@@ -1,0 +1,100 @@
+{
+  "name": "jarvis-ai-assistant",
+  "displayName": "Jarvis AI Assistant - VS Code Extension",
+  "description": "Jarvis VS Code extension with agent sidebar, chat panel and terminal panel.",
+  "version": "3.0.30",
+  "publisher": "jarvis-ai-assistant",
+  "icon": "media/jarvis-128.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skyfireitdiy/Jarvis.git"
+  },
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:jarvis.agentListView",
+    "onCommand:jarvis.openPanel"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "jarvis.openPanel",
+        "title": "Jarvis: Open Panel"
+      },
+      {
+        "command": "jarvis.enableRemoteFileEdit",
+        "title": "Jarvis: 开启编辑"
+      },
+      {
+        "command": "jarvis.disableRemoteFileEdit",
+        "title": "Jarvis: 恢复只读"
+      },
+      {
+        "command": "jarvis.restartNodeService",
+        "title": "Jarvis: 重启节点服务"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "jarvis",
+          "title": "Jarvis",
+          "icon": "media/jarvis-activitybar.png"
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "jarvis-chat",
+          "title": "Jarvis Chat",
+          "icon": "media/jarvis-activitybar.png"
+        }
+      ]
+    },
+    "views": {
+      "jarvis": [
+        {
+          "id": "jarvis.agentListView",
+          "name": "Agents",
+          "type": "webview"
+        }
+      ],
+      "jarvis-chat": [
+        {
+          "id": "jarvis.chatPanel",
+          "name": "Chat",
+          "type": "webview"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build:webview": "esbuild ./src/webview/chatPanel.ts --bundle --format=iife --platform=browser --outfile=./media/chatPanel.js",
+    "build:extension": "esbuild ./src/extension.ts --bundle --platform=node --target=node18 --format=cjs --outfile=./dist/extension.js --external:vscode --minify",
+    "build": "npm run build:webview && npm run build:extension",
+    "package": "npx @vscode/vsce package"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.0",
+    "@types/vscode": "^1.82.0",
+    "@types/ws": "^8.18.1",
+    "@vscode/vsce": "^3.2.2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^5.5.0",
+    "esbuild": "^0.25.12",
+    "eslint": "^10.2.0",
+    "globals": "^17.4.0",
+    "highlight.js": "^11.9.0",
+    "marked": "^15.0.7",
+    "plantuml-encoder": "^1.4.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.58.1",
+    "ws": "^8.18.0",
+    "xterm": "^5.3.0"
+  }
+}

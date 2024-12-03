@@ -1,0 +1,18 @@
+{
+  "name": "Jarvis Web Gateway",
+  "short_name": "Jarvis",
+  "description": "Jarvis Web Gateway PWA",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    {
+      "src": "/icons/robot.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

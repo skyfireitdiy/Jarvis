@@ -1,0 +1,1496 @@
+# -*- coding: utf-8 -*-
+"""Jarvis AI 助手主入口模块"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+from typing import List
+from typing import Optional
+from typing import Tuple
+
+import typer
+import yaml  # type: ignore[import-untyped]
+from rich.console import Console
+from rich.table import Table
+
+import jarvis.jarvis_utils.utils as jutils
+from jarvis.jarvis_agent.agent_manager import AgentManager
+from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.config_editor import ConfigEditor
+from jarvis.jarvis_agent.methodology_share_manager import MethodologyShareManager
+from jarvis.jarvis_agent.rule_share_manager import RuleShareManager
+from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
+from jarvis.jarvis_utils.config import get_agent_definition_dirs
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_roles_dirs
+from jarvis.jarvis_utils.config import is_auto_resume_session
+from jarvis.jarvis_utils.config import is_non_interactive
+from jarvis.jarvis_utils.config import set_config
+from jarvis.jarvis_utils.fzf import fzf_select
+from jarvis.jarvis_utils.input import get_single_line_input
+from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
+from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux
+from jarvis.jarvis_utils.tmux_wrapper import dispatch_to_tmux_window
+
+# 导入quick_config模块用于--quick-config参数
+from jarvis.jarvis_utils import quick_config as qc
+
+# 导入jck模块用于--check参数
+from jarvis.jarvis_jck.core import ToolChecker
+from jarvis.jarvis_jck.cli import (
+    _install_missing_tools,
+    _print_results,
+    _perform_check,
+)
+
+# ========== Agent 状态管理 ==========
+from enum import Enum
+import threading
+
+
+class AgentStatus(Enum):
+    """Agent 状态枚举。
+
+    状态说明：
+    - RUNNING: agent 正在运行中（包括执行任务、空闲等待命令）- 默认状态
+    - WAITING_MULTI: agent 需要多行输入（如代码）
+    - WAITING_SINGLE: agent 需要单行确认（如是否继续）
+    """
+
+    RUNNING = "running"  # 运行中（默认状态）
+    WAITING_MULTI = "waiting_multi"  # 等待多行输入
+    WAITING_SINGLE = "waiting_single"  # 等待单行确认
+
+
+class AgentStateManager:
+    """Agent 状态管理器（线程安全）。"""
+
+    def __init__(self):
+        self._status = AgentStatus.RUNNING  # 初始状态：运行中
+        self._lock = threading.Lock()
+
+    def get_status(self) -> str:
+        """获取当前状态。"""
+        with self._lock:
+            return self._status.value
+
+    def set_status(self, status: AgentStatus) -> None:
+        """设置当前状态。"""
+
+        with self._lock:
+            self._status = status
+
+    def set_running(self) -> None:
+        """设置为运行状态。"""
+        self.set_status(AgentStatus.RUNNING)
+
+    def set_waiting_multi(self) -> None:
+        """设置为等待多行输入状态。"""
+        self.set_status(AgentStatus.WAITING_MULTI)
+
+    def set_waiting_single(self) -> None:
+        """设置为等待单行输入状态。"""
+        self.set_status(AgentStatus.WAITING_SINGLE)
+
+
+# 全局状态管理器实例
+_agent_status_manager: Optional[AgentStateManager] = None
+
+
+def get_agent_status_manager() -> AgentStateManager:
+    """获取全局 Agent 状态管理器实例。"""
+    global _agent_status_manager
+    if _agent_status_manager is None:
+        _agent_status_manager = AgentStateManager()
+    return _agent_status_manager
+
+
+# ========== Agent 状态管理结束 ==========
+
+
+def _normalize_backup_data_argv(argv: List[str]) -> None:
+    """
+    兼容旧版 Click/Typer 对可选参数的解析差异：
+    若用户仅提供 --backup-data 而不跟参数，则在解析前注入默认目录。
+    """
+    try:
+        i = 0
+        while i < len(argv):
+            tok = argv[i]
+            if tok == "--backup-data":
+                # 情况1：位于末尾，无参数
+                # 情况2：后续是下一个选项（以 '-' 开头），表示未提供参数
+                if i == len(argv) - 1 or (
+                    i + 1 < len(argv) and argv[i + 1].startswith("-")
+                ):
+                    argv.insert(i + 1, "~/jarvis_backups")
+                    i += 1  # 跳过我们插入的默认值，避免重复插入
+            i += 1
+    except Exception:
+        # 静默忽略任何异常，避免影响主流程
+        pass
+
+
+_normalize_backup_data_argv(sys.argv)
+
+app = typer.Typer(help="Jarvis AI 助手")
+
+
+def print_commands_overview() -> None:
+    """打印命令与快捷方式总览表。"""
+    try:
+        cmd_table = Table(show_header=True, header_style="bold magenta")
+        cmd_table.add_column("命令", style="bold")
+        cmd_table.add_column("快捷方式", style="cyan")
+        cmd_table.add_column("功能描述", style="white")
+
+        cmd_table.add_row(
+            "jarvis",
+            "jvs",
+            "通用AI代理，适用于多种任务（支持 --quick-config 快速配置 LLM）",
+        )
+        cmd_table.add_row("jarvis-agent", "ja", "AI代理基础功能，处理会话和任务")
+        cmd_table.add_row(
+            "jarvis-agent-dispatcher", "jvsd", "jvs 的便捷封装，支持任务派发和交互模式"
+        )
+        cmd_table.add_row(
+            "jarvis-code-agent",
+            "jca",
+            "专注于代码分析、修改和生成的代码代理",
+        )
+        cmd_table.add_row(
+            "jarvis-code-agent-dispatcher",
+            "jcad",
+            "jca 的便捷封装，支持任务派发和交互模式",
+        )
+        cmd_table.add_row(
+            "jarvis-git-commit",
+            "jgc",
+            "自动化分析代码变更并生成规范的Git提交信息",
+        )
+        cmd_table.add_row("jarvis-git-squash", "jgs", "Git提交历史整理工具")
+        cmd_table.add_row(
+            "jarvis-config",
+            "jcfg",
+            "配置管理工具，基于 JSON Schema 动态生成配置 Web 页面",
+        )
+        cmd_table.add_row("jarvis-quick-config", "jqc", "快速配置 LLM 平台")
+        cmd_table.add_row("jarvis-lsp", "jlsp", "LSP 语言服务器")
+        cmd_table.add_row("jarvis-browser", "jb", "浏览器自动化")
+        cmd_table.add_row("jarvis-windows", "jw", "Windows GUI 自动化")
+        cmd_table.add_row("jarvis-rules-index", "jri", "规则索引管理")
+        cmd_table.add_row(
+            "jarvis-platform-manager",
+            "jpm",
+            "管理和测试不同的大语言模型平台",
+        )
+        cmd_table.add_row("jarvis-tool", "jt", "工具管理与调用系统")
+        cmd_table.add_row("jarvis-methodology", "jm", "方法论知识库管理")
+
+        cmd_table.add_row("jarvis-smart-shell", "jss", "实验性的智能Shell功能")
+        cmd_table.add_row(
+            "jarvis-sec", "jsec", "安全分析套件，结合启发式扫描和 AI 深度验证"
+        )
+        cmd_table.add_row(
+            "jarvis-c2rust", "jc2r", "C→Rust 迁移套件，支持渐进式迁移和智能库替代"
+        )
+        cmd_table.add_row(
+            "jarvis-memory-organizer",
+            "jmo",
+            "记忆管理工具，支持整理、合并、导入导出记忆",
+        )
+
+        Console().print(cmd_table)
+    except Exception:
+        # 静默忽略渲染异常，避免影响主流程
+        pass
+
+
+def handle_edit_option(edit: bool, config_file: Optional[str]) -> bool:
+    """处理配置文件编辑选项，返回是否已处理并需提前结束。"""
+    if edit:
+        ConfigEditor.edit_config(config_file)
+        return True
+    return False
+
+
+def handle_share_methodology_option(
+    share_methodology: bool, config_file: Optional[str]
+) -> bool:
+    """处理方法论分享选项，返回是否已处理并需提前结束。"""
+    if share_methodology:
+        init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
+        methodology_manager = MethodologyShareManager()
+        methodology_manager.run()
+        return True
+    return False
+
+
+def handle_share_tool_option(share_tool: bool, config_file: Optional[str]) -> bool:
+    """处理工具分享选项，返回是否已处理并需提前结束。"""
+    if share_tool:
+        init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
+        tool_manager = ToolShareManager()
+        tool_manager.run()
+        return True
+    return False
+
+
+def handle_share_rule_option(share_rule: bool, config_file: Optional[str]) -> bool:
+    """处理规则分享选项，返回是否已处理并需提前结束。"""
+    if share_rule:
+        init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
+        rule_manager = RuleShareManager()
+        rule_manager.run()
+        return True
+    return False
+
+
+def handle_interactive_config_option(
+    interactive_config: bool, config_file: Optional[str]
+) -> bool:
+    """处理交互式配置选项，返回是否已处理并需提前结束。
+
+    直接调用 jcfg 命令启动 Web 配置界面。
+    """
+    if not interactive_config:
+        return False
+    try:
+        PrettyOutput.auto_print("ℹ️ 正在启动 Web 配置界面...")
+
+        # 构建 jcfg 命令
+        cmd = ["jcfg", "--port", "9312"]
+        if config_file is not None:
+            cmd.extend(["--output", config_file])
+
+        # 直接调用 jcfg 命令
+        subprocess.run(cmd)
+        return True
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 启动配置界面失败: {e}")
+        return True
+
+
+def handle_quick_config_option(quick_config: bool) -> bool:
+    """处理快速配置选项，返回是否已处理并需提前结束。
+
+    启动快速配置向导：快速配置 LLM 平台信息。
+    """
+    if not quick_config:
+        return False
+    qc.quick_config()
+    return True
+
+
+def handle_check_mode(
+    check: bool,
+    check_lint: bool,
+    check_build: bool,
+    check_tool_name: Optional[str],
+    check_json: bool,
+) -> bool:
+    """处理工具检查模式，返回是否已处理并需提前结束。
+
+    执行工具检查（原 jck 命令功能）。
+    """
+    # 任何一个 check 相关参数都会触发检查
+    is_check_mode = check or check_lint or check_build or check_tool_name is not None
+
+    if not is_check_mode:
+        return False
+
+    # 检查选项互斥性
+    check_flags = [check_lint, check_build]
+    active_flags = sum(check_flags)
+    if active_flags > 1:
+        PrettyOutput.auto_print(
+            "❌ 错误：--check-lint 和 --check-build 选项不能同时使用"
+        )
+        raise typer.Exit(code=1)
+
+    # 确定检查类型
+    do_check_lint = check_lint
+    do_check_build = check_build
+
+    # 执行工具检查
+    checker = ToolChecker()
+    results, summary = _perform_check(
+        checker, check_tool_name, do_check_lint, do_check_build
+    )
+
+    if check_json:
+        # JSON格式输出
+        output = {
+            "summary": summary,
+            "results": results,
+        }
+        PrettyOutput.auto_print(
+            "📝 " + json.dumps(output, ensure_ascii=False, indent=2),
+            lang="json",
+        )
+    else:
+        # 友好的文本输出
+        # 如果有未安装工具，询问是否自动安装
+        if summary["missing"] > 0:
+            _install_missing_tools(results)
+            # 重新检查工具状态
+            results, summary = _perform_check(
+                checker, check_tool_name, do_check_lint, do_check_build
+            )
+
+        # 输出最终结果
+        _print_results(results, summary)
+
+    # 如果有工具未安装，返回非零退出码
+    if summary["missing"] > 0:
+        raise typer.Exit(code=1)
+
+    return True
+
+
+def handle_backup_option(backup_dir_path: Optional[str]) -> bool:
+    """处理数据备份选项，返回是否已处理并需提前结束。"""
+    if backup_dir_path is None:
+        return False
+
+    init_env("", config_file=None)
+    data_dir = Path(get_data_dir())
+    if not data_dir.is_dir():
+        PrettyOutput.auto_print(f"❌ 数据目录不存在: {data_dir}")
+        return True
+
+    backup_dir_str = backup_dir_path if backup_dir_path.strip() else "~/jarvis_backups"
+    backup_dir = Path(os.path.expanduser(backup_dir_str))
+    backup_dir.mkdir(exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file_base = backup_dir / f"jarvis_data_{timestamp}"
+
+    try:
+        archive_path = shutil.make_archive(
+            str(backup_file_base), "zip", root_dir=str(data_dir)
+        )
+        PrettyOutput.auto_print(f"✅ 数据已成功备份到: {archive_path}")
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 数据备份失败: {e}")
+
+    return True
+
+
+def handle_restore_option(
+    restore_path: Optional[str], config_file: Optional[str]
+) -> bool:
+    """处理数据恢复选项，返回是否已处理并需提前结束。"""
+    if not restore_path:
+        return False
+
+    restore_file = Path(os.path.expanduser(os.path.expandvars(restore_path)))
+    # 兼容 ~ 与环境变量，避免用户输入未展开路径导致找不到文件
+    if not restore_file.is_file():
+        PrettyOutput.auto_print(f"❌ 指定的恢复文件不存在: {restore_file}")
+        return True
+
+    # 在恢复数据时不要触发完整环境初始化，避免引导流程或网络请求
+    # 优先从配置文件解析 data_path，否则回退到默认数据目录
+    data_dir_str: Optional[str] = None
+    try:
+        if config_file:
+            cfg_path = Path(os.path.expanduser(os.path.expandvars(config_file)))
+            if cfg_path.is_file():
+                with open(cfg_path, "r", encoding="utf-8", errors="ignore") as cf:
+                    cfg_data = yaml.safe_load(cf) or {}
+                if isinstance(cfg_data, dict):
+                    val = cfg_data.get("data_path")
+                    if isinstance(val, str) and val.strip():
+                        data_dir_str = val.strip()
+    except Exception:
+        data_dir_str = None
+
+    if not data_dir_str:
+        data_dir_str = get_data_dir()
+
+    data_dir = Path(os.path.expanduser(os.path.expandvars(str(data_dir_str))))
+
+    if data_dir.exists():
+        if not user_confirm(
+            f"数据目录 '{data_dir}' 已存在，恢复操作将覆盖它。是否继续？", default=False
+        ):
+            PrettyOutput.auto_print("ℹ️ 恢复操作已取消。")
+            return True
+        try:
+            shutil.rmtree(data_dir)
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 无法移除现有数据目录: {e}")
+            return True
+
+    try:
+        data_dir.mkdir(parents=True)
+        shutil.unpack_archive(str(restore_file), str(data_dir), "zip")
+        PrettyOutput.auto_print(f"✅ 数据已从 '{restore_path}' 成功恢复到 '{data_dir}'")
+
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 数据恢复失败: {e}")
+
+    return True
+
+
+def preload_config_for_flags(config_file: Optional[str]) -> None:
+    """预加载配置（仅用于读取功能开关），不会显示欢迎信息或影响后续 init_env。"""
+    try:
+        jutils.g_config_file = config_file
+        jutils.load_config()
+    except Exception:
+        # 静默忽略配置加载异常
+        pass
+
+
+def try_switch_to_jca_if_git_repo(
+    llm_group: Optional[str],
+    tool_group: Optional[str],
+    config_file: Optional[str],
+    restore_session: bool,
+    task: Optional[str],
+    keep_jvs: bool = False,
+    quick_mode: bool = False,
+) -> None:
+    """在初始化环境前自动检测Git仓库，并自动切换到代码开发模式（jca）。"""
+    # 非交互模式下跳过代码模式自动切换
+    if is_non_interactive():
+        return
+    # 如果指定了 --keep-jvs 参数，跳过自动切换
+    if keep_jvs:
+        return
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=False,
+        )
+        if res.returncode == 0:
+            git_root = decode_output(res.stdout).strip()
+            if git_root and os.path.isdir(git_root):
+                PrettyOutput.auto_print(f"ℹ️ 检测到当前位于 Git 仓库: {git_root}")
+                PrettyOutput.auto_print(
+                    "ℹ️ 正在自动切换到 'jca'（jarvis-code-agent）以进入代码开发模式..."
+                )
+                # 构建并切换到 jarvis-code-agent 命令，传递兼容参数
+                args = ["jarvis-code-agent"]
+                if llm_group:
+                    args += ["-g", llm_group]
+                if tool_group:
+                    args += ["-G", tool_group]
+                if config_file:
+                    args += ["-f", config_file]
+                if restore_session:
+                    args += ["--restore-session"]
+                if task:
+                    args += ["-T", task]
+                if quick_mode:
+                    args += ["-q"]
+                os.execvp(args[0], args)
+    except Exception:
+        # 静默忽略检测异常，不影响主流程
+        pass
+
+
+def handle_builtin_config_selector(
+    llm_group: Optional[str],
+    tool_group: Optional[str],
+    config_file: Optional[str],
+    task: Optional[str],
+    skip_selector: bool = False,
+) -> None:
+    """在进入默认通用代理前，列出内置配置供选择（agent/roles）。
+
+    Args:
+        skip_selector: 是否跳过配置选择器，直接使用默认通用代理
+    """
+    if skip_selector:
+        try:
+            # 查找可用的 builtin 目录（支持多候选）
+            builtin_dirs: List[Path] = []
+            try:
+                from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+                # 使用辅助函数查找 builtin 目录
+                builtin_dir = _get_builtin_dir()
+                if builtin_dir is not None:
+                    builtin_dirs.append(builtin_dir)
+            except Exception:
+                pass
+
+            # 向后兼容：也尝试从文件位置向上查找（开发环境）
+            try:
+                ancestors = list(Path(__file__).resolve().parents)
+                for anc in ancestors[:8]:
+                    p = anc / "builtin"
+                    if p.exists() and p.is_dir():
+                        builtin_dirs.append(p)
+            except Exception:
+                pass
+
+            # 去重，保留顺序
+            _seen = set()
+            _unique: List[Path] = []
+            for d in builtin_dirs:
+                try:
+                    key = str(d.resolve())
+                except Exception:
+                    key = str(d)
+                if key not in _seen:
+                    _seen.add(key)
+                    _unique.append(d)
+            builtin_dirs = _unique
+            # 向后兼容：保留第一个候选作为 builtin_root
+            builtin_root = builtin_dirs[0] if builtin_dirs else None
+
+            categories = [
+                ("agent", "jarvis-agent", "*.yaml"),
+                ("roles", "jarvis-platform-manager", "*.yaml"),
+            ]
+
+            options = []
+            for cat, cmd, pattern in categories:
+                # 构建待扫描目录列表：优先使用配置中的目录，其次回退到内置目录
+                search_dirs = []
+                try:
+                    if cat == "agent":
+                        search_dirs.extend(
+                            [
+                                Path(os.path.expanduser(os.path.expandvars(str(p))))
+                                for p in get_agent_definition_dirs()
+                                if p
+                            ]
+                        )
+                    elif cat == "roles":
+                        search_dirs.extend(
+                            [
+                                Path(os.path.expanduser(os.path.expandvars(str(p))))
+                                for p in get_roles_dirs()
+                                if p
+                            ]
+                        )
+                except Exception:
+                    # 忽略配置读取异常
+                    pass
+
+                # 追加内置目录（支持多个候选）
+                try:
+                    candidates = (
+                        builtin_dirs
+                        if isinstance(builtin_dirs, list) and builtin_dirs
+                        else ([builtin_root] if builtin_root else [])
+                    )
+                except Exception:
+                    candidates = [builtin_root] if builtin_root else []
+                for _bd in candidates:
+                    if _bd:
+                        search_dirs.append(Path(_bd) / cat)
+
+                # 去重并保留顺序
+                unique_dirs = []
+                seen = set()
+                for d in search_dirs:
+                    try:
+                        key = str(Path(d).resolve())
+                    except Exception:
+                        key = str(d)
+                    if key not in seen:
+                        seen.add(key)
+                        unique_dirs.append(Path(d))
+
+                for dir_path in unique_dirs:
+                    if not dir_path.exists():
+                        continue
+                    for fpath in sorted(dir_path.glob(pattern)):
+                        # 解析YAML以获取可读名称/描述（失败时静默降级为文件名）
+                        name = fpath.stem
+                        desc = ""
+                        roles_count = 0
+                        try:
+                            with open(
+                                fpath, "r", encoding="utf-8", errors="ignore"
+                            ) as fh:
+                                data = yaml.safe_load(fh) or {}
+                            if isinstance(data, dict):
+                                name = data.get("name") or data.get("title") or name
+                                desc = data.get("description") or data.get("desc") or ""
+                                if cat == "roles" and isinstance(
+                                    data.get("roles"), list
+                                ):
+                                    roles_count = len(data["roles"])
+                                    if not desc:
+                                        desc = f"{roles_count} 个角色"
+                        except Exception:
+                            # 忽略解析错误，使用默认显示
+                            pass
+
+                        # 为 roles 构建详细信息（每个角色的名称与描述）
+                        details = ""
+                        if cat == "roles":
+                            roles = (data or {}).get("roles", [])
+                            if isinstance(roles, list):
+                                lines = []
+                                for role in roles:
+                                    if isinstance(role, dict):
+                                        rname = str(role.get("name", "") or "")
+                                        rdesc = str(role.get("description", "") or "")
+                                        lines.append(
+                                            f"{rname} - {rdesc}" if rdesc else rname
+                                        )
+                                details = "\n".join([ln for ln in lines if ln])
+                            # 如果没有角色详情，退回到统计信息
+                            if not details and isinstance(
+                                (data or {}).get("roles"), list
+                            ):
+                                details = f"{len(data['roles'])} 个角色"
+
+                        options.append(
+                            {
+                                "category": cat,
+                                "cmd": cmd,
+                                "file": str(fpath),
+                                "name": str(name),
+                                "desc": str(desc),
+                                "details": str(details),
+                                "roles_count": int(roles_count),
+                            }
+                        )
+
+            if options:
+                # Add a default option to skip selection
+                options.insert(
+                    0,
+                    {
+                        "category": "skip",
+                        "cmd": "",
+                        "file": "",
+                        "name": "跳过选择 (使用默认通用代理)",
+                        "desc": "直接按回车或ESC也可跳过",
+                        "details": "",
+                        "roles_count": 0,
+                    },
+                )
+
+                PrettyOutput.auto_print("✅ 可用的内置配置")
+                # 使用 rich Table 呈现
+                table = Table(show_header=True, header_style="bold magenta")
+                table.add_column("No.", style="cyan", no_wrap=True)
+                table.add_column("类型", style="green", no_wrap=True)
+                table.add_column("名称", style="bold")
+                table.add_column("文件", style="dim")
+                table.add_column("描述", style="white")
+
+                for idx, opt in enumerate(options, 1):
+                    category = str(opt.get("category", ""))
+                    name = str(opt.get("name", ""))
+                    file_path = str(opt.get("file", ""))
+                    # 描述列显示配置描述；若为 roles 同时显示角色数量与列表
+                    if category == "roles":
+                        count = opt.get("roles_count")
+                        details_val = opt.get("details", "")
+                        parts: List[str] = []
+                        if isinstance(count, int) and count > 0:
+                            parts.append(f"{count} 个角色")
+                        if isinstance(details_val, str) and details_val:
+                            parts.append(details_val)
+                        desc_display = "\n".join(parts) if parts else ""
+                    else:
+                        desc_display = str(opt.get("desc", ""))
+                    table.add_row(str(idx), category, name, file_path, desc_display)
+
+                Console().print(table)
+
+                # Try to use fzf for selection if available (include No. to support number-based filtering)
+                fzf_options = [
+                    f"{idx:>3} | {opt['category']:<12} | {opt['name']:<30} | {opt.get('desc', '')}"
+                    for idx, opt in enumerate(options, 1)
+                ]
+                selected_str = fzf_select(
+                    fzf_options, prompt="选择要启动的配置编号 (ESC跳过) > "
+                )
+
+                choice_index = -1
+                if selected_str:
+                    # Try to parse leading number before first '|'
+                    try:
+                        num_part = selected_str.split("|", 1)[0].strip()
+                        selected_index = int(num_part)
+                        if 1 <= selected_index <= len(options):
+                            choice_index = selected_index - 1
+                    except Exception:
+                        # Fallback to equality matching if parsing fails
+                        for i, fzf_opt in enumerate(fzf_options):
+                            if fzf_opt == selected_str:
+                                choice_index = i
+                                break
+                else:
+                    # Fallback to manual input if fzf is not used or available
+                    choice = get_single_line_input(
+                        "选择要启动的配置编号，直接回车使用默认通用代理(jvs): ",
+                        default="",
+                    )
+                    if choice.strip():
+                        try:
+                            selected_index = int(choice.strip())
+                            if 1 <= selected_index <= len(options):
+                                choice_index = selected_index - 1
+                        except ValueError:
+                            pass  # Invalid input
+
+                if choice_index != -1:
+                    try:
+                        sel = options[choice_index]
+                        # If the "skip" option is chosen, do nothing and proceed to default agent
+                        if sel["category"] == "skip":
+                            pass
+                        else:
+                            args: List[str] = []
+
+                            if sel["category"] == "agent":
+                                # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
+                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
+                                if llm_group:
+                                    args += ["-g", str(llm_group)]
+                                if config_file:
+                                    args += ["-f", str(config_file)]
+                                if task:
+                                    args += ["--task", str(task)]
+
+                            elif sel["category"] == "roles":
+                                # jarvis-platform-manager role 子命令，支持 -c/-t/-g
+                                args = [
+                                    str(sel["cmd"]),
+                                    "role",
+                                    "-c",
+                                    str(sel["file"]),
+                                ]
+                                if llm_group:
+                                    args += ["-g", str(llm_group)]
+
+                            if args:
+                                PrettyOutput.auto_print(f"ℹ️ 正在启动: {' '.join(args)}")
+                                os.execvp(args[0], args)
+                    except Exception:
+                        # 任何异常都不影响默认流程
+                        pass
+                else:
+                    # User pressed Enter or provided invalid input
+                    pass
+        except Exception:
+            # 静默忽略内置配置扫描错误，不影响主流程
+            pass
+
+
+def _run_with_builtin_handler(
+    user_input: str,
+    agent: Any,
+    output_content_ref: list,
+    exit_code_ref: list,
+    error_message_ref: list,
+) -> Tuple[str, bool]:
+    """使用 builtin_input_handler 处理输入，并返回处理后的输入和是否需要调用 agent.run
+
+    参数:
+        user_input: 用户输入
+        agent: Agent 实例
+        output_content_ref: 输出内容的引用列表
+        exit_code_ref: 退出码的引用列表
+        error_message_ref: 错误信息的引用列表
+
+    返回:
+        Tuple[str, bool]: (处理后的输入, 是否需要调用 agent.run)
+            - ("", True) = builtin handler 已处理，跳过 agent.run
+            - (processed_input, False) = 需要调用 agent.run
+    """
+    processed_input, should_skip_agent = builtin_input_handler(user_input, agent)
+    if should_skip_agent:
+        # builtin handler 已处理完成，不需要调用 agent
+        output_content_ref[0] = ""
+        exit_code_ref[0] = 0
+        error_message_ref[0] = ""
+        return "", True  # 跳过 agent.run
+    else:
+        return processed_input, False  # 需要调用 agent.run
+
+
+@app.callback(invoke_without_command=True)
+def run_cli(
+    ctx: typer.Context,
+    task: Optional[str] = typer.Option(
+        None, "-T", "--task", help="从命令行直接输入任务内容"
+    ),
+    task_file: Optional[str] = typer.Option(
+        None, "--task-file", help="从文件读取任务内容"
+    ),
+    llm_group: Optional[str] = typer.Option(
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
+    tool_group: Optional[str] = typer.Option(
+        None, "-G", "--tool-group", help="使用的工具组，覆盖配置文件中的设置"
+    ),
+    config_file: Optional[str] = typer.Option(
+        None, "-f", "--config", help="自定义配置文件路径"
+    ),
+    restore_session: bool = typer.Option(
+        False,
+        "-r",
+        "--restore-session",
+        help="从 .jarvis/saved_session.json 恢复会话",
+    ),
+    edit: bool = typer.Option(False, "-e", "--edit", help="编辑配置文件"),
+    share_methodology: bool = typer.Option(
+        False, "--share-methodology", help="分享本地方法论到中心方法论仓库"
+    ),
+    share_tool: bool = typer.Option(
+        False, "--share-tool", help="分享本地工具到中心工具仓库"
+    ),
+    share_rule: bool = typer.Option(
+        False, "--share-rule", help="分享本地规则到中心规则仓库"
+    ),
+    interactive_config: bool = typer.Option(
+        False,
+        "-I",
+        "--interactive-config",
+        help="启动交互式配置向导（基于当前配置补充设置）",
+    ),
+    disable_methodology_analysis: bool = typer.Option(
+        False,
+        "-D",
+        "--disable-methodology-analysis",
+        help="禁用方法论和任务分析（覆盖配置文件设置）",
+    ),
+    backup_data: Optional[str] = typer.Option(
+        None,
+        "--backup-data",
+        help="备份 Jarvis 数据目录. 可选地传入备份目录. 默认为 '~/jarvis_backups'",
+        show_default=False,
+        flag_value="~/jarvis_backups",
+    ),
+    restore_data: Optional[str] = typer.Option(
+        None, "--restore-data", help="从指定的压缩包恢复 Jarvis 数据"
+    ),
+    non_interactive: bool = typer.Option(
+        False,
+        "-n",
+        "--non-interactive",
+        help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟",
+    ),
+    dispatch: bool = typer.Option(
+        False,
+        "-d",
+        "--dispatch",
+        help="将任务派发到新的 tmux 窗口中执行（仅在 tmux 环境中有效），当前进程退出",
+    ),
+    rule_names: Optional[str] = typer.Option(
+        None,
+        "--rule-names",
+        help="规则名称列表（逗号分隔），用于加载指定的规则",
+    ),
+    optimize_system_prompt: bool = typer.Option(
+        False,
+        "-o",
+        "--optimize-system-prompt",
+        help="自动优化系统提示词：根据用户需求使用大模型优化系统提示词",
+    ),
+    quick_mode: bool = typer.Option(
+        False,
+        "-q",
+        "--quick-mode",
+        help="极速模式：跳过方法论加载、规则筛选等，直接执行任务",
+    ),
+    quick_config: bool = typer.Option(
+        False,
+        "--quick-config",
+        help="启动快速配置向导：快速配置 LLM 平台信息（Claude/OpenAI）",
+    ),
+    # 工具检查相关参数（原 jck 命令功能）
+    # 这些参数会自动触发检查模式，不需要额外加 --check
+    check: bool = typer.Option(
+        False,
+        "--check",
+        help="检查所有工具的安装情况（原 jck 命令）",
+    ),
+    check_lint: bool = typer.Option(
+        False,
+        "--check-lint",
+        help="检查lint工具（原 jck --check-lint）",
+    ),
+    check_build: bool = typer.Option(
+        False,
+        "--check-build",
+        help="检查构建工具（原 jck --check-build）",
+    ),
+    check_json: bool = typer.Option(
+        False,
+        "--check-json",
+        help="以JSON格式输出检查结果（配合其他check选项使用）",
+    ),
+    check_tool_name: Optional[str] = typer.Option(
+        None,
+        "--check-tool",
+        help="检查指定工具（原 jck <tool_name>）",
+    ),
+    skip_config_selector: bool = typer.Option(
+        False,
+        "-S",
+        "--skip-config-selector",
+        help="跳过内置配置选择器，直接使用默认通用代理",
+    ),
+    keep_jvs: bool = typer.Option(
+        False,
+        "--keep-jvs",
+        help="禁止自动切换到代码开发模式（jca），保持使用通用代理（jvs）",
+    ),
+    web_gateway: bool = typer.Option(
+        False,
+        "--web-gateway",
+        help="启用 Web Gateway 服务（WebSocket 输入输出）",
+    ),
+    web_gateway_port: int = typer.Option(
+        8000,
+        "--web-gateway-port",
+        help="Web Gateway 监听端口",
+    ),
+    gateway_password: Optional[str] = typer.Option(
+        None,
+        "--gateway-password",
+        help="Web Gateway 密码（如未设置将禁用密码认证）",
+    ),
+) -> None:
+    """Jarvis AI assistant command-line interface."""
+    if ctx.invoked_subcommand is not None:
+        return
+
+    web_gateway_server = None
+
+    # 处理 --quick-config 参数：启动快速配置向导
+    if handle_quick_config_option(quick_config):
+        return
+
+    # 处理工具检查参数（原 jck 命令功能）
+    if handle_check_mode(check, check_lint, check_build, check_tool_name, check_json):
+        return
+
+    # 处理任务内容：优先从文件读取
+    if task and task_file:
+        PrettyOutput.auto_print("❌ 错误: 不能同时使用 --task 和 --task-file 参数")
+        raise typer.Exit(code=1)
+
+    # 用于tmux并行任务的状态文件路径
+    status_file_path = None
+
+    if task_file:
+        try:
+            with open(task_file, "r", encoding="utf-8") as file_handle:
+                file_content = file_handle.read()
+
+            # 尝试解析为JSON以获取status_file字段
+            try:
+                task_data = json.loads(file_content)
+                status_file_path = task_data.get("status_file")
+                if status_file_path:
+                    # 将status_file_path转换为Path对象
+                    status_file_path = Path(status_file_path)
+                # 提取实际任务内容
+                if "task_desc" in task_data:
+                    task = task_data["task_desc"]
+                    if "background" in task_data:
+                        task += f"\n\n背景信息:\n{task_data['background']}"
+                    if "additional_info" in task_data:
+                        task += f"\n\n附加信息:\n{task_data['additional_info']}"
+                else:
+                    # 不是JSON格式或没有task_desc字段，直接使用文件内容
+                    task = file_content
+            except json.JSONDecodeError:
+                # 不是JSON格式，直接使用文件内容
+                task = file_content
+
+        except (Exception, FileNotFoundError) as e:
+            PrettyOutput.auto_print(f"❌ 错误: 无法从文件读取任务内容: {str(e)}")
+            raise typer.Exit(code=1)
+
+    # 初始化时不再打印命令列表
+    # print_commands_overview()
+
+    # CLI 标志：非交互模式（不依赖配置文件，仅作为 Agent 实例属性）
+
+    # 同步其他 CLI 选项到全局配置，确保后续模块读取一致
+    try:
+        if llm_group:
+            set_config("llm_group", str(llm_group))
+        if tool_group:
+            set_config("tool_group", str(tool_group))
+        if disable_methodology_analysis:
+            set_config("use_methodology", False)
+            set_config("use_analysis", False)
+        # 注意：auto_resume_session 的检测将在 init_env 之后进行，因为配置加载在 init_env 中完成
+    except Exception:
+        # 静默忽略同步异常，不影响主流程
+        pass
+
+    # 非交互模式要求从命令行传入任务
+    if non_interactive and not (task and str(task).strip()):
+        PrettyOutput.auto_print(
+            "❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。"
+        )
+        raise typer.Exit(code=2)
+
+    # 处理 --dispatch 参数：派发任务到新的 tmux 窗口
+    if dispatch:
+        if not (task and str(task).strip()):
+            PrettyOutput.auto_print(
+                "❌ 错误: --dispatch 参数必须与 --task 参数配合使用"
+            )
+            raise typer.Exit(code=1)
+
+        PrettyOutput.auto_print("ℹ️ 正在派发任务到新的 tmux 窗口...")
+        success = dispatch_to_tmux_window(task, sys.argv)
+        if success:
+            PrettyOutput.auto_print("✅ 任务已成功派发到新的 tmux 窗口")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print(
+                "❌ 派发失败：当前不在 tmux 环境中或 tmux 未安装，请在 tmux 环境中使用 --dispatch 参数"
+            )
+            raise typer.Exit(code=1)
+
+    # 处理数据备份
+    if handle_backup_option(backup_data):
+        return
+
+    # 处理数据恢复
+    if handle_restore_option(restore_data, config_file):
+        return
+
+    # 处理配置文件编辑
+    if handle_edit_option(edit, config_file):
+        return
+
+    # 处理方法论分享
+    if handle_share_methodology_option(share_methodology, config_file):
+        return
+
+    # 处理工具分享
+    if handle_share_tool_option(share_tool, config_file):
+        return
+
+    # 处理规则分享
+    if handle_share_rule_option(share_rule, config_file):
+        return
+
+    # 交互式配置（基于现有配置补充设置）
+    if handle_interactive_config_option(interactive_config, config_file):
+        return
+
+    # 在初始化环境前自动检测Git仓库，并自动切换到代码开发模式（jca）
+    # 如果指定了 -T/--task 参数或 --web-gateway 参数，跳过自动切换
+    if not non_interactive and not task and not web_gateway:
+        try_switch_to_jca_if_git_repo(
+            llm_group,
+            tool_group,
+            config_file,
+            restore_session,
+            task,
+            keep_jvs,
+            quick_mode,
+        )
+
+    # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
+    try:
+        from jarvis.jarvis_utils import utils
+
+        # 设置全局配置文件路径（与 init_env 中的逻辑一致）
+        utils.g_config_file = config_file
+        # 加载配置文件
+        utils.load_config()
+    except Exception:
+        # 静默失败，不影响主流程
+        pass
+
+    # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
+    # 非交互模式下跳过内置角色/配置选择
+    # 如果指定了 -T/--task 参数，跳过配置选择
+    if not non_interactive and not task:
+        handle_builtin_config_selector(
+            llm_group, tool_group, config_file, task, skip_config_selector
+        )
+
+    # 检测tmux并在需要时启动（在参数解析之后）
+    # 传入 config_file 以便在检查前加载配置
+    check_and_launch_tmux(config_file=config_file)
+
+    # 初始化环境（传入 llm_group，确保欢迎面板显示正确的模型组）
+    init_env(
+        """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！""",
+        config_file=config_file,
+        llm_group=llm_group,
+    )
+
+    # 在 init_env 之后检测是否自动恢复会话（配置已加载）
+    try:
+        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+        auto_resume_result = is_auto_resume_session()
+        if restore_session or auto_resume_result:
+            set_config("restore_session", True)
+            restore_session = True  # 更新参数值以匹配配置
+    except Exception:
+        # 静默忽略异常，不影响主流程
+        pass
+
+    if web_gateway:
+        try:
+            import threading
+
+            import uvicorn
+
+            from jarvis.jarvis_web_gateway.app import create_app
+            from jarvis.jarvis_web_gateway.app import set_status_update_callback
+
+            # 检测认证方式：Token 认证（新）或密码认证（旧）
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            if auth_token:
+                # Token 认证：validate_gateway_token() 会直接从环境变量读取
+                print("[AGENT] Using JARVIS_AUTH_TOKEN for authentication")
+            elif gateway_password:
+                # 旧密码认证（兼容模式）
+                from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+                if "gateway_auth" not in GLOBAL_CONFIG_DATA:
+                    GLOBAL_CONFIG_DATA["gateway_auth"] = {}
+                GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = gateway_password
+                GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
+                GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
+                print("[AGENT] Using gateway_password for authentication (legacy mode)")
+
+            # 获取状态管理器并注册状态更新回调
+            status_manager = get_agent_status_manager()
+
+            def on_status_update(status_str: str) -> None:
+                """Web Gateway 请求输入时的状态更新回调。"""
+                # 根据 status_str 更新状态
+                if status_str == "running":
+                    status_manager.set_running()
+                elif status_str == "waiting_multi":
+                    status_manager.set_waiting_multi()
+                elif status_str == "waiting_single":
+                    status_manager.set_waiting_single()
+
+            # 注册回调
+            set_status_update_callback(on_status_update)
+
+            # 创建自定义 FastAPI app，添加状态查询接口
+            from fastapi import FastAPI
+            from jarvis.jarvis_utils.globals import get_current_agent
+
+            custom_app = FastAPI()
+
+            @custom_app.get("/status")
+            async def get_status():
+                """获取 Agent 运行状态（任务级别）。"""
+                return {
+                    "execution_status": status_manager.get_status(),
+                    "status": "running",  # Agent 进程状态（永远返回 running，因为进程还在运行）
+                }
+
+            @custom_app.get("/sessions")
+            async def list_sessions():
+                """获取可恢复的 session 列表。"""
+                try:
+                    agent = get_current_agent()
+                    if agent is None:
+                        return {"success": False, "error": "No active agent"}
+
+                    # 解析 session 文件
+                    sessions = agent.session._parse_session_files()
+
+                    # 格式化返回
+                    session_list = []
+                    for (
+                        session_file,
+                        timestamp,
+                        session_name,
+                        commit_status,
+                    ) in sessions:
+                        session_list.append(
+                            {
+                                "file": session_file,
+                                "timestamp": timestamp,
+                                "name": session_name,
+                                "commit_status": commit_status,
+                            }
+                        )
+
+                    return {"success": True, "data": session_list}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+
+            @custom_app.post("/sessions")
+            async def do_restore_session(request: dict):
+                """恢复指定的 session。"""
+                try:
+                    session_file = request.get("session_file")
+                    if not session_file:
+                        return {"success": False, "error": "session_file is required"}
+
+                    agent = get_current_agent()
+                    if agent is None:
+                        return {"success": False, "error": "No active agent"}
+
+                    # 读取 session 名称
+                    session_name = agent.session._read_session_name(session_file)
+
+                    # 恢复 session
+                    result = agent.session.restore_session_from_file(
+                        session_file, session_name
+                    )
+
+                    if result:
+                        # 设置 first 标志为 False
+                        agent.first = False
+                        return {
+                            "success": True,
+                            "data": {
+                                "session_file": session_file,
+                                "session_name": session_name,
+                            },
+                        }
+                    else:
+                        return {"success": False, "error": "Failed to restore session"}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+
+            # 将自定义 app 传递给 gateway
+            config = uvicorn.Config(
+                create_app(custom_app),
+                host="127.0.0.1",
+                port=web_gateway_port,
+                log_level="info",
+            )
+            web_gateway_server = uvicorn.Server(config)
+            thread = threading.Thread(target=web_gateway_server.run, daemon=False)
+            thread.start()
+            print(f"🌐 Web Gateway 已启动: ws://127.0.0.1:{web_gateway_port}/ws")
+            # 验证 gateway 是否设置成功
+            try:
+                from jarvis.jarvis_gateway.manager import get_current_gateway
+
+                get_current_gateway()
+            except Exception:
+                pass
+        except Exception as web_gateway_err:
+            try:
+                from jarvis.jarvis_gateway.manager import set_current_gateway
+
+                set_current_gateway(None)
+            except Exception:
+                pass
+            PrettyOutput.auto_print(f"⚠️ 启动 Web Gateway 失败: {str(web_gateway_err)}")
+
+    # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
+    try:
+        if llm_group:
+            set_config("llm_group", str(llm_group))
+        if tool_group:
+            set_config("tool_group", str(tool_group))
+        if disable_methodology_analysis:
+            set_config("use_methodology", False)
+            set_config("use_analysis", False)
+    except Exception:
+        # 静默忽略同步异常，不影响主流程
+        pass
+
+    # 运行主流程
+    try:
+        agent_manager = AgentManager(
+            tool_group=tool_group,
+            restore_session=restore_session,
+            use_methodology=False if disable_methodology_analysis else None,
+            use_analysis=False if disable_methodology_analysis else None,
+            non_interactive=non_interactive,
+            allow_savesession=True,
+            rule_names=rule_names,
+            optimize_system_prompt=optimize_system_prompt,
+            quick_mode=quick_mode,
+        )
+
+        # 默认 CLI 模式：运行任务（可能来自 --task 或交互输入）
+        output_content = ""
+        exit_code = 0
+        error_message = ""
+        agent = None
+
+        try:
+            # 初始化 agent 并运行任务，捕获输出
+            agent = agent_manager.initialize()
+
+            # 优先处理命令行直接传入的任务
+            if task:
+                # 先经过 builtin_input_handler 处理
+                processed_input, should_skip = _run_with_builtin_handler(
+                    task, agent, [output_content], [exit_code], [error_message]
+                )
+                if not should_skip:
+                    output_content = agent.run(processed_input)
+                # agent.run() 会抛出 typer.Exit，所以正常不会到达这里
+                exit_code = 0
+                error_message = ""
+            else:
+                # 处理预定义任务或交互输入
+                from jarvis.jarvis_agent.task_manager import TaskManager
+                from jarvis.jarvis_agent import get_multiline_input
+                from jarvis.jarvis_utils.config import (
+                    is_non_interactive,
+                    is_skip_predefined_tasks,
+                )
+
+                # 处理预定义任务（非交互模式下跳过；支持配置跳过加载；命令行指定任务时跳过）
+                if (
+                    not is_non_interactive()
+                    and not is_skip_predefined_tasks()
+                    and agent.first
+                ):
+                    task_manager = TaskManager()
+                    tasks = task_manager.load_tasks()
+                    if tasks and (selected_task := task_manager.select_task(tasks)):
+                        PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
+                        # 先经过 builtin_input_handler 处理
+                        processed_input, should_skip = _run_with_builtin_handler(
+                            selected_task,
+                            agent,
+                            [output_content],
+                            [exit_code],
+                            [error_message],
+                        )
+                        if not should_skip:
+                            output_content = agent.run(processed_input)
+                        # agent.run() 会抛出 typer.Exit，所以正常不会到达这里
+
+                # 获取用户输入，循环直到需要传递给 agent
+                while True:
+                    user_input = get_multiline_input("请输入你的任务（Ctrl+C 退出）")
+                    if not user_input:
+                        break
+                    # 先经过 builtin_input_handler 处理
+                    processed_input, should_skip = _run_with_builtin_handler(
+                        user_input,
+                        agent,
+                        [output_content],
+                        [exit_code],
+                        [error_message],
+                    )
+                    if should_skip:
+                        # builtin handler 已处理完成，继续循环获取新输入
+                        continue
+                    else:
+                        # 需要传递给 agent 处理
+                        output_content = agent.run(processed_input)
+                        # 如果 agent 返回 None（ builtin handler 在 agent.run 内部处理了），继续循环
+                        if output_content is None:
+                            continue
+                        # 否则正常退出（单次任务模式）
+                        break
+
+                raise typer.Exit(code=0)
+        except typer.Exit:
+            # 正常退出，设置成功状态
+            exit_code = 0
+            error_message = ""
+            # agent.run() 正常结束时output_content应该已经有了值
+        except Exception as exec_err:
+            exit_code = 1
+            error_message = str(exec_err)
+            raise
+        finally:
+            if agent is not None:
+                try:
+                    agent.save_session()
+                except Exception:
+                    pass
+
+            if web_gateway_server is not None:
+                try:
+                    # 设置退出标志，让 uvicorn 服务器优雅关闭
+                    web_gateway_server.should_exit = True
+                    # 强制退出标志，不等待连接关闭（避免阻塞）
+                    web_gateway_server.force_exit = True
+                    # 等待 uvicorn 线程结束（最多等待 2 秒）
+                    thread.join(timeout=2)
+                except Exception:
+                    pass
+                try:
+                    from jarvis.jarvis_gateway.manager import set_current_gateway
+
+                    set_current_gateway(None)
+                except Exception:
+                    pass
+
+            # 如果是tmux并行任务，写入状态文件
+            if status_file_path:
+                try:
+                    # 写入状态文件
+                    status_data = {
+                        "status": "completed" if exit_code == 0 else "failed",
+                        "exit_code": exit_code,
+                    }
+                    status_file_path.write_text(
+                        json.dumps(status_data, ensure_ascii=False), encoding="utf-8"
+                    )
+
+                    # 写入输出文件（如果存在）
+                    output_file = status_file_path.with_suffix(".output")
+                    # 将捕获的输出内容写入文件
+                    try:
+                        # 确保输出内容为字符串
+                        def _convert_to_string(content):
+                            if content is None:
+                                return ""
+                            try:
+                                # 尝试序列化，如果失败则转换为字符串
+                                json.dumps(content)
+                                return json.dumps(content, ensure_ascii=False, indent=2)
+                            except (TypeError, ValueError):
+                                # 无法序列化时，转换为字符串
+                                return str(content)
+
+                        output_content_str = _convert_to_string(output_content)
+                        output_file.write_text(output_content_str, encoding="utf-8")
+                    except Exception as output_err:
+                        # 如果写入输出失败，至少写入错误信息
+                        PrettyOutput.auto_print(
+                            f"⚠️ 写入输出文件失败: {str(output_err)}"
+                        )
+                        pass
+
+                    # 写入错误文件
+                    if exit_code != 0 and error_message:
+                        error_file = status_file_path.with_suffix(".error")
+                        error_file.write_text(error_message, encoding="utf-8")
+
+                    PrettyOutput.auto_print(f"✅ 已写入状态文件: {status_file_path}")
+                except Exception as status_err:
+                    PrettyOutput.auto_print(f"⚠️ 写入状态文件失败: {str(status_err)}")
+
+    except typer.Exit:
+        raise
+    except Exception as err:  # pylint: disable=broad-except
+        PrettyOutput.auto_print(f"❌ 初始化错误: {str(err)}")
+        raise typer.Exit(code=1)
+
+
+def main() -> None:
+    """Application entry point."""
+    app()
+
+
+if __name__ == "__main__":
+    main()
