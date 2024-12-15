@@ -1,24 +1,36 @@
-from agent import create_agent, process_message
+import os
+from colorama import init, Fore, Style
+import ollama
+
+from logger import ColorLogger
+from execution_tools import ShellTool, PythonTool, MathTool
+from agent import LlamaAgent
 
 def main():
-    # 创建agent
-    agent = create_agent()
+    # Initialize colorama
+    init()
     
-    print("欢迎使用AI助手! 输入'quit'退出。")
+    # Create agent
+    agent = LlamaAgent()
     
-    while True:
-        # 获取用户输入
-        user_input = input("您: ")
-        
-        if user_input.lower() == 'quit':
-            break
-            
-        try:
-            # 处理消息并获取响应
-            response = process_message(agent, user_input)
-            print("AI: ", response)
-        except Exception as e:
-            print("发生错误:", str(e))
+    # Register tools
+    agent.register_tool(ShellTool())
+    agent.register_tool(PythonTool())
+    agent.register_tool(MathTool())
+    
+    # Print welcome message
+    print(f"{Fore.GREEN}🤖 Welcome to Jarvis AI Assistant!{Style.RESET_ALL}")
+    
+    # Get task from user
+    print("Please enter your task description (or press Enter for default task):")
+    task = input("> ").strip()
+    
+    # Use default task if none provided
+    if not task:
+        task = "Show current time and date"
+    
+    # Execute task
+    agent.execute_task(task)
 
 if __name__ == "__main__":
-    main() 
+    main()

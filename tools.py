@@ -1,26 +1,48 @@
-from langchain.tools import Tool
-from langchain_community.utilities import WikipediaAPIWrapper
-from langchain_community.tools import TavilySearchResults
-from langchain_experimental.tools import PythonREPLTool
+from typing import Dict, Any, Callable
 
-def get_tools():
-    """获取所有可用工具"""
-    tools = [
-        Tool(
-            name="Calculator",
-            func=PythonREPLTool().run,
-            description="用于执行数学计算的Python计算器。当需要进行数学运算、计算幂次方等数学任务时使用此工具。输入应该是可执行的Python代码。"
-        ),
-        Tool(
-            name="Search",
-            func=TavilySearchResults().run,
-            description="用于搜索实时信息的工具。当需要查询最新信息、新闻、天气等信息时使用此工具。"
-        ),
-        Tool(
-            name="Wikipedia",
-            func=WikipediaAPIWrapper(lang="zh").run,
-            description="用于查询百科知识的工具。当需要了解某个概念或主题的详细信息时使用此工具。"
-        )
-    ]
+class Tool:
+    """Tool class for agent to use"""
     
-    return tools 
+    def __init__(self, name: str, description: str, parameters: Dict[str, str], execute: Callable):
+        """Initialize tool"""
+        self.name = name
+        self.description = description
+        self.parameters = parameters
+        self.execute = execute
+    
+    def get_description(self) -> str:
+        """Get tool description"""
+        params_desc = "\n  Parameters:\n    " + "\n    ".join(
+            f"- {name}: {desc}" for name, desc in self.parameters.items()
+        )
+        return f"- {self.name}: {self.description}\n{params_desc}"
+
+class ToolRegistry:
+    """Tool registry to manage available tools"""
+    
+    def __init__(self):
+        self.tools = {}
+    
+    def register(self, tool: Tool):
+        """Register a tool"""
+        self.tools[tool.name] = tool
+    
+    def get_tool(self, name: str) -> Tool:
+        """Get tool by name"""
+        return self.tools.get(name)
+    
+    def get_tools_description(self) -> str:
+        """Get description of all registered tools"""
+        return "\n".join(tool.get_description() for tool in self.tools.values())
+    
+    def get_tools_parameters_guide(self) -> str:
+        """Get parameter usage guide for all tools"""
+        guides = ["Tool parameter requirements:"]
+        for name, tool in self.tools.items():
+            required_params = [
+                param_name for param_name, param in tool.parameters.items()
+                if "default" not in param.lower()
+            ]
+            if required_params:
+                guides.append(f"   - {name}: requires {', '.join(required_params)} parameters")
+        return "\n".join(guides) 
