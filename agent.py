@@ -846,7 +846,36 @@ class LlamaAgent:
         
         try:
             result = tool.execute(**parameters)
+            
+            # Log tool output with colors
+            if isinstance(result, dict) and "result" in result:
+                result_data = result["result"]
+                if isinstance(result_data, dict):
+                    # Print stdout if present
+                    if "stdout" in result_data and result_data["stdout"].strip():
+                        self.logger.log('OUTPUT', f"{Fore.GREEN}Standard output:{Style.RESET_ALL}")
+                        for line in result_data["stdout"].strip().split('\n'):
+                            self.logger.log('OUTPUT', f"{Fore.CYAN}{line}{Style.RESET_ALL}")
+                    
+                    # Print stderr if present and not empty
+                    if "stderr" in result_data and result_data["stderr"].strip():
+                        self.logger.log('OUTPUT', f"{Fore.YELLOW}Error output:{Style.RESET_ALL}")
+                        for line in result_data["stderr"].strip().split('\n'):
+                            self.logger.log('OUTPUT', f"{Fore.RED}{line}{Style.RESET_ALL}")
+                    
+                    # Print return code if non-zero
+                    if "returncode" in result_data and result_data["returncode"] != 0:
+                        self.logger.log('OUTPUT', f"{Fore.YELLOW}Return code:{Style.RESET_ALL} {result_data['returncode']}")
+                    
+                    # Print command if present
+                    if "command" in result_data:
+                        self.logger.log('OUTPUT', f"{Fore.GREEN}Command executed:{Style.RESET_ALL} {result_data['command']}")
+                else:
+                    # For non-dict results, print directly
+                    self.logger.log('OUTPUT', f"{Fore.CYAN}{str(result_data)}{Style.RESET_ALL}")
+            
             return result
+            
         except TimeoutError as e:
             # When timeout occurs, reflect on the command
             timeout_reflection = self._reflect_on_timeout(self.current_task, step, parameters.get("timeout", 30))
@@ -1256,11 +1285,11 @@ class LlamaAgent:
     
         # Only return failure if user provided no suggestion or retry also failed
         success = (
-            # 有��果且没有错误
+            # 有果且没有错误
             bool(results) and all("error" not in r for r in results) and 
             # 有变量或结论
             (bool(self.task_context["variables"]) or bool(self.task_context.get("conclusions"))) and
-            # 如果有最终分析，检查是否完成
+            # ��果有最终分析，检查是否完成
             (not final_analysis or final_analysis["analysis"]["is_completed"])
         )
         
@@ -1287,12 +1316,12 @@ class LlamaAgent:
         5. Are there any unresolved aspects?
         
         Return your analysis in this JSON format:
-        {
+        {{{{
             "is_completed": true/false,
             "completion_type": "full" | "partial" | "negative" | "failed",
             "reason": "Detailed explanation of why the task is considered completed or not",
             "missing_aspects": ["Any aspects that remain unaddressed"]
-        }
+        }}}}
         
         Important:
         - "full" means task completed successfully with positive result
