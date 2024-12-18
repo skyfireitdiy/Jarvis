@@ -1,22 +1,29 @@
 import os
+import argparse
 from colorama import init, Fore, Style
 import ollama
 
 from logger import ColorLogger
-from execution_tools import ShellTool, PythonTool, MathTool
+from tools import ShellTool, PythonTool, MathTool
 from agent import LlamaAgent
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Jarvis AI Assistant')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                       help='Print detailed interaction logs with LLM')
+    args = parser.parse_args()
+    
     # Initialize colorama
     init()
     
-    # Create agent
-    agent = LlamaAgent()
+    # Create agent with verbose setting
+    agent = LlamaAgent(verbose=args.verbose)
     
-    # Register tools
-    agent.register_tool(ShellTool())
-    agent.register_tool(PythonTool())
-    agent.register_tool(MathTool())
+    # Register tools with correct IDs
+    agent.register_tool(ShellTool(tool_id="shell"))
+    agent.register_tool(PythonTool(tool_id="python"))  # Changed from "python (execution)"
+    agent.register_tool(MathTool(tool_id="math"))
     
     # Print welcome message
     print(f"{Fore.GREEN}🤖 Welcome to Jarvis AI Assistant!{Style.RESET_ALL}")
