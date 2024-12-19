@@ -225,108 +225,49 @@ class TaskReflector:
         return analysis.get("adjusted_step", step)
     
     def check_task_completion(self, task: str, context: Dict[str, Any], agent=None) -> Dict[str, Any]:
-        """Check if task is completed based on current context"""
-        # 获取历史��记录
-        history = []
-        for attempt in context.get('attempts', []):
-            history.append({
-                'step': attempt.get('step', {}),
-                'result': attempt.get('result', {}),
-                'error': attempt.get('error', ''),
-                'timestamp': attempt.get('timestamp', '')
-            })
+        """Check if task is completed"""
+        # Ensure context has required fields
+        if not context:
+            context = {}
         
-        completion_parts = [
+        last_output = context.get('last_output', {})
+        if not isinstance(last_output, dict):
+            last_output = {}
+        
+        # Build prompt
+        prompt_parts = [
             f"Task: {task}",
             "",
-            "Current context:",
-            f"Variables: {json.dumps(context.get('variables', {}), ensure_ascii=False)}",
-            f"Summaries: {json.dumps(context.get('summaries', []), ensure_ascii=False)}",
-            f"Conclusions: {json.dumps(context.get('conclusions', []), ensure_ascii=False)}",
+            "Context:",
+            f"stdout: {last_output.get('stdout', '')}",
+            f"stderr: {last_output.get('stderr', '')}",
+            f"return code: {last_output.get('returncode', '')}",
             "",
-            "Execution History:",
+            "Based on this information:",
+            "1. Is the task completed successfully?",
+            "2. What specific evidence shows completion?",
+            "3. Are there any remaining steps needed?",
+            "",
+            "Format response as JSON:",
+            "{",
+            '    "is_completed": true/false,',
+            '    "evidence": ["Evidence 1", "Evidence 2"],',
+            '    "remaining_steps": ["Step 1", "Step 2"]',
+            "}"
         ]
         
-        # 添加历史执行记录
-        for i, attempt in enumerate(history, 1):
-            completion_parts.extend([
-                f"\nAttempt {i}:",
-                f"Tool: {attempt['step'].get('tool')}",
-                f"Command: {attempt['step'].get('parameters', {}).get('command', 'N/A')}",
-                f"Result: {'Success' if attempt['result'].get('success') else 'Failed'}",
-                "Output:",
-                f"stdout: {attempt['result'].get('result', {}).get('stdout', '')}",
-                f"stderr: {attempt['result'].get('result', {}).get('stderr', '')}",
-                f"returncode: {attempt['result'].get('result', {}).get('returncode', '')}"
-            ])
+        prompt = "\n".join(prompt_parts)
+        response = agent._get_llm_response(prompt)
         
-        completion_parts.extend([
-            "",
-            "Last command output:",
-            f"stdout: {context.get('last_output', {}).get('stdout', '')}",
-            f"returncode: {context.get('last_output', {}).get('returncode', '')}",
-            "",
-            "Please analyze if this task is completed by considering:",
-            "1. Has the original task goal been achieved?",
-            "2. Do we have all necessary information in the actual command output?",
-            "3. Are the results clear, definitive and based on real output (not assumptions)?",
-            "4. Is there any error in the command execution?",
-            "5. Have we tried appropriate alternatives when previous attempts failed?",
-            "",
-            "CRITICAL RULES:",
-            "1. NEVER make up or assume results that are not in the actual command output",
-            "2. If there is no command output, the task CANNOT be complete",
-            "3. If the last command failed or had errors, the task CANNOT be complete",
-            "4. You MUST quote the exact command output when reporting results",
-            "5. You MUST set is_completed=false if you cannot find a specific number in the output",
-            "6. NEVER generate fake numbers or results",
-            "7. Learn from previous failed attempts",
-            "",
-            "Example of correct response when task is not complete:",
-            '{',
-            '    "is_completed": false,',
-            '    "status": "failed",',
-            '    "reason": "No valid output found from command execution",',
-            '    "evidence": ["Last command returned error: <exact error>"]',
-            '}',
-            "",
-            "Example of correct response when task is complete:",
-            '{',
-            '    "is_completed": true,',
-            '    "status": "completed",',
-            '    "reason": "Command successfully executed and returned line count",',
-            '    "evidence": ["Command output shows exactly 82646 lines of code"]',
-            '}',
-            "",
-            "Respond in this format:",
-            "{",
-            "    \"is_completed\": true/false,",
-            "    \"status\": \"completed/failed/partial\",",
-            "    \"reason\": \"Detailed explanation referencing specific output\",",
-            "    \"evidence\": [",
-            "        \"Exact quotes from command output showing completion\",",
-            "        \"Any errors or issues found in output\"",
-            "    ]",
-            "}"
-        ])
-        
-        completion_prompt = "\n".join(completion_parts)
-        response = agent._get_llm_response(completion_prompt)
-        completion_status = extract_json_from_response(response)
-        
-        # 验证完成状态
-        if completion_status.get("is_completed", False):
-            # 检查是否有实际的命令输出
-            if not context.get("last_output", {}).get("stdout"):
-                # 如果没有实际输出但声��完成了，强制修正状态
-                completion_status.update({
-                    "is_completed": False,
-                    "status": "failed",
-                    "reason": "No actual command output available",
-                    "evidence": ["Task cannot be complete without actual command output"]
-                })
-        
-        return completion_status
+        try:
+            completion_status = json.loads(response)
+            return completion_status
+        except:
+            return {
+                "is_completed": False,
+                "evidence": [],
+                "remaining_steps": ["Failed to parse completion status"]
+            }
     
     def reflect_on_failure(self, task: str, current_step: Dict[str, Any], result: Dict[str, Any], result_analysis: Optional[Dict[str, Any]], agent=None) -> Dict[str, Any]:
         """Reflect on failure and suggest improvements"""
@@ -424,7 +365,7 @@ class TaskReflector:
         
         # 确保返回的反思结果包含改进的步骤
         if "improved_step" in reflection:
-            return reflection["improved_step"]  # ��接返回改进的步骤
+            return reflection["improved_step"]  # 直接返回改进的步骤
         
         # 如果没有改进的步骤返回基本的反思结果
         return {

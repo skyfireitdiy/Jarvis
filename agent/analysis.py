@@ -1,116 +1,111 @@
-from typing import Dict, Any, Optional
-import json
+from typing import Dict, Any
 from colorama import Fore, Style
-from utils import extract_json_from_response
-from .validation import validate_step_format
+import json
+
 from .base import AgentState
+from utils import extract_json_from_response
 
 class TaskAnalyzer:
-    """Task analysis functionality"""
+    """Task analyzer component"""
     
     def analyze_task(self, task: str, agent) -> Dict[str, Any]:
-        """Analyze task and return execution plan"""
-        agent.state = AgentState.ANALYZING
-        agent.logger.log('ANALYSIS', f"Analyzing task: {task}")
-        
-        # Create a detailed summary of completed steps and their results
-        completed_summary = []
-        for i, (var_name, result) in enumerate(sorted(agent.task_context["variables"].items())):
-            step_num = i + 1
-            if isinstance(result, dict):
-                if "description" in result:
-                    completed_summary.append(f"{step_num}. {result['description']}")
-                elif "stdout" in result:
-                    completed_summary.append(f"{step_num}. Output: {result['stdout']}")
-                else:
-                    completed_summary.append(f"{step_num}. Result: {json.dumps(result, ensure_ascii=False)}")
-            else:
-                completed_summary.append(f"{step_num}. Result: {result}")
-        
-        # Include extracted information and conclusions in the summary
-        if agent.task_context.get("summaries"):
-            completed_summary.extend([
-                f"Found information:",
-                *[f"- {info}" for info in agent.task_context["summaries"]]
-            ])
-        
-        if agent.task_context.get("conclusions"):
-            completed_summary.extend([
-                f"Conclusions drawn:",
-                *[f"- {conclusion}" for conclusion in agent.task_context["conclusions"]]
-            ])
-        
-        # Add user suggestions to the prompt
-        suggestions_context = agent._get_suggestions_context()
-        
-        # Build prompt parts
+        """Analyze task and determine next steps"""
+        # Build prompt
         prompt_parts = [
-            f"I need to accomplish this task: {task}",
+            f"Task: {task}",
             "",
-            "These are the tools I have available:",
+            "Please analyze this task and create a detailed plan. Your response should include:",
+            "1. What is the overall goal?", 
+            "2. What are all the steps needed to complete this task?",
+            "3. What information or resources do we need?",
+            "4. What should be our first step?",
+            "",
+            "Available tools:",
             agent.tool_registry.get_tools_description(),
             "",
-            "So far, this is what has been done:",
-            chr(10).join(completed_summary) if completed_summary else "Nothing has been done yet",
-            suggestions_context,
-            "",
-            "Could you help me:",
-            "1. Understand what exactly needs to be accomplished",
-            "2. Identify what information we already have",
-            "3. Determine what information we still need",
-            "4. Plan the next step if we're not done",
-            "5. Consider any user suggestions when planning the next step",
-            "",
-            "Please structure your response in this JSON format:",
-            "{"
-            '    "analysis": {'
-            '        "task_goal": "What exactly needs to be accomplished",'
-            '        "current_info": "What information we already have",'
-            '        "missing_info": "What information we still need",'
-            '        "evidence": ["Specific fact we found 1", "Specific fact we found 2"]'
-            "    },",
-            '    "next_step": {'
-            '        "tool": "tool_name",'
-            '        "parameters": {"param_name": "param_value"},'
-            '        "description": "What we\'ll do next",'
-            '        "success_criteria": ["How we\'ll know it worked"]'
-            "    },",
-            '    "required_tasks": []'
-            "}",
-            "",
-            "Important:",
-            "- Be specific about what information we have and what we need",
-            "- Make sure the next step directly helps get missing information",
-            "- Include actual values and facts in the evidence"
+            "Format your response as JSON:",
+            "{",
+            '    "analysis": {',
+            '        "overall_goal": "Clear description of what we need to accomplish",',
+            '        "required_info": ["List of information/resources needed"],',
+            '        "potential_challenges": ["List of possible challenges"]',
+            '    },',
+            '    "task_plan": {',
+            '        "overall_goal": "The main objective we are trying to achieve",',
+            '        "completed_steps": [],',
+            '        "remaining_steps": [',
+            '            {',
+            '                "step": "Description of step",',
+            '                "tool": "Tool to use",',
+            '                "expected_result": "What we expect to get"',
+            '            }',
+            '        ],',
+            '        "current_focus": "First step to take"',
+            '    },',
+            '    "next_step": {',
+            '        "tool": "tool_name",',
+            '        "parameters": {"param1": "value1"},',
+            '        "description": "What this step will do",',
+            '        "success_criteria": ["How we know it worked"]',
+            '    }',
+            "}"
         ]
         
         prompt = "\n".join(prompt_parts)
         response = agent._get_llm_response(prompt)
-        analysis = extract_json_from_response(response)
         
-        if agent.verbose:
-            agent.logger.log('ANALYSIS-RESULT', f"Parsed analysis:\n{json.dumps(analysis, indent=2, ensure_ascii=False)}")
-        
-        if "error" in analysis or not agent.validate_step_format(analysis):
-            if agent.verbose:
-                agent.logger.log('ANALYSIS-ERROR', "Invalid analysis format, retrying...")
-            return agent.retry_task_analysis(task, response)
-        
-        # Log analysis results with highlights
-        agent.logger.log('ANALYSIS', f"{Fore.GREEN}Goal:{Style.RESET_ALL} {analysis['analysis']['task_goal']}")
-        
-        if analysis['analysis']['current_info']:
-            agent.logger.log('ANALYSIS', f"{Fore.CYAN}Current Info:{Style.RESET_ALL}")
-            current_info = analysis['analysis']['current_info'].split('\n')
-            for info in current_info:
-                if info.strip():
-                    agent.logger.log('ANALYSIS', f"{Fore.CYAN}• {info.strip()}{Style.RESET_ALL}")
-        
-        if analysis['analysis']['missing_info']:
-            agent.logger.log('ANALYSIS', f"{Fore.YELLOW}Missing Info:{Style.RESET_ALL}")
-            missing_info = analysis['analysis']['missing_info'].split('\n')
-            for info in missing_info:
-                if info.strip():
-                    agent.logger.log('ANALYSIS', f"{Fore.RED}• {info.strip()}{Style.RESET_ALL}")
-        
-        return analysis 
+        try:
+            analysis = extract_json_from_response(response)
+            
+            # Store task plan in context if it exists
+            if analysis.get('task_plan'):
+                if 'task_plan' not in agent.task_context:
+                    agent.task_context['task_plan'] = analysis['task_plan']
+            
+            # Print analysis with consistent formatting
+            agent.logger.log('Analysis', f"{Fore.CYAN}╭──────────── 🔍 Initial Analysis ────────────╮{Style.RESET_ALL}", prefix=False)
+            
+            # Print overall goal
+            if analysis.get('analysis', {}).get('overall_goal'):
+                agent.logger.log('Analysis', f"{Fore.CYAN}│ Goal:{Style.RESET_ALL} {analysis['analysis']['overall_goal']}")
+            
+            # Print required information
+            if analysis.get('analysis', {}).get('required_info'):
+                agent.logger.log('Analysis', f"{Fore.CYAN}│ Required Information:{Style.RESET_ALL}")
+                for info in analysis['analysis']['required_info']:
+                    agent.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{info}")
+            
+            # Print task plan
+            if analysis.get('task_plan'):
+                agent.logger.log('Analysis', f"{Fore.CYAN}│ Task Plan:{Style.RESET_ALL}")
+                task_plan = analysis['task_plan']
+                agent.logger.log('Analysis', f"{Fore.CYAN}│ • Overall Goal:{Style.RESET_ALL} {task_plan['overall_goal']}")
+                if task_plan.get('remaining_steps'):
+                    agent.logger.log('Analysis', f"{Fore.CYAN}│ • Planned Steps:{Style.RESET_ALL}")
+                    for step in task_plan['remaining_steps']:
+                        agent.logger.log('Analysis', f"{Fore.CYAN}│   - {Style.RESET_ALL}{step['step']}")
+                agent.logger.log('Analysis', f"{Fore.CYAN}│ • Current Focus:{Style.RESET_ALL} {task_plan['current_focus']}")
+            
+            # Print potential challenges
+            if analysis.get('analysis', {}).get('potential_challenges'):
+                agent.logger.log('Analysis', f"{Fore.CYAN}│ Potential Challenges:{Style.RESET_ALL}")
+                for challenge in analysis['analysis']['potential_challenges']:
+                    agent.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{challenge}")
+            
+            # Print next step
+            if analysis.get('next_step'):
+                agent.logger.log('Analysis', f"{Fore.CYAN}│ Next Step:{Style.RESET_ALL}")
+                next_step = analysis['next_step']
+                agent.logger.log('Analysis', f"{Fore.CYAN}│ • Tool:{Style.RESET_ALL} {next_step['tool']}")
+                agent.logger.log('Analysis', f"{Fore.CYAN}│ • Description:{Style.RESET_ALL} {next_step['description']}")
+            
+            agent.logger.log('Analysis', f"{Fore.CYAN}╰──────────────────────────────────────────╯{Style.RESET_ALL}", prefix=False)
+            
+            return analysis
+            
+        except Exception as e:
+            agent.logger.log('ERROR', f"Failed to analyze task: {str(e)}")
+            return {
+                "error": str(e),
+                "next_step": None
+            }
