@@ -1,0 +1,7 @@
+# Core dependencies
+ollama>=0.1.0  # For LLM interactions
+colorama>=0.4.6  # For colored terminal output
+requests>=2.31.0  # For HTTP requests
+
+# Optional but recommended
+typing-extensions>=4.0.0  # For improved type hints 
