@@ -4,34 +4,64 @@ from .base import Tool, tool
 
 @tool(tool_id="shell", name="Shell Command Execution")
 class ShellTool(Tool):
-    tool_id = "shell"
-    name = "Shell Command Execution"
+    """Execute shell commands with safety constraints.
     
-    def __init__(self):
+    IMPORTANT RULES:
+    1. Commands MUST NOT be long-running or take too long to execute
+    2. Each command has a strict timeout limit (default 30 seconds)
+    3. Commands should be simple and complete quickly
+    4. For long-running tasks, break them into smaller steps
+    5. Background processes and daemons are NOT allowed
+    
+    Examples of VALID commands:
+    - "ls -la"           (List files)
+    - "pwd"             (Show current directory) 
+    - "cat file.txt"    (Read file content)
+    - "echo 'test'"     (Print text)
+    
+    Examples of INVALID commands:
+    - "while true; do echo 'loop'; done"  (Infinite loop)
+    - "sleep 100"                         (Long delay)
+    - "npm install"                       (Long package install)
+    - "python train.py"                   (Long training job)
+    - "mongod"                            (Background daemon)
+    - "ping www.baidu.com"                (Long-running command)
+    """
+    
+    def __init__(self, tool_id: str = "shell"):
         examples = {
             "List files": 'command: "ls -la"',
-            "Check IP address": 'command: "hostname -I"',
-            "Check disk space": 'command: "df -h"',
-            "Check memory usage": 'command: "free -h"',
-            "Find files": 'command: "find /path -name \'*.txt\'"',
-            "Process info": 'command: "ps aux | grep process_name"',
-            "Network status": 'command: "netstat -tuln"',
-            "With timeout": 'command: "long_running_command", timeout: 60'
+            "Show directory": 'command: "pwd"',
+            "Read file": 'command: "cat file.txt"',
+            "With timeout": 'command: "sleep 5", timeout: 10'
         }
         
         super().__init__(
-            tool_id=self.tool_id,
-            name=self.name,
-            description="Execute shell commands with support for standard Unix/Linux commands.",
+            tool_id=tool_id,
+            name="Shell Command Execution",
+            description=(
+                "Execute shell commands with built-in safety constraints and timeout protection. "
+                "Commands MUST complete quickly (default 30s timeout). "
+                "Long-running commands, background processes, and daemons are NOT allowed. "
+                "Break long tasks into smaller steps."
+            ),
             parameters={
                 "command": "Shell command to execute (required)",
-                "timeout": "Timeout in seconds (optional, default 30)"
+                "timeout": "Timeout in seconds (optional, default: 30)"
             },
             examples=examples
         )
     
     def execute(self, command: str, timeout: int = 30) -> Dict[str, Any]:
-        """Execute shell command with timeout"""
+        """Execute a shell command
+        
+        Args:
+            command (str): Shell command to execute (REQUIRED)
+            timeout (int, optional): Timeout in seconds. Defaults to 30.
+            
+        Returns:
+            Dict[str, Any]: Result containing stdout, stderr, and return code
+        """
         try:
             result = subprocess.run(
                 command,

@@ -1,14 +1,18 @@
 import requests
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from .base import BaseLLM
 
 class OllamaLLM(BaseLLM):
     """Ollama LLM implementation"""
     
-    def __init__(self, model_name: str = "llama2", **kwargs):
+    def __init__(self, model_name: str = "llama3:latest", **kwargs):
         super().__init__(model_name=model_name, **kwargs)
         self.api_base = kwargs.get('api_base', 'http://localhost:11434')
+    
+    def get_model_name(self) -> str:
+        """Get the name of the current model"""
+        return f"ollama-{self.model_name}"
     
     def get_completion(self, prompt: str, **kwargs) -> str:
         """Get completion from Ollama"""
@@ -36,50 +40,7 @@ class OllamaLLM(BaseLLM):
                 continue
         
         return full_response
-    
-    def get_chat_completion(self, messages: list, **kwargs) -> str:
-        """Get chat completion from Ollama"""
-        url = f"{self.api_base}/api/chat"
-        
-        data = {
-            "model": self.model_name,
-            "messages": messages,
-            **kwargs
-        }
-        
-        response = requests.post(url, json=data)
-        response.raise_for_status()
-        
-        # Parse streaming response
-        full_response = ""
-        for line in response.text.strip().split('\n'):
-            if not line:
-                continue
-            try:
-                chunk = json.loads(line)
-                if 'message' in chunk and 'content' in chunk['message']:
-                    full_response += chunk['message']['content']
-            except json.JSONDecodeError:
-                continue
-        
-        return full_response
-    
-    def get_embedding(self, text: str) -> list:
-        """Get embedding from Ollama"""
-        url = f"{self.api_base}/api/embeddings"
-        
-        data = {
-            "model": self.model_name,
-            "prompt": text
-        }
-        
-        response = requests.post(url, json=data)
-        response.raise_for_status()
-        
-        return response.json().get('embedding', [])
-    
-    def get_token_count(self, text: str) -> int:
-        """Get token count from Ollama"""
-        # Ollama doesn't provide token counting API
-        # This is a rough estimate
-        return len(text.split())
+
+def create_llm(**kwargs) -> BaseLLM:
+    """Create Ollama LLM instance"""
+    return OllamaLLM(**kwargs)

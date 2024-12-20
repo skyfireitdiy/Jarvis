@@ -1,103 +1,448 @@
 import json
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 from datetime import datetime
 from colorama import Fore, Style
 
-from .base import BaseAgent, AgentState
-from .analysis import TaskAnalyzer
-from .execution import TaskExecutor
-from .reflection import TaskReflector
-from .validation import validate_step_format
+from .base import BaseAgent
 from utils import extract_json_from_response
 from utils.logger import Logger
 from llm import BaseLLM
 
 class LlamaAgent(BaseAgent):
-    """Main agent class that combines all components"""
+    """Main agent class that implements the core task loop"""
     
-    def __init__(self, llm: BaseLLM, verbose: bool = False):
+    def __init__(self, llm: BaseLLM, tool_registry=None, verbose: bool = False):
         super().__init__(llm=llm, verbose=verbose)
-        self.analyzer = TaskAnalyzer()
-        self.executor = TaskExecutor()
-        self.reflector = TaskReflector()
         self.logger = Logger()
+        self.tool_registry = tool_registry
+        self.task_context = {}
+        self.current_task = None
     
-    def validate_step_format(self, analysis: Dict[str, Any]) -> bool:
-        """Validate step format using validation module"""
-        return validate_step_format(analysis, self.logger)
+    def process_input(self, task: str):
+        """Process user input using the task loop pattern"""
+        # 处理多行输入，将连续的换行替换为单个换行
+        task = "\n".join(line.strip() for line in task.splitlines() if line.strip())
+        
+        self.current_task = task
+        self.task_context = {
+            "task_plan": None,
+            "execution_history": [],
+            "current_state": "Starting task analysis",
+            "user_inputs": []  # 存储用户输入历史
+        }
+        
+        self.logger.info(f"\n{Fore.CYAN}🎯 Task:{Style.RESET_ALL}")
+        for line in task.splitlines():
+            self.logger.info(f"{Fore.CYAN}  {line}{Style.RESET_ALL}")
+        
+        consecutive_failures = []
+        reflection_summary = ""
+        
+        while True:
+            # 检查任务是否已完成
+            self.logger.info(f"\n{Fore.BLUE}🔍 Checking task completion...{Style.RESET_ALL}")
+            completion_status = self._check_task_completion()
+            
+            # 打印完成状态的关键信息
+            if completion_status.get("evidence"):
+                self.logger.info(f"{Fore.CYAN}📋 Evidence:{Style.RESET_ALL}")
+                for evidence in completion_status.get("evidence", []):
+                    self.logger.info(f"{Fore.CYAN}  • {evidence}{Style.RESET_ALL}")
+            
+            if completion_status.get("is_complete", False):
+                conclusion = completion_status.get("conclusion", "")
+                self.task_context["conclusion"] = conclusion
+                self.logger.info(f"\n{Fore.GREEN}✨ Task Complete!{Style.RESET_ALL}")
+                self.logger.info(f"{Fore.GREEN}📝 Conclusion: {conclusion}{Style.RESET_ALL}")
+                break
+            
+            # 1. 任务分析：根据任务描述、计划、现有工具、现有信息、历史执行结果，给出下一步指导
+            self.logger.info(f"\n{Fore.BLUE}🤔 Analyzing task...{Style.RESET_ALL}")
+            
+            # 如果有反思总结，添加到提示中
+            if reflection_summary:
+                self.task_context["reflection"] = reflection_summary
+            
+            guidance = self._get_step_guidance()
+            
+            # 打印任务计划
+            if guidance.get("task_plan"):
+                plan = guidance["task_plan"]
+                self.logger.info(f"\n{Fore.YELLOW}📋 Task Plan:{Style.RESET_ALL}")
+                self.logger.info(f"{Fore.YELLOW}  • Goal: {plan.get('overall_goal')}{Style.RESET_ALL}")
+                self.logger.info(f"{Fore.YELLOW}  • Next Focus: {plan.get('next_focus')}{Style.RESET_ALL}")
+            
+            # 打印提取的信息
+            if guidance.get("information_extracted"):
+                info = guidance["information_extracted"]
+                self.logger.info(f"\n{Fore.MAGENTA}ℹ️ Extracted Information:{Style.RESET_ALL}")
+                if info.get("available_info"):
+                    self.logger.info(f"{Fore.MAGENTA}  Available Info:{Style.RESET_ALL}")
+                    for item in info["available_info"]:
+                        self.logger.info(f"{Fore.MAGENTA}    • {item}{Style.RESET_ALL}")
+                if info.get("missing_info"):
+                    self.logger.info(f"{Fore.YELLOW}  Missing Info:{Style.RESET_ALL}")
+                    for item in info["missing_info"]:
+                        self.logger.info(f"{Fore.YELLOW}    • {item}{Style.RESET_ALL}")
+            
+            # 检查是否需要用户补充信息
+            if guidance.get("need_user_input", False):
+                reason = guidance.get("user_input_reason", "Please provide more information")
+                self.logger.info(f"\n{Fore.YELLOW}❓ {reason}{Style.RESET_ALL}")
+                
+                # 获取用户输入
+                self.logger.info(f"\n{Fore.YELLOW}💬 Your response (type 'done' on a new line when finished):{Style.RESET_ALL}")
+                user_input = []
+                while True:
+                    line = input().strip()
+                    if line.lower() == 'done':
+                        break
+                    user_input.append(line)
+                
+                # 存储用户输入
+                if user_input:
+                    input_entry = {
+                        'timestamp': datetime.now().isoformat(),
+                        'reason': reason,
+                        'input': '\n'.join(user_input)
+                    }
+                    self.task_context['user_inputs'].append(input_entry)
+                    self.logger.info(f"{Fore.GREEN}✅ Input received and stored{Style.RESET_ALL}")
+                else:
+                    self.logger.info(f"{Fore.YELLOW}⚠️ No input provided{Style.RESET_ALL}")
+                break
+            
+            # 2. 执行工具
+            next_steps = guidance.get("next_steps", [])
+            if not next_steps:
+                self.logger.info(f"\n{Fore.YELLOW}⚠️ No next steps available{Style.RESET_ALL}")
+                break
+            
+            step_success = False
+            for step in next_steps:
+                # 显示当前步骤
+                self.logger.info(f"\n{Fore.BLUE}🔄 Executing step: {step.get('description', 'Unknown step')}{Style.RESET_ALL}")
+                self.logger.info(f"{Fore.CYAN}⚙️ Using tool: {step.get('tool', '')}{Style.RESET_ALL}")
+                self.logger.info(f"{Fore.CYAN}📋 Parameters: {json.dumps(step.get('parameters', {}), indent=2)}{Style.RESET_ALL}")
+                
+                # 执行工具
+                result = self.execute_step(step)
+                
+                # 显示执行结果状态
+                if result.get("success", False):
+                    self.logger.info(f"{Fore.GREEN}✅ Execution successful{Style.RESET_ALL}")
+                    step_success = True
+                    consecutive_failures = []  # 重置连续失败计数
+                    
+                    # 显示输出结果
+                    stdout = result.get("result", {}).get("result", {}).get("stdout", "").strip()
+                    stderr = result.get("result", {}).get("result", {}).get("stderr", "").strip()
+                    returncode = result.get("result", {}).get("result", {}).get("returncode", "")
+                    
+                    if stdout:
+                        self.logger.info(f"{Fore.WHITE}📤 Output:\n{stdout}{Style.RESET_ALL}")
+                    if stderr:
+                        self.logger.info(f"{Fore.RED}⚠️ Error output:\n{stderr}{Style.RESET_ALL}")
+                    if returncode is not None:
+                        self.logger.info(f"{Fore.CYAN}📊 Return Code: {returncode}{Style.RESET_ALL}")
+                else:
+                    error = result.get('error', 'Unknown error')
+                    self.logger.error(f"{Fore.RED}❌ Execution failed: {error}{Style.RESET_ALL}")
+                    
+                    # 记录失败信息
+                    consecutive_failures.append({
+                        'step': step,
+                        'result': result,
+                        'analysis': None  # 将在分析后更新
+                    })
+                
+                # 3. 结果分析：根据执行结果，结合任务描述、计划、现有信息、历史执行结果，分析出对任务有用的信息
+                self.logger.info(f"\n{Fore.BLUE}📊 Analyzing results...{Style.RESET_ALL}")
+                analysis = self.analyze_tool_result(step, result)
+                self.logger.info(f"{Fore.MAGENTA}💡 Analysis: {analysis}{Style.RESET_ALL}")
+                
+                # 更新最后一次失败的分析结果
+                if consecutive_failures:
+                    consecutive_failures[-1]['analysis'] = analysis
+                
+                # 更新任务上下文
+                self._update_task_context(step, result, analysis)
+            
+            # 如果所有步骤都失败了，检查是否需要反思
+            if not step_success and len(consecutive_failures) >= 3:
+                reflection_summary = self._reflect_on_failures(consecutive_failures[-3:])
+                consecutive_failures = []  # 重置失败计数
     
-    def analyze_task(self, task: str) -> Dict[str, Any]:
-        """Analyze task using TaskAnalyzer"""
-        return self.analyzer.analyze_task(task, self)
+    def _check_task_completion(self) -> Dict[str, Any]:
+        """检查任务是否已完成，如果完成则给出总结"""
+        prompt_parts = [
+            "# Task Completion Check",
+            "",
+            "## Task",
+            self.current_task,
+            "",
+            "## Current Information",
+            "",
+            "### Execution History",
+            *[
+                f"#### Step {i+1}: {execution['step'].get('description', 'Unknown step')}\n"
+                f"Command: {execution['step'].get('parameters', {}).get('command', 'No command')}\n"
+                f"Output:\n```\n{execution['result'].get('result', {}).get('result', {}).get('stdout', '')}\n```\n"
+                f"Error:\n```\n{execution['result'].get('result', {}).get('result', {}).get('stderr', '')}\n```\n"
+                f"Return Code: {execution['result'].get('result', {}).get('result', {}).get('returncode', '')}\n"
+                f"Analysis: {execution.get('analysis', '(No analysis)')}\n"
+                for i, execution in enumerate(self.task_context.get('execution_history', []))
+            ],
+            "",
+            "## Analysis Requirements",
+            "Based on ONLY the execution history above:",
+            "",
+            "1. Do we have enough ACTUAL RESULTS to answer the task question?",
+            "2. If yes, what is the conclusion STRICTLY based on those results?",
+            "",
+            "CRITICAL RULES:",
+            "1. NEVER make assumptions or guess results",
+            "2. ONLY use information from actual execution results",
+            "3. If no execution history exists, task CANNOT be complete",
+            "4. If results are incomplete, task CANNOT be complete",
+            "5. Conclusion MUST include actual evidence from results",
+            "6. For ping results:",
+            "   - Success: Must see actual response from IP",
+            "   - Failure: Timeout or unreachable message IS a valid result",
+            "   - Both success and failure are conclusive results",
+            "",
+            "## Response Format",
+            "Respond with ONLY a JSON object in this format:",
+            "{",
+            '    "is_complete": true/false,',
+            '    "reason": "Why task is/isn\'t complete",',
+            '    "evidence": ["List of actual evidence from results"],',
+            '    "conclusion": "Final answer with evidence if complete, otherwise empty"',
+            "}"
+        ]
+        
+        prompt = "\n".join(prompt_parts)
+        response = self._get_llm_response(prompt)
+        completion_status = extract_json_from_response(response)
+        
+        if completion_status is None:
+            return {
+                "is_complete": False,
+                "reason": "Failed to check completion status",
+                "evidence": [],
+                "conclusion": ""
+            }
+            
+        # 如果没有执行历史，强制设置为未完成
+        if not self.task_context.get('execution_history'):
+            completion_status["is_complete"] = False
+            completion_status["reason"] = "No execution history available"
+            completion_status["evidence"] = []
+            completion_status["conclusion"] = ""
+            
+        return completion_status
     
-    def execute_task(self, task: str) -> Dict[str, Any]:
-        """Execute task using TaskExecutor"""
-        return self.executor.execute_task(task, self)
-    
-    def retry_task_analysis(self, task: str, previous_response: str, retry_count: int = 0) -> Dict[str, Any]:
-        """Retry task analysis using TaskReflector"""
-        return self.reflector.retry_task_analysis(task, previous_response, retry_count, self)
-    
-    def adjust_failed_step(self, step: Dict[str, Any], error: str, context: Dict[str, Any], reflection: Dict[str, Any]) -> Dict[str, Any]:
-        """Adjust failed step using TaskReflector"""
-        return self.reflector.adjust_failed_step(step, error, context, reflection, self)
-    
-    def check_task_completion(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Check task completion using TaskReflector"""
-        return self.reflector.check_task_completion(task, context, self)
-    
-    def reflect_on_failure(self, task: str, current_step: Dict[str, Any], result: Dict[str, Any], result_analysis: Optional[Dict[str, Any]], agent=None) -> Dict[str, Any]:
-        """Reflect on failure using TaskReflector"""
-        return self.reflector.reflect_on_failure(task, current_step, result, result_analysis, self)
-    
-    def analyze_task_with_reflection(self, task: str, reflection: Dict[str, Any], agent=None) -> Dict[str, Any]:
-        """Analyze task with reflection using TaskReflector"""
-        return self.reflector.analyze_task_with_reflection(task, reflection, self)
+    def _get_step_guidance(self) -> Dict[str, Any]:
+        """任务分析：根据上下文给出下一步指导"""
+        prompt_parts = [
+            "# Task Analysis",
+            "",
+            f"## Current Task",
+            f"{self.current_task}",
+            "",
+            "## Information Extraction",
+            "Extract from task description:",
+            "",
+            "* Required values and parameters",
+            "* Implicit constraints",
+            "* Related context",
+            "",
+            "## Tool Selection",
+            "Based on extracted information:",
+            "",
+            "* Choose most suitable tool",
+            "* MUST provide ALL required parameters for the tool",
+            "* For shell tool, 'command' parameter is REQUIRED",
+            "* Request user input only if absolutely necessary",
+            "",
+            "## Available Tools",
+            self.tool_registry.get_tools_description(),
+            "",
+            "## Current Context",
+            "",
+            "### Status",
+            f"`{self.task_context['current_state']}`",
+            "",
+            "### Task Plan",
+            "```json",
+            json.dumps(self.task_context.get('task_plan', {}), indent=2),
+            "```",
+            "",
+            "### Previous Executions",
+            *[
+                f"#### Step: {execution['step'].get('description', 'Unknown step')}\n"
+                f"Analysis: {execution.get('analysis', '(No analysis)')}\n"
+                for execution in self.task_context.get('execution_history', [])
+            ],
+            "",
+            # 添加用户输入历史到提示中
+            *(
+                [
+                    "### User Inputs",
+                    *sum([[
+                        f"#### Input {i+1}:",
+                        f"Reason: {input_entry['reason']}",
+                        f"Response:\n{input_entry['input']}\n"
+                    ] for i, input_entry in enumerate(self.task_context.get('user_inputs', []))], []),
+                    ""
+                ] if self.task_context.get('user_inputs') else []
+            ),
+            # 添加反思结果到提示中
+            *(
+                [
+                    "### Recent Reflection",
+                    "Based on previous failures, consider these insights:",
+                    self.task_context.get('reflection', '(No reflection available)'),
+                    ""
+                ] if self.task_context.get('reflection') else []
+            ),
+            "",
+            "## Response Format",
+            "You MUST respond with ONLY a JSON object in the following format.",
+            "DO NOT include any other text, explanation, or markdown formatting.",
+            "",
+            "CRITICAL RULES:",
+            "1. ALL tool parameters MUST be explicitly provided",
+            "2. For shell tool, MUST include 'command' parameter",
+            "3. Parameters MUST match the tool's requirements",
+            "4. NEVER leave parameters empty",
+            "5. If reflection exists, MUST consider its suggestions",
+            "6. MUST consider all user inputs when available",
+            "",
+            "{",
+            '    "information_extracted": {',
+            '        "available_info": ["List of information found in task"],',
+            '        "implicit_info": ["Any implied information"],',
+            '        "is_sufficient": true/false,',
+            '        "missing_info": ["Any missing but required information"]',
+            '    },',
+            '    "need_user_input": false,',
+            '    "user_input_reason": "Only present if need_user_input is true",',
+            '    "next_steps": [',
+            '        {',
+            '            "tool": "tool_name",',
+            '            "parameters": {"param1": "value1"},',
+            '            "description": "What this step will do"',
+            '        }',
+            '    ],',
+            '    "task_plan": {',
+            '        "overall_goal": "Main objective",',
+            '        "next_focus": "Current step focus"',
+            '    }',
+            "}"
+        ]
+        
+        prompt = "\n".join(prompt_parts)
+        response = self._get_llm_response(prompt)
+        guidance = extract_json_from_response(response)
+        
+        if guidance is None:
+            # 如果无法解析JSON，返回一个基本的引请求用户重试
+            return {
+                "information_extracted": {
+                    "available_info": [],
+                    "implicit_info": [],
+                    "is_sufficient": False,
+                    "missing_info": ["Failed to parse response"]
+                },
+                "need_user_input": True,
+                "user_input_reason": "Failed to analyze task. Please try rephrasing your request.",
+                "next_steps": [],
+                "task_plan": {
+                    "overall_goal": "Retry task analysis",
+                    "next_focus": "Understanding task requirements"
+                }
+            }
+        
+        # 更新任务状态，包含提取的信息
+        if guidance.get('information_extracted'):
+            self.task_context['extracted_info'] = guidance['information_extracted']
+            
+        return guidance
     
     def execute_step(self, step: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a single step"""
+        """执行单个工具步骤"""
+        # 1. 基本参数校验
         if not isinstance(step, dict):
             return {
                 "success": False,
-                "error": "Invalid step format",
+                "error": "Invalid step format: must be a dictionary",
                 "result": None
             }
         
-        # 从工具名称中提取工具ID
         tool_name = step.get("tool", "")
-        tool_id = tool_name.split("(")[-1].strip(")") if "(" in tool_name else tool_name.lower()  # 添加lower()
-        
-        # 获取工具实例
-        tool = self.tool_registry.get_tool(tool_id)
-        
-        if not tool:
+        if not tool_name:
             return {
                 "success": False,
-                "error": f"Tool not found: {tool_name}",
+                "error": "Tool name is required",
+                "result": None
+            }
+            
+        parameters = step.get("parameters", {})
+        if not isinstance(parameters, dict):
+            return {
+                "success": False,
+                "error": "Parameters must be a dictionary",
                 "result": None
             }
         
-        # 执行工具
+        # 2. 获取工具
+        tool_id = tool_name.split("(")[-1].strip(")") if "(" in tool_name else tool_name.lower()
+        tool = self.tool_registry.get_tool(tool_id)
+        if not tool:
+            error = f"Tool not found: {tool_name}"
+            if self.verbose:
+                self.logger.error(error)
+            return {
+                "success": False,
+                "error": error,
+                "result": None
+            }
+        
+        # 3. 工具特定参数校验
+        if tool_id == "shell" and "command" not in parameters:
+            error = "Shell tool requires 'command' parameter"
+            if self.verbose:
+                self.logger.error(error)
+            return {
+                "success": False,
+                "error": error,
+                "result": None
+            }
+        
+        # 4. 执行工具
         try:
-            parameters = step.get("parameters", {})
             result = tool.execute(**parameters)
             return {
                 "success": True,
                 "result": result
             }
         except Exception as e:
+            error_msg = str(e)
+            if self.verbose:
+                self.logger.error(f"Error executing {tool_name}: {error_msg}")
+            else:
+                self.logger.error(error_msg)
             return {
                 "success": False,
-                "error": str(e),
+                "error": error_msg,
                 "result": None
             }
     
-    def analyze_tool_result(self, task: str, step: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze tool execution result"""
-        self.state = AgentState.OBSERVING
-        
+    def analyze_tool_result(self, step: Dict[str, Any], result: Dict[str, Any]) -> str:
+        """分析工具执行结果，提取对任务有用的信息"""
         # Get actual output content
-        result_dict = result.get("result", {}).get("result", {})  # Get nested result dict
+        result_dict = result.get("result", {}).get("result", {})
         if isinstance(result_dict, dict):
             stdout = result_dict.get("stdout", "").strip()
             stderr = result_dict.get("stderr", "").strip()
@@ -107,535 +452,181 @@ class LlamaAgent(BaseAgent):
             stderr = ""
             returncode = ""
         
-        success = result.get("success", False)
-        error = result.get("error", "None")
-        
-        # Get task plan and previous analyses from context
-        current_task_plan = self.task_context.get('task_plan', {})
-        previous_analyses = self.task_context.get('analyses', [])
-        
-        if not current_task_plan:
-            # If no task plan exists, create a basic one
-            current_task_plan = {
-                "overall_goal": task,
-                "completed_steps": [],
-                "remaining_steps": [],
-                "current_focus": "Understanding the task requirements"
-            }
-        
-        # Collect important information from previous analyses
-        accumulated_info = {
-            "key_findings": [],
-            "verified_facts": [],
-            "attempted_approaches": [],
-            "successful_strategies": [],
-            "failed_attempts": []
-        }
-        
-        for prev_analysis in previous_analyses:
-            # Collect key information
-            if prev_analysis.get('key_info'):
-                accumulated_info["key_findings"].extend(prev_analysis['key_info'])
-            
-            # Track successful steps
-            if prev_analysis.get('task_plan', {}).get('completed_steps'):
-                for step in prev_analysis['task_plan']['completed_steps']:
-                    if isinstance(step, dict) and step.get('result'):
-                        accumulated_info["successful_strategies"].append({
-                            "step": step.get('step', ''),
-                            "result": step.get('result', '')
-                        })
-            
-            # Track failed attempts
-            if not prev_analysis.get('success', True):
-                accumulated_info["failed_attempts"].append({
-                    "step": prev_analysis.get('step', ''),
-                    "error": prev_analysis.get('error', '')
-                })
-        
-        # Build prompt parts
         prompt_parts = [
-            f"Task: {task}",
+            "# Result Analysis",
             "",
-            "Previous Information:",
-            "-------------------",
-            "Key Findings:",
-            *[f"• {finding}" for finding in accumulated_info["key_findings"]],
+            "## Task",
+            self.current_task,
             "",
-            "Verified Facts:",
-            *[f"• {fact}" for fact in accumulated_info["verified_facts"]],
+            "## Current Context",
             "",
-            "Successful Strategies:",
-            *[f"• {strategy['step']}: {strategy['result']}" for strategy in accumulated_info["successful_strategies"]],
+            "### Status",
+            f"`{self.task_context['current_state']}`",
             "",
-            "Failed Attempts:",
-            *[f"• {attempt['step']}: {attempt['error']}" for attempt in accumulated_info["failed_attempts"]],
+            "### Task Plan",
+            "```json",
+            json.dumps(self.task_context.get('task_plan', {}), indent=2),
+            "```",
             "",
-            "Current Task Plan:",
-            json.dumps(current_task_plan, indent=2),
+            "### Previous Executions",
+            *[
+                f"#### Step: {execution['step'].get('description', 'Unknown step')}\n"
+                f"Analysis: {execution.get('analysis', '(No analysis)')}\n"
+                for execution in self.task_context.get('execution_history', [])
+            ],
             "",
-            "Current Step executed:",
-            f"Tool: {step.get('tool', 'unknown')}",
-            f"Description: {step.get('description', 'No description')}",
-            f"Success criteria: {', '.join(step.get('success_criteria', []))}",
+            "## Current Step",
+            f"* Tool: `{step.get('tool', 'unknown')}`",
+            f"* Description: {step.get('description', 'No description')}",
+            f"* Parameters: {json.dumps(step.get('parameters', {}), indent=2)}",
             "",
-            "Result details:",
-            "------------",
-            f"Success: {success}",
-            f"Error: {error}",
+            "## Result Output",
             "",
-            "Output:",
-            "stdout:",
+            "### stdout",
+            "```",
             stdout if stdout else "(empty)",
+            "```",
             "",
-            "stderr:",
+            "### stderr",
+            "```",
             stderr if stderr else "(empty)",
+            "```",
             "",
-            f"returncode: {returncode}",
-            "------------",
+            f"### Return Code: `{returncode}`",
             "",
-            "Please analyze the above information and provide a structured response in JSON format with the following fields:",
-            "{",
-            '    "conclusion": "Brief summary of what was found or determined",',
-            '    "key_info": [',
-            '        "List of important information extracted from the result",',
-            '        "Each item should be a specific fact or finding"',
-            '    ],',
-            '    "verified_facts": [',
-            '        "List of facts that have been verified through multiple sources or direct evidence"',
-            '    ],',
-            '    "missing_info": [',
-            '        "List of information that is still needed",',
-            '        "Each item should be specific and actionable"',
-            '    ],',
-            '    "task_plan": {',
-            '        "overall_goal": "The main objective we are trying to achieve",',
-            '        "completed_steps": [',
-            '            {',
-            '                "step": "Description of completed step",',
-            '                "result": "What was achieved"',
-            '            }',
-            '        ],',
-            '        "remaining_steps": [',
-            '            {',
-            '                "step": "Description of remaining step",',
-            '                "expected_result": "What we expect to achieve"',
-            '            }',
-            '        ],',
-            '        "current_focus": "What we are currently working on"',
-            '    },',
-            '    "next_steps": [',
-            '        {',
-            '            "tool": "Tool to use",',
-            '            "parameters": {"param1": "value1"},',
-            '            "description": "What this step will do",',
-            '            "success_criteria": ["How we know it worked"]',
-            '        }',
-            '    ],',
-            '    "task_complete": false,',
-            '    "user_confirmation_required": false,',
-            '    "user_feedback_required": false',
-            "}",
+            "## Analysis Requirements",
+            "Based on ALL the above information, analyze whether this step helped accomplish the task.",
             "",
             "CRITICAL RULES:",
-            "1. NEVER make up or assume information not present in the actual output",
-            "2. If information is missing, list it in missing_info",
-            "3. Be specific and precise in your analysis",
-            "4. Include actual values and quotes from the output when available",
-            "5. task_plan should reflect both what has been done and what is left to do",
-            "6. Ensure next_steps align with remaining_steps in the task plan",
-            "7. Move the current step to completed_steps if it was successful",
-            "8. Update current_focus based on the next immediate step needed",
-            "9. Add any new verified facts to the verified_facts list",
-            "10. Consider all previous findings when analyzing new information"
+            "1. Focus on TASK COMPLETION, not command success",
+            "2. Only include sections that have meaningful content",
+            "3. Skip sections if there's nothing significant to report",
+            "4. Be concise and specific",
+            "",
+            "Format your response using ONLY the relevant sections below:",
+            "",
+            "TASK PROGRESS: (REQUIRED)",
+            "- What specific progress was made toward the goal",
+            "- Which task requirements were satisfied",
+            "",
+            "USEFUL FINDINGS: (Only if actual data/facts were found)",
+            "- Specific facts/data we can use",
+            "- Concrete conclusions from the data",
+            "",
+            "ISSUES: (Only if problems were encountered)",
+            "- Specific problems that blocked progress",
+            "- Missing or invalid information",
+            "",
+            "NEXT STEPS: (Only if changes are needed)",
+            "- Specific adjustments to try",
+            "- Alternative approaches to consider",
+            "",
+            "Example response with all sections:",
+            "TASK PROGRESS:",
+            "Found package version and verified compatibility",
+            "",
+            "USEFUL FINDINGS:",
+            "- numpy 1.21.3 is installed",
+            "- Compatible with Python 3.8+",
+            "",
+            "ISSUES:",
+            "- Missing dependency information",
+            "",
+            "NEXT STEPS:",
+            "Check remaining dependencies",
+            "",
+            "Example response with minimal sections:",
+            "TASK PROGRESS:",
+            "No progress - command output not relevant to task",
+            "",
+            "NEXT STEPS:",
+            "Try using search tool instead"
         ]
         
         prompt = "\n".join(prompt_parts)
-        response = self._get_llm_response(prompt)
-        analysis = extract_json_from_response(response)
-        
-        # Update task plan and accumulated info in context
-        if analysis.get('task_plan'):
-            self.task_context['task_plan'] = analysis['task_plan']
-        
-        if analysis.get('verified_facts'):
-            if 'verified_facts' not in self.task_context:
-                self.task_context['verified_facts'] = []
-            self.task_context['verified_facts'].extend(analysis['verified_facts'])
-        
-        # Print analysis results with better formatting
-        self.logger.log('Analysis', f"{Fore.CYAN}╭──────────── 🔍 Result Analysis 📊 ────────────╮{Style.RESET_ALL}", prefix=False)
-        
-        # Print goal/conclusion
-        if analysis.get('conclusion'):
-            self.logger.log('Analysis', f"{Fore.CYAN}│ Goal:{Style.RESET_ALL} {analysis.get('conclusion')}")
-        
-        # Print current information
-        if analysis.get('key_info'):
-            self.logger.log('Analysis', f"{Fore.CYAN}│ Current Info:{Style.RESET_ALL}")
-            for info in analysis.get('key_info', []):
-                self.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{info}")
-        
-        # Print verified facts
-        if analysis.get('verified_facts'):
-            self.logger.log('Analysis', f"{Fore.CYAN}│ Verified Facts:{Style.RESET_ALL}")
-            for fact in analysis.get('verified_facts', []):
-                self.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{fact}")
-        
-        # Print task plan
-        if analysis.get('task_plan'):
-            self.logger.log('Analysis', f"{Fore.CYAN}│ Task Plan:{Style.RESET_ALL}")
-            task_plan = analysis['task_plan']
-            self.logger.log('Analysis', f"{Fore.CYAN}│ • Goal:{Style.RESET_ALL} {task_plan['overall_goal']}")
-            if task_plan.get('completed_steps'):
-                self.logger.log('Analysis', f"{Fore.CYAN}│ • Completed Steps:{Style.RESET_ALL}")
-                for step in task_plan['completed_steps']:
-                    if isinstance(step, dict):
-                        self.logger.log('Analysis', f"{Fore.CYAN}│   - {Style.RESET_ALL}{step['step']}: {step['result']}")
-                    else:
-                        self.logger.log('Analysis', f"{Fore.CYAN}│   - {Style.RESET_ALL}{step}")
-            if task_plan.get('remaining_steps'):
-                self.logger.log('Analysis', f"{Fore.CYAN}│ • Remaining Steps:{Style.RESET_ALL}")
-                for step in task_plan['remaining_steps']:
-                    if isinstance(step, dict):
-                        self.logger.log('Analysis', f"{Fore.CYAN}│   - {Style.RESET_ALL}{step['step']}: {step['expected_result']}")
-                    else:
-                        self.logger.log('Analysis', f"{Fore.CYAN}│   - {Style.RESET_ALL}{step}")
-            self.logger.log('Analysis', f"{Fore.CYAN}│ • Current Focus:{Style.RESET_ALL} {task_plan['current_focus']}")
-        
-        # Print missing information
-        if analysis.get('missing_info'):
-            self.logger.log('Analysis', f"{Fore.CYAN}│ Missing Info:{Style.RESET_ALL}")
-            for info in analysis.get('missing_info', []):
-                self.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{info}")
-        
-        # Print next steps if any
-        if analysis.get('next_steps'):
-            self.logger.log('Analysis', f"{Fore.CYAN}│ Next Steps:{Style.RESET_ALL}")
-            for step in analysis.get('next_steps', []):
-                if isinstance(step, dict):
-                    self.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{step['description']}")
-                else:
-                    self.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{step}")
-        
-        self.logger.log('Analysis', f"{Fore.CYAN}╰──────────────────────────────────────────╯{Style.RESET_ALL}", prefix=False)
-        
-        # Store current analysis in task context
-        if 'analyses' not in self.task_context:
-            self.task_context['analyses'] = []
-        self.task_context['analyses'].append(analysis)
-        
-        # Handle user confirmation only when task is complete
-        if analysis.get("task_complete") and analysis.get("user_confirmation_required"):
-            # 构建当前信息摘要
-            current_info = []
-            if analysis.get('key_info'):
-                current_info.extend(analysis['key_info'])
-            
-            # 构建缺失信息摘要
-            missing_info = []
-            if analysis.get('missing_info'):
-                missing_info.extend(analysis['missing_info'])
-            
-            # 格式化提示信息
-            confirmation_msg = (
-                f"\n📝 Here's what I found:\n"
-                + "\n".join(f"✓ {info}" for info in current_info)
-            )
-            
-            if missing_info:
-                confirmation_msg += (
-                    f"\n\n❓ Still missing:\n"
-                    + "\n".join(f"• {info}" for info in missing_info)
-                    + "\n\nWould you like me to continue searching for this information? (yes/no)"
-                )
-            else:
-                confirmation_msg += "\n\nIs this information sufficient? (yes/no)"
-            
-            print(f"\n{Fore.YELLOW}{confirmation_msg}{Style.RESET_ALL}")
-            response = input(f"{Fore.GREEN}> {Style.RESET_ALL}").strip().lower()
-            
-            # If user is not satisfied, get feedback and prepare next step
-            if response not in ['y', 'yes', 'done', 'complete']:
-                analysis['task_complete'] = False
-                if analysis.get("user_feedback_required"):
-                    if missing_info:
-                        feedback_msg = "Which missing information should I focus on first?"
-                    else:
-                        feedback_msg = "What additional information would you like me to find?"
-                    
-                    print(f"\n{Fore.YELLOW}🤔 {feedback_msg}{Style.RESET_ALL}")
-                    feedback = input(f"{Fore.GREEN}> {Style.RESET_ALL}").strip()
-                    if feedback:
-                        self.user_suggestions.append(feedback)
-            else:
-                # If user is satisfied, mark task as complete
-                analysis['task_complete'] = True
-                return analysis
-            
-            # If user wants to continue (responded with 'yes'), prepare next step
-            if response in ['y', 'yes']:
-                # Update task plan to reflect the need for more information
-                if 'task_plan' not in analysis:
-                    analysis['task_plan'] = current_task_plan
-                
-                # Add missing information to remaining steps
-                if missing_info and analysis['task_plan'].get('remaining_steps') is not None:
-                    for info in missing_info:
-                        analysis['task_plan']['remaining_steps'].append({
-                            "step": f"Search for {info}",
-                            "expected_result": f"Obtain {info}"
-                        })
-                
-                # Update current focus
-                if missing_info:
-                    analysis['task_plan']['current_focus'] = f"Searching for {missing_info[0]}"
-                
-                # Prepare next step
-                analysis['next_steps'] = [{
-                    "tool": "search",
-                    "parameters": {
-                        "query": f"{task} {missing_info[0] if missing_info else ''}"
-                    },
-                    "description": f"Search for {missing_info[0] if missing_info else 'additional information'}",
-                    "success_criteria": ["Find relevant information about the missing details"]
-                }]
-        
-        return analysis
+        return self._get_llm_response(prompt)
     
-    def plan_next_step_with_suggestion(self, task: str, current_step: Dict[str, Any], suggestion: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Plan next step considering user suggestion"""
+    def _update_task_context(self, step: Dict[str, Any], result: Dict[str, Any], analysis: str):
+        """更新任务上下文"""
+        history_entry = {
+            'step': step,
+            'result': result,
+            'analysis': analysis,
+            'timestamp': datetime.now().isoformat()
+        }
+        self.task_context['execution_history'].append(history_entry)
+    
+    def _reflect_on_failures(self, failed_steps: list) -> str:
+        """根据连续失败的步骤进行反思，给出新的建议"""
+        # 构建失败尝试的描述
+        failed_attempts = []
+        for i, step in enumerate(failed_steps):
+            failed_attempts.extend([
+                f"### Attempt {i+1}:",
+                f"Tool: {step['step'].get('tool')}",
+                f"Parameters: {json.dumps(step['step'].get('parameters', {}), indent=2)}",
+                f"Error: {step['result'].get('error', 'Unknown error')}",
+                f"Output: {json.dumps(step['result'].get('result', {}), indent=2)}",
+                f"Analysis: {step.get('analysis', '(No analysis)')}"
+            ])
+        
         prompt_parts = [
-            f"Task: {task}",
+            "# Reflection on Failed Attempts",
             "",
-            f"Current step: {json.dumps(current_step, ensure_ascii=False)}",
-            f"User suggestion: {suggestion}",
+            "## Task",
+            self.current_task,
             "",
-            "Context:",
-            f"- Variables: {json.dumps(context.get('variables', {}), ensure_ascii=False)}",
-            f"- Files: {json.dumps(context.get('files', {}), ensure_ascii=False)}",
+            "## Failed Attempts",
+            *failed_attempts,
             "",
-            "Previous attempts failed. Please plan a new step considering the user's suggestion.",
+            "## Current Context",
+            f"Task Plan: {json.dumps(self.task_context.get('task_plan', {}), indent=2)}",
             "",
-            "Available tools:",
-            self.tool_registry.get_tools_description(),
+            "## Reflection Requirements",
+            "Based on the failed attempts above, provide a comprehensive analysis including:",
             "",
-            "Format your response as JSON:",
-            "{"
-            '    "next_step": {'
-            '        "tool": "tool_name",'
-            '        "parameters": {"param1": "value1"},'
-            '        "description": "What this step will do",'
-            '        "success_criteria": ["How we know it worked"]'
-            '    }'
-            "}"
+            "1. Common patterns in these failures",
+            "2. Incorrect assumptions that were made",
+            "3. Alternative approaches or tools that could work better",
+            "4. Specific parameter adjustments that might help",
+            "",
+            "Format your response as a clear, structured analysis with specific recommendations.",
+            "Focus on actionable insights that can guide the next attempt.",
+            "",
+            "Example format:",
+            "FAILURE PATTERNS:",
+            "- Pattern 1 description",
+            "- Pattern 2 description",
+            "",
+            "INCORRECT ASSUMPTIONS:",
+            "- Assumption 1 and why it's wrong",
+            "- Assumption 2 and why it's wrong",
+            "",
+            "ALTERNATIVE APPROACHES:",
+            "- Approach 1: description and why it might work",
+            "- Approach 2: description and why it might work",
+            "",
+            "PARAMETER ADJUSTMENTS:",
+            "- Parameter 1: suggested change and reasoning",
+            "- Parameter 2: suggested change and reasoning",
+            "",
+            "RECOMMENDATIONS:",
+            "Clear, actionable steps to try next"
         ]
         
         prompt = "\n".join(prompt_parts)
-        response = self._get_llm_response(prompt)
-        analysis = extract_json_from_response(response)
+        reflection = self._get_llm_response(prompt)
         
-        return analysis.get("next_step", current_step)
-    
-    def _has_tried_combination(self, tool_name: str, parameters: Dict[str, Any]) -> bool:
-        """Check if we've already tried this tool-parameters combination"""
-        return (tool_name, str(parameters)) in self.tried_combinations
-    
-    def _add_tried_combination(self, tool_name: str, parameters: Dict[str, Any]):
-        """Add a tool-parameters combination to the tried set"""
-        self.tried_combinations.add((tool_name, str(parameters)))
-    
-    def analyze_task_completion(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze if task is completed"""
-        prompt_parts = [
-            f"Task: {task}",
-            "",
-            "Current context:",
-            f"Variables: {context.get('variables', {})}",
-            f"Summaries: {context.get('summaries', [])}",
-            f"Conclusions: {context.get('conclusions', [])}",
-            "",
-            "Last command output:",
-            f"stdout: {context.get('last_output', {}).get('stdout', '')}",
-            f"returncode: {context.get('last_output', {}).get('returncode', '')}",
-            "",
-            "Please analyze if this task is completed by considering:",
-            "1. Has the original task goal been achieved?",
-            "2. Do we have all necessary information in the actual command output?", 
-            "3. Are the results clear, definitive and based on real output (not assumptions)?",
-            "4. Is there any error in the command execution?",
-            "",
-            "CRITICAL RULES:",
-            "1. NEVER make up or assume results that are not in the actual command output",
-            "2. If there is no command output, the task CANNOT be complete",
-            "3. If the last command failed or had errors, the task CANNOT be complete",
-            "4. You MUST quote the exact command output when reporting results",
-            "5. You MUST set is_completed=false if you cannot find a specific number in the output",
-            "6. NEVER generate fake numbers or results",
-            "",
-            "Example of correct response when task is not complete:",
-            '{',
-            '    "is_completed": false,',
-            '    "status": "failed",',
-            '    "reason": "No valid output found from command execution",',
-            '    "evidence": ["Last command returned error: <exact error>"]',
-            '}',
-            "",
-            "Example of correct response when task is complete:",
-            '{',
-            '    "is_completed": true,',
-            '    "status": "completed",',
-            '    "reason": "Command successfully executed and returned line count",',
-            '    "evidence": ["Command output shows exactly 82646 lines of code"]',
-            '}',
-            "",
-            "Respond in this format:",
-            "{",
-            "    \"is_completed\": true/false,",
-            "    \"status\": \"completed/failed/partial\",",
-            "    \"reason\": \"Detailed explanation referencing specific output\",",
-            "    \"evidence\": [",
-            "        \"Exact quotes from command output showing completion\",",
-            "        \"Any errors or issues found in output\"",
-            "    ]",
-            "}"
-        ]
-
-        prompt = "\n".join(prompt_parts)
-        response = self._get_llm_response(prompt)
-        return extract_json_from_response(response)
-    
-    def _display_completion_status(self, completion_status: Dict[str, Any]):
-        """Display task completion status with evidence"""
-        if completion_status.get("is_completed"):
-            self.logger.log('STATUS', f"{Fore.GREEN}✓ Task completed{Style.RESET_ALL}")
-            if "result" in completion_status and completion_status["result"].get("value"):
-                self.logger.log('RESULT', f"{Fore.GREEN}Result:{Style.RESET_ALL} {completion_status['result']['value']}")
-                self.logger.log('RESULT', f"{Fore.CYAN}Source:{Style.RESET_ALL} {completion_status['result']['source']}")
-        else:
-            self.logger.log('STATUS', f"{Fore.YELLOW}⚠ Task not completed{Style.RESET_ALL}")
+        # 打印反思结果
+        if reflection:
+            self.logger.info(f"\n{Fore.YELLOW}🤔 Reflection after failures:{Style.RESET_ALL}")
+            # 按行打印，保持格式
+            for line in reflection.splitlines():
+                if line.endswith(':'):  # 标题行
+                    self.logger.info(f"\n{Fore.YELLOW}{line}{Style.RESET_ALL}")
+                elif line.startswith('-'):  # 列表项
+                    self.logger.info(f"{Fore.CYAN}  {line}{Style.RESET_ALL}")
+                else:  # 普通文本
+                    self.logger.info(f"{Fore.WHITE}{line}{Style.RESET_ALL}")
         
-        self.logger.log('STATUS', f"{Fore.CYAN}Status:{Style.RESET_ALL} {completion_status.get('status', 'unknown')}")
-        self.logger.log('STATUS', f"{Fore.CYAN}Reason:{Style.RESET_ALL} {completion_status.get('reason', 'No reason provided')}")
-        
-        if completion_status.get("evidence"):
-            self.logger.log('EVIDENCE', f"{Fore.CYAN}Evidence:{Style.RESET_ALL}")
-            for evidence in completion_status["evidence"]:
-                self.logger.log('EVIDENCE', f"  • {evidence}")
-    
-    def _get_llm_response(self, prompt: str) -> str:
-        """Call LLM to get response"""
-        if self.verbose:
-            self.logger.log('LLM-REQUEST', f"Sending prompt to LLM ({self.llm.get_model_name()}):\n{prompt}")
-        
-        # Convert prompt to chat message format
-        messages = [{"role": "user", "content": prompt}]
-        response = self.llm.get_chat_completion(messages)
-        
-        if self.verbose:
-            self.logger.log('LLM-RESPONSE', f"Received response from LLM:\n{response}")
-        
-        return response
-    
-    def get_user_suggestion(self) -> str:
-        """Get suggestion from user"""
-        print(f"\n{Fore.YELLOW}🤔 I'm not sure what to do next. Could you help me by:{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}1. Providing more specific information about what you want{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}2. Suggesting a different approach{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}3. Clarifying any ambiguous parts{Style.RESET_ALL}")
-        print("(Press Enter to stop)")
-        suggestion = input(f"{Fore.GREEN}> {Style.RESET_ALL}").strip()
-        if suggestion:
-            print(f"{Fore.GREEN}👍 Thanks! I'll try with your suggestion.{Style.RESET_ALL}")
-            self.user_suggestions.append(suggestion)
-        return suggestion
-    
-    def analyze_result(self, result: Dict[str, Any], task: str) -> Dict[str, Any]:
-        """Analyze tool execution result"""
-        self.state = AgentState.ANALYZING
-        
-        # Prepare analysis prompt
-        prompt = f"""
-I need to accomplish this task: {task}
-
-Tool execution result:
-------------
-Success: {result.get('success')}
-Error: {result.get('error')}
-
-Output:
-stdout:
-{result.get('result', {}).get('stdout', '')}
-
-stderr:
-{result.get('result', {}).get('stderr', '')}
-
-returncode: {result.get('result', {}).get('returncode')}
-------------
-
-{self.get_analysis_prompt()}
-"""
-        
-        # Get analysis from LLM
-        analysis = self._get_llm_response(prompt)
-        
-        # Parse analysis
-        try:
-            analysis_data = json.loads(analysis)
-            
-            # Print analysis result with consistent formatting
-            self.logger.log('Analysis', f"{Fore.CYAN}╭──────────── 🔍 Analysis Started ────────────╮{Style.RESET_ALL}", prefix=False)
-            
-            # Print goal/conclusion
-            if analysis_data.get('conclusion'):
-                self.logger.log('Analysis', f"{Fore.CYAN}│ Goal:{Style.RESET_ALL} {analysis_data.get('conclusion')}")
-            
-            # Print current information
-            if analysis_data.get('key_info'):
-                self.logger.log('Analysis', f"{Fore.CYAN}│ Current Info:{Style.RESET_ALL}")
-                for info in analysis_data.get('key_info', []):
-                    self.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{info}")
-            
-            # Print missing information
-            if analysis_data.get('missing_info'):
-                self.logger.log('Analysis', f"{Fore.CYAN}│ Missing Info:{Style.RESET_ALL}")
-                for info in analysis_data.get('missing_info', []):
-                    self.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{info}")
-            
-            # Print next steps if any
-            if analysis_data.get('next_steps'):
-                self.logger.log('Analysis', f"{Fore.CYAN}│ Next Steps:{Style.RESET_ALL}")
-                for step in analysis_data.get('next_steps', []):
-                    self.logger.log('Analysis', f"{Fore.CYAN}│ • {Style.RESET_ALL}{step}")
-            
-            self.logger.log('Analysis', f"{Fore.CYAN}╰──────────────────────────────────────────╯{Style.RESET_ALL}", prefix=False)
-            
-            # Handle user confirmation only when task is complete
-            if analysis_data.get("task_complete") and analysis_data.get("user_confirmation_required"):
-                confirmation_msg = analysis_data.get("user_confirmation_message", 
-                    "I have completed the task. Is this information sufficient or would you like additional details?")
-                print(f"\n{Fore.YELLOW}👋 {confirmation_msg}{Style.RESET_ALL}")
-                response = input("> ").strip().lower()
-                
-                # If user is not satisfied, get feedback
-                if response not in ['y', 'yes', 'done', 'complete']:
-                    analysis_data['task_complete'] = False
-                    if analysis_data.get("user_feedback_required"):
-                        feedback_msg = "What additional information would you like me to focus on?"
-                        print(f"\n{Fore.YELLOW}🤔 {feedback_msg}{Style.RESET_ALL}")
-                        feedback = input("> ").strip()
-                        if feedback:
-                            self.user_suggestions.append(feedback)
-            
-            return analysis_data
-            
-        except json.JSONDecodeError:
-            self.logger.log('ERROR', "Failed to parse analysis response")
-            return {
-                "can_conclude": False,
-                "conclusion": "Failed to parse analysis",
-                "has_valid_data": False,
-                "needs_retry": True,
-                "validation_errors": ["Failed to parse analysis response"],
-                "task_complete": False
-            }
+        return reflection

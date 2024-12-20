@@ -1,8 +1,8 @@
 import requests
-from typing import Dict, Any, Optional
-from ..base import LLM
+from typing import Dict, Any
+from .base import BaseLLM
 
-class ZteLLM(LLM):
+class ZteLLM(BaseLLM):
     """ZTE Nebula LLM implementation"""
     
     def __init__(self, 
@@ -19,10 +19,10 @@ class ZteLLM(LLM):
         self.emp_no = str(emp_no)
         self.auth_value = str(auth_value)
         self.model = model
-        self.api_url = "https://studio.zte.com.cn/zte-studio-ai-platform/openapi/v1/chat"
-    
-    def chat(self, prompt: str) -> str:
-        """Send chat message to ZTE API"""
+        self.base_url = "https://studio.zte.com.cn/zte-studio-ai-platform/openapi/v1"
+        
+    def _make_request(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Make request to ZTE API"""
         headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {self.app_id}-{self.app_key}',
@@ -30,7 +30,23 @@ class ZteLLM(LLM):
             'X-Auth-Value': self.auth_value
         }
         
-        body = {
+        response = requests.post(
+            f"{self.base_url}/{endpoint}",
+            headers=headers,
+            json=data
+        )
+        
+        response.raise_for_status()
+        result = response.json()
+        
+        if result["code"]["code"] != "0000":
+            raise Exception(f"API Error: {result['code']['msg']}")
+            
+        return result["bo"]
+    
+    def get_completion(self, prompt: str, **kwargs) -> str:
+        """Get completion from ZTE LLM"""
+        data = {
             "chatUuid": "",
             "chatName": "",
             "stream": False,
@@ -39,19 +55,12 @@ class ZteLLM(LLM):
             "model": self.model
         }
         
-        response = requests.post(
-            self.api_url,
-            headers=headers,
-            json=body
-        )
-        
-        response.raise_for_status()
-        result = response.json()
-        
-        if result["code"]["code"] != "0000":
-            raise Exception(f"API Error: {result['code']['msg']}")
-        
-        return result["bo"]["result"]
+        result = self._make_request("completion", data)
+        return result["result"]
+    
+    def get_model_name(self) -> str:
+        """Get the name of the current model"""
+        return f"zte-{self.model}"
 
 def create_llm(**kwargs) -> ZteLLM:
     """Create ZTE LLM instance with provided parameters"""
