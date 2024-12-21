@@ -61,13 +61,15 @@ def setup_argument_parser() -> argparse.ArgumentParser:
 
 def setup_tools(tools_dir: Optional[str] = None) -> ToolRegistry:
     """Setup and discover tools"""
-    # Create a new registry instance with the specified directory
+    # Get the singleton instance of ToolRegistry
     tool_registry = ToolRegistry(tools_dir=tools_dir)
     
-    # Print discovered tools
-    print(f"{Fore.CYAN}Discovered tools:{Style.RESET_ALL}")
-    for tool_id in tool_registry.list_tools():
-        print(f"  • {tool_id}")
+    # Print available tools only if we have tools
+    tool_ids = tool_registry.list_tools()
+    if tool_ids:
+        print(f"\n{Fore.CYAN}Available tools:{Style.RESET_ALL}")
+        for tool_id in tool_ids:
+            print(f"  • {tool_id}")
     
     return tool_registry
 
@@ -80,12 +82,12 @@ def main():
     parser = setup_argument_parser()
     args = parser.parse_args()
     
+    # Setup tools first (singleton will ensure one-time initialization)
+    tool_registry = setup_tools(args.tools_dir)
+    
     # Setup LLM
     llm = setup_llm(args)
-    print(f"{Fore.GREEN}Using LLM: {args.model_name}{Style.RESET_ALL}")
-    
-    # Setup tools
-    tool_registry = setup_tools(args.tools_dir)
+    print(f"\n{Fore.GREEN}Using LLM: {args.model_name}{Style.RESET_ALL}")
     
     # Create agent
     agent = LlamaAgent(llm=llm, tool_registry=tool_registry, verbose=args.verbose)

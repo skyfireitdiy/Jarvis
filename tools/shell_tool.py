@@ -4,106 +4,72 @@ from .base import Tool, tool
 
 @tool(tool_id="shell", name="Shell Command Execution")
 class ShellTool(Tool):
-    """执行Shell命令工具。
-    
-    重要规则：
-    1. 命令不能长时间运行
-    2. 每个命令都有严格的超时限制（默认30秒）
-    3. 命令应该简单且能快速完成
-    4. 对于长时间任务，需要拆分成更小的步骤
-    5. 不允许后台进程和守护进程
-    """
+    """Execute shell commands with safety limits."""
     
     def __init__(self, tool_id: str = "shell"):
         examples = {
-            "列出文件": 'command: "ls -la"',
-            "显示目录": 'command: "pwd"',
-            "读取文件": 'command: "cat file.txt"',
-            "带超时": 'command: "sleep 5", timeout: 10'
+            "basic": 'command: "ping -c 1 google.com"'
         }
         
         super().__init__(
             tool_id=tool_id,
-            name="Shell命令执行",
+            name="Shell Command Execution",
             description=(
-                "执行Shell命令，内置安全限制和超时保护。\n"
-                "命令必须快速完成（默认30秒超时）。\n"
+                "Execute shell commands in a controlled environment.\n"
                 "\n"
-                "使用规则：\n"
-                "1. 命令必须快速完成执行\n"
-                "2. 不允许长时间运行的命令\n"
-                "3. 不允许后台进程和守护进程\n"
-                "4. 长任务需要拆分成小步骤\n"
+                "Allowed Commands:\n"
+                "• File listing (ls, pwd)\n"
+                "• Network checks (ping)\n"
+                "• Process info (ps, top)\n"
+                "• File content (cat, head)\n"
                 "\n"
-                "有效命令示例：\n"
-                '- "ls -la"           # 列出文件\n'
-                '- "pwd"             # 显示当前目录\n'
-                '- "cat file.txt"    # 读取文件内容\n'
-                '- "echo \'test\'"     # 打印文本\n'
-                "\n"
-                "无效命令示例：\n"
-                '- "while true; do echo \'loop\'; done"  # 无限循环\n'
-                '- "sleep 100"                         # 长时间延迟\n'
-                '- "npm install"                       # 长时间安装\n'
-                '- "python train.py"                   # 长时间训练\n'
-                '- "mongod"                            # 后台守护进程\n'
-                '- "ping www.baidu.com"                # 持续运行命令'
+                "Restrictions:\n"
+                "• No system changes\n"
+                "• No installations\n"
+                "• No service control\n"
+                "• No user management\n"
+                "• 30s timeout max"
             ),
             parameters={
-                "command": "要执行的Shell命令（必需）",
-                "timeout": "超时时间，单位秒（可选，默认30）"
+                "command": "Shell command to execute (required)",
+                "timeout": "Timeout in seconds (optional, default 30)"
             },
             examples=examples
         )
     
     def execute(self, command: str, timeout: int = 30) -> Dict[str, Any]:
-        """执行Shell命令
-        
-        参数：
-            command (str): 要执行的Shell命令（必需）
-            timeout (int, optional): 超时时间（秒）。默认30秒。
-            
-        返回：
-            Dict[str, Any]: 包含标准输出、标准错误和返回码的结果
-        """
+        """Execute shell command"""
         try:
-            result = subprocess.run(
+            # Execute command
+            process = subprocess.run(
                 command,
                 shell=True,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 timeout=timeout
             )
             
+            # Return result
             return {
                 "success": True,
                 "result": {
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                    "returncode": result.returncode,
-                    "command": command
+                    "stdout": process.stdout,
+                    "stderr": process.stderr,
+                    "returncode": process.returncode,
+                    "command": command,
+                    "timeout": timeout
                 }
             }
-            
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
             return {
                 "success": False,
-                "error": f"命令在 {timeout} 秒后超时",
-                "result": {
-                    "stdout": "",
-                    "stderr": f"{timeout}秒后超时",
-                    "returncode": -1,
-                    "command": command
-                }
+                "error": f"Command timed out after {timeout} seconds",
+                "result": None
             }
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "result": {
-                    "stdout": "",
-                    "stderr": str(e),
-                    "returncode": -1,
-                    "command": command
-                }
-            } 
+                "result": None
+            }

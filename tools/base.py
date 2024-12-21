@@ -26,19 +26,22 @@ class Tool:
     
     def get_description(self) -> str:
         """Get tool description"""
-        # Basic description and parameters
-        desc = [f"Tool: {self.tool_id}",
-               f"Description: {self.description}",
-               "\nParameters:"]
+        # Basic description
+        desc = [
+            f"Tool: {self.tool_id}",
+            f"{self.description}",
+            "",
+            "Parameters:"
+        ]
         
+        # Add required parameters
         for param, param_desc in self.parameters.items():
-            desc.append(f"  - {param}: {param_desc}")
+            desc.append(f"  {param}: {param_desc}")
         
-        # Add examples if available
+        # Add one key example if available
         if self.examples:
-            desc.append("\nExamples:")
-            for name, example in self.examples.items():
-                desc.append(f"  - {name}: {example}")
+            example_name, example = next(iter(self.examples.items()))
+            desc.append(f"\nExample: {example}")
         
         return "\n".join(desc)
     

@@ -9,85 +9,79 @@ logger = logging.getLogger(__name__)
 
 @tool(tool_id="math", name="Math Operations")
 class MathTool(Tool):
-    """数学表达式计算工具。
+    """Execute mathematical calculations."""
     
-    重要规则：
-    1. 仅支持直接的数值表达式，不支持变量
-    2. 表达式必须遵循 Python 语法规则：
-       - 使用 ** 表示幂运算（不是 ^）
-       - 使用 * 表示乘法（不是 ×）
-       - 使用 / 表示除法（不是 ÷）
-       - 使用小括号 () 进行分组（不是 [] 或 {}）
-       - 小数使用点号 . （不是逗号 ,）
-    3. 所有数字必须是实际的数值
-    """
-    
-    def __init__(self):
+    def __init__(self, tool_id: str = "math"):
+        examples = {
+            "basic": 'expression: "2 + 2"'
+        }
+        
         super().__init__(
-            tool_id="math",
-            name="数学运算",
+            tool_id=tool_id,
+            name="Math Expression Evaluation",
             description=(
-                "执行数学计算和运算。\n"
-                "支持基本运算、三角函数、对数等。\n"
+                "Evaluate direct mathematical expressions.\n"
                 "\n"
-                "适用场景：\n"
-                "- 复杂计算\n"
-                "- 三角函数计算\n"
-                "- 对数计算\n"
-                "- 数学常量运算\n"
-                "- 数值比较\n"
+                "Supports: +, -, *, /, **, sqrt, sin, cos, tan, log\n"
+                "Constants: pi, e\n"
                 "\n"
-                "使用规则：\n"
-                "1. 代码必须是有效的Python数学表达式\n"
-                "2. 仅支持数值运算，不支持变量\n"
-                "3. 比较运算返回 True/False\n"
-                "4. 支持所有比较运算符：>, <, >=, <=, ==, !=\n"
-                "5. 可以使用括号组合多个比较\n"
-                "\n"
-                "有效表达式示例：\n"
-                '- "2 + 2"              # 基本加法\n'
-                '- "10 * 5 + 3"        # 乘法和加法\n'
-                '- "2 ** 3"            # 幂运算（2³）\n'
-                '- "(10 + 5) * 2"      # 使用括号分组\n'
-                '- "3.14 * (10 ** 2)"  # 使用小数点\n'
-                '- "abs(-42)"          # 函数调用\n'
-                '- "sqrt(16) + 2"      # 数学函数\n'
-                '- "sin(3.14159 / 2)"  # 三角函数\n'
-                '- "log(100)"          # 对数运算\n'
-                '- "pi * 2"            # 使用常量\n'
-                '- "3**20 > 2**30"     # 数值比较\n'
-                '- "100 <= 2**10"      # 比较运算\n'
-                '- "sqrt(100) == 10"   # 相等性检查\n'
-                "\n"
-                "无效表达式示例：\n"
-                '- "x + y"              （不允许使用变量）\n'
-                '- "2 ^ 3"             （幂运算应使用 **，不是 ^）\n'
-                '- "5 × 3"             （乘法应使用 *，不是 ×）\n'
-                '- "10 ÷ 2"            （除法应使用 /，不是 ÷）\n'
-                '- "3,14 * 2"          （小数应使用点号，不是逗号）\n'
-                '- "[1 + 2] * 3"       （应使用小括号，不是方括号）\n'
-                '- "distance * 2"       （必须使用实际数值）\n'
-                '- "price + tax"        （不允许使用变量名）\n'
-                '- "北京 - 上海"        （不允许使用文本）'
+                "Rules:\n"
+                "• Only direct calculations\n"
+                "• No variables or assignments\n"
+                "• Single line expressions only"
             ),
             parameters={
-                "expression": "要计算的数学表达式（必需）",
-                "precision": "结果小数位数（可选，默认：4）"
+                "expression": "Math expression to evaluate (required)",
+                "precision": "Decimal places (optional, default 4)"
             },
-            examples={
-                "基本运算": 'expression: "2 + 2 * 3"',
-                "三角函数": 'expression: "sin(45)"',
-                "对数运算": 'expression: "log(100)"',
-                "指定精度": 'expression: "pi", precision: 6',
-                "数值比较": 'expression: "3**20 > 2**30"',
-                "复合比较": 'expression: "(2**10 > 1000) and (3**5 < 300)"'
-            }
+            examples=examples
         )
     
-    def execute(self, expression: str, precision: int = 4) -> Dict[str, Any]:
-        """执行数学计算"""
+    def _validate_expression(self, expression: str) -> bool:
+        """Validate math expression before execution"""
+        # 定义合法字符集
+        valid_chars = set('0123456789.+-*/()= \t\n' + 
+                         'abcdefghijklmnopqrstuvwxyz' +  # 函数名如 sqrt, sin 等
+                         'ABCDEFGHIJKLMNOPQRSTUVWXYZ_')  # 常量名如 pi, e 等
+        
+        # 检查是否只包含合法字符
+        invalid_chars = set(expression) - valid_chars
+        if invalid_chars:
+            return False, f"Invalid characters in expression: {', '.join(invalid_chars)}"
+        
+        # 检查括号匹配
+        if expression.count('(') != expression.count(')'):
+            return False, "Unmatched parentheses in expression"
+        
+        # 检查基本语法
         try:
-            # 创建安全的数学上下文
+            compile(expression, '<string>', 'eval')
+            return True, ""
+        except SyntaxError:
+            return False, "Invalid expression syntax"
+    
+    def execute(self, expression: str, precision: int = 4) -> Dict[str, Any]:
+        """Execute math expression"""
+        # 验证表达式
+        is_valid, error_msg = self._validate_expression(expression)
+        if not is_valid:
+            return {
+                "success": False,
+                "error": error_msg,
+                "result": {
+                    "stderr": error_msg,
+                    "returncode": -1,
+                    "expression": expression,
+                    "precision": precision
+                }
+            }
+        
+        try:
+            # Validate expression
+            if "=" in expression or ";" in expression or "\n" in expression:
+                raise ValueError("Invalid expression: No assignments, semicolons, or multiple lines allowed")
+            
+            # Create safe math context
             math_context = {
                 'sin': math.sin,
                 'cos': math.cos,
@@ -101,20 +95,17 @@ class MathTool(Tool):
                 'pow': pow
             }
             
-            # 在安全上下文中计算表达式
+            # Evaluate expression in restricted context
             result = eval(expression, {"__builtins__": {}}, math_context)
             
-            # 如果结果是数值，进行精度控制
+            # Round if numeric
             if isinstance(result, (int, float)):
                 result = round(result, precision)
-            
-            # 转换结果为字符串
-            result_str = str(result)
             
             return {
                 "success": True,
                 "result": {
-                    "stdout": result_str,
+                    "stdout": str(result),
                     "stderr": "",
                     "returncode": 0,
                     "expression": expression,
@@ -123,12 +114,18 @@ class MathTool(Tool):
             }
             
         except Exception as e:
+            error_msg = str(e)
+            if "=" in expression:
+                error_msg = "Variables and assignments are not allowed"
+            elif ";" in expression or "\n" in expression:
+                error_msg = "Only single-line direct calculations are allowed"
+                
             return {
                 "success": False,
-                "error": str(e),
+                "error": error_msg,
                 "result": {
                     "stdout": "",
-                    "stderr": str(e),
+                    "stderr": error_msg,
                     "returncode": -1,
                     "expression": expression,
                     "precision": precision
