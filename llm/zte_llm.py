@@ -55,7 +55,7 @@ class ZteLLM(BaseLLM):
             "model": self.model
         }
         
-        result = self._make_request("completion", data)
+        result = self._make_request("chat", data)
         return result["result"]
     
     def get_model_name(self) -> str:

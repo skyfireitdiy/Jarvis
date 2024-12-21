@@ -4,63 +4,67 @@ from .base import Tool, tool
 
 @tool(tool_id="shell", name="Shell Command Execution")
 class ShellTool(Tool):
-    """Execute shell commands with safety constraints.
+    """执行Shell命令工具。
     
-    IMPORTANT RULES:
-    1. Commands MUST NOT be long-running or take too long to execute
-    2. Each command has a strict timeout limit (default 30 seconds)
-    3. Commands should be simple and complete quickly
-    4. For long-running tasks, break them into smaller steps
-    5. Background processes and daemons are NOT allowed
-    
-    Examples of VALID commands:
-    - "ls -la"           (List files)
-    - "pwd"             (Show current directory) 
-    - "cat file.txt"    (Read file content)
-    - "echo 'test'"     (Print text)
-    
-    Examples of INVALID commands:
-    - "while true; do echo 'loop'; done"  (Infinite loop)
-    - "sleep 100"                         (Long delay)
-    - "npm install"                       (Long package install)
-    - "python train.py"                   (Long training job)
-    - "mongod"                            (Background daemon)
-    - "ping www.baidu.com"                (Long-running command)
+    重要规则：
+    1. 命令不能长时间运行
+    2. 每个命令都有严格的超时限制（默认30秒）
+    3. 命令应该简单且能快速完成
+    4. 对于长时间任务，需要拆分成更小的步骤
+    5. 不允许后台进程和守护进程
     """
     
     def __init__(self, tool_id: str = "shell"):
         examples = {
-            "List files": 'command: "ls -la"',
-            "Show directory": 'command: "pwd"',
-            "Read file": 'command: "cat file.txt"',
-            "With timeout": 'command: "sleep 5", timeout: 10'
+            "列出文件": 'command: "ls -la"',
+            "显示目录": 'command: "pwd"',
+            "读取文件": 'command: "cat file.txt"',
+            "带超时": 'command: "sleep 5", timeout: 10'
         }
         
         super().__init__(
             tool_id=tool_id,
-            name="Shell Command Execution",
+            name="Shell命令执行",
             description=(
-                "Execute shell commands with built-in safety constraints and timeout protection. "
-                "Commands MUST complete quickly (default 30s timeout). "
-                "Long-running commands, background processes, and daemons are NOT allowed. "
-                "Break long tasks into smaller steps."
+                "执行Shell命令，内置安全限制和超时保护。\n"
+                "命令必须快速完成（默认30秒超时）。\n"
+                "\n"
+                "使用规则：\n"
+                "1. 命令必须快速完成执行\n"
+                "2. 不允许长时间运行的命令\n"
+                "3. 不允许后台进程和守护进程\n"
+                "4. 长任务需要拆分成小步骤\n"
+                "\n"
+                "有效命令示例：\n"
+                '- "ls -la"           # 列出文件\n'
+                '- "pwd"             # 显示当前目录\n'
+                '- "cat file.txt"    # 读取文件内容\n'
+                '- "echo \'test\'"     # 打印文本\n'
+                "\n"
+                "无效命令示例：\n"
+                '- "while true; do echo \'loop\'; done"  # 无限循环\n'
+                '- "sleep 100"                         # 长时间延迟\n'
+                '- "npm install"                       # 长时间安装\n'
+                '- "python train.py"                   # 长时间训练\n'
+                '- "mongod"                            # 后台守护进程\n'
+                '- "ping www.baidu.com"                # 持续运行命令'
             ),
             parameters={
-                "command": "Shell command to execute (required)",
-                "timeout": "Timeout in seconds (optional, default: 30)"
+                "command": "要执行的Shell命令（必需）",
+                "timeout": "超时时间，单位秒（可选，默认30）"
             },
             examples=examples
         )
     
     def execute(self, command: str, timeout: int = 30) -> Dict[str, Any]:
-        """Execute a shell command
+        """执行Shell命令
         
-        Args:
-            command (str): Shell command to execute (REQUIRED)
-            timeout (int, optional): Timeout in seconds. Defaults to 30.
+        参数：
+            command (str): 要执行的Shell命令（必需）
+            timeout (int, optional): 超时时间（秒）。默认30秒。
             
-        Returns:
-            Dict[str, Any]: Result containing stdout, stderr, and return code
+        返回：
+            Dict[str, Any]: 包含标准输出、标准错误和返回码的结果
         """
         try:
             result = subprocess.run(
@@ -84,10 +88,10 @@ class ShellTool(Tool):
         except subprocess.TimeoutExpired:
             return {
                 "success": False,
-                "error": f"Command timed out after {timeout} seconds",
+                "error": f"命令在 {timeout} 秒后超时",
                 "result": {
                     "stdout": "",
-                    "stderr": f"Timeout after {timeout}s",
+                    "stderr": f"{timeout}秒后超时",
                     "returncode": -1,
                     "command": command
                 }

@@ -5,78 +5,59 @@ from typing import Dict, Type, Callable
 from .base import BaseLLM
 
 class LLMDiscovery:
-    """LLM discovery and auto-registration"""
+    """Discover LLM implementations"""
     
     @staticmethod
-    def discover_llms(llm_dir: str = None) -> Dict[str, Callable[..., BaseLLM]]:
-        """
-        Discover all LLM factory functions in the llm directory
-        
-        Args:
-            llm_dir: Directory to scan for LLMs. If None, uses current directory
-        
-        Returns:
-            Dict of LLM name to factory function
-        """
-        if llm_dir is None:
-            llm_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        print(f"Scanning directory for LLMs: {llm_dir}")
+    def discover_llms(llms_dir: str = None) -> Dict[str, Callable]:
+        """Discover all LLM factory functions"""
+        if llms_dir is None:
+            llms_dir = os.path.dirname(os.path.abspath(__file__))
+            
+        print(f"Scanning directory for LLMs: {llms_dir}")
         llm_factories = {}
         
-        # Get all .py files in the llm directory
-        for filename in os.listdir(llm_dir):
+        # Get all .py files in the llms directory
+        for filename in os.listdir(llms_dir):
             if filename.endswith('.py') and not filename.startswith('_'):
                 print(f"Found LLM file: {filename}")
-                # Get module name without .py
-                module_name = filename[:-3]
-                
-                # Skip base and discovery modules
-                if module_name in ['base', 'discovery']:
-                    continue
+                # Convert filename to module name
+                module_name = f".{filename[:-3]}"  # Remove .py
                 
                 try:
                     # Import the module
-                    module = importlib.import_module(f".{module_name}", package="llm")
+                    module = importlib.import_module(module_name, package="llm")
                     
-                    # Find factory function that returns BaseLLM
-                    for name, obj in inspect.getmembers(module):
-                        if (inspect.isfunction(obj) and 
-                            name == 'create_llm' and
-                            inspect.signature(obj).return_annotation == BaseLLM):
-                            
-                            # Use module name as LLM name
-                            llm_name = module_name.replace('_llm', '')
-                            llm_factories[llm_name] = obj
-                            print(f"Discovered LLM factory: {name} from {filename}")
-                            
+                    # Look for create_llm function
+                    if hasattr(module, 'create_llm'):
+                        factory_name = filename[:-3]  # Remove .py
+                        llm_factories[factory_name] = module.create_llm
+                        print(f"Discovered LLM factory: create_llm from {filename}")
+                        
                 except Exception as e:
                     print(f"Error loading LLM module {filename}: {e}")
-                    import traceback
-                    traceback.print_exc()
                     
         return llm_factories
 
 class LLMRegistry:
-    """LLM registry with auto-discovery capabilities"""
+    """Registry for LLM implementations"""
     
-    def __init__(self, llm_dir: str = None):
-        self.llm_factories = {}
-        self.llm_dir = llm_dir
+    def __init__(self):
+        self.factories = {}
         self._discover_and_register()
     
     def _discover_and_register(self):
-        """Discover and register all available LLM factories"""
-        self.llm_factories = LLMDiscovery.discover_llms(self.llm_dir)
+        """Discover and register all available LLMs"""
+        discovered = LLMDiscovery.discover_llms()
+        self.factories.update(discovered)
     
-    def create_llm(self, llm_name: str, **kwargs) -> BaseLLM:
-        """Create an LLM instance by name"""
-        factory = self.llm_factories.get(llm_name)
-        if factory is None:
-            available = ', '.join(self.llm_factories.keys())
-            raise ValueError(f"Unknown LLM: {llm_name}. Available LLMs: {available}")
-        return factory(**kwargs)
-    
-    def list_llms(self) -> list:
-        """List all registered LLM names"""
-        return list(self.llm_factories.keys())
+    def create_llm(self, model_name: str = "ollama", **kwargs) -> BaseLLM:
+        """Create LLM instance by name"""
+        # Extract the base model name (e.g., "zte" from "zte-nebulacoder")
+        base_model = model_name.split('-')[0] if '-' in model_name else model_name
+        
+        # Look for factory function
+        factory = self.factories.get(f"{base_model}_llm")
+        if factory:
+            return factory(**kwargs)
+            
+        raise ValueError(f"Unknown LLM model: {model_name}")
