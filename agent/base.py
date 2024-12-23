@@ -25,7 +25,8 @@ class BaseAgent(ABC):
     def __init__(self, llm: BaseLLM, tool_registry=None, verbose: bool = False):
         self.state = AgentState.IDLE
         self.logger = Logger()
-        self.tool_registry = tool_registry or ToolRegistry()
+        from tools import registry
+        self.tool_registry = tool_registry or registry
         self.tried_combinations: Set[tuple] = set()
         
         # Initialize LLM if provided

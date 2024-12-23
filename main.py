@@ -5,13 +5,13 @@ import argparse
 from typing import Optional, Dict
 from colorama import init, Fore, Style
 from dotenv import load_dotenv
+from tools import registry, ToolRegistry
+from llm import create_llm
 
 # Load environment variables from .env file
 load_dotenv()
 
 from agent.llama_agent import LlamaAgent
-from tools import ToolRegistry
-from llm import create_llm
 
 def parse_llm_params(params_list: Optional[list]) -> Dict:
     """Parse LLM parameters from command line"""
@@ -61,15 +61,20 @@ def setup_argument_parser() -> argparse.ArgumentParser:
 
 def setup_tools(tools_dir: Optional[str] = None) -> ToolRegistry:
     """Setup and discover tools"""
-    # Create a new registry instance with the specified directory
-    tool_registry = ToolRegistry(tools_dir=tools_dir)
+    # Use the global registry instance instead of creating a new one
+    from tools import registry
+    
+    # If tools_dir is specified, update the registry's tools_dir and rediscover
+    if tools_dir:
+        registry.tools_dir = tools_dir
+        registry._discover_and_register()
     
     # Print discovered tools
     print(f"{Fore.CYAN}Discovered tools:{Style.RESET_ALL}")
-    for tool_id in tool_registry.list_tools():
+    for tool_id in registry.list_tools():
         print(f"  • {tool_id}")
     
-    return tool_registry
+    return registry
 
 def main():
     """Main entry point"""

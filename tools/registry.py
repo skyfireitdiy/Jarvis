@@ -69,3 +69,9 @@ class ToolRegistry:
             if desc:
                 descriptions.append(desc)
         return "\n".join(descriptions) if descriptions else "No tools available" 
+    
+    def update_tools_dir(self, tools_dir: str):
+        """Update tools directory and rediscover tools"""
+        self.tools_dir = tools_dir
+        self.tools.clear()  # Clear existing tools
+        self._discover_and_register()
