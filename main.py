@@ -1,136 +1,80 @@
-#!/usr/bin/env python3
-import os
+from ollama_agent import OllamaAgent
+from utils import PrettyOutput, OutputType
 import sys
-import argparse
-from typing import Optional, Dict
-from colorama import init, Fore, Style
-from dotenv import load_dotenv
-from tools import registry, ToolRegistry
-from llm import create_llm
 
-# Load environment variables from .env file
-load_dotenv()
-
-from agent.llama_agent import LlamaAgent
-
-def parse_llm_params(params_list: Optional[list]) -> Dict:
-    """Parse LLM parameters from command line"""
-    if not params_list:
-        return {}
-    
-    params = {}
-    for param in params_list:
-        key, value = param.split('=', 1)
-        # Try to convert to appropriate type
-        try:
-            # Try as int
-            params[key] = int(value)
-        except ValueError:
-            try:
-                # Try as float
-                params[key] = float(value)
-            except ValueError:
-                # Keep as string
-                params[key] = value
-    return params
-
-def setup_llm(args):
-    """Setup LLM based on command line arguments"""
-    llm_params = parse_llm_params(args.llm_params)
-    
-    try:
-        # Create LLM instance using the registry
-        llm = create_llm(args.model_name, **llm_params)
-        return llm
-    except Exception as e:
-        print(f"{Fore.RED}Error creating LLM: {e}{Style.RESET_ALL}")
-        sys.exit(1)
-
-def setup_argument_parser() -> argparse.ArgumentParser:
-    """Setup command line argument parser"""
-    parser = argparse.ArgumentParser(description='Jarvis AI Assistant')
-    parser.add_argument('-v', '--verbose', action='store_true',
-                       help='Print detailed interaction logs with LLM')
-    parser.add_argument('--model-name', default='ollama',
-                       help='Name of the LLM to use (e.g. ollama, openai, zte)')
-    parser.add_argument('--llm-params', nargs='+',
-                       help='Additional LLM parameters in format key=value')
-    parser.add_argument('--tools-dir',
-                       help='Directory containing additional tool implementations')
-    return parser
-
-def setup_tools(tools_dir: Optional[str] = None) -> ToolRegistry:
-    """Setup and discover tools"""
-    # Use the global registry instance instead of creating a new one
-    from tools import registry
-    
-    # If tools_dir is specified, update the registry's tools_dir and rediscover
-    if tools_dir:
-        registry.tools_dir = tools_dir
-        registry._discover_and_register()
-    
-    # Print discovered tools
-    print(f"{Fore.CYAN}Discovered tools:{Style.RESET_ALL}")
-    for tool_id in registry.list_tools():
-        print(f"  • {tool_id}")
-    
-    return registry
-
-def main():
-    """Main entry point"""
-    # Initialize colorama
-    init()
-    
-    # Parse command line arguments
-    parser = setup_argument_parser()
-    args = parser.parse_args()
-    
-    # Setup LLM
-    llm = setup_llm(args)
-    print(f"{Fore.GREEN}Using LLM: {args.model_name}{Style.RESET_ALL}")
-    
-    # Setup tools
-    tool_registry = setup_tools(args.tools_dir)
-    
-    # Create agent
-    agent = LlamaAgent(llm=llm, tool_registry=tool_registry, verbose=args.verbose)
-    
-    # Start REPL
-    print("\nWelcome to Jarvis! How can I help you today?")
-    print("Type 'exit' or press Ctrl+C to quit")
-    print(f"{Fore.CYAN}(For multiline input, press Enter twice or type 'done' to finish){Style.RESET_ALL}\n")
+def get_multiline_input() -> str:
+    """获取多行输入，直到输入空行或特定命令为止"""
+    PrettyOutput.print("请输入您的问题 (输入空行完成，'quit'退出):", OutputType.INFO)
+    lines = []
     
     while True:
         try:
-            lines = []
-            print(f"{Fore.GREEN}>{Style.RESET_ALL}", end=" ")
-            while True:
-                line = input().strip()
-                if not line:
-                    if not lines:  # First empty line without input
-                        continue
-                    break  # Second empty line or empty line after input
-                if line.lower() == 'exit':
-                    print("Exiting...")
-                    return
-                if line.lower() == 'done':
-                    break
-                lines.append(line)
+            line = input("... " if lines else ">>> ")
             
-            if not lines:
+            # 检查特殊命令
+            if not lines and line.strip().lower() in ['quit', 'exit']:
+                return 'quit'
+            
+            # 如果是空行且已有输入，则结束输入
+            if not line and lines:
+                break
+            # 如果是空行且没有输入，继续等待
+            elif not line:
                 continue
                 
-            task = "\n".join(lines)
-            agent.process_input(task)
+            lines.append(line)
             
         except KeyboardInterrupt:
-            print("\nExiting...")
-            break
-        except Exception as e:
-            print(f"\n{Fore.RED}Error: {str(e)}{Style.RESET_ALL}")
-            if args.verbose:
-                import traceback
-                traceback.print_exc()
+            PrettyOutput.print("\n输入已取消", OutputType.ERROR)
+            return ""
+        except EOFError:
+            return 'quit'
+    
+    return '\n'.join(lines)
 
-if __name__ == '__main__':
-    main() 
+def print_welcome():
+    """打印欢迎信息"""
+    welcome_msg = """
+🤖 欢迎使用 Ollama Agent
+"""
+    PrettyOutput.print(welcome_msg, OutputType.INFO)
+
+def main():
+    # 创建agent实例
+    agent = OllamaAgent(model_name="qwen2.5:14b")
+    
+    print_welcome()
+    
+    while True:
+        try:
+            # 获取用户输入
+            user_input = get_multiline_input()
+            
+            # 处理特殊命令
+            if not user_input:
+                continue
+            elif user_input == 'quit':
+                PrettyOutput.print("再见！", OutputType.INFO)
+                break
+
+
+            
+            # 执行命令并获取响应
+            agent.run(user_input)
+            
+            # 打印分隔线
+            print("\n" + "─" * 50 + "\n")
+            
+        except KeyboardInterrupt:
+            PrettyOutput.print("\n操作已取消", OutputType.ERROR)
+            continue
+        except Exception as e:
+            PrettyOutput.print(f"发生错误: {str(e)}", OutputType.ERROR)
+            continue
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        PrettyOutput.print("\n程序已退出", OutputType.INFO)
+        sys.exit(0) 

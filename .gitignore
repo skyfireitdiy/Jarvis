@@ -3,3 +3,4 @@ __pycache__
 run.sh
 .vscode
 *.txt
+temp_scripts
