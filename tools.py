@@ -7,14 +7,11 @@ from pathlib import Path
 from utils import PrettyOutput, OutputType
 import sys
 import pkgutil
-from dotenv import load_dotenv
-from tavily import TavilyClient
+from duckduckgo_search import DDGS
+import requests
+from bs4 import BeautifulSoup
+import re
 
-# 加载环境变量
-load_dotenv()
-
-# 初始化 Tavily 客户端
-tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
 class PythonScript:
     """Python脚本管理类"""
@@ -70,7 +67,7 @@ class ToolRegistry:
         # 注册网络搜索工具
         self.register_tool(
             name="search",
-            description="使用Tavily搜索引擎获取信息",
+            description="使用DuckDuckGo搜索引擎获取信息",
             parameters={
                 "type": "object",
                 "properties": {
@@ -78,16 +75,15 @@ class ToolRegistry:
                         "type": "string",
                         "description": "搜索查询内容"
                     },
-                    "search_depth": {
-                        "type": "string",
-                        "description": "搜索深度，basic或comprehensive",
-                        "enum": ["basic", "comprehensive"],
-                        "default": "basic"
+                    "max_results": {
+                        "type": "integer",
+                        "description": "返回结果数量",
+                        "default": 5
                     }
                 },
                 "required": ["query"]
             },
-            func=self._search_tavily
+            func=self._search_ddg
         )
 
         # 注册shell命令执行工具
@@ -167,7 +163,7 @@ class ToolRegistry:
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "要执行的Python代码，记得使用print输出结果"
+                        "description": "要执行的Python代码，需要使用print来输出结果"
                     },
                     "dependencies": {
                         "type": "array",
@@ -210,6 +206,29 @@ class ToolRegistry:
             func=self._ask_user_confirmation
         )
 
+        # 注册网页读取工具
+        self.register_tool(
+            name="read_webpage",
+            description="读取网页内容，支持提取正文、标题等信息",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "要读取的网页URL"
+                    },
+                    "extract_type": {
+                        "type": "string",
+                        "description": "提取类型：'text'(正文文本), 'title'(标题), 'all'(所有信息)",
+                        "enum": ["text", "title", "all"],
+                        "default": "all"
+                    }
+                },
+                "required": ["url"]
+            },
+            func=self._read_webpage
+        )
+
     @staticmethod
     def _is_builtin_package(package_name: str) -> bool:
         """检查是否是Python内置包"""
@@ -230,6 +249,17 @@ class ToolRegistry:
         """执行Python代码"""
         try:
             script_path = PythonScript.generate_script_path(args.get("name"))
+
+            # 尝试对code进行JSON解码，以处理可能的多次编码情况
+            code = args["code"]
+            while True:
+                try:
+                    decoded_code = json.loads(code)
+                    if isinstance(decoded_code, str):
+                        code = decoded_code
+                except json.JSONDecodeError:
+                    # 如果解码失败，使用原始code
+                    break
 
             # 安装依赖
             install_output = []
@@ -266,7 +296,7 @@ class ToolRegistry:
             
             # 创建Python文件
             with open(script_path, "w", encoding="utf-8") as f:
-                f.write(args["code"])
+                f.write(code)  # 使用可能解码后的code
             
             # 执行代码并捕获输出
             execution_result = subprocess.run(
@@ -361,11 +391,11 @@ class ToolRegistry:
             
             # 如果是多行输入
             elif args.get("multiline"):
-                PrettyOutput.print("(输入空行完成)", OutputType.INFO)
+                PrettyOutput.print("\n(输入空行或finish完成)", OutputType.INFO)
                 lines = []
                 while True:
-                    line = input("... " if lines else "> ")
-                    if not line and lines:
+                    line = input("... " if lines else ">>> ").strip()
+                    if (not line and lines) or line.lower() == "finish":
                         break
                     if line:
                         lines.append(line)
@@ -373,7 +403,8 @@ class ToolRegistry:
             
             # 单行输入
             else:
-                response = input("> ").strip()
+                PrettyOutput.print("\n请输入您的回答:", OutputType.INFO)
+                response = input(">>> ").strip()
             
             return {
                 "success": True,
@@ -431,43 +462,95 @@ class ToolRegistry:
                 "error": str(e)
             }
 
-    def _search_tavily(self, args: Dict) -> Dict[str, Any]:
-        """使用Tavily API进行搜索"""
+    def _search_ddg(self, args: Dict) -> Dict[str, Any]:
+        """使用DuckDuckGo进行搜索"""
         try:
-            if not os.getenv("TAVILY_API_KEY"):
-                return {
-                    "success": False,
-                    "error": "未找到TAVILY_API_KEY环境变量"
-                }
-
-            # 发送请求
+            # 打印搜索查询
             PrettyOutput.print(f"搜索查询: {args['query']}", OutputType.INFO)
-            result = tavily_client.search(
-                query=args["query"],
-                search_depth=args.get("search_depth", "basic"),
-                max_results=5,
-                include_answer=True,
-                include_images=False
-            )
+            
+            # 获取搜索结果
+            with DDGS() as ddgs:
+                results = ddgs.text(
+                    keywords=args["query"],
+                    max_results=args.get("max_results", 5)
+                )
+            
+            return {
+                "success": True,
+                "stdout": results,
+                "stderr": ""
+            }
+
+        except Exception as e:
+            error_msg = f"搜索失败: {str(e)}"
+            return {
+                "success": False,
+                "error": error_msg
+            }
+
+    def _read_webpage(self, args: Dict) -> Dict[str, Any]:
+        """读取网页内容"""
+        try:
+            url = args["url"]
+            extract_type = args.get("extract_type", "all")
+            
+            # 设置请求头
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            # 发送请求
+            PrettyOutput.print(f"正在读取网页: {url}", OutputType.INFO)
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            # 使用正确的编码
+            response.encoding = response.apparent_encoding
+            
+            # 解析HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # 移除script和style标签
+            for script in soup(["script", "style"]):
+                script.decompose()
+            
+            result = {}
+            
+            # 提取标题
+            if extract_type in ["title", "all"]:
+                title = soup.title.string if soup.title else ""
+                result["title"] = title.strip() if title else "无标题"
+            
+            # 提取正文
+            if extract_type in ["text", "all"]:
+                # 获取正文内容
+                text = soup.get_text(separator='\n', strip=True)
+                # 清理空行
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                # 合并短行
+                cleaned_lines = []
+                current_line = ""
+                for line in lines:
+                    if len(current_line) < 80:  # 假设一行最大80字符
+                        current_line += " " + line if current_line else line
+                    else:
+                        if current_line:
+                            cleaned_lines.append(current_line)
+                        current_line = line
+                if current_line:
+                    cleaned_lines.append(current_line)
+                
+                result["text"] = "\n".join(cleaned_lines)
             
             # 构建输出
             output = []
-            
-            # 添加AI生成的答案
-            if result.get("answer"):
-                output.append("AI回答:")
-                output.append(result["answer"])
+            if "title" in result:
+                output.append(f"标题: {result['title']}")
                 output.append("")
             
-            # 添加搜索结果
-            if result.get("results"):
-                output.append("搜索结果:")
-                for i, item in enumerate(result["results"], 1):
-                    output.append(f"\n{i}. {item['title']}")
-                    output.append(f"   链接: {item['url']}")
-                    # 检查不同可能的摘要字段
-                    summary = item.get('snippet') or item.get('content') or item.get('summary') or "无摘要"
-                    output.append(f"   摘要: {summary}")
+            if "text" in result:
+                output.append("正文内容:")
+                output.append(result["text"])
             
             return {
                 "success": True,
@@ -475,11 +558,14 @@ class ToolRegistry:
                 "stderr": ""
             }
 
+        except requests.RequestException as e:
+            error_msg = f"网页请求失败: {str(e)}"
+            return {
+                "success": False,
+                "error": error_msg
+            }
         except Exception as e:
-            # 添加更详细的错误信息
-            error_msg = f"搜索失败: {str(e)}"
-            if isinstance(e, AttributeError):
-                error_msg += f"\n结果结构: {str(result)}"
+            error_msg = f"解析网页失败: {str(e)}"
             return {
                 "success": False,
                 "error": error_msg

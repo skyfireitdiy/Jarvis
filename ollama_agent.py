@@ -25,6 +25,12 @@ class OllamaAgent:
                 3. 使用execute_python处理数据
                 4. 如果缺少信息，使用ask_user询问
                 5. 在给出答案前，必须说明数据来源
+                6. 对于search返回的网页链接，可以使用read_webpage工具获取详细内容
+                
+                工具使用建议：
+                1. 先用search工具搜索相关信息
+                2. 如果搜索结果中有感兴趣的网页，使用read_webpage工具读取其内容
+                3. 根据网页内容提供更详细的答案
                 
                 禁止事项：
                 1. 不要猜测或捏造数据
@@ -44,12 +50,24 @@ class OllamaAgent:
                 </tool_call>
                 
                 示例：
+                1. 搜索并读取网页：
                 <tool_call>
                 {
-                    "name": "execute_python",
+                    "name": "search",
                     "arguments": {
-                        "code": "print('Hello World')",
-                        "dependencies": []
+                        "query": "Python GIL",
+                        "max_results": 3
+                    }
+                }
+                </tool_call>
+                
+                对感兴趣的搜索结果使用read_webpage：
+                <tool_call>
+                {
+                    "name": "read_webpage",
+                    "arguments": {
+                        "url": "https://example.com/python-gil",
+                        "extract_type": "all"
                     }
                 }
                 </tool_call>"""
@@ -109,11 +127,17 @@ class OllamaAgent:
     def _extract_tool_calls(self, content: str) -> List[Dict]:
         """从内容中提取工具调用"""
         tool_calls = []
-        matches = self.tool_call_pattern.finditer(content)
+        # 修改正则表达式以更好地处理多行内容
+        pattern = re.compile(
+            r'<tool_call>\s*({(?:[^{}]|(?:{[^{}]*})|(?:{(?:[^{}]|{[^{}]*})*}))*})\s*</tool_call>',
+            re.DOTALL  # 添加DOTALL标志以匹配跨行内容
+        )
         
+        matches = pattern.finditer(content)
         for match in matches:
             try:
-                tool_call = json.loads(match.group(1))
+                tool_call_str = match.group(1).strip()
+                tool_call = json.loads(tool_call_str)
                 if isinstance(tool_call, dict) and "name" in tool_call and "arguments" in tool_call:
                     tool_calls.append({
                         "function": {
@@ -121,7 +145,11 @@ class OllamaAgent:
                             "arguments": tool_call["arguments"]
                         }
                     })
-            except json.JSONDecodeError:
+                else:
+                    PrettyOutput.print(f"无效的工具调用格式: {tool_call_str}", OutputType.ERROR)
+            except json.JSONDecodeError as e:
+                PrettyOutput.print(f"JSON解析错误: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"解析内容: {tool_call_str}", OutputType.ERROR)
                 continue
         
         return tool_calls
@@ -131,7 +159,7 @@ class OllamaAgent:
         # 检查是否是结束命令
         self.clear_history()
         while True:
-            if user_input.strip().lower() == "finish":
+            if user_input.strip().lower() == "finish" or user_input.strip().lower() == "":
                 # 获取最终确认
                 try:
                     result = self.tool_registry.execute_tool(
@@ -226,9 +254,10 @@ class OllamaAgent:
                     outputs.append(final_content)
                 
                 # 如果没有工具调用且响应很短，可能需要继续对话
-                PrettyOutput.print("\n您可以继续输入，或输入'finish'结束当前任务", OutputType.INFO)
-                user_input = input("请输入: ")
-                if user_input.strip().lower() == "finish":
+                PrettyOutput.print("\n您可以继续输入，或输入'finish'或者直接回车结束当前任务", OutputType.INFO)
+                PrettyOutput.print("\n请输入您的回答:", OutputType.INFO)
+                user_input = input(">>> ").strip()
+                if user_input.strip().lower() == "finish" or user_input.strip().lower() == "":
                     break
                 
             except Exception as e:
