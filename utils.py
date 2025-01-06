@@ -81,3 +81,26 @@ class PrettyOutput:
     @staticmethod
     def print(text: str, output_type: OutputType, timestamp: bool = True):
         print(PrettyOutput.format(text, output_type, timestamp)) 
+
+def get_multiline_input() -> str:
+    """获取多行输入"""
+    PrettyOutput.print("\n请输入您的回答:", OutputType.INFO)
+    lines = []
+    
+    while True:
+        try:
+            line = input("... " if lines else ">>> ").strip()
+            
+            # 检查是否结束输入
+            if not line or line.lower() == "finish":
+                if not lines:  # 如果是第一行就输入空行或finish
+                    return "finish"
+                break
+            
+            lines.append(line)
+            
+        except KeyboardInterrupt:
+            PrettyOutput.print("\n输入已取消", OutputType.ERROR)
+            return "finish"
+    
+    return "\n".join(lines) 

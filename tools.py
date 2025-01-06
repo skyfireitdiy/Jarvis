@@ -589,3 +589,58 @@ class ToolRegistry:
         if tool is None:
             return {"success": False, "error": f"工具 {name} 不存在"}
         return tool.execute(arguments) 
+    
+    def tool_help_text(self) -> str:
+        """返回工具帮助文本"""
+        return """工作原则：
+1. 使用search工具获取事实信息
+2. 使用execute_shell获取系统信息
+3. 使用execute_python处理数据
+4. 如果缺少信息，使用ask_user询问
+5. 在给出答案前，必须说明数据来源
+6. 对于search返回的网页链接，可以使用read_webpage工具获取详细内容
+
+工具使用建议：
+1. 先用search工具搜索相关信息
+2. 如果搜索结果中有感兴趣的网页，使用read_webpage工具读取其内容
+3. 根据网页内容提供更详细的答案
+
+禁止事项：
+1. 不要猜测或捏造数据
+2. 不要使用未经验证的信息
+3. 如果工具执行失败，要说明原因
+4. 如果无法获取数据，要诚实告知
+
+工具调用格式：
+<tool_call>
+{
+    "name": "工具名称",
+    "arguments": {
+        "参数1": "值1",
+        "参数2": "值2"
+    }
+}
+</tool_call>
+
+示例：
+1. 搜索并读取网页：
+<tool_call>
+{
+    "name": "search",
+    "arguments": {
+        "query": "Python GIL",
+        "max_results": 3
+    }
+}
+</tool_call>
+
+对感兴趣的搜索结果使用read_webpage：
+<tool_call>
+{
+    "name": "read_webpage",
+    "arguments": {
+        "url": "https://example.com/python-gil",
+        "extract_type": "all"
+    }
+}
+</tool_call>"""
