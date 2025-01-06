@@ -591,39 +591,38 @@ class ToolRegistry:
         return tool.execute(arguments) 
     
     def tool_help_text(self) -> str:
-        """返回工具帮助文本"""
-        return """工作原则：
-1. 使用search工具获取事实信息
-2. 使用execute_shell获取系统信息
-3. 使用execute_python处理数据
-4. 如果缺少信息，使用ask_user询问
-5. 在给出答案前，必须说明数据来源
-6. 对于search返回的网页链接，可以使用read_webpage工具获取详细内容
+        return """Working Principles:
+1. Use search tool to obtain factual information
+2. Use execute_shell to get system information
+3. Use execute_python to process data
+4. Use ask_user to inquire if information is missing
+5. Must cite data sources before providing answers
+6. For search-returned webpage links, use read_webpage tool to get detailed content
 
-工具使用建议：
-1. 先用search工具搜索相关信息
-2. 如果搜索结果中有感兴趣的网页，使用read_webpage工具读取其内容
-3. 根据网页内容提供更详细的答案
+Tool Usage Guidelines:
+1. First use search tool to find relevant information
+2. If search results contain interesting webpages, use read_webpage tool to read their content
+3. Provide more detailed answers based on webpage content
 
-禁止事项：
-1. 不要猜测或捏造数据
-2. 不要使用未经验证的信息
-3. 如果工具执行失败，要说明原因
-4. 如果无法获取数据，要诚实告知
+Prohibited Actions:
+1. Do not guess or fabricate data
+2. Do not use unverified information
+3. If tool execution fails, explain the reason
+4. If data cannot be obtained, honestly acknowledge it
 
-工具调用格式：
+Tool Call Format:
 <tool_call>
 {
-    "name": "工具名称",
+    "name": "tool_name",
     "arguments": {
-        "参数1": "值1",
-        "参数2": "值2"
+        "param1": "value1",
+        "param2": "value2"
     }
 }
 </tool_call>
 
-示例：
-1. 搜索并读取网页：
+Examples:
+1. Search and read webpage:
 <tool_call>
 {
     "name": "search",
@@ -634,7 +633,7 @@ class ToolRegistry:
 }
 </tool_call>
 
-对感兴趣的搜索结果使用read_webpage：
+For interesting search results, use read_webpage:
 <tool_call>
 {
     "name": "read_webpage",
