@@ -22,39 +22,6 @@ class Agent:
         ]
         self.spinner = Spinner()
 
-    def _compress_conversion(self, messages: List[Dict]) -> List[Dict]:
-        """压缩对话历史，提取关键信息并生成新的压缩后的对话记录"""
-        # 保留系统消息
-        PrettyOutput.print("压缩对话历史", OutputType.INFO)
-        compressed_messages = [messages[0]]
-        
-        # 构建提示信息，要求模型总结对话
-        summary_prompt = {
-            "role": "user",
-            "content": """As we are approaching the token limit, please summarize the key points of our previous conversation, including:
-
-1. User's main questions and requirements
-2. Key information that has been confirmed
-3. Important tool calls that were executed and their results
-4. Outstanding issues that need to be addressed
-
-Please organize the information in concise bullet points, ensuring no critical information is lost. This summary will serve as the new context for our conversation."""
-        }
-        
-        # 调用模型生成总结
-        summary_response = self._call_model(messages + [summary_prompt], use_tools=False)
-        summary_content = summary_response["message"].get("content", "")
-        
-        # 添加压缩后的上下文消息
-        compressed_messages.append({
-            "role": "system",
-            "content": f"Summary of previous conversation:\n{summary_content}"
-        })
-        
-        return compressed_messages
-            
-
-
     def _call_model(self, messages: List[Dict], use_tools: bool = True) -> Dict:
         """调用模型获取响应"""
         self.spinner.start()
@@ -86,22 +53,15 @@ Please organize the information in concise bullet points, ensuring no critical i
             if result["success"]:
                 stdout = result["stdout"]
                 stderr = result.get("stderr", "")
-                
-                # 如果任一输出超过1024字符，则保存到文件
-                if len(stdout) > 1024 or len(stderr) > 1024:
-                    output = save_long_output(stdout, stderr, name, args)
-                else:
-                    output_parts = []
-                    output_parts.append(f"执行结果:\n{stdout}")
-                    if stderr:
-                        output_parts.append(f"错误:\n{stderr}")
-                    output = "\n\n".join(output_parts)
+
+                output_parts = []
+                output_parts.append(f"执行结果:\n{stdout}")
+                if stderr:
+                    output_parts.append(f"错误:\n{stderr}")
+                output = "\n\n".join(output_parts)
             else:
                 error_msg = result["error"]
-                if len(error_msg) > 1024:
-                    output = save_long_output(stderr=error_msg, name=name, args=args)
-                else:
-                    output = f"执行失败: {error_msg}"
+                output = f"执行失败: {error_msg}"
                     
             results.append(output)
         return "\n".join(results)
@@ -116,10 +76,6 @@ Please organize the information in concise bullet points, ensuring no critical i
             "content": user_input
         })
         while True:
-            # 检查消息数量是否需要压缩（比如超过10条）
-            if len(self.messages) > 10:
-                self.messages = self._compress_conversion(self.messages)
-                
             try:
                 # 获取初始响应
                 response = self._call_model(self.messages)
@@ -142,9 +98,6 @@ Please organize the information in concise bullet points, ensuring no critical i
                     tool_result = self.tool_registry.handle_tool_calls(current_response["message"]["tool_calls"])
                     PrettyOutput.print(tool_result, OutputType.RESULT)
 
-                    if self.model.max_conversation_count() < len(self.messages):
-                        self.messages = self._compress_conversion(self.messages)
-
                     self.messages.append({
                         "role": "tool",
                         "content": tool_result
@@ -163,9 +116,6 @@ Please organize the information in concise bullet points, ensuring no critical i
                 if  not user_input:
                     PrettyOutput.print("===============任务结束===============", OutputType.INFO)
                     break
-
-                if self.model.max_conversation_count() < len(self.messages):
-                    self.messages = self._compress_conversion(self.messages)
                 
                 self.messages.append({
                     "role": "user",

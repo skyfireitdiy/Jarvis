@@ -16,11 +16,6 @@ class BaseModel(ABC):
         """执行对话"""
         pass
 
-    @abstractmethod
-    def max_conversation_count(self) -> int:
-        """返回模型支持的最大对话轮数"""
-        pass
-
     @staticmethod
     def extract_tool_calls(content: str) -> List[Dict]:
         """从内容中提取工具调用"""
@@ -73,10 +68,6 @@ class DDGSModel(BaseModel):
             prompt += f"[{message['role']}]: {message['content']}\n"
         return prompt
 
-    def max_conversation_count(self) -> int:
-        """返回模型支持的最大对话轮数"""
-        return 20
-
     def chat(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> Dict:
         ddgs = DDGS()
         prompt = self.__make_prompt(messages, tools)
@@ -97,10 +88,6 @@ class OllamaModel(BaseModel):
         self.model_name = model_name
         self.api_base = api_base
         self.client = ollama.Client(host=api_base)
-
-    def max_conversation_count(self) -> int:
-        """返回模型支持的最大对话轮数"""
-        return 40
 
     def chat(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> Dict:
         """调用Ollama API获取响应"""
