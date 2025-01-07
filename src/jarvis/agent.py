@@ -36,37 +36,6 @@ class Agent:
             self.spinner.stop()
 
 
-        results = []
-        for tool_call in tool_calls:
-            name = tool_call["function"]["name"]
-            args = tool_call["function"]["arguments"]
-            # 打印工具调用信息
-            PrettyOutput.print(f"调用工具: {name}", OutputType.INFO)
-            if isinstance(args, dict):
-                for key, value in args.items():
-                    PrettyOutput.print(f"  - {key}: {value}", OutputType.INFO)
-            else:
-                PrettyOutput.print(f"  参数: {args}", OutputType.INFO)
-            PrettyOutput.print("", OutputType.INFO)  # 空行
-            
-            result = self.tool_registry.execute_tool(name, args)
-            if result["success"]:
-                stdout = result["stdout"]
-                stderr = result.get("stderr", "")
-
-                output_parts = []
-                output_parts.append(f"执行结果:\n{stdout}")
-                if stderr:
-                    output_parts.append(f"错误:\n{stderr}")
-                output = "\n\n".join(output_parts)
-            else:
-                error_msg = result["error"]
-                output = f"执行失败: {error_msg}"
-                    
-            results.append(output)
-        return "\n".join(results)
-
-
     def run(self, user_input: str) :
         """处理用户输入并返回响应"""
         # 检查是否是结束命令

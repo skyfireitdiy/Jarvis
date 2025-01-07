@@ -750,42 +750,7 @@ Example:
 
     def handle_tool_calls(self, tool_calls: List[Dict]) -> str:
         """处理工具调用"""
-        def save_long_output(stdout: str, stderr: str = "", name: str = "", args: Any = None) -> str:
-            """保存长输出到文件并返回引用信息"""
-            output_dir = "/tmp/ai_outputs"
-            os.makedirs(output_dir, exist_ok=True)
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{output_dir}/{name}_{timestamp}.txt"
-            
-            # 组织文件内容
-            content = []
-            # 添加工具调用信息
-            content.append("=== Tool Call Information ===")
-            content.append(f"Tool Name: {name}")
-            content.append(f"Arguments: {json.dumps(args, ensure_ascii=False, indent=2)}")
-            content.append("")  # 空行分隔
-            
-            if stdout:
-                content.append("=== Standard Output ===")
-                content.append(stdout)
-            if stderr:
-                content.append("\n=== Error Output ===")
-                content.append(stderr)
-            
-            # 写入文件
-            with open(filename, "w", encoding="utf-8") as f:
-                f.write("\n".join(content))
-            
-            # 生成预览信息
-            preview_parts = []
-            if stdout:
-                preview_parts.append(f"Standard output preview: {stdout[:100]}...")
-            if stderr:
-                preview_parts.append(f"Error output preview: {stderr[:100]}...")
-            
-            return f"Output was too long and has been saved to file: {filename}\n" + \
-                   "\n".join(preview_parts)
+        
 
         results = []
         for tool_call in tool_calls:
@@ -811,21 +776,15 @@ Example:
                 stdout = result["stdout"]
                 stderr = result.get("stderr", "")
                 
-                # 如果任一输出超过1024字符，则保存到文件
-                if len(stdout) > 1024 or len(stderr) > 1024:
-                    output = save_long_output(stdout, stderr, name, args)
-                else:
-                    output_parts = []
-                    output_parts.append(f"Result:\n{stdout}")
-                    if stderr:
-                        output_parts.append(f"Errors:\n{stderr}")
-                    output = "\n\n".join(output_parts)
+
+                output_parts = []
+                output_parts.append(f"Result:\n{stdout}")
+                if stderr:
+                    output_parts.append(f"Errors:\n{stderr}")
+                output = "\n\n".join(output_parts)
             else:
                 error_msg = result["error"]
-                if len(error_msg) > 1024:
-                    output = save_long_output(stderr=error_msg, name=name, args=args)
-                else:
-                    output = f"Execution failed: {error_msg}"
+                output = f"Execution failed: {error_msg}"
                     
             results.append(output)
         return "\n".join(results)
