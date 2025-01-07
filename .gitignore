@@ -5,4 +5,5 @@ run.sh
 *.txt
 temp_scripts
 dist
-*egg-info
+*egg-info.jarvis
+.jarvis

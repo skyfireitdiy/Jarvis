@@ -84,7 +84,7 @@ class DDGSModel(BaseModel):
 class OllamaModel(BaseModel):
     """Ollama模型实现"""
     
-    def __init__(self, model_name: str, api_base: str = "http://localhost:11434"):
+    def __init__(self, model_name: str = "qwen2.5:14b", api_base: str = "http://localhost:11434"):
         self.model_name = model_name
         self.api_base = api_base
         self.client = ollama.Client(host=api_base)

@@ -1,12 +1,31 @@
+#!/usr/bin/env python3
 """Command line interface for Jarvis."""
 
 import argparse
 import yaml
 import os
-from .agent import Agent
-from .tools import ToolRegistry
-from .models import DDGSModel
-from .utils import PrettyOutput, OutputType, get_multiline_input
+import sys
+from pathlib import Path
+
+# 添加父目录到Python路径以支持导入
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from jarvis.agent import Agent
+from jarvis.tools import ToolRegistry
+from jarvis.models import DDGSModel, OllamaModel
+from jarvis.utils import PrettyOutput, OutputType, get_multiline_input
+
+# 定义支持的平台和模型
+SUPPORTED_PLATFORMS = {
+    "ollama": {
+        "models": ["llama3.2", "qwen2.5:14b"],
+        "default": "qwen2.5:14b"
+    },
+    "ddgs": {
+        "models": ["gpt-4o-mini", "claude-3-haiku", "llama-3.1-70b", "mixtral-8x7b"],
+        "default": "gpt-4o-mini"
+    }
+}
 
 def load_tasks() -> list:
     """Load tasks from .jarvis file if it exists."""
@@ -55,30 +74,71 @@ def select_task(tasks: list) -> str:
 def main():
     """Main entry point for Jarvis."""
     parser = argparse.ArgumentParser(description="Jarvis AI Assistant")
-    parser.add_argument("--model", 
-                       choices=["gpt-4o-mini", "claude-3-haiku", "llama-3.1-70b", "mixtral-8x7b"],
-                       default="gpt-4o-mini",
-                       help="Model to use (default: gpt-4o-mini)")
+    
+    # 添加平台选择参数
+    parser.add_argument(
+        "--platform",
+        choices=list(SUPPORTED_PLATFORMS.keys()),
+        default="ollama",
+        help="选择运行平台 (默认: ollama)"
+    )
+    
+    # 添加模型选择参数
+    parser.add_argument(
+        "--model",
+        help="选择模型 (默认: 根据平台自动选择)"
+    )
+    
+    # 添加API基础URL参数
+    parser.add_argument(
+        "--api-base",
+        default="http://localhost:11434",
+        help="Ollama API基础URL (仅用于Ollama平台, 默认: http://localhost:11434)"
+    )
+    
     args = parser.parse_args()
+    
+    # 验证并设置默认模型
+    if args.model:
+        if args.model not in SUPPORTED_PLATFORMS[args.platform]["models"]:
+            supported_models = ", ".join(SUPPORTED_PLATFORMS[args.platform]["models"])
+            PrettyOutput.print(
+                f"错误: 平台 {args.platform} 不支持模型 {args.model}\n"
+                f"支持的模型: {supported_models}",
+                OutputType.ERROR
+            )
+            return 1
+    else:
+        args.model = SUPPORTED_PLATFORMS[args.platform]["default"]
 
     try:
-        model = DDGSModel(model_name=args.model)
+        # 根据平台创建相应的模型实例
+        if args.platform == "ollama":
+            model = OllamaModel(
+                model_name=args.model,
+                api_base=args.api_base
+            )
+            platform_name = f"Ollama ({args.model})"
+        else:  # ddgs
+            model = DDGSModel(model_name=args.model)
+            platform_name = f"DuckDuckGo Search ({args.model})"
+
         tool_registry = ToolRegistry()
         agent = Agent(model, tool_registry)
 
-        # Welcome message
-        PrettyOutput.print(f"Jarvis initialized with {args.model}.", OutputType.SYSTEM)
+        # 欢迎信息
+        PrettyOutput.print(f"Jarvis 已初始化 - {platform_name}", OutputType.SYSTEM)
         
-        # Load predefined tasks
+        # 加载预定义任务
         tasks = load_tasks()
         if tasks:
             selected_task = select_task(tasks)
             if selected_task:
-                PrettyOutput.print(f"\nExecuting task: {selected_task}", OutputType.INFO)
+                PrettyOutput.print(f"\n执行任务: {selected_task}", OutputType.INFO)
                 agent.run(selected_task)
                 return 0
         
-        # If no predefined task was selected, enter interactive mode
+        # 如果没有选择预定义任务，进入交互模式
         while True:
             try:
                 user_input = get_multiline_input("请输入您的任务(输入空行退出):")
@@ -86,13 +146,13 @@ def main():
                     break
                 agent.run(user_input)
             except KeyboardInterrupt:
-                print("\nExiting...")
+                print("\n正在退出...")
                 break
             except Exception as e:
-                PrettyOutput.print(f"Error: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
     except Exception as e:
-        PrettyOutput.print(f"Initialization error: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
         return 1
 
     return 0

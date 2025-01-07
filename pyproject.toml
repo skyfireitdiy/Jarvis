@@ -24,11 +24,19 @@ dependencies = [
     "beautifulsoup4>=4.9.3",
     "duckduckgo-search>=3.0.0",
     "pyyaml>=5.1",
+    "ollama>=0.1.6",
+    "sentence-transformers>=2.5.1",
+    "chromadb>=0.4.24",
 ]
 requires-python = ">=3.8"
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+    "mypy",
+]
 
 [project.urls]
 Homepage = "https://github.com/skyfireitdiy/Jarvis"
