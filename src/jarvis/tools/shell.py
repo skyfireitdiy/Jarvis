@@ -4,13 +4,27 @@ from ..utils import PrettyOutput, OutputType
 
 class ShellTool:
     name = "execute_shell"
-    description = "Execute shell commands and return the results"
+    description = """Execute shell commands and return the results.
+    Guidelines for output optimization:
+    1. Use grep/awk/sed to filter output when possible
+    2. Avoid listing all files/dirs unless specifically needed
+    3. Prefer -q/--quiet flags when status is all that's needed
+    4. Use head/tail to limit long outputs
+    5. Redirect stderr to /dev/null for noisy commands
+    
+    Examples of optimized commands:
+    - 'ls -l file.txt' instead of 'ls -l'
+    - 'grep -c pattern file' instead of 'grep pattern file'
+    - 'ps aux | grep process | head -n 5' instead of 'ps aux'
+    - 'command 2>/dev/null' to suppress error messages
+    - 'df -h . ' instead of 'df -h'
+    """
     parameters = {
         "type": "object",
         "properties": {
             "command": {
                 "type": "string",
-                "description": "Shell command to execute"
+                "description": "Shell command to execute (use filters/limits for large outputs)"
             },
             "timeout": {
                 "type": "integer",

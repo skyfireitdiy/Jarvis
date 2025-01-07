@@ -117,6 +117,7 @@ class ToolRegistry:
     def tool_help_text(self) -> str:
         """返回所有工具的帮助文本"""
         return """Available Tools:
+
 1. search: Search for information using DuckDuckGo
 2. read_webpage: Extract content from webpages
 3. execute_python: Run Python code with dependency management
@@ -152,29 +153,59 @@ Output Guidelines:
    - Combine similar information
    - Skip redundant context
 
-Tool Usage Examples:
+Tool Call Format Requirements:
+1. MUST use exact format:
 <tool_call>
 {
-    "name": "search",
+    "name": "tool_name",
     "arguments": {
-        "query": "Python GIL",
-        "max_results": 2  # Limit results to save context
+        "param1": "value1"
     }
 }
 </tool_call>
 
-<tool_call>
-{
-    "name": "read_webpage",
-    "arguments": {
-        "url": "https://example.com",
-        "extract_type": "text"  # Only get main content
-    }
-}
-</tool_call>
+2. Format Rules:
+   - NO comments or explanations inside tool_call blocks
+   - NO additional text or formatting within JSON
+   - NO markdown or other markup inside tool_call
+   - ONLY valid JSON allowed in arguments
+   - ALL arguments must match tool parameters exactly
+
+3. Invalid Examples (DO NOT USE):
+   ❌ <tool_call>
+   {
+       "name": "search",  # Search tool
+       "arguments": {
+           "query": "Python GIL"  // Search query
+       }
+   }
+   </tool_call>
+
+   ❌ <tool_call>
+   ```json
+   {
+       "name": "search",
+       "arguments": {
+           "query": "Python GIL"
+       }
+   }
+   ```
+   </tool_call>
+
+4. Valid Example:
+   ✅ <tool_call>
+   {
+       "name": "search",
+       "arguments": {
+           "query": "Python GIL",
+           "max_results": 2
+       }
+   }
+   </tool_call>
 
 Remember:
 1. Quality over quantity
 2. Relevance over completeness
 3. Conciseness over verbosity
-4. Context efficiency is crucial"""
+4. Context efficiency is crucial
+5. STRICT adherence to tool call format"""
