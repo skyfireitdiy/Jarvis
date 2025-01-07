@@ -117,7 +117,6 @@ class ToolRegistry:
     def tool_help_text(self) -> str:
         """返回所有工具的帮助文本"""
         return """Available Tools:
-
 1. search: Search for information using DuckDuckGo
 2. read_webpage: Extract content from webpages
 3. execute_python: Run Python code with dependency management
@@ -127,29 +126,55 @@ class ToolRegistry:
 7. file_operation: Read/write files in workspace directory
 8. rag_query: Query documents using RAG
 
-Guidelines:
-1. Always verify information through tools
-2. Use search + read_webpage for research
-3. Use Python/shell for data processing
-4. Ask user when information is missing
+Output Guidelines:
+1. Focus on Essential Information
+   - Filter out irrelevant or redundant information
+   - Only output the most relevant search results
+   - Summarize long content when possible
 
-Tool Call Format:
-<tool_call>
-{
-    "name": "tool_name",
-    "arguments": {
-        "param1": "value1"
-    }
-}
-</tool_call>
+2. Context Management
+   - Avoid repeating information that's already known
+   - Don't echo back the entire content of files
+   - Use snippets instead of full documents
 
-Example:
+3. Error Handling
+   - Only show relevant parts of error messages
+   - Include troubleshooting steps when appropriate
+   - Omit stack traces unless specifically requested
+
+4. Search Results
+   - Focus on the most relevant 2-3 results
+   - Extract key information instead of full articles
+   - Skip duplicate or similar content
+
+5. RAG Queries
+   - Return only the most relevant passages
+   - Combine similar information
+   - Skip redundant context
+
+Tool Usage Examples:
 <tool_call>
 {
     "name": "search",
     "arguments": {
         "query": "Python GIL",
-        "max_results": 3
+        "max_results": 2  # Limit results to save context
     }
 }
-</tool_call>""" 
+</tool_call>
+
+<tool_call>
+{
+    "name": "read_webpage",
+    "arguments": {
+        "url": "https://example.com",
+        "extract_type": "text"  # Only get main content
+    }
+}
+</tool_call>
+
+Remember:
+1. Quality over quantity
+2. Relevance over completeness
+3. Conciseness over verbosity
+4. Context efficiency is crucial"""
