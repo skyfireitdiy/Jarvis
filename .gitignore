@@ -4,3 +4,5 @@ run.sh
 .vscode
 *.txt
 temp_scripts
+dist
+*egg-info

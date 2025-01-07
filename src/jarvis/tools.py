@@ -4,23 +4,24 @@ import os
 import json
 import time
 from pathlib import Path
-from utils import PrettyOutput, OutputType
+from .utils import PrettyOutput, OutputType
 import sys
 import pkgutil
 from duckduckgo_search import DDGS
 import requests
 from bs4 import BeautifulSoup
 import re
+from datetime import datetime
 
 
 class PythonScript:
     """Python脚本管理类"""
-    SCRIPTS_DIR = "temp_scripts"
+    SCRIPTS_DIR = "/tmp/ai_scripts"
 
     @classmethod
     def init_scripts_dir(cls):
         """初始化脚本目录"""
-        Path(cls.SCRIPTS_DIR).mkdir(exist_ok=True)
+        Path(cls.SCRIPTS_DIR).mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def generate_script_path(cls, name: Optional[str] = None) -> str:
@@ -63,21 +64,21 @@ class ToolRegistry:
         self._register_default_tools()
 
     def _register_default_tools(self):
-        """注册默认工具"""
-        # 注册网络搜索工具
+        """Register default tools"""
+        # Register search tool
         self.register_tool(
             name="search",
-            description="使用DuckDuckGo搜索引擎获取信息",
+            description="Search for information using DuckDuckGo search engine",
             parameters={
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "搜索查询内容"
+                        "description": "Search query string"
                     },
                     "max_results": {
                         "type": "integer",
-                        "description": "返回结果数量",
+                        "description": "Maximum number of results to return",
                         "default": 5
                     }
                 },
@@ -86,20 +87,20 @@ class ToolRegistry:
             func=self._search_ddg
         )
 
-        # 注册shell命令执行工具
+        # Register shell command execution tool
         self.register_tool(
             name="execute_shell",
-            description="执行shell命令并返回结果",
+            description="Execute shell commands and return the results",
             parameters={
                 "type": "object",
                 "properties": {
                     "command": {
                         "type": "string",
-                        "description": "要执行的shell命令"
+                        "description": "Shell command to execute"
                     },
                     "timeout": {
                         "type": "integer",
-                        "description": "命令执行超时时间（秒）",
+                        "description": "Command execution timeout in seconds",
                         "default": 30
                     }
                 },
@@ -108,33 +109,33 @@ class ToolRegistry:
             func=self._execute_shell
         )
 
-        # 注册用户交互工具
+        # Register user interaction tool
         self.register_tool(
             name="ask_user",
-            description="向用户询问信息，支持选项选择和多行输入",
+            description="Ask user for information, supports option selection and multiline input",
             parameters={
                 "type": "object",
                 "properties": {
                     "question": {
                         "type": "string",
-                        "description": "要询问用户的问题"
+                        "description": "Question to ask the user"
                     },
                     "options": {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
-                        "description": "可选的选项列表",
+                        "description": "List of options for user to choose from",
                         "default": []
                     },
                     "multiline": {
                         "type": "boolean",
-                        "description": "是否允许多行输入",
+                        "description": "Allow multiline input",
                         "default": False
                     },
                     "description": {
                         "type": "string",
-                        "description": "问题的补充说明",
+                        "description": "Additional description or context for the question",
                         "default": ""
                     }
                 },
@@ -143,39 +144,40 @@ class ToolRegistry:
             func=self._ask_user
         )
 
+        # Register Python execution tool
         self.register_tool(
             name="execute_python",
-            description="""执行Python代码并返回结果。
-            注意：
-            1. 需要使用print输出结果，否则将看不到
-            2. 支持自动管理依赖包
-            3. 代码会保存到临时文件执行
+            description="""Execute Python code and return the results.
+            Notes:
+            1. Use print() to output results, otherwise they won't be visible
+            2. Automatic dependency management is supported
+            3. Code will be saved to a temporary file for execution
             
-            示例:
-            # 错误写法 - 看不到结果
+            Example:
+            # Incorrect - result not visible
             result = 1 + 1
             
-            # 正确写法 - 使用print输出
+            # Correct - using print
             result = 1 + 1
-            print(f"计算结果: {result}")""",
+            print(f"Result: {result}")""",
             parameters={
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "要执行的Python代码，需要使用print来输出结果"
+                        "description": "Python code to execute, must use print() for output"
                     },
                     "dependencies": {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
-                        "description": "需要安装的Python包依赖列表，仅添加第三方包",
+                        "description": "List of Python package dependencies to install (third-party only)",
                         "default": []
                     },
                     "name": {
                         "type": "string",
-                        "description": "脚本名称，用于保存脚本文件",
+                        "description": "Script name for the saved file",
                         "default": ""
                     }
                 },
@@ -184,20 +186,20 @@ class ToolRegistry:
             func=self._execute_python
         )
 
-        # 注册用户确认工具
+        # Register user confirmation tool
         self.register_tool(
             name="ask_user_confirmation",
-            description="向用户请求确认，返回yes/no",
+            description="Request confirmation from user, returns yes/no",
             parameters={
                 "type": "object",
                 "properties": {
                     "question": {
                         "type": "string",
-                        "description": "要询问用户的问题"
+                        "description": "Question to ask for confirmation"
                     },
                     "details": {
                         "type": "string",
-                        "description": "提供给用户的详细信息或上下文",
+                        "description": "Additional details or context for the confirmation",
                         "default": ""
                     }
                 },
@@ -206,20 +208,20 @@ class ToolRegistry:
             func=self._ask_user_confirmation
         )
 
-        # 注册网页读取工具
+        # Register webpage reader tool
         self.register_tool(
             name="read_webpage",
-            description="读取网页内容，支持提取正文、标题等信息",
+            description="Read webpage content, supporting extraction of main text, title, and other information",
             parameters={
                 "type": "object",
                 "properties": {
                     "url": {
                         "type": "string",
-                        "description": "要读取的网页URL"
+                        "description": "URL of the webpage to read"
                     },
                     "extract_type": {
                         "type": "string",
-                        "description": "提取类型：'text'(正文文本), 'title'(标题), 'all'(所有信息)",
+                        "description": "Type of content to extract: 'text' (main content), 'title', or 'all' (everything)",
                         "enum": ["text", "title", "all"],
                         "default": "all"
                     }
@@ -227,6 +229,51 @@ class ToolRegistry:
                 "required": ["url"]
             },
             func=self._read_webpage
+        )
+
+        # Register file operations tool
+        self.register_tool(
+            name="file_operation",
+            description="""Perform file operations including reading and writing files.
+            
+Capabilities:
+1. Read file content
+2. Write content to file
+3. Append content to existing file
+4. Check if file exists
+            
+Note: 
+- Supports operations on any accessible file path
+- Creates directories automatically when writing files
+- Binary files are not supported
+- Large files (>10MB) should be processed in chunks
+- All operations are logged for security tracking""",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["read", "write", "append", "exists"],
+                        "description": "Type of file operation to perform"
+                    },
+                    "filepath": {
+                        "type": "string",
+                        "description": "Absolute or relative path to the file"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Content to write (required for write/append operations)",
+                        "default": ""
+                    },
+                    "encoding": {
+                        "type": "string",
+                        "description": "File encoding (default: utf-8)",
+                        "default": "utf-8"
+                    }
+                },
+                "required": ["operation", "filepath"]
+            },
+            func=self._file_operation
         )
 
     @staticmethod
@@ -571,6 +618,79 @@ class ToolRegistry:
                 "error": error_msg
             }
 
+    def _file_operation(self, args: Dict) -> Dict[str, Any]:
+        """Execute file operations"""
+        try:
+            operation = args["operation"]
+            filepath = args["filepath"]
+            encoding = args.get("encoding", "utf-8")
+            
+            # Log operation with full path for tracking
+            abs_path = os.path.abspath(filepath)
+            PrettyOutput.print(f"File operation: {operation} - {abs_path}", OutputType.INFO)
+            
+            if operation == "exists":
+                exists = os.path.exists(filepath)
+                return {
+                    "success": True,
+                    "stdout": str(exists),
+                    "stderr": ""
+                }
+                
+            elif operation == "read":
+                if not os.path.exists(filepath):
+                    return {
+                        "success": False,
+                        "error": f"File not found: {filepath}"
+                    }
+                    
+                # Check file size
+                if os.path.getsize(filepath) > 10 * 1024 * 1024:  # 10MB
+                    return {
+                        "success": False,
+                        "error": "File too large (>10MB)"
+                    }
+                    
+                with open(filepath, 'r', encoding=encoding) as f:
+                    content = f.read()
+                return {
+                    "success": True,
+                    "stdout": content,
+                    "stderr": ""
+                }
+                
+            elif operation in ["write", "append"]:
+                if not args.get("content"):
+                    return {
+                        "success": False,
+                        "error": "Content parameter is required for write/append operations"
+                    }
+                
+                # Create directory if it doesn't exist
+                os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
+                    
+                mode = 'a' if operation == "append" else 'w'
+                with open(filepath, mode, encoding=encoding) as f:
+                    f.write(args["content"])
+                    
+                return {
+                    "success": True,
+                    "stdout": f"Successfully {operation}ed content to {filepath}",
+                    "stderr": ""
+                }
+                
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unknown operation: {operation}"
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"File operation failed: {str(e)}"
+            }
+
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
         """注册新工具"""
         self.tools[name] = Tool(name, description, parameters, func)
@@ -587,42 +707,37 @@ class ToolRegistry:
         """执行指定工具"""
         tool = self.get_tool(name)
         if tool is None:
-            return {"success": False, "error": f"工具 {name} 不存在"}
-        return tool.execute(arguments) 
-    
+            return {"success": False, "error": f"Tool {name} does not exist"}
+        return tool.execute(arguments)
+
     def tool_help_text(self) -> str:
-        return """Working Principles:
-1. Use search tool to obtain factual information
-2. Use execute_shell to get system information
-3. Use execute_python to process data
-4. Use ask_user to inquire if information is missing
-5. Must cite data sources before providing answers
-6. For search-returned webpage links, use read_webpage tool to get detailed content
+        return """Available Tools:
 
-Tool Usage Guidelines:
-1. First use search tool to find relevant information
-2. If search results contain interesting webpages, use read_webpage tool to read their content
-3. Provide more detailed answers based on webpage content
+1. search: Search for information using DuckDuckGo
+2. read_webpage: Extract content from webpages
+3. execute_python: Run Python code with dependency management
+4. execute_shell: Execute shell commands
+5. ask_user: Get input from user with options support
+6. ask_user_confirmation: Get yes/no confirmation from user
+7. file_operation: Read/write files in workspace directory
 
-Prohibited Actions:
-1. Do not guess or fabricate data
-2. Do not use unverified information
-3. If tool execution fails, explain the reason
-4. If data cannot be obtained, honestly acknowledge it
+Guidelines:
+1. Always verify information through tools
+2. Use search + read_webpage for research
+3. Use Python/shell for data processing
+4. Ask user when information is missing
 
 Tool Call Format:
 <tool_call>
 {
     "name": "tool_name",
     "arguments": {
-        "param1": "value1",
-        "param2": "value2"
+        "param1": "value1"
     }
 }
 </tool_call>
 
-Examples:
-1. Search and read webpage:
+Example:
 <tool_call>
 {
     "name": "search",
@@ -631,15 +746,86 @@ Examples:
         "max_results": 3
     }
 }
-</tool_call>
-
-For interesting search results, use read_webpage:
-<tool_call>
-{
-    "name": "read_webpage",
-    "arguments": {
-        "url": "https://example.com/python-gil",
-        "extract_type": "all"
-    }
-}
 </tool_call>"""
+
+    def handle_tool_calls(self, tool_calls: List[Dict]) -> str:
+        """处理工具调用"""
+        def save_long_output(stdout: str, stderr: str = "", name: str = "", args: Any = None) -> str:
+            """保存长输出到文件并返回引用信息"""
+            output_dir = "/tmp/ai_outputs"
+            os.makedirs(output_dir, exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{output_dir}/{name}_{timestamp}.txt"
+            
+            # 组织文件内容
+            content = []
+            # 添加工具调用信息
+            content.append("=== Tool Call Information ===")
+            content.append(f"Tool Name: {name}")
+            content.append(f"Arguments: {json.dumps(args, ensure_ascii=False, indent=2)}")
+            content.append("")  # 空行分隔
+            
+            if stdout:
+                content.append("=== Standard Output ===")
+                content.append(stdout)
+            if stderr:
+                content.append("\n=== Error Output ===")
+                content.append(stderr)
+            
+            # 写入文件
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("\n".join(content))
+            
+            # 生成预览信息
+            preview_parts = []
+            if stdout:
+                preview_parts.append(f"Standard output preview: {stdout[:100]}...")
+            if stderr:
+                preview_parts.append(f"Error output preview: {stderr[:100]}...")
+            
+            return f"Output was too long and has been saved to file: {filename}\n" + \
+                   "\n".join(preview_parts)
+
+        results = []
+        for tool_call in tool_calls:
+            name = tool_call["function"]["name"]
+            args = tool_call["function"]["arguments"]
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    return f"Invalid JSON in arguments for tool {name}"
+
+            # 打印工具调用信息
+            PrettyOutput.print(f"Calling tool: {name}", OutputType.INFO)
+            if isinstance(args, dict):
+                for key, value in args.items():
+                    PrettyOutput.print(f"  - {key}: {value}", OutputType.INFO)
+            else:
+                PrettyOutput.print(f"  Arguments: {args}", OutputType.INFO)
+            PrettyOutput.print("", OutputType.INFO)  # 空行
+            
+            result = self.execute_tool(name, args)
+            if result["success"]:
+                stdout = result["stdout"]
+                stderr = result.get("stderr", "")
+                
+                # 如果任一输出超过1024字符，则保存到文件
+                if len(stdout) > 1024 or len(stderr) > 1024:
+                    output = save_long_output(stdout, stderr, name, args)
+                else:
+                    output_parts = []
+                    output_parts.append(f"Result:\n{stdout}")
+                    if stderr:
+                        output_parts.append(f"Errors:\n{stderr}")
+                    output = "\n\n".join(output_parts)
+            else:
+                error_msg = result["error"]
+                if len(error_msg) > 1024:
+                    output = save_long_output(stderr=error_msg, name=name, args=args)
+                else:
+                    output = f"Execution failed: {error_msg}"
+                    
+            results.append(output)
+        return "\n".join(results)

@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jarvis-ai"
+version = "0.1.0"
+description = "Jarvis: An AI assistant that uses tools to interact with the system"
+readme = "README.md"
+authors = [{ name = "Your Name", email = "your.email@example.com" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+keywords = ["jarvis", "ai", "assistant", "tools", "automation"]
+dependencies = [
+    "requests>=2.25.1",
+    "beautifulsoup4>=4.9.3",
+    "duckduckgo-search>=3.0.0",
+    "pyyaml>=5.1",
+]
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/skyfireitdiy/Jarvis"
+
+[project.scripts]
+jarvis = "jarvis.main:main"
