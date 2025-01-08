@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional, Callable
 import json
 from ..utils import PrettyOutput, OutputType
+from ..models import BaseModel
 
 class Tool:
     def __init__(self, name: str, description: str, parameters: Dict, func: Callable):
@@ -25,8 +26,9 @@ class Tool:
         return self.func(arguments)
 
 class ToolRegistry:
-    def __init__(self):
+    def __init__(self, model: Optional[BaseModel] = None):
         self.tools: Dict[str, Tool] = {}
+        self.model = model
         self._register_default_tools()
 
     def _register_default_tools(self):
@@ -37,8 +39,8 @@ class ToolRegistry:
         from .user_confirmation import UserConfirmationTool
         from .python_script import PythonScriptTool
         from .file_ops import FileOperationTool
-        from .rag import RAGTool
         from .webpage import WebpageTool
+        from .sub_agent import SubAgentTool
 
         tools = [
             SearchTool(),
@@ -47,7 +49,6 @@ class ToolRegistry:
             UserConfirmationTool(),
             PythonScriptTool(),
             FileOperationTool(),
-            RAGTool(),
             WebpageTool(),
         ]
 
@@ -58,6 +59,14 @@ class ToolRegistry:
                 parameters=tool.parameters,
                 func=tool.execute
             )
+
+        sub_agent_tool = SubAgentTool(self.model)
+        self.register_tool(
+            name=sub_agent_tool.name,
+            description=sub_agent_tool.description,
+            parameters=sub_agent_tool.parameters,
+            func=sub_agent_tool.execute
+        )
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
         """注册新工具"""
@@ -125,36 +134,30 @@ class ToolRegistry:
 5. ask_user: Get input from user with options support
 6. ask_user_confirmation: Get yes/no confirmation from user
 7. file_operation: Read/write files in workspace directory
-8. rag_query: Query documents using RAG
+8. create_sub_agent: Create a sub-agent for independent tasks (RECOMMENDED for subtasks)
 
-Output Guidelines:
-1. Focus on Essential Information
-   - Filter out irrelevant or redundant information
-   - Only output the most relevant search results
-   - Summarize long content when possible
+Core Rules:
+1. ONE Step at a Time
+   - Execute only one action per response
+   - Explain what you're going to do before doing it
+   - Wait for the result before planning next step
+   - No multiple actions or parallel execution
 
-2. Context Management
-   - Avoid repeating information that's already known
-   - Don't echo back the entire content of files
-   - Use snippets instead of full documents
+2. Sub-Agent Usage
+   - Use create_sub_agent for independent subtasks
+   - Let sub-agents handle complex task sequences
+   - Examples of good sub-agent tasks:
+     * Code analysis and documentation
+     * File system operations
+     * Data processing
+     * Research tasks
 
-3. Error Handling
-   - Only show relevant parts of error messages
-   - Include troubleshooting steps when appropriate
-   - Omit stack traces unless specifically requested
+3. Output Guidelines
+   - Focus on essential information
+   - Clear step-by-step explanations
+   - Summarize results concisely
 
-4. Search Results
-   - Focus on the most relevant 2-3 results
-   - Extract key information instead of full articles
-   - Skip duplicate or similar content
-
-5. RAG Queries
-   - Return only the most relevant passages
-   - Combine similar information
-   - Skip redundant context
-
-Tool Call Format Requirements:
-1. MUST use exact format:
+Tool Call Format:
 <tool_call>
 {
     "name": "tool_name",
@@ -164,48 +167,26 @@ Tool Call Format Requirements:
 }
 </tool_call>
 
-2. Format Rules:
-   - NO comments or explanations inside tool_call blocks
-   - NO additional text or formatting within JSON
-   - NO markdown or other markup inside tool_call
-   - ONLY valid JSON allowed in arguments
-   - ALL arguments must match tool parameters exactly
+Format Rules:
+1. ONE tool call per response
+2. Valid JSON only in arguments
+3. No comments or extra formatting
+4. Match parameters exactly
 
-3. Invalid Examples (DO NOT USE):
-   ❌ <tool_call>
-   {
-       "name": "search",  # Search tool
-       "arguments": {
-           "query": "Python GIL"  // Search query
-       }
-   }
-   </tool_call>
-
-   ❌ <tool_call>
-   ```json
-   {
-       "name": "search",
-       "arguments": {
-           "query": "Python GIL"
-       }
-   }
-   ```
-   </tool_call>
-
-4. Valid Example:
-   ✅ <tool_call>
-   {
-       "name": "search",
-       "arguments": {
-           "query": "Python GIL",
-           "max_results": 2
-       }
-   }
-   </tool_call>
+Example (Correct - Single Step):
+Assistant: I'll start by searching for the documentation.
+<tool_call>
+{
+    "name": "search",
+    "arguments": {
+        "query": "Python GIL documentation",
+        "max_results": 2
+    }
+}
+</tool_call>
 
 Remember:
-1. Quality over quantity
-2. Relevance over completeness
-3. Conciseness over verbosity
-4. Context efficiency is crucial
-5. STRICT adherence to tool call format"""
+1. ONE step at a time
+2. Explain before acting
+3. Wait for results
+4. Use sub-agents for complex tasks"""

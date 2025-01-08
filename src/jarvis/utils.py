@@ -1,11 +1,13 @@
+from pathlib import Path
 import sys
 import time
 import threading
-from typing import Optional
+from typing import Dict, Optional
 from enum import Enum
 from datetime import datetime
 import colorama
 from colorama import Fore, Style
+import os
 
 # 初始化colorama
 colorama.init()
@@ -103,3 +105,24 @@ def get_multiline_input(tip: str) -> str:
             return ""
     
     return "\n".join(lines).strip()
+
+
+def load_env_from_file():
+    """Load environment variables from ~/.jarvis_env file"""
+    env_file = Path.home() / ".jarvis_env"
+    
+    if env_file.exists():
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        try:
+                            key, value = line.split("=", 1)
+                            os.environ[key.strip()] = value.strip().strip("'").strip('"')
+                        except ValueError:
+                            continue
+        except Exception as e:
+            print(f"Warning: Failed to read ~/.jarvis_env: {e}")
+    
+    

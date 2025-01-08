@@ -21,8 +21,7 @@ Requires-Dist: beautifulsoup4>=4.9.3
 Requires-Dist: duckduckgo-search>=3.0.0
 Requires-Dist: pyyaml>=5.1
 Requires-Dist: ollama>=0.1.6
-Requires-Dist: sentence-transformers>=2.5.1
-Requires-Dist: chromadb>=0.4.24
+Requires-Dist: colorama>=0.4.6
 Provides-Extra: dev
 Requires-Dist: pytest; extra == "dev"
 Requires-Dist: black; extra == "dev"

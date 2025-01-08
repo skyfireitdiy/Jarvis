@@ -18,8 +18,7 @@ setup(
         "duckduckgo-search>=3.0.0",
         "pyyaml>=5.1",
         "ollama>=0.1.6",
-        "sentence-transformers>=2.5.1",
-        "chromadb>=0.4.24",
+        "colorama>=0.4.6",
     ],
     entry_points={
         "console_scripts": [

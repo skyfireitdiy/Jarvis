@@ -13,7 +13,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from jarvis.agent import Agent
 from jarvis.tools import ToolRegistry
 from jarvis.models import DDGSModel, OllamaModel
-from jarvis.utils import PrettyOutput, OutputType, get_multiline_input
+from jarvis.utils import PrettyOutput, OutputType, get_multiline_input, load_env_from_file
+from jarvis.zte_llm import create_zte_llm
 
 # 定义支持的平台和模型
 SUPPORTED_PLATFORMS = {
@@ -24,6 +25,10 @@ SUPPORTED_PLATFORMS = {
     "ddgs": {
         "models": ["gpt-4o-mini", "claude-3-haiku", "llama-3.1-70b", "mixtral-8x7b"],
         "default": "gpt-4o-mini"
+    },
+    "zte": {
+        "models": ["NebulaBiz", "nebulacoder", "NTele-72B"],
+        "default": "NebulaBiz"
     }
 }
 
@@ -97,6 +102,8 @@ def main():
     )
     
     args = parser.parse_args()
+
+    load_env_from_file()
     
     # 验证并设置默认模型
     if args.model:
@@ -119,9 +126,12 @@ def main():
                 api_base=args.api_base
             )
             platform_name = f"Ollama ({args.model})"
-        else:  # ddgs
+        elif args.platform == "ddgs":  # ddgs
             model = DDGSModel(model_name=args.model)
             platform_name = f"DuckDuckGo Search ({args.model})"
+        elif args.platform == "zte":  # zte
+            model = create_zte_llm(model_name=args.model)
+            platform_name = f"ZTE ({args.model})"
 
         tool_registry = ToolRegistry()
         agent = Agent(model, tool_registry)
