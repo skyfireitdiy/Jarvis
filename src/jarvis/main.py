@@ -84,7 +84,7 @@ def main():
     parser.add_argument(
         "--platform",
         choices=list(SUPPORTED_PLATFORMS.keys()),
-        default="ollama",
+        default="ddgs",
         help="选择运行平台 (默认: ollama)"
     )
     

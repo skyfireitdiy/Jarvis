@@ -1,0 +1,6 @@
+- |
+  1. 将当前git仓库的修改添加到暂存区
+  2. 根据修改的文件内容自动生成commmit信息，再commit信息中打上[修复]、[优化]等标签
+  3. 让用户确认commit信息
+  4. 执行git commit和git push
+- 执行 python3 ./script/publish.py patch 进行版本发布

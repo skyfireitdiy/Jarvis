@@ -127,8 +127,8 @@ class ToolRegistry:
 2. read_webpage: Extract content from webpages
 3. execute_python: Run Python code with dependency management
 4. execute_shell: Execute shell commands
-7. file_operation: Read/write files in workspace directory
-8. create_sub_agent: Create a sub-agent for independent tasks (RECOMMENDED for subtask when there are many subtasks)
+5. file_operation: Read/write files in workspace directory
+6. create_sub_agent: Create a sub-agent to handle subtasks (ONLY for independent subtasks)
 
 Core Rules:
 1. ONE Step at a Time
@@ -137,14 +137,19 @@ Core Rules:
    - Wait for the result before planning next step
    - No multiple actions or parallel execution
 
-2. Sub-Agent Usage
-   - Use create_sub_agent for independent subtasks
-   - Let sub-agents handle complex task sequences
-   - Examples of good sub-agent tasks:
-     * Code analysis and documentation
-     * File system operations
-     * Data processing
-     * Research tasks
+2. Sub-Agent Usage (ONLY for Subtasks)
+   - Create sub-agents ONLY to handle independent subtasks
+   - Main task should be broken down into clear subtasks first
+   - Examples of good subtask delegation:
+     * Analyzing each Python file in a directory
+     * Processing each data file in a batch
+     * Researching different aspects of a topic
+     * Reviewing multiple code components
+   - Do NOT use for:
+     * Main task execution
+     * Single file operations
+     * Simple sequential steps
+     * Tasks requiring continuous context
 
 3. Output Guidelines
    - Focus on essential information
@@ -161,26 +166,33 @@ Tool Call Format:
 }
 </tool_call>
 
-Format Rules:
-1. ONE tool call per response
-2. Valid JSON only in arguments
-3. No comments or extra formatting
-4. Match parameters exactly
-
-Example (Correct - Single Step):
-Assistant: I'll start by searching for the documentation.
+Example (Correct - Subtask Delegation):
+Assistant: I'll create a sub-agent to handle the code analysis subtask.
 <tool_call>
 {
-    "name": "search",
+    "name": "create_sub_agent",
     "arguments": {
-        "query": "Python GIL documentation",
-        "max_results": 2
+        "name": "CodeAnalyzer",
+        "task": "Analyze the utils.py file structure and generate documentation",
+        "context": "This is part of the larger documentation task"
+    }
+}
+</tool_call>
+
+Example (Incorrect - Main Task):
+❌ Assistant: I'll create a sub-agent to handle the entire project analysis.
+<tool_call>
+{
+    "name": "create_sub_agent",
+    "arguments": {
+        "name": "ProjectAnalyzer",
+        "task": "Analyze and document the entire project"
     }
 }
 </tool_call>
 
 Remember:
 1. ONE step at a time
-2. Explain before acting
-3. Wait for results
-4. Use sub-agents for complex tasks"""
+2. Create sub-agents ONLY for subtasks
+3. Explain before acting
+4. Wait for results"""
