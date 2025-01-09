@@ -1,0 +1,91 @@
+commit 78650f4ecd2e202fe51ea43c689bb77d32371dd9
+Author: 王茂斌10268518 <wang.maobin@zte.com.cn>
+Date:   Thu Jan 9 17:38:51 2025 +0800
+
+    [修复] Fix load_tasks function to return a dictionary instead of a list.\n[优化] Improve error handling and task selection in main.py.
+
+diff --git a/.jarvis b/.jarvis
+index 9d9d2fe..f48bea2 100644
+--- a/.jarvis
++++ b/.jarvis
+@@ -1,6 +1,6 @@
+-- |
++提交代码: |
+   1. 将当前git仓库的修改添加到暂存区
+   2. 根据修改的文件内容自动生成commmit信息，再commit信息中打上[修复]、[优化]等标签
+   3. 让用户确认commit信息
+   4. 执行git commit和git push
+-- 执行 python3 ./script/publish.py patch 进行版本发布
+\ No newline at end of file
++发布版本: 执行 python3 ./script/publish.py patch 进行版本发布
+\ No newline at end of file
+diff --git a/src/jarvis/main.py b/src/jarvis/main.py
+index 857226f..9cbd45e 100755
+--- a/src/jarvis/main.py
++++ b/src/jarvis/main.py
+@@ -32,32 +32,41 @@ SUPPORTED_PLATFORMS = {
+     }
+ }
+ 
+-def load_tasks() -> list:
++def load_tasks() -> dict:
+     """Load tasks from .jarvis file if it exists."""
+     if not os.path.exists(".jarvis"):
+-        return []
++        return {}
+     
+     try:
+         with open(".jarvis", "r", encoding="utf-8") as f:
+             tasks = yaml.safe_load(f)
+             
+-        if not isinstance(tasks, list):
+-            PrettyOutput.print("Warning: .jarvis file should contain a list of tasks", OutputType.ERROR)
+-            return []
++        if not isinstance(tasks, dict):
++            PrettyOutput.print("Warning: .jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
++            return {}
+             
+-        return [str(task) for task in tasks if task]  # Convert all tasks to strings and filter out empty ones
++        # Validate format and convert all values to strings
++        validated_tasks = {}
++        for name, desc in tasks.items():
++            if desc:  # Ensure description is not empty
++                validated_tasks[str(name)] = str(desc)
++                
++        return validated_tasks
+     except Exception as e:
+         PrettyOutput.print(f"Error loading .jarvis file: {str(e)}", OutputType.ERROR)
+-        return []
++        return {}
+ 
+-def select_task(tasks: list) -> str:
+-    """Let user select a task from the list or skip."""
++def select_task(tasks: dict) -> str:
++    """Let user select a task from the list or skip. Returns task description if selected."""
+     if not tasks:
+         return ""
+     
+-    PrettyOutput.print("\nFound predefined tasks:", OutputType.INFO)
+-    for i, task in enumerate(tasks, 1):
+-        PrettyOutput.print(f"[{i}] {task}", OutputType.INFO)
++    # Convert tasks to list for ordered display
++    task_names = list(tasks.keys())
++    
++    PrettyOutput.print("\nAvailable tasks:", OutputType.INFO)
++    for i, name in enumerate(task_names, 1):
++        PrettyOutput.print(f"[{i}] {name}", OutputType.INFO)
+     PrettyOutput.print("[0] Skip predefined tasks", OutputType.INFO)
+     
+     while True:
+@@ -69,8 +78,9 @@ def select_task(tasks: list) -> str:
+             choice = int(choice)
+             if choice == 0:
+                 return ""
+-            elif 1 <= choice <= len(tasks):
+-                return tasks[choice - 1]
++            elif 1 <= choice <= len(task_names):
++                selected_name = task_names[choice - 1]
++                return tasks[selected_name]  # Return the task description
+             else:
+                 PrettyOutput.print("Invalid choice. Please try again.", OutputType.ERROR)
+         except ValueError:

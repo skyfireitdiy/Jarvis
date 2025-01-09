@@ -32,32 +32,41 @@ SUPPORTED_PLATFORMS = {
     }
 }
 
-def load_tasks() -> list:
+def load_tasks() -> dict:
     """Load tasks from .jarvis file if it exists."""
     if not os.path.exists(".jarvis"):
-        return []
+        return {}
     
     try:
         with open(".jarvis", "r", encoding="utf-8") as f:
             tasks = yaml.safe_load(f)
             
-        if not isinstance(tasks, list):
-            PrettyOutput.print("Warning: .jarvis file should contain a list of tasks", OutputType.ERROR)
-            return []
+        if not isinstance(tasks, dict):
+            PrettyOutput.print("Warning: .jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
+            return {}
             
-        return [str(task) for task in tasks if task]  # Convert all tasks to strings and filter out empty ones
+        # Validate format and convert all values to strings
+        validated_tasks = {}
+        for name, desc in tasks.items():
+            if desc:  # Ensure description is not empty
+                validated_tasks[str(name)] = str(desc)
+                
+        return validated_tasks
     except Exception as e:
         PrettyOutput.print(f"Error loading .jarvis file: {str(e)}", OutputType.ERROR)
-        return []
+        return {}
 
-def select_task(tasks: list) -> str:
-    """Let user select a task from the list or skip."""
+def select_task(tasks: dict) -> str:
+    """Let user select a task from the list or skip. Returns task description if selected."""
     if not tasks:
         return ""
     
-    PrettyOutput.print("\nFound predefined tasks:", OutputType.INFO)
-    for i, task in enumerate(tasks, 1):
-        PrettyOutput.print(f"[{i}] {task}", OutputType.INFO)
+    # Convert tasks to list for ordered display
+    task_names = list(tasks.keys())
+    
+    PrettyOutput.print("\nAvailable tasks:", OutputType.INFO)
+    for i, name in enumerate(task_names, 1):
+        PrettyOutput.print(f"[{i}] {name}", OutputType.INFO)
     PrettyOutput.print("[0] Skip predefined tasks", OutputType.INFO)
     
     while True:
@@ -69,8 +78,9 @@ def select_task(tasks: list) -> str:
             choice = int(choice)
             if choice == 0:
                 return ""
-            elif 1 <= choice <= len(tasks):
-                return tasks[choice - 1]
+            elif 1 <= choice <= len(task_names):
+                selected_name = task_names[choice - 1]
+                return tasks[selected_name]  # Return the task description
             else:
                 PrettyOutput.print("Invalid choice. Please try again.", OutputType.ERROR)
         except ValueError:
