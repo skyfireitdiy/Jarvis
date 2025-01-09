@@ -88,13 +88,16 @@ def select_task(tasks: dict) -> str:
 
 def main():
     """Main entry point for Jarvis."""
+
+    load_env_from_file()
+
     parser = argparse.ArgumentParser(description="Jarvis AI Assistant")
     
     # 添加平台选择参数
     parser.add_argument(
         "--platform",
         choices=list(SUPPORTED_PLATFORMS.keys()),
-        default="ddgs",
+        default=os.getenv("JARVIS_PLATFORM") or "ddgs",
         help="选择运行平台 (默认: ollama)"
     )
     
@@ -113,7 +116,7 @@ def main():
     
     args = parser.parse_args()
 
-    load_env_from_file()
+    args.model = args.model or os.getenv("JARVIS_MODEL")
     
     # 验证并设置默认模型
     if args.model:
