@@ -53,7 +53,7 @@ The sub-agent will:
             PrettyOutput.print(f"Creating sub-agent '{name}'...", OutputType.INFO)
             
             # Create a new tool registry for the sub-agent
-            tool_registry = ToolRegistry()
+            tool_registry = ToolRegistry(self.model)
             
             # Create the sub-agent with the specified name
             sub_agent = Agent(self.model, tool_registry, name=name)

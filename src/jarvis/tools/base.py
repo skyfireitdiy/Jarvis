@@ -26,7 +26,7 @@ class Tool:
         return self.func(arguments)
 
 class ToolRegistry:
-    def __init__(self, model: Optional[BaseModel] = None):
+    def __init__(self, model: BaseModel):
         self.tools: Dict[str, Tool] = {}
         self.model = model
         self._register_default_tools()
@@ -128,7 +128,7 @@ class ToolRegistry:
 3. execute_python: Run Python code with dependency management
 4. execute_shell: Execute shell commands
 7. file_operation: Read/write files in workspace directory
-8. create_sub_agent: Create a sub-agent for independent tasks (RECOMMENDED for subtasks)
+8. create_sub_agent: Create a sub-agent for independent tasks (RECOMMENDED for subtask when there are many subtasks)
 
 Core Rules:
 1. ONE Step at a Time

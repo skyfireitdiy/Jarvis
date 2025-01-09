@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 
 class Agent:
-    def __init__(self, model: BaseModel, tool_registry: Optional[ToolRegistry] = None, name: str = "Jarvis"):
+    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis"):
         """Initialize Agent with a model, optional tool registry and name"""
         self.model = model
         self.tool_registry = tool_registry or ToolRegistry(model)
@@ -103,21 +103,21 @@ Key Principles:
 
 Focus only on facts and actual results. Be direct and concise."""
                     }
-                    
-                    try:
-                        summary_response = self._call_model(self.messages + [summary_prompt], use_tools=False)
-                        summary = summary_response["message"].get("content", "")
+                    while True:
+                        try:
+                            summary_response = self._call_model(self.messages + [summary_prompt], use_tools=False)
+                            summary = summary_response["message"].get("content", "")
+                            
+                            PrettyOutput.print(f"==============={self.name} 任务总结===============", OutputType.INFO)
+                            PrettyOutput.print(summary, OutputType.SYSTEM)
+                            PrettyOutput.print("=" * (len(self.name) + 16), OutputType.INFO)
+                            
+                            return summary
+                            
+                        except Exception as e:
+                            error_msg = f"{self.name}: 生成任务总结时出错: {str(e)}"
+                            PrettyOutput.print(error_msg, OutputType.ERROR)
                         
-                        PrettyOutput.print(f"==============={self.name} 任务总结===============", OutputType.INFO)
-                        PrettyOutput.print(summary, OutputType.SYSTEM)
-                        PrettyOutput.print("=" * (len(self.name) + 16), OutputType.INFO)
-                        
-                        return summary
-                        
-                    except Exception as e:
-                        error_msg = f"{self.name}: 生成任务总结时出错: {str(e)}"
-                        PrettyOutput.print(error_msg, OutputType.ERROR)
-                        return "Task completed but summary generation failed."
                 
                 self.messages.append({
                     "role": "user",

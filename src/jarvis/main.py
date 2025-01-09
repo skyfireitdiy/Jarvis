@@ -133,7 +133,7 @@ def main():
             model = create_zte_llm(model_name=args.model)
             platform_name = f"ZTE ({args.model})"
 
-        tool_registry = ToolRegistry()
+        tool_registry = ToolRegistry(model)
         agent = Agent(model, tool_registry)
 
         # 欢迎信息
