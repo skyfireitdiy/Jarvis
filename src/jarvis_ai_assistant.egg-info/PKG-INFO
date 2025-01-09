@@ -1,4 +1,4 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.2
 Name: jarvis-ai-assistant
 Version: 0.1.4
 Summary: Jarvis: An AI assistant that uses tools to interact with the system
@@ -27,6 +27,9 @@ Requires-Dist: pytest; extra == "dev"
 Requires-Dist: black; extra == "dev"
 Requires-Dist: isort; extra == "dev"
 Requires-Dist: mypy; extra == "dev"
+Dynamic: author
+Dynamic: home-page
+Dynamic: requires-python
 
 <div align="center">
 

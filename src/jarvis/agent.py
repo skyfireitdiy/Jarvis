@@ -86,22 +86,22 @@ Key Principles:
                 if not user_input:
                     PrettyOutput.print(f"{self.name}: 正在生成任务总结...", OutputType.INFO)
                     
-                    # 请求模型生成任务总结
+                    # 优化后的任务总结提示语
                     summary_prompt = {
                         "role": "user",
-                        "content": """Please provide a concise task summary focusing on:
+                        "content": """The task has been completed. Based on the previous analysis and execution results, provide a task summary including:
 
 1. Key Information:
-   - Important data points
-   - Critical findings
-   - Significant tool outputs
+   - Essential findings from analysis
+   - Important results from tool executions
+   - Critical data discovered
 
 2. Task Results:
-   - Final outcomes
-   - Task completion status
-   - Any important conclusions
+   - Final outcome
+   - Actual achievements
+   - Concrete results
 
-Keep the summary focused and brief, highlighting only the most essential information."""
+Focus only on facts and actual results. Be direct and concise."""
                     }
                     
                     try:
@@ -127,7 +127,6 @@ Keep the summary focused and brief, highlighting only the most essential informa
             except Exception as e:
                 error_msg = f"{self.name}: 处理响应时出错: {str(e)}"
                 PrettyOutput.print(error_msg, OutputType.ERROR)
-                return f"Task failed with error: {str(e)}"
 
     def clear_history(self):
         """清除对话历史，只保留系统提示"""

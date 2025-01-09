@@ -35,8 +35,6 @@ class ToolRegistry:
         """注册所有默认工具"""
         from .search import SearchTool
         from .shell import ShellTool
-        from .user_interaction import UserInteractionTool
-        from .user_confirmation import UserConfirmationTool
         from .python_script import PythonScriptTool
         from .file_ops import FileOperationTool
         from .webpage import WebpageTool
@@ -45,8 +43,6 @@ class ToolRegistry:
         tools = [
             SearchTool(),
             ShellTool(),
-            UserInteractionTool(),
-            UserConfirmationTool(),
             PythonScriptTool(),
             FileOperationTool(),
             WebpageTool(),
@@ -131,8 +127,6 @@ class ToolRegistry:
 2. read_webpage: Extract content from webpages
 3. execute_python: Run Python code with dependency management
 4. execute_shell: Execute shell commands
-5. ask_user: Get input from user with options support
-6. ask_user_confirmation: Get yes/no confirmation from user
 7. file_operation: Read/write files in workspace directory
 8. create_sub_agent: Create a sub-agent for independent tasks (RECOMMENDED for subtasks)
 

@@ -20,31 +20,29 @@ class BaseModel(ABC):
     def extract_tool_calls(content: str) -> List[Dict]:
         """从内容中提取工具调用"""
         tool_calls = []
-        # 修改正则表达式以更好地处理多行内容
-        pattern = re.compile(
-            r'<tool_call>\s*({(?:[^{}]|(?:{[^{}]*})|(?:{(?:[^{}]|{[^{}]*})*}))*})\s*</tool_call>',
-            re.DOTALL  # 添加DOTALL标志以匹配跨行内容
-        )
+        # 使用非贪婪匹配来获取标签之间的所有内容
+        pattern = re.compile(r'<tool_call>(.*?)</tool_call>', re.DOTALL)
         
         matches = pattern.finditer(content)
         for match in matches:
             try:
-                tool_call_str = match.group(1).strip()
-                tool_call = json.loads(tool_call_str)
-                if isinstance(tool_call, dict) and "name" in tool_call and "arguments" in tool_call:
+                # 提取并解析 JSON
+                tool_call_text = match.group(1).strip()
+                tool_call_data = json.loads(tool_call_text)
+                
+                # 验证必要的字段
+                if "name" in tool_call_data and "arguments" in tool_call_data:
                     tool_calls.append({
                         "function": {
-                            "name": tool_call["name"],
-                            "arguments": tool_call["arguments"]
+                            "name": tool_call_data["name"],
+                            "arguments": tool_call_data["arguments"]
                         }
                     })
-                else:
-                    PrettyOutput.print(f"无效的工具调用格式: {tool_call_str}", OutputType.ERROR)
-            except json.JSONDecodeError as e:
-                PrettyOutput.print(f"JSON解析错误: {str(e)}", OutputType.ERROR)
-                PrettyOutput.print(f"解析内容: {tool_call_str}", OutputType.ERROR)
-                continue
-        
+            except json.JSONDecodeError:
+                continue  # 跳过无效的 JSON
+            except Exception:
+                continue  # 跳过其他错误
+                
         return tool_calls
 
 
