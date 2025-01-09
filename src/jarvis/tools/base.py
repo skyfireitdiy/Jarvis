@@ -35,17 +35,17 @@ class ToolRegistry:
         """注册所有默认工具"""
         from .search import SearchTool
         from .shell import ShellTool
-        from .python_script import PythonScriptTool
         from .file_ops import FileOperationTool
         from .webpage import WebpageTool
         from .sub_agent import SubAgentTool
+        from .user_input import UserInputTool
 
         tools = [
             SearchTool(),
             ShellTool(),
-            PythonScriptTool(),
             FileOperationTool(),
             WebpageTool(),
+            UserInputTool(),
         ]
 
         for tool in tools:
@@ -84,115 +84,47 @@ class ToolRegistry:
         return tool.execute(arguments)
 
     def handle_tool_calls(self, tool_calls: List[Dict]) -> str:
-        """处理工具调用"""
-        results = []
-        for tool_call in tool_calls:
-            name = tool_call["function"]["name"]
-            args = tool_call["function"]["arguments"]
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except json.JSONDecodeError:
-                    return f"Invalid JSON in arguments for tool {name}"
-
-            PrettyOutput.print(f"Calling tool: {name}", OutputType.INFO)
-            if isinstance(args, dict):
-                for key, value in args.items():
-                    PrettyOutput.print(f"  - {key}: {value}", OutputType.INFO)
-            else:
-                PrettyOutput.print(f"  Arguments: {args}", OutputType.INFO)
-            PrettyOutput.print("", OutputType.INFO)
+        """处理工具调用，只处理第一个工具"""
+        if not tool_calls:
+            return ""
             
-            result = self.execute_tool(name, args)
-            if result["success"]:
-                stdout = result["stdout"]
-                stderr = result.get("stderr", "")
-                output_parts = []
-                output_parts.append(f"Result:\n{stdout}")
-                if stderr:
-                    output_parts.append(f"Errors:\n{stderr}")
-                output = "\n\n".join(output_parts)
-            else:
-                error_msg = result["error"]
-                output = f"Execution failed: {error_msg}"
-                    
-            results.append(output)
-        return "\n".join(results)
+        # 只处理第一个工具调用
+        tool_call = tool_calls[0]
+        name = tool_call["function"]["name"]
+        args = tool_call["function"]["arguments"]
+        
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                PrettyOutput.print(f"工具参数格式无效: {name}", OutputType.ERROR)
+                return ""
 
-    def tool_help_text(self) -> str:
-        """返回所有工具的帮助文本"""
-        return """Available Tools:
-
-1. search: Search for information using DuckDuckGo
-2. read_webpage: Extract content from webpages
-3. execute_python: Run Python code with dependency management
-4. execute_shell: Execute shell commands
-5. file_operation: Read/write files in workspace directory
-6. create_sub_agent: Create a sub-agent to handle subtasks (ONLY for independent subtasks)
-
-Core Rules:
-1. ONE Step at a Time
-   - Execute only one action per response
-   - Explain what you're going to do before doing it
-   - Wait for the result before planning next step
-   - No multiple actions or parallel execution
-
-2. Sub-Agent Usage (ONLY for Subtasks)
-   - Create sub-agents ONLY to handle independent subtasks
-   - Main task should be broken down into clear subtasks first
-   - Examples of good subtask delegation:
-     * Analyzing each Python file in a directory
-     * Processing each data file in a batch
-     * Researching different aspects of a topic
-     * Reviewing multiple code components
-   - Do NOT use for:
-     * Main task execution
-     * Single file operations
-     * Simple sequential steps
-     * Tasks requiring continuous context
-
-3. Output Guidelines
-   - Focus on essential information
-   - Clear step-by-step explanations
-   - Summarize results concisely
-
-Tool Call Format:
-<tool_call>
-{
-    "name": "tool_name",
-    "arguments": {
-        "param1": "value1"
-    }
-}
-</tool_call>
-
-Example (Correct - Subtask Delegation):
-Assistant: I'll create a sub-agent to handle the code analysis subtask.
-<tool_call>
-{
-    "name": "create_sub_agent",
-    "arguments": {
-        "name": "CodeAnalyzer",
-        "task": "Analyze the utils.py file structure and generate documentation",
-        "context": "This is part of the larger documentation task"
-    }
-}
-</tool_call>
-
-Example (Incorrect - Main Task):
-❌ Assistant: I'll create a sub-agent to handle the entire project analysis.
-<tool_call>
-{
-    "name": "create_sub_agent",
-    "arguments": {
-        "name": "ProjectAnalyzer",
-        "task": "Analyze and document the entire project"
-    }
-}
-</tool_call>
-
-Remember:
-1. ONE step at a time
-2. Create sub-agents ONLY for subtasks
-3. Explain before acting
-4. Wait for results"""
+        # 显示工具调用信息
+        PrettyOutput.section(f"执行工具: {name}", OutputType.TOOL)
+        if isinstance(args, dict):
+            for key, value in args.items():
+                PrettyOutput.print(f"参数: {key} = {value}", OutputType.DEBUG)
+        else:
+            PrettyOutput.print(f"参数: {args}", OutputType.DEBUG)
+        
+        # 执行工具调用
+        result = self.execute_tool(name, args)
+        
+        # 处理结果
+        if result["success"]:
+            stdout = result["stdout"]
+            stderr = result.get("stderr", "")
+            output_parts = []
+            if stdout:
+                output_parts.append(f"输出:\n{stdout}")
+            if stderr:
+                output_parts.append(f"错误:\n{stderr}")
+            output = "\n\n".join(output_parts)
+            PrettyOutput.section("执行成功", OutputType.SUCCESS)
+        else:
+            error_msg = result["error"]
+            output = f"执行失败: {error_msg}"
+            PrettyOutput.section("执行失败", OutputType.ERROR)
+            
+        return output

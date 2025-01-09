@@ -1,80 +1,94 @@
 from typing import Dict, Any
-import subprocess
+import os
+import tempfile
+import shlex
+from pathlib import Path
 from ..utils import PrettyOutput, OutputType
 
 class ShellTool:
     name = "execute_shell"
     description = """Execute shell commands and return the results.
-    Guidelines for output optimization:
-    1. Use grep/awk/sed to filter output when possible
-    2. Avoid listing all files/dirs unless specifically needed
-    3. Prefer -q/--quiet flags when status is all that's needed
-    4. Use head/tail to limit long outputs
-    5. Redirect stderr to /dev/null for noisy commands
-    
-    Examples of optimized commands:
-    - 'ls -l file.txt' instead of 'ls -l'
-    - 'grep -c pattern file' instead of 'grep pattern file'
-    - 'ps aux | grep process | head -n 5' instead of 'ps aux'
-    - 'command 2>/dev/null' to suppress error messages
-    - 'df -h . ' instead of 'df -h'
-    """
+
+Guidelines:
+1. Filter outputs
+   - Use grep/sed for specific data
+   - Use head/tail to limit lines
+   - Use -q for status checks
+
+Examples:
+✓ <START_TOOL_CALL>
+name: execute_shell
+arguments:
+    command: ls -l file.txt  # specific file
+<END_TOOL_CALL>
+
+✗ <START_TOOL_CALL>
+name: execute_shell
+arguments:
+    command: ps aux  # too much output
+<END_TOOL_CALL>"""
+
     parameters = {
         "type": "object",
         "properties": {
             "command": {
                 "type": "string",
-                "description": "Shell command to execute (use filters/limits for large outputs)"
-            },
-            "timeout": {
-                "type": "integer",
-                "description": "Command execution timeout in seconds",
-                "default": 30
+                "description": "Shell command to execute (filter output when possible)"
             }
         },
         "required": ["command"]
     }
 
+    def _escape_command(self, cmd: str) -> str:
+        """转义命令中的特殊字符"""
+        # 将命令中的单引号替换为'"'"'
+        return cmd.replace("'", "'\"'\"'")
+
     def execute(self, args: Dict) -> Dict[str, Any]:
         """执行shell命令"""
         try:
-            # 获取参数
             command = args["command"]
-            timeout = args.get("timeout", 30)
+            
+            # 生成临时文件名
+            output_file = os.path.join(tempfile.gettempdir(), f"jarvis_shell_{os.getpid()}.log")
+            
+            # 转义命令中的特殊字符
+            escaped_command = self._escape_command(command)
+            
+            # 修改命令以使用script
+            tee_command = f"script -q -c '{escaped_command}' {output_file}"
+            
+            PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
             
             # 执行命令
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
+            return_code = os.system(tee_command)
             
-            # 构建输出
-            output = []
-            
-            # 添加命令信息
-            PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
-            output.append(f"命令: {command}")
-            output.append("")
-            
-            # 添加输出
-            if result.stdout:
-                output.append(result.stdout)
+            # 读取输出文件
+            try:
+                with open(output_file, 'r', encoding='utf-8', errors='replace') as f:
+                    output = f.read()
+                    # 移除script命令添加的头尾
+                    if output:
+                        lines = output.splitlines()
+                        if len(lines) > 2:
+                            output = "\n".join(lines[1:-1])
+            except Exception as e:
+                output = f"读取输出文件失败: {str(e)}"
+            finally:
+                # 清理临时文件
+                Path(output_file).unlink(missing_ok=True)
             
             return {
-                "success": True,
-                "stdout": "\n".join(output),
-                "stderr": result.stderr,
-                "return_code": result.returncode
+                "success": return_code == 0,
+                "stdout": output,
+                "stderr": "",
+                "return_code": return_code
             }
-        except subprocess.TimeoutExpired:
-            return {
-                "success": False,
-                "error": f"命令执行超时 (>{timeout}秒)"
-            }
+                
         except Exception as e:
+            # 确保清理临时文件
+            if 'output_file' in locals():
+                Path(output_file).unlink(missing_ok=True)
             return {
                 "success": False,
                 "error": str(e)

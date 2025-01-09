@@ -19,7 +19,7 @@ from jarvis.zte_llm import create_zte_llm
 # 定义支持的平台和模型
 SUPPORTED_PLATFORMS = {
     "ollama": {
-        "models": ["llama3.2", "qwen2.5:14b"],
+        "models": ["qwen2.5:14b", "qwq"],
         "default": "qwen2.5:14b"
     },
     "ddgs": {
@@ -110,7 +110,7 @@ def main():
     # 添加API基础URL参数
     parser.add_argument(
         "--api-base",
-        default="http://localhost:11434",
+        default=os.getenv("JARVIS_OLLAMA_API_BASE") or "http://localhost:11434",
         help="Ollama API基础URL (仅用于Ollama平台, 默认: http://localhost:11434)"
     )
     
@@ -165,12 +165,9 @@ def main():
         while True:
             try:
                 user_input = get_multiline_input("请输入您的任务(输入空行退出):")
-                if not user_input:
+                if not user_input or user_input == "__interrupt__":
                     break
                 agent.run(user_input)
-            except KeyboardInterrupt:
-                print("\n正在退出...")
-                break
             except Exception as e:
                 PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 

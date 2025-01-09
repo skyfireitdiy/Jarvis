@@ -1,10 +1,10 @@
-import json
 import re
 import time
 from typing import Dict, List, Optional
 from duckduckgo_search import DDGS
 import ollama
 from abc import ABC, abstractmethod
+import yaml
 
 from .utils import OutputType, PrettyOutput
 
@@ -18,32 +18,42 @@ class BaseModel(ABC):
 
     @staticmethod
     def extract_tool_calls(content: str) -> List[Dict]:
-        """从内容中提取工具调用"""
-        tool_calls = []
-        # 使用非贪婪匹配来获取标签之间的所有内容
-        pattern = re.compile(r'<tool_call>(.*?)</tool_call>', re.DOTALL)
+        """从内容中提取工具调用，只返回第一个有效的工具调用"""
+        # 匹配所有可能的工具调用格式
+        patterns = [
+            # <START_TOOL_CALL>...<END_TOOL_CALL>格式
+            re.compile(r'<START_TOOL_CALL>(.*?)<END_TOOL_CALL>', re.DOTALL),
+            # ```yaml...```格式
+            re.compile(r'```yaml\s*(.*?)```', re.DOTALL),
+            # ```...```格式(不带语言标识)
+            re.compile(r'```\s*(.*?)```', re.DOTALL)
+        ]
         
-        matches = pattern.finditer(content)
-        for match in matches:
-            try:
-                # 提取并解析 JSON
-                tool_call_text = match.group(1).strip()
-                tool_call_data = json.loads(tool_call_text)
-                
-                # 验证必要的字段
-                if "name" in tool_call_data and "arguments" in tool_call_data:
-                    tool_calls.append({
-                        "function": {
-                            "name": tool_call_data["name"],
-                            "arguments": tool_call_data["arguments"]
-                        }
-                    })
-            except json.JSONDecodeError:
-                continue  # 跳过无效的 JSON
-            except Exception:
-                continue  # 跳过其他错误
-                
-        return tool_calls
+        for pattern in patterns:
+            matches = pattern.finditer(content)
+            for match in matches:
+                try:
+                    # 提取工具调用文本
+                    tool_call_text = match.group(1).strip()
+                    
+                    # YAML解析
+                    tool_call_data = yaml.safe_load(tool_call_text)
+                    
+                    # 验证必要的字段
+                    if "name" in tool_call_data and "arguments" in tool_call_data:
+                        # 只返回第一个有效的工具调用
+                        return [{
+                            "function": {
+                                "name": tool_call_data["name"],
+                                "arguments": tool_call_data["arguments"]
+                            }
+                        }]
+                except yaml.YAMLError:
+                    continue  # 跳过无效的YAML
+                except Exception:
+                    continue  # 跳过其他错误
+        
+        return []  # 如果没有找到有效的工具调用，返回空列表
 
 
 class DDGSModel(BaseModel):
@@ -57,11 +67,6 @@ class DDGSModel(BaseModel):
         self.model_name = model_name
 
     def __make_prompt(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> str:
-        prompt = "You are an AI Agent skilled in utilizing tools and planning tasks. Based on the task input by the user and the list of available tools, you output the tool invocation methods in a specified format. The user will provide feedback on the results of the tool execution, allowing you to continue analyzing and ultimately complete the user's designated task. Below is the list of tools and their usage methods. Let's use them step by step to accomplish the user's task.\n"
-        for tool in tools:
-            prompt += f"- Tool: {tool['function']['name']}\n"
-            prompt += f"  Description: {tool['function']['description']}\n"
-            prompt += f"  Arguments: {tool['function']['parameters']}\n"
         for message in messages:
             prompt += f"[{message['role']}]: {message['content']}\n"
         return prompt
@@ -70,6 +75,7 @@ class DDGSModel(BaseModel):
         ddgs = DDGS()
         prompt = self.__make_prompt(messages, tools)
         content = ddgs.chat(prompt)
+        PrettyOutput.print_stream(content, OutputType.SYSTEM)
         tool_calls = BaseModel.extract_tool_calls(content)
         return {
             "message": {
@@ -90,16 +96,25 @@ class OllamaModel(BaseModel):
     def chat(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> Dict:
         """调用Ollama API获取响应"""
         try:
-            response = self.client.chat(
+            # 使用流式调用
+            stream = self.client.chat(
                 model=self.model_name,
                 messages=messages,
-                tools=tools
+                stream=True
             )
 
-            content = response.message.content
-            tool_calls = response.message.tool_calls or BaseModel.extract_tool_calls(content)
+            # 收集完整响应
+            content_parts = []
+            for chunk in stream:
+                if chunk.message.content:
+                    content_parts.append(chunk.message.content)
+                    # 实时打印内容
+                    PrettyOutput.print_stream(chunk.message.content, OutputType.SYSTEM)
+
+            # 合并完整内容
+            content = "".join(content_parts)
+            tool_calls = BaseModel.extract_tool_calls(content)
             
-            # 转换响应格式
             return {
                 "message": {
                     "content": content,

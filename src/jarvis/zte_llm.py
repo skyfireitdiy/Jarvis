@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+
+from jarvis.utils import OutputType, PrettyOutput
 from .models import BaseModel
 
 class ZteLLM(BaseModel):
@@ -44,7 +46,9 @@ class ZteLLM(BaseModel):
         if result["code"]["code"] != "0000":
             raise Exception(f"API Error: {result['code']['msg']}")
             
-        return result["bo"]
+        ret = result["bo"]
+        PrettyOutput.print_stream(ret, OutputType.SYSTEM)
+        return ret
 
     def chat(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """Chat with ZTE LLM"""
