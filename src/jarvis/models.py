@@ -19,39 +19,43 @@ class BaseModel(ABC):
     @staticmethod
     def extract_tool_calls(content: str) -> List[Dict]:
         """从内容中提取工具调用，只返回第一个有效的工具调用"""
-        # 匹配所有可能的工具调用格式
-        patterns = [
-            # <START_TOOL_CALL>...<END_TOOL_CALL>格式
-            re.compile(r'<START_TOOL_CALL>(.*?)<END_TOOL_CALL>', re.DOTALL),
-            # ```yaml...```格式
-            re.compile(r'```yaml\s*(.*?)```', re.DOTALL),
-            # ```...```格式(不带语言标识)
-            re.compile(r'```\s*(.*?)```', re.DOTALL)
-        ]
+        # 分割内容为行
+        lines = content.split('\n')
+        tool_call_lines = []
+        in_tool_call = False
         
-        for pattern in patterns:
-            matches = pattern.finditer(content)
-            for match in matches:
-                try:
-                    # 提取工具调用文本
-                    tool_call_text = match.group(1).strip()
-                    
-                    # YAML解析
-                    tool_call_data = yaml.safe_load(tool_call_text)
-                    
-                    # 验证必要的字段
-                    if "name" in tool_call_data and "arguments" in tool_call_data:
-                        # 只返回第一个有效的工具调用
-                        return [{
-                            "function": {
-                                "name": tool_call_data["name"],
-                                "arguments": tool_call_data["arguments"]
-                            }
-                        }]
-                except yaml.YAMLError:
-                    continue  # 跳过无效的YAML
-                except Exception:
-                    continue  # 跳过其他错误
+        # 逐行处理
+        for line in lines:
+            if not line:
+                continue
+                
+            if line == '<START_TOOL_CALL>':
+                tool_call_lines = []
+                in_tool_call = True
+                continue
+            elif line == '<END_TOOL_CALL>':
+                if in_tool_call and tool_call_lines:
+                    try:
+                        # 解析工具调用内容
+                        tool_call_text = '\n'.join(tool_call_lines)
+                        tool_call_data = yaml.safe_load(tool_call_text)
+                        
+                        # 验证必要的字段
+                        if "name" in tool_call_data and "arguments" in tool_call_data:
+                            # 只返回第一个有效的工具调用
+                            return [{
+                                "function": {
+                                    "name": tool_call_data["name"],
+                                    "arguments": tool_call_data["arguments"]
+                                }
+                            }]
+                    except yaml.YAMLError:
+                        pass  # 跳过无效的YAML
+                    except Exception:
+                        pass  # 跳过其他错误
+                in_tool_call = False
+            elif in_tool_call:
+                tool_call_lines.append(line)
         
         return []  # 如果没有找到有效的工具调用，返回空列表
 
@@ -67,6 +71,7 @@ class DDGSModel(BaseModel):
         self.model_name = model_name
 
     def __make_prompt(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> str:
+        prompt = ""
         for message in messages:
             prompt += f"[{message['role']}]: {message['content']}\n"
         return prompt

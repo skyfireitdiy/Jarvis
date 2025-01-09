@@ -1,6 +1,7 @@
 提交代码: |
   1. 将当前git仓库的修改添加到暂存区
-  2. 根据修改的**文件清单自动生成**commit信息，再commit信息中打上[修复]、[优化]等标签
-  3. 让用户确认commit信息
+  2. 根据修改文件清单**自动生成**commit信息，并在commit信息中自动打上[修复]、[优化]等标签,如果无法生成准确的commit信息，则询问用户
+  3. 询问用户,让用户确认commit信息
   4. 执行git commit和git push
 发布版本: 执行 python3 ./script/publish.py patch 进行版本发布
+
