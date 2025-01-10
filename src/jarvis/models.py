@@ -1,6 +1,6 @@
 import re
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from duckduckgo_search import DDGS
 import ollama
 from abc import ABC, abstractmethod
@@ -17,23 +17,21 @@ class BaseModel(ABC):
         pass
 
     @staticmethod
-    def extract_tool_calls(content: str) -> List[Dict]:
-        """从内容中提取工具调用，只返回第一个有效的工具调用"""
+    def extract_tool_calls(content: str) -> Tuple[str, List[Dict]]:
+        """从内容中提取工具调用，如果检测到多个工具调用则抛出异常，并返回工具调用之前的内容和工具调用"""
         # 分割内容为行
         lines = content.split('\n')
         tool_call_lines = []
+        content_lines = []  # 存储工具调用之前的内容
         in_tool_call = False
         
         # 逐行处理
-        for line in lines:
-            if not line:
-                continue
-                
-            if line == '<START_TOOL_CALL>':
-                tool_call_lines = []
+        for line in lines:          
+            content_lines.append(line)       
+            if '<START_TOOL_CALL>' in line:
                 in_tool_call = True
                 continue
-            elif line == '<END_TOOL_CALL>':
+            elif '<END_TOOL_CALL>' in line:
                 if in_tool_call and tool_call_lines:
                     try:
                         # 解析工具调用内容
@@ -42,9 +40,9 @@ class BaseModel(ABC):
                         
                         # 验证必要的字段
                         if "name" in tool_call_data and "arguments" in tool_call_data:
-                            # 只返回第一个有效的工具调用
-                            return [{
-                                "function": {
+                            # 返回工具调用之前的内容和工具调用
+                            return '\n'.join(content_lines), [{
+                                "tool_call": {
                                     "name": tool_call_data["name"],
                                     "arguments": tool_call_data["arguments"]
                                 }
@@ -53,11 +51,12 @@ class BaseModel(ABC):
                         pass  # 跳过无效的YAML
                     except Exception:
                         pass  # 跳过其他错误
-                in_tool_call = False
+                break  # 工具调用结束后直接结束处理
             elif in_tool_call:
                 tool_call_lines.append(line)
         
-        return []  # 如果没有找到有效的工具调用，返回空列表
+        # 如果没有找到有效的工具调用，返回原始内容
+        return '\n'.join(content_lines), []
 
 
 class DDGSModel(BaseModel):
@@ -70,22 +69,22 @@ class DDGSModel(BaseModel):
         """
         self.model_name = model_name
 
-    def __make_prompt(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> str:
+    def __make_prompt(self, messages: List[Dict]) -> str:
         prompt = ""
         for message in messages:
             prompt += f"[{message['role']}]: {message['content']}\n"
         return prompt
 
-    def chat(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> Dict:
+    def chat(self, messages: List[Dict]) -> Dict:
         ddgs = DDGS()
-        prompt = self.__make_prompt(messages, tools)
+        prompt = self.__make_prompt(messages)
         content = ddgs.chat(prompt)
         PrettyOutput.print_stream(content, OutputType.SYSTEM)
-        tool_calls = BaseModel.extract_tool_calls(content)
+        result = BaseModel.extract_tool_calls(content)
         return {
             "message": {
-                "content": content,
-                "tool_calls": tool_calls
+                "content": result[0],
+                "tool_calls": result[1]
             }
         }
 
@@ -98,7 +97,7 @@ class OllamaModel(BaseModel):
         self.api_base = api_base
         self.client = ollama.Client(host=api_base)
 
-    def chat(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> Dict:
+    def chat(self, messages: List[Dict]) -> Dict:
         """调用Ollama API获取响应"""
         try:
             # 使用流式调用
@@ -118,12 +117,12 @@ class OllamaModel(BaseModel):
 
             # 合并完整内容
             content = "".join(content_parts)
-            tool_calls = BaseModel.extract_tool_calls(content)
+            result = BaseModel.extract_tool_calls(content)
             
             return {
                 "message": {
-                    "content": content,
-                    "tool_calls": tool_calls
+                    "content": result[0],
+                    "tool_calls": result[1]
                 }
             }
         except Exception as e:

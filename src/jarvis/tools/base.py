@@ -13,8 +13,8 @@ class Tool:
     def to_dict(self) -> Dict:
         """转换为Ollama工具格式"""
         return {
-            "type": "function",
-            "function": {
+            "type": "tool_call",
+            "tool_call": {
                 "name": self.name,
                 "description": self.description,
                 "parameters": self.parameters
@@ -90,8 +90,8 @@ class ToolRegistry:
             
         # 只处理第一个工具调用
         tool_call = tool_calls[0]
-        name = tool_call["function"]["name"]
-        args = tool_call["function"]["arguments"]
+        name = tool_call["tool_call"]["name"]
+        args = tool_call["tool_call"]["arguments"]
         
         if isinstance(args, str):
             try:
@@ -121,6 +121,7 @@ class ToolRegistry:
             if stderr:
                 output_parts.append(f"错误:\n{stderr}")
             output = "\n\n".join(output_parts)
+            output = "没有输出和错误" if not output else output
             PrettyOutput.section("执行成功", OutputType.SUCCESS)
         else:
             error_msg = result["error"]

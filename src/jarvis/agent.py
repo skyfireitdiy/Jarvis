@@ -18,77 +18,68 @@ class Agent:
         # 构建工具说明
         tools_prompt = "Available Tools:\n"
         for tool in self.tool_registry.get_all_tools():
-            tools_prompt += f"- Tool: {tool['function']['name']}\n"
-            tools_prompt += f"  Description: {tool['function']['description']}\n"
-            tools_prompt += f"  Arguments: {tool['function']['parameters']}\n"
+            tools_prompt += f"- Tool: {tool['tool_call']['name']}\n"
+            tools_prompt += f"  Description: {tool['tool_call']['description']}\n"
+            tools_prompt += f"  Arguments: {tool['tool_call']['parameters']}\n"
 
         self.messages = [
             {
                 "role": "system",
-                "content": f"""You are {name}, an AI assistant that follows the ReAct (Reasoning + Acting) framework to solve tasks step by step.
+                "content": f"""You are {name}, an AI assistant that strictly follows the ReAct framework for step-by-step reasoning and action.
 
-FRAMEWORK:
-1. Thought: Analyze the current situation and plan the next step
-2. Action: Execute ONE specific tool call
-3. Observation: Review the result
-4. Next: Plan the next step or conclude
+ReAct FRAMEWORK:
+1. THOUGHT
+   - Analyze current situation
+   - Consider available tools
+   - Plan next action
+   - Base on FACTS only
 
-FORMAT:
-Thought: I need to [reasoning about the current situation]...
-Action: I will use [tool] to [purpose]...
+2. ACTION (ONE TOOL ONLY)
+   - Execute exactly ONE tool
+   - Format:
+   <START_TOOL_CALL>
+   name: tool_name
+   arguments:
+       param1: value1
+   <END_TOOL_CALL>
+
+3. OBSERVATION
+   - Wait for tool result
+   - Continue in next response
+
+RESPONSE FORMAT:
+Thought: I analyze that [current situation]... Based on [facts], I need to [goal]...
+
+Action: I will use [tool] to [specific purpose]...
 <START_TOOL_CALL>
 name: tool_name
 arguments:
     param1: value1
 <END_TOOL_CALL>
 
-After receiving result:
-Observation: The tool returned [analyze result]...
-Next: Based on this, I will [next step]...
+[STOP HERE - Wait for observation]
 
-CORE RULES:
-1. ONE Action Per Response
-   - Only ONE tool call per response
-   - Additional tool calls will be ignored
-   - Complete current step before next
-
-2. Clear Reasoning
-   - Explain your thought process
-   - Justify tool selection
-   - Analyze results thoroughly
-
-Examples:
-✓ Good Response:
-Thought: I need to check the content of utils.py first to understand its structure.
-Action: I will read the file content.
-<START_TOOL_CALL>
-name: file_operation
-arguments:
-    operation: read
-    filepath: src/utils.py
-<END_TOOL_CALL>
-
-✗ Bad Response:
-Thought: Let's analyze the code.
-Action: I'll read and check everything.
-[Multiple or vague tool calls...]
+STRICT RULES:
+‼️ ONE tool call per response
+‼️ Content after <END_TOOL_CALL> is discarded
+‼️ No assumed results
+‼️ No hypothetical actions
 
 Remember:
-- Always start with "Thought:"
-- Use exactly ONE tool per response
-- Wait for results before next step
-- Clearly explain your reasoning
+- Think before acting
+- ONE tool at a time
+- Wait for results
+- Next step in next response
 
 {tools_prompt}"""
             }
         ]
 
-    def _call_model(self, messages: List[Dict], use_tools: bool = True) -> Dict:
+    def _call_model(self, messages: List[Dict]) -> Dict:
         """调用模型获取响应"""
         try:
             return self.model.chat(
                 messages=messages,
-                tools=self.tool_registry.get_all_tools() if use_tools else []
             )
         except Exception as e:
             raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
@@ -117,8 +108,7 @@ Remember:
 
                 self.messages.append({
                     "role": "assistant",
-                    "content": response["message"].get("content", ""),
-                    "tool_calls": current_response["message"]["tool_calls"]
+                    "content": response["message"].get("content", "")
                 })
                 
                 if len(current_response["message"]["tool_calls"]) > 0:
@@ -135,7 +125,7 @@ Remember:
                         tool_result = f"Tool call failed: {str(e)}"
 
                     self.messages.append({
-                        "role": "tool",
+                        "role": "user",
                         "content": tool_result
                     })
                     continue
@@ -165,7 +155,7 @@ Focus only on facts and actual results. Be direct and concise."""
                     
                     while True:
                         try:
-                            summary_response = self._call_model(self.messages + [summary_prompt], use_tools=False)
+                            summary_response = self._call_model(self.messages + [summary_prompt])
                             summary = summary_response["message"].get("content", "")
                             
                             # 显示任务总结

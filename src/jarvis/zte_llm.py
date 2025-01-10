@@ -37,20 +37,33 @@ class ZteLLM(BaseModel):
         response = requests.post(
             f"{self.base_url}/{endpoint}",
             headers=headers,
-            json=data
+            json=data,
+            stream=True  # 启用流式传输
         )
         
         response.raise_for_status()
-        result = response.json()
         
-        if result["code"]["code"] != "0000":
-            raise Exception(f"API Error: {result['code']['msg']}")
-            
-        ret = result["bo"]
-        PrettyOutput.print_stream(ret, OutputType.SYSTEM)
-        return ret
+        full_content = []
+        for line in response.iter_lines():
+            if line:
+                # 解析 SSE 数据
+                line = line.decode('utf-8')
+                if line.startswith('data: '):
+                    try:
+                        data = json.loads(line[6:])  # 跳过 "data: " 前缀
+                        if "result" in data:
+                            result = data["result"]
+                            if result:  # 只处理非空结果
+                                full_content.append(result)
+                                PrettyOutput.print_stream(result, OutputType.SYSTEM)
+                            if data.get("finishReason") == "stop":
+                                break
+                    except json.JSONDecodeError:
+                        continue
+        
+        return "".join(full_content)
 
-    def chat(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
+    def chat(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Chat with ZTE LLM"""
         # Convert messages to prompt
         prompt = self._convert_messages_to_prompt(messages)
@@ -59,28 +72,20 @@ class ZteLLM(BaseModel):
         data = {
             "chatUuid": "",
             "chatName": "",
-            "stream": False,
+            "stream": True,  # 启用流式响应
             "keep": False,
             "text": prompt,
             "model": self.model
         }
         
-        # If tools are provided, add them to the prompt
-        if tools:
-            tools_desc = "Available tools:\n\n" + json.dumps(tools, indent=2, ensure_ascii=False)
-            data["text"] = tools_desc + "\n\n" + data["text"]
-        
         try:
-            result = self._make_request("chat", data)
-            
-            # Parse the response to extract potential tool calls
-            response_text = result["result"]
-            tool_calls = BaseModel.extract_tool_calls(response_text)
+            response_text = self._make_request("chat", data)
+            result = BaseModel.extract_tool_calls(response_text)
             
             return {
                 "message": {
-                    "content": response_text,
-                    "tool_calls": tool_calls
+                    "content": result[0],
+                    "tool_calls": result[1]
                 }
             }
             

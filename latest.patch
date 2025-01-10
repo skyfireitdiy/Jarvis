@@ -1,0 +1,392 @@
+From 9c077ef862cbdc78e2933bc35f1891d9ba93fac9 Mon Sep 17 00:00:00 2001
+From: =?utf-8?q?=E7=8E=8B=E8=8C=82=E6=96=8C10268518?=
+ <wang.maobin@zte.com.cn>
+Date: Fri, 10 Jan 2025 10:04:34 +0800
+Subject: [PATCH] =?utf-8?q?[=E4=BF=AE=E5=A4=8D]=20.jarvis\n[=E4=BC=98?=
+ =?utf-8?q?=E5=8C=96]=20.jarvis\n[=E4=BF=AE=E5=A4=8D]=20src/jarvis/agent.p?=
+ =?utf-8?q?y\n[=E4=BC=98=E5=8C=96]=20src/jarvis/agent.py\n[=E4=BF=AE?=
+ =?utf-8?q?=E5=A4=8D]=20src/jarvis/models.py\n[=E4=BC=98=E5=8C=96]=20src/j?=
+ =?utf-8?q?arvis/models.py\n[=E4=BF=AE=E5=A4=8D]=20src/jarvis/tools/base.p?=
+ =?utf-8?q?y\n[=E4=BC=98=E5=8C=96]=20src/jarvis/tools/base.py\n[=E4=BF=AE?=
+ =?utf-8?q?=E5=A4=8D]=20src/jarvis/zte=5Fllm.py\n[=E4=BC=98=E5=8C=96]=20sr?=
+ =?utf-8?q?c/jarvis/zte=5Fllm.py?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+---
+ .jarvis                  |  5 +++
+ src/jarvis/agent.py      | 90 ++++++++++++++++++----------------------
+ src/jarvis/models.py     | 44 ++++++++++----------
+ src/jarvis/tools/base.py |  1 +
+ src/jarvis/zte_llm.py    | 49 ++++++++++++----------
+ 5 files changed, 95 insertions(+), 94 deletions(-)
+
+diff --git a/.jarvis b/.jarvis
+index d4bd405..b3fd568 100644
+--- a/.jarvis
++++ b/.jarvis
+@@ -1,3 +1,8 @@
++commit代码: |
++  1. 将当前git仓库的修改添加到暂存区
++  2. 根据修改文件清单**自动生成**commit信息，并在commit信息中自动打上[修复]、[优化]等标签,如果无法生成准确的commit信息，则询问用户
++  3. 询问用户,让用户确认commit信息
++  4. 生成最新代码的patch文件
+ 提交代码: |
+   1. 将当前git仓库的修改添加到暂存区
+   2. 根据修改文件清单**自动生成**commit信息，并在commit信息中自动打上[修复]、[优化]等标签,如果无法生成准确的commit信息，则询问用户
+diff --git a/src/jarvis/agent.py b/src/jarvis/agent.py
+index 5c139dd..a7a53bc 100644
+--- a/src/jarvis/agent.py
++++ b/src/jarvis/agent.py
+@@ -25,70 +25,61 @@ class Agent:
+         self.messages = [
+             {
+                 "role": "system",
+-                "content": f"""You are {name}, an AI assistant that follows the ReAct (Reasoning + Acting) framework to solve tasks step by step.
+-
+-FRAMEWORK:
+-1. Thought: Analyze the current situation and plan the next step
+-2. Action: Execute ONE specific tool call
+-3. Observation: Review the result
+-4. Next: Plan the next step or conclude
+-
+-FORMAT:
+-Thought: I need to [reasoning about the current situation]...
+-Action: I will use [tool] to [purpose]...
++                "content": f"""You are {name}, an AI assistant that strictly follows the ReAct framework for step-by-step reasoning and action.
++
++ReAct FRAMEWORK:
++1. THOUGHT
++   - Analyze current situation
++   - Consider available tools
++   - Plan next action
++   - Base on FACTS only
++
++2. ACTION (ONE TOOL ONLY)
++   - Execute exactly ONE tool
++   - Format:
++   <START_TOOL_CALL>
++   name: tool_name
++   arguments:
++       param1: value1
++   <END_TOOL_CALL>
++
++3. OBSERVATION
++   - Wait for tool result
++   - Continue in next response
++
++RESPONSE FORMAT:
++Thought: I analyze that [current situation]... Based on [facts], I need to [goal]...
++
++Action: I will use [tool] to [specific purpose]...
+ <START_TOOL_CALL>
+ name: tool_name
+ arguments:
+     param1: value1
+ <END_TOOL_CALL>
+ 
+-After receiving result:
+-Observation: The tool returned [analyze result]...
+-Next: Based on this, I will [next step]...
+-
+-CORE RULES:
+-1. ONE Action Per Response
+-   - Only ONE tool call per response
+-   - Additional tool calls will be ignored
+-   - Complete current step before next
+-
+-2. Clear Reasoning
+-   - Explain your thought process
+-   - Justify tool selection
+-   - Analyze results thoroughly
+-
+-Examples:
+-✓ Good Response:
+-Thought: I need to check the content of utils.py first to understand its structure.
+-Action: I will read the file content.
+-<START_TOOL_CALL>
+-name: file_operation
+-arguments:
+-    operation: read
+-    filepath: src/utils.py
+-<END_TOOL_CALL>
++[STOP HERE - Wait for observation]
+ 
+-✗ Bad Response:
+-Thought: Let's analyze the code.
+-Action: I'll read and check everything.
+-[Multiple or vague tool calls...]
++STRICT RULES:
++‼️ ONE tool call per response
++‼️ Content after <END_TOOL_CALL> is discarded
++‼️ No assumed results
++‼️ No hypothetical actions
+ 
+ Remember:
+-- Always start with "Thought:"
+-- Use exactly ONE tool per response
+-- Wait for results before next step
+-- Clearly explain your reasoning
++- Think before acting
++- ONE tool at a time
++- Wait for results
++- Next step in next response
+ 
+ {tools_prompt}"""
+             }
+         ]
+ 
+-    def _call_model(self, messages: List[Dict], use_tools: bool = True) -> Dict:
++    def _call_model(self, messages: List[Dict]) -> Dict:
+         """调用模型获取响应"""
+         try:
+             return self.model.chat(
+                 messages=messages,
+-                tools=self.tool_registry.get_all_tools() if use_tools else []
+             )
+         except Exception as e:
+             raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
+@@ -117,8 +108,7 @@ Remember:
+ 
+                 self.messages.append({
+                     "role": "assistant",
+-                    "content": response["message"].get("content", ""),
+-                    "tool_calls": current_response["message"]["tool_calls"]
++                    "content": response["message"].get("content", "")
+                 })
+                 
+                 if len(current_response["message"]["tool_calls"]) > 0:
+@@ -135,7 +125,7 @@ Remember:
+                         tool_result = f"Tool call failed: {str(e)}"
+ 
+                     self.messages.append({
+-                        "role": "tool",
++                        "role": "user",
+                         "content": tool_result
+                     })
+                     continue
+@@ -165,7 +155,7 @@ Focus only on facts and actual results. Be direct and concise."""
+                     
+                     while True:
+                         try:
+-                            summary_response = self._call_model(self.messages + [summary_prompt], use_tools=False)
++                            summary_response = self._call_model(self.messages + [summary_prompt])
+                             summary = summary_response["message"].get("content", "")
+                             
+                             # 显示任务总结
+diff --git a/src/jarvis/models.py b/src/jarvis/models.py
+index 78b25e2..a895dc2 100644
+--- a/src/jarvis/models.py
++++ b/src/jarvis/models.py
+@@ -1,6 +1,6 @@
+ import re
+ import time
+-from typing import Dict, List, Optional
++from typing import Dict, List, Optional, Tuple
+ from duckduckgo_search import DDGS
+ import ollama
+ from abc import ABC, abstractmethod
+@@ -17,20 +17,19 @@ class BaseModel(ABC):
+         pass
+ 
+     @staticmethod
+-    def extract_tool_calls(content: str) -> List[Dict]:
+-        """从内容中提取工具调用，只返回第一个有效的工具调用"""
++    def extract_tool_calls(content: str) -> Tuple[str, List[Dict]]:
++        """从内容中提取工具调用，如果检测到多个工具调用则抛出异常，并返回工具调用之前的内容和工具调用"""
+         # 分割内容为行
+         lines = content.split('\n')
+         tool_call_lines = []
++        content_lines = []  # 存储工具调用之前的内容
+         in_tool_call = False
+         
+         # 逐行处理
+-        for line in lines:
+-            if not line:
+-                continue
+-                
++        for line in lines:          
++            content_lines.append(line)       
+             if line == '<START_TOOL_CALL>':
+-                tool_call_lines = []
++
+                 in_tool_call = True
+                 continue
+             elif line == '<END_TOOL_CALL>':
+@@ -42,8 +41,8 @@ class BaseModel(ABC):
+                         
+                         # 验证必要的字段
+                         if "name" in tool_call_data and "arguments" in tool_call_data:
+-                            # 只返回第一个有效的工具调用
+-                            return [{
++                            # 返回工具调用之前的内容和工具调用
++                            return '\n'.join(content_lines), [{
+                                 "function": {
+                                     "name": tool_call_data["name"],
+                                     "arguments": tool_call_data["arguments"]
+@@ -53,11 +52,12 @@ class BaseModel(ABC):
+                         pass  # 跳过无效的YAML
+                     except Exception:
+                         pass  # 跳过其他错误
+-                in_tool_call = False
++                break  # 工具调用结束后直接结束处理
+             elif in_tool_call:
+                 tool_call_lines.append(line)
+         
+-        return []  # 如果没有找到有效的工具调用，返回空列表
++        # 如果没有找到有效的工具调用，返回原始内容
++        return '\n'.join(content_lines), []
+ 
+ 
+ class DDGSModel(BaseModel):
+@@ -70,22 +70,22 @@ class DDGSModel(BaseModel):
+         """
+         self.model_name = model_name
+ 
+-    def __make_prompt(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> str:
++    def __make_prompt(self, messages: List[Dict]) -> str:
+         prompt = ""
+         for message in messages:
+             prompt += f"[{message['role']}]: {message['content']}\n"
+         return prompt
+ 
+-    def chat(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> Dict:
++    def chat(self, messages: List[Dict]) -> Dict:
+         ddgs = DDGS()
+-        prompt = self.__make_prompt(messages, tools)
++        prompt = self.__make_prompt(messages)
+         content = ddgs.chat(prompt)
+         PrettyOutput.print_stream(content, OutputType.SYSTEM)
+-        tool_calls = BaseModel.extract_tool_calls(content)
++        result = BaseModel.extract_tool_calls(content)
+         return {
+             "message": {
+-                "content": content,
+-                "tool_calls": tool_calls
++                "content": result[0],
++                "tool_calls": result[1]
+             }
+         }
+ 
+@@ -98,7 +98,7 @@ class OllamaModel(BaseModel):
+         self.api_base = api_base
+         self.client = ollama.Client(host=api_base)
+ 
+-    def chat(self, messages: List[Dict], tools: Optional[List[Dict]] = None) -> Dict:
++    def chat(self, messages: List[Dict]) -> Dict:
+         """调用Ollama API获取响应"""
+         try:
+             # 使用流式调用
+@@ -118,12 +118,12 @@ class OllamaModel(BaseModel):
+ 
+             # 合并完整内容
+             content = "".join(content_parts)
+-            tool_calls = BaseModel.extract_tool_calls(content)
++            result = BaseModel.extract_tool_calls(content)
+             
+             return {
+                 "message": {
+-                    "content": content,
+-                    "tool_calls": tool_calls
++                    "content": result[0],
++                    "tool_calls": result[1]
+                 }
+             }
+         except Exception as e:
+diff --git a/src/jarvis/tools/base.py b/src/jarvis/tools/base.py
+index 4e6c332..82d0a06 100644
+--- a/src/jarvis/tools/base.py
++++ b/src/jarvis/tools/base.py
+@@ -121,6 +121,7 @@ class ToolRegistry:
+             if stderr:
+                 output_parts.append(f"错误:\n{stderr}")
+             output = "\n\n".join(output_parts)
++            output = "没有输出和错误" if not output else output
+             PrettyOutput.section("执行成功", OutputType.SUCCESS)
+         else:
+             error_msg = result["error"]
+diff --git a/src/jarvis/zte_llm.py b/src/jarvis/zte_llm.py
+index 1a447f7..cc66173 100644
+--- a/src/jarvis/zte_llm.py
++++ b/src/jarvis/zte_llm.py
+@@ -37,20 +37,33 @@ class ZteLLM(BaseModel):
+         response = requests.post(
+             f"{self.base_url}/{endpoint}",
+             headers=headers,
+-            json=data
++            json=data,
++            stream=True  # 启用流式传输
+         )
+         
+         response.raise_for_status()
+-        result = response.json()
+         
+-        if result["code"]["code"] != "0000":
+-            raise Exception(f"API Error: {result['code']['msg']}")
+-            
+-        ret = result["bo"]
+-        PrettyOutput.print_stream(ret, OutputType.SYSTEM)
+-        return ret
++        full_content = []
++        for line in response.iter_lines():
++            if line:
++                # 解析 SSE 数据
++                line = line.decode('utf-8')
++                if line.startswith('data: '):
++                    try:
++                        data = json.loads(line[6:])  # 跳过 "data: " 前缀
++                        if "result" in data:
++                            result = data["result"]
++                            if result:  # 只处理非空结果
++                                full_content.append(result)
++                                PrettyOutput.print_stream(result, OutputType.SYSTEM)
++                            if data.get("finishReason") == "stop":
++                                break
++                    except json.JSONDecodeError:
++                        continue
++        
++        return "".join(full_content)
+ 
+-    def chat(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
++    def chat(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+         """Chat with ZTE LLM"""
+         # Convert messages to prompt
+         prompt = self._convert_messages_to_prompt(messages)
+@@ -59,28 +72,20 @@ class ZteLLM(BaseModel):
+         data = {
+             "chatUuid": "",
+             "chatName": "",
+-            "stream": False,
++            "stream": True,  # 启用流式响应
+             "keep": False,
+             "text": prompt,
+             "model": self.model
+         }
+         
+-        # If tools are provided, add them to the prompt
+-        if tools:
+-            tools_desc = "Available tools:\n\n" + json.dumps(tools, indent=2, ensure_ascii=False)
+-            data["text"] = tools_desc + "\n\n" + data["text"]
+-        
+         try:
+-            result = self._make_request("chat", data)
+-            
+-            # Parse the response to extract potential tool calls
+-            response_text = result["result"]
+-            tool_calls = BaseModel.extract_tool_calls(response_text)
++            response_text = self._make_request("chat", data)
++            result = BaseModel.extract_tool_calls(response_text)
+             
+             return {
+                 "message": {
+-                    "content": response_text,
+-                    "tool_calls": tool_calls
++                    "content": result[0],
++                    "tool_calls": result[1]
+                 }
+             }
+             
+-- 
+2.25.1
+
