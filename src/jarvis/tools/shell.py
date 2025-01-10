@@ -7,7 +7,7 @@ from ..utils import PrettyOutput, OutputType
 
 class ShellTool:
     name = "execute_shell"
-    description = """Execute shell commands and return the results."""
+    description = """执行shell命令并返回结果"""
 
     parameters = {
         "type": "object",

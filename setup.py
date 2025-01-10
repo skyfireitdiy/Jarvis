@@ -19,6 +19,7 @@ setup(
         "pyyaml>=5.1",
         "ollama>=0.1.6",
         "colorama>=0.4.6",
+        "openai>=1.2.0",
     ],
     entry_points={
         "console_scripts": [

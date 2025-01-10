@@ -5,7 +5,7 @@ from ..utils import PrettyOutput, OutputType
 
 class WebpageTool:
     name = "read_webpage"
-    description = "Read webpage content, supporting extraction of main text, title, and other information"
+    description = "读取网页内容，支持提取主要文本、标题和其他信息"
     parameters = {
         "type": "object",
         "properties": {

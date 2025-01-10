@@ -4,7 +4,7 @@ from ..utils import PrettyOutput, OutputType
 
 class SearchTool:
     name = "search"
-    description = "Search for information using DuckDuckGo search engine"
+    description = "使用DuckDuckGo搜索引擎搜索信息"
     parameters = {
         "type": "object",
         "properties": {

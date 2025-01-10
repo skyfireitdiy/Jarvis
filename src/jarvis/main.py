@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from jarvis.agent import Agent
 from jarvis.tools import ToolRegistry
-from jarvis.models import DDGSModel, OllamaModel
+from jarvis.models import DDGSModel, OllamaModel, OpenAIModel
 from jarvis.utils import PrettyOutput, OutputType, get_multiline_input, load_env_from_file
 from jarvis.zte_llm import create_zte_llm
 
@@ -20,15 +20,23 @@ from jarvis.zte_llm import create_zte_llm
 SUPPORTED_PLATFORMS = {
     "ollama": {
         "models": ["qwen2.5:14b", "qwq"],
-        "default": "qwen2.5:14b"
+        "default": "qwen2.5:14b",
+        "allow_custom": True
     },
     "ddgs": {
         "models": ["gpt-4o-mini", "claude-3-haiku", "llama-3.1-70b", "mixtral-8x7b"],
-        "default": "gpt-4o-mini"
+        "default": "gpt-4o-mini",
+        "allow_custom": False
     },
     "zte": {
         "models": ["NebulaBiz", "nebulacoder", "NTele-72B"],
-        "default": "NebulaBiz"
+        "default": "NebulaBiz",
+        "allow_custom": False
+    },
+    "openai": {
+        "models": ["deepseek-chat"],
+        "default": "deepseek-chat",
+        "allow_custom": True
     }
 }
 
@@ -118,9 +126,10 @@ def main():
 
     args.model = args.model or os.getenv("JARVIS_MODEL")
     
-    # 验证并设置默认模型
+    # 修改模型验证逻辑
     if args.model:
-        if args.model not in SUPPORTED_PLATFORMS[args.platform]["models"]:
+        if (args.model not in SUPPORTED_PLATFORMS[args.platform]["models"] and 
+            not SUPPORTED_PLATFORMS[args.platform]["allow_custom"]):
             supported_models = ", ".join(SUPPORTED_PLATFORMS[args.platform]["models"])
             PrettyOutput.print(
                 f"错误: 平台 {args.platform} 不支持模型 {args.model}\n"
@@ -145,6 +154,13 @@ def main():
         elif args.platform == "zte":  # zte
             model = create_zte_llm(model_name=args.model)
             platform_name = f"ZTE ({args.model})"
+        elif args.platform == "openai":
+            model = OpenAIModel(
+                model_name=args.model,
+                api_key=os.getenv("OPENAI_API_KEY"),
+                api_base=os.getenv("OPENAI_API_BASE")
+            )
+            platform_name = f"OpenAI ({args.model})"
 
         tool_registry = ToolRegistry(model)
         agent = Agent(model, tool_registry)

@@ -6,7 +6,7 @@ from .base import ToolRegistry
 
 class SubAgentTool:
     name = "create_sub_agent"
-    description = """Create a sub-agent to handle independent tasks.(IMPORTANT: Sub-agents start with NO context! Must provide complete steps and context.)"""
+    description = """创建一个子代理来处理独立任务。（重要：子代理启动时没有任何上下文！必须提供完整的步骤和上下文。）"""
 
     parameters = {
         "type": "object",

@@ -5,7 +5,7 @@ from ..utils import PrettyOutput, OutputType
 
 class FileOperationTool:
     name = "file_operation"
-    description = "Execute file operations (read/write/append/exists)"
+    description = "文件操作 (read/write/append/exists)"
     parameters = {
         "type": "object",
         "properties": {
