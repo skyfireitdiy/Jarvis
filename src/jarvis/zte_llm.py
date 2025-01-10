@@ -60,10 +60,11 @@ class ZteLLM(BaseModel):
                                 break
                     except json.JSONDecodeError:
                         continue
+        PrettyOutput.print_stream_end()
         
         return "".join(full_content)
 
-    def chat(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def chat(self, messages: List[Dict[str, Any]]) -> str:
         """Chat with ZTE LLM"""
         # Convert messages to prompt
         prompt = self._convert_messages_to_prompt(messages)
@@ -79,15 +80,8 @@ class ZteLLM(BaseModel):
         }
         
         try:
-            response_text = self._make_request("chat", data)
-            result = BaseModel.extract_tool_calls(response_text)
-            
-            return {
-                "message": {
-                    "content": result[0],
-                    "tool_calls": result[1]
-                }
-            }
+            return self._make_request("chat", data)
+
             
         except Exception as e:
             raise Exception(f"ZTE LLM chat failed: {str(e)}")

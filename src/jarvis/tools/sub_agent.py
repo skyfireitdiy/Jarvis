@@ -6,63 +6,7 @@ from .base import ToolRegistry
 
 class SubAgentTool:
     name = "create_sub_agent"
-    description = """Create a sub-agent to handle independent tasks.
-    
-IMPORTANT: Sub-agents start with NO context!
-Must provide complete steps and context.
-
-Required:
-1. Context
-   - Project background
-   - File locations
-   - Current standards
-   - Requirements
-
-2. Steps
-   - Clear actions
-   - Success criteria
-   - Expected output
-
-Example (Good):
-<START_TOOL_CALL>
-name: create_sub_agent
-arguments:
-    name: CodeAnalyzer
-    task: Analyze error handling
-    context: |
-        Project: Python 3.8+
-        File: src/utils.py
-        
-        Steps:
-        1. Read file content
-        2. Find error patterns
-        3. Check consistency
-        4. Verify logging
-        
-        Expected:
-        - Pattern list
-        - Issues found
-        - Suggestions
-        
-        Standards:
-        - Dict[str, Any] returns
-        - PrettyOutput logging
-<END_TOOL_CALL>
-
-Example (Bad):
-<START_TOOL_CALL>
-name: create_sub_agent
-arguments:
-    name: Analyzer
-    task: Check code
-    context: Look at utils.py
-<END_TOOL_CALL>
-
-Use for:
-✓ Clear, independent tasks
-✓ Well-defined goals
-✗ Vague tasks
-✗ Simple operations"""
+    description = """Create a sub-agent to handle independent tasks.(IMPORTANT: Sub-agents start with NO context! Must provide complete steps and context.)"""
 
     parameters = {
         "type": "object",

@@ -7,26 +7,7 @@ from ..utils import PrettyOutput, OutputType
 
 class ShellTool:
     name = "execute_shell"
-    description = """Execute shell commands and return the results.
-
-Guidelines:
-1. Filter outputs
-   - Use grep/sed for specific data
-   - Use head/tail to limit lines
-   - Use -q for status checks
-
-Examples:
-✓ <START_TOOL_CALL>
-name: execute_shell
-arguments:
-    command: ls -l file.txt  # specific file
-<END_TOOL_CALL>
-
-✗ <START_TOOL_CALL>
-name: execute_shell
-arguments:
-    command: ps aux  # too much output
-<END_TOOL_CALL>"""
+    description = """Execute shell commands and return the results."""
 
     parameters = {
         "type": "object",
