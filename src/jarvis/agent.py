@@ -11,11 +11,19 @@ import os
 from datetime import datetime
 
 class Agent:
-    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis"):
-        """Initialize Agent with a model, optional tool registry and name"""
+    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis", is_sub_agent: bool = False):
+        """Initialize Agent with a model, optional tool registry and name
+        
+        Args:
+            model: 语言模型实例
+            tool_registry: 工具注册表实例
+            name: Agent名称，默认为"Jarvis"
+            is_sub_agent: 是否为子Agent，默认为False
+        """
         self.model = model
         self.tool_registry = tool_registry or ToolRegistry(model)
         self.name = name
+        self.is_sub_agent = is_sub_agent
 
         # 构建工具说明
         tools_prompt = "可用工具:\n"
@@ -233,39 +241,45 @@ arguments:
                 # 获取用户输入
                 user_input = get_multiline_input(f"{self.name}: 您可以继续输入，或输入空行结束当前任务")
                 if not user_input:
-                    PrettyOutput.print("生成任务总结...", OutputType.PROGRESS)
-                    
-                    # 生成任务总结
-                    summary_prompt = {
-                        "role": "user",
-                        "content": """任务已完成。请根据之前的分析和执行结果，提供一个任务总结，包括：
+                    # 只有子Agent才需要生成任务总结
+                    if self.is_sub_agent:
+                        PrettyOutput.print("生成任务总结...", OutputType.PROGRESS)
+                        
+                        # 生成任务总结
+                        summary_prompt = {
+                            "role": "user",
+                            "content": """任务已完成。请根据之前的分析和执行结果，提供一个简明的任务总结，包括：
 
-1. 关键信息：
-   - 分析中的重要发现
-   - 工具执行的重要结果
-   - 发现的关键数据
+1. 关键发现：
+   - 分析过程中的重要发现
+   - 工具执行的关键结果
+   - 发现的重要数据
 
-2. 任务结果：
-   - 最终结果
-   - 实际成果
-   - 具体成就
+2. 执行成果：
+   - 任务完成情况
+   - 具体实现结果
+   - 达成的目标
 
-仅关注事实和实际结果，直接简明地描述。"""
-                    }
-                    
-                    while True:
-                        try:
-                            summary = self._call_model(self.messages + [summary_prompt])
-                             
-                            # 显示任务总结
-                            PrettyOutput.section("任务总结", OutputType.SUCCESS)
-                            PrettyOutput.print(summary, OutputType.SYSTEM)
-                            PrettyOutput.section("任务完成", OutputType.SUCCESS)
-                            
-                            return summary
-                            
-                        except Exception as e:
-                            PrettyOutput.print(str(e), OutputType.ERROR)
+请直接描述事实和实际结果，保持简洁明了。"""
+                        }
+                        
+                        while True:
+                            try:
+                                summary = self._call_model(self.messages + [summary_prompt])
+                                 
+                                # 显示任务总结
+                                PrettyOutput.section("任务总结", OutputType.SUCCESS)
+                                PrettyOutput.print(summary, OutputType.SYSTEM)
+                                PrettyOutput.section("任务完成", OutputType.SUCCESS)
+                                
+                                return summary
+                                
+                            except Exception as e:
+                                PrettyOutput.print(str(e), OutputType.ERROR)
+                    else:
+                        # 顶层Agent直接返回空字符串
+                        PrettyOutput.section("任务完成", OutputType.SUCCESS)
+                        return ""
                 
                 if user_input == "__interrupt__":
                     PrettyOutput.print("任务已取消", OutputType.WARNING)

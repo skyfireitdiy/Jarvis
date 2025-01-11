@@ -13,15 +13,15 @@ class SubAgentTool:
         "properties": {
             "name": {
                 "type": "string",
-                "description": "Sub-agent name (e.g., 'FileAnalyzer')"
+                "description": "子代理名称（例如：'文件分析器'）"
             },
             "task": {
                 "type": "string",
-                "description": "Task with clear steps and goals"
+                "description": "需要明确步骤和目标的任务"
             },
             "context": {
                 "type": "string",
-                "description": "REQUIRED: Background, steps, and expected results",
+                "description": "必填：背景信息、执行步骤和预期结果",
                 "default": ""
             }
         },
@@ -42,44 +42,42 @@ class SubAgentTool:
             if not context:
                 return {
                     "success": False,
-                    "error": "Context is required. Please provide complete background and steps."
+                    "error": "必须提供上下文信息，包括完整的背景和执行步骤。"
                 }
 
-            PrettyOutput.print(f"Creating sub-agent '{name}'...", OutputType.INFO)
+            PrettyOutput.print(f"正在创建子代理 '{name}'...", OutputType.INFO)
             
             # Create a new tool registry for the sub-agent
             tool_registry = ToolRegistry(self.model)
             
             # Create the sub-agent with the specified name
-            sub_agent = Agent(self.model, tool_registry, name=name)
+            sub_agent = Agent(self.model, tool_registry, name=name, is_sub_agent=True)
             
             # Prepare the task with context
-            full_task = f"""Background and Steps:
+            full_task = f"""背景和步骤：
 {context}
 
-Primary Task:
+主要任务：
 {task}
 
-Requirements:
-1. Follow the provided steps exactly
-2. Report progress after each step
-3. Highlight any issues or unclear points
-4. Provide detailed results matching expected output"""
+要求：
+1. 严格按照提供的步骤执行
+2. 每完成一个步骤都要报告进度
+3. 突出显示任何问题或不明确的点
+4. 提供符合预期输出的详细结果"""
             
-            PrettyOutput.print(f"Sub-agent '{name}' executing task...", OutputType.INFO)
+            PrettyOutput.print(f"子代理 '{name}' 正在执行任务...", OutputType.INFO)
             
-         
             # Execute the task and get the summary
             summary = sub_agent.run(full_task)
             return {
                 "success": True,
-                "stdout": f"Sub-agent '{name}' completed.\n\nResults:\n{summary}",
+                "stdout": f"子代理 '{name}' 已完成。\n\n结果：\n{summary}",
                 "stderr": ""
             }
-
 
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Sub-agent failed: {str(e)}"
+                "error": f"子代理执行失败：{str(e)}"
             } 

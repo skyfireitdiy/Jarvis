@@ -37,10 +37,11 @@ class ToolRegistry:
         from .sub_agent import SubAgentTool
 
         tools = [
-            SearchTool(),
+            SearchTool(self.model),
             ShellTool(),
             FileOperationTool(),
             WebpageTool(),
+            SubAgentTool(self.model)
         ]
 
         for tool in tools:
@@ -50,14 +51,6 @@ class ToolRegistry:
                 parameters=tool.parameters,
                 func=tool.execute
             )
-
-        sub_agent_tool = SubAgentTool(self.model)
-        self.register_tool(
-            name=sub_agent_tool.name,
-            description=sub_agent_tool.description,
-            parameters=sub_agent_tool.parameters,
-            func=sub_agent_tool.execute
-        )
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
         """注册新工具"""

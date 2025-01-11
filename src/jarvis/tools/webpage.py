@@ -5,19 +5,13 @@ from ..utils import PrettyOutput, OutputType
 
 class WebpageTool:
     name = "read_webpage"
-    description = "读取网页内容，支持提取主要文本、标题和其他信息"
+    description = "读取网页内容，提取标题和正文文本"
     parameters = {
         "type": "object",
         "properties": {
             "url": {
                 "type": "string",
-                "description": "URL of the webpage to read"
-            },
-            "extract_type": {
-                "type": "string",
-                "description": "Type of content to extract: 'text', 'title', or 'all'",
-                "enum": ["text", "title", "all"],
-                "default": "all"
+                "description": "需要读取的网页URL"
             }
         },
         "required": ["url"]
@@ -27,7 +21,6 @@ class WebpageTool:
         """读取网页内容"""
         try:
             url = args["url"]
-            extract_type = args.get("extract_type", "all")
             
             # 设置请求头
             headers = {
@@ -49,28 +42,21 @@ class WebpageTool:
             for script in soup(["script", "style"]):
                 script.decompose()
             
-            result = {}
-            
             # 提取标题
-            if extract_type in ["title", "all"]:
-                title = soup.title.string if soup.title else ""
-                result["title"] = title.strip() if title else "无标题"
+            title = soup.title.string if soup.title else ""
+            title = title.strip() if title else "无标题"
             
             # 提取正文
-            if extract_type in ["text", "all"]:
-                text = soup.get_text(separator='\n', strip=True)
-                lines = [line.strip() for line in text.splitlines() if line.strip()]
-                result["text"] = "\n".join(lines)
+            text = soup.get_text(separator='\n', strip=True)
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
             
             # 构建输出
-            output = []
-            if "title" in result:
-                output.append(f"标题: {result['title']}")
-                output.append("")
-            
-            if "text" in result:
-                output.append("正文内容:")
-                output.append(result["text"])
+            output = [
+                f"标题: {title}",
+                "",
+                "正文内容:",
+                "\n".join(lines)
+            ]
             
             return {
                 "success": True,
