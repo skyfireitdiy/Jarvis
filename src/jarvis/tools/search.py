@@ -1,11 +1,12 @@
+import os
+import requests
 from typing import Dict, Any, List
-from duckduckgo_search import DDGS
 from ..utils import PrettyOutput, OutputType
 from .webpage import WebpageTool
 
 class SearchTool:
     name = "search"
-    description = "使用DuckDuckGo搜索引擎搜索信息，并根据问题提取关键信息"
+    description = "使用搜索引擎搜索信息，并根据问题提取关键信息"
     parameters = {
         "type": "object",
         "properties": {
@@ -30,6 +31,38 @@ class SearchTool:
         """初始化搜索工具，需要传入语言模型用于信息提取"""
         self.model = model
         self.webpage_tool = WebpageTool()
+        self.api_key = os.getenv("SEARCH_API_KEY")
+        self.engine = os.getenv("SEARCH_ENGINE", "bing")
+        if not self.api_key:
+            raise ValueError("未设置SEARCH_API_KEY环境变量")
+
+    def _search(self, query: str, max_results: int) -> List[Dict]:
+        """执行搜索请求"""
+        url = "https://serpapi.webscrapingapi.com/v2"
+        params = {
+            "engine": self.engine,
+            "api_key": self.api_key,
+            "q": query
+        }
+        
+        try:
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            
+            # 从搜索结果中提取有机结果
+            results = []
+            if "organic" in data:
+                for result in data["organic"][:max_results]:
+                    results.append({
+                        "title": result.get("title", ""),
+                        "href": result.get("link", ""),
+                        "body": result.get("description", "")
+                    })
+            return results
+        except Exception as e:
+            PrettyOutput.print(f"搜索请求失败: {str(e)}", OutputType.ERROR)
+            return []
 
     def _extract_info(self, contents: List[str], question: str) -> str:
         """使用语言模型从网页内容中提取关键信息"""
@@ -68,18 +101,18 @@ class SearchTool:
             PrettyOutput.print(f"相关问题: {question}", OutputType.INFO)
             
             # 获取搜索结果
-            search_results = []
-            with DDGS() as ddgs:
-                results = list(ddgs.text(
-                    keywords=query,
-                    max_results=max_results
-                ))
+            results = self._search(query, max_results)
+            if not results:
+                return {
+                    "success": False,
+                    "error": "未能获取任何搜索结果"
+                }
             
             # 收集网页内容
             contents = []
             for i, result in enumerate(results, 1):
                 try:
-                    PrettyOutput.print(f"正在读取第 {i}/{len(results)} 个结果... {result['title']} - {result['href']} - {result['body']}", OutputType.PROGRESS)
+                    PrettyOutput.print(f"正在读取第 {i}/{len(results)} 个结果... {result['title']} - {result['href']}", OutputType.PROGRESS)
                     webpage_result = self.webpage_tool.execute({"url": result["href"]})
                     if webpage_result["success"]:
                         contents.append(f"\n来源 {i}：{result['href']}\n")
