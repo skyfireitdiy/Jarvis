@@ -20,6 +20,7 @@ setup(
         "ollama>=0.1.6",
         "colorama>=0.4.6",
         "openai>=1.2.0",
+        "playwright>=1.41.1",
     ],
     entry_points={
         "console_scripts": [

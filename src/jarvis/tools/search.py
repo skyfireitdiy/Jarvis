@@ -1,12 +1,12 @@
 import os
-import requests
 from typing import Dict, Any, List
 from ..utils import PrettyOutput, OutputType
 from .webpage import WebpageTool
+from .bing_search import bing_search
 
 class SearchTool:
     name = "search"
-    description = "使用搜索引擎搜索信息，并根据问题提取关键信息"
+    description = "使用Bing搜索引擎搜索信息，并根据问题提取关键信息"
     parameters = {
         "type": "object",
         "properties": {
@@ -31,35 +31,23 @@ class SearchTool:
         """初始化搜索工具，需要传入语言模型用于信息提取"""
         self.model = model
         self.webpage_tool = WebpageTool()
-        self.api_key = os.getenv("SEARCH_API_KEY")
-        self.engine = os.getenv("SEARCH_ENGINE", "bing")
-        if not self.api_key:
-            raise ValueError("未设置SEARCH_API_KEY环境变量")
 
     def _search(self, query: str, max_results: int) -> List[Dict]:
         """执行搜索请求"""
-        url = "https://serpapi.webscrapingapi.com/v2"
-        params = {
-            "engine": self.engine,
-            "api_key": self.api_key,
-            "q": query
-        }
-        
         try:
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
+            results = bing_search(query)
+            if not results:
+                return []
             
-            # 从搜索结果中提取有机结果
-            results = []
-            if "organic" in data:
-                for result in data["organic"][:max_results]:
-                    results.append({
-                        "title": result.get("title", ""),
-                        "href": result.get("link", ""),
-                        "body": result.get("description", "")
-                    })
-            return results
+            # 格式化搜索结果
+            formatted_results = []
+            for result in results[:max_results]:
+                formatted_results.append({
+                    "title": result.get("title", ""),
+                    "href": result.get("href", ""),
+                    "body": result.get("abstract", "")
+                })
+            return formatted_results
         except Exception as e:
             PrettyOutput.print(f"搜索请求失败: {str(e)}", OutputType.ERROR)
             return []
