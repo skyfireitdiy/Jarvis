@@ -10,7 +10,7 @@ import time
 class KimiModel(BaseModel):
     """Kimi模型实现"""
     
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str, verbose: bool = False):
         """
         初始化Kimi模型
         Args:
@@ -23,6 +23,7 @@ class KimiModel(BaseModel):
         self.chat_id = ""
         self.uploaded_files = []  # 存储已上传文件的信息
         self.first_chat = True  # 添加标记，用于判断是否是第一次对话
+        self.verbose = verbose  # 添加verbose属性
 
     def _create_chat(self) -> bool:
         """创建新的对话会话"""
@@ -221,6 +222,10 @@ class KimiModel(BaseModel):
             response = requests.post(url, headers=headers, json=payload, stream=True)
             full_response = ""
             
+            # 收集搜索和引用结果
+            search_results = []
+            ref_sources = []
+            
             PrettyOutput.print("接收响应...", OutputType.PROGRESS)
             for line in response.iter_lines():
                 if not line:
@@ -232,15 +237,90 @@ class KimiModel(BaseModel):
                     
                 try:
                     data = json.loads(line[6:])
-                    if data.get("event") == "cmpl":
+                    event = data.get("event")
+                    
+                    if event == "cmpl":
+                        # 处理补全文本
                         text = data.get("text", "")
                         if text:
                             PrettyOutput.print_stream(text, OutputType.SYSTEM)
                             full_response += text
+                            
+                    elif event == "search_plus":
+                        # 收集搜索结果
+                        msg = data.get("msg", {})
+                        if msg.get("type") == "get_res":
+                            search_results.append({
+                                "date": msg.get("date", ""),
+                                "site_name": msg.get("site_name", ""),
+                                "snippet": msg.get("snippet", ""),
+                                "title": msg.get("title", ""),
+                                "type": msg.get("type", ""),
+                                "url": msg.get("url", "")
+                            })
+                                
+                    elif event == "ref_docs":
+                        # 收集引用来源
+                        ref_cards = data.get("ref_cards", [])
+                        for card in ref_cards:
+                            ref_sources.append({
+                                "idx_s": card.get("idx_s", ""),
+                                "idx_z": card.get("idx_z", ""),
+                                "ref_id": card.get("ref_id", ""),
+                                "url": card.get("url", ""),
+                                "title": card.get("title", ""),
+                                "abstract": card.get("abstract", ""),
+                                "source": card.get("source_label", ""),
+                                "rag_segments": card.get("rag_segments", []),
+                                "origin": card.get("origin", {})
+                            })
+                                    
                 except json.JSONDecodeError:
                     continue
                     
             PrettyOutput.print_stream_end()
+            
+            # 只在verbose模式下显示搜索和引用信息
+            if self.verbose:
+                # 显示搜索结果摘要
+                if search_results:
+                    PrettyOutput.print("\n搜索结果:", OutputType.INFO)
+                    for result in search_results:
+                        PrettyOutput.print(f"- {result['title']}", OutputType.INFO)
+                        if result['date']:
+                            PrettyOutput.print(f"  日期: {result['date']}", OutputType.INFO)
+                        PrettyOutput.print(f"  来源: {result['site_name']}", OutputType.INFO)
+                        if result['snippet']:
+                            PrettyOutput.print(f"  摘要: {result['snippet']}", OutputType.INFO)
+                        PrettyOutput.print(f"  链接: {result['url']}", OutputType.INFO)
+                        PrettyOutput.print("", OutputType.INFO)
+                        
+                # 显示引用来源
+                if ref_sources:
+                    PrettyOutput.print("\n引用来源:", OutputType.INFO)
+                    for source in ref_sources:
+                        PrettyOutput.print(f"- [{source['ref_id']}] {source['title']} ({source['source']})", OutputType.INFO)
+                        PrettyOutput.print(f"  链接: {source['url']}", OutputType.INFO)
+                        if source['abstract']:
+                            PrettyOutput.print(f"  摘要: {source['abstract']}", OutputType.INFO)
+                        
+                        # 显示相关段落
+                        if source['rag_segments']:
+                            PrettyOutput.print("  相关段落:", OutputType.INFO)
+                            for segment in source['rag_segments']:
+                                text = segment.get('text', '').replace('\n', ' ').strip()
+                                if text:
+                                    PrettyOutput.print(f"    - {text}", OutputType.INFO)
+                        
+                        # 显示原文引用
+                        origin = source['origin']
+                        if origin:
+                            text = origin.get('text', '')
+                            if text:
+                                PrettyOutput.print(f"  原文: {text}", OutputType.INFO)
+                        
+                        PrettyOutput.print("", OutputType.INFO)
+            
             return full_response
 
         except Exception as e:

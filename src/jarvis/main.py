@@ -58,19 +58,6 @@ def load_tasks() -> dict:
     
     return tasks
 
-class NumberValidator(Validator):
-    def validate(self, document):
-        text = document.text.strip()
-        if not text:  # Allow empty input
-            return
-            
-        try:
-            number = int(text)
-            if number < 0:
-                raise ValidationError(message='Please enter a non-negative number')
-        except ValueError:
-            raise ValidationError(message='Please enter a valid number')
-
 def select_task(tasks: dict) -> str:
     """Let user select a task from the list or skip. Returns task description if selected."""
     if not tasks:
@@ -93,7 +80,6 @@ def select_task(tasks: dict) -> str:
             choice = prompt(
                 "\nSelect a task number (0 to skip): ",
                 completer=number_completer,
-                validator=NumberValidator(),
                 validate_while_typing=False,
                 enable_history_search=True,
             ).strip()
@@ -121,6 +107,7 @@ def main():
     parser = argparse.ArgumentParser(description='Jarvis AI Assistant')
     parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
     parser.add_argument('--keep-history', action='store_true', help='Keep chat history (do not delete chat session)')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Show detailed search and reference information')
     args = parser.parse_args()
 
     load_env_from_file()
@@ -149,10 +136,10 @@ def main():
             PrettyOutput.print("\n设置完成后重新运行 Jarvis。", OutputType.INFO, timestamp=False)
             return 1
         
-        model = KimiModel(kimi_api_key)
+        model = KimiModel(kimi_api_key, verbose=args.verbose)
 
-        tool_registry = ToolRegistry()
-        agent = Agent(model, tool_registry)
+        tool_registry = ToolRegistry(verbose=args.verbose)
+        agent = Agent(model, tool_registry, verbose=args.verbose)
 
         # 欢迎信息
         PrettyOutput.print(f"Jarvis 已初始化 - With Kimi", OutputType.SYSTEM)

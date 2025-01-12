@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 
 class Agent:
-    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis", is_sub_agent: bool = False):
+    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis", is_sub_agent: bool = False, verbose: bool = False):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -21,7 +21,7 @@ class Agent:
             is_sub_agent: 是否为子Agent，默认为False
         """
         self.model = model
-        self.tool_registry = tool_registry or ToolRegistry(model)
+        self.tool_registry = tool_registry or ToolRegistry(model, verbose=verbose)
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
@@ -112,7 +112,8 @@ class Agent:
 1. 使用现有工具完成任务
 2. 通过 generate_tool 创建新工具扩展功能
 3. 通过 create_sub_agent 创建子代理处理独立任务
-4. 遵循 ReAct (思考-行动-观察) 框架
+4. 访问和理解网页内容（无需使用工具）
+5. 遵循 ReAct (思考-行动-观察) 框架
 
 工作流程：
 1. 思考
@@ -120,17 +121,26 @@ class Agent:
    - 评估是否需要新工具
    - 考虑是否需要拆分子任务
    - 规划解决方案
+   - 确定是否需要访问网页
 
 2. 行动 (如果需要)
    - 使用现有工具
    - 创建新工具
    - 创建子代理
+   - 访问网页获取信息
    - 询问更多信息
    
 3. 观察
    - 等待执行结果
    - 分析反馈
    - 规划下一步
+
+网页访问能力：
+- 可以直接访问和阅读网页内容
+- 无需使用额外工具
+- 可以提取和分析网页信息
+- 支持多种网页格式
+- 注意：仅支持公开访问的网页
 
 任务拆分建议：
 - 当任务包含多个独立步骤时

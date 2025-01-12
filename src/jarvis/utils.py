@@ -95,7 +95,7 @@ class PrettyOutput:
         return formatted_text
 
     @staticmethod
-    def print(text: str, output_type: OutputType, timestamp: bool = True):
+    def print(text: str, output_type: OutputType, timestamp: bool = False):
         """打印格式化的输出"""
         print(PrettyOutput.format(text, output_type, timestamp))
 

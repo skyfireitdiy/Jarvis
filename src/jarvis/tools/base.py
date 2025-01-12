@@ -30,7 +30,7 @@ class Tool:
         return self.func(arguments)
 
 class ToolRegistry:
-    def __init__(self, output_handler=None):
+    def __init__(self, output_handler=None, verbose=False):
         """初始化工具注册器
         
         Args:
@@ -38,7 +38,7 @@ class ToolRegistry:
         """
         self.tools: Dict[str, Tool] = {}
         self.output_handler = output_handler or PrettyOutput
-        
+        self.verbose = verbose
         # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
@@ -106,7 +106,7 @@ class ToolRegistry:
                     hasattr(item, 'parameters')):
                     
                     # 实例化工具类，传入模型和输出处理器
-                    tool_instance = item(model=KimiModel(), register=self, output_handler=self.output_handler)
+                    tool_instance = item(model=KimiModel(self.verbose), register=self, output_handler=self.output_handler)
                     
                     # 注册工具
                     self.register_tool(
