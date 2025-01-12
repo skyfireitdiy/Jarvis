@@ -77,12 +77,13 @@ class Agent:
         except Exception as e:
             raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
 
-    def run(self, user_input: str, file_list: Optional[List[str]] = None):
+    def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False):
         """处理用户输入并返回响应，返回任务总结报告
         
         Args:
             user_input: 用户输入的任务描述
             file_list: 可选的文件列表，默认为None
+            keep_history: 是否保留对话历史，默认为False
         
         Returns:
             str: 任务总结报告
@@ -245,11 +246,12 @@ arguments:
             return f"Task failed: {str(e)}"
         
         finally:
-            # 确保在所有情况下都删除会话
-            try:
-                self.model.delete_chat()
-            except Exception as e:
-                PrettyOutput.print(f"清理会话时发生错误: {str(e)}", OutputType.ERROR)
+            # 只在不保留历史时删除会话
+            if not keep_history:
+                try:
+                    self.model.delete_chat()
+                except Exception as e:
+                    PrettyOutput.print(f"清理会话时发生错误: {str(e)}", OutputType.ERROR)
 
     def clear_history(self):
         """清除对话历史，只保留系统提示"""

@@ -90,6 +90,7 @@ def main():
     # Add argument parser
     parser = argparse.ArgumentParser(description='Jarvis AI Assistant')
     parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
+    parser.add_argument('--keep-history', action='store_true', help='Keep chat history (do not delete chat session)')
     args = parser.parse_args()
 
     load_env_from_file()
@@ -125,6 +126,8 @@ def main():
 
         # 欢迎信息
         PrettyOutput.print(f"Jarvis 已初始化 - With Kimi", OutputType.SYSTEM)
+        if args.keep_history:
+            PrettyOutput.print("已启用历史保留模式", OutputType.INFO)
         
         # 加载预定义任务
         tasks = load_tasks()
@@ -132,7 +135,7 @@ def main():
             selected_task = select_task(tasks)
             if selected_task:
                 PrettyOutput.print(f"\n执行任务: {selected_task}", OutputType.INFO)
-                agent.run(selected_task, args.files)
+                agent.run(selected_task, args.files, keep_history=args.keep_history)
                 return 0
         
         # 如果没有选择预定义任务，进入交互模式
@@ -141,7 +144,7 @@ def main():
                 user_input = get_multiline_input("请输入您的任务(输入空行退出):")
                 if not user_input or user_input == "__interrupt__":
                     break
-                agent.run(user_input, args.files)
+                agent.run(user_input, args.files, keep_history=args.keep_history)
             except Exception as e:
                 PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
