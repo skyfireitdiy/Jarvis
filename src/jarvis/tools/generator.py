@@ -113,9 +113,13 @@ class ExampleTool:
     def __init__(self, **kwargs):
         '''初始化工具
         Args:
-            model: 模型处理器 
+            model: 模型处理器  
+                与大模型交互: model.chat(prompt) 
+                使用完成后删除会话: model.delete_chat()
             output_handler: 输出处理器 
+                输出信息: output_handler.print(text, output_type)
             register: 注册器
+                注册工具: register.register_tool_by_file(tool_file)
         '''
         self.model = kwargs.get('model')
         self.output = kwargs.get('output_handler')
