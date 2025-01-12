@@ -89,6 +89,9 @@ class Agent:
         """
         self.clear_history()
         
+        if file_list:
+            self.model.upload_files(file_list)
+        
         # 显示任务开始
         PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
 

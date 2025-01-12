@@ -93,12 +93,6 @@ def main():
         # 欢迎信息
         PrettyOutput.print(f"Jarvis 已初始化 - With Kimi", OutputType.SYSTEM)
         
-        # Show files if provided
-        if args.files:
-            PrettyOutput.print("\n处理文件:", OutputType.INFO)
-            for file in args.files:
-                PrettyOutput.print(f"- {file}", OutputType.INFO)
-        
         # 加载预定义任务
         tasks = load_tasks()
         if tasks:

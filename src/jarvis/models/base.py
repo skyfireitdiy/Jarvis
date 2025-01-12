@@ -9,6 +9,10 @@ class BaseModel(ABC):
         """执行对话"""
         pass 
 
+    def upload_files(self, file_list: List[str]) -> List[Dict]:
+        """上传文件"""
+        pass
+
     def reset(self):
         """重置模型"""
         pass
