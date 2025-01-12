@@ -78,8 +78,16 @@ class Agent:
         except Exception as e:
             raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
 
-    def run(self, user_input: str) -> str:
-        """处理用户输入并返回响应，返回任务总结报告"""
+    def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str:
+        """处理用户输入并返回响应，返回任务总结报告
+        
+        Args:
+            user_input: 用户输入的任务描述
+            file_list: 可选的文件列表，默认为None
+        
+        Returns:
+            str: 任务总结报告
+        """
         self.clear_history()
         
         # 显示任务开始
