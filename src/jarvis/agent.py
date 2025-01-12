@@ -1,5 +1,6 @@
 import json
 import subprocess
+import time
 from typing import Dict, Any, List, Optional, Tuple
 
 import yaml
@@ -56,13 +57,13 @@ class Agent:
                             }]
                         else:
                             PrettyOutput.print("工具调用缺少必要字段", OutputType.ERROR)
-                            raise '工具调用缺少必要字段'
+                            raise Exception("工具调用缺少必要字段")
                     except yaml.YAMLError as e:
                         PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
-                        raise 'YAML解析错误'
+                        raise Exception(f"YAML解析错误: {str(e)}")
                     except Exception as e:
                         PrettyOutput.print(f"处理工具调用时发生错误: {str(e)}", OutputType.ERROR)
-                        raise '处理工具调用时发生错误'
+                        raise Exception(f"处理工具调用时发生错误: {str(e)}")
                 in_tool_call = False
                 continue
             
@@ -74,7 +75,13 @@ class Agent:
     def _call_model(self, message: str) -> str:
         """调用模型获取响应"""
         try:
-            return self.model.chat(message)
+            while True:
+                ret = self.model.chat(message)
+                if not ret:
+                    PrettyOutput.print("模型返回空值，可能负载过重，5s后重试...", OutputType.WARNING)
+                    time.sleep(5)
+                    continue
+                return ret
         except Exception as e:
             raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
 
@@ -110,24 +117,23 @@ class Agent:
 
 核心能力：
 1. 使用现有工具完成任务
-2. 通过 generate_tool 创建新工具扩展功能
-3. 通过 create_sub_agent 创建子代理处理独立任务
-4. 访问和理解网页内容（无需使用工具）
+2. 访问和理解网页内容（无需使用工具）
+3. 通过 generate_tool 创建新工具（仅在必要时）
+4. 通过 create_sub_agent 创建子代理（仅在必要时）
 5. 遵循 ReAct (思考-行动-观察) 框架
 
 工作流程：
 1. 思考
    - 分析需求和可用工具
-   - 评估是否需要新工具
-   - 考虑是否需要拆分子任务
+   - 评估是否能用现有工具完成
+   - 考虑是否需要访问网页
    - 规划解决方案
-   - 确定是否需要访问网页
 
 2. 行动 (如果需要)
-   - 使用现有工具
-   - 创建新工具
-   - 创建子代理
+   - 优先使用现有工具
    - 访问网页获取信息
+   - 创建新工具（成本高，谨慎使用）
+   - 创建子代理（成本高，谨慎使用）
    - 询问更多信息
    
 3. 观察
@@ -135,58 +141,31 @@ class Agent:
    - 分析反馈
    - 规划下一步
 
-网页访问能力：
-- 可以直接访问和阅读网页内容
-- 无需使用额外工具
-- 可以提取和分析网页信息
-- 支持多种网页格式
-- 注意：仅支持公开访问的网页
+工具使用优先级：
+1. 现有工具：优先使用，成本低
+2. 网页访问：直接获取信息，无需工具
+3. 新工具：仅在反复需要某个功能时创建
+4. 子代理：仅在任务高度独立且复杂时使用
 
-任务拆分建议：
-- 当任务包含多个独立步骤时
-- 当子任务需要独立的上下文时
-- 当子任务有明确的完成目标时
-- 当需要并行处理多个任务时
+创建子代理的条件：
+- 任务非常复杂且独立
+- 需要独立的上下文环境
+- 有明确的完成目标
+- 可能需要多轮交互
+- 无法用现有工具完成
 
-创建子代理时，必须提供尽可能多的上下文信息，以确保其正确工作。
-
-创建子代理示例：
-<START_TOOL_CALL>
-name: create_sub_agent
-arguments:
-    agent_name: CodeAnalyzer
-    task: 分析项目代码质量
-    context: |
-        这是一个Python项目
-        使用了Flask框架
-        需要关注性能和安全性
-    goal: 生成代码质量分析报告
-<END_TOOL_CALL>
-
-创建新工具示例：
-<START_TOOL_CALL>
-name: generate_tool
-arguments:
-    tool_name: custom_tool_name
-    class_name: CustomToolName
-    description: 详细的工具描述
-    parameters:
-        type: object
-        properties:
-            param1: 
-                type: string
-                description: 参数1的描述
-        required: [param1]
-<END_TOOL_CALL>
+创建新工具的条件：
+- 功能会被反复使用
+- 逻辑相对固定
+- 参数明确可控
+- 无法用现有工具组合完成
 
 工具使用格式：
 <START_TOOL_CALL>
 name: tool_name
 arguments:
     param1: value1
-    param2: |
-        multiline
-        value
+    param2: value2
 <END_TOOL_CALL>
 
 严格规则：
