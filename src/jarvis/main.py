@@ -12,38 +12,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from jarvis.agent import Agent
 from jarvis.tools import ToolRegistry
-from jarvis.models import DDGSModel, OllamaModel, OpenAIModel, KimiModel
+from jarvis.models import KimiModel
 from jarvis.utils import PrettyOutput, OutputType, get_multiline_input, load_env_from_file
-from jarvis.zte_llm import create_zte_llm
 
-# 定义支持的平台和模型
-SUPPORTED_PLATFORMS = {
-    "kimi": {
-        "models": ["kimi"],
-        "default": "kimi",
-        "allow_custom": False
-    },
-    "ollama": {
-        "models": ["qwen2.5:14b", "qwq"],
-        "default": "qwen2.5:14b",
-        "allow_custom": True
-    },
-    "ddgs": {
-        "models": ["gpt-4o-mini", "claude-3-haiku", "llama-3.1-70b", "mixtral-8x7b"],
-        "default": "gpt-4o-mini",
-        "allow_custom": False
-    },
-    "zte": {
-        "models": ["NebulaBiz", "nebulacoder", "NTele-72B"],
-        "default": "NebulaBiz",
-        "allow_custom": False
-    },
-    "openai": {
-        "models": ["deepseek-chat"],
-        "default": "deepseek-chat",
-        "allow_custom": True
-    }
-}
 
 def load_tasks() -> dict:
     """Load tasks from .jarvis file if it exists."""
@@ -103,78 +74,20 @@ def main():
     """Main entry point for Jarvis."""
 
     load_env_from_file()
-
-    parser = argparse.ArgumentParser(description="Jarvis AI Assistant")
     
-    # 添加平台选择参数
-    parser.add_argument(
-        "--platform",
-        choices=list(SUPPORTED_PLATFORMS.keys()),
-        default=os.getenv("JARVIS_PLATFORM") or "kimi",
-        help="选择运行平台 (默认: kimi)"
-    )
-    
-    # 添加模型选择参数
-    parser.add_argument(
-        "--model",
-        help="选择模型 (默认: 根据平台自动选择)"
-    )
-    
-    # 添加API基础URL参数
-    parser.add_argument(
-        "--api-base",
-        default=os.getenv("JARVIS_OLLAMA_API_BASE") or "http://localhost:11434",
-        help="Ollama API基础URL (仅用于Ollama平台, 默认: http://localhost:11434)"
-    )
-    
-    args = parser.parse_args()
-
-    args.model = args.model or os.getenv("JARVIS_MODEL")
-    
-    # 修改模型验证逻辑
-    if args.model:
-        if (args.model not in SUPPORTED_PLATFORMS[args.platform]["models"] and 
-            not SUPPORTED_PLATFORMS[args.platform]["allow_custom"]):
-            supported_models = ", ".join(SUPPORTED_PLATFORMS[args.platform]["models"])
-            PrettyOutput.print(
-                f"错误: 平台 {args.platform} 不支持模型 {args.model}\n"
-                f"支持的模型: {supported_models}",
-                OutputType.ERROR
-            )
-            return 1
-    else:
-        args.model = SUPPORTED_PLATFORMS[args.platform]["default"]
-
     try:
-        # 根据平台创建相应的模型实例
-        if args.platform == "kimi":
-            model = KimiModel(os.getenv("KIMI_API_KEY"))
-            platform_name = "Kimi"
-        elif args.platform == "ollama":
-            model = OllamaModel(
-                model_name=args.model,
-                api_base=args.api_base
-            )
-            platform_name = f"Ollama ({args.model})"
-        elif args.platform == "ddgs":  # ddgs
-            model = DDGSModel(model_name=args.model)
-            platform_name = f"DuckDuckGo Search ({args.model})"
-        elif args.platform == "zte":  # zte
-            model = create_zte_llm(model_name=args.model)
-            platform_name = f"ZTE ({args.model})"
-        elif args.platform == "openai":
-            model = OpenAIModel(
-                model_name=args.model,
-                api_key=os.getenv("OPENAI_API_KEY"),
-                api_base=os.getenv("OPENAI_API_BASE")
-            )
-            platform_name = f"OpenAI ({args.model})"
+        kimi_api_key = os.getenv("KIMI_API_KEY")
+        if not kimi_api_key:
+            PrettyOutput.print("Kimi API key 未设置", OutputType.ERROR)
+            return 1
+        
+        model = KimiModel(kimi_api_key)
 
         tool_registry = ToolRegistry(model)
         agent = Agent(model, tool_registry)
 
         # 欢迎信息
-        PrettyOutput.print(f"Jarvis 已初始化 - {platform_name}", OutputType.SYSTEM)
+        PrettyOutput.print(f"Jarvis 已初始化 - With Kimi", OutputType.SYSTEM)
         
         # 加载预定义任务
         tasks = load_tasks()

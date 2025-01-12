@@ -14,13 +14,8 @@ setup(
     include_package_data=True,
     install_requires=[
         "requests>=2.25.1",
-        "beautifulsoup4>=4.9.3",
-        "duckduckgo-search>=3.0.0",
         "pyyaml>=5.1",
-        "ollama>=0.1.6",
         "colorama>=0.4.6",
-        "openai>=1.2.0",
-        "playwright>=1.41.1",
     ],
     entry_points={
         "console_scripts": [

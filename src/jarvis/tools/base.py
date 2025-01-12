@@ -30,18 +30,12 @@ class ToolRegistry:
 
     def _register_default_tools(self):
         """注册所有默认工具"""
-        from .search import SearchTool
         from .shell import ShellTool
         from .file_ops import FileOperationTool
-        from .webpage import WebpageTool
-        from .sub_agent import SubAgentTool
 
         tools = [
-            SearchTool(self.model),
             ShellTool(),
             FileOperationTool(),
-            WebpageTool(),
-            SubAgentTool(self.model)
         ]
 
         for tool in tools:
