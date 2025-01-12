@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 
 class Agent:
-    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis"):
+    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis", is_sub_agent: bool = False):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -23,6 +23,7 @@ class Agent:
         self.model = model
         self.tool_registry = tool_registry or ToolRegistry(model)
         self.name = name
+        self.is_sub_agent = is_sub_agent
         self.prompt = ""
 
 
@@ -77,7 +78,7 @@ class Agent:
         except Exception as e:
             raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
 
-    def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False):
+    def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
         """处理用户输入并返回响应，返回任务总结报告
         
         Args:
@@ -203,7 +204,23 @@ arguments:
                     
                     if not user_input:
                         PrettyOutput.section("任务完成", OutputType.SUCCESS)
-                        return 
+                        if self.is_sub_agent:
+                            # 生成任务总结
+                            summary_prompt = f"""请对以上任务执行情况生成一个简洁的总结报告，包括：
+
+1. 任务目标: xxxx
+2. 执行结果: 成功/失败
+3. 关键信息: 提取执行过程中的重要信息
+4. 重要发现: 任何值得注意的发现
+5. 后续建议: 如果有的话
+
+请用简洁的要点形式描述，突出重要信息。
+"""
+                            self.prompt = summary_prompt
+                            summary = self.model.chat(self.prompt)
+                            return summary
+                        else:
+                            return "Task completed"
 
                 except Exception as e:
                     PrettyOutput.print(str(e), OutputType.ERROR)
