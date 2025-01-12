@@ -42,6 +42,42 @@
 - Multi-line input support
 - Colored output with progress indicators
 
+
+## ⚙️ Environment Setup
+
+Before using Jarvis, you need to set up your environment:
+
+1. **API Key Configuration**
+
+Create a `.jarvis_env` file in your home directory (`~/.jarvis_env`):
+
+```bash
+KIMI_API_KEY=your_kimi_api_key_here
+```
+
+To get your Kimi API key:
+1. Visit [Kimi AI Platform](https://kimi.moonshot.cn) in your browser
+2. Login to your account
+3. Open browser Developer Tools (F12 or right-click -> Inspect)
+4. Go to Network tab
+5. Make any request (e.g., send a message)
+6. Find a request to the Kimi API
+7. Look for the `Authorization` header in the request headers
+8. Copy the token value (remove the "Bearer " prefix)
+9. Use this token as your `KIMI_API_KEY` in the `.jarvis_env` file
+
+2. **Task Configuration (Optional)**
+
+Create a `.jarvis` file in your working directory to define predefined tasks:
+
+```yaml
+# .jarvis
+analyze_code: Analyze the code structure and quality in the current directory
+fix_bugs: Help me find and fix potential bugs in the code
+optimize: Suggest optimizations for the code
+document: Generate documentation for the code
+```
+
 ## 🚀 Installation
 
 ```bash
@@ -50,18 +86,43 @@ pip install jarvis-ai-assistant
 
 ## 💡 Usage
 
+1. **Basic Usage**
 ```bash
-# Quick Start
+# Start Jarvis
 jarvis
 
-# Process files
+# Process specific files
 jarvis -f file1.txt file2.py
-
-# Using predefined tasks
-# Create .jarvis file in your working directory:
-analyze_code: Analyze the code in the current directory
-fix_bugs: Help me find and fix bugs in the code
 ```
+
+2. **Using Predefined Tasks**
+
+If you have a `.jarvis` file in your working directory:
+```bash
+# Jarvis will show available tasks on startup
+# Select a task number or start a new conversation
+```
+
+3. **Interactive Features**
+- Multi-line input support (press Enter twice to submit)
+- File understanding and analysis
+- Context-aware conversations
+- Tool integration for system operations
+
+4. **Environment Variables**
+- `KIMI_API_KEY`: Your Kimi AI API key (required)
+- Location: `~/.jarvis_env`
+- Format: `KEY=value` (one per line)
+
+5. **Task Configuration**
+- File: `.jarvis` in working directory
+- Format: `task_name: task_description`
+- Purpose: Define commonly used tasks for quick access
+- Example tasks:
+  - Code analysis
+  - Bug finding
+  - Documentation generation
+  - Performance optimization
 
 ## 🧰 Tools
 
