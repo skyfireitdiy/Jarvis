@@ -10,7 +10,7 @@ import time
 class KimiModel(BaseModel):
     """Kimi模型实现"""
     
-    def __init__(self, api_key: str, verbose: bool = False):
+    def __init__(self, api_key: Optional[str] = None, verbose: bool = False):
         """
         初始化Kimi模型
         Args:
@@ -42,7 +42,7 @@ class KimiModel(BaseModel):
             self.chat_id = response.json()["id"]
             return True
         except Exception as e:
-            PrettyOutput.print(f"Failed to create chat: {e}", OutputType.ERROR)
+            PrettyOutput.print(f"Failed to create chat: {e}: Response: {response.text}", OutputType.ERROR)
             return False
 
     def _get_presigned_url(self, filename: str) -> Dict:
