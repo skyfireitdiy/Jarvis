@@ -1,12 +1,15 @@
 from pathlib import Path
 import sys
 import time
+import os
 from typing import Dict, Optional
 from enum import Enum
 from datetime import datetime
 import colorama
-from colorama import Fore, Style
-import os
+from colorama import Fore, Style as ColoramaStyle
+from prompt_toolkit import PromptSession
+from prompt_toolkit.styles import Style as PromptStyle
+from prompt_toolkit.formatted_text import FormattedText
 
 # 初始化colorama
 colorama.init()
@@ -84,10 +87,10 @@ class PrettyOutput:
         prefix = PrettyOutput.PREFIXES.get(output_type, "")
         
         # 添加时间戳 - 使用白色
-        time_str = f"{Fore.WHITE}[{datetime.now().strftime('%H:%M:%S')}]{Style.RESET_ALL} " if timestamp else ""
+        time_str = f"{Fore.WHITE}[{datetime.now().strftime('%H:%M:%S')}]{ColoramaStyle.RESET_ALL} " if timestamp else ""
         
         # 格式化输出
-        formatted_text = f"{time_str}{color}{icon} {prefix}: {text}{Style.RESET_ALL}"
+        formatted_text = f"{time_str}{color}{icon} {prefix}: {text}{ColoramaStyle.RESET_ALL}"
         
         return formatted_text
 
@@ -101,15 +104,15 @@ class PrettyOutput:
         """打印带分隔线的段落标题"""
         width = 60
         color = PrettyOutput.COLORS.get(output_type, "")
-        print(f"\n{color}" + "=" * width + f"{Style.RESET_ALL}")
+        print(f"\n{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}")
         PrettyOutput.print(title.center(width - 10), output_type, timestamp=False)
-        print(f"{color}" + "=" * width + f"{Style.RESET_ALL}\n")
+        print(f"{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}\n")
 
     @staticmethod
     def print_stream(text: str, output_type: OutputType):
         """打印流式输出，不换行"""
         color = PrettyOutput.COLORS.get(output_type, "")
-        sys.stdout.write(f"{color}{text}{Style.RESET_ALL}")
+        sys.stdout.write(f"{color}{text}{ColoramaStyle.RESET_ALL}")
         sys.stdout.flush()
 
     @staticmethod
@@ -119,29 +122,44 @@ class PrettyOutput:
         sys.stdout.flush()
 
 def get_multiline_input(tip: str) -> str:
-    """获取多行输入"""
+    """获取多行输入，支持方向键、历史记录等功能"""
     PrettyOutput.print(tip + "\n", OutputType.INFO)
-    lines = []
     
-    while True:
-        try:
-            prompt = "... " if lines else ">>> "
-            sys.stdout.write(f"{Fore.GREEN}{prompt}{Style.RESET_ALL}")
-            sys.stdout.flush()
+    # 创建输入会话，启用历史记录
+    session = PromptSession(history=None)  # 使用默认历史记录
+    
+    # 定义提示符样式
+    style = PromptStyle.from_dict({
+        'prompt': 'ansicyan',
+    })
+    
+    lines = []
+    try:
+        while True:
+            # 设置提示符
+            prompt = FormattedText([
+                ('class:prompt', '... ' if lines else '>>> ')
+            ])
             
-            line = input().strip()
+            # 获取输入
+            line = session.prompt(
+                prompt,
+                style=style,
+            ).strip()
+            
+            # 空行处理
             if not line:
-                if not lines:  # 如果是第一行就输入空行
+                if not lines:  # 第一行就输入空行
                     return ""
-                break
-            
+                break  # 结束多行输入
+                
             lines.append(line)
             
-        except KeyboardInterrupt:
-            PrettyOutput.print("\n输入已取消", OutputType.ERROR)
-            return "__interrupt__"
+    except KeyboardInterrupt:
+        PrettyOutput.print("\n输入已取消", OutputType.ERROR)
+        return "__interrupt__"
     
-    return "\n".join(lines).strip()
+    return "\n".join(lines)
 
 def load_env_from_file():
     """从~/.jarvis_env加载环境变量"""
