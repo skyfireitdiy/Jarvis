@@ -87,21 +87,22 @@ class Agent:
         Returns:
             str: 任务总结报告
         """
-        self.clear_history()
-        
-        if file_list:
-            self.model.upload_files(file_list)
-        
-        # 显示任务开始
-        PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
+        try:
+            self.clear_history()
+            
+            if file_list:
+                self.model.upload_files(file_list)
+            
+            # 显示任务开始
+            PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
 
-        tools_prompt = "可用工具:\n"
-        for tool in self.tool_registry.get_all_tools():
-            tools_prompt += f"- 名称: {tool['name']}\n"
-            tools_prompt += f"  描述: {tool['description']}\n"
-            tools_prompt += f"  参数: {tool['parameters']}\n"
+            tools_prompt = "可用工具:\n"
+            for tool in self.tool_registry.get_all_tools():
+                tools_prompt += f"- 名称: {tool['name']}\n"
+                tools_prompt += f"  描述: {tool['description']}\n"
+                tools_prompt += f"  参数: {tool['parameters']}\n"
 
-        self.prompt =f"""你是 {self.name}，一个严格遵循 ReAct 框架进行逐步推理和行动的 AI 助手。
+            self.prompt = f"""你是 {self.name}，一个严格遵循 ReAct 框架进行逐步推理和行动的 AI 助手。
 
 {tools_prompt}
 
@@ -194,53 +195,61 @@ arguments:
 任务:
 {user_input}
 """
-            
-        
-        while True:
-            try:
-                # 显示思考状态
-                PrettyOutput.print("分析任务...", OutputType.PROGRESS)
-                
-                current_response = self._call_model(self.prompt)
 
+            while True:
                 try:
-                    result = Agent.extract_tool_calls(current_response)
-                except Exception as e:
-                    PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
-                    self.prompt = f"工具调用错误: {str(e)}"
-                    continue
-                
-                if len(result) > 0:
-                    try:
-                        # 显示工具调用
-                        PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
-                        tool_result = self.tool_registry.handle_tool_calls(result)
-                        PrettyOutput.print(tool_result, OutputType.RESULT)
-                    except Exception as e:
-                        PrettyOutput.print(str(e), OutputType.ERROR)
-                        tool_result = f"Tool call failed: {str(e)}"
+                    # 显示思考状态
+                    PrettyOutput.print("分析任务...", OutputType.PROGRESS)
+                    
+                    current_response = self._call_model(self.prompt)
 
-                    self.prompt = tool_result
-                    continue
-                
-                # 获取用户输入
-                user_input = get_multiline_input(f"{self.name}: 您可以继续输入，或输入空行结束当前任务")
-                if user_input == "__interrupt__":
-                    PrettyOutput.print("任务已取消", OutputType.WARNING)
-                    return "Task cancelled by user"
-                if user_input:
-                    self.prompt = user_input
-                    continue
-                
-                if not user_input:
+                    try:
+                        result = Agent.extract_tool_calls(current_response)
+                    except Exception as e:
+                        PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
+                        self.prompt = f"工具调用错误: {str(e)}"
+                        continue
+                    
+                    if len(result) > 0:
+                        try:
+                            # 显示工具调用
+                            PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
+                            tool_result = self.tool_registry.handle_tool_calls(result)
+                            PrettyOutput.print(tool_result, OutputType.RESULT)
+                        except Exception as e:
+                            PrettyOutput.print(str(e), OutputType.ERROR)
+                            tool_result = f"Tool call failed: {str(e)}"
+
+                        self.prompt = tool_result
+                        continue
+                    
+                    # 获取用户输入
+                    user_input = get_multiline_input(f"{self.name}: 您可以继续输入，或输入空行结束当前任务")
+                    if user_input == "__interrupt__":
+                        PrettyOutput.print("任务已取消", OutputType.WARNING)
+                        return "Task cancelled by user"
+                    if user_input:
+                        self.prompt = user_input
+                        continue
+                    
+                    if not user_input:
                         PrettyOutput.section("任务完成", OutputType.SUCCESS)
                         return 
-                
 
-                
-                
+                except Exception as e:
+                    PrettyOutput.print(str(e), OutputType.ERROR)
+                    return f"Task failed: {str(e)}"
+
+        except Exception as e:
+            PrettyOutput.print(str(e), OutputType.ERROR)
+            return f"Task failed: {str(e)}"
+        
+        finally:
+            # 确保在所有情况下都删除会话
+            try:
+                self.model.delete_chat()
             except Exception as e:
-                PrettyOutput.print(str(e), OutputType.ERROR)
+                PrettyOutput.print(f"清理会话时发生错误: {str(e)}", OutputType.ERROR)
 
     def clear_history(self):
         """清除对话历史，只保留系统提示"""

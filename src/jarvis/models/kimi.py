@@ -246,8 +246,34 @@ class KimiModel(BaseModel):
         except Exception as e:
             raise Exception(f"Chat failed: {str(e)}")
 
+    def delete_chat(self) -> bool:
+        """删除当前会话"""
+        if not self.chat_id:
+            return True  # 如果没有会话ID，视为删除成功
+            
+        url = f"https://kimi.moonshot.cn/api/chat/{self.chat_id}"
+        headers = {
+            'Authorization': self.auth_header,
+            'Content-Type': 'application/json'
+        }
+        
+        try:
+            response = requests.delete(url, headers=headers)
+            if response.status_code == 200:
+                PrettyOutput.print("会话已删除", OutputType.SUCCESS)
+                self.chat_id = ""  # 清除会话ID
+                return True
+            else:
+                PrettyOutput.print(f"删除会话失败: HTTP {response.status_code}", OutputType.ERROR)
+                return False
+        except Exception as e:
+            PrettyOutput.print(f"删除会话时发生错误: {str(e)}", OutputType.ERROR)
+            return False
+
     def reset(self):
         """重置对话"""
+        if self.chat_id:
+            self.delete_chat()  # 删除现有会话
         self.chat_id = ""
         self.uploaded_files = []
         self.first_chat = True  # 重置first_chat标记
