@@ -17,28 +17,43 @@ from jarvis.utils import PrettyOutput, OutputType, get_multiline_input, load_env
 
 
 def load_tasks() -> dict:
-    """Load tasks from .jarvis file if it exists."""
-    if not os.path.exists(".jarvis"):
-        return {}
+    """Load tasks from .jarvis files in user home and current directory."""
+    tasks = {}
     
-    try:
-        with open(".jarvis", "r", encoding="utf-8") as f:
-            tasks = yaml.safe_load(f)
-            
-        if not isinstance(tasks, dict):
-            PrettyOutput.print("Warning: .jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
-            return {}
-            
-        # Validate format and convert all values to strings
-        validated_tasks = {}
-        for name, desc in tasks.items():
-            if desc:  # Ensure description is not empty
-                validated_tasks[str(name)] = str(desc)
+    # 检查用户目录下的 .jarvis
+    user_jarvis = os.path.expanduser("~/.jarvis")
+    if os.path.exists(user_jarvis):
+        try:
+            with open(user_jarvis, "r", encoding="utf-8") as f:
+                user_tasks = yaml.safe_load(f)
                 
-        return validated_tasks
-    except Exception as e:
-        PrettyOutput.print(f"Error loading .jarvis file: {str(e)}", OutputType.ERROR)
-        return {}
+            if isinstance(user_tasks, dict):
+                # 验证并添加用户目录的任务
+                for name, desc in user_tasks.items():
+                    if desc:  # 确保描述不为空
+                        tasks[str(name)] = str(desc)
+            else:
+                PrettyOutput.print("Warning: ~/.jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
+        except Exception as e:
+            PrettyOutput.print(f"Error loading ~/.jarvis file: {str(e)}", OutputType.ERROR)
+    
+    # 检查当前目录下的 .jarvis
+    if os.path.exists(".jarvis"):
+        try:
+            with open(".jarvis", "r", encoding="utf-8") as f:
+                local_tasks = yaml.safe_load(f)
+                
+            if isinstance(local_tasks, dict):
+                # 验证并添加当前目录的任务，如果有重名则覆盖用户目录的任务
+                for name, desc in local_tasks.items():
+                    if desc:  # 确保描述不为空
+                        tasks[str(name)] = str(desc)
+            else:
+                PrettyOutput.print("Warning: .jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
+        except Exception as e:
+            PrettyOutput.print(f"Error loading .jarvis file: {str(e)}", OutputType.ERROR)
+    
+    return tasks
 
 def select_task(tasks: dict) -> str:
     """Let user select a task from the list or skip. Returns task description if selected."""
