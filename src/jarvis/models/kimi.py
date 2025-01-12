@@ -45,11 +45,11 @@ class KimiModel(BaseModel):
             PrettyOutput.print(f"Failed to create chat: {e}: Response: {response.text}", OutputType.ERROR)
             return False
 
-    def _get_presigned_url(self, filename: str) -> Dict:
+    def _get_presigned_url(self, filename: str, action: str) -> Dict:
         """获取预签名上传URL"""
         url = "https://kimi.moonshot.cn/api/pre-sign-url"
-        mime_type, _ = mimetypes.guess_type(filename)
-        action = "image" if mime_type and mime_type.startswith('image/') else "file"
+        
+        
         
         payload = json.dumps({
             "action": action,
@@ -75,11 +75,11 @@ class KimiModel(BaseModel):
             PrettyOutput.print(f"Failed to upload file: {e}", OutputType.ERROR)
             return False
 
-    def _get_file_info(self, file_data: Dict, name: str) -> Dict:
+    def _get_file_info(self, file_data: Dict, name: str, file_type: str) -> Dict:
         """获取文件信息"""
         url = "https://kimi.moonshot.cn/api/file"
         payload = json.dumps({
-            "type": "file",
+            "type": file_type,
             "name": name,
             "object_name": file_data["object_name"],
             "chat_id": self.chat_id,
@@ -114,6 +114,7 @@ class KimiModel(BaseModel):
                     continue
                     
                 line = line.decode('utf-8')
+                print(data)
                 if not line.startswith("data: "):
                     continue
                     
@@ -149,25 +150,33 @@ class KimiModel(BaseModel):
         for index, file_path in enumerate(file_list, 1):
             try:
                 PrettyOutput.print(f"处理文件 [{index}/{len(file_list)}]: {file_path}", OutputType.PROGRESS)
+
+                mime_type, _ = mimetypes.guess_type(file_path)
+                action = "image" if mime_type and mime_type.startswith('image/') else "file"
                 
                 # 获取预签名URL
                 PrettyOutput.print("获取上传URL...", OutputType.PROGRESS)
-                presigned_data = self._get_presigned_url(file_path)
+                presigned_data = self._get_presigned_url(file_path, action)
                 
                 # 上传文件
                 PrettyOutput.print("上传文件内容...", OutputType.PROGRESS)
                 if self._upload_file(file_path, presigned_data["url"]):
                     # 获取文件信息
                     PrettyOutput.print("获取文件信息...", OutputType.PROGRESS)
-                    file_info = self._get_file_info(presigned_data, os.path.basename(file_path))
-                    
+                    file_info = self._get_file_info(presigned_data, os.path.basename(file_path), action)
                     # 等待文件解析
                     PrettyOutput.print("等待文件解析完成...", OutputType.PROGRESS)
-                    if self._wait_for_parse(file_info["id"]):
+
+                    # 只有文件需要解析
+                    if action == "file":
+                        if self._wait_for_parse(file_info["id"]):
+                            uploaded_files.append(file_info)
+                            PrettyOutput.print(f"✓ 文件处理成功: {file_path}", OutputType.SUCCESS)
+                        else:
+                            PrettyOutput.print(f"✗ 文件解析失败: {file_path}", OutputType.ERROR)
+                    else:
                         uploaded_files.append(file_info)
                         PrettyOutput.print(f"✓ 文件处理成功: {file_path}", OutputType.SUCCESS)
-                    else:
-                        PrettyOutput.print(f"✗ 文件解析失败: {file_path}", OutputType.ERROR)
                 else:
                     PrettyOutput.print(f"✗ 文件上传失败: {file_path}", OutputType.ERROR)
                     
