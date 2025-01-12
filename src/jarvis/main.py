@@ -121,7 +121,7 @@ def main():
         
         model = KimiModel(kimi_api_key)
 
-        tool_registry = ToolRegistry(model)
+        tool_registry = ToolRegistry()
         agent = Agent(model, tool_registry)
 
         # 欢迎信息

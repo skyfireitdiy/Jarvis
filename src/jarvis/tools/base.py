@@ -1,5 +1,11 @@
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Type
 import json
+import os
+import importlib.util
+from pathlib import Path
+
+from jarvis.models.kimi import KimiModel
+
 from ..utils import PrettyOutput, OutputType
 from ..models import BaseModel
 
@@ -11,7 +17,7 @@ class Tool:
         self.func = func
 
     def to_dict(self) -> Dict:
-        """转换为Ollama工具格式"""
+        """转换为工具格式"""
         return {
             "name": self.name,
             "description": self.description,
@@ -23,28 +29,80 @@ class Tool:
         return self.func(arguments)
 
 class ToolRegistry:
-    def __init__(self, model: BaseModel):
+    def __init__(self, output_handler=None):
         self.tools: Dict[str, Tool] = {}
-        self.model = model
-        self._register_default_tools()
+        self.output_handler = output_handler or PrettyOutput
+        self._load_tools()
 
-    def _register_default_tools(self):
-        """注册所有默认工具"""
-        from .shell import ShellTool
-        from .file_ops import FileOperationTool
+    def register_tool_by_file(self, file_path: str):
+        """从指定文件加载并注册工具
+        
+        Args:
+            file_path: 工具文件的路径
+            
+        Returns:
+            bool: 是否成功加载工具
+        """
+        try:
+            file_path = Path(file_path)
+            if not file_path.exists() or not file_path.is_file():
+                self.output_handler.print(f"文件不存在: {file_path}", OutputType.ERROR)
+                return False
+                
+            # 动态导入模块
+            module_name = file_path.stem
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            if not spec or not spec.loader:
+                self.output_handler.print(f"无法加载模块: {file_path}", OutputType.ERROR)
+                return False
+                
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            # 查找模块中的工具类
+            tool_found = False
+            for item_name in dir(module):
+                item = getattr(module, item_name)
+                # 检查是否是类，并且有必要的属性
+                if (isinstance(item, type) and 
+                    hasattr(item, 'name') and 
+                    hasattr(item, 'description') and 
+                    hasattr(item, 'parameters')):
+                    
+                    # 实例化工具类，传入模型和输出处理器
+                    tool_instance = item(model=KimiModel(), register=self, output_handler=self.output_handler)
+                    
+                    # 注册工具
+                    self.register_tool(
+                        name=tool_instance.name,
+                        description=tool_instance.description,
+                        parameters=tool_instance.parameters,
+                        func=tool_instance.execute
+                    )
+                    self.output_handler.print(f"已加载工具: {tool_instance.name}", OutputType.INFO)
+                    tool_found = True
+                    
+            if not tool_found:
+                self.output_handler.print(f"文件中未找到有效的工具类: {file_path}", OutputType.WARNING)
+                return False
+                
+            return True
+            
+        except Exception as e:
+            self.output_handler.print(f"加载工具失败 {file_path.name}: {str(e)}", OutputType.ERROR)
+            return False
 
-        tools = [
-            ShellTool(),
-            FileOperationTool(),
-        ]
-
-        for tool in tools:
-            self.register_tool(
-                name=tool.name,
-                description=tool.description,
-                parameters=tool.parameters,
-                func=tool.execute
-            )
+    def _load_tools(self):
+        """从tools目录动态加载所有工具"""
+        tools_dir = Path(__file__).parent
+        
+        # 遍历目录下的所有.py文件
+        for file_path in tools_dir.glob("*.py"):
+            # 跳过基础文件和__init__.py
+            if file_path.name in ["base.py", "__init__.py"]:
+                continue
+                
+            self.register_tool_by_file(file_path)
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
         """注册新工具"""
