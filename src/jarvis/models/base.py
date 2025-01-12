@@ -5,7 +5,7 @@ class BaseModel(ABC):
     """大语言模型基类"""
     
     @abstractmethod
-    def chat(self, messages: List[Dict]) -> str:
+    def chat(self, message: str) -> str:
         """执行对话"""
         pass 
 

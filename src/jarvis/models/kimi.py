@@ -41,11 +41,11 @@ class KimiModel(BaseModel):
             PrettyOutput.print(f"Failed to create chat: {e}", OutputType.ERROR)
             return False
 
-    def chat(self, messages: List[Dict]) -> str:
+    def chat(self, message:str) -> str:
         """
         实现BaseModel的chat方法
         Args:
-            messages: 对话消息列表
+            message: 用户消息内容
         Returns:
             str: 模型的回复内容
         """
@@ -55,7 +55,7 @@ class KimiModel(BaseModel):
         
         url = f"https://kimi.moonshot.cn/api/chat/{self.chat_id}/completion/stream"
         payload = json.dumps({
-            "messages": [messages[-1]],
+            "messages": [{"role": "user", "content": message}],
             "use_search": True,
             "extend": {
                 "sidebar": True

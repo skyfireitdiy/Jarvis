@@ -24,7 +24,7 @@ class Agent:
         self.tool_registry = tool_registry or ToolRegistry(model)
         self.name = name
         self.is_sub_agent = is_sub_agent
-        self.messages = []
+        self.prompt = ""
 
 
     @staticmethod
@@ -71,12 +71,10 @@ class Agent:
         
         return []
 
-    def _call_model(self, messages: List[Dict]) -> Dict:
+    def _call_model(self, message: str) -> str:
         """调用模型获取响应"""
         try:
-            return self.model.chat(
-                messages=messages,
-            )
+            return self.model.chat(message)
         except Exception as e:
             raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
 
@@ -93,10 +91,7 @@ class Agent:
             tools_prompt += f"  描述: {tool['description']}\n"
             tools_prompt += f"  参数: {tool['parameters']}\n"
 
-        self.messages = [
-            {
-                "role": "user",
-                "content": f"""你是 {self.name}，一个严格遵循 ReAct 框架进行逐步推理和行动的 AI 助手。
+        self.prompt =f"""你是 {self.name}，一个严格遵循 ReAct 框架进行逐步推理和行动的 AI 助手。
 
 {tools_prompt}
 
@@ -190,32 +185,21 @@ arguments:
 任务:
 {user_input}
 """
-            }
-        ]
+            
         
         while True:
             try:
                 # 显示思考状态
                 PrettyOutput.print("分析任务...", OutputType.PROGRESS)
                 
-                current_response = self._call_model(self.messages)
+                current_response = self._call_model(self.prompt)
 
                 try:
                     result = Agent.extract_tool_calls(current_response)
                 except Exception as e:
                     PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
-                    self.messages.append({
-                        "role": "user",
-                        "content": f"工具调用错误: {str(e)}"
-                    })
+                    self.prompt = f"工具调用错误: {str(e)}"
                     continue
-
-
-                self.messages.append({
-                    "role": "assistant",
-                    "content": current_response
-                })
-
                 
                 if len(result) > 0:
                     try:
@@ -227,23 +211,25 @@ arguments:
                         PrettyOutput.print(str(e), OutputType.ERROR)
                         tool_result = f"Tool call failed: {str(e)}"
 
-                    self.messages.append({
-                        "role": "user",
-                        "content": tool_result
-                    })
+                    self.prompt = tool_result
                     continue
                 
                 # 获取用户输入
                 user_input = get_multiline_input(f"{self.name}: 您可以继续输入，或输入空行结束当前任务")
+                if user_input == "__interrupt__":
+                    PrettyOutput.print("任务已取消", OutputType.WARNING)
+                    return "Task cancelled by user"
+                if user_input:
+                    self.prompt = user_input
+                    continue
+                
                 if not user_input:
                     # 只有子Agent才需要生成任务总结
                     if self.is_sub_agent:
                         PrettyOutput.print("生成任务总结...", OutputType.PROGRESS)
                         
                         # 生成任务总结
-                        summary_prompt = {
-                            "role": "user",
-                            "content": """任务已完成。请根据之前的分析和执行结果，提供一个简明的任务总结，包括：
+                        self.prompt = """任务已完成。请根据之前的分析和执行结果，提供一个简明的任务总结，包括：
 
 1. 关键发现：
    - 分析过程中的重要发现
@@ -256,11 +242,10 @@ arguments:
    - 达成的目标
 
 请直接描述事实和实际结果，保持简洁明了。"""
-                        }
                         
                         while True:
                             try:
-                                summary = self._call_model(self.messages + [summary_prompt])
+                                summary = self._call_model(self.prompt)
                                  
                                 # 显示任务总结
                                 PrettyOutput.section("任务总结", OutputType.SUCCESS)
@@ -276,19 +261,13 @@ arguments:
                         PrettyOutput.section("任务完成", OutputType.SUCCESS)
                         return ""
                 
-                if user_input == "__interrupt__":
-                    PrettyOutput.print("任务已取消", OutputType.WARNING)
-                    return "Task cancelled by user"
+
                 
-                self.messages.append({
-                    "role": "user",
-                    "content": user_input
-                })
                 
             except Exception as e:
                 PrettyOutput.print(str(e), OutputType.ERROR)
 
     def clear_history(self):
         """清除对话历史，只保留系统提示"""
-        self.messages = [] 
+        self.prompt = "" 
         self.model.reset()
