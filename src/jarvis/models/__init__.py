@@ -1,21 +1,12 @@
-import re
-import time
 from typing import Dict, List, Optional, Tuple
 from duckduckgo_search import DDGS
 import ollama
-from abc import ABC, abstractmethod
 import yaml
 import openai
 
-from .utils import OutputType, PrettyOutput
-
-class BaseModel(ABC):
-    """大语言模型基类"""
-    
-    @abstractmethod
-    def chat(self, messages: List[Dict]) -> str:
-        """执行对话"""
-        pass
+from ..utils import OutputType, PrettyOutput
+from .base import BaseModel
+from .kimi import KimiModel
 
 
 class DDGSModel(BaseModel):
@@ -120,3 +111,5 @@ class OpenAIModel(BaseModel):
             
         except Exception as e:
             raise Exception(f"OpenAI API调用失败: {str(e)}") 
+
+__all__ = ['BaseModel', 'DDGSModel', 'OllamaModel', 'OpenAIModel', 'KimiModel'] 

@@ -12,12 +12,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from jarvis.agent import Agent
 from jarvis.tools import ToolRegistry
-from jarvis.models import DDGSModel, OllamaModel, OpenAIModel
+from jarvis.models import DDGSModel, OllamaModel, OpenAIModel, KimiModel
 from jarvis.utils import PrettyOutput, OutputType, get_multiline_input, load_env_from_file
 from jarvis.zte_llm import create_zte_llm
 
 # 定义支持的平台和模型
 SUPPORTED_PLATFORMS = {
+    "kimi": {
+        "models": ["kimi"],
+        "default": "kimi",
+        "allow_custom": False
+    },
     "ollama": {
         "models": ["qwen2.5:14b", "qwq"],
         "default": "qwen2.5:14b",
@@ -105,8 +110,8 @@ def main():
     parser.add_argument(
         "--platform",
         choices=list(SUPPORTED_PLATFORMS.keys()),
-        default=os.getenv("JARVIS_PLATFORM") or "ddgs",
-        help="选择运行平台 (默认: ollama)"
+        default=os.getenv("JARVIS_PLATFORM") or "kimi",
+        help="选择运行平台 (默认: kimi)"
     )
     
     # 添加模型选择参数
@@ -142,7 +147,10 @@ def main():
 
     try:
         # 根据平台创建相应的模型实例
-        if args.platform == "ollama":
+        if args.platform == "kimi":
+            model = KimiModel(os.getenv("KIMI_API_KEY"))
+            platform_name = "Kimi"
+        elif args.platform == "ollama":
             model = OllamaModel(
                 model_name=args.model,
                 api_base=args.api_base
