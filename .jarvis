@@ -1,1 +1,2 @@
 发布版本: 执行 python3 ./scripts/publish.py patch 进行版本发布
+安装当前版本: 执行 python3 -m pip install -e . 安装当前python包
