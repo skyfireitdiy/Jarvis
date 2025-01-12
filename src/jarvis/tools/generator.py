@@ -45,6 +45,8 @@ class ToolGeneratorTool:
         Args:
             model: 模型处理器 (必需)
             output_handler: 输出处理器 (可选)
+            register: 注册器 (必需)
+            tools_dir: 工具目录 (可选，默认为 ~/.jarvis_tools)
         """
         self.register = kwargs.get('register')
         if not self.register:
@@ -54,6 +56,16 @@ class ToolGeneratorTool:
             raise Exception("Model is required for ToolGeneratorTool")
         self.output = kwargs.get('output_handler')
         
+        # 设置工具目录
+        tools_dir = kwargs.get('tools_dir')
+        if tools_dir:
+            self.tools_dir = Path(tools_dir)
+        else:
+            self.tools_dir = Path.home() / '.jarvis_tools'
+        
+        # 确保工具目录存在
+        self.tools_dir.mkdir(parents=True, exist_ok=True)
+
     def _print(self, text: str, output_type: OutputType = OutputType.INFO):
         """输出信息"""
         if self.output:
@@ -136,9 +148,7 @@ class ExampleTool:
                 "success": False,
                 "error": str(e)
             }}
-```
-
-请根据以上要求生成完整的工具代码："""
+```"""
 
         # 调用模型生成代码
         response = self.model.chat(prompt)
@@ -151,7 +161,7 @@ class ExampleTool:
         if code_start == -1 or code_end == -1:
             # 如果没有找到代码块标记，假设整个响应都是代码
             return response
-            
+        
         # 提取代码块内容（去掉```python和```标记）
         code = response[code_start + 9:code_end].strip()
         return code
@@ -174,19 +184,34 @@ class ExampleTool:
                 parameters
             )
 
-            # 获取工具目录路径
-            tools_dir = Path(__file__).parent
-            tool_file = tools_dir / f"{tool_name}.py"
+            # 获取工具文件路径
+            tool_file = self.tools_dir / f"{tool_name}.py"
 
             # 写入工具文件
             with open(tool_file, "w", encoding="utf-8") as f:
                 f.write(tool_code)
 
-            self.register.register_tool_by_file(tool_file)
+            # 创建或更新 __init__.py
+            init_file = self.tools_dir / "__init__.py"
+            if not init_file.exists():
+                with open(init_file, "w", encoding="utf-8") as f:
+                    f.write("# Jarvis Tools\n")
+
+            # 注册工具
+            success = self.register.register_tool_by_file(tool_file)
+            if not success:
+                return {
+                    "success": False,
+                    "error": "工具生成成功但注册失败"
+                }
 
             return {
                 "success": True,
-                "stdout": f"工具已生成,并已经注册到Jarvis, 在后面的对话中可直接调用此工具。工具信息为:\n工具名称: {tool_name}\n工具描述: {description}\n工具参数: {parameters}",
+                "stdout": f"工具已生成并注册到Jarvis\n"
+                         f"工具目录: {self.tools_dir}\n"
+                         f"工具名称: {tool_name}\n"
+                         f"工具描述: {description}\n"
+                         f"工具参数: {parameters}",
                 "stderr": ""
             }
 

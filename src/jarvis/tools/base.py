@@ -3,6 +3,7 @@ import json
 import os
 import importlib.util
 from pathlib import Path
+import sys
 
 from jarvis.models.kimi import KimiModel
 
@@ -30,9 +31,43 @@ class Tool:
 
 class ToolRegistry:
     def __init__(self, output_handler=None):
+        """初始化工具注册器
+        
+        Args:
+            output_handler: 输出处理器 (可选)
+        """
         self.tools: Dict[str, Tool] = {}
         self.output_handler = output_handler or PrettyOutput
-        self._load_tools()
+        
+        # 加载内置工具和外部工具
+        self._load_builtin_tools()
+        self._load_external_tools()
+
+    def _load_builtin_tools(self):
+        """从内置tools目录加载工具"""
+        tools_dir = Path(__file__).parent
+        
+        # 遍历目录下的所有.py文件
+        for file_path in tools_dir.glob("*.py"):
+            # 跳过基础文件和__init__.py
+            if file_path.name in ["base.py", "__init__.py"]:
+                continue
+                
+            self.register_tool_by_file(file_path)
+
+    def _load_external_tools(self):
+        """从~/.jarvis_tools加载外部工具"""
+        external_tools_dir = Path.home() / '.jarvis_tools'
+        if not external_tools_dir.exists():
+            return
+            
+        # 遍历目录下的所有.py文件
+        for file_path in external_tools_dir.glob("*.py"):
+            # 跳过__init__.py
+            if file_path.name == "__init__.py":
+                continue
+                
+            self.register_tool_by_file(file_path)
 
     def register_tool_by_file(self, file_path: str):
         """从指定文件加载并注册工具
@@ -44,7 +79,7 @@ class ToolRegistry:
             bool: 是否成功加载工具
         """
         try:
-            file_path = Path(file_path)
+            file_path = Path(file_path).resolve()  # 获取绝对路径
             if not file_path.exists() or not file_path.is_file():
                 self.output_handler.print(f"文件不存在: {file_path}", OutputType.ERROR)
                 return False
@@ -57,6 +92,7 @@ class ToolRegistry:
                 return False
                 
             module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module  # 添加到 sys.modules 以支持相对导入
             spec.loader.exec_module(module)
             
             # 查找模块中的工具类
@@ -91,18 +127,6 @@ class ToolRegistry:
         except Exception as e:
             self.output_handler.print(f"加载工具失败 {file_path.name}: {str(e)}", OutputType.ERROR)
             return False
-
-    def _load_tools(self):
-        """从tools目录动态加载所有工具"""
-        tools_dir = Path(__file__).parent
-        
-        # 遍历目录下的所有.py文件
-        for file_path in tools_dir.glob("*.py"):
-            # 跳过基础文件和__init__.py
-            if file_path.name in ["base.py", "__init__.py"]:
-                continue
-                
-            self.register_tool_by_file(file_path)
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
         """注册新工具"""

@@ -34,6 +34,9 @@
 - File operations (read/write/append)
 - Task automation
 - Predefined task support
+- Dynamic tool system with auto-loading
+- AI-powered tool generation
+- Custom tool development
 
 🔄 **Interactive Experience**
 - Natural language understanding
@@ -42,6 +45,139 @@
 - Multi-line input support
 - Colored output with progress indicators
 
+## 🛠️ Custom Tools
+
+### Tool Locations
+- Built-in tools: `src/jarvis/tools/`
+- User tools: `~/.jarvis_tools/` (automatically created)
+
+### Creating Tools
+
+#### 1. Using AI Generator (Recommended)
+```yaml
+<START_TOOL_CALL>
+name: generate_tool
+arguments:
+    tool_name: calculator
+    class_name: CalculatorTool
+    description: Basic math calculations
+    parameters:
+        type: object
+        properties:
+            operation:
+                type: string
+                enum: ["add", "subtract", "multiply", "divide"]
+            numbers:
+                type: array
+                items:
+                    type: number
+        required: ["operation", "numbers"]
+<END_TOOL_CALL>
+```
+
+#### 2. Manual Creation
+Create a new Python file in `~/.jarvis_tools/`:
+
+```python
+from typing import Dict, Any, Protocol, Optional
+from enum import Enum
+
+class OutputType(Enum):
+    INFO = "info"
+    ERROR = "error"
+
+class OutputHandler(Protocol):
+    def print(self, text: str, output_type: OutputType) -> None: ...
+
+class ModelHandler(Protocol):
+    def chat(self, message: str) -> str: ...
+
+class CustomTool:
+    name = "tool_name"              # Tool name for invocation
+    description = "Tool description" # Tool purpose
+    parameters = {                  # JSON Schema for parameters
+        "type": "object",
+        "properties": {
+            "param1": {"type": "string"}
+        },
+        "required": ["param1"]
+    }
+
+    def __init__(self, **kwargs):
+        """Initialize tool with optional dependencies
+        
+        Args:
+            model: AI model for advanced features
+            output_handler: For consistent output formatting
+            register: Access to tool registry
+        """
+        self.model = kwargs.get('model')
+        self.output = kwargs.get('output_handler')
+        self.register = kwargs.get('register')
+        
+    def _print(self, text: str, output_type: OutputType = OutputType.INFO):
+        """Print formatted output"""
+        if self.output:
+            self.output.print(text, output_type)
+
+    def execute(self, args: Dict) -> Dict[str, Any]:
+        """Execute tool functionality
+        
+        Args:
+            args: Parameters passed to the tool
+            
+        Returns:
+            Dict with execution results:
+            {
+                "success": bool,
+                "stdout": str,  # On success
+                "stderr": str,  # Optional error details
+                "error": str    # On failure
+            }
+        """
+        try:
+            # Implement tool logic here
+            result = "Tool execution result"
+            
+            return {
+                "success": True,
+                "stdout": result,
+                "stderr": ""
+            }
+        except Exception as e:
+            self._print(str(e), OutputType.ERROR)
+            return {
+                "success": False,
+                "error": str(e)
+            }
+```
+
+### Development Guidelines
+
+1. **Tool Structure**
+   - Clear name and description
+   - Well-defined parameters schema
+   - Proper error handling
+   - Consistent output format
+
+2. **Best Practices**
+   - Use `_print` for output
+   - Handle all required parameters
+   - Document functionality
+   - Return standardized results
+   - Keep tools focused and simple
+
+3. **Testing**
+   - Verify parameter validation
+   - Test error handling
+   - Check output format
+   - Ensure proper cleanup
+
+4. **Integration**
+   - Tools are auto-loaded on startup
+   - No manual registration needed
+   - Hot-reload supported
+   - Dependencies injected automatically
 
 ## ⚙️ Environment Setup
 
