@@ -82,7 +82,25 @@ def main():
     try:
         kimi_api_key = os.getenv("KIMI_API_KEY")
         if not kimi_api_key:
-            PrettyOutput.print("Kimi API key 未设置", OutputType.ERROR)
+            PrettyOutput.section("环境配置缺失", OutputType.ERROR)
+            PrettyOutput.print("\n需要设置 KIMI_API_KEY 才能使用 Jarvis。请按以下步骤操作：", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("\n1. 获取 Kimi API Key:", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   • 访问 Kimi AI 平台: https://kimi.moonshot.cn", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   • 登录您的账号", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   • 打开浏览器开发者工具 (F12 或右键 -> 检查)", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   • 切换到 Network 标签页", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   • 发送任意消息", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   • 在请求中找到 Authorization 头部", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   • 复制 token 值（去掉 'Bearer ' 前缀）", OutputType.INFO, timestamp=False)
+            
+            PrettyOutput.print("\n2. 设置环境变量:", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   方法 1: 创建或编辑 ~/.jarvis_env 文件:", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   echo 'KIMI_API_KEY=your_key_here' > ~/.jarvis_env", OutputType.CODE, timestamp=False)
+            
+            PrettyOutput.print("\n   方法 2: 直接设置环境变量:", OutputType.INFO, timestamp=False)
+            PrettyOutput.print("   export KIMI_API_KEY=your_key_here", OutputType.CODE, timestamp=False)
+            
+            PrettyOutput.print("\n设置完成后重新运行 Jarvis。", OutputType.INFO, timestamp=False)
             return 1
         
         model = KimiModel(kimi_api_key)
