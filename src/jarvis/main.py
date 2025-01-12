@@ -6,6 +6,9 @@ import yaml
 import os
 import sys
 from pathlib import Path
+from prompt_toolkit import prompt
+from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.validation import Validator, ValidationError
 
 # 添加父目录到Python路径以支持导入
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -55,6 +58,19 @@ def load_tasks() -> dict:
     
     return tasks
 
+class NumberValidator(Validator):
+    def validate(self, document):
+        text = document.text.strip()
+        if not text:  # Allow empty input
+            return
+            
+        try:
+            number = int(text)
+            if number < 0:
+                raise ValidationError(message='Please enter a non-negative number')
+        except ValueError:
+            raise ValidationError(message='Please enter a valid number')
+
 def select_task(tasks: dict) -> str:
     """Let user select a task from the list or skip. Returns task description if selected."""
     if not tasks:
@@ -68,9 +84,20 @@ def select_task(tasks: dict) -> str:
         PrettyOutput.print(f"[{i}] {name}", OutputType.INFO)
     PrettyOutput.print("[0] Skip predefined tasks", OutputType.INFO)
     
+    # Create completer with valid numbers
+    valid_numbers = [str(i) for i in range(len(task_names) + 1)]
+    number_completer = WordCompleter(valid_numbers)
+    
     while True:
         try:
-            choice = input("\nSelect a task number (0 to skip): ").strip()
+            choice = prompt(
+                "\nSelect a task number (0 to skip): ",
+                completer=number_completer,
+                validator=NumberValidator(),
+                validate_while_typing=False,
+                enable_history_search=True,
+            ).strip()
+            
             if not choice:
                 return ""
             
@@ -81,9 +108,12 @@ def select_task(tasks: dict) -> str:
                 selected_name = task_names[choice - 1]
                 return tasks[selected_name]  # Return the task description
             else:
-                PrettyOutput.print("Invalid choice. Please try again.", OutputType.ERROR)
-        except ValueError:
-            PrettyOutput.print("Please enter a valid number.", OutputType.ERROR)
+                PrettyOutput.print("Invalid choice. Please select a number from the list.", OutputType.ERROR)
+                
+        except KeyboardInterrupt:
+            return ""  # Return empty on Ctrl+C
+        except EOFError:
+            return ""  # Return empty on Ctrl+D
 
 def main():
     """Main entry point for Jarvis."""
