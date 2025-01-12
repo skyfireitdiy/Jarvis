@@ -1,12 +1,11 @@
 commit代码: |
   1. 将当前git仓库的修改添加到暂存区
-  2. 根据文件修改清单**自动生成**commit信息，并在commit信息中自动打上[修复]、[优化]等标签,如果无法生成准确的commit信息，则询问用户
-  3. 询问用户,让用户确认commit信息
-  4. 生成最新代码的patch文件
+  2. 根据文件修改内容（使用git命令提取）**自动生成**commit信息，并在commit信息中自动打上[修复]、[优化]等标签,如果无法生成准确的commit信息，则询问用户
+  3. 生成最新代码的patch文件
 提交代码: |
   1. 将当前git仓库的修改添加到暂存区
   2. 根据修改文件清单**自动生成**commit信息，并在commit信息中自动打上[修复]、[优化]等标签,如果无法生成准确的commit信息，则询问用户
-  3. 询问用户,让用户确认commit信息
-  4. 执行git commit和git push
+  3. 执行git commit和git push
 发布版本: 执行 python3 ./scripts/publish.py patch 进行版本发布
+
 

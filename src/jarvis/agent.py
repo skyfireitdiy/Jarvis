@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 
 class Agent:
-    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis", is_sub_agent: bool = False):
+    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis"):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -23,7 +23,6 @@ class Agent:
         self.model = model
         self.tool_registry = tool_registry or ToolRegistry(model)
         self.name = name
-        self.is_sub_agent = is_sub_agent
         self.prompt = ""
 
 
@@ -78,7 +77,7 @@ class Agent:
         except Exception as e:
             raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
 
-    def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str:
+    def run(self, user_input: str, file_list: Optional[List[str]] = None):
         """处理用户输入并返回响应，返回任务总结报告
         
         Args:
@@ -103,13 +102,6 @@ class Agent:
 
 {tools_prompt}
 
-关键规则：
-‼️ 禁止创建虚假对话
-‼️ 禁止假设用户回应
-‼️ 禁止在没有实际用户输入时继续
-‼️ 只回应用户实际说的内容
-‼️ 每个动作后停止并等待
-
 ReAct 框架：
 1. 思考
    - 分析当前情况
@@ -126,7 +118,7 @@ ReAct 框架：
      - 只使用下面列出的工具
      - 每次只执行一个工具
      - 工具由用户手动执行
-     - 必须使用有效的YAML格式：
+     - 必须使用有效合法的YAML格式：
      <START_TOOL_CALL>
      name: tool_name
      arguments:
@@ -167,7 +159,6 @@ arguments:
 ‼️ 工具调用必须是有效的YAML格式
 ‼️ 参数必须正确缩进
 ‼️ 使用YAML块样式(|)表示多行值
-‼️ <END_TOOL_CALL>后的内容将被丢弃
 ‼️ 工具由用户手动执行
 ‼️ 等待用户提供工具执行结果
 ‼️ 不要假设或想象用户回应
@@ -232,42 +223,8 @@ arguments:
                     continue
                 
                 if not user_input:
-                    # 只有子Agent才需要生成任务总结
-                    if self.is_sub_agent:
-                        PrettyOutput.print("生成任务总结...", OutputType.PROGRESS)
-                        
-                        # 生成任务总结
-                        self.prompt = """任务已完成。请根据之前的分析和执行结果，提供一个简明的任务总结，包括：
-
-1. 关键发现：
-   - 分析过程中的重要发现
-   - 工具执行的关键结果
-   - 发现的重要数据
-
-2. 执行成果：
-   - 任务完成情况
-   - 具体实现结果
-   - 达成的目标
-
-请直接描述事实和实际结果，保持简洁明了。"""
-                        
-                        while True:
-                            try:
-                                summary = self._call_model(self.prompt)
-                                 
-                                # 显示任务总结
-                                PrettyOutput.section("任务总结", OutputType.SUCCESS)
-                                PrettyOutput.print(summary, OutputType.SYSTEM)
-                                PrettyOutput.section("任务完成", OutputType.SUCCESS)
-                                
-                                return summary
-                                
-                            except Exception as e:
-                                PrettyOutput.print(str(e), OutputType.ERROR)
-                    else:
-                        # 顶层Agent直接返回空字符串
                         PrettyOutput.section("任务完成", OutputType.SUCCESS)
-                        return ""
+                        return 
                 
 
                 
