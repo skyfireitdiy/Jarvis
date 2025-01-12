@@ -115,7 +115,7 @@ class ToolRegistry:
                         parameters=tool_instance.parameters,
                         func=tool_instance.execute
                     )
-                    self.output_handler.print(f"已加载工具: {tool_instance.name}", OutputType.INFO)
+                    self.output_handler.print(f"已加载工具: {tool_instance.name}: {tool_instance.description}", OutputType.INFO)
                     tool_found = True
                     
             if not tool_found:

@@ -15,7 +15,7 @@ class ModelHandler(Protocol):
 
 class ToolGeneratorTool:
     name = "generate_tool"
-    description = "生成新的工具代码并自动注册到ToolRegistry"
+    description = "生成新的工具代码并自动注册到Jarvis，自动扩充Jarvis的能力"
     parameters = {
         "type": "object",
         "properties": {
