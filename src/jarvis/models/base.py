@@ -17,3 +17,7 @@ class BaseModel(ABC):
         """重置模型"""
         pass
         
+    @abstractmethod
+    def name(self) -> str:
+        """模型名称"""
+        pass

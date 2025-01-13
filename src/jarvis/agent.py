@@ -75,7 +75,17 @@ class Agent:
 
     def _call_model(self, message: str) -> str:
         """调用模型获取响应"""
-        return while_true(lambda: while_success(lambda: self.model.chat(message), sleep_time=5), sleep_time=5)
+        sleep_time = 5
+        while True:
+            ret = while_success(lambda: self.model.chat(message), sleep_time=5)
+            if ret:
+                return ret
+            else:
+                sleep_time *= 2
+                if sleep_time > 30:
+                    sleep_time = 30
+                PrettyOutput.print(f"调用模型失败，重试中... 等待 {sleep_time}s", OutputType.INFO)
+                continue
 
 
     def _load_methodology(self) -> str:
@@ -108,7 +118,7 @@ class Agent:
 
             methodology_prompt = ""
             if methodology:
-                methodology_prompt = f"""这是以往处理问题的标准方法论, 如果当前任务与此类似，可参考：
+                methodology_prompt = f"""这是以往处理问题的标准方法论，如果当前任务与此类似，可参考：
 {methodology}
 
 """
@@ -129,6 +139,8 @@ class Agent:
 核心能力：
 1. 使用现有工具完成任务
 2. 访问和理解网页内容（无需使用工具）
+3. 分析和处理文件内容
+4. 创建子代理处理复杂任务
 5. 遵循 ReAct (思考-行动-观察) 框架
 
 工作流程：
@@ -136,19 +148,35 @@ class Agent:
    - 分析需求和可用工具
    - 评估是否能用现有工具完成
    - 考虑是否需要访问网页
+   - 判断是否需要创建子代理
    - 规划解决方案
 
 2. 行动 (如果需要)
    - 优先使用现有工具
    - 访问网页获取信息
    - 创建新工具（成本高，谨慎使用）
-   - 创建子代理（成本高，谨慎使用）
+   - 创建子代理处理以下场景:
+     * 需要深入分析多个文件
+     * 需要长期交互的复杂任务
+     * 需要独立的上下文环境
    - 询问更多信息
    
 3. 观察
    - 等待执行结果
    - 分析反馈
    - 规划下一步
+
+子代理使用场景：
+1. 文件分析任务
+   - 代码审查和重构
+   - 文档内容分析
+   - 多文件关联分析
+2. 复杂交互任务
+   - 多轮对话
+   - 需要保持上下文
+3. 独立任务流程
+   - 特定领域处理
+   - 需要独立决策
 
 工具使用格式：
 <START_TOOL_CALL>
@@ -258,15 +286,25 @@ arguments:
 
     def _make_methodology(self):
         # 生成经验总结和方法论
-        summary_prompt = f"""请根据之前的对话内容，总结处理此类问题的标准方法论.请总结出一个可以复用的标准流程，重点说明通用性和可操作性。
+        summary_prompt = f"""请根据之前的对话内容，总结处理此类问题的标准方法论。请总结出一个可以复用的标准流程，重点说明通用性和可操作性。
+
+注意：
+1. 方法论应该具有独特性，避免与已有方法论重复
+2. 突出此类问题的特殊处理方式
+3. 强调与其他类型问题的区别
+
 输出格式严格遵顼以下模板(不要输出任何其他内容):
 <START_METHOD>
 1. 问题分类抽象
    - 这是什么类型的问题
    - 有哪些典型特征
-3. 最佳实践
+   - 与其他类型问题的主要区别
+
+2. 最佳实践
    - 推荐的处理步骤
    - 常见陷阱和规避方法
+   - 独特的处理技巧
+   - 效果评估方法
 <END_METHOD>
 """         
         PrettyOutput.print("正在总结方法论...", OutputType.PROGRESS)
@@ -278,6 +316,7 @@ arguments:
         # 方法论追加保存至 ~/.jarvis_methodology
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
         with open(user_jarvis_methodology, "a", encoding="utf-8") as f:
+            f.write(f"\n--- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
             f.write(methodology)
             f.write("\n\n" + '-' * 50 + "\n\n")
         PrettyOutput.print("方法论已保存至 ~/.jarvis_methodology", OutputType.SUCCESS)

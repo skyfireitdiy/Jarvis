@@ -4,7 +4,7 @@ import json
 import os
 import mimetypes
 from .base import BaseModel
-from ..utils import PrettyOutput, OutputType
+from ..utils import PrettyOutput, OutputType, while_success
 import time
 
 class KimiModel(BaseModel):
@@ -38,11 +38,11 @@ class KimiModel(BaseModel):
             'Content-Type': 'application/json'
         }
         try:
-            response = requests.request("POST", url, headers=headers, data=payload)
+            response = while_success(lambda: requests.request("POST", url, headers=headers, data=payload), sleep_time=5)
             self.chat_id = response.json()["id"]
             return True
         except Exception as e:
-            PrettyOutput.print(f"Failed to create chat: {e}: Response: {response.text}", OutputType.ERROR)
+            PrettyOutput.print(f"Failed to create chat: {e}", OutputType.ERROR)
             return False
 
     def _get_presigned_url(self, filename: str, action: str) -> Dict:
@@ -61,7 +61,7 @@ class KimiModel(BaseModel):
             'Content-Type': 'application/json'
         }
         
-        response = requests.post(url, headers=headers, data=payload)
+        response = while_success(lambda: requests.post(url, headers=headers, data=payload), sleep_time=5)
         return response.json()
 
     def _upload_file(self, file_path: str, presigned_url: str) -> bool:
@@ -69,7 +69,7 @@ class KimiModel(BaseModel):
         try:
             with open(file_path, 'rb') as f:
                 content = f.read()
-                response = requests.put(presigned_url, data=content)
+                response = while_success(lambda: requests.put(presigned_url, data=content), sleep_time=5)
                 return response.status_code == 200
         except Exception as e:
             PrettyOutput.print(f"Failed to upload file: {e}", OutputType.ERROR)
@@ -91,7 +91,7 @@ class KimiModel(BaseModel):
             'Content-Type': 'application/json'
         }
         
-        response = requests.post(url, headers=headers, data=payload)
+        response = while_success(lambda: requests.post(url, headers=headers, data=payload), sleep_time=5)
         return response.json()
 
     def _wait_for_parse(self, file_id: str) -> bool:
@@ -107,7 +107,7 @@ class KimiModel(BaseModel):
         
         while retry_count < max_retries:
             payload = json.dumps({"ids": [file_id]})
-            response = requests.post(url, headers=headers, data=payload, stream=True)
+            response = while_success(lambda: requests.post(url, headers=headers, data=payload, stream=True), sleep_time=5)
             
             for line in response.iter_lines():
                 if not line:
@@ -228,7 +228,7 @@ class KimiModel(BaseModel):
         }
 
         try:
-            response = requests.post(url, headers=headers, json=payload, stream=True)
+            response = while_success(lambda: requests.post(url, headers=headers, json=payload, stream=True), sleep_time=5)
             full_response = ""
             
             # 收集搜索和引用结果
@@ -347,7 +347,7 @@ class KimiModel(BaseModel):
         }
         
         try:
-            response = requests.delete(url, headers=headers)
+            response = while_success(lambda: requests.delete(url, headers=headers), sleep_time=5)
             if response.status_code == 200:
                 PrettyOutput.print("会话已删除", OutputType.SUCCESS)
                 self.reset()
@@ -365,6 +365,9 @@ class KimiModel(BaseModel):
         self.uploaded_files = []
         self.first_chat = True  # 重置first_chat标记
 
+    def name(self) -> str:
+        """模型名称"""
+        return "kimi"
 
 if __name__ == "__main__":
     kimi = KimiModel()

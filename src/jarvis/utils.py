@@ -98,6 +98,9 @@ class PrettyOutput:
     def print(text: str, output_type: OutputType, timestamp: bool = False):
         """打印格式化的输出"""
         print(PrettyOutput.format(text, output_type, timestamp))
+        if output_type == OutputType.ERROR:
+            import traceback
+            PrettyOutput.print(f"错误追踪: {traceback.format_exc()}", OutputType.INFO)
 
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):

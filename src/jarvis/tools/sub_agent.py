@@ -41,6 +41,12 @@ class SubAgentTool:
                 "type": "string",
                 "description": "任务的完成目标",
                 "default": ""
+            },
+            "files": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "相关文件路径列表，用于文件问答和处理",
+                "default": []
             }
         },
         "required": ["agent_name", "task", "context", "goal"]
@@ -72,6 +78,7 @@ class SubAgentTool:
             task = args["task"]
             context = args.get("context", "")
             goal = args.get("goal", "")
+            files = args.get("files", [])
 
             self._print(f"创建子代理: {agent_name}")
 
@@ -90,9 +97,9 @@ class SubAgentTool:
                 is_sub_agent=True
             )
 
-            # 运行子代理
+            # 运行子代理，传入文件列表
             self._print(f"子代理开始执行任务...")
-            result = sub_agent.run(task_description)
+            result = sub_agent.run(task_description, file_list=files)
 
             return {
                 "success": True,
