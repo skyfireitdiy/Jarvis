@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 import yaml
 from .tools import ToolRegistry
-from .utils import PrettyOutput, OutputType, get_multiline_input
+from .utils import PrettyOutput, OutputType, get_multiline_input, while_success, while_true
 from .models import BaseModel
 import re
 import os
@@ -75,16 +75,8 @@ class Agent:
 
     def _call_model(self, message: str) -> str:
         """调用模型获取响应"""
-        try:
-            while True:
-                ret = self.model.chat(message)
-                if not ret:
-                    PrettyOutput.print("模型返回空值，可能负载过重，5s后重试...", OutputType.WARNING)
-                    time.sleep(5)
-                    continue
-                return ret
-        except Exception as e:
-            raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
+        return while_true(lambda: while_success(lambda: self.model.chat(message), sleep_time=5), sleep_time=5)
+
 
     def _load_methodology(self) -> str:
         """加载方法论"""
@@ -117,7 +109,7 @@ class Agent:
             methodology_prompt = ""
             if methodology:
                 methodology_prompt = f"""这是以往处理问题的标准方法论, 如果当前任务与此类似，可参考：
-{self.methodology}
+{methodology}
 
 """
             
@@ -185,7 +177,7 @@ arguments:
                     PrettyOutput.print("分析任务...", OutputType.PROGRESS)
                     
                     current_response = self._call_model(self.prompt)
-
+                    
                     try:
                         result = Agent.extract_tool_calls(current_response)
                     except Exception as e:
@@ -194,14 +186,10 @@ arguments:
                         continue
                     
                     if len(result) > 0:
-                        try:
-                            # 显示工具调用
-                            PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
-                            tool_result = self.tool_registry.handle_tool_calls(result)
-                            PrettyOutput.print(tool_result, OutputType.RESULT)
-                        except Exception as e:
-                            PrettyOutput.print(str(e), OutputType.ERROR)
-                            tool_result = f"Tool call failed: {str(e)}"
+
+                        PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
+                        tool_result = self.tool_registry.handle_tool_calls(result)
+                        PrettyOutput.print(tool_result, OutputType.RESULT)
 
                         self.prompt = tool_result
                         continue
@@ -242,7 +230,7 @@ arguments:
 请用简洁的要点形式描述，突出重要信息。
 """
                             self.prompt = summary_prompt
-                            summary = self.model.chat(self.prompt)
+                            summary = self._call_model(self.prompt)
                             return summary
                         else:
                             return "Task completed"
@@ -270,34 +258,22 @@ arguments:
 
     def _make_methodology(self):
         # 生成经验总结和方法论
-        summary_prompt = f"""请根据之前的对话内容，总结处理此类问题的标准方法论：
-
-1. 问题分类
+        summary_prompt = f"""请根据之前的对话内容，总结处理此类问题的标准方法论.请总结出一个可以复用的标准流程，重点说明通用性和可操作性。
+输出格式严格遵顼以下模板(不要输出任何其他内容):
+<START_METHOD>
+1. 问题分类抽象
    - 这是什么类型的问题
    - 有哪些典型特征
-   - 需要注意的关键点
-
-2. 解决方案
-   - 标准处理流程
-   - 常用工具和方法
-   - 关键决策点
-
 3. 最佳实践
    - 推荐的处理步骤
    - 常见陷阱和规避方法
-   - 质量保证措施
-
-4. 效率优化
-   - 时间管理建议
-   - 资源优化方案
-   - 可复用的部分
-
-请总结出一个可以复用的标准流程，重点说明通用性和可操作性。"""         
+<END_METHOD>
+"""         
         PrettyOutput.print("正在总结方法论...", OutputType.PROGRESS)
-        methodology = self._call_model(summary_prompt)
-        
+
+        methodology = while_success(lambda: self._call_model(summary_prompt))
+
         PrettyOutput.section("方法论总结", OutputType.SUCCESS)
-        PrettyOutput.print(methodology, OutputType.SYSTEM)
 
         # 方法论追加保存至 ~/.jarvis_methodology
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")

@@ -149,47 +149,51 @@ class ToolRegistry:
 
     def handle_tool_calls(self, tool_calls: List[Dict]) -> str:
         """处理工具调用，只处理第一个工具"""
-        if not tool_calls:
-            return ""
-            
-        # 只处理第一个工具调用
-        tool_call = tool_calls[0]
-        name = tool_call["name"]
-        args = tool_call["arguments"]
-        
-        if isinstance(args, str):
-            try:
-                args = json.loads(args)
-            except json.JSONDecodeError:
-                PrettyOutput.print(f"工具参数格式无效: {name}", OutputType.ERROR)
+        try:
+            if not tool_calls:
                 return ""
-
-        # 显示工具调用信息
-        PrettyOutput.section(f"执行工具: {name}", OutputType.TOOL)
-        if isinstance(args, dict):
-            for key, value in args.items():
-                PrettyOutput.print(f"参数: {key} = {value}", OutputType.DEBUG)
-        else:
-            PrettyOutput.print(f"参数: {args}", OutputType.DEBUG)
-        
-        # 执行工具调用
-        result = self.execute_tool(name, args)
-        
-        # 处理结果
-        if result["success"]:
-            stdout = result["stdout"]
-            stderr = result.get("stderr", "")
-            output_parts = []
-            if stdout:
-                output_parts.append(f"输出:\n{stdout}")
-            if stderr:
-                output_parts.append(f"错误:\n{stderr}")
-            output = "\n\n".join(output_parts)
-            output = "没有输出和错误" if not output else output
-            PrettyOutput.section("执行成功", OutputType.SUCCESS)
-        else:
-            error_msg = result["error"]
-            output = f"执行失败: {error_msg}"
-            PrettyOutput.section("执行失败", OutputType.ERROR)
+                
+            # 只处理第一个工具调用
+            tool_call = tool_calls[0]
+            name = tool_call["name"]
+            args = tool_call["arguments"]
             
-        return output
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    PrettyOutput.print(f"工具参数格式无效: {name}", OutputType.ERROR)
+                    return ""
+
+            # 显示工具调用信息
+            PrettyOutput.section(f"执行工具: {name}", OutputType.TOOL)
+            if isinstance(args, dict):
+                for key, value in args.items():
+                    PrettyOutput.print(f"参数: {key} = {value}", OutputType.DEBUG)
+            else:
+                PrettyOutput.print(f"参数: {args}", OutputType.DEBUG)
+            
+            # 执行工具调用
+            result = self.execute_tool(name, args)
+            
+            # 处理结果
+            if result["success"]:
+                stdout = result["stdout"]
+                stderr = result.get("stderr", "")
+                output_parts = []
+                if stdout:
+                    output_parts.append(f"输出:\n{stdout}")
+                if stderr:
+                    output_parts.append(f"错误:\n{stderr}")
+                output = "\n\n".join(output_parts)
+                output = "没有输出和错误" if not output else output
+                PrettyOutput.section("执行成功", OutputType.SUCCESS)
+            else:
+                error_msg = result["error"]
+                output = f"执行失败: {error_msg}"
+                PrettyOutput.section("执行失败", OutputType.ERROR)
+                
+            return output
+        except Exception as e:
+            PrettyOutput.print(f"执行工具失败: {str(e)}", OutputType.ERROR)
+            return f"Tool call failed: {str(e)}"

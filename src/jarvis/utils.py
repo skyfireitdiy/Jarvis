@@ -180,3 +180,21 @@ def load_env_from_file():
             PrettyOutput.print(f"Warning: Failed to read ~/.jarvis_env: {e}", OutputType.WARNING)
     
     
+def while_success(func, sleep_time: float = 0.1):
+    while True:
+        try:
+            return func()
+        except Exception as e:
+            PrettyOutput.print(f"执行失败: {str(e)}, {sleep_time}s后重试...", OutputType.ERROR)
+            time.sleep(sleep_time)
+            continue
+
+def while_true(func, sleep_time: float = 0.1):
+    """循环执行函数，直到函数返回True"""
+    while True:
+        ret = func()
+        if ret:
+            break
+        PrettyOutput.print(f"执行失败，{sleep_time}s后重试...", OutputType.WARNING)
+        time.sleep(sleep_time)
+    return ret
