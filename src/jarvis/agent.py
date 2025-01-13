@@ -108,7 +108,7 @@ class Agent:
 
             methodology_prompt = ""
             if methodology:
-                methodology_prompt = f"""这是以往处理问题的标准方法论, 如果当前任务与此类似，可参考：
+                methodology_prompt = f"""这是以往处理问题的标准方法论，如果当前任务与此类似，可参考：
 {methodology}
 
 """
@@ -276,15 +276,25 @@ arguments:
 
     def _make_methodology(self):
         # 生成经验总结和方法论
-        summary_prompt = f"""请根据之前的对话内容，总结处理此类问题的标准方法论.请总结出一个可以复用的标准流程，重点说明通用性和可操作性。
+        summary_prompt = f"""请根据之前的对话内容，总结处理此类问题的标准方法论。请总结出一个可以复用的标准流程，重点说明通用性和可操作性。
+
+注意：
+1. 方法论应该具有独特性，避免与已有方法论重复
+2. 突出此类问题的特殊处理方式
+3. 强调与其他类型问题的区别
+
 输出格式严格遵顼以下模板(不要输出任何其他内容):
 <START_METHOD>
 1. 问题分类抽象
    - 这是什么类型的问题
    - 有哪些典型特征
-3. 最佳实践
+   - 与其他类型问题的主要区别
+
+2. 最佳实践
    - 推荐的处理步骤
    - 常见陷阱和规避方法
+   - 独特的处理技巧
+   - 效果评估方法
 <END_METHOD>
 """         
         PrettyOutput.print("正在总结方法论...", OutputType.PROGRESS)
@@ -296,6 +306,7 @@ arguments:
         # 方法论追加保存至 ~/.jarvis_methodology
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
         with open(user_jarvis_methodology, "a", encoding="utf-8") as f:
+            f.write(f"\n--- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
             f.write(methodology)
             f.write("\n\n" + '-' * 50 + "\n\n")
         PrettyOutput.print("方法论已保存至 ~/.jarvis_methodology", OutputType.SUCCESS)
