@@ -75,7 +75,17 @@ class Agent:
 
     def _call_model(self, message: str) -> str:
         """调用模型获取响应"""
-        return while_true(lambda: while_success(lambda: self.model.chat(message), sleep_time=5), sleep_time=5)
+        sleep_time = 5
+        while True:
+            ret = while_success(lambda: self.model.chat(message), sleep_time=5)
+            if ret:
+                return ret
+            else:
+                sleep_time *= 2
+                if sleep_time > 30:
+                    sleep_time = 30
+                PrettyOutput.print(f"调用模型失败，重试中... 等待 {sleep_time}s", OutputType.INFO)
+                continue
 
 
     def _load_methodology(self) -> str:
