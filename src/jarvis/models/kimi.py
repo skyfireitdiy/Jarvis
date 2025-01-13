@@ -24,6 +24,11 @@ class KimiModel(BaseModel):
         self.uploaded_files = []  # 存储已上传文件的信息
         self.first_chat = True  # 添加标记，用于判断是否是第一次对话
         self.verbose = verbose  # 添加verbose属性
+        self.system_message = ""
+
+    def set_system_message(self, message: str):
+        """设置系统消息"""
+        self.system_message = message
 
     def _create_chat(self) -> bool:
         """创建新的对话会话"""
@@ -204,10 +209,12 @@ class KimiModel(BaseModel):
         # 只在第一次对话时带上文件引用
         refs = []
         refs_file = []
-        if self.first_chat and self.uploaded_files:
-            PrettyOutput.print(f"首次对话，引用 {len(self.uploaded_files)} 个文件...", OutputType.PROGRESS)
-            refs = [f["id"] for f in self.uploaded_files]
-            refs_file = self.uploaded_files
+        if self.first_chat:
+            if self.uploaded_files:
+                PrettyOutput.print(f"首次对话，引用 {len(self.uploaded_files)} 个文件...", OutputType.PROGRESS)
+                refs = [f["id"] for f in self.uploaded_files]
+                refs_file = self.uploaded_files
+            message = self.system_message + "\n" + message
             self.first_chat = False
         
         PrettyOutput.print("发送请求...", OutputType.PROGRESS)

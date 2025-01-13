@@ -26,6 +26,12 @@ class OpenAIModel(BaseModel):
         )
         self.verbose = verbose
         self.messages: List[Dict[str, str]] = []
+        self.system_message = ""
+
+    def set_system_message(self, message: str):
+        """设置系统消息"""
+        self.system_message = message
+        self.messages.append({"role": "system", "content": self.system_message})
 
     def chat(self, message: str) -> str:
         """执行对话"""
@@ -67,7 +73,10 @@ class OpenAIModel(BaseModel):
     def reset(self):
         """重置模型状态"""
         # 清空对话历史，只保留system message
-        self.messages = []
+        if self.system_message:
+            self.messages = [{"role": "system", "content": self.system_message}]
+        else:
+            self.messages = []
 
     def delete_chat(self)->bool:
         """删除对话"""

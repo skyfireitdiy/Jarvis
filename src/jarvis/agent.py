@@ -133,7 +133,7 @@ class Agent:
                 tools_prompt += f"  描述: {tool['description']}\n"
                 tools_prompt += f"  参数: {tool['parameters']}\n"
 
-            self.prompt = f"""你是 {self.name}，一个严格遵循 ReAct 框架的 AI 助手。
+            self.model.set_system_message(f"""你是 {self.name}，一个严格遵循 ReAct 框架的 AI 助手。
 
 {tools_prompt}
 
@@ -194,11 +194,10 @@ arguments:
 4. 不要创建虚假对话
 5. 每个动作后停止等待
 
-任务:
-{user_input}
-
 {methodology_prompt}
-"""
+
+""")
+            self.prompt = f"任务: {user_input}"
 
             while True:
                 try:

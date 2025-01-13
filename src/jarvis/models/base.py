@@ -27,6 +27,10 @@ class BaseModel(ABC):
         """删除对话"""
         raise NotImplementedError("delete_chat is not implemented")
     
+    def set_system_message(self, message: str):
+        """设置系统消息"""
+        raise NotImplementedError("set_system_message is not implemented")
+    
 global_model_create_func = None
 
 def set_global_model(model_create_func: Callable[[], BaseModel]):
