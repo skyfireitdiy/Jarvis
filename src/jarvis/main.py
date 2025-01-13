@@ -7,8 +7,6 @@ import os
 import sys
 from pathlib import Path
 from prompt_toolkit import prompt
-from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.validation import Validator, ValidationError
 
 # 添加父目录到Python路径以支持导入
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -69,19 +67,13 @@ def select_task(tasks: dict) -> str:
     PrettyOutput.print("\nAvailable tasks:", OutputType.INFO)
     for i, name in enumerate(task_names, 1):
         PrettyOutput.print(f"[{i}] {name}", OutputType.INFO)
-    PrettyOutput.print("[0] Skip predefined tasks", OutputType.INFO)
+    PrettyOutput.print("[0] 跳过预定义任务", OutputType.INFO)
     
-    # Create completer with valid numbers
-    valid_numbers = [str(i) for i in range(len(task_names) + 1)]
-    number_completer = WordCompleter(valid_numbers)
     
     while True:
         try:
             choice = prompt(
-                "\nSelect a task number (0 to skip): ",
-                completer=number_completer,
-                validate_while_typing=False,
-                enable_history_search=True,
+                "\n请选择一个任务编号(0跳过): ",
             ).strip()
             
             if not choice:

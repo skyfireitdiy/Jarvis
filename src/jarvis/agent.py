@@ -10,6 +10,7 @@ from .models import BaseModel
 import re
 import os
 from datetime import datetime
+from prompt_toolkit import prompt
 
 class Agent:
     def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis", is_sub_agent: bool = False, verbose: bool = False):
@@ -85,6 +86,14 @@ class Agent:
         except Exception as e:
             raise Exception(f"{self.name}: 模型调用失败: {str(e)}")
 
+    def _load_methodology(self) -> str:
+        """加载方法论"""
+        user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
+        if os.path.exists(user_jarvis_methodology):
+            with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
+                return f.read()
+        return ""
+
     def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
         """处理用户输入并返回响应，返回任务总结报告
         
@@ -101,6 +110,16 @@ class Agent:
             
             if file_list:
                 self.model.upload_files(file_list)
+
+            # 加载方法论
+            methodology = self._load_methodology()
+
+            methodology_prompt = ""
+            if methodology:
+                methodology_prompt = f"""这是以往处理问题的标准方法论, 如果当前任务与此类似，可参考：
+{self.methodology}
+
+"""
             
             # 显示任务开始
             PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
@@ -156,6 +175,8 @@ arguments:
 
 任务:
 {user_input}
+
+{methodology_prompt}
 """
 
             while True:
@@ -190,12 +211,24 @@ arguments:
                     if user_input == "__interrupt__":
                         PrettyOutput.print("任务已取消", OutputType.WARNING)
                         return "Task cancelled by user"
+
                     if user_input:
                         self.prompt = user_input
                         continue
                     
                     if not user_input:
                         PrettyOutput.section("任务完成", OutputType.SUCCESS)
+                        while True:
+                            choice = prompt("是否需要为此任务生成方法论以提升Jarvis对类似任务的处理能力？(y/n), 回车跳过: ")
+                            if choice == "y":
+                                self._make_methodology()
+                                break
+                            elif choice == "n" or choice == "":
+                                break
+                            else:
+                                PrettyOutput.print("请输入y或n", OutputType.ERROR)
+                                continue
+
                         if self.is_sub_agent:
                             # 生成任务总结
                             summary_prompt = f"""请对以上任务执行情况生成一个简洁的总结报告，包括：
@@ -234,3 +267,41 @@ arguments:
         """清除对话历史，只保留系统提示"""
         self.prompt = "" 
         self.model.reset()
+
+    def _make_methodology(self):
+        # 生成经验总结和方法论
+        summary_prompt = f"""请根据之前的对话内容，总结处理此类问题的标准方法论：
+
+1. 问题分类
+   - 这是什么类型的问题
+   - 有哪些典型特征
+   - 需要注意的关键点
+
+2. 解决方案
+   - 标准处理流程
+   - 常用工具和方法
+   - 关键决策点
+
+3. 最佳实践
+   - 推荐的处理步骤
+   - 常见陷阱和规避方法
+   - 质量保证措施
+
+4. 效率优化
+   - 时间管理建议
+   - 资源优化方案
+   - 可复用的部分
+
+请总结出一个可以复用的标准流程，重点说明通用性和可操作性。"""         
+        PrettyOutput.print("正在总结方法论...", OutputType.PROGRESS)
+        methodology = self._call_model(summary_prompt)
+        
+        PrettyOutput.section("方法论总结", OutputType.SUCCESS)
+        PrettyOutput.print(methodology, OutputType.SYSTEM)
+
+        # 方法论追加保存至 ~/.jarvis_methodology
+        user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
+        with open(user_jarvis_methodology, "a", encoding="utf-8") as f:
+            f.write(methodology)
+            f.write("\n\n" + '-' * 50 + "\n\n")
+        PrettyOutput.print("方法论已保存至 ~/.jarvis_methodology", OutputType.SUCCESS)
