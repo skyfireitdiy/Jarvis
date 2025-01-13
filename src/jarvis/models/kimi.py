@@ -365,6 +365,9 @@ class KimiModel(BaseModel):
         self.uploaded_files = []
         self.first_chat = True  # 重置first_chat标记
 
+    def name(self) -> str:
+        """模型名称"""
+        return "kimi"
 
 if __name__ == "__main__":
     kimi = KimiModel()
