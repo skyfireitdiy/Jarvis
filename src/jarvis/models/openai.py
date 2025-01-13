@@ -69,6 +69,10 @@ class OpenAIModel(BaseModel):
         # 清空对话历史，只保留system message
         self.messages = []
 
+    def delete_chat(self)->bool:
+        """删除对话"""
+        pass
+
 if __name__ == "__main__":
     model = OpenAIModel()
     print(model.chat("Hello! How are you?")) 

@@ -22,6 +22,11 @@ class BaseModel(ABC):
         """模型名称"""
         raise NotImplementedError("name is not implemented")
     
+    @abstractmethod
+    def delete_chat(self)->bool:
+        """删除对话"""
+        raise NotImplementedError("delete_chat is not implemented")
+    
 global_model_create_func = None
 
 def set_global_model(model_create_func: Callable[[], BaseModel]):
