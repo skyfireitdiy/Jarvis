@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 import sys
 
+from jarvis.models.base import get_global_model
 from jarvis.models.kimi import KimiModel
 
 from ..utils import PrettyOutput, OutputType
@@ -106,7 +107,7 @@ class ToolRegistry:
                     hasattr(item, 'parameters')):
                     
                     # 实例化工具类，传入模型和输出处理器
-                    tool_instance = item(model=KimiModel(verbose=self.verbose), register=self, output_handler=self.output_handler)
+                    tool_instance = item(model=get_global_model(), register=self, output_handler=self.output_handler)
                     
                     # 注册工具
                     self.register_tool(

@@ -10,13 +10,13 @@ import time
 class KimiModel(BaseModel):
     """Kimi模型实现"""
     
-    def __init__(self, api_key: Optional[str] = None, verbose: bool = False):
+    def __init__(self, verbose: bool = False):
         """
         初始化Kimi模型
         Args:
-            api_key: Kimi API密钥，如果不提供则从环境变量获取
+            verbose: 是否显示详细输出
         """
-        self.api_key = api_key or os.getenv("KIMI_API_KEY")
+        self.api_key = os.getenv("KIMI_API_KEY")
         if not self.api_key:
             raise Exception("KIMI_API_KEY is not set")
         self.auth_header = f"Bearer {self.api_key}"

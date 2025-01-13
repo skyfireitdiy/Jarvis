@@ -7,5 +7,6 @@ import openai
 from ..utils import OutputType, PrettyOutput
 from .base import BaseModel
 from .kimi import KimiModel
+from .openai import OpenAIModel
 
-__all__ = ['BaseModel', 'KimiModel'] 
+__all__ = ['BaseModel', 'KimiModel', 'OpenAIModel'] 
