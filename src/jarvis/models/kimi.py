@@ -119,7 +119,6 @@ class KimiModel(BaseModel):
                     continue
                     
                 line = line.decode('utf-8')
-                print(data)
                 if not line.startswith("data: "):
                     continue
                     
