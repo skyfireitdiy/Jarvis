@@ -81,10 +81,11 @@ class Agent:
             if ret:
                 return ret
             else:
+                PrettyOutput.print(f"调用模型失败，重试中... 等待 {sleep_time}s", OutputType.INFO)
+                time.sleep(sleep_time)
                 sleep_time *= 2
                 if sleep_time > 30:
                     sleep_time = 30
-                PrettyOutput.print(f"调用模型失败，重试中... 等待 {sleep_time}s", OutputType.INFO)
                 continue
 
 

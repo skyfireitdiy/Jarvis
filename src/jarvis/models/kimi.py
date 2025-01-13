@@ -54,7 +54,7 @@ class KimiModel(BaseModel):
         payload = json.dumps({
             "action": action,
             "name": os.path.basename(filename)
-        })
+        }, ensure_ascii=False)
         
         headers = {
             'Authorization': self.auth_header,
@@ -84,7 +84,7 @@ class KimiModel(BaseModel):
             "object_name": file_data["object_name"],
             "chat_id": self.chat_id,
             "file_id": file_data.get("file_id", "")
-        })
+        }, ensure_ascii=False)
         
         headers = {
             'Authorization': self.auth_header,
@@ -106,7 +106,7 @@ class KimiModel(BaseModel):
         retry_count = 0
         
         while retry_count < max_retries:
-            payload = json.dumps({"ids": [file_id]})
+            payload = json.dumps({"ids": [file_id]}, ensure_ascii=False)
             response = while_success(lambda: requests.post(url, headers=headers, data=payload, stream=True), sleep_time=5)
             
             for line in response.iter_lines():

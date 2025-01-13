@@ -22,7 +22,7 @@ class Tool:
         return {
             "name": self.name,
             "description": self.description,
-            "parameters": json.dumps(self.parameters)
+            "parameters": json.dumps(self.parameters, ensure_ascii=False)
         }
 
     def execute(self, arguments: Dict) -> Dict[str, Any]:
