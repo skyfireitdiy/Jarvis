@@ -31,6 +31,8 @@ class OpenAIModel(BaseModel):
             
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com")
         self.model_name = os.getenv("OPENAI_MODEL_NAME", "deepseek-chat")
+
+        PrettyOutput.print(f"当前使用模型: {self.model_name}", OutputType.SYSTEM)
             
         self.client = OpenAI(
             api_key=self.api_key,

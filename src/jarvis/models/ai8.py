@@ -68,6 +68,7 @@ class AI8Model(BaseModel):
         self.token = os.getenv("AI8_API_KEY")
         if not all([self.model, self.token]):
             raise Exception("AI8_MODEL or AI8_API_KEY is not set")
+        PrettyOutput.print(f"当前使用模型: {self.model}", OutputType.SYSTEM)
             
     def create_conversation(self) -> bool:
         """Create a new conversation"""

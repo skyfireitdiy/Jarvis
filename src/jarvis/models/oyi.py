@@ -51,6 +51,7 @@ class OyiModel(BaseModel):
         self.token = os.getenv("OYI_API_KEY")
         if not all([self.model, self.token]):
             raise Exception("OYI_MODEL or OYI_API_KEY is not set")
+        PrettyOutput.print(f"当前使用模型: {self.model}", OutputType.SYSTEM)
 
         
     def create_conversation(self) -> bool:
