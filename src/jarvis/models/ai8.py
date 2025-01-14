@@ -103,6 +103,7 @@ class AI8Model(BaseModel):
             # 2. 更新会话设置
             session_data = {
                 **self.conversation,
+                "model": self.model,
                 "contextCount": 1024,
                 "prompt": self.system_message,
                 "plugins": ["tavily_search"],
