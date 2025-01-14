@@ -209,10 +209,16 @@ class AI8Model(BaseModel):
                         try:
                             data = json.loads(line[6:])
                             if data.get('type') == 'string':
-                                full_response += data.get('data', '')
+                                chunk = data.get('data', '')
+                                if chunk:
+                                    full_response += chunk
+                                    PrettyOutput.print_stream(chunk)
+
                         except json.JSONDecodeError:
                             continue
             
+            PrettyOutput.print_stream_end()
+
             return full_response
             
         except Exception as e:

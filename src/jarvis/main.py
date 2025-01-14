@@ -103,19 +103,25 @@ def main():
     parser = argparse.ArgumentParser(description='Jarvis AI Assistant')
     parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
     parser.add_argument('--keep-history', action='store_true', help='Keep chat history (do not delete chat session)')
-    parser.add_argument('-m', '--model', default='kimi', help='选择模型')
+    parser.add_argument('-m', '--model', default='', help='选择模型')
     args = parser.parse_args()
 
     load_env_from_file()
 
-    ModelRegistry.get_model_registry().set_global_model(args.model)
+    model = args.model if args.model else os.getenv('JARVIS_MODEL')
+
+    if not model:
+        PrettyOutput.print("未指定模型，请使用 -m 参数或者设置 JARVIS_MODEL 环境变量", OutputType.ERROR)
+        return 1
+
+    ModelRegistry.get_model_registry().set_global_model(model)
     
     try:
         # 获取全局模型实例
         agent = Agent()
 
         # 欢迎信息
-        PrettyOutput.print(f"Jarvis 已初始化 - With {args.model}", OutputType.SYSTEM)
+        PrettyOutput.print(f"Jarvis 已初始化 - With {model}", OutputType.SYSTEM)
         if args.keep_history:
             PrettyOutput.print("已启用历史保留模式", OutputType.INFO)
         
