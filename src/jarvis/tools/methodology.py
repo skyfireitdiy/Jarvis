@@ -104,20 +104,16 @@ class MethodologyTool:
                 if not content:
                     return {
                         "success": False,
-                        "error": f"{operation} 操作需要提供方法论内容"
-                    }
-                    
-                if operation == "update" and problem_type not in methodologies:
-                    return {
-                        "success": False,
-                        "error": f"未找到问题类型 '{problem_type}' 的方法论，无法更新"
+                        "error": "需要提供方法论内容"
                     }
                     
                 methodologies[problem_type] = content
                 self._save_methodologies(methodologies)
+                
+                action = "更新" if problem_type in methodologies else "添加"
                 return {
                     "success": True,
-                    "stdout": f"已{'更新' if operation == 'update' else '添加'}问题类型 '{problem_type}' 的方法论"
+                    "stdout": f"已{action}问题类型 '{problem_type}' 的方法论"
                 }
                 
             else:
