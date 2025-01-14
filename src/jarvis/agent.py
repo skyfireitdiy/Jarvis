@@ -223,7 +223,7 @@ arguments:
                     
                     if not user_input:
                         while True:
-                            choice = prompt("是否需要为此任务生成方法论以提升Jarvis对类似任务的处理能力？(y/n), 回车跳过: ")
+                            choice = prompt("是否需要手动为此任务生成方法论以提升Jarvis对类似任务的处理能力？(y/n), 回车跳过: ")
                             if choice == "y":
                                 self._make_methodology()
                                 break
