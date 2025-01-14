@@ -14,6 +14,34 @@ class OyiModel(BaseModel):
     
     def __init__(self):
         """Initialize model"""
+        PrettyOutput.section("支持的模型", OutputType.SUCCESS)
+        PrettyOutput.print("gpt-4o-mini", OutputType.INFO)
+        PrettyOutput.print("gpt-3.5-turbo", OutputType.INFO)
+        PrettyOutput.print("gpt-4o", OutputType.INFO)
+        PrettyOutput.print("gpt-4o-2024-11-20", OutputType.INFO)
+        PrettyOutput.print("o1-mini", OutputType.INFO)
+        PrettyOutput.print("o1-mini-2024-09-12", OutputType.INFO)
+        PrettyOutput.print("gpt-4o-all", OutputType.INFO)
+        PrettyOutput.print("claude-3-5-sonnet-20240620", OutputType.INFO)
+        PrettyOutput.print("claude-3-opus-20240229", OutputType.INFO)
+        PrettyOutput.print("deepseek-chat", OutputType.INFO)
+        PrettyOutput.print("deepseek-coder", OutputType.INFO)
+        PrettyOutput.print("glm-4-flash", OutputType.INFO)
+        PrettyOutput.print("glm-4-air", OutputType.INFO)
+        PrettyOutput.print("qwen-plus", OutputType.INFO)
+        PrettyOutput.print("qwen-turbo", OutputType.INFO)
+        PrettyOutput.print("Doubao-lite-4k", OutputType.INFO)
+        PrettyOutput.print("Doubao-pro-4k", OutputType.INFO)
+        PrettyOutput.print("yi-lightning", OutputType.INFO)
+        PrettyOutput.print("step-1-flash", OutputType.INFO)
+        PrettyOutput.print("moonshot-v1-8k", OutputType.INFO)
+        PrettyOutput.print("lite", OutputType.INFO)
+        PrettyOutput.print("generalv3.5", OutputType.INFO)
+        PrettyOutput.print("gemini-pro", OutputType.INFO)
+        PrettyOutput.print("llama3-70b-8192", OutputType.INFO)
+        PrettyOutput.print("使用OYI_MODEL配置模型", OutputType.SUCCESS)
+        
+                           
         self.messages = []
         self.system_message = ""
         self.conversation = None
