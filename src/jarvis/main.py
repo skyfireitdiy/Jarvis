@@ -98,30 +98,30 @@ def select_task(tasks: dict) -> str:
             continue
 
 def main():
-    """Main entry point for Jarvis."""
-    # Add argument parser
-    parser = argparse.ArgumentParser(description='Jarvis AI Assistant')
-    parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
-    parser.add_argument('--keep-history', action='store_true', help='Keep chat history (do not delete chat session)')
-    parser.add_argument('-m', '--model', default='', help='选择模型')
+    """Jarvis 的主入口点"""
+    # 添加参数解析器
+    parser = argparse.ArgumentParser(description='Jarvis AI 助手')
+    parser.add_argument('-f', '--files', nargs='*', help='要处理的文件列表')
+    parser.add_argument('--keep-history', action='store_true', help='保持聊天历史(不删除会话)')
+    parser.add_argument('-p', '--platform', default='', help='选择AI平台')
     args = parser.parse_args()
 
     load_env_from_file()
 
-    model = args.model if args.model else os.getenv('JARVIS_MODEL')
+    platform = args.platform if args.platform else os.getenv('JARVIS_PLATFORM')
 
-    if not model:
-        PrettyOutput.print("未指定模型，请使用 -m 参数或者设置 JARVIS_MODEL 环境变量", OutputType.ERROR)
+    if not platform:
+        PrettyOutput.print("未指定AI平台，请使用 -p 参数或者设置 JARVIS_PLATFORM 环境变量", OutputType.ERROR)
         return 1
 
-    ModelRegistry.get_model_registry().set_global_model(model)
+    ModelRegistry.get_model_registry().set_global_model(platform)
     
     try:
         # 获取全局模型实例
         agent = Agent()
 
         # 欢迎信息
-        PrettyOutput.print(f"Jarvis 已初始化 - With {model}", OutputType.SYSTEM)
+        PrettyOutput.print(f"Jarvis 已初始化 - With {platform} 平台", OutputType.SYSTEM)
         if args.keep_history:
             PrettyOutput.print("已启用历史保留模式", OutputType.INFO)
         
