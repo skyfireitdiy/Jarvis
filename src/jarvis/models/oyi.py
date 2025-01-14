@@ -39,7 +39,7 @@ class OyiModel(BaseModel):
         PrettyOutput.print("generalv3.5", OutputType.INFO)
         PrettyOutput.print("gemini-pro", OutputType.INFO)
         PrettyOutput.print("llama3-70b-8192", OutputType.INFO)
-        PrettyOutput.print("使用OYI_MODEL配置模型", OutputType.SUCCESS)
+        PrettyOutput.print("使用OYI_MODEL环境变量配置模型", OutputType.SUCCESS)
         
                            
         self.messages = []

@@ -96,6 +96,7 @@ class Agent:
                 data = yaml.safe_load(f)
                 for k, v in data.items():
                     ret += f"问题类型: \n{k}\n方法论: \n{v}\n\n"
+            PrettyOutput.print(f"从 {user_jarvis_methodology} 加载方法论: {', '.join(data.keys())}", OutputType.INFO)
         return ret
 
     def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:

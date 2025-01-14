@@ -59,7 +59,7 @@ class AI8Model(BaseModel):
         PrettyOutput.print("ERNIE-3.5-128K", OutputType.INFO)
 
 
-        PrettyOutput.print("使用AI8_MODEL配置模型", OutputType.SUCCESS)
+        PrettyOutput.print("使用AI8_MODEL环境变量配置模型", OutputType.SUCCESS)
         
         self.system_message = ""
         self.conversation = None

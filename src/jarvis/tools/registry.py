@@ -99,7 +99,7 @@ class ToolRegistry:
                         parameters=tool_instance.parameters,
                         func=tool_instance.execute
                     )
-                    PrettyOutput.print(f"已加载工具: {tool_instance.name}: {tool_instance.description}", OutputType.INFO)
+                    PrettyOutput.print(f"从 {file_path} 加载工具: {tool_instance.name}: {tool_instance.description}", OutputType.INFO)
                     tool_found = True
                     
             if not tool_found:
