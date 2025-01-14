@@ -53,8 +53,6 @@ class AI8Model(BaseModel):
         PrettyOutput.print("Baichuan4-Air", OutputType.INFO)
         PrettyOutput.print("Baichuan4-Turbo", OutputType.INFO)
         PrettyOutput.print("moonshot-v1-8k", OutputType.INFO)
-        PrettyOutput.print("moonshot-v1-32k", OutputType.INFO)
-        PrettyOutput.print("moonshot-v1-128k", OutputType.INFO)
         PrettyOutput.print("ERNIE-Speed-128K", OutputType.INFO)
         PrettyOutput.print("ERNIE-3.5-128K", OutputType.INFO)
 
