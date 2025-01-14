@@ -8,7 +8,7 @@ class MethodologyTool:
     """经验管理工具"""
     
     name = "methodology"
-    description = "管理问题处理方法论，支持添加、更新、删除操作"
+    description = "管理问题处理经验总结，支持添加、更新、删除操作"
     parameters = {
         "type": "object",
         "properties": {
@@ -23,7 +23,7 @@ class MethodologyTool:
             },
             "content": {
                 "type": "string",
-                "description": "方法论内容 (update/add 时必需)",
+                "description": "经验总结内容 (update/add 时必需)",
                 "optional": True
             }
         },
@@ -36,39 +36,39 @@ class MethodologyTool:
         self._ensure_file_exists()
             
     def _ensure_file_exists(self):
-        """确保方法论文件存在"""
+        """确保经验总结文件存在"""
         if not os.path.exists(self.methodology_file):
             try:
                 with open(self.methodology_file, 'w', encoding='utf-8') as f:
                     yaml.safe_dump({}, f, allow_unicode=True)
             except Exception as e:
-                PrettyOutput.print(f"创建方法论文件失败: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"创建经验总结文件失败: {str(e)}", OutputType.ERROR)
                 
     def _load_methodologies(self) -> Dict:
-        """加载所有方法论"""
+        """加载所有经验总结"""
         try:
             with open(self.methodology_file, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
-            PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"加载经验总结失败: {str(e)}", OutputType.ERROR)
             return {}
             
     def _save_methodologies(self, methodologies: Dict):
-        """保存所有方法论"""
+        """保存所有经验总结"""
         try:
             with open(self.methodology_file, 'w', encoding='utf-8') as f:
                 yaml.safe_dump(methodologies, f, allow_unicode=True)
         except Exception as e:
-            PrettyOutput.print(f"保存方法论失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"保存经验总结失败: {str(e)}", OutputType.ERROR)
             
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """执行方法论管理操作
+        """执行经验总结管理操作
         
         Args:
             args: 包含操作参数的字典
                 - operation: 操作类型 (delete/update/add)
                 - problem_type: 问题类型
-                - content: 方法论内容 (update/add 时必需)
+                - content: 经验总结内容 (update/add 时必需)
             
         Returns:
             Dict[str, Any]: 包含执行结果的字典
@@ -92,19 +92,19 @@ class MethodologyTool:
                     self._save_methodologies(methodologies)
                     return {
                         "success": True,
-                        "stdout": f"已删除问题类型 '{problem_type}' 的方法论"
+                        "stdout": f"已删除问题类型 '{problem_type}' 的经验总结"
                     }
                 else:
                     return {
                         "success": False,
-                        "error": f"未找到问题类型 '{problem_type}' 的方法论"
+                        "error": f"未找到问题类型 '{problem_type}' 的经验总结"
                     }
                     
             elif operation in ["update", "add"]:
                 if not content:
                     return {
                         "success": False,
-                        "error": "需要提供方法论内容"
+                        "error": "需要提供经验总结内容"
                     }
                     
                 methodologies[problem_type] = content
@@ -113,7 +113,7 @@ class MethodologyTool:
                 action = "更新" if problem_type in methodologies else "添加"
                 return {
                     "success": True,
-                    "stdout": f"已{action}问题类型 '{problem_type}' 的方法论"
+                    "stdout": f"已{action}问题类型 '{problem_type}' 的经验总结"
                 }
                 
             else:
@@ -129,13 +129,13 @@ class MethodologyTool:
             }
             
     def get_methodology(self, problem_type: str) -> Optional[str]:
-        """获取指定问题类型的方法论
+        """获取指定问题类型的经验总结
         
         Args:
             problem_type: 问题类型
             
         Returns:
-            Optional[str]: 方法论内容，如果不存在则返回 None
+            Optional[str]: 经验总结内容，如果不存在则返回 None
         """
         methodologies = self._load_methodologies()
         return methodologies.get(problem_type) 

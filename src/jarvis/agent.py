@@ -88,15 +88,15 @@ class Agent:
 
 
     def _load_methodology(self) -> str:
-        """加载方法论"""
+        """加载经验总结"""
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
         ret = ""
         if os.path.exists(user_jarvis_methodology):
             with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 for k, v in data.items():
-                    ret += f"问题类型: \n{k}\n方法论: \n{v}\n\n"
-            PrettyOutput.print(f"从 {user_jarvis_methodology} 加载方法论: {', '.join(data.keys())}", OutputType.INFO)
+                    ret += f"问题类型: \n{k}\n经验总结: \n{v}\n\n"
+            PrettyOutput.print(f"从 {user_jarvis_methodology} 加载经验总结: {', '.join(data.keys())}", OutputType.INFO)
         return ret
 
     def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
@@ -116,12 +116,12 @@ class Agent:
             if file_list:
                 self.model.upload_files(file_list)
 
-            # 加载方法论
+            # 加载经验总结
             methodology = self._load_methodology()
 
             methodology_prompt = ""
             if methodology:
-                methodology_prompt = f"""这是以往处理问题的标准方法论，如果当前任务与此类似，可参考：
+                methodology_prompt = f"""这是以往处理问题的标准经验总结，如果当前任务与此类似，可参考：
 {methodology}
 
 """
@@ -146,11 +146,11 @@ class Agent:
 6. 制定行动计划：根据目前可以使用的工具制定行动计划
 7. 执行行动计划：每步执行一个步骤，最多使用一个工具（工具执行完成后，等待工具结果再执行下一步）
 8. 监控与调整：如果执行结果与预期不符，则反思并调整行动计划，迭代之前的步骤
-9. 更新方法论（如有必要）：任务完成后总结执行过程中的经验教训，生成同类问题的通用方法论，使用方法论工具进行更新或者添加
+9. 更新经验总结（如有必要）：任务完成后总结执行过程中的经验教训，生成同类问题的通用经验总结，使用经验总结工具进行更新或者添加
 
 -------------------------------------------------------------                       
 
-方法论模板：
+经验总结模板：
 1. 问题重述
 2. 最优解决方案
 3. 最优方案执行步骤（失败的行动不需要体现）
@@ -224,7 +224,7 @@ arguments:
                     
                     if not user_input:
                         while True:
-                            choice = prompt("是否需要手动为此任务生成方法论以提升Jarvis对类似任务的处理能力？(y/n), 回车跳过: ")
+                            choice = prompt("是否需要手动为此任务生成经验总结以提升Jarvis对类似任务的处理能力？(y/n), 回车跳过: ")
                             if choice == "y":
                                 self._make_methodology()
                                 break
@@ -274,9 +274,9 @@ arguments:
         self.model.reset()
 
     def _make_methodology(self):
-        """生成方法论"""
-        current_response = self._call_model("""请根据之前的对话内容，判断是否有必要更新、添加、删除现有方法论，如果有，使用methodology工具进行管理。
-方法论模板：
+        """生成经验总结"""
+        current_response = self._call_model("""请根据之前的对话内容，判断是否有必要更新、添加、删除现有经验总结，如果有，使用methodology工具进行管理。
+经验总结模板：
 1. 问题重述
 2. 最优解决方案
 3. 最优方案执行步骤（失败的行动不需要体现）
