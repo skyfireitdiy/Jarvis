@@ -11,11 +11,12 @@
 
 *Your intelligent assistant for development and system interaction*
 
-[Installation](#installation) •
 [Features](#features) •
 [Usage](#usage) •
 [Configuration](#configuration) •
-[Tools](#tools)
+[Extending Jarvis](#-extending-jarvis) •
+[Contributing](#-contributing) •
+[License](#-license)
 
 </div>
 
