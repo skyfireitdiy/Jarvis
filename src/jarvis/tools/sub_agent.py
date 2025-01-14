@@ -1,22 +1,9 @@
-from typing import Dict, Any, Protocol, Optional
-from enum import Enum
-import os
-import sys
-from pathlib import Path
+from typing import Dict, Any
 
-# 添加项目根目录到 Python 路径
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.append(str(project_root))
 
 from jarvis.agent import Agent
-from jarvis.utils import OutputType
+from jarvis.utils import OutputType, PrettyOutput
 
-class OutputHandler(Protocol):
-    def print(self, text: str, output_type: OutputType) -> None: ...
-
-class ModelHandler(Protocol):
-    def chat(self, message: str) -> str: ...
 
 class SubAgentTool:
     name = "create_sub_agent"
@@ -52,24 +39,6 @@ class SubAgentTool:
         "required": ["agent_name", "task", "context", "goal"]
     }
 
-    def __init__(self, **kwargs):
-        """初始化子代理工具
-        
-        Args:
-            model: 模型处理器
-            output_handler: 输出处理器
-            register: 工具注册器
-        """
-        self.model = kwargs.get('model')
-        if not self.model:
-            raise Exception("Model is required for SubAgentTool")
-        self.output = kwargs.get('output_handler')
-        self.register = kwargs.get('register')
-
-    def _print(self, text: str, output_type: OutputType = OutputType.INFO):
-        """输出信息"""
-        if self.output:
-            self.output.print(text, output_type)
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """创建并运行子代理"""
@@ -80,7 +49,7 @@ class SubAgentTool:
             goal = args.get("goal", "")
             files = args.get("files", [])
 
-            self._print(f"创建子代理: {agent_name}")
+            PrettyOutput.print(f"创建子代理: {agent_name}", OutputType.INFO)
 
             # 构建任务描述
             task_description = task
@@ -92,13 +61,11 @@ class SubAgentTool:
             # 创建子代理
             sub_agent = Agent(
                 name=agent_name,
-                model=self.model,
-                tool_registry=self.register,
                 is_sub_agent=True
             )
 
             # 运行子代理，传入文件列表
-            self._print(f"子代理开始执行任务...")
+            PrettyOutput.print("子代理开始执行任务...", OutputType.INFO)
             result = sub_agent.run(task_description, file_list=files)
 
             return {
@@ -108,7 +75,7 @@ class SubAgentTool:
             }
 
         except Exception as e:
-            self._print(str(e), OutputType.ERROR)
+            PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
                 "error": f"子代理执行失败: {str(e)}"

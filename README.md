@@ -6,91 +6,134 @@
   <img src="docs/images/jarvis-logo.png" alt="Jarvis Logo" width="200"/>
 </p>
 
-[![PyPI version](https://badge.fury.io/py/jarvis-ai-assistant.svg)](https://badge.fury.io/py/jarvis-ai-assistant)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 *Your intelligent assistant for development and system interaction*
 
 [Installation](#installation) •
 [Features](#features) •
 [Usage](#usage) •
-[Tools](#tools) •
-[Documentation](https://jarvis-ai.readthedocs.io/)
+[Configuration](#configuration) •
+[Tools](#tools)
 
 </div>
 
 ---
 
-## 🌟 Features
+## ✨ Features
 
-🤖 **AI Integration**
-- Kimi AI integration with streaming responses
-- Context-aware conversations
-- File understanding capabilities
+### 🧠 Intelligent Agent
+- Self-improving through experience accumulation
+- Automatic methodology generation from successful problem-solving
+- Iterative learning from each interaction
+- Context-aware problem solving
 
-🛠️ **Rich Tool Integration**
-- Shell command execution
-- File operations (read/write/append)
-- Task automation
-- Predefined task support
-- Dynamic tool system with auto-loading
+### 🛠️ Extensible Architecture
+- Dynamic tool loading and integration
+- Custom model support with simple interface
 - AI-powered tool generation
-- Custom tool development
+- Hot-reload support for tools and models
 
-🔄 **Interactive Experience**
-- Natural language understanding
-- Context-aware responses
-- User-friendly interface
+### 💡 Smart Features
+- Automated methodology management
+- Problem-specific solution patterns
+- Continuous capability enhancement
+- Learning from past interactions
+
+### 🎨 User Experience
+- Beautiful console output
+- Interactive mode
 - Multi-line input support
-- Colored output with progress indicators
+- Progress indicators
+- Colored output
 
-## 🛠️ Custom Tools
+## 🚀 Installation
+
+```bash
+pip install jarvis-ai-assistant
+```
+
+## 🔧 Configuration
+
+Create a `.jarvis_env` file in your home directory with your API keys:
+
+### For Kimi:
+```bash
+KIMI_API_KEY=your_kimi_api_key_here
+```
+
+### For OpenAI:
+```bash
+OPENAI_API_KEY=your_api_key_here
+OPENAI_API_BASE=your_api_base  # Optional, defaults to https://api.deepseek.com
+OPENAI_MODEL_NAME=your_model_name  # Optional, defaults to deepseek-chat
+```
+
+## 🎯 Usage
+
+### Basic Usage
+```bash
+jarvis
+```
+
+### With Specific Model
+```bash
+jarvis -m kimi  # Use Kimi model
+jarvis -m openai  # Use OpenAI model
+```
+
+### Process Files
+```bash
+jarvis -f file1.py file2.py  # Process specific files
+```
+
+### Keep Chat History
+```bash
+jarvis --keep-history  # Don't delete chat session after completion
+```
+
+## 🛠️ Tools
+
+### Built-in Tools
+
+| Tool | Description |
+|------|-------------|
+| shell | Execute shell commands |
+| file | File operations (read/write/append) |
+| git | Git operations |
+| methodology | Manage problem-solving methodologies |
 
 ### Tool Locations
 - Built-in tools: `src/jarvis/tools/`
-- User tools: `~/.jarvis_tools/` (automatically created)
+- User tools: `~/.jarvis_tools/`
 
-### Creating Tools
+### Key Features
 
-#### 1. Using AI Generator (Recommended)
-```yaml
-<START_TOOL_CALL>
-name: generate_tool
-arguments:
-    tool_name: calculator
-    class_name: CalculatorTool
-    description: Basic math calculations
-    parameters:
-        type: object
-        properties:
-            operation:
-                type: string
-                enum: ["add", "subtract", "multiply", "divide"]
-            numbers:
-                type: array
-                items:
-                    type: number
-        required: ["operation", "numbers"]
-<END_TOOL_CALL>
-```
+#### 1. Self-Extending Capabilities
+- AI-powered tool generation
+- Automatic integration of new tools
+- Dynamic capability expansion
 
-#### 2. Manual Creation
-Create a new Python file in `~/.jarvis_tools/`:
+#### 2. Methodology Learning
+- Automatic extraction of problem-solving patterns
+- Continuous methodology refinement
+- Experience-based improvement
+
+#### 3. Adaptive Problem Solving
+- Context-aware tool selection
+- Dynamic strategy adjustment
+- Learning from execution results
+
+## �� Extending Jarvis
+
+### Adding New Tools
+
+Create a new Python file in `~/.jarvis_tools/` or `src/jarvis/tools/`:
 
 ```python
-from typing import Dict, Any, Protocol, Optional
-from enum import Enum
-
-class OutputType(Enum):
-    INFO = "info"
-    ERROR = "error"
-
-class OutputHandler(Protocol):
-    def print(self, text: str, output_type: OutputType) -> None: ...
-
-class ModelHandler(Protocol):
-    def chat(self, message: str) -> str: ...
+from typing import Dict, Any
+from jarvis.utils import OutputType, PrettyOutput
 
 class CustomTool:
     name = "tool_name"              # Tool name for invocation
@@ -98,29 +141,15 @@ class CustomTool:
     parameters = {                  # JSON Schema for parameters
         "type": "object",
         "properties": {
-            "param1": {"type": "string"}
+            "param1": {
+                "type": "string",
+                "description": "Parameter description"
+            }
         },
         "required": ["param1"]
     }
 
-    def __init__(self, **kwargs):
-        """Initialize tool with optional dependencies
-        
-        Args:
-            model: AI model for advanced features
-            output_handler: For consistent output formatting
-            register: Access to tool registry
-        """
-        self.model = kwargs.get('model')
-        self.output = kwargs.get('output_handler')
-        self.register = kwargs.get('register')
-        
-    def _print(self, text: str, output_type: OutputType = OutputType.INFO):
-        """Print formatted output"""
-        if self.output:
-            self.output.print(text, output_type)
-
-    def execute(self, args: Dict) -> Dict[str, Any]:
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Execute tool functionality
         
         Args:
@@ -138,138 +167,109 @@ class CustomTool:
         try:
             # Implement tool logic here
             result = "Tool execution result"
-            
             return {
                 "success": True,
-                "stdout": result,
-                "stderr": ""
+                "stdout": result
             }
         except Exception as e:
-            self._print(str(e), OutputType.ERROR)
             return {
                 "success": False,
                 "error": str(e)
             }
 ```
 
+### Adding New Models
+
+Create a new Python file in `~/.jarvis_models/`:
+
+```python
+from typing import Dict, List
+from jarvis.models.base import BaseModel
+from jarvis.utils import PrettyOutput, OutputType
+
+class CustomModel(BaseModel):
+    """Custom model implementation"""
+    
+    model_name = "custom"  # Model identifier
+    
+    def __init__(self):
+        """Initialize model"""
+        # Add your initialization code here
+        self.messages = []
+        self.system_message = ""
+        
+    def set_system_message(self, message: str):
+        """Set system message"""
+        self.system_message = message
+        
+    def chat(self, message: str) -> str:
+        """Execute chat with the model
+        
+        Args:
+            message: User input message
+            
+        Returns:
+            str: Model response
+        """
+        try:
+            # Implement chat logic here
+            PrettyOutput.print("发送请求...", OutputType.PROGRESS)
+            
+            # Add message to history
+            self.messages.append({"role": "user", "content": message})
+            
+            # Get response from your model
+            response = "Model response"
+            
+            # Add response to history
+            self.messages.append({"role": "assistant", "content": response})
+            
+            return response
+            
+        except Exception as e:
+            PrettyOutput.print(f"对话失败: {str(e)}", OutputType.ERROR)
+            raise Exception(f"Chat failed: {str(e)}")
+            
+    def name(self) -> str:
+        """Return model name"""
+        return self.model_name
+        
+    def reset(self):
+        """Reset model state"""
+        self.messages = []
+        if self.system_message:
+            self.messages.append({"role": "system", "content": self.system_message})
+            
+    def delete_chat(self) -> bool:
+        """Delete current chat session"""
+        self.reset()
+        return True
+```
+
 ### Development Guidelines
 
-1. **Tool Structure**
-   - Clear name and description
-   - Well-defined parameters schema
-   - Proper error handling
-   - Consistent output format
-
-2. **Best Practices**
-   - Use `_print` for output
-   - Handle all required parameters
-   - Document functionality
+1. **Tool Development**
+   - Use descriptive names and documentation
+   - Define clear parameter schemas
+   - Handle errors gracefully
    - Return standardized results
    - Keep tools focused and simple
 
-3. **Testing**
-   - Verify parameter validation
-   - Test error handling
-   - Check output format
-   - Ensure proper cleanup
+2. **Model Development**
+   - Implement all required methods
+   - Handle streaming responses
+   - Manage chat history properly
+   - Use proper error handling
+   - Follow existing model patterns
 
-4. **Integration**
-   - Tools are auto-loaded on startup
-   - No manual registration needed
-   - Hot-reload supported
-   - Dependencies injected automatically
-
-## ⚙️ Environment Setup
-
-Before using Jarvis, you need to set up your environment:
-
-1. **API Key Configuration**
-
-Create a `.jarvis_env` file in your home directory (`~/.jarvis_env`):
-
-```bash
-KIMI_API_KEY=your_kimi_api_key_here
-```
-
-To get your Kimi API key:
-1. Visit [Kimi AI Platform](https://kimi.moonshot.cn) in your browser
-2. Login to your account
-3. Open browser Developer Tools (F12 or right-click -> Inspect)
-4. Go to Network tab
-5. Make any request (e.g., send a message)
-6. Find a request to the Kimi API
-7. Look for the `Authorization` header in the request headers
-8. Copy the token value (remove the "Bearer " prefix)
-9. Use this token as your `KIMI_API_KEY` in the `.jarvis_env` file
-
-2. **Task Configuration (Optional)**
-
-Create a `.jarvis` file in your working directory to define predefined tasks:
-
-```yaml
-# .jarvis
-analyze_code: Analyze the code structure and quality in the current directory
-fix_bugs: Help me find and fix potential bugs in the code
-optimize: Suggest optimizations for the code
-document: Generate documentation for the code
-```
-
-## 🚀 Installation
-
-```bash
-pip install jarvis-ai-assistant
-```
-
-## 💡 Usage
-
-1. **Basic Usage**
-```bash
-# Start Jarvis
-jarvis
-
-# Process specific files
-jarvis -f file1.txt file2.py
-```
-
-2. **Using Predefined Tasks**
-
-If you have a `.jarvis` file in your working directory:
-```bash
-# Jarvis will show available tasks on startup
-# Select a task number or start a new conversation
-```
-
-3. **Interactive Features**
-- Multi-line input support (press Enter twice to submit)
-- File understanding and analysis
-- Context-aware conversations
-- Tool integration for system operations
-
-4. **Environment Variables**
-- `KIMI_API_KEY`: Your Kimi AI API key (required)
-- Location: `~/.jarvis_env`
-- Format: `KEY=value` (one per line)
-
-5. **Task Configuration**
-- File: `.jarvis` in working directory
-- Format: `task_name: task_description`
-- Purpose: Define commonly used tasks for quick access
-- Example tasks:
-  - Code analysis
-  - Bug finding
-  - Documentation generation
-  - Performance optimization
-
-## 🧰 Tools
-
-| Tool | Description | Example |
-|------|-------------|---------|
-| 🖥️ Shell | Execute system commands | Manage files and processes |
-| 📂 Files | Read/write operations | Handle configuration files |
+3. **Best Practices**
+   - Use PrettyOutput for console output
+   - Document your code
+   - Add type hints
+   - Test thoroughly
+   - Handle edge cases
 
 ## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -281,18 +281,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## ⚙️ Environment Setup
-
-Create a `.jarvis_env` file in your home directory with:
-
-```bash
-KIMI_API_KEY=your_kimi_api_key_here
-```
-
 ---
 
 <div align="center">
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by the Jarvis Team
 
 </div>

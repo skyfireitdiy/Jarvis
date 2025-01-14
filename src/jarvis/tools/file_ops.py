@@ -1,17 +1,9 @@
-from typing import Dict, Any, Protocol, Optional
+from typing import Dict, Any, Protocol
 import os
-from pathlib import Path
 from enum import Enum
 
-class OutputType(Enum):
-    INFO = "info"
-    ERROR = "error"
+from jarvis.utils import OutputType, PrettyOutput
 
-class OutputHandler(Protocol):
-    def print(self, text: str, output_type: OutputType) -> None: ...
-
-class ModelHandler(Protocol):
-    def chat(self, message: str) -> str: ...
 
 class FileOperationTool:
     name = "file_operation"
@@ -42,13 +34,6 @@ class FileOperationTool:
         "required": ["operation", "filepath"]
     }
 
-    def __init__(self, **kwargs):
-        self.output = kwargs.get('output_handler')
-
-    def _print(self, text: str, output_type: OutputType = OutputType.INFO):
-        """输出信息"""
-        if self.output:
-            self.output.print(text, output_type)
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """执行文件操作"""
@@ -59,7 +44,7 @@ class FileOperationTool:
             
             # 记录操作和完整路径
             abs_path = os.path.abspath(filepath)
-            self._print(f"文件操作: {operation} - {abs_path}")
+            PrettyOutput.print(f"文件操作: {operation} - {abs_path}", OutputType.INFO)
             
             if operation == "exists":
                 exists = os.path.exists(filepath)
@@ -118,7 +103,7 @@ class FileOperationTool:
                 }
                 
         except Exception as e:
-            self._print(str(e), OutputType.ERROR)
+            PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
                 "error": f"文件操作失败: {str(e)}"

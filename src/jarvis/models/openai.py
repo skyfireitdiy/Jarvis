@@ -1,30 +1,41 @@
-from typing import Optional, List, Dict
+from typing import Dict, List
 import os
 from openai import OpenAI
-from .base import BaseModel
-from ..utils import PrettyOutput, OutputType
+from jarvis.models.base import BaseModel
+from jarvis.utils import PrettyOutput, OutputType
 
 class OpenAIModel(BaseModel):
     """DeepSeek模型实现"""
+
+    model_name = "openai"
     
-    def __init__(self, verbose: bool = False):
+    def __init__(self):
         """
         初始化DeepSeek模型
-        Args:
-            verbose: 是否显示详细输出
         """
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
+            PrettyOutput.print("\n需要设置以下环境变量才能使用 OpenAI 模型：", OutputType.INFO)
+            PrettyOutput.print("  • OPENAI_API_KEY: API 密钥", OutputType.INFO)
+            PrettyOutput.print("  • OPENAI_API_BASE: (可选) API 基础地址，默认使用 https://api.deepseek.com", OutputType.INFO)
+            PrettyOutput.print("\n可以通过以下方式设置：", OutputType.INFO)
+            PrettyOutput.print("1. 创建或编辑 ~/.jarvis_env 文件:", OutputType.INFO)
+            PrettyOutput.print("   OPENAI_API_KEY=your_api_key", OutputType.INFO)
+            PrettyOutput.print("   OPENAI_API_BASE=your_api_base", OutputType.INFO)
+            PrettyOutput.print("   OPENAI_MODEL_NAME=your_model_name", OutputType.INFO)
+            PrettyOutput.print("\n2. 或者直接设置环境变量:", OutputType.INFO)
+            PrettyOutput.print("   export OPENAI_API_KEY=your_api_key", OutputType.INFO)
+            PrettyOutput.print("   export OPENAI_API_BASE=your_api_base", OutputType.INFO)
+            PrettyOutput.print("   export OPENAI_MODEL_NAME=your_model_name", OutputType.INFO)
             raise Exception("OPENAI_API_KEY is not set")
             
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com")
-        self.model_name = os.getenv("OPENAI_API_MODEL", "deepseek-chat")
+        self.model_name = os.getenv("OPENAI_MODEL_NAME", "deepseek-chat")
             
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url
         )
-        self.verbose = verbose
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
 
@@ -53,7 +64,7 @@ class OpenAIModel(BaseModel):
             for chunk in response:
                 if chunk.choices[0].delta.content:
                     text = chunk.choices[0].delta.content
-                    PrettyOutput.print_stream(text, OutputType.SYSTEM)
+                    PrettyOutput.print_stream(text)
                     full_response += text
                     
             PrettyOutput.print_stream_end()
@@ -64,6 +75,7 @@ class OpenAIModel(BaseModel):
             return full_response
             
         except Exception as e:
+            PrettyOutput.print(f"对话失败: {str(e)}", OutputType.ERROR)
             raise Exception(f"Chat failed: {str(e)}")
 
     def name(self) -> str:
@@ -80,8 +92,5 @@ class OpenAIModel(BaseModel):
 
     def delete_chat(self)->bool:
         """删除对话"""
-        pass
-
-if __name__ == "__main__":
-    model = OpenAIModel()
-    print(model.chat("Hello! How are you?")) 
+        self.reset()
+        return True

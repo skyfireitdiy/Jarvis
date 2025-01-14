@@ -1,18 +1,10 @@
-from typing import Dict, Any, Protocol, Optional
+from typing import Dict, Any
 import os
 import tempfile
 from pathlib import Path
-from enum import Enum
 
-class OutputType(Enum):
-    INFO = "info"
-    ERROR = "error"
+from jarvis.utils import OutputType, PrettyOutput
 
-class OutputHandler(Protocol):
-    def print(self, text: str, output_type: OutputType) -> None: ...
-
-class ModelHandler(Protocol):
-    def chat(self, message: str) -> str: ...
 
 class ShellTool:
     name = "execute_shell"
@@ -29,13 +21,6 @@ class ShellTool:
         "required": ["command"]
     }
 
-    def __init__(self, **kwargs):
-        self.output = kwargs.get('output_handler')
-        
-    def _print(self, text: str, output_type: OutputType = OutputType.INFO):
-        """输出信息"""
-        if self.output:
-            self.output.print(text, output_type)
 
     def _escape_command(self, cmd: str) -> str:
         """转义命令中的特殊字符"""
@@ -55,7 +40,7 @@ class ShellTool:
             # 修改命令以使用script
             tee_command = f"script -q -c '{escaped_command}' {output_file}"
             
-            self._print(f"执行命令: {command}")
+            PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
             
             # 执行命令
             return_code = os.system(tee_command)
@@ -86,7 +71,7 @@ class ShellTool:
             # 确保清理临时文件
             if 'output_file' in locals():
                 Path(output_file).unlink(missing_ok=True)
-            self._print(str(e), OutputType.ERROR)
+            PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
                 "error": str(e)

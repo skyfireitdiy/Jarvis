@@ -1,19 +1,17 @@
-import json
-import subprocess
 import time
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import yaml
+
+from .models.registry import ModelRegistry
 from .tools import ToolRegistry
-from .utils import PrettyOutput, OutputType, get_multiline_input, while_success, while_true
-from .models import BaseModel
-import re
+from .utils import PrettyOutput, OutputType, get_multiline_input, while_success
 import os
 from datetime import datetime
 from prompt_toolkit import prompt
 
 class Agent:
-    def __init__(self, model: BaseModel, tool_registry: ToolRegistry, name: str = "Jarvis", is_sub_agent: bool = False, verbose: bool = False):
+    def __init__(self, name: str = "Jarvis", is_sub_agent: bool = False):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -22,8 +20,8 @@ class Agent:
             name: Agent名称，默认为"Jarvis"
             is_sub_agent: 是否为子Agent，默认为False
         """
-        self.model = model
-        self.tool_registry = tool_registry or ToolRegistry(model, verbose=verbose)
+        self.model = ModelRegistry.get_global_model()
+        self.tool_registry = ToolRegistry.get_global_tool_registry()
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
@@ -92,10 +90,13 @@ class Agent:
     def _load_methodology(self) -> str:
         """加载方法论"""
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
+        ret = ""
         if os.path.exists(user_jarvis_methodology):
             with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
-                return f.read()
-        return ""
+                data = yaml.safe_load(f)
+                for k, v in data.items():
+                    ret += f"问题类型: \n{k}\n方法论: \n{v}\n\n"
+        return ret
 
     def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
         """处理用户输入并返回响应，返回任务总结报告
@@ -133,53 +134,34 @@ class Agent:
                 tools_prompt += f"  描述: {tool['description']}\n"
                 tools_prompt += f"  参数: {tool['parameters']}\n"
 
-            self.model.set_system_message(f"""你是 {self.name}，一个严格遵循 ReAct 框架的 AI 助手。
+            self.model.set_system_message(f"""你是 {self.name}，一个问题处理能力强大的 AI 助手。
+                                          
+你会严格按照以下步骤处理问题：
+1. 问题重述：确认理解问题
+2. 根因分析（如果是问题分析类需要，其他不需要）
+3. 设定目标：需要可达成，可检验的一个或多个目标
+4. 生成解决方案：生成一个或者多个具备可操作性的解决方案
+5. 评估解决方案：从众多解决方案中选择一种最优的方案
+6. 制定行动计划：根据目前可以使用的工具制定行动计划
+7. 执行行动计划：每步执行一个步骤，最多使用一个工具（工具执行完成后，等待工具结果再执行下一步）
+8. 监控与调整：如果执行结果与预期不符，则反思并调整行动计划，迭代之前的步骤
+9. 更新方法论（如有必要）：任务完成后总结执行过程中的经验教训，生成同类问题的通用方法论，使用方法论工具进行更新或者添加
+
+-------------------------------------------------------------                       
+
+方法论模板：
+1. 问题重述
+2. 最优解决方案
+3. 最优方案执行步骤（失败的行动不需要体现）
+
+-------------------------------------------------------------
 
 {tools_prompt}
 
-核心能力：
-1. 使用现有工具完成任务
-2. 访问和理解网页内容（无需使用工具）
-3. 分析和处理文件内容
-4. 创建子代理处理复杂任务
-5. 遵循 ReAct (思考-行动-观察) 框架
-
-工作流程：
-1. 思考
-   - 分析需求和可用工具
-   - 评估是否能用现有工具完成
-   - 考虑是否需要访问网页
-   - 判断是否需要创建子代理
-   - 规划解决方案
-
-2. 行动 (如果需要)
-   - 优先使用现有工具
-   - 访问网页获取信息
-   - 创建新工具（成本高，谨慎使用）
-   - 创建子代理处理以下场景:
-     * 需要深入分析多个文件
-     * 需要长期交互的复杂任务
-     * 需要独立的上下文环境
-   - 询问更多信息
-   
-3. 观察
-   - 等待执行结果
-   - 分析反馈
-   - 规划下一步
-
-子代理使用场景：
-1. 文件分析任务
-   - 代码审查和重构
-   - 文档内容分析
-   - 多文件关联分析
-2. 复杂交互任务
-   - 多轮对话
-   - 需要保持上下文
-3. 独立任务流程
-   - 特定领域处理
-   - 需要独立决策
+-------------------------------------------------------------
 
 工具使用格式：
+
 <START_TOOL_CALL>
 name: tool_name
 arguments:
@@ -187,17 +169,24 @@ arguments:
     param2: value2
 <END_TOOL_CALL>
 
+-------------------------------------------------------------
+
 严格规则：
 1. 每次只能执行一个工具
 2. 等待用户提供执行结果
 3. 不要假设或想象结果
 4. 不要创建虚假对话
-5. 每个动作后停止等待
+5. 如果现有信息不足以解决问题，则可以询问用户
+6. 处理问题的每个步骤不是必须有的，可按情况省略
+
+-------------------------------------------------------------
 
 {methodology_prompt}
 
+-------------------------------------------------------------
+
 """)
-            self.prompt = f"任务: {user_input}"
+            self.prompt = f"用户任务: {user_input}"
 
             while True:
                 try:
@@ -233,7 +222,6 @@ arguments:
                         continue
                     
                     if not user_input:
-                        PrettyOutput.section("任务完成", OutputType.SUCCESS)
                         while True:
                             choice = prompt("是否需要为此任务生成方法论以提升Jarvis对类似任务的处理能力？(y/n), 回车跳过: ")
                             if choice == "y":
@@ -244,12 +232,12 @@ arguments:
                             else:
                                 PrettyOutput.print("请输入y或n", OutputType.ERROR)
                                 continue
-
+                        PrettyOutput.section("任务完成", OutputType.SUCCESS)
                         if self.is_sub_agent:
                             # 生成任务总结
                             summary_prompt = f"""请对以上任务执行情况生成一个简洁的总结报告，包括：
 
-1. 任务目标: xxxx
+1. 任务目标: 任务重述
 2. 执行结果: 成功/失败
 3. 关键信息: 提取执行过程中的重要信息
 4. 重要发现: 任何值得注意的发现
@@ -285,43 +273,17 @@ arguments:
         self.model.reset()
 
     def _make_methodology(self):
-        # 生成经验总结和方法论
-        summary_prompt = f"""请根据之前的对话内容，总结处理此类问题的标准方法论。请总结出一个可以复用的标准流程，重点说明通用性和可操作性。
-
-注意：
-1. 方法论应该具有独特性，避免与已有方法论重复
-2. 突出此类问题的特殊处理方式
-3. 强调与其他类型问题的区别
-4. 每个步骤都需要说明具体使用的工具或命令
-5. 总结失败的经验教训和规避方法
-
-输出格式严格遵顼以下模板(不要输出任何其他内容):
-<START_METHOD>
-1. 问题分类抽象
-   - 这是什么类型的问题
-   - 有哪些典型特征
-   - 与其他类型问题的主要区别
-
-2. 最佳实践
-   - 推荐的处理步骤
-     * 步骤1: xxx
-       工具/命令: <具体工具名或命令>
-       参数说明: xxx
-     * 步骤2: xxx
-       工具/命令: <具体工具名或命令>
-       参数说明: xxx
-<END_METHOD>
-"""         
-        PrettyOutput.print("正在总结方法论...", OutputType.PROGRESS)
-
-        methodology = while_success(lambda: self._call_model(summary_prompt))
-
-        PrettyOutput.section("方法论总结", OutputType.SUCCESS)
-
-        # 方法论追加保存至 ~/.jarvis_methodology
-        user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
-        with open(user_jarvis_methodology, "a", encoding="utf-8") as f:
-            f.write(f"\n--- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
-            f.write(methodology)
-            f.write("\n\n" + '-' * 50 + "\n\n")
-        PrettyOutput.print("方法论已保存至 ~/.jarvis_methodology", OutputType.SUCCESS)
+        """生成方法论"""
+        current_response = self._call_model("""请根据之前的对话内容，判断是否有必要更新、添加、删除现有方法论，如果有，使用methodology工具进行管理。
+方法论模板：
+1. 问题重述
+2. 最优解决方案
+3. 最优方案执行步骤（失败的行动不需要体现）
+                         """)
+        
+        try:
+            result = Agent.extract_tool_calls(current_response)
+        except Exception as e:
+            PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
+            return
+                         

@@ -1,8 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List
+from typing import Dict, List
+from ..utils import OutputType, PrettyOutput
+
 
 class BaseModel(ABC):
     """大语言模型基类"""
+    
+    def __init__(self):
+        """初始化模型"""
+        pass
+        
     
     @abstractmethod
     def chat(self, message: str) -> str:
@@ -30,14 +37,3 @@ class BaseModel(ABC):
     def set_system_message(self, message: str):
         """设置系统消息"""
         raise NotImplementedError("set_system_message is not implemented")
-    
-global_model_create_func = None
-
-def set_global_model(model_create_func: Callable[[], BaseModel]):
-    global global_model_create_func
-    global_model_create_func = model_create_func
-
-def get_global_model() -> BaseModel:
-    if global_model_create_func is None:
-        raise Exception("global_model_create_func is not set")
-    return global_model_create_func()

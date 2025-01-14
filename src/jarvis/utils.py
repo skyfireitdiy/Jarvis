@@ -2,7 +2,6 @@ from pathlib import Path
 import sys
 import time
 import os
-from typing import Dict, Optional
 from enum import Enum
 from datetime import datetime
 import colorama
@@ -112,9 +111,9 @@ class PrettyOutput:
         print(f"{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}\n")
 
     @staticmethod
-    def print_stream(text: str, output_type: OutputType):
+    def print_stream(text: str):
         """打印流式输出，不换行"""
-        color = PrettyOutput.COLORS.get(output_type, "")
+        color = PrettyOutput.COLORS.get(OutputType.SYSTEM, "")
         sys.stdout.write(f"{color}{text}{ColoramaStyle.RESET_ALL}")
         sys.stdout.flush()
 
