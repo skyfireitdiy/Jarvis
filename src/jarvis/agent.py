@@ -286,4 +286,8 @@ arguments:
         except Exception as e:
             PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
             return
+        if len(result) > 0:
+            PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
+            tool_result = self.tool_registry.handle_tool_calls(result)
+            PrettyOutput.print(tool_result, OutputType.RESULT)
                          
