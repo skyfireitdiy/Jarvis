@@ -14,58 +14,33 @@ class AI8Model(BasePlatform):
     
     def __init__(self):
         """Initialize model"""
-        PrettyOutput.section("支持的模型", OutputType.SUCCESS)
-
-        PrettyOutput.print("gpt-3.5-turbo", OutputType.INFO)
-        PrettyOutput.print("gpt-4-turbo", OutputType.INFO)
-        PrettyOutput.print("gpt-4o", OutputType.INFO)
-        PrettyOutput.print("gpt-4o-mini", OutputType.INFO)
-        PrettyOutput.print("o1-mini", OutputType.INFO)
-        PrettyOutput.print("gpt-4-vision-preview", OutputType.INFO)
-        PrettyOutput.print("gpt-4-turbo-preview", OutputType.INFO)
-        PrettyOutput.print("o1-mini-all", OutputType.INFO)
-        PrettyOutput.print("gpt-4o-all", OutputType.INFO)
-        PrettyOutput.print("o1-preview", OutputType.INFO)
-        PrettyOutput.print("claude-3-5-sonnet-20241022", OutputType.INFO)
-        PrettyOutput.print("claude-3-opus-20240229", OutputType.INFO)
-        PrettyOutput.print("claude-3-haiku-20240307", OutputType.INFO)
-        PrettyOutput.print("claude-3-5-sonnet-20240620", OutputType.INFO)
-        PrettyOutput.print("deepseek-chat", OutputType.INFO)
-        PrettyOutput.print("deepseek-coder", OutputType.INFO)
-        PrettyOutput.print("glm-4-flash", OutputType.INFO)
-        PrettyOutput.print("glm-4-air", OutputType.INFO)
-        PrettyOutput.print("glm-4v-flash", OutputType.INFO)
-        PrettyOutput.print("qwen-plus", OutputType.INFO)
-        PrettyOutput.print("qwen-vl-max", OutputType.INFO)
-        PrettyOutput.print("qwen-turbo", OutputType.INFO)
-        PrettyOutput.print("lite", OutputType.INFO)
-        PrettyOutput.print("generalv3.5", OutputType.INFO)
-        PrettyOutput.print("yi-lightning", OutputType.INFO)
-        PrettyOutput.print("yi-vision", OutputType.INFO)
-        PrettyOutput.print("yi-spark", OutputType.INFO)
-        PrettyOutput.print("yi-medium", OutputType.INFO)
-        PrettyOutput.print("Doubao-lite-4k", OutputType.INFO)
-        PrettyOutput.print("Doubao-lite-32k", OutputType.INFO)
-        PrettyOutput.print("Doubao-pro-4k", OutputType.INFO)
-        PrettyOutput.print("Doubao-pro-32k", OutputType.INFO)
-        PrettyOutput.print("step-1-flash", OutputType.INFO)
-        PrettyOutput.print("step-1v-8k", OutputType.INFO)
-        PrettyOutput.print("Baichuan4-Air", OutputType.INFO)
-        PrettyOutput.print("Baichuan4-Turbo", OutputType.INFO)
-        PrettyOutput.print("moonshot-v1-8k", OutputType.INFO)
-        PrettyOutput.print("ERNIE-Speed-128K", OutputType.INFO)
-        PrettyOutput.print("ERNIE-3.5-128K", OutputType.INFO)
-
-
-        PrettyOutput.print("使用AI8_MODEL环境变量配置模型", OutputType.SUCCESS)
-        
         self.system_message = ""
         self.conversation = None
         self.files = []
-        self.model_name = os.getenv("AI8_MODEL") or "deepseek-chat"
+
+
+        # 获取可用模型列表
+        available_models = self.get_available_models()
+        if available_models:
+            PrettyOutput.section("支持的模型", OutputType.SUCCESS)
+            for model in available_models:
+                PrettyOutput.print(model, OutputType.INFO)
+        else:
+            PrettyOutput.print("获取模型列表失败", OutputType.WARNING)
+
+
         self.token = os.getenv("AI8_API_KEY")
-        if not all([self.model_name, self.token]):
-            raise Exception("AI8_MODEL or AI8_API_KEY is not set")
+        if not self.token:
+            raise Exception("AI8_API_KEY is not set")
+
+
+            
+        PrettyOutput.print("使用AI8_MODEL环境变量配置模型", OutputType.SUCCESS)
+        
+        self.model_name = os.getenv("AI8_MODEL") or "deepseek-chat"
+        if self.model_name not in available_models:
+            PrettyOutput.print(f"警告: 当前选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
+        
         PrettyOutput.print(f"当前使用模型: {self.model_name}", OutputType.SYSTEM)
 
     def set_model_name(self, model_name: str):
@@ -278,4 +253,45 @@ class AI8Model(BasePlatform):
         except Exception as e:
             PrettyOutput.print(f"删除会话异常: {str(e)}", OutputType.ERROR)
             return False
+        
+    def get_available_models(self) -> List[str]:
+        """获取可用的模型列表
+        
+        Returns:
+            List[str]: 可用模型名称列表
+        """
+        try:
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'X-APP-VERSION': '2.2.2',
+                'Origin': self.BASE_URL,
+                'Referer': f'{self.BASE_URL}/chat?_userMenuKey=chat'
+            }
+            
+            response = requests.get(
+                f"{self.BASE_URL}/api/chat/template",
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                PrettyOutput.print(f"获取模型列表失败: {response.status_code}", OutputType.ERROR)
+                return []
+            
+            data = response.json()
+            if data['code'] != 0:
+                PrettyOutput.print(f"获取模型列表失败: {data.get('msg', '未知错误')}", OutputType.ERROR)
+                return []
+            
+            # 从模板数据中提取模型名称
+            models = []
+            for model in data['data']['models']:
+                models.append(f"{model['value']}     ({model['label']})")
+                
+            return sorted(list(set(models)))  # 去重并排序
+            
+        except Exception as e:
+            PrettyOutput.print(f"获取模型列表异常: {str(e)}", OutputType.ERROR)
+            return []
         
