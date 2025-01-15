@@ -17,28 +17,54 @@ class AI8Model(BasePlatform):
         self.system_message = ""
         self.conversation = None
         self.files = []
-
+        self.models = {}  # 存储模型信息
 
         # 获取可用模型列表
         available_models = self.get_available_models()
+        
         if available_models:
             PrettyOutput.section("支持的模型", OutputType.SUCCESS)
-            for model in available_models:
-                PrettyOutput.print(model, OutputType.INFO)
+            for model in self.models.values():
+                # 格式化显示模型信息
+                model_str = f"{model['value']:<30}"
+                
+                # 添加标签
+                model_str += f"{model['label']}"
+                
+                # 添加标签和积分信息
+                attrs = []
+                if model['attr'].get('tag'):
+                    attrs.append(model['attr']['tag'])
+                if model['attr'].get('integral'):
+                    attrs.append(model['attr']['integral'])
+                    
+                # 添加特性标记
+                features = []
+                if model['attr'].get('multimodal'):
+                    features.append("多模态")
+                if model['attr'].get('plugin'):
+                    features.append("插件支持")
+                if model['attr'].get('onlyImg'):
+                    features.append("图像支持")
+                if features:
+                    model_str += f" [{'|'.join(features)}]"
+                    
+                # 添加备注
+                if model['attr'].get('note'):
+                    model_str += f" - {model['attr']['note']}"
+                    
+                PrettyOutput.print(model_str, OutputType.INFO)
         else:
             PrettyOutput.print("获取模型列表失败", OutputType.WARNING)
-
 
         self.token = os.getenv("AI8_API_KEY")
         if not self.token:
             raise Exception("AI8_API_KEY is not set")
-
-
-            
+        
         PrettyOutput.print("使用AI8_MODEL环境变量配置模型", OutputType.SUCCESS)
         
         self.model_name = os.getenv("AI8_MODEL") or "deepseek-chat"
-        if self.model_name not in available_models:
+        if self.model_name not in self.models:
             PrettyOutput.print(f"警告: 当前选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
         
         PrettyOutput.print(f"当前使用模型: {self.model_name}", OutputType.SYSTEM)
@@ -284,12 +310,13 @@ class AI8Model(BasePlatform):
                 PrettyOutput.print(f"获取模型列表失败: {data.get('msg', '未知错误')}", OutputType.ERROR)
                 return []
             
-            # 从模板数据中提取模型名称
-            models = []
-            for model in data['data']['models']:
-                models.append(f"{model['value']}     ({model['label']})")
-                
-            return sorted(list(set(models)))  # 去重并排序
+            # 保存模型信息
+            self.models = {
+                model['value']: model 
+                for model in data['data']['models']
+            }
+            
+            return list(self.models.keys())
             
         except Exception as e:
             PrettyOutput.print(f"获取模型列表异常: {str(e)}", OutputType.ERROR)
