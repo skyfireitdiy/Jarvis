@@ -1,6 +1,6 @@
 from typing import Dict, Any
 from pathlib import Path
-from jarvis.models.registry import ModelRegistry
+from jarvis.models.registry import PlatformRegistry
 from jarvis.tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput
 
@@ -41,7 +41,7 @@ class ToolGeneratorTool:
 
     def _generate_tool_code(self, tool_name: str, class_name: str, description: str, parameters: Dict) -> str:
         """使用大模型生成工具代码"""
-        model = ModelRegistry.get_global_model()
+        model = PlatformRegistry.get_platform()
 
         prompt = f"""请生成一个Python工具类的代码，要求如下，除了代码，不要输出任何内容：
 

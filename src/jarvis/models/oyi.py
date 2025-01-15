@@ -1,12 +1,12 @@
 import mimetypes
 import os
 from typing import Dict, List
-from jarvis.models.base import BaseModel
+from jarvis.models.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType
 import requests
 import json
 
-class OyiModel(BaseModel):
+class OyiModel(BasePlatform):
     """Oyi model implementation"""
     
     platform_name = "oyi"

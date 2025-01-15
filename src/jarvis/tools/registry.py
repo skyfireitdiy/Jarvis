@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from typing import Any, Callable, Dict, List, Optional
 
-from jarvis.models.registry import ModelRegistry
+from jarvis.models.registry import PlatformRegistry
 from jarvis.tools.base import Tool
 from jarvis.utils import OutputType, PrettyOutput
 

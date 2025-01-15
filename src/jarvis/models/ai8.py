@@ -1,12 +1,12 @@
 import os
 from typing import Dict, List
-from jarvis.models.base import BaseModel
+from jarvis.models.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType
 import requests
 import json
 import base64
 
-class AI8Model(BaseModel):
+class AI8Model(BasePlatform):
     """AI8 model implementation"""
     
     platform_name = "ai8"

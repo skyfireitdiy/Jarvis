@@ -1,10 +1,10 @@
 from typing import Dict, List
 import os
 from openai import OpenAI
-from jarvis.models.base import BaseModel
+from jarvis.models.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType
 
-class OpenAIModel(BaseModel):
+class OpenAIModel(BasePlatform):
     """DeepSeek模型实现"""
 
     platform_name = "openai"

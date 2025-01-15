@@ -3,7 +3,7 @@ from typing import Dict, List
 from ..utils import OutputType, PrettyOutput
 
 
-class BaseModel(ABC):
+class BasePlatform(ABC):
     """大语言模型基类"""
     
     def __init__(self):

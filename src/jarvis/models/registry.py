@@ -3,7 +3,7 @@ import inspect
 import os
 import sys
 from typing import Dict, Type, Optional, List
-from .base import BaseModel
+from .base import BasePlatform
 from ..utils import PrettyOutput, OutputType
 
 REQUIRED_METHODS = [
@@ -14,33 +14,33 @@ REQUIRED_METHODS = [
     ('set_system_message', ['message'])
 ]
 
-class ModelRegistry:
+class PlatformRegistry:
     """平台注册器"""
 
-    global_model_name = "kimi"
-    global_model_registry = None
+    global_platform_name = "kimi"
+    global_platform_registry = None
 
     @staticmethod
-    def get_models_dir() -> str:
-        user_models_dir = os.path.expanduser("~/.jarvis_models")
-        if not os.path.exists(user_models_dir):
+    def get_platform_dir() -> str:
+        user_platform_dir = os.path.expanduser("~/.jarvis_models")
+        if not os.path.exists(user_platform_dir):
             try:
-                os.makedirs(user_models_dir)
+                os.makedirs(user_platform_dir)
                 # 创建 __init__.py 使其成为 Python 包
-                with open(os.path.join(user_models_dir, "__init__.py"), "w") as f:
+                with open(os.path.join(user_platform_dir, "__init__.py"), "w") as f:
                     pass
-                PrettyOutput.print(f"已创建平台目录: {user_models_dir}", OutputType.INFO)
+                PrettyOutput.print(f"已创建平台目录: {user_platform_dir}", OutputType.INFO)
             except Exception as e:
                 PrettyOutput.print(f"创建平台目录失败: {str(e)}", OutputType.ERROR)
                 return ""
-        return user_models_dir
+        return user_platform_dir
 
     @staticmethod
-    def check_model_implementation(model_class: Type[BaseModel]) -> bool:
+    def check_platform_implementation(platform_class: Type[BasePlatform]) -> bool:
         """检查平台类是否实现了所有必要的方法
         
         Args:
-            model_class: 要检查的平台类
+            platform_class: 要检查的平台类
             
         Returns:
             bool: 是否实现了所有必要的方法
@@ -48,11 +48,11 @@ class ModelRegistry:
         missing_methods = []
         
         for method_name, params in REQUIRED_METHODS:
-            if not hasattr(model_class, method_name):
+            if not hasattr(platform_class, method_name):
                 missing_methods.append(method_name)
                 continue
                 
-            method = getattr(model_class, method_name)
+            method = getattr(platform_class, method_name)
             if not callable(method):
                 missing_methods.append(method_name)
                 continue
@@ -66,7 +66,7 @@ class ModelRegistry:
         
         if missing_methods:
             PrettyOutput.print(
-                f"平台 {model_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}", 
+                f"平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}", 
                 OutputType.ERROR
             )
             return False
@@ -74,7 +74,7 @@ class ModelRegistry:
         return True
 
     @staticmethod
-    def load_models_from_dir(directory: str) -> Dict[str, Type[BaseModel]]:
+    def load_platform_from_dir(directory: str) -> Dict[str, Type[BasePlatform]]:
         """从指定目录加载平台
         
         Args:
@@ -83,12 +83,12 @@ class ModelRegistry:
         Returns:
             Dict[str, Type[BaseModel]]: 平台名称到平台类的映射
         """
-        models = {}
+        platforms = {}
         
         # 确保目录存在
         if not os.path.exists(directory):
             PrettyOutput.print(f"平台目录不存在: {directory}", OutputType.ERROR)
-            return models
+            return platforms
             
         # 获取目录的包名
         package_name = None
@@ -114,62 +114,62 @@ class ModelRegistry:
                     for name, obj in inspect.getmembers(module):
                         # 检查是否是BaseModel的子类，但不是BaseModel本身
                         if (inspect.isclass(obj) and 
-                            issubclass(obj, BaseModel) and 
-                            obj != BaseModel and
+                            issubclass(obj, BasePlatform) and 
+                            obj != BasePlatform and
                             hasattr(obj, 'platform_name')):
                             # 检查平台实现
-                            if not ModelRegistry.check_model_implementation(obj):
+                            if not PlatformRegistry.check_platform_implementation(obj):
                                 continue
-                            models[obj.platform_name] = obj
+                            platforms[obj.platform_name] = obj
                             PrettyOutput.print(f"从 {directory} 加载平台: {obj.platform_name}", OutputType.INFO)
                             break
                 except Exception as e:
                     PrettyOutput.print(f"加载平台 {module_name} 失败: {str(e)}", OutputType.ERROR)
         
-        return models
+        return platforms
 
 
     @staticmethod
-    def get_model_registry():
+    def get_platform_registry():
         """获取全局平台注册器"""
-        if ModelRegistry.global_model_registry is None:
-            ModelRegistry.global_model_registry = ModelRegistry()
+        if PlatformRegistry.global_platform_registry is None:
+            PlatformRegistry.global_platform_registry = PlatformRegistry()
             
             # 从用户平台目录加载额外平台
-            models_dir = ModelRegistry.get_models_dir()
-            if models_dir and os.path.exists(models_dir):
-                for platform_name, model_class in ModelRegistry.load_models_from_dir(models_dir).items():
-                    ModelRegistry.global_model_registry.register_model(platform_name, model_class)
-            models_dir = os.path.dirname(__file__)
-            if models_dir and os.path.exists(models_dir):
-                for platform_name, model_class in ModelRegistry.load_models_from_dir(models_dir).items():
-                    ModelRegistry.global_model_registry.register_model(platform_name, model_class)
-        return ModelRegistry.global_model_registry
+            platform_dir = PlatformRegistry.get_platform_dir()
+            if platform_dir and os.path.exists(platform_dir):
+                for platform_name, platform_class in PlatformRegistry.load_platform_from_dir(platform_dir).items():
+                    PlatformRegistry.global_platform_registry.register_platform(platform_name, platform_class)
+            platform_dir = os.path.dirname(__file__)
+            if platform_dir and os.path.exists(platform_dir):
+                for platform_name, platform_class in PlatformRegistry.load_platform_from_dir(platform_dir).items():
+                    PlatformRegistry.global_platform_registry.register_platform(platform_name, platform_class)
+        return PlatformRegistry.global_platform_registry
     
     def __init__(self):
         """初始化平台注册器
         """
-        self.models: Dict[str, Type[BaseModel]] = {}
+        self.platforms: Dict[str, Type[BasePlatform]] = {}
 
     @staticmethod
-    def get_global_model() -> BaseModel:
+    def get_platform() -> BasePlatform:
         """获取全局平台实例"""
-        model = ModelRegistry.get_model_registry().create_model(ModelRegistry.global_model_name)
-        if not model:
-            raise Exception(f"Failed to create model: {ModelRegistry.global_model_name}")
-        return model
+        platform = PlatformRegistry.get_platform_registry().create_platform(PlatformRegistry.global_platform_name)
+        if not platform:
+            raise Exception(f"Failed to create platform: {PlatformRegistry.global_platform_name}")
+        return platform
         
-    def register_model(self, name: str, model_class: Type[BaseModel]):
+    def register_platform(self, name: str, platform_class: Type[BasePlatform]):
         """注册平台类
         
         Args:
             name: 平台名称
             model_class: 平台类
         """
-        self.models[name] = model_class
+        self.platforms[name] = platform_class
         PrettyOutput.print(f"已注册平台: {name}", OutputType.INFO)
             
-    def create_model(self, name: str) -> Optional[BaseModel]:
+    def create_platform(self, name: str) -> Optional[BasePlatform]:
         """创建平台实例
         
         Args:
@@ -178,22 +178,22 @@ class ModelRegistry:
         Returns:
             BaseModel: 平台实例
         """
-        if name not in self.models:
+        if name not in self.platforms:
             PrettyOutput.print(f"未找到平台: {name}", OutputType.ERROR)
             return None
             
         try:
-            model = self.models[name]()
+            platform = self.platforms[name]()
             PrettyOutput.print(f"已创建平台实例: {name}", OutputType.INFO)
-            return model
+            return platform
         except Exception as e:
             PrettyOutput.print(f"创建平台失败: {str(e)}", OutputType.ERROR)
             return None
             
-    def get_available_models(self) -> List[str]:
+    def get_available_platforms(self) -> List[str]:
         """获取可用平台列表"""
-        return list(self.models.keys()) 
+        return list(self.platforms.keys()) 
     
-    def set_global_model(self, platform_name: str):
+    def set_global_platform(self, platform_name: str):
         """设置全局平台"""
-        ModelRegistry.global_model_name = platform_name
+        PlatformRegistry.global_platform_name = platform_name

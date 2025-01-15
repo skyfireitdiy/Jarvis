@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from prompt_toolkit import prompt
 
-from jarvis.models.registry import ModelRegistry
+from jarvis.models.registry import PlatformRegistry
 
 # 添加父目录到Python路径以支持导入
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -114,7 +114,7 @@ def main():
         PrettyOutput.print("未指定AI平台，请使用 -p 参数或者设置 JARVIS_PLATFORM 环境变量", OutputType.ERROR)
         return 1
 
-    ModelRegistry.get_model_registry().set_global_model(platform)
+    PlatformRegistry.get_platform_registry().set_global_platform(platform)
     
     try:
         # 获取全局模型实例

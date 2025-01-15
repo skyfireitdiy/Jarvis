@@ -4,11 +4,11 @@ import json
 import os
 import mimetypes
 import time
-from jarvis.models.base import BaseModel
+from jarvis.models.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType
 from jarvis.utils import while_success
 
-class KimiModel(BaseModel):
+class KimiModel(BasePlatform):
     """Kimi模型实现"""
 
     platform_name = "kimi"
