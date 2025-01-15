@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List
-from ..utils import OutputType, PrettyOutput
 
 
 class BasePlatform(ABC):
