@@ -80,8 +80,8 @@ jarvis
 
 ### With Specific Model
 ```bash
-jarvis -m kimi  # Use Kimi model
-jarvis -m openai  # Use OpenAI model
+jarvis -p kimi  # Use Kimi platform
+jarvis -p openai  # Use OpenAI platform
 ```
 
 ### Process Files
@@ -100,10 +100,11 @@ jarvis --keep-history  # Don't delete chat session after completion
 
 | Tool | Description |
 |------|-------------|
-| shell | Execute shell commands |
-| file | File operations (read/write/append) |
-| git | Git operations |
-| methodology | Manage problem-solving methodologies |
+| execute_shell | Execute system commands and capture output |
+| file_operation | File operations (read/write/append/delete) |
+| generate_tool | AI-powered tool generation and integration |
+| methodology | Experience accumulation and methodology management |
+| create_sub_agent | Create specialized sub-agents for specific tasks |
 
 ### Tool Locations
 - Built-in tools: `src/jarvis/tools/`
@@ -112,21 +113,21 @@ jarvis --keep-history  # Don't delete chat session after completion
 ### Key Features
 
 #### 1. Self-Extending Capabilities
-- AI-powered tool generation
-- Automatic integration of new tools
-- Dynamic capability expansion
+- Tool generation through natural language description
+- Automatic code generation and integration
+- Dynamic capability expansion through sub-agents
 
 #### 2. Methodology Learning
-- Automatic extraction of problem-solving patterns
-- Continuous methodology refinement
-- Experience-based improvement
+- Automatic experience accumulation from interactions
+- Pattern recognition and methodology extraction
+- Continuous refinement through usage
 
 #### 3. Adaptive Problem Solving
-- Context-aware tool selection
-- Dynamic strategy adjustment
-- Learning from execution results
+- Context-aware sub-agent creation
+- Dynamic tool composition
+- Learning from execution feedback
 
-## �� Extending Jarvis
+## 🎯 Extending Jarvis
 
 ### Adding New Tools
 
