@@ -114,7 +114,7 @@ def main():
         PrettyOutput.print("未指定AI平台，请使用 -p 参数或者设置 JARVIS_PLATFORM 环境变量", OutputType.ERROR)
         return 1
 
-    PlatformRegistry.get_platform_registry().set_global_platform(platform)
+    PlatformRegistry.get_global_platform_registry().set_global_platform_name(platform)
     
     try:
         # 获取全局模型实例

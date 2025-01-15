@@ -62,11 +62,15 @@ class AI8Model(BasePlatform):
         self.system_message = ""
         self.conversation = None
         self.files = []
-        self.model = os.getenv("AI8_MODEL") or "deepseek-chat"
+        self.model_name = os.getenv("AI8_MODEL") or "deepseek-chat"
         self.token = os.getenv("AI8_API_KEY")
-        if not all([self.model, self.token]):
+        if not all([self.model_name, self.token]):
             raise Exception("AI8_MODEL or AI8_API_KEY is not set")
-        PrettyOutput.print(f"当前使用模型: {self.model}", OutputType.SYSTEM)
+        PrettyOutput.print(f"当前使用模型: {self.model_name}", OutputType.SYSTEM)
+
+    def set_model_name(self, model_name: str):
+        """设置模型名称"""
+        self.model_name = model_name
             
     def create_conversation(self) -> bool:
         """Create a new conversation"""
@@ -102,7 +106,7 @@ class AI8Model(BasePlatform):
             # 2. 更新会话设置
             session_data = {
                 **self.conversation,
-                "model": self.model,
+                "model": self.model_name,
                 "contextCount": 1024,
                 "prompt": self.system_message,
                 "plugins": ["tavily_search"],
@@ -228,7 +232,7 @@ class AI8Model(BasePlatform):
             
     def name(self) -> str:
         """Return model name"""
-        return self.model
+        return self.model_name
         
     def reset(self):
         """Reset model state"""

@@ -45,6 +45,10 @@ class KimiModel(BasePlatform):
         """设置系统消息"""
         self.system_message = message
 
+    def set_model_name(self, model_name: str):
+        """设置模型名称"""
+        pass
+
     def _create_chat(self) -> bool:
         """创建新的对话会话"""
         url = "https://kimi.moonshot.cn/api/chat"

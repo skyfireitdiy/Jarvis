@@ -47,11 +47,15 @@ class OyiModel(BasePlatform):
         self.conversation = None
         self.upload_files = []
         self.first_chat = True
-        self.model = os.getenv("OYI_MODEL") or "deepseek-chat"
+        self.model_name = os.getenv("OYI_MODEL") or "deepseek-chat"
         self.token = os.getenv("OYI_API_KEY")
-        if not all([self.model, self.token]):
+        if not all([self.model_name, self.token]):
             raise Exception("OYI_MODEL or OYI_API_KEY is not set")
-        PrettyOutput.print(f"当前使用模型: {self.model}", OutputType.SYSTEM)
+        PrettyOutput.print(f"当前使用模型: {self.model_name}", OutputType.SYSTEM)
+
+    def set_model_name(self, model_name: str):
+        """设置模型名称"""
+        self.model_name = model_name
 
         
     def create_conversation(self) -> bool:
@@ -71,7 +75,7 @@ class OyiModel(BasePlatform):
                 "isLock": False,
                 "systemMessage": "",
                 "params": json.dumps({
-                    "model": self.model,
+                    "model": self.model_name,
                     "is_webSearch": True,
                     "message": [],
                     "systemMessage": None,
@@ -202,7 +206,7 @@ class OyiModel(BasePlatform):
             
     def name(self) -> str:
         """Return model name"""
-        return self.model
+        return self.model_name
         
     def reset(self):
         """Reset model state"""

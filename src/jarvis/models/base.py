@@ -9,8 +9,11 @@ class BasePlatform(ABC):
     def __init__(self):
         """初始化模型"""
         pass
+
+    def set_model_name(self, model_name: str):
+        """设置模型名称"""
+        raise NotImplementedError("set_model_name is not implemented")
         
-    
     @abstractmethod
     def chat(self, message: str) -> str:
         """执行对话"""

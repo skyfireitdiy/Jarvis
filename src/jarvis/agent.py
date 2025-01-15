@@ -20,7 +20,7 @@ class Agent:
             name: Agent名称，默认为"Jarvis"
             is_sub_agent: 是否为子Agent，默认为False
         """
-        self.model = PlatformRegistry.get_platform()
+        self.model = PlatformRegistry.get_global_platform()
         self.tool_registry = ToolRegistry.get_global_tool_registry()
         self.name = name
         self.is_sub_agent = is_sub_agent

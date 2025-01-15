@@ -30,9 +30,9 @@ class OpenAIModel(BasePlatform):
             raise Exception("OPENAI_API_KEY is not set")
             
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com")
-        self.model = os.getenv("OPENAI_MODEL_NAME", "deepseek-chat")
+        self.model_name = os.getenv("OPENAI_MODEL_NAME", "deepseek-chat")
 
-        PrettyOutput.print(f"当前使用模型: {self.model}", OutputType.SYSTEM)
+        PrettyOutput.print(f"当前使用模型: {self.model_name}", OutputType.SYSTEM)
             
         self.client = OpenAI(
             api_key=self.api_key,
@@ -40,6 +40,10 @@ class OpenAIModel(BasePlatform):
         )
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
+
+    def set_model_name(self, model_name: str):
+        """设置模型名称"""
+        self.model_name = model_name
 
     def set_system_message(self, message: str):
         """设置系统消息"""
@@ -55,7 +59,7 @@ class OpenAIModel(BasePlatform):
             self.messages.append({"role": "user", "content": message})
             
             response = self.client.chat.completions.create(
-                model=self.model,  # 使用配置的模型名称
+                model=self.model_name,  # 使用配置的模型名称
                 messages=self.messages,
                 stream=True
             )
@@ -82,7 +86,7 @@ class OpenAIModel(BasePlatform):
 
     def name(self) -> str:
         """返回模型名称"""
-        return self.model
+        return self.model_name
 
     def reset(self):
         """重置模型状态"""

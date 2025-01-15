@@ -130,7 +130,7 @@ class PlatformRegistry:
 
 
     @staticmethod
-    def get_platform_registry():
+    def get_global_platform_registry():
         """获取全局平台注册器"""
         if PlatformRegistry.global_platform_registry is None:
             PlatformRegistry.global_platform_registry = PlatformRegistry()
@@ -152,9 +152,9 @@ class PlatformRegistry:
         self.platforms: Dict[str, Type[BasePlatform]] = {}
 
     @staticmethod
-    def get_platform() -> BasePlatform:
+    def get_global_platform() -> BasePlatform:
         """获取全局平台实例"""
-        platform = PlatformRegistry.get_platform_registry().create_platform(PlatformRegistry.global_platform_name)
+        platform = PlatformRegistry.get_global_platform_registry().create_platform(PlatformRegistry.global_platform_name)
         if not platform:
             raise Exception(f"Failed to create platform: {PlatformRegistry.global_platform_name}")
         return platform
@@ -194,6 +194,10 @@ class PlatformRegistry:
         """获取可用平台列表"""
         return list(self.platforms.keys()) 
     
-    def set_global_platform(self, platform_name: str):
+    def set_global_platform_name(self, platform_name: str):
         """设置全局平台"""
         PlatformRegistry.global_platform_name = platform_name
+
+    def get_global_platform_name(self) -> str:
+        """获取全局平台名称"""
+        return PlatformRegistry.global_platform_name
