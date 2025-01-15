@@ -121,7 +121,7 @@ def main():
         agent = Agent()
 
         # 欢迎信息
-        PrettyOutput.print(f"Jarvis 已初始化 - With {platform} 平台", OutputType.SYSTEM)
+        PrettyOutput.print(f"Jarvis 已初始化 - With {platform} 平台，模型: {agent.model.name()}", OutputType.SYSTEM)
         if args.keep_history:
             PrettyOutput.print("已启用历史保留模式", OutputType.INFO)
         
