@@ -79,6 +79,15 @@ def run_command(cmd: List[str], error_msg: str) -> None:
         print(f"Command output: {e.output if hasattr(e, 'output') else 'No output'}")
         sys.exit(1)
 
+def remove_pycache_directories():
+    """删除所有的 __pycache__ 目录"""
+    for root, dirs, files in os.walk("."):
+        for dir_name in dirs:
+            if dir_name == "__pycache__":
+                pycache_dir = os.path.join(root, dir_name)
+                print(f"Removing {pycache_dir}")
+                os.system(f"rm -rf {pycache_dir}")
+
 def main():
     if len(sys.argv) != 2 or sys.argv[1] not in ["major", "minor", "patch"]:
         print("Usage: python scripts/publish.py [major|minor|patch]")
@@ -90,6 +99,10 @@ def main():
         # 更新版本号
         new_version = update_version(version_type)
         print(f"Updated version to {new_version}")
+        
+        # 删除所有的 __pycache__ 目录
+        print("Removing __pycache__ directories...")
+        remove_pycache_directories()
         
         # 清理旧的构建文件
         print("Cleaning old build files...")
@@ -149,4 +162,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main()
