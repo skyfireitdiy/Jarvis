@@ -29,7 +29,7 @@ class OyiModel(BasePlatform):
         self.messages = []
         self.system_message = ""
         self.conversation = None
-        self.upload_files = []
+        self.upload_files = []  # 重命名 files 为 upload_files
         self.first_chat = True
         
         self.token = os.getenv("OYI_API_KEY")
@@ -244,7 +244,7 @@ class OyiModel(BasePlatform):
             PrettyOutput.print(f"删除会话异常: {str(e)}", OutputType.ERROR)
             return False
     
-    def upload_file(self, file_path: str) -> Dict:
+    def upload_files(self, file_list: List[str]) -> List[Dict]:
         """Upload a file to OYI API
         
         Args:
@@ -269,30 +269,36 @@ class OyiModel(BasePlatform):
                 'Referer': 'https://ai.rcouyi.com/'
             }
             
-            with open(file_path, 'rb') as f:
-                files = {
-                    'file': (os.path.basename(file_path), f, mimetypes.guess_type(file_path)[0])
-                }
+            for file_path in file_list:
+                # 检查文件类型
+                file_type = mimetypes.guess_type(file_path)[0]
+                if not file_type or not file_type.startswith(('image/', 'text/', 'application/')):
+                    PrettyOutput.print(f"文件类型不支持: {file_type}", OutputType.ERROR)
+                    continue
                 
-                response = requests.post(
-                    f"{self.BASE_URL}/chatapi/m_file/uploadfile",
-                    headers=headers,
-                    files=files
-                )
+                with open(file_path, 'rb') as f:
+                    files = {
+                        'file': (os.path.basename(file_path), f, file_type)
+                    }
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get('code') == 200:
-                        PrettyOutput.print("文件上传成功", OutputType.SUCCESS)
-                        print(data)
-                        self.upload_files.append(data)
-                        return data
+                    response = requests.post(
+                        f"{self.BASE_URL}/chatapi/m_file/uploadfile",
+                        headers=headers,
+                        files=files
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get('code') == 200:
+                            PrettyOutput.print("文件上传成功", OutputType.SUCCESS)
+                            self.upload_files.append(data)
+                            return data
+                        else:
+                            PrettyOutput.print(f"文件上传失败: {data.get('message')}", OutputType.ERROR)
+                            return None
                     else:
-                        PrettyOutput.print(f"文件上传失败: {data.get('message')}", OutputType.ERROR)
+                        PrettyOutput.print(f"文件上传失败: {response.status_code}", OutputType.ERROR)
                         return None
-                else:
-                    PrettyOutput.print(f"文件上传失败: {response.status_code}", OutputType.ERROR)
-                    return None
                 
         except Exception as e:
             PrettyOutput.print(f"文件上传异常: {str(e)}", OutputType.ERROR)

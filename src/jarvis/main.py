@@ -104,6 +104,7 @@ def main():
     parser.add_argument('-f', '--files', nargs='*', help='要处理的文件列表')
     parser.add_argument('--keep-history', action='store_true', help='保持聊天历史(不删除会话)')
     parser.add_argument('-p', '--platform', default='', help='选择AI平台')
+    parser.add_argument('-m', '--model', default='', help='模型')  # 用于指定使用的模型名称，默认使用环境变量或平台默认模型
     args = parser.parse_args()
 
     load_env_from_file()
@@ -119,6 +120,11 @@ def main():
     try:
         # 获取全局模型实例
         agent = Agent()
+
+        # 如果用户传入了模型参数，则更换当前模型为用户指定的模型
+        if args.model:
+            PrettyOutput.print(f"用户传入了模型参数，更换模型: {args.model}", OutputType.USER)
+            agent.model.set_model_name(args.model)
 
         # 欢迎信息
         PrettyOutput.print(f"Jarvis 已初始化 - With {platform} 平台，模型: {agent.model.name()}", OutputType.SYSTEM)
@@ -151,4 +157,4 @@ def main():
     return 0
 
 if __name__ == "__main__":
-    exit(main()) 
+    exit(main())
