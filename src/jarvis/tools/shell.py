@@ -21,7 +21,6 @@ class ShellTool:
         "required": ["command"]
     }
 
-
     def _escape_command(self, cmd: str) -> str:
         """转义命令中的特殊字符"""
         return cmd.replace("'", "'\"'\"'")
@@ -30,21 +29,23 @@ class ShellTool:
         """执行shell命令"""
         try:
             command = args["command"]
-            
+
             # 生成临时文件名
-            output_file = os.path.join(tempfile.gettempdir(), f"jarvis_shell_{os.getpid()}.log")
-            
+            output_file = os.path.join(
+                tempfile.gettempdir(), f"jarvis_shell_{
+                    os.getpid()}.log")
+
             # 转义命令中的特殊字符
             escaped_command = self._escape_command(command)
-            
+
             # 修改命令以使用script
             tee_command = f"script -q -c '{escaped_command}' {output_file}"
-            
+
             PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
-            
+
             # 执行命令
             return_code = os.system(tee_command)
-            
+
             # 读取输出文件
             try:
                 with open(output_file, 'r', encoding='utf-8', errors='replace') as f:
@@ -59,14 +60,14 @@ class ShellTool:
             finally:
                 # 清理临时文件
                 Path(output_file).unlink(missing_ok=True)
-            
+
             return {
                 "success": return_code == 0,
                 "stdout": output,
                 "stderr": "",
                 "return_code": return_code
             }
-                
+
         except Exception as e:
             # 确保清理临时文件
             if 'output_file' in locals():
@@ -75,4 +76,4 @@ class ShellTool:
             return {
                 "success": False,
                 "error": str(e)
-            } 
+            }

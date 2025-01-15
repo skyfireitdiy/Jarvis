@@ -13,23 +13,25 @@ from prompt_toolkit.formatted_text import FormattedText
 # 初始化colorama
 colorama.init()
 
+
 class OutputType(Enum):
     SYSTEM = "system"      # AI助手消息
     CODE = "code"         # 代码相关
     RESULT = "result"     # 工具执行结果
     ERROR = "error"       # 错误信息
     INFO = "info"         # 系统提示
-    PLANNING = "planning" # 任务规划
-    PROGRESS = "progress" # 执行进度
+    PLANNING = "planning"  # 任务规划
+    PROGRESS = "progress"  # 执行进度
     SUCCESS = "success"   # 成功信息
     WARNING = "warning"   # 警告信息
     DEBUG = "debug"       # 调试信息
     USER = "user"         # 用户输入
     TOOL = "tool"         # 工具调用
 
+
 class PrettyOutput:
     """美化输出类"""
-    
+
     # 颜色方案 - 只使用前景色
     COLORS = {
         OutputType.SYSTEM: Fore.CYAN,      # 青色 - AI助手
@@ -37,7 +39,7 @@ class PrettyOutput:
         OutputType.RESULT: Fore.BLUE,      # 蓝色 - 结果
         OutputType.ERROR: Fore.RED,        # 红色 - 错误
         OutputType.INFO: Fore.YELLOW,      # 黄色 - 提示
-        OutputType.PLANNING: Fore.MAGENTA, # 紫色 - 规划
+        OutputType.PLANNING: Fore.MAGENTA,  # 紫色 - 规划
         OutputType.PROGRESS: Fore.WHITE,   # 白色 - 进度
         OutputType.SUCCESS: Fore.GREEN,    # 绿色 - 成功
         OutputType.WARNING: Fore.YELLOW,   # 黄色 - 警告
@@ -45,7 +47,7 @@ class PrettyOutput:
         OutputType.USER: Fore.GREEN,       # 绿色 - 用户
         OutputType.TOOL: Fore.YELLOW,      # 黄色 - 工具
     }
-    
+
     # 图标方案
     ICONS = {
         OutputType.SYSTEM: "🤖",    # 机器人 - AI助手
@@ -61,7 +63,7 @@ class PrettyOutput:
         OutputType.USER: "👤",      # 用户 - 用户
         OutputType.TOOL: "🔧",      # 扳手 - 工具
     }
-    
+
     # 前缀方案
     PREFIXES = {
         OutputType.SYSTEM: "Assistant",
@@ -79,18 +81,20 @@ class PrettyOutput:
     }
 
     @staticmethod
-    def format(text: str, output_type: OutputType, timestamp: bool = True) -> str:
+    def format(text: str, output_type: OutputType,
+               timestamp: bool = True) -> str:
         """格式化输出文本"""
         color = PrettyOutput.COLORS.get(output_type, "")
         icon = PrettyOutput.ICONS.get(output_type, "")
         prefix = PrettyOutput.PREFIXES.get(output_type, "")
-        
+
         # 添加时间戳 - 使用白色
         time_str = f"{Fore.WHITE}[{datetime.now().strftime('%H:%M:%S')}]{ColoramaStyle.RESET_ALL} " if timestamp else ""
-        
+
         # 格式化输出
-        formatted_text = f"{time_str}{color}{icon} {prefix}: {text}{ColoramaStyle.RESET_ALL}"
-        
+        formatted_text = f"{time_str}{color}{icon} {prefix}: {text}{
+            ColoramaStyle.RESET_ALL}"
+
         return formatted_text
 
     @staticmethod
@@ -99,7 +103,10 @@ class PrettyOutput:
         print(PrettyOutput.format(text, output_type, timestamp))
         if output_type == OutputType.ERROR:
             import traceback
-            PrettyOutput.print(f"错误追踪: {traceback.format_exc()}", OutputType.INFO)
+            PrettyOutput.print(
+                f"错误追踪: {
+                    traceback.format_exc()}",
+                OutputType.INFO)
 
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):
@@ -107,7 +114,11 @@ class PrettyOutput:
         width = 60
         color = PrettyOutput.COLORS.get(output_type, "")
         print(f"\n{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}")
-        PrettyOutput.print(title.center(width - 10), output_type, timestamp=False)
+        PrettyOutput.print(
+            title.center(
+                width - 10),
+            output_type,
+            timestamp=False)
         print(f"{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}\n")
 
     @staticmethod
@@ -123,18 +134,19 @@ class PrettyOutput:
         sys.stdout.write("\n")
         sys.stdout.flush()
 
+
 def get_multiline_input(tip: str) -> str:
     """获取多行输入，支持方向键、历史记录等功能"""
     PrettyOutput.print(tip + "\n", OutputType.INFO)
-    
+
     # 创建输入会话，启用历史记录
     session = PromptSession(history=None)  # 使用默认历史记录
-    
+
     # 定义提示符样式
     style = PromptStyle.from_dict({
         'prompt': 'ansicyan',
     })
-    
+
     lines = []
     try:
         while True:
@@ -142,31 +154,32 @@ def get_multiline_input(tip: str) -> str:
             prompt = FormattedText([
                 ('class:prompt', '... ' if lines else '>>> ')
             ])
-            
+
             # 获取输入
             line = session.prompt(
                 prompt,
                 style=style,
             ).strip()
-            
+
             # 空行处理
             if not line:
                 if not lines:  # 第一行就输入空行
                     return ""
                 break  # 结束多行输入
-                
+
             lines.append(line)
-            
+
     except KeyboardInterrupt:
         PrettyOutput.print("\n输入已取消", OutputType.ERROR)
         return "__interrupt__"
-    
+
     return "\n".join(lines)
+
 
 def load_env_from_file():
     """从~/.jarvis_env加载环境变量"""
     env_file = Path.home() / ".jarvis_env"
-    
+
     if env_file.exists():
         try:
             with open(env_file, "r", encoding="utf-8") as f:
@@ -175,21 +188,28 @@ def load_env_from_file():
                     if line and not line.startswith("#"):
                         try:
                             key, value = line.split("=", 1)
-                            os.environ[key.strip()] = value.strip().strip("'").strip('"')
+                            os.environ[key.strip()] = value.strip().strip(
+                                "'").strip('"')
                         except ValueError:
                             continue
         except Exception as e:
-            PrettyOutput.print(f"Warning: Failed to read ~/.jarvis_env: {e}", OutputType.WARNING)
-    
-    
+            PrettyOutput.print(
+                f"Warning: Failed to read ~/.jarvis_env: {e}",
+                OutputType.WARNING)
+
+
 def while_success(func, sleep_time: float = 0.1):
     while True:
         try:
             return func()
         except Exception as e:
-            PrettyOutput.print(f"执行失败: {str(e)}, {sleep_time}s后重试...", OutputType.ERROR)
+            PrettyOutput.print(
+                f"执行失败: {
+                    str(e)}, {sleep_time}s后重试...",
+                OutputType.ERROR)
             time.sleep(sleep_time)
             continue
+
 
 def while_true(func, sleep_time: float = 0.1):
     """循环执行函数，直到函数返回True"""

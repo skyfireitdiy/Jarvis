@@ -39,7 +39,6 @@ class SubAgentTool:
         "required": ["agent_name", "task", "context", "goal"]
     }
 
-
     def execute(self, args: Dict) -> Dict[str, Any]:
         """创建并运行子代理"""
         try:
@@ -79,4 +78,4 @@ class SubAgentTool:
             return {
                 "success": False,
                 "error": f"子代理执行失败: {str(e)}"
-            } 
+            }

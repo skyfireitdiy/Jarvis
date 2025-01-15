@@ -11,7 +11,8 @@ from jarvis.utils import OutputType, PrettyOutput
 
 
 class ToolRegistry:
-    global_tool_registry = None # type: ignore
+    global_tool_registry = None  # type: ignore
+
     def __init__(self):
         """初始化工具注册器
         """
@@ -30,13 +31,13 @@ class ToolRegistry:
     def _load_builtin_tools(self):
         """从内置tools目录加载工具"""
         tools_dir = Path(__file__).parent
-        
+
         # 遍历目录下的所有.py文件
         for file_path in tools_dir.glob("*.py"):
             # 跳过基础文件和__init__.py
             if file_path.name in ["base.py", "__init__.py", "registry.py"]:
                 continue
-                
+
             self.register_tool_by_file(file_path)
 
     def _load_external_tools(self):
@@ -44,21 +45,21 @@ class ToolRegistry:
         external_tools_dir = Path.home() / '.jarvis_tools'
         if not external_tools_dir.exists():
             return
-            
+
         # 遍历目录下的所有.py文件
         for file_path in external_tools_dir.glob("*.py"):
             # 跳过__init__.py
             if file_path.name == "__init__.py":
                 continue
-                
+
             self.register_tool_by_file(file_path)
 
     def register_tool_by_file(self, file_path: str):
         """从指定文件加载并注册工具
-        
+
         Args:
             file_path: 工具文件的路径
-            
+
         Returns:
             bool: 是否成功加载工具
         """
@@ -67,31 +68,32 @@ class ToolRegistry:
             if not file_path.exists() or not file_path.is_file():
                 PrettyOutput.print(f"文件不存在: {file_path}", OutputType.ERROR)
                 return False
-                
+
             # 动态导入模块
             module_name = file_path.stem
-            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            spec = importlib.util.spec_from_file_location(
+                module_name, file_path)
             if not spec or not spec.loader:
                 PrettyOutput.print(f"无法加载模块: {file_path}", OutputType.ERROR)
                 return False
-                
+
             module = importlib.util.module_from_spec(spec)
             sys.modules[module_name] = module  # 添加到 sys.modules 以支持相对导入
             spec.loader.exec_module(module)
-            
+
             # 查找模块中的工具类
             tool_found = False
             for item_name in dir(module):
                 item = getattr(module, item_name)
                 # 检查是否是类，并且有必要的属性
-                if (isinstance(item, type) and 
-                    hasattr(item, 'name') and 
-                    hasattr(item, 'description') and 
-                    hasattr(item, 'parameters')):
-                    
+                if (isinstance(item, type) and
+                    hasattr(item, 'name') and
+                    hasattr(item, 'description') and
+                        hasattr(item, 'parameters')):
+
                     # 实例化工具类，传入模型和输出处理器
                     tool_instance = item()
-                    
+
                     # 注册工具
                     self.register_tool(
                         name=tool_instance.name,
@@ -99,20 +101,31 @@ class ToolRegistry:
                         parameters=tool_instance.parameters,
                         func=tool_instance.execute
                     )
-                    PrettyOutput.print(f"从 {file_path} 加载工具: {tool_instance.name}: {tool_instance.description}", OutputType.INFO)
+                    PrettyOutput.print(
+                        f"从 {file_path} 加载工具: {
+                            tool_instance.name}: {
+                            tool_instance.description}",
+                        OutputType.INFO)
                     tool_found = True
-                    
+
             if not tool_found:
-                PrettyOutput.print(f"文件中未找到有效的工具类: {file_path}", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"文件中未找到有效的工具类: {file_path}",
+                    OutputType.WARNING)
                 return False
-                
+
             return True
-            
+
         except Exception as e:
-            PrettyOutput.print(f"加载工具失败 {file_path.name}: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(
+                f"加载工具失败 {
+                    file_path.name}: {
+                    str(e)}",
+                OutputType.ERROR)
             return False
 
-    def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
+    def register_tool(self, name: str, description: str,
+                      parameters: Dict, func: Callable):
         """注册新工具"""
         self.tools[name] = Tool(name, description, parameters, func)
 
@@ -136,12 +149,12 @@ class ToolRegistry:
         try:
             if not tool_calls:
                 return ""
-                
+
             # 只处理第一个工具调用
             tool_call = tool_calls[0]
             name = tool_call["name"]
             args = tool_call["arguments"]
-            
+
             if isinstance(args, str):
                 try:
                     args = json.loads(args)
@@ -153,13 +166,14 @@ class ToolRegistry:
             PrettyOutput.section(f"执行工具: {name}", OutputType.TOOL)
             if isinstance(args, dict):
                 for key, value in args.items():
-                    PrettyOutput.print(f"参数: {key} = {value}", OutputType.DEBUG)
+                    PrettyOutput.print(
+                        f"参数: {key} = {value}", OutputType.DEBUG)
             else:
                 PrettyOutput.print(f"参数: {args}", OutputType.DEBUG)
-            
+
             # 执行工具调用
             result = self.execute_tool(name, args)
-            
+
             # 处理结果
             if result["success"]:
                 stdout = result["stdout"]
@@ -176,7 +190,7 @@ class ToolRegistry:
                 error_msg = result["error"]
                 output = f"执行失败: {error_msg}"
                 PrettyOutput.section("执行失败", OutputType.ERROR)
-                
+
             return output
         except Exception as e:
             PrettyOutput.print(f"执行工具失败: {str(e)}", OutputType.ERROR)

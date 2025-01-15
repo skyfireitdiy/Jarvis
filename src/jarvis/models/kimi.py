@@ -8,31 +8,46 @@ from jarvis.models.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType
 from jarvis.utils import while_success
 
+
 class KimiModel(BasePlatform):
     """Kimi模型实现"""
 
     platform_name = "kimi"
-    
+
     def __init__(self):
         """
         初始化Kimi模型
         """
         self.api_key = os.getenv("KIMI_API_KEY")
         if not self.api_key:
-            PrettyOutput.print("\n需要设置 KIMI_API_KEY 才能使用 Jarvis。请按以下步骤操作：", OutputType.INFO)
+            PrettyOutput.print(
+                "\n需要设置 KIMI_API_KEY 才能使用 Jarvis。请按以下步骤操作：",
+                OutputType.INFO)
             PrettyOutput.print("\n1. 获取 Kimi API Key:", OutputType.INFO)
-            PrettyOutput.print("   • 访问 Kimi AI 平台: https://kimi.moonshot.cn", OutputType.INFO)
+            PrettyOutput.print(
+                "   • 访问 Kimi AI 平台: https://kimi.moonshot.cn",
+                OutputType.INFO)
             PrettyOutput.print("   • 登录您的账号", OutputType.INFO)
-            PrettyOutput.print("   • 打开浏览器开发者工具 (F12 或右键 -> 检查)", OutputType.INFO)
+            PrettyOutput.print(
+                "   • 打开浏览器开发者工具 (F12 或右键 -> 检查)",
+                OutputType.INFO)
             PrettyOutput.print("   • 切换到 Network 标签页", OutputType.INFO)
             PrettyOutput.print("   • 发送任意消息", OutputType.INFO)
             PrettyOutput.print("   • 在请求中找到 Authorization 头部", OutputType.INFO)
-            PrettyOutput.print("   • 复制 token 值（去掉 'Bearer ' 前缀）", OutputType.INFO)
+            PrettyOutput.print(
+                "   • 复制 token 值（去掉 'Bearer ' 前缀）",
+                OutputType.INFO)
             PrettyOutput.print("\n2. 设置环境变量:", OutputType.INFO)
-            PrettyOutput.print("   方法 1: 创建或编辑 ~/.jarvis_env 文件:", OutputType.INFO)
-            PrettyOutput.print("   echo 'KIMI_API_KEY=your_key_here' > ~/.jarvis_env", OutputType.INFO)
+            PrettyOutput.print(
+                "   方法 1: 创建或编辑 ~/.jarvis_env 文件:",
+                OutputType.INFO)
+            PrettyOutput.print(
+                "   echo 'KIMI_API_KEY=your_key_here' > ~/.jarvis_env",
+                OutputType.INFO)
             PrettyOutput.print("\n   方法 2: 直接设置环境变量:", OutputType.INFO)
-            PrettyOutput.print("   export KIMI_API_KEY=your_key_here", OutputType.INFO)
+            PrettyOutput.print(
+                "   export KIMI_API_KEY=your_key_here",
+                OutputType.INFO)
             PrettyOutput.print("\n设置完成后重新运行 Jarvis。", OutputType.INFO)
             raise Exception("KIMI_API_KEY is not set")
         self.auth_header = f"Bearer {self.api_key}"
@@ -62,30 +77,41 @@ class KimiModel(BasePlatform):
             'Content-Type': 'application/json'
         }
         try:
-            response = while_success(lambda: requests.request("POST", url, headers=headers, data=payload), sleep_time=5)
+            response = while_success(
+                lambda: requests.request(
+                    "POST",
+                    url,
+                    headers=headers,
+                    data=payload),
+                sleep_time=5)
             self.chat_id = response.json()["id"]
             return True
         except Exception as e:
-            PrettyOutput.print(f"Error: Failed to create chat: {e}", OutputType.ERROR)
+            PrettyOutput.print(
+                f"Error: Failed to create chat: {e}",
+                OutputType.ERROR)
             return False
 
     def _get_presigned_url(self, filename: str, action: str) -> Dict:
         """获取预签名上传URL"""
         url = "https://kimi.moonshot.cn/api/pre-sign-url"
-        
-        
-        
+
         payload = json.dumps({
             "action": action,
             "name": os.path.basename(filename)
         }, ensure_ascii=False)
-        
+
         headers = {
             'Authorization': self.auth_header,
             'Content-Type': 'application/json'
         }
-        
-        response = while_success(lambda: requests.post(url, headers=headers, data=payload), sleep_time=5)
+
+        response = while_success(
+            lambda: requests.post(
+                url,
+                headers=headers,
+                data=payload),
+            sleep_time=5)
         return response.json()
 
     def _upload_file(self, file_path: str, presigned_url: str) -> bool:
@@ -93,13 +119,20 @@ class KimiModel(BasePlatform):
         try:
             with open(file_path, 'rb') as f:
                 content = f.read()
-                response = while_success(lambda: requests.put(presigned_url, data=content), sleep_time=5)
+                response = while_success(
+                    lambda: requests.put(
+                        presigned_url,
+                        data=content),
+                    sleep_time=5)
                 return response.status_code == 200
         except Exception as e:
-            PrettyOutput.print(f"Error: Failed to upload file: {e}", OutputType.ERROR)
+            PrettyOutput.print(
+                f"Error: Failed to upload file: {e}",
+                OutputType.ERROR)
             return False
 
-    def _get_file_info(self, file_data: Dict, name: str, file_type: str) -> Dict:
+    def _get_file_info(self, file_data: Dict, name: str,
+                       file_type: str) -> Dict:
         """获取文件信息"""
         url = "https://kimi.moonshot.cn/api/file"
         payload = json.dumps({
@@ -109,13 +142,18 @@ class KimiModel(BasePlatform):
             "chat_id": self.chat_id,
             "file_id": file_data.get("file_id", "")
         }, ensure_ascii=False)
-        
+
         headers = {
             'Authorization': self.auth_header,
             'Content-Type': 'application/json'
         }
-        
-        response = while_success(lambda: requests.post(url, headers=headers, data=payload), sleep_time=5)
+
+        response = while_success(
+            lambda: requests.post(
+                url,
+                headers=headers,
+                data=payload),
+            sleep_time=5)
         return response.json()
 
     def _wait_for_parse(self, file_id: str) -> bool:
@@ -125,22 +163,28 @@ class KimiModel(BasePlatform):
             'Authorization': self.auth_header,
             'Content-Type': 'application/json'
         }
-        
+
         max_retries = 30
         retry_count = 0
-        
+
         while retry_count < max_retries:
             payload = json.dumps({"ids": [file_id]}, ensure_ascii=False)
-            response = while_success(lambda: requests.post(url, headers=headers, data=payload, stream=True), sleep_time=5)
-            
+            response = while_success(
+                lambda: requests.post(
+                    url,
+                    headers=headers,
+                    data=payload,
+                    stream=True),
+                sleep_time=5)
+
             for line in response.iter_lines():
                 if not line:
                     continue
-                    
+
                 line = line.decode('utf-8')
                 if not line.startswith("data: "):
                     continue
-                    
+
                 try:
                     data = json.loads(line[6:])
                     if data.get("event") == "resp":
@@ -151,18 +195,19 @@ class KimiModel(BasePlatform):
                             return False
                 except json.JSONDecodeError:
                     continue
-            
+
             retry_count += 1
             time.sleep(1)
-        
+
         return False
+
     def upload_files(self, file_list: List[str]) -> List[Dict]:
         """上传文件列表并返回文件信息"""
         if not file_list:
             return []
 
         PrettyOutput.print("Progress: 开始处理文件上传...", OutputType.PROGRESS)
-        
+
         if not self.chat_id:
             PrettyOutput.print("创建新的对话会话...", OutputType.PROGRESS)
             if not self._create_chat():
@@ -171,21 +216,24 @@ class KimiModel(BasePlatform):
         uploaded_files = []
         for index, file_path in enumerate(file_list, 1):
             try:
-                PrettyOutput.print(f"处理文件 [{index}/{len(file_list)}]: {file_path}", OutputType.PROGRESS)
+                PrettyOutput.print(
+                    f"处理文件 [{index}/{len(file_list)}]: {file_path}", OutputType.PROGRESS)
 
                 mime_type, _ = mimetypes.guess_type(file_path)
-                action = "image" if mime_type and mime_type.startswith('image/') else "file"
-                
+                action = "image" if mime_type and mime_type.startswith(
+                    'image/') else "file"
+
                 # 获取预签名URL
                 PrettyOutput.print("获取上传URL...", OutputType.PROGRESS)
                 presigned_data = self._get_presigned_url(file_path, action)
-                
+
                 # 上传文件
                 PrettyOutput.print("上传文件内容...", OutputType.PROGRESS)
                 if self._upload_file(file_path, presigned_data["url"]):
                     # 获取文件信息
                     PrettyOutput.print("获取文件信息...", OutputType.PROGRESS)
-                    file_info = self._get_file_info(presigned_data, os.path.basename(file_path), action)
+                    file_info = self._get_file_info(
+                        presigned_data, os.path.basename(file_path), action)
                     # 等待文件解析
                     PrettyOutput.print("等待文件解析完成...", OutputType.PROGRESS)
 
@@ -193,24 +241,31 @@ class KimiModel(BasePlatform):
                     if action == "file":
                         if self._wait_for_parse(file_info["id"]):
                             uploaded_files.append(file_info)
-                            PrettyOutput.print(f"Success: 文件处理成功: {file_path}", OutputType.SUCCESS)
+                            PrettyOutput.print(
+                                f"Success: 文件处理成功: {file_path}", OutputType.SUCCESS)
                         else:
-                            PrettyOutput.print(f"✗ 文件解析失败: {file_path}", OutputType.ERROR)
+                            PrettyOutput.print(
+                                f"✗ 文件解析失败: {file_path}", OutputType.ERROR)
                     else:
                         uploaded_files.append(file_info)
-                        PrettyOutput.print(f"Success: 文件处理成功: {file_path}", OutputType.SUCCESS)
+                        PrettyOutput.print(
+                            f"Success: 文件处理成功: {file_path}", OutputType.SUCCESS)
                 else:
-                    PrettyOutput.print(f"Error: 文件上传失败: {file_path}", OutputType.ERROR)
-                    
+                    PrettyOutput.print(
+                        f"Error: 文件上传失败: {file_path}", OutputType.ERROR)
+
             except Exception as e:
-                PrettyOutput.print(f"✗ 处理文件出错 {file_path}: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(
+                    f"✗ 处理文件出错 {file_path}: {
+                        str(e)}", OutputType.ERROR)
                 continue
-        
+
         if uploaded_files:
-            PrettyOutput.print(f"成功处理 {len(uploaded_files)}/{len(file_list)} 个文件", OutputType.SUCCESS)
+            PrettyOutput.print(
+                f"成功处理 {len(uploaded_files)}/{len(file_list)} 个文件", OutputType.SUCCESS)
         else:
             PrettyOutput.print("没有文件成功处理", OutputType.ERROR)
-        
+
         self.uploaded_files = uploaded_files
         return uploaded_files
 
@@ -221,19 +276,21 @@ class KimiModel(BasePlatform):
             if not self._create_chat():
                 raise Exception("Failed to create chat session")
 
-        url = f"https://kimi.moonshot.cn/api/chat/{self.chat_id}/completion/stream"
-        
+        url = f"https://kimi.moonshot.cn/api/chat/{
+            self.chat_id}/completion/stream"
+
         # 只在第一次对话时带上文件引用
         refs = []
         refs_file = []
         if self.first_chat:
             if self.uploaded_files:
-                PrettyOutput.print(f"首次对话，引用 {len(self.uploaded_files)} 个文件...", OutputType.PROGRESS)
+                PrettyOutput.print(
+                    f"首次对话，引用 {len(self.uploaded_files)} 个文件...", OutputType.PROGRESS)
                 refs = [f["id"] for f in self.uploaded_files]
                 refs_file = self.uploaded_files
             message = self.system_message + "\n" + message
             self.first_chat = False
-        
+
         PrettyOutput.print("发送请求...", OutputType.PROGRESS)
         payload = {
             "messages": [{"role": "user", "content": message}],
@@ -252,33 +309,39 @@ class KimiModel(BasePlatform):
         }
 
         try:
-            response = while_success(lambda: requests.post(url, headers=headers, json=payload, stream=True), sleep_time=5)
+            response = while_success(
+                lambda: requests.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                    stream=True),
+                sleep_time=5)
             full_response = ""
-            
+
             # 收集搜索和引用结果
             search_results = []
             ref_sources = []
-            
+
             PrettyOutput.print("接收响应...", OutputType.PROGRESS)
             for line in response.iter_lines():
                 if not line:
                     continue
-                    
+
                 line = line.decode('utf-8')
                 if not line.startswith("data: "):
                     continue
-                    
+
                 try:
                     data = json.loads(line[6:])
                     event = data.get("event")
-                    
+
                     if event == "cmpl":
                         # 处理补全文本
                         text = data.get("text", "")
                         if text:
                             PrettyOutput.print_stream(text)
                             full_response += text
-                            
+
                     elif event == "search_plus":
                         # 收集搜索结果
                         msg = data.get("msg", {})
@@ -291,7 +354,7 @@ class KimiModel(BasePlatform):
                                 "type": msg.get("type", ""),
                                 "url": msg.get("url", "")
                             })
-                                
+
                     elif event == "ref_docs":
                         # 收集引用来源
                         ref_cards = data.get("ref_cards", [])
@@ -307,52 +370,75 @@ class KimiModel(BasePlatform):
                                 "rag_segments": card.get("rag_segments", []),
                                 "origin": card.get("origin", {})
                             })
-                                    
+
                 except json.JSONDecodeError:
                     continue
-                    
+
             PrettyOutput.print_stream_end()
-            
 
             # 显示搜索结果摘要
             if search_results:
                 PrettyOutput.print("\n搜索结果:", OutputType.PROGRESS)
                 for result in search_results:
-                    PrettyOutput.print(f"- {result['title']}", OutputType.PROGRESS)
+                    PrettyOutput.print(
+                        f"- {result['title']}", OutputType.PROGRESS)
                     if result['date']:
-                        PrettyOutput.print(f"  日期: {result['date']}", OutputType.PROGRESS)
-                    PrettyOutput.print(f"  来源: {result['site_name']}", OutputType.PROGRESS)
+                        PrettyOutput.print(
+                            f"  日期: {
+                                result['date']}",
+                            OutputType.PROGRESS)
+                    PrettyOutput.print(
+                        f"  来源: {
+                            result['site_name']}",
+                        OutputType.PROGRESS)
                     if result['snippet']:
-                        PrettyOutput.print(f"  摘要: {result['snippet']}", OutputType.PROGRESS)
-                    PrettyOutput.print(f"  链接: {result['url']}", OutputType.PROGRESS)
+                        PrettyOutput.print(
+                            f"  摘要: {
+                                result['snippet']}",
+                            OutputType.PROGRESS)
+                    PrettyOutput.print(
+                        f"  链接: {
+                            result['url']}",
+                        OutputType.PROGRESS)
                     PrettyOutput.print("", OutputType.PROGRESS)
-                        
+
             # 显示引用来源
             if ref_sources:
                 PrettyOutput.print("\n引用来源:", OutputType.PROGRESS)
                 for source in ref_sources:
-                    PrettyOutput.print(f"- [{source['ref_id']}] {source['title']} ({source['source']})", OutputType.PROGRESS)
-                    PrettyOutput.print(f"  链接: {source['url']}", OutputType.PROGRESS)
+                    PrettyOutput.print(
+                        f"- [{source['ref_id']}] {source['title']} ({source['source']})", OutputType.PROGRESS)
+                    PrettyOutput.print(
+                        f"  链接: {
+                            source['url']}",
+                        OutputType.PROGRESS)
                     if source['abstract']:
-                        PrettyOutput.print(f"  摘要: {source['abstract']}", OutputType.PROGRESS)
-                    
+                        PrettyOutput.print(
+                            f"  摘要: {
+                                source['abstract']}",
+                            OutputType.PROGRESS)
+
                     # 显示相关段落
                     if source['rag_segments']:
                         PrettyOutput.print("  相关段落:", OutputType.PROGRESS)
                         for segment in source['rag_segments']:
-                            text = segment.get('text', '').replace('\n', ' ').strip()
+                            text = segment.get(
+                                'text', '').replace(
+                                '\n', ' ').strip()
                             if text:
-                                PrettyOutput.print(f"    - {text}", OutputType.PROGRESS)
-                    
+                                PrettyOutput.print(
+                                    f"    - {text}", OutputType.PROGRESS)
+
                     # 显示原文引用
                     origin = source['origin']
                     if origin:
                         text = origin.get('text', '')
                         if text:
-                            PrettyOutput.print(f"  原文: {text}", OutputType.PROGRESS)
-                    
+                            PrettyOutput.print(
+                                f"  原文: {text}", OutputType.PROGRESS)
+
                     PrettyOutput.print("", OutputType.PROGRESS)
-            
+
             return full_response
 
         except Exception as e:
@@ -362,21 +448,26 @@ class KimiModel(BasePlatform):
         """删除当前会话"""
         if not self.chat_id:
             return True  # 如果没有会话ID，视为删除成功
-            
+
         url = f"https://kimi.moonshot.cn/api/chat/{self.chat_id}"
         headers = {
             'Authorization': self.auth_header,
             'Content-Type': 'application/json'
         }
-        
+
         try:
-            response = while_success(lambda: requests.delete(url, headers=headers), sleep_time=5)
+            response = while_success(
+                lambda: requests.delete(
+                    url, headers=headers), sleep_time=5)
             if response.status_code == 200:
                 PrettyOutput.print("会话已删除", OutputType.SUCCESS)
                 self.reset()
                 return True
             else:
-                PrettyOutput.print(f"删除会话失败: HTTP {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(
+                    f"删除会话失败: HTTP {
+                        response.status_code}",
+                    OutputType.ERROR)
                 return False
         except Exception as e:
             PrettyOutput.print(f"删除会话时发生错误: {str(e)}", OutputType.ERROR)

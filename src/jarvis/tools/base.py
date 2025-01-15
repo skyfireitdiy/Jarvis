@@ -2,9 +2,9 @@ from typing import Dict, Any, Callable
 import json
 
 
-
 class Tool:
-    def __init__(self, name: str, description: str, parameters: Dict, func: Callable):
+    def __init__(self, name: str, description: str,
+                 parameters: Dict, func: Callable):
         self.name = name
         self.description = description
         self.parameters = parameters

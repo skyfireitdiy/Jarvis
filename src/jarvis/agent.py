@@ -10,10 +10,11 @@ import os
 from datetime import datetime
 from prompt_toolkit import prompt
 
+
 class Agent:
     def __init__(self, name: str = "Jarvis", is_sub_agent: bool = False):
         """Initialize Agent with a model, optional tool registry and name
-        
+
         Args:
             model: 语言模型实例
             tool_registry: 工具注册表实例
@@ -26,7 +27,6 @@ class Agent:
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
 
-
     @staticmethod
     def extract_tool_calls(content: str) -> List[Dict]:
         """从内容中提取工具调用，如果检测到多个工具调用则抛出异常，并返回工具调用之前的内容和工具调用"""
@@ -34,7 +34,7 @@ class Agent:
         lines = content.split('\n')
         tool_call_lines = []
         in_tool_call = False
-        
+
         # 逐行处理
         for line in lines:
             if '<START_TOOL_CALL>' in line:
@@ -46,7 +46,7 @@ class Agent:
                         # 直接解析YAML
                         tool_call_text = '\n'.join(tool_call_lines)
                         tool_call_data = yaml.safe_load(tool_call_text)
-                        
+
                         # 验证必要的字段
                         if "name" in tool_call_data and "arguments" in tool_call_data:
                             # 返回工具调用之前的内容和工具调用
@@ -58,17 +58,21 @@ class Agent:
                             PrettyOutput.print("工具调用缺少必要字段", OutputType.ERROR)
                             raise Exception("工具调用缺少必要字段")
                     except yaml.YAMLError as e:
-                        PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
+                        PrettyOutput.print(
+                            f"YAML解析错误: {
+                                str(e)}", OutputType.ERROR)
                         raise Exception(f"YAML解析错误: {str(e)}")
                     except Exception as e:
-                        PrettyOutput.print(f"处理工具调用时发生错误: {str(e)}", OutputType.ERROR)
+                        PrettyOutput.print(
+                            f"处理工具调用时发生错误: {
+                                str(e)}", OutputType.ERROR)
                         raise Exception(f"处理工具调用时发生错误: {str(e)}")
                 in_tool_call = False
                 continue
-            
+
             if in_tool_call:
                 tool_call_lines.append(line)
-        
+
         return []
 
     def _call_model(self, message: str) -> str:
@@ -79,13 +83,14 @@ class Agent:
             if ret:
                 return ret
             else:
-                PrettyOutput.print(f"调用模型失败，重试中... 等待 {sleep_time}s", OutputType.INFO)
+                PrettyOutput.print(
+                    f"调用模型失败，重试中... 等待 {sleep_time}s",
+                    OutputType.INFO)
                 time.sleep(sleep_time)
                 sleep_time *= 2
                 if sleep_time > 30:
                     sleep_time = 30
                 continue
-
 
     def _load_methodology(self) -> str:
         """加载经验总结"""
@@ -96,23 +101,28 @@ class Agent:
                 data = yaml.safe_load(f)
                 for k, v in data.items():
                     ret += f"问题类型: \n{k}\n经验总结: \n{v}\n\n"
-            PrettyOutput.print(f"从 {user_jarvis_methodology} 加载经验总结: {', '.join(data.keys())}", OutputType.INFO)
+            PrettyOutput.print(
+                f"从 {user_jarvis_methodology} 加载经验总结: {
+                    ', '.join(
+                        data.keys())}",
+                OutputType.INFO)
         return ret
 
-    def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
+    def run(self, user_input: str,
+            file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
         """处理用户输入并返回响应，返回任务总结报告
-        
+
         Args:
             user_input: 用户输入的任务描述
             file_list: 可选的文件列表，默认为None
             keep_history: 是否保留对话历史，默认为False
-        
+
         Returns:
             str: 任务总结报告
         """
         try:
             self.clear_history()
-            
+
             if file_list:
                 self.model.upload_files(file_list)
 
@@ -125,7 +135,7 @@ class Agent:
 {methodology}
 
 """
-            
+
             # 显示任务开始
             PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
 
@@ -136,7 +146,7 @@ class Agent:
                 tools_prompt += f"  参数: {tool['parameters']}\n"
 
             self.model.set_system_message(f"""你是 {self.name}，一个问题处理能力强大的 AI 助手。
-                                          
+
 你会严格按照以下步骤处理问题：
 1. 问题重述：确认理解问题
 2. 根因分析（如果是问题分析类需要，其他不需要）
@@ -148,7 +158,7 @@ class Agent:
 8. 监控与调整：如果执行结果与预期不符，则反思并调整行动计划，迭代之前的步骤
 9. 更新经验总结（如有必要）：任务完成后总结执行过程中的经验教训，生成同类问题的通用经验总结，使用经验总结工具进行更新或者添加
 
--------------------------------------------------------------                       
+-------------------------------------------------------------
 
 经验总结模板：
 1. 问题重述
@@ -193,27 +203,30 @@ arguments:
                 try:
                     # 显示思考状态
                     PrettyOutput.print("分析任务...", OutputType.PROGRESS)
-                    
+
                     current_response = self._call_model(self.prompt)
-                    
+
                     try:
                         result = Agent.extract_tool_calls(current_response)
                     except Exception as e:
-                        PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
+                        PrettyOutput.print(
+                            f"工具调用错误: {str(e)}", OutputType.ERROR)
                         self.prompt = f"工具调用错误: {str(e)}"
                         continue
-                    
+
                     if len(result) > 0:
 
                         PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
-                        tool_result = self.tool_registry.handle_tool_calls(result)
+                        tool_result = self.tool_registry.handle_tool_calls(
+                            result)
                         PrettyOutput.print(tool_result, OutputType.RESULT)
 
                         self.prompt = tool_result
                         continue
-                    
+
                     # 获取用户输入
-                    user_input = get_multiline_input(f"{self.name}: 您可以继续输入，或输入空行结束当前任务")
+                    user_input = get_multiline_input(
+                        f"{self.name}: 您可以继续输入，或输入空行结束当前任务")
                     if user_input == "__interrupt__":
                         PrettyOutput.print("任务已取消", OutputType.WARNING)
                         return "Task cancelled by user"
@@ -221,10 +234,11 @@ arguments:
                     if user_input:
                         self.prompt = user_input
                         continue
-                    
+
                     if not user_input:
                         while True:
-                            choice = prompt("是否需要手动为此任务生成经验总结以提升Jarvis对类似任务的处理能力？(y/n), 回车跳过: ")
+                            choice = prompt(
+                                "是否需要手动为此任务生成经验总结以提升Jarvis对类似任务的处理能力？(y/n), 回车跳过: ")
                             if choice == "y":
                                 self._make_methodology()
                                 break
@@ -259,18 +273,20 @@ arguments:
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return f"Task failed: {str(e)}"
-        
+
         finally:
             # 只在不保留历史时删除会话
             if not keep_history:
                 try:
                     self.model.delete_chat()
                 except Exception as e:
-                    PrettyOutput.print(f"清理会话时发生错误: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"清理会话时发生错误: {
+                            str(e)}", OutputType.ERROR)
 
     def clear_history(self):
         """清除对话历史，只保留系统提示"""
-        self.prompt = "" 
+        self.prompt = ""
         self.model.reset()
 
     def _make_methodology(self):
@@ -281,7 +297,7 @@ arguments:
 2. 最优解决方案
 3. 最优方案执行步骤（失败的行动不需要体现）
                          """)
-        
+
         try:
             result = Agent.extract_tool_calls(current_response)
         except Exception as e:
@@ -291,4 +307,3 @@ arguments:
             PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
             tool_result = self.tool_registry.handle_tool_calls(result)
             PrettyOutput.print(tool_result, OutputType.RESULT)
-                         

@@ -5,6 +5,7 @@ from jarvis.models.registry import PlatformRegistry
 from jarvis.tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput
 
+
 class ToolGeneratorTool:
     name = "generate_tool"
     description = "生成新的工具代码并自动注册到Jarvis，自动扩充Jarvis的能力"
@@ -36,13 +37,15 @@ class ToolGeneratorTool:
         """
         # 设置工具目录
         self.tools_dir = Path.home() / '.jarvis_tools'
-        
+
         # 确保工具目录存在
         self.tools_dir.mkdir(parents=True, exist_ok=True)
 
-    def _generate_tool_code(self, tool_name: str, class_name: str, description: str, parameters: Dict) -> str:
+    def _generate_tool_code(self, tool_name: str, class_name: str,
+                            description: str, parameters: Dict) -> str:
         """使用大模型生成工具代码"""
-        platform_name = os.getenv("JARVIS_CODEGEN_PLATFORM") or PlatformRegistry.get_global_platform_name()
+        platform_name = os.getenv(
+            "JARVIS_CODEGEN_PLATFORM") or PlatformRegistry.get_global_platform_name()
         model = PlatformRegistry.create_platform(platform_name)
         model_name = os.getenv("JARVIS_CODEGEN_MODEL")
         if model_name:
@@ -81,16 +84,16 @@ class ExampleTool:
             # 验证参数示例
             if "param1" not in args:
                 return {{"success": False, "error": "缺少必需参数: param1"}}
-            
+
             # 记录操作示例
             PrettyOutput.print(f"处理参数: {{args['param1']}}", OutputType.INFO)
 
             # 使用大模型示例
             response = self.model.chat("prompt")
-            
+
             # 实现具体功能
             result = "处理结果"
-            
+
             return {{
                 "success": True,
                 "stdout": result,
@@ -111,11 +114,11 @@ class ExampleTool:
         # 提取代码块
         code_start = response.find("```python")
         code_end = response.find("```", code_start + 9)
-        
+
         if code_start == -1 or code_end == -1:
             # 如果没有找到代码块标记，假设整个响应都是代码
             return response
-        
+
         # 提取代码块内容（去掉```python和```标记）
         code = response[code_start + 9:code_end].strip()
         return code
@@ -162,10 +165,10 @@ class ExampleTool:
             return {
                 "success": True,
                 "stdout": f"工具已生成并注册到Jarvis\n"
-                         f"工具目录: {self.tools_dir}\n"
-                         f"工具名称: {tool_name}\n"
-                         f"工具描述: {description}\n"
-                         f"工具参数: {parameters}",
+                f"工具目录: {self.tools_dir}\n"
+                f"工具名称: {tool_name}\n"
+                f"工具描述: {description}\n"
+                f"工具参数: {parameters}",
                 "stderr": ""
             }
 
