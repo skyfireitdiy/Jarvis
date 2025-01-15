@@ -9,7 +9,7 @@ import json
 class OyiModel(BaseModel):
     """Oyi model implementation"""
     
-    model_name = "oyi"
+    platform_name = "oyi"
     BASE_URL = "https://api-10086.rcouyi.com"
     
     def __init__(self):
@@ -71,7 +71,7 @@ class OyiModel(BaseModel):
                 "isLock": False,
                 "systemMessage": "",
                 "params": json.dumps({
-                    "model": "gpt-4o-mini",
+                    "model": self.model,
                     "is_webSearch": True,
                     "message": [],
                     "systemMessage": None,
@@ -202,7 +202,7 @@ class OyiModel(BaseModel):
             
     def name(self) -> str:
         """Return model name"""
-        return self.model_name
+        return self.model
         
     def reset(self):
         """Reset model state"""

@@ -15,7 +15,7 @@ REQUIRED_METHODS = [
 ]
 
 class ModelRegistry:
-    """模型注册器"""
+    """平台注册器"""
 
     global_model_name = "kimi"
     global_model_registry = None
@@ -29,18 +29,18 @@ class ModelRegistry:
                 # 创建 __init__.py 使其成为 Python 包
                 with open(os.path.join(user_models_dir, "__init__.py"), "w") as f:
                     pass
-                PrettyOutput.print(f"已创建模型目录: {user_models_dir}", OutputType.INFO)
+                PrettyOutput.print(f"已创建平台目录: {user_models_dir}", OutputType.INFO)
             except Exception as e:
-                PrettyOutput.print(f"创建模型目录失败: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"创建平台目录失败: {str(e)}", OutputType.ERROR)
                 return ""
         return user_models_dir
 
     @staticmethod
     def check_model_implementation(model_class: Type[BaseModel]) -> bool:
-        """检查模型类是否实现了所有必要的方法
+        """检查平台类是否实现了所有必要的方法
         
         Args:
-            model_class: 要检查的模型类
+            model_class: 要检查的平台类
             
         Returns:
             bool: 是否实现了所有必要的方法
@@ -66,7 +66,7 @@ class ModelRegistry:
         
         if missing_methods:
             PrettyOutput.print(
-                f"模型 {model_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}", 
+                f"平台 {model_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}", 
                 OutputType.ERROR
             )
             return False
@@ -75,19 +75,19 @@ class ModelRegistry:
 
     @staticmethod
     def load_models_from_dir(directory: str) -> Dict[str, Type[BaseModel]]:
-        """从指定目录加载模型
+        """从指定目录加载平台
         
         Args:
-            directory: 模型目录路径
+            directory: 平台目录路径
             
         Returns:
-            Dict[str, Type[BaseModel]]: 模型名称到模型类的映射
+            Dict[str, Type[BaseModel]]: 平台名称到平台类的映射
         """
         models = {}
         
         # 确保目录存在
         if not os.path.exists(directory):
-            PrettyOutput.print(f"模型目录不存在: {directory}", OutputType.ERROR)
+            PrettyOutput.print(f"平台目录不存在: {directory}", OutputType.ERROR)
             return models
             
         # 获取目录的包名
@@ -116,84 +116,84 @@ class ModelRegistry:
                         if (inspect.isclass(obj) and 
                             issubclass(obj, BaseModel) and 
                             obj != BaseModel and
-                            hasattr(obj, 'model_name')):
-                            # 检查模型实现
+                            hasattr(obj, 'platform_name')):
+                            # 检查平台实现
                             if not ModelRegistry.check_model_implementation(obj):
                                 continue
-                            models[obj.model_name] = obj
-                            PrettyOutput.print(f"从 {directory} 加载模型: {obj.model_name}", OutputType.INFO)
+                            models[obj.platform_name] = obj
+                            PrettyOutput.print(f"从 {directory} 加载平台: {obj.platform_name}", OutputType.INFO)
                             break
                 except Exception as e:
-                    PrettyOutput.print(f"加载模型 {module_name} 失败: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"加载平台 {module_name} 失败: {str(e)}", OutputType.ERROR)
         
         return models
 
 
     @staticmethod
     def get_model_registry():
-        """获取全局模型注册器"""
+        """获取全局平台注册器"""
         if ModelRegistry.global_model_registry is None:
             ModelRegistry.global_model_registry = ModelRegistry()
             
-            # 从用户模型目录加载额外模型
+            # 从用户平台目录加载额外平台
             models_dir = ModelRegistry.get_models_dir()
             if models_dir and os.path.exists(models_dir):
-                for model_name, model_class in ModelRegistry.load_models_from_dir(models_dir).items():
-                    ModelRegistry.global_model_registry.register_model(model_name, model_class)
+                for platform_name, model_class in ModelRegistry.load_models_from_dir(models_dir).items():
+                    ModelRegistry.global_model_registry.register_model(platform_name, model_class)
             models_dir = os.path.dirname(__file__)
             if models_dir and os.path.exists(models_dir):
-                for model_name, model_class in ModelRegistry.load_models_from_dir(models_dir).items():
-                    ModelRegistry.global_model_registry.register_model(model_name, model_class)
+                for platform_name, model_class in ModelRegistry.load_models_from_dir(models_dir).items():
+                    ModelRegistry.global_model_registry.register_model(platform_name, model_class)
         return ModelRegistry.global_model_registry
     
     def __init__(self):
-        """初始化模型注册器
+        """初始化平台注册器
         """
         self.models: Dict[str, Type[BaseModel]] = {}
 
     @staticmethod
     def get_global_model() -> BaseModel:
-        """获取全局模型实例"""
+        """获取全局平台实例"""
         model = ModelRegistry.get_model_registry().create_model(ModelRegistry.global_model_name)
         if not model:
             raise Exception(f"Failed to create model: {ModelRegistry.global_model_name}")
         return model
         
     def register_model(self, name: str, model_class: Type[BaseModel]):
-        """注册模型类
+        """注册平台类
         
         Args:
-            name: 模型名称
-            model_class: 模型类
+            name: 平台名称
+            model_class: 平台类
         """
         self.models[name] = model_class
-        PrettyOutput.print(f"已注册模型: {name}", OutputType.INFO)
+        PrettyOutput.print(f"已注册平台: {name}", OutputType.INFO)
             
     def create_model(self, name: str) -> Optional[BaseModel]:
-        """创建模型实例
+        """创建平台实例
         
         Args:
-            name: 模型名称
+            name: 平台名称
             
         Returns:
-            BaseModel: 模型实例
+            BaseModel: 平台实例
         """
         if name not in self.models:
-            PrettyOutput.print(f"未找到模型: {name}", OutputType.ERROR)
+            PrettyOutput.print(f"未找到平台: {name}", OutputType.ERROR)
             return None
             
         try:
             model = self.models[name]()
-            PrettyOutput.print(f"已创建模型实例: {name}", OutputType.INFO)
+            PrettyOutput.print(f"已创建平台实例: {name}", OutputType.INFO)
             return model
         except Exception as e:
-            PrettyOutput.print(f"创建模型失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"创建平台失败: {str(e)}", OutputType.ERROR)
             return None
             
     def get_available_models(self) -> List[str]:
-        """获取可用模型列表"""
+        """获取可用平台列表"""
         return list(self.models.keys()) 
     
-    def set_global_model(self, model_name: str):
-        """设置全局模型"""
-        ModelRegistry.global_model_name = model_name
+    def set_global_model(self, platform_name: str):
+        """设置全局平台"""
+        ModelRegistry.global_model_name = platform_name

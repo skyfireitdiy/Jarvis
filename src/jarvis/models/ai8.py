@@ -9,7 +9,7 @@ import base64
 class AI8Model(BaseModel):
     """AI8 model implementation"""
     
-    model_name = "ai8"
+    platform_name = "ai8"
     BASE_URL = "https://ai8.rcouyi.com"
     
     def __init__(self):
@@ -228,7 +228,7 @@ class AI8Model(BaseModel):
             
     def name(self) -> str:
         """Return model name"""
-        return self.model_name
+        return self.model
         
     def reset(self):
         """Reset model state"""

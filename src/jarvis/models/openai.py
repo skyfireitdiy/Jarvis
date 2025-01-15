@@ -7,7 +7,7 @@ from jarvis.utils import PrettyOutput, OutputType
 class OpenAIModel(BaseModel):
     """DeepSeek模型实现"""
 
-    model_name = "openai"
+    platform_name = "openai"
     
     def __init__(self):
         """
@@ -30,9 +30,9 @@ class OpenAIModel(BaseModel):
             raise Exception("OPENAI_API_KEY is not set")
             
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com")
-        self.model_name = os.getenv("OPENAI_MODEL_NAME", "deepseek-chat")
+        self.platform_name = os.getenv("OPENAI_MODEL_NAME", "deepseek-chat")
 
-        PrettyOutput.print(f"当前使用模型: {self.model_name}", OutputType.SYSTEM)
+        PrettyOutput.print(f"当前使用模型: {self.platform_name}", OutputType.SYSTEM)
             
         self.client = OpenAI(
             api_key=self.api_key,
@@ -55,7 +55,7 @@ class OpenAIModel(BaseModel):
             self.messages.append({"role": "user", "content": message})
             
             response = self.client.chat.completions.create(
-                model=self.model_name,  # 使用配置的模型名称
+                model=self.platform_name,  # 使用配置的模型名称
                 messages=self.messages,
                 stream=True
             )

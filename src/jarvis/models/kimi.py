@@ -11,7 +11,7 @@ from jarvis.utils import while_success
 class KimiModel(BaseModel):
     """Kimi模型实现"""
 
-    model_name = "kimi"
+    platform_name = "kimi"
     
     def __init__(self):
         """
