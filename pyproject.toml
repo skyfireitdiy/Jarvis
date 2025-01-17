@@ -36,4 +36,4 @@ Homepage = "https://github.com/skyfireitdiy/Jarvis"
 
 [project.scripts]
 jarvis = "jarvis.main:main"
-code_edit = "jarvis.tools.code_edit:main"
+ce = "jarvis.tools.code_edit:main"

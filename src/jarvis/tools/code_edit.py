@@ -356,7 +356,7 @@ file_description: 这个文件的主要功能和作用描述
         
     def _make_patch(self, related_files: List[Dict]) -> List[str]:
         """生成修改方案"""
-        prompt = "你是一个资深程序员，请根据需求描述，修改文件内容，生成最小化的patch，文件列表如下：\n"
+        prompt = "你是一个资深程序员，请根据需求描述，修改文件内容，文件列表如下：\n"
         prompt += "<FILE_RELATION_START>\n"
         for i, file in enumerate(related_files):
             prompt += f"""{i}. {file["file_path"]} : {file["file_description"]}\n"""
@@ -378,6 +378,8 @@ file_description: 这个文件的主要功能和作用描述
         prompt += f"==========\n"
         prompt += f"[新文件内容]\n"
         prompt += f"<<<<<<\n"
+        prompt += f"生成最小化的patch，原文件内容与修改后文件内容不要有大量重复内容。"
+        prompt += f"如果一个文件有多处需要修改，请生成多个patch，不要生成一个patch包含多处修改。"
         
         success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)  # 增加重试次数
         if not success:
@@ -406,7 +408,7 @@ file_description: 这个文件的主要功能和作用描述
         
         error_info = []
 
-        modify_files = set()
+        modified_files = set()  # 记录修改的文件
         
         # 尝试应用所有补丁
         for i, patch in enumerate(patches):
@@ -435,12 +437,13 @@ file_description: 这个文件的主要功能和作用描述
                 
             # 处理新文件的情况
             if file_name not in temp_map:
-                modify_files.add(file_name)
                 PrettyOutput.print(f"创建新文件: {file_name}", OutputType.WARNING)
                 if old_code:  # 如果是新文件但有原始内容，这是错误的
                     error_info.append(f"文件 {file_name} 不存在，但补丁包含原始内容")
                     return False, "\n".join(error_info)
+                
                 temp_map[file_name] = "\n".join(new_code)
+                modified_files.add(file_name)  # 记录新文件
                 continue
             
             # 应用补丁到现有文件
@@ -458,9 +461,10 @@ file_description: 这个文件的主要功能和作用描述
             
             # 应用更改到临时映射
             temp_map[file_name] = temp_map[file_name].replace(old_content, new_content)
-            modify_files.add(file_name)
+            modified_files.add(file_name)  # 记录修改的文件
+            
         # 所有补丁都应用成功，更新实际文件
-        for file_path in temp_map.keys():
+        for file_path in modified_files:
             try:
                 dir = os.path.dirname(file_path)
                 if dir and not os.path.exists(dir):
@@ -531,6 +535,7 @@ file_description: 这个文件的主要功能和作用描述
                 - success: 是否成功
                 - stdout: 标准输出信息
                 - stderr: 错误信息
+                - error: 错误对象(如果有)
         """
         try:
             self.feature = args["feature"]
@@ -543,7 +548,8 @@ file_description: 这个文件的主要功能和作用描述
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "不支持的编程语言"
+                    "stderr": "不支持的编程语言",
+                    "error": ValueError("不支持的编程语言")
                 }
 
             # 1. 判断代码库路径是否存在，如果不存在，创建
@@ -589,6 +595,15 @@ file_description: 这个文件的主要功能和作用描述
                 # 生成修改方案
                 PrettyOutput.print(f"生成{len(patches)}个补丁", OutputType.INFO)
                 
+                if not patches:
+                    self._save_edit_record(self.feature, patches)
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "未生成补丁",
+                        "error": ValueError("未生成补丁")
+                    }
+                
                 # 尝试应用补丁
                 success, error_info = self._apply_patch(related_files, patches)
                 
@@ -609,17 +624,20 @@ file_description: 这个文件的主要功能和作用描述
                         return {
                             "success": True,
                             "stdout": f"已完成功能开发{self.feature}",
-                            "stderr": ""
+                            "stderr": "",
+                            "error": None
                         }
                     else:
                         PrettyOutput.print("修改已取消，回退更改", OutputType.INFO)
                         os.chdir(self.root_dir)
-                        os.system(f"git reset --hard")
+                        os.system(f"git reset --hard")  # 回退已修改的文件
+                        os.system(f"git clean -df")     # 删除新创建的文件和目录
                         os.chdir(self.current_dir)
                         return {
                             "success": False,
                             "stdout": "",
-                            "stderr": "修改被用户取消，文件未发生任何变化"
+                            "stderr": "修改被用户取消，文件未发生任何变化",
+                            "error": UserWarning("用户取消修改")
                         }
                 else:
                     # 补丁应用失败，让模型重新生成
@@ -642,9 +660,10 @@ file_description: 这个文件的主要功能和作用描述
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"执行失败: {str(e)}"
+                "stderr": f"执行失败: {str(e)}",
+                "error": e
             }
-        
+
 
 def main():
     """命令行入口"""
@@ -694,6 +713,8 @@ def main():
             else:
                 if result["stderr"]:
                     PrettyOutput.print(result["stderr"], OutputType.ERROR)
+                if result["error"]:
+                    PrettyOutput.print(f"错误类型: {type(result['error']).__name__}", OutputType.ERROR)
                 
         except KeyboardInterrupt:
             print("\n用户中断执行")
