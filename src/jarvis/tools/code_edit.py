@@ -388,6 +388,8 @@ file_description: 这个文件的主要功能和作用描述
         temp_map = file_map.copy()  # 创建临时映射用于尝试应用
         
         error_info = []
+
+        modify_files = set()
         
         # 尝试应用所有补丁
         for i, patch in enumerate(patches):
@@ -416,6 +418,7 @@ file_description: 这个文件的主要功能和作用描述
                 
             # 处理新文件的情况
             if file_name not in temp_map:
+                modify_files.add(file_name)
                 PrettyOutput.print(f"创建新文件: {file_name}", OutputType.WARNING)
                 if old_code:  # 如果是新文件但有原始内容，这是错误的
                     error_info.append(f"文件 {file_name} 不存在，但补丁包含原始内容")
@@ -438,13 +441,13 @@ file_description: 这个文件的主要功能和作用描述
             
             # 应用更改到临时映射
             temp_map[file_name] = temp_map[file_name].replace(old_content, new_content)
-            
+            modify_files.add(file_name)
         # 所有补丁都应用成功，更新实际文件
-        for file_path, content in temp_map.items():
+        for file_path in temp_map.keys():
             try:
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
                 with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(content)
+                    f.write(temp_map[file_path])
                 PrettyOutput.print(f"成功更新文件: {file_path}", OutputType.SUCCESS)
             except Exception as e:
                 error_info.append(f"写入文件失败 {file_path}: {str(e)}")
@@ -508,120 +511,104 @@ file_description: 这个文件的主要功能和作用描述
         Returns:
             Dict[str, Any]: 包含执行结果的字典
                 - success: 是否成功
-                - changes: 修改内容
-                - preview: 修改预览
-                - results: 执行结果
+                - stdout: 标准输出信息
+                - stderr: 错误信息
         """
-        self.feature = args["feature"]
-        self.root_dir = args["root_dir"]
-        self.language = args["language"]
+        try:
+            self.feature = args["feature"]
+            self.root_dir = args["root_dir"]
+            self.language = args["language"]
+            self.current_dir = os.getcwd()
 
-        self.current_dir = os.getcwd()
+            # 0. 判断语言是否支持
+            if not self._get_file_extensions(self.language):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "不支持的编程语言"
+                }
 
-        # 0. 判断语言是否支持
-        if not self._get_file_extensions(self.language):
-            PrettyOutput.print("Language not supported", OutputType.ERROR)
-            return {"success": False, "changes": "", "preview": "", "results": ""}
+            # 1. 判断代码库路径是否存在，如果不存在，创建
+            if not os.path.exists(self.root_dir):
+                PrettyOutput.print(
+                    "Root directory does not exist, creating...", OutputType.INFO)
+                os.makedirs(self.root_dir)
 
-        # 1. 判断代码库路径是否存在，如果不存在，创建
-        if not os.path.exists(self.root_dir):
-            PrettyOutput.print(
-                "Root directory does not exist, creating...", OutputType.INFO)
-            os.makedirs(self.root_dir)
+            # 2. 判断代码库是否是git仓库，如果不是，初始化git仓库
+            if not os.path.exists(os.path.join(self.root_dir, ".git")):
+                PrettyOutput.print(
+                    "Git repository does not exist, initializing...", OutputType.INFO)
+                os.chdir(self.root_dir)
+                os.system(f"git init")
+                # 2.1 添加所有的文件
+                os.system(f"git add .")
+                # 2.2 提交
+                os.system(f"git commit -m 'Initial commit'")
+                os.chdir(self.current_dir)
 
-        # 2. 判断代码库是否是git仓库，如果不是，初始化git仓库
-        if not os.path.exists(os.path.join(self.root_dir, ".git")):
-            PrettyOutput.print(
-                "Git repository does not exist, initializing...", OutputType.INFO)
+            # 3. 查看代码库是否有未提交的文件，如果有，提交一次
+            if self._has_uncommitted_files(self.root_dir):
+                os.chdir(self.root_dir)
+                os.system(f"git add .")
+                os.system(f"git commit -m 'commit before code edit'")
+                os.chdir(self.current_dir)
+
+            # 4. 开始建立代码库索引
             os.chdir(self.root_dir)
-            os.system(f"git init")
-            # 2.1 添加所有的文件
-            os.system(f"git add .")
-            # 2.2 提交
-            os.system(f"git commit -m 'Initial commit'")
+            self._index_project(self.language)
             os.chdir(self.current_dir)
 
-        # 3. 查看代码库是否有未提交的文件，如果有，提交一次
-        if self._has_uncommitted_files(self.root_dir):
-            os.chdir(self.root_dir)
-            os.system(f"git add .")
-            os.system(f"git commit -m 'commit before code edit'")
-            os.chdir(self.current_dir)
+            # 5. 根据索引和需求，查找相关文件
+            related_files = self._find_related_files(self.feature)
+            for file in related_files:
+                PrettyOutput.print(f"Related file: {file['file_path']}", OutputType.INFO)
+            for file in related_files:
+                with open(file["file_path"], "r", encoding="utf-8") as f:
+                    file_content = f.read()
+                    file["file_content"] = file_content
 
-        # 4. 开始建立代码库索引
-        os.chdir(self.root_dir)
-        self._index_project(self.language)
-        os.chdir(self.current_dir)
-
-        # 5. 根据索引和需求，查找相关文件
-        related_files = self._find_related_files(self.feature)
-        PrettyOutput.print(f"Related files: {related_files}", OutputType.INFO)
-        for file in related_files:
-            with open(file["file_path"], "r", encoding="utf-8") as f:
-                file_content = f.read()
-                file["file_content"] = file_content
-
-        while True:
-            # 生成修改方案
-            patches = self._make_patch(related_files)
-            PrettyOutput.print(f"生成{len(patches)}个补丁", OutputType.INFO)
-            
-            if not patches:
-                PrettyOutput.print("未生成补丁，跳过", OutputType.INFO)
-                self._save_edit_record(self.feature, [], False)
-                return {"success": False, "changes": "", "preview": "", "results": ""}
-            
-            # 尝试应用补丁
-            success, error_info = self._apply_patch(related_files, patches)
-            
-            if success:
-                # 用户确认修改
-                user_confirm = input("是否确认修改？(y/n)")
-                if user_confirm.lower() == "y":
-                    PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
-                    os.chdir(self.root_dir)
-                    os.system(f"git add .")
-                    os.system(f"git commit -m '{self.feature}'")
-                    os.chdir(self.current_dir)
-                    # 保存修改记录
-                    self._save_edit_record(self.feature, patches, True)
-                    # 重新建立代码库索引
-                    self._index_project(self.language)
-                    
-                    # 询问用户是否继续
-                    while True:
-                        continue_choice = input("是否继续添加新的修改？(y/n)")
-                        if continue_choice.lower() == "y":
-                            new_feature = input("请输入新的需求描述: ")
-                            if new_feature.strip():
-                                self.feature = new_feature
-                                # 重新查找相关文件
-                                related_files = self._find_related_files(self.feature)
-                                PrettyOutput.print(f"Related files: {related_files}", OutputType.INFO)
-                                for file in related_files:
-                                    with open(file["file_path"], "r", encoding="utf-8") as f:
-                                        file_content = f.read()
-                                        file["file_content"] = file_content
-                                break  # 跳出询问循环，继续主循环处理新需求
-                            else:
-                                PrettyOutput.print("需求描述不能为空", OutputType.ERROR)
-                        elif continue_choice.lower() == "n":
-                            return {"success": True, "changes": patches, "results": "修改已提交"}
-                        else:
-                            PrettyOutput.print("请输入 y 或 n", OutputType.ERROR)
+            while True:
+                # 生成修改方案
+                patches = self._make_patch(related_files)
+                PrettyOutput.print(f"生成{len(patches)}个补丁", OutputType.INFO)
+                
+                # 尝试应用补丁
+                success, error_info = self._apply_patch(related_files, patches)
+                
+                if success:
+                    # 用户确认修改
+                    user_confirm = input("是否确认修改？(y/n)")
+                    if user_confirm.lower() == "y":
+                        PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
+                        os.chdir(self.root_dir)
+                        os.system(f"git add .")
+                        os.system(f"git commit -m '{self.feature}'")
+                        os.chdir(self.current_dir)
+                        # 保存修改记录
+                        self._save_edit_record(self.feature, patches, True)
+                        # 重新建立代码库索引
+                        self._index_project(self.language)
                         
-                    continue  # 继续主循环处理新需求
+                        return {
+                            "success": True,
+                            "stdout": f"已完成功能开发{self.feature}",
+                            "stderr": ""
+                        }
+                    else:
+                        PrettyOutput.print("修改已取消，回退更改", OutputType.INFO)
+                        os.chdir(self.root_dir)
+                        os.system(f"git reset --hard")
+                        os.chdir(self.current_dir)
+                        self._save_edit_record(self.feature, patches, False)
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": "修改被用户取消，文件未发生任何变化"
+                        }
                 else:
-                    PrettyOutput.print("修改已取消，回退更改", OutputType.INFO)
-                    os.chdir(self.root_dir)
-                    os.system(f"git reset --hard")
-                    os.chdir(self.current_dir)
-                    self._save_edit_record(self.feature, patches, False)
-                    return {"success": False, "changes": patches, "results": "用户取消修改"}
-            else:
-                # 补丁应用失败，让模型重新生成
-                PrettyOutput.print("补丁应用失败，请求重新生成", OutputType.WARNING)
-                retry_prompt = f"""补丁应用失败，请根据以下错误信息重新生成补丁：
+                    # 补丁应用失败，让模型重新生成
+                    PrettyOutput.print("补丁应用失败，请求重新生成", OutputType.WARNING)
+                    retry_prompt = f"""补丁应用失败，请根据以下错误信息重新生成补丁：
 
 错误信息：
 {error_info}
@@ -632,10 +619,21 @@ file_description: 这个文件的主要功能和作用描述
 3. 考虑代码上下文
 4. 对新文件不要包含原始内容
 """
-                self.main_model.chat(retry_prompt)
-                continue
-            
-        return {"success": False, "changes": "", "preview": "", "results": "达到最大重试次数"}
+                    self.main_model.chat(retry_prompt)
+                    continue
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"执行失败: {str(e)}"
+            }
+        
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": "达到最大重试次数"
+        }
 
 
 if __name__ == "__main__":
