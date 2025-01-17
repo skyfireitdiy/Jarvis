@@ -341,6 +341,18 @@ file_description: 这个文件的主要功能和作用描述
             files = files[:3]  # 如果文件数不足3个，取所有文件
             
         return files
+    
+    def _remake_patch(self, prompt: str) -> List[str]:
+        success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)  # 增加重试次数
+        if not success:
+            return []
+            
+        try:
+            patches = re.findall(r">>>>>>.*?<<<<<<", response, re.DOTALL)
+            return patches
+        except Exception as e:
+            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
+            return []
         
     def _make_patch(self, related_files: List[Dict]) -> List[str]:
         """生成修改方案"""
@@ -566,10 +578,9 @@ file_description: 这个文件的主要功能和作用描述
                 with open(file["file_path"], "r", encoding="utf-8") as f:
                     file_content = f.read()
                     file["file_content"] = file_content
-
+            patches = self._make_patch(related_files)
             while True:
                 # 生成修改方案
-                patches = self._make_patch(related_files)
                 PrettyOutput.print(f"生成{len(patches)}个补丁", OutputType.INFO)
                 
                 # 尝试应用补丁
@@ -619,7 +630,7 @@ file_description: 这个文件的主要功能和作用描述
 3. 考虑代码上下文
 4. 对新文件不要包含原始内容
 """
-                    self.main_model.chat(retry_prompt)
+                    patches = self._remake_patch(retry_prompt)
                     continue
                 
         except Exception as e:
@@ -629,12 +640,6 @@ file_description: 这个文件的主要功能和作用描述
                 "stderr": f"执行失败: {str(e)}"
             }
         
-        return {
-            "success": False,
-            "stdout": "",
-            "stderr": "达到最大重试次数"
-        }
-
 
 if __name__ == "__main__":
     tool = CodeEditTool()
