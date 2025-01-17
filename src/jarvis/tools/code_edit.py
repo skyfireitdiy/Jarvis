@@ -8,9 +8,10 @@ import yaml
 from jarvis.utils import OutputType, PrettyOutput
 from jarvis.models.registry import PlatformRegistry
 
+
 class CodeEditTool:
     """代码修改工具"""
-    
+
     name = "code_edit"
     description = "根据需求描述修改代码文件"
     parameters = {
@@ -31,7 +32,7 @@ class CodeEditTool:
         },
         "required": ["feature", "root_dir", "language"]
     }
-    
+
     def __init__(self):
         """初始化代码修改工具"""
         self.main_model = self._new_model()
@@ -58,10 +59,12 @@ class CodeEditTool:
         self.root_dir = ""
         self.language = ""
         self.current_dir = ""
+
     def _new_model(self):
         """获取大模型"""
-        platform_name = os.environ.get("JARVIS_CODEGEN_PLATFORM", PlatformRegistry.global_platform_name)
-        model_name = os.environ.get("JARVIS_CODEGEN_MODEL") 
+        platform_name = os.environ.get(
+            "JARVIS_CODEGEN_PLATFORM", PlatformRegistry.global_platform_name)
+        model_name = os.environ.get("JARVIS_CODEGEN_MODEL")
         model = PlatformRegistry().get_global_platform_registry().create_platform(platform_name)
         if model_name:
             model.set_model_name(model_name)
@@ -71,7 +74,7 @@ class CodeEditTool:
         """判断代码库是否有未提交的文件"""
         os.chdir(root_dir)
         return os.system(f"git status | grep 'Changes not staged for commit'")
-    
+
     def _get_key_info(self, file_path: str, content: str) -> Dict[str, Any]:
         """获取文件的关键信息"""
         model = self._new_model()
@@ -96,7 +99,8 @@ symbols:
 """
         response = model.chat(prompt)
         model.delete_chat()
-        response = response.replace("<FILE_INFO_START>", "").replace("<FILE_INFO_END>", "")
+        response = response.replace(
+            "<FILE_INFO_START>", "").replace("<FILE_INFO_END>", "")
         return yaml.safe_load(response)
 
     def _get_file_extensions(self, language: str) -> List[str]:
@@ -106,22 +110,26 @@ symbols:
     def _get_file_md5(self, file_path: str) -> str:
         """获取文件MD5"""
         return hashlib.md5(open(file_path, "rb").read()).hexdigest()
-    
+
     def _create_index_db(self):
         """创建索引数据库"""
         index_db_path = os.path.join(self.root_dir, ".index.db")
         if not os.path.exists(index_db_path):
-            PrettyOutput.print("Index database does not exist, creating...", OutputType.INFO)
+            PrettyOutput.print(
+                "Index database does not exist, creating...", OutputType.INFO)
             index_db = sqlite3.connect(index_db_path)
-            index_db.execute("CREATE TABLE files (file_path TEXT PRIMARY KEY, file_md5 TEXT, file_description TEXT)")
-            index_db.execute("CREATE TABLE symbols (file_path TEXT, symbol_name TEXT, symbol_description TEXT, symbol_type TEXT)")
+            index_db.execute(
+                "CREATE TABLE files (file_path TEXT PRIMARY KEY, file_md5 TEXT, file_description TEXT)")
+            index_db.execute(
+                "CREATE TABLE symbols (file_path TEXT, symbol_name TEXT, symbol_description TEXT, symbol_type TEXT)")
             index_db.commit()
             index_db.close()
             PrettyOutput.print("Index database created", OutputType.SUCCESS)
             # 将.index.db文件添加到gitignore
             with open(os.path.join(self.root_dir, ".gitignore"), "a") as f:
                 f.write("\n.index.db\n")
-            PrettyOutput.print("Index database added to gitignore", OutputType.SUCCESS)
+            PrettyOutput.print(
+                "Index database added to gitignore", OutputType.SUCCESS)
             # commit
             os.chdir(self.root_dir)
             os.system(f"git add .gitignore -f")
@@ -132,16 +140,18 @@ symbols:
         """根据文件MD5查找文件路径"""
         index_db = sqlite3.connect(index_db_path)
         cursor = index_db.cursor()
-        cursor.execute("SELECT file_path FROM files WHERE file_md5 = ?", (file_md5,))
+        cursor.execute(
+            "SELECT file_path FROM files WHERE file_md5 = ?", (file_md5,))
         result = cursor.fetchone()
         index_db.close()
         return result[0] if result else None
-    
+
     def _update_file_path(self, index_db_path: str, file_path: str, file_md5: str):
         """更新文件路径"""
         index_db = sqlite3.connect(index_db_path)
         cursor = index_db.cursor()
-        cursor.execute("UPDATE files SET file_path = ? WHERE file_md5 = ?", (file_path, file_md5))
+        cursor.execute(
+            "UPDATE files SET file_path = ? WHERE file_md5 = ?", (file_path, file_md5))
         index_db.commit()
         index_db.close()
 
@@ -150,12 +160,14 @@ symbols:
         index_db = sqlite3.connect(index_db_path)
         cursor = index_db.cursor()
         cursor.execute("DELETE FROM files WHERE file_path = ?", (file_path,))
-        cursor.execute("INSERT INTO files (file_path, file_md5, file_description) VALUES (?, ?, ?)", (file_path, file_md5, file_description))
+        cursor.execute("INSERT INTO files (file_path, file_md5, file_description) VALUES (?, ?, ?)",
+                       (file_path, file_md5, file_description))
         for symbol in symbols:
-            cursor.execute("INSERT INTO symbols (file_path, symbol_name, symbol_description, symbol_type) VALUES (?, ?, ?, ?)", (file_path, symbol["name"], symbol["description"], symbol["type"]))
+            cursor.execute("INSERT INTO symbols (file_path, symbol_name, symbol_description, symbol_type) VALUES (?, ?, ?, ?)",
+                           (file_path, symbol["name"], symbol["description"], symbol["type"]))
         index_db.commit()
         index_db.close()
-    
+
     def _index_project(self, language: str):
         """建立代码库索引"""
         # 1. 创建索引数据库，位于root_dir/.index.db
@@ -163,7 +175,7 @@ symbols:
         self.db_path = index_db_path
         if not os.path.exists(index_db_path):
             self._create_index_db()
-        
+
         # 2. 遍历文件
         for root, dirs, files in os.walk(self.root_dir):
             for file in files:
@@ -173,32 +185,40 @@ symbols:
                     file_md5 = self._get_file_md5(file_path)
 
                     # 查找文件
-                    file_path_in_db = self._find_file_by_md5(self.db_path, file_md5)
+                    file_path_in_db = self._find_file_by_md5(
+                        self.db_path, file_md5)
                     if file_path_in_db:
-                        PrettyOutput.print(f"File {file_path} is duplicate, skip", OutputType.INFO)
+                        PrettyOutput.print(
+                            f"File {file_path} is duplicate, skip", OutputType.INFO)
                         if file_path_in_db != file_path:
-                            self._update_file_path(self.db_path, file_path, file_md5)
-                            PrettyOutput.print(f"File {file_path} is duplicate, update path to {file_path}", OutputType.INFO)
+                            self._update_file_path(
+                                self.db_path, file_path, file_md5)
+                            PrettyOutput.print(
+                                f"File {file_path} is duplicate, update path to {file_path}", OutputType.INFO)
                         continue
 
                     with open(file_path, "r", encoding="utf-8") as f:
                         file_content = f.read()
                         key_info = self._get_key_info(file_path, file_content)
                         if not key_info:
-                            PrettyOutput.print(f"File {file_path} index failed", OutputType.INFO)
+                            PrettyOutput.print(
+                                f"File {file_path} index failed", OutputType.INFO)
                             continue
                         if "file_description" in key_info and "symbols" in key_info:
-                            self._insert_info(self.db_path, file_path, file_md5, key_info["file_description"], key_info["symbols"])
-                            PrettyOutput.print(f"File {file_path} is indexed", OutputType.INFO)
+                            self._insert_info(
+                                self.db_path, file_path, file_md5, key_info["file_description"], key_info["symbols"])
+                            PrettyOutput.print(
+                                f"File {file_path} is indexed", OutputType.INFO)
                         else:
-                            PrettyOutput.print(f"File {file_path} is not a code file, skip", OutputType.INFO)
+                            PrettyOutput.print(
+                                f"File {file_path} is not a code file, skip", OutputType.INFO)
         PrettyOutput.print("Index project finished", OutputType.INFO)
 
     def _find_related_files(self, feature: str) -> List[str]:
         """根据需求描述，查找相关文件"""
         model = self._new_model()
 
-        score = [[],[],[],[],[],[],[],[],[],[]]
+        score = [[], [], [], [], [], [], [], [], [], []]
 
         step = 50
         offset = 0
@@ -207,7 +227,8 @@ symbols:
         while True:
             index_db = sqlite3.connect(self.db_path)
             cursor = index_db.cursor()
-            cursor.execute(f"SELECT file_path, file_description FROM files LIMIT {step} OFFSET {offset}")
+            cursor.execute(
+                f"SELECT file_path, file_description FROM files LIMIT {step} OFFSET {offset}")
             result = cursor.fetchall()
             index_db.close()
             if not result:
@@ -227,19 +248,21 @@ symbols:
             prompt += "<FILE_RELATION_END>\n"
             response = model.chat(prompt)
             model.delete_chat()
-            response = response.replace("<FILE_RELATION_START>", "").replace("<FILE_RELATION_END>", "")
+            response = response.replace("<FILE_RELATION_START>", "").replace(
+                "<FILE_RELATION_END>", "")
             file_relation = yaml.safe_load(response)
             if not file_relation:
                 PrettyOutput.print("Response format error", OutputType.WARNING)
                 continue
             for file_id, relation in file_relation.items():
                 id = int(file_id)
-                if relation>9:
+                if relation > 9:
                     relation = 9
-                if relation<0:
+                if relation < 0:
                     relation = 0
-                score[relation].append({"file_path": result[id][0], "file_description": result[id][1]})
-        
+                score[relation].append(
+                    {"file_path": result[id][0], "file_description": result[id][1]})
+
         files = []
         score.reverse()
         for i in score:
@@ -247,16 +270,16 @@ symbols:
             if len(files) >= 10:
                 break
         return files
-        
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行代码修改
-        
+
         Args:
             args: 包含操作参数的字典
                 - feature: 要实现的功能描述
                 - root_dir: 代码库根目录
                 - language: 编程语言
-            
+
         Returns:
             Dict[str, Any]: 包含执行结果的字典
                 - success: 是否成功
@@ -277,13 +300,15 @@ symbols:
 
         # 1. 判断代码库路径是否存在，如果不存在，创建
         if not os.path.exists(self.root_dir):
-            PrettyOutput.print("Root directory does not exist, creating...", OutputType.INFO)
+            PrettyOutput.print(
+                "Root directory does not exist, creating...", OutputType.INFO)
             os.makedirs(self.root_dir)
-        
+
         # 2. 判断代码库是否是git仓库，如果不是，初始化git仓库
         if not os.path.exists(os.path.join(self.root_dir, ".git")):
-            PrettyOutput.print("Git repository does not exist, initializing...", OutputType.INFO)
-            os.chdir(self.root_dir)  
+            PrettyOutput.print(
+                "Git repository does not exist, initializing...", OutputType.INFO)
+            os.chdir(self.root_dir)
             os.system(f"git init")
             # 2.1 添加所有的文件
             os.system(f"git add .")
@@ -339,7 +364,7 @@ symbols:
             os.chdir(self.current_dir)
 
     def _apply_patch(self, related_files, patches):
-        # patch格式 
+        # patch格式
         # >>>>>> [文件路径1]
         # [原文件内容]
         # [原文件内容]
@@ -348,10 +373,12 @@ symbols:
         # [修改后的文件内容]
         # <<<<<<
 
-        file_map = {file["file_path"]: file["file_content"] for file in related_files}
+        file_map = {file["file_path"]: file["file_content"]
+                    for file in related_files}
 
         for i, patch in enumerate(patches):
-            PrettyOutput.print(f"Apply patch {i+1} of {len(patches)}", OutputType.INFO)
+            PrettyOutput.print(
+                f"Apply patch {i+1} of {len(patches)}", OutputType.INFO)
             patch_line = patch.split("\n")
             file_name = ""
             old_code = []
@@ -372,33 +399,38 @@ symbols:
                 elif new_code_flag:
                     new_code.append(line)
             if file_name not in file_map:
-                PrettyOutput.print(f"File {file_name} not found in related files, create it", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"File {file_name} not found in related files, create it", OutputType.WARNING)
                 with open(file_name, "w", encoding="utf-8") as f:
                     f.write("\n".join(new_code))
             else:
                 old_code = "\n".join(old_code)
                 new_code = "\n".join(new_code)
                 if old_code in file_map[file_name]:
-                    file_map[file_name] = file_map[file_name].replace(old_code, new_code)
+                    file_map[file_name] = file_map[file_name].replace(
+                        old_code, new_code)
                     with open(file_name, "w", encoding="utf-8") as f:
                         f.write(file_map[file_name])
-                        PrettyOutput.print(f"File {file_name} apply patch success", OutputType.SUCCESS)
+                        PrettyOutput.print(
+                            f"File {file_name} apply patch success", OutputType.SUCCESS)
                 else:
-                    PrettyOutput.print(f"File {file_name} apply patch failed", OutputType.ERROR)
-                    PrettyOutput.print(f"Old code: \n{old_code}\n", OutputType.INFO)
-                    PrettyOutput.print(f"New code: \n{new_code}\n", OutputType.INFO)
+                    PrettyOutput.print(
+                        f"File {file_name} apply patch failed", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"Old code: \n{old_code}\n", OutputType.INFO)
+                    PrettyOutput.print(
+                        f"New code: \n{new_code}\n", OutputType.INFO)
         PrettyOutput.print("Apply patch finished", OutputType.INFO)
-            
 
     def _make_patch(self, related_files):
-        
+
         prompt = "你是一个资深程序员，请根据需求描述，修改文件内容，生成最小化的patch，文件列表如下：\n"
         prompt += "<FILE_RELATION_START>\n"
         for i, file in enumerate(related_files):
             prompt += f"""{i}. {file["file_path"]} : {file["file_description"]}\n"""
             prompt += f"""文件内容: \n"""
             prompt += f"<FILE_CONTENT_START>\n"
-            prompt += f"{file["file_content"]}\n"
+            prompt += f'{file["file_content"]}\n'
             prompt += f"<FILE_CONTENT_END>\n"
         prompt += f"<FILE_RELATION_END>\n"
         prompt += f"请根据需求描述，修改文件。\n"
