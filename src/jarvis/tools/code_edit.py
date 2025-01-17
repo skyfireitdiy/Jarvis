@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 import yaml
 from jarvis.models.base import BasePlatform
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
 
 
@@ -373,6 +373,11 @@ file_description: 这个文件的主要功能和作用描述
         prompt += f"==========\n"
         prompt += f"[修改后的文件内容]\n"
         prompt += f"<<<<<<\n"
+        prompt += f"如果文件不存在，请创建新文件，不要包含原始内容，如下：\n"
+        prompt += f">>>>>> [文件路径1]\n"
+        prompt += f"==========\n"
+        prompt += f"[新文件内容]\n"
+        prompt += f"<<<<<<\n"
         
         success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)  # 增加重试次数
         if not success:
@@ -457,7 +462,10 @@ file_description: 这个文件的主要功能和作用描述
         # 所有补丁都应用成功，更新实际文件
         for file_path in temp_map.keys():
             try:
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                dir = os.path.dirname(file_path)
+                if dir and not os.path.exists(dir):
+                    os.makedirs(dir, exist_ok=True)
+                PrettyOutput.print(f"更新文件: {file_path}", OutputType.INFO)
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(temp_map[file_path])
                 PrettyOutput.print(f"成功更新文件: {file_path}", OutputType.SUCCESS)
@@ -467,13 +475,12 @@ file_description: 这个文件的主要功能和作用描述
             
         return True, ""
 
-    def _save_edit_record(self, feature: str, patches: List[str], success: bool) -> None:
+    def _save_edit_record(self, feature: str, patches: List[str]) -> None:
         """保存代码修改记录
         
         Args:
             feature: 需求描述
             patches: 补丁列表
-            success: 是否成功
         """
         # 创建记录目录
         record_dir = os.path.join(self.root_dir, ".jarvis_code_edit")
@@ -501,7 +508,6 @@ file_description: 这个文件的主要功能和作用描述
         record = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "feature": feature,
-            "success": success,
             "patches": patches
         }
         
@@ -596,7 +602,7 @@ file_description: 这个文件的主要功能和作用描述
                         os.system(f"git commit -m '{self.feature}'")
                         os.chdir(self.current_dir)
                         # 保存修改记录
-                        self._save_edit_record(self.feature, patches, True)
+                        self._save_edit_record(self.feature, patches)
                         # 重新建立代码库索引
                         self._index_project(self.language)
                         
@@ -610,7 +616,6 @@ file_description: 这个文件的主要功能和作用描述
                         os.chdir(self.root_dir)
                         os.system(f"git reset --hard")
                         os.chdir(self.current_dir)
-                        self._save_edit_record(self.feature, patches, False)
                         return {
                             "success": False,
                             "stdout": "",
@@ -618,7 +623,7 @@ file_description: 这个文件的主要功能和作用描述
                         }
                 else:
                     # 补丁应用失败，让模型重新生成
-                    PrettyOutput.print("补丁应用失败，请求重新生成", OutputType.WARNING)
+                    PrettyOutput.print(f"补丁应用失败，请求重新生成: {error_info}", OutputType.WARNING)
                     retry_prompt = f"""补丁应用失败，请根据以下错误信息重新生成补丁：
 
 错误信息：
@@ -641,10 +646,63 @@ file_description: 这个文件的主要功能和作用描述
             }
         
 
-if __name__ == "__main__":
+def main():
+    """命令行入口"""
+    import argparse
+
+    load_env_from_file()
+    
+    parser = argparse.ArgumentParser(description='代码修改工具')
+    parser.add_argument('-p', '--platform', help='AI平台名称', default=os.environ.get('JARVIS_PLATFORM'))
+    parser.add_argument('-m', '--model', help='模型名称', default=os.environ.get('JARVIS_CODEGEN_MODEL'))
+    parser.add_argument('-d', '--dir', help='项目根目录', required=True)
+    parser.add_argument('-l', '--language', help='编程语言', required=True)
+    args = parser.parse_args()
+    
+    # 设置平台
+    if not args.platform:
+        print("错误: 未指定AI平台，请使用 -p 参数或设置 JARVIS_PLATFORM 环境变量")
+        return 1
+        
+    PlatformRegistry.get_global_platform_registry().set_global_platform_name(args.platform)
+    
+    # 设置模型
+    if args.model:
+        os.environ['JARVIS_CODEGEN_MODEL'] = args.model
+        
     tool = CodeEditTool()
-    tool.execute({
-        "feature": "将排序数据修改为随机生成",
-        "root_dir": "/tmp/test",
-        "language": "c"
-    })
+    
+    # 循环处理需求
+    while True:
+        try:
+            # 获取需求
+            feature = get_multiline_input("请输入开发需求 (输入空行退出):")
+            
+            if not feature or feature == "__interrupt__":
+                break
+                
+            # 执行修改
+            result = tool.execute({
+                "feature": feature,
+                "root_dir": args.dir,
+                "language": args.language
+            })
+            
+            # 显示结果
+            if result["success"]:
+                PrettyOutput.print(result["stdout"], OutputType.SUCCESS)
+            else:
+                if result["stderr"]:
+                    PrettyOutput.print(result["stderr"], OutputType.ERROR)
+                
+        except KeyboardInterrupt:
+            print("\n用户中断执行")
+            break
+        except Exception as e:
+            PrettyOutput.print(f"执行出错: {str(e)}", OutputType.ERROR)
+            continue
+            
+    return 0
+
+if __name__ == "__main__":
+    exit(main())
