@@ -213,6 +213,18 @@ file_description: 这个文件的主要功能和作用描述
         git_files = os.popen("git ls-files").read().splitlines()
         os.chdir(self.current_dir)
 
+        # 2.1 删除数据库中不存在的文件记录
+        index_db = sqlite3.connect(index_db_path)
+        cursor = index_db.cursor()
+        cursor.execute("SELECT file_path FROM files")
+        db_files = [row[0] for row in cursor.fetchall()]
+        for db_file in db_files:
+            if not os.path.exists(db_file):
+                cursor.execute("DELETE FROM files WHERE file_path = ?", (db_file,))
+                PrettyOutput.print(f"删除不存在的文件记录: {db_file}", OutputType.INFO)
+        index_db.commit()
+        index_db.close()
+
         # 3. 遍历git管理的文件
         for file_path in git_files:
             if os.path.splitext(file_path)[1] in self._get_file_extensions(language):
@@ -249,99 +261,113 @@ file_description: 这个文件的主要功能和作用描述
 
     def _find_related_files(self, feature: str) -> List[Dict]:
         """根据需求描述，查找相关文件"""
-        score = [[], [], [], [], [], [], [], [], [], []]
-        step = 5
-        offset = 0
+        try:
+            # Get all files from database
+            index_db = sqlite3.connect(self.db_path)
+            cursor = index_db.cursor()
+            cursor.execute("SELECT file_path, file_description FROM files")
+            all_files = cursor.fetchall()
+            index_db.close()
+        except sqlite3.Error as e:
+            PrettyOutput.print(f"数据库操作失败: {str(e)}", OutputType.ERROR)
+            return []
+
+        batch_size = 100
+        batch_results = []  # Store results from each batch with their scores
         
-        while True:
+        for i in range(0, len(all_files), batch_size):
+            batch_files = all_files[i:i + batch_size]
+            
+            prompt = "你是资深程序员，请根据需求描述，从以下文件路径中选出最相关的文件，按相关度从高到低排序，输出yaml格式，仅输出以下格式内容：\n"
+            prompt += "<RELEVANT_FILES_START>\n"
+            prompt += "file1.py: 9\n"
+            prompt += "file2.py: 7\n"
+            prompt += "<RELEVANT_FILES_END>\n\n"
+            prompt += "文件列表：\n"
+            for file_path, _ in batch_files:
+                prompt += f"- {file_path}\n"
+            prompt += f"\n需求描述: {feature}\n"
+            prompt += "\n注意：\n1. 只输出最相关的文件，不超过5个\n2. 根据文件路径名判断相关性\n3. 相关度必须是0-9的整数"
+            
+            success, response = self._call_model_with_retry(self._new_model(), prompt)
+            if not success:
+                continue
+            
             try:
-                index_db = sqlite3.connect(self.db_path)
-                cursor = index_db.cursor()
-                cursor.execute(f"SELECT file_path, file_description FROM files LIMIT {step} OFFSET {offset}")
-                result = cursor.fetchall()
-                index_db.close()
+                response = response.replace("<RELEVANT_FILES_START>", "").replace("<RELEVANT_FILES_END>", "")
+                result = yaml.safe_load(response)
                 
-                if not result:
-                    break
-                    
-                offset += len(result)
-                prompt = "你是资深程序员，请根据需求描述，分析文件的相关性，文件列表如下：\n"
-                prompt += "<FILE_LIST_START>\n"
-                for i, file_path in enumerate(result):
-                    prompt += f"""{i}. {file_path[0]} : {file_path[1]}\n"""
-                prompt += f"""需求描述: {feature}\n"""
-                prompt += "<FILE_LIST_END>\n"
-                prompt += "请根据需求描述和文件描述，分析文件的相关性，输出每个编号的相关性[0~9]，仅输出以下格式内容(key为文件编号，value为相关性)\n"
-                prompt += "<FILE_RELATION_START>\n"
-                prompt += '''"0": 5'''
-                prompt += '''"1": 3'''
-                prompt += "<FILE_RELATION_END>\n"
-                
-                success, response = self._call_model_with_retry(self._new_model(), prompt)
-                if not success:
-                    continue
-                    
-                try:
-                    response = response.replace("<FILE_RELATION_START>", "").replace("<FILE_RELATION_END>", "")
-                    file_relation = yaml.safe_load(response)
-                    if not file_relation:
-                        PrettyOutput.print("响应格式错误", OutputType.WARNING)
-                        continue
-                        
-                    for file_id, relation in file_relation.items():
-                        id = int(file_id)
-                        relation = max(0, min(9, relation))  # 确保范围在0-9之间
-                        score[relation].append({
-                            "file_path": result[id][0],
-                            "file_description": result[id][1]
-                        })
-                        
-                except Exception as e:
-                    PrettyOutput.print(f"处理文件关系失败: {str(e)}", OutputType.ERROR)
-                    continue
-                    
-            except sqlite3.Error as e:
-                PrettyOutput.print(f"数据库操作失败: {str(e)}", OutputType.ERROR)
-                break
+                # Convert results to file objects with scores
+                batch_files_dict = {f[0]: f[1] for f in batch_files}
+                for file_path, score in result.items():
+                    if isinstance(file_path, str) and isinstance(score, int):
+                        score = max(0, min(9, score))  # Ensure score is between 0-9
+                        if file_path in batch_files_dict:
+                            batch_results.append({
+                                "file_path": file_path,
+                                "file_description": batch_files_dict[file_path],
+                                "score": score
+                            })
+                            
             except Exception as e:
-                PrettyOutput.print(f"查找相关文件失败: {str(e)}", OutputType.ERROR)
-                break
-                
+                PrettyOutput.print(f"处理批次文件失败: {str(e)}", OutputType.ERROR)
+                continue
+        
+        # Sort all results by score
+        batch_results.sort(key=lambda x: x["score"], reverse=True)
+        top_files = batch_results[:5]
+        
+        # If we don't have enough files, add more from database
+        if len(top_files) < 5:
+            remaining_files = [f for f in all_files if f[0] not in [tf["file_path"] for tf in top_files]]
+            top_files.extend([{
+                "file_path": f[0],
+                "file_description": f[1],
+                "score": 0
+            } for f in remaining_files[:5-len(top_files)]])
+
+        # Now do content relevance analysis on these files
+        score = [[], [], [], [], [], [], [], [], [], []]
+        
+        prompt = "你是资深程序员，请根据需求描述，分析文件的相关性，文件列表如下：\n"
+        prompt += "<FILE_LIST_START>\n"
+        for i, file in enumerate(top_files):
+            prompt += f"""{i}. {file["file_path"]} : {file["file_description"]}\n"""
+        prompt += f"""需求描述: {feature}\n"""
+        prompt += "<FILE_LIST_END>\n"
+        prompt += "请根据需求描述和文件描述，分析文件的相关性，输出每个编号的相关性[0~9]，仅输出以下格式内容(key为文件编号，value为相关性)\n"
+        prompt += "<FILE_RELATION_START>\n"
+        prompt += '''"0": 5\n'''
+        prompt += '''"1": 3\n'''
+        prompt += "<FILE_RELATION_END>\n"
+        
+        success, response = self._call_model_with_retry(self._new_model(), prompt)
+        if not success:
+            return top_files[:3]  # Return top 3 files from filename matching if model fails
+        
+        try:
+            response = response.replace("<FILE_RELATION_START>", "").replace("<FILE_RELATION_END>", "")
+            file_relation = yaml.safe_load(response)
+            if not file_relation:
+                return top_files[:3]
+            
+            for file_id, relation in file_relation.items():
+                id = int(file_id)
+                relation = max(0, min(9, relation))  # 确保范围在0-9之间
+                score[relation].append(top_files[id])
+            
+        except Exception as e:
+            PrettyOutput.print(f"处理文件关系失败: {str(e)}", OutputType.ERROR)
+            return top_files[:3]
+        
         files = []
         score.reverse()
         for i in score:
             files.extend(i)
-            if len(files) >= 10:  # 先获取最多10个相关文件
+            if len(files) >= 3:  # 直接取相关性最高的3个文件
                 break
         
-        # 如果找到超过3个相关文件，再次筛选
-        if len(files) > 3:
-            prompt = "你是资深程序员，请从以下文件中挑选出与需求最相关的3个文件：\n"
-            prompt += "<FILE_LIST_START>\n"
-            for i, file in enumerate(files):
-                prompt += f"""{i}. {file["file_path"]} : {file["file_description"]}\n"""
-            prompt += f"""需求描述: {feature}\n"""
-            prompt += "<FILE_LIST_END>\n"
-            prompt += "请输出最相关的3个文件的编号，用逗号分隔，仅输出以下格式内容\n"
-            prompt += "<TOP3_START>\n"
-            prompt += "0,2,5"
-            prompt += "<TOP3_END>\n"
-            
-            success, response = self._call_model_with_retry(self._new_model(), prompt)
-            if success:
-                try:
-                    response = response.replace("<TOP3_START>", "").replace("<TOP3_END>", "")
-                    top3_ids = [int(id.strip()) for id in response.split(",")]
-                    files = [files[i] for i in top3_ids if i < len(files)]
-                except Exception as e:
-                    PrettyOutput.print(f"解析TOP3文件失败: {str(e)}", OutputType.ERROR)
-                    files = files[:3]  # 如果解析失败，取前3个文件
-            else:
-                files = files[:3]  # 如果模型调用失败，取前3个文件
-        else:
-            files = files[:3]  # 如果文件数不足3个，取所有文件
-            
-        return files
+        return files[:3]
     
     def _remake_patch(self, prompt: str) -> List[str]:
         success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)  # 增加重试次数
