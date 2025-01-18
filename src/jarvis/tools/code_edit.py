@@ -208,42 +208,43 @@ file_description: 这个文件的主要功能和作用描述
         if not os.path.exists(index_db_path):
             self._create_index_db()
 
-        # 2. 遍历文件
-        for root, dirs, files in os.walk(self.root_dir):
-            for file in files:
-                if os.path.splitext(file)[1] in self._get_file_extensions(language):
-                    # 计算文件MD5
-                    file_path = os.path.join(root, file)
-                    file_md5 = self._get_file_md5(file_path)
+        # 2. 使用git ls-files获取文件列表
+        os.chdir(self.root_dir)
+        git_files = os.popen("git ls-files").read().splitlines()
+        os.chdir(self.current_dir)
 
-                    # 查找文件
-                    file_path_in_db = self._find_file_by_md5(
-                        self.db_path, file_md5)
-                    if file_path_in_db:
+        # 3. 遍历git管理的文件
+        for file_path in git_files:
+            if os.path.splitext(file_path)[1] in self._get_file_extensions(language):
+                # 计算文件MD5
+                file_md5 = self._get_file_md5(file_path)
+
+                # 查找文件
+                file_path_in_db = self._find_file_by_md5(self.db_path, file_md5)
+                if file_path_in_db:
+                    PrettyOutput.print(
+                        f"File {file_path} is duplicate, skip", OutputType.INFO)
+                    if file_path_in_db != file_path:
+                        self._update_file_path(self.db_path, file_path, file_md5)
                         PrettyOutput.print(
-                            f"File {file_path} is duplicate, skip", OutputType.INFO)
-                        if file_path_in_db != file_path:
-                            self._update_file_path(
-                                self.db_path, file_path, file_md5)
-                            PrettyOutput.print(
-                                f"File {file_path} is duplicate, update path to {file_path}", OutputType.INFO)
-                        continue
+                            f"File {file_path} is duplicate, update path to {file_path}", OutputType.INFO)
+                    continue
 
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        file_content = f.read()
-                        key_info = self._get_key_info(file_path, file_content)
-                        if not key_info:
-                            PrettyOutput.print(
-                                f"File {file_path} index failed", OutputType.INFO)
-                            continue
-                        if "file_description" in key_info:
-                            self._insert_info(
-                                self.db_path, file_path, file_md5, key_info["file_description"])
-                            PrettyOutput.print(
-                                f"File {file_path} is indexed", OutputType.INFO)
-                        else:
-                            PrettyOutput.print(
-                                f"File {file_path} is not a code file, skip", OutputType.INFO)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    file_content = f.read()
+                    key_info = self._get_key_info(file_path, file_content)
+                    if not key_info:
+                        PrettyOutput.print(
+                            f"File {file_path} index failed", OutputType.INFO)
+                        continue
+                    if "file_description" in key_info:
+                        self._insert_info(
+                            self.db_path, file_path, file_md5, key_info["file_description"])
+                        PrettyOutput.print(
+                            f"File {file_path} is indexed", OutputType.INFO)
+                    else:
+                        PrettyOutput.print(
+                            f"File {file_path} is not a code file, skip", OutputType.INFO)
         PrettyOutput.print("Index project finished", OutputType.INFO)
 
     def _find_related_files(self, feature: str) -> List[Dict]:
