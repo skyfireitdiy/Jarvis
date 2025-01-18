@@ -472,6 +472,7 @@ file_description: 这个文件的主要功能和作用描述
                 PrettyOutput.print(f"更新文件: {file_path}", OutputType.INFO)
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(temp_map[file_path])
+                os.system(f"git add {file_path} -f")  # 立即加入暂存区
                 PrettyOutput.print(f"成功更新文件: {file_path}", OutputType.SUCCESS)
             except Exception as e:
                 error_info.append(f"写入文件失败 {file_path}: {str(e)}")
