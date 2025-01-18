@@ -37,7 +37,7 @@ class CodeEditTool:
 
     def __init__(self):
         """初始化代码修改工具"""
-        self.main_model = self._new_model()
+        self.main_model = None
         self.language_extensions = {
             "c": {".c", ".h"},
             "cpp": {".cpp", ".hpp", ".h"},
@@ -121,7 +121,7 @@ class CodeEditTool:
 <CONTENT_START>
 {content}
 <CONTENT_END>
-3. 关键信息: 请生成文件的功能描述，使用标准的yaml格式描述，仅输出以下格式内容，如果目标文件不是代码文件，输出（无）
+3. 关键信息: 请生成文件的功能描述，仅输出以下格式内容
 <FILE_INFO_START>
 file_description: 这个文件的主要功能和作用描述
 <FILE_INFO_END>
@@ -129,9 +129,12 @@ file_description: 这个文件的主要功能和作用描述
         try:
             response = model.chat(prompt)
             model.delete_chat()  # 删除会话历史
-            
+            old_response = response
             response = response.replace("<FILE_INFO_START>", "").replace("<FILE_INFO_END>", "")
-            return yaml.safe_load(response)
+            if old_response != response:
+                return yaml.safe_load(response)
+            else:
+                return None
         except Exception as e:
             PrettyOutput.print(f"解析文件信息失败: {str(e)}", OutputType.ERROR)
             return None
@@ -566,6 +569,7 @@ file_description: 这个文件的主要功能和作用描述
                 - error: 错误对象(如果有)
         """
         try:
+            self.main_model = self._new_model()  # 每次执行时重新创建模型
             self.feature = args["feature"]
             self.root_dir = args["root_dir"]
             self.language = args["language"]
