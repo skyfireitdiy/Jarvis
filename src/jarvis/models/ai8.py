@@ -63,7 +63,7 @@ class AI8Model(BasePlatform):
         
         PrettyOutput.print("使用AI8_MODEL环境变量配置模型", OutputType.SUCCESS)
         
-        self.model_name = os.getenv("AI8_MODEL") or "deepseek-chat"
+        self.model_name = os.getenv("AI8_MODEL") or os.getenv("JARVIS_MODEL") or "deepseek-chat"
         if self.model_name not in self.models:
             PrettyOutput.print(f"警告: 当前选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
         
