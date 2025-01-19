@@ -415,22 +415,19 @@ file2.py: 7
 修改格式说明：
 1. 每个修改块格式如下：
 <PATCH_START>
-diff a/path/to/file
---- old
-+++ new
- 上下文代码
--要删除的代码
-+要添加的代码
- 上下文代码
+>>>>>> path/to/file
+要替换的内容
+======
+新的内容
+<<<<<<
 <PATCH_END>
 
 2. 如果是新文件，格式如下：
 <PATCH_START>
-diff a/path/to/new/file
-new file
---- /dev/null
-+++ b/path/to/new/file
-+新文件的完整内容
+>>>>>> path/to/new/file
+======
+新文件的完整内容
+<<<<<<
 <PATCH_END>
 
 文件列表如下：
@@ -461,15 +458,7 @@ new file
             return []
 
     def _apply_patch(self, related_files: List[Dict], patches: List[str]) -> Tuple[bool, str]:
-        """应用补丁
-        
-        Args:
-            related_files: 相关文件列表
-            patches: 补丁列表
-            
-        Returns:
-            Tuple[bool, str]: (是否成功, 错误信息)
-        """
+        """应用补丁"""
         error_info = []
         modified_files = set()
 
@@ -488,15 +477,27 @@ new file
                     continue
                     
                 # 获取文件路径
-                file_path = lines[0].replace("diff a/", "").strip()
+                file_path_match = re.search(r'>>>>>> (.*)', lines[0])
+                if not file_path_match:
+                    error_info.append(f"无法解析文件路径: {lines[0]}")
+                    return False, "\n".join(error_info)
+                    
+                file_path = file_path_match.group(1).strip()
+                
+                # 解析补丁内容
+                patch_content = "\n".join(lines[1:])
+                parts = patch_content.split("======")
+                
+                if len(parts) != 2:
+                    error_info.append(f"补丁格式错误: {file_path}")
+                    return False, "\n".join(error_info)
+                
+                old_content = parts[0].strip()
+                new_content = parts[1].split("<<<<<<")[0].strip()
                 
                 # 处理新文件
-                if "new file" in lines[1]:
-                    new_content = []
-                    for line in lines[4:]:  # 跳过头部4行
-                        if line.startswith("+"):
-                            new_content.append(line[1:])
-                    temp_map[file_path] = "\n".join(new_content)
+                if not old_content:
+                    temp_map[file_path] = new_content
                     modified_files.add(file_path)
                     continue
                 
@@ -506,31 +507,6 @@ new file
                     return False, "\n".join(error_info)
                 
                 current_content = temp_map[file_path]
-                content_lines = current_content.split("\n")
-                
-                # 解析修改块
-                old_block = []
-                new_block = []
-                context_before = []
-                context_after = []
-                
-                in_change = False
-                for line in lines[3:]:  # 跳过头部3行
-                    if line.startswith(" "):
-                        if not in_change:
-                            context_before.append(line[1:])
-                        else:
-                            context_after.append(line[1:])
-                    elif line.startswith("-"):
-                        in_change = True
-                        old_block.append(line[1:])
-                    elif line.startswith("+"):
-                        in_change = True
-                        new_block.append(line[1:])
-                
-                # 构建完整的旧代码块和新代码块
-                old_content = "\n".join(context_before + old_block + context_after)
-                new_content = "\n".join(context_before + new_block + context_after)
                 
                 # 查找并替换代码块
                 if old_content not in current_content:
