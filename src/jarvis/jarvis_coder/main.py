@@ -129,20 +129,10 @@ class JarvisCoder:
 <CONTENT_START>
 {content}
 <CONTENT_END>
-3. 关键信息: 请生成文件的功能描述，仅输出以下格式内容
-<FILE_INFO_START>
-file_description: 这个文件的主要功能和作用描述，包含的特征符号（函数和类、变量等）
-<FILE_INFO_END>
+3. 关键信息: 请生成这个文件的主要功能和作用描述，包含的特征符号（函数和类、变量等），不超过100字
 """
         try:
-            response = model.chat(prompt)
-            model.delete_chat()  # 删除会话历史
-            old_response = response
-            response = response.replace("<FILE_INFO_START>", "").replace("<FILE_INFO_END>", "")
-            if old_response != response:
-                return yaml.safe_load(response)
-            else:
-                return None
+            return model.chat(prompt)
         except Exception as e:
             PrettyOutput.print(f"解析文件信息失败: {str(e)}", OutputType.ERROR)
             return None
@@ -270,13 +260,11 @@ file_description: 这个文件的主要功能和作用描述，包含的特征�
                     PrettyOutput.print(
                         f"文件 {file_path} 索引失败", OutputType.INFO)
                     return
-                if "file_description" in key_info:
-                    self._insert_info(file_path, file_md5, key_info["file_description"])
-                    PrettyOutput.print(
-                        f"文件 {file_path} 已建立索引", OutputType.INFO)
-                else:
-                    PrettyOutput.print(
-                        f"文件 {file_path} 不是代码文件，跳过", OutputType.INFO)
+
+                self._insert_info(file_path, file_md5, key_info)
+                PrettyOutput.print(
+                    f"文件 {file_path} 已建立索引", OutputType.INFO)
+
 
         # 使用线程池处理文件索引
         with ThreadPoolExecutor(max_workers=10) as executor:
