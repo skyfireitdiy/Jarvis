@@ -439,12 +439,7 @@ new file
         
         prompt += f"\n需求描述: {feature}\n"
         prompt += """
-注意事项：
-1. 每处修改使用单独的diff块
-2. 包含足够的上下文代码(通常3行)以准确定位修改位置
-3. 保持正确的缩进
-4. 如果需要修改多个文件，为每个文件生成独立的diff
-5. 不要输出任何其他内容，只输出修改内容
+注意事项：仅输出补丁内容，不要输出任何其他内容
 """
         
         success, response = self._call_model_with_retry(self.main_model, prompt)
@@ -640,13 +635,9 @@ new file
                 PrettyOutput.print(f"生成{len(patches)}个补丁", OutputType.INFO)
                 
                 if not patches:
-                    self._save_edit_record(feature, patches)
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "未生成补丁",
-                        "error": ValueError("未生成补丁")
-                    }
+                    retry_prompt = f"""未生成补丁，请重新生成补丁"""
+                    patches = self._remake_patch(retry_prompt)
+                    continue
                 
                 # 尝试应用补丁
                 success, error_info = self._apply_patch(related_files, patches)
