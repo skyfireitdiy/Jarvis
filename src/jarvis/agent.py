@@ -111,6 +111,8 @@ class Agent:
         5. 重置对话轮数
         """
         # 创建一个新的模型实例来做总结，避免影响主对话
+
+        PrettyOutput.print("总结对话历史，准备生成总结，开始新的对话...", OutputType.PLANNING)
         
         prompt = """请总结之前对话中的关键信息，包括：
 1. 当前任务目标
