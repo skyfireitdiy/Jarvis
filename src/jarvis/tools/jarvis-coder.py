@@ -35,32 +35,43 @@ class CodeEditTool:
         "required": ["feature", "root_dir", "language"]
     }
 
-    def __init__(self):
+    def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
         self.main_model = None
-        self.language_extensions = {
-            "c": {".c", ".h"},
-            "cpp": {".cpp", ".hpp", ".h"},
-            "python": {".py", ".pyw"},
-            "java": {".java"},
-            "go": {".go"},
-            "rust": {".rs"},
-            "javascript": {".js"},
-            "typescript": {".ts"},
-            "php": {".php"},
-            "ruby": {".rb"},
-            "swift": {".swift"},
-            "kotlin": {".kt"},
-            "scala": {".scala"},
-            "haskell": {".hs"},
-            "erlang": {".erl"},
-            "elixir": {".ex"},
-        }
         self.db_path = ""
-        self.feature = ""
-        self.root_dir = ""
-        self.language = ""
-        self.current_dir = ""
+        self.root_dir = root_dir
+        self.language = language
+
+
+        self.root_dir = self._find_git_root_dir(self.root_dir)
+        if not self.root_dir:
+            self.root_dir = root_dir
+
+        PrettyOutput.print(f"Git根目录: {self.root_dir}", OutputType.INFO)
+
+        # 1. 判断代码库路径是否存在，如果不存在，创建
+        if not os.path.exists(self.root_dir):
+            PrettyOutput.print(
+                "Root directory does not exist, creating...", OutputType.INFO)
+            os.makedirs(self.root_dir)
+
+        os.chdir(self.root_dir)
+
+        # 2. 判断代码库是否是git仓库，如果不是，初始化git仓库
+        if not os.path.exists(os.path.join(self.root_dir, ".git")):
+            PrettyOutput.print(
+                "Git repository does not exist, initializing...", OutputType.INFO)
+            os.system(f"git init")
+            # 2.1 添加所有的文件
+            os.system(f"git add .")
+            # 2.2 提交
+            os.system(f"git commit -m 'Initial commit'")
+
+        # 3. 查看代码库是否有未提交的文件，如果有，提交一次
+        if self._has_uncommitted_files():
+            PrettyOutput.print("代码库有未提交的文件，提交一次", OutputType.INFO)
+            os.system(f"git add .")
+            os.system(f"git commit -m 'commit before code edit'")
 
     def _new_model(self):
         """获取大模型"""
@@ -72,10 +83,16 @@ class CodeEditTool:
             model.set_model_name(model_name)
         return model
 
-    def _has_uncommitted_files(self, root_dir: str) -> bool:
+    def _has_uncommitted_files(self) -> bool:
         """判断代码库是否有未提交的文件"""
-        os.chdir(root_dir)
-        return os.system(f"git status | grep 'Changes not staged for commit'")
+        # 获取未暂存的修改
+        unstaged = os.popen("git diff --name-only").read()
+        # 获取已暂存但未提交的修改
+        staged = os.popen("git diff --cached --name-only").read()
+        # 获取未跟踪的文件
+        untracked = os.popen("git ls-files --others --exclude-standard").read()
+        
+        return bool(unstaged or staged or untracked)
 
     def _call_model_with_retry(self, model: BasePlatform, prompt: str, max_retries: int = 3, initial_delay: float = 1.0) -> Tuple[bool, str]:
         """调用模型并支持重试
@@ -145,9 +162,7 @@ file_description: 这个文件的主要功能和作用描述
             except:
                 pass
 
-    def _get_file_extensions(self, language: str) -> List[str]:
-        """获取文件扩展名"""
-        return self.language_extensions.get(language, [])
+
 
     def _get_file_md5(self, file_path: str) -> str:
         """获取文件MD5"""
@@ -203,18 +218,31 @@ file_description: 这个文件的主要功能和作用描述
         index_db.commit()
         index_db.close()
 
-    def _index_project(self, language: str):
+    def _is_text_file(self, file_path: str) -> bool:
+        """判断文件是否是文本文件"""
+        try:
+            with open(file_path, 'rb') as f:
+                # 读取文件前1024个字节
+                chunk = f.read(1024)
+                # 检查是否包含空字节
+                if b'\x00' in chunk:
+                    return False
+                # 尝试解码为文本
+                chunk.decode('utf-8')
+                return True
+        except:
+            return False
+
+    def _index_project(self):
         """建立代码库索引"""
         # 1. 创建索引数据库，位于root_dir/.index.db
-        index_db_path = os.path.join(self.root_dir, ".index.db")
+        index_db_path = os.path.join(self.root_dir, ".jarvis_index.db")
         self.db_path = index_db_path
         if not os.path.exists(index_db_path):
             self._create_index_db()
 
         # 2. 使用git ls-files获取文件列表
-        os.chdir(self.root_dir)
         git_files = os.popen("git ls-files").read().splitlines()
-        os.chdir(self.current_dir)
 
         # 2.1 删除数据库中不存在的文件记录
         index_db = sqlite3.connect(index_db_path)
@@ -230,7 +258,7 @@ file_description: 这个文件的主要功能和作用描述
 
         # 3. 遍历git管理的文件
         for file_path in git_files:
-            if os.path.splitext(file_path)[1] in self._get_file_extensions(language):
+            if self._is_text_file(file_path):
                 # 计算文件MD5
                 file_md5 = self._get_file_md5(file_path)
 
@@ -238,11 +266,11 @@ file_description: 这个文件的主要功能和作用描述
                 file_path_in_db = self._find_file_by_md5(self.db_path, file_md5)
                 if file_path_in_db:
                     PrettyOutput.print(
-                        f"File {file_path} is duplicate, skip", OutputType.INFO)
+                        f"文件 {file_path} 重复，跳过", OutputType.INFO)
                     if file_path_in_db != file_path:
                         self._update_file_path(self.db_path, file_path, file_md5)
                         PrettyOutput.print(
-                            f"File {file_path} is duplicate, update path to {file_path}", OutputType.INFO)
+                            f"文件 {file_path} 重复，更新路径为 {file_path}", OutputType.INFO)
                     continue
 
                 with open(file_path, "r", encoding="utf-8") as f:
@@ -250,17 +278,17 @@ file_description: 这个文件的主要功能和作用描述
                     key_info = self._get_key_info(file_path, file_content)
                     if not key_info:
                         PrettyOutput.print(
-                            f"File {file_path} index failed", OutputType.INFO)
+                            f"文件 {file_path} 索引失败", OutputType.INFO)
                         continue
                     if "file_description" in key_info:
                         self._insert_info(
                             self.db_path, file_path, file_md5, key_info["file_description"])
                         PrettyOutput.print(
-                            f"File {file_path} is indexed", OutputType.INFO)
+                            f"文件 {file_path} 已建立索引", OutputType.INFO)
                     else:
                         PrettyOutput.print(
-                            f"File {file_path} is not a code file, skip", OutputType.INFO)
-        PrettyOutput.print("Index project finished", OutputType.INFO)
+                            f"文件 {file_path} 不是代码文件，跳过", OutputType.INFO)
+        PrettyOutput.print("项目索引完成", OutputType.INFO)
 
     def _find_related_files(self, feature: str) -> List[Dict]:
         """根据需求描述，查找相关文件"""
@@ -281,16 +309,28 @@ file_description: 这个文件的主要功能和作用描述
         for i in range(0, len(all_files), batch_size):
             batch_files = all_files[i:i + batch_size]
             
-            prompt = "你是资深程序员，请根据需求描述，从以下文件路径中选出最相关的文件，按相关度从高到低排序，输出yaml格式，仅输出以下格式内容：\n"
-            prompt += "<RELEVANT_FILES_START>\n"
-            prompt += "file1.py: 9\n"
-            prompt += "file2.py: 7\n"
-            prompt += "<RELEVANT_FILES_END>\n\n"
-            prompt += "文件列表：\n"
+            prompt = """你是资深程序员，请根据需求描述，从以下文件路径中选出最相关的文件，按相关度从高到低排序。
+
+相关度打分标准(0-9分)：
+- 9分：文件名直接包含需求中的关键词，且文件功能与需求完全匹配
+- 7-8分：文件名包含需求相关词，或文件功能与需求高度相关
+- 5-6分：文件名暗示与需求有关，或文件功能与需求部分相关
+- 3-4分：文件可能需要小幅修改以配合需求
+- 1-2分：文件与需求关系较远，但可能需要少量改动
+- 0分：文件与需求完全无关
+
+请输出yaml格式，仅输出以下格式内容：
+<RELEVANT_FILES_START>
+file1.py: 9
+file2.py: 7
+<RELEVANT_FILES_END>
+
+文件列表：
+"""
             for file_path, _ in batch_files:
                 prompt += f"- {file_path}\n"
             prompt += f"\n需求描述: {feature}\n"
-            prompt += "\n注意：\n1. 只输出最相关的文件，不超过5个\n2. 根据文件路径名判断相关性\n3. 相关度必须是0-9的整数"
+            prompt += "\n注意：\n1. 只输出最相关的文件，不超过5个\n2. 根据上述打分标准判断相关性\n3. 相关度必须是0-9的整数"
             
             success, response = self._call_model_with_retry(self._new_model(), prompt)
             if not success:
@@ -332,17 +372,28 @@ file_description: 这个文件的主要功能和作用描述
         # Now do content relevance analysis on these files
         score = [[], [], [], [], [], [], [], [], [], []]
         
-        prompt = "你是资深程序员，请根据需求描述，分析文件的相关性，文件列表如下：\n"
-        prompt += "<FILE_LIST_START>\n"
+        prompt = """你是资深程序员，请根据需求描述，分析文件的相关性。
+
+相关度打分标准(0-9分)：
+- 9分：文件内容与需求完全匹配，是实现需求的核心文件
+- 7-8分：文件内容与需求高度相关，需要较大改动
+- 5-6分：文件内容与需求部分相关，需要中等改动
+- 3-4分：文件内容与需求相关性较低，但需要配合修改
+- 1-2分：文件内容与需求关系较远，只需极少改动
+- 0分：文件内容与需求完全无关
+
+文件列表如下：
+<FILE_LIST_START>
+"""
         for i, file in enumerate(top_files):
             prompt += f"""{i}. {file["file_path"]} : {file["file_description"]}\n"""
         prompt += f"""需求描述: {feature}\n"""
         prompt += "<FILE_LIST_END>\n"
-        prompt += "请根据需求描述和文件描述，分析文件的相关性，输出每个编号的相关性[0~9]，仅输出以下格式内容(key为文件编号，value为相关性)\n"
-        prompt += "<FILE_RELATION_START>\n"
-        prompt += '''"0": 5\n'''
-        prompt += '''"1": 3\n'''
-        prompt += "<FILE_RELATION_END>\n"
+        prompt += """请根据需求描述和文件描述，分析文件的相关性，输出每个编号的相关性[0~9]，仅输出以下格式内容(key为文件编号，value为相关性)：
+<FILE_RELATION_START>
+"0": 5
+"1": 3
+<FILE_RELATION_END>"""
         
         success, response = self._call_model_with_retry(self._new_model(), prompt)
         if not success:
@@ -384,40 +435,57 @@ file_description: 这个文件的主要功能和作用描述
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
             return []
         
-    def _make_patch(self, related_files: List[Dict]) -> List[str]:
+    def _make_patch(self, related_files: List[Dict], feature: str) -> List[str]:
         """生成修改方案"""
-        prompt = "你是一个资深程序员，请根据需求描述，修改文件内容，文件列表如下：\n"
-        prompt += "<FILE_RELATION_START>\n"
+        prompt = """你是一个资深程序员，请根据需求描述，修改文件内容。
+
+修改格式说明：
+1. 使用标准git diff格式输出修改内容
+2. 每个修改块格式如下：
+diff --git a/path/to/file b/path/to/file
+--- a/path/to/file
++++ b/path/to/file
+@@ -start,count +start,count @@
+ 上下文代码
+-要删除的代码
++要添加的代码
+ 上下文代码
+
+3. 如果是新文件，格式如下：
+diff --git a/path/to/new/file b/path/to/new/file
+new file mode 100644
+--- /dev/null
++++ b/path/to/new/file
+@@ -0,0 +1,N @@
++新文件的完整内容
+
+文件列表如下：
+"""
         for i, file in enumerate(related_files):
             prompt += f"""{i}. {file["file_path"]} : {file["file_description"]}\n"""
-            prompt += f"""文件内容: \n"""
+            prompt += f"""文件内容:\n"""
             prompt += f"<FILE_CONTENT_START>\n"
             prompt += f'{file["file_content"]}\n'
             prompt += f"<FILE_CONTENT_END>\n"
-        prompt += f"<FILE_RELATION_END>\n"
-        prompt += f"请根据需求描述，修改文件。\n"
-        prompt += f"需求描述: {self.feature}\n"
-        prompt += f"请输出以下格式内容（多段patch），注意缩进也是代码的一部分，不要输出任何其他内容\n"
-        prompt += f">>>>>> [文件路径1]\n"
-        prompt += f"[原文件内容]\n"
-        prompt += f"==========\n"
-        prompt += f"[修改后的文件内容]\n"
-        prompt += f"<<<<<<\n"
-        prompt += f"如果文件不存在，请创建新文件，不要包含原始内容，如下：\n"
-        prompt += f">>>>>> [文件路径1]\n"
-        prompt += f"==========\n"
-        prompt += f"[新文件内容]\n"
-        prompt += f"<<<<<<\n"
-        prompt += f"生成最小化的patch，原文件内容与修改后文件内容不要有大量重复内容。"
-        prompt += f"如果一个文件有多处需要修改，请生成多个patch，不要生成一个patch包含多处修改。"
         
-        success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)  # 增加重试次数
+        prompt += f"\n需求描述: {feature}\n"
+        prompt += """
+注意事项：
+1. 每处修改使用单独的diff块
+2. 包含足够的上下文代码(通常3行)以准确定位修改位置
+3. 保持正确的缩进
+4. 如果需要修改多个文件，为每个文件生成独立的diff
+5. 不要输出任何其他内容，只输出标准git diff格式的修改
+"""
+        
+        success, response = self._call_model_with_retry(self.main_model, prompt)
         if not success:
             return []
             
         try:
-            patches = re.findall(r">>>>>>.*?<<<<<<", response, re.DOTALL)
-            return patches
+            # 使用正则表达式匹配每个diff块
+            patches = re.findall(r'diff --git.*?(?=diff --git|\Z)', response, re.DOTALL)
+            return [patch.strip() for patch in patches if patch.strip()]
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
             return []
@@ -427,88 +495,52 @@ file_description: 这个文件的主要功能和作用描述
         
         Args:
             related_files: 相关文件列表
-            patches: 补丁列表
+            patches: 补丁列表（git diff 格式）
             
         Returns:
             Tuple[bool, str]: (是否成功, 错误信息)
         """
-        # 创建文件内容映射
-        file_map = {file["file_path"]: file["file_content"] for file in related_files}
-        temp_map = file_map.copy()  # 创建临时映射用于尝试应用
-        
         error_info = []
-
-        modified_files = set()  # 记录修改的文件
         
-        # 尝试应用所有补丁
-        for i, patch in enumerate(patches):
-            PrettyOutput.print(f"正在应用补丁 {i+1}/{len(patches)}", OutputType.INFO)
-            patch_lines = patch.split("\n")
-            file_name = ""
-            old_code = []
-            new_code = []
-            old_code_flag = False
-            new_code_flag = False
+        # 创建临时补丁文件
+        patch_file = os.path.join(self.root_dir, ".temp.patch")
+        try:
+            # 写入所有补丁到临时文件
+            with open(patch_file, "w", encoding="utf-8") as f:
+                for patch in patches:
+                    f.write(patch + "\n")
             
-            # 解析补丁内容
-            for line in patch_lines:
-                if line.startswith(">>>>>>"):
-                    old_code_flag = True
-                    file_name = line.split(" ")[1]
-                elif line.startswith("=========="):
-                    old_code_flag = False
-                    new_code_flag = True
-                elif line.startswith("<<<<<<"):
-                    new_code_flag = False
-                elif old_code_flag:
-                    old_code.append(line)
-                elif new_code_flag:
-                    new_code.append(line)
-                
-            # 处理新文件的情况
-            if file_name not in temp_map:
-                PrettyOutput.print(f"创建新文件: {file_name}", OutputType.WARNING)
-                if old_code:  # 如果是新文件但有原始内容，这是错误的
-                    error_info.append(f"文件 {file_name} 不存在，但补丁包含原始内容")
-                    return False, "\n".join(error_info)
-                
-                temp_map[file_name] = "\n".join(new_code)
-                modified_files.add(file_name)  # 记录新文件
-                continue
-            
-            # 应用补丁到现有文件
-            old_content = "\n".join(old_code)
-            new_content = "\n".join(new_code)
-            
-            if old_content not in temp_map[file_name]:
-                error_info.append(
-                    f"补丁应用失败: {file_name}\n"
-                    f"原因: 未找到要替换的代码\n"
-                    f"期望找到的代码:\n{old_content}\n"
-                    f"实际文件内容:\n{temp_map[file_name][:200]}..."  # 只显示前200个字符
-                )
+            # 先尝试检查补丁是否可以应用
+            check_result = os.system(f"git apply --check .temp.patch")
+            if check_result != 0:
+                # 如果检查失败，获取详细错误信息
+                error_output = os.popen(f"git apply --check .temp.patch 2>&1").read()
+                error_info.append(f"补丁检查失败:\n{error_output}")
                 return False, "\n".join(error_info)
             
-            # 应用更改到临时映射
-            temp_map[file_name] = temp_map[file_name].replace(old_content, new_content)
-            modified_files.add(file_name)  # 记录修改的文件
+            # 应用补丁
+            apply_result = os.system(f"git apply .temp.patch")
+            if apply_result != 0:
+                error_info.append("补丁应用失败")
+                return False, "\n".join(error_info)
             
-        # 所有补丁都应用成功，更新实际文件
-        for file_path in modified_files:
+            # 获取修改的文件列表
+            modified_files = os.popen("git diff --name-only").read().splitlines()
+            for file in modified_files:
+                PrettyOutput.print(f"成功修改文件: {file}", OutputType.SUCCESS)
+            
+            return True, ""
+            
+        except Exception as e:
+            error_info.append(f"应用补丁时发生错误: {str(e)}")
+            return False, "\n".join(error_info)
+        finally:
+            # 清理临时文件
             try:
-                dir = os.path.dirname(file_path)
-                if dir and not os.path.exists(dir):
-                    os.makedirs(dir, exist_ok=True)
-                PrettyOutput.print(f"更新文件: {file_path}", OutputType.INFO)
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(temp_map[file_path])
-                os.system(f"git add {file_path} -f")  # 立即加入暂存区
-                PrettyOutput.print(f"成功更新文件: {file_path}", OutputType.SUCCESS)
-            except Exception as e:
-                error_info.append(f"写入文件失败 {file_path}: {str(e)}")
-                return False, "\n".join(error_info)
-            
-        return True, ""
+                if os.path.exists(patch_file):
+                    os.remove(patch_file)
+            except:
+                pass
 
     def _save_edit_record(self, feature: str, patches: List[str]) -> None:
         """保存代码修改记录
@@ -552,7 +584,15 @@ file_description: 这个文件的主要功能和作用描述
         
         PrettyOutput.print(f"已保存修改记录: {record_path}", OutputType.SUCCESS)
 
-    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _find_git_root_dir(self, root_dir: str) -> str:
+        """查找git根目录"""
+        while not os.path.exists(os.path.join(root_dir, ".git")):
+            root_dir = os.path.dirname(root_dir)
+            if root_dir == "/":
+                return None
+        return root_dir
+
+    def execute(self, feature: str) -> Dict[str, Any]:
         """执行代码修改
 
         Args:
@@ -570,65 +610,26 @@ file_description: 这个文件的主要功能和作用描述
         """
         try:
             self.main_model = self._new_model()  # 每次执行时重新创建模型
-            self.feature = args["feature"]
-            self.root_dir = args["root_dir"]
-            self.language = args["language"]
-            self.current_dir = os.getcwd()
-
-            # 0. 判断语言是否支持
-            if not self._get_file_extensions(self.language):
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "不支持的编程语言",
-                    "error": ValueError("不支持的编程语言")
-                }
-
-            # 1. 判断代码库路径是否存在，如果不存在，创建
-            if not os.path.exists(self.root_dir):
-                PrettyOutput.print(
-                    "Root directory does not exist, creating...", OutputType.INFO)
-                os.makedirs(self.root_dir)
-
-            # 2. 判断代码库是否是git仓库，如果不是，初始化git仓库
-            if not os.path.exists(os.path.join(self.root_dir, ".git")):
-                PrettyOutput.print(
-                    "Git repository does not exist, initializing...", OutputType.INFO)
-                os.chdir(self.root_dir)
-                os.system(f"git init")
-                # 2.1 添加所有的文件
-                os.system(f"git add .")
-                # 2.2 提交
-                os.system(f"git commit -m 'Initial commit'")
-                os.chdir(self.current_dir)
-
-            # 3. 查看代码库是否有未提交的文件，如果有，提交一次
-            if self._has_uncommitted_files(self.root_dir):
-                os.chdir(self.root_dir)
-                os.system(f"git add .")
-                os.system(f"git commit -m 'commit before code edit'")
-                os.chdir(self.current_dir)
+            
 
             # 4. 开始建立代码库索引
-            os.chdir(self.root_dir)
-            self._index_project(self.language)
-            os.chdir(self.current_dir)
+            self._index_project()
 
             # 5. 根据索引和需求，查找相关文件
-            related_files = self._find_related_files(self.feature)
+            related_files = self._find_related_files(feature)
             for file in related_files:
                 PrettyOutput.print(f"Related file: {file['file_path']}", OutputType.INFO)
             for file in related_files:
                 with open(file["file_path"], "r", encoding="utf-8") as f:
                     file_content = f.read()
                     file["file_content"] = file_content
-            patches = self._make_patch(related_files)
+            patches = self._make_patch(related_files, feature)
             while True:
                 # 生成修改方案
                 PrettyOutput.print(f"生成{len(patches)}个补丁", OutputType.INFO)
                 
                 if not patches:
-                    self._save_edit_record(self.feature, patches)
+                    self._save_edit_record(feature, patches)
                     return {
                         "success": False,
                         "stdout": "",
@@ -644,27 +645,27 @@ file_description: 这个文件的主要功能和作用描述
                     user_confirm = input("是否确认修改？(y/n)")
                     if user_confirm.lower() == "y":
                         PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
-                        os.chdir(self.root_dir)
+                        
                         os.system(f"git add .")
-                        os.system(f"git commit -m '{self.feature}'")
-                        os.chdir(self.current_dir)
+                        os.system(f"git commit -m '{feature}'")
+                        
                         # 保存修改记录
-                        self._save_edit_record(self.feature, patches)
+                        self._save_edit_record(feature, patches)
                         # 重新建立代码库索引
                         self._index_project(self.language)
                         
                         return {
                             "success": True,
-                            "stdout": f"已完成功能开发{self.feature}",
+                            "stdout": f"已完成功能开发{feature}",
                             "stderr": "",
                             "error": None
                         }
                     else:
                         PrettyOutput.print("修改已取消，回退更改", OutputType.INFO)
-                        os.chdir(self.root_dir)
+                        
                         os.system(f"git reset --hard")  # 回退已修改的文件
                         os.system(f"git clean -df")     # 删除新创建的文件和目录
-                        os.chdir(self.current_dir)
+                        
                         return {
                             "success": False,
                             "stdout": "",
@@ -704,15 +705,15 @@ def main():
     load_env_from_file()
     
     parser = argparse.ArgumentParser(description='代码修改工具')
-    parser.add_argument('-p', '--platform', help='AI平台名称', default=os.environ.get('JARVIS_PLATFORM'))
+    parser.add_argument('-p', '--platform', help='AI平台名称', default=os.environ.get('JARVIS_CODEGEN_PLATFORM'))
     parser.add_argument('-m', '--model', help='模型名称', default=os.environ.get('JARVIS_CODEGEN_MODEL'))
-    parser.add_argument('-d', '--dir', help='项目根目录', required=True)
-    parser.add_argument('-l', '--language', help='编程语言', required=True)
+    parser.add_argument('-d', '--dir', help='项目根目录', default=os.getcwd())
+    parser.add_argument('-l', '--language', help='编程语言', default="python")
     args = parser.parse_args()
     
     # 设置平台
     if not args.platform:
-        print("错误: 未指定AI平台，请使用 -p 参数或设置 JARVIS_PLATFORM 环境变量")
+        print("错误: 未指定AI平台，请使用 -p 参数或设置 JARVIS_CODEGEN_PLATFORM 环境变量")
         return 1
         
     PlatformRegistry.get_global_platform_registry().set_global_platform_name(args.platform)
@@ -721,7 +722,7 @@ def main():
     if args.model:
         os.environ['JARVIS_CODEGEN_MODEL'] = args.model
         
-    tool = CodeEditTool()
+    tool = CodeEditTool(args.dir, args.language)
     
     # 循环处理需求
     while True:
@@ -733,11 +734,7 @@ def main():
                 break
                 
             # 执行修改
-            result = tool.execute({
-                "feature": feature,
-                "root_dir": args.dir,
-                "language": args.language
-            })
+            result = tool.execute(feature)
             
             # 显示结果
             if result["success"]:
