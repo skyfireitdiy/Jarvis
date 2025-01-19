@@ -328,7 +328,6 @@ file2.py: 7
 
 文件列表：
 """
-=
             for file_path, _ in batch_files:
                 prompt += f"- {file_path}\n"
             prompt += f"\n需求描述: {feature}\n"
@@ -378,7 +377,6 @@ file2.py: 7
                 results = process_response(response, current_batch)
                 batch_results.extend(results)
         
-=
         # Sort all results by score
         batch_results.sort(key=lambda x: x["score"], reverse=True)
         top_files = batch_results[:5]
@@ -409,7 +407,6 @@ file2.py: 7
 文件列表如下：
 <FILE_LIST_START>
 """
-=
             for i, file in enumerate(top_files):
                 prompt += f"""{i}. {file["file_path"]} : {file["file_description"]}\n"""
             prompt += f"""需求描述: {feature}\n"""
