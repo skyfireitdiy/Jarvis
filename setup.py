@@ -22,7 +22,7 @@ setup(
     entry_points={
         "console_scripts": [
             "jarvis=jarvis.main:main",
-            "jarvis-coder=jarvis-coder.main:main"
+            "jarvis-coder=jarvis.jarvis-coder.main:main"
         ],
     },
     python_requires=">=3.8",
