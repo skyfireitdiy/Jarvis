@@ -25,6 +25,7 @@ class Agent:
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
+        self.conversation_turns = 0  # 添加对话轮次计数器
 
 
     @staticmethod
@@ -107,6 +108,7 @@ class Agent:
         2. 清空对话历史
         3. 保留系统消息
         4. 添加总结作为新的上下文
+        5. 重置对话轮数
         """
         # 创建一个新的模型实例来做总结，避免影响主对话
         summary_model = self._new_model()
@@ -135,6 +137,9 @@ class Agent:
 请基于以上信息继续完成任务。
 """
             
+            # 重置对话轮数
+            self.conversation_turns = 0
+            
         except Exception as e:
             PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
         finally:
@@ -156,6 +161,7 @@ class Agent:
         """
         try:
             self.clear_history()
+            self.conversation_turns = 0  # 重置对话轮次
             
             if file_list:
                 self.model.upload_files(file_list)
@@ -245,6 +251,13 @@ arguments:
                     # 显示思考状态
                     PrettyOutput.print("分析任务...", OutputType.PROGRESS)
                     
+                    # 增加对话轮次
+                    self.conversation_turns += 1
+                    
+                    # 如果对话超过10轮，在提示中添加提醒
+                    if self.conversation_turns > 10:
+                        self.prompt = f"{self.prompt}\n(提示：当前对话已超过10轮，建议使用 !summarize 指令总结对话历史，避免token超限)"
+                    
                     current_response = self._call_model(self.prompt)
                     
                     # 检查是否需要总结对话历史
@@ -328,6 +341,7 @@ arguments:
         """清除对话历史，只保留系统提示"""
         self.prompt = "" 
         self.model.reset()
+        self.conversation_turns = 0  # 重置对话轮次
 
     def _make_methodology(self):
         """生成经验总结"""
