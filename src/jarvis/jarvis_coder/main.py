@@ -631,86 +631,54 @@ file2.py: 7
                 return None
         return root_dir
 
-    def execute(self, feature: str) -> Dict[str, Any]:
-        """执行代码修改
 
-        Args:
-            args: 包含操作参数的字典
-                - feature: 要实现的功能描述
-                - root_dir: 代码库根目录
-                - language: 编程语言
+    def _prepare_execution(self) -> None:
+        """准备执行环境"""
+        self.main_model = self._new_model()
+        self._index_project()
 
-        Returns:
-            Dict[str, Any]: 包含执行结果的字典
-                - success: 是否成功
-                - stdout: 标准输出信息
-                - stderr: 错误信息
-                - error: 错误对象(如果有)
-        """
-        try:
-            self.main_model = self._new_model()  # 每次执行时重新创建模型
+    def _load_related_files(self, feature: str) -> List[Dict]:
+        """加载相关文件内容"""
+        related_files = self._find_related_files(feature)
+        for file in related_files:
+            PrettyOutput.print(f"Related file: {file['file_path']}", OutputType.INFO)
+            with open(file["file_path"], "r", encoding="utf-8") as f:
+                file["file_content"] = f.read()
+        return related_files
+
+    def _handle_patch_application(self, related_files: List[Dict], patches: List[str], feature: str) -> Dict[str, Any]:
+        """处理补丁应用流程"""
+        while True:
+            PrettyOutput.print(f"生成{len(patches)}个补丁", OutputType.INFO)
             
-
-            # 4. 开始建立代码库索引
-            self._index_project()
-
-            # 5. 根据索引和需求，查找相关文件
-            related_files = self._find_related_files(feature)
-            for file in related_files:
-                PrettyOutput.print(f"Related file: {file['file_path']}", OutputType.INFO)
-            for file in related_files:
-                with open(file["file_path"], "r", encoding="utf-8") as f:
-                    file_content = f.read()
-                    file["file_content"] = file_content
-            patches = self._make_patch(related_files, feature)
-            while True:
-                # 生成修改方案
-                PrettyOutput.print(f"生成{len(patches)}个补丁", OutputType.INFO)
-                
-                if not patches:
-                    retry_prompt = f"""未生成补丁，请重新生成补丁"""
-                    patches = self._remake_patch(retry_prompt)
-                    continue
-                
-                # 尝试应用补丁
-                success, error_info = self._apply_patch(related_files, patches)
-                
-                if success:
-                    # 用户确认修改
-                    user_confirm = input("是否确认修改？(y/n)")
-                    if user_confirm.lower() == "y":
-                        PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
-                        
-                        os.system(f"git add .")
-                        os.system(f"git commit -m '{feature}'")
-                        
-                        # 保存修改记录
-                        self._save_edit_record(feature, patches)
-                        # 重新建立代码库索引
-                        self._index_project()
-                        
-                        return {
-                            "success": True,
-                            "stdout": f"已完成功能开发{feature}",
-                            "stderr": "",
-                            "error": None
-                        }
-                    else:
-                        PrettyOutput.print("修改已取消，回退更改", OutputType.INFO)
-                        
-                        os.system(f"git reset --hard")  # 回退已修改的文件
-                        os.system(f"git clean -df")     # 删除新创建的文件和目录
-                        
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": "修改被用户取消，文件未发生任何变化",
-                            "error": UserWarning("用户取消修改")
-                        }
+            if not patches:
+                retry_prompt = f"""未生成补丁，请重新生成补丁"""
+                patches = self._remake_patch(retry_prompt)
+                continue
+            
+            success, error_info = self._apply_patch(related_files, patches)
+            
+            if success:
+                user_confirm = input("是否确认修改？(y/n)")
+                if user_confirm.lower() == "y":
+                    self._finalize_changes(feature, patches)
+                    return {
+                        "success": True,
+                        "stdout": f"已完成功能开发{feature}",
+                        "stderr": "",
+                        "error": None
+                    }
                 else:
-                    # 补丁应用失败，让模型重新生成
-                    PrettyOutput.print(f"补丁应用失败，请求重新生成: {error_info}", OutputType.WARNING)
-                    retry_prompt = f"""补丁应用失败，请根据以下错误信息重新生成补丁：
+                    self._revert_changes()
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "修改被用户取消，文件未发生任何变化",
+                        "error": UserWarning("用户取消修改")
+                    }
+            else:
+                PrettyOutput.print(f"补丁应用失败，请求重新生成: {error_info}", OutputType.WARNING)
+                retry_prompt = f"""补丁应用失败，请根据以下错误信息重新生成补丁：
 
 错误信息：
 {error_info}
@@ -721,8 +689,40 @@ file2.py: 7
 3. 考虑代码上下文
 4. 对新文件不要包含原始内容
 """
-                    patches = self._remake_patch(retry_prompt)
-                    continue
+                patches = self._remake_patch(retry_prompt)
+
+    def _finalize_changes(self, feature: str, patches: List[str]) -> None:
+        """完成修改并提交"""
+        PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
+        os.system(f"git add .")
+        os.system(f"git commit -m '{feature}'")
+        self._save_edit_record(feature, patches)
+        self._index_project()
+
+    def _revert_changes(self) -> None:
+        """回退所有修改"""
+        PrettyOutput.print("修改已取消，回退更改", OutputType.INFO)
+        os.system(f"git reset --hard")
+        os.system(f"git clean -df")
+
+    def execute(self, feature: str) -> Dict[str, Any]:
+        """执行代码修改
+
+        Args:
+            feature: 要实现的功能描述
+
+        Returns:
+            Dict[str, Any]: 包含执行结果的字典
+                - success: 是否成功
+                - stdout: 标准输出信息
+                - stderr: 错误信息
+                - error: 错误对象(如果有)
+        """
+        try:
+            self._prepare_execution()
+            related_files = self._load_related_files(feature)
+            patches = self._make_patch(related_files, feature)
+            return self._handle_patch_application(related_files, patches, feature)
                 
         except Exception as e:
             return {
