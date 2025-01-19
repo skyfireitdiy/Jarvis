@@ -2,6 +2,7 @@ import hashlib
 import os
 import re
 import sqlite3
+import threading
 import time
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -9,6 +10,9 @@ import yaml
 from jarvis.models.base import BasePlatform
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
+
+# 全局锁对象
+index_lock = threading.Lock()
 
 class JarvisCoder:
     def __init__(self, root_dir: str, language: str):
@@ -155,49 +159,57 @@ file_description: 这个文件的主要功能和作用描述
         """获取文件MD5"""
         return hashlib.md5(open(file_path, "rb").read()).hexdigest()
 
+    =
     def _create_index_db(self):
         """创建索引数据库"""
-        if not os.path.exists(self.index_db_path):
-            PrettyOutput.print("Index database does not exist, creating...", OutputType.INFO)
-            index_db = sqlite3.connect(self.index_db_path)
-            index_db.execute(
-                "CREATE TABLE files (file_path TEXT PRIMARY KEY, file_md5 TEXT, file_description TEXT)")
-            index_db.commit()
-            index_db.close()
-            PrettyOutput.print("Index database created", OutputType.SUCCESS)
-            # commit
-            os.chdir(self.root_dir)
-            os.system(f"git add .gitignore -f")
-            os.system(f"git commit -m 'add index database'")
+        with index_lock:
+            if not os.path.exists(self.index_db_path):
+                PrettyOutput.print("Index database does not exist, creating...", OutputType.INFO)
+                index_db = sqlite3.connect(self.index_db_path)
+                index_db.execute(
+                    "CREATE TABLE files (file_path TEXT PRIMARY KEY, file_md5 TEXT, file_description TEXT)")
+                index_db.commit()
+                index_db.close()
+                PrettyOutput.print("Index database created", OutputType.SUCCESS)
+                # commit
+                os.chdir(self.root_dir)
+                os.system(f"git add .gitignore -f")
+                os.system(f"git commit -m 'add index database'")
 
+    =
     def _find_file_by_md5(self, file_md5: str) -> Optional[str]:
         """根据文件MD5查找文件路径"""
-        index_db = sqlite3.connect(self.index_db_path)
-        cursor = index_db.cursor()
-        cursor.execute(
-            "SELECT file_path FROM files WHERE file_md5 = ?", (file_md5,))
-        result = cursor.fetchone()
-        index_db.close()
-        return result[0] if result else None
+        with index_lock:
+            index_db = sqlite3.connect(self.index_db_path)
+            cursor = index_db.cursor()
+            cursor.execute(
+                "SELECT file_path FROM files WHERE file_md5 = ?", (file_md5,))
+            result = cursor.fetchone()
+            index_db.close()
+            return result[0] if result else None
 
+    =
     def _update_file_path(self, file_path: str, file_md5: str):
         """更新文件路径"""
-        index_db = sqlite3.connect(self.index_db_path)
-        cursor = index_db.cursor()
-        cursor.execute(
-            "UPDATE files SET file_path = ? WHERE file_md5 = ?", (file_path, file_md5))
-        index_db.commit()
-        index_db.close()
+        with index_lock:
+            index_db = sqlite3.connect(self.index_db_path)
+            cursor = index_db.cursor()
+            cursor.execute(
+                "UPDATE files SET file_path = ? WHERE file_md5 = ?", (file_path, file_md5))
+            index_db.commit()
+            index_db.close()
 
+    =
     def _insert_info(self, file_path: str, file_md5: str, file_description: str):
         """插入文件信息"""
-        index_db = sqlite3.connect(self.index_db_path)
-        cursor = index_db.cursor()
-        cursor.execute("DELETE FROM files WHERE file_path = ?", (file_path,))
-        cursor.execute("INSERT INTO files (file_path, file_md5, file_description) VALUES (?, ?, ?)",
-                       (file_path, file_md5, file_description))
-        index_db.commit()
-        index_db.close()
+        with index_lock:
+            index_db = sqlite3.connect(self.index_db_path)
+            cursor = index_db.cursor()
+            cursor.execute("DELETE FROM files WHERE file_path = ?", (file_path,))
+            cursor.execute("INSERT INTO files (file_path, file_md5, file_description) VALUES (?, ?, ?)",
+                           (file_path, file_md5, file_description))
+            index_db.commit()
+            index_db.close()
 
     def _is_text_file(self, file_path: str) -> bool:
         """判断文件是否是文本文件"""
