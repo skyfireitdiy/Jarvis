@@ -121,6 +121,7 @@ class JarvisCoder:
             Optional[Dict[str, Any]]: 文件信息，包含文件描述
         """
         model = self._new_model()  # 创建新的模型实例
+        model.set_suppress_output(True)
         
         prompt = f"""你是一个资深程序员，请根据文件内容，生成文件的关键信息，要求如下，除了代码，不要输出任何内容：
 
@@ -521,8 +522,8 @@ file2.py: 7
                     error_info.append(f"补丁格式错误: {file_path}")
                     return False, "\n".join(error_info)
                 
-                old_content = parts[0].strip()
-                new_content = parts[1].split("<<<<<<")[0].strip()
+                old_content = parts[0]
+                new_content = parts[1].split("<<<<<<")[0]
                 
                 # 处理新文件
                 if not old_content:
