@@ -216,6 +216,9 @@ file_description: 这个文件的主要功能和作用描述
 
     def _index_project(self):
         """建立代码库索引"""
+        import threading
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         git_files = os.popen("git ls-files").read().splitlines()
 
         index_db = sqlite3.connect(self.index_db_path)
@@ -229,37 +232,49 @@ file_description: 这个文件的主要功能和作用描述
         index_db.commit()
         index_db.close()
 
-        # 3. 遍历git管理的文件
-        for file_path in git_files:
-            if self._is_text_file(file_path):
-                # 计算文件MD5
-                file_md5 = self._get_file_md5(file_path)
+        def process_file(file_path: str):
+            """处理单个文件的索引任务"""
+            if not self._is_text_file(file_path):
+                return
 
-                # 查找文件
-                file_path_in_db = self._find_file_by_md5(file_md5)
-                if file_path_in_db:
+            # 计算文件MD5
+            file_md5 = self._get_file_md5(file_path)
+
+            # 查找文件
+            file_path_in_db = self._find_file_by_md5(file_md5)
+            if file_path_in_db:
+                PrettyOutput.print(
+                    f"文件 {file_path} 重复，跳过", OutputType.INFO)
+                if file_path_in_db != file_path:
+                    self._update_file_path(file_path, file_md5)
                     PrettyOutput.print(
-                        f"文件 {file_path} 重复，跳过", OutputType.INFO)
-                    if file_path_in_db != file_path:
-                        self._update_file_path(file_path, file_md5)
-                        PrettyOutput.print(
-                            f"文件 {file_path} 重复，更新路径为 {file_path}", OutputType.INFO)
-                    continue
+                        f"文件 {file_path} 重复，更新路径为 {file_path}", OutputType.INFO)
+                return
 
-                with open(file_path, "r", encoding="utf-8") as f:
-                    file_content = f.read()
-                    key_info = self._get_key_info(file_path, file_content)
-                    if not key_info:
-                        PrettyOutput.print(
-                            f"文件 {file_path} 索引失败", OutputType.INFO)
-                        continue
-                    if "file_description" in key_info:
-                        self._insert_info(file_path, file_md5, key_info["file_description"])
-                        PrettyOutput.print(
-                            f"文件 {file_path} 已建立索引", OutputType.INFO)
-                    else:
-                        PrettyOutput.print(
-                            f"文件 {file_path} 不是代码文件，跳过", OutputType.INFO)
+            with open(file_path, "r", encoding="utf-8") as f:
+                file_content = f.read()
+                key_info = self._get_key_info(file_path, file_content)
+                if not key_info:
+                    PrettyOutput.print(
+                        f"文件 {file_path} 索引失败", OutputType.INFO)
+                    return
+                if "file_description" in key_info:
+                    self._insert_info(file_path, file_md5, key_info["file_description"])
+                    PrettyOutput.print(
+                        f"文件 {file_path} 已建立索引", OutputType.INFO)
+                else:
+                    PrettyOutput.print(
+                        f"文件 {file_path} 不是代码文件，跳过", OutputType.INFO)
+
+        # 使用线程池处理文件索引
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(process_file, file_path) for file_path in git_files]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    PrettyOutput.print(f"处理文件时发生错误: {str(e)}", OutputType.ERROR)
+
         PrettyOutput.print("项目索引完成", OutputType.INFO)
 
     def _find_related_files(self, feature: str) -> List[Dict]:
