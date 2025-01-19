@@ -81,7 +81,7 @@ class PlatformRegistry:
             directory: 平台目录路径
             
         Returns:
-            Dict[str, Type[BaseModel]]: 平台名称到平台类的映射
+            Dict[str, Type[BasePlatform]]: 平台名称到平台类的映射
         """
         platforms = {}
         
@@ -112,7 +112,7 @@ class PlatformRegistry:
                     
                     # 遍历模块中的所有类
                     for name, obj in inspect.getmembers(module):
-                        # 检查是否是BaseModel的子类，但不是BaseModel本身
+                        # 检查是否是BasePlatform的子类，但不是BasePlatform本身
                         if (inspect.isclass(obj) and 
                             issubclass(obj, BasePlatform) and 
                             obj != BasePlatform and
@@ -176,7 +176,7 @@ class PlatformRegistry:
             name: 平台名称
             
         Returns:
-            BaseModel: 平台实例
+            BasePlatform: 平台实例
         """
         if name not in self.platforms:
             PrettyOutput.print(f"未找到平台: {name}", OutputType.ERROR)

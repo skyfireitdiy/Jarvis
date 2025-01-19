@@ -11,6 +11,8 @@
 
 *Your intelligent assistant for development and system interaction*
 
+English | [简体中文](README_zh.md)
+
 [Features](#features) •
 [Usage](#usage) •
 [Configuration](#configuration) •
@@ -57,19 +59,23 @@ pip install jarvis-ai-assistant
 
 ## 🔧 Configuration
 
-Create a `.jarvis_env` file in your home directory with your API keys:
+Jarvis supports configuration through environment variables that can be set in the `~/.jarvis_env` file:
 
-### For Kimi:
-```bash
-KIMI_API_KEY=your_kimi_api_key_here
-```
+| Environment Variable | Description | Default Value | Required |
+|---------|------|--------|------|
+| JARVIS_PLATFORM | AI platform to use, supports kimi/openai/ai8 etc | kimi | Yes |
+| JARVIS_MODEL | Model name to use | - | No |
+| JARVIS_CODEGEN_PLATFORM | AI platform for code generation | Same as JARVIS_PLATFORM | No |
+| JARVIS_CODEGEN_MODEL | Model name for code generation | Same as JARVIS_MODEL | No |
+| OPENAI_API_KEY | API key for OpenAI platform | - | Required for OpenAI |
+| OPENAI_API_BASE | Base URL for OpenAI API | https://api.deepseek.com | No |
+| OPENAI_MODEL_NAME | Model name for OpenAI | deepseek-chat | No |
+| AI8_API_KEY | API key for AI8 platform | - | Required for AI8 |
+| AI8_MODEL | Model name for AI8 platform | deepseek-chat | No |
+| KIMI_API_KEY | API key for Kimi platform | - | Required for Kimi |
+| OYI_API_KEY | API key for OYI platform | - | Required for OYI |
+| OYI_MODEL | Model name for OYI platform | deepseek-chat | No |
 
-### For OpenAI:
-```bash
-OPENAI_API_KEY=your_api_key_here
-OPENAI_API_BASE=your_api_base  # Optional, defaults to https://api.deepseek.com
-OPENAI_MODEL_NAME=your_model_name  # Optional, defaults to deepseek-chat
-```
 
 ## 🎯 Usage
 
@@ -186,55 +192,57 @@ Create a new Python file in `~/.jarvis_models/`:
 
 ```python
 from typing import Dict, List
-from jarvis.models.base import BaseModel
+from jarvis.models.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType
 
-class CustomModel(BaseModel):
+class CustomPlatform(BasePlatform):
     """Custom model implementation"""
     
-    model_name = "custom"  # Model identifier
+    platform_name = "custom"  # Platform identifier
     
     def __init__(self):
         """Initialize model"""
-        # Add your initialization code here
+        # add initialization code
+        super().__init__()
         self.messages = []
         self.system_message = ""
-        
-    def set_system_message(self, message: str):
-        """Set system message"""
-        self.system_message = message
-        
+
+    def set_model_name(self, model_name: str):
+        """Set model name"""
+        self.model_name = model_name
+
     def chat(self, message: str) -> str:
-        """Execute chat with the model
+        """Chat with model
         
         Args:
-            message: User input message
+            message: user input message
             
         Returns:
-            str: Model response
+            str: model response
         """
         try:
-            # Implement chat logic here
-            PrettyOutput.print("发送请求...", OutputType.PROGRESS)
+            # implement chat logic
+            PrettyOutput.print("Sending request...", OutputType.PROGRESS)
             
-            # Add message to history
+            # add message to history
             self.messages.append({"role": "user", "content": message})
             
-            # Get response from your model
-            response = "Model response"
+            # get response from model
+            response = "model response"
             
-            # Add response to history
+            # add response to history
             self.messages.append({"role": "assistant", "content": response})
             
             return response
             
         except Exception as e:
-            PrettyOutput.print(f"对话失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Chat failed: {str(e)}", OutputType.ERROR)
             raise Exception(f"Chat failed: {str(e)}")
-            
-    def name(self) -> str:
-        """Return model name"""
-        return self.model_name
+    
+    def upload_files(self, file_list: List[str]) -> List[Dict]:
+        """Upload files"""
+        # implement file upload logic
+        return []    
         
     def reset(self):
         """Reset model state"""
@@ -242,10 +250,22 @@ class CustomModel(BaseModel):
         if self.system_message:
             self.messages.append({"role": "system", "content": self.system_message})
             
+    def name(self) -> str:
+        """Return model name"""
+        return self.model_name
+            
     def delete_chat(self) -> bool:
         """Delete current chat session"""
         self.reset()
-        return True
+        return True  
+
+    def set_system_message(self, message: str):
+        """Set system message"""
+        self.system_message = message
+
+    def set_suppress_output(self, suppress: bool):
+        """Set whether to suppress output"""
+        self.suppress_output = suppress
 ```
 
 ### Development Guidelines
