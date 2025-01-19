@@ -889,22 +889,22 @@ def get_multiline_input(prompt_text: str, root_dir: str = None) -> str:
     session = PromptSession(
         completer=file_completer,
         style=style,
-        multiline=True,
+        multiline=False,  # 改为单行模式
         enable_history_search=True,
         complete_while_typing=True
     )
     
     # 获取输入
     lines = []
-    while True:
-        try:
-            line = session.prompt(formatted_prompt)
+    try:
+        while True:
+            line = session.prompt(formatted_prompt).strip()
             if not line:  # 空行表示输入结束
                 break
             lines.append(line)
-        except KeyboardInterrupt:
-            return "__interrupt__"
-        except EOFError:
-            break
+    except KeyboardInterrupt:
+        return "__interrupt__"
+    except EOFError:
+        pass
     
     return "\n".join(lines)
