@@ -17,8 +17,7 @@ index_lock = threading.Lock()
 class JarvisCoder:
     def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
-        self.main_model = None
-        self.db_path = ""
+
         self.root_dir = root_dir
         self.platform = os.environ.get("JARVIS_CODEGEN_PLATFORM")
         self.model = os.environ.get("JARVIS_CODEGEN_MODEL")
