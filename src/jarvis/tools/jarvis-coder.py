@@ -10,7 +10,6 @@ from jarvis.models.base import BasePlatform
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
 
-
 class CodeEditTool:
     """代码修改工具"""
 
@@ -30,6 +29,14 @@ class CodeEditTool:
             "language": {
                 "type": "string",
                 "description": "编程语言"
+            },
+            "platform": {
+                "type": "string",
+                "description": "AI平台名称"
+            },
+            "model": {
+                "type": "string",
+                "description": "模型名称"
             }
         },
         "required": ["feature", "root_dir", "language"]
@@ -40,6 +47,8 @@ class CodeEditTool:
         self.main_model = None
         self.db_path = ""
         self.root_dir = root_dir
+        self.platform = os.environ.get("JARVIS_CODEGEN_PLATFORM")
+        self.model = os.environ.get("JARVIS_CODEGEN_MODEL")
         self.language = language
 
         self.root_dir = self._find_git_root_dir(self.root_dir)
@@ -82,11 +91,9 @@ class CodeEditTool:
 
     def _new_model(self):
         """获取大模型"""
-        platform_name = os.environ.get(
-            "JARVIS_CODEGEN_PLATFORM", PlatformRegistry.global_platform_name)
-        model_name = os.environ.get("JARVIS_CODEGEN_MODEL")
-        model = PlatformRegistry().get_global_platform_registry().create_platform(platform_name)
-        if model_name:
+        model = PlatformRegistry().get_global_platform_registry().create_platform(self.platform)
+        if self.model:
+            model_name = self.model
             model.set_model_name(model_name)
         return model
 
@@ -697,7 +704,7 @@ def main():
     load_env_from_file()
     
     parser = argparse.ArgumentParser(description='代码修改工具')
-    parser.add_argument('-p', '--platform', help='AI平台名称', default=os.environ.get('JARVIS_CODEGEN_PLATFORM'))
+    parser.add_argument('-p', '--platform', help='AI平台名称', required=True)
     parser.add_argument('-m', '--model', help='模型名称', default=os.environ.get('JARVIS_CODEGEN_MODEL'))
     parser.add_argument('-d', '--dir', help='项目根目录', default=os.getcwd())
     parser.add_argument('-l', '--language', help='编程语言', default="python")
@@ -705,11 +712,7 @@ def main():
     
     # 设置平台
     if not args.platform:
-        print("错误: 未指定AI平台，请使用 -p 参数或设置 JARVIS_CODEGEN_PLATFORM 环境变量")
-        return 1
-        
-    PlatformRegistry.get_global_platform_registry().set_global_platform_name(args.platform)
-    
+        print("错误: 未指定AI平台，请使用 -p 参数")
     # 设置模型
     if args.model:
         os.environ['JARVIS_CODEGEN_MODEL'] = args.model
