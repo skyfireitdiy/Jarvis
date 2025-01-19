@@ -14,6 +14,7 @@ class AI8Model(BasePlatform):
     
     def __init__(self):
         """Initialize model"""
+        super().__init__()
         self.system_message = ""
         self.conversation = None
         self.files = []

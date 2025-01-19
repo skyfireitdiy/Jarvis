@@ -13,6 +13,7 @@ class OpenAIModel(BasePlatform):
         """
         初始化DeepSeek模型
         """
+        super().__init__()
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             PrettyOutput.print("\n需要设置以下环境变量才能使用 OpenAI 模型：", OutputType.INFO)

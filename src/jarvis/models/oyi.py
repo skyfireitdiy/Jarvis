@@ -14,6 +14,7 @@ class OyiModel(BasePlatform):
     
     def __init__(self):
         """Initialize model"""
+        super().__init__()
         PrettyOutput.section("支持的模型", OutputType.SUCCESS)
         
         # 获取可用模型列表
