@@ -369,13 +369,13 @@ file2.py: 7
         
         success, response = self._call_model_with_retry(self._new_model(), prompt)
         if not success:
-            return top_files[:3]  # Return top 3 files from filename matching if model fails
+            return top_files[:5]  # Return top 5 files from filename matching if model fails
         
         try:
             response = response.replace("<FILE_RELATION_START>", "").replace("<FILE_RELATION_END>", "")
             file_relation = yaml.safe_load(response)
             if not file_relation:
-                return top_files[:3]
+                return top_files[:5]
             
             for file_id, relation in file_relation.items():
                 id = int(file_id)
@@ -384,16 +384,16 @@ file2.py: 7
             
         except Exception as e:
             PrettyOutput.print(f"处理文件关系失败: {str(e)}", OutputType.ERROR)
-            return top_files[:3]
+            return top_files[:5]
         
         files = []
         score.reverse()
         for i in score:
             files.extend(i)
-            if len(files) >= 3:  # 直接取相关性最高的3个文件
+            if len(files) >= 5:  # 直接取相关性最高的5个文件
                 break
         
-        return files[:3]
+        return files[:5]
     
     def _remake_patch(self, prompt: str) -> List[str]:
         success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)  # 增加重试次数
