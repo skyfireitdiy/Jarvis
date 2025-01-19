@@ -187,7 +187,6 @@ file_description: 这个文件的主要功能和作用描述
             os.chdir(self.root_dir)
             os.system(f"git add .gitignore -f")
             os.system(f"git commit -m 'add index database'")
-            os.chdir(self.current_dir)
 
     def _find_file_by_md5(self, index_db_path: str, file_md5: str) -> Optional[str]:
         """根据文件MD5查找文件路径"""
