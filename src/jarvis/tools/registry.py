@@ -101,6 +101,7 @@ class ToolRegistry:
                     )
                     PrettyOutput.print(f"从 {file_path} 加载工具: {tool_instance.name}: {tool_instance.description}", OutputType.INFO)
                     tool_found = True
+                    break
                     
             if not tool_found:
                 PrettyOutput.print(f"文件中未找到有效的工具类: {file_path}", OutputType.WARNING)
