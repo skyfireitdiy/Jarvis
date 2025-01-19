@@ -880,25 +880,28 @@ def get_multiline_input(prompt_text: str, root_dir: str = None) -> str:
         'input': 'ansiwhite',
     })
     
-    # 创建格式化提示文本
-    formatted_prompt = FormattedText([
-        ('class:prompt', f"\n{prompt_text}\n>>> ")
-    ])
-    
     # 创建会话
     session = PromptSession(
         completer=file_completer,
         style=style,
-        multiline=False,  # 改为单行模式
+        multiline=False,
         enable_history_search=True,
         complete_while_typing=True
     )
+    
+    # 显示初始提示文本
+    print(f"\n{prompt_text}")
+    
+    # 创建提示符
+    prompt = FormattedText([
+        ('class:prompt', ">>> ")
+    ])
     
     # 获取输入
     lines = []
     try:
         while True:
-            line = session.prompt(formatted_prompt).strip()
+            line = session.prompt(prompt).strip()
             if not line:  # 空行表示输入结束
                 break
             lines.append(line)
