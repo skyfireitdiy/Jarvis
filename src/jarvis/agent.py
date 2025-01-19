@@ -99,6 +99,50 @@ class Agent:
             PrettyOutput.print(f"从 {user_jarvis_methodology} 加载经验总结: {', '.join(data.keys())}", OutputType.INFO)
         return ret
 
+    def _summarize_and_clear_history(self) -> None:
+        """总结当前对话历史并清空历史记录，只保留系统消息和总结
+        
+        这个方法会：
+        1. 请求模型总结当前对话的关键信息
+        2. 清空对话历史
+        3. 保留系统消息
+        4. 添加总结作为新的上下文
+        """
+        # 创建一个新的模型实例来做总结，避免影响主对话
+        summary_model = self._new_model()
+        
+        prompt = """请总结之前对话中的关键信息，包括：
+1. 当前任务目标
+2. 已经确认的关键信息
+3. 已经尝试过的方案
+4. 当前进展
+5. 待解决的问题
+
+请用简洁的要点形式描述，突出重要信息。不要包含对话细节。
+"""
+        
+        try:
+            summary = summary_model.chat(prompt)
+            
+            # 清空当前对话历史，但保留系统消息
+            self.model.reset()
+            
+            # 添加总结作为新的上下文
+            self.prompt = f"""以下是之前对话的关键信息总结：
+
+{summary}
+
+请基于以上信息继续完成任务。
+"""
+            
+        except Exception as e:
+            PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
+        finally:
+            try:
+                summary_model.delete_chat()
+            except:
+                pass
+
     def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
         """处理用户输入并返回响应，返回任务总结报告
         
@@ -184,6 +228,11 @@ arguments:
 
 -------------------------------------------------------------
 
+特殊指令：
+1. !summarize - 当你发现对话历史过长可能导致token超限时，可以使用此指令总结当前对话要点并清空历史。使用方法：直接回复"!summarize"即可。
+
+-------------------------------------------------------------
+
 {methodology_prompt}
 
 -------------------------------------------------------------
@@ -197,6 +246,11 @@ arguments:
                     PrettyOutput.print("分析任务...", OutputType.PROGRESS)
                     
                     current_response = self._call_model(self.prompt)
+                    
+                    # 检查是否需要总结对话历史
+                    if current_response.lower().startswith("!summarize"):
+                        self._summarize_and_clear_history()
+                        continue
                     
                     try:
                         result = Agent.extract_tool_calls(current_response)
