@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="jarvis-ai-assistant",
-    version="0.1.53",
+    version="0.1.55",
     author="skyfire",
     author_email="skyfireitdiy@hotmail.com",
     description="An AI assistant that uses various tools to interact with the system",
@@ -22,7 +22,7 @@ setup(
     entry_points={
         "console_scripts": [
             "jarvis=jarvis.main:main",
-            "jarvis-coder=jarvis.jarvis-coder.main:main"
+            "jarvis_coder=jarvis.jarvis_coder.main:main"
         ],
     },
     python_requires=">=3.8",
@@ -37,4 +37,4 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
     ],
-) 
+)
