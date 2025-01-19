@@ -441,7 +441,9 @@ file2.py: 7
         
         prompt += f"\n需求描述: {feature}\n"
         prompt += """
-注意事项：仅输出补丁内容，不要输出任何其他内容，每个补丁必须用<PATCH_START>和<PATCH_END>标记
+注意事项：
+1、仅输出补丁内容，不要输出任何其他内容，每个补丁必须用<PATCH_START>和<PATCH_END>标记
+2、如果在大段代码中有零星修改，生成多个补丁
 """
         
         success, response = self._call_model_with_retry(self.main_model, prompt)
