@@ -407,6 +407,24 @@ file2.py: 7
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
             return []
         
+    def _find_line_numbers(self, file_path: str, text: str) -> List[int]:
+        """查找文本在文件中的行号
+        
+        Args:
+            file_path: 文件路径
+            text: 要查找的文本
+            
+        Returns:
+            List[int]: 匹配的行号列表(从1开始)
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                return [i + 1 for i, line in enumerate(lines) if text in line]
+        except Exception as e:
+            PrettyOutput.print(f"查找行号失败: {str(e)}", OutputType.ERROR)
+            return []
+
     def _make_patch(self, related_files: List[Dict], feature: str) -> List[str]:
         """生成修改方案"""
         prompt = """你是一个资深程序员，请根据需求描述，修改文件内容。
@@ -431,6 +449,12 @@ new file mode 100644
 @@ -0,0 +1,N @@
 +新文件的完整内容
 
+可用工具函数：
+1. find_line_numbers(file_path: str, text: str) -> List[int]
+   - 查找指定文本在文件中的行号(从1开始)
+   - 示例调用: find_line_numbers("path/to/file", "要查找的文本")
+   - 返回值示例: [23, 45, 67] 表示文本在第23、45、67行出现
+
 文件列表如下：
 """
         for i, file in enumerate(related_files):
@@ -448,19 +472,50 @@ new file mode 100644
 3. 保持正确的缩进
 4. 如果需要修改多个文件，为每个文件生成独立的diff
 5. 不要输出任何其他内容，只输出标准git diff格式的修改
+6. 如果需要查找某段代码的位置，可以使用find_line_numbers工具函数
+
+如果需要调用工具函数，使用以下格式：
+<TOOL_CALL>
+tool: find_line_numbers
+args:
+  file_path: path/to/file
+  text: 要查找的文本
+</TOOL_CALL>
 """
         
-        success, response = self._call_model_with_retry(self.main_model, prompt)
-        if not success:
-            return []
+        while True:
+            success, response = self._call_model_with_retry(self.main_model, prompt)
+            if not success:
+                return []
             
-        try:
-            # 使用正则表达式匹配每个diff块
-            patches = re.findall(r'diff --git.*?(?=diff --git|\Z)', response, re.DOTALL)
-            return [patch.strip() for patch in patches if patch.strip()]
-        except Exception as e:
-            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
-            return []
+            # 处理工具调用
+            if "<TOOL_CALL>" in response:
+                try:
+                    # 提取工具调用部分
+                    tool_calls = re.findall(r'<TOOL_CALL>.*?</TOOL_CALL>', response, re.DOTALL)
+                    for tool_call in tool_calls:
+                        # 解析工具调用参数
+                        tool_info = yaml.safe_load(tool_call.replace('<TOOL_CALL>', '').replace('</TOOL_CALL>', ''))
+                        if tool_info['tool'] == 'find_line_numbers':
+                            # 执行工具调用
+                            line_numbers = self._find_line_numbers(
+                                tool_info['args']['file_path'],
+                                tool_info['args']['text']
+                            )
+                            # 将结果添加到提示中
+                            prompt += f"\n工具调用结果:\n文本 '{tool_info['args']['text']}' 在文件 {tool_info['args']['file_path']} 中的行号: {line_numbers}\n"
+                    continue  # 继续对话以生成最终的patch
+                except Exception as e:
+                    PrettyOutput.print(f"处理工具调用失败: {str(e)}", OutputType.ERROR)
+                    return []
+            
+            try:
+                # 使用正则表达式匹配每个diff块
+                patches = re.findall(r'diff --git.*?(?=diff --git|\Z)', response, re.DOTALL)
+                return [patch.strip() for patch in patches if patch.strip()]
+            except Exception as e:
+                PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
+                return []
 
     def _apply_patch(self, related_files: List[Dict], patches: List[str]) -> Tuple[bool, str]:
         """应用补丁
