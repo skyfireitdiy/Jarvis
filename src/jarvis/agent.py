@@ -141,11 +141,6 @@ class Agent:
             
         except Exception as e:
             PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
-        finally:
-            try:
-                summary_model.delete_chat()
-            except:
-                pass
 
     def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
         """处理用户输入并返回响应，返回任务总结报告
