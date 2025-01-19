@@ -15,7 +15,6 @@ from jarvis.models.registry import PlatformRegistry
 index_lock = threading.Lock()
 
 class JarvisCoder:
-=
     def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
 
@@ -475,7 +474,7 @@ file2.py: 7
 <PATCH_START>
 >>>>>> path/to/file
 要替换的内容
-======
+=======
 新的内容
 <<<<<<
 <PATCH_END>
@@ -483,7 +482,7 @@ file2.py: 7
 2. 如果是新文件，格式如下：
 <PATCH_START>
 >>>>>> path/to/new/file
-======
+=======
 新文件的完整内容
 <<<<<<
 <PATCH_END>
@@ -546,7 +545,7 @@ file2.py: 7
                 
                 # 解析补丁内容
                 patch_content = "\n".join(lines[1:])
-                parts = patch_content.split("======")
+                parts = patch_content.split("=======")
                 
                 if len(parts) != 2:
                     error_info.append(f"补丁格式错误: {file_path}")
