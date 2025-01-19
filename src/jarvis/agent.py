@@ -286,16 +286,7 @@ arguments:
                         continue
                     
                     if not user_input:
-                        while True:
-                            choice = prompt("是否需要手动为此任务生成经验总结以提升Jarvis对类似任务的处理能力？(y/n), 回车跳过: ")
-                            if choice == "y":
-                                self._make_methodology()
-                                break
-                            elif choice == "n" or choice == "":
-                                break
-                            else:
-                                PrettyOutput.print("请输入y或n", OutputType.ERROR)
-                                continue
+                        self._make_methodology()
                         PrettyOutput.section("任务完成", OutputType.SUCCESS)
                         if self.is_sub_agent:
                             # 生成任务总结
@@ -339,7 +330,7 @@ arguments:
 
     def _make_methodology(self):
         """生成经验总结"""
-        current_response = self._call_model("""请根据之前的对话内容，判断是否有必要更新、添加、删除现有经验总结，如果有，使用methodology工具进行管理。
+        current_response = self._call_model("""任务已结束，请根据之前的对话内容，判断是否有必要更新、添加、删除现有经验总结，如果有，使用methodology工具进行管理。
 经验总结模板：
 1. 问题重述
 2. 最优解决方案
