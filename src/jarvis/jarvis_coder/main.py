@@ -361,7 +361,9 @@ file2.py: 7
             for i in range(0, len(all_files), batch_size):
                 batch_files = all_files[i:i + batch_size]
                 prompt, files = process_batch(batch_files)
-                futures.append(executor.submit(self._call_model_with_retry, self._new_model(), prompt))
+                model = self._new_model()
+                model.set_suppress_output(True)
+                futures.append(executor.submit(self._call_model_with_retry, model, prompt))
 
             for future in as_completed(futures):
                 success, response = future.result()
@@ -389,8 +391,6 @@ file2.py: 7
             } for f in remaining_files[:5-len(top_files)]])
 
         # Now do content relevance analysis on these files
-        score = [[], [], [], [], [], [], [], [], [], []]
-        
         def create_content_prompt(top_files, feature):
             prompt = """你是资深程序员，请根据需求描述，分析文件的相关性。
 
@@ -423,16 +423,15 @@ file2.py: 7
                 if not file_relation:
                     return top_files[:5]
                 
-                score = [[], [], [], [], [], [], [], [], [], []]
+                score = [[] for _ in range(10)]  # 创建10个空列表，对应0-9分
                 for file_id, relation in file_relation.items():
                     id = int(file_id)
                     relation = max(0, min(9, relation))  # 确保范围在0-9之间
                     score[relation].append(top_files[id])
                 
                 files = []
-                score.reverse()
-                for i in score:
-                    files.extend(i)
+                for scores in reversed(score):  # 从高分到低分遍历
+                    files.extend(scores)
                     if len(files) >= 5:  # 直接取相关性最高的5个文件
                         break
                 
