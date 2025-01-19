@@ -42,7 +42,6 @@ class CodeEditTool:
         self.root_dir = root_dir
         self.language = language
 
-
         self.root_dir = self._find_git_root_dir(self.root_dir)
         if not self.root_dir:
             self.root_dir = root_dir
@@ -56,6 +55,14 @@ class CodeEditTool:
             os.makedirs(self.root_dir)
 
         os.chdir(self.root_dir)
+
+        self.jarvis_dir = os.path.join(self.root_dir, ".jarvis-coder")
+        if not os.path.exists(self.jarvis_dir):
+            os.makedirs(self.jarvis_dir)
+
+        self.index_db_path = os.path.join(self.jarvis_dir, "index.db")
+        if not os.path.exists(self.index_db_path):
+            self._create_index_db()
 
         # 2. 判断代码库是否是git仓库，如果不是，初始化git仓库
         if not os.path.exists(os.path.join(self.root_dir, ".git")):
@@ -170,7 +177,7 @@ file_description: 这个文件的主要功能和作用描述
 
     def _create_index_db(self):
         """创建索引数据库"""
-        index_db_path = os.path.join(self.root_dir, ".index.db")
+        index_db_path = os.path.join(self.jarvis_dir, "index.db")
         if not os.path.exists(index_db_path):
             PrettyOutput.print("Index database does not exist, creating...", OutputType.INFO)
             index_db = sqlite3.connect(index_db_path)
@@ -179,10 +186,6 @@ file_description: 这个文件的主要功能和作用描述
             index_db.commit()
             index_db.close()
             PrettyOutput.print("Index database created", OutputType.SUCCESS)
-            # 将.index.db文件添加到gitignore
-            with open(os.path.join(self.root_dir, ".gitignore"), "a") as f:
-                f.write("\n.index.db\n")
-            PrettyOutput.print("Index database added to gitignore", OutputType.SUCCESS)
             # commit
             os.chdir(self.root_dir)
             os.system(f"git add .gitignore -f")
@@ -234,17 +237,9 @@ file_description: 这个文件的主要功能和作用描述
 
     def _index_project(self):
         """建立代码库索引"""
-        # 1. 创建索引数据库，位于root_dir/.index.db
-        index_db_path = os.path.join(self.root_dir, ".jarvis_index.db")
-        self.db_path = index_db_path
-        if not os.path.exists(index_db_path):
-            self._create_index_db()
-
-        # 2. 使用git ls-files获取文件列表
         git_files = os.popen("git ls-files").read().splitlines()
 
-        # 2.1 删除数据库中不存在的文件记录
-        index_db = sqlite3.connect(index_db_path)
+        index_db = sqlite3.connect(self.index_db_path)
         cursor = index_db.cursor()
         cursor.execute("SELECT file_path FROM files")
         db_files = [row[0] for row in cursor.fetchall()]
@@ -293,7 +288,7 @@ file_description: 这个文件的主要功能和作用描述
         """根据需求描述，查找相关文件"""
         try:
             # Get all files from database
-            index_db = sqlite3.connect(self.db_path)
+            index_db = sqlite3.connect(self.index_db_path)
             cursor = index_db.cursor()
             cursor.execute("SELECT file_path, file_description FROM files")
             all_files = cursor.fetchall()
@@ -428,8 +423,8 @@ file2.py: 7
             return []
             
         try:
-            patches = re.findall(r">>>>>>.*?<<<<<<", response, re.DOTALL)
-            return patches
+            patches = re.findall(r'diff --git.*?(?=diff --git|\Z)', response, re.DOTALL)
+            return [patch.strip() for patch in patches if patch.strip()]
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
             return []
