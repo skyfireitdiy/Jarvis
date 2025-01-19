@@ -407,53 +407,26 @@ file2.py: 7
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
             return []
         
-    def _find_line_numbers(self, file_path: str, text: str) -> List[int]:
-        """查找文本在文件中的行号
-        
-        Args:
-            file_path: 文件路径
-            text: 要查找的文本
-            
-        Returns:
-            List[int]: 匹配的行号列表(从1开始)
-        """
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-                return [i + 1 for i, line in enumerate(lines) if text in line]
-        except Exception as e:
-            PrettyOutput.print(f"查找行号失败: {str(e)}", OutputType.ERROR)
-            return []
-
     def _make_patch(self, related_files: List[Dict], feature: str) -> List[str]:
         """生成修改方案"""
         prompt = """你是一个资深程序员，请根据需求描述，修改文件内容。
 
 修改格式说明：
-1. 使用标准git diff格式输出修改内容
-2. 每个修改块格式如下：
-diff --git a/path/to/file b/path/to/file
---- a/path/to/file
-+++ b/path/to/file
-@@ -start,count +start,count @@
+1. 每个修改块格式如下：
+diff a/path/to/file
+--- old
++++ new
  上下文代码
 -要删除的代码
 +要添加的代码
  上下文代码
 
-3. 如果是新文件，格式如下：
-diff --git a/path/to/new/file b/path/to/new/file
-new file mode 100644
+2. 如果是新文件，格式如下：
+diff a/path/to/new/file
+new file
 --- /dev/null
 +++ b/path/to/new/file
-@@ -0,0 +1,N @@
 +新文件的完整内容
-
-可用工具函数：
-1. find_line_numbers(file_path: str, text: str) -> List[int]
-   - 查找指定文本在文件中的行号(从1开始)
-   - 示例调用: find_line_numbers("path/to/file", "要查找的文本")
-   - 返回值示例: [23, 45, 67] 表示文本在第23、45、67行出现
 
 文件列表如下：
 """
@@ -471,103 +444,128 @@ new file mode 100644
 2. 包含足够的上下文代码(通常3行)以准确定位修改位置
 3. 保持正确的缩进
 4. 如果需要修改多个文件，为每个文件生成独立的diff
-5. 不要输出任何其他内容，只输出标准git diff格式的修改
-6. 如果需要查找某段代码的位置，可以使用find_line_numbers工具函数
-
-如果需要调用工具函数，使用以下格式：
-<TOOL_CALL>
-tool: find_line_numbers
-args:
-  file_path: path/to/file
-  text: 要查找的文本
-</TOOL_CALL>
+5. 不要输出任何其他内容，只输出修改内容
 """
         
-        while True:
-            success, response = self._call_model_with_retry(self.main_model, prompt)
-            if not success:
-                return []
+        success, response = self._call_model_with_retry(self.main_model, prompt)
+        if not success:
+            return []
             
-            # 处理工具调用
-            if "<TOOL_CALL>" in response:
-                try:
-                    # 提取工具调用部分
-                    tool_calls = re.findall(r'<TOOL_CALL>.*?</TOOL_CALL>', response, re.DOTALL)
-                    for tool_call in tool_calls:
-                        # 解析工具调用参数
-                        tool_info = yaml.safe_load(tool_call.replace('<TOOL_CALL>', '').replace('</TOOL_CALL>', ''))
-                        if tool_info['tool'] == 'find_line_numbers':
-                            # 执行工具调用
-                            line_numbers = self._find_line_numbers(
-                                tool_info['args']['file_path'],
-                                tool_info['args']['text']
-                            )
-                            # 将结果添加到提示中
-                            prompt += f"\n工具调用结果:\n文本 '{tool_info['args']['text']}' 在文件 {tool_info['args']['file_path']} 中的行号: {line_numbers}\n"
-                    continue  # 继续对话以生成最终的patch
-                except Exception as e:
-                    PrettyOutput.print(f"处理工具调用失败: {str(e)}", OutputType.ERROR)
-                    return []
-            
-            try:
-                # 使用正则表达式匹配每个diff块
-                patches = re.findall(r'diff --git.*?(?=diff --git|\Z)', response, re.DOTALL)
-                return [patch.strip() for patch in patches if patch.strip()]
-            except Exception as e:
-                PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
-                return []
+        try:
+            # 使用正则表达式匹配每个diff块
+            patches = re.findall(r'diff a/.*?(?=diff a/|\Z)', response, re.DOTALL)
+            return [patch.strip() for patch in patches if patch.strip()]
+        except Exception as e:
+            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
+            return []
 
     def _apply_patch(self, related_files: List[Dict], patches: List[str]) -> Tuple[bool, str]:
         """应用补丁
         
         Args:
             related_files: 相关文件列表
-            patches: 补丁列表（git diff 格式）
+            patches: 补丁列表
             
         Returns:
             Tuple[bool, str]: (是否成功, 错误信息)
         """
         error_info = []
+        modified_files = set()
+
+        # 创建文件内容映射
+        file_map = {file["file_path"]: file["file_content"] for file in related_files}
+        temp_map = file_map.copy()  # 创建临时映射用于尝试应用
         
-        # 创建临时补丁文件
-        patch_file = os.path.join(self.root_dir, ".temp.patch")
-        try:
-            # 写入所有补丁到临时文件
-            with open(patch_file, "w", encoding="utf-8") as f:
-                for patch in patches:
-                    f.write(patch + "\n")
+        # 尝试应用所有补丁
+        for i, patch in enumerate(patches):
+            PrettyOutput.print(f"正在应用补丁 {i+1}/{len(patches)}", OutputType.INFO)
             
-            # 先尝试检查补丁是否可以应用
-            check_result = os.system(f"git apply --check .temp.patch")
-            if check_result != 0:
-                # 如果检查失败，获取详细错误信息
-                error_output = os.popen(f"git apply --check .temp.patch 2>&1").read()
-                error_info.append(f"补丁检查失败:\n{error_output}")
-                return False, "\n".join(error_info)
-            
-            # 应用补丁
-            apply_result = os.system(f"git apply .temp.patch")
-            if apply_result != 0:
-                error_info.append("补丁应用失败")
-                return False, "\n".join(error_info)
-            
-            # 获取修改的文件列表
-            modified_files = os.popen("git diff --name-only").read().splitlines()
-            for file in modified_files:
-                PrettyOutput.print(f"成功修改文件: {file}", OutputType.SUCCESS)
-            
-            return True, ""
-            
-        except Exception as e:
-            error_info.append(f"应用补丁时发生错误: {str(e)}")
-            return False, "\n".join(error_info)
-        finally:
-            # 清理临时文件
             try:
-                if os.path.exists(patch_file):
-                    os.remove(patch_file)
-            except:
-                pass
+                # 解析补丁
+                lines = patch.split("\n")
+                if not lines:
+                    continue
+                    
+                # 获取文件路径
+                file_path = lines[0].replace("diff a/", "").strip()
+                
+                # 处理新文件
+                if "new file" in lines[1]:
+                    new_content = []
+                    for line in lines[4:]:  # 跳过头部4行
+                        if line.startswith("+"):
+                            new_content.append(line[1:])
+                    temp_map[file_path] = "\n".join(new_content)
+                    modified_files.add(file_path)
+                    continue
+                
+                # 处理文件修改
+                if file_path not in temp_map:
+                    error_info.append(f"文件不存在: {file_path}")
+                    return False, "\n".join(error_info)
+                
+                current_content = temp_map[file_path]
+                content_lines = current_content.split("\n")
+                
+                # 解析修改块
+                old_block = []
+                new_block = []
+                context_before = []
+                context_after = []
+                
+                in_change = False
+                for line in lines[3:]:  # 跳过头部3行
+                    if line.startswith(" "):
+                        if not in_change:
+                            context_before.append(line[1:])
+                        else:
+                            context_after.append(line[1:])
+                    elif line.startswith("-"):
+                        in_change = True
+                        old_block.append(line[1:])
+                    elif line.startswith("+"):
+                        in_change = True
+                        new_block.append(line[1:])
+                
+                # 构建完整的旧代码块和新代码块
+                old_content = "\n".join(context_before + old_block + context_after)
+                new_content = "\n".join(context_before + new_block + context_after)
+                
+                # 查找并替换代码块
+                if old_content not in current_content:
+                    error_info.append(
+                        f"补丁应用失败: {file_path}\n"
+                        f"原因: 未找到要替换的代码\n"
+                        f"期望找到的代码:\n{old_content}\n"
+                        f"实际文件内容:\n{current_content[:200]}..."  # 只显示前200个字符
+                    )
+                    return False, "\n".join(error_info)
+                
+                # 应用更改
+                temp_map[file_path] = current_content.replace(old_content, new_content)
+                modified_files.add(file_path)
+                
+            except Exception as e:
+                error_info.append(f"处理补丁时发生错误: {str(e)}")
+                return False, "\n".join(error_info)
+        
+        # 所有补丁都应用成功，更新实际文件
+        for file_path in modified_files:
+            try:
+                dir_path = os.path.dirname(file_path)
+                if dir_path and not os.path.exists(dir_path):
+                    os.makedirs(dir_path, exist_ok=True)
+                    
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(temp_map[file_path])
+                    
+                PrettyOutput.print(f"成功修改文件: {file_path}", OutputType.SUCCESS)
+                
+            except Exception as e:
+                error_info.append(f"写入文件失败 {file_path}: {str(e)}")
+                return False, "\n".join(error_info)
+        
+        return True, ""
 
     def _save_edit_record(self, feature: str, patches: List[str]) -> None:
         """保存代码修改记录
