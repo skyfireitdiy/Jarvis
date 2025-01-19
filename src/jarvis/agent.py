@@ -254,8 +254,8 @@ arguments:
 -------------------------------------------------------------
 
 特殊指令：
-1. !summarize - 当你发现对话历史过长可能导致token超限时，可以使用此指令总结当前对话要点并清空历史。使用方法：直接回复"!summarize"即可。
-2. !finish - 当你确认任务已经完成时，使用此指令结束任务。使用方法：在回复中包含"!finish"即可。
+1. !<<SUMMARIZE>>! - 当你发现对话历史过长可能导致token超限时，可以使用此指令总结当前对话要点并清空历史。使用方法：直接回复"!<<SUMMARIZE>>!"即可。
+2. !<<FINISHED>>! - 当你确认任务已经完成时，使用此指令结束任务。使用方法：在回复中包含"!<<FINISHED>>!"即可。
 
 -------------------------------------------------------------
 
@@ -276,12 +276,12 @@ arguments:
                     
                     # 如果对话超过10轮，在提示中添加提醒
                     if self.conversation_turns > 10:
-                        self.prompt = f"{self.prompt}\n(提示：当前对话已超过10轮，建议使用 !summarize 指令总结对话历史，避免token超限)"
+                        self.prompt = f"{self.prompt}\n(提示：当前对话已超过10轮，建议使用 !<<SUMMARIZE>>! 指令总结对话历史，避免token超限)"
                     
                     current_response = self._call_model(self.prompt)
                     
                     # 检查是否需要总结对话历史
-                    if current_response.lower().startswith("!summarize"):
+                    if current_response.lower().startswith("!<<SUMMARIZE>>!"):
                         self._summarize_and_clear_history()
                         continue
                     
@@ -301,7 +301,7 @@ arguments:
                         continue
                     
                     # 检查是否完成任务
-                    if "!finish" in current_response.lower():
+                    if "!<<FINISHED>>!" in current_response.lower():
                         return self._complete_task()
                     
                     # 获取用户输入
