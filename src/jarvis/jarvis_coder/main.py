@@ -11,6 +11,11 @@ import yaml
 from jarvis.models.base import BasePlatform
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter, Completer, Completion
+from prompt_toolkit.formatted_text import FormattedText
+from prompt_toolkit.styles import Style
+import fnmatch
 
 # 全局锁对象
 index_lock = threading.Lock()
@@ -758,8 +763,8 @@ def main():
     # 循环处理需求
     while True:
         try:
-            # 获取需求
-            feature = get_multiline_input("请输入开发需求 (输入空行退出):")
+            # 获取需求，传入项目根目录
+            feature = get_multiline_input("请输入开发需求 (输入空行退出):", tool.root_dir)
             
             if not feature or feature == "__interrupt__":
                 break
@@ -787,3 +792,116 @@ def main():
 
 if __name__ == "__main__":
     exit(main())
+
+class FilePathCompleter(Completer):
+    """文件路径自动完成器"""
+    
+    def __init__(self, root_dir: str):
+        self.root_dir = root_dir
+        self._file_list = None
+        
+    def _get_files(self) -> List[str]:
+        """获取git管理的文件列表"""
+        if self._file_list is None:
+            try:
+                # 切换到项目根目录
+                old_cwd = os.getcwd()
+                os.chdir(self.root_dir)
+                
+                # 获取git管理的文件列表
+                self._file_list = os.popen("git ls-files").read().splitlines()
+                
+                # 恢复工作目录
+                os.chdir(old_cwd)
+            except Exception as e:
+                PrettyOutput.print(f"获取文件列表失败: {str(e)}", OutputType.WARNING)
+                self._file_list = []
+        return self._file_list
+    
+    def get_completions(self, document, complete_event):
+        """获取补全建议"""
+        word = document.get_word_before_cursor()
+        
+        # 只在输入@后提供文件补全
+        if not document.text_before_cursor.strip().endswith('@'):
+            return
+            
+        # 获取@后的部分作为搜索词
+        search = word.lower()
+        
+        for path in self._get_files():
+            # 如果搜索词为空，显示所有文件
+            if not search:
+                yield Completion(path, start_position=0)
+                continue
+                
+            # 模糊匹配：文件名或路径中包含搜索词
+            path_lower = path.lower()
+            if (search in path_lower or  # 直接包含
+                search in os.path.basename(path_lower) or  # 文件名包含
+                any(fnmatch.fnmatch(path_lower, f'*{s}*') for s in search.split())): # 通配符匹配
+                yield Completion(path, start_position=0)
+
+class SmartCompleter(Completer):
+    """智能自动完成器，组合词语和文件路径补全"""
+    
+    def __init__(self, word_completer: WordCompleter, file_completer: FilePathCompleter):
+        self.word_completer = word_completer
+        self.file_completer = file_completer
+        
+    def get_completions(self, document, complete_event):
+        """获取补全建议"""
+        # 如果当前行以@结尾，使用文件补全
+        if document.text_before_cursor.strip().endswith('@'):
+            yield from self.file_completer.get_completions(document, complete_event)
+        else:
+            # 否则使用词语补全
+            yield from self.word_completer.get_completions(document, complete_event)
+
+def get_multiline_input(prompt_text: str, root_dir: str = None) -> str:
+    """获取多行输入，支持文件路径自动完成功能
+    
+    Args:
+        prompt_text: 提示文本
+        root_dir: 项目根目录，用于文件补全
+        
+    Returns:
+        str: 用户输入的文本
+    """
+    # 创建文件补全器
+    file_completer = FilePathCompleter(root_dir or os.getcwd())
+    
+    # 创建提示样式
+    style = Style.from_dict({
+        'prompt': 'ansicyan bold',
+        'input': 'ansiwhite',
+    })
+    
+    # 创建格式化提示文本
+    formatted_prompt = FormattedText([
+        ('class:prompt', f"\n{prompt_text}\n>>> ")
+    ])
+    
+    # 创建会话
+    session = PromptSession(
+        completer=file_completer,
+        style=style,
+        multiline=True,
+        enable_history_search=True,
+        complete_while_typing=True
+    )
+    
+    # 获取输入
+    lines = []
+    while True:
+        try:
+            line = session.prompt(formatted_prompt)
+            if not line:  # 空行表示输入结束
+                break
+            lines.append(line)
+        except KeyboardInterrupt:
+            return "__interrupt__"
+        except EOFError:
+            break
+    
+    return "\n".join(lines)
