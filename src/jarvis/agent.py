@@ -142,6 +142,32 @@ class Agent:
         except Exception as e:
             PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
 
+    def _complete_task(self) -> str:
+        """完成任务并生成总结
+        
+        Returns:
+            str: 任务总结或完成状态
+        """
+        self._make_methodology()
+        PrettyOutput.section("任务完成", OutputType.SUCCESS)
+        
+        if not self.is_sub_agent:
+            return "Task completed"
+        
+        # 生成任务总结
+        summary_prompt = f"""请对以上任务执行情况生成一个简洁的总结报告，包括：
+
+1. 任务目标: 任务重述
+2. 执行结果: 成功/失败
+3. 关键信息: 提取执行过程中的重要信息
+4. 重要发现: 任何值得注意的发现
+5. 后续建议: 如果有的话
+
+请用简洁的要点形式描述，突出重要信息。
+"""
+        self.prompt = summary_prompt
+        return self._call_model(self.prompt)
+
     def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
         """处理用户输入并返回响应，返回任务总结报告
         
@@ -230,6 +256,7 @@ arguments:
 
 特殊指令：
 1. !summarize - 当你发现对话历史过长可能导致token超限时，可以使用此指令总结当前对话要点并清空历史。使用方法：直接回复"!summarize"即可。
+2. !finish - 当你确认任务已经完成时，使用此指令结束任务。使用方法：在回复中包含"!finish"即可。
 
 -------------------------------------------------------------
 
@@ -267,13 +294,16 @@ arguments:
                         continue
                     
                     if len(result) > 0:
-
                         PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
                         tool_result = self.tool_registry.handle_tool_calls(result)
                         PrettyOutput.print(tool_result, OutputType.RESULT)
 
                         self.prompt = tool_result
                         continue
+                    
+                    # 检查是否完成任务
+                    if "!finish" in current_response.lower():
+                        return self._complete_task()
                     
                     # 获取用户输入
                     user_input = get_multiline_input(f"{self.name}: 您可以继续输入，或输入空行结束当前任务")
@@ -286,25 +316,7 @@ arguments:
                         continue
                     
                     if not user_input:
-                        self._make_methodology()
-                        PrettyOutput.section("任务完成", OutputType.SUCCESS)
-                        if self.is_sub_agent:
-                            # 生成任务总结
-                            summary_prompt = f"""请对以上任务执行情况生成一个简洁的总结报告，包括：
-
-1. 任务目标: 任务重述
-2. 执行结果: 成功/失败
-3. 关键信息: 提取执行过程中的重要信息
-4. 重要发现: 任何值得注意的发现
-5. 后续建议: 如果有的话
-
-请用简洁的要点形式描述，突出重要信息。
-"""
-                            self.prompt = summary_prompt
-                            summary = self._call_model(self.prompt)
-                            return summary
-                        else:
-                            return "Task completed"
+                        return self._complete_task()
 
                 except Exception as e:
                     PrettyOutput.print(str(e), OutputType.ERROR)
