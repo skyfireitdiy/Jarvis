@@ -360,6 +360,8 @@ class KimiModel(BasePlatform):
                             PrettyOutput.print(f"  原文: {text}", OutputType.PROGRESS)
                     
                     PrettyOutput.print("", OutputType.PROGRESS)
+
+            PrettyOutput.print(full_response, OutputType.RESULT)
             
             return full_response
 

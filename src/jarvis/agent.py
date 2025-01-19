@@ -111,7 +111,6 @@ class Agent:
         5. 重置对话轮数
         """
         # 创建一个新的模型实例来做总结，避免影响主对话
-        summary_model = self._new_model()
         
         prompt = """请总结之前对话中的关键信息，包括：
 1. 当前任务目标
@@ -124,10 +123,10 @@ class Agent:
 """
         
         try:
-            summary = summary_model.chat(prompt)
+            summary = self.model.chat(prompt)
             
             # 清空当前对话历史，但保留系统消息
-            self.model.reset()
+            self.model.delete_chat()
             
             # 添加总结作为新的上下文
             self.prompt = f"""以下是之前对话的关键信息总结：
