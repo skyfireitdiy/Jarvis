@@ -15,13 +15,13 @@ from jarvis.models.registry import PlatformRegistry
 index_lock = threading.Lock()
 
 class JarvisCoder:
+=
     def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
 
         self.root_dir = root_dir
         self.platform = os.environ.get("JARVIS_CODEGEN_PLATFORM")
         self.model = os.environ.get("JARVIS_CODEGEN_MODEL")
-        self.language = language
 
         self.root_dir = self._find_git_root_dir(self.root_dir)
         if not self.root_dir:
