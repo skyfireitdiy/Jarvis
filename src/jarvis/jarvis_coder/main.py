@@ -159,7 +159,7 @@ file_description: 这个文件的主要功能和作用描述
         """获取文件MD5"""
         return hashlib.md5(open(file_path, "rb").read()).hexdigest()
 
-    =
+    
     def _create_index_db(self):
         """创建索引数据库"""
         with index_lock:
@@ -176,7 +176,7 @@ file_description: 这个文件的主要功能和作用描述
                 os.system(f"git add .gitignore -f")
                 os.system(f"git commit -m 'add index database'")
 
-    =
+    
     def _find_file_by_md5(self, file_md5: str) -> Optional[str]:
         """根据文件MD5查找文件路径"""
         with index_lock:
@@ -188,7 +188,7 @@ file_description: 这个文件的主要功能和作用描述
             index_db.close()
             return result[0] if result else None
 
-    =
+    
     def _update_file_path(self, file_path: str, file_md5: str):
         """更新文件路径"""
         with index_lock:
@@ -199,7 +199,7 @@ file_description: 这个文件的主要功能和作用描述
             index_db.commit()
             index_db.close()
 
-    =
+    
     def _insert_info(self, file_path: str, file_md5: str, file_description: str):
         """插入文件信息"""
         with index_lock:
