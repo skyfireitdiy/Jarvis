@@ -148,7 +148,6 @@ class Agent:
         Returns:
             str: 任务总结或完成状态
         """
-        self._make_methodology()
         PrettyOutput.section("任务完成", OutputType.SUCCESS)
         
         if not self.is_sub_agent:
@@ -216,8 +215,8 @@ class Agent:
 6. 制定行动计划：根据目前可以使用的工具制定行动计划
 7. 执行行动计划：每步执行一个步骤，最多使用一个工具（工具执行完成后，等待工具结果再执行下一步）
 8. 监控与调整：如果执行结果与预期不符，则反思并调整行动计划，迭代之前的步骤
-9. 经验总结：如果当前任务具有通用性且执行过程中遇到了值得记录的经验，使用经验总结工具记录经验总结
-
+9. 经验总结：如果当前任务具有通用性且执行过程中遇到了值得记录的经验，使用经验总结工具记录经验总结，以提升后期处理类似问题的能力
+10. 任务结束：如果任务已经完成，使用任务结束指令结束任务
 -------------------------------------------------------------                       
 
 经验总结模板：
@@ -340,23 +339,4 @@ arguments:
         self.model.reset()
         self.conversation_turns = 0  # 重置对话轮次
 
-    def _make_methodology(self):
-        """生成经验总结"""
-        PrettyOutput.print("生成经验总结...", OutputType.PLANNING)
-        current_response = self._call_model("""任务已结束，请根据之前的对话内容，判断是否有必要更新、添加、删除现有经验总结，如果有，使用methodology工具进行管理。
-经验总结模板：
-1. 问题重述
-2. 最优解决方案
-3. 最优方案执行步骤（失败的行动不需要体现）
-                         """)
-        
-        try:
-            result = Agent.extract_tool_calls(current_response)
-        except Exception as e:
-            PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
-            return
-        if len(result) > 0:
-            PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
-            tool_result = self.tool_registry.handle_tool_calls(result)
-            PrettyOutput.print(tool_result, OutputType.RESULT)
-                         
+
