@@ -10,38 +10,7 @@ from jarvis.models.base import BasePlatform
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
 
-class CodeEditTool:
-    """代码修改工具"""
-
-    name = "code_edit"
-    description = "根据需求描述修改代码文件"
-    parameters = {
-        "type": "object",
-        "properties": {
-            "feature": {
-                "type": "string",
-                "description": "要实现的功能描述"
-            },
-            "root_dir": {
-                "type": "string",
-                "description": "代码库根目录"
-            },
-            "language": {
-                "type": "string",
-                "description": "编程语言"
-            },
-            "platform": {
-                "type": "string",
-                "description": "AI平台名称"
-            },
-            "model": {
-                "type": "string",
-                "description": "模型名称"
-            }
-        },
-        "required": ["feature", "root_dir", "language"]
-    }
-
+class JarvisCoder:
     def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
         self.main_model = None
@@ -72,6 +41,10 @@ class CodeEditTool:
         self.index_db_path = os.path.join(self.jarvis_dir, "index.db")
         if not os.path.exists(self.index_db_path):
             self._create_index_db()
+
+        self.record_dir = os.path.join(self.jarvis_dir, "record")
+        if not os.path.exists(self.record_dir):
+            os.makedirs(self.record_dir)
 
         # 2. 判断代码库是否是git仓库，如果不是，初始化git仓库
         if not os.path.exists(os.path.join(self.root_dir, ".git")):
@@ -548,23 +521,9 @@ new file mode 100644
             feature: 需求描述
             patches: 补丁列表
         """
-        # 创建记录目录
-        record_dir = os.path.join(self.root_dir, ".jarvis_code_edit")
-        os.makedirs(record_dir, exist_ok=True)
-        
-        # 添加到 .gitignore
-        gitignore_path = os.path.join(self.root_dir, ".gitignore")
-        if os.path.exists(gitignore_path):
-            with open(gitignore_path, "r") as f:
-                if ".jarvis_code_edit" not in f.read():
-                    with open(gitignore_path, "a") as f:
-                        f.write("\n.jarvis_code_edit/\n")
-        else:
-            with open(gitignore_path, "w") as f:
-                f.write(".jarvis_code_edit/\n")
             
         # 获取下一个序号
-        existing_records = [f for f in os.listdir(record_dir) if f.endswith('.yaml')]
+        existing_records = [f for f in os.listdir(self.record_dir) if f.endswith('.yaml')]
         next_num = 1
         if existing_records:
             last_num = max(int(f[:4]) for f in existing_records)
@@ -577,7 +536,7 @@ new file mode 100644
             "patches": patches
         }
         
-        record_path = os.path.join(record_dir, f"{next_num:04d}.yaml")
+        record_path = os.path.join(self.record_dir, f"{next_num:04d}.yaml")
         with open(record_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(record, f, allow_unicode=True)
         
@@ -651,7 +610,7 @@ new file mode 100644
                         # 保存修改记录
                         self._save_edit_record(feature, patches)
                         # 重新建立代码库索引
-                        self._index_project(self.language)
+                        self._index_project()
                         
                         return {
                             "success": True,
@@ -704,7 +663,7 @@ def main():
     load_env_from_file()
     
     parser = argparse.ArgumentParser(description='代码修改工具')
-    parser.add_argument('-p', '--platform', help='AI平台名称', required=True)
+    parser.add_argument('-p', '--platform', help='AI平台名称', default=os.environ.get('JARVIS_CODEGEN_PLATFORM'))
     parser.add_argument('-m', '--model', help='模型名称', default=os.environ.get('JARVIS_CODEGEN_MODEL'))
     parser.add_argument('-d', '--dir', help='项目根目录', default=os.getcwd())
     parser.add_argument('-l', '--language', help='编程语言', default="python")
@@ -717,7 +676,7 @@ def main():
     if args.model:
         os.environ['JARVIS_CODEGEN_MODEL'] = args.model
         
-    tool = CodeEditTool(args.dir, args.language)
+    tool = JarvisCoder(args.dir, args.language)
     
     # 循环处理需求
     while True:
