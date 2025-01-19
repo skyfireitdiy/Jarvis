@@ -217,7 +217,8 @@ class KimiModel(BasePlatform):
     def chat(self, message: str) -> str:
         """发送消息并获取响应"""
         if not self.chat_id:
-            PrettyOutput.print("创建新的对话会话...", OutputType.PROGRESS)
+            if not self.suppress_output:
+                PrettyOutput.print("创建新的对话会话...", OutputType.PROGRESS)
             if not self._create_chat():
                 raise Exception("Failed to create chat session")
 
@@ -228,13 +229,15 @@ class KimiModel(BasePlatform):
         refs_file = []
         if self.first_chat:
             if self.uploaded_files:
-                PrettyOutput.print(f"首次对话，引用 {len(self.uploaded_files)} 个文件...", OutputType.PROGRESS)
+                if not self.suppress_output:
+                    PrettyOutput.print(f"首次对话，引用 {len(self.uploaded_files)} 个文件...", OutputType.PROGRESS)
                 refs = [f["id"] for f in self.uploaded_files]
                 refs_file = self.uploaded_files
             message = self.system_message + "\n" + message
             self.first_chat = False
         
-        PrettyOutput.print("发送请求...", OutputType.PROGRESS)
+        if not self.suppress_output:
+            PrettyOutput.print("发送请求...", OutputType.PROGRESS)
         payload = {
             "messages": [{"role": "user", "content": message}],
             "use_search": True,
@@ -259,7 +262,9 @@ class KimiModel(BasePlatform):
             search_results = []
             ref_sources = []
             
-            PrettyOutput.print("接收响应...", OutputType.PROGRESS)
+            if not self.suppress_output:
+                PrettyOutput.print("接收响应...", OutputType.PROGRESS)
+            
             for line in response.iter_lines():
                 if not line:
                     continue
@@ -276,7 +281,8 @@ class KimiModel(BasePlatform):
                         # 处理补全文本
                         text = data.get("text", "")
                         if text:
-                            PrettyOutput.print_stream(text)
+                            if not self.suppress_output:
+                                PrettyOutput.print_stream(text)
                             full_response += text
                             
                     elif event == "search_plus":
@@ -311,11 +317,12 @@ class KimiModel(BasePlatform):
                 except json.JSONDecodeError:
                     continue
                     
-            PrettyOutput.print_stream_end()
+            if not self.suppress_output:
+                PrettyOutput.print_stream_end()
             
 
             # 显示搜索结果摘要
-            if search_results:
+            if search_results and not self.suppress_output:
                 PrettyOutput.print("\n搜索结果:", OutputType.PROGRESS)
                 for result in search_results:
                     PrettyOutput.print(f"- {result['title']}", OutputType.PROGRESS)
@@ -328,7 +335,7 @@ class KimiModel(BasePlatform):
                     PrettyOutput.print("", OutputType.PROGRESS)
                         
             # 显示引用来源
-            if ref_sources:
+            if ref_sources and not self.suppress_output:
                 PrettyOutput.print("\n引用来源:", OutputType.PROGRESS)
                 for source in ref_sources:
                     PrettyOutput.print(f"- [{source['ref_id']}] {source['title']} ({source['source']})", OutputType.PROGRESS)

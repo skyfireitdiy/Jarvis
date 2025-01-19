@@ -7,6 +7,7 @@ class BasePlatform(ABC):
     
     def __init__(self):
         """初始化模型"""
+        self.suppress_output = False  # 添加输出控制标志
         pass
 
     def set_model_name(self, model_name: str):
@@ -39,3 +40,11 @@ class BasePlatform(ABC):
     def set_system_message(self, message: str):
         """设置系统消息"""
         raise NotImplementedError("set_system_message is not implemented")
+
+    def set_suppress_output(self, suppress: bool):
+        """设置是否屏蔽输出
+        
+        Args:
+            suppress: 是否屏蔽输出
+        """
+        self.suppress_output = suppress

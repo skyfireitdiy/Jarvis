@@ -114,6 +114,9 @@ class OyiModel(BasePlatform):
             str: Model response
         """
         try:
+            if not self.suppress_output:
+                PrettyOutput.print("发送请求...", OutputType.PROGRESS)
+            
             # 确保有会话ID
             if not self.conversation:
                 if not self.create_conversation():
@@ -182,7 +185,9 @@ class OyiModel(BasePlatform):
             )
             
             if response.status_code == 200:
-                PrettyOutput.print(response.text, OutputType.SYSTEM)
+                if not self.suppress_output:
+                    PrettyOutput.print("接收响应...", OutputType.PROGRESS)
+                    PrettyOutput.print(response.text, OutputType.SYSTEM)
                 self.messages.append({"role": "assistant", "content": response.text})
                 return response.text
             else:
