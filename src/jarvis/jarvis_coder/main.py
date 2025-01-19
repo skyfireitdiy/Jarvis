@@ -290,8 +290,11 @@ file_description: 这个文件的主要功能和作用描述
 
         PrettyOutput.print("项目索引完成", OutputType.INFO)
 
+
     def _find_related_files(self, feature: str) -> List[Dict]:
         """根据需求描述，查找相关文件"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         try:
             # Get all files from database
             index_db = sqlite3.connect(self.index_db_path)
@@ -306,9 +309,7 @@ file_description: 这个文件的主要功能和作用描述
         batch_size = 100
         batch_results = []  # Store results from each batch with their scores
         
-        for i in range(0, len(all_files), batch_size):
-            batch_files = all_files[i:i + batch_size]
-            
+        def process_batch(batch_files):
             prompt = """你是资深程序员，请根据需求描述，从以下文件路径中选出最相关的文件，按相关度从高到低排序。
 
 相关度打分标准(0-9分)：
@@ -327,35 +328,57 @@ file2.py: 7
 
 文件列表：
 """
+=
             for file_path, _ in batch_files:
                 prompt += f"- {file_path}\n"
             prompt += f"\n需求描述: {feature}\n"
             prompt += "\n注意：\n1. 只输出最相关的文件，不超过5个\n2. 根据上述打分标准判断相关性\n3. 相关度必须是0-9的整数"
             
-            success, response = self._call_model_with_retry(self._new_model(), prompt)
-            if not success:
-                continue
-            
+            return prompt, batch_files
+
+        def process_response(response, batch_files):
             try:
                 response = response.replace("<RELEVANT_FILES_START>", "").replace("<RELEVANT_FILES_END>", "")
                 result = yaml.safe_load(response)
                 
                 # Convert results to file objects with scores
                 batch_files_dict = {f[0]: f[1] for f in batch_files}
+                results = []
                 for file_path, score in result.items():
                     if isinstance(file_path, str) and isinstance(score, int):
                         score = max(0, min(9, score))  # Ensure score is between 0-9
                         if file_path in batch_files_dict:
-                            batch_results.append({
+                            results.append({
                                 "file_path": file_path,
                                 "file_description": batch_files_dict[file_path],
                                 "score": score
                             })
-                            
+                return results
             except Exception as e:
                 PrettyOutput.print(f"处理批次文件失败: {str(e)}", OutputType.ERROR)
-                continue
+                return []
+
+        # 使用线程池处理文件相关性分析
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = []
+            for i in range(0, len(all_files), batch_size):
+                batch_files = all_files[i:i + batch_size]
+                prompt, files = process_batch(batch_files)
+                futures.append(executor.submit(self._call_model_with_retry, self._new_model(), prompt))
+
+            for future in as_completed(futures):
+                success, response = future.result()
+                if not success:
+                    continue
+                
+                batch_start = futures.index(future) * batch_size
+                batch_end = min(batch_start + batch_size, len(all_files))
+                current_batch = all_files[batch_start:batch_end]
+                
+                results = process_response(response, current_batch)
+                batch_results.extend(results)
         
+=
         # Sort all results by score
         batch_results.sort(key=lambda x: x["score"], reverse=True)
         top_files = batch_results[:5]
@@ -372,7 +395,8 @@ file2.py: 7
         # Now do content relevance analysis on these files
         score = [[], [], [], [], [], [], [], [], [], []]
         
-        prompt = """你是资深程序员，请根据需求描述，分析文件的相关性。
+        def create_content_prompt(top_files, feature):
+            prompt = """你是资深程序员，请根据需求描述，分析文件的相关性。
 
 相关度打分标准(0-9分)：
 - 9分：文件内容与需求完全匹配，是实现需求的核心文件
@@ -385,43 +409,53 @@ file2.py: 7
 文件列表如下：
 <FILE_LIST_START>
 """
-        for i, file in enumerate(top_files):
-            prompt += f"""{i}. {file["file_path"]} : {file["file_description"]}\n"""
-        prompt += f"""需求描述: {feature}\n"""
-        prompt += "<FILE_LIST_END>\n"
-        prompt += """请根据需求描述和文件描述，分析文件的相关性，输出每个编号的相关性[0~9]，仅输出以下格式内容(key为文件编号，value为相关性)：
+=
+            for i, file in enumerate(top_files):
+                prompt += f"""{i}. {file["file_path"]} : {file["file_description"]}\n"""
+            prompt += f"""需求描述: {feature}\n"""
+            prompt += "<FILE_LIST_END>\n"
+            prompt += """请根据需求描述和文件描述，分析文件的相关性，输出每个编号的相关性[0~9]，仅输出以下格式内容(key为文件编号，value为相关性)：
 <FILE_RELATION_START>
 "0": 5
 "1": 3
 <FILE_RELATION_END>"""
-        
-        success, response = self._call_model_with_retry(self._new_model(), prompt)
-        if not success:
-            return top_files[:5]  # Return top 5 files from filename matching if model fails
-        
-        try:
-            response = response.replace("<FILE_RELATION_START>", "").replace("<FILE_RELATION_END>", "")
-            file_relation = yaml.safe_load(response)
-            if not file_relation:
+            return prompt
+
+        def process_content_response(response, top_files):
+            try:
+                response = response.replace("<FILE_RELATION_START>", "").replace("<FILE_RELATION_END>", "")
+                file_relation = yaml.safe_load(response)
+                if not file_relation:
+                    return top_files[:5]
+                
+                score = [[], [], [], [], [], [], [], [], [], []]
+                for file_id, relation in file_relation.items():
+                    id = int(file_id)
+                    relation = max(0, min(9, relation))  # 确保范围在0-9之间
+                    score[relation].append(top_files[id])
+                
+                files = []
+                score.reverse()
+                for i in score:
+                    files.extend(i)
+                    if len(files) >= 5:  # 直接取相关性最高的5个文件
+                        break
+                
+                return files[:5]
+            except Exception as e:
+                PrettyOutput.print(f"处理文件关系失败: {str(e)}", OutputType.ERROR)
+                return top_files[:5]
+
+        # 使用线程池处理内容相关性分析
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            prompt = create_content_prompt(top_files, feature)
+            future = executor.submit(self._call_model_with_retry, self._new_model(), prompt)
+            success, response = future.result()
+            
+            if not success:
                 return top_files[:5]
             
-            for file_id, relation in file_relation.items():
-                id = int(file_id)
-                relation = max(0, min(9, relation))  # 确保范围在0-9之间
-                score[relation].append(top_files[id])
-            
-        except Exception as e:
-            PrettyOutput.print(f"处理文件关系失败: {str(e)}", OutputType.ERROR)
-            return top_files[:5]
-        
-        files = []
-        score.reverse()
-        for i in score:
-            files.extend(i)
-            if len(files) >= 5:  # 直接取相关性最高的5个文件
-                break
-        
-        return files[:5]
+            return process_content_response(response, top_files)
     
     def _remake_patch(self, prompt: str) -> List[str]:
         success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)  # 增加重试次数
