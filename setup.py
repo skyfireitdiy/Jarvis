@@ -18,6 +18,7 @@ setup(
         "colorama>=0.4.6",
         "prompt_toolkit>=3.0.0",
         "openai>=1.20.0",
+        "playwright>=1.41.1",
     ],
     entry_points={
         "console_scripts": [
