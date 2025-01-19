@@ -820,27 +820,30 @@ class FilePathCompleter(Completer):
     
     def get_completions(self, document, complete_event):
         """获取补全建议"""
-        word = document.get_word_before_cursor()
+        text_before_cursor = document.text_before_cursor
         
-        # 只在输入@后提供文件补全
-        if not document.text_before_cursor.strip().endswith('@'):
+        # 检查是否刚输入了@
+        if text_before_cursor.endswith('@'):
+            # 显示所有文件
+            for path in self._get_files():
+                yield Completion(path, start_position=0)
             return
             
-        # 获取@后的部分作为搜索词
-        search = word.lower()
+        # 检查之前是否有@，并获取@后的搜索词
+        at_pos = text_before_cursor.rfind('@')
+        if at_pos == -1:
+            return
+            
+        search = text_before_cursor[at_pos + 1:].lower().strip()
         
+        # 提供匹配的文件建议
         for path in self._get_files():
-            # 如果搜索词为空，显示所有文件
-            if not search:
-                yield Completion(path, start_position=0)
-                continue
-                
-            # 模糊匹配：文件名或路径中包含搜索词
             path_lower = path.lower()
             if (search in path_lower or  # 直接包含
                 search in os.path.basename(path_lower) or  # 文件名包含
                 any(fnmatch.fnmatch(path_lower, f'*{s}*') for s in search.split())): # 通配符匹配
-                yield Completion(path, start_position=0)
+                # 计算正确的start_position
+                yield Completion(path, start_position=-(len(search)))
 
 class SmartCompleter(Completer):
     """智能自动完成器，组合词语和文件路径补全"""
