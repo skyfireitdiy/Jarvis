@@ -330,6 +330,7 @@ arguments:
 
     def _make_methodology(self):
         """生成经验总结"""
+        PrettyOutput.print("生成经验总结...", OutputType.PLANNING)
         current_response = self._call_model("""任务已结束，请根据之前的对话内容，判断是否有必要更新、添加、删除现有经验总结，如果有，使用methodology工具进行管理。
 经验总结模板：
 1. 问题重述
