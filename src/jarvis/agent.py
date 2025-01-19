@@ -281,7 +281,7 @@ arguments:
                     current_response = self._call_model(self.prompt)
                     
                     # 检查是否需要总结对话历史
-                    if current_response.lower().startswith("!<<SUMMARIZE>>!"):
+                    if "!<<SUMMARIZE>>!" in current_response:
                         self._summarize_and_clear_history()
                         continue
                     
@@ -301,7 +301,7 @@ arguments:
                         continue
                     
                     # 检查是否完成任务
-                    if "!<<FINISHED>>!" in current_response.lower():
+                    if "!<<FINISHED>>!" in current_response:
                         return self._complete_task()
                     
                     # 获取用户输入
