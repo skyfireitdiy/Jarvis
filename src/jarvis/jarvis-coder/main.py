@@ -401,8 +401,9 @@ file2.py: 7
             return []
             
         try:
-            patches = re.findall(r'diff --git.*?(?=diff --git|\Z)', response, re.DOTALL)
-            return [patch.strip() for patch in patches if patch.strip()]
+            patches = re.findall(r'<PATCH_START>.*?<PATCH_END>', response, re.DOTALL)
+            return [patch.replace('<PATCH_START>', '').replace('<PATCH_END>', '').strip() 
+                   for patch in patches if patch.strip()]
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
             return []
@@ -413,6 +414,7 @@ file2.py: 7
 
 修改格式说明：
 1. 每个修改块格式如下：
+<PATCH_START>
 diff a/path/to/file
 --- old
 +++ new
@@ -420,13 +422,16 @@ diff a/path/to/file
 -要删除的代码
 +要添加的代码
  上下文代码
+<PATCH_END>
 
 2. 如果是新文件，格式如下：
+<PATCH_START>
 diff a/path/to/new/file
 new file
 --- /dev/null
 +++ b/path/to/new/file
 +新文件的完整内容
+<PATCH_END>
 
 文件列表如下：
 """
@@ -439,7 +444,7 @@ new file
         
         prompt += f"\n需求描述: {feature}\n"
         prompt += """
-注意事项：仅输出补丁内容，不要输出任何其他内容
+注意事项：仅输出补丁内容，不要输出任何其他内容，每个补丁必须用<PATCH_START>和<PATCH_END>标记
 """
         
         success, response = self._call_model_with_retry(self.main_model, prompt)
@@ -447,9 +452,10 @@ new file
             return []
             
         try:
-            # 使用正则表达式匹配每个diff块
-            patches = re.findall(r'diff a/.*?(?=diff a/|\Z)', response, re.DOTALL)
-            return [patch.strip() for patch in patches if patch.strip()]
+            # 使用正则表达式匹配每个patch块
+            patches = re.findall(r'<PATCH_START>.*?<PATCH_END>', response, re.DOTALL)
+            return [patch.replace('<PATCH_START>', '').replace('<PATCH_END>', '').strip() 
+                   for patch in patches if patch.strip()]
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
             return []
