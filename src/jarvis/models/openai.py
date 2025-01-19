@@ -54,7 +54,8 @@ class OpenAIModel(BasePlatform):
     def chat(self, message: str) -> str:
         """执行对话"""
         try:
-            PrettyOutput.print("发送请求...", OutputType.PROGRESS)
+            if not self.suppress_output:
+                PrettyOutput.print("发送请求...", OutputType.PROGRESS)
             
             # 添加用户消息到历史记录
             self.messages.append({"role": "user", "content": message})
@@ -65,16 +66,19 @@ class OpenAIModel(BasePlatform):
                 stream=True
             )
             
-            PrettyOutput.print("接收响应...", OutputType.PROGRESS)
+            if not self.suppress_output:
+                PrettyOutput.print("接收响应...", OutputType.PROGRESS)
             full_response = ""
             
             for chunk in response:
                 if chunk.choices[0].delta.content:
                     text = chunk.choices[0].delta.content
-                    PrettyOutput.print_stream(text)
+                    if not self.suppress_output:
+                        PrettyOutput.print_stream(text)
                     full_response += text
                     
-            PrettyOutput.print_stream_end()
+            if not self.suppress_output:
+                PrettyOutput.print_stream_end()
             
             # 添加助手回复到历史记录
             self.messages.append({"role": "assistant", "content": full_response})

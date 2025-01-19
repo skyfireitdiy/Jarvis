@@ -156,15 +156,11 @@ class AI8Model(BasePlatform):
         self.system_message = message
         
     def chat(self, message: str) -> str:
-        """Execute chat with the model
-        
-        Args:
-            message: User input message
-            
-        Returns:
-            str: Model response
-        """
+        """执行对话"""
         try:
+            if not self.suppress_output:
+                PrettyOutput.print("发送请求...", OutputType.PROGRESS)
+            
             # 确保有会话ID
             if not self.conversation:
                 if not self.create_conversation():
@@ -219,12 +215,14 @@ class AI8Model(BasePlatform):
                                 chunk = data.get('data', '')
                                 if chunk:
                                     full_response += chunk
-                                    PrettyOutput.print_stream(chunk)
+                                    if not self.suppress_output:
+                                        PrettyOutput.print_stream(chunk)
 
                         except json.JSONDecodeError:
                             continue
             
-            PrettyOutput.print_stream_end()
+            if not self.suppress_output:
+                PrettyOutput.print_stream_end()
 
             return full_response
             
