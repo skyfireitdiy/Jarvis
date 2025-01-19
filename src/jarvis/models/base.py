@@ -42,9 +42,5 @@ class BasePlatform(ABC):
         raise NotImplementedError("set_system_message is not implemented")
 
     def set_suppress_output(self, suppress: bool):
-        """设置是否屏蔽输出
-        
-        Args:
-            suppress: 是否屏蔽输出
-        """
+        """设置是否屏蔽输出"""
         self.suppress_output = suppress
