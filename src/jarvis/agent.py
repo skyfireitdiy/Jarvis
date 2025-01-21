@@ -25,7 +25,7 @@ class Agent:
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
-        self.conversation_turns = 0  # 添加对话轮次计数器
+        self.conversation_turns = 0  
 
 
     @staticmethod
@@ -88,17 +88,15 @@ class Agent:
                 continue
 
 
-    def _load_methodology(self) -> str:
+    def _load_methodology(self) -> Dict[str, str]:
         """加载经验总结"""
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
-        ret = ""
         if os.path.exists(user_jarvis_methodology):
             with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
-                for k, v in data.items():
-                    ret += f"问题类型: \n{k}\n经验总结: \n{v}\n\n"
             PrettyOutput.print(f"从 {user_jarvis_methodology} 加载经验总结: {', '.join(data.keys())}", OutputType.INFO)
-        return ret
+            return data
+        return {}
 
     def _summarize_and_clear_history(self) -> None:
         """总结当前对话历史并清空历史记录，只保留系统消息和总结
@@ -144,6 +142,28 @@ class Agent:
         except Exception as e:
             PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
 
+    def make_mathodology(self) -> str:
+        PrettyOutput.section("生成方法论", OutputType.PLANNING)
+        """生成方法论"""
+        prompt = f"""任务已经结束，请总结任务执行过程中的，调用经验总结工具生成经验总结，经验总结内容格式如下：
+
+1. 问题重述
+2. 最优解决方案
+3. 最优方案执行步骤（失败的行动不需要体现）
+"""
+        return self._call_model(prompt)
+    
+    def _choose_methodology(self, methodology: Dict[str, str], task: str) -> str:
+        """选择方法论"""
+        prompt = f"""请根据任务内容选择合适的方法论，并返回方法论内容，格式如下：
+任务内容:
+{task}
+
+方法论:
+{methodology}
+"""
+        return self._call_model(prompt)
+
     def _complete_task(self) -> str:
         """完成任务并生成总结
         
@@ -151,6 +171,8 @@ class Agent:
             str: 任务总结或完成状态
         """
         PrettyOutput.section("任务完成", OutputType.SUCCESS)
+
+        self.make_mathodology()
         
         if not self.is_sub_agent:
             return "Task completed"
@@ -181,14 +203,13 @@ class Agent:
             str: 任务总结报告
         """
         try:
-            self.clear_history()
-            self.conversation_turns = 0  # 重置对话轮次
-            
             if file_list:
                 self.model.upload_files(file_list)
 
             # 加载经验总结
             methodology = self._load_methodology()
+
+            methodology =self._choose_methodology(methodology, user_input)
 
             methodology_prompt = ""
             if methodology:
@@ -196,6 +217,9 @@ class Agent:
 {methodology}
 
 """
+
+            self.clear_history()
+            self.conversation_turns = 0  
             
             # 显示任务开始
             PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
