@@ -198,16 +198,7 @@ class Agent:
                 # 检查是否包含工具调用
                 try:
                     result = Agent.extract_tool_calls(response)
-                    if result and result[0]["name"] == "methodology":
-                        tool_result = self.tool_registry.handle_tool_calls(result)
-                        if isinstance(tool_result, dict) and tool_result.get("success"):
-                            action = result[0]["arguments"].get("action", "create")
-                            PrettyOutput.print(f"方法论已{action}成功", OutputType.SUCCESS)
-                        else:
-                            PrettyOutput.print(f"保存方法论失败: {tool_result}", OutputType.ERROR)
-                    else:
-                        PrettyOutput.print("模型认为不需要生成方法论", OutputType.INFO)
-                        PrettyOutput.print(response, OutputType.INFO)
+                    PrettyOutput.print(result, OutputType.RESULT)
                 except Exception as e:
                     PrettyOutput.print(f"处理方法论生成失败: {str(e)}", OutputType.ERROR)
                 
