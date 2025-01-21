@@ -144,6 +144,7 @@ class Agent:
 
     
     def _choose_methodology(self, methodology: Dict[str, str], task: str) -> str:
+        PrettyOutput.section("选择方法论", OutputType.PLANNING)
         """选择方法论"""
         prompt = f"""请根据任务内容选择合适的方法论，并返回问题类型和方法论内容，如果当前任务没有合适的方法论，则返回空字符串，格式如下：
 任务内容:
@@ -174,7 +175,7 @@ class Agent:
         if user_input == 'y':
             try:
                 # 让模型判断是否需要生成方法论
-                analysis_prompt = """请分析此次任务是否值得生成方法论，需要考虑以下几点：
+                analysis_prompt = """本次任务已结束，请分析是否值得生成方法论，需要考虑以下几点：
 1. 任务是否具有通用性，可以应用到类似场景
 2. 解决方案是否具有创新性或特殊价值
 3. 执行过程是否包含值得记录的经验或教训
@@ -189,6 +190,7 @@ class Agent:
 3. 最优方案执行步骤：列出具体的执行步骤（失败的尝试不需要记录）
 
 如果认为不需要生成方法论，请说明原因。
+仅输出方法论工具的调用指令，或者是不需要生成方法论的说明，除此之外不要输出任何内容。
 """
                 self.prompt = analysis_prompt
                 response = self._call_model(self.prompt)
