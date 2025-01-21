@@ -164,6 +164,72 @@ class Agent:
         """
         PrettyOutput.section("任务完成", OutputType.SUCCESS)
         
+        # 询问是否生成方法论，带输入验证
+        while True:
+            user_input = input("是否要为此任务生成方法论？(y/n): ").strip().lower()
+            if user_input in ['y', 'n', '']:
+                break
+            PrettyOutput.print("无效输入，请输入 y 或 n", OutputType.WARNING)
+        
+        if user_input == 'y':
+            try:
+                # 让模型判断是否需要生成方法论
+                analysis_prompt = """请分析此次任务是否值得生成方法论，需要考虑以下几点：
+1. 任务是否具有通用性，可以应用到类似场景
+2. 解决方案是否具有创新性或特殊价值
+3. 执行过程是否包含值得记录的经验或教训
+4. 是否有助于提升处理类似问题的效率
+
+如果认为值得生成方法论，请先判断是创建新的方法论还是更新已有方法论。如果是更新已有方法论，使用action: update，否则使用action: create。
+
+方法论模板：
+1. 问题重述：准确描述问题的核心和边界
+2. 最优解决方案：描述最佳的解决思路和方案
+3. 最优方案执行步骤：列出具体的执行步骤（失败的尝试不需要记录）
+
+工具调用格式：
+<START_TOOL_CALL>
+name: methodology
+arguments:
+    action: create  # 或 update
+    content: |
+        问题类型：xxx
+        
+        1. 问题重述
+        - xxx
+        
+        2. 最优解决方案
+        - xxx
+        
+        3. 最优方案执行步骤
+        1) xxx
+        2) xxx
+<END_TOOL_CALL>
+
+如果认为不值得生成方法论，请说明原因。
+"""
+                self.prompt = analysis_prompt
+                response = self._call_model(self.prompt)
+                
+                # 检查是否包含工具调用
+                try:
+                    result = Agent.extract_tool_calls(response)
+                    if result and result[0]["name"] == "methodology":
+                        tool_result = self.tool_registry.handle_tool_calls(result)
+                        if isinstance(tool_result, dict) and tool_result.get("success"):
+                            action = result[0]["arguments"].get("action", "create")
+                            PrettyOutput.print(f"方法论已{action}成功", OutputType.SUCCESS)
+                        else:
+                            PrettyOutput.print(f"保存方法论失败: {tool_result}", OutputType.ERROR)
+                    else:
+                        PrettyOutput.print("模型认为不需要生成方法论", OutputType.INFO)
+                        PrettyOutput.print(response, OutputType.INFO)
+                except Exception as e:
+                    PrettyOutput.print(f"处理方法论生成失败: {str(e)}", OutputType.ERROR)
+                
+            except Exception as e:
+                PrettyOutput.print(f"生成方法论时发生错误: {str(e)}", OutputType.ERROR)
+        
         if not self.is_sub_agent:
             return "Task completed"
         
