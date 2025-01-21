@@ -44,7 +44,7 @@ class OpenAIModel(BasePlatform):
 
     def set_model_name(self, model_name: str):
         """设置模型名称"""
-        PrettyOutput.print(f"设置模型: {model_name}", OutputType.USER)
+
         self.model_name = model_name
 
     def set_system_message(self, message: str):
