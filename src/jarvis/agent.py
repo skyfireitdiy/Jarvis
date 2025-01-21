@@ -142,21 +142,6 @@ class Agent:
         except Exception as e:
             PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
 
-    
-    def _choose_methodology(self, methodology: Dict[str, str], task: str) -> str:
-        PrettyOutput.section("选择方法论", OutputType.PLANNING)
-        """选择方法论"""
-        prompt = f"""请根据任务内容选择合适的方法论，并返回问题类型和方法论内容，如果当前任务没有合适的方法论，则返回空字符串，格式如下：
-任务内容:
-{task}
-
-方法论:
-"""
-        for k, v in methodology.items():
-            prompt += f"问题类型：{k}\n"
-            prompt += f"方法论：{v}\n"
-        return self._call_model(prompt)
-
     def _complete_task(self) -> str:
         """完成任务并生成总结
         
@@ -175,20 +160,8 @@ class Agent:
         if user_input == 'y':
             try:
                 # 让模型判断是否需要生成方法论
-                analysis_prompt = """本次任务已结束，请分析是否值得生成方法论，需要考虑以下几点：
-1. 任务是否具有通用性，可以应用到类似场景
-2. 解决方案是否具有创新性或特殊价值
-3. 执行过程是否包含值得记录的经验或教训
-4. 是否有助于提升处理类似问题的效率
-5. 是否已经有类似的方法论了
-
+                analysis_prompt = """本次任务已结束，请分析是否需要生成方法论。
 如果认为需要生成方法论，请先判断是创建新的方法论还是更新已有方法论。如果是更新已有方法论，使用update，否则使用add。
-
-方法论模板：
-1. 问题重述：准确描述问题的核心和边界
-2. 最优解决方案：描述最佳的解决思路和方案
-3. 最优方案执行步骤：列出具体的执行步骤（失败的尝试不需要记录）
-
 如果认为不需要生成方法论，请说明原因。
 仅输出方法论工具的调用指令，或者是不需要生成方法论的说明，除此之外不要输出任何内容。
 """
@@ -239,10 +212,6 @@ class Agent:
 
             # 加载方法论
             methodology = self._load_methodology()
-
-            if not methodology:
-                methodology = self._choose_methodology(methodology, user_input)
-
             methodology_prompt = ""
             if methodology:
                 methodology_prompt = f"""这是以往处理问题的标准方法论，如果当前任务与此类似，可参考：
