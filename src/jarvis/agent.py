@@ -89,12 +89,12 @@ class Agent:
 
 
     def _load_methodology(self) -> Dict[str, str]:
-        """加载经验总结"""
+        """加载方法论"""
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
         if os.path.exists(user_jarvis_methodology):
             with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
-            PrettyOutput.print(f"从 {user_jarvis_methodology} 加载经验总结: {', '.join(data.keys())}", OutputType.INFO)
+            PrettyOutput.print(f"从 {user_jarvis_methodology} 加载方法论: {', '.join(data.keys())}", OutputType.INFO)
             return data
         return {}
 
@@ -142,10 +142,10 @@ class Agent:
         except Exception as e:
             PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
 
-    def make_mathodology(self) -> str:
+    def _make_mathodology(self) -> str:
         PrettyOutput.section("生成方法论", OutputType.PLANNING)
         """生成方法论"""
-        prompt = f"""任务已经结束，请总结任务执行过程中的，调用经验总结工具生成经验总结，经验总结内容格式如下：
+        prompt = f"""任务已经结束，请总结任务执行过程中的经验，评估是否需要补充新的方法论，如果需要，请调用方法论工具生成方法论，方法论内容格式如下：
 
 1. 问题重述
 2. 最优解决方案
@@ -172,7 +172,7 @@ class Agent:
         """
         PrettyOutput.section("任务完成", OutputType.SUCCESS)
 
-        self.make_mathodology()
+        self._make_mathodology()
         
         if not self.is_sub_agent:
             return "Task completed"
@@ -206,14 +206,14 @@ class Agent:
             if file_list:
                 self.model.upload_files(file_list)
 
-            # 加载经验总结
+            # 加载方法论
             methodology = self._load_methodology()
 
             methodology =self._choose_methodology(methodology, user_input)
 
             methodology_prompt = ""
             if methodology:
-                methodology_prompt = f"""这是以往处理问题的标准经验总结，如果当前任务与此类似，可参考：
+                methodology_prompt = f"""这是以往处理问题的标准方法论，如果当前任务与此类似，可参考：
 {methodology}
 
 """
@@ -241,11 +241,11 @@ class Agent:
 6. 制定行动计划：根据目前可以使用的工具制定行动计划
 7. 执行行动计划：每步执行一个步骤，最多使用一个工具（工具执行完成后，等待工具结果再执行下一步）
 8. 监控与调整：如果执行结果与预期不符，则反思并调整行动计划，迭代之前的步骤
-9. 经验总结：如果当前任务具有通用性且执行过程中遇到了值得记录的经验，使用经验总结工具记录经验总结，以提升后期处理类似问题的能力
+9. 方法论：如果当前任务具有通用性且执行过程中遇到了值得记录的经验，使用方法论工具记录方法论，以提升后期处理类似问题的能力
 10. 任务结束：如果任务已经完成，使用任务结束指令结束任务
 -------------------------------------------------------------                       
 
-经验总结模板：
+方法论模板：
 1. 问题重述
 2. 最优解决方案
 3. 最优方案执行步骤（失败的行动不需要体现）
