@@ -142,16 +142,6 @@ class Agent:
         except Exception as e:
             PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
 
-    def _make_mathodology(self) -> str:
-        PrettyOutput.section("生成方法论", OutputType.PLANNING)
-        """生成方法论"""
-        prompt = f"""任务已经结束，请总结任务执行过程中的经验，评估是否需要补充新的方法论，如果需要，请调用方法论工具生成方法论，方法论内容格式如下：
-
-1. 问题重述
-2. 最优解决方案
-3. 最优方案执行步骤（失败的行动不需要体现）
-"""
-        return self._call_model(prompt)
     
     def _choose_methodology(self, methodology: Dict[str, str], task: str) -> str:
         """选择方法论"""
@@ -160,8 +150,10 @@ class Agent:
 {task}
 
 方法论:
-{methodology}
 """
+        for k, v in methodology.items():
+            prompt += f"问题类型：{k}\n"
+            prompt += f"方法论：{v}\n"
         return self._call_model(prompt)
 
     def _complete_task(self) -> str:
@@ -171,8 +163,6 @@ class Agent:
             str: 任务总结或完成状态
         """
         PrettyOutput.section("任务完成", OutputType.SUCCESS)
-
-        self._make_mathodology()
         
         if not self.is_sub_agent:
             return "Task completed"
