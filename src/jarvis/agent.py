@@ -145,7 +145,7 @@ class Agent:
     
     def _choose_methodology(self, methodology: Dict[str, str], task: str) -> str:
         """选择方法论"""
-        prompt = f"""请根据任务内容选择合适的方法论，并返回方法论内容，如果当前任务没有合适的方法论，则返回空字符串，格式如下：
+        prompt = f"""请根据任务内容选择合适的方法论，并返回问题类型和方法论内容，如果当前任务没有合适的方法论，则返回空字符串，格式如下：
 任务内容:
 {task}
 
