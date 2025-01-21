@@ -26,6 +26,9 @@ class CoderTool:
         }
     }
 
+    def __init__(self):
+        self._coder = None
+
 
     def _init_coder(self, dir: Optional[str] = None, language: Optional[str] = "python") -> None:
         """初始化JarvisCoder实例"""
@@ -34,7 +37,7 @@ class CoderTool:
             work_dir = dir or os.getcwd()
             self._coder = JarvisCoder(work_dir, language)
 
-    def execute(self, **kwargs) -> Dict[str, Any]:
+    def execute(self, args: Dict) -> Dict[str, Any]:
         """执行代码修改
         
         Args:
@@ -45,9 +48,9 @@ class CoderTool:
         Returns:
             Dict[str, Any]: 执行结果
         """
-        feature = kwargs.get("feature")
-        dir = kwargs.get("dir")
-        language = kwargs.get("language", "python")
+        feature = args.get("feature")
+        dir = args.get("dir")
+        language = args.get("language", "python")
         
         try:
             self.current_dir = os.getcwd()
