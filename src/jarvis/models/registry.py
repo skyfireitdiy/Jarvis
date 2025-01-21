@@ -29,7 +29,8 @@ class PlatformRegistry:
                 # 创建 __init__.py 使其成为 Python 包
                 with open(os.path.join(user_platform_dir, "__init__.py"), "w") as f:
                     pass
-                PrettyOutput.print(f"已创建平台目录: {user_platform_dir}", OutputType.INFO)
+
+                pass
             except Exception as e:
                 PrettyOutput.print(f"创建平台目录失败: {str(e)}", OutputType.ERROR)
                 return ""
@@ -120,8 +121,8 @@ class PlatformRegistry:
                             # 检查平台实现
                             if not PlatformRegistry.check_platform_implementation(obj):
                                 continue
+
                             platforms[obj.platform_name] = obj
-                            PrettyOutput.print(f"从 {directory} 加载平台: {obj.platform_name}", OutputType.INFO)
                             break
                 except Exception as e:
                     PrettyOutput.print(f"加载平台 {module_name} 失败: {str(e)}", OutputType.ERROR)
@@ -159,6 +160,7 @@ class PlatformRegistry:
             raise Exception(f"Failed to create platform: {PlatformRegistry.global_platform_name}")
         return platform
         
+
     def register_platform(self, name: str, platform_class: Type[BasePlatform]):
         """注册平台类
         
@@ -167,7 +169,6 @@ class PlatformRegistry:
             model_class: 平台类
         """
         self.platforms[name] = platform_class
-        PrettyOutput.print(f"已注册平台: {name}", OutputType.INFO)
             
     def create_platform(self, name: str) -> Optional[BasePlatform]:
         """创建平台实例
@@ -183,8 +184,8 @@ class PlatformRegistry:
             return None
             
         try:
+
             platform = self.platforms[name]()
-            PrettyOutput.print(f"已创建平台实例: {name}", OutputType.INFO)
             return platform
         except Exception as e:
             PrettyOutput.print(f"创建平台失败: {str(e)}", OutputType.ERROR)
