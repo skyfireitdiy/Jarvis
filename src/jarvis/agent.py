@@ -240,7 +240,8 @@ class Agent:
             # 加载方法论
             methodology = self._load_methodology()
 
-            methodology =self._choose_methodology(methodology, user_input)
+            if not methodology:
+                methodology = self._choose_methodology(methodology, user_input)
 
             methodology_prompt = ""
             if methodology:
