@@ -13,6 +13,7 @@ from jarvis.utils import OutputType, PrettyOutput, find_git_root
 from jarvis.utils import load_env_from_file
 import argparse
 from sentence_transformers import SentenceTransformer
+import pickle
 
 class CodeBase:
     def __init__(self, root_dir: str, thread_count: int = 10):
@@ -59,59 +60,43 @@ class CodeBase:
             
         self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
 
-            
-        self.db_path = os.path.join(self.data_dir, "codebase.db")
-        if not os.path.exists(self.db_path):
-            self.create_db()
         self.git_file_list = self.get_git_file_list()
         self.platform_registry = PlatformRegistry().get_global_platform_registry()
+        
+        # 初始化向量索引
         self.index_path = os.path.join(self.data_dir, "vectors.index")
         self.index = None
-        if  os.path.exists(self.index_path):
+        self.file_paths = []
+        if os.path.exists(self.index_path):
             PrettyOutput.print("正在加载向量数据库", output_type=OutputType.INFO)
             self.index = faiss.read_index(self.index_path)
+            try:
+                with open(os.path.join(self.data_dir, "file_paths.pkl"), "rb") as f:
+                    self.file_paths = pickle.load(f)
+            except Exception as e:
+                PrettyOutput.print(f"加载文件路径列表失败: {str(e)}", 
+                                 output_type=OutputType.WARNING)
+                self.file_paths = []
+
+        # 初始化向量缓存
+        self.vector_cache_path = os.path.join(self.data_dir, "vector_cache.pkl")
+        self.vector_cache = {}
+        if os.path.exists(self.vector_cache_path):
+            try:
+                with open(self.vector_cache_path, 'rb') as f:
+                    self.vector_cache = pickle.load(f)
+                PrettyOutput.print(f"加载了 {len(self.vector_cache)} 个向量缓存", 
+                                 output_type=OutputType.INFO)
+            except Exception as e:
+                PrettyOutput.print(f"加载向量缓存失败: {str(e)}", 
+                                 output_type=OutputType.WARNING)
+                self.vector_cache = {}
 
     def get_git_file_list(self):
-        return os.popen("git ls-files").read().splitlines()
-
-    def get_db_connection(self):
-        """创建并返回一个新的数据库连接"""
-        return sqlite3.connect(self.db_path)
-
-    def clean_db(self) -> bool:
-        """清理数据库和向量索引中的过期记录"""
-        db = self.get_db_connection()
-        try:
-            # 获取所有数据库记录
-            all_records = db.execute("SELECT path FROM codebase").fetchall()
-            files_to_delete = []
-            
-            # 找出需要删除的文件
-            for row in all_records:
-                if row[0] not in self.git_file_list:
-                    files_to_delete.append(row[0])
-            
-            if not files_to_delete:
-                return False
-                
-            for file_path in files_to_delete:
-                db.execute("DELETE FROM codebase WHERE path = ?", (file_path,))
-            
-            db.commit()
-            
-            PrettyOutput.print(f"清理了 {len(files_to_delete)} 个文件的记录", 
-                             output_type=OutputType.INFO)
-            return True
-        finally:
-            db.close()
-        
-    def create_db(self):
-        db = self.get_db_connection()
-        try:
-            db.execute("CREATE TABLE IF NOT EXISTS codebase (path TEXT, md5 TEXT ,description TEXT)")
-            db.commit()
-        finally:
-            db.close()
+        """获取 git 仓库中的文件列表，排除 .jarvis-codebase 目录"""
+        files = os.popen("git ls-files").read().splitlines()
+        # 过滤掉 .jarvis-codebase 目录下的文件
+        return [f for f in files if not f.startswith(".jarvis-codebase/")]
 
     def is_text_file(self, file_path: str):
         with open(file_path, "r", encoding="utf-8") as f:
@@ -144,8 +129,51 @@ class CodeBase:
         response = model.chat(prompt)
         return response
 
+    def save_vector_cache(self):
+        """保存向量缓存到文件"""
+        try:
+            with open(self.vector_cache_path, 'wb') as f:
+                pickle.dump(self.vector_cache, f)
+            PrettyOutput.print(f"保存了 {len(self.vector_cache)} 个向量缓存", output_type=OutputType.INFO)
+        except Exception as e:
+            PrettyOutput.print(f"保存向量缓存失败: {str(e)}", output_type=OutputType.ERROR)
+
+    def get_cached_vector(self, file_path: str, description: str = None) -> Optional[np.ndarray]:
+        """从缓存中获取向量
+        
+        Args:
+            file_path: 文件路径
+            description: 文件描述，如果提供则同时检查描述是否匹配
+        """
+        if file_path not in self.vector_cache:
+            return None
+            
+        cached_data = self.vector_cache[file_path]
+        if description is not None and cached_data["description"] != description:
+            return None
+            
+        return cached_data["vector"]
+
+    def cache_vector(self, file_path: str, vector: np.ndarray, description: str = None):
+        """将向量保存到缓存
+        
+        Args:
+            file_path: 文件路径
+            vector: 向量数据
+            description: 文件描述，用于检查文件内容是否变化
+        """
+        self.vector_cache[file_path] = {
+            "vector": vector,
+            "description": description
+        }
+
     def get_embedding(self, text: str) -> np.ndarray:
         """使用 transformers 模型获取文本的向量表示"""
+        # 先尝试从缓存获取
+        cached_vector = self.get_cached_vector(text)
+        if cached_vector is not None:
+            return cached_vector
+
         # 对长文本进行截断
         max_length = 512  # 或其他合适的长度
         text = ' '.join(text.split()[:max_length])
@@ -154,146 +182,173 @@ class CodeBase:
         embedding = self.embedding_model.encode(text, 
                                              normalize_embeddings=True,  # L2归一化
                                              show_progress_bar=False)
-        return np.array(embedding, dtype=np.float32)
+        vector = np.array(embedding, dtype=np.float32)
+        
+        # 保存到缓存
+        self.cache_vector(text, vector)
+        return vector
 
     def vectorize_file(self, file_path: str, description: str) -> np.ndarray:
         """将文件内容和描述向量化"""
-        try:            
+        try:
+            # 先尝试从缓存获取
+            cached_vector = self.get_cached_vector(file_path, description)
+            if cached_vector is not None:
+                return cached_vector
+                
             # 组合文件信息
             combined_text = f"""
 文件路径: {file_path}
 文件描述: {description}
 """
-            return self.get_embedding(combined_text)
+            vector = self.get_embedding(combined_text)
+            
+            # 保存到缓存，使用实际文件路径作为键
+            self.cache_vector(file_path, vector, description)
+            return vector
         except Exception as e:
             PrettyOutput.print(f"Error vectorizing file {file_path}: {str(e)}", 
                              output_type=OutputType.ERROR)
             return np.zeros(self.vector_dim, dtype=np.float32)
 
-    def process_file(self, file):
-        """处理单个文件的辅助方法"""
-        db = self.get_db_connection()
-        try:
-            if not self.is_text_file(file):
-                return None
-            md5 = hashlib.md5(open(file, "rb").read()).hexdigest()
-            if db.execute("SELECT path FROM codebase WHERE md5 = ?", (md5,)).fetchone():
-                return None
-            description = self.make_description(file)
-            return (file, md5, description)
-        finally:
-            db.close()
+    def clean_cache(self) -> bool:
+        """清理过期的缓存记录"""
+        files_to_delete = []
+        for file_path in list(self.vector_cache.keys()):
+            if file_path not in self.git_file_list:
+                del self.vector_cache[file_path]
+                files_to_delete.append(file_path)
+        
+        if files_to_delete:
+            self.save_vector_cache()
+            PrettyOutput.print(f"清理了 {len(files_to_delete)} 个文件的缓存", 
+                             output_type=OutputType.INFO)
+            return True
+        return False
 
-    def gen_vector_db_from_sqlite(self):
-        self.index = faiss.IndexHNSWFlat(self.vector_dim, 16)
-        self.index.hnsw.efConstruction = 40
-        self.index.hnsw.efSearch = 16
-        db = self.get_db_connection()
+    def process_file(self, file_path: str):
+        """处理单个文件"""
         try:
-            all_records = db.execute("SELECT path, description FROM codebase").fetchall()
-            for row in all_records:
-                file, description = row
-                PrettyOutput.print(f"正在向量化文件: {file}", output_type=OutputType.INFO)
-                vector = self.vectorize_file(file, description)
-                vector = vector.reshape(1, -1)  
-                self.index.add(vector)
-            faiss.write_index(self.index, self.index_path)
-        finally:
-            db.close()
+            # 跳过不存在的文件
+            if not os.path.exists(file_path):
+                return None
+                
+            if not self.is_text_file(file_path):
+                return None
+                
+            md5 = hashlib.md5(open(file_path, "rb").read()).hexdigest()
+            
+            # 检查文件是否已经处理过且内容未变
+            if file_path in self.vector_cache:
+                if self.vector_cache[file_path].get("md5") == md5:
+                    return None
+                    
+            description = self.make_description(file_path)
+            vector = self.vectorize_file(file_path, description)
+            
+            # 保存到缓存，使用实际文件路径作为键
+            self.vector_cache[file_path] = {
+                "vector": vector,
+                "description": description,
+                "md5": md5
+            }
+            
+            return file_path
+            
+        except Exception as e:
+            PrettyOutput.print(f"处理文件失败 {file_path}: {str(e)}", 
+                             output_type=OutputType.ERROR,
+                             traceback=True)
+            return None
 
     def generate_codebase(self):
-        updated =self.clean_db()
-        db_lock = Lock()
-        processed_files = []  # 用于跟踪已处理的文件
+        """生成代码库索引"""
+        self.clean_cache()  # 清理过期缓存
+        processed_files = []
         
-        def process_and_save(file):
-            result = self.process_file(file)
-            if result:
-                file, md5, description = result
-                db = self.get_db_connection()
-                try:
-                    with db_lock:
-                        db.execute("DELETE FROM codebase WHERE path = ?", (file,))
-                        db.execute("INSERT INTO codebase (path, md5, description) VALUES (?, ?, ?)", 
-                                 (file, md5, description))
-                        db.commit()
-                        PrettyOutput.print(f"索引文件: {file}", output_type=OutputType.INFO)
-                        processed_files.append(file)
-                finally:
-                    db.close()
-        
-        # 使用 ThreadPoolExecutor 并等待所有任务完成
+        # 使用线程池处理文件
         with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
-            futures = [executor.submit(process_and_save, file) for file in self.git_file_list]
-            # 等待所有任务完成
-            concurrent.futures.wait(futures)
+            futures = [executor.submit(self.process_file, file) for file in self.git_file_list]
+            for future in concurrent.futures.as_completed(futures):
+                result = future.result()
+                if result:
+                    processed_files.append(result)
+                    PrettyOutput.print(f"索引文件: {result}", output_type=OutputType.INFO)
 
-        if updated or len(processed_files) > 0:
-            PrettyOutput.print("有新的文件被删除或添加，正在重新生成向量数据库", output_type=OutputType.INFO)
-            self.gen_vector_db_from_sqlite()
+        if processed_files:
+            PrettyOutput.print("重新生成向量数据库", output_type=OutputType.INFO)
+            self.gen_vector_db_from_cache()
+            self.save_vector_cache()
         else:
-            PrettyOutput.print("没有新的文件被删除或添加，跳过向量数据库生成", output_type=OutputType.INFO)
+            PrettyOutput.print("没有新的文件变更，跳过向量数据库生成", output_type=OutputType.INFO)
             
         PrettyOutput.print(f"成功索引 {len(processed_files)} 个文件", output_type=OutputType.INFO)
 
-    def search_similar(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
-        """搜索与查询最相似的文件
+    def gen_vector_db_from_cache(self):
+        """从缓存生成向量数据库"""
+        self.index = faiss.IndexHNSWFlat(self.vector_dim, 16)
+        self.index.hnsw.efConstruction = 40
+        self.index.hnsw.efSearch = 16
         
-        Args:
-            query: 查询文本
-            top_k: 返回结果数量
+        vectors = []
+        self.file_paths = []  # 存储文件路径列表，与向量顺序对应
+        
+        for file_path, data in self.vector_cache.items():
+            vectors.append(data["vector"].reshape(1, -1))
+            # 使用实际文件路径
+            self.file_paths.append(file_path)
             
-        Returns:
-            List of (file_path, similarity_score, description) tuples
-        """
-        # 获取查询文本的向量表示
+        if vectors:
+            vectors = np.vstack(vectors)
+            self.index.add(vectors)
+            faiss.write_index(self.index, self.index_path)
+            # 保存文件路径列表
+            with open(os.path.join(self.data_dir, "file_paths.pkl"), "wb") as f:
+                pickle.dump(self.file_paths, f)
+
+    def search_similar(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
+        """搜索相似文件"""
         query_vector = self.get_embedding(query)
         query_vector = query_vector.reshape(1, -1)
-
-        # 搜索最相似的向量
+        
         distances, indices = self.index.search(query_vector, top_k)
         
-        # 获取对应的文件信息
-        db = self.get_db_connection()
-        try:
-            results = []
-            for i, distance in zip(indices[0], distances[0]):
-                if i == -1:  # faiss返回-1表示无效结果
-                    continue
-                    
-                # 将numpy.int64转换为Python int
-                offset = int(i)
-                # 获取文件路径和描述
-                cursor = db.execute("SELECT path, description FROM codebase LIMIT 1 OFFSET ?", (offset,))
-                row = cursor.fetchone()
-                if row:
-                    path, description = row
-                    # 将distance转换为相似度分数（0-1之间）
-                    similarity = 1.0 / (1.0 + float(distance))  # 确保使用Python float
-                    results.append((path, similarity, description))
-            
-            return results
-        finally:
-            db.close()
+        results = []
+        for i, distance in zip(indices[0], distances[0]):
+            if i == -1:  # faiss返回-1表示无效结果
+                continue
+                
+            file_path = self.file_paths[i]
+            data = self.vector_cache[file_path]
+            similarity = 1.0 / (1.0 + float(distance))
+            results.append((file_path, similarity, data["description"]))
+        
+        return results
 
     def ask_codebase(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
-        """Ask a question about the codebase"""
-        # 使用搜索函数获取相似文件
+        """查询代码库"""
         results = self.search_similar(query, top_k)
         PrettyOutput.print(f"找到的关联文件: ", output_type=OutputType.INFO)
         for path, score, _ in results:
-            PrettyOutput.print(f"文件: {path} 关联度: {score:.3f}", output_type=OutputType.INFO)
+            PrettyOutput.print(f"文件: {path} 关联度: {score:.3f}", 
+                             output_type=OutputType.INFO)
         
         prompt = f"""你是一个代码专家，请根据以下文件信息回答用户的问题：
 """
         for path, _, _ in results:
-            content = open(path, "r", encoding="utf-8").read()
-            prompt += f"""
+            try:
+                content = open(path, "r", encoding="utf-8").read()
+                prompt += f"""
 文件路径: {path}
 文件内容:
 {content}
 ========================================
 """
+            except Exception as e:
+                PrettyOutput.print(f"读取文件失败 {path}: {str(e)}", 
+                                 output_type=OutputType.ERROR)
+                continue
+                
         prompt += f"""
 用户问题: {query}
 
