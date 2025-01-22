@@ -200,3 +200,10 @@ def while_true(func, sleep_time: float = 0.1):
         PrettyOutput.print(f"执行失败，{sleep_time}s后重试...", OutputType.WARNING)
         time.sleep(sleep_time)
     return ret
+
+def find_git_root(dir="."):
+    curr_dir = os.getcwd()
+    os.chdir(dir)
+    ret = os.popen("git rev-parse --show-toplevel").read().strip()
+    os.chdir(curr_dir)
+    return ret

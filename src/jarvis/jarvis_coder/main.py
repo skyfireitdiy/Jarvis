@@ -9,8 +9,9 @@ from typing import Dict, Any, List, Optional, Tuple
 
 import yaml
 from jarvis.models.base import BasePlatform
-from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, load_env_from_file
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
+from jarvis.codebase.main import CodeBase
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter, Completer, Completion
 from prompt_toolkit.formatted_text import FormattedText
@@ -23,12 +24,15 @@ index_lock = threading.Lock()
 class JarvisCoder:
     def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
+        
+        self.platform = os.environ.get("JARVIS_CODEGEN_PLATFORM") or os.environ.get("JARVIS_PLATFORM")
+        self.model = os.environ.get("JARVIS_CODEGEN_MODEL") or os.environ.get("JARVIS_MODEL")
 
-        self.root_dir = root_dir
-        self.platform = os.environ.get("JARVIS_CODEGEN_PLATFORM")
-        self.model = os.environ.get("JARVIS_CODEGEN_MODEL")
 
-        self.root_dir = self._find_git_root_dir(self.root_dir)
+        if not self.platform or not self.model:
+            raise ValueError("JARVIS_CODEGEN_PLATFORM or JARVIS_CODEGEN_MODEL is not set")
+
+        self.root_dir = find_git_root(root_dir)
         if not self.root_dir:
             self.root_dir = root_dir
 
@@ -45,10 +49,6 @@ class JarvisCoder:
         self.jarvis_dir = os.path.join(self.root_dir, ".jarvis-coder")
         if not os.path.exists(self.jarvis_dir):
             os.makedirs(self.jarvis_dir)
-
-        self.index_db_path = os.path.join(self.jarvis_dir, "index.db")
-        if not os.path.exists(self.index_db_path):
-            self._create_index_db()
 
         self.record_dir = os.path.join(self.jarvis_dir, "record")
         if not os.path.exists(self.record_dir):
@@ -150,62 +150,6 @@ class JarvisCoder:
 
 
 
-    def _get_file_md5(self, file_path: str) -> str:
-        """获取文件MD5"""
-        return hashlib.md5(open(file_path, "rb").read()).hexdigest()
-
-    
-    def _create_index_db(self):
-        """创建索引数据库"""
-        with index_lock:
-            if not os.path.exists(self.index_db_path):
-                PrettyOutput.print("Index database does not exist, creating...", OutputType.INFO)
-                index_db = sqlite3.connect(self.index_db_path)
-                index_db.execute(
-                    "CREATE TABLE files (file_path TEXT PRIMARY KEY, file_md5 TEXT, file_description TEXT)")
-                index_db.commit()
-                index_db.close()
-                PrettyOutput.print("Index database created", OutputType.SUCCESS)
-                # commit
-                os.chdir(self.root_dir)
-                os.system(f"git add .gitignore -f")
-                os.system(f"git commit -m 'add index database'")
-
-    
-    def _find_file_by_md5(self, file_md5: str) -> Optional[str]:
-        """根据文件MD5查找文件路径"""
-        with index_lock:
-            index_db = sqlite3.connect(self.index_db_path)
-            cursor = index_db.cursor()
-            cursor.execute(
-                "SELECT file_path FROM files WHERE file_md5 = ?", (file_md5,))
-            result = cursor.fetchone()
-            index_db.close()
-            return result[0] if result else None
-
-    
-    def _update_file_path(self, file_path: str, file_md5: str):
-        """更新文件路径"""
-        with index_lock:
-            index_db = sqlite3.connect(self.index_db_path)
-            cursor = index_db.cursor()
-            cursor.execute(
-                "UPDATE files SET file_path = ? WHERE file_md5 = ?", (file_path, file_md5))
-            index_db.commit()
-            index_db.close()
-
-    
-    def _insert_info(self, file_path: str, file_md5: str, file_description: str):
-        """插入文件信息"""
-        with index_lock:
-            index_db = sqlite3.connect(self.index_db_path)
-            cursor = index_db.cursor()
-            cursor.execute("DELETE FROM files WHERE file_path = ?", (file_path,))
-            cursor.execute("INSERT INTO files (file_path, file_md5, file_description) VALUES (?, ?, ?)",
-                           (file_path, file_md5, file_description))
-            index_db.commit()
-            index_db.close()
-
     def _is_text_file(self, file_path: str) -> bool:
         """判断文件是否是文本文件"""
         try:
@@ -222,82 +166,8 @@ class JarvisCoder:
             return False
 
     def _index_project(self):
-        """建立代码库索引"""
-        import threading
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
-        git_files = os.popen("git ls-files").read().splitlines()
-
-        index_db = sqlite3.connect(self.index_db_path)
-        cursor = index_db.cursor()
-        cursor.execute("SELECT file_path FROM files")
-        db_files = [row[0] for row in cursor.fetchall()]
-        for db_file in db_files:
-            if not os.path.exists(db_file):
-                cursor.execute("DELETE FROM files WHERE file_path = ?", (db_file,))
-                PrettyOutput.print(f"删除不存在的文件记录: {db_file}", OutputType.INFO)
-        index_db.commit()
-        index_db.close()
-
-        def process_file(file_path: str):
-            """处理单个文件的索引任务"""
-            if not self._is_text_file(file_path):
-                return
-
-            # 计算文件MD5
-            file_md5 = self._get_file_md5(file_path)
-
-            # 查找文件
-            file_path_in_db = self._find_file_by_md5(file_md5)
-            if file_path_in_db:
-                PrettyOutput.print(
-                    f"文件 {file_path} 重复，跳过", OutputType.INFO)
-                if file_path_in_db != file_path:
-                    self._update_file_path(file_path, file_md5)
-                    PrettyOutput.print(
-                        f"文件 {file_path} 重复，更新路径为 {file_path}", OutputType.INFO)
-                return
-
-            with open(file_path, "r", encoding="utf-8") as f:
-                file_content = f.read()
-                key_info = self._get_key_info(file_path, file_content)
-                if not key_info:
-                    PrettyOutput.print(
-                        f"文件 {file_path} 索引失败", OutputType.INFO)
-                    return
-
-                self._insert_info(file_path, file_md5, key_info)
-                PrettyOutput.print(
-                    f"文件 {file_path} 已建立索引", OutputType.INFO)
-
-
-        # 使用线程池处理文件索引
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(process_file, file_path) for file_path in git_files]
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    PrettyOutput.print(f"处理文件时发生错误: {str(e)}", OutputType.ERROR)
-
-        PrettyOutput.print("项目索引完成", OutputType.INFO)
-
-    def _get_files_from_db(self) -> List[Tuple[str, str]]:
-        """从数据库获取所有文件信息
-        
-        Returns:
-            List[Tuple[str, str]]: [(file_path, file_description), ...]
-        """
-        try:
-            index_db = sqlite3.connect(self.index_db_path)
-            cursor = index_db.cursor()
-            cursor.execute("SELECT file_path, file_description FROM files")
-            all_files = cursor.fetchall()
-            index_db.close()
-            return all_files
-        except sqlite3.Error as e:
-            PrettyOutput.print(f"数据库操作失败: {str(e)}", OutputType.ERROR)
-            return []
+        cb = CodeBase(self.root_dir)
+        cb.generate_codebase()
 
     def _analyze_files_in_batches(self, all_files: List[Tuple[str, str]], feature: str, batch_size: int = 100) -> List[Dict]:
         """批量分析文件相关性
@@ -629,13 +499,6 @@ file2.py: 7
         
         PrettyOutput.print(f"已保存修改记录: {record_path}", OutputType.SUCCESS)
 
-    def _find_git_root_dir(self, root_dir: str) -> str:
-        """查找git根目录"""
-        while not os.path.exists(os.path.join(root_dir, ".git")):
-            root_dir = os.path.dirname(root_dir)
-            if root_dir == "/":
-                return None
-        return root_dir
 
 
     def _prepare_execution(self) -> None:
