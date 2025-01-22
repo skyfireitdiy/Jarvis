@@ -306,13 +306,14 @@ class JarvisCoder:
 
     def _load_related_files(self, feature: str) -> List[Dict]:
         """加载相关文件内容"""
+        ret = []
         related_files = self._codebase.search_similar(feature, top_k=5)
         for file, score, _ in related_files:
             PrettyOutput.print(f"相关文件: {file} 相关度: {score:.3f}", OutputType.INFO)
             with open(file, "r", encoding="utf-8") as f:
                 content = f.read()
-            related_files.append({"file_path": file, "file_content": content})
-        return related_files
+            ret.append({"file_path": file, "file_content": content})
+        return ret
 
     def _handle_patch_application(self, related_files: List[Dict], patches: List[str], feature: str) -> Dict[str, Any]:
         """处理补丁应用流程"""
