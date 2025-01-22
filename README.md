@@ -65,7 +65,6 @@ Jarvis supports configuration through environment variables that can be set in t
 |---------|------|--------|------|
 | JARVIS_PLATFORM | AI platform to use, supports kimi/openai/ai8 etc | kimi | Yes |
 | JARVIS_MODEL | Model name to use | - | No |
-
 | JARVIS_CODEGEN_PLATFORM | AI platform for code generation | Same as JARVIS_PLATFORM | No |
 | JARVIS_CODEGEN_MODEL | Model name for code generation | Same as JARVIS_MODEL | No |
 | JARVIS_CHEAP_PLATFORM | AI platform for cheap operations | Same as JARVIS_PLATFORM | No |
