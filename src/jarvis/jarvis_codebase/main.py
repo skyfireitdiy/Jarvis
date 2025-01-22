@@ -329,7 +329,6 @@ class CodeBase:
 
     def search_similar(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
         """搜索相似文件"""
-        # 使用模型生成多个相似查询
         model = self.platform_registry.create_platform(self.normal_platform)
         model.set_model_name(self.normal_model)
         model.set_suppress_output(True)
