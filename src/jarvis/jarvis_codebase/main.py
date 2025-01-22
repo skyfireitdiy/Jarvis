@@ -16,20 +16,21 @@ from sentence_transformers import SentenceTransformer
 
 class CodeBase:
     def __init__(self, root_dir: str, thread_count: int = 10, 
-                 model_name: str = "BAAI/bge-large-zh-v1.5",
                  vector_dim: Optional[int] = None):
         load_env_from_file()
         self.root_dir = root_dir
         os.chdir(self.root_dir)
         self.thread_count = thread_count
-        self.platform = os.environ.get("JARVIS_CHEAP_PLATFORM") or os.environ.get("JARVIS_PLATFORM")
-        self.model = os.environ.get("JARVIS_CHEAP_MODEL") or os.environ.get("JARVIS_MODEL")
-        if not self.platform or not self.model:
-            raise ValueError("JARVIS_CHEAP_PLATFORM or JARVIS_CHEAP_MODEL is not set")
+        self.platform = os.environ.get("JARVIS_CHEAP_PLATFORM") or os.environ.get("JARVIS_PLATFORM") or "kimi"
+        self.model = os.environ.get("JARVIS_CHEAP_MODEL") or os.environ.get("JARVIS_MODEL") or "kimi"
+        self.embedding_model_name = os.environ.get("JARVIS_EMBEDDING_MODEL") or "BAAI/bge-large-zh-v1.5"
+        if not self.platform or not self.model or not self.embedding_model_name:
+            raise ValueError("JARVIS_CHEAP_PLATFORM or JARVIS_CHEAP_MODEL or JARVIS_EMBEDDING_MODEL is not set")
+        
+        PrettyOutput.print(f"使用平台: {self.platform} 模型: {self.model} 嵌入模型: {self.embedding_model_name}", output_type=OutputType.INFO)
             
         # 初始化嵌入模型
-        self.embedding_model_name = model_name
-        self.embedding_model = SentenceTransformer(model_name)
+        self.embedding_model = SentenceTransformer(self.embedding_model_name)
         if vector_dim is None:
             self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
         else:
@@ -126,11 +127,20 @@ class CodeBase:
         model.set_model_name(self.model)
         model.set_suppress_output(True)
         content = open(file_path, "r", encoding="utf-8").read()
-        prompt = f"""
-你是一个代码库的描述专家，请根据以下代码内容，生成一个详细的描述，描述该代码库的功能和用途。
+        prompt = f"""请分析以下代码文件，并生成一个详细的描述。描述应该包含以下要点：
 
-代码路径：{file_path}
-代码内容：{content}
+1. 主要功能和用途
+2. 关键类和方法的作用
+3. 重要的依赖和技术特征（如使用了什么框架、算法、设计模式等）
+4. 代码处理的主要数据类型和数据结构
+5. 关键业务逻辑和处理流程
+6. 特殊功能点和亮点特性
+
+请用简洁专业的语言描述，突出代码的技术特征和功能特点，以便后续进行相似代码检索。
+
+文件路径：{file_path}
+代码内容：
+{content}
 """
         response = model.chat(prompt)
         return response
@@ -259,8 +269,6 @@ def main():
     parser.add_argument('--search', type=str, help='Search query to find similar code files')
     parser.add_argument('--top-k', type=int, default=5, help='Number of results to return (default: 5)')
     parser.add_argument('--generate', action='store_true', help='Generate or update the codebase index')
-    parser.add_argument('--model', type=str, default=os.environ.get("JARVIS_EMBEDDING_MODEL") or "BAAI/bge-large-zh-v1.5",
-                       help='Embedding model name (default: BAAI/bge-large-zh-v1.5)')
     args = parser.parse_args()
     
     current_dir = find_git_root()

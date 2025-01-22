@@ -25,8 +25,6 @@ class OyiModel(BasePlatform):
         else:
             PrettyOutput.print("获取模型列表失败", OutputType.WARNING)
         
-        PrettyOutput.print("使用OYI_MODEL环境变量配置模型", OutputType.SUCCESS)
-        
         self.messages = []
         self.system_message = ""
         self.conversation = None
@@ -37,11 +35,10 @@ class OyiModel(BasePlatform):
         if not self.token:
             raise Exception("OYI_API_KEY is not set")
         
-        self.model_name = os.getenv("OYI_MODEL") or os.getenv("JARVIS_MODEL") or "deepseek-chat"
+        self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
         if self.model_name not in [m.split()[0] for m in available_models]:
             PrettyOutput.print(f"警告: 当前选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
         
-        PrettyOutput.print(f"当前使用模型: {self.model_name}", OutputType.SYSTEM)
 
     def set_model_name(self, model_name: str):
         """设置模型名称"""

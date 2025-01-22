@@ -117,7 +117,6 @@ def main():
     PlatformRegistry.get_global_platform_registry().set_global_platform_name(platform)
 
     if args.model:
-        PrettyOutput.print(f"用户传入了模型参数，更换模型: {args.model}", OutputType.USER)
         os.environ["JARVIS_MODEL"] = args.model
 
     try:
@@ -126,7 +125,6 @@ def main():
 
         # 如果用户传入了模型参数，则更换当前模型为用户指定的模型
         if args.model:
-            PrettyOutput.print(f"用户传入了模型参数，更换模型: {args.model}", OutputType.USER)
             agent.model.set_model_name(args.model)
 
         # 欢迎信息
