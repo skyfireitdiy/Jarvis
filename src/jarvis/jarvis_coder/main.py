@@ -167,6 +167,7 @@ class JarvisCoder:
 1、仅输出补丁内容，不要输出任何其他内容，每个补丁必须用<PATCH_START>和<PATCH_END>标记
 2、如果在大段代码中有零星修改，生成多个补丁
 3、要替换的内容，一定要与文件内容完全一致，不要有任何多余或者缺失的内容
+4、每个patch不超过20行，超出20行，请生成多个patch
 """
         
         success, response = self._call_model_with_retry(self.main_model, prompt)
