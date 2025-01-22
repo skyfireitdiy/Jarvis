@@ -19,6 +19,9 @@ setup(
         "prompt_toolkit>=3.0.0",
         "openai>=1.20.0",
         "playwright>=1.41.1",
+        "numpy>=1.26.0",
+        "faiss-cpu>=1.8.1",
+        "sentence-transformers>=2.2.2",
     ],
     entry_points={
         "console_scripts": [

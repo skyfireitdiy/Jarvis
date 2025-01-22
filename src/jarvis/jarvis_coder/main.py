@@ -11,7 +11,7 @@ import yaml
 from jarvis.models.base import BasePlatform
 from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
-from jarvis.codebase.main import CodeBase
+from jarvis.jarvis_codebase.main import CodeBase
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter, Completer, Completion
 from prompt_toolkit.formatted_text import FormattedText
