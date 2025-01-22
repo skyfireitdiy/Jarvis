@@ -14,11 +14,11 @@ from sentence_transformers import SentenceTransformer
 import pickle
 
 class CodeBase:
-    def __init__(self, root_dir: str, thread_count: int = 10):
+    def __init__(self, root_dir: str):
         load_env_from_file()
         self.root_dir = root_dir
         os.chdir(self.root_dir)
-        self.thread_count = thread_count
+        self.thread_count = os.environ.get("JARVIS_THREAD_COUNT") or 10
         self.cheap_platform = os.environ.get("JARVIS_CHEAP_PLATFORM") or os.environ.get("JARVIS_PLATFORM") or "kimi"
         self.cheap_model = os.environ.get("JARVIS_CHEAP_MODEL") or os.environ.get("JARVIS_MODEL") or "kimi"
         self.normal_platform = os.environ.get("JARVIS_PLATFORM") or "kimi"
@@ -325,26 +325,86 @@ class CodeBase:
         else:
             PrettyOutput.print("没有新的文件变更，跳过向量数据库生成", output_type=OutputType.INFO)
             
-        PrettyOutput.print(f"成功索引 {len(processed_files)} 个文件", output_type=OutputType.INFO)
+        PrettyOutput.print(f"成功为 {len(processed_files)} 个文件生成索引", output_type=OutputType.INFO)
 
     def search_similar(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
         """搜索相似文件"""
-        query_vector = self.get_embedding(query)
-        query_vector = query_vector.reshape(1, -1)
+        # 使用模型生成多个相似查询
+        model = self.platform_registry.create_platform(self.normal_platform)
+        model.set_model_name(self.normal_model)
+        model.set_suppress_output(True)
         
-        distances, indices = self.index.search(query_vector, top_k)
+        try:
+            prompt = f"""请根据以下查询，生成5个意思完全相同但表述不同的句子。这些句子将用于代码搜索，所以要保持专业性和准确性。
+原始查询: {query}
+
+请直接输出5个句子，每行一个，不要有编号或其他标记。
+请用<REWRITE_START>和<REWRITE_END>标签包裹你的回答。
+
+例如:
+<REWRITE_START>
+如何实现单例模式
+怎样保证类只有一个实例
+单例设计模式的实现方法
+如何确保类的实例唯一性
+实现Singleton模式的最佳实践
+<REWRITE_END>"""
+            
+            response = model.chat(prompt)
+            # 提取<REWRITE_START>和<REWRITE_END>之间的内容
+            if "<REWRITE_START>" in response and "<REWRITE_END>" in response:
+                rewrite_content = response.split("<REWRITE_START>")[1].split("<REWRITE_END>")[0].strip()
+                queries = [query] + rewrite_content.strip().split('\n')
+            else:
+                queries = [query]  # 如果格式不正确，只使用原始查询
+        finally:
+            model.delete_chat()
+
+        PrettyOutput.print(f"查询:", output_type=OutputType.INFO)
+        for q in queries:
+            PrettyOutput.print(f"  {q}", output_type=OutputType.INFO)
         
-        results = []
-        for i, distance in zip(indices[0], distances[0]):
-            if i == -1:  # faiss返回-1表示无效结果
+        # 为每个查询获取相似文件
+        all_results = {}  # 文件路径 -> (总分数, 出现次数, 描述)
+        
+        for q in queries:
+            q = q.strip()
+            if not q:  # 跳过空行
                 continue
+            
+            q_vector = self.get_embedding(q)
+            q_vector = q_vector.reshape(1, -1)
+            
+            distances, indices = self.index.search(q_vector, top_k)
+
+            PrettyOutput.print(f"查询 {q} 的结果: ", output_type=OutputType.INFO)
+            
+            for i, distance in zip(indices[0], distances[0]):
+                if i == -1:  # faiss返回-1表示无效结果
+                    continue
+                    
+                similarity = 1.0 / (1.0 + float(distance))
+                PrettyOutput.print(f"  {self.file_paths[i]} : 距离 {distance:.3f}, 相似度 {similarity:.3f}", 
+                                 output_type=OutputType.INFO)
+                    
+                file_path = self.file_paths[i]
+                data = self.vector_cache[file_path]
                 
-            file_path = self.file_paths[i]
-            data = self.vector_cache[file_path]
-            similarity = 1.0 / (1.0 + float(distance))
-            results.append((file_path, similarity, data["description"]))
+                if file_path in all_results:
+                    total_score, count, _ = all_results[file_path]
+                    all_results[file_path] = (total_score + similarity, count + 1, data["description"])
+                else:
+                    all_results[file_path] = (similarity, 1, data["description"])
         
-        return results
+        # 计算平均分数并排序
+        results = []
+        for file_path, (total_score, count, description) in all_results.items():
+            avg_score = total_score / count
+            results.append((file_path, avg_score, description))
+        
+        # 按平均分数排序并取top_k
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results[:top_k]
 
     def ask_codebase(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
         """查询代码库"""
@@ -377,8 +437,11 @@ class CodeBase:
 """
         model = self.platform_registry.create_platform(self.normal_platform)
         model.set_model_name(self.normal_model)
-        response = model.chat(prompt)
-        return response
+        try:
+            response = model.chat(prompt)
+            return response
+        finally:
+            model.delete_chat()
 
 
 def main():
