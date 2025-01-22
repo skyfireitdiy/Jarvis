@@ -367,7 +367,6 @@ class JarvisCoder:
         os.system(f"git add .")
         os.system(f"git commit -m '{feature}'")
         self._save_edit_record(feature, patches)
-        self._index_project()
 
     def _revert_changes(self) -> None:
         """回退所有修改"""
