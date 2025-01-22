@@ -1,7 +1,5 @@
 import hashlib
 import os
-import sqlite3
-import time
 import numpy as np
 import faiss
 from typing import List, Tuple, Optional
@@ -63,34 +61,28 @@ class CodeBase:
         self.git_file_list = self.get_git_file_list()
         self.platform_registry = PlatformRegistry().get_global_platform_registry()
         
-        # 初始化向量索引
-        self.index_path = os.path.join(self.data_dir, "vectors.index")
-        self.index = None
-        self.file_paths = []
-        if os.path.exists(self.index_path):
-            PrettyOutput.print("正在加载向量数据库", output_type=OutputType.INFO)
-            self.index = faiss.read_index(self.index_path)
-            try:
-                with open(os.path.join(self.data_dir, "file_paths.pkl"), "rb") as f:
-                    self.file_paths = pickle.load(f)
-            except Exception as e:
-                PrettyOutput.print(f"加载文件路径列表失败: {str(e)}", 
-                                 output_type=OutputType.WARNING)
-                self.file_paths = []
-
-        # 初始化向量缓存
-        self.vector_cache_path = os.path.join(self.data_dir, "vector_cache.pkl")
+        # 初始化缓存和索引
+        self.cache_path = os.path.join(self.data_dir, "cache.pkl")
         self.vector_cache = {}
-        if os.path.exists(self.vector_cache_path):
+        self.file_paths = []
+        
+        # 加载缓存
+        if os.path.exists(self.cache_path):
             try:
-                with open(self.vector_cache_path, 'rb') as f:
-                    self.vector_cache = pickle.load(f)
+                with open(self.cache_path, 'rb') as f:
+                    cache_data = pickle.load(f)
+                    self.vector_cache = cache_data["vectors"]
+                    self.file_paths = cache_data["file_paths"]
                 PrettyOutput.print(f"加载了 {len(self.vector_cache)} 个向量缓存", 
                                  output_type=OutputType.INFO)
+                # 从缓存重建索引
+                self.build_index()
             except Exception as e:
-                PrettyOutput.print(f"加载向量缓存失败: {str(e)}", 
+                PrettyOutput.print(f"加载缓存失败: {str(e)}", 
                                  output_type=OutputType.WARNING)
                 self.vector_cache = {}
+                self.file_paths = []
+                self.index = None
 
     def get_git_file_list(self):
         """获取 git 仓库中的文件列表，排除 .jarvis-codebase 目录"""
@@ -129,63 +121,85 @@ class CodeBase:
         response = model.chat(prompt)
         return response
 
-    def save_vector_cache(self):
-        """保存向量缓存到文件"""
+    def save_cache(self):
+        """保存缓存数据"""
         try:
-            with open(self.vector_cache_path, 'wb') as f:
-                pickle.dump(self.vector_cache, f)
-            PrettyOutput.print(f"保存了 {len(self.vector_cache)} 个向量缓存", output_type=OutputType.INFO)
+            cache_data = {
+                "vectors": self.vector_cache,
+                "file_paths": self.file_paths
+            }
+            with open(self.cache_path, 'wb') as f:
+                pickle.dump(cache_data, f)
+            PrettyOutput.print(f"保存了 {len(self.vector_cache)} 个向量缓存", 
+                             output_type=OutputType.INFO)
         except Exception as e:
-            PrettyOutput.print(f"保存向量缓存失败: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"保存缓存失败: {str(e)}", 
+                             output_type=OutputType.ERROR)
 
-    def get_cached_vector(self, file_path: str, description: str = None) -> Optional[np.ndarray]:
-        """从缓存中获取向量
-        
-        Args:
-            file_path: 文件路径
-            description: 文件描述，如果提供则同时检查描述是否匹配
-        """
+    def get_cached_vector(self, file_path: str, description: str) -> Optional[np.ndarray]:
+        """从缓存获取文件的向量表示"""
         if file_path not in self.vector_cache:
             return None
-            
-        cached_data = self.vector_cache[file_path]
-        if description is not None and cached_data["description"] != description:
+        
+        # 检查文件是否被修改
+        try:
+            with open(file_path, "rb") as f:
+                current_md5 = hashlib.md5(f.read()).hexdigest()
+        except Exception as e:
+            PrettyOutput.print(f"计算文件MD5失败 {file_path}: {str(e)}", 
+                              output_type=OutputType.ERROR)
             return None
-            
+        
+        cached_data = self.vector_cache[file_path]
+        if cached_data["md5"] != current_md5:
+            return None
+        
+        # 检查描述是否变化
+        if cached_data["description"] != description:
+            return None
+        
         return cached_data["vector"]
 
-    def cache_vector(self, file_path: str, vector: np.ndarray, description: str = None):
-        """将向量保存到缓存
+    def cache_vector(self, file_path: str, vector: np.ndarray, description: str):
+        """缓存文件的向量表示"""
+        try:
+            with open(file_path, "rb") as f:
+                file_md5 = hashlib.md5(f.read()).hexdigest()
+        except Exception as e:
+            PrettyOutput.print(f"计算文件MD5失败 {file_path}: {str(e)}", 
+                              output_type=OutputType.ERROR)
+            file_md5 = ""
         
-        Args:
-            file_path: 文件路径
-            vector: 向量数据
-            description: 文件描述，用于检查文件内容是否变化
-        """
         self.vector_cache[file_path] = {
-            "vector": vector,
-            "description": description
+            "path": file_path,  # 保存文件路径
+            "md5": file_md5,    # 保存文件MD5
+            "description": description,  # 保存文件描述
+            "vector": vector    # 保存向量
         }
+        
+        # 保存缓存到文件
+        try:
+            with open(self.cache_path, 'wb') as f:
+                cache_data = {
+                    "vectors": self.vector_cache,
+                    "file_paths": self.file_paths
+                }
+                pickle.dump(cache_data, f)
+        except Exception as e:
+            PrettyOutput.print(f"保存向量缓存失败: {str(e)}", 
+                              output_type=OutputType.ERROR)
 
     def get_embedding(self, text: str) -> np.ndarray:
         """使用 transformers 模型获取文本的向量表示"""
-        # 先尝试从缓存获取
-        cached_vector = self.get_cached_vector(text)
-        if cached_vector is not None:
-            return cached_vector
-
         # 对长文本进行截断
         max_length = 512  # 或其他合适的长度
         text = ' '.join(text.split()[:max_length])
         
         # 获取嵌入向量
         embedding = self.embedding_model.encode(text, 
-                                             normalize_embeddings=True,  # L2归一化
-                                             show_progress_bar=False)
+                                                 normalize_embeddings=True,  # L2归一化
+                                                 show_progress_bar=False)
         vector = np.array(embedding, dtype=np.float32)
-        
-        # 保存到缓存
-        self.cache_vector(text, vector)
         return vector
 
     def vectorize_file(self, file_path: str, description: str) -> np.ndarray:
@@ -203,7 +217,7 @@ class CodeBase:
 """
             vector = self.get_embedding(combined_text)
             
-            # 保存到缓存，使用实际文件路径作为键
+            # 保存到缓存
             self.cache_vector(file_path, vector, description)
             return vector
         except Exception as e:
@@ -212,7 +226,7 @@ class CodeBase:
             return np.zeros(self.vector_dim, dtype=np.float32)
 
     def clean_cache(self) -> bool:
-        """清理过期的缓存记录"""
+        """清理过期的缓存记录，返回是否有文件被删除"""
         files_to_delete = []
         for file_path in list(self.vector_cache.keys()):
             if file_path not in self.git_file_list:
@@ -220,7 +234,7 @@ class CodeBase:
                 files_to_delete.append(file_path)
         
         if files_to_delete:
-            self.save_vector_cache()
+            self.save_cache()
             PrettyOutput.print(f"清理了 {len(files_to_delete)} 个文件的缓存", 
                              output_type=OutputType.INFO)
             return True
@@ -261,9 +275,39 @@ class CodeBase:
                              traceback=True)
             return None
 
+    def build_index(self):
+        """从向量缓存构建 faiss 索引"""
+        # 创建底层 HNSW 索引
+        hnsw_index = faiss.IndexHNSWFlat(self.vector_dim, 16)
+        hnsw_index.hnsw.efConstruction = 40
+        hnsw_index.hnsw.efSearch = 16
+        
+        # 用 IndexIDMap 包装 HNSW 索引
+        self.index = faiss.IndexIDMap(hnsw_index)
+        
+        vectors = []
+        ids = []
+        self.file_paths = []  # 重置文件路径列表
+        
+        for i, (file_path, data) in enumerate(self.vector_cache.items()):
+            vectors.append(data["vector"].reshape(1, -1))
+            ids.append(i)
+            self.file_paths.append(file_path)
+            
+        if vectors:
+            vectors = np.vstack(vectors)
+            self.index.add_with_ids(vectors, np.array(ids))
+        else:
+            self.index = None
+
+    def gen_vector_db_from_cache(self):
+        """从缓存生成向量数据库"""
+        self.build_index()
+        self.save_cache()
+
     def generate_codebase(self):
         """生成代码库索引"""
-        self.clean_cache()  # 清理过期缓存
+        files_deleted = self.clean_cache()  # 清理过期缓存
         processed_files = []
         
         # 使用线程池处理文件
@@ -275,36 +319,13 @@ class CodeBase:
                     processed_files.append(result)
                     PrettyOutput.print(f"索引文件: {result}", output_type=OutputType.INFO)
 
-        if processed_files:
+        if files_deleted or processed_files:
             PrettyOutput.print("重新生成向量数据库", output_type=OutputType.INFO)
             self.gen_vector_db_from_cache()
-            self.save_vector_cache()
         else:
             PrettyOutput.print("没有新的文件变更，跳过向量数据库生成", output_type=OutputType.INFO)
             
         PrettyOutput.print(f"成功索引 {len(processed_files)} 个文件", output_type=OutputType.INFO)
-
-    def gen_vector_db_from_cache(self):
-        """从缓存生成向量数据库"""
-        self.index = faiss.IndexHNSWFlat(self.vector_dim, 16)
-        self.index.hnsw.efConstruction = 40
-        self.index.hnsw.efSearch = 16
-        
-        vectors = []
-        self.file_paths = []  # 存储文件路径列表，与向量顺序对应
-        
-        for file_path, data in self.vector_cache.items():
-            vectors.append(data["vector"].reshape(1, -1))
-            # 使用实际文件路径
-            self.file_paths.append(file_path)
-            
-        if vectors:
-            vectors = np.vstack(vectors)
-            self.index.add(vectors)
-            faiss.write_index(self.index, self.index_path)
-            # 保存文件路径列表
-            with open(os.path.join(self.data_dir, "file_paths.pkl"), "wb") as f:
-                pickle.dump(self.file_paths, f)
 
     def search_similar(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
         """搜索相似文件"""
