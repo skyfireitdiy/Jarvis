@@ -94,17 +94,17 @@ jarvis -p openai  # 使用 OpenAI 平台
 
 ### 代码修改
 ```bash
-jarvis coder --feature "添加新功能"  # 修改代码以添加新功能
+jarvis-coder --feature "添加新功能"  # 修改代码以添加新功能
 ```
 
 ### 代码库搜索
 ```bash
-jarvis codebase --search "数据库连接"  # 搜索代码库
+jarvis-codebase --search "数据库连接"  # 搜索代码库
 ```
 
 ### 代码库问答
 ```bash
-jarvis codebase --ask "如何使用数据库？"  # 询问关于代码库的问题
+jarvis-codebase --ask "如何使用数据库？"  # 询问关于代码库的问题
 ```
 
 ### 保留聊天历史
