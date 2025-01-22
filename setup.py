@@ -27,7 +27,7 @@ setup(
         "console_scripts": [
             "jarvis=jarvis.main:main",
             "jarvis-coder=jarvis.jarvis_coder.main:main",
-            "jarvis-codebase=jarvis.codebase.main:main",
+            "jarvis-codebase=jarvis.jarvis_codebase.main:main",
         ],
     },
     python_requires=">=3.8",
