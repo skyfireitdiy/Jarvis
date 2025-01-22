@@ -335,76 +335,43 @@ class CodeBase:
         model.set_suppress_output(True)
         
         try:
-            prompt = f"""请根据以下查询，生成5个意思完全相同但表述不同的句子。这些句子将用于代码搜索，所以要保持专业性和准确性。
+            prompt = f"""请根据以下查询，生成意思完全相同的另一个表述。这个表述将用于代码搜索，所以要保持专业性和准确性。
 原始查询: {query}
 
-请直接输出5个句子，每行一个，不要有编号或其他标记。
-请用<REWRITE_START>和<REWRITE_END>标签包裹你的回答。
-
-例如:
-<REWRITE_START>
-如何实现单例模式
-怎样保证类只有一个实例
-单例设计模式的实现方法
-如何确保类的实例唯一性
-实现Singleton模式的最佳实践
-<REWRITE_END>"""
+请直接输出新表述，不要有编号或其他标记。
+"""
             
-            response = model.chat(prompt)
-            # 提取<REWRITE_START>和<REWRITE_END>之间的内容
-            if "<REWRITE_START>" in response and "<REWRITE_END>" in response:
-                rewrite_content = response.split("<REWRITE_START>")[1].split("<REWRITE_END>")[0].strip()
-                queries = [query] + rewrite_content.strip().split('\n')
-            else:
-                queries = [query]  # 如果格式不正确，只使用原始查询
+            query = model.chat(prompt)
+            
         finally:
             model.delete_chat()
 
-        PrettyOutput.print(f"查询:", output_type=OutputType.INFO)
-        for q in queries:
-            PrettyOutput.print(f"  {q}", output_type=OutputType.INFO)
+        PrettyOutput.print(f"查询:  {query}", output_type=OutputType.INFO)
         
         # 为每个查询获取相似文件
         all_results = {}  # 文件路径 -> (总分数, 出现次数, 描述)
         
-        for q in queries:
-            q = q.strip()
-            if not q:  # 跳过空行
-                continue
+        q_vector = self.get_embedding(query)
+        q_vector = q_vector.reshape(1, -1)
             
-            q_vector = self.get_embedding(q)
-            q_vector = q_vector.reshape(1, -1)
-            
-            distances, indices = self.index.search(q_vector, top_k)
+        distances, indices = self.index.search(q_vector, top_k)
 
-            PrettyOutput.print(f"查询 {q} 的结果: ", output_type=OutputType.INFO)
-            
-            for i, distance in zip(indices[0], distances[0]):
-                if i == -1:  # faiss返回-1表示无效结果
-                    continue
-                    
-                similarity = 1.0 / (1.0 + float(distance))
-                PrettyOutput.print(f"  {self.file_paths[i]} : 距离 {distance:.3f}, 相似度 {similarity:.3f}", 
-                                 output_type=OutputType.INFO)
-                    
-                file_path = self.file_paths[i]
-                data = self.vector_cache[file_path]
+        PrettyOutput.print(f"查询 {query} 的结果: ", output_type=OutputType.INFO)
+
+        ret = []
+        
+        for i, distance in zip(indices[0], distances[0]):
+            if i == -1:  # faiss返回-1表示无效结果
+                continue
                 
-                if file_path in all_results:
-                    total_score, count, _ = all_results[file_path]
-                    all_results[file_path] = (total_score + similarity, count + 1, data["description"])
-                else:
-                    all_results[file_path] = (similarity, 1, data["description"])
-        
-        # 计算平均分数并排序
-        results = []
-        for file_path, (total_score, count, description) in all_results.items():
-            avg_score = total_score / count
-            results.append((file_path, avg_score, description))
-        
-        # 按平均分数排序并取top_k
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results[:top_k]
+            similarity = 1.0 / (1.0 + float(distance))
+            PrettyOutput.print(f"  {self.file_paths[i]} : 距离 {distance:.3f}, 相似度 {similarity:.3f}", 
+                                output_type=OutputType.INFO)
+                
+            file_path = self.file_paths[i]
+            data = self.vector_cache[file_path]
+            ret.append((file_path, similarity, data["description"]))
+        return ret
 
     def ask_codebase(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
         """查询代码库"""
