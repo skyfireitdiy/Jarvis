@@ -443,7 +443,7 @@ def main():
                 if result["stderr"]:
                     PrettyOutput.print(result["stderr"], OutputType.ERROR)
                 if result["error"]:
-                    PrettyOutput.print(f"错误类型: {type(result['error']).__name__}", OutputType.ERROR)
+                    PrettyOutput.print(f"错误类型: {type(result['error']).__name__}", OutputType.WARNING)
                 
         except KeyboardInterrupt:
             print("\n用户中断执行")
