@@ -96,17 +96,17 @@ jarvis -p openai  # Use OpenAI platform
 
 ### Code Modification
 ```bash
-jarvis coder --feature "Add new feature"  # Modify code to add new feature
+jarvis-coder --feature "Add new feature"  # Modify code to add new feature
 ```
 
 ### Codebase Search
 ```bash
-jarvis codebase --search "database connection"  # Search codebase
+jarvis-codebase --search "database connection"  # Search codebase
 ```
 
 ### Codebase Question
 ```bash
-jarvis codebase --ask "How to use the database?"  # Ask about codebase
+jarvis-codebase --ask "How to use the database?"  # Ask about codebase
 ```
 
 ### Keep Chat History
