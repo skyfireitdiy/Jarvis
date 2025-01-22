@@ -65,8 +65,12 @@ Jarvis supports configuration through environment variables that can be set in t
 |---------|------|--------|------|
 | JARVIS_PLATFORM | AI platform to use, supports kimi/openai/ai8 etc | kimi | Yes |
 | JARVIS_MODEL | Model name to use | - | No |
+
 | JARVIS_CODEGEN_PLATFORM | AI platform for code generation | Same as JARVIS_PLATFORM | No |
 | JARVIS_CODEGEN_MODEL | Model name for code generation | Same as JARVIS_MODEL | No |
+| JARVIS_CHEAP_PLATFORM | AI platform for cheap operations | Same as JARVIS_PLATFORM | No |
+| JARVIS_CHEAP_MODEL | Model name for cheap operations | Same as JARVIS_MODEL | No |
+| JARVIS_EMBEDDING_MODEL | Embedding model for code analysis | BAAI/bge-large-zh-v1.5 | No |
 | OPENAI_API_KEY | API key for OpenAI platform | - | Required for OpenAI |
 | OPENAI_API_BASE | Base URL for OpenAI API | https://api.deepseek.com | No |
 | OPENAI_MODEL_NAME | Model name for OpenAI | deepseek-chat | No |
@@ -84,15 +88,26 @@ Jarvis supports configuration through environment variables that can be set in t
 jarvis
 ```
 
+
 ### With Specific Model
 ```bash
 jarvis -p kimi  # Use Kimi platform
 jarvis -p openai  # Use OpenAI platform
 ```
 
-### Process Files
+### Code Modification
 ```bash
-jarvis -f file1.py file2.py  # Process specific files
+jarvis coder --feature "Add new feature"  # Modify code to add new feature
+```
+
+### Codebase Search
+```bash
+jarvis codebase --search "database connection"  # Search codebase
+```
+
+### Codebase Question
+```bash
+jarvis codebase --ask "How to use the database?"  # Ask about codebase
 ```
 
 ### Keep Chat History
@@ -101,6 +116,7 @@ jarvis --keep-history  # Don't delete chat session after completion
 ```
 
 ## 🛠️ Tools
+
 
 ### Built-in Tools
 
@@ -111,10 +127,13 @@ jarvis --keep-history  # Don't delete chat session after completion
 | generate_tool | AI-powered tool generation and integration |
 | methodology | Experience accumulation and methodology management |
 | create_sub_agent | Create specialized sub-agents for specific tasks |
+| coder | Automatic code modification and generation tool |
+| codebase | Codebase management and search tool |
 
 ### Tool Locations
 - Built-in tools: `src/jarvis/tools/`
 - User tools: `~/.jarvis_tools/`
+
 
 ### Key Features
 
@@ -122,16 +141,29 @@ jarvis --keep-history  # Don't delete chat session after completion
 - Tool generation through natural language description
 - Automatic code generation and integration
 - Dynamic capability expansion through sub-agents
+- Automatic code modification with version control
+- Codebase indexing and semantic search
 
 #### 2. Methodology Learning
 - Automatic experience accumulation from interactions
 - Pattern recognition and methodology extraction
 - Continuous refinement through usage
+- Code modification history tracking
+- Codebase analysis and documentation generation
 
 #### 3. Adaptive Problem Solving
 - Context-aware sub-agent creation
 - Dynamic tool composition
 - Learning from execution feedback
+- Codebase-aware problem solving
+- Multi-model collaboration for complex tasks
+
+#### 4. Code Intelligence
+- Automatic codebase indexing
+- Semantic code search
+- Code modification with git integration
+- Code analysis and documentation
+- Multi-model code generation
 
 ## 🎯 Extending Jarvis
 
