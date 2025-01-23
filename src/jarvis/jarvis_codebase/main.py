@@ -377,10 +377,12 @@ class CodeBase:
                 try:
                     file_path, score_str = line.split(':', 1)
                     file_path = file_path.strip()
-                    score = float(score_str.strip())
-                    # 找到对应的原始描述
-                    desc = next((desc for p, _, desc in initial_results if p == file_path), "")
-                    scored_results.append((file_path, score/100.0, desc))
+                    score = float(score_str.strip()) / 100.0  # 转换为0-1范围
+                    # 只保留相关度大于等于0.7的结果
+                    if score >= 0.7:
+                        # 找到对应的原始描述
+                        desc = next((desc for p, _, desc in initial_results if p == file_path), "")
+                        scored_results.append((file_path, score, desc))
                 except:
                     continue
             
@@ -413,8 +415,6 @@ class CodeBase:
         PrettyOutput.print(f"查询:  {query}", output_type=OutputType.INFO)
         
         # 为每个查询获取相似文件
-        all_results = {}  # 文件路径 -> (总分数, 出现次数, 描述)
-        
         q_vector = self.get_embedding(query)
         q_vector = q_vector.reshape(1, -1)
             
@@ -429,12 +429,18 @@ class CodeBase:
                 continue
                 
             similarity = 1.0 / (1.0 + float(distance))
-            PrettyOutput.print(f"  {self.file_paths[i]} : 距离 {distance:.3f}, 相似度 {similarity:.3f}", 
-                                output_type=OutputType.INFO)
+            # 只保留相似度大于等于0.5的结果
+            if similarity >= 0.5:
+                PrettyOutput.print(f"  {self.file_paths[i]} : 距离 {distance:.3f}, 相似度 {similarity:.3f}", 
+                                 output_type=OutputType.INFO)
                 
-            file_path = self.file_paths[i]
-            data = self.vector_cache[file_path]
-            initial_results.append((file_path, similarity, data["description"]))
+                file_path = self.file_paths[i]
+                data = self.vector_cache[file_path]
+                initial_results.append((file_path, similarity, data["description"]))
+
+        if not initial_results:
+            PrettyOutput.print("没有找到相似度大于0.5的文件", output_type=OutputType.WARNING)
+            return []
 
         # 使用大模型重新排序
         PrettyOutput.print("使用大模型重新排序...", output_type=OutputType.INFO)
