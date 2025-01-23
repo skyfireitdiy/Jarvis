@@ -328,7 +328,7 @@ class CodeBase:
             
         PrettyOutput.print(f"成功为 {len(processed_files)} 个文件生成索引", output_type=OutputType.INFO)
 
-    def search_similar(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
+    def search_similar(self, query: str, top_k: int = 20) -> List[Tuple[str, float, str]]:
         """搜索相似文件"""
         model = self.platform_registry.create_platform(self.normal_platform)
         model.set_model_name(self.normal_model)
@@ -385,6 +385,9 @@ class CodeBase:
 """
         for path, _, _ in results:
             try:
+                if len(content) > 30 * 1024:
+                    PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{path}", OutputType.INFO)
+                    continue
                 content = open(path, "r", encoding="utf-8").read()
                 prompt += f"""
 文件路径: {path}
@@ -414,7 +417,7 @@ class CodeBase:
 def main():
     parser = argparse.ArgumentParser(description='Codebase management and search tool')
     parser.add_argument('--search', type=str, help='Search query to find similar code files')
-    parser.add_argument('--top-k', type=int, default=5, help='Number of results to return (default: 5)')
+    parser.add_argument('--top-k', type=int, default=20, help='Number of results to return (default: 20)')
     parser.add_argument('--ask', type=str, help='Ask a question about the codebase')
     args = parser.parse_args()
     

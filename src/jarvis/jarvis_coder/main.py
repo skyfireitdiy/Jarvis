@@ -152,6 +152,9 @@ class JarvisCoder:
 文件列表如下：
 """
         for i, file in enumerate(related_files):
+            if len(prompt) > 30 * 1024:
+                PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{file["file_path"]}", OutputType.INFO)
+                continue
             prompt += f"""{i}. {file["file_path"]}\n"""
             prompt += f"""文件内容:\n"""
             prompt += f"<FILE_CONTENT_START>\n"
