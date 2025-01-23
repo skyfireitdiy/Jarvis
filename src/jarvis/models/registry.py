@@ -121,7 +121,7 @@ class PlatformRegistry:
                             # 检查平台实现
                             if not PlatformRegistry.check_platform_implementation(obj):
                                 continue
-                            PrettyOutput.print(f"从 {filename} 加载平台：{obj.platform_name}", OutputType.SUCCESS)
+                            PrettyOutput.print(f"从 {os.path.join(directory, filename)} 加载平台：{obj.platform_name}", OutputType.SUCCESS)
                             platforms[obj.platform_name] = obj
                             break
                 except Exception as e:
