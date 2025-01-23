@@ -308,14 +308,28 @@ class JarvisCoder:
 
 
 
+
     def _prepare_execution(self) -> None:
         """准备执行环境"""
         self.main_model = self._new_model()
-        self._codebase.generate_codebase()
+        
+        # 询问用户是否更新索引数据库
+        answer = get_multiline_input("是否要更新代码库索引数据库？(y/n)")
+        if answer.lower() == 'y':
+            PrettyOutput.print("正在更新代码库索引数据库...", OutputType.PROGRESS)
+            self._codebase.generate_codebase()
+        else:
+            PrettyOutput.print("跳过代码库索引数据库更新", OutputType.INFO)
+
 
     def _load_related_files(self, feature: str) -> List[Dict]:
         """加载相关文件内容"""
         ret = []
+        # 确保索引数据库已生成
+        if not self._codebase.is_index_generated():
+            PrettyOutput.print("检测到索引数据库未生成，正在生成...", OutputType.WARNING)
+            self._codebase.generate_codebase()
+            
         related_files = self._codebase.search_similar(feature)
         for file, score, _ in related_files:
             PrettyOutput.print(f"相关文件: {file} 相关度: {score:.3f}", OutputType.SUCCESS)
