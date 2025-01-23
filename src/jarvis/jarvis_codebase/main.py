@@ -385,12 +385,12 @@ class CodeBase:
 """
         for path, _, _ in results:
             try:
-                if len(content) > 30 * 1024:
+                if len(prompt) > 30 * 1024:
                     PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{path}", OutputType.INFO)
                     continue
                 content = open(path, "r", encoding="utf-8").read()
                 prompt += f"""
-文件路径: {path}
+文件路径: {path}prompt
 文件内容:
 {content}
 ========================================
