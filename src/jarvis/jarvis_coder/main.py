@@ -377,8 +377,9 @@ class JarvisCoder:
                 patches = self._remake_patch(retry_prompt)
 
 
+
     def _generate_commit_message(self, patches: List[str]) -> str:
-        """根据补丁内容生成commit信息
+        """根据补丁内容和git diff生成commit信息
         
         Args:
             patches: 补丁列表
@@ -386,13 +387,20 @@ class JarvisCoder:
         Returns:
             str: 生成的commit信息
         """
+        # 获取git diff --cached的输出
+        git_diff = os.popen("git diff --cached").read()
+        
         # 生成提示词
         prompt = """你是一个经验丰富的程序员，请根据以下代码变更生成简洁明了的commit信息：
 
 代码变更：
 """
+        # 添加git diff内容
+        prompt += f"Git Diff:\n{git_diff}\n\n"
+        
+        # 添加patch内容
         for patch in patches:
-            prompt += f"{patch}\n\n"
+            prompt += f"Patch:\n{patch}\n\n"
             
         prompt += """
 请遵循以下规则：
@@ -400,6 +408,7 @@ class JarvisCoder:
 2. 采用常规的commit message格式：<type>(<scope>): <subject>
 3. 保持简洁，不超过50个字符
 4. 准确描述代码变更的主要内容
+5. 优先考虑git diff中的变更内容
 """
         
         # 使用normal模型生成commit信息
