@@ -45,8 +45,11 @@ class CodebaseQATool:
                     "stderr": "错误：当前目录不在Git仓库中",
                     "error": "NotInGitRepository"
                 }
+
             os.chdir(root_dir)
             codebase = CodeBase(root_dir)
+            # 生成索引
+            codebase.generate_codebase()
             # 执行问答
             response = codebase.ask_codebase(question, top_k)
             os.chdir(current_dir)
