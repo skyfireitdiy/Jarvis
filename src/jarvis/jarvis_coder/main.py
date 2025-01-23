@@ -378,8 +378,9 @@ class JarvisCoder:
 
 
 
+
     def _generate_commit_message(self, patches: List[str]) -> str:
-        """根据补丁内容和git diff生成commit信息
+        """根据git diff生成commit信息
         
         Args:
             patches: 补丁列表
@@ -397,10 +398,6 @@ class JarvisCoder:
 """
         # 添加git diff内容
         prompt += f"Git Diff:\n{git_diff}\n\n"
-        
-        # 添加patch内容
-        for patch in patches:
-            prompt += f"Patch:\n{patch}\n\n"
             
         prompt += """
 请遵循以下规则：
