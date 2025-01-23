@@ -158,7 +158,7 @@ def get_multiline_input(tip: str) -> str:
             lines.append(line)
             
     except KeyboardInterrupt:
-        PrettyOutput.print("\n输入已取消", OutputType.ERROR)
+        PrettyOutput.print("\n输入已取消", OutputType.INFO)
         return "__interrupt__"
     
     return "\n".join(lines)

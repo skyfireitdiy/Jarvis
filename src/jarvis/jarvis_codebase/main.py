@@ -18,7 +18,7 @@ class CodeBase:
         load_env_from_file()
         self.root_dir = root_dir
         os.chdir(self.root_dir)
-        self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT")) or 10
+        self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT") or 10)
         self.cheap_platform = os.environ.get("JARVIS_CHEAP_PLATFORM") or os.environ.get("JARVIS_PLATFORM") or "kimi"
         self.cheap_model = os.environ.get("JARVIS_CHEAP_MODEL") or os.environ.get("JARVIS_MODEL") or "kimi"
         self.normal_platform = os.environ.get("JARVIS_PLATFORM") or "kimi"
