@@ -141,11 +141,19 @@ class JarvisCoder:
 <<<<<<
 <PATCH_END>
 
-2. 如果是新文件，格式如下：
+2. 如果是新文件或者替换整个文件内容，格式如下：
 <PATCH_START>
 >>>>>> path/to/new/file
 =======
 新文件的完整内容
+<<<<<<
+<PATCH_END>
+
+3. 如果要删除文件中的某一段，格式如下：
+<PATCH_START>
+>>>>>> path/to/file
+要删除的内容
+=======
 <<<<<<
 <PATCH_END>
 
