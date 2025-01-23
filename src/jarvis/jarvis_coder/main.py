@@ -409,13 +409,15 @@ class JarvisCoder:
 """
         
         # 使用normal模型生成commit信息
-        model = PlatformRegistry().get_global_platform_registry().create_platform("normal")
+        model = PlatformRegistry().get_global_platform_registry().create_platform(self.platform)
+        model.set_model(self.model)
+        model.set_suppress_output(True)
         success, response = self._call_model_with_retry(model, prompt)
         if not success:
             return "Update code changes"
             
         # 清理响应内容
-        return response.strip().split("\n")[0][:50]  # 取第一行并截断到50字符
+        return response.strip().split("\n")[0]
 
     def _finalize_changes(self, feature: str, patches: List[str]) -> None:
         """完成修改并提交"""
