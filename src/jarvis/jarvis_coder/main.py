@@ -408,7 +408,7 @@ class JarvisCoder:
         
         # 使用normal模型生成commit信息
         model = PlatformRegistry().get_global_platform_registry().create_platform(self.platform)
-        model.set_model(self.model)
+        model.set_model_name(self.model)
         model.set_suppress_output(True)
         success, response = self._call_model_with_retry(model, prompt)
         if not success:
