@@ -39,6 +39,7 @@ class CodeBase:
             
         # 初始化嵌入模型，使用系统默认缓存目录
         try:
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
             PrettyOutput.print("正在加载/下载模型，请稍候...", output_type=OutputType.INFO)
             self.embedding_model = SentenceTransformer(self.embedding_model_name)
             
