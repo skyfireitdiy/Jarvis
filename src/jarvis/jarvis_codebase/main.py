@@ -312,25 +312,94 @@ class CodeBase:
 
     def generate_codebase(self):
         """生成代码库索引"""
-        files_deleted = self.clean_cache()  # 清理过期缓存
-        processed_files = []
+        # 更新 git 文件列表
+        self.git_file_list = self.get_git_file_list()
         
-        # 使用线程池处理文件
-        with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
-            futures = [executor.submit(self.process_file, file) for file in self.git_file_list]
-            for future in concurrent.futures.as_completed(futures):
-                result = future.result()
-                if result:
-                    processed_files.append(result)
-                    PrettyOutput.print(f"索引文件: {result}", output_type=OutputType.INFO)
+        # 检查文件变化
+        changes_detected = False
+        new_files = []
+        modified_files = []
+        deleted_files = []
+        
+        # 检查删除的文件
+        files_to_delete = []
+        for file_path in list(self.vector_cache.keys()):
+            if file_path not in self.git_file_list:
+                deleted_files.append(file_path)
+                files_to_delete.append(file_path)
+                changes_detected = True
+        
+        # 检查新增和修改的文件
+        for file_path in self.git_file_list:
+            if not os.path.exists(file_path) or not self.is_text_file(file_path):
+                continue
+            
+            try:
+                current_md5 = hashlib.md5(open(file_path, "rb").read()).hexdigest()
+                
+                if file_path not in self.vector_cache:
+                    new_files.append(file_path)
+                    changes_detected = True
+                elif self.vector_cache[file_path].get("md5") != current_md5:
+                    modified_files.append(file_path)
+                    changes_detected = True
+            except Exception as e:
+                PrettyOutput.print(f"检查文件失败 {file_path}: {str(e)}", 
+                                 output_type=OutputType.ERROR)
+                continue
+        
+        # 如果检测到变化，显示变化并询问用户
+        if changes_detected:
+            PrettyOutput.print("\n检测到以下变化:", output_type=OutputType.WARNING)
+            if new_files:
+                PrettyOutput.print("\n新增文件:", output_type=OutputType.INFO)
+                for f in new_files:
+                    PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
+            if modified_files:
+                PrettyOutput.print("\n修改的文件:", output_type=OutputType.INFO)
+                for f in modified_files:
+                    PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
+            if deleted_files:
+                PrettyOutput.print("\n删除的文件:", output_type=OutputType.INFO)
+                for f in deleted_files:
+                    PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
+            
+            # 询问用户是否继续
+            while True:
+                response = input("\n是否重建索引？[y/N] ").lower().strip()
+                if response in ['y', 'yes']:
+                    break
+                elif response in ['', 'n', 'no']:
+                    PrettyOutput.print("取消重建索引", output_type=OutputType.INFO)
+                    return
+                else:
+                    PrettyOutput.print("请输入 y 或 n", output_type=OutputType.WARNING)
+            
+            # 清理已删除的文件
+            for file_path in files_to_delete:
+                del self.vector_cache[file_path]
+            if files_to_delete:
+                PrettyOutput.print(f"清理了 {len(files_to_delete)} 个文件的缓存", 
+                                 output_type=OutputType.INFO)
+            
+            # 处理新文件和修改的文件
+            processed_files = []
+            files_to_process = new_files + modified_files
+            
+            # 使用线程池处理文件
+            with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
+                futures = [executor.submit(self.process_file, file) for file in files_to_process]
+                for future in concurrent.futures.as_completed(futures):
+                    result = future.result()
+                    if result:
+                        processed_files.append(result)
+                        PrettyOutput.print(f"索引文件: {result}", output_type=OutputType.INFO)
 
-        if files_deleted or processed_files:
             PrettyOutput.print("重新生成向量数据库", output_type=OutputType.INFO)
             self.gen_vector_db_from_cache()
+            PrettyOutput.print(f"成功为 {len(processed_files)} 个文件生成索引", output_type=OutputType.INFO)
         else:
-            PrettyOutput.print("没有新的文件变更，跳过向量数据库生成", output_type=OutputType.INFO)
-            
-        PrettyOutput.print(f"成功为 {len(processed_files)} 个文件生成索引", output_type=OutputType.INFO)
+            PrettyOutput.print("没有检测到文件变更，无需重建索引", output_type=OutputType.INFO)
 
     def rerank_results(self, query: str, initial_results: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
         """使用大模型对搜索结果重新排序"""
