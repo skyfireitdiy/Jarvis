@@ -18,7 +18,7 @@ class CodeBase:
         load_env_from_file()
         self.root_dir = root_dir
         os.chdir(self.root_dir)
-        self.thread_count = os.environ.get("JARVIS_THREAD_COUNT") or 10
+        self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT")) or 10
         self.cheap_platform = os.environ.get("JARVIS_CHEAP_PLATFORM") or os.environ.get("JARVIS_PLATFORM") or "kimi"
         self.cheap_model = os.environ.get("JARVIS_CHEAP_MODEL") or os.environ.get("JARVIS_MODEL") or "kimi"
         self.normal_platform = os.environ.get("JARVIS_PLATFORM") or "kimi"
@@ -33,6 +33,7 @@ class CodeBase:
         PrettyOutput.print(f"代码生成模型使用平台: {self.codegen_platform} 模型: {self.codegen_model}", output_type=OutputType.INFO)
         PrettyOutput.print(f"分析模型使用平台: {self.normal_platform} 模型: {self.normal_model}", output_type=OutputType.INFO)
         PrettyOutput.print(f"嵌入模型: {self.embedding_model_name}", output_type=OutputType.INFO)
+        PrettyOutput.print(f"索引建立线程数: {self.thread_count}", output_type=OutputType.INFO)
         PrettyOutput.print(f"检索算法：分层导航小世界算法", output_type=OutputType.INFO)
             
         # 初始化数据目录
