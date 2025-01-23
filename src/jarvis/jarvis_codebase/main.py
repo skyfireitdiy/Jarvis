@@ -328,6 +328,66 @@ class CodeBase:
             
         PrettyOutput.print(f"成功为 {len(processed_files)} 个文件生成索引", output_type=OutputType.INFO)
 
+    def rerank_results(self, query: str, initial_results: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
+        """使用大模型对搜索结果重新排序"""
+        if not initial_results:
+            return []
+
+        model = self.platform_registry.create_platform(self.normal_platform)
+        model.set_model_name(self.normal_model)
+        model.set_suppress_output(True)
+
+        try:
+            # 构建重排序的prompt
+            prompt = f"""请根据用户的查询，对以下代码文件进行相关性排序。对每个文件给出0-100的相关性分数，分数越高表示越相关。
+只需要输出每个文件的分数，格式为：
+<RERANK_START>
+文件路径: 分数
+文件路径: 分数
+<RERANK_END>
+
+用户查询: {query}
+
+待评估文件:
+"""
+            for path, _, desc in initial_results:
+                prompt += f"""
+文件: {path}
+描述: {desc}
+---
+"""
+            
+            response = model.chat(prompt)
+            
+            # 提取<RERANK_START>和<RERANK_END>之间的内容
+            start_tag = "<RERANK_START>"
+            end_tag = "<RERANK_END>"
+            if start_tag in response and end_tag in response:
+                response = response[response.find(start_tag) + len(start_tag):response.find(end_tag)]
+            
+            # 解析响应，提取文件路径和分数
+            scored_results = []
+            for line in response.split('\n'):
+                if ':' not in line:
+                    continue
+                try:
+                    file_path, score_str = line.split(':', 1)
+                    file_path = file_path.strip()
+                    score = float(score_str.strip())
+                    # 找到对应的原始描述
+                    desc = next((desc for p, _, desc in initial_results if p == file_path), "")
+                    scored_results.append((file_path, score/100.0, desc))
+                except:
+                    continue
+            
+            # 按分数降序排序
+            return sorted(scored_results, key=lambda x: x[1], reverse=True)
+            
+        finally:
+            model.delete_chat()
+        
+        return initial_results
+
     def search_similar(self, query: str, top_k: int = 20) -> List[Tuple[str, float, str]]:
         """搜索相似文件"""
         model = self.platform_registry.create_platform(self.normal_platform)
@@ -358,7 +418,7 @@ class CodeBase:
 
         PrettyOutput.print(f"查询 {query} 的结果: ", output_type=OutputType.INFO)
 
-        ret = []
+        initial_results = []
         
         for i, distance in zip(indices[0], distances[0]):
             if i == -1:  # faiss返回-1表示无效结果
@@ -370,10 +430,15 @@ class CodeBase:
                 
             file_path = self.file_paths[i]
             data = self.vector_cache[file_path]
-            ret.append((file_path, similarity, data["description"]))
-        return ret
+            initial_results.append((file_path, similarity, data["description"]))
 
-    def ask_codebase(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
+        # 使用大模型重新排序
+        PrettyOutput.print("使用大模型重新排序...", output_type=OutputType.INFO)
+        reranked_results = self.rerank_results(query, initial_results)
+        
+        return reranked_results
+
+    def ask_codebase(self, query: str, top_k: int=20) -> str:
         """查询代码库"""
         results = self.search_similar(query, top_k)
         PrettyOutput.print(f"找到的关联文件: ", output_type=OutputType.SUCCESS)
