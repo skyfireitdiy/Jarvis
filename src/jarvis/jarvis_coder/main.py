@@ -346,7 +346,7 @@ class JarvisCoder:
             if success:
                 user_confirm = input("是否确认修改？(y/n)")
                 if user_confirm.lower() == "y":
-                    self._finalize_changes(feature, patches)
+                    self._finalize_changes(feature)
                     return {
                         "success": True,
                         "stdout": f"已完成功能开发{feature}",
@@ -379,18 +379,22 @@ class JarvisCoder:
 
 
 
-    def _generate_commit_message(self, git_diff: str) -> str:
-        """根据git diff生成commit信息
+    def _generate_commit_message(self, git_diff: str, feature: str) -> str:
+        """根据git diff和功能描述生成commit信息
         
         Args:
             git_diff: git diff --cached的输出
+            feature: 用户的功能描述
             
         Returns:
             str: 生成的commit信息
         """
         
         # 生成提示词
-        prompt = """你是一个经验丰富的程序员，请根据以下代码变更生成简洁明了的commit信息：
+        prompt = f"""你是一个经验丰富的程序员，请根据以下代码变更和功能描述生成简洁明了的commit信息：
+
+功能描述：
+{feature}
 
 代码变更：
 """
@@ -403,7 +407,7 @@ class JarvisCoder:
 2. 采用常规的commit message格式：<type>(<scope>): <subject>
 3. 保持简洁，不超过50个字符
 4. 准确描述代码变更的主要内容
-5. 优先考虑git diff中的变更内容
+5. 优先考虑功能描述和git diff中的变更内容
 """
         
         # 使用normal模型生成commit信息
@@ -417,14 +421,18 @@ class JarvisCoder:
         # 清理响应内容
         return response.strip().split("\n")[0]
 
-    def _finalize_changes(self, feature: str, patches: List[str]) -> None:
+    def _finalize_changes(self, feature: str) -> None:
         """完成修改并提交"""
         PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
 
+        # 只添加已经在 git 控制下的修改文件
+        os.system("git add -u")
+        
+        # 然后获取 git diff
         git_diff = os.popen("git diff --cached").read()
         
-        # 自动生成commit信息
-        commit_message = self._generate_commit_message(git_diff)
+        # 自动生成commit信息，传入feature
+        commit_message = self._generate_commit_message(git_diff, feature)
         
         # 显示并确认commit信息
         PrettyOutput.print(f"自动生成的commit信息: {commit_message}", OutputType.INFO)
@@ -433,7 +441,7 @@ class JarvisCoder:
         if user_confirm.lower() != "y":
             commit_message = input("请输入新的commit信息: ")
         
-        os.system(f"git add .")
+        # 不需要再次 git add，因为已经添加过了
         os.system(f"git commit -m '{commit_message}'")
         self._save_edit_record(commit_message, git_diff)
 
