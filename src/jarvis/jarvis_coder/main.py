@@ -138,7 +138,7 @@ class JarvisCoder:
 要替换的内容
 =======
 新的内容
-<<<<<<
+>>>>>>
 <PATCH_END>
 
 2. 如果是新文件或者替换整个文件内容，格式如下：
@@ -146,7 +146,7 @@ class JarvisCoder:
 >>>>>> path/to/new/file
 =======
 新文件的完整内容
-<<<<<<
+>>>>>>
 <PATCH_END>
 
 3. 如果要删除文件中的某一段，格式如下：
@@ -154,7 +154,7 @@ class JarvisCoder:
 >>>>>> path/to/file
 要删除的内容
 =======
-<<<<<<
+>>>>>>
 <PATCH_END>
 
 文件列表如下：
@@ -227,7 +227,7 @@ class JarvisCoder:
                     return False, "\n".join(error_info)
                 
                 old_content = parts[0]
-                new_content = parts[1].split("<<<<<<")[0]
+                new_content = parts[1].split(">>>>>>")[0]
                 
                 # 处理新文件
                 if not old_content:
