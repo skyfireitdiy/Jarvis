@@ -310,8 +310,12 @@ class CodeBase:
         self.build_index()
         self.save_cache()
 
-    def generate_codebase(self):
-        """生成代码库索引"""
+
+    def generate_codebase(self, force: bool = False):
+        """生成代码库索引
+        Args:
+            force: 是否强制重建索引，不询问用户
+        """
         # 更新 git 文件列表
         self.git_file_list = self.get_git_file_list()
         
@@ -364,16 +368,19 @@ class CodeBase:
                 for f in deleted_files:
                     PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
             
-            # 询问用户是否继续
-            while True:
-                response = input("\n是否重建索引？[y/N] ").lower().strip()
-                if response in ['y', 'yes']:
-                    break
-                elif response in ['', 'n', 'no']:
-                    PrettyOutput.print("取消重建索引", output_type=OutputType.INFO)
-                    return
-                else:
-                    PrettyOutput.print("请输入 y 或 n", output_type=OutputType.WARNING)
+
+            # 如果force为True，直接继续
+            if not force:
+                # 询问用户是否继续
+                while True:
+                    response = input("\n是否重建索引？[y/N] ").lower().strip()
+                    if response in ['y', 'yes']:
+                        break
+                    elif response in ['', 'n', 'no']:
+                        PrettyOutput.print("取消重建索引", output_type=OutputType.INFO)
+                        return
+                    else:
+                        PrettyOutput.print("请输入 y 或 n", output_type=OutputType.WARNING)
             
             # 清理已删除的文件
             for file_path in files_to_delete:
@@ -600,9 +607,10 @@ def main():
         PrettyOutput.print("索引尚未生成，请先运行 --generate 生成索引", output_type=OutputType.WARNING)
         return
 
+
     if args.generate:
         try:
-            codebase.generate_codebase()
+            codebase.generate_codebase(force=True)
             PrettyOutput.print("\nCodebase generation completed", output_type=OutputType.SUCCESS)
         except Exception as e:
             PrettyOutput.print(f"Error during codebase generation: {str(e)}", output_type=OutputType.ERROR)

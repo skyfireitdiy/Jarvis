@@ -49,7 +49,8 @@ class CodebaseQATool:
             os.chdir(root_dir)
             codebase = CodeBase(root_dir)
             # 生成索引
-            codebase.generate_codebase()
+
+            codebase.generate_codebase(force=True)
             # 执行问答
             response = codebase.ask_codebase(question, top_k)
             os.chdir(current_dir)
