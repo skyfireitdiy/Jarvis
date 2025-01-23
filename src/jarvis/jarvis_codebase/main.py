@@ -22,12 +22,15 @@ class CodeBase:
         self.cheap_platform = os.environ.get("JARVIS_CHEAP_PLATFORM") or os.environ.get("JARVIS_PLATFORM") or "kimi"
         self.cheap_model = os.environ.get("JARVIS_CHEAP_MODEL") or os.environ.get("JARVIS_MODEL") or "kimi"
         self.normal_platform = os.environ.get("JARVIS_PLATFORM") or "kimi"
+        self.codegen_platform = os.environ.get("JARVIS_CODEGEN_PLATFORM") or os.environ.get("JARVIS_PLATFORM") or "kimi"
+        self.codegen_model = os.environ.get("JARVIS_CODEGEN_MODEL") or os.environ.get("JARVIS_MODEL") or "kimi"
         self.normal_model = os.environ.get("JARVIS_MODEL") or "kimi"
         self.embedding_model_name = os.environ.get("JARVIS_EMBEDDING_MODEL") or "BAAI/bge-large-zh-v1.5"
-        if not self.cheap_platform or not self.cheap_model or not self.embedding_model_name or not self.normal_platform or not self.normal_model:
-            raise ValueError("JARVIS_CHEAP_PLATFORM or JARVIS_CHEAP_MODEL or JARVIS_EMBEDDING_MODEL or JARVIS_PLATFORM or JARVIS_MODEL is not set")
+        if not self.cheap_platform or not self.cheap_model or not self.codegen_platform or not self.codegen_model or not self.embedding_model_name or not self.normal_platform or not self.normal_model:
+            raise ValueError("JARVIS_CHEAP_PLATFORM or JARVIS_CHEAP_MODEL or JARVIS_CODEGEN_PLATFORM or JARVIS_CODEGEN_MODEL or JARVIS_EMBEDDING_MODEL or JARVIS_PLATFORM or JARVIS_MODEL is not set")
         
         PrettyOutput.print(f"廉价模型使用平台: {self.cheap_platform} 模型: {self.cheap_model}", output_type=OutputType.INFO)
+        PrettyOutput.print(f"代码生成模型使用平台: {self.codegen_platform} 模型: {self.codegen_model}", output_type=OutputType.INFO)
         PrettyOutput.print(f"分析模型使用平台: {self.normal_platform} 模型: {self.normal_model}", output_type=OutputType.INFO)
         PrettyOutput.print(f"嵌入模型: {self.embedding_model_name}", output_type=OutputType.INFO)
         PrettyOutput.print(f"检索算法：分层导航小世界算法", output_type=OutputType.INFO)
@@ -470,8 +473,8 @@ class CodeBase:
 
 请用专业的语言回答用户的问题，如果给出的文件内容不足以回答用户的问题，请告诉用户，绝对不要胡编乱造。
 """
-        model = self.platform_registry.create_platform(self.normal_platform)
-        model.set_model_name(self.normal_model)
+        model = self.platform_registry.create_platform(self.codegen_platform)
+        model.set_model_name(self.codegen_model)
         try:
             response = model.chat(prompt)
             return response
