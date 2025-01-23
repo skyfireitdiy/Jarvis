@@ -489,21 +489,25 @@ class CodeBase:
             model.delete_chat()
 
 
+
 def main():
     parser = argparse.ArgumentParser(description='Codebase management and search tool')
     parser.add_argument('--search', type=str, help='Search query to find similar code files')
     parser.add_argument('--top-k', type=int, default=20, help='Number of results to return (default: 20)')
     parser.add_argument('--ask', type=str, help='Ask a question about the codebase')
+    parser.add_argument('--generate', action='store_true', help='Generate codebase index')
     args = parser.parse_args()
     
     current_dir = find_git_root()
     codebase = CodeBase(current_dir)
 
-    try:
-        codebase.generate_codebase()
-        PrettyOutput.print("\nCodebase generation completed", output_type=OutputType.SUCCESS)
-    except Exception as e:
-        PrettyOutput.print(f"Error during codebase generation: {str(e)}", output_type=OutputType.ERROR)
+
+    if args.generate:
+        try:
+            codebase.generate_codebase()
+            PrettyOutput.print("\nCodebase generation completed", output_type=OutputType.SUCCESS)
+        except Exception as e:
+            PrettyOutput.print(f"Error during codebase generation: {str(e)}", output_type=OutputType.ERROR)
     
     if args.search:
         results = codebase.search_similar(args.search, args.top_k)
