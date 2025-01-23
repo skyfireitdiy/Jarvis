@@ -316,7 +316,7 @@ class JarvisCoder:
     def _load_related_files(self, feature: str) -> List[Dict]:
         """加载相关文件内容"""
         ret = []
-        related_files = self._codebase.search_similar(feature, top_k=5)
+        related_files = self._codebase.search_similar(feature)
         for file, score, _ in related_files:
             PrettyOutput.print(f"相关文件: {file} 相关度: {score:.3f}", OutputType.SUCCESS)
             with open(file, "r", encoding="utf-8") as f:
