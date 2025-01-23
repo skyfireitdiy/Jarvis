@@ -557,6 +557,31 @@ class CodeBase:
         finally:
             model.delete_chat()
 
+    def is_index_generated(self) -> bool:
+        """检查索引是否已经生成"""
+        # 检查缓存文件是否存在
+        if not os.path.exists(self.cache_path):
+            return False
+        
+        # 检查缓存是否有效
+        try:
+            with open(self.cache_path, 'rb') as f:
+                cache_data = pickle.load(f)
+                if not cache_data.get("vectors") or not cache_data.get("file_paths"):
+                    return False
+        except Exception:
+            return False
+        
+        # 检查索引是否已构建
+        if not hasattr(self, 'index') or self.index is None:
+            return False
+        
+        # 检查向量缓存和文件路径列表是否非空
+        if not self.vector_cache or not self.file_paths:
+            return False
+        
+        return True
+
 
 
 def main():
@@ -570,6 +595,10 @@ def main():
     current_dir = find_git_root()
     codebase = CodeBase(current_dir)
 
+    # 如果没有生成索引，且不是生成命令，提示用户先生成索引
+    if not codebase.is_index_generated() and not args.generate:
+        PrettyOutput.print("索引尚未生成，请先运行 --generate 生成索引", output_type=OutputType.WARNING)
+        return
 
     if args.generate:
         try:
