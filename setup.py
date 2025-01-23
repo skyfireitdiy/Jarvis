@@ -22,6 +22,7 @@ setup(
         "numpy>=1.24.0",
         "faiss-cpu>=1.8.0",
         "sentence-transformers>=2.2.2",
+        "bs4>=0.0.1",
     ],
     entry_points={
         "console_scripts": [
