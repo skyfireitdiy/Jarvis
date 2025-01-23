@@ -376,7 +376,7 @@ class CodeBase:
     def ask_codebase(self, query: str, top_k: int = 5) -> List[Tuple[str, float, str]]:
         """查询代码库"""
         results = self.search_similar(query, top_k)
-        PrettyOutput.print(f"找到的关联文件: ", output_type=OutputType.INFO)
+        PrettyOutput.print(f"找到的关联文件: ", output_type=OutputType.SUCCESS)
         for path, score, _ in results:
             PrettyOutput.print(f"文件: {path} 关联度: {score:.3f}", 
                              output_type=OutputType.INFO)
@@ -386,7 +386,7 @@ class CodeBase:
         for path, _, _ in results:
             try:
                 if len(prompt) > 30 * 1024:
-                    PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{path}", OutputType.INFO)
+                    PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{path}", OutputType.WARNING)
                     continue
                 content = open(path, "r", encoding="utf-8").read()
                 prompt += f"""

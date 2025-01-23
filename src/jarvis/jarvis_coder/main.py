@@ -124,7 +124,7 @@ class JarvisCoder:
             return [patch.replace('<PATCH_START>', '').replace('<PATCH_END>', '').strip() 
                    for patch in patches if patch.strip()]
         except Exception as e:
-            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
             return []
         
     def _make_patch(self, related_files: List[Dict], feature: str) -> List[str]:
@@ -153,7 +153,7 @@ class JarvisCoder:
 """
         for i, file in enumerate(related_files):
             if len(prompt) > 30 * 1024:
-                PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{file["file_path"]}", OutputType.INFO)
+                PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{file["file_path"]}", OutputType.WARNING)
                 continue
             prompt += f"""{i}. {file["file_path"]}\n"""
             prompt += f"""文件内容:\n"""
@@ -180,7 +180,7 @@ class JarvisCoder:
             return [patch.replace('<PATCH_START>', '').replace('<PATCH_END>', '').strip() 
                    for patch in patches if patch.strip()]
         except Exception as e:
-            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
             return []
 
     def _apply_patch(self, related_files: List[Dict], patches: List[str]) -> Tuple[bool, str]:
@@ -310,7 +310,7 @@ class JarvisCoder:
         ret = []
         related_files = self._codebase.search_similar(feature, top_k=5)
         for file, score, _ in related_files:
-            PrettyOutput.print(f"相关文件: {file} 相关度: {score:.3f}", OutputType.INFO)
+            PrettyOutput.print(f"相关文件: {file} 相关度: {score:.3f}", OutputType.SUCCESS)
             with open(file, "r", encoding="utf-8") as f:
                 content = f.read()
             ret.append({"file_path": file, "file_content": content})
@@ -441,7 +441,7 @@ def main():
                 PrettyOutput.print(result["stdout"], OutputType.SUCCESS)
             else:
                 if result["stderr"]:
-                    PrettyOutput.print(result["stderr"], OutputType.ERROR)
+                    PrettyOutput.print(result["stderr"], OutputType.WARNING)
                 if result["error"]:
                     PrettyOutput.print(f"错误类型: {type(result['error']).__name__}", OutputType.WARNING)
                 
