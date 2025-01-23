@@ -376,11 +376,57 @@ class JarvisCoder:
 """
                 patches = self._remake_patch(retry_prompt)
 
+
+    def _generate_commit_message(self, patches: List[str]) -> str:
+        """根据补丁内容生成commit信息
+        
+        Args:
+            patches: 补丁列表
+            
+        Returns:
+            str: 生成的commit信息
+        """
+        # 生成提示词
+        prompt = """你是一个经验丰富的程序员，请根据以下代码变更生成简洁明了的commit信息：
+
+代码变更：
+"""
+        for patch in patches:
+            prompt += f"{patch}\n\n"
+            
+        prompt += """
+请遵循以下规则：
+1. 使用英文编写
+2. 采用常规的commit message格式：<type>(<scope>): <subject>
+3. 保持简洁，不超过50个字符
+4. 准确描述代码变更的主要内容
+"""
+        
+        # 使用normal模型生成commit信息
+        model = PlatformRegistry().get_global_platform_registry().create_platform("normal")
+        success, response = self._call_model_with_retry(model, prompt)
+        if not success:
+            return "Update code changes"
+            
+        # 清理响应内容
+        return response.strip().split("\n")[0][:50]  # 取第一行并截断到50字符
+
     def _finalize_changes(self, feature: str, patches: List[str]) -> None:
         """完成修改并提交"""
         PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
+        
+        # 自动生成commit信息
+        commit_message = self._generate_commit_message(patches)
+        
+        # 显示并确认commit信息
+        PrettyOutput.print(f"自动生成的commit信息: {commit_message}", OutputType.INFO)
+        user_confirm = input("是否使用该commit信息？(y/n) [y]: ") or "y"
+        
+        if user_confirm.lower() != "y":
+            commit_message = input("请输入新的commit信息: ")
+        
         os.system(f"git add .")
-        os.system(f"git commit -m '{feature}'")
+        os.system(f"git commit -m '{commit_message}'")
         self._save_edit_record(feature, patches)
 
     def _revert_changes(self) -> None:
