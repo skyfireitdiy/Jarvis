@@ -313,13 +313,19 @@ class JarvisCoder:
         """准备执行环境"""
         self.main_model = self._new_model()
         
+
         # 询问用户是否更新索引数据库
-        answer = get_multiline_input("是否要更新代码库索引数据库？(y/n)")
-        if answer.lower() == 'y':
-            PrettyOutput.print("正在更新代码库索引数据库...", OutputType.PROGRESS)
-            self._codebase.generate_codebase()
-        else:
-            PrettyOutput.print("跳过代码库索引数据库更新", OutputType.INFO)
+        while True:
+            answer = get_multiline_input("是否要更新代码库索引数据库？(y/n)").strip().lower()
+            if answer == 'y':
+                PrettyOutput.print("正在更新代码库索引数据库...", OutputType.PROGRESS)
+                self._codebase.generate_codebase()
+                break
+            elif answer == 'n' or not answer:
+                PrettyOutput.print("跳过代码库索引数据库更新", OutputType.INFO)
+                break
+            else:
+                PrettyOutput.print("请输入 y 或 n", OutputType.WARNING)
 
 
     def _load_related_files(self, feature: str) -> List[Dict]:
