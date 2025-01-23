@@ -278,12 +278,12 @@ class JarvisCoder:
         
         return True, ""
 
-    def _save_edit_record(self, feature: str, patches: List[str]) -> None:
+    def _save_edit_record(self, commit_message: str, git_diff: str) -> None:
         """保存代码修改记录
         
         Args:
-            feature: 需求描述
-            patches: 补丁列表
+            commit_message: 提交信息
+            git_diff: git diff --cached的输出
         """
             
         # 获取下一个序号
@@ -296,8 +296,8 @@ class JarvisCoder:
         # 创建记录文件
         record = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "feature": feature,
-            "patches": patches
+            "commit_message": commit_message,
+            "git_diff": git_diff
         }
         
         record_path = os.path.join(self.record_dir, f"{next_num:04d}.yaml")
@@ -379,17 +379,15 @@ class JarvisCoder:
 
 
 
-    def _generate_commit_message(self, patches: List[str]) -> str:
+    def _generate_commit_message(self, git_diff: str) -> str:
         """根据git diff生成commit信息
         
         Args:
-            patches: 补丁列表
+            git_diff: git diff --cached的输出
             
         Returns:
             str: 生成的commit信息
         """
-        # 获取git diff --cached的输出
-        git_diff = os.popen("git diff --cached").read()
         
         # 生成提示词
         prompt = """你是一个经验丰富的程序员，请根据以下代码变更生成简洁明了的commit信息：
@@ -422,9 +420,11 @@ class JarvisCoder:
     def _finalize_changes(self, feature: str, patches: List[str]) -> None:
         """完成修改并提交"""
         PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
+
+        git_diff = os.popen("git diff --cached").read()
         
         # 自动生成commit信息
-        commit_message = self._generate_commit_message(patches)
+        commit_message = self._generate_commit_message(git_diff)
         
         # 显示并确认commit信息
         PrettyOutput.print(f"自动生成的commit信息: {commit_message}", OutputType.INFO)
@@ -435,7 +435,7 @@ class JarvisCoder:
         
         os.system(f"git add .")
         os.system(f"git commit -m '{commit_message}'")
-        self._save_edit_record(feature, patches)
+        self._save_edit_record(commit_message, git_diff)
 
     def _revert_changes(self) -> None:
         """回退所有修改"""
