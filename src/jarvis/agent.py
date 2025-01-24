@@ -176,15 +176,14 @@ class Agent:
                 for dist, idx in zip(distances[0], indices[0]):
                     if idx >= 0:
                         similarity = 1.0 / (1.0 + float(dist))
-                        if similarity >= 0.5:
-                            methodology = self.methodology_data[idx]
-                            relevant_methodologies[methodology["key"]] = methodology["value"]
+                        methodology = self.methodology_data[idx]
                         PrettyOutput.print(
                             f"方法论 '{methodology['key']}' 相似度: {similarity:.3f}",
                             OutputType.INFO
                         )
+                        if similarity >= 0.5:
+                            relevant_methodologies[methodology["key"]] = methodology["value"]
                         
-
                 if relevant_methodologies:
                     return relevant_methodologies
 
