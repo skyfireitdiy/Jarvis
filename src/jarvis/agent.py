@@ -2,6 +2,9 @@ import time
 from typing import Dict, List, Optional
 
 import yaml
+import numpy as np
+import faiss
+import json
 
 from .models.registry import PlatformRegistry
 from .tools import ToolRegistry
@@ -9,6 +12,7 @@ from .utils import PrettyOutput, OutputType, get_multiline_input, while_success
 import os
 from datetime import datetime
 from prompt_toolkit import prompt
+from sentence_transformers import SentenceTransformer
 
 class Agent:
     def __init__(self, name: str = "Jarvis", is_sub_agent: bool = False):
@@ -26,7 +30,37 @@ class Agent:
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
         self.conversation_turns = 0  
-
+        
+        # 从环境变量加载嵌入模型配置
+        self.embedding_model_name = os.environ.get("JARVIS_EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5")
+        self.embedding_dimension = 1536  # Default for many embedding models
+        
+        # 初始化嵌入模型
+        try:
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+            PrettyOutput.print(f"正在加载嵌入模型: {self.embedding_model_name}...", OutputType.INFO)
+            self.embedding_model = SentenceTransformer(self.embedding_model_name)
+            
+            # 预热模型并获取正确的维度
+            test_text = "这是一段测试文本，用于确保模型完全加载。"
+            test_embedding = self.embedding_model.encode(test_text, 
+                                                      convert_to_tensor=True,
+                                                      normalize_embeddings=True)
+            self.embedding_dimension = len(test_embedding)
+            PrettyOutput.print("嵌入模型加载完成", OutputType.SUCCESS)
+            
+            # 初始化HNSW索引（使用正确的维度）
+            hnsw_index = faiss.IndexHNSWFlat(self.embedding_dimension, 16)
+            hnsw_index.hnsw.efConstruction = 40
+            hnsw_index.hnsw.efSearch = 16
+            self.methodology_index = faiss.IndexIDMap(hnsw_index)
+            
+        except Exception as e:
+            PrettyOutput.print(f"加载嵌入模型失败: {str(e)}", OutputType.ERROR)
+            raise
+            
+        # 初始化方法论相关属性
+        self.methodology_data = []
 
     @staticmethod
     def extract_tool_calls(content: str) -> List[Dict]:
@@ -87,16 +121,77 @@ class Agent:
                     sleep_time = 30
                 continue
 
+    def _create_methodology_embedding(self, methodology_text: str) -> np.ndarray:
+        """为方法论文本创建嵌入向量"""
+        try:
+            # 对长文本进行截断
+            max_length = 512
+            text = ' '.join(methodology_text.split()[:max_length])
+            
+            # 使用sentence_transformers模型获取嵌入向量
+            embedding = self.embedding_model.encode([text], 
+                                                 convert_to_tensor=True,
+                                                 normalize_embeddings=True)
+            vector = np.array(embedding, dtype=np.float32)
+            return vector[0]  # 返回第一个向量，因为我们只编码了一个文本
+        except Exception as e:
+            PrettyOutput.print(f"创建方法论嵌入向量失败: {str(e)}", OutputType.ERROR)
+            return np.zeros(self.embedding_dimension, dtype=np.float32)
 
     def _load_methodology(self) -> Dict[str, str]:
-        """加载方法论"""
+        """加载方法论并构建向量索引"""
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
-        if os.path.exists(user_jarvis_methodology):
+        if not os.path.exists(user_jarvis_methodology):
+            return {}
+
+        try:
             with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
-            PrettyOutput.print(f"从 {user_jarvis_methodology} 加载方法论: {', '.join(data.keys())}", OutputType.INFO)
-            return data
-        return {}
+
+            # 重置数据结构
+            self.methodology_data = []
+            vectors = []
+            ids = []
+
+            # 为每个方法论创建嵌入向量
+            for i, (key, value) in enumerate(data.items()):
+                methodology_text = f"{key}\n{value}"
+                embedding = self._create_methodology_embedding(methodology_text)
+                vectors.append(embedding)
+                ids.append(i)
+                self.methodology_data.append({"key": key, "value": value})
+
+            if vectors:
+                vectors_array = np.vstack(vectors)
+                self.methodology_index.add_with_ids(vectors_array, np.array(ids))
+
+                if self.prompt:
+                    query_embedding = self._create_methodology_embedding(self.prompt)
+                    k = min(3, len(self.methodology_data))
+                    distances, indices = self.methodology_index.search(
+                        query_embedding.reshape(1, -1), k
+                    )
+
+                    relevant_methodologies = {}
+                    for dist, idx in zip(distances[0], indices[0]):
+                        if idx >= 0:
+                            similarity = 1.0 / (1.0 + float(dist))
+                            if similarity >= 0.5:
+                                methodology = self.methodology_data[idx]
+                                relevant_methodologies[methodology["key"]] = methodology["value"]
+                                PrettyOutput.print(
+                                    f"方法论 '{methodology['key']}' 相似度: {similarity:.3f}",
+                                    OutputType.INFO
+                                )
+
+                    if relevant_methodologies:
+                        return relevant_methodologies
+
+            return {}
+
+        except Exception as e:
+            PrettyOutput.print(f"加载方法论时发生错误: {str(e)}", OutputType.ERROR)
+            return {}
 
     def _summarize_and_clear_history(self) -> None:
         """总结当前对话历史并清空历史记录，只保留系统消息和总结
