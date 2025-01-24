@@ -138,7 +138,7 @@ class Agent:
             PrettyOutput.print(f"创建方法论嵌入向量失败: {str(e)}", OutputType.ERROR)
             return np.zeros(self.embedding_dimension, dtype=np.float32)
 
-    def _load_methodology(self) -> Dict[str, str]:
+    def _load_methodology(self, user_input: str) -> Dict[str, str]:
         """加载方法论并构建向量索引"""
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
         if not os.path.exists(user_jarvis_methodology):
@@ -155,6 +155,7 @@ class Agent:
 
             # 为每个方法论创建嵌入向量
             for i, (key, value) in enumerate(data.items()):
+                PrettyOutput.print(f"向量化方法论: {key} ...", OutputType.INFO)
                 methodology_text = f"{key}\n{value}"
                 embedding = self._create_methodology_embedding(methodology_text)
                 vectors.append(embedding)
@@ -164,28 +165,28 @@ class Agent:
             if vectors:
                 vectors_array = np.vstack(vectors)
                 self.methodology_index.add_with_ids(vectors_array, np.array(ids))
+                query_embedding = self._create_methodology_embedding(user_input)
+                k = min(5, len(self.methodology_data))
+                PrettyOutput.print(f"检索方法论...", OutputType.INFO)
+                distances, indices = self.methodology_index.search(
+                    query_embedding.reshape(1, -1), k
+                )
 
-                if self.prompt:
-                    query_embedding = self._create_methodology_embedding(self.prompt)
-                    k = min(3, len(self.methodology_data))
-                    distances, indices = self.methodology_index.search(
-                        query_embedding.reshape(1, -1), k
-                    )
+                relevant_methodologies = {}
+                for dist, idx in zip(distances[0], indices[0]):
+                    if idx >= 0:
+                        similarity = 1.0 / (1.0 + float(dist))
+                        if similarity >= 0.5:
+                            methodology = self.methodology_data[idx]
+                            relevant_methodologies[methodology["key"]] = methodology["value"]
+                        PrettyOutput.print(
+                            f"方法论 '{methodology['key']}' 相似度: {similarity:.3f}",
+                            OutputType.INFO
+                        )
+                        
 
-                    relevant_methodologies = {}
-                    for dist, idx in zip(distances[0], indices[0]):
-                        if idx >= 0:
-                            similarity = 1.0 / (1.0 + float(dist))
-                            if similarity >= 0.5:
-                                methodology = self.methodology_data[idx]
-                                relevant_methodologies[methodology["key"]] = methodology["value"]
-                                PrettyOutput.print(
-                                    f"方法论 '{methodology['key']}' 相似度: {similarity:.3f}",
-                                    OutputType.INFO
-                                )
-
-                    if relevant_methodologies:
-                        return relevant_methodologies
+                if relevant_methodologies:
+                    return relevant_methodologies
 
             return {}
 
@@ -306,7 +307,7 @@ class Agent:
                 self.model.upload_files(file_list)
 
             # 加载方法论
-            methodology = self._load_methodology()
+            methodology = self._load_methodology(user_input)
             methodology_prompt = ""
             if methodology:
                 methodology_prompt = f"""这是以往处理问题的标准方法论，如果当前任务与此类似，可参考：
