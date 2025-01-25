@@ -5,7 +5,7 @@ import faiss
 from typing import List, Tuple, Optional, Dict
 from sentence_transformers import SentenceTransformer
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, find_git_root
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, load_embedding_model
 from jarvis.utils import load_env_from_file
 import tiktoken
 from dataclasses import dataclass
@@ -149,9 +149,7 @@ class RAGTool:
             
         # 初始化嵌入模型
         try:
-            os.environ["TOKENIZERS_PARALLELISM"] = "false"
-            PrettyOutput.print("正在加载/下载模型，请稍候...", output_type=OutputType.INFO)
-            self.embedding_model = SentenceTransformer(self.embedding_model_name)
+            self.embedding_model = load_embedding_model(self.embedding_model_name)
             self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
             PrettyOutput.print("模型加载完成", output_type=OutputType.SUCCESS)
         except Exception as e:

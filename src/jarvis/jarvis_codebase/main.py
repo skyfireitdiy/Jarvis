@@ -7,7 +7,7 @@ from jarvis.models.registry import PlatformRegistry
 import concurrent.futures
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.utils import OutputType, PrettyOutput, find_git_root
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, load_embedding_model
 from jarvis.utils import load_env_from_file
 import argparse
 from sentence_transformers import SentenceTransformer
@@ -43,9 +43,7 @@ class CodeBase:
             
         # 初始化嵌入模型，使用系统默认缓存目录
         try:
-            os.environ["TOKENIZERS_PARALLELISM"] = "false"
-            PrettyOutput.print("正在加载/下载模型，请稍候...", output_type=OutputType.INFO)
-            self.embedding_model = SentenceTransformer(self.embedding_model_name)
+            self.embedding_model = load_embedding_model(self.embedding_model_name)
             
             # 强制完全加载所有模型组件
             test_text = """

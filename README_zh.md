@@ -65,6 +65,7 @@ Jarvis 支持通过环境变量进行配置，可以在 `~/.jarvis_env` 文件�
 |---------|------|--------|------|
 | JARVIS_PLATFORM | 使用的 AI 平台，支持 kimi/openai/ai8 等 | kimi | 是 |
 | JARVIS_MODEL | 使用的模型名称 | - | 否 |
+| JARVIS_THREAD_COUNT | 并行处理使用的线程数量 | 10 | 否 |
 | JARVIS_CODEGEN_PLATFORM | 代码生成使用的 AI 平台 | 同 JARVIS_PLATFORM | 否 |
 | JARVIS_CODEGEN_MODEL | 代码生成使用的模型名称 | 同 JARVIS_MODEL | 否 |
 | JARVIS_CHEAP_PLATFORM | 低成本操作使用的 AI 平台 | 同 JARVIS_PLATFORM | 否 |
@@ -99,12 +100,35 @@ jarvis-coder --feature "添加新功能"  # 修改代码以添加新功能
 
 ### 代码库搜索
 ```bash
-jarvis-codebase --search "数据库连接"  # 搜索代码库
+# 生成代码库索引
+jarvis-codebase --generate
+
+# 搜索相似代码
+jarvis-codebase --search "搜索关键词"
+
+# 询问代码库相关问题
+jarvis-codebase --ask "你的问题"
 ```
 
-### 代码库问答
+### 文档分析 (RAG)
 ```bash
-jarvis-codebase --ask "如何使用数据库？"  # 询问关于代码库的问题
+# 构建文档索引
+jarvis-rag --dir /path/to/documents --build
+
+# 搜索文档
+jarvis-rag --query "搜索关键词"
+```
+
+### 搜索工具
+```bash
+# 基本搜索
+jarvis-search "搜索关键词"
+
+# 仅显示网址
+jarvis-search "搜索关键词" --url-only
+
+# 限制结果数量
+jarvis-search "搜索关键词" --max 3
 ```
 
 ### 保留聊天历史
