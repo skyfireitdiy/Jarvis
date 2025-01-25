@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Operating System :: POSIX :: Linux",
 ]
 keywords = ["jarvis", "ai", "assistant", "tools", "automation"]
 dependencies = [
@@ -30,6 +31,10 @@ dependencies = [
     "faiss-cpu>=1.8.0",
     "sentence-transformers>=2.2.2",
     "bs4>=0.0.1",
+    "PyMuPDF>=1.21.0",
+    "python-docx>=0.8.11",
+    "tiktoken>=0.3.0",
+    "tqdm>=4.65.0",
 ]
 requires-python = ">=3.8"
 
@@ -43,3 +48,4 @@ Homepage = "https://github.com/skyfireitdiy/Jarvis"
 jarvis = "jarvis.main:main"
 jarvis-coder = "jarvis.jarvis_coder.main:main"
 jarvis-codebase = "jarvis.jarvis_codebase.main:main"
+jarvis-rag = "jarvis.rag.main:main"
