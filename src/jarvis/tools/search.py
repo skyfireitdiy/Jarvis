@@ -86,7 +86,7 @@ class SearchTool:
 
     def __init__(self):
         """初始化搜索工具，需要传入语言模型用于信息提取"""
-        self.model = PlatformRegistry.get_global_platform_registry().get_global_platform()
+        self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         self.webpage_tool = WebpageTool()
 
     def _search(self, query: str, max_results: int) -> List[Dict]:

@@ -152,14 +152,26 @@ class PlatformRegistry:
         """
         self.platforms: Dict[str, Type[BasePlatform]] = {}
 
-    @staticmethod
-    def get_global_platform() -> BasePlatform:
-        """获取全局平台实例"""
-        platform = PlatformRegistry.get_global_platform_registry().create_platform(PlatformRegistry.global_platform_name)
-        if not platform:
-            raise Exception(f"Failed to create platform: {PlatformRegistry.global_platform_name}")
+    def get_normal_platform(self) -> BasePlatform:
+        platform_name = os.environ.get("JARVIS_PLATFORM", "kimi")
+        model_name = os.environ.get("JARVIS_MODEL", "kimi")
+        platform = self.create_platform(platform_name)
+        platform.set_model_name(model_name)
         return platform
-        
+    
+    def get_codegen_platform(self) -> BasePlatform:
+        platform_name = os.environ.get("JARVIS_CODEGEN_PLATFORM", os.environ.get("JARVIS_PLATFORM", "kimi"))
+        model_name = os.environ.get("JARVIS_CODEGEN_MODEL", os.environ.get("JARVIS_MODEL", "kimi"))
+        platform = self.create_platform(platform_name)
+        platform.set_model_name(model_name)
+        return platform
+    
+    def get_cheap_platform(self) -> BasePlatform:
+        platform_name = os.environ.get("JARVIS_CHEAP_PLATFORM", os.environ.get("JARVIS_PLATFORM", "kimi"))
+        model_name = os.environ.get("JARVIS_CHEAP_MODEL", os.environ.get("JARVIS_MODEL", "kimi"))
+        platform = self.create_platform(platform_name)
+        platform.set_model_name(model_name)
+        return platform
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]):
         """注册平台类
@@ -195,10 +207,3 @@ class PlatformRegistry:
         """获取可用平台列表"""
         return list(self.platforms.keys()) 
     
-    def set_global_platform_name(self, platform_name: str):
-        """设置全局平台"""
-        PlatformRegistry.global_platform_name = platform_name
-
-    def get_global_platform_name(self) -> str:
-        """获取全局平台名称"""
-        return PlatformRegistry.global_platform_name
