@@ -412,7 +412,8 @@ class RAGTool:
             文档和相似度得分的列表
         """
         if not self.index:
-            raise ValueError("索引未构建，请先调用build_index()")
+            PrettyOutput.print("索引未构建，正在构建...", output_type=OutputType.INFO)
+            self.build_index(self.root_dir)
             
         # 获取查询的向量表示
         query_vector = self._get_embedding(query)
