@@ -291,37 +291,6 @@ class Agent:
         self.prompt = summary_prompt
         return self._call_model(self.prompt)
 
-    def choose_tools(self, user_input: str) -> List[Dict]:
-        """根据用户输入选择工具"""
-        PrettyOutput.print("选择工具...", OutputType.PLANNING)
-        tools = self.tool_registry.get_all_tools()
-        prompt = f"""你是一个工具选择专家，请根据用户输入选择合适的工具，返回可能使用到的工具的名称。以下是可用工具：
-"""
-        for tool in tools:
-            prompt += f"- {tool['name']}: {tool['description']}\n"
-        prompt += f"用户输入: {user_input}\n"
-        prompt += f"请返回可能使用到的工具的名称，如果无法确定，请返回空列表。"
-        prompt += f"返回的格式为：\n"
-        prompt += f"<TOOL_CHOICE_START>\n"
-        prompt += f"tool_name1\n"
-        prompt += f"tool_name2\n"
-        prompt += f"<TOOL_CHOICE_END>\n"
-        model = PlatformRegistry.get_global_platform()
-        model.set_suppress_output(True)
-        try:
-            response = model.chat(prompt)
-            response = response.replace("<TOOL_CHOICE_START>", "").replace("<TOOL_CHOICE_END>", "")
-            tools_name = response.split("\n")
-            choosed_tools = []
-            for tool_name in tools_name:
-                for tool in tools:
-                    if tool['name'] == tool_name:
-                        choosed_tools.append(tool)
-                        break
-            return choosed_tools
-        except Exception as e:
-            PrettyOutput.print(f"工具选择失败: {str(e)}", OutputType.ERROR)
-            return []
 
     def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
         """处理用户输入并返回响应，返回任务总结报告
@@ -350,7 +319,7 @@ class Agent:
             tools_prompt = ""
 
             # 选择工具
-            tools = self.choose_tools(user_input)
+            tools = self.tool_registry.get_all_tools()
             if tools:
                 tools_prompt += "可用工具:\n"
                 for tool in tools:
