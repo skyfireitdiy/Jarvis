@@ -318,6 +318,7 @@ class Agent:
             tools_prompt = ""
 
             # 选择工具
+            PrettyOutput.section("选择工具", OutputType.PLANNING)
             tools = self.tool_registry.get_all_tools()
             if tools:
                 tools_prompt += "可用工具:\n"
