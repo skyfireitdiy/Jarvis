@@ -140,6 +140,7 @@ class Agent:
 
     def _load_methodology(self, user_input: str) -> Dict[str, str]:
         """加载方法论并构建向量索引"""
+        PrettyOutput.print("加载方法论...", OutputType.PLANNING)
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
         if not os.path.exists(user_jarvis_methodology):
             return {}
@@ -292,6 +293,7 @@ class Agent:
 
     def choose_tools(self, user_input: str) -> List[Dict]:
         """根据用户输入选择工具"""
+        PrettyOutput.print("选择工具...", OutputType.PLANNING)
         tools = self.tool_registry.get_all_tools()
         prompt = f"""你是一个工具选择专家，请根据用户输入选择合适的工具，返回可能使用到的工具的名称。以下是可用工具：
 """
@@ -333,6 +335,7 @@ class Agent:
             str: 任务总结报告
         """
         try:
+            PrettyOutput.section("准备环境", OutputType.PLANNING)
             if file_list:
                 self.model.upload_files(file_list)
 
@@ -344,23 +347,23 @@ class Agent:
 {methodology}
 
 """
-
-            self.clear_history()
-            self.conversation_turns = 0  
-            
-            # 显示任务开始
-            PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
+            tools_prompt = ""
 
             # 选择工具
             tools = self.choose_tools(user_input)
             if tools:
-                PrettyOutput.print(f"选择工具: {tools}", OutputType.INFO)
+                tools_prompt += "可用工具:\n"
+                for tool in tools:
+                    PrettyOutput.print(f"选择工具: {tool['name']}", OutputType.INFO)
+                    tools_prompt += f"- 名称: {tool['name']}\n"
+                    tools_prompt += f"  描述: {tool['description']}\n"
+                    tools_prompt += f"  参数: {tool['parameters']}\n"
 
-            tools_prompt = "可用工具:\n"
-            for tool in tools:
-                tools_prompt += f"- 名称: {tool['name']}\n"
-                tools_prompt += f"  描述: {tool['description']}\n"
-                tools_prompt += f"  参数: {tool['parameters']}\n"
+            # 显示任务开始
+            PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
+
+            self.clear_history()
+            self.conversation_turns = 0  
 
             self.model.set_system_message(f"""你是 {self.name}，一个问题处理能力强大的 AI 助手。
                                           
