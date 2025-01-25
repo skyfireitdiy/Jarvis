@@ -373,7 +373,7 @@ class RAGTool:
             for file in files:
                 file_path = os.path.join(root, file)
                 # 跳过大文件
-                if os.path.getsize(file_path) > 10 * 1024 * 1024:  # 10MB
+                if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
                     PrettyOutput.print(f"跳过大文件: {file_path}", 
                                     output_type=OutputType.WARNING)
                     continue

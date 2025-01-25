@@ -404,9 +404,9 @@ arguments:
                     # 增加对话轮次
                     self.conversation_turns += 1
                     
-                    # 如果对话超过10轮，在提示中添加提醒
-                    if self.conversation_turns > 10:
-                        self.prompt = f"{self.prompt}\n(提示：当前对话已超过10轮，建议使用 !<<SUMMARIZE>>! 指令总结对话历史，避免token超限)"
+                    # 如果对话超过20轮，在提示中添加提醒
+                    if self.conversation_turns > 20:
+                        self.prompt = f"{self.prompt}\n(提示：当前对话已超过20轮，建议使用 !<<SUMMARIZE>>! 指令总结对话历史，避免token超限)"
                     
                     current_response = self._call_model(self.prompt)
                     
