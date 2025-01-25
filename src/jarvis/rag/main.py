@@ -13,6 +13,7 @@ from tqdm import tqdm
 import fitz  # PyMuPDF for PDF files
 from docx import Document as DocxDocument  # python-docx for DOCX files
 from pathlib import Path
+from jarvis.models.registry import PlatformRegistry
 
 @dataclass
 class Document:
@@ -140,6 +141,8 @@ class RAGTool:
         # 初始化配置
         self.min_paragraph_length = int(os.environ.get("JARVIS_MIN_PARAGRAPH_LENGTH", "50"))  # 最小段落长度
         self.max_paragraph_length = int(os.environ.get("JARVIS_MAX_PARAGRAPH_LENGTH", "1000"))  # 最大段落长度
+        self.model_name = os.environ.get("JARVIS_MODEL", "kimi")
+        self.platform_name = os.environ.get("JARVIS_PLATFORM", "kimi")
         self.embedding_model_name = os.environ.get("JARVIS_EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5")
         
         # 初始化数据目录
@@ -363,11 +366,11 @@ class RAGTool:
                             output_type=OutputType.ERROR)
             return []
 
-    def build_index(self):
+    def build_index(self, dir: str):
         """构建文档索引"""
         # 获取所有文件
         all_files = []
-        for root, _, files in os.walk(self.root_dir):
+        for root, _, files in os.walk(dir):
             if any(ignored in root for ignored in ['.jarvis-rag', '.git', '__pycache__', 'node_modules']):
                 continue
             for file in files:
@@ -431,8 +434,74 @@ class RAGTool:
                 
         return results
 
+    def is_index_built(self):
+        """检查索引是否已构建"""
+        return self.index is not None
+
+    def query(self, query: str) -> List[Document]:
+        """查询相关文档
+        
+        Args:
+            query: 查询文本
+            
+        Returns:
+            相关文档列表
+        """
+        if not self.is_index_built():
+            raise ValueError("索引未构建，请先调用build_index()")
+            
+        results = self.search(query)
+        return [doc for doc, _ in results]
+
+    def ask(self, question: str) -> Optional[str]:
+        """询问关于文档的问题
+        
+        Args:
+            question: 用户问题
+            
+        Returns:
+            模型回答，如果失败则返回 None
+        """
+        try:
+            # 搜索相关文档片段
+            results = self.query(question)
+            if not results:
+                return None
+
+            # 构建上下文
+            context = []
+            for doc in results:
+                context.append(f"""
+来源文件: {doc.metadata['file_path']}
+片段位置: {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}
+内容:
+{doc.content}
+---
+""")
+
+            # 构建提示词
+            prompt = f"""请基于以下文档片段回答用户的问题。如果文档片段中的信息不足以完整回答问题，请明确指出。
+            
+用户问题: {question}
+
+相关文档片段:
+{''.join(context)}
+
+请提供准确、简洁的回答，并在适当时引用具体的文档来源。
+"""
+            # 获取模型实例并生成回答
+            model = PlatformRegistry.get_global_platform_registry().create_platform(self.platform_name)
+            model.set_model_name(self.model_name)
+            response = model.chat(prompt)
+            
+            return response
+            
+        except Exception as e:
+            PrettyOutput.print(f"问答失败: {str(e)}", output_type=OutputType.ERROR)
+            return None
+
 def main():
-    """命令行入口"""
+    """主函数"""
     import argparse
     import sys
     
@@ -442,39 +511,57 @@ def main():
         sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
     
-    parser = argparse.ArgumentParser(description='RAG工具')
-    parser.add_argument('--dir', type=str, default=os.getcwd(), help='项目根目录')
-    parser.add_argument('--build', action='store_true', help='构建索引')
-    parser.add_argument('--query', type=str, help='搜索查询')
-    parser.add_argument('--top-k', type=int, default=5, help='返回结果数量')
-    
+    parser = argparse.ArgumentParser(description='文档检索和分析工具')
+    parser.add_argument('--dir', type=str, help='要处理的文档目录')
+    parser.add_argument('--build', action='store_true', help='构建文档索引')
+    parser.add_argument('--search', type=str, help='搜索文档内容')
+    parser.add_argument('--ask', type=str, help='询问关于文档的问题')
     args = parser.parse_args()
-    
+
     try:
-        rag = RAGTool(args.dir)
-        
-        if args.build:
-            rag.build_index()
-            
-        if args.query:
-            results = rag.search(args.query, args.top_k)
-            
-            if not results:
-                PrettyOutput.print("未找到相关内容", output_type=OutputType.WARNING)
-                return
-                
-            PrettyOutput.print("\n搜索结果:", output_type=OutputType.INFO)
-            for doc, score in results:
-                PrettyOutput.print("\n" + "="*50, output_type=OutputType.INFO)
-                PrettyOutput.print(f"文件: {doc.metadata['file_path']}", output_type=OutputType.INFO)
-                PrettyOutput.print(f"相似度: {score:.3f}", output_type=OutputType.INFO)
-                PrettyOutput.print(f"片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}", 
-                                output_type=OutputType.INFO)
-                PrettyOutput.print("\n内容:", output_type=OutputType.INFO)
-                # 确保内容是UTF-8编码
-                content = doc.content.encode('utf-8', errors='replace').decode('utf-8')
-                PrettyOutput.print(content, output_type=OutputType.INFO)
-                
+        current_dir = find_git_root()
+        rag = RAGTool(current_dir)
+
+        if args.dir and args.build:
+            PrettyOutput.print(f"正在处理目录: {args.dir}", output_type=OutputType.INFO)
+            rag.build_index(args.dir)
+            return 0
+
+        if args.search or args.ask:
+            if not rag.is_index_built():
+                PrettyOutput.print("索引尚未构建，请先使用 --dir 和 --build 参数构建索引", output_type=OutputType.WARNING)
+                return 1
+
+            if args.search:
+                results = rag.query(args.search)
+                if not results:
+                    PrettyOutput.print("未找到相关内容", output_type=OutputType.WARNING)
+                    return 1
+                    
+                for doc in results:
+                    PrettyOutput.print(f"\n文件: {doc.metadata['file_path']}", output_type=OutputType.INFO)
+                    PrettyOutput.print(f"片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}", 
+                                    output_type=OutputType.INFO)
+                    PrettyOutput.print("\n内容:", output_type=OutputType.INFO)
+                    content = doc.content.encode('utf-8', errors='replace').decode('utf-8')
+                    PrettyOutput.print(content, output_type=OutputType.INFO)
+                return 0
+
+            if args.ask:
+                # 调用 ask 方法
+                response = rag.ask(args.ask)
+                if not response:
+                    PrettyOutput.print("未能获取答案", output_type=OutputType.WARNING)
+                    return 1
+                    
+                # 显示回答
+                PrettyOutput.print("\n回答:", output_type=OutputType.INFO)
+                PrettyOutput.print(response, output_type=OutputType.INFO)
+                return 0
+
+        PrettyOutput.print("请指定操作参数。使用 -h 查看帮助。", output_type=OutputType.WARNING)
+        return 1
+
     except Exception as e:
         PrettyOutput.print(f"执行失败: {str(e)}", output_type=OutputType.ERROR)
         return 1
