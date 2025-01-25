@@ -65,6 +65,7 @@ Jarvis supports configuration through environment variables that can be set in t
 |---------|------|--------|------|
 | JARVIS_PLATFORM | AI platform to use, supports kimi/openai/ai8 etc | kimi | Yes |
 | JARVIS_MODEL | Model name to use | - | No |
+| JARVIS_THREAD_COUNT | Number of threads for parallel processing | 10 | No |
 | JARVIS_CODEGEN_PLATFORM | AI platform for code generation | Same as JARVIS_PLATFORM | No |
 | JARVIS_CODEGEN_MODEL | Model name for code generation | Same as JARVIS_MODEL | No |
 | JARVIS_CHEAP_PLATFORM | AI platform for cheap operations | Same as JARVIS_PLATFORM | No |
@@ -82,36 +83,47 @@ Jarvis supports configuration through environment variables that can be set in t
 
 ## 🎯 Usage
 
-### Basic Usage
+### Main Assistant
 ```bash
 jarvis
 ```
 
-
-### With Specific Model
+### Code Generation
 ```bash
-jarvis -p kimi  # Use Kimi platform
-jarvis -p openai  # Use OpenAI platform
-```
-
-### Code Modification
-```bash
-jarvis-coder --feature "Add new feature"  # Modify code to add new feature
+jarvis-coder
 ```
 
 ### Codebase Search
 ```bash
-jarvis-codebase --search "database connection"  # Search codebase
+# Generate codebase index
+jarvis-codebase --generate
+
+# Search similar code
+jarvis-codebase --search "your search query"
+
+# Ask questions about codebase
+jarvis-codebase --ask "your question"
 ```
 
-### Codebase Question
+### Document Analysis (RAG)
 ```bash
-jarvis-codebase --ask "How to use the database?"  # Ask about codebase
+# Build document index
+jarvis-rag --dir /path/to/documents --build
+
+# Search documents
+jarvis-rag --query "your search query"
 ```
 
-### Keep Chat History
+### Search Tool
 ```bash
-jarvis --keep-history  # Don't delete chat session after completion
+# Basic search
+jarvis-search "your query"
+
+# Show only URLs
+jarvis-search "your query" --url-only
+
+# Limit results
+jarvis-search "your query" --max 3
 ```
 
 ## 🛠️ Tools

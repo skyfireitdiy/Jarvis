@@ -8,7 +8,7 @@ import json
 
 from .models.registry import PlatformRegistry
 from .tools import ToolRegistry
-from .utils import PrettyOutput, OutputType, get_multiline_input, while_success
+from .utils import PrettyOutput, OutputType, get_multiline_input, load_embedding_model, while_success
 import os
 from datetime import datetime
 from prompt_toolkit import prompt
@@ -37,15 +37,15 @@ class Agent:
         
         # 初始化嵌入模型
         try:
-            os.environ["TOKENIZERS_PARALLELISM"] = "false"
-            PrettyOutput.print(f"正在加载嵌入模型: {self.embedding_model_name}...", OutputType.INFO)
-            self.embedding_model = SentenceTransformer(self.embedding_model_name)
+            self.embedding_model = load_embedding_model(self.embedding_model_name)
             
             # 预热模型并获取正确的维度
             test_text = "这是一段测试文本，用于确保模型完全加载。"
-            test_embedding = self.embedding_model.encode(test_text, 
-                                                      convert_to_tensor=True,
-                                                      normalize_embeddings=True)
+            test_embedding = self.embedding_model.encode(
+                test_text, 
+                convert_to_tensor=True,
+                normalize_embeddings=True
+            )
             self.embedding_dimension = len(test_embedding)
             PrettyOutput.print("嵌入模型加载完成", OutputType.SUCCESS)
             

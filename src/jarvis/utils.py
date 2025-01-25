@@ -9,6 +9,7 @@ from colorama import Fore, Style as ColoramaStyle
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
 from prompt_toolkit.formatted_text import FormattedText
+from sentence_transformers import SentenceTransformer
 
 # 初始化colorama
 colorama.init()
@@ -207,3 +208,26 @@ def find_git_root(dir="."):
     ret = os.popen("git rev-parse --show-toplevel").read().strip()
     os.chdir(curr_dir)
     return ret
+
+def load_embedding_model(model_name: str):
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    PrettyOutput.print(f"正在加载嵌入模型: {model_name}...", OutputType.INFO)
+    try:
+        # 首先尝试离线加载
+        embedding_model = SentenceTransformer(
+            model_name,
+            device="cpu",
+            cache_folder=os.path.expanduser("~/.cache/huggingface/hub"),
+            local_files_only=True
+        )
+        PrettyOutput.print("使用本地缓存加载模型成功", OutputType.SUCCESS)
+    except Exception as local_error:
+        PrettyOutput.print(f"本地加载失败，尝试在线下载: {str(local_error)}", OutputType.WARNING)
+        # 如果离线加载失败，尝试在线下载
+        embedding_model = SentenceTransformer(
+            model_name,
+            device="cpu",
+            cache_folder=os.path.expanduser("~/.cache/huggingface/hub")
+        )
+        PrettyOutput.print("模型下载并加载成功", OutputType.SUCCESS)
+    return embedding_model
