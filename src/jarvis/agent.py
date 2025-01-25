@@ -24,7 +24,7 @@ class Agent:
             name: Agent名称，默认为"Jarvis"
             is_sub_agent: 是否为子Agent，默认为False
         """
-        self.model = PlatformRegistry.get_global_platform()
+        self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         self.tool_registry = ToolRegistry.get_global_tool_registry()
         self.name = name
         self.is_sub_agent = is_sub_agent
@@ -32,12 +32,11 @@ class Agent:
         self.conversation_turns = 0  
         
         # 从环境变量加载嵌入模型配置
-        self.embedding_model_name = os.environ.get("JARVIS_EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5")
         self.embedding_dimension = 1536  # Default for many embedding models
         
         # 初始化嵌入模型
         try:
-            self.embedding_model = load_embedding_model(self.embedding_model_name)
+            self.embedding_model = load_embedding_model()
             
             # 预热模型并获取正确的维度
             test_text = "这是一段测试文本，用于确保模型完全加载。"

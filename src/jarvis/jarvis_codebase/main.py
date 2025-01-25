@@ -19,22 +19,6 @@ class CodeBase:
         self.root_dir = root_dir
         os.chdir(self.root_dir)
         self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT") or 10)
-        self.cheap_platform = os.environ.get("JARVIS_CHEAP_PLATFORM") or os.environ.get("JARVIS_PLATFORM") or "kimi"
-        self.cheap_model = os.environ.get("JARVIS_CHEAP_MODEL") or os.environ.get("JARVIS_MODEL") or "kimi"
-        self.normal_platform = os.environ.get("JARVIS_PLATFORM") or "kimi"
-        self.codegen_platform = os.environ.get("JARVIS_CODEGEN_PLATFORM") or os.environ.get("JARVIS_PLATFORM") or "kimi"
-        self.codegen_model = os.environ.get("JARVIS_CODEGEN_MODEL") or os.environ.get("JARVIS_MODEL") or "kimi"
-        self.normal_model = os.environ.get("JARVIS_MODEL") or "kimi"
-        self.embedding_model_name = os.environ.get("JARVIS_EMBEDDING_MODEL") or "BAAI/bge-large-zh-v1.5"
-        if not self.cheap_platform or not self.cheap_model or not self.codegen_platform or not self.codegen_model or not self.embedding_model_name or not self.normal_platform or not self.normal_model:
-            raise ValueError("JARVIS_CHEAP_PLATFORM or JARVIS_CHEAP_MODEL or JARVIS_CODEGEN_PLATFORM or JARVIS_CODEGEN_MODEL or JARVIS_EMBEDDING_MODEL or JARVIS_PLATFORM or JARVIS_MODEL is not set")
-        
-        PrettyOutput.print(f"廉价模型使用平台: {self.cheap_platform} 模型: {self.cheap_model}", output_type=OutputType.INFO)
-        PrettyOutput.print(f"代码生成模型使用平台: {self.codegen_platform} 模型: {self.codegen_model}", output_type=OutputType.INFO)
-        PrettyOutput.print(f"分析模型使用平台: {self.normal_platform} 模型: {self.normal_model}", output_type=OutputType.INFO)
-        PrettyOutput.print(f"嵌入模型: {self.embedding_model_name}", output_type=OutputType.INFO)
-        PrettyOutput.print(f"索引建立线程数: {self.thread_count}", output_type=OutputType.INFO)
-        PrettyOutput.print(f"检索算法：分层导航小世界算法", output_type=OutputType.INFO)
             
         # 初始化数据目录
         self.data_dir = os.path.join(self.root_dir, ".jarvis-codebase")
@@ -43,7 +27,7 @@ class CodeBase:
             
         # 初始化嵌入模型，使用系统默认缓存目录
         try:
-            self.embedding_model = load_embedding_model(self.embedding_model_name)
+            self.embedding_model = load_embedding_model()
             
             # 强制完全加载所有模型组件
             test_text = """
@@ -62,7 +46,7 @@ class CodeBase:
         self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
 
         self.git_file_list = self.get_git_file_list()
-        self.platform_registry = PlatformRegistry().get_global_platform_registry()
+        self.platform_registry = PlatformRegistry.get_global_platform_registry()
         
         # 初始化缓存和索引
         self.cache_path = os.path.join(self.data_dir, "cache.pkl")
@@ -102,8 +86,7 @@ class CodeBase:
                 return False
 
     def make_description(self, file_path: str) -> str:
-        model = self.platform_registry.create_platform(self.cheap_platform)
-        model.set_model_name(self.cheap_model)
+        model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
         model.set_suppress_output(True)
         content = open(file_path, "r", encoding="utf-8").read()
         prompt = f"""请分析以下代码文件，并生成一个详细的描述。描述应该包含以下要点：
@@ -411,8 +394,7 @@ class CodeBase:
         if not initial_results:
             return []
 
-        model = self.platform_registry.create_platform(self.normal_platform)
-        model.set_model_name(self.normal_model)
+        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(True)
 
         try:
@@ -470,8 +452,7 @@ class CodeBase:
 
     def search_similar(self, query: str, top_k: int = 20) -> List[Tuple[str, float, str]]:
         """搜索相似文件"""
-        model = self.platform_registry.create_platform(self.normal_platform)
-        model.set_model_name(self.normal_model)
+        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(True)
         
         try:
@@ -554,8 +535,7 @@ class CodeBase:
 
 请用专业的语言回答用户的问题，如果给出的文件内容不足以回答用户的问题，请告诉用户，绝对不要胡编乱造。
 """
-        model = self.platform_registry.create_platform(self.codegen_platform)
-        model.set_model_name(self.codegen_model)
+        model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
         try:
             response = model.chat(prompt)
             return response

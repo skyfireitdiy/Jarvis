@@ -21,13 +21,7 @@ index_lock = threading.Lock()
 class JarvisCoder:
     def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
-        
-        self.platform = os.environ.get("JARVIS_CODEGEN_PLATFORM") or os.environ.get("JARVIS_PLATFORM")
-        self.model = os.environ.get("JARVIS_CODEGEN_MODEL") or os.environ.get("JARVIS_MODEL")
 
-
-        if not self.platform or not self.model:
-            raise ValueError("JARVIS_CODEGEN_PLATFORM or JARVIS_CODEGEN_MODEL is not set")
 
         self.root_dir = find_git_root(root_dir)
         if not self.root_dir:
@@ -486,8 +480,6 @@ def main():
     load_env_from_file()
     
     parser = argparse.ArgumentParser(description='代码修改工具')
-    parser.add_argument('-p', '--platform', help='AI平台名称', default=os.environ.get('JARVIS_CODEGEN_PLATFORM'))
-    parser.add_argument('-m', '--model', help='模型名称', default=os.environ.get('JARVIS_CODEGEN_MODEL'))
     parser.add_argument('-d', '--dir', help='项目根目录', default=os.getcwd())
     parser.add_argument('-l', '--language', help='编程语言', default="python")
     args = parser.parse_args()
@@ -495,9 +487,6 @@ def main():
     # 设置平台
     if not args.platform:
         print("错误: 未指定AI平台，请使用 -p 参数")
-    # 设置模型
-    if args.model:
-        os.environ['JARVIS_CODEGEN_MODEL'] = args.model
         
     tool = JarvisCoder(args.dir, args.language)
     

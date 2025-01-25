@@ -141,9 +141,6 @@ class RAGTool:
         # 初始化配置
         self.min_paragraph_length = int(os.environ.get("JARVIS_MIN_PARAGRAPH_LENGTH", "50"))  # 最小段落长度
         self.max_paragraph_length = int(os.environ.get("JARVIS_MAX_PARAGRAPH_LENGTH", "1000"))  # 最大段落长度
-        self.model_name = os.environ.get("JARVIS_MODEL", "kimi")
-        self.platform_name = os.environ.get("JARVIS_PLATFORM", "kimi")
-        self.embedding_model_name = os.environ.get("JARVIS_EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5")
         
         # 初始化数据目录
         self.data_dir = os.path.join(self.root_dir, ".jarvis-rag")
@@ -152,7 +149,7 @@ class RAGTool:
             
         # 初始化嵌入模型
         try:
-            self.embedding_model = load_embedding_model(self.embedding_model_name)
+            self.embedding_model = load_embedding_model()
             self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
             PrettyOutput.print("模型加载完成", output_type=OutputType.SUCCESS)
         except Exception as e:
@@ -490,8 +487,7 @@ class RAGTool:
 请提供准确、简洁的回答，并在适当时引用具体的文档来源。
 """
             # 获取模型实例并生成回答
-            model = PlatformRegistry.get_global_platform_registry().create_platform(self.platform_name)
-            model.set_model_name(self.model_name)
+            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
             response = model.chat(prompt)
             
             return response

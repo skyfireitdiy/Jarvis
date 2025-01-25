@@ -42,11 +42,7 @@ class ToolGeneratorTool:
 
     def _generate_tool_code(self, tool_name: str, class_name: str, description: str, parameters: Dict) -> str:
         """使用大模型生成工具代码"""
-        platform_name = os.getenv("JARVIS_CODEGEN_PLATFORM") or PlatformRegistry.get_global_platform_name()
-        model = PlatformRegistry.create_platform(platform_name)
-        model_name = os.getenv("JARVIS_CODEGEN_MODEL")
-        if model_name:
-            model.set_model_name(model_name)
+        model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
 
         prompt = f"""请生成一个Python工具类的代码，要求如下，除了代码，不要输出任何内容：
 

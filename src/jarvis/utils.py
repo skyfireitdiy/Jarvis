@@ -209,8 +209,9 @@ def find_git_root(dir="."):
     os.chdir(curr_dir)
     return ret
 
-def load_embedding_model(model_name: str):
+def load_embedding_model():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    model_name = os.environ.get("JARVIS_EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5")
     PrettyOutput.print(f"正在加载嵌入模型: {model_name}...", OutputType.INFO)
     try:
         # 首先尝试离线加载
@@ -230,4 +231,5 @@ def load_embedding_model(model_name: str):
             cache_folder=os.path.expanduser("~/.cache/huggingface/hub")
         )
         PrettyOutput.print("模型下载并加载成功", OutputType.SUCCESS)
+    
     return embedding_model
