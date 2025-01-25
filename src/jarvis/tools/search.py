@@ -8,33 +8,58 @@ from urllib.parse import quote
 def bing_search(query):
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch()
-            page = browser.new_page()
-            page.goto(
-                f"https://www.bing.com/search?form=QBRE&q={quote(query)}&cc=US"
+            # 启动浏览器时设置参数
+            browser = p.chromium.launch(
+                headless=True,  # 无头模式
+                args=['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
             )
-
-            page.wait_for_selector("#b_results", timeout=10000)
             
+            # 创建新页面并设置超时
+            page = browser.new_page(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                viewport={'width': 1920, 'height': 1080}
+            )
+            
+            # 设置页面超时
+            page.set_default_timeout(60000)
+            
+            # 访问搜索页面
+            url = f"https://www.bing.com/search?q={quote(query)}&form=QBLH&sp=-1"
+            page.goto(url, wait_until="networkidle")
+            
+            # 等待搜索结果加载
+            page.wait_for_selector("#b_results", state="visible", timeout=30000)
+            
+            # 等待一下以确保结果完全加载
+            page.wait_for_timeout(1000)
+            
+            # 提取搜索结果
             summaries = page.evaluate("""() => {
-                const liElements = Array.from(
-                    document.querySelectorAll("#b_results > .b_algo")
-                );
-                return liElements.map((li) => {
-                    const abstractElement = li.querySelector(".b_caption > p");
-                    const linkElement = li.querySelector("a");
-                    const href = linkElement.getAttribute("href");
-                    const title = linkElement.textContent;
-                    const abstract = abstractElement ? abstractElement.textContent : "";
-                    return { href, title, abstract };
-                });
+                const results = [];
+                const elements = document.querySelectorAll("#b_results > .b_algo");
+                
+                for (const el of elements) {
+                    const titleEl = el.querySelector("h2");
+                    const linkEl = titleEl ? titleEl.querySelector("a") : null;
+                    const abstractEl = el.querySelector(".b_caption p");
+                    
+                    if (linkEl) {
+                        results.push({
+                            title: titleEl.innerText.trim(),
+                            href: linkEl.href,
+                            abstract: abstractEl ? abstractEl.innerText.trim() : ""
+                        });
+                    }
+                }
+                return results;
             }""")
             
             browser.close()
-            print(summaries)
             return summaries
+            
     except Exception as error:
-        print("An error occurred:", error)
+        PrettyOutput.print(f"搜索出错: {str(error)}", OutputType.ERROR)
+        return None
 
 class SearchTool:
     name = "search"
@@ -158,4 +183,46 @@ class SearchTool:
             return {
                 "success": False,
                 "error": f"搜索失败: {str(e)}"
-            } 
+            }
+
+def main():
+    """命令行直接运行搜索工具"""
+    import argparse
+    import sys
+    
+    parser = argparse.ArgumentParser(description='Bing搜索工具')
+    parser.add_argument('query', help='搜索关键词')
+    parser.add_argument('--max', type=int, default=5, help='最大结果数量(默认5)')
+    parser.add_argument('--url-only', action='store_true', help='只显示URL')
+    args = parser.parse_args()
+    
+    try:
+        PrettyOutput.print(f"正在搜索: {args.query}", OutputType.INFO)
+        
+        results = bing_search(args.query)
+        
+        if not results:
+            PrettyOutput.print("未找到搜索结果", OutputType.WARNING)
+            sys.exit(1)
+            
+        PrettyOutput.print(f"\n找到 {len(results)} 条结果:", OutputType.INFO)
+        
+        for i, result in enumerate(results[:args.max], 1):
+            PrettyOutput.print(f"\n{'-'*50}", OutputType.INFO)
+            if args.url_only:
+                PrettyOutput.print(f"{i}. {result['href']}", OutputType.INFO)
+            else:
+                PrettyOutput.print(f"{i}. {result['title']}", OutputType.INFO)
+                PrettyOutput.print(f"链接: {result['href']}", OutputType.INFO)
+                if result['abstract']:
+                    PrettyOutput.print(f"摘要: {result['abstract']}", OutputType.INFO)
+                    
+    except KeyboardInterrupt:
+        PrettyOutput.print("\n搜索已取消", OutputType.WARNING)
+        sys.exit(1)
+    except Exception as e:
+        PrettyOutput.print(f"执行出错: {str(e)}", OutputType.ERROR)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main() 
