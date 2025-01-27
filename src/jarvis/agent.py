@@ -320,12 +320,12 @@ class Agent:
             tools_prompt = ""
 
             # 选择工具
-            PrettyOutput.section("选择工具", OutputType.PLANNING)
+            PrettyOutput.section("可用工具", OutputType.PLANNING)
             tools = self.tool_registry.get_all_tools()
             if tools:
                 tools_prompt += "可用工具:\n"
                 for tool in tools:
-                    PrettyOutput.print(f"选择工具: {tool['name']}", OutputType.INFO)
+                    PrettyOutput.print(f"{tool['name']}: {tool['description']}", OutputType.INFO)
                     tools_prompt += f"- 名称: {tool['name']}\n"
                     tools_prompt += f"  描述: {tool['description']}\n"
                     tools_prompt += f"  参数: {tool['parameters']}\n"
