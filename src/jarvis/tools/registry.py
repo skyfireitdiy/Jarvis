@@ -1,5 +1,6 @@
 import importlib
 import json
+import os
 from pathlib import Path
 import sys
 from typing import Any, Callable, Dict, List, Optional
@@ -18,6 +19,7 @@ class ToolRegistry:
         # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
+        self.max_context_length = int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '30720'))  # 默认30k
 
     @staticmethod
     def get_global_tool_registry():
@@ -180,8 +182,8 @@ class ToolRegistry:
                         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
                         
                         # 如果输出超过30k，只取最后30k字符
-                        if len(output) > 30720:
-                            output_to_summarize = output[-30720:]
+                        if len(output) > self.max_context_length:
+                            output_to_summarize = output[-self.max_context_length:]
                             truncation_notice = "\n(注意: 由于输出过长，仅总结最后30720字符)"
                         else:
                             output_to_summarize = output

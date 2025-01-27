@@ -29,10 +29,11 @@ class Agent:
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
-        self.conversation_turns = 0  
+        self.conversation_length = 0  # 改用长度计数器
         
-        # 从环境变量加载嵌入模型配置
+        # 从环境变量加载配置
         self.embedding_dimension = 1536  # Default for many embedding models
+        self.max_context_length = int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '30720'))  # 默认30k
         
         # 初始化嵌入模型
         try:
@@ -222,6 +223,7 @@ class Agent:
             
             # 清空当前对话历史，但保留系统消息
             self.model.delete_chat()
+            self.conversation_length = 0  # 重置对话长度
             
             # 添加总结作为新的上下文
             self.prompt = f"""以下是之前对话的关键信息总结：
@@ -230,9 +232,7 @@ class Agent:
 
 请基于以上信息继续完成任务。
 """
-            
-            # 重置对话轮数
-            self.conversation_turns = 0
+            self.conversation_length = len(self.prompt)  # 设置新的起始长度
             
         except Exception as e:
             PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
@@ -331,8 +331,7 @@ class Agent:
             # 显示任务开始
             PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
 
-            self.clear_history()
-            self.conversation_turns = 0  
+            self.clear_history()  
 
             self.model.set_system_message(f"""你是 {self.name}，一个问题处理能力强大的 AI 助手。
                                           
@@ -401,14 +400,15 @@ arguments:
                     # 显示思考状态
                     PrettyOutput.print("分析任务...", OutputType.PROGRESS)
                     
-                    # 增加对话轮次
-                    self.conversation_turns += 1
+                    # 累加对话长度
+                    self.conversation_length += len(self.prompt)
                     
-                    # 如果对话超过20轮，在提示中添加提醒
-                    if self.conversation_turns > 20:
-                        self.prompt = f"{self.prompt}\n(提示：当前对话已超过20轮，建议使用 !<<SUMMARIZE>>! 指令总结对话历史，避免token超限)"
+                    # 如果对话历史长度超过限制，在提示中添加提醒
+                    if self.conversation_length > self.max_context_length:
+                        self.prompt = f"{self.prompt}\n(提示：当前对话历史长度已超过{self.max_context_length}字符，建议使用 !<<SUMMARIZE>>! 指令总结对话历史，避免token超限)"
                     
                     current_response = self._call_model(self.prompt)
+                    self.conversation_length += len(current_response)  # 添加响应长度
                     
                     # 检查是否需要总结对话历史
                     if "!<<SUMMARIZE>>!" in current_response:
@@ -463,6 +463,7 @@ arguments:
         """清除对话历史，只保留系统提示"""
         self.prompt = "" 
         self.model.reset()
-        self.conversation_turns = 0  # 重置对话轮次
+        self.conversation_length = 0  # 重置对话长度
+
 
 
