@@ -19,6 +19,7 @@ class CodeBase:
         self.root_dir = root_dir
         os.chdir(self.root_dir)
         self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT") or 10)
+        self.max_context_length = int(os.getenv("JARVIS_MAX_CONTEXT_LENGTH", 65536))
             
         # 初始化数据目录
         self.data_dir = os.path.join(self.root_dir, ".jarvis-codebase")
@@ -450,7 +451,7 @@ class CodeBase:
         
         return initial_results
 
-    def search_similar(self, query: str, top_k: int = 20) -> List[Tuple[str, float, str]]:
+    def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float, str]]:
         """搜索相似文件"""
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(True)
@@ -515,7 +516,7 @@ class CodeBase:
 """
         for path, _, _ in results:
             try:
-                if len(prompt) > 30 * 1024:
+                if len(prompt) > self.max_context_length:
                     PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{path}", OutputType.WARNING)
                     continue
                 content = open(path, "r", encoding="utf-8").read()

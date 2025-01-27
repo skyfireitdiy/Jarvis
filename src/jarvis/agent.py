@@ -33,7 +33,7 @@ class Agent:
         
         # 从环境变量加载配置
         self.embedding_dimension = 1536  # Default for many embedding models
-        self.max_context_length = int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '30720'))  # 默认30k
+        self.max_context_length = int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '65536'))  # 默认30k
         
         # 初始化嵌入模型
         try:
