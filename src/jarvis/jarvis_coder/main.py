@@ -22,6 +22,8 @@ class JarvisCoder:
     def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
 
+        self.max_context_length = int(os.getenv("JARVIS_MAX_CONTEXT_LENGTH", 65536))
+
 
         self.root_dir = find_git_root(root_dir)
         if not self.root_dir:
@@ -154,7 +156,7 @@ class JarvisCoder:
 文件列表如下：
 """
         for i, file in enumerate(related_files):
-            if len(prompt) > 30 * 1024:
+            if len(prompt) > self.max_context_length:
                 PrettyOutput.print(f'避免上下文超限，丢弃低相关度文件：{file["file_path"]}', OutputType.WARNING)
                 continue
             prompt += f"""{i}. {file["file_path"]}\n"""
