@@ -2,10 +2,28 @@
 import argparse
 import os
 import sys
+import readline
 from typing import Optional
 
 from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType, load_env_from_file
+
+def execute_command(command: str) -> None:
+    """显示命令并允许用户编辑，回车执行，Ctrl+C取消"""
+    try:
+        print("生成的命令 (可以编辑，回车执行，Ctrl+C取消):")
+        # 预填充输入行
+        readline.set_startup_hook(lambda: readline.insert_text(command))
+        try:
+            edited_command = input("> ")
+            if edited_command.strip():  # 确保命令不为空
+                os.system(edited_command)
+        except KeyboardInterrupt:
+            print("\n已取消执行")
+        finally:
+            readline.set_startup_hook()  # 清除预填充
+    except Exception as e:
+        PrettyOutput.print(f"执行命令时发生错误: {str(e)}", OutputType.ERROR)
 
 def process_request(request: str) -> Optional[str]:
     """处理用户请求并返回对应的shell命令
@@ -96,7 +114,7 @@ def main():
     
     # 输出结果
     if command:
-        print(command)
+        execute_command(command)  # 显示并执行命令
         return 0
     else:
         return 1
