@@ -273,7 +273,8 @@ class CustomPlatform(BasePlatform):
         """
         try:
             # 实现聊天逻辑
-            PrettyOutput.print("发送请求...", OutputType.PROGRESS)
+            if not self.suppress_output:
+                PrettyOutput.print("发送请求...", OutputType.PROGRESS)
             
             # 将消息添加到历史记录
             self.messages.append({"role": "user", "content": message})
