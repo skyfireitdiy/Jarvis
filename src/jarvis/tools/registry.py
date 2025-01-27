@@ -179,6 +179,14 @@ class ToolRegistry:
                         PrettyOutput.print("输出较长，正在总结...", OutputType.PROGRESS)
                         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
                         
+                        # 如果输出超过30k，只取最后30k字符
+                        if len(output) > 30720:
+                            output_to_summarize = output[-30720:]
+                            truncation_notice = "\n(注意: 由于输出过长，仅总结最后30720字符)"
+                        else:
+                            output_to_summarize = output
+                            truncation_notice = ""
+
                         prompt = f"""请总结以下工具执行结果，提取关键信息和重要结果。注意：
 1. 保留所有重要的数值、路径、错误信息等关键数据
 2. 保持结果的准确性
@@ -187,12 +195,12 @@ class ToolRegistry:
 
 工具名称: {name}
 执行结果:
-{output}
+{output_to_summarize}
 
 请提供总结："""
 
                         summary = model.chat(prompt)
-                        output = f"""--- 原始输出较长，以下是总结 ---
+                        output = f"""--- 原始输出较长，以下是总结 ---{truncation_notice}
 
 {summary}
 
