@@ -1,4 +1,3 @@
-
 import importlib
 import json
 from pathlib import Path
@@ -173,12 +172,43 @@ class ToolRegistry:
                 output = "\n\n".join(output_parts)
                 output = "没有输出和错误" if not output else output
                 PrettyOutput.section("执行成功", OutputType.SUCCESS)
+                
+                # 如果输出超过4k字符，使用大模型总结
+                if len(output) > 4096:
+                    try:
+                        PrettyOutput.print("输出较长，正在总结...", OutputType.PROGRESS)
+                        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+                        
+                        prompt = f"""请总结以下工具执行结果，提取关键信息和重要结果。注意：
+1. 保留所有重要的数值、路径、错误信息等关键数据
+2. 保持结果的准确性
+3. 用简洁的语言描述主要内容
+4. 如果有错误信息，确保包含在总结中
+
+工具名称: {name}
+执行结果:
+{output}
+
+请提供总结："""
+
+                        summary = model.chat(prompt)
+                        output = f"""--- 原始输出较长，以下是总结 ---
+
+{summary}
+
+--- 总结结束 ---"""
+                        
+                    except Exception as e:
+                        PrettyOutput.print(f"总结失败: {str(e)}", OutputType.WARNING)
+                        output = f"输出较长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
+            
             else:
                 error_msg = result["error"]
                 output = f"执行失败: {error_msg}"
                 PrettyOutput.section("执行失败", OutputType.ERROR)
                 
             return output
+            
         except Exception as e:
             PrettyOutput.print(f"执行工具失败: {str(e)}", OutputType.ERROR)
             return f"Tool call failed: {str(e)}"
