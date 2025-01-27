@@ -195,7 +195,9 @@ class Agent:
             return {}
 
     def _summarize_and_clear_history(self) -> None:
-        """总结当前对话历史并清空历史记录，只保留系统消息和总结
+        """
+        [系统消息]
+        总结当前对话历史并清空历史记录，只保留系统消息和总结
         
         这个方法会：
         1. 请求模型总结当前对话的关键信息
@@ -219,7 +221,7 @@ class Agent:
 """
         
         try:
-            summary = self.model.chat(prompt)
+            summary = self.model.chat(self.prompt + "\n" + prompt)
             
             # 清空当前对话历史，但保留系统消息
             self.model.delete_chat()
@@ -380,13 +382,6 @@ arguments:
 8. 在多次迭代却没有任何进展时，可请求用户指导
 9. 如果返回的yaml字符串中包含冒号，请将整个字符串用引号包裹，避免yaml解析错误
 
--------------------------------------------------------------
-
-特殊指令：
-1. !<<SUMMARIZE>>! - 当你发现对话历史过长可能导致token超限时，可以使用此指令总结当前对话要点并清空历史。使用方法：直接回复"!<<SUMMARIZE>>!"即可。
-
--------------------------------------------------------------
-
 {methodology_prompt}
 
 -------------------------------------------------------------
@@ -404,16 +399,11 @@ arguments:
                     
                     # 如果对话历史长度超过限制，在提示中添加提醒
                     if self.conversation_length > self.max_context_length:
-                        self.prompt = f"{self.prompt}\n(提示：当前对话历史长度已超过{self.max_context_length}字符，建议使用 !<<SUMMARIZE>>! 指令总结对话历史，避免token超限)"
-                    
-                    current_response = self._call_model(self.prompt)
-                    self.conversation_length += len(current_response)  # 添加响应长度
-                    
-                    # 检查是否需要总结对话历史
-                    if "!<<SUMMARIZE>>!" in current_response:
-                        self._summarize_and_clear_history()
+                        current_response = self._summarize_and_clear_history()
                         continue
-                    
+                    else:
+                        current_response = self._call_model(self.prompt)
+                        self.conversation_length += len(current_response)  # 添加响应长度
                     try:
                         result = Agent.extract_tool_calls(current_response)
                     except Exception as e:
