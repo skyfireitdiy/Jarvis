@@ -111,7 +111,7 @@ class AI8Model(BasePlatform):
                 "model": self.model_name,
                 "contextCount": 1024,
                 "prompt": self.system_message,
-                "plugins": ["tavily_search"],
+                "plugins": [],
                 "localPlugins": None,
                 "useAppId": 0
             }
