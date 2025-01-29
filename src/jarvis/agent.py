@@ -268,8 +268,8 @@ class Agent:
                 try:
                     tool_calls = Agent.extract_tool_calls(response)
                     if tool_calls:
-                        Agent.handle_tool_calls(tool_calls)
-                        PrettyOutput.print(tool_calls, OutputType.RESULT)
+                        result = self.tool_registry.handle_tool_calls(tool_calls)
+                        PrettyOutput.print(result, OutputType.RESULT)
                 except Exception as e:
                     PrettyOutput.print(f"处理方法论生成失败: {str(e)}", OutputType.ERROR)
                 
