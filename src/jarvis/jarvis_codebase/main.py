@@ -86,10 +86,9 @@ class CodeBase:
             except UnicodeDecodeError:
                 return False
 
-    def make_description(self, file_path: str) -> str:
+    def make_description(self, file_path: str, content: str) -> str:
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
         model.set_suppress_output(True)
-        content = open(file_path, "r", encoding="utf-8").read()
         prompt = f"""请分析以下代码文件，并生成一个详细的描述。描述应该包含以下要点：
 
 1. 主要功能和用途
@@ -237,14 +236,22 @@ class CodeBase:
             if not self.is_text_file(file_path):
                 return None
                 
-            md5 = hashlib.md5(open(file_path, "rb").read()).hexdigest()
+            # 读取文件内容，限制长度
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                if len(content) > self.max_context_length:
+                    PrettyOutput.print(f"文件 {file_path} 内容超出长度限制，将截取前 {self.max_context_length} 个字符", 
+                                     output_type=OutputType.WARNING)
+                    content = content[:self.max_context_length]
+            
+            md5 = hashlib.md5(content.encode('utf-8')).hexdigest()
             
             # 检查文件是否已经处理过且内容未变
             if file_path in self.vector_cache:
                 if self.vector_cache[file_path].get("md5") == md5:
                     return None
                     
-            description = self.make_description(file_path)
+            description = self.make_description(file_path, content)  # 传入截取后的内容
             vector = self.vectorize_file(file_path, description)
             
             # 保存到缓存，使用实际文件路径作为键
