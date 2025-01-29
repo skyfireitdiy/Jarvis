@@ -370,9 +370,15 @@ class RAGTool:
         # 获取所有文件
         all_files = []
         for root, _, files in os.walk(dir):
-            if any(ignored in root for ignored in ['.jarvis-rag', '.git', '__pycache__', 'node_modules']):
+            # 忽略特定目录
+            if any(ignored in root for ignored in ['.git', '__pycache__', 'node_modules']) or \
+               any(part.startswith('.jarvis-') for part in root.split(os.sep)):
                 continue
             for file in files:
+                # 忽略 .jarvis- 开头的文件
+                if file.startswith('.jarvis-'):
+                    continue
+                    
                 file_path = os.path.join(root, file)
                 # 跳过大文件
                 if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
