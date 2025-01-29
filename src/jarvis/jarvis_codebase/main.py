@@ -76,7 +76,7 @@ class CodeBase:
         """获取 git 仓库中的文件列表，排除 .jarvis-codebase 目录"""
         files = os.popen("git ls-files").read().splitlines()
         # 过滤掉 .jarvis-codebase 目录下的文件
-        return [f for f in files if not f.startswith(".jarvis-codebase/")]
+        return [f for f in files if not f.startswith(".jarvis-")]
 
     def is_text_file(self, file_path: str):
         with open(file_path, "r", encoding="utf-8") as f:
