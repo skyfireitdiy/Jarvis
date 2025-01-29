@@ -123,7 +123,7 @@ def main():
             selected_task = select_task(tasks)
             if selected_task:
                 PrettyOutput.print(f"\n执行任务: {selected_task}", OutputType.INFO)
-                agent.run(selected_task, args.files, keep_history=args.keep_history)
+                agent.run(selected_task, args.files)
                 return 0
         
         # 如果没有选择预定义任务，进入交互模式
