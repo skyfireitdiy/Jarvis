@@ -68,7 +68,7 @@ class JarvisCoder:
 
     def _new_model(self):
         """获取大模型"""
-        model = PlatformRegistry().get_global_platform_registry().create_platform(self.platform)
+        model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
         if self.model:
             model_name = self.model
             model.set_model_name(model_name)
@@ -407,7 +407,7 @@ class JarvisCoder:
 """
         
         # 使用normal模型生成commit信息
-        model = PlatformRegistry().get_global_platform_registry().create_platform(self.platform)
+        model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
         model.set_model_name(self.model)
         model.set_suppress_output(True)
         success, response = self._call_model_with_retry(model, prompt)
