@@ -102,7 +102,6 @@ class ExampleTool:
 
         # 调用模型生成代码
         response = model.chat(prompt)
-        model.delete_chat()
 
         # 提取代码块
         code_start = response.find("```python")

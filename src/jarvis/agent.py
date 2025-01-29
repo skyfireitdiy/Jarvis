@@ -224,7 +224,6 @@ class Agent:
             summary = self.model.chat(self.prompt + "\n" + prompt)
             
             # 清空当前对话历史，但保留系统消息
-            self.model.delete_chat()
             self.conversation_length = 0  # 重置对话长度
             
             # 添加总结作为新的上下文
@@ -293,13 +292,12 @@ class Agent:
         return self._call_model(self.prompt)
 
 
-    def run(self, user_input: str, file_list: Optional[List[str]] = None, keep_history: bool = False) -> str:
+    def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str:
         """处理用户输入并返回响应，返回任务总结报告
         
         Args:
             user_input: 用户输入的任务描述
             file_list: 可选的文件列表，默认为None
-            keep_history: 是否保留对话历史，默认为False
         
         Returns:
             str: 任务总结报告
@@ -440,13 +438,6 @@ arguments:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return f"Task failed: {str(e)}"
         
-        finally:
-            # 只在不保留历史时删除会话
-            if not keep_history:
-                try:
-                    self.model.delete_chat()
-                except Exception as e:
-                    PrettyOutput.print(f"清理会话时发生错误: {str(e)}", OutputType.ERROR)
 
     def clear_history(self):
         """清除对话历史，只保留系统提示"""
