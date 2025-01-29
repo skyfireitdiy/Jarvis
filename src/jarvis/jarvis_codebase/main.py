@@ -396,7 +396,7 @@ class CodeBase:
             return []
 
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
-        model.set_suppress_output(True)
+        # model.set_suppress_output(True)
 
         # 构建重排序的prompt
         prompt = f"""请根据用户的查询，对以下代码文件进行相关性排序。对每个文件给出0-100的相关性分数，分数越高表示越相关。
