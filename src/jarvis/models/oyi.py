@@ -11,6 +11,8 @@ class OyiModel(BasePlatform):
     
     platform_name = "oyi"
     BASE_URL = "https://api-10086.rcouyi.com"
+
+    first_time = True
     
     def __init__(self):
         """Initialize model"""
@@ -19,11 +21,14 @@ class OyiModel(BasePlatform):
         
         # 获取可用模型列表
         available_models = self.get_available_models()
-        if available_models:
-            for model in available_models:
-                PrettyOutput.print(model, OutputType.INFO)
-        else:
-            PrettyOutput.print("获取模型列表失败", OutputType.WARNING)
+
+        if OyiModel.first_time:
+            OyiModel.first_time = False
+            if available_models:
+                for model in available_models:
+                    PrettyOutput.print(model, OutputType.INFO)
+            else:
+                PrettyOutput.print("获取模型列表失败", OutputType.WARNING)
         
         self.messages = []
         self.system_message = ""
@@ -85,7 +90,6 @@ class OyiModel(BasePlatform):
                 data = response.json()
                 if data['code'] == 200 and data['type'] == 'success':
                     self.conversation = data
-                    PrettyOutput.print(f"创建会话成功: {data['result']['id']}", OutputType.SUCCESS)
                     return True
                 else:
                     PrettyOutput.print(f"创建会话失败: {data['message']}", OutputType.ERROR)
@@ -112,9 +116,6 @@ class OyiModel(BasePlatform):
             str: Model response
         """
         try:
-            if not self.suppress_output:
-                PrettyOutput.print("发送请求...", OutputType.PROGRESS)
-            
             # 确保有会话ID
             if not self.conversation:
                 if not self.create_conversation():
@@ -184,7 +185,6 @@ class OyiModel(BasePlatform):
             
             if response.status_code == 200:
                 if not self.suppress_output:
-                    PrettyOutput.print("接收响应...", OutputType.PROGRESS)
                     PrettyOutput.print(response.text, OutputType.SYSTEM)
                 self.messages.append({"role": "assistant", "content": response.text})
                 return response.text
@@ -232,7 +232,6 @@ class OyiModel(BasePlatform):
             if response.status_code == 200:
                 data = response.json()
                 if data['code'] == 200 and data['type'] == 'success':
-                    PrettyOutput.print("会话删除成功", OutputType.SUCCESS)
                     self.reset()
                     return True
                 else:
@@ -294,7 +293,6 @@ class OyiModel(BasePlatform):
                     if response.status_code == 200:
                         data = response.json()
                         if data.get('code') == 200:
-                            PrettyOutput.print("文件上传成功", OutputType.SUCCESS)
                             self.upload_files.append(data)
                             return data
                         else:

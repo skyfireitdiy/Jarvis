@@ -11,6 +11,8 @@ class AI8Model(BasePlatform):
     
     platform_name = "ai8"
     BASE_URL = "https://ai8.rcouyi.com"
+
+    first_time = True
     
     def __init__(self):
         """Initialize model"""
@@ -23,46 +25,47 @@ class AI8Model(BasePlatform):
         # 获取可用模型列表
         available_models = self.get_available_models()
         
-        if available_models:
-            PrettyOutput.section("支持的模型", OutputType.SUCCESS)
-            for model in self.models.values():
-                # 格式化显示模型信息
-                model_str = f"{model['value']:<30}"
-                
-                # 添加标签
-                model_str += f"{model['label']}"
-                
-                # 添加标签和积分信息
-                attrs = []
-                if model['attr'].get('tag'):
-                    attrs.append(model['attr']['tag'])
-                if model['attr'].get('integral'):
-                    attrs.append(model['attr']['integral'])
+        if AI8Model.first_time:
+            AI8Model.first_time = False
+            if available_models:
+                PrettyOutput.section("支持的模型", OutputType.SUCCESS)
+                for model in self.models.values():
+                    # 格式化显示模型信息
+                    model_str = f"{model['value']:<30}"
                     
-                # 添加特性标记
-                features = []
-                if model['attr'].get('multimodal'):
-                    features.append("多模态")
-                if model['attr'].get('plugin'):
-                    features.append("插件支持")
-                if model['attr'].get('onlyImg'):
-                    features.append("图像支持")
-                if features:
-                    model_str += f" [{'|'.join(features)}]"
+                    # 添加标签
+                    model_str += f"{model['label']}"
                     
-                # 添加备注
-                if model['attr'].get('note'):
-                    model_str += f" - {model['attr']['note']}"
-                    
-                PrettyOutput.print(model_str, OutputType.INFO)
-        else:
-            PrettyOutput.print("获取模型列表失败", OutputType.WARNING)
+                    # 添加标签和积分信息
+                    attrs = []
+                    if model['attr'].get('tag'):
+                        attrs.append(model['attr']['tag'])
+                    if model['attr'].get('integral'):
+                        attrs.append(model['attr']['integral'])
+                        
+                    # 添加特性标记
+                    features = []
+                    if model['attr'].get('multimodal'):
+                        features.append("多模态")
+                    if model['attr'].get('plugin'):
+                        features.append("插件支持")
+                    if model['attr'].get('onlyImg'):
+                        features.append("图像支持")
+                    if features:
+                        model_str += f" [{'|'.join(features)}]"
+                        
+                    # 添加备注
+                    if model['attr'].get('note'):
+                        model_str += f" - {model['attr']['note']}"
+                        
+                    PrettyOutput.print(model_str, OutputType.INFO)
+            else:
+                PrettyOutput.print("获取模型列表失败", OutputType.WARNING)
 
         self.token = os.getenv("AI8_API_KEY")
         if not self.token:
             raise Exception("AI8_API_KEY is not set")
         
-        PrettyOutput.print("使用AI8_MODEL环境变量配置模型", OutputType.SUCCESS)
         
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
         if self.model_name not in self.models:
@@ -103,7 +106,6 @@ class AI8Model(BasePlatform):
                 return False
             
             self.conversation = data['data']
-            PrettyOutput.print(f"创建会话成功: {data['data']['id']}", OutputType.SUCCESS)
             
             # 2. 更新会话设置
             session_data = {
@@ -126,7 +128,6 @@ class AI8Model(BasePlatform):
                 data = response.json()
                 if data['code'] == 0:
                     self.conversation = data['data']
-                    PrettyOutput.print("会话设置更新成功", OutputType.SUCCESS)
                     return True
                 else:
                     PrettyOutput.print(f"更新会话设置失败: {data.get('msg', '未知错误')}", OutputType.ERROR)
@@ -149,7 +150,6 @@ class AI8Model(BasePlatform):
                 "name": name,
                 "data": f"data:image/png;base64,{base64_data}"
             })
-            PrettyOutput.print(f"文件 {name} 已准备好发送", OutputType.SUCCESS)
     
     def set_system_message(self, message: str):
         """Set system message"""
@@ -158,8 +158,6 @@ class AI8Model(BasePlatform):
     def chat(self, message: str) -> str:
         """执行对话"""
         try:
-            if not self.suppress_output:
-                PrettyOutput.print("发送请求...", OutputType.PROGRESS)
             
             # 确保有会话ID
             if not self.conversation:
@@ -263,7 +261,6 @@ class AI8Model(BasePlatform):
             if response.status_code == 200:
                 data = response.json()
                 if data['code'] == 0:
-                    PrettyOutput.print("会话删除成功", OutputType.SUCCESS)
                     self.reset()
                     return True
                 else:
