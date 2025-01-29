@@ -141,6 +141,7 @@ class RAGTool:
         # 初始化配置
         self.min_paragraph_length = int(os.environ.get("JARVIS_MIN_PARAGRAPH_LENGTH", "50"))  # 最小段落长度
         self.max_paragraph_length = int(os.environ.get("JARVIS_MAX_PARAGRAPH_LENGTH", "1000"))  # 最大段落长度
+        self.context_window = int(os.environ.get("JARVIS_CONTEXT_WINDOW", "5"))  # 上下文窗口大小，默认前后各5个片段
         
         # 初始化数据目录
         self.data_dir = os.path.join(self.root_dir, ".jarvis-rag")
@@ -160,6 +161,7 @@ class RAGTool:
         self.cache_path = os.path.join(self.data_dir, "cache.pkl")
         self.documents: List[Document] = []
         self.index = None
+        self.max_context_length = int(os.getenv("JARVIS_MAX_CONTEXT_LENGTH", 65536))
         
         # 加载缓存
         self._load_cache()
@@ -424,11 +426,58 @@ class RAGTool:
         
         # 返回结果
         results = []
+        current_length = 0
+        
         for idx, distance in zip(indices[0], distances[0]):
             if idx == -1:  # FAISS返回-1表示无效结果
                 continue
+                
+            doc = self.documents[idx]
             similarity = 1.0 / (1.0 + float(distance))
-            results.append((self.documents[idx], similarity))
+            
+            # 获取同一文件中的所有文档片段
+            file_docs = [d for d in self.documents if d.metadata['file_path'] == doc.metadata['file_path']]
+            file_docs.sort(key=lambda x: x.metadata['chunk_index'])
+            
+            # 找到当前片段的索引
+            current_idx = file_docs.index(doc)
+            
+            # 尝试不同的上下文窗口大小，从最大到最小
+            added = False
+            for window_size in range(self.context_window, -1, -1):
+                start_idx = max(0, current_idx - window_size)
+                end_idx = min(len(file_docs), current_idx + window_size + 1)
+                
+                # 合并内容，包含上下文
+                content_parts = []
+                content_parts.extend(file_docs[i].content for i in range(start_idx, current_idx))
+                content_parts.append(doc.content)
+                content_parts.extend(file_docs[i].content for i in range(current_idx + 1, end_idx))
+                
+                merged_content = "\n".join(content_parts)
+                
+                # 创建文档对象
+                context_doc = Document(
+                    content=merged_content,
+                    metadata={
+                        **doc.metadata,
+                        "similarity": similarity
+                    }
+                )
+                
+                # 计算添加这个结果后的总长度
+                total_content_length = len(merged_content)
+                
+                # 检查是否在长度限制内
+                if current_length + total_content_length <= self.max_context_length:
+                    results.append((context_doc, similarity))
+                    current_length += total_content_length
+                    added = True
+                    break
+            
+            # 如果即使没有上下文也无法添加，就停止添加更多结果
+            if not added:
+                break
                 
         return results
 
@@ -443,11 +492,8 @@ class RAGTool:
             query: 查询文本
             
         Returns:
-            相关文档列表
+            相关文档列表，包含上下文
         """
-        if not self.is_index_built():
-            raise ValueError("索引未构建，请先调用build_index()")
-            
         results = self.search(query)
         return [doc for doc, _ in results]
 
@@ -471,14 +517,13 @@ class RAGTool:
             for doc in results:
                 context.append(f"""
 来源文件: {doc.metadata['file_path']}
-片段位置: {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}
 内容:
 {doc.content}
 ---
 """)
 
             # 构建提示词
-            prompt = f"""请基于以下文档片段回答用户的问题。如果文档片段中的信息不足以完整回答问题，请明确指出。
+            prompt = f"""请基于以下文档片段回答用户的问题。如果文档内容不足以完整回答问题，请明确指出。
             
 用户问题: {question}
 
@@ -525,9 +570,6 @@ def main():
             return 0
 
         if args.search or args.ask:
-            if not rag.is_index_built():
-                PrettyOutput.print("索引尚未构建，请先使用 --dir 和 --build 参数构建索引", output_type=OutputType.WARNING)
-                return 1
 
             if args.search:
                 results = rag.query(args.search)
