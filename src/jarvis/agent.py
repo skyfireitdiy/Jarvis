@@ -266,8 +266,10 @@ class Agent:
                 
                 # 检查是否包含工具调用
                 try:
-                    result = Agent.extract_tool_calls(response)
-                    PrettyOutput.print(result, OutputType.RESULT)
+                    tool_calls = Agent.extract_tool_calls(response)
+                    if tool_calls:
+                        Agent.handle_tool_calls(tool_calls)
+                        PrettyOutput.print(tool_calls, OutputType.RESULT)
                 except Exception as e:
                     PrettyOutput.print(f"处理方法论生成失败: {str(e)}", OutputType.ERROR)
                 
