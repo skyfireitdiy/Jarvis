@@ -18,7 +18,7 @@ class CodeBase:
         load_env_from_file()
         self.root_dir = root_dir
         os.chdir(self.root_dir)
-        self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT") or 10)
+        self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT") or 1)
         self.max_context_length = int(os.getenv("JARVIS_MAX_CONTEXT_LENGTH", 65536))
             
         # 初始化数据目录
@@ -398,9 +398,8 @@ class CodeBase:
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(True)
 
-        try:
-            # 构建重排序的prompt
-            prompt = f"""请根据用户的查询，对以下代码文件进行相关性排序。对每个文件给出0-100的相关性分数，分数越高表示越相关。
+        # 构建重排序的prompt
+        prompt = f"""请根据用户的查询，对以下代码文件进行相关性排序。对每个文件给出0-100的相关性分数，分数越高表示越相关。
 只需要输出每个文件的分数，格式为：
 <RERANK_START>
 文件路径: 分数
@@ -411,62 +410,57 @@ class CodeBase:
 
 待评估文件:
 """
-            for path, _, desc in initial_results:
-                prompt += f"""
+        for path, _, desc in initial_results:
+            prompt += f"""
 文件: {path}
 描述: {desc}
 ---
 """
-            
-            response = model.chat(prompt)
-            
-            # 提取<RERANK_START>和<RERANK_END>之间的内容
-            start_tag = "<RERANK_START>"
-            end_tag = "<RERANK_END>"
-            if start_tag in response and end_tag in response:
-                response = response[response.find(start_tag) + len(start_tag):response.find(end_tag)]
-            
-            # 解析响应，提取文件路径和分数
-            scored_results = []
-            for line in response.split('\n'):
-                if ':' not in line:
-                    continue
-                try:
-                    file_path, score_str = line.split(':', 1)
-                    file_path = file_path.strip()
-                    score = float(score_str.strip()) / 100.0  # 转换为0-1范围
-                    # 只保留相关度大于等于0.7的结果
-                    if score >= 0.7:
-                        # 找到对应的原始描述
-                        desc = next((desc for p, _, desc in initial_results if p == file_path), "")
-                        scored_results.append((file_path, score, desc))
-                except:
-                    continue
-            
-            # 按分数降序排序
-            return sorted(scored_results, key=lambda x: x[1], reverse=True)
-            
-        finally:
-            model.delete_chat()
         
-        return initial_results
+        response = model.chat(prompt)
+        
+        # 提取<RERANK_START>和<RERANK_END>之间的内容
+        start_tag = "<RERANK_START>"
+        end_tag = "<RERANK_END>"
+        if start_tag in response and end_tag in response:
+            response = response[response.find(start_tag) + len(start_tag):response.find(end_tag)]
+        
+        # 解析响应，提取文件路径和分数
+        scored_results = []
+        for line in response.split('\n'):
+            if ':' not in line:
+                continue
+            try:
+                file_path, score_str = line.split(':', 1)
+                file_path = file_path.strip()
+                score = float(score_str.strip()) / 100.0  # 转换为0-1范围
+                # 只保留相关度大于等于0.7的结果
+                if score >= 0.7:
+                    # 找到对应的原始描述
+                    desc = next((desc for p, _, desc in initial_results if p == file_path), "")
+                    scored_results.append((file_path, score, desc))
+            except:
+                continue
+        
+        # 按分数降序排序
+        return sorted(scored_results, key=lambda x: x[1], reverse=True)
+        
 
     def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float, str]]:
         """搜索相似文件"""
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(True)
         
-        try:
-            prompt = f"""请根据以下查询，生成意思完全相同的另一个表述。这个表述将用于代码搜索，所以要保持专业性和准确性。
+
+        prompt = f"""请根据以下查询，生成意思完全相同的另一个表述。这个表述将用于代码搜索，所以要保持专业性和准确性。
 原始查询: {query}
 
 请直接输出新表述，不要有编号或其他标记。
 """
+        
+        query = model.chat(prompt)
             
-            query = model.chat(prompt)
-            
-        finally:
-            model.delete_chat()
+
 
         PrettyOutput.print(f"查询:  {query}", output_type=OutputType.INFO)
         
@@ -537,11 +531,8 @@ class CodeBase:
 请用专业的语言回答用户的问题，如果给出的文件内容不足以回答用户的问题，请告诉用户，绝对不要胡编乱造。
 """
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
-        try:
-            response = model.chat(prompt)
-            return response
-        finally:
-            model.delete_chat()
+        response = model.chat(prompt)
+        return response
 
     def is_index_generated(self) -> bool:
         """检查索引是否已经生成"""

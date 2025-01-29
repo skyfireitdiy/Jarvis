@@ -10,6 +10,10 @@ class BasePlatform(ABC):
         self.suppress_output = False  # 添加输出控制标志
         pass
 
+    def __del__(self):
+        """销毁模型"""
+        self.delete_chat()
+
     def set_model_name(self, model_name: str):
         """设置模型名称"""
         raise NotImplementedError("set_model_name is not implemented")
