@@ -162,10 +162,8 @@ class KimiModel(BasePlatform):
         if not file_list:
             return []
 
-        PrettyOutput.print("Progress: 开始处理文件上传...", OutputType.PROGRESS)
         
         if not self.chat_id:
-            PrettyOutput.print("创建新的对话会话...", OutputType.PROGRESS)
             if not self._create_chat():
                 raise Exception("Failed to create chat session")
 
@@ -178,28 +176,23 @@ class KimiModel(BasePlatform):
                 action = "image" if mime_type and mime_type.startswith('image/') else "file"
                 
                 # 获取预签名URL
-                PrettyOutput.print("获取上传URL...", OutputType.PROGRESS)
                 presigned_data = self._get_presigned_url(file_path, action)
                 
                 # 上传文件
-                PrettyOutput.print("上传文件内容...", OutputType.PROGRESS)
                 if self._upload_file(file_path, presigned_data["url"]):
                     # 获取文件信息
-                    PrettyOutput.print("获取文件信息...", OutputType.PROGRESS)
+                    file_info = self._get_file_info(presigned_data, os.path.basename(file_path), action)
                     file_info = self._get_file_info(presigned_data, os.path.basename(file_path), action)
                     # 等待文件解析
-                    PrettyOutput.print("等待文件解析完成...", OutputType.PROGRESS)
 
                     # 只有文件需要解析
                     if action == "file":
                         if self._wait_for_parse(file_info["id"]):
                             uploaded_files.append(file_info)
-                            PrettyOutput.print(f"Success: 文件处理成功: {file_path}", OutputType.SUCCESS)
                         else:
                             PrettyOutput.print(f"✗ 文件解析失败: {file_path}", OutputType.ERROR)
                     else:
                         uploaded_files.append(file_info)
-                        PrettyOutput.print(f"Success: 文件处理成功: {file_path}", OutputType.SUCCESS)
                 else:
                     PrettyOutput.print(f"Error: 文件上传失败: {file_path}", OutputType.ERROR)
                     
@@ -207,19 +200,12 @@ class KimiModel(BasePlatform):
                 PrettyOutput.print(f"✗ 处理文件出错 {file_path}: {str(e)}", OutputType.ERROR)
                 continue
         
-        if uploaded_files:
-            PrettyOutput.print(f"成功处理 {len(uploaded_files)}/{len(file_list)} 个文件", OutputType.SUCCESS)
-        else:
-            PrettyOutput.print("没有文件成功处理", OutputType.ERROR)
-        
         self.uploaded_files = uploaded_files
         return uploaded_files
 
     def chat(self, message: str) -> str:
         """发送消息并获取响应"""
         if not self.chat_id:
-            if not self.suppress_output:
-                PrettyOutput.print("创建新的对话会话...", OutputType.PROGRESS)
             if not self._create_chat():
                 raise Exception("Failed to create chat session")
 
@@ -230,15 +216,11 @@ class KimiModel(BasePlatform):
         refs_file = []
         if self.first_chat:
             if self.uploaded_files:
-                if not self.suppress_output:
-                    PrettyOutput.print(f"首次对话，引用 {len(self.uploaded_files)} 个文件...", OutputType.PROGRESS)
                 refs = [f["id"] for f in self.uploaded_files]
                 refs_file = self.uploaded_files
             message = self.system_message + "\n" + message
             self.first_chat = False
         
-        if not self.suppress_output:
-            PrettyOutput.print("发送请求...", OutputType.PROGRESS)
         payload = {
             "messages": [{"role": "user", "content": message}],
             "use_search": True,
@@ -262,9 +244,6 @@ class KimiModel(BasePlatform):
             # 收集搜索和引用结果
             search_results = []
             ref_sources = []
-            
-            if not self.suppress_output:
-                PrettyOutput.print("接收响应...", OutputType.PROGRESS)
             
             for line in response.iter_lines():
                 if not line:
@@ -382,7 +361,6 @@ class KimiModel(BasePlatform):
         try:
             response = while_success(lambda: requests.delete(url, headers=headers), sleep_time=5)
             if response.status_code == 200:
-                PrettyOutput.print("会话已删除", OutputType.SUCCESS)
                 self.reset()
                 return True
             else:
