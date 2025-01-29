@@ -486,9 +486,6 @@ def main():
     parser.add_argument('-l', '--language', help='编程语言', default="python")
     args = parser.parse_args()
     
-    # 设置平台
-    if not args.platform:
-        print("错误: 未指定AI平台，请使用 -p 参数")
         
     tool = JarvisCoder(args.dir, args.language)
     
