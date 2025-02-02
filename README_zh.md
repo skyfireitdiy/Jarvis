@@ -70,7 +70,6 @@ Jarvis 支持通过环境变量进行配置，可以在 `~/.jarvis_env` 文件�
 | JARVIS_CODEGEN_MODEL | 代码生成使用的模型名称 | 同 JARVIS_MODEL | 否 |
 | JARVIS_CHEAP_PLATFORM | 低成本操作使用的 AI 平台 | 同 JARVIS_PLATFORM | 否 |
 | JARVIS_CHEAP_MODEL | 低成本操作使用的模型名称 | 同 JARVIS_MODEL | 否 |
-| JARVIS_EMBEDDING_MODEL | 代码分析使用的嵌入模型 | BAAI/bge-large-zh-v1.5 | 否 |
 | OPENAI_API_KEY | OpenAI 平台的 API 密钥 | - | OpenAI 必需 |
 | OPENAI_API_BASE | OpenAI API 的基础 URL | https://api.deepseek.com | 否 |
 | OPENAI_MODEL_NAME | OpenAI 的模型名称 | deepseek-chat | 否 |

@@ -111,7 +111,7 @@ class AI8Model(BasePlatform):
             session_data = {
                 **self.conversation,
                 "model": self.model_name,
-                "contextCount": 1024,
+                "contextCount": 65536,
                 "prompt": self.system_message,
                 "plugins": [],
                 "localPlugins": None,
