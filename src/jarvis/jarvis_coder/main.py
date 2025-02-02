@@ -127,27 +127,24 @@ class JarvisCoder:
 修改格式说明：
 1. 每个修改块格式如下：
 <PATCH>
->>>>>> path/to/file
+> path/to/file
 要替换的内容
 =======
 新的内容
->>>>>>
 </PATCH>
 
 2. 如果是新文件或者替换整个文件内容，格式如下：
 <PATCH>
->>>>>> path/to/new/file
+> path/to/new/file
 =======
 新文件的完整内容
->>>>>>
 </PATCH>
 
 3. 如果要删除文件中的某一段，格式如下：
 <PATCH>
->>>>>> path/to/file
+> path/to/file
 要删除的内容
 =======
->>>>>>
 </PATCH>
 
 文件列表如下：
@@ -170,7 +167,7 @@ class JarvisCoder:
 3、要替换的内容，一定要与文件内容完全一致，不要有任何多余或者缺失的内容
 4、每个patch不超过20行，超出20行，请生成多个patch
 """
-        
+
         success, response = self._call_model_with_retry(self.main_model, prompt)
         if not success:
             return []
@@ -204,7 +201,7 @@ class JarvisCoder:
                     continue
                     
                 # 获取文件路径
-                file_path_match = re.search(r'>>>>>> (.*)', lines[0])
+                file_path_match = re.search(r'> (.*)', lines[0])
                 if not file_path_match:
                     error_info.append(f"无法解析文件路径: {lines[0]}")
                     return False, "\n".join(error_info)
@@ -220,7 +217,7 @@ class JarvisCoder:
                     return False, "\n".join(error_info)
                 
                 old_content = parts[0]
-                new_content = parts[1].split(">>>>>>")[0]
+                new_content = parts[1].split("</PATCH>")[0]
                 
                 # 处理新文件
                 if not old_content:
