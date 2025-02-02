@@ -355,11 +355,25 @@ class JarvisCoder:
                         "error": UserWarning("用户取消修改")
                     }
             else:
-                PrettyOutput.print(f"补丁应用失败，请求重新生成: {error_info}", OutputType.WARNING)
-                retry_prompt = f"""补丁应用失败，请根据以下错误信息重新生成补丁：
+                PrettyOutput.print(f"补丁应用失败: {error_info}", OutputType.WARNING)
+                
+                # 让用户输入补充信息
+                user_info = get_multiline_input("""
+补丁应用失败。请提供更多信息来帮助修复问题：
+1. 是否需要调整代码位置？
+2. 是否有特殊的格式要求？
+3. 是否需要考虑其他文件的依赖？
+4. 其他补充说明？
+
+请输入补充信息(直接回车跳过):""")
+                
+                retry_prompt = f"""补丁应用失败，请根据以下信息重新生成补丁：
 
 错误信息：
 {error_info}
+
+用户补充信息：
+{user_info if user_info else "用户未提供补充信息"}
 
 请确保：
 1. 准确定位要修改的代码位置
