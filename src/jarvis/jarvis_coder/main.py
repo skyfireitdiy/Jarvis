@@ -128,23 +128,54 @@ class JarvisCoder:
 1. 每个修改块格式如下：
 <PATCH>
 > path/to/file
-要替换的内容
+def old_function():
+    print("old code")
+    return False
 =======
-新的内容
+def old_function():
+    print("new code")
+    return True
 </PATCH>
 
 2. 如果是新文件或者替换整个文件内容，格式如下：
 <PATCH>
-> path/to/new/file
+> src/new_module.py
 =======
-新文件的完整内容
+from typing import List
+
+def new_function():
+    return "This is a new file"
 </PATCH>
 
 3. 如果要删除文件中的某一段，格式如下：
 <PATCH>
 > path/to/file
-要删除的内容
+    # 这是要删除的注释
+    deprecated_code = True
+    if deprecated_code:
+        print("old feature")
 =======
+</PATCH>
+
+4. 如果要修改导入语句，格式如下：
+<PATCH>
+> src/main.py
+from old_module import old_class
+=======
+from new_module import new_class
+</PATCH>
+
+5. 如果要修改类定义，格式如下：
+<PATCH>
+> src/models.py
+class OldModel:
+    def __init__(self):
+        self.value = 0
+=======
+class OldModel:
+    def __init__(self):
+        self.value = 1
+        self.name = "new"
 </PATCH>
 
 文件列表如下：
@@ -345,12 +376,38 @@ class JarvisCoder:
                     }
                 else:
                     self._revert_changes()
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "修改被用户取消，文件未发生任何变化",
-                        "error": UserWarning("用户取消修改")
-                    }
+                    
+                    # 让用户输入调整意见
+                    user_feedback = get_multiline_input("""
+请提供修改建议，帮助生成更好的补丁：
+1. 修改的位置是否正确？
+2. 修改的内容是否合适？
+3. 是否有遗漏的修改？
+4. 其他调整建议？
+
+请输入调整意见(直接回车跳过):""")
+                    
+                    if not user_feedback:
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": "修改被用户取消，文件未发生任何变化",
+                            "error": UserWarning("用户取消修改")
+                        }
+                    
+                    retry_prompt = f"""补丁被用户拒绝，请根据用户意见重新生成补丁：
+
+用户意见：
+{user_feedback}
+
+请重新生成补丁，确保：
+1. 按照用户意见调整修改内容
+2. 准确定位要修改的代码位置
+3. 正确处理代码缩进
+4. 考虑代码上下文
+"""
+                    patches = self._remake_patch(retry_prompt)
+                    continue
             else:
                 PrettyOutput.print(f"补丁应用失败: {error_info}", OutputType.WARNING)
                 
