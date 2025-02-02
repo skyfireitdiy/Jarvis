@@ -8,7 +8,7 @@ import json
 
 from .models.registry import PlatformRegistry
 from .tools import ToolRegistry
-from .utils import PrettyOutput, OutputType, get_multiline_input, load_embedding_model, while_success
+from .utils import PrettyOutput, OutputType, get_max_context_length, get_multiline_input, load_embedding_model, while_success
 import os
 from datetime import datetime
 from prompt_toolkit import prompt
@@ -33,7 +33,7 @@ class Agent:
         
         # 从环境变量加载配置
         self.embedding_dimension = 1536  # Default for many embedding models
-        self.max_context_length = int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '65536'))  # 默认30k
+        self.max_context_length = get_max_context_length()
         
         # 初始化嵌入模型
         try:
@@ -72,10 +72,10 @@ class Agent:
         
         # 逐行处理
         for line in lines:
-            if '<START_TOOL_CALL>' in line:
+            if '<TOOL_CALL>' in line:
                 in_tool_call = True
                 continue
-            elif '<END_TOOL_CALL>' in line:
+            elif '</TOOL_CALL>' in line:
                 if in_tool_call and tool_call_lines:
                     try:
                         # 直接解析YAML
@@ -344,7 +344,7 @@ class Agent:
 4. 生成解决方案：生成一个或者多个具备可操作性的解决方案
 5. 评估解决方案：从众多解决方案中选择一种最优的方案
 6. 制定行动计划：根据目前可以使用的工具制定行动计划，使用 PlantUML 格式输出明确的执行流程
-7. 执行行动计划：每步执行一个步骤，最多使用一个工具（工具执行完成后，等待工具结果再执行下一步）
+7. 执行行动计划：每步执行一个步骤，**最多使用一个工具**（工具执行完成后，等待工具结果再执行下一步）
 8. 监控与调整：如果执行结果与预期不符，则反思并调整行动计划，迭代之前的步骤
 9. 方法论：如果当前任务具有通用性且执行过程中遇到了值得记录的经验，使用方法论工具记录方法论，以提升后期处理类似问题的能力
 10. 任务结束：如果任务已经完成，使用任务结束指令结束任务
@@ -362,12 +362,12 @@ class Agent:
 
 工具使用格式：
 
-<START_TOOL_CALL>
+<TOOL_CALL>
 name: tool_name
 arguments:
     param1: value1
     param2: value2
-<END_TOOL_CALL>
+</TOOL_CALL>
 
 -------------------------------------------------------------
 
@@ -381,6 +381,7 @@ arguments:
 7. 在执行一些可能对系统或者用户代码库造成破坏的工具时，请先询问用户
 8. 在多次迭代却没有任何进展时，可请求用户指导
 9. 如果返回的yaml字符串中包含冒号，请将整个字符串用引号包裹，避免yaml解析错误
+10. yaml中包含多行字符串时，请使用 | 语法
 
 {methodology_prompt}
 

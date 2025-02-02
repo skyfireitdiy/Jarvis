@@ -75,10 +75,9 @@ Jarvis 支持通过环境变量进行配置，可以在 `~/.jarvis_env` 文件�
 | OPENAI_API_BASE | OpenAI API 的基础 URL | https://api.deepseek.com | 否 |
 | OPENAI_MODEL_NAME | OpenAI 的模型名称 | deepseek-chat | 否 |
 | AI8_API_KEY | AI8 平台的 API 密钥 | - | AI8 必需 |
-| AI8_MODEL | AI8 平台的模型名称 | deepseek-chat | 否 |
 | KIMI_API_KEY | Kimi 平台的 API 密钥 | - | Kimi 必需 |
 | OYI_API_KEY | OYI 平台的 API 密钥 | - | OYI 必需 |
-| OYI_MODEL | OYI 平台的模型名称 | deepseek-chat | 否 |
+| OLLAMA_API_BASE | Ollama API 的基础 URL | http://localhost:11434 | 否 |
 
 ## 🎯 使用方法
 

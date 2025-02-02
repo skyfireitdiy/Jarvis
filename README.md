@@ -75,10 +75,9 @@ Jarvis supports configuration through environment variables that can be set in t
 | OPENAI_API_BASE | Base URL for OpenAI API | https://api.deepseek.com | No |
 | OPENAI_MODEL_NAME | Model name for OpenAI | deepseek-chat | No |
 | AI8_API_KEY | API key for AI8 platform | - | Required for AI8 |
-| AI8_MODEL | Model name for AI8 platform | deepseek-chat | No |
 | KIMI_API_KEY | API key for Kimi platform | - | Required for Kimi |
 | OYI_API_KEY | API key for OYI platform | - | Required for OYI |
-| OYI_MODEL | Model name for OYI platform | deepseek-chat | No |
+| OLLAMA_API_BASE | Base URL for Ollama API | http://localhost:11434 | No |
 
 
 ## 🎯 Usage

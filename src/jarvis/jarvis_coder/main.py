@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Tuple
 
 import yaml
 from jarvis.models.base import BasePlatform
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_multiline_input, load_env_from_file
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
 from jarvis.jarvis_codebase.main import CodeBase
 from prompt_toolkit import PromptSession
@@ -22,7 +22,7 @@ class JarvisCoder:
     def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
 
-        self.max_context_length = int(os.getenv("JARVIS_MAX_CONTEXT_LENGTH", 65536))
+        self.max_context_length = get_max_context_length()
 
 
         self.root_dir = find_git_root(root_dir)
@@ -113,8 +113,8 @@ class JarvisCoder:
             return []
             
         try:
-            patches = re.findall(r'<PATCH_START>.*?<PATCH_END>', response, re.DOTALL)
-            return [patch.replace('<PATCH_START>', '').replace('<PATCH_END>', '').strip() 
+            patches = re.findall(r'<PATCH>.*?</PATCH>', response, re.DOTALL)
+            return [patch.replace('<PATCH>', '').replace('</PATCH>', '').strip() 
                    for patch in patches if patch.strip()]
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
@@ -126,29 +126,29 @@ class JarvisCoder:
 
 修改格式说明：
 1. 每个修改块格式如下：
-<PATCH_START>
+<PATCH>
 >>>>>> path/to/file
 要替换的内容
 =======
 新的内容
 >>>>>>
-<PATCH_END>
+</PATCH>
 
 2. 如果是新文件或者替换整个文件内容，格式如下：
-<PATCH_START>
+<PATCH>
 >>>>>> path/to/new/file
 =======
 新文件的完整内容
 >>>>>>
-<PATCH_END>
+</PATCH>
 
 3. 如果要删除文件中的某一段，格式如下：
-<PATCH_START>
+<PATCH>
 >>>>>> path/to/file
 要删除的内容
 =======
 >>>>>>
-<PATCH_END>
+</PATCH>
 
 文件列表如下：
 """
@@ -158,14 +158,14 @@ class JarvisCoder:
                 continue
             prompt += f"""{i}. {file["file_path"]}\n"""
             prompt += f"""文件内容:\n"""
-            prompt += f"<FILE_CONTENT_START>\n"
+            prompt += f"<FILE_CONTENT>\n"
             prompt += f'{file["file_content"]}\n'
-            prompt += f"<FILE_CONTENT_END>\n"
+            prompt += f"</FILE_CONTENT>\n"
         
         prompt += f"\n需求描述: {feature}\n"
         prompt += """
 注意事项：
-1、仅输出补丁内容，不要输出任何其他内容，每个补丁必须用<PATCH_START>和<PATCH_END>标记
+1、仅输出补丁内容，不要输出任何其他内容，每个补丁必须用<PATCH>和</PATCH>标记
 2、如果在大段代码中有零星修改，生成多个补丁
 3、要替换的内容，一定要与文件内容完全一致，不要有任何多余或者缺失的内容
 4、每个patch不超过20行，超出20行，请生成多个patch
@@ -177,8 +177,8 @@ class JarvisCoder:
             
         try:
             # 使用正则表达式匹配每个patch块
-            patches = re.findall(r'<PATCH_START>.*?<PATCH_END>', response, re.DOTALL)
-            return [patch.replace('<PATCH_START>', '').replace('<PATCH_END>', '').strip() 
+            patches = re.findall(r'<PATCH>.*?</PATCH>', response, re.DOTALL)
+            return [patch.replace('<PATCH>', '').replace('</PATCH>', '').strip() 
                    for patch in patches if patch.strip()]
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
