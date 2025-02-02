@@ -7,7 +7,7 @@ from jarvis.models.registry import PlatformRegistry
 import concurrent.futures
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, get_thread_count, load_embedding_model
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, get_thread_count, load_embedding_model, load_rerank_model
 from jarvis.utils import load_env_from_file
 import argparse
 from sentence_transformers import SentenceTransformer
@@ -398,60 +398,59 @@ class CodeBase:
             PrettyOutput.print("没有检测到文件变更，无需重建索引", output_type=OutputType.INFO)
 
     def rerank_results(self, query: str, initial_results: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
-        """使用大模型对搜索结果重新排序"""
+        """使用 BAAI/bge-reranker-v2-m3 对搜索结果重新排序"""
         if not initial_results:
             return []
-
-        model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
-        # model.set_suppress_output(True)
-
-        # 构建重排序的prompt
-        prompt = f"""请根据用户的查询，对以下代码文件进行相关性排序。对每个文件给出0-100的相关性分数，分数越高表示越相关。
-只需要输出每个文件的分数，格式为：
-<RERANK>
-文件路径: 分数
-文件路径: 分数
-</RERANK>
-
-用户查询: {query}
-
-待评估文件:
-"""
-        for path, _, desc in initial_results:
-            prompt += f"""
-文件: {path}
-描述: {desc}
----
-"""
-        
-        response = model.chat(prompt)
-        
-        # 提取<RERANK>和</RERANK>之间的内容
-        start_tag = "<RERANK>"
-        end_tag = "</RERANK>"
-        if start_tag in response and end_tag in response:
-            response = response[response.find(start_tag) + len(start_tag):response.find(end_tag)]
-        
-        # 解析响应，提取文件路径和分数
-        scored_results = []
-        for line in response.split('\n'):
-            if ':' not in line:
-                continue
-            try:
-                file_path, score_str = line.split(':', 1)
-                file_path = file_path.strip()
-                score = float(score_str.strip()) / 100.0  # 转换为0-1范围
-                # 只保留相关度大于等于0.7的结果
-                if score >= 0.7:
-                    # 找到对应的原始描述
-                    desc = next((desc for p, _, desc in initial_results if p == file_path), "")
-                    scored_results.append((file_path, score, desc))
-            except:
-                continue
-        
-        # 按分数降序排序
-        return sorted(scored_results, key=lambda x: x[1], reverse=True)
-        
+            
+        try:
+            import torch
+            
+            # 加载模型和分词器
+            model, tokenizer = load_rerank_model()
+            
+            # 准备数据
+            pairs = []
+            for path, _, desc in initial_results:
+                # 组合文件路径和描述作为文档内容
+                doc_content = f"文件: {path}\n描述: {desc}"
+                pairs.append([query, doc_content])
+                
+            # 对每个文档对进行打分
+            scores = []
+            batch_size = 8  # 可以根据显存大小调整
+            
+            with torch.no_grad():
+                for i in range(0, len(pairs), batch_size):
+                    batch_pairs = pairs[i:i + batch_size]
+                    encoded = tokenizer(
+                        batch_pairs,
+                        padding=True,
+                        truncation=True,
+                        max_length=512,
+                        return_tensors='pt'
+                    )
+                    
+                    if torch.cuda.is_available():
+                        encoded = {k: v.cuda() for k, v in encoded.items()}
+                        
+                    outputs = model(**encoded)
+                    batch_scores = torch.softmax(outputs.logits, dim=1)[:, 1].cpu().numpy()
+                    scores.extend(batch_scores.tolist())
+            
+            # 将分数与原始结果组合并排序
+            scored_results = []
+            for (path, _, desc), score in zip(initial_results, scores):
+                if score >= 0.5:  # 只保留相关度大于 0.5 的结果
+                    scored_results.append((path, float(score), desc))
+                    
+            # 按分数降序排序
+            scored_results.sort(key=lambda x: x[1], reverse=True)
+            
+            return scored_results
+            
+        except Exception as e:
+            PrettyOutput.print(f"重排序失败，使用原始排序: {str(e)}", output_type=OutputType.WARNING)
+            return initial_results
 
     def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float, str]]:
         """搜索相似文件"""

@@ -10,6 +10,8 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
 from prompt_toolkit.formatted_text import FormattedText
 from sentence_transformers import SentenceTransformer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import torch
 
 # 初始化colorama
 colorama.init()
@@ -211,7 +213,7 @@ def find_git_root(dir="."):
 
 def load_embedding_model():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    model_name = os.environ.get("JARVIS_EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5")
+    model_name = "BAAI/bge-large-zh-v1.5"
     PrettyOutput.print(f"正在加载嵌入模型: {model_name}...", OutputType.INFO)
     try:
         # 首先尝试离线加载
@@ -233,6 +235,44 @@ def load_embedding_model():
         PrettyOutput.print("模型下载并加载成功", OutputType.SUCCESS)
     
     return embedding_model
+
+def load_rerank_model():
+    """加载重排序模型"""
+    model_name = "BAAI/bge-reranker-v2-m3"
+    PrettyOutput.print(f"正在加载重排序模型: {model_name}...", OutputType.INFO)
+    
+    try:
+        # 首先尝试离线加载
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            local_files_only=True,
+            cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name,
+            local_files_only=True,
+            cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
+        )
+        PrettyOutput.print("使用本地缓存加载模型成功", OutputType.SUCCESS)
+    except Exception as local_error:
+        PrettyOutput.print(f"本地加载失败，尝试在线下载: {str(local_error)}", OutputType.WARNING)
+        # 如果离线加载失败，尝试在线下载
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name,
+            cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
+        )
+        PrettyOutput.print("模型下载并加载成功", OutputType.SUCCESS)
+    
+    # 如果有 GPU 就使用 GPU
+    if torch.cuda.is_available():
+        model = model.cuda()
+    model.eval()
+    
+    return model, tokenizer
 
 def get_max_context_length():
     return int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '131072'))  # 默认128k
