@@ -496,7 +496,7 @@ class CodeBase:
             # 只保留关联度大于等于0.5的结果
             if similarity >= 0.5:
                 PrettyOutput.print(f"  {self.file_paths[i]} : 距离 {distance:.3f}, 关联度 {similarity:.3f}", 
-                                 output_type=OutputType.INFO)
+                                 output_type=OutputType.SUCCESS)
                 
                 file_path = self.file_paths[i]
                 data = self.vector_cache[file_path]
