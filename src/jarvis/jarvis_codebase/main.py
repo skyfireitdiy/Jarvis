@@ -196,10 +196,15 @@ class CodeBase:
             if cached_vector is not None:
                 return cached_vector
                 
-            # 组合文件信息
+            # 读取文件内容并组合信息
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()[:self.max_context_length]  # 限制文件内容长度
+            
+            # 组合文件信息，包含文件内容
             combined_text = f"""
 文件路径: {file_path}
 文件描述: {description}
+文件内容: {content}
 """
             vector = self.get_embedding(combined_text)
             
@@ -408,16 +413,23 @@ class CodeBase:
             # 加载模型和分词器
             model, tokenizer = load_rerank_model()
             
-            # 准备数据
+            # 准备数据 - 加入文件内容进行更准确的重排序
             pairs = []
             for path, _, desc in initial_results:
-                # 组合文件路径和描述作为文档内容
-                doc_content = f"文件: {path}\n描述: {desc}"
-                pairs.append([query, doc_content])
-                
-            # 对每个文档对进行打分
-            scores = []
-            batch_size = 8  # 可以根据显存大小调整
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        content = f.read()[:512]  # 限制内容长度
+                    # 组合文件路径、描述和内容
+                    doc_content = f"文件: {path}\n描述: {desc}\n内容: {content}"
+                    pairs.append([query, doc_content])
+                except Exception as e:
+                    PrettyOutput.print(f"读取文件失败 {path}: {str(e)}", 
+                                    output_type=OutputType.ERROR)
+                    doc_content = f"文件: {path}\n描述: {desc}"
+                    pairs.append([query, doc_content])
+            
+            # 使用更大的batch size提高处理速度
+            batch_size = 16  # 根据GPU显存调整
             
             with torch.no_grad():
                 for i in range(0, len(pairs), batch_size):
@@ -436,18 +448,17 @@ class CodeBase:
                     outputs = model(**encoded)
                     # 修改这里：直接使用 outputs.logits 作为分数
                     batch_scores = outputs.logits.squeeze(-1).cpu().numpy()
-                    scores.extend(batch_scores.tolist())
             
             # 归一化分数到 0-1 范围
-            if scores:
-                min_score = min(scores)
-                max_score = max(scores)
+            if batch_scores:
+                min_score = min(batch_scores)
+                max_score = max(batch_scores)
                 if max_score > min_score:
-                    scores = [(s - min_score) / (max_score - min_score) for s in scores]
+                    batch_scores = [(s - min_score) / (max_score - min_score) for s in batch_scores]
             
             # 将分数与原始结果组合并排序
             scored_results = []
-            for (path, _, desc), score in zip(initial_results, scores):
+            for (path, _, desc), score in zip(initial_results, batch_scores):
                 if score >= 0.5:  # 只保留相关度大于 0.5 的结果
                     scored_results.append((path, float(score), desc))
                     
@@ -462,55 +473,48 @@ class CodeBase:
 
     def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float, str]]:
         """搜索关联文件"""
-        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        model.set_suppress_output(True)
-        
-
-        prompt = f"""请根据以下查询，生成意思完全相同的另一个表述。这个表述将用于代码搜索，所以要保持专业性和准确性。
+        try:
+            # 生成多个查询变体以提高召回率
+            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+            model.set_suppress_output(True)
+            
+            prompt = f"""请根据以下查询，生成3个不同的表述，每个表述都要完整表达原始查询的意思。这些表述将用于代码搜索，要保持专业性和准确性。
 原始查询: {query}
 
-请直接输出新表述，不要有编号或其他标记。
+请直接输出3个表述，用换行分隔，不要有编号或其他标记。
 """
-        
-        query = model.chat(prompt)
+            query_variants = model.chat(prompt).strip().split('\n')
+            query_variants.append(query)  # 添加原始查询
             
-
-
-        PrettyOutput.print(f"查询:  {query}", output_type=OutputType.INFO)
-        
-        # 为每个查询获取关联文件
-        q_vector = self.get_embedding(query)
-        q_vector = q_vector.reshape(1, -1)
+            # 对每个查询变体进行搜索
+            all_results = {}
+            for q in query_variants:
+                q_vector = self.get_embedding(q)
+                q_vector = q_vector.reshape(1, -1)
+                
+                distances, indices = self.index.search(q_vector, top_k)
+                
+                for i, distance in zip(indices[0], distances[0]):
+                    if i == -1:
+                        continue
+                        
+                    similarity = 1.0 / (1.0 + float(distance))
+                    if similarity >= 0.5:
+                        file_path = self.file_paths[i]
+                        # 使用最高的相似度分数
+                        if file_path not in all_results or similarity > all_results[file_path][1]:
+                            data = self.vector_cache[file_path]
+                            all_results[file_path] = (file_path, similarity, data["description"])
             
-        distances, indices = self.index.search(q_vector, top_k)
-
-        PrettyOutput.print(f"查询 {query} 的结果: ", output_type=OutputType.INFO)
-
-        initial_results = []
-        
-        for i, distance in zip(indices[0], distances[0]):
-            if i == -1:  # faiss返回-1表示无效结果
-                continue
-                
-            similarity = 1.0 / (1.0 + float(distance))
-            # 只保留关联度大于等于0.5的结果
-            if similarity >= 0.5:
-                PrettyOutput.print(f"  {self.file_paths[i]} : 距离 {distance:.3f}, 关联度 {similarity:.3f}", 
-                                 output_type=OutputType.SUCCESS)
-                
-                file_path = self.file_paths[i]
-                data = self.vector_cache[file_path]
-                initial_results.append((file_path, similarity, data["description"]))
-
-        if not initial_results:
-            PrettyOutput.print("没有找到关联度大于0.5的文件", output_type=OutputType.WARNING)
+            # 转换为列表并排序
+            results = list(all_results.values())
+            results.sort(key=lambda x: x[1], reverse=True)
+            
+            return results[:top_k]
+            
+        except Exception as e:
+            PrettyOutput.print(f"搜索失败: {str(e)}", output_type=OutputType.ERROR)
             return []
-
-        # 使用大模型重新排序
-        PrettyOutput.print("重排序...", output_type=OutputType.INFO)
-        reranked_results = self.rerank_results(query, initial_results)
-        
-        return reranked_results
 
     def ask_codebase(self, query: str, top_k: int=20) -> str:
         """查询代码库"""

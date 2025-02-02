@@ -5,7 +5,7 @@ import faiss
 from typing import List, Tuple, Optional, Dict
 from sentence_transformers import SentenceTransformer
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, load_embedding_model
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, load_embedding_model, load_rerank_model
 from jarvis.utils import load_env_from_file
 import tiktoken
 from dataclasses import dataclass
@@ -14,6 +14,8 @@ import fitz  # PyMuPDF for PDF files
 from docx import Document as DocxDocument  # python-docx for DOCX files
 from pathlib import Path
 from jarvis.models.registry import PlatformRegistry
+import shutil
+from datetime import datetime
 
 @dataclass
 class Document:
@@ -193,15 +195,30 @@ class RAGTool:
                 self.index = None
 
     def _save_cache(self, vectors: np.ndarray):
-        """保存缓存数据"""
+        """优化缓存保存"""
         try:
+            # 添加版本号和时间戳
             cache_data = {
+                "version": "1.0",
+                "timestamp": datetime.now().isoformat(),
                 "documents": self.documents,
-                "vectors": vectors
+                "vectors": vectors,
+                "metadata": {
+                    "vector_dim": self.vector_dim,
+                    "total_docs": len(self.documents),
+                    "model_name": self.embedding_model.__class__.__name__
+                }
             }
+            
+            # 使用压缩存储
             with open(self.cache_path, 'wb') as f:
-                pickle.dump(cache_data, f)
-            PrettyOutput.print(f"保存了 {len(self.documents)} 个文档片段", 
+                pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            
+            # 创建备份
+            backup_path = f"{self.cache_path}.backup"
+            shutil.copy2(self.cache_path, backup_path)
+            
+            PrettyOutput.print(f"缓存已保存: {len(self.documents)} 个文档片段", 
                             output_type=OutputType.INFO)
         except Exception as e:
             PrettyOutput.print(f"保存缓存失败: {str(e)}", 
@@ -209,100 +226,74 @@ class RAGTool:
 
     def _build_index(self, vectors: np.ndarray):
         """构建FAISS索引"""
-        # 创建HNSW索引
-        hnsw_index = faiss.IndexHNSWFlat(self.vector_dim, 16)
-        hnsw_index.hnsw.efConstruction = 40
-        hnsw_index.hnsw.efSearch = 16
+        # 添加IVF索引以提高大规模检索性能
+        nlist = max(4, int(vectors.shape[0] / 1000))  # 每1000个向量一个聚类中心
+        quantizer = faiss.IndexFlatIP(self.vector_dim)
+        self.index = faiss.IndexIVFFlat(quantizer, self.vector_dim, nlist, faiss.METRIC_INNER_PRODUCT)
         
-        # 用IndexIDMap包装HNSW索引
-        self.index = faiss.IndexIDMap(hnsw_index)
-        
-        # 添加向量到索引
         if vectors.shape[0] > 0:
-            self.index.add_with_ids(vectors, np.arange(vectors.shape[0]))
+            # 训练IVF索引
+            self.index.train(vectors)
+            self.index.add(vectors)
+            # 设置搜索时探测的聚类数
+            self.index.nprobe = min(nlist, 10)
         else:
             self.index = None
 
     def _split_text(self, text: str) -> List[str]:
-        """将文本分割成段落
+        """使用更智能的分块策略"""
+        # 添加重叠分块以保持上下文连贯性
+        overlap_size = min(200, self.max_paragraph_length // 4)
         
-        Args:
-            text: 要分割的文本
-            
-        Returns:
-            分割后的段落列表
-        """
-        # 首先按空行分割
         paragraphs = []
-        current_paragraph = []
+        current_chunk = []
+        current_length = 0
         
-        for line in text.split('\n'):
-            line = line.strip()
-            if not line:  # 空行表示段落结束
-                if current_paragraph:
-                    paragraph_text = ' '.join(current_paragraph)
-                    if len(paragraph_text) >= self.min_paragraph_length:
-                        paragraphs.append(paragraph_text)
-                    current_paragraph = []
-            else:
-                current_paragraph.append(line)
+        # 首先按句子分割
+        sentences = []
+        current_sentence = []
+        sentence_ends = {'。', '！', '？', '…', '.', '!', '?'}
         
-        # 处理最后一个段落
-        if current_paragraph:
-            paragraph_text = ' '.join(current_paragraph)
-            if len(paragraph_text) >= self.min_paragraph_length:
-                paragraphs.append(paragraph_text)
-        
-        # 处理过长的段落
-        final_paragraphs = []
-        for paragraph in paragraphs:
-            if len(paragraph) <= self.max_paragraph_length:
-                final_paragraphs.append(paragraph)
-            else:
-                # 按句子分割过长的段落
-                sentences = []
+        for char in text:
+            current_sentence.append(char)
+            if char in sentence_ends:
+                sentence = ''.join(current_sentence)
+                if sentence.strip():
+                    sentences.append(sentence)
                 current_sentence = []
-                
-                # 中文句子结束标记
-                sentence_ends = {'。', '！', '？', '…', '.', '!', '?'}
-                
-                for char in paragraph:
-                    current_sentence.append(char)
-                    if char in sentence_ends:
-                        sentence = ''.join(current_sentence)
-                        if sentence.strip():
-                            sentences.append(sentence)
-                        current_sentence = []
-                
-                # 处理最后一个句子
-                if current_sentence:
-                    sentence = ''.join(current_sentence)
-                    if sentence.strip():
-                        sentences.append(sentence)
-                
-                # 组合句子成适当长度的段落
-                current_chunk = []
-                current_length = 0
-                
-                for sentence in sentences:
-                    sentence_length = len(sentence)
-                    if current_length + sentence_length > self.max_paragraph_length:
-                        if current_chunk:
-                            final_paragraphs.append(''.join(current_chunk))
-                        current_chunk = [sentence]
-                        current_length = sentence_length
-                    else:
-                        current_chunk.append(sentence)
-                        current_length += sentence_length
-                
-                # 处理最后一个chunk
+        
+        if current_sentence:
+            sentence = ''.join(current_sentence)
+            if sentence.strip():
+                sentences.append(sentence)
+        
+        # 基于句子构建重叠块
+        for sentence in sentences:
+            if current_length + len(sentence) > self.max_paragraph_length:
                 if current_chunk:
-                    final_paragraphs.append(''.join(current_chunk))
+                    chunk_text = ' '.join(current_chunk)
+                    if len(chunk_text) >= self.min_paragraph_length:
+                        paragraphs.append(chunk_text)
+                        
+                    # 保留部分内容作为重叠
+                    overlap_text = ' '.join(current_chunk[-2:])  # 保留最后两句
+                    current_chunk = []
+                    if overlap_text:
+                        current_chunk.append(overlap_text)
+                        current_length = len(overlap_text)
+                    else:
+                        current_length = 0
+                        
+            current_chunk.append(sentence)
+            current_length += len(sentence)
         
-        # 过滤掉太短的段落
-        final_paragraphs = [p for p in final_paragraphs if len(p) >= self.min_paragraph_length]
+        # 处理最后一个chunk
+        if current_chunk:
+            chunk_text = ' '.join(current_chunk)
+            if len(chunk_text) >= self.min_paragraph_length:
+                paragraphs.append(chunk_text)
         
-        return final_paragraphs
+        return paragraphs
 
     def _get_embedding(self, text: str) -> np.ndarray:
         """获取文本的向量表示"""
@@ -410,82 +401,131 @@ class RAGTool:
                         output_type=OutputType.SUCCESS)
 
     def search(self, query: str, top_k: int = 5) -> List[Tuple[Document, float]]:
-        """搜索相关文档
-        
-        Args:
-            query: 查询文本
-            top_k: 返回结果数量
-            
-        Returns:
-            文档和相似度得分的列表
-        """
+        """优化搜索策略"""
         if not self.index:
             PrettyOutput.print("索引未构建，正在构建...", output_type=OutputType.INFO)
             self.build_index(self.root_dir)
+        
+        # 实现MMR (Maximal Marginal Relevance) 来增加结果多样性
+        def mmr(query_vec, doc_vecs, doc_ids, lambda_param=0.5, n_docs=top_k):
+            selected = []
+            selected_ids = []
             
-        # 获取查询的向量表示
+            while len(selected) < n_docs and len(doc_ids) > 0:
+                best_score = -1
+                best_idx = -1
+                
+                for i, (doc_vec, doc_id) in enumerate(zip(doc_vecs, doc_ids)):
+                    # 计算与查询的相似度
+                    query_sim = float(np.dot(query_vec, doc_vec))
+                    
+                    # 计算与已选文档的最大相似度
+                    if selected:
+                        doc_sims = [float(np.dot(doc_vec, selected_doc)) for selected_doc in selected]
+                        max_doc_sim = max(doc_sims)
+                    else:
+                        max_doc_sim = 0
+                    
+                    # MMR score
+                    score = lambda_param * query_sim - (1 - lambda_param) * max_doc_sim
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_idx = i
+                
+                if best_idx == -1:
+                    break
+                
+                selected.append(doc_vecs[best_idx])
+                selected_ids.append(doc_ids[best_idx])
+                doc_vecs = np.delete(doc_vecs, best_idx, axis=0)
+                doc_ids = np.delete(doc_ids, best_idx)
+            
+            return selected_ids
+        
+        # 获取查询向量
         query_vector = self._get_embedding(query)
         query_vector = query_vector.reshape(1, -1)
         
-        # 搜索最相似的向量
-        distances, indices = self.index.search(query_vector, top_k)
+        # 初始搜索更多结果用于MMR
+        initial_k = min(top_k * 2, len(self.documents))
+        distances, indices = self.index.search(query_vector, initial_k)
         
-        # 返回结果
+        # 获取有效结果
+        valid_indices = indices[0][indices[0] != -1]
+        valid_vectors = np.vstack([self._get_embedding(self.documents[idx].content) for idx in valid_indices])
+        
+        # 应用MMR
+        final_indices = mmr(query_vector[0], valid_vectors, valid_indices, n_docs=top_k)
+        
+        # 构建结果
         results = []
-        current_length = 0
-        
-        for idx, distance in zip(indices[0], distances[0]):
-            if idx == -1:  # FAISS返回-1表示无效结果
-                continue
-                
+        for idx in final_indices:
             doc = self.documents[idx]
-            similarity = 1.0 / (1.0 + float(distance))
-            
-            # 获取同一文件中的所有文档片段
-            file_docs = [d for d in self.documents if d.metadata['file_path'] == doc.metadata['file_path']]
-            file_docs.sort(key=lambda x: x.metadata['chunk_index'])
-            
-            # 找到当前片段的索引
-            current_idx = file_docs.index(doc)
-            
-            # 尝试不同的上下文窗口大小，从最大到最小
-            added = False
-            for window_size in range(self.context_window, -1, -1):
-                start_idx = max(0, current_idx - window_size)
-                end_idx = min(len(file_docs), current_idx + window_size + 1)
-                
-                # 合并内容，包含上下文
-                content_parts = []
-                content_parts.extend(file_docs[i].content for i in range(start_idx, current_idx))
-                content_parts.append(doc.content)
-                content_parts.extend(file_docs[i].content for i in range(current_idx + 1, end_idx))
-                
-                merged_content = "\n".join(content_parts)
-                
-                # 创建文档对象
-                context_doc = Document(
-                    content=merged_content,
-                    metadata={
-                        **doc.metadata,
-                        "similarity": similarity
-                    }
-                )
-                
-                # 计算添加这个结果后的总长度
-                total_content_length = len(merged_content)
-                
-                # 检查是否在长度限制内
-                if current_length + total_content_length <= self.max_context_length:
-                    results.append((context_doc, similarity))
-                    current_length += total_content_length
-                    added = True
-                    break
-            
-            # 如果即使没有上下文也无法添加，就停止添加更多结果
-            if not added:
-                break
-                
+            similarity = 1.0 / (1.0 + float(distances[0][np.where(indices[0] == idx)[0][0]]))
+            results.append((doc, similarity))
+        
         return results
+
+    def _rerank_results(self, query: str, initial_results: List[Tuple[Document, float]]) -> List[Tuple[Document, float]]:
+        """使用 rerank 模型重新排序搜索结果"""
+        try:
+            import torch
+            model, tokenizer = load_rerank_model()
+            
+            # 准备数据
+            pairs = []
+            for doc, _ in initial_results:
+                # 组合文档信息
+                doc_content = f"""
+文件: {doc.metadata['file_path']}
+内容: {doc.content}
+"""
+                pairs.append([query, doc_content])
+                
+            # 对每个文档对进行打分
+            scores = []
+            batch_size = 8
+            
+            with torch.no_grad():
+                for i in range(0, len(pairs), batch_size):
+                    batch_pairs = pairs[i:i + batch_size]
+                    encoded = tokenizer(
+                        batch_pairs,
+                        padding=True,
+                        truncation=True,
+                        max_length=512,
+                        return_tensors='pt'
+                    )
+                    
+                    if torch.cuda.is_available():
+                        encoded = {k: v.cuda() for k, v in encoded.items()}
+                        
+                    outputs = model(**encoded)
+                    batch_scores = outputs.logits.squeeze(-1).cpu().numpy()
+                    scores.extend(batch_scores.tolist())
+            
+            # 归一化分数到 0-1 范围
+            if scores:
+                min_score = min(scores)
+                max_score = max(scores)
+                if max_score > min_score:
+                    scores = [(s - min_score) / (max_score - min_score) for s in scores]
+            
+            # 将分数与文档组合并排序
+            scored_results = []
+            for (doc, _), score in zip(initial_results, scores):
+                if score >= 0.5:  # 只保留关联度大于 0.5 的结果
+                    scored_results.append((doc, float(score)))
+                    
+            # 按分数降序排序
+            scored_results.sort(key=lambda x: x[1], reverse=True)
+            
+            return scored_results
+            
+        except Exception as e:
+            PrettyOutput.print(f"重排序失败，使用原始排序: {str(e)}", output_type=OutputType.WARNING)
+            return initial_results
 
     def is_index_built(self):
         """检查索引是否已构建"""
@@ -567,8 +607,11 @@ def main():
     args = parser.parse_args()
 
     try:
-        current_dir = find_git_root()
+        current_dir = os.getcwd()
         rag = RAGTool(current_dir)
+
+        if not args.dir:
+            args.dir = current_dir
 
         if args.dir and args.build:
             PrettyOutput.print(f"正在处理目录: {args.dir}", output_type=OutputType.INFO)
