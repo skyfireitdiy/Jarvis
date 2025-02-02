@@ -270,8 +270,7 @@ class CodeBase:
             
         except Exception as e:
             PrettyOutput.print(f"处理文件失败 {file_path}: {str(e)}", 
-                             output_type=OutputType.ERROR,
-                             traceback=True)
+                             output_type=OutputType.ERROR)
             return None
 
     def build_index(self):
