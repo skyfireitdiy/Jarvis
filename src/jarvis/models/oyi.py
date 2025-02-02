@@ -2,7 +2,7 @@ import mimetypes
 import os
 from typing import Dict, List
 from jarvis.models.base import BasePlatform
-from jarvis.utils import PrettyOutput, OutputType
+from jarvis.utils import PrettyOutput, OutputType, get_max_context_length
 import requests
 import json
 
@@ -72,10 +72,10 @@ class OyiModel(BasePlatform):
                     "is_webSearch": True,
                     "message": [],
                     "systemMessage": None,
-                    "requestMsgCount": 1000,
+                    "requestMsgCount": 65536,
                     "temperature": 0.8,
                     "speechVoice": "Alloy",
-                    "max_tokens": 8192,
+                    "max_tokens": get_max_context_length(),
                     "chatPluginIds": []
                 })
             }
