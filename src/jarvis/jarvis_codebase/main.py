@@ -98,7 +98,7 @@ class CodeBase:
 5. 关键业务逻辑和处理流程
 6. 特殊功能点和亮点特性
 
-请用简洁专业的语言描述，突出代码的技术特征和功能特点，以便后续进行相似代码检索。
+请用简洁专业的语言描述，突出代码的技术特征和功能特点，以便后续进行关联代码检索。
 
 文件路径：{file_path}
 代码内容：
@@ -434,8 +434,16 @@ class CodeBase:
                         encoded = {k: v.cuda() for k, v in encoded.items()}
                         
                     outputs = model(**encoded)
-                    batch_scores = torch.softmax(outputs.logits, dim=1)[:, 1].cpu().numpy()
+                    # 修改这里：直接使用 outputs.logits 作为分数
+                    batch_scores = outputs.logits.squeeze(-1).cpu().numpy()
                     scores.extend(batch_scores.tolist())
+            
+            # 归一化分数到 0-1 范围
+            if scores:
+                min_score = min(scores)
+                max_score = max(scores)
+                if max_score > min_score:
+                    scores = [(s - min_score) / (max_score - min_score) for s in scores]
             
             # 将分数与原始结果组合并排序
             scored_results = []
@@ -453,7 +461,7 @@ class CodeBase:
             return initial_results
 
     def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float, str]]:
-        """搜索相似文件"""
+        """搜索关联文件"""
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(True)
         
@@ -470,7 +478,7 @@ class CodeBase:
 
         PrettyOutput.print(f"查询:  {query}", output_type=OutputType.INFO)
         
-        # 为每个查询获取相似文件
+        # 为每个查询获取关联文件
         q_vector = self.get_embedding(query)
         q_vector = q_vector.reshape(1, -1)
             
@@ -485,9 +493,9 @@ class CodeBase:
                 continue
                 
             similarity = 1.0 / (1.0 + float(distance))
-            # 只保留相似度大于等于0.5的结果
+            # 只保留关联度大于等于0.5的结果
             if similarity >= 0.5:
-                PrettyOutput.print(f"  {self.file_paths[i]} : 距离 {distance:.3f}, 相似度 {similarity:.3f}", 
+                PrettyOutput.print(f"  {self.file_paths[i]} : 距离 {distance:.3f}, 关联度 {similarity:.3f}", 
                                  output_type=OutputType.INFO)
                 
                 file_path = self.file_paths[i]
@@ -495,11 +503,11 @@ class CodeBase:
                 initial_results.append((file_path, similarity, data["description"]))
 
         if not initial_results:
-            PrettyOutput.print("没有找到相似度大于0.5的文件", output_type=OutputType.WARNING)
+            PrettyOutput.print("没有找到关联度大于0.5的文件", output_type=OutputType.WARNING)
             return []
 
         # 使用大模型重新排序
-        PrettyOutput.print("使用大模型重新排序...", output_type=OutputType.INFO)
+        PrettyOutput.print("重排序...", output_type=OutputType.INFO)
         reranked_results = self.rerank_results(query, initial_results)
         
         return reranked_results
@@ -507,6 +515,10 @@ class CodeBase:
     def ask_codebase(self, query: str, top_k: int=20) -> str:
         """查询代码库"""
         results = self.search_similar(query, top_k)
+        if not results:
+            PrettyOutput.print("没有找到关联的文件", output_type=OutputType.WARNING)
+            return ""
+        
         PrettyOutput.print(f"找到的关联文件: ", output_type=OutputType.SUCCESS)
         for path, score, _ in results:
             PrettyOutput.print(f"文件: {path} 关联度: {score:.3f}", 
