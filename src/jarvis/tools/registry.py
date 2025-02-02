@@ -19,7 +19,8 @@ class ToolRegistry:
         # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
-        self.max_context_length = get_max_context_length() * 0.8
+        # 确保 max_context_length 是整数
+        self.max_context_length = int(get_max_context_length() * 0.8)
 
     @staticmethod
     def get_global_tool_registry():
@@ -181,10 +182,11 @@ class ToolRegistry:
                         PrettyOutput.print("输出较长，正在总结...", OutputType.PROGRESS)
                         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
                         
-                        # 如果输出超过30k，只取最后30k字符
-                        if len(output) > self.max_context_length:
-                            output_to_summarize = output[-self.max_context_length:]
-                            truncation_notice = f"\n(注意: 由于输出过长，仅总结最后{self.max_context_length}字符)"
+                        # 如果输出超过最大上下文长度，只取最后部分
+                        max_len = self.max_context_length
+                        if len(output) > max_len:
+                            output_to_summarize = output[-max_len:]
+                            truncation_notice = f"\n(注意: 由于输出过长，仅总结最后{max_len}字符)"
                         else:
                             output_to_summarize = output
                             truncation_notice = ""
