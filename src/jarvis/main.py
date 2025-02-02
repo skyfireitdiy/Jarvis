@@ -132,7 +132,7 @@ def main():
                 user_input = get_multiline_input("请输入您的任务(输入空行退出):")
                 if not user_input or user_input == "__interrupt__":
                     break
-                agent.run(user_input, args.files, keep_history=args.keep_history)
+                agent.run(user_input, args.files)
             except Exception as e:
                 PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
