@@ -7,7 +7,7 @@ from jarvis.models.registry import PlatformRegistry
 import concurrent.futures
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, load_embedding_model
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, get_thread_count, load_embedding_model
 from jarvis.utils import load_env_from_file
 import argparse
 from sentence_transformers import SentenceTransformer
@@ -18,8 +18,8 @@ class CodeBase:
         load_env_from_file()
         self.root_dir = root_dir
         os.chdir(self.root_dir)
-        self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT") or 1)
-        self.max_context_length = int(os.getenv("JARVIS_MAX_CONTEXT_LENGTH", 65536))
+        self.thread_count = get_thread_count()
+        self.max_context_length = get_max_context_length()
             
         # 初始化数据目录
         self.data_dir = os.path.join(self.root_dir, ".jarvis-codebase")
@@ -408,10 +408,10 @@ class CodeBase:
         # 构建重排序的prompt
         prompt = f"""请根据用户的查询，对以下代码文件进行相关性排序。对每个文件给出0-100的相关性分数，分数越高表示越相关。
 只需要输出每个文件的分数，格式为：
-<RERANK_START>
+<RERANK>
 文件路径: 分数
 文件路径: 分数
-<RERANK_END>
+</RERANK>
 
 用户查询: {query}
 
@@ -426,9 +426,9 @@ class CodeBase:
         
         response = model.chat(prompt)
         
-        # 提取<RERANK_START>和<RERANK_END>之间的内容
-        start_tag = "<RERANK_START>"
-        end_tag = "<RERANK_END>"
+        # 提取<RERANK>和</RERANK>之间的内容
+        start_tag = "<RERANK>"
+        end_tag = "</RERANK>"
         if start_tag in response and end_tag in response:
             response = response[response.find(start_tag) + len(start_tag):response.find(end_tag)]
         

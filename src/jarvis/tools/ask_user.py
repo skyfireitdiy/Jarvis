@@ -2,11 +2,9 @@ from typing import Dict, Any
 from jarvis.tools.base import Tool
 from jarvis.utils import get_multiline_input, PrettyOutput, OutputType
 
-class AskUserTool(Tool):
-    def __init__(self):
-        super().__init__(
-            name="ask_user",
-            description="""当缺少完成任务的信息或有关键决策信息缺失时，询问用户。
+class AskUserTool:
+    name="ask_user",
+    description="""当缺少完成任务的信息或有关键决策信息缺失时，询问用户。
 用户可以输入多行文本，空行结束输入。
 
 使用场景：
@@ -17,17 +15,17 @@ class AskUserTool(Tool):
 
 参数说明：
 - question: 要询问用户的问题，应该清晰明确""",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "question": {
-                        "type": "string",
-                        "description": "要询问用户的问题"
-                    }
-                },
-                "required": ["question"]
+    parameters={
+        "type": "object",
+        "properties": {
+            "question": {
+                "type": "string",
+                "description": "要询问用户的问题"
             }
-        )
+        },
+        "required": ["question"]
+    }
+        
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行询问用户操作

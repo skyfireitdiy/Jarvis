@@ -233,3 +233,9 @@ def load_embedding_model():
         PrettyOutput.print("模型下载并加载成功", OutputType.SUCCESS)
     
     return embedding_model
+
+def get_max_context_length():
+    return int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '131072'))  # 默认128k
+
+def get_thread_count():
+    return int(os.getenv('JARVIS_THREAD_COUNT', '1'))  

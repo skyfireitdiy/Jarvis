@@ -5,7 +5,7 @@ import faiss
 from typing import List, Tuple, Optional, Dict
 from sentence_transformers import SentenceTransformer
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, load_embedding_model
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, load_embedding_model
 from jarvis.utils import load_env_from_file
 import tiktoken
 from dataclasses import dataclass
@@ -161,7 +161,7 @@ class RAGTool:
         self.cache_path = os.path.join(self.data_dir, "cache.pkl")
         self.documents: List[Document] = []
         self.index = None
-        self.max_context_length = int(os.getenv("JARVIS_MAX_CONTEXT_LENGTH", 65536))
+        self.max_context_length = get_max_context_length()
         
         # 加载缓存
         self._load_cache()

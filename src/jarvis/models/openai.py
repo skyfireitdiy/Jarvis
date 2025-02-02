@@ -30,8 +30,8 @@ class OpenAIModel(BasePlatform):
             PrettyOutput.print("   export OPENAI_MODEL_NAME=your_model_name", OutputType.INFO)
             raise Exception("OPENAI_API_KEY is not set")
             
-        self.base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com")
-        self.model_name = os.getenv("OPENAI_MODEL_NAME") or os.getenv("JARVIS_MODEL") or "deepseek-chat"
+        self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+        self.model_name =  os.getenv("JARVIS_MODEL") or "gpt-4o"
 
             
         self.client = OpenAI(
