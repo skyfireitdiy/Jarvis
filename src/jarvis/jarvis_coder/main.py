@@ -67,7 +67,6 @@ class JarvisCoder:
             PrettyOutput.print("代码库有未提交的文件，提交一次", OutputType.INFO)
             os.system(f"git add .")
             os.system(f"git commit -m 'commit before code edit'")
-# 从第三行开始是新的代码内容，将替换第一行到最后一行之间的所有内容：
         # 3. 查看代码库是否有未提交的文件，如果有，提交一次
         if self._has_uncommitted_files():
             PrettyOutput.print("代码库有未提交的文件，提交一次", OutputType.INFO)
