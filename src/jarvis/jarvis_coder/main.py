@@ -107,25 +107,72 @@ class JarvisCoder:
                 time.sleep(delay)
                 delay *= 2  # 指数退避
                 
-    def _remake_patch(self, prompt: str) -> List[str]:
-        success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)  # 增加重试次数
+    def _remake_patch(self, prompt: str) -> List[Tuple[str, str, str]]:
+        """重新生成补丁
+        
+        Returns:
+            List[Tuple[str, str, str]]: 补丁列表，每个补丁是 (格式, 文件路径, 补丁内容) 的元组
+        """
+        success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)
         if not success:
             return []
             
         try:
-            patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', response, re.DOTALL)
-            return [patch for patch in patches if patch]
+            patches = []
+            
+            # 匹配两种格式的补丁
+            fmt1_patches = re.finditer(r'<PATCH_FMT1>\n?(.*?)\n?</PATCH_FMT1>', response, re.DOTALL)
+            fmt2_patches = re.finditer(r'<PATCH_FMT2>\n?(.*?)\n?</PATCH_FMT2>', response, re.DOTALL)
+            
+            # 处理 FMT1 格式的补丁
+            for match in fmt1_patches:
+                patch_content = match.group(1)
+                if not patch_content:
+                    continue
+                    
+                # 提取文件路径和补丁内容
+                lines = patch_content.split('\n')
+                file_path_match = re.search(r'> (.*)', lines[0])
+                if not file_path_match:
+                    continue
+                    
+                file_path = file_path_match.group(1).strip()
+                patch_content = '\n'.join(lines[1:])
+                patches.append(("FMT1", file_path, patch_content))
+            
+            # 处理 FMT2 格式的补丁
+            for match in fmt2_patches:
+                patch_content = match.group(1)
+                if not patch_content:
+                    continue
+                    
+                # 提取文件路径和补丁内容
+                lines = patch_content.split('\n')
+                file_path_match = re.search(r'> (.*)', lines[0])
+                if not file_path_match:
+                    continue
+                    
+                file_path = file_path_match.group(1).strip()
+                patch_content = '\n'.join(lines[1:])
+                patches.append(("FMT2", file_path, patch_content))
+            
+            return patches
+            
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
             return []
+
+    def _make_patch(self, related_files: List[Dict], feature: str) -> List[Tuple[str, str, str]]:
+        """生成修改方案
         
-    def _make_patch(self, related_files: List[Dict], feature: str) -> List[str]:
-        """生成修改方案"""
+        Returns:
+            List[Tuple[str, str, str]]: 补丁列表，每个补丁是 (格式, 文件路径, 补丁内容) 的元组
+        """
         prompt = """你是一个资深程序员，请根据需求描述，修改文件内容。
 
 修改格式说明：
-1. 每个修改块格式如下(6个@号作为分割新旧代码的分割符)：
-<PATCH>
+1. 第一种格式 - 完整代码块替换：
+<PATCH_FMT1>
 > path/to/file
 def old_function():
     print("old code")
@@ -134,50 +181,26 @@ def old_function():
 def old_function():
     print("new code")
     return True
-</PATCH>
+</PATCH_FMT1>
 
-2. 如果是新文件或者替换整个文件内容，格式如下：
-<PATCH>
-> src/new_module.py
-@@@@@@
-from typing import List
-
-def new_function():
-    return "This is a new file"
-</PATCH>
-
-3. 如果要删除文件中的某一段，格式如下：
-<PATCH>
+2. 第二种格式 - 通过首尾行定位：
+<PATCH_FMT2>
 > path/to/file
-    # 这是要删除的注释
-    deprecated_code = True
-    if deprecated_code:
-        print("old feature")
-@@@@@@
-</PATCH>
+    def old_function():  # 第一行内容
+    return False  # 最后一行内容
+    def new_function():
+        print("new code")
+        return True
+</PATCH_FMT2>
 
-4. 如果要修改导入语句，格式如下：
-<PATCH>
-> src/main.py
-from old_module import old_class
-@@@@@@
-from new_module import new_class
-</PATCH>
-
-5. 如果要修改类定义，格式如下：
-<PATCH>
-> src/models.py
-class OldModel:
-    def __init__(self):
-        self.value = 0
-@@@@@@
-class OldModel:
-    def __init__(self):
-        self.value = 1
-        self.name = "new"
-</PATCH>
-
-文件列表如下：
+注意事项：
+1、仅输出补丁内容，不要输出任何其他内容
+2、如果在大段代码中有零星修改，生成多个补丁
+3、要替换的内容，一定要与文件内容完全一致，不要有任何多余或者缺失的内容
+4、每个patch不超过20行，超出20行，请生成多个patch
+5、务必保留原始文件的缩进和格式
+6、优先使用第二种格式（PATCH_FMT2）
+7、如果第二种格式无法定位到要修改的代码或者有歧义，请使用第一种格式（PATCH_FMT1）
 """
         for i, file in enumerate(related_files):
             if len(prompt) > self.max_context_length:
@@ -190,30 +213,63 @@ class OldModel:
             prompt += f"</FILE_CONTENT>\n"
         
         prompt += f"\n需求描述: {feature}\n"
-        prompt += """
-注意事项：
-1、仅输出补丁内容，不要输出任何其他内容，每个补丁必须用<PATCH>和</PATCH>标记
-2、如果在大段代码中有零星修改，生成多个补丁
-3、要替换的内容，一定要与文件内容完全一致，不要有任何多余或者缺失的内容
-4、**每个patch不超过20行，超出20行，请生成多个patch**
-5、务必保留原始文件的缩进和格式
-"""
 
         success, response = self._call_model_with_retry(self.main_model, prompt)
         if not success:
             return []
             
         try:
-            # 使用正则表达式匹配每个patch块
-            patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', response, re.DOTALL)
-            # 直接返回匹配的内容，不需要替换标记
-            return [patch for patch in patches if patch]
+            patches = []
+            
+            # 匹配两种格式的补丁
+            fmt1_patches = re.finditer(r'<PATCH_FMT1>\n?(.*?)\n?</PATCH_FMT1>', response, re.DOTALL)
+            fmt2_patches = re.finditer(r'<PATCH_FMT2>\n?(.*?)\n?</PATCH_FMT2>', response, re.DOTALL)
+            
+            # 处理 FMT1 格式的补丁
+            for match in fmt1_patches:
+                patch_content = match.group(1)
+                if not patch_content:
+                    continue
+                    
+                # 提取文件路径和补丁内容
+                lines = patch_content.split('\n')
+                file_path_match = re.search(r'> (.*)', lines[0])
+                if not file_path_match:
+                    continue
+                    
+                file_path = file_path_match.group(1).strip()
+                patch_content = '\n'.join(lines[1:])
+                patches.append(("FMT1", file_path, patch_content))
+            
+            # 处理 FMT2 格式的补丁
+            for match in fmt2_patches:
+                patch_content = match.group(1)
+                if not patch_content:
+                    continue
+                    
+                # 提取文件路径和补丁内容
+                lines = patch_content.split('\n')
+                file_path_match = re.search(r'> (.*)', lines[0])
+                if not file_path_match:
+                    continue
+                    
+                file_path = file_path_match.group(1).strip()
+                patch_content = '\n'.join(lines[1:])
+                patches.append(("FMT2", file_path, patch_content))
+            
+            return patches
+            
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
             return []
 
-    def _apply_patch(self, related_files: List[Dict], patches: List[str]) -> Tuple[bool, str]:
-        """应用补丁"""
+    def _apply_patch(self, related_files: List[Dict], patches: List[Tuple[str, str, str]]) -> Tuple[bool, str]:
+        """应用补丁
+        
+        Args:
+            related_files: 相关文件列表
+            patches: 补丁列表，每个补丁是 (格式, 文件路径, 补丁内容) 的元组
+        """
         error_info = []
         modified_files = set()
 
@@ -222,51 +278,10 @@ class OldModel:
         temp_map = file_map.copy()  # 创建临时映射用于尝试应用
         
         # 尝试应用所有补丁
-        for i, patch in enumerate(patches):
+        for i, (fmt, file_path, patch_content) in enumerate(patches):
             PrettyOutput.print(f"正在应用补丁 {i+1}/{len(patches)}", OutputType.INFO)
             
             try:
-                # 解析补丁
-                lines = patch.split("\n")
-                if not lines:
-                    continue
-                    
-                # 获取文件路径
-                file_path_match = re.search(r'> (.*)', lines[0])
-                if not file_path_match:
-                    error_info.append(f"无法解析文件路径: {lines[0]}")
-                    return False, "\n".join(error_info)
-                    
-                file_path = file_path_match.group(1).strip()
-                
-                # 解析补丁内容
-                patch_content = "\n".join(lines[1:])
-                # 使用换行符分割，只有单独一行的 @@@@@@ 才作为分隔符
-                parts = []
-                current_part = []
-                for line in patch_content.splitlines(keepends=True):
-                    if line.strip() == "@@@@@@":
-                        if current_part:
-                            parts.append("".join(current_part))
-                            current_part = []
-                    else:
-                        current_part.append(line)
-                if current_part:
-                    parts.append("".join(current_part))
-                
-                if len(parts) != 2:
-                    error_info.append(f"补丁格式错误: {file_path}，parts数量: {len(parts)}")
-                    return False, "\n".join(error_info)
-                
-                old_content = parts[0]
-                new_content = parts[1].split("</PATCH>")[0]
-                
-                # 处理新文件
-                if not old_content:
-                    temp_map[file_path] = new_content
-                    modified_files.add(file_path)
-                    continue
-                
                 # 处理文件修改
                 if file_path not in temp_map:
                     error_info.append(f"文件不存在: {file_path}")
@@ -274,18 +289,69 @@ class OldModel:
                 
                 current_content = temp_map[file_path]
                 
-                # 查找并替换代码块
-                if old_content not in current_content:
-                    error_info.append(
-                        f"补丁应用失败: {file_path}\n"
-                        f"原因: 未找到要替换的代码\n"
-                        f"期望找到的代码:\n{old_content}\n"
-                        f"实际文件内容:\n{current_content[:200]}..."  # 只显示前200个字符
-                    )
-                    return False, "\n".join(error_info)
+                if fmt == "FMT1":  # 完整代码块替换格式
+                    parts = patch_content.split("@@@@@@")
+                    if len(parts) != 2:
+                        error_info.append(f"FMT1补丁格式错误: {file_path}，缺少分隔符")
+                        return False, "\n".join(error_info)
+                        
+                    old_content, new_content = parts
+                    
+                    # 处理新文件
+                    if not old_content:
+                        temp_map[file_path] = new_content
+                        modified_files.add(file_path)
+                        continue
+                    
+                    # 查找并替换代码块
+                    if old_content not in current_content:
+                        error_info.append(
+                            f"补丁应用失败: {file_path}\n"
+                            f"原因: 未找到要替换的代码\n"
+                            f"期望找到的代码:\n{old_content}\n"
+                            f"实际文件内容:\n{current_content[:200]}..."
+                        )
+                        return False, "\n".join(error_info)
+                    
+                    # 应用更改
+                    temp_map[file_path] = current_content.replace(old_content, new_content)
+                    
+                else:  # FMT2 - 首尾行定位格式
+                    lines = patch_content.splitlines()
+                    if len(lines) < 3:
+                        error_info.append(f"FMT2补丁格式错误: {file_path}，行数不足")
+                        return False, "\n".join(error_info)
+                        
+                    first_line = lines[0]
+                    last_line = lines[1]
+                    new_content = '\n'.join(lines[2:])
+                    
+                    # 在文件内容中定位要替换的区域
+                    content_lines = current_content.splitlines()
+                    start_idx = -1
+                    end_idx = -1
+                    
+                    # 查找匹配的起始行和结束行
+                    for idx, line in enumerate(content_lines):
+                        if line.rstrip() == first_line.rstrip():
+                            start_idx = idx
+                        if start_idx != -1 and line.rstrip() == last_line.rstrip():
+                            end_idx = idx
+                            break
+                    
+                    if start_idx == -1 or end_idx == -1:
+                        error_info.append(
+                            f"补丁应用失败: {file_path}\n"
+                            f"原因: 未找到匹配的代码范围\n"
+                            f"起始行: {first_line}\n"
+                            f"结束行: {last_line}"
+                        )
+                        return False, "\n".join(error_info)
+                    
+                    # 替换内容
+                    content_lines[start_idx:end_idx + 1] = new_content.splitlines()
+                    temp_map[file_path] = "\n".join(content_lines)
                 
-                # 应用更改
-                temp_map[file_path] = current_content.replace(old_content, new_content)
                 modified_files.add(file_path)
                 
             except Exception as e:
