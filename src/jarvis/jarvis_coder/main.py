@@ -113,9 +113,8 @@ class JarvisCoder:
             return []
             
         try:
-            patches = re.findall(r'<PATCH>.*?</PATCH>', response, re.DOTALL)
-            return [patch.replace('<PATCH>', '').replace('</PATCH>', '') 
-                   for patch in patches if patch]
+            patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', response, re.DOTALL)
+            return [patch for patch in patches if patch]
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
             return []
@@ -206,10 +205,9 @@ class OldModel:
             
         try:
             # 使用正则表达式匹配每个patch块
-            patches = re.findall(r'<PATCH>.*?</PATCH>', response, re.DOTALL)
-            # 只移除标记，保留内部的所有空白字符
-            return [patch.replace('<PATCH>', '').replace('</PATCH>', '') 
-                   for patch in patches if patch]
+            patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', response, re.DOTALL)
+            # 直接返回匹配的内容，不需要替换标记
+            return [patch for patch in patches if patch]
         except Exception as e:
             PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
             return []
