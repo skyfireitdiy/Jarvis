@@ -189,7 +189,6 @@ def main():
     parser.add_argument('-l', '--language', help='编程语言', default="python")
     args = parser.parse_args()
     
-        
     tool = JarvisCoder(args.dir, args.language)
     
     # 循环处理需求
@@ -208,10 +207,12 @@ def main():
             if result["success"]:
                 PrettyOutput.print(result["stdout"], OutputType.SUCCESS)
             else:
-                if result["stderr"]:
+                if result.get("stderr"):
                     PrettyOutput.print(result["stderr"], OutputType.WARNING)
-                if result["error"]:
-                    PrettyOutput.print(f"错误类型: {type(result['error']).__name__}", OutputType.WARNING)
+                if result.get("error"):  # 使用 get() 方法避免 KeyError
+                    error = result["error"]
+                    PrettyOutput.print(f"错误类型: {type(error).__name__}", OutputType.WARNING)
+                    PrettyOutput.print(f"错误信息: {str(error)}", OutputType.WARNING)
                 
         except KeyboardInterrupt:
             print("\n用户中断执行")
