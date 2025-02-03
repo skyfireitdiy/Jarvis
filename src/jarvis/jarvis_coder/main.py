@@ -197,6 +197,7 @@ class OldModel:
 2、如果在大段代码中有零星修改，生成多个补丁
 3、要替换的内容，一定要与文件内容完全一致，不要有任何多余或者缺失的内容
 4、**每个patch不超过20行，超出20行，请生成多个patch**
+5、务必保留原始文件的缩进和格式
 """
 
         success, response = self._call_model_with_retry(self.main_model, prompt)
@@ -431,7 +432,7 @@ class OldModel:
 4. 其他补充说明？
 
 请输入补充信息(直接回车跳过):""")
-                
+                PrettyOutput.print(f"开始重新生成补丁", OutputType.INFO)
                 retry_prompt = f"""补丁应用失败，请根据以下信息重新生成补丁：
 
 错误信息：
