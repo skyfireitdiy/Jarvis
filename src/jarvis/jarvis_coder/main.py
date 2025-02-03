@@ -14,6 +14,8 @@ from prompt_toolkit.completion import WordCompleter, Completer, Completion
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.styles import Style
 import fnmatch
+from .patch_handler import PatchHandler
+from .git_utils import has_uncommitted_files, generate_commit_message, save_edit_record
 
 # 全局锁对象
 index_lock = threading.Lock()
@@ -21,13 +23,18 @@ index_lock = threading.Lock()
 class JarvisCoder:
     def __init__(self, root_dir: str, language: str):
         """初始化代码修改工具"""
-
+        self.root_dir = root_dir
+        self.language = language
+        self._init_directories()
+        self._init_codebase()
+        
+    def _init_directories(self):
+        """初始化目录"""
         self.max_context_length = get_max_context_length()
 
-
-        self.root_dir = find_git_root(root_dir)
+        self.root_dir = find_git_root(self.root_dir)
         if not self.root_dir:
-            self.root_dir = root_dir
+            self.root_dir = self.root_dir
 
         PrettyOutput.print(f"Git根目录: {self.root_dir}", OutputType.INFO)
 
@@ -63,7 +70,8 @@ class JarvisCoder:
             os.system(f"git add .")
             os.system(f"git commit -m 'commit before code edit'")
 
-        # 4. 初始化代码库
+    def _init_codebase(self):
+        """初始化代码库"""
         self._codebase = CodeBase(self.root_dir)
 
     def _new_model(self):
@@ -82,336 +90,10 @@ class JarvisCoder:
         
         return bool(unstaged or staged or untracked)
 
-    def _call_model_with_retry(self, model: BasePlatform, prompt: str, max_retries: int = 3, initial_delay: float = 1.0) -> Tuple[bool, str]:
-        """调用模型并支持重试
-        
-        Args:
-            prompt: 提示词
-            max_retries: 最大重试次数
-            initial_delay: 初始延迟时间(秒)
-            
-        Returns:
-            Tuple[bool, str]: (是否成功, 响应内容)
-        """
-        delay = initial_delay
-        for attempt in range(max_retries):
-            try:
-                response = model.chat(prompt)
-                return True, response
-            except Exception as e:
-                if attempt == max_retries - 1:  # 最后一次尝试
-                    PrettyOutput.print(f"调用模型失败: {str(e)}", OutputType.ERROR)
-                    return False, str(e)
-                    
-                PrettyOutput.print(f"调用模型失败，{delay}秒后重试: {str(e)}", OutputType.WARNING)
-                time.sleep(delay)
-                delay *= 2  # 指数退避
-                
-    def _remake_patch(self, prompt: str) -> List[Tuple[str, str, str]]:
-        """重新生成补丁
-        
-        Returns:
-            List[Tuple[str, str, str]]: 补丁列表，每个补丁是 (格式, 文件路径, 补丁内容) 的元组
-        """
-        success, response = self._call_model_with_retry(self.main_model, prompt, max_retries=5)
-        if not success:
-            return []
-            
-        try:
-            patches = []
-            
-            # 匹配两种格式的补丁
-            fmt1_patches = re.finditer(r'<PATCH_FMT1>\n?(.*?)\n?</PATCH_FMT1>', response, re.DOTALL)
-            fmt2_patches = re.finditer(r'<PATCH_FMT2>\n?(.*?)\n?</PATCH_FMT2>', response, re.DOTALL)
-            
-            # 处理 FMT1 格式的补丁
-            for match in fmt1_patches:
-                patch_content = match.group(1)
-                if not patch_content:
-                    continue
-                    
-                # 提取文件路径和补丁内容
-                lines = patch_content.split('\n')
-                file_path_match = re.search(r'> (.*)', lines[0])
-                if not file_path_match:
-                    continue
-                    
-                file_path = file_path_match.group(1).strip()
-                patch_content = '\n'.join(lines[1:])
-                patches.append(("FMT1", file_path, patch_content))
-            
-            # 处理 FMT2 格式的补丁
-            for match in fmt2_patches:
-                patch_content = match.group(1)
-                if not patch_content:
-                    continue
-                    
-                # 提取文件路径和补丁内容
-                lines = patch_content.split('\n')
-                file_path_match = re.search(r'> (.*)', lines[0])
-                if not file_path_match:
-                    continue
-                    
-                file_path = file_path_match.group(1).strip()
-                patch_content = '\n'.join(lines[1:])
-                patches.append(("FMT2", file_path, patch_content))
-            
-            return patches
-            
-        except Exception as e:
-            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
-            return []
-
-    def _make_patch(self, related_files: List[Dict], feature: str) -> List[Tuple[str, str, str]]:
-        """生成修改方案
-        
-        Returns:
-            List[Tuple[str, str, str]]: 补丁列表，每个补丁是 (格式, 文件路径, 补丁内容) 的元组
-        """
-        prompt = """你是一个资深程序员，请根据需求描述，修改文件内容。
-
-修改格式说明：
-1. 第一种格式 - 完整代码块替换：
-<PATCH_FMT1>
-> path/to/file
-def old_function():
-    print("old code")
-    return False
-@@@@@@
-def old_function():
-    print("new code")
-    return True
-</PATCH_FMT1>
-
-2. 第二种格式 - 通过首尾行定位：
-<PATCH_FMT2>
-> path/to/file
-    def old_function():  # 第一行内容
-    return False  # 最后一行内容
-    def new_function():
-        print("new code")
-        return True
-</PATCH_FMT2>
-
-注意事项：
-1、仅输出补丁内容，不要输出任何其他内容
-2、如果在大段代码中有零星修改，生成多个补丁
-3、要替换的内容，一定要与文件内容完全一致，不要有任何多余或者缺失的内容
-4、每个patch不超过20行，超出20行，请生成多个patch
-5、务必保留原始文件的缩进和格式
-6、优先使用第二种格式（PATCH_FMT2）
-7、如果第二种格式无法定位到要修改的代码或者有歧义，请使用第一种格式（PATCH_FMT1）
-"""
-        for i, file in enumerate(related_files):
-            if len(prompt) > self.max_context_length:
-                PrettyOutput.print(f'避免上下文超限，丢弃低相关度文件：{file["file_path"]}', OutputType.WARNING)
-                continue
-            prompt += f"""{i}. {file["file_path"]}\n"""
-            prompt += f"""文件内容:\n"""
-            prompt += f"<FILE_CONTENT>\n"
-            prompt += f'{file["file_content"]}\n'
-            prompt += f"</FILE_CONTENT>\n"
-        
-        prompt += f"\n需求描述: {feature}\n"
-
-        success, response = self._call_model_with_retry(self.main_model, prompt)
-        if not success:
-            return []
-            
-        try:
-            patches = []
-            
-            # 匹配两种格式的补丁
-            fmt1_patches = re.finditer(r'<PATCH_FMT1>\n?(.*?)\n?</PATCH_FMT1>', response, re.DOTALL)
-            fmt2_patches = re.finditer(r'<PATCH_FMT2>\n?(.*?)\n?</PATCH_FMT2>', response, re.DOTALL)
-            
-            # 处理 FMT1 格式的补丁
-            for match in fmt1_patches:
-                patch_content = match.group(1)
-                if not patch_content:
-                    continue
-                    
-                # 提取文件路径和补丁内容
-                lines = patch_content.split('\n')
-                file_path_match = re.search(r'> (.*)', lines[0])
-                if not file_path_match:
-                    continue
-                    
-                file_path = file_path_match.group(1).strip()
-                patch_content = '\n'.join(lines[1:])
-                patches.append(("FMT1", file_path, patch_content))
-            
-            # 处理 FMT2 格式的补丁
-            for match in fmt2_patches:
-                patch_content = match.group(1)
-                if not patch_content:
-                    continue
-                    
-                # 提取文件路径和补丁内容
-                lines = patch_content.split('\n')
-                file_path_match = re.search(r'> (.*)', lines[0])
-                if not file_path_match:
-                    continue
-                    
-                file_path = file_path_match.group(1).strip()
-                patch_content = '\n'.join(lines[1:])
-                patches.append(("FMT2", file_path, patch_content))
-            
-            return patches
-            
-        except Exception as e:
-            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
-            return []
-
-    def _apply_patch(self, related_files: List[Dict], patches: List[Tuple[str, str, str]]) -> Tuple[bool, str]:
-        """应用补丁
-        
-        Args:
-            related_files: 相关文件列表
-            patches: 补丁列表，每个补丁是 (格式, 文件路径, 补丁内容) 的元组
-        """
-        error_info = []
-        modified_files = set()
-
-        # 创建文件内容映射
-        file_map = {file["file_path"]: file["file_content"] for file in related_files}
-        temp_map = file_map.copy()  # 创建临时映射用于尝试应用
-        
-        # 尝试应用所有补丁
-        for i, (fmt, file_path, patch_content) in enumerate(patches):
-            PrettyOutput.print(f"正在应用补丁 {i+1}/{len(patches)}", OutputType.INFO)
-            
-            try:
-                # 处理文件修改
-                if file_path not in temp_map:
-                    error_info.append(f"文件不存在: {file_path}")
-                    return False, "\n".join(error_info)
-                
-                current_content = temp_map[file_path]
-                
-                if fmt == "FMT1":  # 完整代码块替换格式
-                    parts = patch_content.split("@@@@@@")
-                    if len(parts) != 2:
-                        error_info.append(f"FMT1补丁格式错误: {file_path}，缺少分隔符")
-                        return False, "\n".join(error_info)
-                        
-                    old_content, new_content = parts
-                    
-                    # 处理新文件
-                    if not old_content:
-                        temp_map[file_path] = new_content
-                        modified_files.add(file_path)
-                        continue
-                    
-                    # 查找并替换代码块
-                    if old_content not in current_content:
-                        error_info.append(
-                            f"补丁应用失败: {file_path}\n"
-                            f"原因: 未找到要替换的代码\n"
-                            f"期望找到的代码:\n{old_content}\n"
-                            f"实际文件内容:\n{current_content[:200]}..."
-                        )
-                        return False, "\n".join(error_info)
-                    
-                    # 应用更改
-                    temp_map[file_path] = current_content.replace(old_content, new_content)
-                    
-                else:  # FMT2 - 首尾行定位格式
-                    lines = patch_content.splitlines()
-                    if len(lines) < 3:
-                        error_info.append(f"FMT2补丁格式错误: {file_path}，行数不足")
-                        return False, "\n".join(error_info)
-                        
-                    first_line = lines[0]
-                    last_line = lines[1]
-                    new_content = '\n'.join(lines[2:])
-                    
-                    # 在文件内容中定位要替换的区域
-                    content_lines = current_content.splitlines()
-                    start_idx = -1
-                    end_idx = -1
-                    
-                    # 查找匹配的起始行和结束行
-                    for idx, line in enumerate(content_lines):
-                        if line.rstrip() == first_line.rstrip():
-                            start_idx = idx
-                        if start_idx != -1 and line.rstrip() == last_line.rstrip():
-                            end_idx = idx
-                            break
-                    
-                    if start_idx == -1 or end_idx == -1:
-                        error_info.append(
-                            f"补丁应用失败: {file_path}\n"
-                            f"原因: 未找到匹配的代码范围\n"
-                            f"起始行: {first_line}\n"
-                            f"结束行: {last_line}"
-                        )
-                        return False, "\n".join(error_info)
-                    
-                    # 替换内容
-                    content_lines[start_idx:end_idx + 1] = new_content.splitlines()
-                    temp_map[file_path] = "\n".join(content_lines)
-                
-                modified_files.add(file_path)
-                
-            except Exception as e:
-                error_info.append(f"处理补丁时发生错误: {str(e)}")
-                return False, "\n".join(error_info)
-        
-        # 所有补丁都应用成功，更新实际文件
-        for file_path in modified_files:
-            try:
-                dir_path = os.path.dirname(file_path)
-                if dir_path and not os.path.exists(dir_path):
-                    os.makedirs(dir_path, exist_ok=True)
-                    
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(temp_map[file_path])
-                    
-                PrettyOutput.print(f"成功修改文件: {file_path}", OutputType.SUCCESS)
-                
-            except Exception as e:
-                error_info.append(f"写入文件失败 {file_path}: {str(e)}")
-                return False, "\n".join(error_info)
-        
-        return True, ""
-
-    def _save_edit_record(self, commit_message: str, git_diff: str) -> None:
-        """保存代码修改记录
-        
-        Args:
-            commit_message: 提交信息
-            git_diff: git diff --cached的输出
-        """
-            
-        # 获取下一个序号
-        existing_records = [f for f in os.listdir(self.record_dir) if f.endswith('.yaml')]
-        next_num = 1
-        if existing_records:
-            last_num = max(int(f[:4]) for f in existing_records)
-            next_num = last_num + 1
-        
-        # 创建记录文件
-        record = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "commit_message": commit_message,
-            "git_diff": git_diff
-        }
-        
-        record_path = os.path.join(self.record_dir, f"{next_num:04d}.yaml")
-        with open(record_path, "w", encoding="utf-8") as f:
-            yaml.safe_dump(record, f, allow_unicode=True)
-        
-        PrettyOutput.print(f"已保存修改记录: {record_path}", OutputType.SUCCESS)
-
-
-
-
     def _prepare_execution(self) -> None:
         """准备执行环境"""
         self.main_model = self._new_model()
         self._codebase.generate_codebase()
-
 
     def _load_related_files(self, feature: str) -> List[Dict]:
         """加载相关文件内容"""
@@ -429,135 +111,6 @@ def old_function():
             ret.append({"file_path": file, "file_content": content})
         return ret
 
-    def _handle_patch_application(self, related_files: List[Dict], patches: List[str], feature: str) -> Dict[str, Any]:
-        """处理补丁应用流程"""
-        while True:
-            PrettyOutput.print(f"生成{len(patches)}个补丁", OutputType.INFO)
-            
-            if not patches:
-                retry_prompt = f"""未生成补丁，请重新生成补丁"""
-                patches = self._remake_patch(retry_prompt)
-                continue
-            
-            success, error_info = self._apply_patch(related_files, patches)
-            
-            if success:
-                user_confirm = input("是否确认修改？(y/n)")
-                if user_confirm.lower() == "y":
-                    self._finalize_changes(feature)
-                    return {
-                        "success": True,
-                        "stdout": f"已完成功能开发{feature}",
-                        "stderr": "",
-                        "error": None
-                    }
-                else:
-                    self._revert_changes()
-                    
-                    # 让用户输入调整意见
-                    user_feedback = get_multiline_input("""
-请提供修改建议，帮助生成更好的补丁：
-1. 修改的位置是否正确？
-2. 修改的内容是否合适？
-3. 是否有遗漏的修改？
-4. 其他调整建议？
-
-请输入调整意见(直接回车跳过):""")
-                    
-                    if not user_feedback:
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": "修改被用户取消，文件未发生任何变化",
-                            "error": UserWarning("用户取消修改")
-                        }
-                    
-                    retry_prompt = f"""补丁被用户拒绝，请根据用户意见重新生成补丁：
-
-用户意见：
-{user_feedback}
-
-请重新生成补丁，确保：
-1. 按照用户意见调整修改内容
-2. 准确定位要修改的代码位置
-3. 正确处理代码缩进
-4. 考虑代码上下文
-"""
-                    patches = self._remake_patch(retry_prompt)
-                    continue
-            else:
-                PrettyOutput.print(f"补丁应用失败: {error_info}", OutputType.WARNING)
-                
-                # 让用户输入补充信息
-                user_info = get_multiline_input("""
-补丁应用失败。请提供更多信息来帮助修复问题：
-1. 是否需要调整代码位置？
-2. 是否有特殊的格式要求？
-3. 是否需要考虑其他文件的依赖？
-4. 其他补充说明？
-
-请输入补充信息(直接回车跳过):""")
-                PrettyOutput.print(f"开始重新生成补丁", OutputType.INFO)
-                retry_prompt = f"""补丁应用失败，请根据以下信息重新生成补丁：
-
-错误信息：
-{error_info}
-
-用户补充信息：
-{user_info if user_info else "用户未提供补充信息"}
-
-请确保：
-1. 准确定位要修改的代码位置
-2. 正确处理代码缩进
-3. 考虑代码上下文
-4. 对新文件不要包含原始内容
-"""
-                patches = self._remake_patch(retry_prompt)
-
-
-
-
-    def _generate_commit_message(self, git_diff: str, feature: str) -> str:
-        """根据git diff和功能描述生成commit信息
-        
-        Args:
-            git_diff: git diff --cached的输出
-            feature: 用户的功能描述
-            
-        Returns:
-            str: 生成的commit信息
-        """
-        
-        # 生成提示词
-        prompt = f"""你是一个经验丰富的程序员，请根据以下代码变更和功能描述生成简洁明了的commit信息：
-
-功能描述：
-{feature}
-
-代码变更：
-"""
-        # 添加git diff内容
-        prompt += f"Git Diff:\n{git_diff}\n\n"
-            
-        prompt += """
-请遵循以下规则：
-1. 使用英文编写
-2. 采用常规的commit message格式：<type>(<scope>): <subject>
-3. 保持简洁，不超过50个字符
-4. 准确描述代码变更的主要内容
-5. 优先考虑功能描述和git diff中的变更内容
-"""
-        
-        # 使用normal模型生成commit信息
-        model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
-        model.set_suppress_output(True)
-        success, response = self._call_model_with_retry(model, prompt)
-        if not success:
-            return "Update code changes"
-            
-        # 清理响应内容
-        return response.strip().split("\n")[0]
-
     def _finalize_changes(self, feature: str) -> None:
         """完成修改并提交"""
         PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
@@ -569,7 +122,7 @@ def old_function():
         git_diff = os.popen("git diff --cached").read()
         
         # 自动生成commit信息，传入feature
-        commit_message = self._generate_commit_message(git_diff, feature)
+        commit_message = generate_commit_message(git_diff, feature)
         
         # 显示并确认commit信息
         PrettyOutput.print(f"自动生成的commit信息: {commit_message}", OutputType.INFO)
@@ -580,7 +133,7 @@ def old_function():
         
         # 不需要再次 git add，因为已经添加过了
         os.system(f"git commit -m '{commit_message}'")
-        self._save_edit_record(commit_message, git_diff)
+        save_edit_record(self.record_dir, commit_message, git_diff)
 
     def _revert_changes(self) -> None:
         """回退所有修改"""
@@ -596,16 +149,26 @@ def old_function():
 
         Returns:
             Dict[str, Any]: 包含执行结果的字典
-                - success: 是否成功
-                - stdout: 标准输出信息
-                - stderr: 错误信息
-                - error: 错误对象(如果有)
         """
         try:
             self._prepare_execution()
             related_files = self._load_related_files(feature)
-            patches = self._make_patch(related_files, feature)
-            return self._handle_patch_application(related_files, patches, feature)
+            
+            patch_handler = PatchHandler(self.main_model)
+            if patch_handler.handle_patch_application(related_files, feature):
+                self._finalize_changes(feature)
+                return {
+                    "success": True,
+                    "stdout": "代码修改成功",
+                    "stderr": "",
+                }
+            else:
+                self._revert_changes()
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "代码修改失败",
+                }
                 
         except Exception as e:
             return {
@@ -614,7 +177,6 @@ def old_function():
                 "stderr": f"执行失败: {str(e)}",
                 "error": e
             }
-
 
 def main():
     """命令行入口"""
