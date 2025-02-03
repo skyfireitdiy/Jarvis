@@ -8,6 +8,55 @@ class PatchHandler:
     def __init__(self, model):
         self.model = model
 
+    def _extract_patches(self, response: str) -> List[Tuple[str, str, str]]:
+        """从响应中提取补丁
+        
+        Args:
+            response: 模型响应内容
+            
+        Returns:
+            List[Tuple[str, str, str]]: 补丁列表，每个补丁是 (格式, 文件路径, 补丁内容) 的元组
+        """
+        patches = []
+        
+        # 匹配两种格式的补丁
+        fmt1_patches = re.finditer(r'<PATCH_FMT1>\n?(.*?)\n?</PATCH_FMT1>', response, re.DOTALL)
+        fmt2_patches = re.finditer(r'<PATCH_FMT2>\n?(.*?)\n?</PATCH_FMT2>', response, re.DOTALL)
+        
+        # 处理 FMT1 格式的补丁
+        for match in fmt1_patches:
+            patch_content = match.group(1)
+            if not patch_content:
+                continue
+                
+            # 提取文件路径和补丁内容
+            lines = patch_content.split('\n')
+            file_path_match = re.search(r'> (.*)', lines[0])
+            if not file_path_match:
+                continue
+                
+            file_path = file_path_match.group(1).strip()
+            patch_content = '\n'.join(lines[1:])
+            patches.append(("FMT1", file_path, patch_content))
+        
+        # 处理 FMT2 格式的补丁
+        for match in fmt2_patches:
+            patch_content = match.group(1)
+            if not patch_content:
+                continue
+                
+            # 提取文件路径和补丁内容
+            lines = patch_content.split('\n')
+            file_path_match = re.search(r'> (.*)', lines[0])
+            if not file_path_match:
+                continue
+                
+            file_path = file_path_match.group(1).strip()
+            patch_content = '\n'.join(lines[1:])
+            patches.append(("FMT2", file_path, patch_content))
+        
+        return patches
+
     def make_patch(self, related_files: List[Dict], feature: str) -> List[Tuple[str, str, str]]:
         """生成修改方案"""
         prompt = """你是一个资深程序员，请根据需求描述，修改文件内容。
@@ -44,7 +93,35 @@ def old_function():
 6、优先使用第二种格式（PATCH_FMT2）
 7、如果第二种格式无法定位到要修改的代码或者有歧义，请使用第一种格式（PATCH_FMT1）
 """
-        # ... (其余代码保持不变)
+        # 添加文件内容到提示
+        for i, file in enumerate(related_files):
+            prompt += f"""\n{i}. {file["file_path"]}\n"""
+            prompt += f"""文件内容:\n"""
+            prompt += f"<FILE_CONTENT>\n"
+            prompt += f'{file["file_content"]}\n'
+            prompt += f"</FILE_CONTENT>\n"
+        
+        prompt += f"\n需求描述: {feature}\n"
+
+        # 调用模型生成补丁
+        success, response = call_model_with_retry(self.model, prompt)
+        if not success:
+            PrettyOutput.print("生成补丁失败", OutputType.ERROR)
+            return []
+            
+        try:
+            patches = self._extract_patches(response)
+            
+            if not patches:
+                PrettyOutput.print("未生成任何有效补丁", OutputType.WARNING)
+                return []
+                
+            PrettyOutput.print(f"生成了 {len(patches)} 个补丁", OutputType.SUCCESS)
+            return patches
+            
+        except Exception as e:
+            PrettyOutput.print(f"解析patch失败: {str(e)}", OutputType.WARNING)
+            return []
 
     def apply_patch(self, related_files: List[Dict], patches: List[Tuple[str, str, str]]) -> Tuple[bool, str]:
         """应用补丁
@@ -200,44 +277,7 @@ def old_function():
             return []
             
         try:
-            patches = []
-            
-            # 匹配两种格式的补丁
-            fmt1_patches = re.finditer(r'<PATCH_FMT1>\n?(.*?)\n?</PATCH_FMT1>', response, re.DOTALL)
-            fmt2_patches = re.finditer(r'<PATCH_FMT2>\n?(.*?)\n?</PATCH_FMT2>', response, re.DOTALL)
-            
-            # 处理 FMT1 格式的补丁
-            for match in fmt1_patches:
-                patch_content = match.group(1)
-                if not patch_content:
-                    continue
-                    
-                # 提取文件路径和补丁内容
-                lines = patch_content.split('\n')
-                file_path_match = re.search(r'> (.*)', lines[0])
-                if not file_path_match:
-                    continue
-                    
-                file_path = file_path_match.group(1).strip()
-                patch_content = '\n'.join(lines[1:])
-                patches.append(("FMT1", file_path, patch_content))
-            
-            # 处理 FMT2 格式的补丁
-            for match in fmt2_patches:
-                patch_content = match.group(1)
-                if not patch_content:
-                    continue
-                    
-                # 提取文件路径和补丁内容
-                lines = patch_content.split('\n')
-                file_path_match = re.search(r'> (.*)', lines[0])
-                if not file_path_match:
-                    continue
-                    
-                file_path = file_path_match.group(1).strip()
-                patch_content = '\n'.join(lines[1:])
-                patches.append(("FMT2", file_path, patch_content))
-            
+            patches = self._extract_patches(response)
             return patches
             
         except Exception as e:
