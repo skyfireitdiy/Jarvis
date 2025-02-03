@@ -125,13 +125,13 @@ class JarvisCoder:
         prompt = """你是一个资深程序员，请根据需求描述，修改文件内容。
 
 修改格式说明：
-1. 每个修改块格式如下：
+1. 每个修改块格式如下(6个@号作为分割新旧代码的分割符)：
 <PATCH>
 > path/to/file
 def old_function():
     print("old code")
     return False
-=======
+@@@@@@
 def old_function():
     print("new code")
     return True
@@ -140,7 +140,7 @@ def old_function():
 2. 如果是新文件或者替换整个文件内容，格式如下：
 <PATCH>
 > src/new_module.py
-=======
+@@@@@@
 from typing import List
 
 def new_function():
@@ -154,14 +154,14 @@ def new_function():
     deprecated_code = True
     if deprecated_code:
         print("old feature")
-=======
+@@@@@@
 </PATCH>
 
 4. 如果要修改导入语句，格式如下：
 <PATCH>
 > src/main.py
 from old_module import old_class
-=======
+@@@@@@
 from new_module import new_class
 </PATCH>
 
@@ -171,7 +171,7 @@ from new_module import new_class
 class OldModel:
     def __init__(self):
         self.value = 0
-=======
+@@@@@@
 class OldModel:
     def __init__(self):
         self.value = 1
@@ -241,10 +241,10 @@ class OldModel:
                 
                 # 解析补丁内容
                 patch_content = "\n".join(lines[1:])
-                parts = patch_content.split("=======")
+                parts = patch_content.split("@@@@@@")
                 
                 if len(parts) != 2:
-                    error_info.append(f"补丁格式错误: {file_path}")
+                    error_info.append(f"补丁格式错误: {file_path}，parts数量: {len(parts)}")
                     return False, "\n".join(error_info)
                 
                 old_content = parts[0]
