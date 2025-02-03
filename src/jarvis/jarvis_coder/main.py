@@ -241,7 +241,18 @@ class OldModel:
                 
                 # 解析补丁内容
                 patch_content = "\n".join(lines[1:])
-                parts = patch_content.split("@@@@@@")
+                # 使用换行符分割，只有单独一行的 @@@@@@ 才作为分隔符
+                parts = []
+                current_part = []
+                for line in patch_content.splitlines(keepends=True):
+                    if line.strip() == "@@@@@@":
+                        if current_part:
+                            parts.append("".join(current_part))
+                            current_part = []
+                    else:
+                        current_part.append(line)
+                if current_part:
+                    parts.append("".join(current_part))
                 
                 if len(parts) != 2:
                     error_info.append(f"补丁格式错误: {file_path}，parts数量: {len(parts)}")
