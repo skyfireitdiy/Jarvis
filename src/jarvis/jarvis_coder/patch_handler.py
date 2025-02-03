@@ -77,13 +77,15 @@ def old_function():
 2. 第二种格式 - 通过首尾行定位要修改的代码范围：
 <PATCH_FMT2>
 > path/to/file
-def old_function():    # 第一行：要修改的代码块的第一行
-    return False       # 第二行：要修改的代码块的最后一行
+def old_function():
+    return False
 # 从第三行开始是新的代码内容，将替换第一行到最后一行之间的所有内容：
 def new_function():
     print("new code")
     return True
 </PATCH_FMT2>
+
+例子中 `def old_function():` 是首行，`return False` 是尾行，第三行开始是新的代码内容，将替换第一行到最后一行之间的所有内容
 
 注意事项：
 1、仅输出补丁内容，不要输出任何其他内容
