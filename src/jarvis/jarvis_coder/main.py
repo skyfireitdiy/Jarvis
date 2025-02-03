@@ -175,14 +175,15 @@ class JarvisCoder:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "代码修改失败",
+                    "stderr": "代码修改失败，请修改需求后重试",
                 }
                 
         except Exception as e:
+            self._revert_changes()
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"执行失败: {str(e)}",
+                "stderr": f"执行失败: {str(e)}，请修改需求后重试",
                 "error": e
             }
 
@@ -221,12 +222,15 @@ def main():
                     error = result["error"]
                     PrettyOutput.print(f"错误类型: {type(error).__name__}", OutputType.WARNING)
                     PrettyOutput.print(f"错误信息: {str(error)}", OutputType.WARNING)
+                # 提示用户可以继续输入
+                PrettyOutput.print("\n您可以修改需求后重试", OutputType.INFO)
                 
         except KeyboardInterrupt:
             print("\n用户中断执行")
             break
         except Exception as e:
             PrettyOutput.print(f"执行出错: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print("\n您可以修改需求后重试", OutputType.INFO)
             continue
             
     return 0

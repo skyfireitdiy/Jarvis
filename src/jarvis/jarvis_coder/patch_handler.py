@@ -340,42 +340,51 @@ def new_function():
         while attempt < max_attempts:
             attempt += 1
             
-            # 1. 生成补丁
-            patches = self.make_patch(related_files, feature)
-            if not patches:
-                return False
-            
-            # 2. 显示补丁内容
-            PrettyOutput.print("\n将要应用以下补丁:", OutputType.INFO)
-            for fmt, file_path, patch_content in patches:
-                PrettyOutput.print(f"\n文件: {file_path}", OutputType.INFO)
-                PrettyOutput.print(f"格式: {fmt}", OutputType.INFO)
-                PrettyOutput.print("补丁内容:", OutputType.INFO)
-                print(patch_content)
-            
-            # 3. 应用补丁
-            success, error_msg = self.apply_patch(related_files, patches)
-            if not success:
-                # 4. 如果应用失败，询问是否重试
-                should_retry = self.monitor_patch_result(success, error_msg)
-                if not should_retry:
-                    return False
-                    
-                # 5. 处理失败反馈
-                patches = self.handle_patch_feedback(error_msg, feature)
+            while True:  # 在当前尝试中循环，直到成功或用户放弃
+                # 1. 生成补丁
+                patches = self.make_patch(related_files, feature)
                 if not patches:
                     return False
-                continue
+                
+                # 2. 显示补丁内容
+                PrettyOutput.print("\n将要应用以下补丁:", OutputType.INFO)
+                for fmt, file_path, patch_content in patches:
+                    PrettyOutput.print(f"\n文件: {file_path}", OutputType.INFO)
+                    PrettyOutput.print(f"格式: {fmt}", OutputType.INFO)
+                    PrettyOutput.print("补丁内容:", OutputType.INFO)
+                    print(patch_content)
+                
+                # 3. 应用补丁
+                success, error_msg = self.apply_patch(related_files, patches)
+                if not success:
+                    # 4. 如果应用失败，询问是否重试
+                    should_retry = self.monitor_patch_result(success, error_msg)
+                    if not should_retry:
+                        break  # 退出内层循环，尝试下一次完整的迭代
+                        
+                    # 5. 处理失败反馈
+                    patches = self.handle_patch_feedback(error_msg, feature)
+                    if not patches:
+                        return False
+                    continue  # 继续当前迭代
+                
+                # 6. 应用成功，让用户确认修改
+                PrettyOutput.print("\n补丁已应用，请检查修改效果。", OutputType.SUCCESS)
+                confirm = input("\n是否保留这些修改？(y/n) [y]: ").lower() or "y"
+                if confirm != "y":
+                    PrettyOutput.print("用户取消修改，正在回退", OutputType.WARNING)
+                    os.system("git reset --hard")  # 回退所有修改
+                    
+                    # 询问是否要在当前迭代中重试
+                    retry = input("\n是否要重新生成补丁？(y/n) [y]: ").lower() or "y"
+                    if retry != "y":
+                        break  # 退出内层循环，尝试下一次完整的迭代
+                    continue  # 继续当前迭代
+                
+                return True  # 用户确认修改，返回成功
             
-            # 6. 应用成功，让用户确认修改
-            PrettyOutput.print("\n补丁已应用，请检查修改效果。", OutputType.SUCCESS)
-            confirm = input("\n是否保留这些修改？(y/n) [y]: ").lower() or "y"
-            if confirm != "y":
-                PrettyOutput.print("用户取消修改，正在回退", OutputType.WARNING)
-                os.system("git reset --hard")  # 回退所有修改
-                return False
-            
-            return True
+            # 如果内层循环正常退出（非return），继续外层循环
+            continue
         
         PrettyOutput.print(f"达到最大重试次数 ({max_attempts})", OutputType.WARNING)
         return False 
