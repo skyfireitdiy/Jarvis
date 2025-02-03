@@ -74,14 +74,15 @@ def old_function():
     return True
 </PATCH_FMT1>
 
-2. 第二种格式 - 通过首尾行定位：
+2. 第二种格式 - 通过首尾行定位要修改的代码范围：
 <PATCH_FMT2>
 > path/to/file
-    def old_function():  # 第一行内容
-    return False  # 最后一行内容
-    def new_function():
-        print("new code")
-        return True
+def old_function():    # 第一行：要修改的代码块的第一行
+    return False       # 第二行：要修改的代码块的最后一行
+# 从第三行开始是新的代码内容，将替换第一行到最后一行之间的所有内容：
+def new_function():
+    print("new code")
+    return True
 </PATCH_FMT2>
 
 注意事项：
@@ -90,8 +91,9 @@ def old_function():
 3、要替换的内容，一定要与文件内容完全一致，不要有任何多余或者缺失的内容
 4、每个patch不超过20行，超出20行，请生成多个patch
 5、务必保留原始文件的缩进和格式
-6、优先使用第二种格式（PATCH_FMT2）
-7、如果第二种格式无法定位到要修改的代码或者有歧义，请使用第一种格式（PATCH_FMT1）
+6、优先使用第二种格式（PATCH_FMT2），因为它更准确地定位要修改的代码范围
+7、第二种格式（PATCH_FMT2）的前两行必须完全匹配文件中要修改的代码块的首尾行
+8、如果第二种格式无法准确定位到要修改的代码（比如有重复的行），请使用第一种格式（PATCH_FMT1）
 """
         # 添加文件内容到提示
         for i, file in enumerate(related_files):
