@@ -30,8 +30,8 @@ class AskUserTool:
             question = args["question"]
             
             # 显示问题
-            PrettyOutput.print("\n问题:", OutputType.QUESTION)
-            PrettyOutput.print(question, OutputType.QUESTION)
+            PrettyOutput.print("\n问题:", OutputType.SYSTEM)
+            PrettyOutput.print(question, OutputType.SYSTEM)
             
             # 获取用户输入
             PrettyOutput.print("\n请输入您的回答（输入空行结束）:", OutputType.INPUT)

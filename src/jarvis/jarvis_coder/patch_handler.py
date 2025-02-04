@@ -59,7 +59,7 @@ class PatchHandler:
 
     def make_patch(self, related_files: List[Dict], feature: str, modification_plan: str) -> List[Tuple[str, str, str]]:
         """生成修改方案"""
-        prompt = """你是一个资深程序员，请根据需求描述和修改方案，修改文件内容。
+        prompt = f"""你是一个资深程序员，请根据需求描述和修改方案，修改文件内容。
 
 修改方案：
 {modification_plan}
