@@ -1,6 +1,6 @@
 import mimetypes
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from jarvis.models.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType, get_max_context_length
 import requests
@@ -13,6 +13,10 @@ class OyiModel(BasePlatform):
     BASE_URL = "https://api-10086.rcouyi.com"
 
     first_time = True
+
+    def get_model_list(self) -> List[Tuple[str, str]]:
+        """获取模型列表"""
+        return [(name,info['desc']) for name,info in self.models.items()]
     
     def __init__(self):
         """Initialize model"""
@@ -313,6 +317,9 @@ class OyiModel(BasePlatform):
             List[str]: 可用模型名称列表
         """
         try:
+            if self.models:
+                return list(self.models.keys())
+            
             headers = {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json, text/plain, */*',
@@ -343,7 +350,8 @@ class OyiModel(BasePlatform):
             models = []
             for model in self.models.values():
                 # 基本信息
-                model_str = f"{model['value']:<30} {model['label']}"
+                model_name = model['value']
+                model_str = model['label']
                 
                 # 添加后缀标签
                 suffix = model.get('suffix', [])
@@ -364,8 +372,8 @@ class OyiModel(BasePlatform):
                 # 添加文件上传支持标记
                 if model.get('uploadFile'):
                     model_str += " [支持文件上传]"
-                    
-                models.append(model_str)
+                model['desc'] = model_str
+                models.append(model_name)
                 
             return sorted(models)
             

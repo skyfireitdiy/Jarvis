@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import requests
 import json
 import os
@@ -12,6 +12,10 @@ class KimiModel(BasePlatform):
     """Kimi模型实现"""
 
     platform_name = "kimi"
+
+    def get_model_list(self) -> List[Tuple[str, str]]:
+        """获取模型列表"""
+        return [("kimi", "Kimi")]
     
     def __init__(self):
         """

@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from jarvis.models.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType
 import requests
@@ -13,6 +13,10 @@ class AI8Model(BasePlatform):
     BASE_URL = "https://ai8.rcouyi.com"
 
     first_time = True
+
+    def get_model_list(self) -> List[Tuple[str, str]]:
+        """获取模型列表"""
+        return [(name,info['desc']) for name,info in self.models.items()]
     
     def __init__(self):
         """Initialize model"""
@@ -283,6 +287,9 @@ class AI8Model(BasePlatform):
             List[str]: 可用模型名称列表
         """
         try:
+            if self.models:
+                return list(self.models.keys())
+            
             headers = {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json, text/plain, */*',
@@ -311,6 +318,36 @@ class AI8Model(BasePlatform):
                 model['value']: model 
                 for model in data['data']['models']
             }
+
+            for model in self.models.values():
+                # 格式化显示模型信息
+                model_str = f"{model['value']:<30}"
+                
+                # 添加标签
+                model_str += f"{model['label']}"
+                
+                # 添加标签和积分信息
+                attrs = []
+                if model['attr'].get('tag'):
+                    attrs.append(model['attr']['tag'])
+                if model['attr'].get('integral'):
+                    attrs.append(model['attr']['integral'])
+                    
+                # 添加特性标记
+                features = []
+                if model['attr'].get('multimodal'):
+                    features.append("多模态")
+                if model['attr'].get('plugin'):
+                    features.append("插件支持")
+                if model['attr'].get('onlyImg'):
+                    features.append("图像支持")
+                if features:
+                    model_str += f" [{'|'.join(features)}]"
+                    
+                # 添加备注
+                if model['attr'].get('note'):
+                    model_str += f" - {model['attr']['note']}"
+                model['desc'] = model_str
             
             return list(self.models.keys())
             

@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import os
 from openai import OpenAI
 from jarvis.models.base import BasePlatform
@@ -40,6 +40,10 @@ class OpenAIModel(BasePlatform):
         )
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
+
+    def get_model_list(self) -> List[Tuple[str, str]]:
+        """获取模型列表"""
+        return []
 
     def set_model_name(self, model_name: str):
         """设置模型名称"""
