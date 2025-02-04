@@ -165,13 +165,6 @@ def new_function():
             PrettyOutput.print(f"正在应用补丁 {i+1}/{len(patches)}", OutputType.INFO)
             
             try:
-                # 处理文件修改
-                if file_path not in temp_map:
-                    error_info.append(f"文件不存在: {file_path}")
-                    return False, "\n".join(error_info)
-                
-                current_content = temp_map[file_path]
-                
                 if fmt == "FMT1":  # 完整代码块替换格式
                     parts = patch_content.split("@@@@@@")
                     if len(parts) != 2:
@@ -180,14 +173,37 @@ def new_function():
                         
                     old_content, new_content = parts
                     
-                    # 处理新文件
-                    if not old_content:
-                        temp_map[file_path] = new_content
-                        modified_files.add(file_path)
-                        continue
+                    # 处理新文件的情况
+                    if file_path not in temp_map and not old_content.strip():
+                        PrettyOutput.print(f"检测到新文件: {file_path}", OutputType.INFO)
+                        # 确保目录存在
+                        dir_path = os.path.dirname(file_path)
+                        if dir_path and not os.path.exists(dir_path):
+                            os.makedirs(dir_path, exist_ok=True)
+                        
+                        # 写入新文件
+                        try:
+                            with open(file_path, "w", encoding="utf-8") as f:
+                                f.write(new_content)
+                            # 将新文件加入版本控制
+                            os.system(f"git add {file_path}")
+                            PrettyOutput.print(f"成功创建并添加文件: {file_path}", OutputType.SUCCESS)
+                            modified_files.add(file_path)
+                            temp_map[file_path] = new_content  # 更新临时映射
+                            continue
+                        except Exception as e:
+                            error_info.append(f"创建新文件失败 {file_path}: {str(e)}")
+                            return False, "\n".join(error_info)
+                    
+                    # 处理现有文件的修改
+                    if file_path not in temp_map:
+                        error_info.append(f"文件不存在: {file_path}")
+                        return False, "\n".join(error_info)
+                    
+                    current_content = temp_map[file_path]
                     
                     # 查找并替换代码块
-                    if old_content not in current_content:
+                    if old_content and old_content not in current_content:
                         error_info.append(
                             f"补丁应用失败: {file_path}\n"
                             f"原因: 未找到要替换的代码\n"
