@@ -41,6 +41,7 @@ class PlanGenerator:
         prompt += "1. 需要修改哪些文件\n"
         prompt += "2. 每个文件需要做什么修改\n"
         prompt += "3. 修改的主要逻辑和原因\n"
+        prompt += "4. 不要生成具体的代码，只需要生成修改方案\n"
         
         return prompt
     
