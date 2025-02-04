@@ -1,6 +1,7 @@
 import os
 import threading
 from typing import Dict, Any, List
+import re
 
 from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
@@ -193,6 +194,78 @@ class JarvisCoder:
         
         return sorted(list(selected))
 
+    def _get_file_completer(self) -> Completer:
+        """创建文件路径补全器"""
+        class FileCompleter(Completer):
+            def __init__(self, root_dir: str):
+                self.root_dir = root_dir
+                
+            def get_completions(self, document, complete_event):
+                # 获取当前输入的文本
+                text = document.text_before_cursor
+                
+                # 如果输入为空，返回根目录下的所有文件
+                if not text:
+                    for path in self._list_files(""):
+                        yield Completion(path, start_position=0)
+                    return
+                    
+                # 获取当前目录和部分文件名
+                current_dir = os.path.dirname(text)
+                file_prefix = os.path.basename(text)
+                
+                # 列出匹配的文件
+                search_dir = os.path.join(self.root_dir, current_dir) if current_dir else self.root_dir
+                if os.path.isdir(search_dir):
+                    for path in self._list_files(current_dir):
+                        if path.startswith(text):
+                            yield Completion(path, start_position=-len(text))
+            
+            def _list_files(self, current_dir: str) -> List[str]:
+                """列出指定目录下的所有文件（递归）"""
+                files = []
+                search_dir = os.path.join(self.root_dir, current_dir)
+                
+                for root, _, filenames in os.walk(search_dir):
+                    for filename in filenames:
+                        full_path = os.path.join(root, filename)
+                        rel_path = os.path.relpath(full_path, self.root_dir)
+                        # 忽略 .git 目录和其他隐藏文件
+                        if not any(part.startswith('.') for part in rel_path.split(os.sep)):
+                            files.append(rel_path)
+                
+                return sorted(files)
+
+        return FileCompleter(self.root_dir)
+
+    def _fuzzy_match_files(self, pattern: str) -> List[str]:
+        """模糊匹配文件路径
+        
+        Args:
+            pattern: 匹配模式
+            
+        Returns:
+            List[str]: 匹配的文件路径列表
+        """
+        matches = []
+        
+        # 将模式转换为正则表达式
+        pattern = pattern.replace('.', r'\.').replace('*', '.*').replace('?', '.')
+        pattern = f".*{pattern}.*"  # 允许部分匹配
+        regex = re.compile(pattern, re.IGNORECASE)
+        
+        # 遍历所有文件
+        for root, _, files in os.walk(self.root_dir):
+            for file in files:
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, self.root_dir)
+                # 忽略 .git 目录和其他隐藏文件
+                if not any(part.startswith('.') for part in rel_path.split(os.sep)):
+                    if regex.match(rel_path):
+                        matches.append(rel_path)
+        
+        return sorted(matches)
+
     def _select_files(self, related_files: List[Dict], feature: str) -> List[Dict]:
         """让用户选择和补充相关文件"""
         PrettyOutput.section("相关文件", OutputType.INFO)
@@ -218,30 +291,63 @@ class JarvisCoder:
         # 询问是否需要补充文件
         user_input = input("\n是否需要补充其他文件？(y/n) [n]: ").strip().lower() or 'n'
         if user_input == 'y':
+            # 创建文件补全会话
+            session = PromptSession(
+                completer=self._get_file_completer(),
+                complete_while_typing=True
+            )
+            
             while True:
-                PrettyOutput.print("\n请输入要补充的文件路径（相对于项目根目录，输入空行结束）:", OutputType.INFO)
-                file_path = get_multiline_input("")
-                
-                if not file_path or file_path == "__interrupt__":
+                PrettyOutput.print("\n请输入要补充的文件路径（支持Tab补全和*?通配符，输入空行结束）:", OutputType.INFO)
+                try:
+                    file_path = session.prompt(">>> ").strip()
+                except KeyboardInterrupt:
                     break
                     
-                # 检查文件是否存在
-                full_path = os.path.join(self.root_dir, file_path)
-                if not os.path.isfile(full_path):
-                    PrettyOutput.print(f"文件不存在: {file_path}", OutputType.ERROR)
-                    continue
+                if not file_path:
+                    break
                     
-                # 读取文件内容
-                try:
-                    with open(full_path, "r", encoding="utf-8") as f:
-                        content = f.read()
-                    selected_files.append({
-                        "file_path": file_path,
-                        "file_content": content
-                    })
-                    PrettyOutput.print(f"已添加文件: {file_path}", OutputType.SUCCESS)
-                except Exception as e:
-                    PrettyOutput.print(f"读取文件失败: {str(e)}", OutputType.ERROR)
+                # 处理通配符匹配
+                if '*' in file_path or '?' in file_path:
+                    matches = self._fuzzy_match_files(file_path)
+                    if not matches:
+                        PrettyOutput.print("未找到匹配的文件", OutputType.WARNING)
+                        continue
+                        
+                    # 显示匹配的文件
+                    PrettyOutput.print("\n找到以下匹配的文件:", OutputType.INFO)
+                    for i, path in enumerate(matches, 1):
+                        PrettyOutput.print(f"[{i}] {path}", OutputType.INFO)
+                        
+                    # 让用户选择
+                    numbers = input("\n请选择要添加的文件编号（支持: 1,3-6 格式，直接回车全选）: ").strip()
+                    if numbers:
+                        indices = self._parse_file_selection(numbers, len(matches))
+                        if not indices:
+                            continue
+                        paths_to_add = [matches[i] for i in indices]
+                    else:
+                        paths_to_add = matches
+                else:
+                    paths_to_add = [file_path]
+                
+                # 添加选中的文件
+                for path in paths_to_add:
+                    full_path = os.path.join(self.root_dir, path)
+                    if not os.path.isfile(full_path):
+                        PrettyOutput.print(f"文件不存在: {path}", OutputType.ERROR)
+                        continue
+                    
+                    try:
+                        with open(full_path, "r", encoding="utf-8") as f:
+                            content = f.read()
+                        selected_files.append({
+                            "file_path": path,
+                            "file_content": content
+                        })
+                        PrettyOutput.print(f"已添加文件: {path}", OutputType.SUCCESS)
+                    except Exception as e:
+                        PrettyOutput.print(f"读取文件失败: {str(e)}", OutputType.ERROR)
         
         return selected_files
 
