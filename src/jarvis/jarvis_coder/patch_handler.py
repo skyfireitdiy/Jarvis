@@ -19,11 +19,10 @@ class PatchHandler:
         """
         patches = []
         
-        # 匹配两种格式的补丁
-        fmt1_patches = re.finditer(r'<PATCH_FMT1>\n?(.*?)\n?</PATCH_FMT1>', response, re.DOTALL)
-        fmt2_patches = re.finditer(r'<PATCH_FMT2>\n?(.*?)\n?</PATCH_FMT2>', response, re.DOTALL)
+        # 匹配补丁格式
+        fmt1_patches = re.finditer(r'<PATCH_FMT>\n?(.*?)\n?</PATCH_FMT>', response, re.DOTALL)
         
-        # 处理 FMT1 格式的补丁
+        # 处理补丁
         for match in fmt1_patches:
             patch_content = match.group(1)
             if not patch_content:
@@ -39,22 +38,6 @@ class PatchHandler:
             patch_content = '\n'.join(lines[1:])
             patches.append(("FMT1", file_path, patch_content))
         
-        # 处理 FMT2 格式的补丁
-        for match in fmt2_patches:
-            patch_content = match.group(1)
-            if not patch_content:
-                continue
-                
-            # 提取文件路径和补丁内容
-            lines = patch_content.split('\n')
-            file_path_match = re.search(r'> (.*)', lines[0])
-            if not file_path_match:
-                continue
-                
-            file_path = file_path_match.group(1).strip()
-            patch_content = '\n'.join(lines[1:])
-            patches.append(("FMT2", file_path, patch_content))
-        
         return patches
 
     def make_patch(self, related_files: List[Dict], feature: str, modification_plan: str) -> List[Tuple[str, str, str]]:
@@ -65,45 +48,24 @@ class PatchHandler:
 {modification_plan}
 
 修改格式说明：
-1. 第一种格式 - 完整代码块替换：
-<PATCH_FMT1>
+使用以下格式生成补丁：
+<PATCH_FMT>
 > path/to/file
 old_content
 @@@@@@
 new_content
-</PATCH_FMT1>
+</PATCH_FMT>
 
 注意：
-- 如果是新增文件，使用第一种格式，old_content留空，只写new_content
+- 如果是新增文件，old_content留空，只写new_content
 - 例如新建文件：
-<PATCH_FMT1>
+<PATCH_FMT>
 > src/new_file.py
 @@@@@@
 def new_function():
     print("new code")
     return True
-</PATCH_FMT1>
-
-2. 第二种格式 - 通过首尾行定位要修改的代码范围：
-<PATCH_FMT2>
-> path/to/file
-start_line_content
-end_line_content
-new_content
-...
-</PATCH_FMT2>
-
-例：
-<PATCH_FMT2>
-> src/main.py
-def old_function():
-    return False
-def new_function():
-    print("new code")
-    return True
-</PATCH_FMT2>
-
-例子中 `def old_function():` 是**首行内容**，`return False` 是**尾行内容**，第三行开始是新的代码内容，将替换第一行到最后一行之间的所有内容
+</PATCH_FMT>
 
 注意事项：
 1、仅输出补丁内容，不要输出任何其他内容
@@ -111,10 +73,7 @@ def new_function():
 3、要替换的内容，一定要与文件内容完全一致（**包括缩进与空白**），不要有任何多余或者缺失的内容
 4、每个patch不超过20行，超出20行，请生成多个patch
 5、务必保留原始文件的缩进和格式
-6、优先使用第二种格式（PATCH_FMT2），因为它更准确地定位要修改的代码范围
-7、第二种格式（PATCH_FMT2）的前两行必须完全匹配文件中要修改的代码块的首尾行
-8、如果第二种格式无法准确定位到要修改的代码（比如有重复的行），请使用第一种格式（PATCH_FMT1）
-9、对于新文件，必须使用第一种格式（PATCH_FMT1），并且不需要写old_content部分
+6、对于新文件，不需要写old_content部分
 """
         # 添加文件内容到提示
         for i, file in enumerate(related_files):
@@ -166,98 +125,54 @@ def new_function():
             PrettyOutput.print(f"正在应用补丁 {i+1}/{len(patches)}", OutputType.INFO)
             
             try:
-                if fmt == "FMT1":  # 完整代码块替换格式
-                    parts = patch_content.split("@@@@@@")
-                    if len(parts) != 2:
-                        error_info.append(f"FMT1补丁格式错误: {file_path}，缺少分隔符")
-                        return False, "\n".join(error_info)
-                        
-                    old_content, new_content = parts
+                parts = patch_content.split("@@@@@@")
+                if len(parts) != 2:
+                    error_info.append(f"补丁格式错误: {file_path}，缺少分隔符")
+                    return False, "\n".join(error_info)
                     
-                    # 处理新文件的情况
-                    if file_path not in temp_map and not old_content.strip():
-                        PrettyOutput.print(f"检测到新文件: {file_path}", OutputType.INFO)
-                        # 确保目录存在
-                        dir_path = os.path.dirname(file_path)
-                        if dir_path and not os.path.exists(dir_path):
-                            os.makedirs(dir_path, exist_ok=True)
-                        
-                        # 写入新文件
-                        try:
-                            with open(file_path, "w", encoding="utf-8") as f:
-                                f.write(new_content)
-                            # 将新文件加入版本控制
-                            os.system(f"git add {file_path}")
-                            PrettyOutput.print(f"成功创建并添加文件: {file_path}", OutputType.SUCCESS)
-                            modified_files.add(file_path)
-                            temp_map[file_path] = new_content  # 更新临时映射
-                            continue
-                        except Exception as e:
-                            error_info.append(f"创建新文件失败 {file_path}: {str(e)}")
-                            return False, "\n".join(error_info)
-                    
-                    # 处理现有文件的修改
-                    if file_path not in temp_map:
-                        error_info.append(f"文件不存在: {file_path}")
-                        return False, "\n".join(error_info)
-                    
-                    current_content = temp_map[file_path]
-                    
-                    # 查找并替换代码块
-                    if old_content and old_content not in current_content:
-                        error_info.append(
-                            f"补丁应用失败: {file_path}\n"
-                            f"原因: 未找到要替换的代码\n"
-                            f"期望找到的代码:\n{old_content}\n"
-                            f"实际文件内容:\n{current_content[:200]}..."
-                        )
-                        return False, "\n".join(error_info)
-                    
-                    # 应用更改
-                    temp_map[file_path] = current_content.replace(old_content, new_content)
-                    
-                else:  # FMT2 - 首尾行定位格式
-                    # 检查文件是否存在
-                    if file_path not in temp_map:
-                        error_info.append(f"文件不存在: {file_path}")
-                        return False, "\n".join(error_info)
-                    
-                    current_content = temp_map[file_path]
-                    lines = patch_content.splitlines()
-                    if len(lines) < 3:
-                        error_info.append(f"FMT2补丁格式错误: {file_path}，行数不足")
-                        return False, "\n".join(error_info)
-                        
-                    first_line = lines[0]
-                    last_line = lines[1]
-                    new_content = '\n'.join(lines[2:])
-                    
-                    # 在文件内容中定位要替换的区域
-                    content_lines = current_content.splitlines()
-                    start_idx = -1
-                    end_idx = -1
-                    
-                    # 查找匹配的起始行和结束行
-                    for idx, line in enumerate(content_lines):
-                        if line.rstrip() == first_line.rstrip():
-                            start_idx = idx
-                        if start_idx != -1 and line.rstrip() == last_line.rstrip():
-                            end_idx = idx
-                            break
-                    
-                    if start_idx == -1 or end_idx == -1:
-                        error_info.append(
-                            f"补丁应用失败: {file_path}\n"
-                            f"原因: 未找到匹配的代码范围\n"
-                            f"起始行: {first_line}\n"
-                            f"结束行: {last_line}"
-                        )
-                        return False, "\n".join(error_info)
-                    
-                    # 替换内容
-                    content_lines[start_idx:end_idx + 1] = new_content.splitlines()
-                    temp_map[file_path] = "\n".join(content_lines)
+                old_content, new_content = parts
                 
+                # 处理新文件的情况
+                if file_path not in temp_map and not old_content.strip():
+                    PrettyOutput.print(f"检测到新文件: {file_path}", OutputType.INFO)
+                    # 确保目录存在
+                    dir_path = os.path.dirname(file_path)
+                    if dir_path and not os.path.exists(dir_path):
+                        os.makedirs(dir_path, exist_ok=True)
+                    
+                    # 写入新文件
+                    try:
+                        with open(file_path, "w", encoding="utf-8") as f:
+                            f.write(new_content)
+                        # 将新文件加入版本控制
+                        os.system(f"git add {file_path}")
+                        PrettyOutput.print(f"成功创建并添加文件: {file_path}", OutputType.SUCCESS)
+                        modified_files.add(file_path)
+                        temp_map[file_path] = new_content  # 更新临时映射
+                        continue
+                    except Exception as e:
+                        error_info.append(f"创建新文件失败 {file_path}: {str(e)}")
+                        return False, "\n".join(error_info)
+                
+                # 处理现有文件的修改
+                if file_path not in temp_map:
+                    error_info.append(f"文件不存在: {file_path}")
+                    return False, "\n".join(error_info)
+                
+                current_content = temp_map[file_path]
+                
+                # 查找并替换代码块
+                if old_content and old_content not in current_content:
+                    error_info.append(
+                        f"补丁应用失败: {file_path}\n"
+                        f"原因: 未找到要替换的代码\n"
+                        f"期望找到的代码:\n{old_content}\n"
+                        f"实际文件内容:\n{current_content[:200]}..."
+                    )
+                    return False, "\n".join(error_info)
+                
+                # 应用更改
+                temp_map[file_path] = current_content.replace(old_content, new_content)
                 modified_files.add(file_path)
                 
             except Exception as e:
