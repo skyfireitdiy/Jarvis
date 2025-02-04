@@ -125,12 +125,14 @@ def new_function():
             PrettyOutput.print(f"正在应用补丁 {i+1}/{len(patches)}", OutputType.INFO)
             
             try:
+                # 分割新旧内容，并处理换行符
                 parts = patch_content.split("@@@@@@")
                 if len(parts) != 2:
                     error_info.append(f"补丁格式错误: {file_path}，缺少分隔符")
                     return False, "\n".join(error_info)
                     
-                old_content, new_content = parts
+                old_content = parts[0].strip('\n')  # 移除前后的换行符
+                new_content = parts[1].strip('\n')  # 移除前后的换行符
                 
                 # 处理新文件的情况
                 if file_path not in temp_map and not old_content.strip():

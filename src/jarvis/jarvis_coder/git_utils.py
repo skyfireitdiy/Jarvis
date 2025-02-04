@@ -34,6 +34,7 @@ Git Diff:
 3. 保持简洁，不超过50个字符
 4. 准确描述代码变更的主要内容
 5. 优先考虑功能描述和git diff中的变更内容
+6. 仅生成commit信息的文本，不要输出任何其他内容
 """
     
     model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
