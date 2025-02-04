@@ -33,9 +33,11 @@ class JarvisCoder:
         """初始化目录"""
         self.max_context_length = get_max_context_length()
 
-        self.root_dir = find_git_root(self.root_dir)
-        if not self.root_dir:
-            self.root_dir = self.root_dir
+        root_dir = find_git_root(self.root_dir)
+        if not root_dir:
+            root_dir = self.root_dir
+
+        self.root_dir = root_dir
 
         PrettyOutput.print(f"Git根目录: {self.root_dir}", OutputType.INFO)
 
