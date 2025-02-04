@@ -219,7 +219,6 @@ def load_embedding_model():
         # 首先尝试离线加载
         embedding_model = SentenceTransformer(
             model_name,
-            device="cpu",
             cache_folder=os.path.expanduser("~/.cache/huggingface/hub"),
             local_files_only=True
         )
@@ -229,7 +228,6 @@ def load_embedding_model():
         # 如果离线加载失败，尝试在线下载
         embedding_model = SentenceTransformer(
             model_name,
-            device="cpu",
             cache_folder=os.path.expanduser("~/.cache/huggingface/hub")
         )
         PrettyOutput.print("模型下载并加载成功", OutputType.SUCCESS)
