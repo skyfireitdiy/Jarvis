@@ -74,10 +74,12 @@ class OpenAIModel(BasePlatform):
             for chunk in response:
                 if chunk.choices[0].delta.content:
                     text = chunk.choices[0].delta.content
-                    PrettyOutput.print_stream(text)
+                    if not self.suppress_output:
+                        PrettyOutput.print_stream(text)
                     full_response += text
                     
-            PrettyOutput.print_stream_end()
+            if not self.suppress_output:
+                PrettyOutput.print_stream_end()
             
             # 添加助手回复到历史记录
             self.messages.append({"role": "assistant", "content": full_response})

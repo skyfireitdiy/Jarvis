@@ -175,12 +175,14 @@ class AI8Model(BasePlatform):
                                 chunk = data.get('data', '')
                                 if chunk:
                                     full_response += chunk
-                                    PrettyOutput.print_stream(chunk)
+                                    if not self.suppress_output:
+                                        PrettyOutput.print_stream(chunk)
 
                         except json.JSONDecodeError:
                             continue
             
-            PrettyOutput.print_stream_end()
+            if not self.suppress_output:
+                PrettyOutput.print_stream_end()
 
             return full_response
             

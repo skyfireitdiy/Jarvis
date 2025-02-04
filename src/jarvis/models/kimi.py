@@ -266,7 +266,8 @@ class KimiModel(BasePlatform):
                         # 处理补全文本
                         text = data.get("text", "")
                         if text:
-                            PrettyOutput.print_stream(text)
+                            if not self.suppress_output:
+                                PrettyOutput.print_stream(text)
                             full_response += text
                             
                     elif event == "search_plus":
@@ -301,46 +302,48 @@ class KimiModel(BasePlatform):
                 except json.JSONDecodeError:
                     continue
                     
-            
-            PrettyOutput.print_stream_end()
+            if not self.suppress_output:
+                PrettyOutput.print_stream_end()
             
 
             # 显示搜索结果摘要
-            PrettyOutput.print("\n搜索结果:", OutputType.PROGRESS)
-            for result in search_results:
-                PrettyOutput.print(f"- {result['title']}", OutputType.PROGRESS)
-                if result['date']:
-                    PrettyOutput.print(f"  日期: {result['date']}", OutputType.PROGRESS)
-                PrettyOutput.print(f"  来源: {result['site_name']}", OutputType.PROGRESS)
-                if result['snippet']:
-                    PrettyOutput.print(f"  摘要: {result['snippet']}", OutputType.PROGRESS)
-                PrettyOutput.print(f"  链接: {result['url']}", OutputType.PROGRESS)
-                PrettyOutput.print("", OutputType.PROGRESS)
+            if search_results and not self.suppress_output:
+                PrettyOutput.print("\n搜索结果:", OutputType.PROGRESS)
+                for result in search_results:
+                    PrettyOutput.print(f"- {result['title']}", OutputType.PROGRESS)
+                    if result['date']:
+                        PrettyOutput.print(f"  日期: {result['date']}", OutputType.PROGRESS)
+                    PrettyOutput.print(f"  来源: {result['site_name']}", OutputType.PROGRESS)
+                    if result['snippet']:
+                        PrettyOutput.print(f"  摘要: {result['snippet']}", OutputType.PROGRESS)
+                    PrettyOutput.print(f"  链接: {result['url']}", OutputType.PROGRESS)
+                    PrettyOutput.print("", OutputType.PROGRESS)
                         
             # 显示引用来源
-            PrettyOutput.print("\n引用来源:", OutputType.PROGRESS)
-            for source in ref_sources:
-                PrettyOutput.print(f"- [{source['ref_id']}] {source['title']} ({source['source']})", OutputType.PROGRESS)
-                PrettyOutput.print(f"  链接: {source['url']}", OutputType.PROGRESS)
-                if source['abstract']:
-                    PrettyOutput.print(f"  摘要: {source['abstract']}", OutputType.PROGRESS)
-                
-                # 显示相关段落
-                if source['rag_segments']:
-                    PrettyOutput.print("  相关段落:", OutputType.PROGRESS)
-                    for segment in source['rag_segments']:
-                        text = segment.get('text', '').replace('\n', ' ').strip()
+            if ref_sources and not self.suppress_output:
+                PrettyOutput.print("\n引用来源:", OutputType.PROGRESS)
+                for source in ref_sources:
+                    PrettyOutput.print(f"- [{source['ref_id']}] {source['title']} ({source['source']})", OutputType.PROGRESS)
+                    PrettyOutput.print(f"  链接: {source['url']}", OutputType.PROGRESS)
+                    if source['abstract']:
+                        PrettyOutput.print(f"  摘要: {source['abstract']}", OutputType.PROGRESS)
+                    
+                    # 显示相关段落
+                    if source['rag_segments']:
+                        PrettyOutput.print("  相关段落:", OutputType.PROGRESS)
+                        for segment in source['rag_segments']:
+                            text = segment.get('text', '').replace('\n', ' ').strip()
+                            if text:
+                                PrettyOutput.print(f"    - {text}", OutputType.PROGRESS)
+                    
+                    # 显示原文引用
+                    origin = source['origin']
+                    if origin:
+                        text = origin.get('text', '')
                         if text:
-                            PrettyOutput.print(f"    - {text}", OutputType.PROGRESS)
-                
-                # 显示原文引用
-                origin = source['origin']
-                if origin:
-                    text = origin.get('text', '')
-                    if text:
-                        PrettyOutput.print(f"  原文: {text}", OutputType.PROGRESS)
-                
-                PrettyOutput.print("", OutputType.PROGRESS)
+                            PrettyOutput.print(f"  原文: {text}", OutputType.PROGRESS)
+                    
+                    PrettyOutput.print("", OutputType.PROGRESS)
 
             PrettyOutput.print(full_response, OutputType.RESULT)
             
