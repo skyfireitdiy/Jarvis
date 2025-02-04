@@ -45,6 +45,7 @@ class JarvisCoder:
 
         os.chdir(self.root_dir)
 
+        # 2. 创建 .jarvis-coder 目录
         self.jarvis_dir = os.path.join(self.root_dir, ".jarvis-coder")
         if not os.path.exists(self.jarvis_dir):
             os.makedirs(self.jarvis_dir)
@@ -53,29 +54,50 @@ class JarvisCoder:
         if not os.path.exists(self.record_dir):
             os.makedirs(self.record_dir)
 
-        # 2. 判断代码库是否是git仓库，如果不是，初始化git仓库
-        if not os.path.exists(os.path.join(self.root_dir, ".git")):
-            PrettyOutput.print(
-                "Git repository does not exist, initializing...", OutputType.INFO)
-            os.system(f"git init")
-            # 2.1 添加所有的文件
-            os.system(f"git add .")
-            # 2.2 提交
-            os.system(f"git commit -m 'Initial commit'")
+        # 3. 处理 .gitignore 文件
+        gitignore_path = os.path.join(self.root_dir, ".gitignore")
+        gitignore_modified = False
+        jarvis_ignore_pattern = ".jarvis-*"
 
-            PrettyOutput.print("代码库有未提交的文件，提交一次", OutputType.INFO)
-            os.system(f"git add .")
-            os.system(f"git commit -m 'commit before code edit'")
-        # 3. 查看代码库是否有未提交的文件，如果有，提交一次
-        if self._has_uncommitted_files():
-            PrettyOutput.print("代码库有未提交的文件，提交一次", OutputType.INFO)
-            os.system(f"git add .")
+        # 3.1 如果 .gitignore 不存在，创建它
+        if not os.path.exists(gitignore_path):
+            PrettyOutput.print("创建 .gitignore 文件", OutputType.INFO)
+            with open(gitignore_path, "w", encoding="utf-8") as f:
+                f.write(f"{jarvis_ignore_pattern}\n")
+            gitignore_modified = True
+        else:
+            # 3.2 检查是否已经包含 .jarvis-* 模式
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            # 检查是否需要添加 .jarvis-* 模式
+            if jarvis_ignore_pattern not in content.split("\n"):
+                PrettyOutput.print("将 .jarvis-* 添加到 .gitignore", OutputType.INFO)
+                with open(gitignore_path, "a", encoding="utf-8") as f:
+                    # 确保文件以换行符结尾
+                    if not content.endswith("\n"):
+                        f.write("\n")
+                    f.write(f"{jarvis_ignore_pattern}\n")
+                gitignore_modified = True
+
+        # 4. 判断代码库是否是git仓库，如果不是，初始化git仓库
+        if not os.path.exists(os.path.join(self.root_dir, ".git")):
+            PrettyOutput.print("初始化 Git 仓库", OutputType.INFO)
+            os.system("git init")
+            os.system("git add .")
+            os.system("git commit -m 'Initial commit'")
+        # 5. 如果修改了 .gitignore，提交更改
+        elif gitignore_modified:
+            PrettyOutput.print("提交 .gitignore 更改", OutputType.INFO)
+            os.system("git add .gitignore")
+            os.system("git commit -m 'chore: update .gitignore to exclude .jarvis-* files'")
+        # 6. 查看代码库是否有未提交的文件，如果有，提交一次
+        elif self._has_uncommitted_files():
+            PrettyOutput.print("提交未保存的更改", OutputType.INFO)
+            os.system("git add .")
             git_diff = os.popen("git diff --cached").read()
             commit_message = generate_commit_message(git_diff, "Pre-edit commit")
             os.system(f"git commit -m '{commit_message}'")
-            PrettyOutput.print("代码库有未提交的文件，提交一次", OutputType.INFO)
-            os.system(f"git add .")
-            os.system(f"git commit -m 'commit before code edit'")
 
     def _init_codebase(self):
         """初始化代码库"""
