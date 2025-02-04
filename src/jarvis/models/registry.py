@@ -11,7 +11,11 @@ REQUIRED_METHODS = [
     ('name', []),
     ('delete_chat', []),
     ('reset', []),
-    ('set_system_message', ['message'])
+    ('set_system_message', ['message']),
+    ('set_model_name', ['model_name']),
+    ('get_model_list', []),
+    ('set_suppress_output', ['suppress']),
+    ('upload_files', ['file_list'])
 ]
 
 class PlatformRegistry:
