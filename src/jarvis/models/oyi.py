@@ -12,8 +12,6 @@ class OyiModel(BasePlatform):
     platform_name = "oyi"
     BASE_URL = "https://api-10086.rcouyi.com"
 
-    first_time = True
-
     def get_model_list(self) -> List[Tuple[str, str]]:
         """获取模型列表"""
         return [(name,info['desc']) for name,info in self.models.items()]
@@ -21,23 +19,11 @@ class OyiModel(BasePlatform):
     def __init__(self):
         """Initialize model"""
         super().__init__()
-        PrettyOutput.section("支持的模型", OutputType.SUCCESS)
-        
-        # 获取可用模型列表
-        available_models = self.get_available_models()
-
-        if OyiModel.first_time:
-            OyiModel.first_time = False
-            if available_models:
-                for model in available_models:
-                    PrettyOutput.print(model, OutputType.INFO)
-            else:
-                PrettyOutput.print("获取模型列表失败", OutputType.WARNING)
-        
+        self.models = {}        
         self.messages = []
         self.system_message = ""
         self.conversation = None
-        self.upload_files = []  # 重命名 files 为 upload_files
+        self.upload_files = [] 
         self.first_chat = True
         
         self.token = os.getenv("OYI_API_KEY")
@@ -45,7 +31,7 @@ class OyiModel(BasePlatform):
             raise Exception("OYI_API_KEY is not set")
         
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
-        if self.model_name not in [m.split()[0] for m in available_models]:
+        if self.model_name not in [m.split()[0] for m in self.get_available_models()]:
             PrettyOutput.print(f"警告: 当前选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
         
 
