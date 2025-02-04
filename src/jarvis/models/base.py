@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 
 class BasePlatform(ABC):
@@ -41,9 +41,15 @@ class BasePlatform(ABC):
         """删除对话"""
         raise NotImplementedError("delete_chat is not implemented")
     
+    @abstractmethod
     def set_system_message(self, message: str):
         """设置系统消息"""
         raise NotImplementedError("set_system_message is not implemented")
+    
+    @abstractmethod
+    def get_model_list(self) -> List[Tuple[str, str]]:
+        """获取模型列表"""
+        raise NotImplementedError("get_model_list is not implemented")
 
     def set_suppress_output(self, suppress: bool):
         """设置是否屏蔽输出"""

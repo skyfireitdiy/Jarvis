@@ -1,5 +1,5 @@
 import requests
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from jarvis.models.base import BasePlatform
 from jarvis.utils import OutputType, PrettyOutput
 import os
@@ -52,6 +52,12 @@ class OllamaPlatform(BasePlatform):
             
         self.messages = []
         self.system_message = ""
+
+    def get_model_list(self) -> List[Tuple[str, str]]:
+        """获取模型列表"""
+        response = requests.get(f"{self.api_base}/api/tags")
+        response.raise_for_status()
+        return [(model["name"], "") for model in response.json().get("models", [])]
 
     def set_model_name(self, model_name: str):
         """设置模型名称"""
