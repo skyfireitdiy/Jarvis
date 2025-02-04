@@ -383,7 +383,7 @@ def new_function():
                     # 4. 如果应用失败，询问是否重试
                     should_retry = self.monitor_patch_result(success, error_msg)
                     if not should_retry:
-                        break  # 退出内层循环，尝试下一次完整的迭代
+                        return False  # 用户选择不重试，直接返回失败
                         
                     # 5. 处理失败反馈
                     patches = self.handle_patch_feedback(error_msg, feature)
@@ -401,7 +401,7 @@ def new_function():
                     # 询问是否要在当前迭代中重试
                     retry = input("\n是否要重新生成补丁？(y/n) [y]: ").lower() or "y"
                     if retry != "y":
-                        break  # 退出内层循环，尝试下一次完整的迭代
+                        return False  # 用户选择不重试，直接返回失败
                     continue  # 继续当前迭代
                 
                 return True  # 用户确认修改，返回成功
