@@ -100,8 +100,61 @@ class JarvisCoder:
 
     def _prepare_execution(self) -> None:
         """准备执行环境"""
-        self.main_model = self._new_model()
+        self.thinking_model = PlatformRegistry().get_global_platform_registry().get_thinking_platform()
+        self.codegen_model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
         self._codebase.generate_codebase()
+
+    def _get_modification_plan(self, feature: str, related_files: List[Dict]) -> str:
+        """获取修改方案
+        
+        Args:
+            feature: 功能描述
+            related_files: 相关文件列表
+            
+        Returns:
+            str: 修改方案，如果用户取消则返回 None
+        """
+        user_feedback = None
+        
+        while True:
+            # 构建提示词
+            prompt = "我需要你帮我分析如何实现以下功能:\n\n"
+            prompt += f"{feature}\n\n"
+            
+            # 如果有用户反馈，添加到提示中
+            if user_feedback:
+                prompt += "用户对之前的方案有以下补充意见：\n"
+                prompt += f"{user_feedback}\n\n"
+            
+            prompt += "以下是相关的代码文件:\n\n"
+            
+            for file in related_files:
+                prompt += f"文件: {file['file_path']}\n```\n{file['file_content']}\n```\n\n"
+            
+            prompt += "\n请详细说明需要做哪些修改来实现这个功能。包括:\n"
+            prompt += "1. 需要修改哪些文件\n"
+            prompt += "2. 每个文件需要做什么修改\n"
+            prompt += "3. 修改的主要逻辑和原因\n"
+            
+            # 获取修改方案
+            plan = self.thinking_model.chat(prompt)
+            
+            # 显示修改方案并获取用户确认
+            PrettyOutput.section("修改方案", OutputType.PLANNING)
+            PrettyOutput.print(plan, OutputType.PLANNING)
+            
+            user_input = input("\n是否同意这个修改方案？(y/n/f) [y]: ").strip().lower() or 'y'
+            if user_input == 'y':
+                return plan
+            elif user_input == 'n':
+                return None
+            else:  # 'f' - feedback
+                # 获取用户反馈
+                PrettyOutput.print("\n请输入您的补充意见或建议:", OutputType.INFO)
+                user_feedback = get_multiline_input("")
+                if user_feedback == "__interrupt__":
+                    return None
+                continue
 
     def _load_related_files(self, feature: str) -> List[Dict]:
         """加载相关文件内容"""
@@ -162,7 +215,17 @@ class JarvisCoder:
             self._prepare_execution()
             related_files = self._load_related_files(feature)
             
-            patch_handler = PatchHandler(self.main_model)
+            # 获取修改方案
+            modification_plan = self._get_modification_plan(feature, related_files)
+            if not modification_plan:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "用户取消修改",
+                }
+            
+            # 执行修改
+            patch_handler = PatchHandler(self.codegen_model)
             if patch_handler.handle_patch_application(related_files, feature):
                 self._finalize_changes(feature)
                 return {
