@@ -132,7 +132,7 @@ class Agent:
             embedding = self.embedding_model.encode([text], 
                                                  convert_to_tensor=True,
                                                  normalize_embeddings=True)
-            vector = np.array(embedding, dtype=np.float32)
+            vector = np.array(embedding.cpu().numpy(), dtype=np.float32)
             return vector[0]  # 返回第一个向量，因为我们只编码了一个文本
         except Exception as e:
             PrettyOutput.print(f"创建方法论嵌入向量失败: {str(e)}", OutputType.ERROR)
