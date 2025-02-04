@@ -40,7 +40,7 @@ class KimiModel(BasePlatform):
             PrettyOutput.print("\n   方法 2: 直接设置环境变量:", OutputType.INFO)
             PrettyOutput.print("   export KIMI_API_KEY=your_key_here", OutputType.INFO)
             PrettyOutput.print("\n设置完成后重新运行 Jarvis。", OutputType.INFO)
-            raise Exception("KIMI_API_KEY is not set")
+            PrettyOutput.print("KIMI_API_KEY未设置", OutputType.WARNING)
         self.auth_header = f"Bearer {self.api_key}"
         self.chat_id = ""
         self.uploaded_files = []  # 存储已上传文件的信息

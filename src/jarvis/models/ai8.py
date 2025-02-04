@@ -26,7 +26,7 @@ class AI8Model(BasePlatform):
 
         self.token = os.getenv("AI8_API_KEY")
         if not self.token:
-            raise Exception("AI8_API_KEY is not set")
+            PrettyOutput.print("AI8_API_KEY未设置", OutputType.WARNING)
         
         
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
