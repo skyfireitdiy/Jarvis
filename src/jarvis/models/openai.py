@@ -8,6 +8,10 @@ class OpenAIModel(BasePlatform):
     """DeepSeek模型实现"""
 
     platform_name = "openai"
+
+    def upload_files(self, file_list: List[str]):
+        """上传文件"""
+        PrettyOutput.print("OpenAI 不支持上传文件", OutputType.WARNING)
     
     def __init__(self):
         """
@@ -19,7 +23,7 @@ class OpenAIModel(BasePlatform):
         if not self.api_key:
             PrettyOutput.print("\n需要设置以下环境变量才能使用 OpenAI 模型：", OutputType.INFO)
             PrettyOutput.print("  • OPENAI_API_KEY: API 密钥", OutputType.INFO)
-            PrettyOutput.print("  • OPENAI_API_BASE: (可选) API 基础地址，默认使用 https://api.openai.com", OutputType.INFO)
+            PrettyOutput.print("  • OPENAI_API_BASE: (可选) API 基础地址，默认使用 https://api.openai.com/v1", OutputType.INFO)
             PrettyOutput.print("\n可以通过以下方式设置：", OutputType.INFO)
             PrettyOutput.print("1. 创建或编辑 ~/.jarvis_env 文件:", OutputType.INFO)
             PrettyOutput.print("   OPENAI_API_KEY=your_api_key", OutputType.INFO)
@@ -31,7 +35,7 @@ class OpenAIModel(BasePlatform):
             PrettyOutput.print("   export OPENAI_MODEL_NAME=your_model_name", OutputType.INFO)
             PrettyOutput.print("OPENAI_API_KEY未设置", OutputType.WARNING)
             
-        self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com")
+        self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
         self.model_name =  os.getenv("JARVIS_MODEL") or "gpt-4o"
 
             
