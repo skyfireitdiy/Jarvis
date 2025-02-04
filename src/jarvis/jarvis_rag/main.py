@@ -144,6 +144,7 @@ class RAGTool:
         self.min_paragraph_length = int(os.environ.get("JARVIS_MIN_PARAGRAPH_LENGTH", "50"))  # 最小段落长度
         self.max_paragraph_length = int(os.environ.get("JARVIS_MAX_PARAGRAPH_LENGTH", "1000"))  # 最大段落长度
         self.context_window = int(os.environ.get("JARVIS_CONTEXT_WINDOW", "5"))  # 上下文窗口大小，默认前后各5个片段
+        self.max_context_length = int(get_max_context_length() * 0.8)
         
         # 初始化数据目录
         self.data_dir = os.path.join(self.root_dir, ".jarvis-rag")
@@ -163,7 +164,6 @@ class RAGTool:
         self.cache_path = os.path.join(self.data_dir, "cache.pkl")
         self.documents: List[Document] = []
         self.index = None
-        self.max_context_length = get_max_context_length()
         
         # 加载缓存
         self._load_cache()
@@ -400,7 +400,7 @@ class RAGTool:
         PrettyOutput.print(f"成功索引了 {len(self.documents)} 个文档片段", 
                         output_type=OutputType.SUCCESS)
 
-    def search(self, query: str, top_k: int = 5) -> List[Tuple[Document, float]]:
+    def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
         """优化搜索策略"""
         if not self.index:
             PrettyOutput.print("索引未构建，正在构建...", output_type=OutputType.INFO)
@@ -557,27 +557,55 @@ class RAGTool:
             results = self.query(question)
             if not results:
                 return None
-
-            # 构建上下文
-            context = []
+            
+            # 显示找到的文档片段
             for doc in results:
-                context.append(f"""
+                PrettyOutput.print(f"文件: {doc.metadata['file_path']}", output_type=OutputType.INFO)
+                PrettyOutput.print(f"片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}", 
+                                output_type=OutputType.INFO)
+                PrettyOutput.print("\n内容:", output_type=OutputType.INFO)
+                content = doc.content.encode('utf-8', errors='replace').decode('utf-8')
+                PrettyOutput.print(content, output_type=OutputType.INFO)
+
+            # 构建基础提示词
+            base_prompt = f"""请基于以下文档片段回答用户的问题。如果文档内容不足以完整回答问题，请明确指出。
+
+用户问题: {question}
+
+相关文档片段:
+"""
+            end_prompt = "\n请提供准确、简洁的回答，并在适当时引用具体的文档来源。"
+            
+            # 计算可用于文档内容的最大长度
+            # 预留一些空间给模型回答
+            available_length = self.max_context_length - len(base_prompt) - len(end_prompt) - 500
+            
+            # 构建上下文，同时控制总长度
+            context = []
+            current_length = 0
+            
+            for doc in results:
+                # 计算这个文档片段的内容长度
+                doc_content = f"""
 来源文件: {doc.metadata['file_path']}
 内容:
 {doc.content}
 ---
-""")
-
-            # 构建提示词
-            prompt = f"""请基于以下文档片段回答用户的问题。如果文档内容不足以完整回答问题，请明确指出。
-            
-用户问题: {question}
-
-相关文档片段:
-{''.join(context)}
-
-请提供准确、简洁的回答，并在适当时引用具体的文档来源。
 """
+                content_length = len(doc_content)
+                
+                # 如果添加这个片段会超出限制，就停止添加
+                if current_length + content_length > available_length:
+                    PrettyOutput.print("由于上下文长度限制，部分相关文档片段被省略", 
+                                    output_type=OutputType.WARNING)
+                    break
+                    
+                context.append(doc_content)
+                current_length += content_length
+
+            # 构建完整的提示词
+            prompt = base_prompt + ''.join(context) + end_prompt
+            
             # 获取模型实例并生成回答
             model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
             response = model.chat(prompt)
