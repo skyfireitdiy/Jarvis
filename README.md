@@ -65,11 +65,13 @@ Jarvis supports configuration through environment variables that can be set in t
 |---------|------|--------|------|
 | JARVIS_PLATFORM | AI platform to use, supports kimi/openai/ai8 etc | kimi | Yes |
 | JARVIS_MODEL | Model name to use | - | No |
-| JARVIS_THREAD_COUNT | Number of threads for parallel processing | 10 | No |
 | JARVIS_CODEGEN_PLATFORM | AI platform for code generation | Same as JARVIS_PLATFORM | No |
 | JARVIS_CODEGEN_MODEL | Model name for code generation | Same as JARVIS_MODEL | No |
 | JARVIS_CHEAP_PLATFORM | AI platform for cheap operations | Same as JARVIS_PLATFORM | No |
 | JARVIS_CHEAP_MODEL | Model name for cheap operations | Same as JARVIS_MODEL | No |
+| JARVIS_THINKING_PLATFORM | AI platform for thinking | Same as JARVIS_PLATFORM | No |
+| JARVIS_THINKING_MODEL | Model name for thinking | Same as JARVIS_MODEL | No |
+| JARVIS_THREAD_COUNT | Number of threads for parallel processing | 10 | No |
 | OPENAI_API_KEY | API key for OpenAI platform | - | Required for OpenAI |
 | OPENAI_API_BASE | Base URL for OpenAI API | https://api.deepseek.com | No |
 | OPENAI_MODEL_NAME | Model name for OpenAI | deepseek-chat | No |

@@ -174,6 +174,13 @@ class PlatformRegistry:
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name)
         return platform
+    
+    def get_thinking_platform(self) -> BasePlatform:
+        platform_name = os.environ.get("JARVIS_THINKING_PLATFORM", os.environ.get("JARVIS_PLATFORM", "kimi"))
+        model_name = os.environ.get("JARVIS_THINKING_MODEL", os.environ.get("JARVIS_MODEL", "kimi"))
+        platform = self.create_platform(platform_name)
+        platform.set_model_name(model_name)
+        return platform
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]):
         """注册平台类
