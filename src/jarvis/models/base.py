@@ -14,6 +14,7 @@ class BasePlatform(ABC):
         """销毁模型"""
         self.delete_chat()
 
+    @abstractmethod
     def set_model_name(self, model_name: str):
         """设置模型名称"""
         raise NotImplementedError("set_model_name is not implemented")
@@ -23,10 +24,12 @@ class BasePlatform(ABC):
         """执行对话"""
         raise NotImplementedError("chat is not implemented")
 
+    @abstractmethod
     def upload_files(self, file_list: List[str]) -> List[Dict]:
         """上传文件"""
         raise NotImplementedError("upload_files is not implemented")
 
+    @abstractmethod
     def reset(self):
         """重置模型"""
         raise NotImplementedError("reset is not implemented")
