@@ -19,7 +19,6 @@ class PlatformRegistry:
 
     global_platform_name = "kimi"
     global_platform_registry = None
-    suppress_output = False
 
     @staticmethod
     def get_platform_dir() -> str:
@@ -122,8 +121,7 @@ class PlatformRegistry:
                             # 检查平台实现
                             if not PlatformRegistry.check_platform_implementation(obj):
                                 continue
-                            if not PlatformRegistry.suppress_output:
-                                PrettyOutput.print(f"从 {os.path.join(directory, filename)} 加载平台：{obj.platform_name}", OutputType.SUCCESS)
+                            PrettyOutput.print(f"从 {os.path.join(directory, filename)} 加载平台：{obj.platform_name}", OutputType.SUCCESS)
                             platforms[obj.platform_name] = obj
                             break
                 except Exception as e:

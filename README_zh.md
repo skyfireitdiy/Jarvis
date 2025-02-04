@@ -272,9 +272,7 @@ class CustomPlatform(BasePlatform):
             str: 模型响应
         """
         try:
-            # 实现聊天逻辑
-            if not self.suppress_output:
-                PrettyOutput.print("发送请求...", OutputType.PROGRESS)
+            PrettyOutput.print("发送请求...", OutputType.PROGRESS)
             
             # 将消息添加到历史记录
             self.messages.append({"role": "user", "content": message})
@@ -314,10 +312,6 @@ class CustomPlatform(BasePlatform):
     def set_system_message(self, message: str):
         """设置系统消息"""
         self.system_message = message
-
-    def set_suppress_output(self, suppress: bool):
-        """设置是否抑制输出"""
-        self.suppress_output = suppress
 ```
 
 ### 开发指南

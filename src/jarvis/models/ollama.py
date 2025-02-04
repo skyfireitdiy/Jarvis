@@ -1,3 +1,4 @@
+import re
 import requests
 from typing import List, Dict, Tuple
 from jarvis.models.base import BasePlatform
@@ -86,18 +87,21 @@ class OllamaPlatform(BasePlatform):
                         result = json.loads(chunk)
                         if "message" in result and "content" in result["message"]:
                             text = result["message"]["content"]
-                            if not self.suppress_output:
-                                PrettyOutput.print_stream(text)
+                            PrettyOutput.print_stream(text)
                             full_response += text
                     except json.JSONDecodeError:
                         continue
                         
-            if not self.suppress_output:
-                PrettyOutput.print_stream_end()
+            PrettyOutput.print_stream_end()
+
+            
             
             # 更新消息历史
             self.messages.append({"role": "user", "content": message})
             self.messages.append({"role": "assistant", "content": full_response})
+
+            # 删除<think>标签之间的内容
+            full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL)
             
             return full_response
             

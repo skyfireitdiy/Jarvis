@@ -305,10 +305,6 @@ class CustomPlatform(BasePlatform):
     def set_system_message(self, message: str):
         """Set system message"""
         self.system_message = message
-
-    def set_suppress_output(self, suppress: bool):
-        """Set whether to suppress output"""
-        self.suppress_output = suppress
 ```
 
 ### Development Guidelines
