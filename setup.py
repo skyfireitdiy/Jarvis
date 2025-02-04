@@ -36,6 +36,7 @@ setup(
             "jarvis-rag=jarvis.jarvis_rag.main:main",
             "jarvis-smart-shell=jarvis.jarvis_smart_shell.main:main",
             "jss=jarvis.jarvis_smart_shell.main:main",
+            "jarvis-platform=jarvis.jarvis_platform.main:main",
         ],
     },
     python_requires=">=3.8",

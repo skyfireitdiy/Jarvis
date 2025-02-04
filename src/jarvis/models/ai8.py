@@ -12,8 +12,6 @@ class AI8Model(BasePlatform):
     platform_name = "ai8"
     BASE_URL = "https://ai8.rcouyi.com"
 
-    first_time = True
-
     def get_model_list(self) -> List[Tuple[str, str]]:
         """获取模型列表"""
         return [(name,info['desc']) for name,info in self.models.items()]
@@ -26,53 +24,13 @@ class AI8Model(BasePlatform):
         self.files = []
         self.models = {}  # 存储模型信息
 
-        # 获取可用模型列表
-        available_models = self.get_available_models()
-        
-        if AI8Model.first_time:
-            AI8Model.first_time = False
-            if available_models:
-                PrettyOutput.section("支持的模型", OutputType.SUCCESS)
-                for model in self.models.values():
-                    # 格式化显示模型信息
-                    model_str = f"{model['value']:<30}"
-                    
-                    # 添加标签
-                    model_str += f"{model['label']}"
-                    
-                    # 添加标签和积分信息
-                    attrs = []
-                    if model['attr'].get('tag'):
-                        attrs.append(model['attr']['tag'])
-                    if model['attr'].get('integral'):
-                        attrs.append(model['attr']['integral'])
-                        
-                    # 添加特性标记
-                    features = []
-                    if model['attr'].get('multimodal'):
-                        features.append("多模态")
-                    if model['attr'].get('plugin'):
-                        features.append("插件支持")
-                    if model['attr'].get('onlyImg'):
-                        features.append("图像支持")
-                    if features:
-                        model_str += f" [{'|'.join(features)}]"
-                        
-                    # 添加备注
-                    if model['attr'].get('note'):
-                        model_str += f" - {model['attr']['note']}"
-                        
-                    PrettyOutput.print(model_str, OutputType.INFO)
-            else:
-                PrettyOutput.print("获取模型列表失败", OutputType.WARNING)
-
         self.token = os.getenv("AI8_API_KEY")
         if not self.token:
             raise Exception("AI8_API_KEY is not set")
         
         
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
-        if self.model_name not in self.models:
+        if self.model_name not in self.get_available_models():
             PrettyOutput.print(f"警告: 当前选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
         
 
@@ -320,11 +278,8 @@ class AI8Model(BasePlatform):
             }
 
             for model in self.models.values():
-                # 格式化显示模型信息
-                model_str = f"{model['value']:<30}"
-                
                 # 添加标签
-                model_str += f"{model['label']}"
+                model_str = f"{model['label']}"
                 
                 # 添加标签和积分信息
                 attrs = []

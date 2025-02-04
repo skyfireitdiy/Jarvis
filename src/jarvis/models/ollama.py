@@ -20,7 +20,6 @@ class OllamaPlatform(BasePlatform):
         
         # 检查 Ollama 服务是否可用
         try:
-            PrettyOutput.print(f"正在连接 Ollama 服务 ({self.api_base})...", OutputType.INFO)
             response = requests.get(f"{self.api_base}/api/tags")
             response.raise_for_status()
             available_models = [model["name"] for model in response.json().get("models", [])]
@@ -31,16 +30,6 @@ class OllamaPlatform(BasePlatform):
                 PrettyOutput.print("2. 下载模型:", OutputType.INFO)
                 PrettyOutput.print(f"   ollama pull {self.model_name}", OutputType.INFO)
                 raise Exception("No available models found")
-                
-            PrettyOutput.print(f"可用模型: {', '.join(available_models)}", OutputType.INFO)
-            
-            if self.model_name not in available_models:
-                PrettyOutput.print(f"\n警告：模型 {self.model_name} 未下载", OutputType.WARNING)
-                PrettyOutput.print("\n请使用以下命令下载模型：", OutputType.INFO)
-                PrettyOutput.print(f"ollama pull {self.model_name}", OutputType.INFO)
-                raise Exception(f"Model {self.model_name} is not available")
-                
-            PrettyOutput.print(f"使用模型: {self.model_name}", OutputType.SUCCESS)
                 
         except requests.exceptions.ConnectionError:
             PrettyOutput.print("\nOllama 服务未启动或无法连接", OutputType.ERROR)

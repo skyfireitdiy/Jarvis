@@ -15,13 +15,14 @@ class KimiModel(BasePlatform):
 
     def get_model_list(self) -> List[Tuple[str, str]]:
         """获取模型列表"""
-        return [("kimi", "Kimi")]
+        return [("kimi", "基于网页Kimi的封装，免费接口")]
     
     def __init__(self):
         """
         初始化Kimi模型
         """
         super().__init__()
+        self.chat_id = ""
         self.api_key = os.getenv("KIMI_API_KEY")
         if not self.api_key:
             PrettyOutput.print("\n需要设置 KIMI_API_KEY 才能使用 Jarvis。请按以下步骤操作：", OutputType.INFO)
