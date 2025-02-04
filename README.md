@@ -88,11 +88,6 @@ Jarvis supports configuration through environment variables that can be set in t
 jarvis
 ```
 
-### Code Generation
-```bash
-jarvis-coder
-```
-
 ### Codebase Search
 ```bash
 # Generate codebase index
