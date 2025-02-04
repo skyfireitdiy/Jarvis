@@ -4,17 +4,7 @@ from jarvis.utils import get_multiline_input, PrettyOutput, OutputType
 
 class AskUserTool:
     name="ask_user"
-    description="""当缺少完成任务的信息或有关键决策信息缺失时，询问用户。
-用户可以输入多行文本，空行结束输入。
-
-使用场景：
-1. 需要用户提供更多信息来完成任务
-2. 需要用户做出关键决策
-3. 需要用户确认某些重要操作
-4. 需要用户提供额外信息
-
-参数说明：
-- question: 要询问用户的问题，应该清晰明确"""
+    description="""当缺少完成任务的信息或有关键决策信息缺失时，询问用户。用户可以输入多行文本，空行结束输入。使用场景：1. 需要用户提供更多信息来完成任务；2. 需要用户做出关键决策；3. 需要用户确认某些重要操作；4. 需要用户提供额外信息"""
     parameters={
         "type": "object",
         "properties": {
