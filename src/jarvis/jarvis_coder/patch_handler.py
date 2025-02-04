@@ -70,14 +70,13 @@ old_content
 new_content
 </PATCH_FMT1>
 
-例：
+注意：
+- 如果是新增文件，使用第一种格式，old_content留空，只写new_content
+- 例如新建文件：
 <PATCH_FMT1>
-> src/main.py
-def old_function():
-    print("old code")
-    return False
+> src/new_file.py
 @@@@@@
-def old_function():
+def new_function():
     print("new code")
     return True
 </PATCH_FMT1>
@@ -112,6 +111,7 @@ def new_function():
 6、优先使用第二种格式（PATCH_FMT2），因为它更准确地定位要修改的代码范围
 7、第二种格式（PATCH_FMT2）的前两行必须完全匹配文件中要修改的代码块的首尾行
 8、如果第二种格式无法准确定位到要修改的代码（比如有重复的行），请使用第一种格式（PATCH_FMT1）
+9、对于新文件，必须使用第一种格式（PATCH_FMT1），并且不需要写old_content部分
 """
         # 添加文件内容到提示
         for i, file in enumerate(related_files):
