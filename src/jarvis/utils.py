@@ -128,7 +128,7 @@ class PrettyOutput:
 
 def get_multiline_input(tip: str) -> str:
     """获取多行输入，支持方向键、历史记录等功能"""
-    PrettyOutput.print(tip + "\n", OutputType.INFO)
+    print(tip, end="")
     
     # 创建输入会话，启用历史记录
     session = PromptSession(history=None)  # 使用默认历史记录
