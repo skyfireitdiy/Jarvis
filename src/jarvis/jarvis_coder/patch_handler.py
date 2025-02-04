@@ -338,6 +338,7 @@ def new_function():
         attempt = 0
         
         while attempt < max_attempts:
+            PrettyOutput.print("开始生成补丁...", OutputType.PLANNING)
             attempt += 1
             
             while True:  # 在当前尝试中循环，直到成功或用户放弃
