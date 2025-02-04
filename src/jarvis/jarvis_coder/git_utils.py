@@ -37,6 +37,7 @@ Git Diff:
 """
     
     model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
+    model.set_suppress_output(True)
     success, response = call_model_with_retry(model, prompt)
     if not success:
         return "Update code changes"

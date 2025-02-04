@@ -174,7 +174,8 @@ class OyiModel(BasePlatform):
             )
             
             if response.status_code == 200:
-                PrettyOutput.print(response.text, OutputType.SYSTEM)
+                if not self.suppress_output:
+                    PrettyOutput.print(response.text, OutputType.SYSTEM)
                 self.messages.append({"role": "assistant", "content": response.text})
                 return response.text
             else:

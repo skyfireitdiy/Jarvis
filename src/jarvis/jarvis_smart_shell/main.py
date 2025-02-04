@@ -36,7 +36,9 @@ def process_request(request: str) -> Optional[str]:
     """
     try:
         # 获取语言模型实例
+        PlatformRegistry.suppress_output = True
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        model.set_suppress_output(True)
 
         shell = os.environ.get("SHELL") or "bash"
         current_path = os.getcwd()

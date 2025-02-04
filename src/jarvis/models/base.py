@@ -7,6 +7,7 @@ class BasePlatform(ABC):
     
     def __init__(self):
         """初始化模型"""
+        self.suppress_output = False  # 添加输出控制标志
         pass
 
     def __del__(self):
@@ -49,3 +50,7 @@ class BasePlatform(ABC):
     def get_model_list(self) -> List[Tuple[str, str]]:
         """获取模型列表"""
         raise NotImplementedError("get_model_list is not implemented")
+
+    def set_suppress_output(self, suppress: bool):
+        """设置是否屏蔽输出"""
+        self.suppress_output = suppress
