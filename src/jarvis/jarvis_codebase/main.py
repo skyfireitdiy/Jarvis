@@ -20,6 +20,7 @@ class CodeBase:
         os.chdir(self.root_dir)
         self.thread_count = get_thread_count()
         self.max_context_length = get_max_context_length()
+        self.index = None
             
         # 初始化数据目录
         self.data_dir = os.path.join(self.root_dir, ".jarvis-codebase")
