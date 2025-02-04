@@ -59,6 +59,8 @@ class PlanGenerator:
         while True:
             # 构建提示词
             prompt = self._build_prompt(feature, related_files, user_feedback)
+
+            PrettyOutput.print("开始生成修改方案...", OutputType.PLANNING)
             
             # 获取修改方案
             plan = self.thinking_model.chat(prompt)
