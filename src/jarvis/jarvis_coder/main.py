@@ -123,6 +123,108 @@ class JarvisCoder:
             ret.append({"file_path": file, "file_content": content})
         return ret
 
+    def _parse_file_selection(self, input_str: str, max_index: int) -> List[int]:
+        """解析文件选择表达式
+        
+        支持的格式:
+        - 单个数字: "1"
+        - 逗号分隔: "1,3,5"
+        - 范围: "1-5"
+        - 组合: "1,3-5,7"
+        
+        Args:
+            input_str: 用户输入的选择表达式
+            max_index: 最大可选择的索引
+            
+        Returns:
+            List[int]: 选中的索引列表（从0开始）
+        """
+        selected = set()
+        
+        # 移除所有空白字符
+        input_str = "".join(input_str.split())
+        
+        # 处理逗号分隔的部分
+        for part in input_str.split(","):
+            if not part:
+                continue
+            
+            # 处理范围（例如：3-6）
+            if "-" in part:
+                try:
+                    start, end = map(int, part.split("-"))
+                    # 转换为从0开始的索引
+                    start = max(0, start - 1)
+                    end = min(max_index, end - 1)
+                    if start <= end:
+                        selected.update(range(start, end + 1))
+                except ValueError:
+                    PrettyOutput.print(f"忽略无效的范围表达式: {part}", OutputType.WARNING)
+            # 处理单个数字
+            else:
+                try:
+                    index = int(part) - 1  # 转换为从0开始的索引
+                    if 0 <= index < max_index:
+                        selected.add(index)
+                    else:
+                        PrettyOutput.print(f"忽略超出范围的索引: {part}", OutputType.WARNING)
+                except ValueError:
+                    PrettyOutput.print(f"忽略无效的数字: {part}", OutputType.WARNING)
+        
+        return sorted(list(selected))
+
+    def _select_files(self, related_files: List[Dict], feature: str) -> List[Dict]:
+        """让用户选择和补充相关文件"""
+        PrettyOutput.section("相关文件", OutputType.INFO)
+        
+        # 显示找到的文件
+        selected_files = list(related_files)  # 默认全选
+        for i, file in enumerate(related_files, 1):
+            PrettyOutput.print(f"[{i}] {file['file_path']}", OutputType.INFO)
+        
+        # 询问用户是否需要调整
+        user_input = input("\n是否需要调整文件列表？(y/n) [n]: ").strip().lower() or 'n'
+        if user_input == 'y':
+            # 让用户选择文件
+            PrettyOutput.print("\n请输入要包含的文件编号（支持: 1,3-6 格式，直接回车保持当前选择）:", OutputType.INFO)
+            numbers = input(">>> ").strip()
+            if numbers:
+                selected_indices = self._parse_file_selection(numbers, len(related_files))
+                if selected_indices:
+                    selected_files = [related_files[i] for i in selected_indices]
+                else:
+                    PrettyOutput.print("未选择任何有效文件，保持原有选择", OutputType.WARNING)
+        
+        # 询问是否需要补充文件
+        user_input = input("\n是否需要补充其他文件？(y/n) [n]: ").strip().lower() or 'n'
+        if user_input == 'y':
+            while True:
+                PrettyOutput.print("\n请输入要补充的文件路径（相对于项目根目录，输入空行结束）:", OutputType.INFO)
+                file_path = get_multiline_input("")
+                
+                if not file_path or file_path == "__interrupt__":
+                    break
+                    
+                # 检查文件是否存在
+                full_path = os.path.join(self.root_dir, file_path)
+                if not os.path.isfile(full_path):
+                    PrettyOutput.print(f"文件不存在: {file_path}", OutputType.ERROR)
+                    continue
+                    
+                # 读取文件内容
+                try:
+                    with open(full_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    selected_files.append({
+                        "file_path": file_path,
+                        "file_content": content
+                    })
+                    PrettyOutput.print(f"已添加文件: {file_path}", OutputType.SUCCESS)
+                except Exception as e:
+                    PrettyOutput.print(f"读取文件失败: {str(e)}", OutputType.ERROR)
+        
+        return selected_files
+
     def _finalize_changes(self, feature: str) -> None:
         """完成修改并提交"""
         PrettyOutput.print("修改确认成功，提交修改", OutputType.INFO)
@@ -164,10 +266,20 @@ class JarvisCoder:
         """
         try:
             self._prepare_execution()
-            related_files = self._load_related_files(feature)
+            
+            # 获取并选择相关文件
+            initial_files = self._load_related_files(feature)
+            selected_files = self._select_files(initial_files, feature)
+            
+            if not selected_files:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "未选择任何文件",
+                }
             
             # 获取修改方案
-            modification_plan = self.plan_generator.generate_plan(feature, related_files)
+            modification_plan = self.plan_generator.generate_plan(feature, selected_files)
             if not modification_plan:
                 return {
                     "success": False,
@@ -177,7 +289,7 @@ class JarvisCoder:
             
             # 执行修改
             patch_handler = PatchHandler(self.codegen_model)
-            if patch_handler.handle_patch_application(related_files, feature):
+            if patch_handler.handle_patch_application(selected_files, feature):
                 self._finalize_changes(feature)
                 return {
                     "success": True,
