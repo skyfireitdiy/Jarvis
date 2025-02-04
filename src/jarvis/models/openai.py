@@ -29,7 +29,7 @@ class OpenAIModel(BasePlatform):
             PrettyOutput.print("   export OPENAI_API_KEY=your_api_key", OutputType.INFO)
             PrettyOutput.print("   export OPENAI_API_BASE=your_api_base", OutputType.INFO)
             PrettyOutput.print("   export OPENAI_MODEL_NAME=your_model_name", OutputType.INFO)
-            raise Exception("OPENAI_API_KEY is not set")
+            PrettyOutput.print("OPENAI_API_KEY未设置", OutputType.WARNING)
             
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com")
         self.model_name =  os.getenv("JARVIS_MODEL") or "gpt-4o"

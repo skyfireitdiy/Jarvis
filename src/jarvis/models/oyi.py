@@ -28,7 +28,7 @@ class OyiModel(BasePlatform):
         
         self.token = os.getenv("OYI_API_KEY")
         if not self.token:
-            raise Exception("OYI_API_KEY is not set")
+            PrettyOutput.print("OYI_API_KEY未设置", OutputType.WARNING)
         
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
         if self.model_name not in [m.split()[0] for m in self.get_available_models()]:
