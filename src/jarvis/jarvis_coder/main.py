@@ -1,11 +1,7 @@
 import os
-import re
 import threading
-import time
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 
-import yaml
-from jarvis.models.base import BasePlatform
 from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, get_multiline_input, load_env_from_file
 from jarvis.models.registry import PlatformRegistry
 from jarvis.jarvis_codebase.main import CodeBase
@@ -15,7 +11,7 @@ from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.styles import Style
 import fnmatch
 from .patch_handler import PatchHandler
-from .git_utils import has_uncommitted_files, generate_commit_message, save_edit_record
+from .git_utils import generate_commit_message, save_edit_record
 from .plan_generator import PlanGenerator
 
 # 全局锁对象

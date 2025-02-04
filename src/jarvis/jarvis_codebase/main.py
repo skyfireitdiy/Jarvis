@@ -478,8 +478,6 @@ class CodeBase:
                 return []
             # 生成多个查询变体以提高召回率
             model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-            model.set_suppress_output(True)
-            
             prompt = f"""请根据以下查询，生成3个不同的表述，每个表述都要完整表达原始查询的意思。这些表述将用于代码搜索，要保持专业性和准确性。
 原始查询: {query}
 
