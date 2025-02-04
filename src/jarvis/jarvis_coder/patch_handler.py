@@ -216,6 +216,12 @@ def new_function():
                     temp_map[file_path] = current_content.replace(old_content, new_content)
                     
                 else:  # FMT2 - 首尾行定位格式
+                    # 检查文件是否存在
+                    if file_path not in temp_map:
+                        error_info.append(f"文件不存在: {file_path}")
+                        return False, "\n".join(error_info)
+                    
+                    current_content = temp_map[file_path]
                     lines = patch_content.splitlines()
                     if len(lines) < 3:
                         error_info.append(f"FMT2补丁格式错误: {file_path}，行数不足")
