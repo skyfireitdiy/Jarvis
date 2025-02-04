@@ -88,7 +88,6 @@ class CodeBase:
 
     def make_description(self, file_path: str, content: str) -> str:
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
-        model.set_suppress_output(True)
         prompt = f"""请分析以下代码文件，并生成一个详细的描述。描述应该包含以下要点：
 
 1. 主要功能和用途
@@ -475,7 +474,6 @@ class CodeBase:
         try:
             # 生成多个查询变体以提高召回率
             model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-            model.set_suppress_output(True)
             
             prompt = f"""请根据以下查询，生成3个不同的表述，每个表述都要完整表达原始查询的意思。这些表述将用于代码搜索，要保持专业性和准确性。
 原始查询: {query}
