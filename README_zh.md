@@ -93,11 +93,6 @@ jarvis -p kimi  # 使用 Kimi 平台
 jarvis -p openai  # 使用 OpenAI 平台
 ```
 
-### 代码修改
-```bash
-jarvis-coder --feature "添加新功能"  # 修改代码以添加新功能
-```
-
 ### 代码库搜索
 ```bash
 # 生成代码库索引
