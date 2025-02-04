@@ -57,9 +57,12 @@ class PatchHandler:
         
         return patches
 
-    def make_patch(self, related_files: List[Dict], feature: str) -> List[Tuple[str, str, str]]:
+    def make_patch(self, related_files: List[Dict], feature: str, modification_plan: str) -> List[Tuple[str, str, str]]:
         """生成修改方案"""
-        prompt = """你是一个资深程序员，请根据需求描述，修改文件内容。
+        prompt = """你是一个资深程序员，请根据需求描述和修改方案，修改文件内容。
+
+修改方案：
+{modification_plan}
 
 修改格式说明：
 1. 第一种格式 - 完整代码块替换：
@@ -100,12 +103,12 @@ def new_function():
     return True
 </PATCH_FMT2>
 
-例子中 `def old_function():` 是首行内容，`return False` 是尾行内容，第三行开始是新的代码内容，将替换第一行到最后一行之间的所有内容
+例子中 `def old_function():` 是**首行内容**，`return False` 是**尾行内容**，第三行开始是新的代码内容，将替换第一行到最后一行之间的所有内容
 
 注意事项：
 1、仅输出补丁内容，不要输出任何其他内容
 2、如果在大段代码中有零星修改，生成多个补丁
-3、要替换的内容，一定要与文件内容完全一致，不要有任何多余或者缺失的内容
+3、要替换的内容，一定要与文件内容完全一致（**包括缩进与空白**），不要有任何多余或者缺失的内容
 4、每个patch不超过20行，超出20行，请生成多个patch
 5、务必保留原始文件的缩进和格式
 6、优先使用第二种格式（PATCH_FMT2），因为它更准确地定位要修改的代码范围
@@ -120,8 +123,6 @@ def new_function():
             prompt += f"<FILE_CONTENT>\n"
             prompt += f'{file["file_content"]}\n'
             prompt += f"</FILE_CONTENT>\n"
-        
-        prompt += f"\n需求描述: {feature}\n"
 
         # 调用模型生成补丁
         success, response = call_model_with_retry(self.model, prompt)
@@ -346,12 +347,13 @@ def new_function():
         retry = input("\n是否重新尝试？(y/n) [y]: ").lower() or "y"
         return retry == "y"
 
-    def handle_patch_application(self, related_files: List[Dict], feature: str) -> bool:
+    def handle_patch_application(self, related_files: List[Dict], feature: str, modification_plan: str) -> bool:
         """处理补丁应用流程
         
         Args:
             related_files: 相关文件列表
             feature: 功能描述
+            modification_plan: 修改方案
             
         Returns:
             bool: 是否成功应用补丁
@@ -365,7 +367,7 @@ def new_function():
             
             while True:  # 在当前尝试中循环，直到成功或用户放弃
                 # 1. 生成补丁
-                patches = self.make_patch(related_files, feature)
+                patches = self.make_patch(related_files, feature, modification_plan)
                 if not patches:
                     return False
                 

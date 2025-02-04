@@ -276,14 +276,7 @@ class JarvisCoder:
         os.system(f"git clean -df")
 
     def execute(self, feature: str) -> Dict[str, Any]:
-        """执行代码修改
-
-        Args:
-            feature: 要实现的功能描述
-
-        Returns:
-            Dict[str, Any]: 包含执行结果的字典
-        """
+        """执行代码修改"""
         try:
             self._prepare_execution()
             
@@ -302,7 +295,7 @@ class JarvisCoder:
             
             # 执行修改
             patch_handler = PatchHandler(self.codegen_model)
-            if patch_handler.handle_patch_application(selected_files, feature):
+            if patch_handler.handle_patch_application(selected_files, feature, modification_plan):
                 self._finalize_changes(feature)
                 return {
                     "success": True,
