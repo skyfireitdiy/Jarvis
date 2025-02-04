@@ -65,11 +65,13 @@ Jarvis 支持通过环境变量进行配置，可以在 `~/.jarvis_env` 文件�
 |---------|------|--------|------|
 | JARVIS_PLATFORM | 使用的 AI 平台，支持 kimi/openai/ai8 等 | kimi | 是 |
 | JARVIS_MODEL | 使用的模型名称 | - | 否 |
-| JARVIS_THREAD_COUNT | 并行处理使用的线程数量 | 10 | 否 |
 | JARVIS_CODEGEN_PLATFORM | 代码生成使用的 AI 平台 | 同 JARVIS_PLATFORM | 否 |
 | JARVIS_CODEGEN_MODEL | 代码生成使用的模型名称 | 同 JARVIS_MODEL | 否 |
 | JARVIS_CHEAP_PLATFORM | 低成本操作使用的 AI 平台 | 同 JARVIS_PLATFORM | 否 |
 | JARVIS_CHEAP_MODEL | 低成本操作使用的模型名称 | 同 JARVIS_MODEL | 否 |
+| JARVIS_THINKING_PLATFORM | 思考使用的 AI 平台 | 同 JARVIS_PLATFORM | 否 |
+| JARVIS_THINKING_MODEL | 思考使用的模型名称 | 同 JARVIS_MODEL | 否 |
+| JARVIS_THREAD_COUNT | 并行处理使用的线程数量 | 10 | 否 |
 | OPENAI_API_KEY | OpenAI 平台的 API 密钥 | - | OpenAI 必需 |
 | OPENAI_API_BASE | OpenAI API 的基础 URL | https://api.deepseek.com | 否 |
 | OPENAI_MODEL_NAME | OpenAI 的模型名称 | deepseek-chat | 否 |
