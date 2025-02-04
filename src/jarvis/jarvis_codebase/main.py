@@ -473,6 +473,8 @@ class CodeBase:
     def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float, str]]:
         """搜索关联文件"""
         try:
+            if self.index is None:
+                return []
             # 生成多个查询变体以提高召回率
             model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
             model.set_suppress_output(True)

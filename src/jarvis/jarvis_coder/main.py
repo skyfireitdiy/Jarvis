@@ -273,13 +273,6 @@ class JarvisCoder:
             initial_files = self._load_related_files(feature)
             selected_files = self._select_files(initial_files, feature)
             
-            if not selected_files:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "未选择任何文件",
-                }
-            
             # 获取修改方案
             modification_plan = self.plan_generator.generate_plan(feature, selected_files)
             if not modification_plan:
