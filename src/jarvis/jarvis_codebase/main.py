@@ -2,7 +2,7 @@ import hashlib
 import os
 import numpy as np
 import faiss
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 from jarvis.models.registry import PlatformRegistry
 import concurrent.futures
 from threading import Lock
@@ -429,8 +429,64 @@ class CodeBase:
                                 output_type=OutputType.ERROR)
             raise e  # 重新抛出原始异常
 
+    def _extract_search_keywords(self, query: str) -> List[str]:
+        """从用户问题中提取搜索关键词
+        
+        Args:
+            query: 用户问题
+            
+        Returns:
+            List[str]: 关键词列表
+        """
+        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        model.set_suppress_output(True)
+        
+        prompt = f"""请从以下问题中提取关键的技术词汇和概念，用于代码搜索。要求：
+1. 每行一个关键词
+2. 只保留重要的技术词汇、函数名、变量名等
+3. 去掉常见的语气词、语法词
+4. 同时考虑中英文对应
+
+问题：{query}
+
+关键词："""
+        
+        try:
+            response = model.chat(prompt)
+            keywords = [kw.strip() for kw in response.split('\n') if kw.strip()]
+            return keywords
+        except Exception as e:
+            PrettyOutput.print(f"提取关键词失败: {str(e)}", 
+                             output_type=OutputType.ERROR)
+            return []
+
+    def _text_search_score(self, content: str, keywords: List[str]) -> float:
+        """计算文本内容与关键词的匹配分数
+        
+        Args:
+            content: 文本内容
+            keywords: 关键词列表
+            
+        Returns:
+            float: 匹配分数 (0-1)
+        """
+        if not keywords:
+            return 0.0
+            
+        content = content.lower()
+        matched_keywords = set()
+        
+        for keyword in keywords:
+            keyword = keyword.lower()
+            if keyword in content:
+                matched_keywords.add(keyword)
+                
+        # 计算匹配分数
+        score = len(matched_keywords) / len(keywords)
+        return score
+
     def rerank_results(self, query: str, initial_results: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
-        """使用 BAAI/bge-reranker-v2-m3 对搜索结果重新排序"""
+        """使用多种策略对搜索结果重新排序"""
         if not initial_results:
             return []
             
@@ -440,13 +496,15 @@ class CodeBase:
             # 加载模型和分词器
             model, tokenizer = load_rerank_model()
             
-            # 准备数据 - 加入文件内容进行更准确的重排序
+            # 准备数据
             pairs = []
+            
             for path, _, desc in initial_results:
                 try:
                     with open(path, "r", encoding="utf-8") as f:
                         content = f.read()[:512]  # 限制内容长度
-                    # 组合文件路径、描述和内容
+                    
+                    # 组合文件信息
                     doc_content = f"文件: {path}\n描述: {desc}\n内容: {content}"
                     pairs.append([query, doc_content])
                 except Exception as e:
@@ -457,6 +515,7 @@ class CodeBase:
             
             # 使用更大的batch size提高处理速度
             batch_size = 16  # 根据GPU显存调整
+            batch_scores = []
             
             with torch.no_grad():
                 for i in range(0, len(pairs), batch_size):
@@ -473,8 +532,7 @@ class CodeBase:
                         encoded = {k: v.cuda() for k, v in encoded.items()}
                         
                     outputs = model(**encoded)
-                    # 修改这里：直接使用 outputs.logits 作为分数
-                    batch_scores = outputs.logits.squeeze(-1).cpu().numpy()
+                    batch_scores.extend(outputs.logits.squeeze(-1).cpu().numpy())
             
             # 归一化分数到 0-1 范围
             if batch_scores:
@@ -483,61 +541,164 @@ class CodeBase:
                 if max_score > min_score:
                     batch_scores = [(s - min_score) / (max_score - min_score) for s in batch_scores]
             
-            # 将分数与原始结果组合并排序
+            # 将重排序分数与原始分数结合
             scored_results = []
-            for (path, _, desc), score in zip(initial_results, batch_scores):
-                if score >= 0.5:  # 只保留相关度大于 0.5 的结果
-                    scored_results.append((path, float(score), desc))
+            for (path, orig_score, desc), rerank_score in zip(initial_results, batch_scores):
+                # 综合分数 = 0.3 * 原始分数 + 0.7 * 重排序分数
+                combined_score = 0.3 * float(orig_score) + 0.7 * float(rerank_score)
+                if combined_score >= 0.5:  # 只保留相关度较高的结果
+                    scored_results.append((path, combined_score, desc))
                     
-            # 按分数降序排序
+            # 按综合分数降序排序
             scored_results.sort(key=lambda x: x[1], reverse=True)
             
             return scored_results
             
         except Exception as e:
-            PrettyOutput.print(f"重排序失败，使用原始排序: {str(e)}", output_type=OutputType.WARNING)
-            return initial_results
+            PrettyOutput.print(f"重排序失败: {str(e)}", 
+                            output_type=OutputType.ERROR)
+            return initial_results  # 发生错误时返回原始结果
+
+    def _generate_query_variants(self, query: str) -> List[str]:
+        """生成查询的不同表述变体
+        
+        Args:
+            query: 原始查询
+            
+        Returns:
+            List[str]: 查询变体列表
+        """
+        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        prompt = f"""请根据以下查询，生成3个不同的表述，每个表述都要完整表达原始查询的意思。这些表述将用于代码搜索，要保持专业性和准确性。
+原始查询: {query}
+
+请直接输出3个表述，用换行分隔，不要有编号或其他标记。
+"""
+        variants = model.chat(prompt).strip().split('\n')
+        variants.append(query)  # 添加原始查询
+        return variants
+
+    def _vector_search(self, query_variants: List[str], top_k: int) -> Dict[str, Tuple[str, float, str]]:
+        """使用向量搜索查找相关文件
+        
+        Args:
+            query_variants: 查询变体列表
+            top_k: 返回结果数量
+            
+        Returns:
+            Dict[str, Tuple[str, float, str]]: 文件路径到(路径,分数,描述)的映射
+        """
+        results = {}
+        for query in query_variants:
+            query_vector = self.get_embedding(query)
+            query_vector = query_vector.reshape(1, -1)
+            
+            distances, indices = self.index.search(query_vector, top_k)
+            
+            for i, distance in zip(indices[0], distances[0]):
+                if i == -1:
+                    continue
+                    
+                similarity = 1.0 / (1.0 + float(distance))
+                if similarity >= 0.5:
+                    file_path = self.file_paths[i]
+                    # 使用最高的相似度分数
+                    if file_path not in results or similarity > results[file_path][1]:
+                        data = self.vector_cache[file_path]
+                        results[file_path] = (file_path, similarity, data["description"])
+        
+        return results
+
+    def _keyword_search(self, keywords: List[str]) -> Dict[str, Tuple[str, float, str]]:
+        """使用关键词搜索查找相关文件
+        
+        Args:
+            keywords: 关键词列表
+            
+        Returns:
+            Dict[str, Tuple[str, float, str]]: 文件路径到(路径,分数,描述)的映射
+        """
+        results = {}
+        for file_path in self.file_paths:
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()[:512]  # 限制内容长度
+                text_score = self._text_search_score(content, keywords)
+                if text_score > 0:  # 只要匹配到关键词就保留
+                    data = self.vector_cache[file_path]
+                    results[file_path] = (file_path, text_score, data["description"])
+            except Exception as e:
+                PrettyOutput.print(f"读取文件失败 {file_path}: {str(e)}", 
+                                output_type=OutputType.ERROR)
+                continue
+        
+        return results
+
+    def _merge_search_results(self, vector_results: Dict[str, Tuple[str, float, str]], 
+                            keyword_results: Dict[str, Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
+        """合并向量搜索和关键词搜索的结果
+        
+        Args:
+            vector_results: 向量搜索结果
+            keyword_results: 关键词搜索结果
+            
+        Returns:
+            List[Tuple[str, float, str]]: 合并后的结果列表
+        """
+        all_results = {}
+        
+        # 添加向量搜索结果
+        for file_path, (path, score, desc) in vector_results.items():
+            all_results[file_path] = (path, score, desc)
+        
+        # 添加或更新关键词搜索结果
+        for file_path, (path, score, desc) in keyword_results.items():
+            if file_path in all_results:
+                # 如果文件同时出现在两种搜索中，取较高的分数
+                existing_score = all_results[file_path][1]
+                all_results[file_path] = (path, max(score, existing_score), desc)
+            else:
+                # 添加只在关键词搜索中出现的结果
+                all_results[file_path] = (path, score, desc)
+        
+        # 转换为列表并排序
+        results = list(all_results.values())
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results
 
     def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float, str]]:
         """搜索关联文件"""
         try:
             if self.index is None:
                 return []
-            # 生成多个查询变体以提高召回率
-            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-            prompt = f"""请根据以下查询，生成3个不同的表述，每个表述都要完整表达原始查询的意思。这些表述将用于代码搜索，要保持专业性和准确性。
-原始查询: {query}
 
-请直接输出3个表述，用换行分隔，不要有编号或其他标记。
-"""
-            query_variants = model.chat(prompt).strip().split('\n')
-            query_variants.append(query)  # 添加原始查询
+            # 提取搜索关键词
+            keywords = self._extract_search_keywords(query)
+            if keywords:
+                PrettyOutput.print(f"搜索关键词: {', '.join(keywords)}", 
+                                output_type=OutputType.INFO)
             
-            # 对每个查询变体进行搜索
-            all_results = {}
-            for q in query_variants:
-                q_vector = self.get_embedding(q)
-                q_vector = q_vector.reshape(1, -1)
+            # 生成查询变体
+            query_variants = self._generate_query_variants(query)
+            
+            # 进行向量搜索
+            vector_results = self._vector_search(query_variants, top_k)
+            
+            # 如果有关键词，进行关键词搜索
+            keyword_results = self._keyword_search(keywords) if keywords else {}
+            
+            # 合并搜索结果
+            results = self._merge_search_results(vector_results, keyword_results)
+            
+            # 取前 top_k 个结果进行重排序
+            initial_results = results[:top_k]
+            
+            # 如果没有找到结果，直接返回
+            if not initial_results:
+                return []
                 
-                distances, indices = self.index.search(q_vector, top_k)
-                
-                for i, distance in zip(indices[0], distances[0]):
-                    if i == -1:
-                        continue
-                        
-                    similarity = 1.0 / (1.0 + float(distance))
-                    if similarity >= 0.5:
-                        file_path = self.file_paths[i]
-                        # 使用最高的相似度分数
-                        if file_path not in all_results or similarity > all_results[file_path][1]:
-                            data = self.vector_cache[file_path]
-                            all_results[file_path] = (file_path, similarity, data["description"])
-            
-            # 转换为列表并排序
-            results = list(all_results.values())
-            results.sort(key=lambda x: x[1], reverse=True)
-            
-            return results[:top_k]
+            # 对初步结果进行重排序
+            return self.rerank_results(query, initial_results)
             
         except Exception as e:
             PrettyOutput.print(f"搜索失败: {str(e)}", output_type=OutputType.ERROR)

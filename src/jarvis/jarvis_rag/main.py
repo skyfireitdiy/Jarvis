@@ -364,8 +364,7 @@ class RAGTool:
 
             # 检查文件是否需要重新处理
             if file_path in self.file_md5_cache and self.file_md5_cache[file_path] == current_md5:
-                # 返回已有的文档
-                return [doc for doc in self.documents if doc.metadata['file_path'] == file_path]
+                return []
 
             # 查找合适的处理器
             processor = None
@@ -375,7 +374,17 @@ class RAGTool:
                     break
                     
             if not processor:
-                return []
+                # 如果找不到合适的处理器，则返回一个空的文档
+                return [Document(
+                    content="",
+                    metadata={
+                        "file_path": file_path,
+                        "file_type": Path(file_path).suffix.lower(),
+                        "chunk_index": 0,
+                        "total_chunks": 1
+                    },
+                    md5=current_md5
+                )]
             
             # 提取文本内容
             content = processor.extract_text(file_path)
@@ -508,7 +517,9 @@ class RAGTool:
                     doc_idx = next((i for i, d in enumerate(self.documents) 
                                 if d.metadata['file_path'] == doc.metadata['file_path']), None)
                     if doc_idx is not None:
-                        vector = faiss.extract_row(self.index, doc_idx)
+                        # 使用 reconstruct 方法获取向量
+                        vector = np.zeros((1, self.vector_dim), dtype=np.float32)
+                        self.index.reconstruct(doc_idx, vector.ravel())
                         unchanged_vectors.append(vector)
                 
                 if unchanged_vectors:
