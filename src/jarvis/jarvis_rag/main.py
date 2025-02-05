@@ -164,7 +164,8 @@ class RAGTool:
         # 初始化缓存和索引
         self.cache_path = os.path.join(self.data_dir, "cache.pkl")
         self.documents: List[Document] = []
-        self.index = None
+        self.index = None  # 用于搜索的IVF索引
+        self.flat_index = None  # 用于存储原始向量
         self.file_md5_cache = {}  # 用于存储文件的MD5值
         
         # 加载缓存
@@ -192,7 +193,8 @@ class RAGTool:
                     self.file_md5_cache = cache_data.get("file_md5_cache", {})  # 加载MD5缓存
                     
                 # 重建索引
-                self._build_index(vectors)
+                if vectors is not None:
+                    self._build_index(vectors)
                 PrettyOutput.print(f"加载了 {len(self.documents)} 个文档片段", 
                                 output_type=OutputType.INFO)
             except Exception as e:
@@ -200,6 +202,7 @@ class RAGTool:
                                 output_type=OutputType.WARNING)
                 self.documents = []
                 self.index = None
+                self.flat_index = None
                 self.file_md5_cache = {}
 
     def _save_cache(self, vectors: np.ndarray):
@@ -238,19 +241,25 @@ class RAGTool:
 
     def _build_index(self, vectors: np.ndarray):
         """构建FAISS索引"""
-        # 添加IVF索引以提高大规模检索性能
+        if vectors.shape[0] == 0:
+            self.index = None
+            self.flat_index = None
+            return
+            
+        # 创建扁平索引存储原始向量，用于重建
+        self.flat_index = faiss.IndexFlatIP(self.vector_dim)
+        self.flat_index.add(vectors)
+        
+        # 创建IVF索引用于快速搜索
         nlist = max(4, int(vectors.shape[0] / 1000))  # 每1000个向量一个聚类中心
         quantizer = faiss.IndexFlatIP(self.vector_dim)
         self.index = faiss.IndexIVFFlat(quantizer, self.vector_dim, nlist, faiss.METRIC_INNER_PRODUCT)
         
-        if vectors.shape[0] > 0:
-            # 训练IVF索引
-            self.index.train(vectors)
-            self.index.add(vectors)
-            # 设置搜索时探测的聚类数
-            self.index.nprobe = min(nlist, 10)
-        else:
-            self.index = None
+        # 训练并添加向量
+        self.index.train(vectors)
+        self.index.add(vectors)
+        # 设置搜索时探测的聚类数
+        self.index.nprobe = min(nlist, 10)
 
     def _split_text(self, text: str) -> List[str]:
         """使用更智能的分块策略"""
@@ -375,16 +384,7 @@ class RAGTool:
                     
             if not processor:
                 # 如果找不到合适的处理器，则返回一个空的文档
-                return [Document(
-                    content="",
-                    metadata={
-                        "file_path": file_path,
-                        "file_type": Path(file_path).suffix.lower(),
-                        "chunk_index": 0,
-                        "total_chunks": 1
-                    },
-                    md5=current_md5
-                )]
+                return []
             
             # 提取文本内容
             content = processor.extract_text(file_path)
@@ -455,8 +455,6 @@ class RAGTool:
                     if file_path in self.file_md5_cache and self.file_md5_cache[file_path] == current_md5:
                         # 文件未变化，记录但不重新处理
                         unchanged_files.append(file_path)
-                        PrettyOutput.print(f"文件未变化，跳过处理: {file_path}", 
-                                        output_type=OutputType.INFO)
                     else:
                         # 新文件或已修改的文件
                         files_to_process.append(file_path)
@@ -473,7 +471,7 @@ class RAGTool:
                 for file_path in files_to_process:
                     try:
                         docs = self._process_file(file_path)
-                        if docs:
+                        if len(docs) > 0:
                             new_documents.extend(docs)
                     except Exception as e:
                         PrettyOutput.print(f"处理文件失败 {file_path}: {str(e)}", 
@@ -509,7 +507,7 @@ class RAGTool:
                         pbar.update(len(batch))
 
             # 合并新旧向量
-            if self.index is not None:
+            if self.flat_index is not None:
                 # 获取未变化文档的向量
                 unchanged_vectors = []
                 for doc in unchanged_documents:
@@ -517,9 +515,9 @@ class RAGTool:
                     doc_idx = next((i for i, d in enumerate(self.documents) 
                                 if d.metadata['file_path'] == doc.metadata['file_path']), None)
                     if doc_idx is not None:
-                        # 使用 reconstruct 方法获取向量
+                        # 从扁平索引中重建向量
                         vector = np.zeros((1, self.vector_dim), dtype=np.float32)
-                        self.index.reconstruct(doc_idx, vector.ravel())
+                        self.flat_index.reconstruct(doc_idx, vector.ravel())
                         unchanged_vectors.append(vector)
                 
                 if unchanged_vectors:
