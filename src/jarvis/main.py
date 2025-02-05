@@ -54,6 +54,15 @@ def load_tasks() -> dict:
                 PrettyOutput.print("Warning: .jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
         except Exception as e:
             PrettyOutput.print(f"Error loading .jarvis file: {str(e)}", OutputType.ERROR)
+
+    # 读取方法论
+    method_path = os.path.expanduser("~/.jarvis_methodology")
+    if os.path.exists(method_path):
+        with open(method_path, "r", encoding="utf-8") as f:
+            methodology = yaml.safe_load(f)
+        if isinstance(methodology, dict):
+            for name, desc in methodology.items():
+                tasks[f"执行方法论：{str(name)}"] = str(desc)
     
     return tasks
 
