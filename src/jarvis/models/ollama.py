@@ -29,15 +29,15 @@ class OllamaPlatform(BasePlatform):
                 PrettyOutput.print("1. 安装 Ollama: https://ollama.ai", OutputType.INFO)
                 PrettyOutput.print("2. 下载模型:", OutputType.INFO)
                 PrettyOutput.print(f"   ollama pull {self.model_name}", OutputType.INFO)
-                raise Exception("No available models found")
+                PrettyOutput.print("Ollama没有可用的模型", OutputType.WARNING)
                 
         except requests.exceptions.ConnectionError:
-            PrettyOutput.print("\nOllama 服务未启动或无法连接", OutputType.ERROR)
+            PrettyOutput.print("\nOllama 服务未启动或无法连接", OutputType.WARNING)
             PrettyOutput.print("请确保已经：", OutputType.INFO)
             PrettyOutput.print("1. 安装了 Ollama: https://ollama.ai", OutputType.INFO)
             PrettyOutput.print("2. 启动了 Ollama 服务", OutputType.INFO)
             PrettyOutput.print("3. 服务地址配置正确 (默认: http://localhost:11434)", OutputType.INFO)
-            raise Exception("Ollama service is not available")
+            
             
         self.messages = []
         self.system_message = ""
