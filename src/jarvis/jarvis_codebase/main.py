@@ -429,36 +429,6 @@ class CodeBase:
                                 output_type=OutputType.ERROR)
             raise e  # 重新抛出原始异常
 
-    def _extract_search_keywords(self, query: str) -> List[str]:
-        """从用户问题中提取搜索关键词
-        
-        Args:
-            query: 用户问题
-            
-        Returns:
-            List[str]: 关键词列表
-        """
-        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        model.set_suppress_output(True)
-        
-        prompt = f"""请从以下问题中提取关键的技术词汇和概念，用于代码搜索。要求：
-1. 每行一个关键词
-2. 只保留重要的技术词汇、函数名、变量名等
-3. 去掉常见的语气词、语法词
-4. 同时考虑中英文对应
-
-问题：{query}
-
-关键词："""
-        
-        try:
-            response = model.chat(prompt)
-            keywords = [kw.strip() for kw in response.split('\n') if kw.strip()]
-            return keywords
-        except Exception as e:
-            PrettyOutput.print(f"提取关键词失败: {str(e)}", 
-                             output_type=OutputType.ERROR)
-            return []
 
     def _text_search_score(self, content: str, keywords: List[str]) -> float:
         """计算文本内容与关键词的匹配分数
@@ -609,87 +579,21 @@ class CodeBase:
         
         return results
 
-    def _keyword_search(self, keywords: List[str]) -> Dict[str, Tuple[str, float, str]]:
-        """使用关键词搜索查找相关文件
-        
-        Args:
-            keywords: 关键词列表
-            
-        Returns:
-            Dict[str, Tuple[str, float, str]]: 文件路径到(路径,分数,描述)的映射
-        """
-        results = {}
-        for file_path in self.file_paths:
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()[:512]  # 限制内容长度
-                text_score = self._text_search_score(content, keywords)
-                if text_score > 0:  # 只要匹配到关键词就保留
-                    data = self.vector_cache[file_path]
-                    results[file_path] = (file_path, text_score, data["description"])
-            except Exception as e:
-                PrettyOutput.print(f"读取文件失败 {file_path}: {str(e)}", 
-                                output_type=OutputType.ERROR)
-                continue
-        
-        return results
-
-    def _merge_search_results(self, vector_results: Dict[str, Tuple[str, float, str]], 
-                            keyword_results: Dict[str, Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
-        """合并向量搜索和关键词搜索的结果
-        
-        Args:
-            vector_results: 向量搜索结果
-            keyword_results: 关键词搜索结果
-            
-        Returns:
-            List[Tuple[str, float, str]]: 合并后的结果列表
-        """
-        all_results = {}
-        
-        # 添加向量搜索结果
-        for file_path, (path, score, desc) in vector_results.items():
-            all_results[file_path] = (path, score, desc)
-        
-        # 添加或更新关键词搜索结果
-        for file_path, (path, score, desc) in keyword_results.items():
-            if file_path in all_results:
-                # 如果文件同时出现在两种搜索中，取较高的分数
-                existing_score = all_results[file_path][1]
-                all_results[file_path] = (path, max(score, existing_score), desc)
-            else:
-                # 添加只在关键词搜索中出现的结果
-                all_results[file_path] = (path, score, desc)
-        
-        # 转换为列表并排序
-        results = list(all_results.values())
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results
 
     def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float, str]]:
         """搜索关联文件"""
         try:
             if self.index is None:
-                return []
-
-            # 提取搜索关键词
-            keywords = self._extract_search_keywords(query)
-            if keywords:
-                PrettyOutput.print(f"搜索关键词: {', '.join(keywords)}", 
-                                output_type=OutputType.INFO)
-            
+                return []            
             # 生成查询变体
             query_variants = self._generate_query_variants(query)
             
             # 进行向量搜索
-            vector_results = self._vector_search(query_variants, top_k)
-            
-            # 如果有关键词，进行关键词搜索
-            keyword_results = self._keyword_search(keywords) if keywords else {}
-            
-            # 合并搜索结果
-            results = self._merge_search_results(vector_results, keyword_results)
-            
+            vector_results = self._vector_search(query_variants, top_k)            
+
+            results = list(vector_results.values())
+            results.sort(key=lambda x: x[1], reverse=True)
+
             # 取前 top_k 个结果进行重排序
             initial_results = results[:top_k]
             
