@@ -55,11 +55,22 @@ def chat_with_model(platform_name: str, model_name: str):
             user_input = get_multiline_input("")
             
             # 检查是否取消输入
-            if user_input == "__interrupt__":
+            if user_input == "__interrupt__" or user_input.strip() == "/bye":
+                PrettyOutput.print("再见！", OutputType.SUCCESS)
                 break
                 
             # 检查是否为空输入
             if not user_input.strip():
+                continue
+                
+            # 检查是否为清除会话命令
+            if user_input.strip() == "/clear":
+                try:
+                    platform.delete_chat()
+                    platform.set_model_name(model_name)  # 重新初始化会话
+                    PrettyOutput.print("会话已清除", OutputType.SUCCESS)
+                except Exception as e:
+                    PrettyOutput.print(f"清除会话失败: {str(e)}", OutputType.ERROR)
                 continue
                 
             try:
