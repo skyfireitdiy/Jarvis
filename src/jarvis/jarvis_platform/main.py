@@ -32,7 +32,7 @@ def list_platforms():
                 PrettyOutput.print("  没有可用的模型信息", OutputType.WARNING)
                 
         except Exception as e:
-            PrettyOutput.print(f"获取 {platform_name} 平台模型列表失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"获取 {platform_name} 平台模型列表失败: {str(e)}", OutputType.WARNING)
 
 def chat_with_model(platform_name: str, model_name: str):
     """与指定平台和模型进行对话"""
