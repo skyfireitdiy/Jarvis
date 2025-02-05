@@ -27,7 +27,6 @@ setup(
         "python-docx>=0.8.11",
         "tiktoken>=0.3.0",
         "tqdm>=4.65.0",
-        "fitz>=3.20.2",
         "docx>=0.2.4",
         "yaspin>=2.5.0",
     ],
