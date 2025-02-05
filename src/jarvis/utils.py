@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 import sys
 import time
@@ -277,3 +278,6 @@ def get_max_context_length():
 
 def get_thread_count():
     return int(os.getenv('JARVIS_THREAD_COUNT', '1'))  
+
+def get_file_md5(filepath: str)->str:    
+    return hashlib.md5(open(filepath, "rb").read(100*1024*1024)).hexdigest()
