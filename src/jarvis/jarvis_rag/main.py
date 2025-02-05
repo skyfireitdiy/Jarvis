@@ -1,13 +1,10 @@
 import os
-import hashlib
 import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
-from sentence_transformers import SentenceTransformer
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, load_embedding_model, load_rerank_model
+from jarvis.utils import OutputType, PrettyOutput, get_max_context_length, load_embedding_model, load_rerank_model
 from jarvis.utils import load_env_from_file
-import tiktoken
 from dataclasses import dataclass
 from tqdm import tqdm
 import fitz  # PyMuPDF for PDF files
