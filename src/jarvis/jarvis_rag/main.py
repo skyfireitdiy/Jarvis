@@ -3,7 +3,7 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, get_max_context_length, load_embedding_model, load_rerank_model
+from jarvis.utils import OutputType, PrettyOutput, get_file_md5, get_max_context_length, load_embedding_model, load_rerank_model
 from jarvis.utils import load_env_from_file
 from dataclasses import dataclass
 from tqdm import tqdm
@@ -13,12 +13,16 @@ from pathlib import Path
 from jarvis.models.registry import PlatformRegistry
 import shutil
 from datetime import datetime
+import lzma  # 添加 lzma 导入
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 
 @dataclass
 class Document:
     """文档类，用于存储文档内容和元数据"""
     content: str  # 文档内容
     metadata: Dict  # 元数据(文件路径、位置等)
+    md5: str = ""  # 文件MD5值，用于增量更新检测
 
 class FileProcessor:
     """文件处理器基类"""
@@ -161,6 +165,7 @@ class RAGTool:
         self.cache_path = os.path.join(self.data_dir, "cache.pkl")
         self.documents: List[Document] = []
         self.index = None
+        self.file_md5_cache = {}  # 用于存储文件的MD5值
         
         # 加载缓存
         self._load_cache()
@@ -172,14 +177,19 @@ class RAGTool:
             DocxProcessor()
         ]
 
+        # 添加线程相关配置
+        self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT", os.cpu_count() or 4))
+        self.vector_lock = Lock()  # 用于保护向量列表的并发访问
+
     def _load_cache(self):
         """加载缓存数据"""
         if os.path.exists(self.cache_path):
             try:
-                with open(self.cache_path, 'rb') as f:
+                with lzma.open(self.cache_path, 'rb') as f:
                     cache_data = pickle.load(f)
                     self.documents = cache_data["documents"]
                     vectors = cache_data["vectors"]
+                    self.file_md5_cache = cache_data.get("file_md5_cache", {})  # 加载MD5缓存
                     
                 # 重建索引
                 self._build_index(vectors)
@@ -190,16 +200,17 @@ class RAGTool:
                                 output_type=OutputType.WARNING)
                 self.documents = []
                 self.index = None
+                self.file_md5_cache = {}
 
     def _save_cache(self, vectors: np.ndarray):
         """优化缓存保存"""
         try:
-            # 添加版本号和时间戳
             cache_data = {
                 "version": "1.0",
                 "timestamp": datetime.now().isoformat(),
                 "documents": self.documents,
-                "vectors": vectors,
+                "vectors": vectors.copy() if vectors is not None else None,  # 创建数组的副本
+                "file_md5_cache": dict(self.file_md5_cache),  # 创建字典的副本
                 "metadata": {
                     "vector_dim": self.vector_dim,
                     "total_docs": len(self.documents),
@@ -207,9 +218,12 @@ class RAGTool:
                 }
             }
             
-            # 使用压缩存储
-            with open(self.cache_path, 'wb') as f:
-                pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            # 先将数据序列化为字节流
+            data = pickle.dumps(cache_data, protocol=pickle.HIGHEST_PROTOCOL)
+            
+            # 然后使用 LZMA 压缩字节流
+            with lzma.open(self.cache_path, 'wb') as f:
+                f.write(data)
             
             # 创建备份
             backup_path = f"{self.cache_path}.backup"
@@ -220,6 +234,7 @@ class RAGTool:
         except Exception as e:
             PrettyOutput.print(f"保存缓存失败: {str(e)}", 
                             output_type=OutputType.ERROR)
+            raise
 
     def _build_index(self, vectors: np.ndarray):
         """构建FAISS索引"""
@@ -299,16 +314,59 @@ class RAGTool:
                                             show_progress_bar=False)
         return np.array(embedding, dtype=np.float32)
 
-    def _process_file(self, file_path: str) -> List[Document]:
-        """处理单个文件
+    def _get_embedding_batch(self, texts: List[str]) -> np.ndarray:
+        """批量获取文本的向量表示
         
         Args:
-            file_path: 文件路径
+            texts: 文本列表
             
         Returns:
-            文档对象列表
+            np.ndarray: 向量表示数组
         """
         try:
+            embeddings = self.embedding_model.encode(texts, 
+                                                normalize_embeddings=True,
+                                                show_progress_bar=False,
+                                                batch_size=32)  # 使用批处理提高效率
+            return np.array(embeddings, dtype=np.float32)
+        except Exception as e:
+            PrettyOutput.print(f"获取向量表示失败: {str(e)}", 
+                            output_type=OutputType.ERROR)
+            return np.zeros((len(texts), self.vector_dim), dtype=np.float32)
+
+    def _process_document_batch(self, documents: List[Document]) -> List[np.ndarray]:
+        """处理一批文档的向量化
+        
+        Args:
+            documents: 文档列表
+            
+        Returns:
+            List[np.ndarray]: 向量列表
+        """
+        texts = []
+        for doc in documents:
+            # 组合文档信息
+            combined_text = f"""
+文件: {doc.metadata['file_path']}
+内容: {doc.content}
+"""
+            texts.append(combined_text)
+            
+        return self._get_embedding_batch(texts)
+
+    def _process_file(self, file_path: str) -> List[Document]:
+        """处理单个文件"""
+        try:
+            # 计算文件MD5
+            current_md5 = get_file_md5(file_path)
+            if not current_md5:
+                return []
+
+            # 检查文件是否需要重新处理
+            if file_path in self.file_md5_cache and self.file_md5_cache[file_path] == current_md5:
+                # 返回已有的文档
+                return [doc for doc in self.documents if doc.metadata['file_path'] == file_path]
+
             # 查找合适的处理器
             processor = None
             for p in self.file_processors:
@@ -317,18 +375,13 @@ class RAGTool:
                     break
                     
             if not processor:
-                PrettyOutput.print(f"跳过不支持的文件: {file_path}", 
-                                output_type=OutputType.WARNING)
                 return []
             
             # 提取文本内容
             content = processor.extract_text(file_path)
             if not content.strip():
-                PrettyOutput.print(f"文件内容为空: {file_path}", 
-                                output_type=OutputType.WARNING)
                 return []
             
-                
             # 分割文本
             chunks = self._split_text(content)
             
@@ -342,10 +395,13 @@ class RAGTool:
                         "file_type": Path(file_path).suffix.lower(),
                         "chunk_index": i,
                         "total_chunks": len(chunks)
-                    }
+                    },
+                    md5=current_md5
                 )
                 documents.append(doc)
-                
+            
+            # 更新MD5缓存
+            self.file_md5_cache[file_path] = current_md5
             return documents
             
         except Exception as e:
@@ -358,43 +414,117 @@ class RAGTool:
         # 获取所有文件
         all_files = []
         for root, _, files in os.walk(dir):
-            # 忽略特定目录
             if any(ignored in root for ignored in ['.git', '__pycache__', 'node_modules']) or \
                any(part.startswith('.jarvis-') for part in root.split(os.sep)):
                 continue
             for file in files:
-                # 忽略 .jarvis- 开头的文件
                 if file.startswith('.jarvis-'):
                     continue
                     
                 file_path = os.path.join(root, file)
-                # 跳过大文件
                 if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
                     PrettyOutput.print(f"跳过大文件: {file_path}", 
                                     output_type=OutputType.WARNING)
                     continue
                 all_files.append(file_path)
 
-        # 处理所有文件
-        self.documents = []
-        for file_path in tqdm(all_files, desc="处理文件"):
-            docs = self._process_file(file_path)
-            self.documents.extend(docs)
+        # 清理已删除文件的缓存
+        deleted_files = set(self.file_md5_cache.keys()) - set(all_files)
+        for file_path in deleted_files:
+            del self.file_md5_cache[file_path]
+            # 移除相关的文档
+            self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
 
-        # 获取所有文档的向量表示
-        vectors = []
-        for doc in tqdm(self.documents, desc="生成向量"):
-            vector = self._get_embedding(doc.content)
-            vectors.append(vector)
+        # 检查文件变化
+        files_to_process = []
+        unchanged_files = []
+        
+        with tqdm(total=len(all_files), desc="检查文件状态") as pbar:
+            for file_path in all_files:
+                current_md5 = get_file_md5(file_path)
+                if current_md5:  # 只处理能成功计算MD5的文件
+                    if file_path in self.file_md5_cache and self.file_md5_cache[file_path] == current_md5:
+                        # 文件未变化，记录但不重新处理
+                        unchanged_files.append(file_path)
+                        PrettyOutput.print(f"文件未变化，跳过处理: {file_path}", 
+                                        output_type=OutputType.INFO)
+                    else:
+                        # 新文件或已修改的文件
+                        files_to_process.append(file_path)
+                pbar.update(1)
 
-        if vectors:
-            vectors = np.vstack(vectors)
+        # 保留未变化文件的文档
+        unchanged_documents = [doc for doc in self.documents 
+                            if doc.metadata['file_path'] in unchanged_files]
+
+        # 处理新文件和修改的文件
+        new_documents = []
+        if files_to_process:
+            with tqdm(total=len(files_to_process), desc="处理文件") as pbar:
+                for file_path in files_to_process:
+                    try:
+                        docs = self._process_file(file_path)
+                        if docs:
+                            new_documents.extend(docs)
+                    except Exception as e:
+                        PrettyOutput.print(f"处理文件失败 {file_path}: {str(e)}", 
+                                        output_type=OutputType.ERROR)
+                    pbar.update(1)
+
+        # 更新文档列表
+        self.documents = unchanged_documents + new_documents
+
+        if not self.documents:
+            PrettyOutput.print("没有需要处理的文档", output_type=OutputType.WARNING)
+            return
+
+        # 只对新文档进行向量化
+        if new_documents:
+            PrettyOutput.print(f"开始处理 {len(new_documents)} 个新文档", 
+                            output_type=OutputType.INFO)
+            
+            # 使用线程池并发处理向量化
+            batch_size = 32
+            new_vectors = []
+            
+            with tqdm(total=len(new_documents), desc="生成向量") as pbar:
+                with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
+                    for i in range(0, len(new_documents), batch_size):
+                        batch = new_documents[i:i + batch_size]
+                        future = executor.submit(self._process_document_batch, batch)
+                        batch_vectors = future.result()
+                        
+                        with self.vector_lock:
+                            new_vectors.extend(batch_vectors)
+                        
+                        pbar.update(len(batch))
+
+            # 合并新旧向量
+            if self.index is not None:
+                # 获取未变化文档的向量
+                unchanged_vectors = []
+                for doc in unchanged_documents:
+                    # 从现有索引中提取向量
+                    doc_idx = next((i for i, d in enumerate(self.documents) 
+                                if d.metadata['file_path'] == doc.metadata['file_path']), None)
+                    if doc_idx is not None:
+                        vector = faiss.extract_row(self.index, doc_idx)
+                        unchanged_vectors.append(vector)
+                
+                if unchanged_vectors:
+                    unchanged_vectors = np.vstack(unchanged_vectors)
+                    vectors = np.vstack([unchanged_vectors, np.vstack(new_vectors)])
+                else:
+                    vectors = np.vstack(new_vectors)
+            else:
+                vectors = np.vstack(new_vectors)
+
             # 构建索引
             self._build_index(vectors)
             # 保存缓存
             self._save_cache(vectors)
-            
-        PrettyOutput.print(f"成功索引了 {len(self.documents)} 个文档片段", 
+        
+        PrettyOutput.print(f"成功索引了 {len(self.documents)} 个文档片段 (新增/修改: {len(new_documents)}, 未变化: {len(unchanged_documents)})", 
                         output_type=OutputType.SUCCESS)
 
     def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
