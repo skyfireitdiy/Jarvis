@@ -4,6 +4,8 @@ import os
 import sys
 import readline
 from typing import Optional
+from yaspin import yaspin
+from yaspin.spinners import Spinners
 
 from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType, load_env_from_file
@@ -11,7 +13,7 @@ from jarvis.utils import PrettyOutput, OutputType, load_env_from_file
 def execute_command(command: str) -> None:
     """显示命令并允许用户编辑，回车执行，Ctrl+C取消"""
     try:
-        print("生成的命令 (可以编辑，回车执行，Ctrl+C取消):")
+        print("\n生成的命令 (可以编辑，回车执行，Ctrl+C取消):")
         # 预填充输入行
         readline.set_startup_hook(lambda: readline.insert_text(command))
         try:
@@ -68,14 +70,19 @@ find . -name "*.py"
         prefix = f"当前路径: {current_path}\n"
         prefix += f"当前shell: {shell}\n"
         
-        # 处理请求
-        result = model.chat(prefix + request)
-        
-        # 提取命令 - 简化处理逻辑，因为现在应该只返回纯命令
-        if result and isinstance(result, str):
-            return result.strip()
-        
-        return None
+        # 使用yaspin显示Thinking状态
+        with yaspin(Spinners.dots, text="Thinking", color="yellow") as spinner:
+            # 处理请求
+            result = model.chat(prefix + request)
+            
+            # 提取命令
+            if result and isinstance(result, str):
+                command = result.strip()
+                spinner.ok("✓")
+                return command
+            
+            spinner.fail("✗")
+            return None
         
     except Exception as e:
         PrettyOutput.print(f"处理请求时发生错误: {str(e)}", OutputType.ERROR)
