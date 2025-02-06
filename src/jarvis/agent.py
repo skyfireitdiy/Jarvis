@@ -165,13 +165,13 @@ class Agent:
 
             if vectors:
                 vectors_array = np.vstack(vectors)
-                self.methodology_index.add_with_ids(vectors_array, np.array(ids))
+                self.methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
                 query_embedding = self._create_methodology_embedding(user_input)
                 k = min(5, len(self.methodology_data))
                 PrettyOutput.print(f"检索方法论...", OutputType.INFO)
                 distances, indices = self.methodology_index.search(
                     query_embedding.reshape(1, -1), k
-                )
+                ) # type: ignore
 
                 relevant_methodologies = {}
                 for dist, idx in zip(distances[0], indices[0]):

@@ -235,7 +235,7 @@ int add(int a, int b) {
                 PrettyOutput.print(f"成功修改文件: {file_path}", OutputType.SUCCESS)
                 return True
             except Exception as e:
-                PrettyOutput.print(f"写入文件失败 {file_path}: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"写入文件失败 {file_path}: {str(e)}", OutputType.WARNING)
                 return False
         else:
             # 回退修改
@@ -328,8 +328,8 @@ CONFIRM_DELETE  # 必须包含此确认标记
                 
                 if not file_success:
                     # 显示错误信息并询问用户操作
-                    PrettyOutput.print(f"\n文件 {file_path} 补丁应用失败:", OutputType.ERROR)
-                    PrettyOutput.print("\n".join(current_errors), OutputType.ERROR)
+                    PrettyOutput.print(f"\n文件 {file_path} 补丁应用失败:", OutputType.WARNING)
+                    PrettyOutput.print("\n".join(current_errors), OutputType.WARNING)
                     
                     # 恢复用户选择逻辑
                     choice = input("\n请选择操作: (1) 重试 (2) 补充信息后重试 (3) 跳过 (4) 完全中止 [1]: ") or "1"
@@ -431,7 +431,7 @@ CONFIRM_DELETE  # 必须包含此确认标记
             PrettyOutput.print("补丁应用成功", OutputType.SUCCESS)
             return False
             
-        PrettyOutput.print(f"补丁应用失败: {error_msg}", OutputType.ERROR)
+        PrettyOutput.print(f"补丁应用失败: {error_msg}", OutputType.WARNING)
         
         # 询问是否继续尝试
         retry = input("\n是否重新尝试？(y/n) [y]: ").lower() or "y"
