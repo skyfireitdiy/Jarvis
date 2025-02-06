@@ -117,10 +117,7 @@ class JarvisCoder:
 
     def _prepare_execution(self) -> None:
         """准备执行环境"""
-        self.thinking_model = PlatformRegistry().get_global_platform_registry().get_thinking_platform()
-        self.codegen_model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
         self._codebase.generate_codebase()
-        self.plan_generator = PlanGenerator(self.thinking_model)
 
 
     def _load_related_files(self, feature: str) -> List[Dict]:
@@ -429,7 +426,7 @@ content
                     file["parts"] = [file["file_content"]]
             
             # 获取修改方案
-            modification_plan = self.plan_generator.generate_plan(feature, selected_files)
+            modification_plan = PlanGenerator().generate_plan(feature, selected_files)
             if not modification_plan:
                 return {
                     "success": False,
@@ -438,8 +435,7 @@ content
                 }
             
             # 执行修改
-            patch_handler = PatchHandler(self.codegen_model)
-            if patch_handler.handle_patch_application(selected_files, feature, modification_plan):
+            if PatchHandler().handle_patch_application(selected_files, feature, modification_plan):
                 self._finalize_changes(feature)
                 return {
                     "success": True,

@@ -1,17 +1,18 @@
 from typing import Dict, List, Optional
+from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType, get_multiline_input, while_success
 from jarvis.models.base import BasePlatform
 
 class PlanGenerator:
     """修改方案生成器"""
     
-    def __init__(self, thinking_model: BasePlatform):
+    def __init__(self):
         """初始化
         
         Args:
             thinking_model: 用于思考的大模型
         """
-        self.thinking_model = thinking_model
+        self.thinking_model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
     
     def _build_prompt(self, feature: str, related_files: List[Dict]) -> str:
         """构建提示词
@@ -52,7 +53,6 @@ class PlanGenerator:
         Returns:
             str: 修改方案，如果用户取消则返回 None
         """
-        user_feedback = None
         prompt = self._build_prompt(feature, related_files)
         while True:
             # 构建提示词
