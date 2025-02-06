@@ -2,9 +2,8 @@ import os
 from typing import List
 import yaml
 import time
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.utils import OutputType, PrettyOutput, while_success
 from jarvis.models.registry import PlatformRegistry
-from .model_utils import call_model_with_retry
 
 def has_uncommitted_files() -> bool:
     """判断代码库是否有未提交的文件"""
@@ -38,9 +37,7 @@ Git Diff:
 """
     
     model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
-    success, response = call_model_with_retry(model, prompt)
-    if not success:
-        return "Update code changes"
+    response = while_success(lambda: model.chat(prompt), 5)
         
     return response.strip().split("\n")[0]
 

@@ -2,7 +2,6 @@ import re
 import os
 from typing import List, Tuple, Dict
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, while_success
-from .model_utils import call_model_with_retry
 
 class PatchHandler:
     def __init__(self, model):
@@ -105,10 +104,7 @@ CONFIRM_DELETE  # 必须包含此确认标记
             prompt += f"</FILE_CONTENT>\n"
 
         # 调用模型生成补丁
-        success, response = call_model_with_retry(self.model, prompt)
-        if not success:
-            PrettyOutput.print("生成补丁失败", OutputType.ERROR)
-            return []
+        response = while_success(lambda: self.model.chat(prompt), 5)
             
         try:
             patches = self._extract_patches(response)
@@ -290,9 +286,7 @@ CONFIRM_DELETE  # 必须包含此确认标记
 2. 保持正确的缩进和格式
 3. 避免之前的错误
 """
-        success, response = call_model_with_retry(self.model, retry_prompt)
-        if not success:
-            return []
+        response = while_success(lambda: self.model.chat(retry_prompt), 5)
             
         try:
             patches = self._extract_patches(response)
