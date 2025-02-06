@@ -23,7 +23,7 @@ class OyiModel(BasePlatform):
         self.messages = []
         self.system_message = ""
         self.conversation = None
-        self.upload_files = [] 
+        self.files = []
         self.first_chat = True
         
         self.token = os.getenv("OYI_API_KEY")
@@ -122,7 +122,7 @@ class OyiModel(BasePlatform):
             }
             
             payload = {
-                "topicId": self.conversation['result']['id'],
+                "topicId": self.conversation['result']['id'] if self.conversation else None,
                 "messages": self.messages,
                 "content": message,
                 "contentFiles": []
@@ -130,8 +130,8 @@ class OyiModel(BasePlatform):
             
             # 如果有上传的文件，添加到请求中
             if self.first_chat:
-                if self.upload_files:
-                    for file_data in self.upload_files:
+                if self.files:
+                    for file_data in self.files:
                         file_info = {
                             "contentType": 1,  # 1 表示图片
                             "fileUrl": file_data['result']['url'],
@@ -140,7 +140,7 @@ class OyiModel(BasePlatform):
                         }
                         payload["contentFiles"].append(file_info)
                     # 清空已使用的文件列表
-                    self.upload_files = []
+                    self.files = []
                 message = self.system_message + "\n" + message
                 payload["content"] = message
                 self.first_chat = False
@@ -195,7 +195,7 @@ class OyiModel(BasePlatform):
         """Reset model state"""
         self.messages = []
         self.conversation = None
-        self.upload_files = []
+        self.files = []
         self.first_chat = True
             
     def delete_chat(self) -> bool:
@@ -251,7 +251,7 @@ class OyiModel(BasePlatform):
             model_info = self.models.get(self.model_name)
             if not model_info or not model_info.get('uploadFile', False):
                 PrettyOutput.print(f"当前模型 {self.model_name} 不支持文件上传", OutputType.WARNING)
-                return None
+                return []
             
             headers = {
                 'Authorization': f'Bearer {self.token}',
@@ -283,18 +283,18 @@ class OyiModel(BasePlatform):
                     if response.status_code == 200:
                         data = response.json()
                         if data.get('code') == 200:
-                            self.upload_files.append(data)
-                            return data
+                            self.files.append(data)
                         else:
                             PrettyOutput.print(f"文件上传失败: {data.get('message')}", OutputType.ERROR)
-                            return None
+                            return []
                     else:
                         PrettyOutput.print(f"文件上传失败: {response.status_code}", OutputType.ERROR)
-                        return None
+                        return []
                 
+            return self.files
         except Exception as e:
             PrettyOutput.print(f"文件上传异常: {str(e)}", OutputType.ERROR)
-            return None
+            return []
 
     def get_available_models(self) -> List[str]:
         """获取可用的模型列表
