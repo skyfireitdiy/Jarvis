@@ -330,7 +330,7 @@ CONFIRM_DELETE  # 必须包含此确认标记
                         current_errors.append(msg)
                         file_success = False
                 
-                if not file_success:
+                if not file_success or not self._confirm_and_apply_changes(file_path, temp_map, modified_files):
                     # 显示错误信息并询问用户操作
                     PrettyOutput.print(f"\n文件 {file_path} 补丁应用失败:", OutputType.WARNING)
                     PrettyOutput.print("\n".join(current_errors), OutputType.WARNING)
@@ -353,10 +353,6 @@ CONFIRM_DELETE  # 必须包含此确认标记
                     # 选择1直接重试
                     retry_count += 1
                     continue
-
-                # 确认修改
-                if self._confirm_and_apply_changes(file_path, temp_map, modified_files):
-                    break
                 else:
                     continue
 
