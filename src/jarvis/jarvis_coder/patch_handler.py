@@ -301,12 +301,13 @@ CONFIRM_DELETE  # 必须包含此确认标记
                         initial_patches = patches  # 保存初始补丁
                     else:  # 重试时直接生成新补丁
                         # 构建重试提示
+                        original_code_str = '\n'.join(original_code_list)
                         retry_prompt = f"""根据以下信息重新生成补丁：
 原始需求：{plan}
 错误信息：{error_details}
 用户补充：{additional_info}
 原始代码片段：
-{'\n'.join(original_code_list)}
+{original_code_str}
 请生成新的补丁，特别注意代码匹配准确性"""
                         
                         response = while_success(lambda: model.chat(retry_prompt), 5)
