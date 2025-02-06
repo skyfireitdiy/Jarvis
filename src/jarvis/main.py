@@ -62,7 +62,7 @@ def load_tasks() -> dict:
             methodology = yaml.safe_load(f)
         if isinstance(methodology, dict):
             for name, desc in methodology.items():
-                tasks[f"执行方法论：{str(name)}"] = str(desc)
+                tasks[f"执行方法论：{str(name)}\n {str(desc)}" ] = str(desc)
     
     return tasks
 
