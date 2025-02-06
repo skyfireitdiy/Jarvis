@@ -69,9 +69,9 @@ class OpenAIModel(BasePlatform):
             
             response = self.client.chat.completions.create(
                 model=self.model_name,  # 使用配置的模型名称
-                messages=self.messages,
+                messages=self.messages, # type: ignore
                 stream=True
-            )
+            ) # type: ignore
             
             full_response = ""
             
