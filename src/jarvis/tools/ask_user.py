@@ -34,8 +34,7 @@ class AskUserTool:
             PrettyOutput.print(question, OutputType.SYSTEM)
             
             # 获取用户输入
-            PrettyOutput.print("\n请输入您的回答（输入空行结束）:", OutputType.INPUT)
-            user_response = get_multiline_input()
+            user_response = get_multiline_input("请输入您的回答（输入空行结束）")
             
             if user_response == "__interrupt__":
                 return {
