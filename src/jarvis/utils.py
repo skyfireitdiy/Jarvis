@@ -1,3 +1,4 @@
+from ast import List, Str
 import hashlib
 from pathlib import Path
 import sys
@@ -277,6 +278,27 @@ def load_rerank_model():
 
 def get_max_context_length():
     return int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '131072'))  # 默认128k
+
+def is_long_context(files: list) -> bool:
+    """检测文件列表是否属于长上下文（总字符数超过最大上下文长度的80%）"""
+    max_length = get_max_context_length()
+    threshold = max_length * 0.8
+    total_chars = 0
+    
+    for file_path in files:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                total_chars += len(content)
+                
+                # 提前终止检查如果已经超过阈值
+                if total_chars > threshold:
+                    return True
+        except Exception as e:
+            PrettyOutput.print(f"无法读取文件 {file_path}: {e}", OutputType.WARNING)
+            continue
+            
+    return total_chars > threshold
 
 def get_thread_count():
     return int(os.getenv('JARVIS_THREAD_COUNT', '1'))  
