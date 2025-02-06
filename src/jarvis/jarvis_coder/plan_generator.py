@@ -61,10 +61,6 @@ class PlanGenerator:
             # 获取修改方案
             plan = while_success(lambda: self.thinking_model.chat(prompt), 5)
             
-            # 显示修改方案并获取用户确认
-            PrettyOutput.section("修改方案", OutputType.INFO)
-            PrettyOutput.print(plan, OutputType.INFO)
-            
             user_input = input("\n是否同意这个修改方案？(y/n/f) [y]: ").strip().lower() or 'y'
             if user_input == 'y':
                 return plan
