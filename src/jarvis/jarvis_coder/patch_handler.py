@@ -88,7 +88,7 @@ int add(int a, int b) {
             Dict[str, List[str]]: 代码字典，key为文件路径，value为代码片段列表
         """
         code_dict = {}
-        for match in re.finditer(r'<CODE>\n> (.+)\n(.*?)\n</CODE>', response, re.DOTALL):
+        for match in re.finditer(r'<CODE>\n> (.+?)\n(.*)\n</CODE>', response, re.DOTALL):
             file_path = match.group(1).strip()
             code_list = match.group(2).strip()
             code_dict[file_path] = code_list
