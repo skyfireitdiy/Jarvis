@@ -20,7 +20,7 @@ class AI8Model(BasePlatform):
         """Initialize model"""
         super().__init__()
         self.system_message = ""
-        self.conversation = None
+        self.conversation = {}
         self.files = []
         self.models = {}  # 存储模型信息
 
@@ -112,6 +112,7 @@ class AI8Model(BasePlatform):
                 "name": name,
                 "data": f"data:image/png;base64,{base64_data}"
             })
+        return self.files
     
     def set_system_message(self, message: str):
         """Set system message"""
@@ -138,7 +139,7 @@ class AI8Model(BasePlatform):
             
             payload = {
                 "text": message,
-                "sessionId": self.conversation['id'],
+                "sessionId": self.conversation['id'] if self.conversation else None,
                 "files": []
             }
             

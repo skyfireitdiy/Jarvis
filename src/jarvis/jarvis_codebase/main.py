@@ -210,7 +210,7 @@ class CodeBase:
         except Exception as e:
             PrettyOutput.print(f"Error vectorizing file {file_path}: {str(e)}", 
                              output_type=OutputType.ERROR)
-            return np.zeros(self.vector_dim, dtype=np.float32)
+            return np.zeros(self.vector_dim, dtype=np.float32) # type: ignore
 
     def clean_cache(self) -> bool:
         """清理过期的缓存记录，返回是否有文件被删除"""
@@ -296,7 +296,7 @@ class CodeBase:
             
         if vectors:
             vectors = np.vstack(vectors)
-            self.index.add_with_ids(vectors, np.array(ids))
+            self.index.add_with_ids(vectors, np.array(ids)) # type: ignore
         else:
             self.index = None
 
@@ -563,7 +563,7 @@ class CodeBase:
             query_vector = self.get_embedding(query)
             query_vector = query_vector.reshape(1, -1)
             
-            distances, indices = self.index.search(query_vector, top_k)
+            distances, indices = self.index.search(query_vector, top_k) # type: ignore
             
             for i, distance in zip(indices[0], distances[0]):
                 if i == -1:
