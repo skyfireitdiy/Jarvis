@@ -99,11 +99,13 @@ int add(int a, int b) {
         prompt = f"# 修改方案：\n{modification_plan}\n# 相关文件："
         # 添加文件内容到提示
         for i, file in enumerate(related_files):
-            prompt += f"""\n{i}. {file["file_path"]}\n"""
-            prompt += f"""文件内容:\n"""
-            prompt += f"<FILE_CONTENT>\n"
-            prompt += f'{file["file_content"]}\n'
-            prompt += f"</FILE_CONTENT>\n"
+            if file["parts"]:
+                prompt += f"""\n{i}. {file["file_path"]}\n"""
+                prompt += f"""文件内容片段:\n"""
+                for i, p in enumerate(file["parts"]):
+                    prompt += f"<PART{i}>\n"
+                    prompt += f'{p}\n'
+                    prompt += f"</PART{i}>\n"
 
         # 调用模型生成代码片段
         response = while_success(lambda: self.code_part_model.chat(prompt), 5)
@@ -115,7 +117,7 @@ int add(int a, int b) {
             content = open(file, "r", encoding="utf-8").read()
         else:
             content = "<文件不存在，需要创建>"
-        prompt = f"""文件路径:\n{file}\n文件内容：\n<CONTENT>{content}\n</CONTENT>\n要修改的代码片段:"""
+        prompt = f"""\n# 完整修改方案：{plan}\n# 当前修改文件路径:\n{file}\n# 当前修改文件内容：\n<CONTENT>{content}\n</CONTENT>\n# 生成的补丁:"""
         for code in code_list:
             prompt += f"\n<CODE>\n{code}\n</CODE>"
         PrettyOutput.print(f"为{file}生成格式化补丁...", OutputType.PROGRESS)
