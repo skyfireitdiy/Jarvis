@@ -140,7 +140,7 @@ class Agent:
 
     def _load_methodology(self, user_input: str) -> Dict[str, str]:
         """加载方法论并构建向量索引"""
-        PrettyOutput.print("加载方法论...", OutputType.PLANNING)
+        PrettyOutput.print("加载方法论...", OutputType.PROGRESS)
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
         if not os.path.exists(user_jarvis_methodology):
             return {}
@@ -208,7 +208,7 @@ class Agent:
         """
         # 创建一个新的模型实例来做总结，避免影响主对话
 
-        PrettyOutput.print("总结对话历史，准备生成总结，开始新的对话...", OutputType.PLANNING)
+        PrettyOutput.print("总结对话历史，准备生成总结，开始新的对话...", OutputType.PROGRESS)
         
         prompt = """请总结之前对话中的关键信息，包括：
 1. 当前任务目标
