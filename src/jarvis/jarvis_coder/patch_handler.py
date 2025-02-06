@@ -89,9 +89,11 @@ int add(int a, int b) {
         """
         code_dict = {}
         for match in re.finditer(r'<CODE>\n> (.+?)\n(.*)\n</CODE>', response, re.DOTALL):
-            file_path = match.group(1).strip()
-            code_list = match.group(2).strip()
-            code_dict[file_path] = code_list
+            file_path = match.group(1)
+            code_list = match.group(2)
+            if file_path not in code_dict:
+                code_dict[file_path] = []
+            code_dict[file_path].append(code_list)
         return code_dict
 
     def make_code_raw_patch(self, related_files: List[Dict], modification_plan: str) -> Dict[str, List[str]]:
