@@ -273,28 +273,35 @@ old_content
 @@@@@@
 new_content
 </PATCH_FMT1>
+                                     
+注意事项：
+a、仅输出补丁内容，不要输出任何其他内容
+b、如果在大段代码中有零星修改，生成多个补丁
+c、要替换的内容，一定要与文件内容完全一致（**包括缩进与空白**），不要有任何多余或者缺失的内容
+d、务必保留原始文件的缩进和格式
+e、给出的代码是修改的一部分，不用关注除本文件以外的修改
 
 2. 全文件模式（适合新建或完全重写）：
 <PATCH_FMT2>
-> path/to/new_file.py
+> path/to/file
 def new_function():
     print("new code")
 </PATCH_FMT2>
 
+注意事项：
+a、仅输出补丁内容，不要输出任何其他内容
+b、给出的代码是修改的一部分，不用关注除本文件以外的修改
+                                     
 3. 删除文件模式：
 <PATCH_FMT3>
 > path/to/file_to_delete
-CONFIRM_DELETE  # 必须包含此确认标记
+CONFIRM_DELETE 
 </PATCH_FMT3>
-
+                                     
 注意事项：
-1、仅输出补丁内容，不要输出任何其他内容
-2、如果在大段代码中有零星修改，生成多个补丁
-3、要替换的内容，一定要与文件内容完全一致（**包括缩进与空白**），不要有任何多余或者缺失的内容
-4、务必保留原始文件的缩进和格式
-5、对于新文件，不需要写old_content部分
-6、删除文件时必须包含CONFIRM_DELETE确认标记
-7、给出的代码是修改的一部分，不用关注除本文件以外的修改""")
+1. 必须包含CONFIRM_DELETE确认标记
+""")
+
 
             while True:
                 try:
@@ -302,12 +309,10 @@ CONFIRM_DELETE  # 必须包含此确认标记
                         patches = self.make_file_formatted_patch(
                             file_path, plan, original_code_list, model
                         )
-                        initial_patches = patches  # 保存初始补丁
                     else:  # 重试时直接生成新补丁
                         # 构建重试提示
                         original_code_str = '\n'.join(original_code_list)
                         retry_prompt = f"""根据以下信息重新生成补丁：
-原始需求：{plan}
 错误信息：{error_details}
 用户补充：{additional_info}
 原始代码片段：
