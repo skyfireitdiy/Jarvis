@@ -27,10 +27,12 @@ class PlanGenerator:
         prompt = "我需要你帮我分析如何实现以下功能:\n\n"
         prompt += f"{feature}\n\n"
                 
-        prompt += "以下是相关的代码文件:\n\n"
+        prompt += "以下是相关的代码文件片段:\n\n"
         
         for file in related_files:
-            prompt += f"文件: {file['file_path']}\n```\n{file['file_content']}\n```\n\n"
+            prompt += f"文件: {file['file_path']}\n"
+            for part in file["parts"]:
+                prompt += f"<PART>\n{part}\n</PART>\n"
         
         prompt += "\n请详细说明需要做哪些修改来实现这个功能。包括:\n"
         prompt += "1. 需要修改哪些文件\n"
