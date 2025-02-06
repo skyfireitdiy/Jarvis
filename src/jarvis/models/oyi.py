@@ -364,5 +364,5 @@ class OyiModel(BasePlatform):
             return sorted(models)
             
         except Exception as e:
-            PrettyOutput.print(f"获取模型列表异常: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"获取模型列表异常: {str(e)}", OutputType.WARNING)
             return []
