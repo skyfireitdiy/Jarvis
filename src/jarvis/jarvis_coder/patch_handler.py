@@ -450,7 +450,7 @@ CONFIRM_DELETE  # 必须包含此确认标记
         """
         
         while True:
-            PrettyOutput.print("开始生成补丁...", OutputType.PLANNING)
+            PrettyOutput.print("开始生成补丁...", OutputType.PROGRESS)
             patches = self.make_code_raw_patch(related_files, modification_plan)
             while True:  # 在当前尝试中循环，直到成功或用户放弃
                 # 1. 生成补丁
