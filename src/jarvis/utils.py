@@ -17,6 +17,9 @@ import torch
 # 初始化colorama
 colorama.init()
 
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 class OutputType(Enum):
     SYSTEM = "system"      # AI助手消息
     CODE = "code"         # 代码相关
@@ -213,7 +216,6 @@ def find_git_root(dir="."):
     return ret
 
 def load_embedding_model():
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     model_name = "BAAI/bge-large-zh-v1.5"
     PrettyOutput.print(f"正在加载嵌入模型: {model_name}...", OutputType.INFO)
     try:
