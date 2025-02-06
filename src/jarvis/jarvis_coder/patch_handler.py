@@ -1,7 +1,7 @@
 import re
 import os
 from typing import List, Tuple, Dict
-from jarvis.utils import OutputType, PrettyOutput, get_multiline_input
+from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, while_success
 from .model_utils import call_model_with_retry
 
 class PatchHandler:
@@ -10,7 +10,7 @@ class PatchHandler:
         self.model.set_system_prompt("""你是一个资深程序开发专家，你可以根据文件文件内容，需求和修改计划生成特定格式的补丁片段，供程序自动应用。
 
 补丁片段格式说明：
-可选两种格式：
+可选三种格式：
 1. 差异模式（适合局部修改）：
 <PATCH_FMT1>
 > path/to/file
@@ -26,13 +26,20 @@ def new_function():
     print("new code")
 </PATCH_FMT2>
 
+3. 删除文件模式：
+<PATCH_FMT3>
+> path/to/file_to_delete
+CONFIRM_DELETE  # 必须包含此确认标记
+</PATCH_FMT3>
+
 注意事项：
 1、仅输出补丁内容，不要输出任何其他内容
 2、如果在大段代码中有零星修改，生成多个补丁
 3、要替换的内容，一定要与文件内容完全一致（**包括缩进与空白**），不要有任何多余或者缺失的内容
 4、每个patch不超过20行，超出20行，请生成多个patch
 5、务必保留原始文件的缩进和格式
-6、对于新文件，不需要写old_content部分""")
+6、对于新文件，不需要写old_content部分
+7、删除文件时必须包含CONFIRM_DELETE确认标记""")
 
     def _extract_patches(self, response: str) -> List[Tuple[str, str, str]]:
         """从响应中提取补丁
@@ -45,7 +52,7 @@ def new_function():
         """
         patches = []
         
-        # 匹配两种补丁格式
+        # 修改后的正则表达式匹配三种补丁格式
         fmt_pattern = r'<PATCH_FMT(\d?)>\n?(.*?)\n?</PATCH_FMT\d?>\n?'
         
         for match in re.finditer(fmt_pattern, response, re.DOTALL):
@@ -64,7 +71,12 @@ def new_function():
             file_path = file_path_match.group(1).strip()
             
             # 处理不同格式
-            if fmt_type == "1":
+            if fmt_type == "3":
+                # FMT3格式：文件删除
+                if len(lines) < 2 or "CONFIRM_DELETE" not in lines[1]:
+                    continue
+                patches.append(("FMT3", file_path, "CONFIRM_DELETE"))
+            elif fmt_type == "1":
                 # FMT1格式：新旧内容分隔
                 parts = '\n'.join(lines[1:]).split('@@@@@@')
                 if len(parts) != 2:
@@ -134,7 +146,26 @@ def new_function():
             PrettyOutput.print(f"正在应用补丁 {i+1}/{len(patches)}", OutputType.INFO)
             
             try:
-                if fmt == "FMT2":
+                if fmt == "FMT3":
+                    # 文件删除逻辑
+                    if not os.path.exists(file_path):
+                        error_info.append(f"文件不存在无法删除: {file_path}")
+                        return False, "\n".join(error_info)
+                        
+                    # 安全检查
+                    if patch_content != "CONFIRM_DELETE":
+                        error_info.append(f"删除确认标记缺失: {file_path}")
+                        return False, "\n".join(error_info)
+                        
+                    # 执行删除
+                    os.remove(file_path)
+                    os.system(f"git rm {file_path}")
+                    PrettyOutput.print(f"成功删除文件: {file_path}", OutputType.SUCCESS)
+                    if file_path in temp_map:
+                        del temp_map[file_path]
+                    modified_files.add(file_path)
+                    continue
+                elif fmt == "FMT2":
                     # 全文件替换逻辑
                     if not os.path.isabs(file_path):  # 新增路径校验
                         file_path = os.path.abspath(file_path)
@@ -337,7 +368,7 @@ def new_function():
                 if not user_feed or user_feed == "__interrupt__":
                     return True
                 
-                response = self.model.chat(user_feed)
+                response = while_success(lambda: self.model.chat(user_feed), 5)
                 patches = self._extract_patches(response)
                 
                 continue  # 回到外层循环重新开始补丁生成流程
