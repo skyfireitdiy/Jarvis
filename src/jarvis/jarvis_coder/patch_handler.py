@@ -2,7 +2,6 @@ import re
 import os
 from typing import List, Tuple, Dict
 
-from click import prompt
 from jarvis.models.base import BasePlatform
 from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, while_success
