@@ -3,7 +3,7 @@ import threading
 from typing import Dict, Any, List, Optional
 import re
 
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, load_env_from_file
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, is_long_context, load_env_from_file, while_success
 from jarvis.models.registry import PlatformRegistry
 from jarvis.jarvis_codebase.main import CodeBase
 from prompt_toolkit import PromptSession
@@ -103,11 +103,6 @@ class JarvisCoder:
     def _init_codebase(self):
         """初始化代码库"""
         self._codebase = CodeBase(self.root_dir)
-
-    def _new_model(self):
-        """获取大模型"""
-        model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
-        return model
 
     def _has_uncommitted_files(self) -> bool:
         """判断代码库是否有未提交的文件"""
@@ -266,7 +261,7 @@ class JarvisCoder:
         
         return sorted(matches)
 
-    def _select_files(self, related_files: List[Dict], feature: str) -> List[Dict]:
+    def _select_files(self, related_files: List[Dict]) -> List[Dict]:
         """让用户选择和补充相关文件"""
         PrettyOutput.section("相关文件", OutputType.INFO)
         
@@ -381,6 +376,42 @@ class JarvisCoder:
         os.system(f"git reset --hard")
         os.system(f"git clean -df")
 
+    def get_key_code(self, files: List[Dict], feature: str):
+        """提取文件中与需求相关的关键代码片段"""
+        for file_info in files:
+            PrettyOutput.print(f"分析文件: {file_info['file_path']}", OutputType.INFO)
+            model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
+            model.set_suppress_output(True)
+            file_path = file_info["file_path"]
+            content = file_info["file_content"]
+            
+            # 生成分析提示
+            system_message = f"""你是一个代码分析专家，可以从代码中提取出与需求相关的片段。
+请按以下格式返回：
+<PART>
+content
+</PART>
+
+可返回多个片段。如果文件内容与需求无关，则返回空。
+"""
+            model.set_system_message(system_message)
+            
+            try:
+
+                prompt = f"""需求：{feature}
+文件路径：{file_path}
+代码内容：
+{content}
+"""
+
+                # 调用大模型进行分析
+                response = while_success(lambda: model.chat(prompt))
+
+                parts = re.findall(r'<PART>\n(.*?)\n</PART>', response, re.DOTALL)
+                file_info["parts"] = parts
+            except Exception as e:
+                PrettyOutput.print(f"分析文件失败: {str(e)}", OutputType.ERROR)
+
     def execute(self, feature: str) -> Dict[str, Any]:
         """执行代码修改"""
         try:
@@ -388,7 +419,14 @@ class JarvisCoder:
             
             # 获取并选择相关文件
             initial_files = self._load_related_files(feature)
-            selected_files = self._select_files(initial_files, feature)
+            selected_files = self._select_files(initial_files)
+
+            # 是否是长上下文
+            if is_long_context([file['file_path'] for file in selected_files]):
+                self.get_key_code(selected_files, feature)
+            else:
+                for file in selected_files:
+                    file["parts"] = [file["file_content"]]
             
             # 获取修改方案
             modification_plan = self.plan_generator.generate_plan(feature, selected_files)
