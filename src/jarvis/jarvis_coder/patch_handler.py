@@ -42,7 +42,7 @@ int add(int a, int b) {
         
         for match in re.finditer(fmt_pattern, response, re.DOTALL):
             fmt_type = match.group(1) or "1"  # 默认FMT1
-            patch_content = match.group(2).strip()
+            patch_content = match.group(2)
             
             # 提取文件路径和内容
             lines = patch_content.split('\n')
@@ -53,7 +53,7 @@ int add(int a, int b) {
             if not file_path_match:
                 continue
                 
-            file_path = file_path_match.group(1).strip()
+            file_path = file_path_match.group(1)
             
             # 处理不同格式
             if fmt_type == "3":
@@ -66,14 +66,14 @@ int add(int a, int b) {
                 parts = '\n'.join(lines[1:]).split('@@@@@@')
                 if len(parts) != 2:
                     continue
-                old_content = parts[0].strip()
-                new_content = parts[1].strip()
+                old_content = parts[0]
+                new_content = parts[1]
                 patches.append(("FMT1", file_path, f"{old_content}\n@@@@@@\n{new_content}"))
             elif fmt_type == "2":
                 # FMT2格式：全文件替换
                 if not lines[1:]:  # 新增内容校验
                     continue
-                full_content = '\n'.join(lines[1:]).strip()
+                full_content = '\n'.join(lines[1:])
                 patches.append(("FMT2", file_path, full_content))
 
         return patches
@@ -170,7 +170,7 @@ int add(int a, int b) {
     def _handle_fmt1_diff(self, patch_file_path: str, old_content: str, new_content: str,
                          temp_map: dict, modified_files: set) -> Tuple[bool, str]:
         """处理FMT1差异补丁"""
-        if patch_file_path not in temp_map and not old_content.strip():
+        if patch_file_path not in temp_map and not old_content:
             # 处理新文件创建
             try:
                 dir_path = os.path.dirname(patch_file_path)
@@ -187,7 +187,7 @@ int add(int a, int b) {
                 return False, f"创建新文件失败 {patch_file_path}: {str(e)}"
 
         if patch_file_path not in temp_map:
-            return False, f"文件不存在: {patch_file_path}"
+            return False, f"文件不存在: {patch_file_path}:{temp_map.keys()}"
             
         current_content = temp_map[patch_file_path]
         if old_content and old_content not in current_content:
@@ -216,8 +216,8 @@ int add(int a, int b) {
                 parts = patch_content.split("@@@@@@")
                 if len(parts) != 2:
                     return False, f"补丁格式错误: {patch_file_path}，缺少分隔符"
-                old_content = parts[0].strip('\n')
-                new_content = parts[1].strip('\n')
+                old_content = parts[0]
+                new_content = parts[1]
                 return self._handle_fmt1_diff(patch_file_path, old_content, new_content, temp_map, modified_files)
                 
             return False, f"未知的补丁格式: {fmt}"
