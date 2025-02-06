@@ -122,17 +122,142 @@ int add(int a, int b) {
         response = while_success(lambda: model.chat(prompt), 5)
         return self._extract_patches(response)
 
-    def apply_patch(self, related_files: List[Dict], plan: str,patches_code: Dict[str, List[str]]) -> Tuple[bool, str]:
-        """应用补丁
-        
-        Args:
-            related_files: 相关文件列表
-            patches: 补丁列表，每个补丁是 (格式, 文件路径, 补丁内容) 的元组
+    def _handle_fmt3_delete(self, patch_file_path: str, patch_content: str, temp_map: dict, modified_files: set) -> Tuple[bool, str]:
+        """处理FMT3文件删除补丁"""
+        if not os.path.exists(patch_file_path):
+            return False, f"文件不存在无法删除: {patch_file_path}"
             
-        Returns:
-            Tuple[bool, str]: (是否成功, 错误信息)
-        """
-        for file, code_list in patches_code.items():
+        # 安全检查
+        if patch_content != "CONFIRM_DELETE":
+            return False, f"删除确认标记缺失: {patch_file_path}"
+            
+        # 执行删除
+        os.remove(patch_file_path)
+        os.system(f"git rm {patch_file_path}")
+        PrettyOutput.print(f"成功删除文件: {patch_file_path}", OutputType.SUCCESS)
+        if patch_file_path in temp_map:
+            del temp_map[patch_file_path]
+        modified_files.add(patch_file_path)
+        return True, ""
+
+    def _handle_fmt2_full_replace(self, patch_file_path: str, patch_content: str, 
+                                 temp_map: dict, modified_files: set) -> Tuple[bool, str]:
+        """处理FMT2全文件替换补丁"""
+        if not os.path.isabs(patch_file_path):
+            patch_file_path = os.path.abspath(patch_file_path)
+            
+        if patch_file_path not in temp_map:
+            # 新建文件
+            try:
+                os.makedirs(os.path.dirname(patch_file_path), exist_ok=True)
+                with open(patch_file_path, "w", encoding="utf-8") as f:
+                    f.write(patch_content)
+                temp_map[patch_file_path] = patch_content
+                modified_files.add(patch_file_path)
+                return True, ""
+            except Exception as e:
+                return False, f"创建新文件失败 {patch_file_path}: {str(e)}"
+                
+        # 替换现有文件
+        temp_map[patch_file_path] = patch_content
+        modified_files.add(patch_file_path)
+        return True, ""
+
+    def _handle_fmt1_diff(self, patch_file_path: str, old_content: str, new_content: str,
+                         temp_map: dict, modified_files: set) -> Tuple[bool, str]:
+        """处理FMT1差异补丁"""
+        if patch_file_path not in temp_map and not old_content.strip():
+            # 处理新文件创建
+            try:
+                dir_path = os.path.dirname(patch_file_path)
+                if dir_path and not os.path.exists(dir_path):
+                    os.makedirs(dir_path, exist_ok=True)
+                with open(patch_file_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+                os.system(f"git add {patch_file_path}")
+                PrettyOutput.print(f"成功创建并添加文件: {patch_file_path}", OutputType.SUCCESS)
+                modified_files.add(patch_file_path)
+                temp_map[patch_file_path] = new_content
+                return True, ""
+            except Exception as e:
+                return False, f"创建新文件失败 {patch_file_path}: {str(e)}"
+
+        if patch_file_path not in temp_map:
+            return False, f"文件不存在: {patch_file_path}"
+            
+        current_content = temp_map[patch_file_path]
+        if old_content and old_content not in current_content:
+            return False, (
+                f"补丁应用失败: {patch_file_path}\n"
+                f"原因: 未找到要替换的代码\n"
+                f"期望找到的代码:\n{old_content}\n"
+                f"实际文件内容:\n{current_content[:200]}..."
+            )
+            
+        temp_map[patch_file_path] = current_content.replace(old_content, new_content)
+        modified_files.add(patch_file_path)
+        return True, ""
+
+    def _apply_single_patch(self, fmt: str, patch_file_path: str, patch_content: str,
+                           temp_map: dict, modified_files: set) -> Tuple[bool, str]:
+        """应用单个补丁"""
+        try:
+            if fmt == "FMT3":
+                return self._handle_fmt3_delete(patch_file_path, patch_content, temp_map, modified_files)
+                
+            elif fmt == "FMT2":
+                return self._handle_fmt2_full_replace(patch_file_path, patch_content, temp_map, modified_files)
+                
+            elif fmt == "FMT1":
+                parts = patch_content.split("@@@@@@")
+                if len(parts) != 2:
+                    return False, f"补丁格式错误: {patch_file_path}，缺少分隔符"
+                old_content = parts[0].strip('\n')
+                new_content = parts[1].strip('\n')
+                return self._handle_fmt1_diff(patch_file_path, old_content, new_content, temp_map, modified_files)
+                
+            return False, f"未知的补丁格式: {fmt}"
+        except Exception as e:
+            return False, f"处理补丁时发生错误: {str(e)}"
+
+    def _confirm_and_apply_changes(self, file_path: str, temp_map: dict, modified_files: set) -> bool:
+        """确认并应用修改"""
+        os.system(f"git diff {file_path}")
+        confirm = input(f"\n是否接受 {file_path} 的修改？(y/n) [y]: ").lower() or "y"
+        if confirm == "y":
+            # 写入实际文件
+            try:
+                dir_path = os.path.dirname(file_path)
+                if dir_path and not os.path.exists(dir_path):
+                    os.makedirs(dir_path, exist_ok=True)
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(temp_map[file_path])
+                PrettyOutput.print(f"成功修改文件: {file_path}", OutputType.SUCCESS)
+                return True
+            except Exception as e:
+                PrettyOutput.print(f"写入文件失败 {file_path}: {str(e)}", OutputType.ERROR)
+                return False
+        else:
+            # 回退修改
+            os.system(f"git checkout -- {file_path}")
+            PrettyOutput.print(f"已回退 {file_path} 的修改", OutputType.WARNING)
+            modified_files.discard(file_path)
+            if file_path in temp_map:
+                del temp_map[file_path]
+            return False
+
+    def apply_patch(self, related_files: List[Dict], plan: str, patches_code: Dict[str, List[str]]) -> Tuple[bool, str]:
+        """应用补丁（主入口）"""
+        error_info = []
+        modified_files = set()
+        file_map = {file["file_path"]: file["file_content"] for file in related_files}
+        temp_map = file_map.copy()
+
+        for file_path, code_list in patches_code.items():
+            retry_count = 0
+            original_code_list = code_list.copy()
+            additional_info = ""
+            error_details = ""
             model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
             model.set_system_message("""你是一个资深程序开发专家，你可以根据修改方案，要修改的代码文件，要修改代码的代码片段，生成给出代码片段的规范的补丁片段供程序自动应用。
 补丁片段格式说明：
@@ -166,108 +291,71 @@ CONFIRM_DELETE  # 必须包含此确认标记
 5、对于新文件，不需要写old_content部分
 6、删除文件时必须包含CONFIRM_DELETE确认标记
 7、给出的代码是修改的一部分，不用关注除本文件以外的修改""")
-            patches = self.make_file_formatted_patch(file, plan,code_list, model)
-            error_info = []
-            modified_files = set()
-            file_map = {file["file_path"]: file["file_content"] for file in related_files}
-            temp_map = file_map.copy()  # 创建临时映射用于尝试应用
-            for fmt, file_path, patch_content in patches:
+
+            while True:
                 try:
-                    if fmt == "FMT3":
-                        # 文件删除逻辑
-                        if not os.path.exists(file_path):
-                            error_info.append(f"文件不存在无法删除: {file_path}")
-                            return False, "\n".join(error_info)
-                            
-                        # 安全检查
-                        if patch_content != "CONFIRM_DELETE":
-                            error_info.append(f"删除确认标记缺失: {file_path}")
-                            return False, "\n".join(error_info)
-                            
-                        # 执行删除
-                        os.remove(file_path)
-                        os.system(f"git rm {file_path}")
-                        PrettyOutput.print(f"成功删除文件: {file_path}", OutputType.SUCCESS)
-                        if file_path in temp_map:
-                            del temp_map[file_path]
-                        modified_files.add(file_path)
-                        continue
-                    elif fmt == "FMT2":
-                        # 全文件替换逻辑
-                        if not os.path.isabs(file_path):  # 新增路径校验
-                            file_path = os.path.abspath(file_path)
-                        if file_path not in temp_map:
-                            # 新建文件
-                            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                            with open(file_path, "w", encoding="utf-8") as f:
-                                f.write(patch_content)
-                            temp_map[file_path] = patch_content
-                            modified_files.add(file_path)
-                            continue
-                            
-                        # 替换现有文件
-                        temp_map[file_path] = patch_content
-                        modified_files.add(file_path)
-                        continue
-                    
-                    # 分割新旧内容，并处理换行符
-                    parts = patch_content.split("@@@@@@")
-                    if len(parts) != 2:
-                        error_info.append(f"补丁格式错误: {file_path}，缺少分隔符")
-                        return False, "\n".join(error_info)
-                        
-                    old_content = parts[0].strip('\n')  # 移除前后的换行符
-                    new_content = parts[1].strip('\n')  # 移除前后的换行符
-                    
-                    # 处理新文件的情况
-                    if file_path not in temp_map and not old_content.strip():
-                        PrettyOutput.print(f"检测到新文件: {file_path}", OutputType.INFO)
-                        # 确保目录存在
-                        dir_path = os.path.dirname(file_path)
-                        if dir_path and not os.path.exists(dir_path):
-                            os.makedirs(dir_path, exist_ok=True)
-                        
-                        # 写入新文件
-                        try:
-                            with open(file_path, "w", encoding="utf-8") as f:
-                                f.write(new_content)
-                            # 将新文件加入版本控制
-                            os.system(f"git add {file_path}")
-                            PrettyOutput.print(f"成功创建并添加文件: {file_path}", OutputType.SUCCESS)
-                            modified_files.add(file_path)
-                            temp_map[file_path] = new_content  # 更新临时映射
-                            continue
-                        except Exception as e:
-                            error_info.append(f"创建新文件失败 {file_path}: {str(e)}")
-                            return False, "\n".join(error_info)
-                    
-                    # 处理现有文件的修改
-                    if file_path not in temp_map:
-                        error_info.append(f"文件不存在: {file_path}")
-                        return False, "\n".join(error_info)
-                    
-                    current_content = temp_map[file_path]
-                    
-                    # 查找并替换代码块
-                    if old_content and old_content not in current_content:
-                        error_info.append(
-                            f"补丁应用失败: {file_path}\n"
-                            f"原因: 未找到要替换的代码\n"
-                            f"期望找到的代码:\n{old_content}\n"
-                            f"实际文件内容:\n{current_content[:200]}..."
+                    if retry_count == 0:  # 首次调用生成格式化补丁
+                        patches = self.make_file_formatted_patch(
+                            file_path, plan, original_code_list, model
                         )
-                        return False, "\n".join(error_info)
-                    
-                    # 应用更改
-                    PrettyOutput.print(f"文件{file_path}补丁片段应用成功", OutputType.SUCCESS)
-                    temp_map[file_path] = current_content.replace(old_content, new_content)
-                    modified_files.add(file_path)
-                    
+                        initial_patches = patches  # 保存初始补丁
+                    else:  # 重试时直接生成新补丁
+                        # 构建重试提示
+                        retry_prompt = f"""根据以下信息重新生成补丁：
+原始需求：{plan}
+错误信息：{error_details}
+用户补充：{additional_info}
+原始代码片段：
+{'\n'.join(original_code_list)}
+请生成新的补丁，特别注意代码匹配准确性"""
+                        
+                        response = while_success(lambda: model.chat(retry_prompt), 5)
+                        patches = self._extract_patches(response)
+                
                 except Exception as e:
-                    error_info.append(f"处理补丁时发生错误: {str(e)}")
+                    error_info.append(f"生成补丁失败: {str(e)}")
                     return False, "\n".join(error_info)
-            
-        # 所有补丁都应用成功，更新实际文件
+
+                # 处理当前文件的所有补丁
+                file_success = True
+                current_errors = []
+                for fmt, patch_file_path, patch_content in patches:
+                    success, msg = self._apply_single_patch(fmt, patch_file_path, patch_content, temp_map, modified_files)
+                    if not success:
+                        current_errors.append(msg)
+                        file_success = False
+                
+                if not file_success:
+                    # 显示错误信息并询问用户操作
+                    PrettyOutput.print(f"\n文件 {file_path} 补丁应用失败:", OutputType.ERROR)
+                    PrettyOutput.print("\n".join(current_errors), OutputType.ERROR)
+                    
+                    # 恢复用户选择逻辑
+                    choice = input("\n请选择操作: (1) 重试 (2) 补充信息后重试 (3) 跳过 (4) 完全中止 [1]: ") or "1"
+                    
+                    if choice == "3":
+                        PrettyOutput.print(f"跳过文件 {file_path}", OutputType.WARNING)
+                        break
+                    if choice == "4":
+                        return False, "用户中止补丁应用"
+                    
+                    # 处理补充信息
+                    if choice == "2":
+                        additional_info = get_multiline_input("请输入补充说明和要求:")
+                        retry_count += 1
+                        continue  # 直接进入下一次循环生成新补丁
+                    
+                    # 选择1直接重试
+                    retry_count += 1
+                    continue
+
+                # 确认修改
+                if self._confirm_and_apply_changes(file_path, temp_map, modified_files):
+                    break
+                else:
+                    continue
+
+        # 所有文件处理完成后写入实际文件
         for file_path in modified_files:
             try:
                 dir_path = os.path.dirname(file_path)
