@@ -99,7 +99,7 @@ class ThinkerTool:
                 PrettyOutput.print(f"目标: {goal}", OutputType.INFO)
             
             # 调用模型进行分析
-            response = self.model.chat(prompt)
+            response = self.model.chat_until_success(prompt)
             
             if not response:
                 return {

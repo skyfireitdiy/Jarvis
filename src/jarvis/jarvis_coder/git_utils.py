@@ -16,12 +16,9 @@ def has_uncommitted_files() -> bool:
     
     return bool(unstaged or staged or untracked)
 
-def generate_commit_message(git_diff: str, feature: str) -> str:
+def generate_commit_message(git_diff: str) -> str:
     """根据git diff和功能描述生成commit信息"""
     prompt = f"""你是一个经验丰富的程序员，请根据以下代码变更和功能描述生成简洁明了的commit信息：
-
-功能描述：
-{feature}
 
 代码变更：
 Git Diff:
@@ -36,10 +33,10 @@ Git Diff:
 6. 仅生成commit信息的文本，不要输出任何其他内容
 """
     
-    model = PlatformRegistry().get_global_platform_registry().get_codegen_platform()
-    response = while_success(lambda: model.chat(prompt), 5)
+    model = PlatformRegistry().get_global_platform_registry().get_normal_platform()
+    response = model.chat_until_success(prompt)
         
-    return response.strip().split("\n")[0]
+    return ';'.join(response.strip().split("\n"))
 
 def save_edit_record(record_dir: str, commit_message: str, git_diff: str) -> None:
     """保存代码修改记录"""

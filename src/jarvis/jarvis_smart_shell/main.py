@@ -73,7 +73,7 @@ find . -name "*.py"
         # 使用yaspin显示Thinking状态
         with yaspin(Spinners.dots, text="Thinking", color="yellow") as spinner:
             # 处理请求
-            result = model.chat(prefix + request)
+            result = model.chat_until_success(prefix + request)
             
             # 提取命令
             if result and isinstance(result, str):
