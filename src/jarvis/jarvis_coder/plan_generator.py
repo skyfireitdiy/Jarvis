@@ -59,17 +59,15 @@ class PlanGenerator:
             PrettyOutput.print("开始生成修改方案...", OutputType.PROGRESS)
             
             # 获取修改方案
-            plan = while_success(lambda: self.thinking_model.chat(prompt), 5)
+            plan = self.thinking_model.chat_until_success(prompt)
             
-            user_input = input("\n是否同意这个修改方案？(y/n/f) [y]: ").strip().lower() or 'y'
-            if user_input == 'y':
+            user_input = input("\n是否同意这个修改方案？(y/n) [y]: ").strip().lower() or 'y'
+            if user_input == 'y' or user_input == '':
                 return plan
             elif user_input == 'n':
-                return ""
-            else:  # 'f' - feedback
                 # 获取用户反馈
-                prompt = get_multiline_input("请输入您的补充意见或建议:")
-                if prompt == "__interrupt__":
+                prompt = get_multiline_input("请输入您的补充意见或建议（直接回车取消）:")
+                if prompt == "__interrupt__" or prompt == "":
                     return ""
                 prompt = f"用户补充反馈：\n{prompt}\n\n请重新生成完整方案"
                 continue 

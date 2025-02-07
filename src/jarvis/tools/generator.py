@@ -70,7 +70,7 @@ class ExampleTool:
     }}
 
     def __init__(self):
-        self.model = ModelRegistry.get_global_model()
+        self.model = ModelRegistry.get_global_platform_registry().get_normal_platform()
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         try:
@@ -82,7 +82,7 @@ class ExampleTool:
             PrettyOutput.print(f"处理参数: {{args['param1']}}", OutputType.INFO)
 
             # 使用大模型示例
-            response = self.model.chat("prompt")
+            response = self.model.chat_until_success("prompt")
             
             # 实现具体功能
             result = "处理结果"
@@ -101,7 +101,7 @@ class ExampleTool:
 ```"""
 
         # 调用模型生成代码
-        response = model.chat(prompt)
+        response = model.chat_until_success(prompt)
 
         # 提取代码块
         code_start = response.find("```python")
@@ -147,7 +147,7 @@ class ExampleTool:
                     f.write("# Jarvis Tools\n")
 
             # 注册工具
-            success = ToolRegistry.get_global_tool_registry().register_tool_by_file(tool_file)
+            success = ToolRegistry.get_global_tool_registry().register_tool_by_file(str(tool_file))
             if not success:
                 return {
                     "success": False,

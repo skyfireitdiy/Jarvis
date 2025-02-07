@@ -137,7 +137,7 @@ if __name__ == "__main__":
         while True:
             try:
                 message = input("\n输入问题(Ctrl+C退出): ")
-                ollama.chat(message)
+                ollama.chat_until_success(message)
             except KeyboardInterrupt:
                 print("\n再见！")
                 break
