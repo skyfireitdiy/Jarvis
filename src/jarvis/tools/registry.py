@@ -203,7 +203,7 @@ class ToolRegistry:
 
 请提供总结："""
 
-                        summary = model.chat(prompt)
+                        summary = model.chat_until_success(prompt)
                         output = f"""--- 原始输出较长，以下是总结 ---{truncation_notice}
 
 {summary}

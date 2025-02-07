@@ -110,7 +110,7 @@ class Agent:
         """调用模型获取响应"""
         sleep_time = 5
         while True:
-            ret = while_success(lambda: self.model.chat(message), sleep_time=5)
+            ret = self.model.chat_until_success(message)
             if ret:
                 return ret
             else:
@@ -221,7 +221,7 @@ class Agent:
 """
         
         try:
-            summary = self.model.chat(self.prompt + "\n" + prompt)
+            summary = self.model.chat_until_success(self.prompt + "\n" + prompt)
             
             # 清空当前对话历史，但保留系统消息
             self.conversation_length = 0  # 重置对话长度
@@ -270,8 +270,7 @@ class Agent:
                 try:
                     tool_calls = Agent.extract_tool_calls(response)
                     if tool_calls:
-                        result = self.tool_registry.handle_tool_calls(tool_calls)
-                        PrettyOutput.print(result, OutputType.RESULT)
+                        self.tool_registry.handle_tool_calls(tool_calls)
                 except Exception as e:
                     PrettyOutput.print(f"处理方法论生成失败: {str(e)}", OutputType.ERROR)
                 
@@ -374,16 +373,17 @@ arguments:
 -------------------------------------------------------------
 
 严格规则：
-1. 每次只能执行一个工具
-2. 等待用户提供执行结果
-3. 不要假设或想象结果
-4. 不要创建虚假对话
-5. 如果现有信息不足以解决问题，则可以询问用户
-6. 处理问题的每个步骤不是必须有的，可按情况省略
-7. 在执行一些可能对系统或者用户代码库造成破坏的工具时，请先询问用户
-8. 在多次迭代却没有任何进展时，可请求用户指导
-9. 如果返回的yaml字符串中包含冒号，请将整个字符串用引号包裹，避免yaml解析错误
-10. yaml中包含多行字符串时，请使用 | 语法
+- 每次只能执行一个工具
+- 工具执行必须严格按照工具使用格式
+- 等待用户提供执行结果
+- 不要假设或想象结果
+- 不要创建虚假对话
+- 如果现有信息不足以解决问题，则可以询问用户
+- 处理问题的每个步骤不是必须有的，可按情况省略
+- 在执行一些可能对系统或者用户代码库造成破坏的工具时，请先询问用户
+- 在多次迭代却没有任何进展时，可请求用户指导
+- 如果返回的yaml字符串中包含冒号，请将整个字符串用引号包裹，避免yaml解析错误
+- yaml中包含多行字符串时，请使用 | 语法
 
 {methodology_prompt}
 
@@ -417,8 +417,6 @@ arguments:
                     if len(result) > 0:
                         PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
                         tool_result = self.tool_registry.handle_tool_calls(result)
-                        PrettyOutput.print(tool_result, OutputType.RESULT)
-
                         self.prompt = tool_result
                         continue
                     

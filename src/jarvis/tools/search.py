@@ -126,7 +126,7 @@ class SearchTool:
 4. 如果信息不完整或不确定，请说明"""
 
         try:
-            response = self.model.chat(prompt)
+            response = self.model.chat_until_success(prompt)
             return response
         except Exception as e:
             return f"信息提取失败: {str(e)}"

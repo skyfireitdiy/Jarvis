@@ -744,7 +744,7 @@ class RAGTool:
             
             # 获取模型实例并生成回答
             model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-            response = model.chat(prompt)
+            response = model.chat_until_success(prompt)
             
             return response
             

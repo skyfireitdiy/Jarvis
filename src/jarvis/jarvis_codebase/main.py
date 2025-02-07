@@ -101,7 +101,7 @@ class CodeBase:
 代码内容：
 {content}
 """
-        response = model.chat(prompt)
+        response = model.chat_until_success(prompt)
         return response
 
     def _save_cache(self):
@@ -536,9 +536,9 @@ class CodeBase:
         prompt = f"""请根据以下查询，生成3个不同的表述，每个表述都要完整表达原始查询的意思。这些表述将用于代码搜索，要保持专业性和准确性。
 原始查询: {query}
 
-请直接输出3个表述，用换行分隔，不要有编号或其他标记。
+请直接输出3个表述，用两个换行分隔，不要有编号或其他标记。
 """
-        variants = model.chat(prompt).strip().split('\n')
+        variants = model.chat_until_success(prompt).strip().split('\n\n')
         variants.append(query)  # 添加原始查询
         return variants
 
@@ -639,7 +639,7 @@ class CodeBase:
 请用专业的语言回答用户的问题，如果给出的文件内容不足以回答用户的问题，请告诉用户，绝对不要胡编乱造。
 """
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
-        response = model.chat(prompt)
+        response = model.chat_until_success(prompt)
         return response
 
     def is_index_generated(self) -> bool:
@@ -669,32 +669,45 @@ class CodeBase:
 
 
 
+
+
 def main():
     parser = argparse.ArgumentParser(description='Codebase management and search tool')
-    parser.add_argument('--search', type=str, help='Search query to find similar code files')
-    parser.add_argument('--top-k', type=int, default=20, help='Number of results to return (default: 20)')
-    parser.add_argument('--ask', type=str, help='Ask a question about the codebase')
-    parser.add_argument('--generate', action='store_true', help='Generate codebase index')
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+
+    # Generate command
+    generate_parser = subparsers.add_parser('generate', help='Generate codebase index')
+    generate_parser.add_argument('--force', action='store_true', help='Force rebuild index')
+
+    # Search command
+    search_parser = subparsers.add_parser('search', help='Search similar code files')
+    search_parser.add_argument('query', type=str, help='Search query')
+    search_parser.add_argument('--top-k', type=int, default=20, help='Number of results to return (default: 20)')
+
+    # Ask command
+    ask_parser = subparsers.add_parser('ask', help='Ask a question about the codebase')
+    ask_parser.add_argument('question', type=str, help='Question to ask')
+    ask_parser.add_argument('--top-k', type=int, default=20, help='Number of results to use (default: 20)')
+
     args = parser.parse_args()
     
     current_dir = find_git_root()
     codebase = CodeBase(current_dir)
 
     # 如果没有生成索引，且不是生成命令，提示用户先生成索引
-    if not codebase.is_index_generated() and not args.generate:
-        PrettyOutput.print("索引尚未生成，请先运行 --generate 生成索引", output_type=OutputType.WARNING)
+    if not codebase.is_index_generated() and args.command != 'generate':
+        PrettyOutput.print("索引尚未生成，请先运行 'generate' 命令生成索引", output_type=OutputType.WARNING)
         return
 
-
-    if args.generate:
+    if args.command == 'generate':
         try:
-            codebase.generate_codebase(force=True)
+            codebase.generate_codebase(force=args.force)
             PrettyOutput.print("\nCodebase generation completed", output_type=OutputType.SUCCESS)
         except Exception as e:
             PrettyOutput.print(f"Error during codebase generation: {str(e)}", output_type=OutputType.ERROR)
     
-    if args.search:
-        results = codebase.search_similar(args.search, args.top_k)
+    elif args.command == 'search':
+        results = codebase.search_similar(args.query, args.top_k)
         if not results:
             PrettyOutput.print("No similar files found", output_type=OutputType.WARNING)
             return
@@ -706,9 +719,16 @@ def main():
             PrettyOutput.print(f"Similarity: {score:.3f}", output_type=OutputType.INFO)
             PrettyOutput.print(f"Description: {desc[100:]}", output_type=OutputType.INFO)
 
-    if args.ask:            
-        codebase.ask_codebase(args.ask, args.top_k)
+    elif args.command == 'ask':            
+        response = codebase.ask_codebase(args.question, args.top_k)
+        PrettyOutput.print("\nAnswer:", output_type=OutputType.INFO)
+        PrettyOutput.print(response, output_type=OutputType.INFO)
+
+    else:
+        parser.print_help()
 
 
+if __name__ == "__main__":
+    exit(main())
 if __name__ == "__main__":
     exit(main())

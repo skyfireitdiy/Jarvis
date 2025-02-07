@@ -127,8 +127,8 @@ class PlatformRegistry:
                             if not PlatformRegistry.check_platform_implementation(obj):
                                 continue
                             if not PlatformRegistry.suppress_output:
-                                PrettyOutput.print(f"从 {os.path.join(directory, filename)} 加载平台：{obj.platform_name}", OutputType.SUCCESS)
-                            platforms[obj.platform_name] = obj
+                                PrettyOutput.print(f"从 {os.path.join(directory, filename)} 加载平台：{obj.platform_name}", OutputType.SUCCESS) # type: ignore
+                            platforms[obj.platform_name] = obj # type: ignore
                             break
                 except Exception as e:
                     PrettyOutput.print(f"加载平台 {module_name} 失败: {str(e)}", OutputType.ERROR)
@@ -162,29 +162,29 @@ class PlatformRegistry:
         platform_name = os.environ.get("JARVIS_PLATFORM", "kimi")
         model_name = os.environ.get("JARVIS_MODEL", "kimi")
         platform = self.create_platform(platform_name)
-        platform.set_model_name(model_name)
-        return platform
+        platform.set_model_name(model_name) # type: ignore
+        return platform # type: ignore
     
     def get_codegen_platform(self) -> BasePlatform:
         platform_name = os.environ.get("JARVIS_CODEGEN_PLATFORM", os.environ.get("JARVIS_PLATFORM", "kimi"))
         model_name = os.environ.get("JARVIS_CODEGEN_MODEL", os.environ.get("JARVIS_MODEL", "kimi"))
         platform = self.create_platform(platform_name)
-        platform.set_model_name(model_name)
-        return platform
+        platform.set_model_name(model_name) # type: ignore
+        return platform # type: ignore
     
     def get_cheap_platform(self) -> BasePlatform:
         platform_name = os.environ.get("JARVIS_CHEAP_PLATFORM", os.environ.get("JARVIS_PLATFORM", "kimi"))
         model_name = os.environ.get("JARVIS_CHEAP_MODEL", os.environ.get("JARVIS_MODEL", "kimi"))
         platform = self.create_platform(platform_name)
-        platform.set_model_name(model_name)
-        return platform
+        platform.set_model_name(model_name) # type: ignore
+        return platform # type: ignore
     
     def get_thinking_platform(self) -> BasePlatform:
         platform_name = os.environ.get("JARVIS_THINKING_PLATFORM", os.environ.get("JARVIS_PLATFORM", "kimi"))
         model_name = os.environ.get("JARVIS_THINKING_MODEL", os.environ.get("JARVIS_MODEL", "kimi"))
         platform = self.create_platform(platform_name)
-        platform.set_model_name(model_name)
-        return platform
+        platform.set_model_name(model_name) # type: ignore
+        return platform # type: ignore
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]):
         """注册平台类

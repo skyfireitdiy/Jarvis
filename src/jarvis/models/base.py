@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple
 
+from jarvis.utils import while_success, while_true
+
 
 class BasePlatform(ABC):
     """大语言模型基类"""
@@ -23,6 +25,9 @@ class BasePlatform(ABC):
     def chat(self, message: str) -> str:
         """执行对话"""
         raise NotImplementedError("chat is not implemented")
+
+    def chat_until_success(self, message: str) -> str:
+        return while_true(lambda: while_success(lambda: self.chat(message), 5), 5)
 
     @abstractmethod
     def upload_files(self, file_list: List[str]) -> List[Dict]:

@@ -75,7 +75,7 @@ def chat_with_model(platform_name: str, model_name: str):
                 
             try:
                 # 发送到模型并获取回复
-                response = platform.chat(user_input)
+                response = platform.chat_until_success(user_input)
                 if not response:
                     PrettyOutput.print("未获得有效回复", OutputType.WARNING)
                     

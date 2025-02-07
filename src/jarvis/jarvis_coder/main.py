@@ -97,7 +97,7 @@ class JarvisCoder:
             PrettyOutput.print("提交未保存的更改", OutputType.INFO)
             os.system("git add .")
             git_diff = os.popen("git diff --cached").read()
-            commit_message = generate_commit_message(git_diff, "Pre-edit commit")
+            commit_message = generate_commit_message(git_diff)
             os.system(f"git commit -m '{commit_message}'")
 
     def _init_codebase(self):
@@ -354,7 +354,7 @@ class JarvisCoder:
         git_diff = os.popen("git diff --cached").read()
         
         # 自动生成commit信息，传入feature
-        commit_message = generate_commit_message(git_diff, feature)
+        commit_message = generate_commit_message(git_diff)
         
         # 显示并确认commit信息
         PrettyOutput.print(f"自动生成的commit信息: {commit_message}", OutputType.INFO)
@@ -402,7 +402,7 @@ content
 """
 
                 # 调用大模型进行分析
-                response = while_success(lambda: model.chat(prompt))
+                response = model.chat_until_success(prompt)
 
                 parts = re.findall(r'<PART>\n(.*?)\n</PART>', response, re.DOTALL)
                 file_info["parts"] = parts
