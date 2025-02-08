@@ -14,14 +14,12 @@ from prompt_toolkit.formatted_text import FormattedText
 from sentence_transformers import SentenceTransformer
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import torch
-from huggingface_hub import HfApi
 
 # 初始化colorama
 colorama.init()
 
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["TRANSFORMERS_BASE_URL"] = "https://hf-mirror.com"
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 class OutputType(Enum):
     SYSTEM = "system"      # AI assistant message
@@ -220,58 +218,50 @@ def find_git_root(dir="."):
 
 def load_embedding_model():
     model_name = "BAAI/bge-m3"
+    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+    model_dir = os.path.join(cache_dir, "models--" + model_name.replace("/", "--"))
+    
     PrettyOutput.print(f"Loading embedding model: {model_name}...", OutputType.INFO)
-    try:
-        # 首先尝试离线加载
-        embedding_model = SentenceTransformer(
-            model_name,
-            cache_folder=os.path.expanduser("~/.cache/huggingface/hub"),
-            local_files_only=True
-        )
-        PrettyOutput.print("Successfully loaded model using local cache", OutputType.SUCCESS)
-    except Exception as local_error:
-        PrettyOutput.print(f"Failed to load locally, trying to download online: {str(local_error)}", OutputType.WARNING)
-        # 如果离线加载失败，尝试在线下载
-        embedding_model = SentenceTransformer(
-            model_name,
-            cache_folder=os.path.expanduser("~/.cache/huggingface/hub")
-        )
-        PrettyOutput.print("Successfully downloaded and loaded model", OutputType.SUCCESS)
+    
+    # Check if model exists
+    if not os.path.exists(model_dir):
+        PrettyOutput.print("Model not found locally, downloading using huggingface-cli...", OutputType.INFO)
+        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}' + f' --token {os.getenv("HF_TOKEN")}' if os.getenv("HF_TOKEN") else "")
+    
+    # Load model
+    embedding_model = SentenceTransformer(
+        model_name,
+        cache_folder=cache_dir
+    )
+    PrettyOutput.print("Successfully loaded model", OutputType.SUCCESS)
     
     return embedding_model
 
 def load_rerank_model():
     """Load reranking model"""
     model_name = "BAAI/bge-reranker-v2-m3"
+    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+    model_dir = os.path.join(cache_dir, "models--" + model_name.replace("/", "--"))
+    
     PrettyOutput.print(f"Loading reranking model: {model_name}...", OutputType.INFO)
     
-    try:
-        # 首先尝试离线加载
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            local_files_only=True,
-            cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
-        )
-        model = AutoModelForSequenceClassification.from_pretrained(
-            model_name,
-            local_files_only=True,
-            cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
-        )
-        PrettyOutput.print("Successfully loaded model using local cache", OutputType.SUCCESS)
-    except Exception as local_error:
-        PrettyOutput.print(f"Failed to load locally, trying to download online: {str(local_error)}", OutputType.WARNING)
-        # 如果离线加载失败，尝试在线下载
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
-        )
-        model = AutoModelForSequenceClassification.from_pretrained(
-            model_name,
-            cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
-        )
-        PrettyOutput.print("Successfully downloaded and loaded model", OutputType.SUCCESS)
+    # Check if model exists
+    if not os.path.exists(model_dir):
+        PrettyOutput.print("Model not found locally, downloading using huggingface-cli...", OutputType.INFO)
+        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}' + f' --token {os.getenv("HF_TOKEN")}' if os.getenv("HF_TOKEN") else "")
     
-    # 如果有 GPU 就使用 GPU
+    # Load model and tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        cache_dir=cache_dir
+    )
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_name,
+        cache_dir=cache_dir
+    )
+    PrettyOutput.print("Successfully loaded model", OutputType.SUCCESS)
+    
+    # Use GPU if available
     if torch.cuda.is_available():
         model = model.cuda()
     model.eval()
