@@ -3,6 +3,8 @@ import os
 import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
+
+import yaml
 from jarvis.models.registry import PlatformRegistry
 import concurrent.futures
 from threading import Lock
@@ -10,10 +12,10 @@ from concurrent.futures import ThreadPoolExecutor
 from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_file_md5, get_max_context_length, get_thread_count, load_embedding_model, load_rerank_model
 from jarvis.utils import load_env_from_file
 import argparse
-from sentence_transformers import SentenceTransformer
 import pickle
 import lzma  # 添加 lzma 导入
 from tqdm import tqdm
+import re
 
 class CodeBase:
     def __init__(self, root_dir: str):
@@ -95,6 +97,7 @@ class CodeBase:
         prompt = f"""请分析以下代码文件，并生成一个详细的描述。描述应该包含以下要点：
 1. 整个文件的功能描述，不超过100个字
 2. 每个全局变量、函数、类型定义、类、方法等代码元素的一句话描述，不超过50字
+3. 用户可能会对该文件提出哪些问题，5条
 
 请用简洁专业的语言描述，突出代码的技术功能，以便后续进行关联代码检索。
 文件路径：{file_path}
@@ -104,6 +107,13 @@ class CodeBase:
         response = model.chat_until_success(prompt)
         return response
 
+    def export(self):
+        """导出当前索引数据到标准输出"""
+        for file_path, data in self.vector_cache.items():
+            print(f"## {file_path}")
+            print(f"- path: {file_path}")
+            print(f"- description: {data['description']}")
+    
     def _save_cache(self):
         """保存缓存数据"""
         try:
@@ -187,8 +197,7 @@ class CodeBase:
                 return cached_vector
                 
             # 读取文件内容并组合信息
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()[:self.max_context_length]  # 限制文件内容长度
+            content = open(file_path, "r", encoding="utf-8").read()[:self.max_context_length]  # 限制文件内容长度
             
             # 组合文件信息，包含文件内容
             combined_text = f"""
@@ -449,7 +458,7 @@ class CodeBase:
         score = len(matched_keywords) / len(keywords)
         return score
 
-    def rerank_results(self, query: str, initial_results: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
+    def rerank_results(self, query: str, initial_results: List[Tuple[str, float, str]]) -> List[Tuple[str, float]]:
         """使用多种策略对搜索结果重新排序"""
         if not initial_results:
             return []
@@ -465,8 +474,7 @@ class CodeBase:
             
             for path, _, desc in initial_results:
                 try:
-                    with open(path, "r", encoding="utf-8") as f:
-                        content = f.read()[:512]  # 限制内容长度
+                    content = open(path, "r", encoding="utf-8").read()[:512]  # 限制内容长度
                     
                     # 组合文件信息
                     doc_content = f"文件: {path}\n描述: {desc}\n内容: {content}"
@@ -507,11 +515,9 @@ class CodeBase:
             
             # 将重排序分数与原始分数结合
             scored_results = []
-            for (path, orig_score, desc), rerank_score in zip(initial_results, batch_scores):
-                # 综合分数 = 0.3 * 原始分数 + 0.7 * 重排序分数
-                combined_score = 0.3 * float(orig_score) + 0.7 * float(rerank_score)
-                if combined_score >= 0.5:  # 只保留相关度较高的结果
-                    scored_results.append((path, combined_score, desc))
+            for (path,_, desc), rerank_score in zip(initial_results, batch_scores):
+                if rerank_score >= 0.5:  # 只保留相关度较高的结果
+                    scored_results.append((path, rerank_score))
                     
             # 按综合分数降序排序
             scored_results.sort(key=lambda x: x[1], reverse=True)
@@ -521,7 +527,7 @@ class CodeBase:
         except Exception as e:
             PrettyOutput.print(f"重排序失败: {str(e)}", 
                             output_type=OutputType.ERROR)
-            return initial_results  # 发生错误时返回原始结果
+            return [(path, score) for path, score, _ in initial_results]  # 发生错误时返回原始结果
 
     def _generate_query_variants(self, query: str) -> List[str]:
         """生成查询的不同表述变体
@@ -574,7 +580,7 @@ class CodeBase:
         return results
 
 
-    def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float, str]]:
+    def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float]]:
         """搜索关联文件"""
         try:
             if self.index is None:
@@ -594,6 +600,9 @@ class CodeBase:
             # 如果没有找到结果，直接返回
             if not initial_results:
                 return []
+            
+            # 过滤低分结果
+            initial_results = [(path, score, desc) for path, score, desc in initial_results if score >= 0.5]
                 
             # 对初步结果进行重排序
             return self.rerank_results(query, initial_results)
@@ -610,13 +619,13 @@ class CodeBase:
             return ""
         
         PrettyOutput.print(f"找到的关联文件: ", output_type=OutputType.SUCCESS)
-        for path, score, _ in results:
+        for path, score in results:
             PrettyOutput.print(f"文件: {path} 关联度: {score:.3f}", 
                              output_type=OutputType.INFO)
         
         prompt = f"""你是一个代码专家，请根据以下文件信息回答用户的问题：
 """
-        for path, _, _ in results:
+        for path, _ in results:
             try:
                 if len(prompt) > self.max_context_length:
                     PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{path}", OutputType.WARNING)
@@ -672,6 +681,7 @@ class CodeBase:
 
 
 def main():
+
     parser = argparse.ArgumentParser(description='Codebase management and search tool')
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
@@ -689,10 +699,15 @@ def main():
     ask_parser.add_argument('question', type=str, help='Question to ask')
     ask_parser.add_argument('--top-k', type=int, default=20, help='Number of results to use (default: 20)')
 
+    export_parser = subparsers.add_parser('export', help='Export current index data')
     args = parser.parse_args()
     
     current_dir = find_git_root()
     codebase = CodeBase(current_dir)
+
+    if args.command == 'export':
+        codebase.export()
+        return
 
     # 如果没有生成索引，且不是生成命令，提示用户先生成索引
     if not codebase.is_index_generated() and args.command != 'generate':
@@ -713,11 +728,10 @@ def main():
             return
             
         PrettyOutput.print("\nSearch Results:", output_type=OutputType.INFO)
-        for path, score, desc in results:
+        for path, score in results:
             PrettyOutput.print("\n" + "="*50, output_type=OutputType.INFO)
             PrettyOutput.print(f"File: {path}", output_type=OutputType.INFO)
             PrettyOutput.print(f"Similarity: {score:.3f}", output_type=OutputType.INFO)
-            PrettyOutput.print(f"Description: {desc[100:]}", output_type=OutputType.INFO)
 
     elif args.command == 'ask':            
         response = codebase.ask_codebase(args.question, args.top_k)
@@ -728,7 +742,5 @@ def main():
         parser.print_help()
 
 
-if __name__ == "__main__":
-    exit(main())
 if __name__ == "__main__":
     exit(main())

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple
 
-from jarvis.utils import while_success, while_true
+from jarvis.utils import OutputType, PrettyOutput, while_success, while_true
 
 
 class BasePlatform(ABC):
@@ -10,7 +10,6 @@ class BasePlatform(ABC):
     def __init__(self):
         """初始化模型"""
         self.suppress_output = False  # 添加输出控制标志
-        pass
 
     def __del__(self):
         """销毁模型"""

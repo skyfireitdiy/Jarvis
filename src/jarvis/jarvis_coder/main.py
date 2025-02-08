@@ -129,10 +129,9 @@ class JarvisCoder:
             self._codebase.generate_codebase()
             
         related_files = self._codebase.search_similar(feature)
-        for file, score, _ in related_files:
+        for file, score in related_files:
             PrettyOutput.print(f"相关文件: {file} 相关度: {score:.3f}", OutputType.SUCCESS)
-            with open(file, "r", encoding="utf-8") as f:
-                content = f.read()
+            content = open(file, "r", encoding="utf-8").read()
             ret.append({"file_path": file, "file_content": content})
         return ret
 
@@ -381,21 +380,18 @@ class JarvisCoder:
             model.set_suppress_output(True)
             file_path = file_info["file_path"]
             content = file_info["file_content"]
-            
-            # 生成分析提示
-            system_message = f"""你是一个代码分析专家，可以从代码中提取出与需求相关的片段。
+
+            try:
+
+                prompt = f"""你是一个代码分析专家，可以从代码中提取出与需求相关的片段。
 请按以下格式返回：
 <PART>
 content
 </PART>
 
 可返回多个片段。如果文件内容与需求无关，则返回空。
-"""
-            model.set_system_message(system_message)
-            
-            try:
 
-                prompt = f"""需求：{feature}
+需求：{feature}
 文件路径：{file_path}
 代码内容：
 {content}
@@ -426,16 +422,16 @@ content
                     file["parts"] = [file["file_content"]]
             
             # 获取修改方案
-            modification_plan = PlanGenerator().generate_plan(feature, selected_files)
-            if not modification_plan:
+            raw_plan, structed_plan = PlanGenerator().generate_plan(feature, selected_files)
+            if not raw_plan or not structed_plan:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "用户取消修改",
+                    "stderr": "修改计划生成失败，请修改需求后重试",
                 }
             
             # 执行修改
-            if PatchHandler().handle_patch_application(selected_files, feature, modification_plan):
+            if PatchHandler().handle_patch_application(feature ,raw_plan, structed_plan):
                 self._finalize_changes(feature)
                 return {
                     "success": True,
