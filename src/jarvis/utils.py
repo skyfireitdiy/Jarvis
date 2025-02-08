@@ -231,7 +231,8 @@ def load_embedding_model():
     # Load model
     embedding_model = SentenceTransformer(
         model_name,
-        cache_folder=cache_dir
+        cache_folder=cache_dir,
+        local_files_only=True
     )
     PrettyOutput.print("Successfully loaded model", OutputType.SUCCESS)
     
@@ -253,11 +254,13 @@ def load_rerank_model():
     # Load model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         model_name,
-        cache_dir=cache_dir
+        cache_dir=cache_dir,
+        local_files_only=True
     )
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
-        cache_dir=cache_dir
+        cache_dir=cache_dir,
+        local_files_only=True
     )
     PrettyOutput.print("Successfully loaded model", OutputType.SUCCESS)
     
