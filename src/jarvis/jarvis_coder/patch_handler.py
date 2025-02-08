@@ -1,6 +1,8 @@
 import re
 import os
 from typing import List, Tuple, Dict
+import yaml
+from pathlib import Path
 
 from jarvis.models.base import BasePlatform
 from jarvis.models.registry import PlatformRegistry
@@ -12,7 +14,29 @@ class Patch:
         self.new_code = new_code
 
 class PatchHandler:
+    def __init__(self):
+        self.prompt_file = Path.home() / ".jarvis-coder-patch-prompt"
+        self.additional_info = self._load_additional_info()
 
+    def _load_additional_info(self) -> str:
+        """Load saved additional info from prompt file"""
+        if not self.prompt_file.exists():
+            return ""
+        try:
+            with open(self.prompt_file, 'r') as f:
+                data = yaml.safe_load(f)
+                return data.get('additional_info', '') if data else ''
+        except Exception as e:
+            PrettyOutput.print(f"Failed to load additional info: {e}", OutputType.WARNING)
+            return ""
+
+    def _save_additional_info(self, info: str):
+        """Save additional info to prompt file"""
+        try:
+            with open(self.prompt_file, 'w') as f:
+                yaml.dump({'additional_info': info}, f)
+        except Exception as e:
+            PrettyOutput.print(f"Failed to save additional info: {e}", OutputType.WARNING)
 
     def _extract_patches(self, response: str) -> List[Patch]:
         """Extract patches from response
@@ -79,19 +103,33 @@ class PatchHandler:
         return True
             
     
-    def retry_comfirm(self) -> Tuple[str, str]:# Restore user selection logic
+    def retry_comfirm(self) -> Tuple[str, str]:
         choice = input("\nPlease choose an action: (1) Retry (2) Skip (3) Completely stop [1]: ") or "1"
         if choice == "2":
             return "skip", ""
         if choice == "3":
             return "break", ""
+            
         feedback = get_multiline_input("Please enter additional information and requirements:")
-        return "continue", feedback
+        if feedback:
+            save_prompt = input("Would you like to save this as general feedback for future patches? (y/n) [n]: ").lower() or "n"
+            if save_prompt == "y":
+                self._save_additional_info(feedback)
+                PrettyOutput.print("Feedback saved for future use", OutputType.SUCCESS)
+        
+        # Combine saved and new feedback
+        combined_feedback = ""
+        if self.additional_info:
+            combined_feedback += self.additional_info + "\n"
+        if feedback:
+            combined_feedback += feedback
+            
+        return "continue", combined_feedback.strip()
 
     def apply_patch(self, feature: str, raw_plan: str, structed_plan: Dict[str, str]) -> bool:
         """Apply patch (main entry)"""
         for file_path, current_plan in structed_plan.items():
-            additional_info = ""            
+            additional_info = self.additional_info  # Initialize with saved info
             while True:
                 
                 if os.path.exists(file_path):
