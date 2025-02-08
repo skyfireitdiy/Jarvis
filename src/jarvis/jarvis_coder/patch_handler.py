@@ -115,11 +115,13 @@ class PatchHandler:
                         2. old_code will be replaced with new_code, pay attention to context continuity
                         3. Avoid breaking existing code logic when generating patches, e.g., don't insert function definitions inside existing function bodies
                         4. Include sufficient context to avoid ambiguity
-                        5. Patches will be merged using file_content.replace(patch.old_code, patch.new_code, 1), so old_code and new_code need to match exactly, including empty lines, line breaks, whitespace, tabs, and comments
+                        5. Patches will be merged using file_content.replace(patch.old_code, patch.new_code, 1), so old_code and new_code need to match exactly, including EMPTY LINES, LINE BREAKS, WHITESPACE, TABS, and COMMENTS
                         6. Ensure generated code has correct format (syntax, indentation, line breaks)
                         7. Ensure new_code's indentation and format matches old_code
                         8. Ensure code is inserted in appropriate locations, e.g., code using variables should be after declarations/definitions
                         9. Provide at least 3 lines of context before and after modified code for location
+                        10. Each patch should be no more than 20 lines of code, if it is more than 20 lines, split it into multiple patches
+                        11. old code's line breaks should be consistent with the original code
 
 
                         """
