@@ -95,6 +95,8 @@ class CodeBase:
         model = PlatformRegistry.get_global_platform_registry().get_cheap_platform()
         if self.thread_count > 1:
             model.set_suppress_output(True)
+        else:
+            PrettyOutput.print(f"Make description for {file_path} ...", output_type=OutputType.PROGRESS)
         prompt = f"""Please analyze the following code file and generate a detailed description. The description should include:
 1. Overall file functionality description, no more than 100 characters
 2. One-sentence description (max 50 characters) for each global variable, function, type definition, class, method, and other code elements
