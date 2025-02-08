@@ -4,73 +4,69 @@ from typing import Dict, List, Optional
 import yaml
 import numpy as np
 import faiss
-import json
 
 from .models.registry import PlatformRegistry
 from .tools import ToolRegistry
-from .utils import PrettyOutput, OutputType, get_max_context_length, get_multiline_input, load_embedding_model, while_success
+from .utils import PrettyOutput, OutputType, get_max_context_length, get_multiline_input, load_embedding_model
 import os
-from datetime import datetime
-from prompt_toolkit import prompt
-from sentence_transformers import SentenceTransformer
 
 class Agent:
     def __init__(self, name: str = "Jarvis", is_sub_agent: bool = False):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
-            model: 语言模型实例
-            tool_registry: 工具注册表实例
-            name: Agent名称，默认为"Jarvis"
-            is_sub_agent: 是否为子Agent，默认为False
+            model: LLM model instance
+            tool_registry: Tool registry instance
+            name: Agent name, default is "Jarvis"
+            is_sub_agent: Whether it is a sub-agent, default is False
         """
         self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         self.tool_registry = ToolRegistry.get_global_tool_registry()
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
-        self.conversation_length = 0  # 改用长度计数器
+        self.conversation_length = 0  # Use length counter instead
         
-        # 从环境变量加载配置
+        # Load configuration from environment variables
         self.embedding_dimension = 1536  # Default for many embedding models
         self.max_context_length = get_max_context_length()
         
-        # 初始化嵌入模型
+        # Initialize embedding model
         try:
             self.embedding_model = load_embedding_model()
             
-            # 预热模型并获取正确的维度
-            test_text = "这是一段测试文本，用于确保模型完全加载。"
+            # Warm up model and get correct dimension
+            test_text = "This is a test text to ensure the model is fully loaded."
             test_embedding = self.embedding_model.encode(
                 test_text, 
                 convert_to_tensor=True,
                 normalize_embeddings=True
             )
             self.embedding_dimension = len(test_embedding)
-            PrettyOutput.print("嵌入模型加载完成", OutputType.SUCCESS)
+            PrettyOutput.print("Successfully loaded embedding model", OutputType.SUCCESS)
             
-            # 初始化HNSW索引（使用正确的维度）
+            # Initialize HNSW index (use correct dimension)
             hnsw_index = faiss.IndexHNSWFlat(self.embedding_dimension, 16)
             hnsw_index.hnsw.efConstruction = 40
             hnsw_index.hnsw.efSearch = 16
             self.methodology_index = faiss.IndexIDMap(hnsw_index)
             
         except Exception as e:
-            PrettyOutput.print(f"加载嵌入模型失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Failed to load embedding model: {str(e)}", OutputType.ERROR)
             raise
             
-        # 初始化方法论相关属性
+        # Initialize methodology related attributes
         self.methodology_data = []
 
     @staticmethod
     def extract_tool_calls(content: str) -> List[Dict]:
-        """从内容中提取工具调用，如果检测到多个工具调用则抛出异常，并返回工具调用之前的内容和工具调用"""
-        # 分割内容为行
+        """Extract tool calls from content, if multiple tool calls are detected, raise an exception, and return the content before the tool call and the tool call"""
+        # Split content into lines
         lines = content.split('\n')
         tool_call_lines = []
         in_tool_call = False
         
-        # 逐行处理
+        # Process line by line
         for line in lines:
             if '<TOOL_CALL>' in line:
                 in_tool_call = True
@@ -78,26 +74,26 @@ class Agent:
             elif '</TOOL_CALL>' in line:
                 if in_tool_call and tool_call_lines:
                     try:
-                        # 直接解析YAML
+                        # Parse YAML directly
                         tool_call_text = '\n'.join(tool_call_lines)
                         tool_call_data = yaml.safe_load(tool_call_text)
                         
-                        # 验证必要的字段
+                        # Validate necessary fields
                         if "name" in tool_call_data and "arguments" in tool_call_data:
-                            # 返回工具调用之前的内容和工具调用
+                            # Return content before tool call and tool call
                             return [{
                                 "name": tool_call_data["name"],
                                 "arguments": tool_call_data["arguments"]
                             }]
                         else:
-                            PrettyOutput.print("工具调用缺少必要字段", OutputType.ERROR)
-                            raise Exception("工具调用缺少必要字段")
+                            PrettyOutput.print("Tool call missing necessary fields", OutputType.ERROR)
+                            raise Exception("Tool call missing necessary fields")
                     except yaml.YAMLError as e:
-                        PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
-                        raise Exception(f"YAML解析错误: {str(e)}")
+                        PrettyOutput.print(f"YAML parsing error: {str(e)}", OutputType.ERROR)
+                        raise Exception(f"YAML parsing error: {str(e)}")
                     except Exception as e:
-                        PrettyOutput.print(f"处理工具调用时发生错误: {str(e)}", OutputType.ERROR)
-                        raise Exception(f"处理工具调用时发生错误: {str(e)}")
+                        PrettyOutput.print(f"Error processing tool call: {str(e)}", OutputType.ERROR)
+                        raise Exception(f"Error processing tool call: {str(e)}")
                 in_tool_call = False
                 continue
             
@@ -107,14 +103,14 @@ class Agent:
         return []
 
     def _call_model(self, message: str) -> str:
-        """调用模型获取响应"""
+        """Call model to get response"""
         sleep_time = 5
         while True:
             ret = self.model.chat_until_success(message)
             if ret:
                 return ret
             else:
-                PrettyOutput.print(f"调用模型失败，重试中... 等待 {sleep_time}s", OutputType.INFO)
+                PrettyOutput.print(f"Model call failed, retrying... waiting {sleep_time}s", OutputType.INFO)
                 time.sleep(sleep_time)
                 sleep_time *= 2
                 if sleep_time > 30:
@@ -122,9 +118,9 @@ class Agent:
                 continue
 
     def _create_methodology_embedding(self, methodology_text: str) -> np.ndarray:
-        """为方法论文本创建嵌入向量"""
+        """Create embedding vector for methodology text"""
         try:
-            # 对长文本进行截断
+            # Truncate long text
             max_length = 512
             text = ' '.join(methodology_text.split()[:max_length])
             
@@ -133,14 +129,14 @@ class Agent:
                                                  convert_to_tensor=True,
                                                  normalize_embeddings=True)
             vector = np.array(embedding.cpu().numpy(), dtype=np.float32)
-            return vector[0]  # 返回第一个向量，因为我们只编码了一个文本
+            return vector[0]  # Return first vector, because we only encoded one text
         except Exception as e:
-            PrettyOutput.print(f"创建方法论嵌入向量失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Failed to create methodology embedding vector: {str(e)}", OutputType.ERROR)
             return np.zeros(self.embedding_dimension, dtype=np.float32)
 
     def _load_methodology(self, user_input: str) -> Dict[str, str]:
-        """加载方法论并构建向量索引"""
-        PrettyOutput.print("加载方法论...", OutputType.PROGRESS)
+        """Load methodology and build vector index"""
+        PrettyOutput.print("Loading methodology...", OutputType.PROGRESS)
         user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
         if not os.path.exists(user_jarvis_methodology):
             return {}
@@ -149,14 +145,14 @@ class Agent:
             with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
-            # 重置数据结构
+            # Reset data structure
             self.methodology_data = []
             vectors = []
             ids = []
 
-            # 为每个方法论创建嵌入向量
+            # Create embedding vector for each methodology
             for i, (key, value) in enumerate(data.items()):
-                PrettyOutput.print(f"向量化方法论: {key} ...", OutputType.INFO)
+                PrettyOutput.print(f"Vectorizing methodology: {key} ...", OutputType.INFO)
                 methodology_text = f"{key}\n{value}"
                 embedding = self._create_methodology_embedding(methodology_text)
                 vectors.append(embedding)
@@ -168,7 +164,7 @@ class Agent:
                 self.methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
                 query_embedding = self._create_methodology_embedding(user_input)
                 k = min(5, len(self.methodology_data))
-                PrettyOutput.print(f"检索方法论...", OutputType.INFO)
+                PrettyOutput.print(f"Retrieving methodology...", OutputType.INFO)
                 distances, indices = self.methodology_index.search(
                     query_embedding.reshape(1, -1), k
                 ) # type: ignore
@@ -179,7 +175,7 @@ class Agent:
                         similarity = 1.0 / (1.0 + float(dist))
                         methodology = self.methodology_data[idx]
                         PrettyOutput.print(
-                            f"方法论 '{methodology['key']}' 相似度: {similarity:.3f}",
+                            f"Methodology '{methodology['key']}' similarity: {similarity:.3f}",
                             OutputType.INFO
                         )
                         if similarity >= 0.5:
@@ -191,24 +187,24 @@ class Agent:
             return {}
 
         except Exception as e:
-            PrettyOutput.print(f"加载方法论时发生错误: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Error loading methodology: {str(e)}", OutputType.ERROR)
             return {}
 
     def _summarize_and_clear_history(self) -> None:
         """
-        [系统消息]
-        总结当前对话历史并清空历史记录，只保留系统消息和总结
+        [System message]
+        Summarize current conversation history and clear history, only keep system message and summary
         
-        这个方法会：
-        1. 请求模型总结当前对话的关键信息
-        2. 清空对话历史
-        3. 保留系统消息
-        4. 添加总结作为新的上下文
-        5. 重置对话轮数
+        This method will:
+        1. Request the model to summarize the key information from the current conversation
+        2. Clear the conversation history
+        3. Keep the system message
+        4. Add the summary as new context
+        5. Reset the conversation round
         """
-        # 创建一个新的模型实例来做总结，避免影响主对话
+        # Create a new model instance to summarize, avoid affecting the main conversation
 
-        PrettyOutput.print("总结对话历史，准备生成总结，开始新的对话...", OutputType.PROGRESS)
+        PrettyOutput.print("Summarizing conversation history, preparing to generate summary, starting new conversation...", OutputType.PROGRESS)
         
         prompt = """Please summarize the key information from the previous conversation, including:
 1. Current task objective
@@ -236,22 +232,22 @@ Please continue the task based on the above information.
             self.conversation_length = len(self.prompt)  # 设置新的起始长度
             
         except Exception as e:
-            PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Failed to summarize conversation history: {str(e)}", OutputType.ERROR)
 
     def _complete_task(self) -> str:
-        """完成任务并生成总结
+        """Complete task and generate summary
         
         Returns:
-            str: 任务总结或完成状态
+            str: Task summary or completion status
         """
-        PrettyOutput.section("任务完成", OutputType.SUCCESS)
+        PrettyOutput.section("Task completed", OutputType.SUCCESS)
         
         # 询问是否生成方法论，带输入验证
         while True:
-            user_input = input("是否要为此任务生成方法论？(y/n): ").strip().lower()
+            user_input = input("Generate methodology for this task? (y/n): ").strip().lower()
             if user_input in ['y', 'n', '']:
                 break
-            PrettyOutput.print("无效输入，请输入 y 或 n", OutputType.WARNING)
+            PrettyOutput.print("Invalid input, please enter y or n", OutputType.WARNING)
         
         if user_input == 'y':
             try:
@@ -272,10 +268,10 @@ Only output the methodology tool call instruction, or the explanation for not ge
                     if tool_calls:
                         self.tool_registry.handle_tool_calls(tool_calls)
                 except Exception as e:
-                    PrettyOutput.print(f"处理方法论生成失败: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"Failed to handle methodology generation: {str(e)}", OutputType.ERROR)
                 
             except Exception as e:
-                PrettyOutput.print(f"生成方法论时发生错误: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"Error generating methodology: {str(e)}", OutputType.ERROR)
         
         if not self.is_sub_agent:
             return "Task completed"
@@ -296,43 +292,43 @@ Please describe in concise bullet points, highlighting important information.
 
 
     def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str:
-        """处理用户输入并返回响应，返回任务总结报告
+        """Process user input and return response, return task summary report
         
         Args:
-            user_input: 用户输入的任务描述
-            file_list: 可选的文件列表，默认为None
+            user_input: User input task description
+            file_list: Optional file list, default is None
         
         Returns:
-            str: 任务总结报告
+            str: Task summary report
         """
         try:
-            PrettyOutput.section("准备环境", OutputType.PLANNING)
+            PrettyOutput.section("Preparing environment", OutputType.PLANNING)
             if file_list:
                 self.model.upload_files(file_list)
 
-            # 加载方法论
+            # Load methodology
             methodology = self._load_methodology(user_input)
             methodology_prompt = ""
             if methodology:
-                methodology_prompt = f"""这是以往处理问题的标准方法论，如果当前任务与此类似，可参考：
+                methodology_prompt = f"""This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it:
 {methodology}
 
 """
             tools_prompt = ""
 
             # 选择工具
-            PrettyOutput.section("可用工具", OutputType.PLANNING)
+            PrettyOutput.section("Available tools", OutputType.PLANNING)
             tools = self.tool_registry.get_all_tools()
             if tools:
-                tools_prompt += "可用工具:\n"
+                tools_prompt += "Available tools:\n"
                 for tool in tools:
                     PrettyOutput.print(f"{tool['name']}: {tool['description']}", OutputType.INFO)
-                    tools_prompt += f"- 名称: {tool['name']}\n"
-                    tools_prompt += f"  描述: {tool['description']}\n"
-                    tools_prompt += f"  参数: {tool['parameters']}\n"
+                    tools_prompt += f"- Name: {tool['name']}\n"
+                    tools_prompt += f"  Description: {tool['description']}\n"
+                    tools_prompt += f"  Parameters: {tool['parameters']}\n"
 
             # 显示任务开始
-            PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
+            PrettyOutput.section(f"Starting new task: {self.name}", OutputType.PLANNING)
 
             self.clear_history()  
 
@@ -395,7 +391,7 @@ Strict Rules:
             while True:
                 try:
                     # 显示思考状态
-                    PrettyOutput.print("分析任务...", OutputType.PROGRESS)
+                    PrettyOutput.print("Analyzing task...", OutputType.PROGRESS)
                     
                     # 累加对话长度
                     self.conversation_length += len(self.prompt)
@@ -406,24 +402,24 @@ Strict Rules:
                         continue
                     else:
                         current_response = self._call_model(self.prompt)
-                        self.conversation_length += len(current_response)  # 添加响应长度
+                        self.conversation_length += len(current_response)  # Add response length
                     try:
                         result = Agent.extract_tool_calls(current_response)
                     except Exception as e:
-                        PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
-                        self.prompt = f"工具调用错误: {str(e)}"
+                        PrettyOutput.print(f"Tool call error: {str(e)}", OutputType.ERROR)
+                        self.prompt = f"Tool call error: {str(e)}"
                         continue
                     
                     if len(result) > 0:
-                        PrettyOutput.print("执行工具调用...", OutputType.PROGRESS)
+                        PrettyOutput.print("Executing tool call...", OutputType.PROGRESS)
                         tool_result = self.tool_registry.handle_tool_calls(result)
                         self.prompt = tool_result
                         continue
                     
                     # 获取用户输入
-                    user_input = get_multiline_input(f"{self.name}: 您可以继续输入，或输入空行结束当前任务")
+                    user_input = get_multiline_input(f"{self.name}: You can continue to input, or enter an empty line to end the current task")
                     if user_input == "__interrupt__":
-                        PrettyOutput.print("任务已取消", OutputType.WARNING)
+                        PrettyOutput.print("Task cancelled by user", OutputType.WARNING)
                         return "Task cancelled by user"
 
                     if user_input:
@@ -443,10 +439,10 @@ Strict Rules:
         
 
     def clear_history(self):
-        """清除对话历史，只保留系统提示"""
+        """Clear conversation history, only keep system prompt"""
         self.prompt = "" 
         self.model.reset()
-        self.conversation_length = 0  # 重置对话长度
+        self.conversation_length = 0  # Reset conversation length
 
 
 
