@@ -14,12 +14,14 @@ from prompt_toolkit.formatted_text import FormattedText
 from sentence_transformers import SentenceTransformer
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import torch
+from huggingface_hub import HfApi
 
 # 初始化colorama
 colorama.init()
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["TRANSFORMERS_BASE_URL"] = "https://hf-mirror.com"
 
 class OutputType(Enum):
     SYSTEM = "system"      # AI assistant message
