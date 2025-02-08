@@ -58,6 +58,8 @@ class Agent:
         # Initialize methodology related attributes
         self.methodology_data = []
 
+        PrettyOutput.print(f"Jarvis initialized - With {self.model.name()}", OutputType.SYSTEM)
+
     @staticmethod
     def extract_tool_calls(content: str) -> List[Dict]:
         """Extract tool calls from content, if multiple tool calls are detected, raise an exception, and return the content before the tool call and the tool call"""
@@ -445,11 +447,6 @@ Strict Rules:
         # 获取全局模型实例
         agent = Agent(system_prompt=system_prompt)
 
-        # 如果用户传入了模型参数，则更换当前模型为用户指定的模型
-
-        # Welcome information
-        PrettyOutput.print(f"Jarvis initialized - With {agent.model.name()}", OutputType.SYSTEM)
-        
         # 加载预定义任务
         tasks = load_tasks()
         if tasks:
