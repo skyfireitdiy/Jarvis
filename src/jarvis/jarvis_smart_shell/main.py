@@ -11,33 +11,33 @@ from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType, load_env_from_file
 
 def execute_command(command: str) -> None:
-    """显示命令并允许用户编辑，回车执行，Ctrl+C取消"""
+    """Show command and allow user to edit, then execute, Ctrl+C to cancel"""
     try:
-        print("\n生成的命令 (可以编辑，回车执行，Ctrl+C取消):")
-        # 预填充输入行
+        print("\nGenerated command (can be edited, press Enter to execute, Ctrl+C to cancel):")
+        # Pre-fill input line
         readline.set_startup_hook(lambda: readline.insert_text(command))
         try:
             edited_command = input("> ")
-            if edited_command.strip():  # 确保命令不为空
+            if edited_command.strip():  # Ensure command is not empty
                 os.system(edited_command)
         except KeyboardInterrupt:
-            print("\n已取消执行")
+            print("\nExecution cancelled")
         finally:
-            readline.set_startup_hook()  # 清除预填充
+            readline.set_startup_hook()  # Clear pre-filled
     except Exception as e:
-        PrettyOutput.print(f"执行命令时发生错误: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"Failed to execute command: {str(e)}", OutputType.ERROR)
 
 def process_request(request: str) -> Optional[str]:
-    """处理用户请求并返回对应的shell命令
+    """Process user request and return corresponding shell command
     
     Args:
-        request: 用户的自然语言请求
+        request: User's natural language request
         
     Returns:
-        Optional[str]: 对应的shell命令，如果处理失败则返回None
+        Optional[str]: Corresponding shell command, return None if processing fails
     """
     try:
-        # 获取语言模型实例
+        # Get language model instance
         PlatformRegistry.suppress_output = True
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(True)
@@ -45,7 +45,7 @@ def process_request(request: str) -> Optional[str]:
         shell = os.environ.get("SHELL") or "bash"
         current_path = os.getcwd()
         
-        # 设置系统提示
+        # Set system prompt
         system_message = f"""You are a shell command generation assistant.
 
 Your only task is to convert user's natural language requirements into corresponding shell commands.
@@ -85,26 +85,26 @@ Remember: Only return the command itself, without any additional content.
             return None
         
     except Exception as e:
-        PrettyOutput.print(f"处理请求时发生错误: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"Failed to process request: {str(e)}", OutputType.ERROR)
         return None
 
 def main():
     # 创建参数解析器
     load_env_from_file()
     parser = argparse.ArgumentParser(
-        description="将自然语言需求转换为shell命令",
+        description="Convert natural language requirements to shell commands",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-示例:
-  %(prog)s "查找当前目录下所有的Python文件"
-  %(prog)s "压缩所有jpg图片"
-  %(prog)s "查找最近一周修改过的文档"
+Example:
+  %(prog)s "Find all Python files in the current directory"
+  %(prog)s "Compress all jpg images"
+  %(prog)s "Find documents modified in the last week"
 """)
     
     # 添加参数
     parser.add_argument(
         "request",
-        help="用自然语言描述你需要执行的操作"
+        help="Describe the operation you want to perform in natural language"
     )
     
     # 解析参数
