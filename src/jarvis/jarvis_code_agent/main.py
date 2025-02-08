@@ -92,11 +92,6 @@ TOOL USAGE RULES:
         # 获取全局模型实例
         agent = Agent(system_prompt=system_prompt)
 
-        # 如果用户传入了模型参数，则更换当前模型为用户指定的模型
-
-        # Welcome information
-        PrettyOutput.print(f"Jarvis initialized - With {agent.model.name()}", OutputType.SYSTEM)
-        
         # 如果没有选择预定义任务，进入交互模式
         while True:
             try:
