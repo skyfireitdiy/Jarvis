@@ -11,7 +11,7 @@ class Tool:
         self.func = func
 
     def to_dict(self) -> Dict:
-        """转换为工具格式"""
+        """Convert to tool format"""
         return {
             "name": self.name,
             "description": self.description,
@@ -19,5 +19,5 @@ class Tool:
         }
 
     def execute(self, arguments: Dict) -> Dict[str, Any]:
-        """执行工具函数"""
+        """Execute tool function"""
         return self.func(arguments)

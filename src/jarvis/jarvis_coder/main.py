@@ -382,18 +382,17 @@ class JarvisCoder:
             content = file_info["file_content"]
 
             try:
-
-                prompt = f"""你是一个代码分析专家，可以从代码中提取出与需求相关的片段。
-请按以下格式返回：
+                prompt = f"""You are a code analysis expert who can extract relevant snippets from code.
+Please return in the following format:
 <PART>
 content
 </PART>
 
-可返回多个片段。如果文件内容与需求无关，则返回空。
+Multiple snippets can be returned. If the file content is not relevant to the requirement, return empty.
 
-需求：{feature}
-文件路径：{file_path}
-代码内容：
+Requirement: {feature}
+File path: {file_path}
+Code content:
 {content}
 """
 

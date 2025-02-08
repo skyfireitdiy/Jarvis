@@ -4,13 +4,13 @@ from jarvis.utils import get_multiline_input, PrettyOutput, OutputType
 
 class AskUserTool:
     name="ask_user"
-    description="""当缺少完成任务的信息或有关键决策信息缺失时，询问用户。用户可以输入多行文本，空行结束输入。使用场景：1. 需要用户提供更多信息来完成任务；2. 需要用户做出关键决策；3. 需要用户确认某些重要操作；4. 需要用户提供额外信息"""
+    description="""Ask the user when information needed to complete the task is missing or when critical decision information is lacking. Users can input multiple lines of text, ending with an empty line. Use cases: 1. Need user to provide more information to complete the task; 2. Need user to make critical decisions; 3. Need user to confirm important operations; 4. Need user to provide additional information"""
     parameters={
         "type": "object",
         "properties": {
             "question": {
                 "type": "string",
-                "description": "要询问用户的问题"
+                "description": "The question to ask the user"
             }
         },
         "required": ["question"]
@@ -34,12 +34,12 @@ class AskUserTool:
             PrettyOutput.print(question, OutputType.SYSTEM)
             
             # 获取用户输入
-            user_response = get_multiline_input("请输入您的回答（输入空行结束）")
+            user_response = get_multiline_input("Please enter your answer (input empty line to end)")
             
             if user_response == "__interrupt__":
                 return {
                     "success": False,
-                    "error": "用户取消了输入"
+                    "error": "User canceled input"
                 }
             
             return {
@@ -50,5 +50,5 @@ class AskUserTool:
         except Exception as e:
             return {
                 "success": False,
-                "error": f"询问用户失败: {str(e)}"
+                "error": f"Failed to ask user: {str(e)}"
             } 

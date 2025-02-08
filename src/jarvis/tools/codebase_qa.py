@@ -7,21 +7,21 @@ class CodebaseQATool:
     """代码库问答工具，用于回答关于代码库的问题"""
     
     name = "codebase_qa"
-    description = "回答关于代码库的问题，可以查询和理解代码的功能、结构和实现细节"
+    description = "Answer questions about the codebase, can query and understand code functionality, structure, and implementation details"
     parameters = {
         "type": "object",
         "properties": {
             "dir": {
                 "type": "string",
-                "description": "项目根目录"
+                "description": "Project root directory"
             },
             "question": {
                 "type": "string",
-                "description": "关于代码库的问题"
+                "description": "Question about the codebase"
             },
             "top_k": {
                 "type": "integer",
-                "description": "搜索相关文件的数量",
+                "description": "Number of relevant files to search",
                 "default": 5
             }
         },

@@ -7,21 +7,21 @@ class CoderTool:
     """代码修改工具"""
     
     name = "coder"
-    description = "分析并修改现有代码，用于实现新功能、修复bug、重构代码等。能理解代码上下文并进行精确的代码编辑。"
+    description = "Analyze and modify existing code for implementing new features, fixing bugs, refactoring code, etc. Can understand code context and perform precise code edits."
     parameters = {
         "feature": {
             "type": "string",
-            "description": "要实现的功能描述或需要修改的内容，例如：'添加日志功能'、'修复内存泄漏'、'优化性能'等",
+            "description": "Description of the feature to implement or content to modify, e.g., 'add logging functionality', 'fix memory leak', 'optimize performance', etc.",
             "required": True
         },
         "dir": {
             "type": "string", 
-            "description": "项目根目录，默认为当前目录",
+            "description": "Project root directory, defaults to current directory",
             "required": False
         },
         "language": {
             "type": "string",
-            "description": "项目的主要编程语言，默认为python",
+            "description": "Main programming language of the project, defaults to python",
             "required": False
         }
     }

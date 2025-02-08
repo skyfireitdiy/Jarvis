@@ -19,7 +19,7 @@ REQUIRED_METHODS = [
 ]
 
 class PlatformRegistry:
-    """平台注册器"""
+    """Platform registry"""
 
     global_platform_name = "kimi"
     global_platform_registry = None
@@ -37,19 +37,19 @@ class PlatformRegistry:
 
                 pass
             except Exception as e:
-                PrettyOutput.print(f"创建平台目录失败: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"Create platform directory failed: {str(e)}", OutputType.ERROR)
                 return ""
         return user_platform_dir
 
     @staticmethod
     def check_platform_implementation(platform_class: Type[BasePlatform]) -> bool:
-        """检查平台类是否实现了所有必要的方法
+        """Check if the platform class implements all necessary methods
         
         Args:
-            platform_class: 要检查的平台类
+            platform_class: The platform class to check
             
         Returns:
-            bool: 是否实现了所有必要的方法
+            bool: Whether all necessary methods are implemented
         """
         missing_methods = []
         
@@ -68,11 +68,11 @@ class PlatformRegistry:
             sig = inspect.signature(method)
             method_params = [p for p in sig.parameters if p != 'self']
             if len(method_params) != len(params):
-                missing_methods.append(f"{method_name}(参数不匹配)")
+                missing_methods.append(f"{method_name}(parameter mismatch)")
         
         if missing_methods:
             PrettyOutput.print(
-                f"平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}", 
+                f"Platform {platform_class.__name__} is missing necessary methods: {', '.join(missing_methods)}", 
                 OutputType.ERROR
             )
             return False
@@ -81,19 +81,19 @@ class PlatformRegistry:
 
     @staticmethod
     def load_platform_from_dir(directory: str) -> Dict[str, Type[BasePlatform]]:
-        """从指定目录加载平台
+        """Load platforms from specified directory
         
         Args:
-            directory: 平台目录路径
+            directory: Platform directory path
             
         Returns:
-            Dict[str, Type[BasePlatform]]: 平台名称到平台类的映射
+            Dict[str, Type[BasePlatform]]: Platform name to platform class mapping
         """
         platforms = {}
         
         # 确保目录存在
         if not os.path.exists(directory):
-            PrettyOutput.print(f"平台目录不存在: {directory}", OutputType.ERROR)
+            PrettyOutput.print(f"Platform directory does not exist: {directory}", OutputType.ERROR)
             return platforms
             
         # 获取目录的包名
@@ -127,18 +127,18 @@ class PlatformRegistry:
                             if not PlatformRegistry.check_platform_implementation(obj):
                                 continue
                             if not PlatformRegistry.suppress_output:
-                                PrettyOutput.print(f"从 {os.path.join(directory, filename)} 加载平台：{obj.platform_name}", OutputType.SUCCESS) # type: ignore
+                                PrettyOutput.print(f"Load platform from {os.path.join(directory, filename)}: {obj.platform_name}", OutputType.SUCCESS) # type: ignore
                             platforms[obj.platform_name] = obj # type: ignore
                             break
                 except Exception as e:
-                    PrettyOutput.print(f"加载平台 {module_name} 失败: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"Load platform {module_name} failed: {str(e)}", OutputType.ERROR)
         
         return platforms
 
 
     @staticmethod
     def get_global_platform_registry():
-        """获取全局平台注册器"""
+        """Get global platform registry"""
         if PlatformRegistry.global_platform_registry is None:
             PlatformRegistry.global_platform_registry = PlatformRegistry()
             
@@ -154,8 +154,7 @@ class PlatformRegistry:
         return PlatformRegistry.global_platform_registry
     
     def __init__(self):
-        """初始化平台注册器
-        """
+        """Initialize platform registry"""
         self.platforms: Dict[str, Type[BasePlatform]] = {}
 
     def get_normal_platform(self) -> BasePlatform:
@@ -187,25 +186,25 @@ class PlatformRegistry:
         return platform # type: ignore
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]):
-        """注册平台类
+        """Register platform class
         
         Args:
-            name: 平台名称
-            model_class: 平台类
+            name: Platform name
+            model_class: Platform class
         """
         self.platforms[name] = platform_class
             
     def create_platform(self, name: str) -> Optional[BasePlatform]:
-        """创建平台实例
+        """Create platform instance
         
         Args:
-            name: 平台名称
+            name: Platform name
             
         Returns:
-            BasePlatform: 平台实例
+            BasePlatform: Platform instance
         """
         if name not in self.platforms:
-            PrettyOutput.print(f"未找到平台: {name}", OutputType.ERROR)
+            PrettyOutput.print(f"Platform not found: {name}", OutputType.ERROR)
             return None
             
         try:
@@ -213,10 +212,10 @@ class PlatformRegistry:
             platform = self.platforms[name]()
             return platform
         except Exception as e:
-            PrettyOutput.print(f"创建平台失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Create platform failed: {str(e)}", OutputType.ERROR)
             return None
             
     def get_available_platforms(self) -> List[str]:
-        """获取可用平台列表"""
+        """Get available platform list"""
         return list(self.platforms.keys()) 
     

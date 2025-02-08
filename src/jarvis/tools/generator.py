@@ -7,25 +7,25 @@ from jarvis.utils import OutputType, PrettyOutput
 
 class ToolGeneratorTool:
     name = "generate_tool"
-    description = "生成新的工具代码并自动注册到Jarvis，自动扩充Jarvis的能力"
+    description = "Generate new tool code and automatically register it to Jarvis, automatically expanding Jarvis's capabilities"
     parameters = {
         "type": "object",
         "properties": {
             "tool_name": {
                 "type": "string",
-                "description": "工具的名称（snake_case格式）"
+                "description": "Name of the tool (in snake_case format)"
             },
             "class_name": {
                 "type": "string",
-                "description": "工具类的名称（PascalCase格式）"
+                "description": "Name of the tool class (in PascalCase format)"
             },
             "description": {
                 "type": "string",
-                "description": "工具的功能描述"
+                "description": "Description of the tool's functionality"
             },
             "parameters": {
                 "type": "object",
-                "description": "工具参数的JSON Schema定义"
+                "description": "JSON Schema definition of tool parameters"
             }
         },
         "required": ["tool_name", "class_name", "description", "parameters"]
@@ -44,14 +44,14 @@ class ToolGeneratorTool:
         """使用大模型生成工具代码"""
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
 
-        prompt = f"""请生成一个Python工具类的代码，要求如下，除了代码，不要输出任何内容：
+        prompt = f"""Please generate the code for a Python tool class, with the following requirements, and do not output any content except the code:
 
-1. 类名: {class_name}
-2. 工具名称: {tool_name}
-3. 功能描述: {description}
-4. 参数定义: {parameters}
+1. Class name: {class_name}
+2. Tool name: {tool_name}
+3. Function description: {description}
+4. Parameter definition: {parameters}
 
-严格按照以下格式生成代码(各函数的参数和返回值一定要与示例一致)：
+Strictly follow the following format to generate code (the parameters and return values of each function must be consistent with the example):
 
 ```python
 from typing import Dict, Any, Protocol, Optional
@@ -60,7 +60,7 @@ from jarvis.models.registry import ModelRegistry
 
 class ExampleTool:
     name = "example_tool"
-    description = "示例工具"
+    description = "Example tool"
     parameters = {{
         "type": "object",
         "properties": {{
@@ -74,18 +74,18 @@ class ExampleTool:
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         try:
-            # 验证参数示例
+            # Validate parameter example
             if "param1" not in args:
-                return {{"success": False, "error": "缺少必需参数: param1"}}
+                return {{"success": False, "error": "Missing required parameter: param1"}}
             
-            # 记录操作示例
-            PrettyOutput.print(f"处理参数: {{args['param1']}}", OutputType.INFO)
+            # Record operation example
+            PrettyOutput.print(f"Processing parameter: {{args['param1']}}", OutputType.INFO)
 
-            # 使用大模型示例
+            # Use large model example
             response = self.model.chat_until_success("prompt")
             
-            # 实现具体功能
-            result = "处理结果"
+            # Implement specific functionality
+            result = "Processing result"
             
             return {{
                 "success": True,

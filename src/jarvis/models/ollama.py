@@ -6,56 +6,56 @@ import os
 import json
 
 class OllamaPlatform(BasePlatform):
-    """Ollama 平台实现"""
+    """Ollama platform implementation"""
     
     platform_name = "ollama"
     
     def __init__(self):
-        """初始化模型"""
+        """Initialize model"""
         super().__init__()
         
-        # 检查环境变量并提供帮助信息
+        # Check environment variables and provide help information
         self.api_base = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-r1:1.5b"
         
-        # 检查 Ollama 服务是否可用
+        # Check if Ollama service is available
         try:
             response = requests.get(f"{self.api_base}/api/tags")
             response.raise_for_status()
             available_models = [model["name"] for model in response.json().get("models", [])]
             
             if not available_models:
-                PrettyOutput.print("\n需要先下载 Ollama 模型才能使用：", OutputType.INFO)
-                PrettyOutput.print("1. 安装 Ollama: https://ollama.ai", OutputType.INFO)
-                PrettyOutput.print("2. 下载模型:", OutputType.INFO)
+                PrettyOutput.print("\nNeed to download Ollama model first to use:", OutputType.INFO)
+                PrettyOutput.print("1. Install Ollama: https://ollama.ai", OutputType.INFO)
+                PrettyOutput.print("2. Download model:", OutputType.INFO)
                 PrettyOutput.print(f"   ollama pull {self.model_name}", OutputType.INFO)
-                PrettyOutput.print("Ollama没有可用的模型", OutputType.WARNING)
+                PrettyOutput.print("Ollama has no available models", OutputType.WARNING)
                 
         except requests.exceptions.ConnectionError:
-            PrettyOutput.print("\nOllama 服务未启动或无法连接", OutputType.WARNING)
-            PrettyOutput.print("请确保已经：", OutputType.INFO)
-            PrettyOutput.print("1. 安装了 Ollama: https://ollama.ai", OutputType.INFO)
-            PrettyOutput.print("2. 启动了 Ollama 服务", OutputType.INFO)
-            PrettyOutput.print("3. 服务地址配置正确 (默认: http://localhost:11434)", OutputType.INFO)
+            PrettyOutput.print("\nOllama service is not started or cannot be connected", OutputType.WARNING)
+            PrettyOutput.print("Please ensure that you have:", OutputType.INFO)
+            PrettyOutput.print("1. Installed Ollama: https://ollama.ai", OutputType.INFO)
+            PrettyOutput.print("2. Started Ollama service", OutputType.INFO)
+            PrettyOutput.print("3. Service address configured correctly (default: http://localhost:11434)", OutputType.INFO)
             
             
         self.messages = []
         self.system_message = ""
 
     def get_model_list(self) -> List[Tuple[str, str]]:
-        """获取模型列表"""
+        """Get model list"""
         response = requests.get(f"{self.api_base}/api/tags")
         response.raise_for_status()
         return [(model["name"], "") for model in response.json().get("models", [])]
 
     def set_model_name(self, model_name: str):
-        """设置模型名称"""
+        """Set model name"""
         self.model_name = model_name
 
     def chat(self, message: str) -> str:
-        """执行对话"""
+        """Execute conversation"""
         try:
-            # 构建消息列表
+            # Build message list
             messages = []
             if self.system_message:
                 messages.append({"role": "system", "content": self.system_message})
@@ -102,31 +102,31 @@ class OllamaPlatform(BasePlatform):
             return full_response
             
         except Exception as e:
-            PrettyOutput.print(f"对话失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Chat failed: {str(e)}", OutputType.ERROR)
             raise Exception(f"Chat failed: {str(e)}")
 
     def upload_files(self, file_list: List[str]) -> List[Dict]:
-        """上传文件 (Ollama 不支持文件上传)"""
-        PrettyOutput.print("Ollama 不支持文件上传", output_type=OutputType.WARNING)
+        """Upload files (Ollama does not support file upload)"""
+        PrettyOutput.print("Ollama does not support file upload", output_type=OutputType.WARNING)
         return []
         
     def reset(self):
-        """重置模型状态"""
+        """Reset model state"""
         self.messages = []
         if self.system_message:
             self.messages.append({"role": "system", "content": self.system_message})
             
     def name(self) -> str:
-        """返回模型名称"""
+        """Return model name"""
         return self.model_name
             
     def delete_chat(self) -> bool:
-        """删除当前聊天会话"""
+        """Delete current chat session"""
         self.reset()
         return True
         
     def set_system_message(self, message: str):
-        """设置系统消息"""
+        """Set system message"""
         self.system_message = message
         self.reset()  # 重置会话以应用新的系统消息 
 
@@ -136,10 +136,10 @@ if __name__ == "__main__":
         ollama = OllamaPlatform()
         while True:
             try:
-                message = input("\n输入问题(Ctrl+C退出): ")
+                message = input("\nInput question (Ctrl+C to exit): ")
                 ollama.chat_until_success(message)
             except KeyboardInterrupt:
-                print("\n再见！")
+                print("\nGoodbye!")
                 break
     except Exception as e:
-        PrettyOutput.print(f"程序异常退出: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"Program exited with an exception: {str(e)}", OutputType.ERROR)
