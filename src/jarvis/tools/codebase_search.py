@@ -3,11 +3,11 @@ from typing import Any, Dict
 from jarvis.jarvis_codebase.main import CodeBase
 from jarvis.utils import find_git_root, PrettyOutput, OutputType
 
-class CodebaseQATool:
-    """Codebase QA Tool"""
+class CodebaseSearchTool:
+    """Codebase Search Tool"""
     
-    name = "codebase_qa"
-    description = "Answer questions about the codebase, can query and understand code functionality, structure, and implementation details"
+    name = "codebase_search"
+    description = "Search the codebase, find related code files"
     parameters = {
         "type": "object",
         "properties": {
@@ -15,9 +15,9 @@ class CodebaseQATool:
                 "type": "string",
                 "description": "Project root directory"
             },
-            "question": {
+            "query": {
                 "type": "string",
-                "description": "Question about the codebase"
+                "description": "Query about the codebase"
             },
             "top_k": {
                 "type": "integer",
@@ -25,17 +25,17 @@ class CodebaseQATool:
                 "default": 5
             }
         },
-        "required": ["question"]
+        "required": ["query"]
     }
     
     def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute codebase QA"""
+        """Execute codebase search"""
         try:
             dir = params.get("dir")
-            question = params["question"]
+            query = params["query"]
             top_k = params.get("top_k", 5)
             
-            # 初始化代码库
+            # Find the root directory of the codebase
             current_dir = os.getcwd()
             root_dir = find_git_root(dir or current_dir)
             if not root_dir:
@@ -48,15 +48,15 @@ class CodebaseQATool:
 
             os.chdir(root_dir)
             codebase = CodeBase(root_dir)
-            # 生成索引
+            # Generate index
 
             codebase.generate_codebase()
-            # 执行问答
-            response = codebase.ask_codebase(question, top_k)
+            # Execute search
+            response = codebase.search_similar(query, top_k)
             os.chdir(current_dir)
             return {
                 "success": True,
-                "stdout": response,
+                "stdout": str(response),
                 "stderr": "",
                 "error": None
             }
@@ -69,4 +69,3 @@ class CodebaseQATool:
                 "stderr": f"Error executing codebase QA: {str(e)}",
                 "error": str(type(e).__name__)
             }
-
