@@ -13,7 +13,7 @@ class OyiModel(BasePlatform):
     BASE_URL = "https://api-10086.rcouyi.com"
 
     def get_model_list(self) -> List[Tuple[str, str]]:
-        """获取模型列表"""
+        """Get model list"""
         return [(name,info['desc']) for name,info in self.models.items()]
     
     def __init__(self):
@@ -28,15 +28,15 @@ class OyiModel(BasePlatform):
         
         self.token = os.getenv("OYI_API_KEY")
         if not self.token:
-            PrettyOutput.print("OYI_API_KEY未设置", OutputType.WARNING)
+            PrettyOutput.print("OYI_API_KEY is not set", OutputType.WARNING)
         
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
         if self.model_name not in [m.split()[0] for m in self.get_available_models()]:
-            PrettyOutput.print(f"警告: 当前选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
+            PrettyOutput.print(f"Warning: The selected model {self.model_name} is not in the available list", OutputType.WARNING)
         
 
     def set_model_name(self, model_name: str):
-        """设置模型名称"""
+        """Set model name"""
 
         self.model_name = model_name
 
@@ -54,7 +54,7 @@ class OyiModel(BasePlatform):
             payload = {
                 "id": 0,
                 "roleId": 0,
-                "title": "新对话",
+                "title": "New conversation",
                 "isLock": False,
                 "systemMessage": "",
                 "params": json.dumps({
@@ -82,14 +82,14 @@ class OyiModel(BasePlatform):
                     self.conversation = data
                     return True
                 else:
-                    PrettyOutput.print(f"创建会话失败: {data['message']}", OutputType.ERROR)
+                    PrettyOutput.print(f"Create conversation failed: {data['message']}", OutputType.ERROR)
                     return False
             else:
-                PrettyOutput.print(f"创建会话失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"Create conversation failed: {response.status_code}", OutputType.ERROR)
                 return False
                 
         except Exception as e:
-            PrettyOutput.print(f"创建会话异常: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Create conversation failed: {str(e)}", OutputType.ERROR)
             return False
     
     def set_system_message(self, message: str):
@@ -155,13 +155,13 @@ class OyiModel(BasePlatform):
             )
             
             if response.status_code != 200:
-                error_msg = f"聊天请求失败: {response.status_code}"
+                error_msg = f"Chat request failed: {response.status_code}"
                 PrettyOutput.print(error_msg, OutputType.ERROR)
                 raise Exception(error_msg)
             
             data = response.json()
             if data['code'] != 200 or data['type'] != 'success':
-                error_msg = f"聊天失败: {data.get('message', '未知错误')}"
+                error_msg = f"Chat failed: {data.get('message', 'Unknown error')}"
                 PrettyOutput.print(error_msg, OutputType.ERROR)
                 raise Exception(error_msg)
             
@@ -179,12 +179,12 @@ class OyiModel(BasePlatform):
                 self.messages.append({"role": "assistant", "content": response.text})
                 return response.text
             else:
-                error_msg = f"获取响应失败: {response.status_code}"
+                error_msg = f"Get response failed: {response.status_code}"
                 PrettyOutput.print(error_msg, OutputType.ERROR)
                 raise Exception(error_msg)
             
         except Exception as e:
-            PrettyOutput.print(f"聊天异常: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Chat failed: {str(e)}", OutputType.ERROR)
             raise e
             
     def name(self) -> str:
@@ -225,16 +225,16 @@ class OyiModel(BasePlatform):
                     self.reset()
                     return True
                 else:
-                    error_msg = f"删除会话失败: {data.get('message', '未知错误')}"
+                    error_msg = f"Delete conversation failed: {data.get('message', 'Unknown error')}"
                     PrettyOutput.print(error_msg, OutputType.ERROR)
                     return False
             else:
-                error_msg = f"删除会话请求失败: {response.status_code}"
+                error_msg = f"Delete conversation request failed: {response.status_code}"
                 PrettyOutput.print(error_msg, OutputType.ERROR)
                 return False
             
         except Exception as e:
-            PrettyOutput.print(f"删除会话异常: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Delete conversation failed: {str(e)}", OutputType.ERROR)
             return False
     
     def upload_files(self, file_list: List[str]) -> List[Dict]:
@@ -250,7 +250,7 @@ class OyiModel(BasePlatform):
             # 检查当前模型是否支持文件上传
             model_info = self.models.get(self.model_name)
             if not model_info or not model_info.get('uploadFile', False):
-                PrettyOutput.print(f"当前模型 {self.model_name} 不支持文件上传", OutputType.WARNING)
+                PrettyOutput.print(f"The current model {self.model_name} does not support file upload", OutputType.WARNING)
                 return []
             
             headers = {
@@ -266,7 +266,7 @@ class OyiModel(BasePlatform):
                 # 检查文件类型
                 file_type = mimetypes.guess_type(file_path)[0]
                 if not file_type or not file_type.startswith(('image/', 'text/', 'application/')):
-                    PrettyOutput.print(f"文件类型不支持: {file_type}", OutputType.ERROR)
+                    PrettyOutput.print(f"The file type {file_type} is not supported", OutputType.ERROR)
                     continue
                 
                 with open(file_path, 'rb') as f:
@@ -285,22 +285,22 @@ class OyiModel(BasePlatform):
                         if data.get('code') == 200:
                             self.files.append(data)
                         else:
-                            PrettyOutput.print(f"文件上传失败: {data.get('message')}", OutputType.ERROR)
+                            PrettyOutput.print(f"File upload failed: {data.get('message')}", OutputType.ERROR)
                             return []
                     else:
-                        PrettyOutput.print(f"文件上传失败: {response.status_code}", OutputType.ERROR)
+                        PrettyOutput.print(f"File upload failed: {response.status_code}", OutputType.ERROR)
                         return []
                 
             return self.files
         except Exception as e:
-            PrettyOutput.print(f"文件上传异常: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"File upload failed: {str(e)}", OutputType.ERROR)
             return []
 
     def get_available_models(self) -> List[str]:
-        """获取可用的模型列表
+        """Get available model list
         
         Returns:
-            List[str]: 可用模型名称列表
+            List[str]: Available model name list
         """
         try:
             if self.models:
@@ -320,7 +320,7 @@ class OyiModel(BasePlatform):
             )
             
             if response.status_code != 200:
-                PrettyOutput.print(f"获取模型列表失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"Get model list failed: {response.status_code}", OutputType.ERROR)
                 return []
             
             data = response.json()
@@ -357,12 +357,12 @@ class OyiModel(BasePlatform):
                     
                 # 添加文件上传支持标记
                 if model.get('uploadFile'):
-                    model_str += " [支持文件上传]"
+                    model_str += " [Support file upload]"
                 model['desc'] = model_str
                 models.append(model_name)
                 
             return sorted(models)
             
         except Exception as e:
-            PrettyOutput.print(f"获取模型列表异常: {str(e)}", OutputType.WARNING)
+            PrettyOutput.print(f"Get model list failed: {str(e)}", OutputType.WARNING)
             return []

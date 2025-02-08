@@ -26,16 +26,16 @@ class AI8Model(BasePlatform):
 
         self.token = os.getenv("AI8_API_KEY")
         if not self.token:
-            PrettyOutput.print("AI8_API_KEY未设置", OutputType.WARNING)
+            PrettyOutput.print("AI8_API_KEY is not set", OutputType.WARNING)
         
         
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
         if self.model_name not in self.get_available_models():
-            PrettyOutput.print(f"警告: 当前选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
+            PrettyOutput.print(f"Warning: The selected model {self.model_name} is not in the available list", OutputType.WARNING)
         
 
     def set_model_name(self, model_name: str):
-        """设置模型名称"""
+        """Set model name"""
 
         self.model_name = model_name
             
@@ -59,12 +59,12 @@ class AI8Model(BasePlatform):
             )
             
             if response.status_code != 200:
-                PrettyOutput.print(f"创建会话失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"Failed to create session: {response.status_code}", OutputType.ERROR)
                 return False
             
             data = response.json()
             if data['code'] != 0:
-                PrettyOutput.print(f"创建会话失败: {data.get('msg', '未知错误')}", OutputType.ERROR)
+                PrettyOutput.print(f"Failed to create session: {data.get('msg', 'Unknown error')}", OutputType.ERROR)
                 return False
             
             self.conversation = data['data']
@@ -92,14 +92,14 @@ class AI8Model(BasePlatform):
                     self.conversation = data['data']
                     return True
                 else:
-                    PrettyOutput.print(f"更新会话设置失败: {data.get('msg', '未知错误')}", OutputType.ERROR)
+                    PrettyOutput.print(f"Failed to update session settings: {data.get('msg', 'Unknown error')}", OutputType.ERROR)
                     return False
             else:
-                PrettyOutput.print(f"更新会话设置失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"Failed to update session settings: {response.status_code}", OutputType.ERROR)
                 return False
             
         except Exception as e:
-            PrettyOutput.print(f"创建会话异常: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Failed to create session: {str(e)}", OutputType.ERROR)
             return False
         
     def upload_files(self, file_list: List[str]) -> List[Dict]:
@@ -119,7 +119,7 @@ class AI8Model(BasePlatform):
         self.system_message = message
         
     def chat(self, message: str) -> str:
-        """执行对话"""
+        """Execute conversation"""
         try:
             
             # 确保有会话ID
@@ -160,7 +160,7 @@ class AI8Model(BasePlatform):
             )
             
             if response.status_code != 200:
-                error_msg = f"聊天请求失败: {response.status_code}"
+                error_msg = f"Failed to chat: {response.status_code}"
                 PrettyOutput.print(error_msg, OutputType.ERROR)
                 raise Exception(error_msg)
             
@@ -188,7 +188,7 @@ class AI8Model(BasePlatform):
             return full_response
             
         except Exception as e:
-            PrettyOutput.print(f"聊天异常: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Chat exception: {str(e)}", OutputType.ERROR)
             raise e
             
     def name(self) -> str:
@@ -227,23 +227,23 @@ class AI8Model(BasePlatform):
                     self.reset()
                     return True
                 else:
-                    error_msg = f"删除会话失败: {data.get('msg', '未知错误')}"
+                    error_msg = f"Failed to delete session: {data.get('msg', 'Unknown error')}"
                     PrettyOutput.print(error_msg, OutputType.ERROR)
                     return False
             else:
-                error_msg = f"删除会话请求失败: {response.status_code}"
+                error_msg = f"Failed to delete session request: {response.status_code}"
                 PrettyOutput.print(error_msg, OutputType.ERROR)
                 return False
             
         except Exception as e:
-            PrettyOutput.print(f"删除会话异常: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Failed to delete session: {str(e)}", OutputType.ERROR)
             return False
         
     def get_available_models(self) -> List[str]:
-        """获取可用的模型列表
+        """Get available model list
         
         Returns:
-            List[str]: 可用模型名称列表
+            List[str]: Available model name list
         """
         try:
             if self.models:
@@ -264,12 +264,12 @@ class AI8Model(BasePlatform):
             )
             
             if response.status_code != 200:
-                PrettyOutput.print(f"获取模型列表失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"Failed to get model list: {response.status_code}", OutputType.ERROR)
                 return []
             
             data = response.json()
             if data['code'] != 0:
-                PrettyOutput.print(f"获取模型列表失败: {data.get('msg', '未知错误')}", OutputType.ERROR)
+                PrettyOutput.print(f"Failed to get model list: {data.get('msg', 'Unknown error')}", OutputType.ERROR)
                 return []
             
             # 保存模型信息
@@ -292,11 +292,11 @@ class AI8Model(BasePlatform):
                 # 添加特性标记
                 features = []
                 if model['attr'].get('multimodal'):
-                    features.append("多模态")
+                    features.append("Multimodal")
                 if model['attr'].get('plugin'):
-                    features.append("插件支持")
+                    features.append("Plugin support")
                 if model['attr'].get('onlyImg'):
-                    features.append("图像支持")
+                    features.append("Image support")
                 if features:
                     model_str += f" [{'|'.join(features)}]"
                     
@@ -308,6 +308,6 @@ class AI8Model(BasePlatform):
             return list(self.models.keys())
             
         except Exception as e:
-            PrettyOutput.print(f"获取模型列表异常: {str(e)}", OutputType.WARNING)
+            PrettyOutput.print(f"Failed to get model list: {str(e)}", OutputType.WARNING)
             return []
         

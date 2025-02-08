@@ -10,7 +10,7 @@ from prompt_toolkit import prompt
 
 from jarvis.models.registry import PlatformRegistry
 
-# 添加父目录到Python路径以支持导入
+# Add parent directory to Python path to support imports    
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from jarvis.agent import Agent
@@ -22,7 +22,7 @@ def load_tasks() -> dict:
     """Load tasks from .jarvis files in user home and current directory."""
     tasks = {}
     
-    # 检查用户目录下的 .jarvis
+    # Check .jarvis in user directory
     user_jarvis = os.path.expanduser("~/.jarvis")
     if os.path.exists(user_jarvis):
         try:
@@ -30,39 +30,39 @@ def load_tasks() -> dict:
                 user_tasks = yaml.safe_load(f)
                 
             if isinstance(user_tasks, dict):
-                # 验证并添加用户目录的任务
+                # Validate and add user directory tasks
                 for name, desc in user_tasks.items():
-                    if desc:  # 确保描述不为空
+                    if desc:  # Ensure description is not empty
                         tasks[str(name)] = str(desc)
             else:
                 PrettyOutput.print("Warning: ~/.jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
         except Exception as e:
             PrettyOutput.print(f"Error loading ~/.jarvis file: {str(e)}", OutputType.ERROR)
     
-    # 检查当前目录下的 .jarvis
+    # Check .jarvis in current directory
     if os.path.exists(".jarvis"):
         try:
             with open(".jarvis", "r", encoding="utf-8") as f:
                 local_tasks = yaml.safe_load(f)
                 
             if isinstance(local_tasks, dict):
-                # 验证并添加当前目录的任务，如果有重名则覆盖用户目录的任务
+                # Validate and add current directory tasks, overwrite user directory tasks if there is a name conflict
                 for name, desc in local_tasks.items():
-                    if desc:  # 确保描述不为空
+                    if desc:  # Ensure description is not empty
                         tasks[str(name)] = str(desc)
             else:
                 PrettyOutput.print("Warning: .jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
         except Exception as e:
             PrettyOutput.print(f"Error loading .jarvis file: {str(e)}", OutputType.ERROR)
 
-    # 读取方法论
+    # Read methodology
     method_path = os.path.expanduser("~/.jarvis_methodology")
     if os.path.exists(method_path):
         with open(method_path, "r", encoding="utf-8") as f:
             methodology = yaml.safe_load(f)
         if isinstance(methodology, dict):
             for name, desc in methodology.items():
-                tasks[f"执行方法论：{str(name)}\n {str(desc)}" ] = str(desc)
+                tasks[f"Run Methodology: {str(name)}\n {str(desc)}" ] = str(desc)
     
     return tasks
 
@@ -77,13 +77,13 @@ def select_task(tasks: dict) -> str:
     PrettyOutput.print("\nAvailable tasks:", OutputType.INFO)
     for i, name in enumerate(task_names, 1):
         PrettyOutput.print(f"[{i}] {name}", OutputType.INFO)
-    PrettyOutput.print("[0] 跳过预定义任务", OutputType.INFO)
+    PrettyOutput.print("[0] Skip predefined tasks", OutputType.INFO)
     
     
     while True:
         try:
             choice = prompt(
-                "\n请选择一个任务编号(0跳过): ",
+                "\nPlease select a task number (0 to skip): ",
             ).strip()
             
             if not choice:
@@ -103,16 +103,16 @@ def select_task(tasks: dict) -> str:
         except EOFError:
             return ""  # Return empty on Ctrl+D
         except Exception as e:
-            PrettyOutput.print(f"选择失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Failed to select task: {str(e)}", OutputType.ERROR)
             continue
 
 def main():
-    """Jarvis 的主入口点"""
-    # 添加参数解析器
+    """Jarvis main entry point"""
+    # Add argument parser
     load_env_from_file()
-    parser = argparse.ArgumentParser(description='Jarvis AI 助手')
-    parser.add_argument('-f', '--files', nargs='*', help='要处理的文件列表')
-    parser.add_argument('--keep-history', action='store_true', help='保持聊天历史(不删除会话)')
+    parser = argparse.ArgumentParser(description='Jarvis AI assistant')
+    parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
+    parser.add_argument('--keep-history', action='store_true', help='Keep chat history (do not delete session)')
     args = parser.parse_args()
 
     try:
@@ -121,32 +121,32 @@ def main():
 
         # 如果用户传入了模型参数，则更换当前模型为用户指定的模型
 
-        # 欢迎信息
-        PrettyOutput.print(f"Jarvis 已初始化 - With {agent.model.name()}", OutputType.SYSTEM)
+        # Welcome information
+        PrettyOutput.print(f"Jarvis initialized - With {agent.model.name()}", OutputType.SYSTEM)
         if args.keep_history:
-            PrettyOutput.print("已启用历史保留模式", OutputType.INFO)
+            PrettyOutput.print("History preservation mode enabled", OutputType.INFO)
         
         # 加载预定义任务
         tasks = load_tasks()
         if tasks:
             selected_task = select_task(tasks)
             if selected_task:
-                PrettyOutput.print(f"\n执行任务: {selected_task}", OutputType.INFO)
+                PrettyOutput.print(f"\nExecute task: {selected_task}", OutputType.INFO)
                 agent.run(selected_task, args.files)
                 return 0
         
         # 如果没有选择预定义任务，进入交互模式
         while True:
             try:
-                user_input = get_multiline_input("请输入您的任务(输入空行退出):")
+                user_input = get_multiline_input("Please enter your task (input empty line to exit):")
                 if not user_input or user_input == "__interrupt__":
                     break
                 agent.run(user_input, args.files)
             except Exception as e:
-                PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"Error: {str(e)}", OutputType.ERROR)
 
     except Exception as e:
-        PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"Initialization error: {str(e)}", OutputType.ERROR)
         return 1
 
     return 0

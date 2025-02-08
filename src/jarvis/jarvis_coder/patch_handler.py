@@ -97,7 +97,7 @@ class PatchHandler:
                     content = open(file_path, "r", encoding="utf-8").read()
                 else:
                     content = "<文件不存在，需要创建>"
-                prompt = """你是一个资深程序开发专家，你可以根据代码完整修改方案、当前要修改的原始代码文件路径、代码内容、当前文件的修改方案，生成修改后的代码补丁。需要输出的格式如下：
+                prompt = """You are a senior software development expert who can generate code patches based on the complete modification plan, current original code file path, code content, and current file's modification plan. The output format should be as follows:
                         <PATCH>
                         >>>>>> SEARCH
                         old_code
@@ -105,33 +105,33 @@ class PatchHandler:
                         new_code
                         <<<<<< REPLACE
                         </PATCH>
-                        规则：
-                        1. 当old_code为空时，表示从开头到结尾全部替换
-                        2. 当new_code为空时，表示删除old_code
-                        3. 当old_code和new_code都为空时，表示删除文件
-                        注意：
-                        1. 可生成多个补丁
-                        2. old code的代码会被替换为new code的代码，注意上下文衔接
-                        3. 生成补丁要避免破坏现有代码逻辑，比如：在现有函数体内部插入函数定义破坏已有代码
-                        4. 带有足够的上下文，避免歧义
-                        5. 补丁将以 file_content.replace(patch.old_code, patch.new_code, 1) 的方式合并，因此补丁的old_code和new_code需要精确匹配，old_code中的空行、换行、空白、制表符、注释都需要保持一致
-                        6. 确保生成的代码格式正确（语法、缩进、换行）
-                        7. 确保new_code的缩进、格式与old_code一致
-                        8. 确保代码被插入到合适的位置，如使用变量的代码要在声明/定义之后
-                        9. 修改的代码前后至少提供3行供定位
+                        Rules:
+                        1. When old_code is empty, it means replace everything from start to end
+                        2. When new_code is empty, it means delete old_code
+                        3. When both old_code and new_code are empty, it means delete the file
+                        Notes:
+                        1. Multiple patches can be generated
+                        2. old_code will be replaced with new_code, pay attention to context continuity
+                        3. Avoid breaking existing code logic when generating patches, e.g., don't insert function definitions inside existing function bodies
+                        4. Include sufficient context to avoid ambiguity
+                        5. Patches will be merged using file_content.replace(patch.old_code, patch.new_code, 1), so old_code and new_code need to match exactly, including empty lines, line breaks, whitespace, tabs, and comments
+                        6. Ensure generated code has correct format (syntax, indentation, line breaks)
+                        7. Ensure new_code's indentation and format matches old_code
+                        8. Ensure code is inserted in appropriate locations, e.g., code using variables should be after declarations/definitions
+                        9. Provide at least 3 lines of context before and after modified code for location
 
 
                         """
-                prompt += f"""# 原始需求：{feature}
-                    # 完整修改计划：{raw_plan}
-                    # 当前修改文件路径:{file_path}
-                    # 当前文件内容：
+                prompt += f"""# Original requirement: {feature}
+                    # Complete modification plan: {raw_plan}
+                    # Current file path: {file_path}
+                    # Current file content:
                     <CONTENT>
                     {content}
                     </CONTENT>
-                    # 当前文件修改计划:
+                    # Current file modification plan:
                     {current_plan}
-                    { "# 补充信息：" + additional_info if additional_info else "" }
+                    { "# Additional information: " + additional_info if additional_info else "" }
                     """
 
 

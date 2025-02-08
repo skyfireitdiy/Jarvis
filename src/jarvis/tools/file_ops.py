@@ -7,7 +7,7 @@ from jarvis.utils import OutputType, PrettyOutput
 
 class FileOperationTool:
     name = "file_operation"
-    description = "文件操作 (read/write/append/exists)"
+    description = "File operations (read/write/append/exists)"
     parameters = {
         "type": "object",
         "properties": {

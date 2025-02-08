@@ -93,15 +93,16 @@ class CodeBase:
 
     def make_description(self, file_path: str, content: str) -> str:
         model = PlatformRegistry.get_global_platform_registry().get_cheap_platform()
-        model.set_suppress_output(True)
-        prompt = f"""请分析以下代码文件，并生成一个详细的描述。描述应该包含以下要点：
-1. 整个文件的功能描述，不超过100个字
-2. 每个全局变量、函数、类型定义、类、方法等代码元素的一句话描述，不超过50字
-3. 用户可能会对该文件提出哪些问题，5条
+        if self.thread_count > 1:
+            model.set_suppress_output(True)
+        prompt = f"""Please analyze the following code file and generate a detailed description. The description should include:
+1. Overall file functionality description, no more than 100 characters
+2. One-sentence description (max 50 characters) for each global variable, function, type definition, class, method, and other code elements
+3. 5 potential questions users might ask about this file
 
-请用简洁专业的语言描述，突出代码的技术功能，以便后续进行关联代码检索。
-文件路径：{file_path}
-代码内容：
+Please use concise and professional language, emphasizing technical functionality to facilitate subsequent code retrieval.
+File path: {file_path}
+Code content:
 {content}
 """
         response = model.chat_until_success(prompt)
@@ -201,9 +202,9 @@ class CodeBase:
             
             # 组合文件信息，包含文件内容
             combined_text = f"""
-文件路径: {file_path}
-文件描述: {description}
-文件内容: {content}
+{file_path}
+{description}
+{content}
 """
             vector = self.get_embedding(combined_text)
             
@@ -477,12 +478,12 @@ class CodeBase:
                     content = open(path, "r", encoding="utf-8").read()[:512]  # 限制内容长度
                     
                     # 组合文件信息
-                    doc_content = f"文件: {path}\n描述: {desc}\n内容: {content}"
+                    doc_content = f"File path: {path}\nDescription: {desc}\nContent: {content}"
                     pairs.append([query, doc_content])
                 except Exception as e:
                     PrettyOutput.print(f"读取文件失败 {path}: {str(e)}", 
                                     output_type=OutputType.ERROR)
-                    doc_content = f"文件: {path}\n描述: {desc}"
+                    doc_content = f"File path: {path}\nDescription: {desc}"
                     pairs.append([query, doc_content])
             
             # 使用更大的batch size提高处理速度
@@ -539,10 +540,10 @@ class CodeBase:
             List[str]: 查询变体列表
         """
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        prompt = f"""请根据以下查询，生成3个不同的表述，每个表述都要完整表达原始查询的意思。这些表述将用于代码搜索，要保持专业性和准确性。
-原始查询: {query}
+        prompt = f"""Please generate 3 different expressions based on the following query, each expression should fully convey the meaning of the original query. These expressions will be used for code search, maintain professionalism and accuracy.
+Original query: {query}
 
-请直接输出3个表述，用两个换行分隔，不要有编号或其他标记。
+Please output 3 expressions directly, separated by two line breaks, without numbering or other markers.
 """
         variants = model.chat_until_success(prompt).strip().split('\n\n')
         variants.append(query)  # 添加原始查询
@@ -632,8 +633,8 @@ class CodeBase:
                     continue
                 content = open(path, "r", encoding="utf-8").read()
                 prompt += f"""
-文件路径: {path}prompt
-文件内容:
+File path: {path}prompt
+File content:
 {content}
 ========================================
 """
@@ -643,9 +644,9 @@ class CodeBase:
                 continue
                 
         prompt += f"""
-用户问题: {query}
+User question: {query}
 
-请用专业的语言回答用户的问题，如果给出的文件内容不足以回答用户的问题，请告诉用户，绝对不要胡编乱造。
+Please answer the user's question in Chinese using professional language. If the provided file content is insufficient to answer the user's question, please inform the user. Never make up information.
 """
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
         response = model.chat_until_success(prompt)

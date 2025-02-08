@@ -17,33 +17,33 @@ class PlanGenerator:
         Returns:
             str: 完整的提示词
         """
-        prompt = "你是一个代码修改专家，可以根据需求和相关的文件代码片段生成修改计划，我需要你帮我分析如何实现以下功能:\n\n"
+        prompt = "You are a code modification expert who can generate modification plans based on requirements and relevant code snippets. I need your help to analyze how to implement the following feature:\n\n"
         prompt += f"{feature}\n\n"
                 
-        prompt += "以下是相关的代码文件片段:\n\n"
+        prompt += "Here are the relevant code file snippets:\n\n"
         
         for file in related_files:
-            prompt += f"文件: {file['file_path']}\n"
+            prompt += f"File: {file['file_path']}\n"
             for part in file["parts"]:
                 prompt += f"<PART>\n{part}\n</PART>\n"
         
-        prompt += "\n请详细说明需要做哪些修改来实现这个功能。包括:\n"
-        prompt += "1. 需要修改哪些文件\n"
-        prompt += "2. 每个文件如何修改，不需要解释\n"
-        prompt += "3. 不要假设有其他文件或者有其他代码，仅根据提供的文件内容和描述生成修改方案\n"
-        prompt += "4. 不要实现需求外的功能\n"
-        prompt += "5. 每个文件仅输出一个修改方案（可以有多行）\n"
-        prompt += "6. 输出格式如下：\n"
+        prompt += "\nPlease provide detailed modifications needed to implement this feature. Include:\n"
+        prompt += "1. Which files need to be modified\n"
+        prompt += "2. How to modify each file, no explanation needed\n"
+        prompt += "3. Don't assume other files or code exist, only generate modification plans based on provided file contents and description\n"
+        prompt += "4. Don't implement features outside the requirement\n"
+        prompt += "5. Output only one modification plan per file (can be multiple lines)\n"
+        prompt += "6. Output format as follows:\n"
         prompt += "<PLAN>\n"
         prompt += "> path/to/file1\n"
-        prompt += "修改计划\n"
+        prompt += "modification plan\n"
         prompt += "</PLAN>\n"
         prompt += "<PLAN>\n"
         prompt += "> path/to/file2\n"
-        prompt += "修改计划\n"
+        prompt += "modification plan\n"
         prompt += "</PLAN>\n"
         if additional_info:
-            prompt += f"# 补充信息：\n{additional_info}\n"
+            prompt += f"# Additional information:\n{additional_info}\n"
         
         return prompt
     

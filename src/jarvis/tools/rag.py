@@ -5,21 +5,21 @@ from jarvis.jarvis_rag.main import RAGTool as RAGCore
 
 class RAGTool:
     name = "rag"
-    description = "基于文档目录进行问答，支持多种文档格式（txt、pdf、docx等）"
+    description = "Ask questions based on a document directory, supporting multiple document formats (txt, pdf, docx, etc.)"
     parameters = {
         "type": "object",
         "properties": {
             "dir": {
                 "type": "string",
-                "description": "文档目录路径，支持相对路径和绝对路径"
+                "description": "Document directory path, supports both relative and absolute paths"
             },
             "question": {
                 "type": "string",
-                "description": "要询问的问题"
+                "description": "The question to ask"
             },
             "rebuild_index": {
                 "type": "boolean",
-                "description": "是否重建索引",
+                "description": "Whether to rebuild the index",
                 "default": False
             }
         },

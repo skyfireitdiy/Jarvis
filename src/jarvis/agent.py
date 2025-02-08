@@ -210,28 +210,28 @@ class Agent:
 
         PrettyOutput.print("总结对话历史，准备生成总结，开始新的对话...", OutputType.PROGRESS)
         
-        prompt = """请总结之前对话中的关键信息，包括：
-1. 当前任务目标
-2. 已经确认的关键信息
-3. 已经尝试过的方案
-4. 当前进展
-5. 待解决的问题
+        prompt = """Please summarize the key information from the previous conversation, including:
+1. Current task objective
+2. Confirmed key information
+3. Solutions that have been tried
+4. Current progress
+5. Pending issues
 
-请用简洁的要点形式描述，突出重要信息。不要包含对话细节。
+Please describe in concise bullet points, highlighting important information. Do not include conversation details.
 """
         
         try:
             summary = self.model.chat_until_success(self.prompt + "\n" + prompt)
             
             # 清空当前对话历史，但保留系统消息
-            self.conversation_length = 0  # 重置对话长度
+            self.conversation_length = 0  # Reset conversation length
             
             # 添加总结作为新的上下文
-            self.prompt = f"""以下是之前对话的关键信息总结：
+            self.prompt = f"""Here is a summary of key information from previous conversations:
 
 {summary}
 
-请基于以上信息继续完成任务。
+Please continue the task based on the above information.
 """
             self.conversation_length = len(self.prompt)  # 设置新的起始长度
             
@@ -256,12 +256,12 @@ class Agent:
         if user_input == 'y':
             try:
                 # 让模型判断是否需要生成方法论
-                analysis_prompt = """本次任务已结束，请分析是否需要生成方法论。
-如果认为需要生成方法论，请先判断是创建新的方法论还是更新已有方法论。如果是更新已有方法论，使用update，否则使用add。
-如果认为不需要生成方法论，请说明原因。
-方法论应该适应普遍场景，不要出现本次任务特定的信息，如代码的commit信息等。
-方法论中应该包含：问题重述、最优解决方案、注意事项（按需），除此外不要出现任何其他的信息。
-仅输出方法论工具的调用指令，或者是不需要生成方法论的说明，除此之外不要输出任何内容。
+                analysis_prompt = """The current task has ended, please analyze whether a methodology needs to be generated.
+If you think a methodology should be generated, first determine whether to create a new methodology or update an existing one. If updating an existing methodology, use 'update', otherwise use 'add'.
+If you think a methodology is not needed, please explain why.
+The methodology should be applicable to general scenarios, do not include task-specific information such as code commit messages.
+The methodology should include: problem restatement, optimal solution, notes (as needed), and nothing else.
+Only output the methodology tool call instruction, or the explanation for not generating a methodology. Do not output anything else.
 """
                 self.prompt = analysis_prompt
                 response = self._call_model(self.prompt)
@@ -281,15 +281,15 @@ class Agent:
             return "Task completed"
         
         # 生成任务总结
-        summary_prompt = f"""请对以上任务执行情况生成一个简洁的总结报告，包括：
+        summary_prompt = f"""Please generate a concise summary report of the task execution, including:
 
-1. 任务目标: 任务重述
-2. 执行结果: 成功/失败
-3. 关键信息: 提取执行过程中的重要信息
-4. 重要发现: 任何值得注意的发现
-5. 后续建议: 如果有的话
+1. Task Objective: Task restatement
+2. Execution Result: Success/Failure
+3. Key Information: Important information extracted during execution
+4. Important Findings: Any noteworthy discoveries
+5. Follow-up Suggestions: If any
 
-请用简洁的要点形式描述，突出重要信息。
+Please describe in concise bullet points, highlighting important information.
 """
         self.prompt = summary_prompt
         return self._call_model(self.prompt)
@@ -336,24 +336,24 @@ class Agent:
 
             self.clear_history()  
 
-            self.model.set_system_message(f"""你是 {self.name}，一个问题处理能力强大的 AI 助手。
-                                          
-如果用户需要执行任务，你会严格按照以下步骤处理问题：
-1. 问题重述：确认理解问题
-2. 根因分析（如果是问题分析类需要，其他不需要）
-3. 设定目标：需要可达成，可检验的一个或多个目标
-4. 生成解决方案：生成一个或者多个具备可操作性的解决方案
-5. 评估解决方案：从众多解决方案中选择一种最优的方案
-6. 制定行动计划：根据目前可以使用的工具制定行动计划，使用 PlantUML 格式输出明确的执行流程
-7. 执行行动计划：每步执行一个步骤，**最多使用一个工具**（工具执行完成后，等待工具结果再执行下一步）
-8. 监控与调整：如果执行结果与预期不符，则反思并调整行动计划，迭代之前的步骤
-9. 方法论：如果当前任务具有通用性且执行过程中遇到了值得记录的经验，使用方法论工具记录方法论，以提升后期处理类似问题的能力
-10. 任务结束：如果任务已经完成，使用任务结束指令结束任务
+            self.model.set_system_message(f"""You are {self.name}, an AI assistant with powerful problem-solving capabilities.
 
-方法论模板：
-1. 问题重述
-2. 最优解决方案
-3. 最优方案执行步骤（失败的行动不需要体现）
+When users need to execute tasks, you will strictly follow these steps to handle problems:
+1. Problem Restatement: Confirm understanding of the problem
+2. Root Cause Analysis (only if needed for problem analysis tasks)
+3. Set Objectives: Define achievable and verifiable goals
+4. Generate Solutions: Create one or more actionable solutions
+5. Evaluate Solutions: Select the optimal solution from multiple options
+6. Create Action Plan: Based on available tools, create an action plan using PlantUML format for clear execution flow
+7. Execute Action Plan: Execute one step at a time, **use at most one tool** (wait for tool execution results before proceeding)
+8. Monitor and Adjust: If execution results don't match expectations, reflect and adjust the action plan, iterate previous steps
+9. Methodology: If the current task has general applicability and valuable experience is gained, use methodology tools to record it for future similar problems
+10. Task Completion: End the task using task completion command when finished
+
+Methodology Template:
+1. Problem Restatement
+2. Optimal Solution
+3. Optimal Solution Steps (exclude failed actions)
 
 -------------------------------------------------------------
 
@@ -361,7 +361,7 @@ class Agent:
 
 -------------------------------------------------------------
 
-工具使用格式：
+Tool Usage Format:
 
 <TOOL_CALL>
 name: tool_name
@@ -372,18 +372,18 @@ arguments:
 
 -------------------------------------------------------------
 
-严格规则：
-- 每次只能执行一个工具
-- 工具执行必须严格按照工具使用格式
-- 等待用户提供执行结果
-- 不要假设或想象结果
-- 不要创建虚假对话
-- 如果现有信息不足以解决问题，则可以询问用户
-- 处理问题的每个步骤不是必须有的，可按情况省略
-- 在执行一些可能对系统或者用户代码库造成破坏的工具时，请先询问用户
-- 在多次迭代却没有任何进展时，可请求用户指导
-- 如果返回的yaml字符串中包含冒号，请将整个字符串用引号包裹，避免yaml解析错误
-- yaml中包含多行字符串时，请使用 | 语法
+Strict Rules:
+- Execute only one tool at a time
+- Tool execution must strictly follow the tool usage format
+- Wait for user to provide execution results
+- Don't assume or imagine results
+- Don't create fake dialogues
+- If current information is insufficient, you may ask the user
+- Not all problem-solving steps are mandatory, skip as appropriate
+- Ask user before executing tools that might damage system or user's codebase
+- Request user guidance when multiple iterations show no progress
+- If yaml string contains colons, wrap the entire string in quotes to avoid yaml parsing errors
+- Use | syntax for multi-line strings in yaml
 
 {methodology_prompt}
 

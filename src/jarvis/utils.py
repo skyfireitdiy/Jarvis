@@ -22,52 +22,52 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class OutputType(Enum):
-    SYSTEM = "system"      # AI助手消息
-    CODE = "code"         # 代码相关
-    RESULT = "result"     # 工具执行结果
-    ERROR = "error"       # 错误信息
-    INFO = "info"         # 系统提示
-    PLANNING = "planning" # 任务规划
-    PROGRESS = "progress" # 执行进度
-    SUCCESS = "success"   # 成功信息
-    WARNING = "warning"   # 警告信息
-    DEBUG = "debug"       # 调试信息
-    USER = "user"         # 用户输入
-    TOOL = "tool"         # 工具调用
+    SYSTEM = "system"      # AI assistant message
+    CODE = "code"         # Code related
+    RESULT = "result"     # Tool execution result
+    ERROR = "error"       # Error information
+    INFO = "info"         # System prompt
+    PLANNING = "planning" # Task planning
+    PROGRESS = "progress" # Execution progress
+    SUCCESS = "success"   # Success information
+    WARNING = "warning"   # Warning information
+    DEBUG = "debug"       # Debug information
+    USER = "user"         # User input
+    TOOL = "tool"         # Tool call
 
 class PrettyOutput:
     """美化输出类"""
     
     # 颜色方案 - 只使用前景色
     COLORS = {
-        OutputType.SYSTEM: Fore.CYAN,      # 青色 - AI助手
-        OutputType.CODE: Fore.GREEN,       # 绿色 - 代码
-        OutputType.RESULT: Fore.BLUE,      # 蓝色 - 结果
-        OutputType.ERROR: Fore.RED,        # 红色 - 错误
-        OutputType.INFO: Fore.YELLOW,      # 黄色 - 提示
-        OutputType.PLANNING: Fore.MAGENTA, # 紫色 - 规划
-        OutputType.PROGRESS: Fore.WHITE,   # 白色 - 进度
-        OutputType.SUCCESS: Fore.GREEN,    # 绿色 - 成功
-        OutputType.WARNING: Fore.YELLOW,   # 黄色 - 警告
-        OutputType.DEBUG: Fore.BLUE,       # 蓝色 - 调试
-        OutputType.USER: Fore.GREEN,       # 绿色 - 用户
-        OutputType.TOOL: Fore.YELLOW,      # 黄色 - 工具
+        OutputType.SYSTEM: Fore.CYAN,      # Cyan - AI assistant
+        OutputType.CODE: Fore.GREEN,       # Green - Code
+        OutputType.RESULT: Fore.BLUE,      # Blue - Result
+        OutputType.ERROR: Fore.RED,        # Red - Error
+        OutputType.INFO: Fore.YELLOW,      # Yellow - Prompt
+        OutputType.PLANNING: Fore.MAGENTA, # Magenta - Planning
+        OutputType.PROGRESS: Fore.WHITE,   # White - Progress
+        OutputType.SUCCESS: Fore.GREEN,    # Green - Success
+        OutputType.WARNING: Fore.YELLOW,   # Yellow - Warning
+        OutputType.DEBUG: Fore.BLUE,       # Blue - Debug
+        OutputType.USER: Fore.GREEN,       # Green - User
+        OutputType.TOOL: Fore.YELLOW,      # Yellow - Tool
     }
     
     # 图标方案
     ICONS = {
-        OutputType.SYSTEM: "🤖",    # 机器人 - AI助手
-        OutputType.CODE: "📝",      # 记事本 - 代码
-        OutputType.RESULT: "✨",    # 闪光 - 结果
-        OutputType.ERROR: "❌",     # 错误 - 错误
-        OutputType.INFO: "ℹ️",      # 信息 - 提示
-        OutputType.PLANNING: "📋",  # 剪贴板 - 规划
-        OutputType.PROGRESS: "⏳",  # 沙漏 - 进度
-        OutputType.SUCCESS: "✅",   # 勾选 - 成功
-        OutputType.WARNING: "⚠️",   # 警告 - 警告
-        OutputType.DEBUG: "🔍",     # 放大镜 - 调试
-        OutputType.USER: "👤",      # 用户 - 用户
-        OutputType.TOOL: "🔧",      # 扳手 - 工具
+        OutputType.SYSTEM: "🤖",    # Robot - AI assistant
+        OutputType.CODE: "📝",      # Notebook - Code
+        OutputType.RESULT: "✨",    # Flash - Result
+        OutputType.ERROR: "❌",     # Error - Error
+        OutputType.INFO: "ℹ️",      # Info - Prompt
+        OutputType.PLANNING: "📋",  # Clipboard - Planning
+        OutputType.PROGRESS: "⏳",  # Hourglass - Progress
+        OutputType.SUCCESS: "✅",   # Checkmark - Success
+        OutputType.WARNING: "⚠️",   # Warning - Warning
+        OutputType.DEBUG: "🔍",     # Magnifying glass - Debug
+        OutputType.USER: "👤",      # User - User
+        OutputType.TOOL: "🔧",      # Wrench - Tool
     }
     
     # 前缀方案
@@ -88,7 +88,7 @@ class PrettyOutput:
 
     @staticmethod
     def format(text: str, output_type: OutputType, timestamp: bool = True) -> str:
-        """格式化输出文本"""
+        """Format output text"""
         color = PrettyOutput.COLORS.get(output_type, "")
         icon = PrettyOutput.ICONS.get(output_type, "")
         prefix = PrettyOutput.PREFIXES.get(output_type, "")
@@ -103,15 +103,15 @@ class PrettyOutput:
 
     @staticmethod
     def print(text: str, output_type: OutputType, timestamp: bool = True):
-        """打印格式化的输出"""
+        """Print formatted output"""
         print(PrettyOutput.format(text, output_type, timestamp))
         if output_type == OutputType.ERROR:
             import traceback
-            PrettyOutput.print(f"错误追踪: {traceback.format_exc()}", OutputType.INFO)
+            PrettyOutput.print(f"Error trace: {traceback.format_exc()}", OutputType.INFO)
 
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):
-        """打印带分隔线的段落标题"""
+        """Print paragraph title with separator"""
         width = 60
         color = PrettyOutput.COLORS.get(output_type, "")
         print(f"\n{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}")
@@ -120,19 +120,19 @@ class PrettyOutput:
 
     @staticmethod
     def print_stream(text: str):
-        """打印流式输出，不换行"""
+        """Print stream output, no line break"""
         color = PrettyOutput.COLORS.get(OutputType.SYSTEM, "")
         sys.stdout.write(f"{color}{text}{ColoramaStyle.RESET_ALL}")
         sys.stdout.flush()
 
     @staticmethod
     def print_stream_end():
-        """流式输出结束，打印换行"""
+        """Stream output end, print line break"""
         sys.stdout.write("\n")
         sys.stdout.flush()
 
 def get_multiline_input(tip: str) -> str:
-    """获取多行输入，支持方向键、历史记录等功能"""
+    """Get multi-line input, support direction key, history function, etc."""
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
     
     # 创建输入会话，启用历史记录
@@ -166,13 +166,13 @@ def get_multiline_input(tip: str) -> str:
             lines.append(line)
             
     except KeyboardInterrupt:
-        PrettyOutput.print("\n输入已取消", OutputType.INFO)
+        PrettyOutput.print("\nInput cancelled", OutputType.INFO)
         return "__interrupt__"
     
     return "\n".join(lines)
 
 def load_env_from_file():
-    """从~/.jarvis_env加载环境变量"""
+    """Load environment variables from ~/.jarvis_env"""
     env_file = Path.home() / ".jarvis_env"
     
     if env_file.exists():
@@ -195,17 +195,17 @@ def while_success(func, sleep_time: float = 0.1):
         try:
             return func()
         except Exception as e:
-            PrettyOutput.print(f"执行失败: {str(e)}, {sleep_time}s后重试...", OutputType.ERROR)
+            PrettyOutput.print(f"Execution failed: {str(e)}, retry in {sleep_time}s...", OutputType.ERROR)
             time.sleep(sleep_time)
             continue
 
 def while_true(func, sleep_time: float = 0.1):
-    """循环执行函数，直到函数返回True"""
+    """Loop execution function, until the function returns True"""
     while True:
         ret = func()
         if ret:
             break
-        PrettyOutput.print(f"执行失败，{sleep_time}s后重试...", OutputType.WARNING)
+        PrettyOutput.print(f"Execution failed, retry in {sleep_time}s...", OutputType.WARNING)
         time.sleep(sleep_time)
     return ret
 
@@ -218,7 +218,7 @@ def find_git_root(dir="."):
 
 def load_embedding_model():
     model_name = "BAAI/bge-large-zh-v1.5"
-    PrettyOutput.print(f"正在加载嵌入模型: {model_name}...", OutputType.INFO)
+    PrettyOutput.print(f"Loading embedding model: {model_name}...", OutputType.INFO)
     try:
         # 首先尝试离线加载
         embedding_model = SentenceTransformer(
@@ -226,22 +226,22 @@ def load_embedding_model():
             cache_folder=os.path.expanduser("~/.cache/huggingface/hub"),
             local_files_only=True
         )
-        PrettyOutput.print("使用本地缓存加载模型成功", OutputType.SUCCESS)
+        PrettyOutput.print("Successfully loaded model using local cache", OutputType.SUCCESS)
     except Exception as local_error:
-        PrettyOutput.print(f"本地加载失败，尝试在线下载: {str(local_error)}", OutputType.WARNING)
+        PrettyOutput.print(f"Failed to load locally, trying to download online: {str(local_error)}", OutputType.WARNING)
         # 如果离线加载失败，尝试在线下载
         embedding_model = SentenceTransformer(
             model_name,
             cache_folder=os.path.expanduser("~/.cache/huggingface/hub")
         )
-        PrettyOutput.print("模型下载并加载成功", OutputType.SUCCESS)
+        PrettyOutput.print("Successfully downloaded and loaded model", OutputType.SUCCESS)
     
     return embedding_model
 
 def load_rerank_model():
-    """加载重排序模型"""
+    """Load reranking model"""
     model_name = "BAAI/bge-reranker-v2-m3"
-    PrettyOutput.print(f"正在加载重排序模型: {model_name}...", OutputType.INFO)
+    PrettyOutput.print(f"Loading reranking model: {model_name}...", OutputType.INFO)
     
     try:
         # 首先尝试离线加载
@@ -255,9 +255,9 @@ def load_rerank_model():
             local_files_only=True,
             cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
         )
-        PrettyOutput.print("使用本地缓存加载模型成功", OutputType.SUCCESS)
+        PrettyOutput.print("Successfully loaded model using local cache", OutputType.SUCCESS)
     except Exception as local_error:
-        PrettyOutput.print(f"本地加载失败，尝试在线下载: {str(local_error)}", OutputType.WARNING)
+        PrettyOutput.print(f"Failed to load locally, trying to download online: {str(local_error)}", OutputType.WARNING)
         # 如果离线加载失败，尝试在线下载
         tokenizer = AutoTokenizer.from_pretrained(
             model_name,
@@ -267,7 +267,7 @@ def load_rerank_model():
             model_name,
             cache_dir=os.path.expanduser("~/.cache/huggingface/hub")
         )
-        PrettyOutput.print("模型下载并加载成功", OutputType.SUCCESS)
+        PrettyOutput.print("Successfully downloaded and loaded model", OutputType.SUCCESS)
     
     # 如果有 GPU 就使用 GPU
     if torch.cuda.is_available():
@@ -280,7 +280,7 @@ def get_max_context_length():
     return int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '131072'))  # 默认128k
 
 def is_long_context(files: list) -> bool:
-    """检测文件列表是否属于长上下文（总字符数超过最大上下文长度的80%）"""
+    """Check if the file list belongs to a long context (total characters exceed 80% of the maximum context length)"""
     max_length = get_max_context_length()
     threshold = max_length * 0.8
     total_chars = 0
@@ -291,11 +291,10 @@ def is_long_context(files: list) -> bool:
                 content = f.read()
                 total_chars += len(content)
                 
-                # 提前终止检查如果已经超过阈值
                 if total_chars > threshold:
                     return True
         except Exception as e:
-            PrettyOutput.print(f"无法读取文件 {file_path}: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"Failed to read file {file_path}: {e}", OutputType.WARNING)
             continue
             
     return total_chars > threshold

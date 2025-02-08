@@ -46,29 +46,29 @@ def process_request(request: str) -> Optional[str]:
         current_path = os.getcwd()
         
         # 设置系统提示
-        system_message = f"""你是一个 shell 命令生成助手。
+        system_message = f"""You are a shell command generation assistant.
 
-你的唯一任务是将用户的自然语言需求转换为对应的shell命令。
+Your only task is to convert user's natural language requirements into corresponding shell commands.
 
-严格要求：
-1. 只返回shell命令本身
-2. 不要添加任何标记（如```、/**/、//等）
-3. 不要添加任何解释或说明
-4. 不要添加任何换行或额外空格
-5. 如果需要多个命令，使用 && 连接
+Strict requirements:
+1. Only return the shell command itself
+2. Do not add any markers (like ```, /**/, // etc.)
+3. Do not add any explanations or descriptions
+4. Do not add any line breaks or extra spaces
+5. If multiple commands are needed, connect them with &&
 
-示例输入：
-"查找当前目录下的所有Python文件"
+Example input:
+"Find all Python files in the current directory"
 
-示例输出：
+Example output:
 find . -name "*.py"
 
-记住：只返回命令本身，不要有任何额外的内容。
+Remember: Only return the command itself, without any additional content.
 """
         model.set_system_message(system_message)
 
-        prefix = f"当前路径: {current_path}\n"
-        prefix += f"当前shell: {shell}\n"
+        prefix = f"Current path: {current_path}\n"
+        prefix += f"Current shell: {shell}\n"
         
         # 使用yaspin显示Thinking状态
         with yaspin(Spinners.dots, text="Thinking", color="yellow") as spinner:
