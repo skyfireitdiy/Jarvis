@@ -217,7 +217,7 @@ def find_git_root(dir="."):
     return ret
 
 def load_embedding_model():
-    model_name = "BAAI/bge-large-zh-v1.5"
+    model_name = "BAAI/bge-m3"
     PrettyOutput.print(f"Loading embedding model: {model_name}...", OutputType.INFO)
     try:
         # 首先尝试离线加载
