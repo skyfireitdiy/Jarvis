@@ -4,8 +4,8 @@ import os
 import sys
 import readline
 from typing import Optional
-from yaspin import yaspin
-from yaspin.spinners import Spinners
+from yaspin import yaspin # type: ignore
+from yaspin.spinners import Spinners # type: ignore
 
 from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType, load_env_from_file

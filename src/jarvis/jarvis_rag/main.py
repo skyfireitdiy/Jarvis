@@ -90,7 +90,7 @@ class TextFileProcessor(FileProcessor):
                     continue
                     
             if not detected_encoding:
-                raise UnicodeDecodeError(f"Failed to decode file with supported encodings: {file_path}")
+                raise UnicodeDecodeError(f"Failed to decode file with supported encodings: {file_path}") # type: ignore
                 
             # Use the detected encoding to read the file
             with open(file_path, 'r', encoding=detected_encoding, errors='replace') as f:
@@ -114,7 +114,7 @@ class PDFProcessor(FileProcessor):
     @staticmethod
     def extract_text(file_path: str) -> str:
         text_parts = []
-        with fitz.open(file_path) as doc:
+        with fitz.open(file_path) as doc: # type: ignore
             for page in doc:
                 text_parts.append(page.get_text())
         return "\n".join(text_parts)
@@ -248,7 +248,7 @@ class RAGTool:
             
         # Create a flat index to store original vectors, for reconstruction
         self.flat_index = faiss.IndexFlatIP(self.vector_dim)
-        self.flat_index.add(vectors)
+        self.flat_index.add(vectors) # type: ignore
         
         # Create an IVF index for fast search
         nlist = max(4, int(vectors.shape[0] / 1000))  # 每1000个向量一个聚类中心
@@ -256,8 +256,8 @@ class RAGTool:
         self.index = faiss.IndexIVFFlat(quantizer, self.vector_dim, nlist, faiss.METRIC_INNER_PRODUCT)
         
         # Train and add vectors
-        self.index.train(vectors)
-        self.index.add(vectors)
+        self.index.train(vectors) # type: ignore
+        self.index.add(vectors) # type: ignore
         # Set the number of clusters to probe during search
         self.index.nprobe = min(nlist, 10)
 
@@ -341,7 +341,7 @@ class RAGTool:
         except Exception as e:
             PrettyOutput.print(f"Failed to get vector representation: {str(e)}", 
                             output_type=OutputType.ERROR)
-            return np.zeros((len(texts), self.vector_dim), dtype=np.float32)
+            return np.zeros((len(texts), self.vector_dim), dtype=np.float32) # type: ignore
 
     def _process_document_batch(self, documents: List[Document]) -> List[np.ndarray]:
         """Process a batch of documents vectorization
@@ -361,7 +361,7 @@ Content: {doc.content}
 """
             texts.append(combined_text)
             
-        return self._get_embedding_batch(texts)
+        return self._get_embedding_batch(texts) # type: ignore
 
     def _process_file(self, file_path: str) -> List[Document]:
         """Process a single file"""
@@ -516,7 +516,7 @@ Content: {doc.content}
                                 if d.metadata['file_path'] == doc.metadata['file_path']), None)
                     if doc_idx is not None:
                         # Reconstruct vectors from flat index
-                        vector = np.zeros((1, self.vector_dim), dtype=np.float32)
+                        vector = np.zeros((1, self.vector_dim), dtype=np.float32) # type: ignore
                         self.flat_index.reconstruct(doc_idx, vector.ravel())
                         unchanged_vectors.append(vector)
                 
@@ -585,7 +585,7 @@ Content: {doc.content}
         
         # Initial search more results for MMR
         initial_k = min(top_k * 2, len(self.documents))
-        distances, indices = self.index.search(query_vector, initial_k)
+        distances, indices = self.index.search(query_vector, initial_k) # type: ignore
         
         # Get valid results
         valid_indices = indices[0][indices[0] != -1]

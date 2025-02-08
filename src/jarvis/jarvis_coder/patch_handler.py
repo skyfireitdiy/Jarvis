@@ -85,9 +85,10 @@ class PatchHandler:
             return "skip", ""
         if choice == "3":
             return "break", ""
-        return "continue", get_multiline_input("Please enter additional information and requirements:")
+        feedback = get_multiline_input("Please enter additional information and requirements:")
+        return "continue", feedback
 
-    def apply_patch(self, feature: str, raw_plan: str, structed_plan: Dict[str, str]) -> Tuple[bool, str]:
+    def apply_patch(self, feature: str, raw_plan: str, structed_plan: Dict[str, str]) -> bool:
         """Apply patch (main entry)"""
         for file_path, current_plan in structed_plan.items():
             additional_info = ""            
@@ -146,7 +147,7 @@ class PatchHandler:
                     act, msg = self.retry_comfirm()
                     if act == "break":
                         PrettyOutput.print("Terminate patch application", OutputType.WARNING)
-                        return False, msg
+                        return False
                     if act == "skip":
                         PrettyOutput.print(f"Skip file {file_path}", OutputType.WARNING)
                         break
@@ -156,7 +157,7 @@ class PatchHandler:
                 else:
                     break
         
-        return True, ""
+        return True
 
 
 
@@ -176,7 +177,7 @@ class PatchHandler:
             PrettyOutput.print(f"\nFile: {file_path}", OutputType.INFO)
             PrettyOutput.print(f"Modification plan: \n{patches_code}", OutputType.INFO)
         # 3. Apply patches
-        success, error_msg = self.apply_patch(feature, raw_plan, structed_plan)
+        success = self.apply_patch(feature, raw_plan, structed_plan)
         if not success:
             os.system("git reset --hard")
             return False
