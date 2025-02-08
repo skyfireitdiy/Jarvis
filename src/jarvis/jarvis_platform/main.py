@@ -2,26 +2,26 @@ from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType, load_env_from_file, get_multiline_input
 
 def list_platforms():
-    """列出所有支持的平台和模型"""
+    """List all supported platforms and models"""
     registry = PlatformRegistry.get_global_platform_registry()
     platforms = registry.get_available_platforms()
     
-    PrettyOutput.section("支持的平台和模型", OutputType.SUCCESS)
+    PrettyOutput.section("Supported platforms and models", OutputType.SUCCESS)
     
     for platform_name in platforms:
-        # 创建平台实例
+        # Create platform instance
         platform = registry.create_platform(platform_name)
         if not platform:
             continue
             
-        # 获取平台支持的模型列表
+        # Get the list of models supported by the platform
         try:
             models = platform.get_model_list()
             
-            # 打印平台名称
+            # Print platform name
             PrettyOutput.section(f"{platform_name}", OutputType.SUCCESS)
             
-            # 打印模型列表
+            # Print model list
             if models:
                 for model_name, description in models:
                     if description:
@@ -29,95 +29,95 @@ def list_platforms():
                     else:
                         PrettyOutput.print(f"  • {model_name}", OutputType.SUCCESS)
             else:
-                PrettyOutput.print("  没有可用的模型信息", OutputType.WARNING)
+                PrettyOutput.print("  • No available model information", OutputType.WARNING)
                 
         except Exception as e:
-            PrettyOutput.print(f"获取 {platform_name} 平台模型列表失败: {str(e)}", OutputType.WARNING)
+            PrettyOutput.print(f"Failed to get model list for {platform_name}: {str(e)}", OutputType.WARNING)
 
 def chat_with_model(platform_name: str, model_name: str):
-    """与指定平台和模型进行对话"""
+    """Chat with specified platform and model"""
     registry = PlatformRegistry.get_global_platform_registry()
     
-    # 创建平台实例
+    # Create platform instance
     platform = registry.create_platform(platform_name)
     if not platform:
-        PrettyOutput.print(f"创建平台 {platform_name} 失败", OutputType.ERROR)
+        PrettyOutput.print(f"Failed to create platform {platform_name}", OutputType.ERROR)
         return
     
     try:
-        # 设置模型
+        # Set model
         platform.set_model_name(model_name)
-        PrettyOutput.print(f"已连接到 {platform_name} 平台的 {model_name} 模型", OutputType.SUCCESS)
+        PrettyOutput.print(f"Connected to {platform_name} platform {model_name} model", OutputType.SUCCESS)
         
-        # 开始对话循环
+        # Start conversation loop
         while True:
-            # 获取用户输入
+            # Get user input
             user_input = get_multiline_input("")
             
-            # 检查是否取消输入
+            # Check if input is cancelled
             if user_input == "__interrupt__" or user_input.strip() == "/bye":
-                PrettyOutput.print("再见！", OutputType.SUCCESS)
+                PrettyOutput.print("Bye!", OutputType.SUCCESS)
                 break
                 
-            # 检查是否为空输入
+            # Check if input is empty
             if not user_input.strip():
                 continue
                 
-            # 检查是否为清除会话命令
+            # Check if it is a clear session command
             if user_input.strip() == "/clear":
                 try:
                     platform.delete_chat()
-                    platform.set_model_name(model_name)  # 重新初始化会话
-                    PrettyOutput.print("会话已清除", OutputType.SUCCESS)
+                    platform.set_model_name(model_name)  # Reinitialize session
+                    PrettyOutput.print("Session cleared", OutputType.SUCCESS)
                 except Exception as e:
-                    PrettyOutput.print(f"清除会话失败: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"Failed to clear session: {str(e)}", OutputType.ERROR)
                 continue
                 
             try:
-                # 发送到模型并获取回复
+                # Send to model and get reply
                 response = platform.chat_until_success(user_input)
                 if not response:
-                    PrettyOutput.print("未获得有效回复", OutputType.WARNING)
+                    PrettyOutput.print("No valid reply", OutputType.WARNING)
                     
             except Exception as e:
-                PrettyOutput.print(f"对话失败: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"Failed to chat: {str(e)}", OutputType.ERROR)
                 
     except Exception as e:
-        PrettyOutput.print(f"初始化对话失败: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"Failed to initialize conversation: {str(e)}", OutputType.ERROR)
     finally:
-        # 清理资源
+        # Clean up resources
         try:
             platform.delete_chat()
         except:
             pass
 
 def info_command(args):
-    """处理 info 子命令"""
+    """Process info subcommand"""
     list_platforms()
 
 def chat_command(args):
-    """处理 chat 子命令"""
+    """Process chat subcommand"""
     if not args.platform or not args.model:
-        PrettyOutput.print("请指定平台和模型。使用 'jarvis info' 查看可用的平台和模型。", OutputType.ERROR)
+        PrettyOutput.print("Please specify platform and model. Use 'jarvis info' to view available platforms and models.", OutputType.ERROR)
         return
     chat_with_model(args.platform, args.model)
 
 def main():
-    """主函数"""
+    """Main function"""
     import argparse
 
     load_env_from_file()
     
     parser = argparse.ArgumentParser(description='Jarvis AI Platform')
-    subparsers = parser.add_subparsers(dest='command', help='可用的子命令')
+    subparsers = parser.add_subparsers(dest='command', help='Available subcommands')
     
-    # info 子命令
-    info_parser = subparsers.add_parser('info', help='显示支持的平台和模型信息')
+    # info subcommand
+    info_parser = subparsers.add_parser('info', help='Display supported platforms and models information')
     
-    # chat 子命令
-    chat_parser = subparsers.add_parser('chat', help='与指定的平台和模型进行对话')
-    chat_parser.add_argument('--platform', '-p', help='指定要使用的平台')
-    chat_parser.add_argument('--model', '-m', help='指定要使用的模型')
+    # chat subcommand
+    chat_parser = subparsers.add_parser('chat', help='Chat with specified platform and model')
+    chat_parser.add_argument('--platform', '-p', help='Specify the platform to use')
+    chat_parser.add_argument('--model', '-m', help='Specify the model to use')
     
     args = parser.parse_args()
     

@@ -19,46 +19,46 @@ from threading import Lock
 
 @dataclass
 class Document:
-    """文档类，用于存储文档内容和元数据"""
-    content: str  # 文档内容
-    metadata: Dict  # 元数据(文件路径、位置等)
-    md5: str = ""  # 文件MD5值，用于增量更新检测
+    """Document class, for storing document content and metadata"""
+    content: str  # Document content
+    metadata: Dict  # Metadata (file path, position, etc.)
+    md5: str = ""  # File MD5 value, for incremental update detection
 
 class FileProcessor:
-    """文件处理器基类"""
+    """Base class for file processor"""
     @staticmethod
     def can_handle(file_path: str) -> bool:
-        """判断是否可以处理该文件"""
+        """Determine if the file can be processed"""
         raise NotImplementedError
         
     @staticmethod
     def extract_text(file_path: str) -> str:
-        """提取文件文本内容"""
+        """Extract file text content"""
         raise NotImplementedError
 
 class TextFileProcessor(FileProcessor):
-    """文本文件处理器"""
+    """Text file processor"""
     ENCODINGS = ['utf-8', 'gbk', 'gb2312', 'latin1']
-    SAMPLE_SIZE = 8192  # 读取前8KB来检测编码
+    SAMPLE_SIZE = 8192  # Read the first 8KB to detect encoding
     
     @staticmethod
     def can_handle(file_path: str) -> bool:
-        """判断文件是否为文本文件，通过尝试解码来判断"""
+        """Determine if the file is a text file by trying to decode it"""
         try:
-            # 读取文件开头的一小部分来检测
+            # Read the first part of the file to detect encoding
             with open(file_path, 'rb') as f:
                 sample = f.read(TextFileProcessor.SAMPLE_SIZE)
                 
-            # 检查是否包含空字节（通常表示二进制文件）
+            # Check if it contains null bytes (usually represents a binary file)
             if b'\x00' in sample:
                 return False
                 
-            # 检查是否包含过多的非打印字符（通常表示二进制文件）
+            # Check if it contains too many non-printable characters (usually represents a binary file)
             non_printable = sum(1 for byte in sample if byte < 32 and byte not in (9, 10, 13))  # tab, newline, carriage return
-            if non_printable / len(sample) > 0.3:  # 如果非打印字符超过30%，认为是二进制文件
+            if non_printable / len(sample) > 0.3:  # If non-printable characters exceed 30%, it is considered a binary file
                 return False
                 
-            # 尝试用不同编码解码
+            # Try to decode with different encodings
             for encoding in TextFileProcessor.ENCODINGS:
                 try:
                     sample.decode(encoding)
@@ -73,14 +73,14 @@ class TextFileProcessor(FileProcessor):
     
     @staticmethod
     def extract_text(file_path: str) -> str:
-        """提取文本内容，使用检测到的正确编码"""
+        """Extract text content, using the detected correct encoding"""
         detected_encoding = None
         try:
-            # 首先尝试检测编码
+            # First try to detect encoding
             with open(file_path, 'rb') as f:
                 raw_data = f.read()
                 
-            # 尝试不同的编码
+            # Try different encodings
             for encoding in TextFileProcessor.ENCODINGS:
                 try:
                     raw_data.decode(encoding)
@@ -90,23 +90,23 @@ class TextFileProcessor(FileProcessor):
                     continue
                     
             if not detected_encoding:
-                raise UnicodeDecodeError(f"无法用支持的编码解码文件: {file_path}")
+                raise UnicodeDecodeError(f"Failed to decode file with supported encodings: {file_path}")
                 
-            # 使用检测到的编码读取文件
+            # Use the detected encoding to read the file
             with open(file_path, 'r', encoding=detected_encoding, errors='replace') as f:
                 content = f.read()
                 
-            # 规范化Unicode字符
+            # Normalize Unicode characters
             import unicodedata
             content = unicodedata.normalize('NFKC', content)
             
             return content
             
         except Exception as e:
-            raise Exception(f"读取文件失败: {str(e)}")
+            raise Exception(f"Failed to read file: {str(e)}")
 
 class PDFProcessor(FileProcessor):
-    """PDF文件处理器"""
+    """PDF file processor"""
     @staticmethod
     def can_handle(file_path: str) -> bool:
         return Path(file_path).suffix.lower() == '.pdf'
@@ -120,7 +120,7 @@ class PDFProcessor(FileProcessor):
         return "\n".join(text_parts)
 
 class DocxProcessor(FileProcessor):
-    """DOCX文件处理器"""
+    """DOCX file processor"""
     @staticmethod
     def can_handle(file_path: str) -> bool:
         return Path(file_path).suffix.lower() == '.docx'
@@ -132,58 +132,58 @@ class DocxProcessor(FileProcessor):
 
 class RAGTool:
     def __init__(self, root_dir: str):
-        """初始化RAG工具
+        """Initialize RAG tool
         
         Args:
-            root_dir: 项目根目录
+            root_dir: Project root directory
         """
         load_env_from_file()
         self.root_dir = root_dir
         os.chdir(self.root_dir)
         
-        # 初始化配置
-        self.min_paragraph_length = int(os.environ.get("JARVIS_MIN_PARAGRAPH_LENGTH", "50"))  # 最小段落长度
-        self.max_paragraph_length = int(os.environ.get("JARVIS_MAX_PARAGRAPH_LENGTH", "1000"))  # 最大段落长度
-        self.context_window = int(os.environ.get("JARVIS_CONTEXT_WINDOW", "5"))  # 上下文窗口大小，默认前后各5个片段
+        # Initialize configuration
+        self.min_paragraph_length = int(os.environ.get("JARVIS_MIN_PARAGRAPH_LENGTH", "50"))  # Minimum paragraph length
+        self.max_paragraph_length = int(os.environ.get("JARVIS_MAX_PARAGRAPH_LENGTH", "1000"))  # Maximum paragraph length
+        self.context_window = int(os.environ.get("JARVIS_CONTEXT_WINDOW", "5"))  # Context window size, default前后各5个片段
         self.max_context_length = int(get_max_context_length() * 0.8)
         
-        # 初始化数据目录
+        # Initialize data directory
         self.data_dir = os.path.join(self.root_dir, ".jarvis-rag")
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
             
-        # 初始化嵌入模型
+        # Initialize embedding model
         try:
             self.embedding_model = load_embedding_model()
             self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
-            PrettyOutput.print("模型加载完成", output_type=OutputType.SUCCESS)
+            PrettyOutput.print("Model loaded", output_type=OutputType.SUCCESS)
         except Exception as e:
-            PrettyOutput.print(f"加载模型失败: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"Failed to load model: {str(e)}", output_type=OutputType.ERROR)
             raise
 
-        # 初始化缓存和索引
+        # Initialize cache and index
         self.cache_path = os.path.join(self.data_dir, "cache.pkl")
         self.documents: List[Document] = []
-        self.index = None  # 用于搜索的IVF索引
-        self.flat_index = None  # 用于存储原始向量
-        self.file_md5_cache = {}  # 用于存储文件的MD5值
+        self.index = None  # IVF index for search
+        self.flat_index = None  # Store original vectors
+        self.file_md5_cache = {}  # Store file MD5 values
         
-        # 加载缓存
+        # Load cache
         self._load_cache()
 
-        # 注册文件处理器
+        # Register file processors
         self.file_processors = [
             TextFileProcessor(),
             PDFProcessor(),
             DocxProcessor()
         ]
 
-        # 添加线程相关配置
+        # Add thread related configuration
         self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT", os.cpu_count() or 4))
-        self.vector_lock = Lock()  # 用于保护向量列表的并发访问
+        self.vector_lock = Lock()  # Protect vector list concurrency
 
     def _load_cache(self):
-        """加载缓存数据"""
+        """Load cache data"""
         if os.path.exists(self.cache_path):
             try:
                 with lzma.open(self.cache_path, 'rb') as f:
@@ -195,10 +195,10 @@ class RAGTool:
                 # 重建索引
                 if vectors is not None:
                     self._build_index(vectors)
-                PrettyOutput.print(f"加载了 {len(self.documents)} 个文档片段", 
+                PrettyOutput.print(f"Loaded {len(self.documents)} document fragments", 
                                 output_type=OutputType.INFO)
             except Exception as e:
-                PrettyOutput.print(f"加载缓存失败: {str(e)}", 
+                PrettyOutput.print(f"Failed to load cache: {str(e)}", 
                                 output_type=OutputType.WARNING)
                 self.documents = []
                 self.index = None
@@ -206,14 +206,14 @@ class RAGTool:
                 self.file_md5_cache = {}
 
     def _save_cache(self, vectors: np.ndarray):
-        """优化缓存保存"""
+        """Optimize cache saving"""
         try:
             cache_data = {
                 "version": "1.0",
                 "timestamp": datetime.now().isoformat(),
                 "documents": self.documents,
-                "vectors": vectors.copy() if vectors is not None else None,  # 创建数组的副本
-                "file_md5_cache": dict(self.file_md5_cache),  # 创建字典的副本
+                "vectors": vectors.copy() if vectors is not None else None,  # Create a copy of the array
+                "file_md5_cache": dict(self.file_md5_cache),  # Create a copy of the dictionary
                 "metadata": {
                     "vector_dim": self.vector_dim,
                     "total_docs": len(self.documents),
@@ -221,56 +221,56 @@ class RAGTool:
                 }
             }
             
-            # 先将数据序列化为字节流
+            # First serialize the data to a byte stream
             data = pickle.dumps(cache_data, protocol=pickle.HIGHEST_PROTOCOL)
             
-            # 然后使用 LZMA 压缩字节流
+            # Then use LZMA to compress the byte stream
             with lzma.open(self.cache_path, 'wb') as f:
                 f.write(data)
             
-            # 创建备份
+            # Create a backup
             backup_path = f"{self.cache_path}.backup"
             shutil.copy2(self.cache_path, backup_path)
             
-            PrettyOutput.print(f"缓存已保存: {len(self.documents)} 个文档片段", 
+            PrettyOutput.print(f"Cache saved: {len(self.documents)} document fragments", 
                             output_type=OutputType.INFO)
         except Exception as e:
-            PrettyOutput.print(f"保存缓存失败: {str(e)}", 
+            PrettyOutput.print(f"Failed to save cache: {str(e)}", 
                             output_type=OutputType.ERROR)
             raise
 
     def _build_index(self, vectors: np.ndarray):
-        """构建FAISS索引"""
+        """Build FAISS index"""
         if vectors.shape[0] == 0:
             self.index = None
             self.flat_index = None
             return
             
-        # 创建扁平索引存储原始向量，用于重建
+        # Create a flat index to store original vectors, for reconstruction
         self.flat_index = faiss.IndexFlatIP(self.vector_dim)
         self.flat_index.add(vectors)
         
-        # 创建IVF索引用于快速搜索
+        # Create an IVF index for fast search
         nlist = max(4, int(vectors.shape[0] / 1000))  # 每1000个向量一个聚类中心
         quantizer = faiss.IndexFlatIP(self.vector_dim)
         self.index = faiss.IndexIVFFlat(quantizer, self.vector_dim, nlist, faiss.METRIC_INNER_PRODUCT)
         
-        # 训练并添加向量
+        # Train and add vectors
         self.index.train(vectors)
         self.index.add(vectors)
-        # 设置搜索时探测的聚类数
+        # Set the number of clusters to probe during search
         self.index.nprobe = min(nlist, 10)
 
     def _split_text(self, text: str) -> List[str]:
-        """使用更智能的分块策略"""
-        # 添加重叠分块以保持上下文连贯性
+        """Use a more intelligent splitting strategy"""
+        # Add overlapping blocks to maintain context consistency
         overlap_size = min(200, self.max_paragraph_length // 4)
         
         paragraphs = []
         current_chunk = []
         current_length = 0
         
-        # 首先按句子分割
+        # First split by sentence
         sentences = []
         current_sentence = []
         sentence_ends = {'。', '！', '？', '…', '.', '!', '?'}
@@ -288,7 +288,7 @@ class RAGTool:
             if sentence.strip():
                 sentences.append(sentence)
         
-        # 基于句子构建重叠块
+        # Build overlapping blocks based on sentences
         for sentence in sentences:
             if current_length + len(sentence) > self.max_paragraph_length:
                 if current_chunk:
@@ -296,8 +296,8 @@ class RAGTool:
                     if len(chunk_text) >= self.min_paragraph_length:
                         paragraphs.append(chunk_text)
                         
-                    # 保留部分内容作为重叠
-                    overlap_text = ' '.join(current_chunk[-2:])  # 保留最后两句
+                    # Keep some content as overlap
+                    overlap_text = ' '.join(current_chunk[-2:])  # Keep the last two sentences
                     current_chunk = []
                     if overlap_text:
                         current_chunk.append(overlap_text)
@@ -308,7 +308,7 @@ class RAGTool:
             current_chunk.append(sentence)
             current_length += len(sentence)
         
-        # 处理最后一个chunk
+        # Process the last chunk
         if current_chunk:
             chunk_text = ' '.join(current_chunk)
             if len(chunk_text) >= self.min_paragraph_length:
@@ -317,65 +317,65 @@ class RAGTool:
         return paragraphs
 
     def _get_embedding(self, text: str) -> np.ndarray:
-        """获取文本的向量表示"""
+        """Get the vector representation of the text"""
         embedding = self.embedding_model.encode(text, 
                                             normalize_embeddings=True,
                                             show_progress_bar=False)
         return np.array(embedding, dtype=np.float32)
 
     def _get_embedding_batch(self, texts: List[str]) -> np.ndarray:
-        """批量获取文本的向量表示
+        """Get the vector representation of the text batch
         
         Args:
-            texts: 文本列表
+            texts: Text list
             
         Returns:
-            np.ndarray: 向量表示数组
+            np.ndarray: Vector representation array
         """
         try:
             embeddings = self.embedding_model.encode(texts, 
                                                 normalize_embeddings=True,
                                                 show_progress_bar=False,
-                                                batch_size=32)  # 使用批处理提高效率
+                                                batch_size=32)  # Use batch processing to improve efficiency
             return np.array(embeddings, dtype=np.float32)
         except Exception as e:
-            PrettyOutput.print(f"获取向量表示失败: {str(e)}", 
+            PrettyOutput.print(f"Failed to get vector representation: {str(e)}", 
                             output_type=OutputType.ERROR)
             return np.zeros((len(texts), self.vector_dim), dtype=np.float32)
 
     def _process_document_batch(self, documents: List[Document]) -> List[np.ndarray]:
-        """处理一批文档的向量化
+        """Process a batch of documents vectorization
         
         Args:
-            documents: 文档列表
+            documents: Document list
             
         Returns:
-            List[np.ndarray]: 向量列表
+            List[np.ndarray]: Vector list
         """
         texts = []
         for doc in documents:
-            # 组合文档信息
+            # Combine document information
             combined_text = f"""
-文件: {doc.metadata['file_path']}
-内容: {doc.content}
+File: {doc.metadata['file_path']}
+Content: {doc.content}
 """
             texts.append(combined_text)
             
         return self._get_embedding_batch(texts)
 
     def _process_file(self, file_path: str) -> List[Document]:
-        """处理单个文件"""
+        """Process a single file"""
         try:
-            # 计算文件MD5
+            # Calculate file MD5
             current_md5 = get_file_md5(file_path)
             if not current_md5:
                 return []
 
-            # 检查文件是否需要重新处理
+            # Check if the file needs to be reprocessed
             if file_path in self.file_md5_cache and self.file_md5_cache[file_path] == current_md5:
                 return []
 
-            # 查找合适的处理器
+            # Find the appropriate processor
             processor = None
             for p in self.file_processors:
                 if p.can_handle(file_path):
@@ -383,18 +383,18 @@ class RAGTool:
                     break
                     
             if not processor:
-                # 如果找不到合适的处理器，则返回一个空的文档
+                # If no appropriate processor is found, return an empty document
                 return []
             
-            # 提取文本内容
+            # Extract text content
             content = processor.extract_text(file_path)
             if not content.strip():
                 return []
             
-            # 分割文本
+            # Split text
             chunks = self._split_text(content)
             
-            # 创建文档对象
+            # Create document objects
             documents = []
             for i, chunk in enumerate(chunks):
                 doc = Document(
@@ -409,18 +409,18 @@ class RAGTool:
                 )
                 documents.append(doc)
             
-            # 更新MD5缓存
+            # Update MD5 cache
             self.file_md5_cache[file_path] = current_md5
             return documents
             
         except Exception as e:
-            PrettyOutput.print(f"处理文件失败 {file_path}: {str(e)}", 
+            PrettyOutput.print(f"Failed to process file {file_path}: {str(e)}", 
                             output_type=OutputType.ERROR)
             return []
 
     def build_index(self, dir: str):
-        """构建文档索引"""
-        # 获取所有文件
+        """Build document index"""
+        # Get all files
         all_files = []
         for root, _, files in os.walk(dir):
             if any(ignored in root for ignored in ['.git', '__pycache__', 'node_modules']) or \
@@ -432,69 +432,69 @@ class RAGTool:
                     
                 file_path = os.path.join(root, file)
                 if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
-                    PrettyOutput.print(f"跳过大文件: {file_path}", 
+                    PrettyOutput.print(f"Skip large file: {file_path}", 
                                     output_type=OutputType.WARNING)
                     continue
                 all_files.append(file_path)
 
-        # 清理已删除文件的缓存
+        # Clean up cache for deleted files
         deleted_files = set(self.file_md5_cache.keys()) - set(all_files)
         for file_path in deleted_files:
             del self.file_md5_cache[file_path]
-            # 移除相关的文档
+            # Remove related documents
             self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
 
-        # 检查文件变化
+        # Check file changes
         files_to_process = []
         unchanged_files = []
         
-        with tqdm(total=len(all_files), desc="检查文件状态") as pbar:
+        with tqdm(total=len(all_files), desc="Check file status") as pbar:
             for file_path in all_files:
                 current_md5 = get_file_md5(file_path)
-                if current_md5:  # 只处理能成功计算MD5的文件
+                if current_md5:  # Only process files that can successfully calculate MD5
                     if file_path in self.file_md5_cache and self.file_md5_cache[file_path] == current_md5:
-                        # 文件未变化，记录但不重新处理
+                        # File未变化，记录但不重新处理
                         unchanged_files.append(file_path)
                     else:
-                        # 新文件或已修改的文件
+                        # New file or modified file
                         files_to_process.append(file_path)
                 pbar.update(1)
 
-        # 保留未变化文件的文档
+        # Keep documents for unchanged files
         unchanged_documents = [doc for doc in self.documents 
                             if doc.metadata['file_path'] in unchanged_files]
 
-        # 处理新文件和修改的文件
+        # Process new files and modified files
         new_documents = []
         if files_to_process:
-            with tqdm(total=len(files_to_process), desc="处理文件") as pbar:
+            with tqdm(total=len(files_to_process), desc="Process files") as pbar:
                 for file_path in files_to_process:
                     try:
                         docs = self._process_file(file_path)
                         if len(docs) > 0:
                             new_documents.extend(docs)
                     except Exception as e:
-                        PrettyOutput.print(f"处理文件失败 {file_path}: {str(e)}", 
+                        PrettyOutput.print(f"Failed to process file {file_path}: {str(e)}", 
                                         output_type=OutputType.ERROR)
                     pbar.update(1)
 
-        # 更新文档列表
+        # Update document list
         self.documents = unchanged_documents + new_documents
 
         if not self.documents:
-            PrettyOutput.print("没有需要处理的文档", output_type=OutputType.WARNING)
+            PrettyOutput.print("No documents to process", output_type=OutputType.WARNING)
             return
 
-        # 只对新文档进行向量化
+        # Only vectorize new documents
         if new_documents:
-            PrettyOutput.print(f"开始处理 {len(new_documents)} 个新文档", 
+            PrettyOutput.print(f"Start processing {len(new_documents)} new documents", 
                             output_type=OutputType.INFO)
             
-            # 使用线程池并发处理向量化
+            # Use thread pool to process vectorization
             batch_size = 32
             new_vectors = []
             
-            with tqdm(total=len(new_documents), desc="生成向量") as pbar:
+            with tqdm(total=len(new_documents), desc="Generating vectors") as pbar:
                 with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
                     for i in range(0, len(new_documents), batch_size):
                         batch = new_documents[i:i + batch_size]
@@ -506,16 +506,16 @@ class RAGTool:
                         
                         pbar.update(len(batch))
 
-            # 合并新旧向量
+            # Merge new and old vectors
             if self.flat_index is not None:
-                # 获取未变化文档的向量
+                # Get vectors for unchanged documents
                 unchanged_vectors = []
                 for doc in unchanged_documents:
-                    # 从现有索引中提取向量
+                    # Get vectors from existing index
                     doc_idx = next((i for i, d in enumerate(self.documents) 
                                 if d.metadata['file_path'] == doc.metadata['file_path']), None)
                     if doc_idx is not None:
-                        # 从扁平索引中重建向量
+                        # Reconstruct vectors from flat index
                         vector = np.zeros((1, self.vector_dim), dtype=np.float32)
                         self.flat_index.reconstruct(doc_idx, vector.ravel())
                         unchanged_vectors.append(vector)
@@ -528,21 +528,21 @@ class RAGTool:
             else:
                 vectors = np.vstack(new_vectors)
 
-            # 构建索引
+            # Build index
             self._build_index(vectors)
-            # 保存缓存
+            # Save cache
             self._save_cache(vectors)
         
-        PrettyOutput.print(f"成功索引了 {len(self.documents)} 个文档片段 (新增/修改: {len(new_documents)}, 未变化: {len(unchanged_documents)})", 
+        PrettyOutput.print(f"Successfully indexed {len(self.documents)} document fragments (Added/Modified: {len(new_documents)}, Unchanged: {len(unchanged_documents)})", 
                         output_type=OutputType.SUCCESS)
 
     def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
-        """优化搜索策略"""
+        """Optimize search strategy"""
         if not self.index:
-            PrettyOutput.print("索引未构建，正在构建...", output_type=OutputType.INFO)
+            PrettyOutput.print("Index not built, building...", output_type=OutputType.INFO)
             self.build_index(self.root_dir)
         
-        # 实现MMR (Maximal Marginal Relevance) 来增加结果多样性
+        # Implement MMR (Maximal Marginal Relevance) to increase result diversity
         def mmr(query_vec, doc_vecs, doc_ids, lambda_param=0.5, n_docs=top_k):
             selected = []
             selected_ids = []
@@ -552,10 +552,10 @@ class RAGTool:
                 best_idx = -1
                 
                 for i, (doc_vec, doc_id) in enumerate(zip(doc_vecs, doc_ids)):
-                    # 计算与查询的相似度
+                    # Calculate similarity with query
                     query_sim = float(np.dot(query_vec, doc_vec))
                     
-                    # 计算与已选文档的最大相似度
+                    # Calculate maximum similarity with selected documents
                     if selected:
                         doc_sims = [float(np.dot(doc_vec, selected_doc)) for selected_doc in selected]
                         max_doc_sim = max(doc_sims)
@@ -579,22 +579,22 @@ class RAGTool:
             
             return selected_ids
         
-        # 获取查询向量
+        # Get query vector
         query_vector = self._get_embedding(query)
         query_vector = query_vector.reshape(1, -1)
         
-        # 初始搜索更多结果用于MMR
+        # Initial search more results for MMR
         initial_k = min(top_k * 2, len(self.documents))
         distances, indices = self.index.search(query_vector, initial_k)
         
-        # 获取有效结果
+        # Get valid results
         valid_indices = indices[0][indices[0] != -1]
         valid_vectors = np.vstack([self._get_embedding(self.documents[idx].content) for idx in valid_indices])
         
-        # 应用MMR
+        # Apply MMR
         final_indices = mmr(query_vector[0], valid_vectors, valid_indices, n_docs=top_k)
         
-        # 构建结果
+        # Build results
         results = []
         for idx in final_indices:
             doc = self.documents[idx]
@@ -604,22 +604,22 @@ class RAGTool:
         return results
 
     def _rerank_results(self, query: str, initial_results: List[Tuple[Document, float]]) -> List[Tuple[Document, float]]:
-        """使用 rerank 模型重新排序搜索结果"""
+        """Use rerank model to rerank search results"""
         try:
             import torch
             model, tokenizer = load_rerank_model()
             
-            # 准备数据
+            # Prepare data
             pairs = []
             for doc, _ in initial_results:
-                # 组合文档信息
+                # Combine document information
                 doc_content = f"""
-文件: {doc.metadata['file_path']}
-内容: {doc.content}
+File: {doc.metadata['file_path']}
+Content: {doc.content}
 """
                 pairs.append([query, doc_content])
                 
-            # 对每个文档对进行打分
+            # Score each document pair
             scores = []
             batch_size = 8
             
@@ -641,133 +641,133 @@ class RAGTool:
                     batch_scores = outputs.logits.squeeze(-1).cpu().numpy()
                     scores.extend(batch_scores.tolist())
             
-            # 归一化分数到 0-1 范围
+            # Normalize scores to 0-1 range
             if scores:
                 min_score = min(scores)
                 max_score = max(scores)
                 if max_score > min_score:
                     scores = [(s - min_score) / (max_score - min_score) for s in scores]
             
-            # 将分数与文档组合并排序
+            # Combine scores with documents and sort
             scored_results = []
             for (doc, _), score in zip(initial_results, scores):
-                if score >= 0.5:  # 只保留关联度大于 0.5 的结果
+                if score >= 0.5:  # Only keep results with a score greater than 0.5
                     scored_results.append((doc, float(score)))
                     
-            # 按分数降序排序
+            # Sort by score in descending order
             scored_results.sort(key=lambda x: x[1], reverse=True)
             
             return scored_results
             
         except Exception as e:
-            PrettyOutput.print(f"重排序失败，使用原始排序: {str(e)}", output_type=OutputType.WARNING)
+            PrettyOutput.print(f"Failed to rerank, using original sorting: {str(e)}", output_type=OutputType.WARNING)
             return initial_results
 
     def is_index_built(self):
-        """检查索引是否已构建"""
+        """Check if index is built"""
         return self.index is not None
 
     def query(self, query: str) -> List[Document]:
-        """查询相关文档
+        """Query related documents
         
         Args:
-            query: 查询文本
+            query: Query text
             
         Returns:
-            相关文档列表，包含上下文
+            List[Document]: Related documents, including context
         """
         results = self.search(query)
         return [doc for doc, _ in results]
 
     def ask(self, question: str) -> Optional[str]:
-        """询问关于文档的问题
+        """Ask about documents
         
         Args:
-            question: 用户问题
+            question: User question
             
         Returns:
-            模型回答，如果失败则返回 None
+            Model answer, return None if failed
         """
         try:
-            # 搜索相关文档片段
+            # Search related document fragments
             results = self.query(question)
             if not results:
                 return None
             
-            # 显示找到的文档片段
+            # Display found document fragments
             for doc in results:
-                PrettyOutput.print(f"文件: {doc.metadata['file_path']}", output_type=OutputType.INFO)
-                PrettyOutput.print(f"片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}", 
+                PrettyOutput.print(f"File: {doc.metadata['file_path']}", output_type=OutputType.INFO)
+                PrettyOutput.print(f"Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}", 
                                 output_type=OutputType.INFO)
-                PrettyOutput.print("\n内容:", output_type=OutputType.INFO)
+                PrettyOutput.print("\nContent:", output_type=OutputType.INFO)
                 content = doc.content.encode('utf-8', errors='replace').decode('utf-8')
                 PrettyOutput.print(content, output_type=OutputType.INFO)
 
-            # 构建基础提示词
-            base_prompt = f"""请基于以下文档片段回答用户的问题。如果文档内容不足以完整回答问题，请明确指出。
+            # Build base prompt
+            base_prompt = f"""Please answer the user's question based on the following document fragments. If the document content is not sufficient to answer the question completely, please clearly indicate.
 
-用户问题: {question}
+User question: {question}
 
-相关文档片段:
+Related document fragments:
 """
-            end_prompt = "\n请提供准确、简洁的回答，如果文档内容不足以完整回答问题，请明确指出。"
+            end_prompt = "\nPlease provide an accurate and concise answer. If the document content is not sufficient to answer the question completely, please clearly indicate."
             
-            # 计算可用于文档内容的最大长度
-            # 预留一些空间给模型回答
+            # Calculate the maximum length that can be used for document content
+            # Leave some space for the model's answer
             available_length = self.max_context_length - len(base_prompt) - len(end_prompt) - 500
             
-            # 构建上下文，同时控制总长度
+            # Build context, while controlling the total length
             context = []
             current_length = 0
             
             for doc in results:
-                # 计算这个文档片段的内容长度
+                # Calculate the length of this document fragment's content
                 doc_content = f"""
-来源文件: {doc.metadata['file_path']}
-内容:
+Source file: {doc.metadata['file_path']}
+Content:
 {doc.content}
 ---
 """
                 content_length = len(doc_content)
                 
-                # 如果添加这个片段会超出限制，就停止添加
+                # If adding this fragment would exceed the limit, stop adding
                 if current_length + content_length > available_length:
-                    PrettyOutput.print("由于上下文长度限制，部分相关文档片段被省略", 
+                    PrettyOutput.print("Due to context length limit, some related document fragments were omitted", 
                                     output_type=OutputType.WARNING)
                     break
                     
                 context.append(doc_content)
                 current_length += content_length
 
-            # 构建完整的提示词
+            # Build complete prompt
             prompt = base_prompt + ''.join(context) + end_prompt
             
-            # 获取模型实例并生成回答
+            # Get model instance and generate answer
             model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
             response = model.chat_until_success(prompt)
             
             return response
             
         except Exception as e:
-            PrettyOutput.print(f"问答失败: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"Failed to answer: {str(e)}", output_type=OutputType.ERROR)
             return None
 
 def main():
-    """主函数"""
+    """Main function"""
     import argparse
     import sys
     
-    # 设置标准输出编码为UTF-8
+    # Set standard output encoding to UTF-8
     if sys.stdout.encoding != 'utf-8':
         import codecs
         sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
     
-    parser = argparse.ArgumentParser(description='文档检索和分析工具')
-    parser.add_argument('--dir', type=str, help='要处理的文档目录')
-    parser.add_argument('--build', action='store_true', help='构建文档索引')
-    parser.add_argument('--search', type=str, help='搜索文档内容')
-    parser.add_argument('--ask', type=str, help='询问关于文档的问题')
+    parser = argparse.ArgumentParser(description='Document retrieval and analysis tool')
+    parser.add_argument('--dir', type=str, help='Directory to process')
+    parser.add_argument('--build', action='store_true', help='Build document index')
+    parser.add_argument('--search', type=str, help='Search document content')
+    parser.add_argument('--ask', type=str, help='Ask about documents')
     args = parser.parse_args()
 
     try:
@@ -778,7 +778,7 @@ def main():
             args.dir = current_dir
 
         if args.dir and args.build:
-            PrettyOutput.print(f"正在处理目录: {args.dir}", output_type=OutputType.INFO)
+            PrettyOutput.print(f"Processing directory: {args.dir}", output_type=OutputType.INFO)
             rag.build_index(args.dir)
             return 0
 
@@ -787,35 +787,35 @@ def main():
             if args.search:
                 results = rag.query(args.search)
                 if not results:
-                    PrettyOutput.print("未找到相关内容", output_type=OutputType.WARNING)
+                    PrettyOutput.print("No related content found", output_type=OutputType.WARNING)
                     return 1
                     
                 for doc in results:
-                    PrettyOutput.print(f"\n文件: {doc.metadata['file_path']}", output_type=OutputType.INFO)
-                    PrettyOutput.print(f"片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}", 
+                    PrettyOutput.print(f"\nFile: {doc.metadata['file_path']}", output_type=OutputType.INFO)
+                    PrettyOutput.print(f"Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}", 
                                     output_type=OutputType.INFO)
-                    PrettyOutput.print("\n内容:", output_type=OutputType.INFO)
+                    PrettyOutput.print("\nContent:", output_type=OutputType.INFO)
                     content = doc.content.encode('utf-8', errors='replace').decode('utf-8')
                     PrettyOutput.print(content, output_type=OutputType.INFO)
                 return 0
 
             if args.ask:
-                # 调用 ask 方法
+                # Call ask method
                 response = rag.ask(args.ask)
                 if not response:
-                    PrettyOutput.print("未能获取答案", output_type=OutputType.WARNING)
+                    PrettyOutput.print("Failed to get answer", output_type=OutputType.WARNING)
                     return 1
                     
-                # 显示回答
-                PrettyOutput.print("\n回答:", output_type=OutputType.INFO)
+                # Display answer
+                PrettyOutput.print("\nAnswer:", output_type=OutputType.INFO)
                 PrettyOutput.print(response, output_type=OutputType.INFO)
                 return 0
 
-        PrettyOutput.print("请指定操作参数。使用 -h 查看帮助。", output_type=OutputType.WARNING)
+        PrettyOutput.print("Please specify operation parameters. Use -h to view help.", output_type=OutputType.WARNING)
         return 1
 
     except Exception as e:
-        PrettyOutput.print(f"执行失败: {str(e)}", output_type=OutputType.ERROR)
+        PrettyOutput.print(f"Failed to execute: {str(e)}", output_type=OutputType.ERROR)
         return 1
 
 if __name__ == "__main__":

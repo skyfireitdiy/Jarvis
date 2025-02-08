@@ -15,13 +15,13 @@ class PatchHandler:
 
 
     def _extract_patches(self, response: str) -> List[Patch]:
-        """从响应中提取补丁
+        """Extract patches from response
         
         Args:
-            response: 模型响应内容
+            response: Model response content
             
         Returns:
-            List[Tuple[str, str, str]]: 补丁列表，每个补丁是 (格式, 文件路径, 补丁内容) 的元组
+            List[Tuple[str, str, str]]: Patch list, each patch is a tuple of (format, file path, patch content)
         """
         # 修改后的正则表达式匹配三种补丁格式
         fmt_pattern = r'<PATCH>\n>>>>>> SEARCH\n(.*?)\n?(={5,})\n(.*?)\n?<<<<<< REPLACE\n</PATCH>'
@@ -32,21 +32,21 @@ class PatchHandler:
 
 
     def _confirm_and_apply_changes(self, file_path: str) -> bool:
-        """确认并应用修改"""
+        """Confirm and apply changes"""
         os.system(f"git diff --cached {file_path}")
-        confirm = input(f"\n是否接受 {file_path} 的修改？(y/n) [y]: ").lower() or "y"
+        confirm = input(f"\nAccept {file_path} changes? (y/n) [y]: ").lower() or "y"
         if confirm == "y":
             return True
         else:
-            # 回退修改
+            # Rollback changes
             os.system(f"git reset {file_path}")
             os.system(f"git checkout -- {file_path}")
-            PrettyOutput.print(f"已回退 {file_path} 的修改", OutputType.WARNING)
+            PrettyOutput.print(f"Changes to {file_path} have been rolled back", OutputType.WARNING)
             return False
 
     
     def apply_file_patch(self, file_path: str, patches: List[Patch]) -> bool:
-        """应用文件补丁"""
+        """Apply file patch"""
         if not os.path.exists(file_path):
             base_dir = os.path.dirname(file_path)
             os.makedirs(base_dir, exist_ok=True)
@@ -54,20 +54,20 @@ class PatchHandler:
         file_content = open(file_path, "r", encoding="utf-8").read()
         for i, patch in enumerate(patches):
             if patch.old_code == "" and patch.new_code == "":
-                PrettyOutput.print(f"应用第 {i+1}/{len(patches)} 个补丁：删除文件 {file_path}", OutputType.INFO)
+                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)}: Delete file {file_path}", OutputType.INFO)
                 file_content = ""
                 os.system(f"git rm {file_path}")
-                PrettyOutput.print(f"应用第 {i+1}/{len(patches)} 个补丁成功", OutputType.SUCCESS)
+                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)} successfully", OutputType.SUCCESS)
             elif patch.old_code == "":
-                PrettyOutput.print(f"应用第 {i+1}/{len(patches)} 个补丁：替换文件 {file_path} 内容：\n{patch.new_code}", OutputType.INFO)
+                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)}: Replace file {file_path} content: \n{patch.new_code}", OutputType.INFO)
                 file_content = patch.new_code
                 open(file_path, "w", encoding="utf-8").write(patch.new_code)
                 os.system(f"git add {file_path}")
-                PrettyOutput.print(f"应用第 {i+1}/{len(patches)} 个补丁成功", OutputType.SUCCESS)
+                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)} successfully", OutputType.SUCCESS)
             else:
-                PrettyOutput.print(f"应用第 {i+1}/{len(patches)} 个补丁：文件原始内容：\n{patch.old_code}\n替换为：\n{patch.new_code}", OutputType.INFO)
+                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)}: File original content: \n{patch.old_code}\nReplace with: \n{patch.new_code}", OutputType.INFO)
                 if file_content.find(patch.old_code) == -1:
-                    PrettyOutput.print(f"文件 {file_path} 中不存在 {patch.old_code}", OutputType.WARNING)
+                    PrettyOutput.print(f"File {file_path} does not contain {patch.old_code}", OutputType.WARNING)
                     os.system(f"git reset {file_path}")
                     os.system(f"git checkout -- {file_path}")
                     return False
@@ -75,20 +75,20 @@ class PatchHandler:
                     file_content = file_content.replace(patch.old_code, patch.new_code, 1)
                     open(file_path, "w", encoding="utf-8").write(file_content)
                     os.system(f"git add {file_path}")
-                    PrettyOutput.print(f"应用第 {i+1}/{len(patches)} 个补丁成功", OutputType.SUCCESS)
+                    PrettyOutput.print(f"Apply patch {i+1}/{len(patches)} successfully", OutputType.SUCCESS)
         return True
             
     
-    def retry_comfirm(self) -> Tuple[str, str]:# 恢复用户选择逻辑
-        choice = input("\n请选择操作: (1) 重试 (2) 跳过 (3) 完全中止 [1]: ") or "1"
+    def retry_comfirm(self) -> Tuple[str, str]:# Restore user selection logic
+        choice = input("\nPlease choose an action: (1) Retry (2) Skip (3) Completely stop [1]: ") or "1"
         if choice == "2":
             return "skip", ""
         if choice == "3":
             return "break", ""
-        return "continue", get_multiline_input("请输入补充说明和要求:")
+        return "continue", get_multiline_input("Please enter additional information and requirements:")
 
     def apply_patch(self, feature: str, raw_plan: str, structed_plan: Dict[str, str]) -> Tuple[bool, str]:
-        """应用补丁（主入口）"""
+        """Apply patch (main entry)"""
         for file_path, current_plan in structed_plan.items():
             additional_info = ""            
             while True:
@@ -96,7 +96,7 @@ class PatchHandler:
                 if os.path.exists(file_path):
                     content = open(file_path, "r", encoding="utf-8").read()
                 else:
-                    content = "<文件不存在，需要创建>"
+                    content = "<File does not exist, need to create>"
                 prompt = """You are a senior software development expert who can generate code patches based on the complete modification plan, current original code file path, code content, and current file's modification plan. The output format should be as follows:
                         <PATCH>
                         >>>>>> SEARCH
@@ -135,20 +135,20 @@ class PatchHandler:
                     """
 
 
-                PrettyOutput.print(f"为{file_path}生成格式化补丁...", OutputType.PROGRESS)
+                PrettyOutput.print(f"Generating formatted patches for {file_path}...", OutputType.PROGRESS)
                 response = PlatformRegistry.get_global_platform_registry().get_codegen_platform().chat_until_success(prompt)
                 patches = self._extract_patches(response)
 
                 if not patches or not self.apply_file_patch(file_path, patches) or not self._confirm_and_apply_changes(file_path):
                     os.system(f"git reset {file_path}")
                     os.system(f"git checkout -- {file_path}")
-                    PrettyOutput.print("补丁生成失败", OutputType.WARNING)
+                    PrettyOutput.print("Patch generation failed", OutputType.WARNING)
                     act, msg = self.retry_comfirm()
                     if act == "break":
-                        PrettyOutput.print("终止补丁应用", OutputType.WARNING)
+                        PrettyOutput.print("Terminate patch application", OutputType.WARNING)
                         return False, msg
                     if act == "skip":
-                        PrettyOutput.print(f"跳过文件 {file_path}", OutputType.WARNING)
+                        PrettyOutput.print(f"Skip file {file_path}", OutputType.WARNING)
                         break
                     else:
                         additional_info += msg + "\n"
@@ -161,31 +161,31 @@ class PatchHandler:
 
 
     def handle_patch_application(self, feature: str, raw_plan: str, structed_plan: Dict[str,str]) -> bool:
-        """处理补丁应用流程
+        """Process patch application process
         
         Args:
-            related_files: 相关文件列表
-            feature: 功能描述
-            modification_plan: 修改方案
+            related_files: Related files list
+            feature: Feature description
+            modification_plan: Modification plan
             
         Returns:
-            bool: 是否成功应用补丁
+            bool: Whether patch application is successful
         """
-        PrettyOutput.print("\n将要应用以下修改方案:", OutputType.INFO)
+        PrettyOutput.print("\nThe following modification plan will be applied:", OutputType.INFO)
         for file_path, patches_code in structed_plan.items():
-            PrettyOutput.print(f"\n文件: {file_path}", OutputType.INFO)
-            PrettyOutput.print(f"修改方案: \n{patches_code}", OutputType.INFO)
-        # 3. 应用补丁
+            PrettyOutput.print(f"\nFile: {file_path}", OutputType.INFO)
+            PrettyOutput.print(f"Modification plan: \n{patches_code}", OutputType.INFO)
+        # 3. Apply patches
         success, error_msg = self.apply_patch(feature, raw_plan, structed_plan)
         if not success:
             os.system("git reset --hard")
             return False
-        # 6. 应用成功，让用户确认修改
-        PrettyOutput.print("\n补丁已应用，请检查修改效果。", OutputType.SUCCESS)
-        confirm = input("\n是否保留这些修改？(y/n) [y]: ").lower() or "y"
+        # 6. Apply successfully, let user confirm changes
+        PrettyOutput.print("\nPatches applied, please check the modification effect.", OutputType.SUCCESS)
+        confirm = input("\nKeep these changes? (y/n) [y]: ").lower() or "y"
         if confirm != "y":
-            PrettyOutput.print("用户取消修改，正在回退", OutputType.WARNING)
-            os.system("git reset --hard")  # 回退所有修改
+            PrettyOutput.print("User cancelled changes, rolling back", OutputType.WARNING)
+            os.system("git reset --hard")  # Rollback all changes
             return False
         else:
             return True
