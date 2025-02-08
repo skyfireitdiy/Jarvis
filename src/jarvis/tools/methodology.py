@@ -8,22 +8,22 @@ class MethodologyTool:
     """经验管理工具"""
     
     name = "methodology"
-    description = "管理问题处理方法论，支持添加、更新、删除操作"
+    description = "Manage problem-solving methodologies, supporting add, update, and delete operations"
     parameters = {
         "type": "object",
         "properties": {
             "operation": {
                 "type": "string",
-                "description": "操作类型 (delete/update/add)",
+                "description": "Operation type (delete/update/add)",
                 "enum": ["delete", "update", "add"]
             },
             "problem_type": {
                 "type": "string",
-                "description": "问题类型，例如：code_review, bug_fix 等"
+                "description": "Problem type, e.g., code_review, bug_fix, etc."
             },
             "content": {
                 "type": "string",
-                "description": "方法论内容 (update/add 时必需)",
+                "description": "Methodology content (required for update/add)",
                 "optional": True
             }
         },

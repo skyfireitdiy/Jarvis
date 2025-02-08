@@ -7,32 +7,32 @@ from jarvis.utils import OutputType, PrettyOutput
 
 class SubAgentTool:
     name = "create_sub_agent"
-    description = "创建一个子代理来处理特定任务，子代理会生成任务总结报告"
+    description = "Create a sub-agent to handle specific tasks, the sub-agent will generate a task summary report"
     parameters = {
         "type": "object",
         "properties": {
             "agent_name": {
                 "type": "string",
-                "description": "子代理的名称"
+                "description": "Sub-agent name"
             },
             "task": {
                 "type": "string",
-                "description": "需要完成的具体任务"
+                "description": "Specific task to complete"
             },
             "context": {
                 "type": "string",
-                "description": "任务相关的上下文信息",
+                "description": "Context information related to the task",
                 "default": ""
             },
             "goal": {
                 "type": "string",
-                "description": "任务的完成目标",
+                "description": "Completion goal of the task",
                 "default": ""
             },
             "files": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "相关文件路径列表，用于文件问答和处理",
+                "description": "Related file path list, used for file question answering and processing",
                 "default": []
             }
         },
@@ -41,7 +41,7 @@ class SubAgentTool:
 
 
     def execute(self, args: Dict) -> Dict[str, Any]:
-        """创建并运行子代理"""
+        """Create and run sub-agent"""
         try:
             agent_name = args["agent_name"]
             task = args["task"]
@@ -49,28 +49,28 @@ class SubAgentTool:
             goal = args.get("goal", "")
             files = args.get("files", [])
 
-            PrettyOutput.print(f"创建子代理: {agent_name}", OutputType.INFO)
+            PrettyOutput.print(f"Create sub-agent: {agent_name}", OutputType.INFO)
 
-            # 构建任务描述
+            # Build task description
             task_description = task
             if context:
-                task_description = f"上下文信息:\n{context}\n\n任务:\n{task}"
+                task_description = f"Context information:\n{context}\n\nTask:\n{task}"
             if goal:
-                task_description += f"\n\n完成目标:\n{goal}"
+                task_description += f"\n\nCompletion goal:\n{goal}"
 
-            # 创建子代理
+            # Create sub-agent
             sub_agent = Agent(
                 name=agent_name,
                 is_sub_agent=True
             )
 
-            # 运行子代理，传入文件列表
-            PrettyOutput.print("子代理开始执行任务...", OutputType.INFO)
+            # Run sub-agent, pass file list
+            PrettyOutput.print("Sub-agent starts executing task...", OutputType.INFO)
             result = sub_agent.run(task_description, file_list=files)
 
             return {
                 "success": True,
-                "stdout": f"子代理任务完成\n\n{result}",
+                "stdout": f"Sub-agent task completed\n\n{result}",
                 "stderr": ""
             }
 
@@ -78,5 +78,5 @@ class SubAgentTool:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"子代理执行失败: {str(e)}"
+                "error": f"Sub-agent execution failed: {str(e)}"
             } 

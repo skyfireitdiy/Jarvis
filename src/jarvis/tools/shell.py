@@ -8,7 +8,7 @@ from jarvis.utils import OutputType, PrettyOutput
 
 class ShellTool:
     name = "execute_shell"
-    description = """执行shell命令并返回结果"""
+    description = """Execute shell command and return result"""
 
     parameters = {
         "type": "object",
@@ -23,41 +23,41 @@ class ShellTool:
 
 
     def _escape_command(self, cmd: str) -> str:
-        """转义命令中的特殊字符"""
+        """Escape special characters in command"""
         return cmd.replace("'", "'\"'\"'")
 
     def execute(self, args: Dict) -> Dict[str, Any]:
-        """执行shell命令"""
+        """Execute shell command"""
         try:
             command = args["command"]
             
-            # 生成临时文件名
+            # Generate temporary file name
             output_file = os.path.join(tempfile.gettempdir(), f"jarvis_shell_{os.getpid()}.log")
             
-            # 转义命令中的特殊字符
+            # Escape special characters in command
             escaped_command = self._escape_command(command)
             
-            # 修改命令以使用script
+            # Modify command to use script
             tee_command = f"script -q -c '{escaped_command}' {output_file}"
             
-            PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
+            PrettyOutput.print(f"Execute command: {command}", OutputType.INFO)
             
-            # 执行命令
+            # Execute command
             return_code = os.system(tee_command)
             
-            # 读取输出文件
+            # Read output file
             try:
                 with open(output_file, 'r', encoding='utf-8', errors='replace') as f:
                     output = f.read()
-                    # 移除script命令添加的头尾
+                    # Remove header and footer added by script
                     if output:
                         lines = output.splitlines()
                         if len(lines) > 2:
                             output = "\n".join(lines[1:-1])
             except Exception as e:
-                output = f"读取输出文件失败: {str(e)}"
+                output = f"Failed to read output file: {str(e)}"
             finally:
-                # 清理临时文件
+                # Clean up temporary file
                 Path(output_file).unlink(missing_ok=True)
             
             return {
@@ -68,7 +68,7 @@ class ShellTool:
             }
                 
         except Exception as e:
-            # 确保清理临时文件
+            # Ensure temporary file is cleaned up
             if 'output_file' in locals():
                 Path(output_file).unlink(missing_ok=True)
             PrettyOutput.print(str(e), OutputType.ERROR)

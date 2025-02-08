@@ -9,38 +9,38 @@ from jarvis.utils import PrettyOutput, OutputType
 from jarvis.utils import while_success
 
 class KimiModel(BasePlatform):
-    """Kimi模型实现"""
+    """Kimi model implementation"""
 
     platform_name = "kimi"
 
     def get_model_list(self) -> List[Tuple[str, str]]:
-        """获取模型列表"""
-        return [("kimi", "基于网页Kimi的封装，免费接口")]
+        """Get model list"""
+        return [("kimi", "Based on the web Kimi, free interface")]
     
     def __init__(self):
         """
-        初始化Kimi模型
+        Initialize Kimi model
         """
         super().__init__()
         self.chat_id = ""
         self.api_key = os.getenv("KIMI_API_KEY")
         if not self.api_key:
-            PrettyOutput.print("\n需要设置 KIMI_API_KEY 才能使用 Jarvis。请按以下步骤操作：", OutputType.INFO)
-            PrettyOutput.print("\n1. 获取 Kimi API Key:", OutputType.INFO)
-            PrettyOutput.print("   • 访问 Kimi AI 平台: https://kimi.moonshot.cn", OutputType.INFO)
-            PrettyOutput.print("   • 登录您的账号", OutputType.INFO)
-            PrettyOutput.print("   • 打开浏览器开发者工具 (F12 或右键 -> 检查)", OutputType.INFO)
-            PrettyOutput.print("   • 切换到 Network 标签页", OutputType.INFO)
-            PrettyOutput.print("   • 发送任意消息", OutputType.INFO)
-            PrettyOutput.print("   • 在请求中找到 Authorization 头部", OutputType.INFO)
-            PrettyOutput.print("   • 复制 token 值（去掉 'Bearer ' 前缀）", OutputType.INFO)
-            PrettyOutput.print("\n2. 设置环境变量:", OutputType.INFO)
-            PrettyOutput.print("   方法 1: 创建或编辑 ~/.jarvis_env 文件:", OutputType.INFO)
+            PrettyOutput.print("\nNeed to set KIMI_API_KEY to use Jarvis. Please follow the steps below:", OutputType.INFO)
+            PrettyOutput.print("\n1. Get Kimi API Key:", OutputType.INFO)
+            PrettyOutput.print("   • Visit Kimi AI platform: https://kimi.moonshot.cn", OutputType.INFO)
+            PrettyOutput.print("   • Login to your account", OutputType.INFO)
+            PrettyOutput.print("   • Open browser developer tools (F12 or right-click -> Inspect)", OutputType.INFO)
+            PrettyOutput.print("   • Switch to the Network tab", OutputType.INFO)
+            PrettyOutput.print("   • Send any message", OutputType.INFO)
+            PrettyOutput.print("   • Find the Authorization header in the request", OutputType.INFO)
+            PrettyOutput.print("   • Copy the token value (remove the 'Bearer ' prefix)", OutputType.INFO)
+            PrettyOutput.print("\n2. Set environment variable:", OutputType.INFO)
+            PrettyOutput.print("   • Method 1: Create or edit ~/.jarvis_env file:", OutputType.INFO)
             PrettyOutput.print("   echo 'KIMI_API_KEY=your_key_here' > ~/.jarvis_env", OutputType.INFO)
-            PrettyOutput.print("\n   方法 2: 直接设置环境变量:", OutputType.INFO)
+            PrettyOutput.print("\n   • Method 2: Set environment variable directly:", OutputType.INFO)
             PrettyOutput.print("   export KIMI_API_KEY=your_key_here", OutputType.INFO)
-            PrettyOutput.print("\n设置完成后重新运行 Jarvis。", OutputType.INFO)
-            PrettyOutput.print("KIMI_API_KEY未设置", OutputType.WARNING)
+            PrettyOutput.print("\nAfter setting, run Jarvis again.", OutputType.INFO)
+            PrettyOutput.print("KIMI_API_KEY is not set", OutputType.WARNING)
         self.auth_header = f"Bearer {self.api_key}"
         self.chat_id = ""
         self.uploaded_files = []  # 存储已上传文件的信息
@@ -48,18 +48,18 @@ class KimiModel(BasePlatform):
         self.system_message = ""
 
     def set_system_message(self, message: str):
-        """设置系统消息"""
+        """Set system message"""
         self.system_message = message
 
     def set_model_name(self, model_name: str):
-        """设置模型名称"""
+        """Set model name"""
         pass
 
     def _create_chat(self) -> bool:
-        """创建新的对话会话"""
+        """Create a new chat session"""
         url = "https://kimi.moonshot.cn/api/chat"
         payload = json.dumps({
-            "name": "未命名会话",
+            "name": "Unnamed session",
             "is_example": False,
             "kimiplus_id": "kimi"
         })
@@ -76,7 +76,7 @@ class KimiModel(BasePlatform):
             return False
 
     def _get_presigned_url(self, filename: str, action: str) -> Dict:
-        """获取预签名上传URL"""
+        """Get presigned upload URL"""
         url = "https://kimi.moonshot.cn/api/pre-sign-url"
         
         
@@ -95,7 +95,7 @@ class KimiModel(BasePlatform):
         return response.json()
 
     def _upload_file(self, file_path: str, presigned_url: str) -> bool:
-        """上传文件到预签名URL"""
+        """Upload file to presigned URL"""
         try:
             with open(file_path, 'rb') as f:
                 content = f.read()
@@ -106,7 +106,7 @@ class KimiModel(BasePlatform):
             return False
 
     def _get_file_info(self, file_data: Dict, name: str, file_type: str) -> Dict:
-        """获取文件信息"""
+        """Get file information"""
         url = "https://kimi.moonshot.cn/api/file"
         payload = json.dumps({
             "type": file_type,
@@ -125,7 +125,7 @@ class KimiModel(BasePlatform):
         return response.json()
 
     def _wait_for_parse(self, file_id: str) -> bool:
-        """等待文件解析完成"""
+        """Wait for file parsing to complete"""
         url = "https://kimi.moonshot.cn/api/file/parse_process"
         headers = {
             'Authorization': self.auth_header,
@@ -163,7 +163,7 @@ class KimiModel(BasePlatform):
         
         return False
     def upload_files(self, file_list: List[str]) -> List[Dict]:
-        """上传文件列表并返回文件信息"""
+        """Upload file list and return file information"""
         if not file_list:
             return []
 
@@ -209,7 +209,7 @@ class KimiModel(BasePlatform):
         return uploaded_files
 
     def chat(self, message: str) -> str:
-        """发送消息并获取响应"""
+        """Send message and get response"""
         if not self.chat_id:
             if not self._create_chat():
                 raise Exception("Failed to create chat session")
@@ -353,7 +353,7 @@ class KimiModel(BasePlatform):
             raise Exception(f"Chat failed: {str(e)}")
 
     def delete_chat(self) -> bool:
-        """删除当前会话"""
+        """Delete current session"""
         if not self.chat_id:
             return True  # 如果没有会话ID，视为删除成功
             
@@ -376,11 +376,11 @@ class KimiModel(BasePlatform):
             return False
 
     def reset(self):
-        """重置对话"""
+        """Reset chat"""
         self.chat_id = ""
         self.uploaded_files = []
         self.first_chat = True  # 重置first_chat标记
 
     def name(self) -> str:
-        """模型名称"""
+        """Model name"""
         return "kimi"

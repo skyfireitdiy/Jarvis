@@ -6,13 +6,13 @@ class ChdirTool:
     """修改当前工作目录的工具"""
     
     name = "chdir"
-    description = "修改当前工作目录"
+    description = "Change current working directory"
     parameters = {
         "type": "object",
         "properties": {
             "path": {
                 "type": "string",
-                "description": "要切换到的目录路径，支持相对路径和绝对路径"
+                "description": "Directory path to switch to, supports both relative and absolute paths"
             }
         },
         "required": ["path"]
@@ -38,14 +38,14 @@ class ChdirTool:
             if not os.path.exists(path):
                 return {
                     "success": False,
-                    "error": f"目录不存在: {path}"
+                    "error": f"Directory does not exist: {path}"
                 }
                 
             # 检查是否是目录
             if not os.path.isdir(path):
                 return {
                     "success": False,
-                    "error": f"路径不是目录: {path}"
+                    "error": f"The path is not a directory: {path}"
                 }
                 
             # 尝试切换目录
@@ -54,27 +54,27 @@ class ChdirTool:
             
             return {
                 "success": True,
-                "stdout": f"已切换工作目录:\n从: {old_path}\n到: {path}",
+                "stdout": f"Changed working directory:\nFrom: {old_path}\nTo: {path}",
                 "stderr": ""
             }
             
         except PermissionError:
             return {
                 "success": False,
-                "error": f"没有权限访问目录: {path}"
+                "error": f"No permission to access directory: {path}"
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": f"切换目录失败: {str(e)}"
+                "error": f"Failed to switch directory: {str(e)}"
             }
             
 def main():
     """命令行直接运行工具"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='修改当前工作目录')
-    parser.add_argument('path', help='要切换到的目录路径')
+    parser = argparse.ArgumentParser(description='Change current working directory')
+    parser.add_argument('path', help='Directory path to switch to, supports both relative and absolute paths')
     args = parser.parse_args()
     
     tool = ChdirTool()
