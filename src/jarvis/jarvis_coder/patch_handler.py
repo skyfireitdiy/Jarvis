@@ -116,15 +116,8 @@ class PatchHandler:
             if save_prompt == "y":
                 self._save_additional_info(feedback)
                 PrettyOutput.print("Feedback saved for future use", OutputType.SUCCESS)
-        
-        # Combine saved and new feedback
-        combined_feedback = ""
-        if self.additional_info:
-            combined_feedback += self.additional_info + "\n"
-        if feedback:
-            combined_feedback += feedback
             
-        return "continue", combined_feedback.strip()
+        return "continue", feedback
 
     def apply_patch(self, feature: str, raw_plan: str, structed_plan: Dict[str, str]) -> bool:
         """Apply patch (main entry)"""
