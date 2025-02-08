@@ -6,14 +6,18 @@ import time
 import os
 from enum import Enum
 from datetime import datetime
+from typing import Any, Dict
 import colorama
 from colorama import Fore, Style as ColoramaStyle
+import numpy as np
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
 from prompt_toolkit.formatted_text import FormattedText
 from sentence_transformers import SentenceTransformer
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import torch
+import yaml
+import faiss
 
 # 初始化colorama
 colorama.init()
@@ -299,3 +303,93 @@ def get_thread_count():
 
 def get_file_md5(filepath: str)->str:    
     return hashlib.md5(open(filepath, "rb").read(100*1024*1024)).hexdigest()
+
+
+def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -> np.ndarray:
+    """Create embedding vector for methodology text"""
+    try:
+        # Truncate long text
+        max_length = 512
+        text = ' '.join(methodology_text.split()[:max_length])
+        
+        # 使用sentence_transformers模型获取嵌入向量
+        embedding = embedding_model.encode([text], 
+                                                convert_to_tensor=True,
+                                                normalize_embeddings=True)
+        vector = np.array(embedding.cpu().numpy(), dtype=np.float32)
+        return vector[0]  # Return first vector, because we only encoded one text
+    except Exception as e:
+        PrettyOutput.print(f"Failed to create methodology embedding vector: {str(e)}", OutputType.ERROR)
+        return np.zeros(1536, dtype=np.float32)
+
+
+def _load_methodology(user_input: str) -> str:
+    """Load methodology and build vector index"""
+    PrettyOutput.print("Loading methodology...", OutputType.PROGRESS)
+    user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
+    if not os.path.exists(user_jarvis_methodology):
+        return ""
+
+    try:
+        with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        # Reset data structure
+        methodology_data = []
+        vectors = []
+        ids = []
+
+        # Get embedding model
+        embedding_model = load_embedding_model()
+        
+        # Create test embedding to get correct dimension
+        test_embedding = _create_methodology_embedding(embedding_model, "test")
+        embedding_dimension = len(test_embedding)
+
+        # Create embedding vector for each methodology
+        for i, (key, value) in enumerate(data.items()):
+            PrettyOutput.print(f"Vectorizing methodology: {key} ...", OutputType.INFO)
+            methodology_text = f"{key}\n{value}"
+            embedding = _create_methodology_embedding(embedding_model, methodology_text)
+            vectors.append(embedding)
+            ids.append(i)
+            methodology_data.append({"key": key, "value": value})
+
+        if vectors:
+            vectors_array = np.vstack(vectors)
+            # Use correct dimension from test embedding
+            hnsw_index = faiss.IndexHNSWFlat(embedding_dimension, 16)
+            hnsw_index.hnsw.efConstruction = 40
+            hnsw_index.hnsw.efSearch = 16
+            methodology_index = faiss.IndexIDMap(hnsw_index)
+            methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
+            query_embedding = _create_methodology_embedding(embedding_model, user_input)
+            k = min(5, len(methodology_data))
+            PrettyOutput.print(f"Retrieving methodology...", OutputType.INFO)
+            distances, indices = methodology_index.search(
+                query_embedding.reshape(1, -1), k
+            ) # type: ignore
+
+            relevant_methodologies = {}
+            for dist, idx in zip(distances[0], indices[0]):
+                if idx >= 0:
+                    similarity = 1.0 / (1.0 + float(dist))
+                    methodology = methodology_data[idx]
+                    PrettyOutput.print(
+                        f"Methodology '{methodology['key']}' similarity: {similarity:.3f}",
+                        OutputType.INFO
+                    )
+                    if similarity >= 0.5:
+                        relevant_methodologies[methodology["key"]] = methodology["value"]
+                    
+            if relevant_methodologies:
+                return f"""This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it:
+                        {relevant_methodologies}
+                        """
+        return ""
+
+    except Exception as e:
+        PrettyOutput.print(f"Error loading methodology: {str(e)}", OutputType.ERROR)
+        import traceback
+        PrettyOutput.print(f"Error trace: {traceback.format_exc()}", OutputType.INFO)
+        return ""

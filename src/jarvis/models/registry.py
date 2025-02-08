@@ -3,8 +3,8 @@ import inspect
 import os
 import sys
 from typing import Dict, Type, Optional, List
-from .base import BasePlatform
-from ..utils import PrettyOutput, OutputType
+from jarvis.models.base import BasePlatform
+from jarvis.utils import PrettyOutput, OutputType
 
 REQUIRED_METHODS = [
     ('chat', ['message']),           # 方法名和参数列表

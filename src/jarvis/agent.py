@@ -1,17 +1,20 @@
+import argparse
 import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
+from prompt_toolkit import prompt
 import yaml
 import numpy as np
 import faiss
 
-from .models.registry import PlatformRegistry
-from .tools import ToolRegistry
-from .utils import PrettyOutput, OutputType, get_max_context_length, get_multiline_input, load_embedding_model
+from jarvis.models.registry import PlatformRegistry
+from jarvis.tools import ToolRegistry
+from jarvis.tools.registry import _load_tools
+from jarvis.utils import PrettyOutput, OutputType, _load_methodology, get_max_context_length, get_multiline_input, load_embedding_model, load_env_from_file
 import os
 
 class Agent:
-    def __init__(self, name: str = "Jarvis", is_sub_agent: bool = False):
+    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -26,7 +29,7 @@ class Agent:
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
         self.conversation_length = 0  # Use length counter instead
-        
+        self.system_prompt = system_prompt
         # Load configuration from environment variables
         self.embedding_dimension = 1536  # Default for many embedding models
         self.max_context_length = get_max_context_length()
@@ -46,10 +49,7 @@ class Agent:
             PrettyOutput.print("Successfully loaded embedding model", OutputType.SUCCESS)
             
             # Initialize HNSW index (use correct dimension)
-            hnsw_index = faiss.IndexHNSWFlat(self.embedding_dimension, 16)
-            hnsw_index.hnsw.efConstruction = 40
-            hnsw_index.hnsw.efSearch = 16
-            self.methodology_index = faiss.IndexIDMap(hnsw_index)
+            
             
         except Exception as e:
             PrettyOutput.print(f"Failed to load embedding model: {str(e)}", OutputType.ERROR)
@@ -117,78 +117,6 @@ class Agent:
                     sleep_time = 30
                 continue
 
-    def _create_methodology_embedding(self, methodology_text: str) -> np.ndarray:
-        """Create embedding vector for methodology text"""
-        try:
-            # Truncate long text
-            max_length = 512
-            text = ' '.join(methodology_text.split()[:max_length])
-            
-            # 使用sentence_transformers模型获取嵌入向量
-            embedding = self.embedding_model.encode([text], 
-                                                 convert_to_tensor=True,
-                                                 normalize_embeddings=True)
-            vector = np.array(embedding.cpu().numpy(), dtype=np.float32)
-            return vector[0]  # Return first vector, because we only encoded one text
-        except Exception as e:
-            PrettyOutput.print(f"Failed to create methodology embedding vector: {str(e)}", OutputType.ERROR)
-            return np.zeros(self.embedding_dimension, dtype=np.float32)
-
-    def _load_methodology(self, user_input: str) -> Dict[str, str]:
-        """Load methodology and build vector index"""
-        PrettyOutput.print("Loading methodology...", OutputType.PROGRESS)
-        user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
-        if not os.path.exists(user_jarvis_methodology):
-            return {}
-
-        try:
-            with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-
-            # Reset data structure
-            self.methodology_data = []
-            vectors = []
-            ids = []
-
-            # Create embedding vector for each methodology
-            for i, (key, value) in enumerate(data.items()):
-                PrettyOutput.print(f"Vectorizing methodology: {key} ...", OutputType.INFO)
-                methodology_text = f"{key}\n{value}"
-                embedding = self._create_methodology_embedding(methodology_text)
-                vectors.append(embedding)
-                ids.append(i)
-                self.methodology_data.append({"key": key, "value": value})
-
-            if vectors:
-                vectors_array = np.vstack(vectors)
-                self.methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
-                query_embedding = self._create_methodology_embedding(user_input)
-                k = min(5, len(self.methodology_data))
-                PrettyOutput.print(f"Retrieving methodology...", OutputType.INFO)
-                distances, indices = self.methodology_index.search(
-                    query_embedding.reshape(1, -1), k
-                ) # type: ignore
-
-                relevant_methodologies = {}
-                for dist, idx in zip(distances[0], indices[0]):
-                    if idx >= 0:
-                        similarity = 1.0 / (1.0 + float(dist))
-                        methodology = self.methodology_data[idx]
-                        PrettyOutput.print(
-                            f"Methodology '{methodology['key']}' similarity: {similarity:.3f}",
-                            OutputType.INFO
-                        )
-                        if similarity >= 0.5:
-                            relevant_methodologies[methodology["key"]] = methodology["value"]
-                        
-                if relevant_methodologies:
-                    return relevant_methodologies
-
-            return {}
-
-        except Exception as e:
-            PrettyOutput.print(f"Error loading methodology: {str(e)}", OutputType.ERROR)
-            return {}
 
     def _summarize_and_clear_history(self) -> None:
         """
@@ -307,84 +235,20 @@ Please describe in concise bullet points, highlighting important information.
                 self.model.upload_files(file_list)
 
             # Load methodology
-            methodology = self._load_methodology(user_input)
-            methodology_prompt = ""
-            if methodology:
-                methodology_prompt = f"""This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it:
-{methodology}
-
-"""
-            tools_prompt = ""
-
-            # 选择工具
-            PrettyOutput.section("Available tools", OutputType.PLANNING)
-            tools = self.tool_registry.get_all_tools()
-            if tools:
-                tools_prompt += "Available tools:\n"
-                for tool in tools:
-                    PrettyOutput.print(f"{tool['name']}: {tool['description']}", OutputType.INFO)
-                    tools_prompt += f"- Name: {tool['name']}\n"
-                    tools_prompt += f"  Description: {tool['description']}\n"
-                    tools_prompt += f"  Parameters: {tool['parameters']}\n"
+            methodology_prompt = _load_methodology(user_input)
+            tools_prompt = _load_tools()
 
             # 显示任务开始
             PrettyOutput.section(f"Starting new task: {self.name}", OutputType.PLANNING)
 
             self.clear_history()  
 
-            self.model.set_system_message(f"""You are {self.name}, an AI assistant with powerful problem-solving capabilities.
-
-When users need to execute tasks, you will strictly follow these steps to handle problems:
-1. Problem Restatement: Confirm understanding of the problem
-2. Root Cause Analysis (only if needed for problem analysis tasks)
-3. Set Objectives: Define achievable and verifiable goals
-4. Generate Solutions: Create one or more actionable solutions
-5. Evaluate Solutions: Select the optimal solution from multiple options
-6. Create Action Plan: Based on available tools, create an action plan using PlantUML format for clear execution flow
-7. Execute Action Plan: Execute one step at a time, **use at most one tool** (wait for tool execution results before proceeding)
-8. Monitor and Adjust: If execution results don't match expectations, reflect and adjust the action plan, iterate previous steps
-9. Methodology: If the current task has general applicability and valuable experience is gained, use methodology tools to record it for future similar problems
-10. Task Completion: End the task using task completion command when finished
-
-Methodology Template:
-1. Problem Restatement
-2. Optimal Solution
-3. Optimal Solution Steps (exclude failed actions)
-
--------------------------------------------------------------
+            self.model.set_system_message(f"""
+{self.system_prompt}
 
 {tools_prompt}
 
--------------------------------------------------------------
-
-Tool Usage Format:
-
-<TOOL_CALL>
-name: tool_name
-arguments:
-    param1: value1
-    param2: value2
-</TOOL_CALL>
-
--------------------------------------------------------------
-
-Strict Rules:
-- Execute only one tool at a time
-- Tool execution must strictly follow the tool usage format
-- Wait for user to provide execution results
-- Don't assume or imagine results
-- Don't create fake dialogues
-- If current information is insufficient, you may ask the user
-- Not all problem-solving steps are mandatory, skip as appropriate
-- Ask user before executing tools that might damage system or user's codebase
-- Request user guidance when multiple iterations show no progress
-- If yaml string contains colons, wrap the entire string in quotes to avoid yaml parsing errors
-- Use | syntax for multi-line strings in yaml
-
 {methodology_prompt}
-
--------------------------------------------------------------
-
 """)
             self.prompt = f"{user_input}"
 
@@ -446,3 +310,170 @@ Strict Rules:
 
 
 
+
+def load_tasks() -> dict:
+    """Load tasks from .jarvis files in user home and current directory."""
+    tasks = {}
+    
+    # Check .jarvis in user directory
+    user_jarvis = os.path.expanduser("~/.jarvis")
+    if os.path.exists(user_jarvis):
+        try:
+            with open(user_jarvis, "r", encoding="utf-8") as f:
+                user_tasks = yaml.safe_load(f)
+                
+            if isinstance(user_tasks, dict):
+                # Validate and add user directory tasks
+                for name, desc in user_tasks.items():
+                    if desc:  # Ensure description is not empty
+                        tasks[str(name)] = str(desc)
+            else:
+                PrettyOutput.print("Warning: ~/.jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
+        except Exception as e:
+            PrettyOutput.print(f"Error loading ~/.jarvis file: {str(e)}", OutputType.ERROR)
+    
+    # Check .jarvis in current directory
+    if os.path.exists(".jarvis"):
+        try:
+            with open(".jarvis", "r", encoding="utf-8") as f:
+                local_tasks = yaml.safe_load(f)
+                
+            if isinstance(local_tasks, dict):
+                # Validate and add current directory tasks, overwrite user directory tasks if there is a name conflict
+                for name, desc in local_tasks.items():
+                    if desc:  # Ensure description is not empty
+                        tasks[str(name)] = str(desc)
+            else:
+                PrettyOutput.print("Warning: .jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
+        except Exception as e:
+            PrettyOutput.print(f"Error loading .jarvis file: {str(e)}", OutputType.ERROR)
+
+    # Read methodology
+    method_path = os.path.expanduser("~/.jarvis_methodology")
+    if os.path.exists(method_path):
+        with open(method_path, "r", encoding="utf-8") as f:
+            methodology = yaml.safe_load(f)
+        if isinstance(methodology, dict):
+            for name, desc in methodology.items():
+                tasks[f"Run Methodology: {str(name)}\n {str(desc)}" ] = str(desc)
+    
+    return tasks
+
+def select_task(tasks: dict) -> str:
+    """Let user select a task from the list or skip. Returns task description if selected."""
+    if not tasks:
+        return ""
+    
+    # Convert tasks to list for ordered display
+    task_names = list(tasks.keys())
+    
+    PrettyOutput.print("\nAvailable tasks:", OutputType.INFO)
+    for i, name in enumerate(task_names, 1):
+        PrettyOutput.print(f"[{i}] {name}", OutputType.INFO)
+    PrettyOutput.print("[0] Skip predefined tasks", OutputType.INFO)
+    
+    
+    while True:
+        try:
+            choice = prompt(
+                "\nPlease select a task number (0 to skip): ",
+            ).strip()
+            
+            if not choice:
+                return ""
+            
+            choice = int(choice)
+            if choice == 0:
+                return ""
+            elif 1 <= choice <= len(task_names):
+                selected_name = task_names[choice - 1]
+                return tasks[selected_name]  # Return the task description
+            else:
+                PrettyOutput.print("Invalid choice. Please select a number from the list.", OutputType.ERROR)
+                
+        except KeyboardInterrupt:
+            return ""  # Return empty on Ctrl+C
+        except EOFError:
+            return ""  # Return empty on Ctrl+D
+        except Exception as e:
+            PrettyOutput.print(f"Failed to select task: {str(e)}", OutputType.ERROR)
+            continue
+
+def main():
+    """Jarvis main entry point"""
+    # Add argument parser
+    load_env_from_file()
+    parser = argparse.ArgumentParser(description='Jarvis AI assistant')
+    parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
+    args = parser.parse_args()
+
+    system_prompt = """You are Jarvis, an AI assistant with powerful problem-solving capabilities.
+
+When users need to execute tasks, you will strictly follow these steps to handle problems:
+1. Problem Restatement: Confirm understanding of the problem
+2. Root Cause Analysis (only if needed for problem analysis tasks)
+3. Set Objectives: Define achievable and verifiable goals
+4. Generate Solutions: Create one or more actionable solutions
+5. Evaluate Solutions: Select the optimal solution from multiple options
+6. Create Action Plan: Based on available tools, create an action plan using PlantUML format for clear execution flow
+7. Execute Action Plan: Execute one step at a time, **use at most one tool** (wait for tool execution results before proceeding)
+8. Monitor and Adjust: If execution results don't match expectations, reflect and adjust the action plan, iterate previous steps
+9. Methodology: If the current task has general applicability and valuable experience is gained, use methodology tools to record it for future similar problems
+10. Task Completion: End the task using task completion command when finished
+
+Methodology Template:
+1. Problem Restatement
+2. Optimal Solution
+3. Optimal Solution Steps (exclude failed actions)
+                                          
+Strict Rules:
+- Execute only one tool at a time
+- Tool execution must strictly follow the tool usage format
+- Wait for user to provide execution results
+- Don't assume or imagine results
+- Don't create fake dialogues
+- If current information is insufficient, you may ask the user
+- Not all problem-solving steps are mandatory, skip as appropriate
+- Ask user before executing tools that might damage system or user's codebase
+- Request user guidance when multiple iterations show no progress
+- If yaml string contains colons, wrap the entire string in quotes to avoid yaml parsing errors
+- Use | syntax for multi-line strings in yaml
+
+-------------------------------------------------------------"""
+
+    try:
+        # 获取全局模型实例
+        agent = Agent(system_prompt=system_prompt)
+
+        # 如果用户传入了模型参数，则更换当前模型为用户指定的模型
+
+        # Welcome information
+        PrettyOutput.print(f"Jarvis initialized - With {agent.model.name()}", OutputType.SYSTEM)
+        
+        # 加载预定义任务
+        tasks = load_tasks()
+        if tasks:
+            selected_task = select_task(tasks)
+            if selected_task:
+                PrettyOutput.print(f"\nExecute task: {selected_task}", OutputType.INFO)
+                agent.run(selected_task, args.files)
+                return 0
+        
+        # 如果没有选择预定义任务，进入交互模式
+        while True:
+            try:
+                user_input = get_multiline_input("Please enter your task (input empty line to exit):")
+                if not user_input or user_input == "__interrupt__":
+                    break
+                agent.run(user_input, args.files)
+            except Exception as e:
+                PrettyOutput.print(f"Error: {str(e)}", OutputType.ERROR)
+
+    except Exception as e:
+        PrettyOutput.print(f"Initialization error: {str(e)}", OutputType.ERROR)
+        return 1
+
+    return 0
+
+if __name__ == "__main__":
+    exit(main())

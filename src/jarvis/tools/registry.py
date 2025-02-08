@@ -10,6 +10,33 @@ from jarvis.tools.base import Tool
 from jarvis.utils import OutputType, PrettyOutput, get_max_context_length
 
 
+
+def _load_tools() -> str:
+    """Load tools"""
+    PrettyOutput.section("Available tools", OutputType.PLANNING)
+    tools = ToolRegistry.get_global_tool_registry().get_all_tools()
+    if tools:
+        tools_prompt = "Available tools:\n"
+        for tool in tools:
+            PrettyOutput.print(f"{tool['name']}: {tool['description']}", OutputType.INFO)
+            tools_prompt += f"- Name: {tool['name']}\n"
+            tools_prompt += f"  Description: {tool['description']}\n"
+            tools_prompt += f"  Parameters: {tool['parameters']}\n"
+            tools_prompt += f"  Usage Format: <TOOL_CALL>\n"
+        tools_prompt += """
+Tool Usage Format:
+
+<TOOL_CALL>
+name: tool_name
+arguments:
+    param1: value1
+    param2: value2
+</TOOL_CALL>
+---------------------------------------------
+"""
+        return tools_prompt
+    return ""
+
 class ToolRegistry:
     global_tool_registry = None # type: ignore
     def __init__(self):

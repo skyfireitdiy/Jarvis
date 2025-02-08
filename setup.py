@@ -32,7 +32,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "jarvis=jarvis.main:main",
+            "jarvis=jarvis.agent:main",
             "jarvis-coder=jarvis.jarvis_coder.main:main",
             "jarvis-codebase=jarvis.jarvis_codebase.main:main",
             "jarvis-rag=jarvis.jarvis_rag.main:main",
