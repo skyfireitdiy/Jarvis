@@ -6,31 +6,31 @@ from jarvis.utils import OutputType, PrettyOutput, while_success
 from jarvis.models.registry import PlatformRegistry
 
 def has_uncommitted_files() -> bool:
-    """判断代码库是否有未提交的文件"""
-    # 获取未暂存的修改
+    """Check if there are uncommitted files in the repository"""
+    # Get unstaged modifications
     unstaged = os.popen("git diff --name-only").read()
-    # 获取已暂存但未提交的修改
+    # Get staged but uncommitted modifications
     staged = os.popen("git diff --cached --name-only").read()
-    # 获取未跟踪的文件
+    # Get untracked files
     untracked = os.popen("git ls-files --others --exclude-standard").read()
     
     return bool(unstaged or staged or untracked)
 
 def generate_commit_message(git_diff: str) -> str:
-    """根据git diff和功能描述生成commit信息"""
-    prompt = f"""你是一个经验丰富的程序员，请根据以下代码变更和功能描述生成简洁明了的commit信息：
+    """Generate commit message based on git diff and feature description"""
+    prompt = f"""You are an experienced programmer, please generate a concise and clear commit message based on the following code changes and feature description:
 
-代码变更：
+Code changes:
 Git Diff:
 {git_diff}
 
-请遵循以下规则：
-1. 使用英文编写
-2. 采用常规的commit message格式：<type>(<scope>): <subject>
-3. 保持简洁，不超过50个字符
-4. 准确描述代码变更的主要内容
-5. 优先考虑功能描述和git diff中的变更内容
-6. 仅生成commit信息的文本，不要输出任何其他内容
+Please follow these rules:
+1. Write in English
+2. Use conventional commit message format: <type>(<scope>): <subject>
+3. Keep it concise, no more than 50 characters
+4. Accurately describe the main content of code changes
+5. Prioritize feature description and changes in git diff
+6. Only generate the commit message text, do not output anything else
 """
     
     model = PlatformRegistry().get_global_platform_registry().get_normal_platform()
@@ -39,15 +39,15 @@ Git Diff:
     return ';'.join(response.strip().split("\n"))
 
 def save_edit_record(record_dir: str, commit_message: str, git_diff: str) -> None:
-    """保存代码修改记录"""
-    # 获取下一个序号
+    """Save code modification record"""
+    # Get next sequence number
     existing_records = [f for f in os.listdir(record_dir) if f.endswith('.yaml')]
     next_num = 1
     if existing_records:
         last_num = max(int(f[:4]) for f in existing_records)
         next_num = last_num + 1
     
-    # 创建记录文件
+    # Create record file
     record = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "commit_message": commit_message,
@@ -58,4 +58,4 @@ def save_edit_record(record_dir: str, commit_message: str, git_diff: str) -> Non
     with open(record_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(record, f, allow_unicode=True)
     
-    PrettyOutput.print(f"已保存修改记录: {record_path}", OutputType.SUCCESS) 
+    PrettyOutput.print(f"Modification record saved: {record_path}", OutputType.SUCCESS) 
