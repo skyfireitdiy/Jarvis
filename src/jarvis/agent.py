@@ -8,7 +8,7 @@ import yaml
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools import ToolRegistry
 from jarvis.tools.registry import _load_tools
-from jarvis.utils import PrettyOutput, OutputType, _load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, load_embedding_model, load_env_from_file
+from jarvis.utils import PrettyOutput, OutputType, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, load_embedding_model, load_env_from_file
 import os
 
 class Agent:
@@ -16,7 +16,7 @@ class Agent:
     def __del__(self):
         delete_current_agent()
         
-    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False, tool_registry: ToolRegistry = ToolRegistry.get_global_tool_registry()):
+    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False, tool_registry: Optional[ToolRegistry] = None):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -27,7 +27,7 @@ class Agent:
         """
         add_agent(name)
         self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        self.tool_registry = tool_registry
+        self.tool_registry = tool_registry if tool_registry else ToolRegistry.get_global_tool_registry()
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
@@ -249,7 +249,7 @@ Please describe in concise bullet points, highlighting important information.
                 self.model.upload_files(file_list)
 
             # Load methodology
-            methodology_prompt = _load_methodology(user_input)
+            methodology_prompt = load_methodology(user_input)
             tools_prompt = _load_tools()
 
             # 显示任务开始

@@ -1,6 +1,5 @@
 from typing import Dict, Any
 
-from jarvis.agent import Agent
 from jarvis.utils import OutputType, PrettyOutput
 from jarvis.jarvis_coder.plan_generator import PlanGenerator
 

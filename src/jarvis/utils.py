@@ -334,7 +334,7 @@ def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -
         return np.zeros(1536, dtype=np.float32)
 
 
-def _load_methodology(user_input: str) -> str:
+def load_methodology(user_input: str) -> str:
     """Load methodology and build vector index"""
     PrettyOutput.print("Loading methodology...", OutputType.PROGRESS)
     user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
