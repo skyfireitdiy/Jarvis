@@ -98,39 +98,6 @@ DEVELOPMENT WORKFLOW:
          codebase_dir: .
      </TOOL_CALL>
 
-5. Change Verification
-   - Test modifications:
-     <TOOL_CALL>
-     name: verify_code_changes
-     arguments:
-         changes:
-             - auth.py
-         test_cases:
-             - test_password_validation
-     </TOOL_CALL>
-
-6. Version Control
-   - Check changes:
-     <TOOL_CALL>
-     name: git_status
-     arguments: {}
-     </TOOL_CALL>
-   - Review changes:
-     <TOOL_CALL>
-     name: git_diff
-     arguments:
-         files:
-             - auth.py
-     </TOOL_CALL>
-   - Save changes:
-     <TOOL_CALL>
-     name: git_commit
-     arguments:
-         message: Add password validation to auth.py
-         files:
-             - auth.py
-     </TOOL_CALL>
-
 FILE SELECTION WORKFLOW:
 1. Initial Search
    - Use codebase_search to find relevant files
@@ -187,12 +154,6 @@ ITERATION GUIDELINES:
 - Document issues and solutions
 - Learn from previous iterations
 
-VERSION CONTROL PRACTICES:
-- Commit after each small change
-- Write clear commit messages
-- Reference task/subtask in commits
-- Keep changes traceable
-
 TOOL USAGE:
 1. Analysis Tools:
    - execute_shell: Run grep/find/head/tail commands
@@ -205,13 +166,7 @@ TOOL USAGE:
    - create_code_sub_agent: Create agent for each small change
 
 3. Implementation Tools:
-   - execute_code_modification: Apply small changes (≤20 lines)
-   - verify_code_changes: Test modifications
-
-4. Version Control:
-   - git_status: Check changes
-   - git_commit: Save changes
-   - git_diff: Review changes"""
+   - execute_code_modification: Apply small changes (≤20 lines)"""
 
 def main():
     """Jarvis main entry point"""
