@@ -2,6 +2,7 @@ from typing import Dict, Any
 
 from jarvis.agent import Agent
 from jarvis.utils import OutputType, PrettyOutput
+from jarvis.jarvis_code_agent.main import system_prompt
 
 
 class CodeSubAgentTool:
@@ -14,26 +15,10 @@ class CodeSubAgentTool:
                 "type": "string",
                 "description": "The specific code development subtask to complete"
             },
-            "parent_task": {
+            "codebase_dir": {
                 "type": "string",
-                "description": "The parent task context",
-                "default": ""
-            },
-            "files": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "List of files related to the subtask",
-                "default": []
-            },
-            "dependencies": {
-                "type": "string",
-                "description": "Dependencies and relationships with other parts of the code",
-                "default": ""
-            },
-            "constraints": {
-                "type": "string",
-                "description": "Specific constraints or requirements for the subtask",
-                "default": ""
+                "description": "Directory containing the codebase",
+                "default": "."
             }
         },
         "required": ["subtask"]
@@ -43,118 +28,19 @@ class CodeSubAgentTool:
         """Execute code development subtask"""
         try:
             subtask = args["subtask"]
-            parent_task = args.get("parent_task", "")
-            files = args.get("files", [])
-            dependencies = args.get("dependencies", "")
-            constraints = args.get("constraints", "")
+            codebase_dir = args.get("codebase_dir", ".")
 
-            PrettyOutput.print("Creating code sub-agent for subtask...", OutputType.INFO)
-
-            # Customize system message for subtask handling
-            system_message = """You are a Code Development Sub-Agent specialized in handling specific code subtasks within a larger development effort.
-
-Your task is to:
-1. Focus on the assigned subtask
-2. Maintain consistency with parent task
-3. Follow code development best practices
-4. Coordinate with other components
-5. Ensure quality and compatibility
-
-Subtask Execution Process:
-1. ANALYSIS
-   - Understand subtask requirements
-   - Review related code
-   - Identify dependencies
-   - Plan implementation
-
-2. IMPLEMENTATION
-   - Follow parent task guidelines
-   - Make focused changes
-   - Maintain consistency
-   - Document changes
-   - Consider dependencies
-
-3. COORDINATION
-   - Align with parent task
-   - Check interface compatibility
-   - Verify integration points
-   - Handle dependencies
-
-4. QUALITY CONTROL
-   - Test changes thoroughly
-   - Verify requirements
-   - Check edge cases
-   - Document thoroughly
-
-Version Control:
-- Create focused commits
-- Reference parent task
-- Document relationships
-- Maintain traceability
-
-Guidelines:
-- Stay within subtask scope
-- Maintain code standards
-- Consider parent context
-- Handle edge cases
-- Document clearly
-
-Output Format:
-1. SUBTASK SUMMARY
-   - Implementation status
-   - Changes made
-   - Integration points
-
-2. VERIFICATION
-   - Test results
-   - Quality checks
-   - Integration status
-
-3. NEXT STEPS
-   - Required actions
-   - Dependencies
-   - Integration notes"""
+            PrettyOutput.print(f"Creating code sub-agent for subtask: {subtask}", OutputType.INFO)
 
             # Create sub-agent
             sub_agent = Agent(
-                system_prompt=system_message,
+                system_prompt=system_prompt,
                 name="CodeSubAgent",
                 is_sub_agent=True
             )
 
-            # Build comprehensive subtask description
-            task_description = f"""CODE DEVELOPMENT SUBTASK
-
-SUBTASK:
-{subtask}
-
-"""
-            if parent_task:
-                task_description += f"""
-PARENT TASK CONTEXT:
-{parent_task}
-
-"""
-            if files:
-                task_description += f"""
-RELATED FILES:
-{', '.join(files)}
-
-"""
-            if dependencies:
-                task_description += f"""
-DEPENDENCIES:
-{dependencies}
-
-"""
-            if constraints:
-                task_description += f"""
-CONSTRAINTS:
-{constraints}
-"""
-
             # Execute subtask
-            result = sub_agent.run(task_description)
+            result = sub_agent.run(subtask)
 
             return {
                 "success": True,

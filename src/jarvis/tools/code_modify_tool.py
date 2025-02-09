@@ -15,16 +15,17 @@ class CodeModifyTool:
                 "type": "string",
                 "description": "The code modification task description"
             },
-            "raw_plan": {
-                "type": "string",
-                "description": "The complete modification plan in raw text format"
-            },
             "structured_plan": {
                 "type": "object",
-                "description": "The structured modification plan with file paths and their modifications",
+                "description": "Dictionary mapping file paths to their modification plans. Example: {'path/to/file.py': 'Add function foo() to handle...'}", 
                 "additionalProperties": {
-                    "type": "string"
-                }
+                    "type": "string",
+                    "description": "Modification plan for a specific file"
+                },
+                "examples": [{
+                    "src/file1.py": "Add error handling to process_data()",
+                    "src/file2.py": "Update API endpoint URL in get_data()"
+                }]
             }
         },
         "required": ["task", "raw_plan", "structured_plan"]
@@ -34,7 +35,6 @@ class CodeModifyTool:
         """Execute code modifications using PatchHandler"""
         try:
             task = args["task"]
-            raw_plan = args["raw_plan"]
             structured_plan = args["structured_plan"]
 
             PrettyOutput.print("Executing code modifications...", OutputType.INFO)
