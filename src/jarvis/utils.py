@@ -130,7 +130,7 @@ class PrettyOutput:
         width = 100
         color = PrettyOutput.COLORS.get(output_type, "")
         print(f"\n{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}")
-        PrettyOutput.print(title.center(width - 10), output_type, timestamp=True)
+        PrettyOutput.print(title.center(width - 25), output_type, timestamp=False)
         print(f"{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}\n")
 
     @staticmethod
@@ -244,8 +244,6 @@ def load_embedding_model():
     cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
     model_dir = os.path.join(cache_dir, "models--" + model_name.replace("/", "--"))
     
-    PrettyOutput.print(f"Loading embedding model: {model_name}...", OutputType.INFO)
-    
     # Check if model exists
     if not os.path.exists(model_dir):
         PrettyOutput.print("Model not found locally, downloading using huggingface-cli...", OutputType.INFO)
@@ -257,7 +255,6 @@ def load_embedding_model():
         cache_folder=cache_dir,
         local_files_only=True
     )
-    PrettyOutput.print("Successfully loaded model", OutputType.SUCCESS)
     
     return embedding_model
 
@@ -285,7 +282,6 @@ def load_rerank_model():
         cache_dir=cache_dir,
         local_files_only=True
     )
-    PrettyOutput.print("Successfully loaded model", OutputType.SUCCESS)
     
     # Use GPU if available
     if torch.cuda.is_available():
