@@ -472,6 +472,7 @@ Code content:
             return []
             
         try:
+            PrettyOutput.print(f"Picking results for query: {query}", output_type=OutputType.INFO)
             # Prepare the prompt
             files_info = ""
             for path, _, desc in initial_results:
@@ -506,11 +507,12 @@ Note: Only include files that have a strong connection to the query."""
             # Extract the file list
             selected_files = yaml.safe_load(files_match.group(1))
 
+            raw_score = {file_path: score for file_path, score, _ in initial_results}
             # Build the results, using the position as the score
             scored_results = []
             for i, file_path in enumerate(selected_files):
                 # The score decreases from 1 to 0.1
-                score = 1.0 - (i * 0.9 / len(selected_files))
+                score = raw_score.get(file_path, 0.0)
                 scored_results.append((file_path, score))
 
             return scored_results
@@ -594,6 +596,9 @@ Please output 3 expressions directly, separated by two line breaks, without numb
             
             # Filter low-scoring results
             initial_results = [(path, score, desc) for path, score, desc in initial_results if score >= 0.5]
+
+            for path, score, desc in initial_results:
+                PrettyOutput.print(f"File: {path} Similarity: {score:.3f} Description: {desc}", output_type=OutputType.INFO)
                 
             # Reorder the preliminary results
             return self.pick_results(query, initial_results)

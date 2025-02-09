@@ -4,6 +4,7 @@ from typing import List, Tuple, Dict
 import yaml
 from pathlib import Path
 
+from jarvis.jarvis_coder.git_utils import generate_commit_message, init_git_repo, save_edit_record
 from jarvis.models.base import BasePlatform
 from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, while_success
@@ -17,7 +18,10 @@ class PatchHandler:
     def __init__(self):
         self.prompt_file = Path.home() / ".jarvis-coder-patch-prompt"
         self.additional_info = self._load_additional_info()
-
+        self.root_dir = init_git_repo(os.getcwd())
+        self.record_dir = os.path.join(self.root_dir, ".jarvis-coder", "record")
+        if not os.path.exists(self.record_dir):
+            os.makedirs(self.record_dir)
     def _load_additional_info(self) -> str:
         """Load saved additional info from prompt file"""
         if not self.prompt_file.exists():
@@ -67,6 +71,38 @@ class PatchHandler:
             os.system(f"git checkout -- {file_path}")
             PrettyOutput.print(f"Changes to {file_path} have been rolled back", OutputType.WARNING)
             return False
+        
+    
+
+    def _finalize_changes(self) -> None:
+        """Complete changes and commit"""
+        PrettyOutput.print("Modification confirmed, committing...", OutputType.INFO)
+
+        # Add only modified files under git control
+        os.system("git add -u")
+        
+        # Then get git diff
+        git_diff = os.popen("git diff --cached").read()
+        
+        # Automatically generate commit information, pass in feature
+        commit_message = generate_commit_message(git_diff)
+        
+        # Display and confirm commit information
+        PrettyOutput.print(f"Automatically generated commit information: {commit_message}", OutputType.INFO)
+        user_confirm = input("Use this commit information? (y/n) [y]: ") or "y"
+        
+        if user_confirm.lower() != "y":
+            commit_message = input("Please enter a new commit information: ")
+        
+        # No need to git add again, it has already been added
+        os.system(f"git commit -m '{commit_message}'")
+        save_edit_record(self.record_dir, commit_message, git_diff)
+
+    def _revert_changes(self) -> None:
+        """Revert all changes"""
+        PrettyOutput.print("Modification cancelled, reverting changes", OutputType.INFO)
+        os.system(f"git reset --hard")
+        os.system(f"git clean -df")
 
     
     def apply_file_patch(self, file_path: str, patches: List[Patch]) -> bool:
@@ -187,6 +223,7 @@ class PatchHandler:
                         additional_info += msg + "\n"
                         continue
                 else:
+                    self._finalize_changes()
                     break
         
         return True
