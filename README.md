@@ -59,7 +59,7 @@ pip install jarvis-ai-assistant
 
 ## 🔧 Configuration
 
-Jarvis supports configuration through environment variables that can be set in the `~/.jarvis_env` file:
+Jarvis supports configuration through environment variables that can be set in the `~/.jarvis/env` file:
 
 | Environment Variable | Description | Default Value | Required |
 |---------|------|--------|------|
