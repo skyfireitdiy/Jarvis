@@ -1,7 +1,7 @@
 import requests
 from typing import List, Dict, Tuple
 from jarvis.models.base import BasePlatform
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.utils import OutputType, PrettyOutput, get_single_line_input
 import os
 import json
 
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         ollama = OllamaPlatform()
         while True:
             try:
-                message = input("\nInput question (Ctrl+C to exit): ")
+                message = get_single_line_input("\nInput question (Ctrl+C to exit)")
                 ollama.chat_until_success(message)
             except KeyboardInterrupt:
                 print("\nGoodbye!")

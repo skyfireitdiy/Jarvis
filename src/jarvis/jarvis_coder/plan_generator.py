@@ -1,7 +1,7 @@
 import re
 from typing import Dict, List, Tuple
 from jarvis.models.registry import PlatformRegistry
-from jarvis.utils import PrettyOutput, OutputType, get_multiline_input, is_long_context
+from jarvis.utils import PrettyOutput, OutputType, get_multiline_input, get_single_line_input, is_long_context
 
 class PlanGenerator:
     """Modification plan generator"""   
@@ -116,7 +116,7 @@ Code content:
                     return {}
                 additional_info += tmp + "\n"
                 continue
-            user_input = input("\nDo you agree with this modification plan? (y/n) [y]: ").strip().lower() or 'y'
+            user_input = get_single_line_input("Do you agree with this modification plan? (y/n) [y]").strip().lower() or 'y'
             if user_input == 'y' or user_input == '':
                 return structed_plan
             elif user_input == 'n':
