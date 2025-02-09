@@ -28,16 +28,14 @@ class CodeBase:
             
         # 初始化数据目录
         self.data_dir = os.path.join(self.root_dir, ".jarvis-codebase")
-        if not os.path.exists(self.data_dir):
-            os.makedirs(self.data_dir)
+        self.cache_dir = os.path.join(self.data_dir, "cache")
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
             
-        # 初始化嵌入模型，使用系统默认缓存目录
+        # 初始化嵌入模型
         try:
             self.embedding_model = load_embedding_model()
-            
-            # 强制完全加载所有模型组件
             test_text = """This is a test text"""
-            # 预热模型，确保所有组件都被加载
             self.embedding_model.encode([test_text], 
                                      convert_to_tensor=True,
                                      normalize_embeddings=True)
@@ -47,32 +45,15 @@ class CodeBase:
             raise
             
         self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
-
         self.git_file_list = self.get_git_file_list()
         self.platform_registry = PlatformRegistry.get_global_platform_registry()
         
         # 初始化缓存和索引
-        self.cache_path = os.path.join(self.data_dir, "cache.pkl")
         self.vector_cache = {}
         self.file_paths = []
         
-        # 加载缓存
-        if os.path.exists(self.cache_path):
-            try:
-                with lzma.open(self.cache_path, 'rb') as f:
-                    cache_data = pickle.load(f)
-                    self.vector_cache = cache_data["vectors"]
-                    self.file_paths = cache_data["file_paths"]
-                PrettyOutput.print(f"Loaded {len(self.vector_cache)} vector cache", 
-                                 output_type=OutputType.INFO)
-                # 从缓存重建索引
-                self.build_index()
-            except Exception as e:
-                PrettyOutput.print(f"Failed to load cache: {str(e)}", 
-                                 output_type=OutputType.WARNING)
-                self.vector_cache = {}
-                self.file_paths = []
-                self.index = None
+        # 加载所有缓存文件
+        self._load_all_cache()
 
     def get_git_file_list(self):
         """Get the list of files in the git repository, excluding the .jarvis-codebase directory"""
@@ -114,24 +95,82 @@ Code content:
             print(f"- path: {file_path}")
             print(f"- description: {data['description']}")
     
-    def _save_cache(self):
-        """Save cache data"""
-        try:
-            # Create a copy of the cache data
-            cache_data = {
-                "vectors": dict(self.vector_cache),  # 创建字典的副本
-                "file_paths": list(self.file_paths)  # 创建列表的副本
-            }
+    def _get_cache_path(self, file_path: str) -> str:
+        """Get cache file path for a source file
+        
+        Args:
+            file_path: Source file path
             
-            # 使用 lzma 压缩存储
-            with lzma.open(self.cache_path, 'wb') as f:
-                pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
-            PrettyOutput.print(f"Saved {len(self.vector_cache)} vector cache", 
+        Returns:
+            str: Cache file path
+        """
+        # 处理文件路径：
+        # 1. 移除开头的 ./ 或 /
+        # 2. 将 / 替换为 --
+        # 3. 添加 .cache 后缀
+        clean_path = file_path.lstrip('./').lstrip('/')
+        cache_name = clean_path.replace('/', '--') + '.cache'
+        return os.path.join(self.cache_dir, cache_name)
+
+    def _load_all_cache(self):
+        """Load all cache files"""
+        try:
+            for cache_file in os.listdir(self.cache_dir):
+                if not cache_file.endswith('.cache'):
+                    continue
+                    
+                cache_path = os.path.join(self.cache_dir, cache_file)
+                try:
+                    with lzma.open(cache_path, 'rb') as f:
+                        cache_data = pickle.load(f)
+                        file_path = cache_data["path"]
+                        self.vector_cache[file_path] = cache_data
+                        self.file_paths.append(file_path)
+                except Exception as e:
+                    PrettyOutput.print(f"Failed to load cache file {cache_file}: {str(e)}", 
+                                     output_type=OutputType.WARNING)
+                    continue
+                    
+            PrettyOutput.print(f"Loaded {len(self.vector_cache)} vector cache", 
                              output_type=OutputType.INFO)
+            # 从缓存重建索引
+            self.build_index()
         except Exception as e:
-            PrettyOutput.print(f"Failed to save cache: {str(e)}", 
+            PrettyOutput.print(f"Failed to load cache directory: {str(e)}", 
+                             output_type=OutputType.WARNING)
+            self.vector_cache = {}
+            self.file_paths = []
+            self.index = None
+
+    def cache_vector(self, file_path: str, vector: np.ndarray, description: str):
+        """Cache the vector representation of a file"""
+        try:
+            with open(file_path, "rb") as f:
+                file_md5 = hashlib.md5(f.read()).hexdigest()
+        except Exception as e:
+            PrettyOutput.print(f"Failed to calculate MD5 for {file_path}: {str(e)}", 
+                              output_type=OutputType.ERROR)
+            file_md5 = ""
+        
+        # 准备缓存数据
+        cache_data = {
+            "path": file_path,  # 保存文件路径
+            "md5": file_md5,    # 保存文件MD5
+            "description": description,  # 保存文件描述
+            "vector": vector    # 保存向量
+        }
+        
+        # 更新内存缓存
+        self.vector_cache[file_path] = cache_data
+        
+        # 保存到单独的缓存文件
+        cache_path = self._get_cache_path(file_path)
+        try:
+            with lzma.open(cache_path, 'wb') as f:
+                pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        except Exception as e:
+            PrettyOutput.print(f"Failed to save cache for {file_path}: {str(e)}", 
                              output_type=OutputType.ERROR)
-            raise  # 抛出异常以便上层处理
 
     def get_cached_vector(self, file_path: str, description: str) -> Optional[np.ndarray]:
         """Get the vector representation of a file from the cache"""
@@ -156,24 +195,6 @@ Code content:
             return None
         
         return cached_data["vector"]
-
-    def cache_vector(self, file_path: str, vector: np.ndarray, description: str):
-        """Cache the vector representation of a file"""
-        try:
-            with open(file_path, "rb") as f:
-                file_md5 = hashlib.md5(f.read()).hexdigest()
-        except Exception as e:
-            PrettyOutput.print(f"Failed to calculate MD5 for {file_path}: {str(e)}", 
-                              output_type=OutputType.ERROR)
-            file_md5 = ""
-        
-        # Only update the in-memory cache
-        self.vector_cache[file_path] = {
-            "path": file_path,  # Save file path
-            "md5": file_md5,    # Save file MD5
-            "description": description,  # Save file description
-            "vector": vector    # Save vector
-        }
 
     def get_embedding(self, text: str) -> np.ndarray:
         """Use the transformers model to get the vector representation of text"""
@@ -216,30 +237,28 @@ Content: {content}
             return np.zeros(self.vector_dim, dtype=np.float32) # type: ignore
 
     def clean_cache(self) -> bool:
-        """Clean expired cache records, return whether any files were deleted"""
+        """Clean expired cache records"""
         try:
             files_to_delete = []
             for file_path in list(self.vector_cache.keys()):
-                if file_path not in self.git_file_list:
-                    del self.vector_cache[file_path]
+                if not os.path.exists(file_path):
                     files_to_delete.append(file_path)
-            
-            if files_to_delete:
-                # Save cache only when files are deleted
-                self._save_cache()
-                PrettyOutput.print(f"Cleaned {len(files_to_delete)} cache files", 
-                                output_type=OutputType.INFO)
-                return True
-            return False
+                    cache_path = self._get_cache_path(file_path)
+                    try:
+                        os.remove(cache_path)
+                    except Exception:
+                        pass
+                        
+            for file_path in files_to_delete:
+                del self.vector_cache[file_path]
+                if file_path in self.file_paths:
+                    self.file_paths.remove(file_path)
+                    
+            return bool(files_to_delete)
             
         except Exception as e:
             PrettyOutput.print(f"Failed to clean cache: {str(e)}", 
-                            output_type=OutputType.ERROR)
-            # Try to save the current state when an exception occurs
-            try:
-                self._save_cache()
-            except:
-                pass
+                             output_type=OutputType.ERROR)
             return False
 
     def process_file(self, file_path: str):
@@ -306,7 +325,7 @@ Content: {content}
     def gen_vector_db_from_cache(self):
         """Generate a vector database from the cache"""
         self.build_index()
-        self._save_cache()
+        self._load_all_cache()
 
 
     def generate_codebase(self, force: bool = False):
@@ -426,7 +445,7 @@ Content: {content}
         except Exception as e:
             # Try to save the cache when an exception occurs
             try:
-                self._save_cache()
+                self._load_all_cache()
             except Exception as save_error:
                 PrettyOutput.print(f"Failed to save cache: {str(save_error)}", 
                                 output_type=OutputType.ERROR)
@@ -695,25 +714,32 @@ Please answer the user's question in Chinese using professional language. If the
 
     def is_index_generated(self) -> bool:
         """Check if the index has been generated"""
-        # Check if the cache file exists
-        if not os.path.exists(self.cache_path):
+        # Check if the vector cache and file path list are non-empty
+        if not self.vector_cache or not self.file_paths:
             return False
-        
-        # Check if the cache is valid
-        try:
-            with lzma.open(self.cache_path, 'rb') as f:
-                cache_data = pickle.load(f)
-                if not cache_data.get("vectors") or not cache_data.get("file_paths"):
-                    return False
-        except Exception:
+            
+        # Check if the cache directory exists and has files
+        if not os.path.exists(self.cache_dir) or not os.listdir(self.cache_dir):
             return False
         
         # Check if the index has been built
         if not hasattr(self, 'index') or self.index is None:
             return False
         
-        # Check if the vector cache and file path list are non-empty
-        if not self.vector_cache or not self.file_paths:
+        # Check if at least one cache file is valid
+        try:
+            first_file = list(self.vector_cache.keys())[0]
+            cache_path = self._get_cache_path(first_file)
+            
+            if not os.path.exists(cache_path):
+                return False
+                
+            with lzma.open(cache_path, 'rb') as f:
+                cache_data = pickle.load(f)
+                if not cache_data.get("vector") or not cache_data.get("path"):
+                    return False
+                    
+        except (IndexError, Exception):
             return False
         
         return True
