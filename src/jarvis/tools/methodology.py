@@ -32,7 +32,7 @@ class MethodologyTool:
     
     def __init__(self):
         """Initialize the experience management tool"""
-        self.methodology_file = os.path.expanduser("~/.jarvis_methodology")
+        self.methodology_file = os.path.expanduser("~/.jarvis/methodology")
         self._ensure_file_exists()
             
     def _ensure_file_exists(self):
