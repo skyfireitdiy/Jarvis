@@ -43,7 +43,7 @@ class CodeModifyTool:
             patch_handler = PatchHandler()
 
             # Apply patches and handle the process
-            success = patch_handler.handle_patch_application(
+            success, additional_info = patch_handler.handle_patch_application(
                 feature=task,
                 structed_plan=structured_plan
             )
@@ -53,13 +53,13 @@ class CodeModifyTool:
                     "success": False,
                     "error": "Code modification was cancelled or failed",
                     "stdout": "Changes have been rolled back",
-                    "stderr": ""
+                    "stderr": additional_info
                 }
 
             return {
                 "success": True,
                 "stdout": "Code modifications have been successfully applied and committed",
-                "stderr": ""
+                "stderr": additional_info
             }
 
         except Exception as e:
