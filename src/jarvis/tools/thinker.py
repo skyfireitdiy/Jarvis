@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from jarvis.utils import OutputType, PrettyOutput, load_env_from_file
+from jarvis.utils import OutputType, PrettyOutput, init_env
 from jarvis.models.registry import PlatformRegistry
 
 class ThinkerTool:
@@ -124,7 +124,7 @@ def main():
     """Run tool directly from command line"""
     import argparse
 
-    load_env_from_file()
+    init_env()
     
     parser = argparse.ArgumentParser(description='Deep thinking analysis tool')
     parser.add_argument('--question', required=True, help='The problem to analyze')

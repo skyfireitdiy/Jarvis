@@ -4,7 +4,7 @@ import faiss
 from typing import List, Tuple, Optional, Dict
 import pickle
 from jarvis.utils import OutputType, PrettyOutput, get_file_md5, get_max_context_length, load_embedding_model, load_rerank_model
-from jarvis.utils import load_env_from_file
+from jarvis.utils import init_env
 from dataclasses import dataclass
 from tqdm import tqdm
 import fitz  # PyMuPDF for PDF files
@@ -137,7 +137,7 @@ class RAGTool:
         Args:
             root_dir: Project root directory
         """
-        load_env_from_file()
+        init_env()
         self.root_dir = root_dir
         os.chdir(self.root_dir)
         

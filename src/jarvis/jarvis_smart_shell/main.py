@@ -8,7 +8,7 @@ from yaspin import yaspin # type: ignore
 from yaspin.spinners import Spinners # type: ignore
 
 from jarvis.models.registry import PlatformRegistry
-from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_env_from_file
+from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, init_env
 
 def execute_command(command: str) -> None:
     """Show command and allow user to edit, then execute, Ctrl+C to cancel"""
@@ -88,7 +88,7 @@ Remember: Only return the command itself, without any additional content.
 
 def main():
     # 创建参数解析器
-    load_env_from_file()
+    init_env()
     parser = argparse.ArgumentParser(
         description="Convert natural language requirements to shell commands",
         formatter_class=argparse.RawDescriptionHelpFormatter,
