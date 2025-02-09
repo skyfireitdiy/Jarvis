@@ -18,22 +18,22 @@ class AskUserTool:
         
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """执行询问用户操作
+        """Execute the operation of asking the user
         
         Args:
-            args: 包含问题的字典
+            args: A dictionary containing the question
             
         Returns:
-            Dict: 包含用户响应的字典
+            Dict: A dictionary containing the user's response
         """
         try:
             question = args["question"]
             
-            # 显示问题
-            PrettyOutput.print("\n问题:", OutputType.SYSTEM)
+            # Display the question
+            PrettyOutput.print("\nQuestion:", OutputType.SYSTEM)
             PrettyOutput.print(question, OutputType.SYSTEM)
             
-            # 获取用户输入
+            # Get user input
             user_response = get_multiline_input("Please enter your answer (input empty line to end)")
             
             if user_response == "__interrupt__":

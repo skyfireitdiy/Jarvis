@@ -27,71 +27,71 @@ class RAGTool:
     }
 
     def __init__(self):
-        """初始化 RAG 工具"""
-        self.rag_instances = {}  # 缓存不同目录的 RAG 实例
+        """Initialize RAG tool"""
+        self.rag_instances = {}  # Cache RAG instances for different directories
 
     def _get_rag_instance(self, dir_path: str) -> RAGCore:
-        """获取或创建 RAG 实例
+        """Get or create RAG instance
         
         Args:
-            dir_path: 文档目录的绝对路径
+            dir_path: The absolute path of the document directory
             
         Returns:
-            RAGCore: RAG 实例
+            RAGCore: RAG instance
         """
         if dir_path not in self.rag_instances:
             self.rag_instances[dir_path] = RAGCore(dir_path)
         return self.rag_instances[dir_path]
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """执行文档问答
+        """Execute document question and answer
         
         Args:
-            args: 包含参数的字典
-                - dir: 文档目录路径
-                - question: 要询问的问题
-                - rebuild_index: 是否重建索引
+            args: A dictionary containing parameters
+                - dir: The document directory path
+                - question: The question to ask
+                - rebuild_index: Whether to rebuild the index
                 
         Returns:
-            Dict[str, Any]: 执行结果
+            Dict[str, Any]: The execution result
         """
         try:
-            # 获取参数
-            dir_path = os.path.expanduser(args["dir"])  # 展开 ~ 等路径
-            dir_path = os.path.abspath(dir_path)  # 转换为绝对路径
+            # Get parameters
+            dir_path = os.path.expanduser(args["dir"])  # Expand ~ paths
+            dir_path = os.path.abspath(dir_path)  # Convert to absolute path
             question = args["question"]
             rebuild_index = args.get("rebuild_index", False)
             
-            # 检查目录是否存在
+            # Check if the directory exists
             if not os.path.exists(dir_path):
                 return {
                     "success": False,
-                    "error": f"目录不存在: {dir_path}"
+                    "error": f"Directory does not exist: {dir_path}"
                 }
                 
-            # 检查是否是目录
+            # Check if it is a directory
             if not os.path.isdir(dir_path):
                 return {
                     "success": False,
-                    "error": f"路径不是目录: {dir_path}"
+                    "error": f"The path is not a directory: {dir_path}"
                 }
                 
-            # 获取 RAG 实例
+            # Get RAG instance
             rag = self._get_rag_instance(dir_path)
             
-            # 如果需要重建索引或索引不存在
+            # If you need to rebuild the index or the index does not exist
             if rebuild_index or not rag.is_index_built():
-                PrettyOutput.print("正在构建文档索引...", OutputType.INFO)
+                PrettyOutput.print("Building document index...", OutputType.INFO)
                 rag.build_index(dir_path)
             
-            # 执行问答
-            PrettyOutput.print(f"问题: {question}", OutputType.INFO)
+            # Execute question and answer
+            PrettyOutput.print(f"Question: {question}", OutputType.INFO)
             response = rag.ask(question)
             
             if response is None:
                 return {
                     "success": False,
-                    "error": "未能获取答案，可能是没有找到相关文档"
+                    "error": "Failed to get answer, possibly no relevant documents found"
                 }
                 
             return {
@@ -101,20 +101,20 @@ class RAGTool:
             }
             
         except Exception as e:
-            PrettyOutput.print(f"文档问答失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Document question and answer failed: {str(e)}", OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"执行失败: {str(e)}"
+                "error": f"Execution failed: {str(e)}"
             }
 
 def main():
-    """命令行直接运行工具"""
+    """Run the tool directly from the command line"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='文档问答工具')
-    parser.add_argument('--dir', required=True, help='文档目录路径')
-    parser.add_argument('--question', required=True, help='要询问的问题')
-    parser.add_argument('--rebuild', action='store_true', help='重建索引')
+    parser = argparse.ArgumentParser(description='Document question and answer tool')
+    parser.add_argument('--dir', required=True, help='Document directory path')
+    parser.add_argument('--question', required=True, help='The question to ask')
+    parser.add_argument('--rebuild', action='store_true', help='Rebuild index')
     args = parser.parse_args()
     
     tool = RAGTool()
@@ -125,7 +125,7 @@ def main():
     })
     
     if result["success"]:
-        PrettyOutput.print("\n回答:", OutputType.INFO)
+        PrettyOutput.print("\nAnswer:", OutputType.INFO)
         PrettyOutput.print(result["stdout"], OutputType.INFO)
     else:
         PrettyOutput.print(result["error"], OutputType.ERROR)
