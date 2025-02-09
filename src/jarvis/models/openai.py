@@ -23,7 +23,7 @@ class OpenAIModel(BasePlatform):
             PrettyOutput.print("  • OPENAI_API_KEY: API key", OutputType.INFO)
             PrettyOutput.print("  • OPENAI_API_BASE: (optional) API base address, default using https://api.openai.com/v1", OutputType.INFO)
             PrettyOutput.print("\nYou can set them in the following ways:", OutputType.INFO)
-            PrettyOutput.print("1. Create or edit ~/.jarvis_env file:", OutputType.INFO)
+            PrettyOutput.print("1. Create or edit ~/.jarvis/env file:", OutputType.INFO)
             PrettyOutput.print("   OPENAI_API_KEY=your_api_key", OutputType.INFO)
             PrettyOutput.print("   OPENAI_API_BASE=your_api_base", OutputType.INFO)
             PrettyOutput.print("   OPENAI_MODEL_NAME=your_model_name", OutputType.INFO)

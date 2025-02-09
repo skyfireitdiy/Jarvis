@@ -364,7 +364,7 @@ def load_tasks() -> dict:
             PrettyOutput.print(f"Error loading .jarvis/pre-command file: {str(e)}", OutputType.ERROR)
 
     # Read methodology
-    method_path = os.path.expanduser("~/.jarvis_methodology")
+    method_path = os.path.expanduser("~/.jarvis/methodology")
     if os.path.exists(method_path):
         with open(method_path, "r", encoding="utf-8") as f:
             methodology = yaml.safe_load(f)
