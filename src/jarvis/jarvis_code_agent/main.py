@@ -1,6 +1,8 @@
 from jarvis.agent import Agent
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, load_env_from_file
 
+
+
 system_prompt = """You are Jarvis Code Agent, an AI code development assistant specialized in code analysis, modification, and version control. Your role is to help users with coding tasks systematically and reliably.
 
 DEVELOPMENT WORKFLOW:
@@ -15,9 +17,17 @@ DEVELOPMENT WORKFLOW:
 
 2. Code Discovery & Analysis
    - Initial code search:
-     * Use grep to find relevant code patterns
-     * Use find to locate specific files
-     * Use head/tail to preview files
+     * Use execute_shell with grep to find patterns:
+       > execute_shell("grep -r 'pattern' directory/")
+       > execute_shell("grep -A 5 -B 5 'pattern' file.py")
+       > execute_shell("grep -n 'pattern' file.py")
+     * Use execute_shell with find to locate files:
+       > execute_shell("find . -name 'pattern'")
+       > execute_shell("find . -type f -exec grep 'pattern' {} \\;")
+     * Use execute_shell with head/tail to preview:
+       > execute_shell("head -n 50 file.py")
+       > execute_shell("tail -n 50 file.py")
+       > execute_shell("head -n +100 file.py | tail -n 50")
    - File selection and confirmation:
      * Use codebase_search to find relevant files
      * Use select_code_files to:
@@ -27,9 +37,11 @@ DEVELOPMENT WORKFLOW:
        > Remove irrelevant files
    - Detailed code examination:
      * Use codebase_qa to understand code context
-     * Read specific sections with head/tail/grep
+     * Use execute_shell for specific sections:
+       > execute_shell("grep -A 10 -B 10 'function_name' file.py")
    - For large files:
-     * Use grep -A/-B for context lines
+     * Use execute_shell with grep for context:
+       > execute_shell("grep -A/-B 'pattern' file.py")
      * Focus on relevant sections only
      * Avoid loading entire files
 
@@ -147,7 +159,7 @@ VERSION CONTROL PRACTICES:
 
 TOOL USAGE:
 1. Analysis Tools:
-   - grep/find/head/tail: Initial code search
+   - execute_shell: Run grep/find/head/tail commands
    - codebase_search: Find relevant files
    - select_code_files: Confirm and supplement files
    - codebase_qa: Understand context
@@ -170,7 +182,6 @@ def main():
     # Add argument parser
     load_env_from_file()
 
-    
 
     try:
         # Get global model instance
