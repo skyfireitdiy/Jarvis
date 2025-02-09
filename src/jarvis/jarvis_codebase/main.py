@@ -95,8 +95,8 @@ class CodeBase:
         else:
             PrettyOutput.print(f"Make description for {file_path} ...", output_type=OutputType.PROGRESS)
         prompt = f"""Please analyze the following code file and generate a detailed description. The description should include:
-1. Overall file functionality description, no more than 100 characters
-2. One-sentence description (max 50 characters) for each global variable, function, type definition, class, method, and other code elements
+1. Overall file functionality description
+2. description for each global variable, function, type definition, class, method, and other code elements
 3. 5 potential questions users might ask about this file
 
 Please use concise and professional language, emphasizing technical functionality to facilitate subsequent code retrieval.
