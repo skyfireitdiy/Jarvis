@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import re
 from typing import Dict, List, Tuple
 
 from jarvis.utils import OutputType, PrettyOutput, while_success, while_true
@@ -26,7 +27,11 @@ class BasePlatform(ABC):
         raise NotImplementedError("chat is not implemented")
 
     def chat_until_success(self, message: str) -> str:
-        return while_true(lambda: while_success(lambda: self.chat(message), 5), 5)
+        def _chat():
+            response = self.chat(message)
+            response = re.sub(r'<think>(.*?)</think>', '', response, flags=re.DOTALL)
+            return response
+        return while_true(lambda: while_success(lambda: _chat(), 5), 5)
 
     @abstractmethod
     def upload_files(self, file_list: List[str]) -> List[Dict]:
