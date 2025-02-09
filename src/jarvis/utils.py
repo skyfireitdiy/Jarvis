@@ -196,9 +196,28 @@ def get_multiline_input(tip: str) -> str:
 
 def load_env_from_file():
     """Load environment variables from ~/.jarvis/env"""
-    env_file = Path.home() / ".jarvis" / "env"
+    jarvis_dir = Path.home() / ".jarvis"
+    env_file = jarvis_dir / "env"
     old_env_file = Path.home() / ".jarvis_env"
+    
+    # Check if ~/.jarvis directory exists
+    if not jarvis_dir.exists():
+        jarvis_dir.mkdir(parents=True)  # Create the ~/.jarvis directory
+    elif old_env_file.exists() and old_env_file.is_file():
+        os.rename(old_env_file, Path.home() / ".jarvis_old")
+        PrettyOutput.print(f"Moved existing {old_env_file} to ~/.jarvis_old", OutputType.INFO)
+        jarvis_dir.mkdir(parents=True, exist_ok=True)  # Ensure ~/.jarvis exists
 
+    # Move ~/.jarvis_old to ~/.jarvis/pre-command
+    old_dir = Path.home() / ".jarvis_old"
+    pre_command_dir = jarvis_dir / "pre-command"
+    
+    if old_dir.exists():
+        pre_command_dir.mkdir(parents=True, exist_ok=True)
+        os.rename(old_dir, pre_command_dir / old_dir.name)
+        PrettyOutput.print(f"Moved ~/.jarvis_old to {pre_command_dir}", OutputType.INFO)
+
+    # Check and move env_file
     if not env_file.exists():
         if old_env_file.exists():
             os.rename(old_env_file, env_file)
