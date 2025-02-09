@@ -769,10 +769,9 @@ def main():
             return
             
         PrettyOutput.print("\nSearch Results:", output_type=OutputType.INFO)
-        for path, score in results:
+        for path in results:
             PrettyOutput.print("\n" + "="*50, output_type=OutputType.INFO)
             PrettyOutput.print(f"File: {path}", output_type=OutputType.INFO)
-            PrettyOutput.print(f"Similarity: {score:.3f}", output_type=OutputType.INFO)
 
     elif args.command == 'ask':            
         response = codebase.ask_codebase(args.question, args.top_k)
