@@ -35,7 +35,7 @@ class ToolGeneratorTool:
         """初始化工具生成器
         """
         # 设置工具目录
-        self.tools_dir = Path.home() / '.jarvis_tools'
+        self.tools_dir = Path.home() / '.jarvis/tools'
         
         # 确保工具目录存在
         self.tools_dir.mkdir(parents=True, exist_ok=True)
