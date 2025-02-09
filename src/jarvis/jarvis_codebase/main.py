@@ -143,7 +143,7 @@ Code content:
             with open(file_path, "rb") as f:
                 current_md5 = hashlib.md5(f.read()).hexdigest()
         except Exception as e:
-            PrettyOutput.print(f"计算文件MD5失败 {file_path}: {str(e)}", 
+            PrettyOutput.print(f"Failed to calculate MD5 for {file_path}: {str(e)}", 
                               output_type=OutputType.ERROR)
             return None
         
@@ -163,7 +163,7 @@ Code content:
             with open(file_path, "rb") as f:
                 file_md5 = hashlib.md5(f.read()).hexdigest()
         except Exception as e:
-            PrettyOutput.print(f"计算文件MD5失败 {file_path}: {str(e)}", 
+            PrettyOutput.print(f"Failed to calculate MD5 for {file_path}: {str(e)}", 
                               output_type=OutputType.ERROR)
             file_md5 = ""
         
@@ -350,7 +350,7 @@ Code content:
                             modified_files.append(file_path)
                             changes_detected = True
                     except Exception as e:
-                        PrettyOutput.print(f"检查文件失败 {file_path}: {str(e)}", 
+                        PrettyOutput.print(f"Failed to check file {file_path}: {str(e)}", 
                                          output_type=OutputType.ERROR)
                     pbar.update(1)
             
@@ -411,7 +411,7 @@ Code content:
                                 if result:
                                     processed_files.append(result)
                             except Exception as e:
-                                PrettyOutput.print(f"处理文件失败 {file}: {str(e)}", 
+                                PrettyOutput.print(f"Failed to process file {file}: {str(e)}", 
                                                 output_type=OutputType.ERROR)
                             pbar.update(1)
 
@@ -458,7 +458,7 @@ Code content:
         score = len(matched_keywords) / len(keywords)
         return score
 
-    def pick_results(self, query: str, initial_results: List[Tuple[str, float, str]]) -> List[Tuple[str, float]]:
+    def pick_results(self, query: str, initial_results: List[str]) -> List[str]:
         """Use a large model to pick the search results
         
         Args:
@@ -466,7 +466,7 @@ Code content:
             initial_results: Initial results list, each item is a tuple of (file path, score, description)
             
         Returns:
-            List[Tuple[str, float]]: The picked results list, each item is a tuple of (file path, score)
+            List[str]: The picked results list, each item is a file path
         """
         if not initial_results:
             return []
@@ -475,8 +475,9 @@ Code content:
             PrettyOutput.print(f"Picking results for query: {query}", output_type=OutputType.INFO)
             # Prepare the prompt
             files_info = ""
-            for path, _, desc in initial_results:
-                files_info += f"File: {path}\nDescription: {desc}\n\n"
+            for path in initial_results:
+                content = open(path, "r", encoding="utf-8").read()
+                files_info += f"File: {path}\nContent: {content}\n\n"
                 
             prompt = f"""Please analyze the following code files and determine which files are most relevant to the given query. Consider file paths and descriptions to make your judgment.
 
@@ -502,25 +503,17 @@ Note: Only include files that have a strong connection to the query."""
             import yaml
             files_match = re.search(r'<FILES>\n(.*?)</FILES>', response, re.DOTALL)
             if not files_match:
-                return [(path, score) for path, score, _ in initial_results]
+                return initial_results
 
             # Extract the file list
             selected_files = yaml.safe_load(files_match.group(1))
-
-            raw_score = {file_path: score for file_path, score, _ in initial_results}
-            # Build the results, using the position as the score
-            scored_results = []
-            for i, file_path in enumerate(selected_files):
-                # The score decreases from 1 to 0.1
-                score = raw_score.get(file_path, 0.0)
-                scored_results.append((file_path, score))
-
-            return scored_results
+    
+            return selected_files
 
         except Exception as e:
             PrettyOutput.print(f"Failed to pick: {str(e)}", 
                             output_type=OutputType.ERROR)
-            return [(path, score) for path, score, _ in initial_results]
+            return initial_results
 
     def _generate_query_variants(self, query: str) -> List[str]:
         """Generate different expressions of the query
@@ -572,7 +565,7 @@ Please output 3 expressions directly, separated by two line breaks, without numb
         return results
 
 
-    def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float]]:
+    def search_similar(self, query: str, top_k: int = 30) -> List[str]:
         """Search related files"""
         try:
             if self.index is None:
@@ -597,10 +590,10 @@ Please output 3 expressions directly, separated by two line breaks, without numb
             initial_results = [(path, score, desc) for path, score, desc in initial_results if score >= 0.5]
 
             for path, score, desc in initial_results:
-                PrettyOutput.print(f"File: {path} Similarity: {score:.3f} Description: {desc}", output_type=OutputType.INFO)
+                PrettyOutput.print(f"File: {path} Similarity: {score:.3f}", output_type=OutputType.INFO)
                 
             # Reorder the preliminary results
-            return self.pick_results(query, initial_results)
+            return self.pick_results(query, [path for path, _, _ in initial_results])
             
         except Exception as e:
             PrettyOutput.print(f"Failed to search: {str(e)}", output_type=OutputType.ERROR)

@@ -46,8 +46,8 @@ class JarvisCoder:
             self._codebase.generate_codebase()
             
         related_files = self._codebase.search_similar(feature)
-        for file, score in related_files:
-            PrettyOutput.print(f"Related file: {file} (score: {score:.3f})", OutputType.SUCCESS)
+        for file in related_files:
+            PrettyOutput.print(f"Related file: {file}", OutputType.SUCCESS)
             ret.append(file)
         return ret
 
