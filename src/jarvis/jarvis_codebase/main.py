@@ -563,12 +563,11 @@ Please output 3 expressions directly, separated by two line breaks, without numb
                     continue
                     
                 similarity = 1.0 / (1.0 + float(distance))
-                if similarity >= 0.5:
-                    file_path = self.file_paths[i]
-                    # Use the highest similarity score
-                    if file_path not in results or similarity > results[file_path][1]:
-                        data = self.vector_cache[file_path]
-                        results[file_path] = (file_path, similarity, data["description"])
+                file_path = self.file_paths[i]
+                # Use the highest similarity score
+                if file_path not in results or similarity > results[file_path][1]:
+                    data = self.vector_cache[file_path]
+                    results[file_path] = (file_path, similarity, data["description"])
         
         return results
 
