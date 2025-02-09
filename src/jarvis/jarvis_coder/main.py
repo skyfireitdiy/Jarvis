@@ -88,7 +88,6 @@ class JarvisCoder:
                 "success": False,
                 "stdout": "",
                 "stderr": f"Execution failed: {str(e)}, please modify the requirement and try again",
-                "error": e
             }
 
 def main():
@@ -122,11 +121,6 @@ def main():
             else:
                 if result.get("stderr"):
                     PrettyOutput.print(result["stderr"], OutputType.WARNING)
-                if result.get("error"):  # Use get() method to avoid KeyError
-                    error = result["error"]
-                    PrettyOutput.print(f"Error type: {type(error).__name__}", OutputType.WARNING)
-                    PrettyOutput.print(f"Error information: {str(error)}", OutputType.WARNING)
-                # Prompt user to continue input
                 PrettyOutput.print("\nYou can modify the requirements and try again", OutputType.INFO)
                 
         except KeyboardInterrupt:

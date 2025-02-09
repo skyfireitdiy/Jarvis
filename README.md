@@ -207,7 +207,6 @@ class CustomTool:
                 "success": bool,
                 "stdout": str,  # On success
                 "stderr": str,  # Optional error details
-                "error": str    # On failure
             }
         """
         try:
@@ -215,12 +214,14 @@ class CustomTool:
             result = "Tool execution result"
             return {
                 "success": True,
-                "stdout": result
+                "stdout": result,
+                "stderr": ""
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": str(e)
+                "stdout": "",
+                "stderr": str(e)
             }
 ```
 
