@@ -201,9 +201,9 @@ Code content:
             
             # Combine file information, including file content
             combined_text = f"""
-{file_path}
-{description}
-{content}
+File path: {file_path}
+Description: {description}
+Content: {content}
 """
             vector = self.get_embedding(combined_text)
             
@@ -660,13 +660,13 @@ Please output 3 expressions directly, separated by two line breaks, without numb
             return ""
         
         PrettyOutput.print(f"Found related files: ", output_type=OutputType.SUCCESS)
-        for path, score in results:
-            PrettyOutput.print(f"File: {path} Similarity: {score:.3f}", 
+        for path in results:
+            PrettyOutput.print(f"File: {path}", 
                              output_type=OutputType.INFO)
         
         prompt = f"""You are a code expert, please answer the user's question based on the following file information:
 """
-        for path, _ in results:
+        for path in results:
             try:
                 if len(prompt) > self.max_context_length:
                     PrettyOutput.print(f"Avoid context overflow, discard low-related file: {path}", OutputType.WARNING)
