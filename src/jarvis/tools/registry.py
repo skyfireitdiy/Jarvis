@@ -68,8 +68,8 @@ class ToolRegistry:
             self.register_tool_by_file(str(file_path))
 
     def _load_external_tools(self):
-        """Load external tools from ~/.jarvis_tools"""
-        external_tools_dir = Path.home() / '.jarvis_tools'
+        """Load external tools from ~/.jarvis/tools"""
+        external_tools_dir = Path.home() / '.jarvis/tools'
         if not external_tools_dir.exists():
             return
             
