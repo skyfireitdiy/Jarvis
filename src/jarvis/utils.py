@@ -127,7 +127,7 @@ class PrettyOutput:
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):
         """Print paragraph title with separator"""
-        width = 60
+        width = 100
         color = PrettyOutput.COLORS.get(output_type, "")
         print(f"\n{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}")
         PrettyOutput.print(title.center(width - 10), output_type, timestamp=True)
