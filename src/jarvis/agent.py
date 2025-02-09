@@ -10,10 +10,14 @@ import faiss
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools import ToolRegistry
 from jarvis.tools.registry import _load_tools
-from jarvis.utils import PrettyOutput, OutputType, _load_methodology, get_max_context_length, get_multiline_input, load_embedding_model, load_env_from_file
+from jarvis.utils import PrettyOutput, OutputType, _load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, load_embedding_model, load_env_from_file
 import os
 
 class Agent:
+
+    def __del__(self):
+        delete_current_agent()
+        
     def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False):
         """Initialize Agent with a model, optional tool registry and name
         
@@ -23,6 +27,7 @@ class Agent:
             name: Agent name, default is "Jarvis"
             is_sub_agent: Whether it is a sub-agent, default is False
         """
+        add_agent(name)
         self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         self.tool_registry = ToolRegistry.get_global_tool_registry()
         self.name = name

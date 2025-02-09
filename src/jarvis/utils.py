@@ -25,6 +25,17 @@ colorama.init()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
+current_agent = []
+
+def add_agent(agent_name: str):
+    current_agent.append(agent_name)
+
+def get_current_agent():
+    return current_agent[-1]
+
+def delete_current_agent():
+    current_agent.pop()
+
 class OutputType(Enum):
     SYSTEM = "system"      # AI assistant message
     CODE = "code"         # Code related
@@ -98,7 +109,7 @@ class PrettyOutput:
         prefix = PrettyOutput.PREFIXES.get(output_type, "")
         
         # 添加时间戳 - 使用白色
-        time_str = f"{Fore.WHITE}[{datetime.now().strftime('%H:%M:%S')}]{ColoramaStyle.RESET_ALL} " if timestamp else ""
+        time_str = f"{Fore.BLUE}[{get_current_agent()}]{ColoramaStyle.RESET_ALL}{Fore.WHITE}[{datetime.now().strftime('%H:%M:%S')}]{ColoramaStyle.RESET_ALL} " if timestamp else ""
         
         # 格式化输出
         formatted_text = f"{time_str}{color}{icon} {prefix}: {text}{ColoramaStyle.RESET_ALL}"
