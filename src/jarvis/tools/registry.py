@@ -251,7 +251,7 @@ Please provide a summary:"""
                         output = f"Output is too long ({len(output)} characters), it is recommended to view the original output.\nPreview of the first 300 characters:\n{output[:300]}..."
             
             else:
-                error_msg = result["error"]
+                error_msg = result["stderr"]
                 output = f"Execution failed: {error_msg}"
                 PrettyOutput.section("Execution failed", OutputType.ERROR)
                 

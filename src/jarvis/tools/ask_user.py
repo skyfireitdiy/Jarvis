@@ -39,16 +39,19 @@ class AskUserTool:
             if user_response == "__interrupt__":
                 return {
                     "success": False,
-                    "error": "User canceled input"
+                    "stdout": "",
+                    "stderr": "User canceled input"
                 }
             
             return {
                 "success": True,
-                "stdout": user_response
+                "stdout": user_response,
+                "stderr": ""
             }
             
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Failed to ask user: {str(e)}"
+                "stdout": "",
+                "stderr": f"Failed to ask user: {str(e)}"
             } 
