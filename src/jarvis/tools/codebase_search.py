@@ -6,8 +6,8 @@ from jarvis.utils import find_git_root, PrettyOutput, OutputType
 class CodebaseSearchTool:
     """Codebase Search Tool"""
     
-    name = "codebase_search"
-    description = "Search the codebase to find related code files based on natural language description or questions"
+    name = "find_related_files"
+    description = "Find code files related to the given requirement by searching the codebase"
     parameters = {
         "type": "object",
         "properties": {
@@ -17,7 +17,7 @@ class CodebaseSearchTool:
             },
             "query": {
                 "type": "string",
-                "description": "Natural language description or question about what you want to find in the codebase. For example: 'Where is the code that handles user authentication?' or 'Find the implementation of the database connection logic'"
+                "description": "Requirement description to find related code files. For example: 'Need to modify the user authentication process' or 'Want to update the database connection configuration'"
             },
             "top_k": {
                 "type": "integer",
