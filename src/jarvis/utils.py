@@ -31,7 +31,7 @@ def add_agent(agent_name: str):
     current_agent.append(agent_name)
 
 def get_current_agent():
-    return current_agent[-1]
+    return current_agent[-1] if current_agent else "No Agent"
 
 def delete_current_agent():
     current_agent.pop()
