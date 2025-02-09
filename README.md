@@ -138,7 +138,7 @@ jarvis-search "your query" --max 3
 
 ### Tool Locations
 - Built-in tools: `src/jarvis/tools/`
-- User tools: `~/.jarvis_tools/`
+- User tools: `~/.jarvis/tools/`
 
 
 ### Key Features
@@ -175,7 +175,7 @@ jarvis-search "your query" --max 3
 
 ### Adding New Tools
 
-Create a new Python file in `~/.jarvis_tools/` or `src/jarvis/tools/`:
+Create a new Python file in `~/.jarvis/tools/` or `src/jarvis/tools/`:
 
 ```python
 from typing import Dict, Any
@@ -226,7 +226,7 @@ class CustomTool:
 
 ### Adding New Models
 
-Create a new Python file in `~/.jarvis_models/`:
+Create a new Python file in `~/.jarvis/models/`:
 
 ```python
 from typing import Dict, List
