@@ -27,7 +27,7 @@ class CodeBase:
         self.index = None
             
         # 初始化数据目录
-        self.data_dir = os.path.join(self.root_dir, ".jarvis-codebase")
+        self.data_dir = os.path.join(self.root_dir, ".jarvis/codebase")
         self.cache_dir = os.path.join(self.data_dir, "cache")
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
