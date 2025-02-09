@@ -11,31 +11,30 @@ class CodeSubAgentTool:
     parameters = {
         "type": "object",
         "properties": {
+            "name": {
+                "type": "string",
+                "description": "The name of the sub-agent"
+            },
             "subtask": {
                 "type": "string",
                 "description": "The specific code development subtask to complete"
             },
-            "codebase_dir": {
-                "type": "string",
-                "description": "Directory containing the codebase",
-                "default": "."
-            }
         },
-        "required": ["subtask"]
+        "required": ["subtask", "name"]
     }
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute code development subtask"""
         try:
             subtask = args["subtask"]
-            codebase_dir = args.get("codebase_dir", ".")
+            name = args["name"]
 
-            PrettyOutput.print(f"Creating code sub-agent for subtask: {subtask}", OutputType.INFO)
+            PrettyOutput.print(f"Creating code sub-agent {name} for subtask: {subtask}", OutputType.INFO)
 
             # Create sub-agent
             sub_agent = Agent(
                 system_prompt=system_prompt,
-                name="CodeSubAgent",
+                name=name,
                 is_sub_agent=True
             )
 
