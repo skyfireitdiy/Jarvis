@@ -104,7 +104,8 @@ Related context:
             if not response:
                 return {
                     "success": False,
-                    "error": "Failed to obtain valid analysis results"
+                    "stdout": "",
+                    "stderr": "Failed to obtain valid analysis results"
                 }
                 
             return {
@@ -117,7 +118,8 @@ Related context:
             PrettyOutput.print(f"Thinking analysis failed: {str(e)}", OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"Execution failed: {str(e)}"
+                "stdout": "",
+                "stderr": f"Execution failed: {str(e)}"
             }
 
 def main():
@@ -143,7 +145,7 @@ def main():
         PrettyOutput.print("\nAnalysis results:", OutputType.INFO)
         PrettyOutput.print(result["stdout"], OutputType.INFO)
     else:
-        PrettyOutput.print(result["error"], OutputType.ERROR)
+        PrettyOutput.print(result["stderr"], OutputType.ERROR)
 
 if __name__ == "__main__":
     main() 

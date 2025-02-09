@@ -79,7 +79,7 @@ def init_git_repo(root_dir: str) -> str:
     # 3. Process .gitignore file
     gitignore_path = os.path.join(git_dir, ".gitignore")
     gitignore_modified = False
-    jarvis_ignore_pattern = ".jarvis-*"
+    jarvis_ignore_pattern = ".jarvis"
 
     # 3.1 If .gitignore does not exist, create it
     if not os.path.exists(gitignore_path):
@@ -88,13 +88,13 @@ def init_git_repo(root_dir: str) -> str:
             f.write(f"{jarvis_ignore_pattern}\n")
         gitignore_modified = True
     else:
-        # 3.2 Check if it already contains the .jarvis-* pattern
+        # 3.2 Check if it already contains the .jarvis pattern
         with open(gitignore_path, "r", encoding="utf-8") as f:
             content = f.read()
         
-        # 3.2 Check if it already contains the .jarvis-* pattern
+        # 3.2 Check if it already contains the .jarvis pattern
         if jarvis_ignore_pattern not in content.split("\n"):
-            PrettyOutput.print("Add .jarvis-* to .gitignore", OutputType.INFO)
+            PrettyOutput.print("Add .jarvis to .gitignore", OutputType.INFO)
             with open(gitignore_path, "a", encoding="utf-8") as f:
                 # Ensure the file ends with a newline
                 if not content.endswith("\n"):

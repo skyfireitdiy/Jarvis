@@ -81,5 +81,6 @@ class SubAgentTool:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"Sub-agent execution failed: {str(e)}"
+                "stdout": "",
+                "stderr": f"Sub-agent execution failed: {str(e)}"
             } 

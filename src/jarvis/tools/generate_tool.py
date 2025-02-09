@@ -96,7 +96,8 @@ class ExampleTool:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {{
                 "success": False,
-                "error": str(e)
+                "stdout": "",
+                "stderr": str(e)
             }}
 ```"""
 
@@ -151,7 +152,8 @@ class ExampleTool:
             if not success:
                 return {
                     "success": False,
-                    "error": "工具生成成功但注册失败"
+                    "stdout": "",
+                    "stderr": "工具生成成功但注册失败"
                 }
 
             return {
@@ -168,5 +170,6 @@ class ExampleTool:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"生成工具失败: {str(e)}"
+                "stdout": "",
+                "stderr": f"生成工具失败: {str(e)}"
             }

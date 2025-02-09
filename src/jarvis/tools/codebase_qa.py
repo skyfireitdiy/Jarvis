@@ -43,7 +43,6 @@ class CodebaseQATool:
                     "success": False,
                     "stdout": "",
                     "stderr": "Error: Current directory is not in a Git repository",
-                    "error": "NotInGitRepository"
                 }
 
             os.chdir(root_dir)
@@ -58,7 +57,6 @@ class CodebaseQATool:
                 "success": True,
                 "stdout": response,
                 "stderr": "",
-                "error": None
             }
             
         except Exception as e:
@@ -67,6 +65,5 @@ class CodebaseQATool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"Error executing codebase QA: {str(e)}",
-                "error": str(type(e).__name__)
             }
 
