@@ -197,7 +197,13 @@ def get_multiline_input(tip: str) -> str:
 def load_env_from_file():
     """Load environment variables from ~/.jarvis/env"""
     env_file = Path.home() / ".jarvis" / "env"
-    
+    old_env_file = Path.home() / ".jarvis_env"
+
+    if not env_file.exists():
+        if old_env_file.exists():
+            os.rename(old_env_file, env_file)
+            PrettyOutput.print(f"Moved {old_env_file} to {env_file}", OutputType.INFO)
+
     if env_file.exists():
         try:
             with open(env_file, "r", encoding="utf-8") as f:
@@ -210,7 +216,7 @@ def load_env_from_file():
                         except ValueError:
                             continue
         except Exception as e:
-            PrettyOutput.print(f"Warning: Failed to read ~/.jarvis/env: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"Warning: Failed to read {env_file}: {e}", OutputType.WARNING)
     
     
 def while_success(func, sleep_time: float = 0.1):
