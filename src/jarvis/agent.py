@@ -330,8 +330,8 @@ def load_tasks() -> dict:
     """Load tasks from .jarvis files in user home and current directory."""
     tasks = {}
     
-    # Check .jarvis in user directory
-    user_jarvis = os.path.expanduser("~/.jarvis")
+    # Check .jarvis/pre-command in user directory
+    user_jarvis = os.path.expanduser("~/.jarvis/pre-command")
     if os.path.exists(user_jarvis):
         try:
             with open(user_jarvis, "r", encoding="utf-8") as f:
@@ -343,14 +343,14 @@ def load_tasks() -> dict:
                     if desc:  # Ensure description is not empty
                         tasks[str(name)] = str(desc)
             else:
-                PrettyOutput.print("Warning: ~/.jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
+                PrettyOutput.print("Warning: ~/.jarvis/pre-command file should contain a dictionary of task_name: task_description", OutputType.ERROR)
         except Exception as e:
-            PrettyOutput.print(f"Error loading ~/.jarvis file: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Error loading ~/.jarvis/pre-command file: {str(e)}", OutputType.ERROR)
     
-    # Check .jarvis in current directory
-    if os.path.exists(".jarvis"):
+    # Check .jarvis/pre-command in current directory
+    if os.path.exists(".jarvis/pre-command"):
         try:
-            with open(".jarvis", "r", encoding="utf-8") as f:
+            with open(".jarvis/pre-command", "r", encoding="utf-8") as f:
                 local_tasks = yaml.safe_load(f)
                 
             if isinstance(local_tasks, dict):
@@ -359,9 +359,9 @@ def load_tasks() -> dict:
                     if desc:  # Ensure description is not empty
                         tasks[str(name)] = str(desc)
             else:
-                PrettyOutput.print("Warning: .jarvis file should contain a dictionary of task_name: task_description", OutputType.ERROR)
+                PrettyOutput.print("Warning: .jarvis/pre-command file should contain a dictionary of task_name: task_description", OutputType.ERROR)
         except Exception as e:
-            PrettyOutput.print(f"Error loading .jarvis file: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Error loading .jarvis/pre-command file: {str(e)}", OutputType.ERROR)
 
     # Read methodology
     method_path = os.path.expanduser("~/.jarvis_methodology")
