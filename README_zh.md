@@ -215,7 +215,6 @@ class CustomTool:
                 "success": bool,
                 "stdout": str,  # 成功时的输出
                 "stderr": str,  # 可选的错误详情
-                "error": str    # 失败时的错误信息
             }
         """
         try:
@@ -223,12 +222,14 @@ class CustomTool:
             result = "工具执行结果"
             return {
                 "success": True,
-                "stdout": result
+                "stdout": result,
+                "stderr": ""
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": str(e)
+                "stdout": "",
+                "stderr": str(e)
             }
 ```
 
