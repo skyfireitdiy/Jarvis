@@ -1,5 +1,5 @@
 提交代码: |
-  1. 使用git add . 添加所有修改的文件
+  1. 使用git add . 添加所有修改的文件（当前路径就是git根目录）
   2. 使用git diff --cached | cat - 查看修改的文件内容
   3. 根据修改的内容总结生成commit信息
   4. 使用git commit -m "commit信息" 提交修改
