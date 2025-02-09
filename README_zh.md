@@ -147,7 +147,7 @@ jarvis --keep-history  # 完成后不删除聊天会话
 
 ### 工具位置
 - 内置工具：`src/jarvis/tools/`
-- 用户工具：`~/.jarvis_tools/`
+- 用户工具：`~/.jarvis/tools/`
 
 ### 核心功能
 
@@ -234,7 +234,7 @@ class CustomTool:
 
 ### 添加新模型
 
-在 `~/.jarvis_models/` 中创建新的 Python 文件：
+在 `~/.jarvis/models/` 中创建新的 Python 文件：
 
 ```python
 from typing import Dict, List
