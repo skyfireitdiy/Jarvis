@@ -163,7 +163,7 @@ TOOL USAGE:
    - ask_user: Ask user for confirmation and information if needed
 
 3. Implementation Tools:
-   - execute_shell: Run shell commands
+   - execute_shell: Run shell commands, some changes can use sed/awk/etc. to modify the code
    - execute_code_modification: Apply small changes (≤20 lines)
    - file_operation: Read, write, or append to files
    
