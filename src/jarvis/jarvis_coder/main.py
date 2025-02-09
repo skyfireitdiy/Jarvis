@@ -13,7 +13,7 @@ from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.styles import Style
 import fnmatch
 from .patch_handler import PatchHandler
-from .git_utils import generate_commit_message, save_edit_record
+from .git_utils import generate_commit_message, init_git_repo, save_edit_record
 from .plan_generator import PlanGenerator
 
 # 全局锁对象
@@ -30,95 +30,11 @@ class JarvisCoder:
     def _init_directories(self):
         """Initialize directories"""
         self.max_context_length = get_max_context_length()
-
-        root_dir = find_git_root(self.root_dir)
-        if not root_dir:
-            root_dir = self.root_dir
-
-        self.root_dir = root_dir
-
-        PrettyOutput.print(f"Git root directory: {self.root_dir}", OutputType.INFO)
-
-        # 1. Check if the code repository path exists, if it does not exist, create it
-        if not os.path.exists(self.root_dir):
-            PrettyOutput.print(
-                "Root directory does not exist, creating...", OutputType.INFO)
-            os.makedirs(self.root_dir)
-
-        os.chdir(self.root_dir)
-
-        # 2. Create .jarvis-coder directory
-        self.jarvis_dir = os.path.join(self.root_dir, ".jarvis-coder")
-        if not os.path.exists(self.jarvis_dir):
-            os.makedirs(self.jarvis_dir)
-
-        self.record_dir = os.path.join(self.jarvis_dir, "record")
-        if not os.path.exists(self.record_dir):
-            os.makedirs(self.record_dir)
-
-        # 3. Process .gitignore file
-        gitignore_path = os.path.join(self.root_dir, ".gitignore")
-        gitignore_modified = False
-        jarvis_ignore_pattern = ".jarvis-*"
-
-        # 3.1 If .gitignore does not exist, create it
-        if not os.path.exists(gitignore_path):
-            PrettyOutput.print("Create .gitignore file", OutputType.INFO)
-            with open(gitignore_path, "w", encoding="utf-8") as f:
-                f.write(f"{jarvis_ignore_pattern}\n")
-            gitignore_modified = True
-        else:
-            # 3.2 Check if it already contains the .jarvis-* pattern
-            with open(gitignore_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            
-            # 3.2 Check if it already contains the .jarvis-* pattern
-            if jarvis_ignore_pattern not in content.split("\n"):
-                PrettyOutput.print("Add .jarvis-* to .gitignore", OutputType.INFO)
-                with open(gitignore_path, "a", encoding="utf-8") as f:
-                    # Ensure the file ends with a newline
-                    if not content.endswith("\n"):
-                        f.write("\n")
-                    f.write(f"{jarvis_ignore_pattern}\n")
-                gitignore_modified = True
-
-        # 4. Check if the code repository is a git repository, if not, initialize the git repository
-        if not os.path.exists(os.path.join(self.root_dir, ".git")):
-            PrettyOutput.print("Initialize Git repository", OutputType.INFO)
-            os.system("git init")
-            os.system("git add .")
-            os.system("git commit -m 'Initial commit'")
-        # 5. If .gitignore is modified, commit the changes
-        elif gitignore_modified:
-            PrettyOutput.print("Commit .gitignore changes", OutputType.INFO)
-            os.system("git add .gitignore")
-            os.system("git commit -m 'chore: update .gitignore to exclude .jarvis-* files'")
-        # 6. Check if there are uncommitted files in the code repository, if there are, commit once
-        elif self._has_uncommitted_files():
-            PrettyOutput.print("Commit uncommitted changes", OutputType.INFO)
-            os.system("git add .")
-            git_diff = os.popen("git diff --cached").read()
-            commit_message = generate_commit_message(git_diff)
-            os.system(f"git commit -m '{commit_message}'")
+        self.root_dir = init_git_repo(self.root_dir)
 
     def _init_codebase(self):
         """Initialize codebase"""
         self._codebase = CodeBase(self.root_dir)
-
-    def _has_uncommitted_files(self) -> bool:
-        """Check if there are uncommitted files in the code repository"""
-        # Get unstaged modifications
-        unstaged = os.popen("git diff --name-only").read()
-        # Get staged but uncommitted modifications
-        staged = os.popen("git diff --cached --name-only").read()
-        # Get untracked files
-        untracked = os.popen("git ls-files --others --exclude-standard").read()
-        
-        return bool(unstaged or staged or untracked)
-
-    def _prepare_execution(self) -> None:
-        """Prepare execution environment"""
-        self._codebase.generate_codebase()
 
 
     def _load_related_files(self, feature: str) -> List[str]:
@@ -136,49 +52,14 @@ class JarvisCoder:
         return ret
 
 
-    def _finalize_changes(self, feature: str) -> None:
-        """Complete changes and commit"""
-        PrettyOutput.print("Modification confirmed, committing...", OutputType.INFO)
-
-        # Add only modified files under git control
-        os.system("git add -u")
-        
-        # Then get git diff
-        git_diff = os.popen("git diff --cached").read()
-        
-        # Automatically generate commit information, pass in feature
-        commit_message = generate_commit_message(git_diff)
-        
-        # Display and confirm commit information
-        PrettyOutput.print(f"Automatically generated commit information: {commit_message}", OutputType.INFO)
-        user_confirm = input("Use this commit information? (y/n) [y]: ") or "y"
-        
-        if user_confirm.lower() != "y":
-            commit_message = input("Please enter a new commit information: ")
-        
-        # No need to git add again, it has already been added
-        os.system(f"git commit -m '{commit_message}'")
-        save_edit_record(self.record_dir, commit_message, git_diff)
-
-    def _revert_changes(self) -> None:
-        """Revert all changes"""
-        PrettyOutput.print("Modification cancelled, reverting changes", OutputType.INFO)
-        os.system(f"git reset --hard")
-        os.system(f"git clean -df")
-
 
     def execute(self, feature: str) -> Dict[str, Any]:
         """Execute code modification"""
         try:
-            self._prepare_execution()
-            
             # Get and select related files
             initial_files = self._load_related_files(feature)
             selected_files = select_files(initial_files, self.root_dir)
 
-            # Whether it is a long context
-
-            
             # Get modification plan
             structed_plan = PlanGenerator().generate_plan(feature, selected_files)
             if not structed_plan:
@@ -190,14 +71,12 @@ class JarvisCoder:
             
             # Execute modification
             if PatchHandler().handle_patch_application(feature, structed_plan):
-                self._finalize_changes(feature)
                 return {
                     "success": True,
                     "stdout": "Code modification successful",
                     "stderr": "",
                 }
             else:
-                self._revert_changes()
                 return {
                     "success": False,
                     "stdout": "",
@@ -205,7 +84,6 @@ class JarvisCoder:
                 }
                 
         except Exception as e:
-            self._revert_changes()
             return {
                 "success": False,
                 "stdout": "",
@@ -316,21 +194,6 @@ class FilePathCompleter(Completer):
                 # Calculate the correct start_position
                 yield Completion(path, start_position=-(len(search)))
 
-class SmartCompleter(Completer):
-    """Smart auto-completer, combine word and file path completion"""
-    
-    def __init__(self, word_completer: WordCompleter, file_completer: FilePathCompleter):
-        self.word_completer = word_completer
-        self.file_completer = file_completer
-        
-    def get_completions(self, document, complete_event):
-        """Get completion suggestions"""
-        # If the current line ends with @, use file completion
-        if document.text_before_cursor.strip().endswith('@'):
-            yield from self.file_completer.get_completions(document, complete_event)
-        else:
-            # Otherwise, use word completion
-            yield from self.word_completer.get_completions(document, complete_event)
 
 def get_multiline_input(prompt_text: str, root_dir: Optional[str] = ".") -> str:
     """Get multi-line input, support file path auto-completion function
