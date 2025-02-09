@@ -18,16 +18,9 @@ class CodePlanAgentTool:
             "related_files": {
                 "type": "array",
                 "items": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {"type": "string"},
-                        "parts": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        }
-                    }
+                    "type": "string"
                 },
-                "description": "List of related files with their code snippets",
+                "description": "List of related files",
                 "default": []
             },
             "additional_info": {
@@ -70,6 +63,7 @@ class CodePlanAgentTool:
             output += f"{task}\n\n"
 
             output += "2. MODIFICATION DETAILS\n"
+            
             for file_path, modification in structured_plan.items():
                 output += f"- {file_path}\n"
                 output += f"  {modification}\n"

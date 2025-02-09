@@ -7,7 +7,7 @@ class CodebaseSearchTool:
     """Codebase Search Tool"""
     
     name = "codebase_search"
-    description = "Search the codebase, find related code files"
+    description = "Search the codebase to find related code files based on natural language description or questions"
     parameters = {
         "type": "object",
         "properties": {
@@ -17,11 +17,11 @@ class CodebaseSearchTool:
             },
             "query": {
                 "type": "string",
-                "description": "Query about the codebase"
+                "description": "Natural language description or question about what you want to find in the codebase. For example: 'Where is the code that handles user authentication?' or 'Find the implementation of the database connection logic'"
             },
             "top_k": {
                 "type": "integer",
-                "description": "Number of relevant files to search",
+                "description": "Number of most relevant files to return",
                 "default": 5
             }
         },
