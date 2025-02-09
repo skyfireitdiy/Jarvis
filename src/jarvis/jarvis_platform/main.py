@@ -1,5 +1,5 @@
 from jarvis.models.registry import PlatformRegistry
-from jarvis.utils import PrettyOutput, OutputType, load_env_from_file, get_multiline_input
+from jarvis.utils import PrettyOutput, OutputType, init_env, get_multiline_input
 
 def list_platforms():
     """List all supported platforms and models"""
@@ -106,7 +106,7 @@ def main():
     """Main function"""
     import argparse
 
-    load_env_from_file()
+    init_env()
     
     parser = argparse.ArgumentParser(description='Jarvis AI Platform')
     subparsers = parser.add_subparsers(dest='command', help='Available subcommands')

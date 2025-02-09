@@ -8,7 +8,7 @@ import yaml
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools import ToolRegistry
 from jarvis.tools.registry import load_tools
-from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, load_embedding_model, load_env_from_file
+from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, load_embedding_model, init_env
 import os
 
 class Agent:
@@ -452,7 +452,7 @@ Strict Rules:
 def main():
     """Jarvis main entry point"""
     # Add argument parser
-    load_env_from_file()
+    init_env()
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
     parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
     args = parser.parse_args()

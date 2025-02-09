@@ -10,7 +10,7 @@ import concurrent.futures
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
 from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_file_md5, get_max_context_length, get_single_line_input, get_thread_count, load_embedding_model, load_rerank_model
-from jarvis.utils import load_env_from_file
+from jarvis.utils import init_env
 import argparse
 import pickle
 import lzma  # 添加 lzma 导入
@@ -19,7 +19,7 @@ import re
 
 class CodeBase:
     def __init__(self, root_dir: str):
-        load_env_from_file()
+        init_env()
         self.root_dir = root_dir
         os.chdir(self.root_dir)
         self.thread_count = get_thread_count()

@@ -194,7 +194,7 @@ def get_multiline_input(tip: str) -> str:
     
     return "\n".join(lines)
 
-def load_env_from_file():
+def init_env():
     """Load environment variables from ~/.jarvis/env"""
     jarvis_dir = Path.home() / ".jarvis"
     env_file = jarvis_dir / "env"
