@@ -252,11 +252,4 @@ class PatchHandler:
             return False
         # 6. Apply successfully, let user confirm changes
         PrettyOutput.print("\nPatches applied, please check the modification effect.", OutputType.SUCCESS)
-        confirm = get_single_line_input("\nKeep these changes? (y/n) [y]: ").lower() or "y"
-        if confirm != "y":
-            PrettyOutput.print("User cancelled changes, rolling back", OutputType.WARNING)
-            os.system("git reset --hard")  # Rollback all changes
-            return False
-        else:
-            return True
-            
+        return True
