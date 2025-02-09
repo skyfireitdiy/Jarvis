@@ -149,7 +149,10 @@ class PrettyOutput:
 def get_single_line_input(tip: str) -> str:
     """Get single line input, support direction key, history function, etc."""
     session = PromptSession(history=None)
-    return session.prompt(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
+    style = PromptStyle.from_dict({
+        'prompt': 'ansicyan',
+    })
+    return session.prompt(f"{tip}", style=style)
 
 def get_multiline_input(tip: str) -> str:
     """Get multi-line input, support direction key, history function, etc."""
@@ -157,6 +160,11 @@ def get_multiline_input(tip: str) -> str:
     
     # 创建输入会话，启用历史记录
     session = PromptSession(history=None)  # 使用默认历史记录
+    
+    # 定义提示符样式
+    style = PromptStyle.from_dict({
+        'prompt': 'ansicyan',
+    })
     
     lines = []
     try:
@@ -168,7 +176,8 @@ def get_multiline_input(tip: str) -> str:
             
             # 获取输入
             line = session.prompt(
-                prompt
+                prompt,
+                style=style,
             ).strip()
             
             # 空行处理
