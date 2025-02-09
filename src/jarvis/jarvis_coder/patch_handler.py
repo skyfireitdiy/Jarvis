@@ -155,7 +155,7 @@ class PatchHandler:
             
         return "continue", feedback
 
-    def apply_patch(self, feature: str, structed_plan: Dict[str, str]) -> bool:
+    def apply_patch(self, feature: str, structed_plan: Dict[str, str]) -> Tuple[bool, str]:
         """Apply patch (main entry)"""
         for file_path, current_plan in structed_plan.items():
             additional_info = self.additional_info  # Initialize with saved info
@@ -215,7 +215,8 @@ class PatchHandler:
                     act, msg = self.retry_comfirm()
                     if act == "break":
                         PrettyOutput.print("Terminate patch application", OutputType.WARNING)
-                        return False
+                        additional_info = get_multiline_input("Please enter your additional information or suggestions (press Enter to cancel):")
+                        return False, additional_info
                     if act == "skip":
                         PrettyOutput.print(f"Skip file {file_path}", OutputType.WARNING)
                         break
@@ -226,11 +227,11 @@ class PatchHandler:
                     self._finalize_changes()
                     break
         
-        return True
+        return True, ""
 
 
 
-    def handle_patch_application(self, feature: str, structed_plan: Dict[str,str]) -> bool:
+    def handle_patch_application(self, feature: str, structed_plan: Dict[str,str]) -> Tuple[bool, str]:
         """Process patch application process
         
         Args:
@@ -246,10 +247,10 @@ class PatchHandler:
             PrettyOutput.print(f"\nFile: {file_path}", OutputType.INFO)
             PrettyOutput.print(f"Modification plan: \n{patches_code}", OutputType.INFO)
         # 3. Apply patches
-        success = self.apply_patch(feature, structed_plan)
+        success, additional_info = self.apply_patch(feature, structed_plan)
         if not success:
             os.system("git reset --hard")
-            return False
+            return False, additional_info
         # 6. Apply successfully, let user confirm changes
         PrettyOutput.print("\nPatches applied, please check the modification effect.", OutputType.SUCCESS)
-        return True
+        return True, "Modification applied successfully"
