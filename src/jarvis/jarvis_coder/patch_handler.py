@@ -7,7 +7,7 @@ from pathlib import Path
 from jarvis.jarvis_coder.git_utils import generate_commit_message, init_git_repo, save_edit_record
 from jarvis.models.base import BasePlatform
 from jarvis.models.registry import PlatformRegistry
-from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, while_success
+from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, get_single_line_input, while_success
 
 class Patch:
     def __init__(self, old_code: str, new_code: str):
@@ -62,7 +62,7 @@ class PatchHandler:
     def _confirm_and_apply_changes(self, file_path: str) -> bool:
         """Confirm and apply changes"""
         os.system(f"git diff --cached {file_path}")
-        confirm = input(f"\nAccept {file_path} changes? (y/n) [y]: ").lower() or "y"
+        confirm = get_single_line_input(f"Accept {file_path} changes? (y/n) [y]").lower() or "y"
         if confirm == "y":
             return True
         else:
@@ -89,10 +89,10 @@ class PatchHandler:
         
         # Display and confirm commit information
         PrettyOutput.print(f"Automatically generated commit information: {commit_message}", OutputType.INFO)
-        user_confirm = input("Use this commit information? (y/n) [y]: ") or "y"
+        user_confirm = get_single_line_input("Use this commit information? (y/n) [y]").lower() or "y"
         
         if user_confirm.lower() != "y":
-            commit_message = input("Please enter a new commit information: ")
+            commit_message = get_single_line_input("Please enter a new commit information")
         
         # No need to git add again, it has already been added
         os.system(f"git commit -m '{commit_message}'")
@@ -140,7 +140,7 @@ class PatchHandler:
             
     
     def retry_comfirm(self) -> Tuple[str, str]:
-        choice = input("\nPlease choose an action: (1) Retry (2) Skip (3) Completely stop [1]: ") or "1"
+        choice = get_single_line_input("\nPlease choose an action: (1) Retry (2) Skip (3) Completely stop [1]: ") or "1"
         if choice == "2":
             return "skip", ""
         if choice == "3":
@@ -148,7 +148,7 @@ class PatchHandler:
             
         feedback = get_multiline_input("Please enter additional information and requirements:")
         if feedback:
-            save_prompt = input("Would you like to save this as general feedback for future patches? (y/n) [n]: ").lower() or "n"
+            save_prompt = get_single_line_input("Would you like to save this as general feedback for future patches? (y/n) [n]: ").lower() or "n"
             if save_prompt == "y":
                 self._save_additional_info(feedback)
                 PrettyOutput.print("Feedback saved for future use", OutputType.SUCCESS)
@@ -252,7 +252,7 @@ class PatchHandler:
             return False
         # 6. Apply successfully, let user confirm changes
         PrettyOutput.print("\nPatches applied, please check the modification effect.", OutputType.SUCCESS)
-        confirm = input("\nKeep these changes? (y/n) [y]: ").lower() or "y"
+        confirm = get_single_line_input("\nKeep these changes? (y/n) [y]: ").lower() or "y"
         if confirm != "y":
             PrettyOutput.print("User cancelled changes, rolling back", OutputType.WARNING)
             os.system("git reset --hard")  # Rollback all changes

@@ -8,20 +8,19 @@ from yaspin import yaspin # type: ignore
 from yaspin.spinners import Spinners # type: ignore
 
 from jarvis.models.registry import PlatformRegistry
-from jarvis.utils import PrettyOutput, OutputType, load_env_from_file
+from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_env_from_file
 
 def execute_command(command: str) -> None:
     """Show command and allow user to edit, then execute, Ctrl+C to cancel"""
     try:
-        print("\nGenerated command (can be edited, press Enter to execute, Ctrl+C to cancel):")
         # Pre-fill input line
         readline.set_startup_hook(lambda: readline.insert_text(command))
         try:
-            edited_command = input("> ")
+            edited_command = get_single_line_input("Generated command (can be edited, press Enter to execute, Ctrl+C to cancel)")
             if edited_command.strip():  # Ensure command is not empty
                 os.system(edited_command)
         except KeyboardInterrupt:
-            print("\nExecution cancelled")
+            PrettyOutput.print("Execution cancelled", OutputType.INFO)
         finally:
             readline.set_startup_hook()  # Clear pre-filled
     except Exception as e:

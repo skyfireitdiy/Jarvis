@@ -9,7 +9,7 @@ from jarvis.models.registry import PlatformRegistry
 import concurrent.futures
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_file_md5, get_max_context_length, get_thread_count, load_embedding_model, load_rerank_model
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_file_md5, get_max_context_length, get_single_line_input, get_thread_count, load_embedding_model, load_rerank_model
 from jarvis.utils import load_env_from_file
 import argparse
 import pickle
@@ -374,7 +374,7 @@ Code content:
                 if not force:
                     # Ask the user whether to continue
                     while True:
-                        response = input("\nRebuild the index? [y/N] ").lower().strip()
+                        response = get_single_line_input("\nRebuild the index? [y/N]").lower().strip()
                         if response in ['y', 'yes']:
                             break
                         elif response in ['', 'n', 'no']:
