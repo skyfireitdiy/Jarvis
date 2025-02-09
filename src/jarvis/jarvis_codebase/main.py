@@ -463,7 +463,7 @@ Code content:
         
         Args:
             query: Search query
-            initial_results: Initial results list, each item is a tuple of (file path, score, description)
+            initial_results: Initial results list of file paths
             
         Returns:
             List[str]: The picked results list, each item is a file path
@@ -473,18 +473,73 @@ Code content:
             
         try:
             PrettyOutput.print(f"Picking results for query: {query}", output_type=OutputType.INFO)
-            # Prepare the prompt
-            files_info = ""
+            
+            # Maximum content length per batch
+            max_batch_length = self.max_context_length - 1000  # Reserve space for prompt
+            max_file_length = max_batch_length // 3  # Limit individual file size
+            
+            # Process files in batches
+            all_selected_files = set()
+            current_batch = []
+            current_length = 0
+            
             for path in initial_results:
-                content = open(path, "r", encoding="utf-8").read()
-                files_info += f"File: {path}\nContent: {content}\n\n"
-                
-            prompt = f"""Please analyze the following code files and determine which files are most relevant to the given query. Consider file paths and descriptions to make your judgment.
+                try:
+                    content = open(path, "r", encoding="utf-8").read()
+                    # Truncate large files
+                    if len(content) > max_file_length:
+                        PrettyOutput.print(f"Truncating large file: {path}", OutputType.WARNING)
+                        content = content[:max_file_length] + "\n... (content truncated)"
+                    
+                    file_info = f"File: {path}\nContent: {content}\n\n"
+                    file_length = len(file_info)
+                    
+                    # If adding this file would exceed batch limit
+                    if current_length + file_length > max_batch_length:
+                        # Process current batch
+                        if current_batch:
+                            selected = self._process_batch(query, current_batch)
+                            all_selected_files.update(selected)
+                        # Start new batch
+                        current_batch = [file_info]
+                        current_length = file_length
+                    else:
+                        current_batch.append(file_info)
+                        current_length += file_length
+                        
+                except Exception as e:
+                    PrettyOutput.print(f"Failed to read file {path}: {str(e)}", OutputType.ERROR)
+                    continue
+            
+            # Process final batch
+            if current_batch:
+                selected = self._process_batch(query, current_batch)
+                all_selected_files.update(selected)
+            
+            # Convert set to list and maintain original order
+            final_results = [path for path in initial_results if path in all_selected_files]
+            return final_results
+
+        except Exception as e:
+            PrettyOutput.print(f"Failed to pick: {str(e)}", OutputType.ERROR)
+            return initial_results
+            
+    def _process_batch(self, query: str, files_info: List[str]) -> List[str]:
+        """Process a batch of files
+        
+        Args:
+            query: Search query
+            files_info: List of file information strings
+            
+        Returns:
+            List[str]: Selected file paths from this batch
+        """
+        prompt = f"""Please analyze the following code files and determine which files are most relevant to the given query. Consider file paths and code content to make your judgment.
 
 Query: {query}
 
 Available files:
-{files_info}
+{''.join(files_info)}
 
 Please output a YAML list of relevant file paths, ordered by relevance (most relevant first). Only include files that are truly relevant to the query.
 Output format:
@@ -495,25 +550,23 @@ Output format:
 
 Note: Only include files that have a strong connection to the query."""
 
-            # Use a large model to evaluate
-            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-            response = model.chat_until_success(prompt)
+        # Use a large model to evaluate
+        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        response = model.chat_until_success(prompt)
 
-            # Parse the response
-            import yaml
-            files_match = re.search(r'<FILES>\n(.*?)</FILES>', response, re.DOTALL)
-            if not files_match:
-                return initial_results
+        # Parse the response
+        import yaml
+        files_match = re.search(r'<FILES>\n(.*?)</FILES>', response, re.DOTALL)
+        if not files_match:
+            return []
 
-            # Extract the file list
+        # Extract the file list
+        try:
             selected_files = yaml.safe_load(files_match.group(1))
-    
-            return selected_files
-
+            return selected_files if selected_files else []
         except Exception as e:
-            PrettyOutput.print(f"Failed to pick: {str(e)}", 
-                            output_type=OutputType.ERROR)
-            return initial_results
+            PrettyOutput.print(f"Failed to parse response: {str(e)}", OutputType.ERROR)
+            return []
 
     def _generate_query_variants(self, query: str) -> List[str]:
         """Generate different expressions of the query
