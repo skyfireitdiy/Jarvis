@@ -1,6 +1,5 @@
-from typing import Dict, Any, Protocol
+from typing import Dict, Any
 import os
-from enum import Enum
 
 from jarvis.utils import OutputType, PrettyOutput
 
@@ -36,15 +35,15 @@ class FileOperationTool:
 
 
     def execute(self, args: Dict) -> Dict[str, Any]:
-        """执行文件操作"""
+        """Execute file operations"""
         try:
             operation = args["operation"]
             filepath = args["filepath"]
             encoding = args.get("encoding", "utf-8")
             
-            # 记录操作和完整路径
+            # Record the operation and the full path
             abs_path = os.path.abspath(filepath)
-            PrettyOutput.print(f"文件操作: {operation} - {abs_path}", OutputType.INFO)
+            PrettyOutput.print(f"File operation: {operation} - {abs_path}", OutputType.INFO)
             
             if operation == "exists":
                 exists = os.path.exists(filepath)
@@ -61,15 +60,15 @@ class FileOperationTool:
                         "error": f"文件不存在: {filepath}"
                     }
                     
-                # 检查文件大小
+                # Check file size
                 if os.path.getsize(filepath) > 10 * 1024 * 1024:  # 10MB
                     return {
                         "success": False,
-                        "error": "文件过大 (>10MB)"
+                        "error": "File too large (>10MB)"
                     }
                     
-                with open(filepath, 'r', encoding=encoding) as f:
-                    content = f.read()
+                content = open(filepath, 'r', encoding=encoding).read()
+                PrettyOutput.print(content, OutputType.INFO)
                 return {
                     "success": True,
                     "stdout": content,
@@ -80,10 +79,10 @@ class FileOperationTool:
                 if not args.get("content"):
                     return {
                         "success": False,
-                        "error": "写入/追加操作需要提供content参数"
+                        "error": "Write/append operation requires providing the content parameter"
                     }
                 
-                # 创建目录（如果不存在）
+                # Create directory (if it doesn't exist)
                 os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
                     
                 mode = 'a' if operation == "append" else 'w'
@@ -92,19 +91,19 @@ class FileOperationTool:
                     
                 return {
                     "success": True,
-                    "stdout": f"成功{operation}内容到 {filepath}",
+                    "stdout": f"Successfully {operation} content to {filepath}",
                     "stderr": ""
                 }
                 
             else:
                 return {
                     "success": False,
-                    "error": f"未知操作: {operation}"
+                    "error": f"Unknown operation: {operation}"
                 }
                 
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"文件操作失败: {str(e)}"
+                "error": f"File operation failed: {str(e)}"
             } 
