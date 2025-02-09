@@ -36,17 +36,14 @@ class CodeBase:
             self.embedding_model = load_embedding_model()
             
             # 强制完全加载所有模型组件
-            test_text = """
-这是一段测试文本，用于确保模型完全加载。
-包含多行内容，以模拟实际使用场景。
-"""
+            test_text = """This is a test text"""
             # 预热模型，确保所有组件都被加载
             self.embedding_model.encode([test_text], 
                                      convert_to_tensor=True,
                                      normalize_embeddings=True)
-            PrettyOutput.print("模型加载完成", output_type=OutputType.SUCCESS)
+            PrettyOutput.print("Model loaded successfully", output_type=OutputType.SUCCESS)
         except Exception as e:
-            PrettyOutput.print(f"加载模型失败: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"Failed to load model: {str(e)}", output_type=OutputType.ERROR)
             raise
             
         self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
@@ -66,21 +63,21 @@ class CodeBase:
                     cache_data = pickle.load(f)
                     self.vector_cache = cache_data["vectors"]
                     self.file_paths = cache_data["file_paths"]
-                PrettyOutput.print(f"加载了 {len(self.vector_cache)} 个向量缓存", 
+                PrettyOutput.print(f"Loaded {len(self.vector_cache)} vector cache", 
                                  output_type=OutputType.INFO)
                 # 从缓存重建索引
                 self.build_index()
             except Exception as e:
-                PrettyOutput.print(f"加载缓存失败: {str(e)}", 
+                PrettyOutput.print(f"Failed to load cache: {str(e)}", 
                                  output_type=OutputType.WARNING)
                 self.vector_cache = {}
                 self.file_paths = []
                 self.index = None
 
     def get_git_file_list(self):
-        """获取 git 仓库中的文件列表，排除 .jarvis-codebase 目录"""
+        """Get the list of files in the git repository, excluding the .jarvis-codebase directory"""
         files = os.popen("git ls-files").read().splitlines()
-        # 过滤掉 .jarvis-codebase 目录下的文件
+        # Filter out files in the .jarvis-codebase directory
         return [f for f in files if not f.startswith(".jarvis-")]
 
     def is_text_file(self, file_path: str):
@@ -111,16 +108,16 @@ Code content:
         return response
 
     def export(self):
-        """导出当前索引数据到标准输出"""
+        """Export the current index data to standard output"""
         for file_path, data in self.vector_cache.items():
             print(f"## {file_path}")
             print(f"- path: {file_path}")
             print(f"- description: {data['description']}")
     
     def _save_cache(self):
-        """保存缓存数据"""
+        """Save cache data"""
         try:
-            # 创建缓存数据的副本
+            # Create a copy of the cache data
             cache_data = {
                 "vectors": dict(self.vector_cache),  # 创建字典的副本
                 "file_paths": list(self.file_paths)  # 创建列表的副本
@@ -129,19 +126,19 @@ Code content:
             # 使用 lzma 压缩存储
             with lzma.open(self.cache_path, 'wb') as f:
                 pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
-            PrettyOutput.print(f"保存了 {len(self.vector_cache)} 个向量缓存", 
+            PrettyOutput.print(f"Saved {len(self.vector_cache)} vector cache", 
                              output_type=OutputType.INFO)
         except Exception as e:
-            PrettyOutput.print(f"保存缓存失败: {str(e)}", 
+            PrettyOutput.print(f"Failed to save cache: {str(e)}", 
                              output_type=OutputType.ERROR)
             raise  # 抛出异常以便上层处理
 
     def get_cached_vector(self, file_path: str, description: str) -> Optional[np.ndarray]:
-        """从缓存获取文件的向量表示"""
+        """Get the vector representation of a file from the cache"""
         if file_path not in self.vector_cache:
             return None
         
-        # 检查文件是否被修改
+        # Check if the file has been modified
         try:
             with open(file_path, "rb") as f:
                 current_md5 = hashlib.md5(f.read()).hexdigest()
@@ -154,14 +151,14 @@ Code content:
         if cached_data["md5"] != current_md5:
             return None
         
-        # 检查描述是否变化
+        # Check if the description has changed
         if cached_data["description"] != description:
             return None
         
         return cached_data["vector"]
 
     def cache_vector(self, file_path: str, vector: np.ndarray, description: str):
-        """缓存文件的向量表示"""
+        """Cache the vector representation of a file"""
         try:
             with open(file_path, "rb") as f:
                 file_md5 = hashlib.md5(f.read()).hexdigest()
@@ -170,39 +167,39 @@ Code content:
                               output_type=OutputType.ERROR)
             file_md5 = ""
         
-        # 只更新内存中的缓存
+        # Only update the in-memory cache
         self.vector_cache[file_path] = {
-            "path": file_path,  # 保存文件路径
-            "md5": file_md5,    # 保存文件MD5
-            "description": description,  # 保存文件描述
-            "vector": vector    # 保存向量
+            "path": file_path,  # Save file path
+            "md5": file_md5,    # Save file MD5
+            "description": description,  # Save file description
+            "vector": vector    # Save vector
         }
 
     def get_embedding(self, text: str) -> np.ndarray:
-        """使用 transformers 模型获取文本的向量表示"""
-        # 对长文本进行截断
-        max_length = 512  # 或其他合适的长度
+        """Use the transformers model to get the vector representation of text"""
+        # Truncate long text
+        max_length = 512  # Or other suitable length
         text = ' '.join(text.split()[:max_length])
         
-        # 获取嵌入向量
+        # Get the embedding vector
         embedding = self.embedding_model.encode(text, 
-                                                 normalize_embeddings=True,  # L2归一化
+                                                 normalize_embeddings=True,  # L2 normalization
                                                  show_progress_bar=False)
         vector = np.array(embedding, dtype=np.float32)
         return vector
 
     def vectorize_file(self, file_path: str, description: str) -> np.ndarray:
-        """将文件内容和描述向量化"""
+        """Vectorize the file content and description"""
         try:
-            # 先尝试从缓存获取
+            # Try to get the vector from the cache first
             cached_vector = self.get_cached_vector(file_path, description)
             if cached_vector is not None:
                 return cached_vector
                 
-            # 读取文件内容并组合信息
-            content = open(file_path, "r", encoding="utf-8").read()[:self.max_context_length]  # 限制文件内容长度
+            # Read the file content and combine information
+            content = open(file_path, "r", encoding="utf-8").read()[:self.max_context_length]  # Limit the file content length
             
-            # 组合文件信息，包含文件内容
+            # Combine file information, including file content
             combined_text = f"""
 {file_path}
 {description}
@@ -210,7 +207,7 @@ Code content:
 """
             vector = self.get_embedding(combined_text)
             
-            # 保存到缓存
+            # Save to cache
             self.cache_vector(file_path, vector, description)
             return vector
         except Exception as e:
@@ -219,7 +216,7 @@ Code content:
             return np.zeros(self.vector_dim, dtype=np.float32) # type: ignore
 
     def clean_cache(self) -> bool:
-        """清理过期的缓存记录，返回是否有文件被删除"""
+        """Clean expired cache records, return whether any files were deleted"""
         try:
             files_to_delete = []
             for file_path in list(self.vector_cache.keys()):
@@ -228,17 +225,17 @@ Code content:
                     files_to_delete.append(file_path)
             
             if files_to_delete:
-                # 只在有文件被删除时保存缓存
+                # Save cache only when files are deleted
                 self._save_cache()
-                PrettyOutput.print(f"清理了 {len(files_to_delete)} 个文件的缓存", 
+                PrettyOutput.print(f"Cleaned {len(files_to_delete)} cache files", 
                                 output_type=OutputType.INFO)
                 return True
             return False
             
         except Exception as e:
-            PrettyOutput.print(f"清理缓存失败: {str(e)}", 
+            PrettyOutput.print(f"Failed to clean cache: {str(e)}", 
                             output_type=OutputType.ERROR)
-            # 发生异常时尝试保存当前状态
+            # Try to save the current state when an exception occurs
             try:
                 self._save_cache()
             except:
@@ -246,9 +243,9 @@ Code content:
             return False
 
     def process_file(self, file_path: str):
-        """处理单个文件"""
+        """Process a single file"""
         try:
-            # 跳过不存在的文件
+            # Skip non-existent files
             if not os.path.exists(file_path):
                 return None
                 
@@ -259,15 +256,15 @@ Code content:
 
             content = open(file_path, "r", encoding="utf-8").read()
             
-            # 检查文件是否已经处理过且内容未变
+            # Check if the file has already been processed and the content has not changed
             if file_path in self.vector_cache:
                 if self.vector_cache[file_path].get("md5") == md5:
                     return None
                     
-            description = self.make_description(file_path, content)  # 传入截取后的内容
+            description = self.make_description(file_path, content)  # Pass the truncated content
             vector = self.vectorize_file(file_path, description)
             
-            # 保存到缓存，使用实际文件路径作为键
+            # Save to cache, using the actual file path as the key
             self.vector_cache[file_path] = {
                 "vector": vector,
                 "description": description,
@@ -277,23 +274,23 @@ Code content:
             return file_path
             
         except Exception as e:
-            PrettyOutput.print(f"处理文件失败 {file_path}: {str(e)}", 
+            PrettyOutput.print(f"Failed to process file {file_path}: {str(e)}", 
                              output_type=OutputType.ERROR)
             return None
 
     def build_index(self):
-        """从向量缓存构建 faiss 索引"""
-        # 创建底层 HNSW 索引
+        """Build a faiss index from the vector cache"""
+        # Create the underlying HNSW index
         hnsw_index = faiss.IndexHNSWFlat(self.vector_dim, 16)
         hnsw_index.hnsw.efConstruction = 40
         hnsw_index.hnsw.efSearch = 16
         
-        # 用 IndexIDMap 包装 HNSW 索引
+        # Wrap the HNSW index with IndexIDMap
         self.index = faiss.IndexIDMap(hnsw_index)
         
         vectors = []
         ids = []
-        self.file_paths = []  # 重置文件路径列表
+        self.file_paths = []  # Reset the file path list
         
         for i, (file_path, data) in enumerate(self.vector_cache.items()):
             vectors.append(data["vector"].reshape(1, -1))
@@ -307,28 +304,28 @@ Code content:
             self.index = None
 
     def gen_vector_db_from_cache(self):
-        """从缓存生成向量数据库"""
+        """Generate a vector database from the cache"""
         self.build_index()
         self._save_cache()
 
 
     def generate_codebase(self, force: bool = False):
-        """生成代码库索引
+        """Generate the codebase index
         Args:
-            force: 是否强制重建索引，不询问用户
+            force: Whether to force rebuild the index, without asking the user
         """
         try:
-            # 更新 git 文件列表
+            # Update the git file list
             self.git_file_list = self.get_git_file_list()
             
-            # 检查文件变化
-            PrettyOutput.print("\n检查文件变化...", output_type=OutputType.INFO)
+            # Check file changes
+            PrettyOutput.print("\nCheck file changes...", output_type=OutputType.INFO)
             changes_detected = False
             new_files = []
             modified_files = []
             deleted_files = []
             
-            # 检查删除的文件
+            # Check deleted files
             files_to_delete = []
             for file_path in list(self.vector_cache.keys()):
                 if file_path not in self.git_file_list:
@@ -336,8 +333,8 @@ Code content:
                     files_to_delete.append(file_path)
                     changes_detected = True
             
-            # 检查新增和修改的文件
-            with tqdm(total=len(self.git_file_list), desc="检查文件状态") as pbar:
+            # Check new and modified files
+            with tqdm(total=len(self.git_file_list), desc="Check file status") as pbar:
                 for file_path in self.git_file_list:
                     if not os.path.exists(file_path) or not self.is_text_file(file_path):
                         pbar.update(1)
@@ -357,56 +354,56 @@ Code content:
                                          output_type=OutputType.ERROR)
                     pbar.update(1)
             
-            # 如果检测到变化，显示变化并询问用户
+            # If changes are detected, display changes and ask the user
             if changes_detected:
-                PrettyOutput.print("\n检测到以下变化:", output_type=OutputType.WARNING)
+                PrettyOutput.print("\nDetected the following changes:", output_type=OutputType.WARNING)
                 if new_files:
-                    PrettyOutput.print("\n新增文件:", output_type=OutputType.INFO)
+                    PrettyOutput.print("\nNew files:", output_type=OutputType.INFO)
                     for f in new_files:
                         PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
                 if modified_files:
-                    PrettyOutput.print("\n修改的文件:", output_type=OutputType.INFO)
+                    PrettyOutput.print("\nModified files:", output_type=OutputType.INFO)
                     for f in modified_files:
                         PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
                 if deleted_files:
-                    PrettyOutput.print("\n删除的文件:", output_type=OutputType.INFO)
+                    PrettyOutput.print("\nDeleted files:", output_type=OutputType.INFO)
                     for f in deleted_files:
                         PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
 
-                # 如果force为True，直接继续
+                # If force is True, continue directly
                 if not force:
-                    # 询问用户是否继续
+                    # Ask the user whether to continue
                     while True:
-                        response = input("\n是否重建索引？[y/N] ").lower().strip()
+                        response = input("\nRebuild the index? [y/N] ").lower().strip()
                         if response in ['y', 'yes']:
                             break
                         elif response in ['', 'n', 'no']:
-                            PrettyOutput.print("取消重建索引", output_type=OutputType.INFO)
+                            PrettyOutput.print("Cancel rebuilding the index", output_type=OutputType.INFO)
                             return
                         else:
-                            PrettyOutput.print("请输入 y 或 n", output_type=OutputType.WARNING)
+                            PrettyOutput.print("Please input y or n", output_type=OutputType.WARNING)
                 
-                # 清理已删除的文件
+                # Clean deleted files
                 for file_path in files_to_delete:
                     del self.vector_cache[file_path]
                 if files_to_delete:
-                    PrettyOutput.print(f"清理了 {len(files_to_delete)} 个文件的缓存", 
+                    PrettyOutput.print(f"Cleaned the cache of {len(files_to_delete)} files", 
                                      output_type=OutputType.INFO)
                 
-                # 处理新文件和修改的文件
+                # Process new and modified files
                 files_to_process = new_files + modified_files
                 processed_files = []
                 
-                with tqdm(total=len(files_to_process), desc="处理文件") as pbar:
-                    # 使用线程池处理文件
+                with tqdm(total=len(files_to_process), desc="Processing files") as pbar:
+                    # Use a thread pool to process files
                     with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
-                        # 提交所有任务
+                        # Submit all tasks
                         future_to_file = {
                             executor.submit(self.process_file, file): file 
                             for file in files_to_process
                         }
                         
-                        # 处理完成的任务
+                        # Process completed tasks
                         for future in concurrent.futures.as_completed(future_to_file):
                             file = future_to_file[future]
                             try:
@@ -419,32 +416,32 @@ Code content:
                             pbar.update(1)
 
                 if processed_files:
-                    PrettyOutput.print("\n重新生成向量数据库...", output_type=OutputType.INFO)
+                    PrettyOutput.print("\nRebuilding the vector database...", output_type=OutputType.INFO)
                     self.gen_vector_db_from_cache()
-                    PrettyOutput.print(f"成功为 {len(processed_files)} 个文件生成索引", 
+                    PrettyOutput.print(f"Successfully generated the index for {len(processed_files)} files", 
                                     output_type=OutputType.SUCCESS)
             else:
-                PrettyOutput.print("没有检测到文件变更，无需重建索引", output_type=OutputType.INFO)
+                PrettyOutput.print("No file changes detected, no need to rebuild the index", output_type=OutputType.INFO)
                 
         except Exception as e:
-            # 发生异常时尝试保存缓存
+            # Try to save the cache when an exception occurs
             try:
                 self._save_cache()
             except Exception as save_error:
-                PrettyOutput.print(f"保存缓存失败: {str(save_error)}", 
+                PrettyOutput.print(f"Failed to save cache: {str(save_error)}", 
                                 output_type=OutputType.ERROR)
-            raise e  # 重新抛出原始异常
+            raise e  # Re-raise the original exception
 
 
     def _text_search_score(self, content: str, keywords: List[str]) -> float:
-        """计算文本内容与关键词的匹配分数
+        """Calculate the matching score between the text content and the keywords
         
         Args:
-            content: 文本内容
-            keywords: 关键词列表
+            content: Text content
+            keywords: List of keywords
             
         Returns:
-            float: 匹配分数 (0-1)
+            float: Matching score (0-1)
         """
         if not keywords:
             return 0.0
@@ -457,89 +454,80 @@ Code content:
             if keyword in content:
                 matched_keywords.add(keyword)
                 
-        # 计算匹配分数
+        # Calculate the matching score
         score = len(matched_keywords) / len(keywords)
         return score
 
-    def rerank_results(self, query: str, initial_results: List[Tuple[str, float, str]]) -> List[Tuple[str, float]]:
-        """使用多种策略对搜索结果重新排序"""
+    def pick_results(self, query: str, initial_results: List[Tuple[str, float, str]]) -> List[Tuple[str, float]]:
+        """Use a large model to pick the search results
+        
+        Args:
+            query: Search query
+            initial_results: Initial results list, each item is a tuple of (file path, score, description)
+            
+        Returns:
+            List[Tuple[str, float]]: The picked results list, each item is a tuple of (file path, score)
+        """
         if not initial_results:
             return []
             
         try:
-            import torch
-            
-            # 加载模型和分词器
-            model, tokenizer = load_rerank_model()
-            
-            # 准备数据
-            pairs = []
-            
+            # Prepare the prompt
+            files_info = ""
             for path, _, desc in initial_results:
-                try:
-                    content = open(path, "r", encoding="utf-8").read()[:512]  # 限制内容长度
-                    
-                    # 组合文件信息
-                    doc_content = f"File path: {path}\nDescription: {desc}\nContent: {content}"
-                    pairs.append([query, doc_content])
-                except Exception as e:
-                    PrettyOutput.print(f"读取文件失败 {path}: {str(e)}", 
-                                    output_type=OutputType.ERROR)
-                    doc_content = f"File path: {path}\nDescription: {desc}"
-                    pairs.append([query, doc_content])
-            
-            # 使用更大的batch size提高处理速度
-            batch_size = 16  # 根据GPU显存调整
-            batch_scores = []
-            
-            with torch.no_grad():
-                for i in range(0, len(pairs), batch_size):
-                    batch_pairs = pairs[i:i + batch_size]
-                    encoded = tokenizer(
-                        batch_pairs,
-                        padding=True,
-                        truncation=True,
-                        max_length=512,
-                        return_tensors='pt'
-                    )
-                    
-                    if torch.cuda.is_available():
-                        encoded = {k: v.cuda() for k, v in encoded.items()}
-                        
-                    outputs = model(**encoded)
-                    batch_scores.extend(outputs.logits.squeeze(-1).cpu().numpy())
-            
-            # 归一化分数到 0-1 范围
-            if batch_scores:
-                min_score = min(batch_scores)
-                max_score = max(batch_scores)
-                if max_score > min_score:
-                    batch_scores = [(s - min_score) / (max_score - min_score) for s in batch_scores]
-            
-            # 将重排序分数与原始分数结合
+                files_info += f"File: {path}\nDescription: {desc}\n\n"
+                
+            prompt = f"""Please analyze the following code files and determine which files are most relevant to the given query. Consider file paths and descriptions to make your judgment.
+
+Query: {query}
+
+Available files:
+{files_info}
+
+Please output a YAML list of relevant file paths, ordered by relevance (most relevant first). Only include files that are truly relevant to the query.
+Output format:
+<FILES>
+- path/to/file1.py
+- path/to/file2.py
+</FILES>
+
+Note: Only include files that have a strong connection to the query."""
+
+            # Use a large model to evaluate
+            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+            response = model.chat_until_success(prompt)
+
+            # Parse the response
+            import yaml
+            files_match = re.search(r'<FILES>\n(.*?)</FILES>', response, re.DOTALL)
+            if not files_match:
+                return [(path, score) for path, score, _ in initial_results]
+
+            # Extract the file list
+            selected_files = yaml.safe_load(files_match.group(1))
+
+            # Build the results, using the position as the score
             scored_results = []
-            for (path,_, desc), rerank_score in zip(initial_results, batch_scores):
-                if rerank_score >= 0.5:  # 只保留相关度较高的结果
-                    scored_results.append((path, rerank_score))
-                    
-            # 按综合分数降序排序
-            scored_results.sort(key=lambda x: x[1], reverse=True)
-            
+            for i, file_path in enumerate(selected_files):
+                # The score decreases from 1 to 0.1
+                score = 1.0 - (i * 0.9 / len(selected_files))
+                scored_results.append((file_path, score))
+
             return scored_results
-            
+
         except Exception as e:
-            PrettyOutput.print(f"重排序失败: {str(e)}", 
+            PrettyOutput.print(f"Failed to pick: {str(e)}", 
                             output_type=OutputType.ERROR)
-            return [(path, score) for path, score, _ in initial_results]  # 发生错误时返回原始结果
+            return [(path, score) for path, score, _ in initial_results]
 
     def _generate_query_variants(self, query: str) -> List[str]:
-        """生成查询的不同表述变体
+        """Generate different expressions of the query
         
         Args:
-            query: 原始查询
+            query: Original query
             
         Returns:
-            List[str]: 查询变体列表
+            List[str]: The query variants list
         """
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         prompt = f"""Please generate 3 different expressions based on the following query, each expression should fully convey the meaning of the original query. These expressions will be used for code search, maintain professionalism and accuracy.
@@ -548,18 +536,18 @@ Original query: {query}
 Please output 3 expressions directly, separated by two line breaks, without numbering or other markers.
 """
         variants = model.chat_until_success(prompt).strip().split('\n\n')
-        variants.append(query)  # 添加原始查询
+        variants.append(query)  # Add the original query
         return variants
 
     def _vector_search(self, query_variants: List[str], top_k: int) -> Dict[str, Tuple[str, float, str]]:
-        """使用向量搜索查找相关文件
+        """Use vector search to find related files
         
         Args:
-            query_variants: 查询变体列表
-            top_k: 返回结果数量
+            query_variants: The query variants list
+            top_k: The number of results to return
             
         Returns:
-            Dict[str, Tuple[str, float, str]]: 文件路径到(路径,分数,描述)的映射
+            Dict[str, Tuple[str, float, str]]: The mapping from file path to (file path, score, description)
         """
         results = {}
         for query in query_variants:
@@ -575,7 +563,7 @@ Please output 3 expressions directly, separated by two line breaks, without numb
                 similarity = 1.0 / (1.0 + float(distance))
                 if similarity >= 0.5:
                     file_path = self.file_paths[i]
-                    # 使用最高的相似度分数
+                    # Use the highest similarity score
                     if file_path not in results or similarity > results[file_path][1]:
                         data = self.vector_cache[file_path]
                         results[file_path] = (file_path, similarity, data["description"])
@@ -584,54 +572,54 @@ Please output 3 expressions directly, separated by two line breaks, without numb
 
 
     def search_similar(self, query: str, top_k: int = 30) -> List[Tuple[str, float]]:
-        """搜索关联文件"""
+        """Search related files"""
         try:
             if self.index is None:
                 return []            
-            # 生成查询变体
+            # Generate the query variants
             query_variants = self._generate_query_variants(query)
             
-            # 进行向量搜索
+            # Perform vector search
             vector_results = self._vector_search(query_variants, top_k)            
 
             results = list(vector_results.values())
             results.sort(key=lambda x: x[1], reverse=True)
 
-            # 取前 top_k 个结果进行重排序
+            # Take the top top_k results for reordering
             initial_results = results[:top_k]
             
-            # 如果没有找到结果，直接返回
+            # If no results are found, return directly
             if not initial_results:
                 return []
             
-            # 过滤低分结果
+            # Filter low-scoring results
             initial_results = [(path, score, desc) for path, score, desc in initial_results if score >= 0.5]
                 
-            # 对初步结果进行重排序
-            return self.rerank_results(query, initial_results)
+            # Reorder the preliminary results
+            return self.pick_results(query, initial_results)
             
         except Exception as e:
-            PrettyOutput.print(f"搜索失败: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"Failed to search: {str(e)}", output_type=OutputType.ERROR)
             return []
 
     def ask_codebase(self, query: str, top_k: int=20) -> str:
-        """查询代码库"""
+        """Query the codebase"""
         results = self.search_similar(query, top_k)
         if not results:
-            PrettyOutput.print("没有找到关联的文件", output_type=OutputType.WARNING)
+            PrettyOutput.print("No related files found", output_type=OutputType.WARNING)
             return ""
         
-        PrettyOutput.print(f"找到的关联文件: ", output_type=OutputType.SUCCESS)
+        PrettyOutput.print(f"Found related files: ", output_type=OutputType.SUCCESS)
         for path, score in results:
-            PrettyOutput.print(f"文件: {path} 关联度: {score:.3f}", 
+            PrettyOutput.print(f"File: {path} Similarity: {score:.3f}", 
                              output_type=OutputType.INFO)
         
-        prompt = f"""你是一个代码专家，请根据以下文件信息回答用户的问题：
+        prompt = f"""You are a code expert, please answer the user's question based on the following file information:
 """
         for path, _ in results:
             try:
                 if len(prompt) > self.max_context_length:
-                    PrettyOutput.print(f"避免上下文超限，丢弃低相关度文件：{path}", OutputType.WARNING)
+                    PrettyOutput.print(f"Avoid context overflow, discard low-related file: {path}", OutputType.WARNING)
                     continue
                 content = open(path, "r", encoding="utf-8").read()
                 prompt += f"""
@@ -641,7 +629,7 @@ File content:
 ========================================
 """
             except Exception as e:
-                PrettyOutput.print(f"读取文件失败 {path}: {str(e)}", 
+                PrettyOutput.print(f"Failed to read file {path}: {str(e)}", 
                                  output_type=OutputType.ERROR)
                 continue
                 
@@ -655,12 +643,12 @@ Please answer the user's question in Chinese using professional language. If the
         return response
 
     def is_index_generated(self) -> bool:
-        """检查索引是否已经生成"""
-        # 检查缓存文件是否存在
+        """Check if the index has been generated"""
+        # Check if the cache file exists
         if not os.path.exists(self.cache_path):
             return False
         
-        # 检查缓存是否有效
+        # Check if the cache is valid
         try:
             with lzma.open(self.cache_path, 'rb') as f:
                 cache_data = pickle.load(f)
@@ -669,11 +657,11 @@ Please answer the user's question in Chinese using professional language. If the
         except Exception:
             return False
         
-        # 检查索引是否已构建
+        # Check if the index has been built
         if not hasattr(self, 'index') or self.index is None:
             return False
         
-        # 检查向量缓存和文件路径列表是否非空
+        # Check if the vector cache and file path list are non-empty
         if not self.vector_cache or not self.file_paths:
             return False
         
