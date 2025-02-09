@@ -11,7 +11,7 @@ from jarvis.utils import OutputType, PrettyOutput, get_max_context_length
 
 
 
-def _load_tools() -> str:
+def load_tools() -> str:
     """Load tools"""
     PrettyOutput.section("Available tools", OutputType.PLANNING)
     tools = ToolRegistry.get_global_tool_registry().get_all_tools()
@@ -40,64 +40,63 @@ arguments:
 class ToolRegistry:
     global_tool_registry = None # type: ignore
     def __init__(self):
-        """初始化工具注册器
-        """
+        """Initialize tool registry"""
         self.tools: Dict[str, Tool] = {}
-        # 加载内置工具和外部工具
+        # Load built-in tools and external tools
         self._load_builtin_tools()
         self._load_external_tools()
-        # 确保 max_context_length 是整数
+        # Ensure max_context_length is an integer
         self.max_context_length = int(get_max_context_length() * 0.8)
 
     @staticmethod
     def get_global_tool_registry():
-        """获取全局工具注册器"""
+        """Get the global tool registry"""
         if ToolRegistry.global_tool_registry is None:
             ToolRegistry.global_tool_registry = ToolRegistry()
         return ToolRegistry.global_tool_registry
 
     def _load_builtin_tools(self):
-        """从内置tools目录加载工具"""
+        """Load tools from the built-in tools directory"""
         tools_dir = Path(__file__).parent
         
-        # 遍历目录下的所有.py文件
+        # Iterate through all .py files in the directory
         for file_path in tools_dir.glob("*.py"):
-            # 跳过基础文件和__init__.py
+            # Skip base.py and __init__.py
             if file_path.name in ["base.py", "__init__.py", "registry.py"]:
                 continue
                 
             self.register_tool_by_file(str(file_path))
 
     def _load_external_tools(self):
-        """从~/.jarvis_tools加载外部工具"""
+        """Load external tools from ~/.jarvis_tools"""
         external_tools_dir = Path.home() / '.jarvis_tools'
         if not external_tools_dir.exists():
             return
             
-        # 遍历目录下的所有.py文件
+        # Iterate through all .py files in the directory
         for file_path in external_tools_dir.glob("*.py"):
-            # 跳过__init__.py
+            # Skip __init__.py
             if file_path.name == "__init__.py":
                 continue
                 
             self.register_tool_by_file(str(file_path))
 
     def register_tool_by_file(self, file_path: str):
-        """从指定文件加载并注册工具
+        """Load and register tools from a specified file
         
         Args:
-            file_path: 工具文件的路径
+            file_path: The path of the tool file
             
         Returns:
-            bool: 是否成功加载工具
+            bool: Whether the tool is loaded successfully
         """
         try:
-            p_file_path = Path(file_path).resolve()  # 获取绝对路径
+            p_file_path = Path(file_path).resolve()  # Get the absolute path
             if not p_file_path.exists() or not p_file_path.is_file():
                 PrettyOutput.print(f"File does not exist: {p_file_path}", OutputType.ERROR)
                 return False
                 
-            # 动态导入模块
+            # Dynamically import the module
             module_name = p_file_path.stem
             spec = importlib.util.spec_from_file_location(module_name, p_file_path) # type: ignore
             if not spec or not spec.loader:
@@ -105,23 +104,23 @@ class ToolRegistry:
                 return False
                 
             module = importlib.util.module_from_spec(spec) # type: ignore
-            sys.modules[module_name] = module  # 添加到 sys.modules 以支持相对导入
+            sys.modules[module_name] = module  # Add to sys.modules to support relative imports
             spec.loader.exec_module(module)
             
-            # 查找模块中的工具类
+            # Find the tool class in the module
             tool_found = False
             for item_name in dir(module):
                 item = getattr(module, item_name)
-                # 检查是否是类，并且有必要的属性
+                # Check if it is a class and has the necessary attributes
                 if (isinstance(item, type) and 
                     hasattr(item, 'name') and 
                     hasattr(item, 'description') and 
                     hasattr(item, 'parameters')):
                     
-                    # 实例化工具类，传入模型和输出处理器
+                    # Instantiate the tool class, passing in the model and output processor
                     tool_instance = item()
                     
-                    # 注册工具
+                    # Register the tool
                     self.register_tool(
                         name=tool_instance.name,
                         description=tool_instance.description,
@@ -143,31 +142,31 @@ class ToolRegistry:
             return False
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
-        """注册新工具"""
+        """Register a new tool"""
         self.tools[name] = Tool(name, description, parameters, func)
 
     def get_tool(self, name: str) -> Optional[Tool]:
-        """获取工具"""
+        """Get a tool"""
         return self.tools.get(name)
 
     def get_all_tools(self) -> List[Dict]:
-        """获取所有工具的Ollama格式定义"""
+        """Get all tools in Ollama format definition"""
         return [tool.to_dict() for tool in self.tools.values()]
 
     def execute_tool(self, name: str, arguments: Dict) -> Dict[str, Any]:
-        """执行指定工具"""
+        """Execute a specified tool"""
         tool = self.get_tool(name)
         if tool is None:
             return {"success": False, "error": f"Tool {name} does not exist, available tools: {', '.join(self.tools.keys())}"}
         return tool.execute(arguments)
 
     def handle_tool_calls(self, tool_calls: List[Dict]) -> str:
-        """处理工具调用，只处理第一个工具"""
+        """Handle tool calls, only process the first tool"""
         try:
             if not tool_calls:
                 return ""
                 
-            # 只处理第一个工具调用
+            # Only process the first tool call
             tool_call = tool_calls[0]
             name = tool_call["name"]
             args = tool_call["arguments"]
@@ -190,7 +189,7 @@ arguments:
                     PrettyOutput.print(f"Invalid tool parameters format: {name} {tool_call_help}", OutputType.ERROR)
                     return ""
 
-            # 显示工具调用信息
+            # Display tool call information
             PrettyOutput.section(f"Executing tool: {name}", OutputType.TOOL)
             if isinstance(args, dict):
                 for key, value in args.items():
@@ -198,10 +197,10 @@ arguments:
             else:
                 PrettyOutput.print(f"Parameter: {args}", OutputType.DEBUG)
             
-            # 执行工具调用
+            # Execute tool call
             result = self.execute_tool(name, args)
             
-            # 处理结果
+            # Process the result
             if result["success"]:
                 stdout = result["stdout"]
                 stderr = result.get("stderr", "")
@@ -211,16 +210,16 @@ arguments:
                 if stderr:
                     output_parts.append(f"Error:\n{stderr}")
                 output = "\n\n".join(output_parts)
-                output = "No output and error" if not output else output
+                output = "Tool execution successful, no output and error" if not output else output
                 PrettyOutput.section("Execution successful", OutputType.SUCCESS)
                 
-                # 如果输出超过4k字符，使用大模型总结
+                # If the output exceeds 4k characters, use a large model to summarize
                 if len(output) > self.max_context_length:
                     try:
                         PrettyOutput.print("Output is too long, summarizing...", OutputType.PROGRESS)
                         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
                         
-                        # 如果输出超过最大上下文长度，只取最后部分
+                        # If the output exceeds the maximum context length, only take the last part
                         max_len = self.max_context_length
                         if len(output) > max_len:
                             output_to_summarize = output[-max_len:]

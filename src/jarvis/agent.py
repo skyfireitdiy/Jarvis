@@ -7,7 +7,7 @@ import yaml
 
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools import ToolRegistry
-from jarvis.tools.registry import _load_tools
+from jarvis.tools.registry import load_tools
 from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, load_embedding_model, load_env_from_file
 import os
 
@@ -250,7 +250,7 @@ Please describe in concise bullet points, highlighting important information.
 
             # Load methodology
             methodology_prompt = load_methodology(user_input)
-            tools_prompt = _load_tools()
+            tools_prompt = load_tools()
 
             # 显示任务开始
             PrettyOutput.section(f"Starting new task: {self.name}", OutputType.PLANNING)
@@ -413,15 +413,7 @@ def select_task(tasks: dict) -> str:
             PrettyOutput.print(f"Failed to select task: {str(e)}", OutputType.ERROR)
             continue
 
-def main():
-    """Jarvis main entry point"""
-    # Add argument parser
-    load_env_from_file()
-    parser = argparse.ArgumentParser(description='Jarvis AI assistant')
-    parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
-    args = parser.parse_args()
-
-    system_prompt = """You are Jarvis, an AI assistant with powerful problem-solving capabilities.
+origin_agent_system_prompt = """You are Jarvis, an AI assistant with powerful problem-solving capabilities.
 
 When users need to execute tasks, you will strictly follow these steps to handle problems:
 1. Problem Restatement: Confirm understanding of the problem
@@ -452,12 +444,21 @@ Strict Rules:
 - Request user guidance when multiple iterations show no progress
 - If yaml string contains colons, wrap the entire string in quotes to avoid yaml parsing errors
 - Use | syntax for multi-line strings in yaml
+- If you can start executing the task, please start directly without asking the user if you can begin.
 
 -------------------------------------------------------------"""
 
+def main():
+    """Jarvis main entry point"""
+    # Add argument parser
+    load_env_from_file()
+    parser = argparse.ArgumentParser(description='Jarvis AI assistant')
+    parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
+    args = parser.parse_args()
+
     try:
         # 获取全局模型实例
-        agent = Agent(system_prompt=system_prompt)
+        agent = Agent(system_prompt=origin_agent_system_prompt)
 
         # 加载预定义任务
         tasks = load_tasks()
