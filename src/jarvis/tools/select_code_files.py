@@ -49,16 +49,13 @@ class CodeFileSelecterTool:
             return {
                 "success": True,
                 "stdout": output,
-                "stderr": "",
-                "selected_files": selected_files  # Return the selected files for other tools to use
+                "stderr": ""
             }
 
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"Failed to select files: {str(e)}",
                 "stdout": "",
-                "stderr": str(e),
-                "selected_files": []  # Return empty list on error
+                "stderr": str(e)
             }

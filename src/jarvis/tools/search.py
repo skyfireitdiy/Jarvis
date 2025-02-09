@@ -8,32 +8,32 @@ from urllib.parse import quote
 def bing_search(query):
     try:
         with sync_playwright() as p:
-            # 启动浏览器时设置参数
+            # Set parameters when starting the browser
             browser = p.chromium.launch(
-                headless=True,  # 无头模式
+                headless=True,  # Headless mode
                 args=['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
             )
             
-            # 创建新页面并设置超时
+            # Create a new page and set timeout
             page = browser.new_page(
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                 viewport={'width': 1920, 'height': 1080}
             )
             
-            # 设置页面超时
+            # Set page timeout
             page.set_default_timeout(60000)
             
-            # 访问搜索页面
+            # Visit search page
             url = f"https://www.bing.com/search?q={quote(query)}&form=QBLH&sp=-1"
             page.goto(url, wait_until="networkidle")
             
-            # 等待搜索结果加载
+            # Wait for search results to load
             page.wait_for_selector("#b_results", state="visible", timeout=30000)
             
-            # 等待一下以确保结果完全加载
+            # Wait for a moment to ensure the results are fully loaded
             page.wait_for_timeout(1000)
             
-            # 提取搜索结果
+            # Extract search results
             summaries = page.evaluate("""() => {
                 const results = [];
                 const elements = document.querySelectorAll("#b_results > .b_algo");
@@ -96,7 +96,7 @@ class SearchTool:
             if not results:
                 return []
             
-            # 格式化搜索结果
+            # Format search results
             formatted_results = []
             for result in results[:max_results]:
                 formatted_results.append({
@@ -142,15 +142,16 @@ When answering, pay attention to:
             PrettyOutput.print(f"Search query: {query}", OutputType.INFO)
             PrettyOutput.print(f"Related question: {question}", OutputType.INFO)
             
-            # 获取搜索结果
+            # Get search results
             results = self._search(query, max_results)
             if not results:
                 return {
                     "success": False,
-                    "error": "No search results found"
+                    "stdout": "",
+                    "stderr": "No search results found"
                 }
             
-            # 收集网页内容
+            # Collect webpage content
             contents = []
             for i, result in enumerate(results, 1):
                 try:
@@ -166,7 +167,8 @@ When answering, pay attention to:
             if not contents:
                 return {
                     "success": False,
-                    "error": "No valid search results found"
+                    "stdout": "",
+                    "stderr": "No valid search results found"
                 }
             
             # Extract information
@@ -182,11 +184,12 @@ When answering, pay attention to:
         except Exception as e:
             return {
                 "success": False,
-                "error": f"搜索失败: {str(e)}"
+                "stdout": "",
+                "stderr": f"Search failed: {str(e)}"
             }
 
 def main():
-    """命令行直接运行搜索工具"""
+    """Command line directly run search tool"""
     import argparse
     import sys
     

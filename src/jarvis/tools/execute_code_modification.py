@@ -51,7 +51,6 @@ class CodeModifyTool:
             if not success:
                 return {
                     "success": False,
-                    "error": "Code modification was cancelled or failed",
                     "stdout": "Changes have been rolled back",
                     "stderr": additional_info
                 }
@@ -66,7 +65,6 @@ class CodeModifyTool:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"Failed to execute code modifications: {str(e)}",
                 "stdout": "",
-                "stderr": str(e)
+                "stderr": f"Failed to execute code modifications: {str(e)}"
             }

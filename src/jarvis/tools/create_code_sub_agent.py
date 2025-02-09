@@ -51,5 +51,6 @@ class CodeSubAgentTool:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"Failed to execute code development subtask: {str(e)}"
+                "stdout": "",
+                "stderr": f"Failed to execute code development subtask: {str(e)}"
             }

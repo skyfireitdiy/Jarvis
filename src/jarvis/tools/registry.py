@@ -198,18 +198,20 @@ arguments:
             
             # Execute tool call
             result = self.execute_tool(name, args)
+
+            stdout = result["stdout"]
+            stderr = result.get("stderr", "")
+            output_parts = []
+            if stdout:
+                output_parts.append(f"Output:\n{stdout}")
+            if stderr:
+                output_parts.append(f"Error:\n{stderr}")
+            output = "\n\n".join(output_parts)
+            output = "no output and error" if not output else output
             
             # Process the result
             if result["success"]:
-                stdout = result["stdout"]
-                stderr = result.get("stderr", "")
-                output_parts = []
-                if stdout:
-                    output_parts.append(f"Output:\n{stdout}")
-                if stderr:
-                    output_parts.append(f"Error:\n{stderr}")
-                output = "\n\n".join(output_parts)
-                output = "Tool execution successful, no output and error" if not output else output
+                
                 PrettyOutput.section("Execution successful", OutputType.SUCCESS)
                 
                 # If the output exceeds 4k characters, use a large model to summarize
@@ -251,8 +253,6 @@ Please provide a summary:"""
                         output = f"Output is too long ({len(output)} characters), it is recommended to view the original output.\nPreview of the first 300 characters:\n{output[:300]}..."
             
             else:
-                error_msg = result["stderr"]
-                output = f"Execution failed: {error_msg}"
                 PrettyOutput.section("Execution failed", OutputType.ERROR)
                 
             return output

@@ -66,14 +66,16 @@ class RAGTool:
             if not os.path.exists(dir_path):
                 return {
                     "success": False,
-                    "error": f"Directory does not exist: {dir_path}"
+                    "stdout": "",
+                    "stderr": f"Directory does not exist: {dir_path}"
                 }
                 
             # Check if it is a directory
             if not os.path.isdir(dir_path):
                 return {
                     "success": False,
-                    "error": f"The path is not a directory: {dir_path}"
+                    "stdout": "",
+                    "stderr": f"The path is not a directory: {dir_path}"
                 }
                 
             # Get RAG instance
@@ -91,7 +93,8 @@ class RAGTool:
             if response is None:
                 return {
                     "success": False,
-                    "error": "Failed to get answer, possibly no relevant documents found"
+                    "stdout": "",
+                    "stderr": "Failed to get answer, possibly no relevant documents found"
                 }
                 
             return {
@@ -104,7 +107,8 @@ class RAGTool:
             PrettyOutput.print(f"Document question and answer failed: {str(e)}", OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"Execution failed: {str(e)}"
+                "stdout": "",
+                "stderr": f"Execution failed: {str(e)}"
             }
 
 def main():
@@ -128,7 +132,7 @@ def main():
         PrettyOutput.print("\nAnswer:", OutputType.INFO)
         PrettyOutput.print(result["stdout"], OutputType.INFO)
     else:
-        PrettyOutput.print(result["error"], OutputType.ERROR)
+        PrettyOutput.print(result["stderr"], OutputType.ERROR)
 
 if __name__ == "__main__":
     main() 

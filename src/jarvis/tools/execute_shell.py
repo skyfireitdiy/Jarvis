@@ -64,7 +64,6 @@ class ShellTool:
                 "success": return_code == 0,
                 "stdout": output,
                 "stderr": "",
-                "return_code": return_code
             }
                 
         except Exception as e:
@@ -74,5 +73,6 @@ class ShellTool:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
-                "error": str(e)
+                "stdout": "",
+                "stderr": str(e)
             } 
