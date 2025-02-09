@@ -78,7 +78,6 @@ class CodeBase:
         prompt = f"""Please analyze the following code file and generate a detailed description. The description should include:
 1. Overall file functionality description
 2. description for each global variable, function, type definition, class, method, and other code elements
-3. 5 potential questions users might ask about this file
 
 Please use concise and professional language, emphasizing technical functionality to facilitate subsequent code retrieval.
 File path: {file_path}
@@ -115,6 +114,11 @@ Code content:
     def _load_all_cache(self):
         """Load all cache files"""
         try:
+            # 清空现有缓存和文件路径
+            self.vector_cache = {}
+            self.file_paths = []
+            vectors = []
+            
             for cache_file in os.listdir(self.cache_dir):
                 if not cache_file.endswith('.cache'):
                     continue
@@ -126,15 +130,27 @@ Code content:
                         file_path = cache_data["path"]
                         self.vector_cache[file_path] = cache_data
                         self.file_paths.append(file_path)
+                        vectors.append(cache_data["vector"])
                 except Exception as e:
                     PrettyOutput.print(f"Failed to load cache file {cache_file}: {str(e)}", 
                                      output_type=OutputType.WARNING)
                     continue
-                    
-            PrettyOutput.print(f"Loaded {len(self.vector_cache)} vector cache", 
-                             output_type=OutputType.INFO)
-            # 从缓存重建索引
-            self.build_index()
+            
+            if vectors:
+                # 重建索引
+                vectors_array = np.vstack(vectors)
+                hnsw_index = faiss.IndexHNSWFlat(self.vector_dim, 16)
+                hnsw_index.hnsw.efConstruction = 40
+                hnsw_index.hnsw.efSearch = 16
+                self.index = faiss.IndexIDMap(hnsw_index)
+                self.index.add_with_ids(vectors_array, np.array(range(len(vectors)))) # type: ignore
+                
+                PrettyOutput.print(f"Loaded {len(self.vector_cache)} vector cache and rebuilt index", 
+                                 output_type=OutputType.INFO)
+            else:
+                self.index = None
+                PrettyOutput.print("No valid cache files found", output_type=OutputType.WARNING)
+                
         except Exception as e:
             PrettyOutput.print(f"Failed to load cache directory: {str(e)}", 
                              output_type=OutputType.WARNING)
@@ -299,27 +315,63 @@ Content: {content}
 
     def build_index(self):
         """Build a faiss index from the vector cache"""
-        # Create the underlying HNSW index
-        hnsw_index = faiss.IndexHNSWFlat(self.vector_dim, 16)
-        hnsw_index.hnsw.efConstruction = 40
-        hnsw_index.hnsw.efSearch = 16
-        
-        # Wrap the HNSW index with IndexIDMap
-        self.index = faiss.IndexIDMap(hnsw_index)
-        
-        vectors = []
-        ids = []
-        self.file_paths = []  # Reset the file path list
-        
-        for i, (file_path, data) in enumerate(self.vector_cache.items()):
-            vectors.append(data["vector"].reshape(1, -1))
-            ids.append(i)
-            self.file_paths.append(file_path)
+        try:
+            if not self.vector_cache:
+                self.index = None
+                return
+
+            # Create the underlying HNSW index
+            hnsw_index = faiss.IndexHNSWFlat(self.vector_dim, 16)
+            hnsw_index.hnsw.efConstruction = 40
+            hnsw_index.hnsw.efSearch = 16
             
-        if vectors:
-            vectors = np.vstack(vectors)
-            self.index.add_with_ids(vectors, np.array(ids)) # type: ignore
-        else:
+            # Wrap the HNSW index with IndexIDMap
+            self.index = faiss.IndexIDMap(hnsw_index)
+            
+            vectors = []
+            ids = []
+            self.file_paths = []  # Reset the file path list
+            
+            for i, (file_path, data) in enumerate(self.vector_cache.items()):
+                if "vector" not in data:
+                    PrettyOutput.print(f"Invalid cache data for {file_path}: missing vector", 
+                                     output_type=OutputType.WARNING)
+                    continue
+                    
+                vector = data["vector"]
+                if not isinstance(vector, np.ndarray):
+                    PrettyOutput.print(f"Invalid vector type for {file_path}: {type(vector)}", 
+                                     output_type=OutputType.WARNING)
+                    continue
+                    
+                vectors.append(vector.reshape(1, -1))
+                ids.append(i)
+                self.file_paths.append(file_path)
+                
+            if vectors:
+                vectors = np.vstack(vectors)
+                if len(vectors) != len(ids):
+                    PrettyOutput.print(f"Vector count mismatch: {len(vectors)} vectors vs {len(ids)} ids", 
+                                     output_type=OutputType.ERROR)
+                    self.index = None
+                    return
+                    
+                try:
+                    self.index.add_with_ids(vectors, np.array(ids)) # type: ignore
+                    PrettyOutput.print(f"Successfully built index with {len(vectors)} vectors", 
+                                     output_type=OutputType.SUCCESS)
+                except Exception as e:
+                    PrettyOutput.print(f"Failed to add vectors to index: {str(e)}", 
+                                     output_type=OutputType.ERROR)
+                    self.index = None
+            else:
+                PrettyOutput.print("No valid vectors found, index not built", 
+                                 output_type=OutputType.WARNING)
+                self.index = None
+                
+        except Exception as e:
+            PrettyOutput.print(f"Failed to build index: {str(e)}", 
+                             output_type=OutputType.ERROR)
             self.index = None
 
     def gen_vector_db_from_cache(self):
@@ -693,7 +745,7 @@ Please output 3 expressions directly, separated by two line breaks, without numb
                     continue
                 content = open(path, "r", encoding="utf-8").read()
                 prompt += f"""
-File path: {path}prompt
+File path: {path}
 File content:
 {content}
 ========================================
@@ -714,35 +766,45 @@ Please answer the user's question in Chinese using professional language. If the
 
     def is_index_generated(self) -> bool:
         """Check if the index has been generated"""
-        # Check if the vector cache and file path list are non-empty
-        if not self.vector_cache or not self.file_paths:
-            return False
-            
-        # Check if the cache directory exists and has files
-        if not os.path.exists(self.cache_dir) or not os.listdir(self.cache_dir):
-            return False
-        
-        # Check if the index has been built
-        if not hasattr(self, 'index') or self.index is None:
-            return False
-        
-        # Check if at least one cache file is valid
         try:
-            first_file = list(self.vector_cache.keys())[0]
-            cache_path = self._get_cache_path(first_file)
-            
-            if not os.path.exists(cache_path):
+            # 1. 检查基本条件
+            if not self.vector_cache or not self.file_paths:
                 return False
                 
-            with lzma.open(cache_path, 'rb') as f:
-                cache_data = pickle.load(f)
-                if not cache_data.get("vector") or not cache_data.get("path"):
+            if not hasattr(self, 'index') or self.index is None:
+                return False
+                
+            # 2. 检查索引是否可用
+            # 创建测试向量
+            test_vector = np.zeros((1, self.vector_dim), dtype=np.float32) # type: ignore
+            try:
+                self.index.search(test_vector, 1) # type: ignore
+            except Exception:
+                return False
+                
+            # 3. 验证向量缓存和文件路径的一致性
+            if len(self.vector_cache) != len(self.file_paths):
+                return False
+                
+            # 4. 验证所有缓存文件
+            for file_path in self.file_paths:
+                if file_path not in self.vector_cache:
                     return False
                     
-        except (IndexError, Exception):
+                cache_path = self._get_cache_path(file_path)
+                if not os.path.exists(cache_path):
+                    return False
+                    
+                cache_data = self.vector_cache[file_path]
+                if not isinstance(cache_data.get("vector"), np.ndarray):
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            PrettyOutput.print(f"Error checking index status: {str(e)}", 
+                             output_type=OutputType.ERROR)
             return False
-        
-        return True
 
 
 
