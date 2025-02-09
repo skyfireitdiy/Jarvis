@@ -1,5 +1,5 @@
 from jarvis.agent import Agent
-from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, load_env_from_file
+from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, init_env
 
 
 
@@ -176,7 +176,7 @@ IMPORTANT:
 def main():
     """Jarvis main entry point"""
     # Add argument parser
-    load_env_from_file()
+    init_env()
 
 
     try:

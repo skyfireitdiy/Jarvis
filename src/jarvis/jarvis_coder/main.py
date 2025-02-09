@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional
 import re
 
 from jarvis.jarvis_coder.file_select import select_files
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, is_long_context, load_env_from_file, while_success
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_max_context_length, is_long_context, init_env, while_success
 from jarvis.models.registry import PlatformRegistry
 from jarvis.jarvis_codebase.main import CodeBase
 from prompt_toolkit import PromptSession
@@ -95,7 +95,7 @@ def main():
     """Command line entry"""
     import argparse
 
-    load_env_from_file()
+    init_env()
     
     parser = argparse.ArgumentParser(description='Code modification tool')
     parser.add_argument('-d', '--dir', help='Project root directory', default=os.getcwd())
