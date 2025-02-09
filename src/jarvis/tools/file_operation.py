@@ -57,14 +57,16 @@ class FileOperationTool:
                 if not os.path.exists(filepath):
                     return {
                         "success": False,
-                        "error": f"文件不存在: {filepath}"
+                        "stdout": "",
+                        "stderr": f"文件不存在: {filepath}"
                     }
                     
                 # Check file size
                 if os.path.getsize(filepath) > 10 * 1024 * 1024:  # 10MB
                     return {
                         "success": False,
-                        "error": "File too large (>10MB)"
+                        "stdout": "",
+                        "stderr": "File too large (>10MB)"
                     }
                     
                 content = open(filepath, 'r', encoding=encoding).read()
@@ -79,7 +81,8 @@ class FileOperationTool:
                 if not args.get("content"):
                     return {
                         "success": False,
-                        "error": "Write/append operation requires providing the content parameter"
+                        "stdout": "",
+                        "stderr": "Write/append operation requires providing the content parameter"
                     }
                 
                 # Create directory (if it doesn't exist)
@@ -98,12 +101,14 @@ class FileOperationTool:
             else:
                 return {
                     "success": False,
-                    "error": f"Unknown operation: {operation}"
+                    "stdout": "",
+                    "stderr": f"Unknown operation: {operation}"
                 }
                 
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
                 "success": False,
-                "error": f"File operation failed: {str(e)}"
+                "stdout": "",
+                "stderr": f"File operation failed: {str(e)}"
             } 

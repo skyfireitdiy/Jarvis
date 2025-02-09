@@ -38,14 +38,16 @@ class ChdirTool:
             if not os.path.exists(path):
                 return {
                     "success": False,
-                    "error": f"Directory does not exist: {path}"
+                    "stdout": "",
+                    "stderr": f"Directory does not exist: {path}"
                 }
                 
             # 检查是否是目录
             if not os.path.isdir(path):
                 return {
                     "success": False,
-                    "error": f"The path is not a directory: {path}"
+                    "stdout": "",
+                    "stderr": f"The path is not a directory: {path}"
                 }
                 
             # 尝试切换目录
@@ -61,12 +63,14 @@ class ChdirTool:
         except PermissionError:
             return {
                 "success": False,
-                "error": f"No permission to access directory: {path}"
+                "stdout": "",
+                "stderr": f"No permission to access directory: {path}"
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Failed to switch directory: {str(e)}"
+                "stdout": "",
+                "stderr": f"Failed to switch directory: {str(e)}"
             }
             
 def main():
@@ -83,7 +87,7 @@ def main():
     if result["success"]:
         PrettyOutput.print(result["stdout"], OutputType.SUCCESS)
     else:
-        PrettyOutput.print(result["error"], OutputType.ERROR)
+        PrettyOutput.print(result["stderr"], OutputType.ERROR)
         
 if __name__ == "__main__":
     main() 

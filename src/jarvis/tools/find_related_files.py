@@ -58,7 +58,6 @@ Bad examples (will not work well):
                     "success": False,
                     "stdout": "",
                     "stderr": "Error: Current directory is not in a Git repository",
-                    "error": "NotInGitRepository"
                 }
 
             os.chdir(root_dir)
@@ -73,7 +72,6 @@ Bad examples (will not work well):
                 "success": True,
                 "stdout": str(response),
                 "stderr": "",
-                "error": None
             }
             
         except Exception as e:
@@ -81,6 +79,5 @@ Bad examples (will not work well):
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Error executing codebase QA: {str(e)}",
-                "error": str(type(e).__name__)
+                "stderr": f"Error executing codebase QA: {str(e)}"
             }

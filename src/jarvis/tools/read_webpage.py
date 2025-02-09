@@ -67,10 +67,12 @@ class WebpageTool:
         except requests.RequestException as e:
             return {
                 "success": False,
-                "error": f"Webpage request failed: {str(e)}"
+                "stdout": "",
+                "stderr": f"Webpage request failed: {str(e)}"
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Failed to parse webpage: {str(e)}"
+                "stdout": "",
+                "stderr": f"Failed to parse webpage: {str(e)}"
             } 

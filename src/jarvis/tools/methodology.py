@@ -80,7 +80,8 @@ class MethodologyTool:
         if not operation or not problem_type:
             return {
                 "success": False,
-                "error": "Missing required parameters: operation and problem_type"
+                "stdout": "",
+                "stderr": "Missing required parameters: operation and problem_type"
             }
             
         methodologies = self._load_methodologies()
@@ -97,14 +98,16 @@ class MethodologyTool:
                 else:
                     return {
                         "success": False,
-                        "error": f"Methodology for problem type '{problem_type}' not found"
+                        "stdout": "",
+                        "stderr": f"Methodology for problem type '{problem_type}' not found"
                     }
                     
             elif operation in ["update", "add"]:
                 if not content:
                     return {
                         "success": False,
-                        "error": "Need to provide methodology content"
+                        "stdout": "",
+                        "stderr": "Need to provide methodology content"
                     }
                     
                 methodologies[problem_type] = content
@@ -113,19 +116,22 @@ class MethodologyTool:
                 action = "Update" if problem_type in methodologies else "Add"
                 return {
                     "success": True,
-                    "stdout": f"{action} methodology for problem type '{problem_type}'"
+                    "stdout": f"{action} methodology for problem type '{problem_type}'",
+                    "stderr": ""
                 }
                 
             else:
                 return {
                     "success": False,
-                    "error": f"Unsupported operation type: {operation}"
+                    "stdout": "",
+                    "stderr": f"Unsupported operation type: {operation}"
                 }
                 
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Execution failed: {str(e)}"
+                "stdout": "",
+                "stderr": f"Execution failed: {str(e)}"
             }
             
     def get_methodology(self, problem_type: str) -> Optional[str]:
