@@ -119,7 +119,7 @@ class PatchHandler:
             
         return "continue", feedback
 
-    def apply_patch(self, feature: str, raw_plan: str, structed_plan: Dict[str, str]) -> bool:
+    def apply_patch(self, feature: str, structed_plan: Dict[str, str]) -> bool:
         """Apply patch (main entry)"""
         for file_path, current_plan in structed_plan.items():
             additional_info = self.additional_info  # Initialize with saved info
@@ -157,7 +157,6 @@ class PatchHandler:
 
                         """
                 prompt += f"""# Original requirement: {feature}
-                    # Complete modification plan: {raw_plan}
                     # Current file path: {file_path}
                     # Current file content:
                     <CONTENT>
@@ -194,7 +193,7 @@ class PatchHandler:
 
 
 
-    def handle_patch_application(self, feature: str, raw_plan: str, structed_plan: Dict[str,str]) -> bool:
+    def handle_patch_application(self, feature: str, structed_plan: Dict[str,str]) -> bool:
         """Process patch application process
         
         Args:
@@ -210,7 +209,7 @@ class PatchHandler:
             PrettyOutput.print(f"\nFile: {file_path}", OutputType.INFO)
             PrettyOutput.print(f"Modification plan: \n{patches_code}", OutputType.INFO)
         # 3. Apply patches
-        success = self.apply_patch(feature, raw_plan, structed_plan)
+        success = self.apply_patch(feature, structed_plan)
         if not success:
             os.system("git reset --hard")
             return False
