@@ -146,6 +146,14 @@ class PrettyOutput:
         sys.stdout.write("\n")
         sys.stdout.flush()
 
+def get_single_line_input(tip: str) -> str:
+    """Get single line input, support direction key, history function, etc."""
+    session = PromptSession(history=None)
+    style = PromptStyle.from_dict({
+        'prompt': 'ansicyan',
+    })
+    return session.prompt(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}", style=style)
+
 def get_multiline_input(tip: str) -> str:
     """Get multi-line input, support direction key, history function, etc."""
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")

@@ -8,7 +8,7 @@ import yaml
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools import ToolRegistry
 from jarvis.tools.registry import _load_tools
-from jarvis.utils import PrettyOutput, OutputType, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, load_embedding_model, load_env_from_file
+from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, load_embedding_model, load_env_from_file
 import os
 
 class Agent:
@@ -186,7 +186,7 @@ Please continue the task based on the above information.
         
         # 询问是否生成方法论，带输入验证
         while True:
-            user_input = input("Generate methodology for this task? (y/n): ").strip().lower()
+            user_input = get_single_line_input("Generate methodology for this task? (y/n)").strip().lower()
             if user_input in ['y', 'n', '']:
                 break
             PrettyOutput.print("Invalid input, please enter y or n", OutputType.WARNING)

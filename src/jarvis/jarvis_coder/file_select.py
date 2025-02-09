@@ -4,7 +4,7 @@ import re
 from typing import Dict, List
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter, Completer, Completion
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.utils import OutputType, PrettyOutput, get_single_line_input
 
 
 def _parse_file_selection(input_str: str, max_index: int) -> List[int]:
@@ -139,11 +139,10 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
         PrettyOutput.print(f"[{i}] {file}", OutputType.INFO)
     
     # Ask the user if they need to adjust the file list
-    user_input = input("\nDo you need to adjust the file list? (y/n) [n]: ").strip().lower() or 'n'
+    user_input = get_single_line_input("Do you need to adjust the file list? (y/n) [n]").strip().lower() or 'n'
     if user_input == 'y':
         # Let the user select files
-        PrettyOutput.print("\nPlease enter the file numbers to include (support: 1,3-6 format, press Enter to keep the current selection):", OutputType.INFO)
-        numbers = input(">>> ").strip()
+        numbers = get_single_line_input("Please enter the file numbers to include (support: 1,3-6 format, press Enter to keep the current selection)").strip()
         if numbers:
             selected_indices = _parse_file_selection(numbers, len(related_files))
             if selected_indices:
@@ -152,7 +151,7 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
                 PrettyOutput.print("No valid files selected, keep the current selection", OutputType.WARNING)
     
     # Ask if they need to supplement files
-    user_input = input("\nDo you need to supplement other files? (y/n) [n]: ").strip().lower() or 'n'
+    user_input = get_single_line_input("Do you need to supplement other files? (y/n) [n]").strip().lower() or 'n'
     if user_input == 'y':
         # Create file completion session
         session = PromptSession(
@@ -183,7 +182,7 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
                     PrettyOutput.print(f"[{i}] {path}", OutputType.INFO)
                     
                 # Let the user select
-                numbers = input("\nPlease select the file numbers to add (support: 1,3-6 format, press Enter to select all): ").strip()
+                numbers = get_single_line_input("Please select the file numbers to add (support: 1,3-6 format, press Enter to select all)").strip()
                 if numbers:
                     indices = _parse_file_selection(numbers, len(matches))
                     if not indices:
