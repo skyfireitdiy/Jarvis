@@ -195,8 +195,8 @@ def get_multiline_input(tip: str) -> str:
     return "\n".join(lines)
 
 def load_env_from_file():
-    """Load environment variables from ~/.jarvis_env"""
-    env_file = Path.home() / ".jarvis_env"
+    """Load environment variables from ~/.jarvis/env"""
+    env_file = Path.home() / ".jarvis" / "env"
     
     if env_file.exists():
         try:
@@ -210,7 +210,7 @@ def load_env_from_file():
                         except ValueError:
                             continue
         except Exception as e:
-            PrettyOutput.print(f"Warning: Failed to read ~/.jarvis_env: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"Warning: Failed to read ~/.jarvis/env: {e}", OutputType.WARNING)
     
     
 def while_success(func, sleep_time: float = 0.1):
@@ -341,7 +341,7 @@ def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -
 def load_methodology(user_input: str) -> str:
     """Load methodology and build vector index"""
     PrettyOutput.print("Loading methodology...", OutputType.PROGRESS)
-    user_jarvis_methodology = os.path.expanduser("~/.jarvis_methodology")
+    user_jarvis_methodology = os.path.expanduser("~/.jarvis/methodology")
     if not os.path.exists(user_jarvis_methodology):
         return ""
 
