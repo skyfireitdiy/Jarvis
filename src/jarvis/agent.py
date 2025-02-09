@@ -1,11 +1,9 @@
 import argparse
 import time
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from prompt_toolkit import prompt
 import yaml
-import numpy as np
-import faiss
 
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools import ToolRegistry
@@ -18,18 +16,18 @@ class Agent:
     def __del__(self):
         delete_current_agent()
         
-    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False):
+    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False, tool_registry: ToolRegistry = ToolRegistry.get_global_tool_registry()):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
-            model: LLM model instance
-            tool_registry: Tool registry instance
+            system_prompt: System prompt
             name: Agent name, default is "Jarvis"
             is_sub_agent: Whether it is a sub-agent, default is False
+            tool_registry: Tool registry instance
         """
         add_agent(name)
         self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        self.tool_registry = ToolRegistry.get_global_tool_registry()
+        self.tool_registry = tool_registry
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
