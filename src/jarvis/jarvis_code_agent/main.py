@@ -147,7 +147,6 @@ ITERATION GUIDELINES:
 TOOL USAGE:
 1. Analysis Tools:
    - execute_shell: Run grep/find/head/tail commands
-   - codebase_search: Find relevant files
    - find_related_files: Find relevant files
    - select_code_files: Confirm and supplement files
    - codebase_qa: Understand context
