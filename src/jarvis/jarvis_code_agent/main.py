@@ -166,7 +166,12 @@ TOOL USAGE:
    - create_code_sub_agent: Create agent for each small change
 
 3. Implementation Tools:
-   - execute_code_modification: Apply small changes (≤20 lines)"""
+   - execute_code_modification: Apply small changes (≤20 lines)
+   
+
+IMPORTANT:
+1. If you can start executing the task, please start directly without asking the user if you can begin.
+"""
 
 def main():
     """Jarvis main entry point"""
