@@ -250,9 +250,7 @@ def load_embedding_model():
     model_dir = os.path.join(cache_dir, "models--" + model_name.replace("/", "--"))
     
     # Check if model exists
-    if not os.path.exists(model_dir):
-        PrettyOutput.print("Model not found locally, downloading using huggingface-cli...", OutputType.INFO)
-        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}' + f' --token {os.getenv("HF_TOKEN")}' if os.getenv("HF_TOKEN") else "")
+    os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
     
     # Load model
     embedding_model = SentenceTransformer(
@@ -272,9 +270,7 @@ def load_rerank_model():
     PrettyOutput.print(f"Loading reranking model: {model_name}...", OutputType.INFO)
     
     # Check if model exists
-    if not os.path.exists(model_dir):
-        PrettyOutput.print("Model not found locally, downloading using huggingface-cli...", OutputType.INFO)
-        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}' + f' --token {os.getenv("HF_TOKEN")}' if os.getenv("HF_TOKEN") else "")
+    os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
     
     # Load model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
