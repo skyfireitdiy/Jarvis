@@ -67,7 +67,16 @@ class Agent:
         lines = content.split('\n')
         tool_call_lines = []
         in_tool_call = False
-        
+
+        tool_call_help = """Tool Usage Format:
+
+<TOOL_CALL>
+name: tool_name
+arguments:
+    param1: value1
+    param2: value2
+</TOOL_CALL>"""
+
         # Process line by line
         for line in lines:
             if '<TOOL_CALL>' in line:
@@ -89,7 +98,7 @@ class Agent:
                             }]
                         else:
                             PrettyOutput.print("Tool call missing necessary fields", OutputType.ERROR)
-                            raise Exception("Tool call missing necessary fields")
+                            raise Exception("Tool call missing necessary fields, " + tool_call_help)
                     except yaml.YAMLError as e:
                         PrettyOutput.print(f"YAML parsing error: {str(e)}", OutputType.ERROR)
                         raise Exception(f"YAML parsing error: {str(e)}")

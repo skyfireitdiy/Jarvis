@@ -158,7 +158,7 @@ class ToolRegistry:
         """执行指定工具"""
         tool = self.get_tool(name)
         if tool is None:
-            return {"success": False, "error": f"Tool {name} does not exist"}
+            return {"success": False, "error": f"Tool {name} does not exist, available tools: {', '.join(self.tools.keys())}"}
         return tool.execute(arguments)
 
     def handle_tool_calls(self, tool_calls: List[Dict]) -> str:
@@ -171,12 +171,23 @@ class ToolRegistry:
             tool_call = tool_calls[0]
             name = tool_call["name"]
             args = tool_call["arguments"]
+
+            tool_call_help = """
+Tool Usage Format:
+
+<TOOL_CALL>
+name: tool_name
+arguments:
+    param1: value1
+    param2: value2
+</TOOL_CALL>
+"""
             
             if isinstance(args, str):
                 try:
                     args = json.loads(args)
                 except json.JSONDecodeError:
-                    PrettyOutput.print(f"Invalid tool parameters format: {name}", OutputType.ERROR)
+                    PrettyOutput.print(f"Invalid tool parameters format: {name} {tool_call_help}", OutputType.ERROR)
                     return ""
 
             # 显示工具调用信息
