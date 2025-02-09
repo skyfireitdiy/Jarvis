@@ -26,7 +26,7 @@ class PlatformRegistry:
 
     @staticmethod
     def get_platform_dir() -> str:
-        user_platform_dir = os.path.expanduser("~/.jarvis_models")
+        user_platform_dir = os.path.expanduser("~/.jarvis/models")
         if not os.path.exists(user_platform_dir):
             try:
                 os.makedirs(user_platform_dir)
