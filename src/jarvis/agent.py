@@ -26,6 +26,7 @@ class Agent:
             tool_registry: Tool registry instance
         """
         add_agent(name)
+        PrettyOutput.print(f"Welcome to Jarvis, your AI assistant, Initiating...", OutputType.SYSTEM)
         self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         self.tool_registry = tool_registry if tool_registry else ToolRegistry.get_global_tool_registry()
         self.name = name
@@ -61,7 +62,7 @@ class Agent:
         # Initialize methodology related attributes
         self.methodology_data = []
 
-        PrettyOutput.print(f"Jarvis initialized - With {self.model.name()}", OutputType.SYSTEM)
+        PrettyOutput.section(f"Jarvis initialized - With {self.model.name()}", OutputType.SYSTEM)
 
     @staticmethod
     def extract_tool_calls(content: str) -> List[Dict]:

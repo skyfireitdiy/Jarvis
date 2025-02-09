@@ -127,7 +127,6 @@ class ToolRegistry:
                         parameters=tool_instance.parameters,
                         func=tool_instance.execute
                     )
-                    PrettyOutput.print(f"Loaded tool from {p_file_path}: {tool_instance.name}: {tool_instance.description}", OutputType.SUCCESS)
                     tool_found = True
                     break
                     

@@ -23,7 +23,6 @@ class PlatformRegistry:
 
     global_platform_name = "kimi"
     global_platform_registry = None
-    suppress_output = False
 
     @staticmethod
     def get_platform_dir() -> str:
@@ -117,7 +116,7 @@ class PlatformRegistry:
                         module = importlib.import_module(module_name)
                     
                     # 遍历模块中的所有类
-                    for name, obj in inspect.getmembers(module):
+                    for _, obj in inspect.getmembers(module):
                         # 检查是否是BasePlatform的子类，但不是BasePlatform本身
                         if (inspect.isclass(obj) and 
                             issubclass(obj, BasePlatform) and 
@@ -126,8 +125,6 @@ class PlatformRegistry:
                             # 检查平台实现
                             if not PlatformRegistry.check_platform_implementation(obj):
                                 continue
-                            if not PlatformRegistry.suppress_output:
-                                PrettyOutput.print(f"Load platform from {os.path.join(directory, filename)}: {obj.platform_name}", OutputType.SUCCESS) # type: ignore
                             platforms[obj.platform_name] = obj # type: ignore
                             break
                 except Exception as e:
