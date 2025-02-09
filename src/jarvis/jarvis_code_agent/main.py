@@ -69,17 +69,7 @@ DEVELOPMENT WORKFLOW:
        </TOOL_CALL>
 
 3. Modification Planning
-   - Create detailed plan:
-     <TOOL_CALL>
-     name: create_code_plan
-     arguments:
-         task: Update user authentication process
-         related_files:
-             - file_path: auth.py
-               parts:
-                   - authenticate()
-                   - validate_token()
-     </TOOL_CALL>
+   Generate a detailed modification plan based on user requirements and actual code conditions.
 
 4. Code Implementation
    - For small changes (≤20 lines):
@@ -158,15 +148,25 @@ TOOL USAGE:
 1. Analysis Tools:
    - execute_shell: Run grep/find/head/tail commands
    - codebase_search: Find relevant files
+   - find_related_files: Find relevant files
    - select_code_files: Confirm and supplement files
    - codebase_qa: Understand context
+   - ask_user: Ask user for confirmation and information if needed
+   - create_code_sub_agent: Create agent for each small change
+   - file_operation: Read files
+   - rag: Ask questions based on a document directory, supporting multiple document formats (txt, pdf, docx, etc.)
+   - search: Use Bing search engine to search for information, and extract key information based on the question
+   - thinker: Deep thinking and logical reasoning
 
 2. Planning Tools:
-   - create_code_plan: Generate small, focused modification plans
+   - thinker: Generate a detailed modification plan based on user requirements and actual code conditions.
    - create_code_sub_agent: Create agent for each small change
+   - ask_user: Ask user for confirmation and information if needed
 
 3. Implementation Tools:
+   - execute_shell: Run shell commands
    - execute_code_modification: Apply small changes (≤20 lines)
+   - file_operation: Read, write, or append to files
    
 
 IMPORTANT:
