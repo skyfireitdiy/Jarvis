@@ -129,23 +129,11 @@ class PatchHandler:
                 os.system(f"git checkout -- {file_path}")
                 return False
             
-            if patch.start == patch.end:
-                # Insert new code before start line (changed from at start line)
-                if patch.new_code:
-                    new_lines = patch.new_code.splitlines(keepends=True)
-                    # Insert at patch.start instead of after it
-                    if patch.start == 0:
-                        lines[0:0] = new_lines  # Insert at beginning of file
-                    else:
-                        lines[patch.start:patch.start] = new_lines
+            if patch.new_code:
+                new_lines = patch.new_code.splitlines(keepends=True)
+                lines[patch.start:patch.end] = new_lines
             else:
-                # Replace or delete code between start and end
-                if patch.new_code:
-                    new_lines = patch.new_code.splitlines(keepends=True)
-                    lines[patch.start:patch.end] = new_lines
-                else:
-                    # Delete lines if new_code is empty
-                    del lines[patch.start:patch.end]
+                del lines[patch.start:patch.end]
                 
         # Write modified content back to file
         with open(file_path, "w", encoding="utf-8") as f:
