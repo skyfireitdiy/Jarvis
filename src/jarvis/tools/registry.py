@@ -58,7 +58,6 @@ class ToolRegistry:
     def dont_use_tools(self, names: List[str]):
         """Remove specified tools from the registry"""
         self.tools = {name: tool for name, tool in self.tools.items() if name not in names}
-                del self.tools[name]
     @staticmethod
     def get_global_tool_registry():
         """Get the global tool registry"""
