@@ -10,9 +10,10 @@ from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, get_single_line_input, while_success
 
 class Patch:
-    def __init__(self, old_code: str, new_code: str):
-        self.old_code = old_code
-        self.new_code = new_code
+    def __init__(self, start: int, end: int, new_code: str):
+        self.start = start  # Line number where patch starts (inclusive)
+        self.end = end      # Line number where patch ends (exclusive) 
+        self.new_code = new_code  # New code to insert/replace
 
 class PatchHandler:
     def __init__(self):
@@ -43,21 +44,22 @@ class PatchHandler:
             PrettyOutput.print(f"Failed to save additional info: {e}", OutputType.WARNING)
 
     def _extract_patches(self, response: str) -> List[Patch]:
-        """Extract patches from response
+        """Extract patches from response with hexadecimal line numbers
         
         Args:
             response: Model response content
             
         Returns:
-            List[Tuple[str, str, str]]: Patch list, each patch is a tuple of (format, file path, patch content)
+            List[Patch]: List of patches, each containing the line range and new code
         """
-        # 修改后的正则表达式匹配三种补丁格式
-        fmt_pattern = r'<PATCH>\n>>>>>> SEARCH\n(.*?)\n?(={5,})\n(.*?)\n?<<<<<< REPLACE\n</PATCH>'
+        fmt_pattern = r'<PATCH>\n\[([0-9a-f]+),([0-9a-f]+)\)\n(.*?)\n</PATCH>'
         ret = []
         for m in re.finditer(fmt_pattern, response, re.DOTALL):
-            ret.append(Patch(m.group(1), m.group(3)))   
+            start = int(m.group(1), 16)  # Convert hex to decimal
+            end = int(m.group(2), 16)
+            new_code = m.group(3)
+            ret.append(Patch(start, end, new_code))
         return ret
-
 
     def _confirm_and_apply_changes(self, file_path: str) -> bool:
         """Confirm and apply changes"""
@@ -106,36 +108,47 @@ class PatchHandler:
 
     
     def apply_file_patch(self, file_path: str, patches: List[Patch]) -> bool:
-        """Apply file patch"""
+        """Apply file patches using line numbers"""
         if not os.path.exists(file_path):
             base_dir = os.path.dirname(file_path)
             os.makedirs(base_dir, exist_ok=True)
             open(file_path, "w", encoding="utf-8").close()
-        file_content = open(file_path, "r", encoding="utf-8").read()
+        
+        with open(file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        
+        # Sort patches by start line in reverse order to apply from bottom to top
+        patches.sort(key=lambda x: x.start, reverse=True)
+        
         for i, patch in enumerate(patches):
-            if patch.old_code == "" and patch.new_code == "":
-                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)}: Delete file {file_path}", OutputType.INFO)
-                file_content = ""
-                os.system(f"git rm {file_path}")
-                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)} successfully", OutputType.SUCCESS)
-            elif patch.old_code == "":
-                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)}: Replace file {file_path} content: \n{patch.new_code}", OutputType.INFO)
-                file_content = patch.new_code
-                open(file_path, "w", encoding="utf-8").write(patch.new_code)
-                os.system(f"git add {file_path}")
-                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)} successfully", OutputType.SUCCESS)
+            PrettyOutput.print(f"Applying patch {i+1}/{len(patches)} at lines [{patch.start},{patch.end})", OutputType.INFO)
+            
+            if patch.start > len(lines):
+                PrettyOutput.print(f"Invalid patch: start line {patch.start} exceeds file length {len(lines)}", OutputType.WARNING)
+                os.system(f"git reset {file_path}")
+                os.system(f"git checkout -- {file_path}")
+                return False
+            
+            if patch.start == patch.end:
+                # Insert new code at start line
+                if patch.new_code:
+                    new_lines = patch.new_code.splitlines(keepends=True)
+                    lines[patch.start:patch.start] = new_lines
             else:
-                PrettyOutput.print(f"Apply patch {i+1}/{len(patches)}: File original content: \n{patch.old_code}\nReplace with: \n{patch.new_code}", OutputType.INFO)
-                if file_content.find(patch.old_code) == -1:
-                    PrettyOutput.print(f"File {file_path} does not contain {patch.old_code}", OutputType.WARNING)
-                    os.system(f"git reset {file_path}")
-                    os.system(f"git checkout -- {file_path}")
-                    return False
+                # Replace or delete code between start and end
+                if patch.new_code:
+                    new_lines = patch.new_code.splitlines(keepends=True)
+                    lines[patch.start:patch.end] = new_lines
                 else:
-                    file_content = file_content.replace(patch.old_code, patch.new_code, 1)
-                    open(file_path, "w", encoding="utf-8").write(file_content)
-                    os.system(f"git add {file_path}")
-                    PrettyOutput.print(f"Apply patch {i+1}/{len(patches)} successfully", OutputType.SUCCESS)
+                    # Delete lines if new_code is empty
+                    del lines[patch.start:patch.end]
+                
+        # Write modified content back to file
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+        
+        os.system(f"git add {file_path}")
+        PrettyOutput.print(f"Successfully applied all patches to {file_path}", OutputType.SUCCESS)
         return True
             
     
@@ -160,38 +173,38 @@ class PatchHandler:
         for file_path, current_plan in structed_plan.items():
             additional_info = self.additional_info  # Initialize with saved info
             while True:
-                
                 if os.path.exists(file_path):
-                    content = open(file_path, "r", encoding="utf-8").read()
+                    # Read file and add line numbers
+                    lines = []
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        for i, line in enumerate(f):
+                            lines.append(f"{i:04x}{line}")
+                    content = "".join(lines)
                 else:
                     content = "<File does not exist, need to create>"
+                    
                 prompt = """You are a senior software development expert who can generate code patches based on the complete modification plan, current original code file path, code content, and current file's modification plan. The output format should be as follows:
-                        <PATCH>
-                        >>>>>> SEARCH
-                        old_code
-                        ======
-                        new_code
-                        <<<<<< REPLACE
-                        </PATCH>
-                        Rules:
-                        1. When old_code is empty, it means replace everything from start to end
-                        2. When new_code is empty, it means delete old_code
-                        3. When both old_code and new_code are empty, it means delete the file
-                        Notes:
-                        1. Multiple patches can be generated
-                        2. old_code will be replaced with new_code, pay attention to context continuity
-                        3. Avoid breaking existing code logic when generating patches, e.g., don't insert function definitions inside existing function bodies
-                        4. Include sufficient context to avoid ambiguity
-                        5. Patches will be merged using file_content.replace(patch.old_code, patch.new_code, 1), so old_code and new_code need to match exactly, including EMPTY LINES, LINE BREAKS, WHITESPACE, TABS, and COMMENTS
-                        6. Ensure generated code has correct format (syntax, indentation, line breaks)
-                        7. Ensure new_code's indentation and format matches old_code
-                        8. Ensure code is inserted in appropriate locations, e.g., code using variables should be after declarations/definitions
-                        9. Provide at least 3 lines of context before and after modified code for location
-                        10. Each patch should be no more than 20 lines of code, if it is more than 20 lines, split it into multiple patches
-                        11. old code's line breaks should be consistent with the original code
 
+                <PATCH>
+                [start,end)
+                new_code
+                </PATCH>
 
-                        """
+                Rules:
+                1. start and end are hexadecimal line numbers (e.g., 000a)
+                2. The patch will replace lines [start,end) with new_code (including start, excluding end)
+                3. If start equals end, new_code will be inserted at that line
+                4. If new_code is empty, lines [start,end) will be deleted
+                5. Multiple patches can be generated
+                6. Each line in the input file starts with its 4-digit hexadecimal line number
+                7. Your new_code should NOT include line numbers
+                8. Ensure patches don't overlap
+                9. Generate patches from bottom to top of the file
+                10. Ensure new_code maintains correct indentation and formatting
+                11. Each patch should modify no more than 20 lines
+                12. Include sufficient context in new_code to maintain code consistency
+                """
+                
                 prompt += f"""# Original requirement: {feature}
                     # Current file path: {file_path}
                     # Current file content:
