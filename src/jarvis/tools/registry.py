@@ -56,6 +56,15 @@ class ToolRegistry:
                 PrettyOutput.print(f"Tool {tool_name} does not exist, available tools: {', '.join(tools)}", OutputType.WARNING)
         self.tools = {tool_name: self.tools[tool_name] for tool_name in name}
 
+    def dont_use_tools(self, names: List[str]):
+        """Remove specified tools from the registry
+        
+        Args:
+            names: List of tool names to remove
+        """
+        for name in names:
+            if name in self.tools:
+                del self.tools[name]
     @staticmethod
     def get_global_tool_registry():
         """Get the global tool registry"""
