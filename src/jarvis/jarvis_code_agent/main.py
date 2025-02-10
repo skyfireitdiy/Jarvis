@@ -183,6 +183,7 @@ IMPORTANT:
 2. NEVER assume code structure or implementation - always examine the actual code first.
 3. Base all suggestions and modifications on the current implementation, not assumptions.
 4. If code implementation is unclear, use available tools to investigate before proceeding.
+5. The codebase tool output may be inaccurate, prefer using shell tools to read code context
 """
 
 def main():
