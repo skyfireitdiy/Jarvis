@@ -1,4 +1,5 @@
 from jarvis.agent import Agent
+from jarvis.tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, init_env
 
 
@@ -165,6 +166,8 @@ IMPORTANT:
 2. NEVER assume code structure or implementation - always examine the actual code first.
 3. Base all suggestions and modifications on the current implementation, not assumptions.
 4. If code implementation is unclear, use available tools to investigate before proceeding.
+5. Before you start modifying the code, you should ask the user for confirmation of the modification plan.
+6. For some small changes, you can modify the code using the execute_shell tool directly or use file_operation tool to read the file and modify it.
 """
 
 def main():
@@ -174,8 +177,10 @@ def main():
 
 
     try:
+        tool_registry = ToolRegistry()
+        tool_registry.dont_use_tools(["create_sub_agent"])
         # Get global model instance
-        agent = Agent(system_prompt=system_prompt, name="Jarvis Code Agent")
+        agent = Agent(system_prompt=system_prompt, name="Jarvis Code Agent", tool_registry=tool_registry)
 
         # Interactive mode
         while True:
