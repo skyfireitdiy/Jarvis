@@ -47,13 +47,6 @@ DEVELOPMENT WORKFLOW:
            command: head -n 50 file.py
        </TOOL_CALL>
    - File selection and confirmation:
-     * Find relevant files:
-       <TOOL_CALL>
-       name: find_related_files
-       arguments:
-           query: Need to modify user authentication
-           top_k: 5
-       </TOOL_CALL>
      * Let user confirm selection:
        <TOOL_CALL>
        name: select_code_files
@@ -62,15 +55,6 @@ DEVELOPMENT WORKFLOW:
                - auth.py
                - user.py
            root_dir: .
-       </TOOL_CALL>
-   - Detailed code examination:
-     * MANDATORY: Understand existing code context before suggesting changes:
-       <TOOL_CALL>
-       name: codebase_qa
-       arguments:
-           query: How is this functionality currently implemented?
-           files:
-               - auth.py
        </TOOL_CALL>
 
 3. Modification Planning
@@ -100,7 +84,7 @@ DEVELOPMENT WORKFLOW:
 
 FILE SELECTION WORKFLOW:
 1. Initial Search
-   - Use codebase_search to find relevant files
+   - Use shell commands to find relevant files
    - Review search results for relevance
 
 2. User Confirmation
@@ -157,9 +141,7 @@ ITERATION GUIDELINES:
 TOOL USAGE:
 1. Analysis Tools:
    - execute_shell: Run grep/find/head/tail commands
-   - find_related_files: Find relevant files
    - select_code_files: Confirm and supplement files
-   - codebase_qa: Understand context
    - ask_user: Ask user for confirmation and information if needed
    - create_code_sub_agent: Create agent for each small change
    - file_operation: Read files
@@ -176,14 +158,12 @@ TOOL USAGE:
    - execute_shell: Run shell commands, some changes can use sed/awk/etc. to modify the code
    - execute_code_modification: Apply small changes (≤20 lines)
    - file_operation: Read, write, or append to files
-   
 
 IMPORTANT:
 1. If you can start executing the task, please start directly without asking the user if you can begin.
 2. NEVER assume code structure or implementation - always examine the actual code first.
 3. Base all suggestions and modifications on the current implementation, not assumptions.
 4. If code implementation is unclear, use available tools to investigate before proceeding.
-5. The codebase tool output may be inaccurate, prefer using shell tools to read code context
 """
 
 def main():
