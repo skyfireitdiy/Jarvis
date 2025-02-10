@@ -197,6 +197,7 @@ class PatchHandler:
 
     def apply_patch(self, feature: str, structed_plan: Dict[str, str]) -> Tuple[bool, str]:
         """Apply patch (main entry)"""
+        feedback = ""
         for file_path, current_plan in structed_plan.items():
             additional_info = self.additional_info  # Initialize with saved info
             while True:
@@ -300,6 +301,8 @@ class PatchHandler:
                         return False, additional_info
                     if act == "skip":
                         PrettyOutput.print(f"Skip file {file_path}", OutputType.WARNING)
+                        feedback += f"Skip file {file_path}\n"
+                        feedback += "Reason: " + get_multiline_input("Please enter your reason:") + "\n"
                         break
                     else:
                         additional_info += msg + "\n"
@@ -308,7 +311,7 @@ class PatchHandler:
                     self._finalize_changes()
                     break
         
-        return True, ""
+        return True, feedback
 
 
 
