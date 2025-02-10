@@ -211,7 +211,7 @@ class PatchHandler:
                 else:
                     content = "<File does not exist, need to create>"
                     
-                prompt = """You are a senior software development expert who can generate code patches based on the complete modification plan, current original code file path, code content, and current file's modification plan. The output format should be as follows:
+                prompt = """You are a senior software development expert who can generate code patches based on the complete modification plan, current original code file path, code content (with 4-digit hexadecimal line numbers), and current file's modification plan. The output format should be as follows:
 
                 <PATCH>
                 [start,end)
@@ -220,16 +220,16 @@ class PatchHandler:
 
                 Example:
                 <PATCH>
-                [0004,0004)
+                [000c,000c)
                 def new_function():
-    pass
+                    pass
                 </PATCH>
 
                 means:
-                Insert code BEFORE line 4:
+                Insert code BEFORE line 12:
                 ```
                 def new_function():
-    pass
+                    pass
                 ```
                 
                 Example 2:
