@@ -178,7 +178,7 @@ class PatchHandler:
                     lines = []
                     with open(file_path, "r", encoding="utf-8") as f:
                         for i, line in enumerate(f):
-                            lines.append(f"{i:04x}{line}")
+                            lines.append(f"{i+1:04x}{line}")
                     content = "".join(lines)
                 else:
                     content = "<File does not exist, need to create>"
@@ -189,6 +189,23 @@ class PatchHandler:
                 [start,end)
                 new_code
                 </PATCH>
+
+                Example:
+                <PATCH>
+                [0005,000c)
+                aa
+                bb
+                cc
+                </PATCH>
+
+                means:
+                Replace lines [5,12) with 
+                ```
+                aa
+                bb
+                cc
+                ```
+                
 
                 Rules:
                 1. start and end are hexadecimal line numbers (e.g., 000a)
@@ -203,6 +220,7 @@ class PatchHandler:
                 10. Ensure new_code maintains correct indentation and formatting
                 11. Each patch should modify no more than 20 lines
                 12. Include sufficient context in new_code to maintain code consistency
+                13. `[` and `)` must be included in the line range
                 """
                 
                 prompt += f"""# Original requirement: {feature}
