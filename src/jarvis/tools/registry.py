@@ -49,21 +49,15 @@ class ToolRegistry:
         self.max_context_length = int(get_max_context_length() * 0.8)
 
     def use_tools(self, name: List[str]):
-        """Use a tool"""
-        tools = self.tools.keys()
-        for tool_name in name:
-            if tool_name not in tools:
-                PrettyOutput.print(f"Tool {tool_name} does not exist, available tools: {', '.join(tools)}", OutputType.WARNING)
+        """Use specified tools"""
+        missing_tools = [tool_name for tool_name in name if tool_name not in self.tools]
+        if missing_tools:
+            PrettyOutput.print(f"Tools {missing_tools} do not exist, available tools: {', '.join(self.tools.keys())}", OutputType.WARNING)
         self.tools = {tool_name: self.tools[tool_name] for tool_name in name}
 
     def dont_use_tools(self, names: List[str]):
-        """Remove specified tools from the registry
-        
-        Args:
-            names: List of tool names to remove
-        """
-        for name in names:
-            if name in self.tools:
+        """Remove specified tools from the registry"""
+        self.tools = {name: tool for name, tool in self.tools.items() if name not in names}
                 del self.tools[name]
     @staticmethod
     def get_global_tool_registry():
