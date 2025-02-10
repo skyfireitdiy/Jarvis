@@ -178,7 +178,7 @@ class PatchHandler:
                     lines = []
                     with open(file_path, "r", encoding="utf-8") as f:
                         for i, line in enumerate(f):
-                            lines.append(f"{i+1:04x}{line}")
+                            lines.append(f"{i:04x}{line}")  # Changed from i+1 to i for 0-based indexing
                     content = "".join(lines)
                 else:
                     content = "<File does not exist, need to create>"
@@ -192,14 +192,14 @@ class PatchHandler:
 
                 Example:
                 <PATCH>
-                [0005,000c)
+                [0004,000b)
                 aa
                 bb
                 cc
                 </PATCH>
 
                 means:
-                Replace lines [5,12) with 
+                Replace lines [4,11) with 
                 ```
                 aa
                 bb
@@ -213,7 +213,7 @@ class PatchHandler:
                 3. If start equals end, new_code will be inserted at that line
                 4. If new_code is empty, lines [start,end) will be deleted
                 5. Multiple patches can be generated
-                6. Each line in the input file starts with its 4-digit hexadecimal line number
+                6. Each line in the input file starts with its 4-digit hexadecimal line number (0-based)
                 7. Your new_code should NOT include line numbers
                 8. Ensure patches don't overlap
                 9. Generate patches from bottom to top of the file
@@ -221,6 +221,7 @@ class PatchHandler:
                 11. Each patch should modify no more than 20 lines
                 12. Include sufficient context in new_code to maintain code consistency
                 13. `[` and `)` must be included in the line range
+                14. Line numbers start from 0
                 """
                 
                 prompt += f"""# Original requirement: {feature}
