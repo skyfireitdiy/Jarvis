@@ -137,22 +137,22 @@ class PlatformRegistry:
     def get_global_platform_registry():
         """Get global platform registry"""
         if PlatformRegistry.global_platform_registry is None:
-            PlatformRegistry.global_platform_registry = PlatformRegistry()
-            
-            # 从用户平台目录加载额外平台
-            platform_dir = PlatformRegistry.get_platform_dir()
-            if platform_dir and os.path.exists(platform_dir):
-                for platform_name, platform_class in PlatformRegistry.load_platform_from_dir(platform_dir).items():
-                    PlatformRegistry.global_platform_registry.register_platform(platform_name, platform_class)
-            platform_dir = os.path.dirname(__file__)
-            if platform_dir and os.path.exists(platform_dir):
-                for platform_name, platform_class in PlatformRegistry.load_platform_from_dir(platform_dir).items():
-                    PlatformRegistry.global_platform_registry.register_platform(platform_name, platform_class)
+            PlatformRegistry.global_platform_registry = PlatformRegistry()  
         return PlatformRegistry.global_platform_registry
     
     def __init__(self):
         """Initialize platform registry"""
         self.platforms: Dict[str, Type[BasePlatform]] = {}
+        # 从用户平台目录加载额外平台
+        platform_dir = PlatformRegistry.get_platform_dir()
+        if platform_dir and os.path.exists(platform_dir):
+            for platform_name, platform_class in PlatformRegistry.load_platform_from_dir(platform_dir).items():
+                self.register_platform(platform_name, platform_class)
+        platform_dir = os.path.dirname(__file__)
+        if platform_dir and os.path.exists(platform_dir):
+            for platform_name, platform_class in PlatformRegistry.load_platform_from_dir(platform_dir).items():
+                self.register_platform(platform_name, platform_class)
+        
 
     def get_normal_platform(self) -> BasePlatform:
         platform_name = os.environ.get("JARVIS_PLATFORM", "kimi")

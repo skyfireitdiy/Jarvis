@@ -48,6 +48,14 @@ class ToolRegistry:
         # Ensure max_context_length is an integer
         self.max_context_length = int(get_max_context_length() * 0.8)
 
+    def use_tools(self, name: List[str]):
+        """Use a tool"""
+        tools = self.tools.keys()
+        for tool_name in name:
+            if tool_name not in tools:
+                PrettyOutput.print(f"Tool {tool_name} does not exist, available tools: {', '.join(tools)}", OutputType.WARNING)
+        self.tools = {tool_name: self.tools[tool_name] for tool_name in name}
+
     @staticmethod
     def get_global_tool_registry():
         """Get the global tool registry"""
