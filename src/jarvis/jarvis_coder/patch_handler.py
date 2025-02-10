@@ -130,10 +130,14 @@ class PatchHandler:
                 return False
             
             if patch.start == patch.end:
-                # Insert new code at start line
+                # Insert new code before start line (changed from at start line)
                 if patch.new_code:
                     new_lines = patch.new_code.splitlines(keepends=True)
-                    lines[patch.start:patch.start] = new_lines
+                    # Insert at patch.start instead of after it
+                    if patch.start == 0:
+                        lines[0:0] = new_lines  # Insert at beginning of file
+                    else:
+                        lines[patch.start:patch.start] = new_lines
             else:
                 # Replace or delete code between start and end
                 if patch.new_code:
@@ -192,6 +196,20 @@ class PatchHandler:
 
                 Example:
                 <PATCH>
+                [0004,0004)
+                def new_function():
+    pass
+                </PATCH>
+
+                means:
+                Insert code BEFORE line 4:
+                ```
+                def new_function():
+    pass
+                ```
+                
+                Example 2:
+                <PATCH>
                 [0004,000b)
                 aa
                 bb
@@ -199,18 +217,17 @@ class PatchHandler:
                 </PATCH>
 
                 means:
-                Replace lines [4,11) with 
+                Replace lines [4,11) with:
                 ```
                 aa
                 bb
                 cc
                 ```
-                
 
                 Rules:
                 1. start and end are hexadecimal line numbers (e.g., 000a)
                 2. The patch will replace lines [start,end) with new_code (including start, excluding end)
-                3. If start equals end, new_code will be inserted at that line
+                3. If start equals end, new_code will be inserted BEFORE that line
                 4. If new_code is empty, lines [start,end) will be deleted
                 5. Multiple patches can be generated
                 6. Each line in the input file starts with its 4-digit hexadecimal line number (0-based)
