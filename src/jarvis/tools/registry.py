@@ -156,7 +156,7 @@ class ToolRegistry:
         """Execute a specified tool"""
         tool = self.get_tool(name)
         if tool is None:
-            return {"success": False, "error": f"Tool {name} does not exist, available tools: {', '.join(self.tools.keys())}"}
+            return {"success": False, "stderr": f"Tool {name} does not exist, available tools: {', '.join(self.tools.keys())}", "stdout": ""}
         return tool.execute(arguments)
 
     def handle_tool_calls(self, tool_calls: List[Dict]) -> str:
