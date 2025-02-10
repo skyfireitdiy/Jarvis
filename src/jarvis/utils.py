@@ -247,17 +247,24 @@ def find_git_root(dir="."):
 def load_embedding_model():
     model_name = "BAAI/bge-m3"
     cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    model_dir = os.path.join(cache_dir, "models--" + model_name.replace("/", "--"))
     
-    # Check if model exists
-    os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
-    
-    # Load model
-    embedding_model = SentenceTransformer(
-        model_name,
-        cache_folder=cache_dir,
-        local_files_only=True
-    )
+
+    try:
+        # Load model
+        embedding_model = SentenceTransformer(
+            model_name,
+            cache_folder=cache_dir,
+            local_files_only=True
+        )
+    except Exception as e:
+        PrettyOutput.print(f"Failed to load embedding model: {str(e)}", OutputType.ERROR)
+        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
+        # Load model
+        embedding_model = SentenceTransformer(
+            model_name,
+            cache_folder=cache_dir,
+            local_files_only=True
+        )
     
     return embedding_model
 
@@ -265,24 +272,35 @@ def load_rerank_model():
     """Load reranking model"""
     model_name = "BAAI/bge-reranker-v2-m3"
     cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    model_dir = os.path.join(cache_dir, "models--" + model_name.replace("/", "--"))
     
     PrettyOutput.print(f"Loading reranking model: {model_name}...", OutputType.INFO)
     
-    # Check if model exists
-    os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
-    
-    # Load model and tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
-        cache_dir=cache_dir,
-        local_files_only=True
-    )
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_name,
-        cache_dir=cache_dir,
-        local_files_only=True
-    )
+    try:
+        # Load model and tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            cache_dir=cache_dir,
+            local_files_only=True
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name,
+            cache_dir=cache_dir,
+            local_files_only=True
+        )
+    except Exception as e:
+        PrettyOutput.print(f"Failed to load reranking model: {str(e)}", OutputType.ERROR)
+        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
+        # Load model and tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            cache_dir=cache_dir,
+            local_files_only=True
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name,
+            cache_dir=cache_dir,
+            local_files_only=True
+        )
     
     # Use GPU if available
     if torch.cuda.is_available():
