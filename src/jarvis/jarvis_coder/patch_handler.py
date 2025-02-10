@@ -52,7 +52,7 @@ class PatchHandler:
         Returns:
             List[Patch]: List of patches, each containing the line range and new code
         """
-        fmt_pattern = r'<PATCH>\n\[([0-9a-f]+),([0-9a-f]+)\)\n(.*?)\n</PATCH>'
+        fmt_pattern = r'<PATCH>\n\[([0-9a-f]+),([0-9a-f]+)\)\n(.*?\n)</PATCH>'
         ret = []
         for m in re.finditer(fmt_pattern, response, re.DOTALL):
             start = int(m.group(1), 16)  # Convert hex to decimal
