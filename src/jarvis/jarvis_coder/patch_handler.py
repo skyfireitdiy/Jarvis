@@ -271,10 +271,6 @@ class PatchHandler:
                     [0003,0007)  # This overlaps with the previous patch
                     code2
                     </PATCH>
-                # Original requirement: Add line number accuracy reminder to patch generation prompts
-                # Current file content must be provided with exact line numbers (0-based)
-                # Ensure old code remains unchanged when generating new patches
-                # Provide sufficient context around modified lines
                 """
                 
                 prompt += f"""# Original requirement: {feature}
