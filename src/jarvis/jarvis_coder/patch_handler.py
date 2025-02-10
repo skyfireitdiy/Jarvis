@@ -106,13 +106,48 @@ class PatchHandler:
         os.system(f"git reset --hard")
         os.system(f"git clean -df")
 
-    
+    def _check_patches_overlap(self, patches: List[Patch]) -> bool:
+        """Check if any patches overlap with each other
+        
+        Args:
+            patches: List of patches to check
+            
+        Returns:
+            bool: True if patches overlap, False otherwise
+        """
+        if not patches:
+            return False
+        
+        # Sort patches by start line
+        sorted_patches = sorted(patches, key=lambda x: x.start)
+        
+        # Check for overlaps
+        for i in range(len(sorted_patches) - 1):
+            current = sorted_patches[i]
+            next_patch = sorted_patches[i + 1]
+            
+            if current.end > next_patch.start:
+                PrettyOutput.print(
+                    f"Overlapping patches detected: [{current.start:04x},{current.end:04x}) and [{next_patch.start:04x},{next_patch.end:04x})",
+                    OutputType.WARNING
+                )
+                return True
+            
+        return False
+
     def apply_file_patch(self, file_path: str, patches: List[Patch]) -> bool:
         """Apply file patches using line numbers"""
         if not os.path.exists(file_path):
             base_dir = os.path.dirname(file_path)
             os.makedirs(base_dir, exist_ok=True)
             open(file_path, "w", encoding="utf-8").close()
+        
+        # Check for overlapping patches
+        if self._check_patches_overlap(patches):
+            PrettyOutput.print("Cannot apply overlapping patches", OutputType.ERROR)
+            os.system(f"git reset {file_path}")
+            os.system(f"git checkout -- {file_path}")
+            return False
         
         with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
@@ -220,13 +255,22 @@ class PatchHandler:
                 5. Multiple patches can be generated
                 6. Each line in the input file starts with its 4-digit hexadecimal line number (0-based)
                 7. Your new_code should NOT include line numbers
-                8. Ensure patches don't overlap
+                8. CRITICAL: Patches MUST NOT overlap - ensure each line is modified by at most one patch
                 9. Generate patches from bottom to top of the file
                 10. Ensure new_code maintains correct indentation and formatting
                 11. Each patch should modify no more than 20 lines
                 12. Include sufficient context in new_code to maintain code consistency
                 13. `[` and `)` must be included in the line range
                 14. Line numbers start from 0
+                15. Example of INVALID overlapping patches:
+                    <PATCH>
+                    [0001,0005)
+                    code1
+                    </PATCH>
+                    <PATCH>
+                    [0003,0007)  # This overlaps with the previous patch
+                    code2
+                    </PATCH>
                 """
                 
                 prompt += f"""# Original requirement: {feature}

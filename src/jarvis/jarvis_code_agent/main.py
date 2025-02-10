@@ -141,6 +141,7 @@ ITERATION GUIDELINES:
 TOOL USAGE:
 1. Analysis Tools:
    - execute_shell: Run grep/find/head/tail commands
+   - find_files: Search and identify relevant code files in the codebase based on requirements or problems
    - select_code_files: Confirm and supplement files
    - ask_user: Ask user for confirmation and information if needed
    - create_code_sub_agent: Create agent for each small change
