@@ -211,31 +211,7 @@ class PlatformRegistry:
         except Exception as e:
             PrettyOutput.print(f"Create platform failed: {str(e)}", OutputType.ERROR)
             return None
-            
-    def use_platforms(self, platform_names: List[str]):
-        """Restrict available platforms to the specified list
-        
-        Args:
-            platform_names: List of platform names to use
-        """
-        self.platforms = {
-            name: cls 
-            for name, cls in self.platforms.items()
-            if name in platform_names
-        }
 
-    def dont_use_platforms(self, platform_names: List[str]):
-        """Restrict available platforms by excluding the specified list
-        
-        Args:
-            platform_names: List of platform names to exclude
-        """
-        self.platforms = {
-            name: cls 
-            for name, cls in self.platforms.items()
-            if name not in platform_names
-        }
     def get_available_platforms(self) -> List[str]:
         """Get available platform list"""
-        return list(self.platforms.keys()) 
-    
+        return list(self.platforms.keys())
