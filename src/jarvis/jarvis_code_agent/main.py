@@ -149,10 +149,8 @@ TOOL USAGE:
    - file_operation: Read files
    - rag: Ask questions based on a document directory, supporting multiple document formats (txt, pdf, docx, etc.)
    - search: Use Bing search engine to search for information, and extract key information based on the question
-   - thinker: Deep thinking and logical reasoning
 
 2. Planning Tools:
-   - thinker: Generate a detailed modification plan based on user requirements and actual code conditions.
    - create_code_sub_agent: Create agent for each small change
    - ask_user: Ask user for confirmation and information if needed
 
