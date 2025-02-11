@@ -93,27 +93,6 @@ jarvis -p kimi  # 使用 Kimi 平台
 jarvis -p openai  # 使用 OpenAI 平台
 ```
 
-### 代码库搜索
-```bash
-# 生成代码库索引
-jarvis-codebase --generate
-
-# 搜索相似代码
-jarvis-codebase --search "搜索关键词"
-
-# 询问代码库相关问题
-jarvis-codebase --ask "你的问题"
-```
-
-### 文档分析 (RAG)
-```bash
-# 构建文档索引
-jarvis-rag --dir /path/to/documents --build
-
-# 搜索文档
-jarvis-rag --query "搜索关键词"
-```
-
 ### 搜索工具
 ```bash
 # 基本搜索
@@ -133,18 +112,6 @@ jarvis --keep-history  # 完成后不删除聊天会话
 
 ## 🛠️ 工具
 
-### 内置工具
-
-| 工具 | 描述 |
-|------|-------------|
-| execute_shell | 执行系统命令并捕获输出 |
-| file_operation | 文件操作（读/写/追加/删除） |
-| generate_tool | AI 驱动的工具生成和集成 |
-| methodology | 经验积累和方法论管理 |
-| create_sub_agent | 创建特定任务的专门子代理 |
-| coder | 自动代码修改和生成工具 |
-| codebase | 代码库管理和搜索工具 |
-
 ### 工具位置
 - 内置工具：`src/jarvis/tools/`
 - 用户工具：`~/.jarvis/tools/`
@@ -156,27 +123,21 @@ jarvis --keep-history  # 完成后不删除聊天会话
 - 自动代码生成和集成
 - 通过子代理动态扩展能力
 - 自动代码修改与版本控制
-- 代码库索引和语义搜索
 
 #### 2. 方法论学习
 - 从交互中自动积累经验
 - 模式识别和方法论提取
 - 通过使用持续改进
 - 代码修改历史跟踪
-- 代码库分析和文档生成
 
 #### 3. 自适应问题解决
 - 上下文感知的子代理创建
 - 动态工具组合
 - 从执行反馈中学习
-- 基于代码库的问题解决
 - 复杂任务的多模型协作
 
 #### 4. 代码智能
-- 自动代码库索引
-- 语义代码搜索
 - 集成 git 的代码修改
-- 代码分析和文档
 - 多模型代码生成
 
 ## 🎯 扩展 Jarvis
