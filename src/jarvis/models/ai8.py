@@ -14,6 +14,7 @@ class AI8Model(BasePlatform):
 
     def get_model_list(self) -> List[Tuple[str, str]]:
         """获取模型列表"""
+        self.get_available_models()
         return [(name,info['desc']) for name,info in self.models.items()]
     
     def __init__(self):
