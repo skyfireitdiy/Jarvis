@@ -2,6 +2,7 @@ from typing import Dict, Any
 
 
 from jarvis.agent import Agent, origin_agent_system_prompt
+from jarvis.tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput
 
 
@@ -58,13 +59,14 @@ class SubAgentTool:
             if goal:
                 task_description += f"\n\nCompletion goal:\n{goal}"
 
-            
+            tool_registry = ToolRegistry()
 
             # Create sub-agent
             sub_agent = Agent(
                 system_prompt=origin_agent_system_prompt,
                 name=agent_name,
-                is_sub_agent=True
+                is_sub_agent=True,
+                tool_registry=tool_registry
             )
 
             # Run sub-agent, pass file list

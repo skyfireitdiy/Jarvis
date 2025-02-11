@@ -1,6 +1,7 @@
 from typing import Dict, Any
 
 from jarvis.agent import Agent
+from jarvis.tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput
 from jarvis.jarvis_code_agent.main import system_prompt
 
@@ -31,11 +32,14 @@ class CodeSubAgentTool:
 
             PrettyOutput.print(f"Creating code sub-agent {name} for subtask: {subtask}", OutputType.INFO)
 
+            tool_registry = ToolRegistry()
+
             # Create sub-agent
             sub_agent = Agent(
                 system_prompt=system_prompt,
                 name=name,
-                is_sub_agent=True
+                is_sub_agent=True,
+                tool_registry=tool_registry
             )
 
             # Execute subtask

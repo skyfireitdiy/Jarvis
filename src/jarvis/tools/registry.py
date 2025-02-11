@@ -11,33 +11,32 @@ from jarvis.utils import OutputType, PrettyOutput, get_max_context_length
 
 
 
-def load_tools() -> str:
-    """Load tools"""
-    PrettyOutput.section("Available tools", OutputType.PLANNING)
-    tools = ToolRegistry.get_global_tool_registry().get_all_tools()
-    if tools:
-        tools_prompt = "Available tools:\n"
-        for tool in tools:
-            PrettyOutput.print(f"{tool['name']}: {tool['description']}", OutputType.INFO)
-            tools_prompt += f"- Name: {tool['name']}\n"
-            tools_prompt += f"  Description: {tool['description']}\n"
-            tools_prompt += f"  Parameters: {tool['parameters']}\n"
-        tools_prompt += """
-Tool Usage Format:
-
-<TOOL_CALL>
-name: tool_name
-arguments:
-    param1: value1
-    param2: value2
-</TOOL_CALL>
----------------------------------------------
-"""
-        return tools_prompt
-    return ""
-
 class ToolRegistry:
-    global_tool_registry = None # type: ignore
+    def load_tools(self) -> str:
+        """Load tools"""
+        PrettyOutput.section("Available tools", OutputType.PLANNING)
+        tools = self.get_all_tools()
+        if tools:
+            tools_prompt = "Available tools:\n"
+            for tool in tools:
+                PrettyOutput.print(f"{tool['name']}: {tool['description']}", OutputType.INFO)
+                tools_prompt += f"- Name: {tool['name']}\n"
+                tools_prompt += f"  Description: {tool['description']}\n"
+                tools_prompt += f"  Parameters: {tool['parameters']}\n"
+            tools_prompt += """
+    Tool Usage Format:
+
+    <TOOL_CALL>
+    name: tool_name
+    arguments:
+        param1: value1
+        param2: value2
+    </TOOL_CALL>
+    ---------------------------------------------
+    """
+            return tools_prompt
+        return ""
+
     def __init__(self):
         """Initialize tool registry"""
         self.tools: Dict[str, Tool] = {}
@@ -57,12 +56,6 @@ class ToolRegistry:
     def dont_use_tools(self, names: List[str]):
         """Remove specified tools from the registry"""
         self.tools = {name: tool for name, tool in self.tools.items() if name not in names}
-    @staticmethod
-    def get_global_tool_registry():
-        """Get the global tool registry"""
-        if ToolRegistry.global_tool_registry is None:
-            ToolRegistry.global_tool_registry = ToolRegistry()
-        return ToolRegistry.global_tool_registry
 
     def _load_builtin_tools(self):
         """Load tools from the built-in tools directory"""
