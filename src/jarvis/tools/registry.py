@@ -272,7 +272,7 @@ Please provide a summary:"""
                 PrettyOutput.section("Execution failed", OutputType.WARNING)
             
             if len(tool_calls) > 1:
-                output += f"\n\n--- 一次只能执行一个工具, 因此以下工具未执行\n{str(tool_calls[1:])} ---"
+                output += f"\n\n--- Only one tool can be executed at a time, the following tools were not executed\n{str(tool_calls[1:])} ---"
             return output
             
         except Exception as e:
