@@ -11,27 +11,22 @@ from jarvis.tools import ToolRegistry
 # System prompt for the GitHub workflow agent
 github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage the complete development workflow using GitHub CLI (gh). Follow these steps strictly:
 
-1. Environment Check:
-   - Verify gh CLI installation
-   - Check authentication status
-   - Set up authentication if needed
-
-2. Issue Management:
+1. Issue Management:
    - List and display available issues
    - Help user select an issue to work on
    - Analyze the selected issue thoroughly
 
-3. Development Planning:
+2. Development Planning:
    - Create a development branch for the issue
    - Generate a detailed modification plan
    - Break down the task into smaller steps
 
-4. Implementation:
+3. Implementation:
    - Guide through the implementation process
    - Track changes and progress
    - Ensure code quality
 
-5. Review and Submit:
+4. Review and Submit:
    - Review changes before submission
    - Create and submit pull request
    - Handle review feedback
