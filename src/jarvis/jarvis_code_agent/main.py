@@ -79,8 +79,8 @@ DEVELOPMENT WORKFLOW:
      <TOOL_CALL>
      name: create_code_sub_agent
      arguments:
+         name: code_sub_agent
          subtask: Implement new authentication flow
-         codebase_dir: .
      </TOOL_CALL>
 
 FILE SELECTION WORKFLOW:
