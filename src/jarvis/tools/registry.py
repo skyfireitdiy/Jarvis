@@ -22,7 +22,6 @@ def load_tools() -> str:
             tools_prompt += f"- Name: {tool['name']}\n"
             tools_prompt += f"  Description: {tool['description']}\n"
             tools_prompt += f"  Parameters: {tool['parameters']}\n"
-            tools_prompt += f"  Usage Format: <TOOL_CALL>\n"
         tools_prompt += """
 Tool Usage Format:
 
@@ -106,53 +105,55 @@ class ToolRegistry:
                 PrettyOutput.print(f"File does not exist: {p_file_path}", OutputType.ERROR)
                 return False
                 
-            # Dynamically import the module
-            module_name = p_file_path.stem
-            spec = importlib.util.spec_from_file_location(module_name, p_file_path) # type: ignore
-            if not spec or not spec.loader:
-                PrettyOutput.print(f"Failed to load module: {p_file_path}", OutputType.ERROR)
-                return False
-                
-            module = importlib.util.module_from_spec(spec) # type: ignore
-            sys.modules[module_name] = module  # Add to sys.modules to support relative imports
-            spec.loader.exec_module(module)
+            # Add the parent directory to sys.path temporarily
+            parent_dir = str(p_file_path.parent)
+            sys.path.insert(0, parent_dir)
             
-            # Find the tool class in the module
-            tool_found = False
-            for item_name in dir(module):
-                item = getattr(module, item_name)
-                # Check if it is a class and has the necessary attributes
-                if (isinstance(item, type) and 
-                    hasattr(item, 'name') and 
-                    hasattr(item, 'description') and 
-                    hasattr(item, 'parameters')):
+            try:
+                # Import the module using standard import mechanism
+                module_name = p_file_path.stem
+                module = __import__(module_name)
+                
+                # Find the tool class in the module
+                tool_found = False
+                for item_name in dir(module):
+                    item = getattr(module, item_name)
+                    # Check if it is a class and has the necessary attributes
+                    if (isinstance(item, type) and 
+                        hasattr(item, 'name') and 
+                        hasattr(item, 'description') and 
+                        hasattr(item, 'parameters')):
 
-                    if hasattr(item, "check"):
-                        if not item.check():
-                            PrettyOutput.print(f"Tool {item.name} check failed, skipping", OutputType.INFO)
-                            continue
+                        if hasattr(item, "check"):
+                            if not item.check():
+                                PrettyOutput.print(f"Tool {item.name} check failed, skipping", OutputType.INFO)
+                                continue
+                        
+                        # Instantiate the tool class
+                        tool_instance = item()
+                        
+                        # Register the tool
+                        self.register_tool(
+                            name=tool_instance.name,
+                            description=tool_instance.description,
+                            parameters=tool_instance.parameters,
+                            func=tool_instance.execute
+                        )
+                        tool_found = True
+                        break
+                        
+                if not tool_found:
+                    PrettyOutput.print(f"No valid tool class found in the file: {p_file_path}", OutputType.INFO)
+                    return False
                     
-                    # Instantiate the tool class, passing in the model and output processor
-                    tool_instance = item()
-                    
-                    # Register the tool
-                    self.register_tool(
-                        name=tool_instance.name,
-                        description=tool_instance.description,
-                        parameters=tool_instance.parameters,
-                        func=tool_instance.execute
-                    )
-                    tool_found = True
-                    break
-                    
-            if not tool_found:
-                PrettyOutput.print(f"No valid tool class found in the file: {p_file_path}", OutputType.INFO)
-                return False
+                return True
                 
-            return True
-            
+            finally:
+                # Remove the directory from sys.path
+                sys.path.remove(parent_dir)
+                
         except Exception as e:
-            PrettyOutput.print(f"Failed to load tool from {p_file_path.name}: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"Failed to load tool from {Path(file_path).name}: {str(e)}", OutputType.ERROR)
             return False
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
