@@ -7,7 +7,6 @@ import yaml
 
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools import ToolRegistry
-from jarvis.tools.registry import load_tools
 from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env
 import os
 
@@ -28,7 +27,7 @@ class Agent:
         add_agent(name)
         PrettyOutput.print(f"Welcome to Jarvis, your AI assistant, Initiating...", OutputType.SYSTEM)
         self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        self.tool_registry = tool_registry if tool_registry else ToolRegistry.get_global_tool_registry()
+        self.tool_registry = tool_registry if tool_registry else ToolRegistry()
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
@@ -246,7 +245,7 @@ Please describe in concise bullet points, highlighting important information.
 
             # Load methodology
             methodology_prompt = load_methodology(user_input)
-            tools_prompt = load_tools()
+            tools_prompt = self.tool_registry.load_tools()
 
             # 显示任务开始
             PrettyOutput.section(f"Starting new task: {self.name}", OutputType.PLANNING)
