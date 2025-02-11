@@ -88,27 +88,6 @@ Jarvis supports configuration through environment variables that can be set in t
 jarvis
 ```
 
-### Codebase Search
-```bash
-# Generate codebase index
-jarvis-codebase --generate
-
-# Search similar code
-jarvis-codebase --search "your search query"
-
-# Ask questions about codebase
-jarvis-codebase --ask "your question"
-```
-
-### Document Analysis (RAG)
-```bash
-# Build document index
-jarvis-rag --dir /path/to/documents --build
-
-# Search documents
-jarvis-rag --query "your search query"
-```
-
 ### Search Tool
 ```bash
 # Basic search
@@ -123,19 +102,6 @@ jarvis-search "your query" --max 3
 
 ## 🛠️ Tools
 
-
-### Built-in Tools
-
-| Tool | Description |
-|------|-------------|
-| execute_shell | Execute system commands and capture output |
-| file_operation | File operations (read/write/append/delete) |
-| generate_tool | AI-powered tool generation and integration |
-| methodology | Experience accumulation and methodology management |
-| create_sub_agent | Create specialized sub-agents for specific tasks |
-| coder | Automatic code modification and generation tool |
-| codebase | Codebase management and search tool |
-
 ### Tool Locations
 - Built-in tools: `src/jarvis/tools/`
 - User tools: `~/.jarvis/tools/`
@@ -148,27 +114,21 @@ jarvis-search "your query" --max 3
 - Automatic code generation and integration
 - Dynamic capability expansion through sub-agents
 - Automatic code modification with version control
-- Codebase indexing and semantic search
 
 #### 2. Methodology Learning
 - Automatic experience accumulation from interactions
 - Pattern recognition and methodology extraction
 - Continuous refinement through usage
 - Code modification history tracking
-- Codebase analysis and documentation generation
 
 #### 3. Adaptive Problem Solving
 - Context-aware sub-agent creation
 - Dynamic tool composition
 - Learning from execution feedback
-- Codebase-aware problem solving
 - Multi-model collaboration for complex tasks
 
 #### 4. Code Intelligence
-- Automatic codebase indexing
-- Semantic code search
 - Code modification with git integration
-- Code analysis and documentation
 - Multi-model code generation
 
 ## 🎯 Extending Jarvis

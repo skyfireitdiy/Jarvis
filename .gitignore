@@ -9,4 +9,5 @@ dist
 .jarvis
 jarvis_ai_assistant.egg-info
 PKG-INFO
-.jarvis-*
+.jarvis-*.venv
+.venv

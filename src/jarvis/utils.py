@@ -1,4 +1,3 @@
-from ast import List, Str
 import hashlib
 from pathlib import Path
 import sys
@@ -6,18 +5,14 @@ import time
 import os
 from enum import Enum
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 import colorama
 from colorama import Fore, Style as ColoramaStyle
 import numpy as np
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
 from prompt_toolkit.formatted_text import FormattedText
-from sentence_transformers import SentenceTransformer
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-import torch
 import yaml
-import faiss
 
 # 初始化colorama
 colorama.init()
@@ -244,70 +239,6 @@ def find_git_root(dir="."):
     os.chdir(curr_dir)
     return ret
 
-def load_embedding_model():
-    model_name = "BAAI/bge-m3"
-    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    
-
-    try:
-        # Load model
-        embedding_model = SentenceTransformer(
-            model_name,
-            cache_folder=cache_dir,
-            local_files_only=True
-        )
-    except Exception as e:
-        PrettyOutput.print(f"Failed to load embedding model: {str(e)}", OutputType.ERROR)
-        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
-        # Load model
-        embedding_model = SentenceTransformer(
-            model_name,
-            cache_folder=cache_dir,
-            local_files_only=True
-        )
-    
-    return embedding_model
-
-def load_rerank_model():
-    """Load reranking model"""
-    model_name = "BAAI/bge-reranker-v2-m3"
-    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    
-    PrettyOutput.print(f"Loading reranking model: {model_name}...", OutputType.INFO)
-    
-    try:
-        # Load model and tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            cache_dir=cache_dir,
-            local_files_only=True
-        )
-        model = AutoModelForSequenceClassification.from_pretrained(
-            model_name,
-            cache_dir=cache_dir,
-            local_files_only=True
-        )
-    except Exception as e:
-        PrettyOutput.print(f"Failed to load reranking model: {str(e)}", OutputType.ERROR)
-        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
-        # Load model and tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            cache_dir=cache_dir,
-            local_files_only=True
-        )
-        model = AutoModelForSequenceClassification.from_pretrained(
-            model_name,
-            cache_dir=cache_dir,
-            local_files_only=True
-        )
-    
-    # Use GPU if available
-    if torch.cuda.is_available():
-        model = model.cuda()
-    model.eval()
-    
-    return model, tokenizer
 
 def get_max_context_length():
     return int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '131072'))  # 默认128k
@@ -359,7 +290,6 @@ def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -
 
 def load_methodology(user_input: str) -> str:
     """Load methodology and build vector index"""
-    PrettyOutput.print("Loading methodology...", OutputType.PROGRESS)
     user_jarvis_methodology = os.path.expanduser("~/.jarvis/methodology")
     if not os.path.exists(user_jarvis_methodology):
         return ""
@@ -368,62 +298,17 @@ def load_methodology(user_input: str) -> str:
         with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        # Reset data structure
-        methodology_data = []
-        vectors = []
-        ids = []
-
-        # Get embedding model
-        embedding_model = load_embedding_model()
         
-        # Create test embedding to get correct dimension
-        test_embedding = _create_methodology_embedding(embedding_model, "test")
-        embedding_dimension = len(test_embedding)
-
-        # Create embedding vector for each methodology
-        for i, (key, value) in enumerate(data.items()):
-            PrettyOutput.print(f"Vectorizing methodology: {key} ...", OutputType.INFO)
-            methodology_text = f"{key}\n{value}"
-            embedding = _create_methodology_embedding(embedding_model, methodology_text)
-            vectors.append(embedding)
-            ids.append(i)
-            methodology_data.append({"key": key, "value": value})
-
-        if vectors:
-            vectors_array = np.vstack(vectors)
-            # Use correct dimension from test embedding
-            hnsw_index = faiss.IndexHNSWFlat(embedding_dimension, 16)
-            hnsw_index.hnsw.efConstruction = 40
-            hnsw_index.hnsw.efSearch = 16
-            methodology_index = faiss.IndexIDMap(hnsw_index)
-            methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
-            query_embedding = _create_methodology_embedding(embedding_model, user_input)
-            k = min(5, len(methodology_data))
-            PrettyOutput.print(f"Retrieving methodology...", OutputType.INFO)
-            distances, indices = methodology_index.search(
-                query_embedding.reshape(1, -1), k
-            ) # type: ignore
-
-            relevant_methodologies = {}
-            for dist, idx in zip(distances[0], indices[0]):
-                if idx >= 0:
-                    similarity = 1.0 / (1.0 + float(dist))
-                    methodology = methodology_data[idx]
-                    PrettyOutput.print(
-                        f"Methodology '{methodology['key']}' similarity: {similarity:.3f}",
-                        OutputType.INFO
-                    )
-                    if similarity >= 0.5:
-                        relevant_methodologies[methodology["key"]] = methodology["value"]
-                    
-            if relevant_methodologies:
-                return f"""This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it:
-                        {relevant_methodologies}
-                        """
-        return ""
+        ret = """This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it:"""
+        for k, v in data.items():
+            ret += f"\n{k}: {v}\n"
+        return ret
 
     except Exception as e:
         PrettyOutput.print(f"Error loading methodology: {str(e)}", OutputType.ERROR)
         import traceback
         PrettyOutput.print(f"Error trace: {traceback.format_exc()}", OutputType.INFO)
         return ""
+    
+def no_embedding() -> bool:
+    return bool(os.environ.get("JARVIS_NO_EMBEDDING", ""))
