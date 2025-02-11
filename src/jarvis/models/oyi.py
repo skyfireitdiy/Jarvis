@@ -14,6 +14,7 @@ class OyiModel(BasePlatform):
 
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
+        self.get_available_models()
         return [(name,info['desc']) for name,info in self.models.items()]
     
     def __init__(self):
