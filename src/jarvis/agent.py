@@ -59,7 +59,22 @@ name: tool_name
 arguments:
     param1: value1
     param2: value2
-</TOOL_CALL>"""
+</TOOL_CALL>
+
+Strict Rules:
+- Execute only one tool at a time
+- Tool execution must strictly follow the tool usage format
+- Wait for user to provide execution results
+- Don't assume or imagine results
+- Don't create fake dialogues
+- If current information is insufficient, you may ask the user
+- Not all problem-solving steps are mandatory, skip as appropriate
+- Request user guidance when multiple iterations show no progress
+- If yaml string contains colons, wrap the entire string in quotes to avoid yaml parsing errors
+- Use | syntax for multi-line strings in yaml
+- If you can start executing the task, please start directly without asking the user if you can begin.
+
+"""
 
         # Process line by line
         for line in lines:
@@ -412,19 +427,6 @@ Methodology Template:
 1. Problem Restatement
 2. Optimal Solution
 3. Optimal Solution Steps (exclude failed actions)
-                                          
-Strict Rules:
-- Execute only one tool at a time
-- Tool execution must strictly follow the tool usage format
-- Wait for user to provide execution results
-- Don't assume or imagine results
-- Don't create fake dialogues
-- If current information is insufficient, you may ask the user
-- Not all problem-solving steps are mandatory, skip as appropriate
-- Request user guidance when multiple iterations show no progress
-- If yaml string contains colons, wrap the entire string in quotes to avoid yaml parsing errors
-- Use | syntax for multi-line strings in yaml
-- If you can start executing the task, please start directly without asking the user if you can begin.
 
 -------------------------------------------------------------"""
 
