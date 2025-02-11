@@ -30,9 +30,7 @@ class AI8Model(BasePlatform):
         
         
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
-        if self.model_name not in self.get_available_models():
-            PrettyOutput.print(f"Warning: The selected model {self.model_name} is not in the available list", OutputType.WARNING)
-        
+
 
     def set_model_name(self, model_name: str):
         """Set model name"""

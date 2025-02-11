@@ -126,6 +126,11 @@ class ToolRegistry:
                     hasattr(item, 'name') and 
                     hasattr(item, 'description') and 
                     hasattr(item, 'parameters')):
+
+                    if hasattr(item, "check"):
+                        if not item.check():
+                            PrettyOutput.print(f"Tool {item.name} check failed, skipping", OutputType.INFO)
+                            continue
                     
                     # Instantiate the tool class, passing in the model and output processor
                     tool_instance = item()
@@ -141,7 +146,7 @@ class ToolRegistry:
                     break
                     
             if not tool_found:
-                PrettyOutput.print(f"No valid tool class found in the file: {p_file_path}", OutputType.WARNING)
+                PrettyOutput.print(f"No valid tool class found in the file: {p_file_path}", OutputType.INFO)
                 return False
                 
             return True

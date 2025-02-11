@@ -8,7 +8,7 @@ import yaml
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools import ToolRegistry
 from jarvis.tools.registry import load_tools
-from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, load_embedding_model, init_env
+from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env
 import os
 
 class Agent:
@@ -35,29 +35,9 @@ class Agent:
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
         # Load configuration from environment variables
-        self.embedding_dimension = 1536  # Default for many embedding models
+        
         self.max_context_length = get_max_context_length()
         
-        # Initialize embedding model
-        try:
-            self.embedding_model = load_embedding_model()
-            
-            # Warm up model and get correct dimension
-            test_text = "This is a test text to ensure the model is fully loaded."
-            test_embedding = self.embedding_model.encode(
-                test_text, 
-                convert_to_tensor=True,
-                normalize_embeddings=True
-            )
-            self.embedding_dimension = len(test_embedding)
-            PrettyOutput.print("Successfully loaded embedding model", OutputType.SUCCESS)
-            
-            # Initialize HNSW index (use correct dimension)
-            
-            
-        except Exception as e:
-            PrettyOutput.print(f"Failed to load embedding model: {str(e)}", OutputType.ERROR)
-            raise
             
         # Initialize methodology related attributes
         self.methodology_data = []
@@ -441,7 +421,6 @@ Strict Rules:
 - Don't create fake dialogues
 - If current information is insufficient, you may ask the user
 - Not all problem-solving steps are mandatory, skip as appropriate
-- Ask user before executing tools that might damage system or user's codebase
 - Request user guidance when multiple iterations show no progress
 - If yaml string contains colons, wrap the entire string in quotes to avoid yaml parsing errors
 - Use | syntax for multi-line strings in yaml
@@ -459,7 +438,7 @@ def main():
 
     try:
         # 获取全局模型实例
-        agent = Agent(system_prompt=origin_agent_system_prompt)
+        agent = Agent(system_prompt=origin_agent_system_prompt, tool_registry=ToolRegistry())
 
         # 加载预定义任务
         tasks = load_tasks()
