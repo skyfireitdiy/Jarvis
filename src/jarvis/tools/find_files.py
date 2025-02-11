@@ -77,7 +77,7 @@ class FindFilesTool:
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The search query or requirement description"
+                "description": "The search query or requirement description, you should give me more details about the search to make it more accurate"
             }
         },
         "required": ["query"]
