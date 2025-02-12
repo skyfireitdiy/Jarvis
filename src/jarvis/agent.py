@@ -433,7 +433,8 @@ When users need to execute tasks, you will strictly follow these steps to handle
 7. Execute Action Plan: Execute one step at a time, **use at most one tool** (wait for tool execution results before proceeding)
 8. Monitor and Adjust: If execution results don't match expectations, reflect and adjust the action plan, iterate previous steps
 9. Methodology: If the current task has general applicability and valuable experience is gained, use methodology tools to record it for future similar problems
-10. Task Completion: End the task using task completion command when finished
+10. Check the task goal completion status: If the task goal is completed, use the task completion command to end the task
+11. Task Completion: End the task using task completion command when finished
 
 Methodology Template:
 1. Problem Restatement
