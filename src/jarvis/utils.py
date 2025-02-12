@@ -168,8 +168,7 @@ class PrettyOutput:
             # Progress messages with spinner
             console.print(Panel(
                 Text(text, style="blue"),
-                border_style=output_type.value,
-                subtitle="[progress]"
+                border_style=output_type.value
             ))
             
         elif output_type == OutputType.TOOL:
