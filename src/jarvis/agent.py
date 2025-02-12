@@ -15,7 +15,7 @@ class Agent:
     def __del__(self):
         delete_current_agent()
         
-    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False, tool_registry: Optional[ToolRegistry] = None):
+    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False, tool_registry: Optional[ToolRegistry] = None, platform: Optional[BasePlatform] = None):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -23,10 +23,14 @@ class Agent:
             name: Agent name, default is "Jarvis"
             is_sub_agent: Whether it is a sub-agent, default is False
             tool_registry: Tool registry instance
+            platform: Optional platform instance, default uses normal platform
         """
         add_agent(name)
         PrettyOutput.print(f"Welcome to Jarvis, your AI assistant, Initiating...", OutputType.SYSTEM)
-        self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        if platform is not None:
+            self.model = platform
+        else:
+            self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         self.tool_registry = tool_registry if tool_registry else ToolRegistry()
         self.name = name
         self.is_sub_agent = is_sub_agent
