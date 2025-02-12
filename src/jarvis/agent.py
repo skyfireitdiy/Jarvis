@@ -188,36 +188,29 @@ Please continue the task based on the above information.
         PrettyOutput.section("Task completed", OutputType.SUCCESS)
         
         if not self.is_sub_agent:
-            # 询问是否生成方法论，带输入验证
-            while True:
-                user_input = get_single_line_input("Generate methodology for this task? (y/n)").strip().lower()
-                if user_input in ['y', 'n', '']:
-                    break
-                PrettyOutput.print("Invalid input, please enter y or n", OutputType.WARNING)
-            
-            if user_input == 'y':
-                try:
-                    # 让模型判断是否需要生成方法论
-                    analysis_prompt = """The current task has ended, please analyze whether a methodology needs to be generated.
+
+            try:
+                # 让模型判断是否需要生成方法论
+                analysis_prompt = """The current task has ended, please analyze whether a methodology needs to be generated.
 If you think a methodology should be generated, first determine whether to create a new methodology or update an existing one. If updating an existing methodology, use 'update', otherwise use 'add'.
 If you think a methodology is not needed, please explain why.
 The methodology should be applicable to general scenarios, do not include task-specific information such as code commit messages.
 The methodology should include: problem restatement, optimal solution, notes (as needed), and nothing else.
 Only output the methodology tool call instruction, or the explanation for not generating a methodology. Do not output anything else.
 """
-                    self.prompt = analysis_prompt
-                    response = self._call_model(self.prompt)
-                    
-                    # 检查是否包含工具调用
-                    try:
-                        tool_calls = Agent.extract_tool_calls(response)
-                        if tool_calls:
-                            self.tool_registry.handle_tool_calls(tool_calls)
-                    except Exception as e:
-                        PrettyOutput.print(f"Failed to handle methodology generation: {str(e)}", OutputType.ERROR)
-                    
+                self.prompt = analysis_prompt
+                response = self._call_model(self.prompt)
+                
+                # 检查是否包含工具调用
+                try:
+                    tool_calls = Agent.extract_tool_calls(response)
+                    if tool_calls:
+                        self.tool_registry.handle_tool_calls(tool_calls)
                 except Exception as e:
-                    PrettyOutput.print(f"Error generating methodology: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"Failed to handle methodology generation: {str(e)}", OutputType.ERROR)
+                
+            except Exception as e:
+                PrettyOutput.print(f"Error generating methodology: {str(e)}", OutputType.ERROR)
             
             return "Task completed"
         
