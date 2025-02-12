@@ -64,7 +64,7 @@ class SubAgentTool:
             # Create sub-agent
             sub_agent = Agent(
                 system_prompt=origin_agent_system_prompt,
-                name=agent_name,
+                name=f"Agent({agent_name})",
                 is_sub_agent=True,
                 tool_registry=tool_registry
             )
