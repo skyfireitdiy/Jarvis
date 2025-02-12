@@ -246,6 +246,12 @@ Please describe in concise bullet points, highlighting important information.
         Returns:
             str: Task summary report
         """
+
+        complete_prompt = """
+        When the task is completed, you should print the following message:
+        <!!!COMPLETE!!!>
+        """
+
         try:
             PrettyOutput.section("Preparing environment", OutputType.PLANNING)
             if file_list:
@@ -266,6 +272,8 @@ Please describe in concise bullet points, highlighting important information.
 {tools_prompt}
 
 {methodology_prompt}
+
+{complete_prompt}
 """)
             self.prompt = f"{user_input}"
 
@@ -296,6 +304,9 @@ Please describe in concise bullet points, highlighting important information.
                         tool_result = self.tool_registry.handle_tool_calls(result)
                         self.prompt = tool_result
                         continue
+
+                    if "<!!!COMPLETE!!!>" in current_response:
+                        return self._complete_task()
                     
                     # 获取用户输入
                     user_input = get_multiline_input(f"{self.name}: You can continue to input, or enter an empty line to end the current task")
