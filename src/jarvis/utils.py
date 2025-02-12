@@ -395,7 +395,6 @@ def load_methodology(user_input: str) -> str:
 
         # Create embedding vector for each methodology
         for i, (key, value) in enumerate(data.items()):
-            PrettyOutput.print(f"Vectorizing methodology: {key} ...", OutputType.INFO)
             methodology_text = f"{key}\n{value}"
             embedding = _create_methodology_embedding(embedding_model, methodology_text)
             vectors.append(embedding)

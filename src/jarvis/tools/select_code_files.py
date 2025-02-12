@@ -1,7 +1,7 @@
 from typing import Dict, Any, List
 
 from jarvis.utils import OutputType, PrettyOutput
-from jarvis.jarvis_coder.file_select import select_files
+from jarvis.jarvis_code_agent.file_select import select_files
 
 
 class CodeFileSelecterTool:
