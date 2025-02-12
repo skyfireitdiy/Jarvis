@@ -19,18 +19,21 @@ class OpenAIModel(BasePlatform):
         self.system_message = ""
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
-            PrettyOutput.print("\nNeed to set the following environment variables to use OpenAI model:", OutputType.INFO)
-            PrettyOutput.print("  • OPENAI_API_KEY: API key", OutputType.INFO)
-            PrettyOutput.print("  • OPENAI_API_BASE: (optional) API base address, default using https://api.openai.com/v1", OutputType.INFO)
-            PrettyOutput.print("\nYou can set them in the following ways:", OutputType.INFO)
-            PrettyOutput.print("1. Create or edit ~/.jarvis/env file:", OutputType.INFO)
-            PrettyOutput.print("   OPENAI_API_KEY=your_api_key", OutputType.INFO)
-            PrettyOutput.print("   OPENAI_API_BASE=your_api_base", OutputType.INFO)
-            PrettyOutput.print("   OPENAI_MODEL_NAME=your_model_name", OutputType.INFO)
-            PrettyOutput.print("\n2. Or set the environment variables directly:", OutputType.INFO)
-            PrettyOutput.print("   export OPENAI_API_KEY=your_api_key", OutputType.INFO)
-            PrettyOutput.print("   export OPENAI_API_BASE=your_api_base", OutputType.INFO)
-            PrettyOutput.print("   export OPENAI_MODEL_NAME=your_model_name", OutputType.INFO)
+            message = (
+                "Need to set the following environment variables to use OpenAI model:\n"
+                "  • OPENAI_API_KEY: API key\n" 
+                "  • OPENAI_API_BASE: (optional) API base address, default using https://api.openai.com/v1\n"
+                "You can set them in the following ways:\n"
+                "1. Create or edit ~/.jarvis/env file:\n"
+                "   OPENAI_API_KEY=your_api_key\n"
+                "   OPENAI_API_BASE=your_api_base\n" 
+                "   OPENAI_MODEL_NAME=your_model_name\n"
+                "2. Or set the environment variables directly:\n"
+                "   export OPENAI_API_KEY=your_api_key\n"
+                "   export OPENAI_API_BASE=your_api_base\n"
+                "   export OPENAI_MODEL_NAME=your_model_name"
+            )
+            PrettyOutput.print(message, OutputType.INFO)
             PrettyOutput.print("OPENAI_API_KEY is not set", OutputType.WARNING)
             
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
