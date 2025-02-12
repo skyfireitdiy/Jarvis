@@ -258,9 +258,10 @@ def select_issue(issues: List[Dict]) -> Optional[Dict]:
         PrettyOutput.print("No issues found.", OutputType.WARNING)
         return None
     
-    PrettyOutput.print("Available Issues:", OutputType.INFO)
+    out = "Available Issues:\n"
     for i, issue in enumerate(issues, 1):
-        print(f"{i}. #{issue['number']} - {issue['title']}")
+        out += f"{i}. #{issue['number']} - {issue['title']}\n"
+    PrettyOutput.print(out, OutputType.INFO)
     
     while True:
         try:
