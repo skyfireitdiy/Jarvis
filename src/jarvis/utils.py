@@ -19,6 +19,17 @@ import torch
 import yaml
 import faiss
 
+from rich.console import Console
+from rich.theme import Theme
+from rich.panel import Panel
+from rich.text import Text
+from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.traceback import install as install_rich_traceback
+from rich.markdown import Markdown
+from rich.syntax import Syntax
+from rich.padding import Padding
+
 # 初始化colorama
 colorama.init()
 
@@ -26,6 +37,27 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 current_agent = []
+
+# Install rich traceback handler
+install_rich_traceback()
+
+# Create console with custom theme
+custom_theme = Theme({
+    "info": "yellow",
+    "warning": "yellow",
+    "error": "red",
+    "success": "green",
+    "system": "cyan",
+    "code": "green",
+    "result": "blue",
+    "planning": "magenta",
+    "progress": "white",
+    "debug": "blue",
+    "user": "green",
+    "tool": "yellow",
+})
+
+console = Console(theme=custom_theme)
 
 def add_agent(agent_name: str):
     current_agent.append(agent_name)
@@ -51,25 +83,9 @@ class OutputType(Enum):
     TOOL = "tool"         # Tool call
 
 class PrettyOutput:
-    """美化输出类"""
+    """Pretty output using rich"""
     
-    # 颜色方案 - 只使用前景色
-    COLORS = {
-        OutputType.SYSTEM: Fore.CYAN,      # Cyan - AI assistant
-        OutputType.CODE: Fore.GREEN,       # Green - Code
-        OutputType.RESULT: Fore.BLUE,      # Blue - Result
-        OutputType.ERROR: Fore.RED,        # Red - Error
-        OutputType.INFO: Fore.YELLOW,      # Yellow - Prompt
-        OutputType.PLANNING: Fore.MAGENTA, # Magenta - Planning
-        OutputType.PROGRESS: Fore.WHITE,   # White - Progress
-        OutputType.SUCCESS: Fore.GREEN,    # Green - Success
-        OutputType.WARNING: Fore.YELLOW,   # Yellow - Warning
-        OutputType.DEBUG: Fore.BLUE,       # Blue - Debug
-        OutputType.USER: Fore.GREEN,       # Green - User
-        OutputType.TOOL: Fore.YELLOW,      # Yellow - Tool
-    }
-    
-    # 图标方案
+    # Icons for different output types
     ICONS = {
         OutputType.SYSTEM: "🤖",    # Robot - AI assistant
         OutputType.CODE: "📝",      # Notebook - Code
@@ -84,67 +100,118 @@ class PrettyOutput:
         OutputType.USER: "👤",      # User - User
         OutputType.TOOL: "🔧",      # Wrench - Tool
     }
-    
-    # 前缀方案
-    PREFIXES = {
-        OutputType.SYSTEM: "Assistant",
-        OutputType.CODE: "Code",
-        OutputType.RESULT: "Result",
-        OutputType.ERROR: "Error",
-        OutputType.INFO: "Info",
-        OutputType.PLANNING: "Plan",
-        OutputType.PROGRESS: "Progress",
-        OutputType.SUCCESS: "Success",
-        OutputType.WARNING: "Warning",
-        OutputType.DEBUG: "Debug",
-        OutputType.USER: "User",
-        OutputType.TOOL: "Tool",
-    }
 
     @staticmethod
-    def format(text: str, output_type: OutputType, timestamp: bool = True) -> str:
-        """Format output text"""
-        color = PrettyOutput.COLORS.get(output_type, "")
+    def format(text: str, output_type: OutputType, timestamp: bool = True) -> Text:
+        """Format output text using rich Text"""
+        # Create rich Text object
+        formatted = Text()
+        
+        # Add timestamp and agent info
+        if timestamp:
+            formatted.append(f"[{get_agent_list()}]", style="blue")
+            formatted.append(f"[{datetime.now().strftime('%H:%M:%S')}] ", style="white")
+        
+        # Add icon
         icon = PrettyOutput.ICONS.get(output_type, "")
-        prefix = PrettyOutput.PREFIXES.get(output_type, "")
+        formatted.append(f"{icon} ", style=output_type.value)
         
-        # 添加时间戳 - 使用白色
-        time_str = f"{Fore.BLUE}[{get_agent_list()}]{ColoramaStyle.RESET_ALL}{Fore.WHITE}[{datetime.now().strftime('%H:%M:%S')}]{ColoramaStyle.RESET_ALL} " if timestamp else ""
-        
-        # 格式化输出
-        formatted_text = f"{time_str}{color}{icon} {prefix}: {text}{ColoramaStyle.RESET_ALL}"
-        
-        return formatted_text
+        return formatted
 
     @staticmethod
     def print(text: str, output_type: OutputType, timestamp: bool = True):
-        """Print formatted output"""
-        print(PrettyOutput.format(text, output_type, timestamp))
-        if output_type == OutputType.ERROR:
-            import traceback
-            PrettyOutput.print(f"Error trace: {traceback.format_exc()}", OutputType.INFO)
+        """Print formatted output using rich console"""
+        # Get formatted header
+        header = PrettyOutput.format("", output_type, timestamp)
+        console.print(header)
+
+        # Create panel with content
+        if output_type == OutputType.CODE:
+            # Syntax highlighting for code
+            code = Syntax(text, "python", theme="monokai", line_numbers=True)
+            console.print(Panel(code, border_style=output_type.value))
+            
+        elif output_type == OutputType.ERROR:
+            # Error messages with stack trace
+            console.print(Panel(Text(text, style="red bold"), border_style="red"))
+            console.print_exception()
+            
+        elif output_type == OutputType.PLANNING:
+            # Markdown formatting for planning
+            console.print(Panel(Markdown(text), border_style=output_type.value))
+            
+        elif output_type == OutputType.RESULT:
+            # Syntax highlighting for results if it looks like code
+            if text.strip().startswith(("def ", "class ", "import ", "from ")):
+                result = Syntax(text, "python", theme="monokai")
+            else:
+                result = Text(text, style="blue")
+            console.print(Panel(result, border_style=output_type.value))
+            
+        elif output_type == OutputType.SYSTEM:
+            # Assistant messages with markdown support
+            console.print(Panel(Markdown(text), border_style=output_type.value))
+            
+        elif output_type == OutputType.INFO:
+            # Info messages with yellow highlight
+            console.print(Panel(Text(text, style="yellow"), border_style=output_type.value))
+            
+        elif output_type == OutputType.WARNING:
+            # Warning messages in yellow box
+            console.print(Panel(Text(text, style="yellow"), border_style=output_type.value))
+            
+        elif output_type == OutputType.SUCCESS:
+            # Success messages in green
+            console.print(Panel(Text(text, style="green bold"), border_style=output_type.value))
+            
+        elif output_type == OutputType.PROGRESS:
+            # Progress messages with spinner
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                progress.add_task(text)
+            
+        elif output_type == OutputType.TOOL:
+            # Tool calls in yellow box with code style
+            console.print(Panel(
+                Syntax(text, "yaml", theme="monokai"),
+                border_style=output_type.value
+            ))
+            
+        elif output_type == OutputType.DEBUG:
+            # Debug messages in blue
+            console.print(Panel(Text(text, style="blue dim"), border_style=output_type.value))
+            
+        elif output_type == OutputType.USER:
+            # User input in green
+            console.print(Panel(Text(text, style="green"), border_style=output_type.value))
+            
+        else:
+            # Default text output with header
+            console.print(Panel(Text(text, style=output_type.value), border_style=output_type.value))
 
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):
-        """Print paragraph title with separator"""
-        width = 100
-        color = PrettyOutput.COLORS.get(output_type, "")
-        print(f"\n{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}")
-        PrettyOutput.print(title.center(width - 25), output_type, timestamp=False)
-        print(f"{color}" + "=" * width + f"{ColoramaStyle.RESET_ALL}\n")
+        """Print section title in a panel"""
+        panel = Panel(
+            Text(title, style=output_type.value, justify="center"),
+            border_style=output_type.value
+        )
+        console.print()
+        console.print(panel)
+        console.print()
 
     @staticmethod
     def print_stream(text: str):
-        """Print stream output, no line break"""
-        color = PrettyOutput.COLORS.get(OutputType.SYSTEM, "")
-        sys.stdout.write(f"{color}{text}{ColoramaStyle.RESET_ALL}")
-        sys.stdout.flush()
+        """Print stream output without line break"""
+        console.print(text, style="system", end="")
 
     @staticmethod
     def print_stream_end():
-        """Stream output end, print line break"""
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+        """End stream output with line break"""
+        console.print()
 
 def get_single_line_input(tip: str) -> str:
     """Get single line input, support direction key, history function, etc."""
