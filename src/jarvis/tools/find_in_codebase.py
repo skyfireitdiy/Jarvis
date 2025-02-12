@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from jarvis.utils import OutputType, PrettyOutput, find_git_root
+from jarvis.utils import OutputType, PrettyOutput, dont_use_local_model, find_git_root
 from jarvis.jarvis_codebase.main import CodeBase
 
 class FindInCodebaseTool:
@@ -22,6 +22,10 @@ class FindInCodebaseTool:
         },
         "required": ["query"]
     }
+
+    @staticmethod
+    def check() -> bool:
+        return not dont_use_local_model()
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute the search

@@ -1,6 +1,6 @@
 from typing import Dict, Any
 import os
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.utils import OutputType, PrettyOutput, dont_use_local_model
 from jarvis.jarvis_rag.main import RAGTool as RAGCore
 
 class RAGTool:
@@ -25,6 +25,10 @@ class RAGTool:
         },
         "required": ["dir", "question"]
     }
+
+    @staticmethod
+    def check() -> bool:
+        return not dont_use_local_model()
 
     def __init__(self):
         """Initialize RAG tool"""
