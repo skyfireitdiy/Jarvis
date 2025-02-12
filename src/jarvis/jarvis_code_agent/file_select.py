@@ -160,7 +160,7 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
         )
         
         while True:
-            PrettyOutput.print("\nPlease enter the file path to supplement (support Tab completion and *? wildcard, input empty line to end):", OutputType.INFO)
+            PrettyOutput.print("Please enter the file path to supplement (support Tab completion and *? wildcard, input empty line to end):", OutputType.INFO)
             try:
                 file_path = session.prompt(">>> ").strip()
             except KeyboardInterrupt:
@@ -177,7 +177,7 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
                     continue
                     
                 # Display matching files
-                PrettyOutput.print("\nFound the following matching files:", OutputType.INFO)
+                PrettyOutput.print("Found the following matching files:", OutputType.INFO)
                 for i, path in enumerate(matches, 1):
                     PrettyOutput.print(f"[{i}] {path}", OutputType.INFO)
                     

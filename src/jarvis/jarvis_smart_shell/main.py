@@ -13,7 +13,7 @@ from jarvis.utils import PrettyOutput, OutputType, init_env
 def execute_command(command: str) -> None:
     """Show command and allow user to edit, then execute, Ctrl+C to cancel"""
     try:
-        print("\nGenerated command (can be edited, press Enter to execute, Ctrl+C to cancel):")
+        print("Generated command (can be edited, press Enter to execute, Ctrl+C to cancel):")
         # Pre-fill input line
         readline.set_startup_hook(lambda: readline.insert_text(command))
         try:
@@ -21,7 +21,7 @@ def execute_command(command: str) -> None:
             if edited_command.strip():  # Ensure command is not empty
                 os.system(edited_command)
         except KeyboardInterrupt:
-            print("\nExecution cancelled")
+            print("Execution cancelled")
         finally:
             readline.set_startup_hook()  # Clear pre-filled
     except Exception as e:
