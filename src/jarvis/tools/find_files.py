@@ -95,8 +95,9 @@ class FindFilesTool:
 
             PrettyOutput.print(f"Creating Find Files agent to search for: {query}", OutputType.INFO)
 
+
             tool_registry = ToolRegistry()
-            tool_registry.use_tools(["ask_user", "execute_shell", "file_operation", "find_in_codebase", "select_file"])
+            tool_registry.dont_use_tools(["find_files"])
 
             # Create find files agent
             find_agent = Agent(

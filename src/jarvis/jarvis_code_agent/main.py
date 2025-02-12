@@ -136,13 +136,8 @@ def main():
 
 
     try:
-        tool_registry = ToolRegistry()
-        tool_registry.dont_use_tools(["create_sub_agent"])
-        tool_registry.use_tools(["ask_codebase"])
-      
-
         # Get global model instance
-        agent = Agent(system_prompt=system_prompt, name="Jarvis Code Agent", tool_registry=tool_registry)
+        agent = Agent(system_prompt=system_prompt, name="Jarvis Code Agent")
 
         # Interactive mode
         while True:

@@ -59,14 +59,12 @@ class SubAgentTool:
             if goal:
                 task_description += f"\n\nCompletion goal:\n{goal}"
 
-            tool_registry = ToolRegistry()
 
             # Create sub-agent
             sub_agent = Agent(
                 system_prompt=origin_agent_system_prompt,
                 name=f"Agent({agent_name})",
-                is_sub_agent=True,
-                tool_registry=tool_registry
+                is_sub_agent=True
             )
 
             # Run sub-agent, pass file list

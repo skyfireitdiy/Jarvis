@@ -2,6 +2,7 @@ from typing import Dict, Any
 import subprocess
 import yaml
 from jarvis.models.registry import PlatformRegistry
+from jarvis.tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput, init_env, find_git_root
 from jarvis.agent import Agent
 
@@ -94,11 +95,15 @@ OUTPUT REQUIREMENTS:
 - Highlight security risks clearly
 - Separate technical debt from blockers"""
 
+            tool_registry = ToolRegistry()
+            tool_registry.dont_use_tools(["code_review"])
+
             review_agent = Agent(
                 name="Code Review Agent",
                 platform=PlatformRegistry().get_thinking_platform(),
                 system_prompt=system_prompt,
-                is_sub_agent=True
+                is_sub_agent=True,
+                tool_registry=tool_registry
             )
             
             result = review_agent.run(

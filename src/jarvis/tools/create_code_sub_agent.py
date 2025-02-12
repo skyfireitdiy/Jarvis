@@ -32,14 +32,11 @@ class CodeSubAgentTool:
 
             PrettyOutput.print(f"Creating code sub-agent {name} for subtask: {subtask}", OutputType.INFO)
 
-            tool_registry = ToolRegistry()
-
             # Create sub-agent
             sub_agent = Agent(
                 system_prompt=system_prompt,
                 name=f"Coder({name})",
                 is_sub_agent=True,
-                tool_registry=tool_registry
             )
 
             # Execute subtask
