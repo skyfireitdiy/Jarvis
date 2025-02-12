@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from jarvis.utils import OutputType, PrettyOutput, find_git_root
+from jarvis.utils import OutputType, PrettyOutput, dont_use_local_model, find_git_root
 from jarvis.jarvis_codebase.main import CodeBase
 
 class AskCodebaseTool:
@@ -22,6 +22,9 @@ class AskCodebaseTool:
         },
         "required": ["question"]
     }
+
+    def check() -> bool:
+        return not dont_use_local_model()
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Execute codebase analysis using CodeBase

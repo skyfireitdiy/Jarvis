@@ -240,10 +240,13 @@ Please describe in concise bullet points, highlighting important information.
             str: Task summary report
         """
 
-        complete_prompt = """
-        When the task is completed, you should print the following message:
-        <!!!COMPLETE!!!>
-        """
+        complete_prompt = """"""
+
+        if os.environ.get("JARVIS_AUTO_COMPLETE"):
+            complete_prompt = """
+            When the task is completed, you should print the following message:
+            <!!!COMPLETE!!!>
+            """
 
         try:
             PrettyOutput.section("Preparing environment", OutputType.PLANNING)
