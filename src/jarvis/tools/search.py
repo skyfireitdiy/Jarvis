@@ -211,17 +211,19 @@ def main():
         PrettyOutput.print(f"\nFound {len(results)} results:", OutputType.INFO)
         
         for i, result in enumerate(results[:args.max], 1):
-            PrettyOutput.print(f"\n{'-'*50}", OutputType.INFO)
+            output = []
+            output.append(f"\n{'-'*50}")
             if args.url_only:
-                PrettyOutput.print(f"{i}. {result['href']}", OutputType.INFO)
+                output.append(f"{i}. {result['href']}")
             else:
-                PrettyOutput.print(f"{i}. {result['title']}", OutputType.INFO)
-                PrettyOutput.print(f"Link: {result['href']}", OutputType.INFO)
+                output.append(f"{i}. {result['title']}")
+                output.append(f"Link: {result['href']}")
                 if result['abstract']:
-                    PrettyOutput.print(f"Abstract: {result['abstract']}", OutputType.INFO)
+                    output.append(f"Abstract: {result['abstract']}")
+            PrettyOutput.print("\n".join(output), OutputType.INFO)
                     
     except KeyboardInterrupt:
-        PrettyOutput.print("\nSearch cancelled", OutputType.WARNING)
+        PrettyOutput.print("Search cancelled", OutputType.WARNING)
         sys.exit(1)
     except Exception as e:
         PrettyOutput.print(f"Execution error: {str(e)}", OutputType.ERROR)

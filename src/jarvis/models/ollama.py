@@ -25,18 +25,24 @@ class OllamaPlatform(BasePlatform):
             available_models = [model["name"] for model in response.json().get("models", [])]
             
             if not available_models:
-                PrettyOutput.print("\nNeed to download Ollama model first to use:", OutputType.INFO)
-                PrettyOutput.print("1. Install Ollama: https://ollama.ai", OutputType.INFO)
-                PrettyOutput.print("2. Download model:", OutputType.INFO)
-                PrettyOutput.print(f"   ollama pull {self.model_name}", OutputType.INFO)
+                message = (
+                    "Need to download Ollama model first to use:\n"
+                    "1. Install Ollama: https://ollama.ai\n"
+                    "2. Download model:\n"
+                    f"   ollama pull {self.model_name}"
+                )
+                PrettyOutput.print(message, OutputType.INFO)
                 PrettyOutput.print("Ollama has no available models", OutputType.WARNING)
                 
         except requests.exceptions.ConnectionError:
-            PrettyOutput.print("\nOllama service is not started or cannot be connected", OutputType.WARNING)
-            PrettyOutput.print("Please ensure that you have:", OutputType.INFO)
-            PrettyOutput.print("1. Installed Ollama: https://ollama.ai", OutputType.INFO)
-            PrettyOutput.print("2. Started Ollama service", OutputType.INFO)
-            PrettyOutput.print("3. Service address configured correctly (default: http://localhost:11434)", OutputType.INFO)
+            message = (
+                "Ollama service is not started or cannot be connected\n"
+                "Please ensure that you have:\n"
+                "1. Installed Ollama: https://ollama.ai\n"
+                "2. Started Ollama service\n"
+                "3. Service address configured correctly (default: http://localhost:11434)"
+            )
+            PrettyOutput.print(message, OutputType.WARNING)
             
             
         self.messages = []
@@ -136,10 +142,10 @@ if __name__ == "__main__":
         ollama = OllamaPlatform()
         while True:
             try:
-                message = get_single_line_input("\nInput question (Ctrl+C to exit)")
+                message = get_single_line_input("Input question (Ctrl+C to exit)")
                 ollama.chat_until_success(message)
             except KeyboardInterrupt:
-                print("\nGoodbye!")
+                print("Goodbye!")
                 break
     except Exception as e:
         PrettyOutput.print(f"Program exited with an exception: {str(e)}", OutputType.ERROR)

@@ -258,13 +258,13 @@ def select_issue(issues: List[Dict]) -> Optional[Dict]:
         PrettyOutput.print("No issues found.", OutputType.WARNING)
         return None
     
-    PrettyOutput.print("\nAvailable Issues:", OutputType.INFO)
+    PrettyOutput.print("Available Issues:", OutputType.INFO)
     for i, issue in enumerate(issues, 1):
         print(f"{i}. #{issue['number']} - {issue['title']}")
     
     while True:
         try:
-            choice = get_single_line_input("\nSelect an issue number (or 0 to exit): ")
+            choice = get_single_line_input("Select an issue number (or 0 to exit): ")
             if not choice or choice == "0":
                 return None
             

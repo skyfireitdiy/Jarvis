@@ -25,21 +25,24 @@ class KimiModel(BasePlatform):
         self.chat_id = ""
         self.api_key = os.getenv("KIMI_API_KEY")
         if not self.api_key:
-            PrettyOutput.print("\nNeed to set KIMI_API_KEY to use Jarvis. Please follow the steps below:", OutputType.INFO)
-            PrettyOutput.print("\n1. Get Kimi API Key:", OutputType.INFO)
-            PrettyOutput.print("   • Visit Kimi AI platform: https://kimi.moonshot.cn", OutputType.INFO)
-            PrettyOutput.print("   • Login to your account", OutputType.INFO)
-            PrettyOutput.print("   • Open browser developer tools (F12 or right-click -> Inspect)", OutputType.INFO)
-            PrettyOutput.print("   • Switch to the Network tab", OutputType.INFO)
-            PrettyOutput.print("   • Send any message", OutputType.INFO)
-            PrettyOutput.print("   • Find the Authorization header in the request", OutputType.INFO)
-            PrettyOutput.print("   • Copy the token value (remove the 'Bearer ' prefix)", OutputType.INFO)
-            PrettyOutput.print("\n2. Set environment variable:", OutputType.INFO)
-            PrettyOutput.print("   • Method 1: Create or edit ~/.jarvis/env file:", OutputType.INFO)
-            PrettyOutput.print("   echo 'KIMI_API_KEY=your_key_here' > ~/.jarvis/env", OutputType.INFO)
-            PrettyOutput.print("\n   • Method 2: Set environment variable directly:", OutputType.INFO)
-            PrettyOutput.print("   export KIMI_API_KEY=your_key_here", OutputType.INFO)
-            PrettyOutput.print("\nAfter setting, run Jarvis again.", OutputType.INFO)
+            message = (
+                "Need to set KIMI_API_KEY to use Jarvis. Please follow the steps below:\n"
+                "1. Get Kimi API Key:\n"
+                "   • Visit Kimi AI platform: https://kimi.moonshot.cn\n"
+                "   • Login to your account\n" 
+                "   • Open browser developer tools (F12 or right-click -> Inspect)\n"
+                "   • Switch to the Network tab\n"
+                "   • Send any message\n"
+                "   • Find the Authorization header in the request\n"
+                "   • Copy the token value (remove the 'Bearer ' prefix)\n"
+                "2. Set environment variable:\n"
+                "   • Method 1: Create or edit ~/.jarvis/env file:\n"
+                "   echo 'KIMI_API_KEY=your_key_here' > ~/.jarvis/env\n"
+                "   • Method 2: Set environment variable directly:\n"
+                "   export KIMI_API_KEY=your_key_here\n"
+                "After setting, run Jarvis again."
+            )
+            PrettyOutput.print(message, OutputType.INFO)
             PrettyOutput.print("KIMI_API_KEY is not set", OutputType.WARNING)
         self.auth_header = f"Bearer {self.api_key}"
         self.chat_id = ""
@@ -308,42 +311,45 @@ class KimiModel(BasePlatform):
 
             # 显示搜索结果摘要
             if search_results and not self.suppress_output:
-                PrettyOutput.print("\n搜索结果:", OutputType.PROGRESS)
+                output = ["搜索结果:"]
                 for result in search_results:
-                    PrettyOutput.print(f"- {result['title']}", OutputType.PROGRESS)
+                    output.append(f"- {result['title']}")
                     if result['date']:
-                        PrettyOutput.print(f"  日期: {result['date']}", OutputType.PROGRESS)
-                    PrettyOutput.print(f"  来源: {result['site_name']}", OutputType.PROGRESS)
+                        output.append(f"  日期: {result['date']}")
+                    output.append(f"  来源: {result['site_name']}")
                     if result['snippet']:
-                        PrettyOutput.print(f"  摘要: {result['snippet']}", OutputType.PROGRESS)
-                    PrettyOutput.print(f"  链接: {result['url']}", OutputType.PROGRESS)
-                    PrettyOutput.print("", OutputType.PROGRESS)
+                        output.append(f"  摘要: {result['snippet']}")
+                    output.append(f"  链接: {result['url']}")
+                    output.append("")
+                PrettyOutput.print("\n".join(output), OutputType.PROGRESS)
                         
             # 显示引用来源
             if ref_sources and not self.suppress_output:
-                PrettyOutput.print("\n引用来源:", OutputType.PROGRESS)
+                output = ["引用来源:"]
                 for source in ref_sources:
-                    PrettyOutput.print(f"- [{source['ref_id']}] {source['title']} ({source['source']})", OutputType.PROGRESS)
-                    PrettyOutput.print(f"  链接: {source['url']}", OutputType.PROGRESS)
+                    output.append(f"- [{source['ref_id']}] {source['title']} ({source['source']})")
+                    output.append(f"  链接: {source['url']}")
                     if source['abstract']:
-                        PrettyOutput.print(f"  摘要: {source['abstract']}", OutputType.PROGRESS)
+                        output.append(f"  摘要: {source['abstract']}")
                     
                     # 显示相关段落
                     if source['rag_segments']:
-                        PrettyOutput.print("  相关段落:", OutputType.PROGRESS)
+                        output.append("  相关段落:")
                         for segment in source['rag_segments']:
                             text = segment.get('text', '').replace('\n', ' ').strip()
                             if text:
-                                PrettyOutput.print(f"    - {text}", OutputType.PROGRESS)
+                                output.append(f"    - {text}")
                     
                     # 显示原文引用
                     origin = source['origin']
                     if origin:
                         text = origin.get('text', '')
                         if text:
-                            PrettyOutput.print(f"  原文: {text}", OutputType.PROGRESS)
+                            output.append(f"  原文: {text}")
                     
-                    PrettyOutput.print("", OutputType.PROGRESS)
+                    output.append("")
+
+                PrettyOutput.print("\n".join(output), OutputType.PROGRESS)
 
             PrettyOutput.print(full_response, OutputType.RESULT)
             

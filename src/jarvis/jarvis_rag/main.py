@@ -696,12 +696,10 @@ Content: {doc.content}
             
             # Display found document fragments
             for doc in results:
-                PrettyOutput.print(f"File: {doc.metadata['file_path']}", output_type=OutputType.INFO)
-                PrettyOutput.print(f"Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}", 
-                                output_type=OutputType.INFO)
-                PrettyOutput.print("\nContent:", output_type=OutputType.INFO)
-                content = doc.content.encode('utf-8', errors='replace').decode('utf-8')
-                PrettyOutput.print(content, output_type=OutputType.INFO)
+                output = f"""File: {doc.metadata['file_path']}\n"""
+                output += f"""Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}\n"""
+                output += f"""Content:\n{doc.content}\n"""
+                PrettyOutput.print(output, output_type=OutputType.INFO)
 
             # Build base prompt
             base_prompt = f"""Please answer the user's question based on the following document fragments. If the document content is not sufficient to answer the question completely, please clearly indicate.
@@ -791,12 +789,10 @@ def main():
                     return 1
                     
                 for doc in results:
-                    PrettyOutput.print(f"\nFile: {doc.metadata['file_path']}", output_type=OutputType.INFO)
-                    PrettyOutput.print(f"Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}", 
-                                    output_type=OutputType.INFO)
-                    PrettyOutput.print("\nContent:", output_type=OutputType.INFO)
-                    content = doc.content.encode('utf-8', errors='replace').decode('utf-8')
-                    PrettyOutput.print(content, output_type=OutputType.INFO)
+                    output = f"""File: {doc.metadata['file_path']}\n"""
+                    output += f"""Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}\n"""
+                    output += f"""Content:\n{doc.content}\n"""
+                    PrettyOutput.print(output, output_type=OutputType.INFO)
                 return 0
 
             if args.ask:
@@ -807,8 +803,8 @@ def main():
                     return 1
                     
                 # Display answer
-                PrettyOutput.print("\nAnswer:", output_type=OutputType.INFO)
-                PrettyOutput.print(response, output_type=OutputType.INFO)
+                output = f"""Answer:\n{response}"""
+                PrettyOutput.print(output, output_type=OutputType.INFO)
                 return 0
 
         PrettyOutput.print("Please specify operation parameters. Use -h to view help.", output_type=OutputType.WARNING)

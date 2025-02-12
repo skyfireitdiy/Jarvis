@@ -133,8 +133,7 @@ def main():
     })
     
     if result["success"]:
-        PrettyOutput.print("\nAnswer:", OutputType.INFO)
-        PrettyOutput.print(result["stdout"], OutputType.INFO)
+        PrettyOutput.print(f"Answer: {result['stdout']}", OutputType.INFO)
     else:
         PrettyOutput.print(result["stderr"], OutputType.ERROR)
 

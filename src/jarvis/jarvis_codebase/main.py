@@ -390,7 +390,7 @@ Content: {content}
             self.git_file_list = self.get_git_file_list()
             
             # Check file changes
-            PrettyOutput.print("\nCheck file changes...", output_type=OutputType.INFO)
+            PrettyOutput.print("Check file changes...", output_type=OutputType.INFO)
             changes_detected = False
             new_files = []
             modified_files = []
@@ -427,17 +427,17 @@ Content: {content}
             
             # If changes are detected, display changes and ask the user
             if changes_detected:
-                PrettyOutput.print("\nDetected the following changes:", output_type=OutputType.WARNING)
+                PrettyOutput.print("Detected the following changes:", output_type=OutputType.WARNING)
                 if new_files:
-                    PrettyOutput.print("\nNew files:", output_type=OutputType.INFO)
+                    PrettyOutput.print("New files:", output_type=OutputType.INFO)
                     for f in new_files:
                         PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
                 if modified_files:
-                    PrettyOutput.print("\nModified files:", output_type=OutputType.INFO)
+                    PrettyOutput.print("Modified files:", output_type=OutputType.INFO)
                     for f in modified_files:
                         PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
                 if deleted_files:
-                    PrettyOutput.print("\nDeleted files:", output_type=OutputType.INFO)
+                    PrettyOutput.print("Deleted files:", output_type=OutputType.INFO)
                     for f in deleted_files:
                         PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
 
@@ -445,7 +445,7 @@ Content: {content}
                 if not force:
                     # Ask the user whether to continue
                     while True:
-                        response = get_single_line_input("\nRebuild the index? [y/N]").lower().strip()
+                        response = get_single_line_input("Rebuild the index? [y/N]").lower().strip()
                         if response in ['y', 'yes']:
                             break
                         elif response in ['', 'n', 'no']:
@@ -487,7 +487,7 @@ Content: {content}
                             pbar.update(1)
 
                 if processed_files:
-                    PrettyOutput.print("\nRebuilding the vector database...", output_type=OutputType.INFO)
+                    PrettyOutput.print("Rebuilding the vector database...", output_type=OutputType.INFO)
                     self.gen_vector_db_from_cache()
                     PrettyOutput.print(f"Successfully generated the index for {len(processed_files)} files", 
                                     output_type=OutputType.SUCCESS)
@@ -847,7 +847,7 @@ def main():
     if args.command == 'generate':
         try:
             codebase.generate_codebase(force=args.force)
-            PrettyOutput.print("\nCodebase generation completed", output_type=OutputType.SUCCESS)
+            PrettyOutput.print("Codebase generation completed", output_type=OutputType.SUCCESS)
         except Exception as e:
             PrettyOutput.print(f"Error during codebase generation: {str(e)}", output_type=OutputType.ERROR)
     
@@ -857,15 +857,15 @@ def main():
             PrettyOutput.print("No similar files found", output_type=OutputType.WARNING)
             return
             
-        PrettyOutput.print("\nSearch Results:", output_type=OutputType.INFO)
+        output = "Search Results:\n"
         for path in results:
-            PrettyOutput.print("\n" + "="*50, output_type=OutputType.INFO)
-            PrettyOutput.print(f"File: {path}", output_type=OutputType.INFO)
+            output += f"""{path}\n"""
+        PrettyOutput.print(output, output_type=OutputType.INFO)
 
     elif args.command == 'ask':            
         response = codebase.ask_codebase(args.question, args.top_k)
-        PrettyOutput.print("\nAnswer:", output_type=OutputType.INFO)
-        PrettyOutput.print(response, output_type=OutputType.INFO)
+        output = f"""Answer:\n{response}"""
+        PrettyOutput.print(output, output_type=OutputType.INFO)
 
     else:
         parser.print_help()

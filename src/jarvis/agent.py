@@ -388,10 +388,11 @@ def select_task(tasks: dict) -> str:
     # Convert tasks to list for ordered display
     task_names = list(tasks.keys())
     
-    PrettyOutput.print("\nAvailable tasks:", OutputType.INFO)
+    task_list = ["Available tasks:"]
     for i, name in enumerate(task_names, 1):
-        PrettyOutput.print(f"[{i}] {name}", OutputType.INFO)
-    PrettyOutput.print("[0] Skip predefined tasks", OutputType.INFO)
+        task_list.append(f"[{i}] {name}")
+    task_list.append("[0] Skip predefined tasks")
+    PrettyOutput.print("\n".join(task_list), OutputType.INFO)
     
     
     while True:
