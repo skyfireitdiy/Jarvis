@@ -17,8 +17,21 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
    - Break down into technical components
    - Determine success criteria
 
-2. Development Coordination:
-   - Create development branch using gh CLI
+2. Branch Management:
+   - Create development branch:
+     <TOOL_CALL>
+     name: execute_shell
+     arguments:
+         command: gh issue develop {number} --checkout
+     </TOOL_CALL>
+   - Verify branch creation:
+     <TOOL_CALL>
+     name: execute_shell
+     arguments:
+         command: git branch --show-current
+     </TOOL_CALL>
+
+3. Development Coordination:
    - Create code development sub-agent:
      <TOOL_CALL>
      name: create_code_sub_agent
@@ -39,21 +52,43 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
            - Documentation updates
      </TOOL_CALL>
 
-3. Quality Review:
+4. Quality Review:
    - Review implementation results
    - Verify all requirements are met
    - Check documentation updates
    - Ensure tests are included
 
-4. Pull Request Management:
-   - Create descriptive PR using gh CLI
-   - Link PR to original issue
-   - Include:
-     * Implementation summary
-     * Testing results
-     * Documentation changes
-   - Handle review feedback
-   - Close issue upon completion
+5. Pull Request Management:
+   - Create PR using gh CLI:
+     <TOOL_CALL>
+     name: execute_shell
+     arguments:
+         command: gh pr create --title "{title}" --body "{body}" --issue {number}
+     </TOOL_CALL>
+   - Review PR status:
+     <TOOL_CALL>
+     name: execute_shell
+     arguments:
+         command: gh pr view --json number,mergeable,reviewDecision
+     </TOOL_CALL>
+   - When ready, merge PR:
+     <TOOL_CALL>
+     name: execute_shell
+     arguments:
+         command: gh pr merge {number} --merge --delete-branch
+     </TOOL_CALL>
+   - Close issue:
+     <TOOL_CALL>
+     name: execute_shell
+     arguments:
+         command: gh issue close {number}
+     </TOOL_CALL>
+   - Clean up branches:
+     <TOOL_CALL>
+     name: execute_shell
+     arguments:
+         command: git checkout main && git branch -D {branch}
+     </TOOL_CALL>
 
 Best Practices:
 - Let code sub-agent handle all code-related decisions
@@ -61,10 +96,12 @@ Best Practices:
 - Ensure clear communication of requirements
 - Track overall progress
 - Maintain project standards
+- Make autonomous decisions about branch creation and PR readiness
+- Handle branch cleanup when appropriate
 
 Tool Usage:
 1. create_code_sub_agent: Primary tool for all code development tasks
-2. gh CLI: For GitHub operations (branches, PRs, issues)
+2. execute_shell: For GitHub CLI operations (gh) and git commands
 
 Always provide clear status updates and coordinate between issue management and code development.
 """
@@ -126,24 +163,6 @@ def create_development_branch(issue_number: int) -> bool:
         PrettyOutput.print(f"Error creating branch: {str(e)}", OutputType.ERROR)
         return False
 
-def create_pull_request(issue_number: int, title: str, body: str) -> bool:
-    """Create a pull request for the changes"""
-    try:
-        cmd = f'gh pr create --title "{title}" --body "{body}" --issue {issue_number}'
-        result = os.system(cmd)
-        return result == 0
-    except Exception as e:
-        PrettyOutput.print(f"Error creating pull request: {str(e)}", OutputType.ERROR)
-        return False
-
-def close_issue(issue_number: int) -> bool:
-    """Close the issue"""
-    try:
-        result = os.system(f"gh issue close {issue_number}")
-        return result == 0
-    except Exception as e:
-        PrettyOutput.print(f"Error closing issue: {str(e)}", OutputType.ERROR)
-        return False
 
 def install_gh_linux() -> bool:
     """Install GitHub CLI on Linux"""
@@ -230,10 +249,6 @@ def main():
     
     # Start the workflow
     try:
-        # Create development branch
-        if not create_development_branch(selected_issue['number']):
-            return 1
-        
         # Run the agent with the selected issue
         workflow_request = f"""
         Working on issue #{selected_issue['number']}: {selected_issue['title']}
@@ -241,21 +256,24 @@ def main():
         Issue description:
         {selected_issue['body']}
         
-        Please guide through the development process and help create a pull request.
+        Please manage the complete development workflow, including:
+        1. Branch creation and management
+        2. Code development coordination
+        3. Quality review
+        4. PR creation and management
+        5. Issue closure and cleanup
+        
+        Make autonomous decisions about branch creation, PR readiness, and cleanup based on development status and quality checks.
         """
         
         result = agent.run(workflow_request)
         
-        # Create pull request and close issue if successful
         if result and "success" in result.lower():
-            if create_pull_request(
-                selected_issue['number'],
-                f"Fix #{selected_issue['number']}: {selected_issue['title']}",
-                "Implements the requested changes and fixes the issue."
-            ):
-                close_issue(selected_issue['number'])
-                PrettyOutput.print("Workflow completed successfully!", OutputType.SUCCESS)
-                return 0
+            PrettyOutput.print("Workflow completed successfully!", OutputType.SUCCESS)
+            return 0
+            
+        PrettyOutput.print("Workflow did not complete successfully", OutputType.ERROR)
+        return 1
     
     except Exception as e:
         PrettyOutput.print(f"Error in workflow: {str(e)}", OutputType.ERROR)
