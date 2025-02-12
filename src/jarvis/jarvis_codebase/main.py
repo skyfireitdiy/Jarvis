@@ -714,8 +714,10 @@ Please output 3 expressions directly, separated by two line breaks, without numb
             # Filter low-scoring results
             initial_results = [(path, score, desc) for path, score, desc in initial_results if score >= 0.5]
 
-            for path, score, desc in initial_results:
-                PrettyOutput.print(f"File: {path} Similarity: {score:.3f}", output_type=OutputType.INFO)
+            message = "Found related files:\n"
+            for path, score, _ in initial_results:
+                message += f"File: {path} Similarity: {score:.3f}\n"
+            PrettyOutput.print(message.rstrip(), output_type=OutputType.INFO)
                 
             # Reorder the preliminary results
             return self.pick_results(query, [path for path, _, _ in initial_results])
@@ -731,10 +733,10 @@ Please output 3 expressions directly, separated by two line breaks, without numb
             PrettyOutput.print("No related files found", output_type=OutputType.WARNING)
             return ""
         
-        PrettyOutput.print(f"Found related files: ", output_type=OutputType.SUCCESS)
+        message = "Found related files:\n"
         for path in results:
-            PrettyOutput.print(f"File: {path}", 
-                             output_type=OutputType.INFO)
+            message += f"File: {path}\n"
+        PrettyOutput.print(message.rstrip(), output_type=OutputType.SUCCESS)
         
         prompt = f"""You are a code expert, please answer the user's question based on the following file information:
 """
