@@ -30,8 +30,8 @@ current_agent = []
 def add_agent(agent_name: str):
     current_agent.append(agent_name)
 
-def get_current_agent():
-    return current_agent[-1] if current_agent else "No Agent"
+def get_agent_list():
+    return ']['.join(current_agent) if current_agent else "No Agent"
 
 def delete_current_agent():
     current_agent.pop()
@@ -109,7 +109,7 @@ class PrettyOutput:
         prefix = PrettyOutput.PREFIXES.get(output_type, "")
         
         # 添加时间戳 - 使用白色
-        time_str = f"{Fore.BLUE}[{get_current_agent()}]{ColoramaStyle.RESET_ALL}{Fore.WHITE}[{datetime.now().strftime('%H:%M:%S')}]{ColoramaStyle.RESET_ALL} " if timestamp else ""
+        time_str = f"{Fore.BLUE}[{get_agent_list()}]{ColoramaStyle.RESET_ALL}{Fore.WHITE}[{datetime.now().strftime('%H:%M:%S')}]{ColoramaStyle.RESET_ALL} " if timestamp else ""
         
         # 格式化输出
         formatted_text = f"{time_str}{color}{icon} {prefix}: {text}{ColoramaStyle.RESET_ALL}"
@@ -339,6 +339,10 @@ def get_file_md5(filepath: str)->str:
     return hashlib.md5(open(filepath, "rb").read(100*1024*1024)).hexdigest()
 
 
+def dont_use_local_model():
+    return os.getenv('JARVIS_DONT_USE_LOCAL_MODEL', 'false') == 'true'
+
+
 def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -> np.ndarray:
     """Create embedding vector for methodology text"""
     try:
@@ -363,10 +367,19 @@ def load_methodology(user_input: str) -> str:
     user_jarvis_methodology = os.path.expanduser("~/.jarvis/methodology")
     if not os.path.exists(user_jarvis_methodology):
         return ""
+    
+    def make_methodology_prompt(data: Dict) -> str:
+        ret = """This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it:\n""" 
+        for key, value in data.items():
+            ret += f"Problem: {key}\nMethodology: {value}\n"
+        return ret
 
     try:
         with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
+
+        if dont_use_local_model():
+            return make_methodology_prompt(data)
 
         # Reset data structure
         methodology_data = []
@@ -417,10 +430,8 @@ def load_methodology(user_input: str) -> str:
                         relevant_methodologies[methodology["key"]] = methodology["value"]
                     
             if relevant_methodologies:
-                return f"""This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it:
-                        {relevant_methodologies}
-                        """
-        return ""
+                return make_methodology_prompt(relevant_methodologies)
+        return make_methodology_prompt(data)
 
     except Exception as e:
         PrettyOutput.print(f"Error loading methodology: {str(e)}", OutputType.ERROR)
