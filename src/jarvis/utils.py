@@ -166,12 +166,11 @@ class PrettyOutput:
             
         elif output_type == OutputType.PROGRESS:
             # Progress messages with spinner
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console
-            ) as progress:
-                progress.add_task(text)
+            console.print(Panel(
+                Text(text, style="blue"),
+                border_style=output_type.value,
+                subtitle="[progress]"
+            ))
             
         elif output_type == OutputType.TOOL:
             # Tool calls in yellow box with code style
@@ -484,16 +483,19 @@ def load_methodology(user_input: str) -> str:
             ) # type: ignore
 
             relevant_methodologies = {}
+            output_lines = []
             for dist, idx in zip(distances[0], indices[0]):
                 if idx >= 0:
                     similarity = 1.0 / (1.0 + float(dist))
                     methodology = methodology_data[idx]
-                    PrettyOutput.print(
-                        f"Methodology '{methodology['key']}' similarity: {similarity:.3f}",
-                        OutputType.INFO
+                    output_lines.append(
+                        f"Methodology '{methodology['key']}' similarity: {similarity:.3f}"
                     )
                     if similarity >= 0.5:
                         relevant_methodologies[methodology["key"]] = methodology["value"]
+            
+            if output_lines:
+                PrettyOutput.print("\n".join(output_lines), OutputType.INFO)
                     
             if relevant_methodologies:
                 return make_methodology_prompt(relevant_methodologies)
