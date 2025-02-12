@@ -1,6 +1,7 @@
 from typing import Dict, Any
 import subprocess
 import yaml
+from jarvis.models.registry import PlatformRegistry
 from jarvis.utils import OutputType, PrettyOutput, init_env, find_git_root
 from jarvis.agent import Agent
 
@@ -94,6 +95,8 @@ OUTPUT REQUIREMENTS:
 - Separate technical debt from blockers"""
 
             review_agent = Agent(
+                name="Code Review Agent",
+                platform=PlatformRegistry().get_thinking_platform(),
                 system_prompt=system_prompt,
                 is_sub_agent=True
             )
