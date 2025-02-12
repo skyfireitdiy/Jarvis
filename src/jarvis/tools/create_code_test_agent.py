@@ -40,7 +40,7 @@ class TestAgentTool:
 
             test_agent = Agent(
                 system_prompt=self._build_system_prompt(args),
-                name=args["name"],
+                name=f"TestAgent({args['name']})",
                 is_sub_agent=True,
                 tool_registry=ToolRegistry()
             )

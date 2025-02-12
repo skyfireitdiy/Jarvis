@@ -37,7 +37,7 @@ class CodeSubAgentTool:
             # Create sub-agent
             sub_agent = Agent(
                 system_prompt=system_prompt,
-                name=name,
+                name=f"Coder({name})",
                 is_sub_agent=True,
                 tool_registry=tool_registry
             )

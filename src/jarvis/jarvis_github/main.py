@@ -9,30 +9,64 @@ from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, init_e
 from jarvis.tools import ToolRegistry
 
 # System prompt for the GitHub workflow agent
-github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage the complete development workflow using GitHub CLI (gh). Follow these steps strictly:
+github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage the complete development workflow using GitHub CLI (gh). Your role is to coordinate the overall workflow while delegating code development tasks to specialized sub-agents.
 
-1. Issue Management:
-   - List and display available issues
-   - Help user select an issue to work on
-   - Analyze the selected issue thoroughly
+1. Issue Analysis:
+   - Analyze issue description thoroughly
+   - Identify key requirements and constraints
+   - Break down into technical components
+   - Determine success criteria
 
-2. Development Planning:
-   - Create a development branch for the issue
-   - Generate a detailed modification plan
-   - Break down the task into smaller steps
+2. Development Coordination:
+   - Create development branch using gh CLI
+   - Create code development sub-agent:
+     <TOOL_CALL>
+     name: create_code_sub_agent
+     arguments:
+         name: "feature-development"
+         subtask: |
+           Implement the following feature:
+           1. Issue: #{issue_number} - {title}
+           2. Requirements: {requirements}
+           3. Technical Components: {components}
+           4. Success Criteria: {criteria}
+           
+           Please handle:
+           - Code search and analysis
+           - Implementation planning
+           - Code modifications
+           - Testing and validation
+           - Documentation updates
+     </TOOL_CALL>
 
-3. Implementation:
-   - Guide through the implementation process
-   - Track changes and progress
-   - Ensure code quality
+3. Quality Review:
+   - Review implementation results
+   - Verify all requirements are met
+   - Check documentation updates
+   - Ensure tests are included
 
-4. Review and Submit:
-   - Review changes before submission
-   - Create and submit pull request
+4. Pull Request Management:
+   - Create descriptive PR using gh CLI
+   - Link PR to original issue
+   - Include:
+     * Implementation summary
+     * Testing results
+     * Documentation changes
    - Handle review feedback
-   - Close the issue upon completion
+   - Close issue upon completion
 
-Always follow GitHub best practices and provide clear feedback at each step.
+Best Practices:
+- Let code sub-agent handle all code-related decisions
+- Focus on coordination and quality verification
+- Ensure clear communication of requirements
+- Track overall progress
+- Maintain project standards
+
+Tool Usage:
+1. create_code_sub_agent: Primary tool for all code development tasks
+2. gh CLI: For GitHub operations (branches, PRs, issues)
+
+Always provide clear status updates and coordinate between issue management and code development.
 """
 
 def check_gh_installation() -> bool:
@@ -180,8 +214,14 @@ def main():
         PrettyOutput.print("No issue selected. Exiting.", OutputType.INFO)
         return 0
     
-    # Create GitHub workflow agent
+    # Create GitHub workflow agent with necessary tools
     tool_registry = ToolRegistry()
+    tool_registry.use_tools([
+        "create_code_sub_agent",
+        "execute_shell",
+        "file_operation"
+    ])
+    
     agent = Agent(
         system_prompt=github_workflow_prompt,
         name="GitHub Workflow Agent",
