@@ -403,12 +403,13 @@ Content: {content}
                     deleted_files.append(file_path)
                     files_to_delete.append(file_path)
                     changes_detected = True
-            
             # Check new and modified files
-            with tqdm(total=len(self.git_file_list), desc="Check file status") as pbar:
+            from rich.progress import Progress
+            with Progress() as progress:
+                task = progress.add_task("Check file status", total=len(self.git_file_list))
                 for file_path in self.git_file_list:
                     if not os.path.exists(file_path) or not self.is_text_file(file_path):
-                        pbar.update(1)
+                        progress.advance(task)
                         continue
                     
                     try:
@@ -423,23 +424,22 @@ Content: {content}
                     except Exception as e:
                         PrettyOutput.print(f"Failed to check file {file_path}: {str(e)}", 
                                          output_type=OutputType.ERROR)
-                    pbar.update(1)
+                    progress.advance(task)
             
             # If changes are detected, display changes and ask the user
             if changes_detected:
-                PrettyOutput.print("Detected the following changes:", output_type=OutputType.WARNING)
+                output_lines = ["Detected the following changes:"]
                 if new_files:
-                    PrettyOutput.print("New files:", output_type=OutputType.INFO)
-                    for f in new_files:
-                        PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
+                    output_lines.append("New files:")
+                    output_lines.extend(f"  {f}" for f in new_files)
                 if modified_files:
-                    PrettyOutput.print("Modified files:", output_type=OutputType.INFO)
-                    for f in modified_files:
-                        PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
+                    output_lines.append("Modified files:")
+                    output_lines.extend(f"  {f}" for f in modified_files)
                 if deleted_files:
-                    PrettyOutput.print("Deleted files:", output_type=OutputType.INFO)
-                    for f in deleted_files:
-                        PrettyOutput.print(f"  {f}", output_type=OutputType.INFO)
+                    output_lines.append("Deleted files:")
+                    output_lines.extend(f"  {f}" for f in deleted_files)
+                
+                PrettyOutput.print("\n".join(output_lines), output_type=OutputType.WARNING)
 
                 # If force is True, continue directly
                 if not force:
