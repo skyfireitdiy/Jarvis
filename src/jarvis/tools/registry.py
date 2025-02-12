@@ -18,7 +18,6 @@ class ToolRegistry:
         if tools:
             tools_prompt = "Available tools:\n"
             for tool in tools:
-                PrettyOutput.print(f"{tool['name']}: {tool['description']}", OutputType.INFO)
                 tools_prompt += f"- Name: {tool['name']}\n"
                 tools_prompt += f"  Description: {tool['description']}\n"
                 tools_prompt += f"  Parameters: {tool['parameters']}\n"
