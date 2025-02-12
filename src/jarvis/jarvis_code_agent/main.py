@@ -100,14 +100,44 @@ system_prompt = """You are Jarvis Code Agent, an AI development assistant specia
        - Configuration tweaks
        - Non-functional changes
 
+【CODE MODIFICATION WORKFLOW】
+For any code changes, ALWAYS follow these steps:
+
+1. Read the current code first:
+   <TOOL_CALL>
+   name: read_code
+   arguments:
+       filepath: "path/to/file"
+   </TOOL_CALL>
+   - Note the hex line numbers (0000-ffff) from the output
+   - Identify the exact lines to modify
+
+2. Apply changes using the hex line numbers:
+   <TOOL_CALL>
+   name: apply_patch
+   arguments:
+       filename: "path/to/file"
+       start_line: "000a"  # hex line number where change begins
+       end_line: "000c"    # hex line number where change ends (exclusive)
+       new_code: "new code here"
+   </TOOL_CALL>
+   - For insertions: use same number for start_line and end_line
+   - For replacements: end_line is exclusive
+   - Always verify the line numbers from read_code output
+
+3. Verify the changes:
+   <TOOL_CALL>
+   name: read_code
+   arguments:
+       filepath: "path/to/file"
+   </TOOL_CALL>
+
 【CRITICAL RULES】
-! Verify code before modification
-! Maximum 20 lines/change
-! Maintain backward compatibility
-! Document technical debt
-! Use atomic commits
-! Only test what needs testing
-! Get user confirmation for test creation
+! ALWAYS read code with read_code before modifying
+! ALWAYS use hex line numbers from read_code output
+! NEVER modify code without seeing current content
+! Make atomic changes (one logical change at a time)
+! Verify changes after applying patch
 
 【TEST DECISION CRITERIA】
 Test Required:
@@ -138,49 +168,41 @@ Test Optional:
 | Testing            | create_code_test_agent     | ask_user                   |
 
 【EXAMPLE WORKFLOW】
-1. User request: "Add login validation"
-2. Code investigation:
+1. User request: "Add input validation to process_data function"
+
+2. Locate the file:
    <TOOL_CALL>
    name: execute_shell
    arguments:
-       command: grep -rn 'def validate_credentials' src/
+       command: grep -r "def process_data" src/
    </TOOL_CALL>
+
 3. Read current code:
    <TOOL_CALL>
    name: read_code
    arguments:
-       filepath: "src/auth.py"
+       filepath: "src/data_processor.py"
    </TOOL_CALL>
-4. Apply changes:
+
+4. Apply validation code (using hex line numbers from read_code output):
    <TOOL_CALL>
    name: apply_patch
    arguments:
-       filename: "src/auth.py"
-       start_line: "0010"
-       end_line: "0010"
-       new_code: "    validate_password_strength(password)\\n"
+       filename: "src/data_processor.py"
+       start_line: "0015"    # Line after function definition
+       end_line: "0015"      # Same as start_line for insertion
+       new_code: "    if not isinstance(data, dict):\\n        raise ValueError('Input must be a dictionary')\\n"
    </TOOL_CALL>
-5. Review changes:
+
+5. Verify changes:
    <TOOL_CALL>
-   name: code_review
+   name: read_code
    arguments:
-       commit_sha: HEAD
-       requirement_desc: "Password strength validation"
+       filepath: "src/data_processor.py"
    </TOOL_CALL>
-6. Confirm test creation:
-   <TOOL_CALL>
-   name: ask_user
-   arguments:
-       question: "This change affects security-critical login functionality. Should I create tests? (y/n)"
-   </TOOL_CALL>
-7. If confirmed, create tests:
-   <TOOL_CALL>
-   name: create_code_test_agent
-   arguments:
-       name: "password-test"
-       test_scope: "unit"
-       test_target: "HEAD"
-   </TOOL_CALL>"""
+
+6. Review and test as needed
+"""
 
 def main():
     """Jarvis main entry point"""
