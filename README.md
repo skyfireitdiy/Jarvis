@@ -91,13 +91,13 @@ jarvis
 ### Codebase Search
 ```bash
 # Generate codebase index
-jarvis-codebase --generate
+jarvis-codebase generate
 
 # Search similar code
-jarvis-codebase --search "your search query"
+jarvis-codebase search "your search query"
 
 # Ask questions about codebase
-jarvis-codebase --ask "your question"
+jarvis-codebase ask "your question"
 ```
 
 ### Document Analysis (RAG)

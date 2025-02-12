@@ -96,13 +96,13 @@ jarvis -p openai  # 使用 OpenAI 平台
 ### 代码库搜索
 ```bash
 # 生成代码库索引
-jarvis-codebase --generate
+jarvis-codebase generate
 
 # 搜索相似代码
-jarvis-codebase --search "搜索关键词"
+jarvis-codebase search "搜索关键词"
 
 # 询问代码库相关问题
-jarvis-codebase --ask "你的问题"
+jarvis-codebase ask "你的问题"
 ```
 
 ### 文档分析 (RAG)
