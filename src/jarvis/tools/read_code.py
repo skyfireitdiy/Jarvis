@@ -99,6 +99,8 @@ class ReadCodeTool:
                 formatted_lines.append(f"{line_num:04x}{line}")
                 
             content = "".join(formatted_lines)
+
+            PrettyOutput.print(f"File: {filepath}\nLines: [{start_line:04x}, {end_line:04x})\n{content}", OutputType.CODE)
             
             return {
                 "success": True,
