@@ -268,11 +268,7 @@ def main():
         
         result = agent.run(workflow_request)
         
-        if result and "success" in result.lower():
-            PrettyOutput.print("Workflow completed successfully!", OutputType.SUCCESS)
-            return 0
-            
-        PrettyOutput.print("Workflow did not complete successfully", OutputType.ERROR)
+        PrettyOutput.print(result, OutputType.RESULT)
         return 1
     
     except Exception as e:
