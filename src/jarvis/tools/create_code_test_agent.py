@@ -1,9 +1,7 @@
 from typing import Dict, Any
 from jarvis.agent import Agent
 from jarvis.tools.registry import ToolRegistry
-from jarvis.utils import OutputType, PrettyOutput
 import subprocess
-import re
 
 class TestAgentTool:
     name = "create_code_test_agent"
@@ -38,11 +36,14 @@ class TestAgentTool:
                     "stderr": f"Invalid commit SHA: {args['commit_sha']}"
                 }
 
+            tool_registry = ToolRegistry()  
+            tool_registry.dont_use_tools(["create_code_test_agent"])
+
             test_agent = Agent(
                 system_prompt=self._build_system_prompt(args),
                 name=f"TestAgent({args['name']})",
                 is_sub_agent=True,
-                tool_registry=ToolRegistry()
+                tool_registry=tool_registry
             )
 
             result = test_agent.run(
