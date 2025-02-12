@@ -116,7 +116,7 @@ class PDFProcessor(FileProcessor):
         text_parts = []
         with fitz.open(file_path) as doc: # type: ignore
             for page in doc:
-                text_parts.append(page.get_text())
+                text_parts.append(page.get_text()) # type: ignore
         return "\n".join(text_parts)
 
 class DocxProcessor(FileProcessor):

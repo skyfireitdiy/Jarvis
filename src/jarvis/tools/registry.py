@@ -14,7 +14,6 @@ from jarvis.utils import OutputType, PrettyOutput, get_max_context_length
 class ToolRegistry:
     def load_tools(self) -> str:
         """Load tools"""
-        PrettyOutput.section("Available tools", OutputType.PLANNING)
         tools = self.get_all_tools()
         if tools:
             tools_prompt = "Available tools:\n"
@@ -119,7 +118,6 @@ class ToolRegistry:
 
                         if hasattr(item, "check"):
                             if not item.check():
-                                PrettyOutput.print(f"Tool {item.name} check failed, skipping", OutputType.INFO)
                                 continue
                         
                         # Instantiate the tool class
@@ -136,7 +134,6 @@ class ToolRegistry:
                         break
                         
                 if not tool_found:
-                    PrettyOutput.print(f"No valid tool class found in the file: {p_file_path}", OutputType.INFO)
                     return False
                     
                 return True

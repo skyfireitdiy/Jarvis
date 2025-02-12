@@ -76,29 +76,35 @@ class PatchHandler:
         
     
 
-    def _finalize_changes(self) -> None:
-        """Complete changes and commit"""
+    def _finalize_changes(self) -> str:
+        """Complete changes and commit, return commit info"""
         PrettyOutput.print("Modification confirmed, committing...", OutputType.INFO)
 
         # Add only modified files under git control
         os.system("git add -u")
         
-        # Then get git diff
-        git_diff = os.popen("git diff --cached").read()
+        # Get commit SHA before commit
+        prev_commit = os.popen("git rev-parse HEAD").read().strip()
         
-        # Automatically generate commit information, pass in feature
+        # Generate commit message
+        git_diff = os.popen("git diff --cached").read()
         commit_message = generate_commit_message(git_diff)
         
-        # Display and confirm commit information
+        # User confirmation
         PrettyOutput.print(f"Automatically generated commit information: {commit_message}", OutputType.INFO)
         user_confirm = get_single_line_input("Use this commit information? (y/n) [y]").lower() or "y"
         
-        if user_confirm.lower() != "y":
+        if user_confirm != "y":
             commit_message = get_single_line_input("Please enter a new commit information")
         
-        # No need to git add again, it has already been added
+        # Commit and get new SHA
         os.system(f"git commit -m '{commit_message}'")
+        new_commit = os.popen("git rev-parse HEAD").read().strip()
+        
+        # Save record
         save_edit_record(self.record_dir, commit_message, git_diff)
+        
+        return f"{new_commit}:{commit_message}"
 
     def _revert_changes(self) -> None:
         """Revert all changes"""
@@ -218,61 +224,68 @@ class PatchHandler:
                 new_code
                 </PATCH>
 
-                Example:
+                Example 1 (Insertion):
                 <PATCH>
                 [000c,000c)
                 def new_function():
                     pass
                 </PATCH>
+                Result:
+                - Line 12 (original) becomes line 13
+                - Original line 12 remains unchanged
+                - New code inserted at line 12
 
-                means:
-                Insert code BEFORE line 12:
-                ```
-                def new_function():
-                    pass
-                ```
-                
-                Example 2:
+                Example 2 (Replacement):
                 <PATCH>
                 [0004,000b)
                 aa
                 bb
                 cc
                 </PATCH>
-
-                means:
-                Replace lines [4,11) with:
-                ```
-                aa
-                bb
-                cc
-                ```
+                Result:
+                - Original lines 4-10 are replaced
+                - Total 3 new lines inserted
 
                 Rules:
-                1. start and end are hexadecimal line numbers (e.g., 000a)
-                2. The patch will replace lines [start,end) with new_code (including start, excluding end)
-                3. If start equals end, new_code will be inserted BEFORE that line
-                4. If new_code is empty, lines [start,end) will be deleted
-                5. Multiple patches can be generated
-                6. Each line in the input file starts with its 4-digit hexadecimal line number (0-based)
-                7. Your new_code should NOT include line numbers
-                8. CRITICAL: Patches MUST NOT overlap - ensure each line is modified by at most one patch
-                9. Generate patches from bottom to top of the file
-                10. Ensure new_code maintains correct indentation and formatting
-                11. Each patch should modify no more than 20 lines
-                12. Include sufficient context in new_code to maintain code consistency
-                13. `[` and `)` must be included in the line range
-                14. Line numbers start from 0
-                15. Example of INVALID overlapping patches:
-                    <PATCH>
-                    [0001,0005)
-                    code1
-                    </PATCH>
-                    <PATCH>
-                    [0003,0007)  # This overlaps with the previous patch
-                    code2
-                    </PATCH>
-                """
+                1. Line ranges use 4-digit hexadecimal (0-based)
+                2. Patch replaces [start,end) with new_code:
+                   - Includes start line
+                   - Excludes end line
+                3. Insertion Rule:
+                   - When start == end: 
+                     * Insert new_code BEFORE start line
+                     * Original start line shifts down
+                     * Original content remains unchanged
+                4. Deletion: new_code empty → delete [start,end)
+                5. Multiple non-overlapping patches
+                6. Input lines have 4-digit hex prefixes
+                7. new_code must NOT include line numbers
+                8. Critical Constraints:
+                   - Max 20 lines per patch
+                   - No overlapping ranges
+                   - Generate from bottom up
+                9. Code Quality:
+                   - Maintain original indentation
+                   - Preserve surrounding context
+                   - Add necessary comments
+
+                Invalid Case (Overlap):
+                <PATCH>
+                [0001,0005)
+                code1
+                </PATCH>
+                <PATCH>
+                [0003,0007)  # ERROR: Overlaps previous
+                code2
+                </PATCH>
+
+                Valid Workflow:
+                1. Analyze required changes
+                2. Identify target line ranges
+                3. Generate patches from BOTTOM to TOP
+                4. Verify no overlaps
+                5. Check line count limits
+                6. Ensure code consistency"""
                 
                 prompt += f"""# Original requirement: {feature}
                     # Current file path: {file_path}
@@ -308,7 +321,7 @@ class PatchHandler:
                         additional_info += msg + "\n"
                         continue
                 else:
-                    self._finalize_changes()
+                    feedback += "User Accepted: " + self._finalize_changes() + "\n"
                     break
         
         return True, feedback
@@ -331,10 +344,10 @@ class PatchHandler:
             PrettyOutput.print(f"\nFile: {file_path}", OutputType.INFO)
             PrettyOutput.print(f"Modification plan: \n{patches_code}", OutputType.INFO)
         # 3. Apply patches
-        success, additional_info = self.apply_patch(feature, structed_plan)
+        success, commit_info = self.apply_patch(feature, structed_plan)
         if not success:
             os.system("git reset --hard")
-            return False, additional_info
+            return False, commit_info
         # 6. Apply successfully, let user confirm changes
         PrettyOutput.print("\nPatches applied, please check the modification effect.", OutputType.SUCCESS)
-        return True, "Modification applied successfully"
+        return True, commit_info
