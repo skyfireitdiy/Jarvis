@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from prompt_toolkit import prompt
 import yaml
 
+from jarvis.models.base import BasePlatform
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools import ToolRegistry
 from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env
