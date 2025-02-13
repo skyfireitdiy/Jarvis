@@ -23,6 +23,7 @@ class AskCodebaseTool:
         "required": ["question"]
     }
 
+    @staticmethod
     def check() -> bool:
         return not dont_use_local_model()
 
