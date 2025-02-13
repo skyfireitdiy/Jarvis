@@ -67,27 +67,19 @@ class Agent:
                 continue
             elif '</TOOL_CALL>' in line:
                 if in_tool_call and tool_call_lines:
-                    try:
-                        # Parse YAML directly
-                        tool_call_text = '\n'.join(tool_call_lines)
-                        tool_call_data = yaml.safe_load(tool_call_text)
-                        
-                        # Validate necessary fields
-                        if "name" in tool_call_data and "arguments" in tool_call_data:
-                            # Return content before tool call and tool call
-                            return [{
-                                "name": tool_call_data["name"],
-                                "arguments": tool_call_data["arguments"]
-                            }]
-                        else:
-                            PrettyOutput.print("Tool call missing necessary fields", OutputType.ERROR)
-                            return []
-                    except yaml.YAMLError as e:
-                        PrettyOutput.print(f"YAML parsing error: {str(e)}", OutputType.ERROR)
-                        return []
-                    except Exception as e:
-                        PrettyOutput.print(f"Error processing tool call: {str(e)}", OutputType.ERROR)
-                        return []
+                    # Parse YAML directly
+                    tool_call_text = '\n'.join(tool_call_lines)
+                    tool_call_data = yaml.safe_load(tool_call_text)
+                    
+                    # Validate necessary fields
+                    if "name" in tool_call_data and "arguments" in tool_call_data:
+                        # Return content before tool call and tool call
+                        return [{
+                            "name": tool_call_data["name"],
+                            "arguments": tool_call_data["arguments"]
+                        }]
+                    else:
+                        raise Exception("Tool call missing necessary fields")
                 in_tool_call = False
                 continue
             
