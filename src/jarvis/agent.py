@@ -81,13 +81,13 @@ class Agent:
                             }]
                         else:
                             PrettyOutput.print("Tool call missing necessary fields", OutputType.ERROR)
-                            raise Exception("Tool call missing necessary fields, " + tool_call_help)
+                            return []
                     except yaml.YAMLError as e:
                         PrettyOutput.print(f"YAML parsing error: {str(e)}", OutputType.ERROR)
-                        raise Exception(f"YAML parsing error: {str(e)}")
+                        return []
                     except Exception as e:
                         PrettyOutput.print(f"Error processing tool call: {str(e)}", OutputType.ERROR)
-                        raise Exception(f"Error processing tool call: {str(e)}")
+                        return []
                 in_tool_call = False
                 continue
             

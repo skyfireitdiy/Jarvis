@@ -10,9 +10,12 @@ commit_agent_prompt = """You are an Autonomous Git Commit Agent. Follow this pro
 1. Message Structure:
    <type>[optional scope]: <description>
    
-   [optional body]
-   
-   [optional footer]
+   <TOOL_CALL>
+   name: execute_shell
+   arguments:
+       command: |
+           git commit -m "{message}"
+   </TOOL_CALL>
 
 2. Type Guidelines:
    | Type     | When to use                          | Example                          |
@@ -36,13 +39,6 @@ commit_agent_prompt = """You are an Autonomous Git Commit Agent. Follow this pro
      * First letter lowercase
      * No trailing punctuation
      * ≤72 characters
-   - Body: 
-     * Explain "what" and "why" not "how"
-     * Wrap at 72 characters
-     * Use bullet points for multiple changes
-   - Footer:
-     * Reference issues: Closes #123, Fixes #45
-     * Breaking changes: BREAKING CHANGE: <description>
 
 4. Validation Checklist:
    - [ ] Single logical change per commit
@@ -51,34 +47,16 @@ commit_agent_prompt = """You are an Autonomous Git Commit Agent. Follow this pro
    - [ ] Signed-off-by present if required
 
 【AUTONOMOUS WORKFLOW】
-1. Situation Analysis:
-   <TOOL_CALL>
-   name: execute_shell
-   arguments:
-       command: |
-           git status --porcelain
-   </TOOL_CALL>
+1. Situation Analysis: git status --porcelain
    - Check working directory status
    - Detect uncommitted changes
 
 2. Change Preparation:
-   IF needs_staging:
-     <TOOL_CALL>
-     name: execute_shell
-     arguments:
-         command: |
-            git add {files}
-     </TOOL_CALL>
+   IF needs_staging: git add {files}
    ELSE:
      Proceed to message generation
 
-3. Change Inspection:
-   <TOOL_CALL>
-   name: execute_shell
-   arguments:
-       command: |
-           git diff --staged | cat -
-   </TOOL_CALL>
+3. Change Inspection: git diff --staged
    - Analyze diff content
    - Group related changes
    - Verify atomicity
@@ -88,13 +66,7 @@ commit_agent_prompt = """You are an Autonomous Git Commit Agent. Follow this pro
    - Validate message format
    - Ensure clarity and conciseness
 
-5. Commit Execution:
-   <TOOL_CALL>
-   name: execute_shell
-   arguments:
-       command: |
-          git commit -m "{message}"
-   </TOOL_CALL>
+5. Commit Execution: git commit -m "{message}"
    - Verify commit success
    - Handle errors if any
 

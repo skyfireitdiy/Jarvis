@@ -23,7 +23,7 @@ Strict Rules:
 - Wait for user to provide execution results
 - Don't assume or imagine results
 - Don't create fake dialogues
-- If current information is insufficient, you may ask the user
+- If current information is insufficient, you may ask the user for more information
 - Not all problem-solving steps are mandatory, skip as appropriate
 - Request user guidance when multiple iterations show no progress
 - ALWAYS use | syntax for string parameters to prevent parsing errors
