@@ -1,4 +1,5 @@
 from typing import Dict, Any
+from jarvis.jarvis_code_agent.file_select import select_files
 from jarvis.utils import OutputType, PrettyOutput, dont_use_local_model, find_git_root
 from jarvis.jarvis_codebase.main import CodeBase
 
@@ -45,10 +46,14 @@ class FindInCodebaseTool:
             query = args["query"]
             top_k = args.get("top_k", 20)
 
-            codebase = CodeBase(find_git_root())
+            root_dir = find_git_root()
+
+            codebase = CodeBase(root_dir)
 
             # Search for relevant files
             results = codebase.search_similar(query, top_k)
+
+            results = select_files(results, root_dir)
 
             if not results:
                 return {
