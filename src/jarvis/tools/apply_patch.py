@@ -74,8 +74,10 @@ class ApplyPatchTool:
                 
             # Read file content
             try:
-                with open(filename, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
+                lines = open(filename, 'r', encoding='utf-8').readlines()
+                # auto add newline if not exists
+                if lines and not lines[-1].endswith('\n'):
+                    lines[-1] += '\n'
             except UnicodeDecodeError:
                 return {
                     "success": False,
