@@ -8,7 +8,7 @@ import yaml
 from jarvis.models.base import BasePlatform
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools.registry import ToolRegistry, tool_call_help
-from jarvis.utils import PrettyOutput, OutputType, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env
+from jarvis.utils import PrettyOutput, OutputType, is_auto_complete, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env
 import os
 
 class Agent:
@@ -278,7 +278,7 @@ Please describe in concise bullet points, highlighting important information.
                         self.prompt = tool_result
                         continue
 
-                    if "<!!!COMPLETE!!!>" in current_response:
+                    if is_auto_complete() and "<!!!COMPLETE!!!>" in current_response:
                         return self._complete_task()
                     
                     # 获取用户输入
