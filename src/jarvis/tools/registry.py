@@ -27,6 +27,20 @@ Strict Rules:
 - Not all problem-solving steps are mandatory, skip as appropriate
 - Request user guidance when multiple iterations show no progress
 - ALWAYS use | syntax for string parameters to prevent parsing errors
+    Example:
+    <TOOL_CALL>
+    name: execute_shell
+    arguments:
+        command: |
+            git status --porcelain
+    </TOOL_CALL>
+    <TOOL_CALL>
+    name: execute_shell
+    arguments:
+        command: |
+            git commit -m "fix bug"
+    </TOOL_CALL>
+    
 - If you can start executing the task, please start directly without asking the user if you can begin.
 """
 
