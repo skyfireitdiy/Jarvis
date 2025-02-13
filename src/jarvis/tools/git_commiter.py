@@ -100,7 +100,7 @@ class GitCommitTool:
         """Execute automatic commit process"""
         try:
             tool_registry = ToolRegistry()
-            tool_registry.use_tools(["execute_shell", "ask_user", "file_operation"])
+            tool_registry.use_tools(["execute_shell", "ask_user"])
 
             commit_agent = Agent(
                 system_prompt=commit_agent_prompt,

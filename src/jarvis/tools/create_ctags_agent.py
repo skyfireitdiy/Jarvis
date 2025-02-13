@@ -135,7 +135,7 @@ class CtagsTool:
         """Execute code analysis based on natural language query"""
         try:
             tool_registry = ToolRegistry()
-            tool_registry.use_tools(["execute_shell", "file_operation", "ask_user"])
+            tool_registry.use_tools(["execute_shell"])
 
             ctags_agent = Agent(
                 system_prompt=ctags_system_prompt,
