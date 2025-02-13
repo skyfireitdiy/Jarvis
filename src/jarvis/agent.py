@@ -211,7 +211,7 @@ Please describe in concise bullet points, highlighting important information.
 
         complete_prompt = """"""
 
-        if os.environ.get("JARVIS_AUTO_COMPLETE"):
+        if is_auto_complete():
             complete_prompt = """
             When the task is completed, you should print the following message:
             <!!!COMPLETE!!!>
