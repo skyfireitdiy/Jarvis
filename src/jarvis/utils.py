@@ -500,3 +500,6 @@ def load_methodology(user_input: str) -> str:
         import traceback
         PrettyOutput.print(f"Error trace: {traceback.format_exc()}", OutputType.INFO)
         return ""
+    
+def is_auto_complete() -> bool:
+    return os.getenv('JARVIS_AUTO_COMPLETE', 'false') == 'true'

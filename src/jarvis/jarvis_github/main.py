@@ -13,21 +13,9 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
 
 【AUTOMATED WORKFLOW】
 1. Branch Creation
-   - Create development branch:
-     <TOOL_CALL>
-     name: execute_shell
-     arguments:
-         command: |
-            gh issue develop {number} --checkout
-     </TOOL_CALL>
-   - Verify branch creation:
-     <TOOL_CALL>
-     name: execute_shell
-     arguments:
-         command: |
-            git branch --show-current
-     </TOOL_CALL>
-
+   - Create development branch: gh issue develop {number} --checkout
+   - Verify branch creation: git branch --show-current
+    
 2. Code Development
    - Create code development sub-agent:
      <TOOL_CALL>
@@ -50,25 +38,17 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
      name: code_review
      arguments:
          commit_sha: HEAD
-         requirement_desc: |
-            "Original issue requirements"
+         requirement_desc: "Original issue requirements"
      </TOOL_CALL>
    
-   - Check code style and quality:
-     <TOOL_CALL>
-     name: execute_shell
-     arguments:
-         command: |
-            git diff --name-only HEAD^ | xargs pylint
-     </TOOL_CALL>
+   - Check code style and quality:  git diff --name-only HEAD^ | xargs pylint
 
    - If issues found, create fix sub-agent:
      <TOOL_CALL>
      name: create_code_sub_agent
      arguments:
          name: "review-fixes"
-         subtask: |
-            Fix code review issues: {issues}
+         subtask: "Fix code review issues: {issues}"
      </TOOL_CALL>
 
 4. Pull Request Creation
@@ -93,22 +73,14 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
      </TOOL_CALL>
 
 5. Review Management
-   - Monitor PR status and reviews:
-     <TOOL_CALL>
-     name: execute_shell
-     arguments:
-         command: |
-            gh pr view {number} --json reviews,comments,checks
-     </TOOL_CALL>
-
+   - Monitor PR status and reviews: gh pr view {number} --json reviews,comments,checks
    - For each review comment:
      1. Analyze feedback:
         <TOOL_CALL>
         name: code_review
         arguments:
             commit_sha: HEAD
-            requirement_desc: |
-                Review comment: {comment}
+            requirement_desc: "Review comment: {comment}"
         </TOOL_CALL>
 
      2. Create fix sub-agent:
@@ -116,8 +88,7 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
         name: create_code_sub_agent
         arguments:
             name: "review-feedback"
-            subtask: |
-                Address review feedback: {comment}
+            subtask: "Address review feedback: {comment}"
         </TOOL_CALL>
 
      3. Verify fixes:
@@ -125,41 +96,16 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
         name: code_review
         arguments:
             commit_sha: HEAD
-            requirement_desc: |
-                Verify fix for: {comment}
+            requirement_desc: "Verify fix for: {comment}"
         </TOOL_CALL>
 
 6. PR Merge
-   - Check merge requirements:
-     <TOOL_CALL>
-     name: execute_shell
-     arguments:
-         command: |
-            gh pr checks {number}
-     </TOOL_CALL>
-   - Merge when ready:
-     <TOOL_CALL>
-     name: execute_shell
-     arguments:
-         command: |
-            gh pr merge {number} --squash --delete-branch
-     </TOOL_CALL>
+   - Check merge requirements:  gh pr checks {number}
+   - Merge when ready: gh pr merge {number} --squash --delete-branch
 
 7. Cleanup
-   - Close issue:
-     <TOOL_CALL>
-     name: execute_shell
-     arguments:
-         command: |
-            gh issue close {number}
-     </TOOL_CALL>
-   - Clean up local branch:
-     <TOOL_CALL>
-     name: execute_shell
-     arguments:
-         command: |
-            git checkout main && git pull && git branch -D {branch}
-     </TOOL_CALL>
+   - Close issue: gh issue close {number}
+   - Clean up local branch: git checkout main && git pull && git branch -D {branch}
 
 【WORKFLOW AUTOMATION RULES】
 ! Automatically create feature branch from issue
