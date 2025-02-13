@@ -34,7 +34,6 @@ from rich.padding import Padding
 colorama.init()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 current_agent = []
 
@@ -322,13 +321,11 @@ def load_embedding_model():
             local_files_only=True
         )
     except Exception as e:
-        PrettyOutput.print(f"Failed to load embedding model: {str(e)}", OutputType.ERROR)
-        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
         # Load model
         embedding_model = SentenceTransformer(
             model_name,
             cache_folder=cache_dir,
-            local_files_only=True
+            local_files_only=False
         )
     
     return embedding_model
@@ -353,18 +350,16 @@ def load_rerank_model():
             local_files_only=True
         )
     except Exception as e:
-        PrettyOutput.print(f"Failed to load reranking model: {str(e)}", OutputType.ERROR)
-        os.system(f'huggingface-cli download --repo-type model --local-dir {cache_dir} {model_name}')
         # Load model and tokenizer
         tokenizer = AutoTokenizer.from_pretrained(
             model_name,
             cache_dir=cache_dir,
-            local_files_only=True
+            local_files_only=False
         )
         model = AutoModelForSequenceClassification.from_pretrained(
             model_name,
             cache_dir=cache_dir,
-            local_files_only=True
+            local_files_only=False
         )
     
     # Use GPU if available

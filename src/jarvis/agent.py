@@ -7,8 +7,8 @@ import yaml
 
 from jarvis.models.base import BasePlatform
 from jarvis.models.registry import PlatformRegistry
-from jarvis.tools import ToolRegistry
-from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env
+from jarvis.tools.registry import ToolRegistry, tool_call_help
+from jarvis.utils import PrettyOutput, OutputType, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env
 import os
 
 class Agent:
@@ -59,29 +59,6 @@ class Agent:
         tool_call_lines = []
         in_tool_call = False
 
-        tool_call_help = """Tool Usage Format:
-
-<TOOL_CALL>
-name: tool_name
-arguments:
-    param1: value1
-    param2: value2
-</TOOL_CALL>
-
-Strict Rules:
-- Execute only one tool at a time
-- Tool execution must strictly follow the tool usage format
-- Wait for user to provide execution results
-- Don't assume or imagine results
-- Don't create fake dialogues
-- If current information is insufficient, you may ask the user
-- Not all problem-solving steps are mandatory, skip as appropriate
-- Request user guidance when multiple iterations show no progress
-- If yaml string contains colons, wrap the entire string in quotes to avoid yaml parsing errors
-- Use | syntax for multi-line strings in yaml
-- If you can start executing the task, please start directly without asking the user if you can begin.
-
-"""
 
         # Process line by line
         for line in lines:
