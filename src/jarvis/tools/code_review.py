@@ -96,6 +96,7 @@ OUTPUT REQUIREMENTS:
 - Separate technical debt from blockers"""
 
             tool_registry = ToolRegistry()
+            tool_registry.use_tools(["execute_shell", "file_operation", "ask_user", "ask_codebase", "find_in_codebase", "create_ctags_agent"])
             tool_registry.dont_use_tools(["code_review"])
 
             review_agent = Agent(

@@ -97,6 +97,7 @@ class FindFilesTool:
 
 
             tool_registry = ToolRegistry()
+            tool_registry.use_tools(["execute_shell", "file_operation", "ask_user", "ask_codebase", "find_in_codebase", "create_ctags_agent"])
             tool_registry.dont_use_tools(["find_files"])
 
             # Create find files agent
