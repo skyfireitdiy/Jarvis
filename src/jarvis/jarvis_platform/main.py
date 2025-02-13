@@ -21,13 +21,15 @@ def list_platforms():
             # Print platform name
             PrettyOutput.section(f"{platform_name}", OutputType.SUCCESS)
             
+            output = ""
             # Print model list
             if models:
                 for model_name, description in models:
                     if description:
-                        PrettyOutput.print(f"  • {model_name} - {description}", OutputType.SUCCESS)
+                        output += f"  • {model_name} - {description}\n"
                     else:
-                        PrettyOutput.print(f"  • {model_name}", OutputType.SUCCESS)
+                        output += f"  • {model_name}\n"
+                PrettyOutput.print(output, OutputType.SUCCESS)
             else:
                 PrettyOutput.print("  • No available model information", OutputType.WARNING)
                 

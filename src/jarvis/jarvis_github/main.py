@@ -6,7 +6,7 @@ import yaml
 
 from jarvis.agent import Agent
 from jarvis.utils import PrettyOutput, OutputType, get_single_line_input, init_env
-from jarvis.tools import ToolRegistry
+from jarvis.tools.registry import ToolRegistry
 
 # System prompt for the GitHub workflow agent
 github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage the complete development workflow using GitHub CLI (gh). Your role is to coordinate the overall workflow while delegating code development tasks to specialized sub-agents.
@@ -17,13 +17,15 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
      <TOOL_CALL>
      name: execute_shell
      arguments:
-         command: gh issue develop {number} --checkout
+         command: |
+            gh issue develop {number} --checkout
      </TOOL_CALL>
    - Verify branch creation:
      <TOOL_CALL>
      name: execute_shell
      arguments:
-         command: git branch --show-current
+         command: |
+            git branch --show-current
      </TOOL_CALL>
 
 2. Code Development
@@ -48,14 +50,16 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
      name: code_review
      arguments:
          commit_sha: HEAD
-         requirement_desc: "Original issue requirements"
+         requirement_desc: |
+            "Original issue requirements"
      </TOOL_CALL>
    
    - Check code style and quality:
      <TOOL_CALL>
      name: execute_shell
      arguments:
-         command: git diff --name-only HEAD^ | xargs pylint
+         command: |
+            git diff --name-only HEAD^ | xargs pylint
      </TOOL_CALL>
 
    - If issues found, create fix sub-agent:
@@ -63,7 +67,8 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
      name: create_code_sub_agent
      arguments:
          name: "review-fixes"
-         subtask: "Fix code review issues: {issues}"
+         subtask: |
+            Fix code review issues: {issues}
      </TOOL_CALL>
 
 4. Pull Request Creation
@@ -92,7 +97,8 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
      <TOOL_CALL>
      name: execute_shell
      arguments:
-         command: gh pr view {number} --json reviews,comments,checks
+         command: |
+            gh pr view {number} --json reviews,comments,checks
      </TOOL_CALL>
 
    - For each review comment:
@@ -101,7 +107,8 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
         name: code_review
         arguments:
             commit_sha: HEAD
-            requirement_desc: "Review comment: {comment}"
+            requirement_desc: |
+                Review comment: {comment}
         </TOOL_CALL>
 
      2. Create fix sub-agent:
@@ -109,7 +116,8 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
         name: create_code_sub_agent
         arguments:
             name: "review-feedback"
-            subtask: "Address review feedback: {comment}"
+            subtask: |
+                Address review feedback: {comment}
         </TOOL_CALL>
 
      3. Verify fixes:
@@ -117,7 +125,8 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
         name: code_review
         arguments:
             commit_sha: HEAD
-            requirement_desc: "Verify fix for: {comment}"
+            requirement_desc: |
+                Verify fix for: {comment}
         </TOOL_CALL>
 
 6. PR Merge
@@ -125,13 +134,15 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
      <TOOL_CALL>
      name: execute_shell
      arguments:
-         command: gh pr checks {number}
+         command: |
+            gh pr checks {number}
      </TOOL_CALL>
    - Merge when ready:
      <TOOL_CALL>
      name: execute_shell
      arguments:
-         command: gh pr merge {number} --squash --delete-branch
+         command: |
+            gh pr merge {number} --squash --delete-branch
      </TOOL_CALL>
 
 7. Cleanup
@@ -139,13 +150,15 @@ github_workflow_prompt = """You are a GitHub Workflow Agent that helps manage th
      <TOOL_CALL>
      name: execute_shell
      arguments:
-         command: gh issue close {number}
+         command: |
+            gh issue close {number}
      </TOOL_CALL>
    - Clean up local branch:
      <TOOL_CALL>
      name: execute_shell
      arguments:
-         command: git checkout main && git pull && git branch -D {branch}
+         command: |
+            git checkout main && git pull && git branch -D {branch}
      </TOOL_CALL>
 
 【WORKFLOW AUTOMATION RULES】

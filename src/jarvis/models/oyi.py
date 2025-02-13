@@ -66,7 +66,7 @@ class OyiModel(BasePlatform):
                     "requestMsgCount": 65536,
                     "temperature": 0.8,
                     "speechVoice": "Alloy",
-                    "max_tokens": get_max_context_length(),
+                    "max_tokens": 8192,
                     "chatPluginIds": []
                 })
             }
@@ -171,19 +171,33 @@ class OyiModel(BasePlatform):
             # 获取响应内容
             response = requests.post(
                 f"{self.BASE_URL}/chatapi/chat/message/{message_id}",
-                headers=headers
+                headers=headers,
+                stream=True
             )
             
             if response.status_code == 200:
-                if not self.suppress_output:
-                    PrettyOutput.print(response.text, OutputType.SYSTEM)
-                self.messages.append({"role": "assistant", "content": response.text})
-                return response.text
+                full_response = ""
+                bin = b""
+                for chunk in response.iter_content(decode_unicode=True):
+                    if chunk:
+                        bin += chunk
+                        try:
+                            text = bin.decode('utf-8')
+                        except UnicodeDecodeError:
+                            continue
+                        if not self.suppress_output:
+                            PrettyOutput.print_stream(text)
+                        full_response += text
+                        bin = b""
+
+                PrettyOutput.print_stream_end()
+                
+                self.messages.append({"role": "assistant", "content": full_response})
+                return full_response
             else:
                 error_msg = f"Get response failed: {response.status_code}"
                 PrettyOutput.print(error_msg, OutputType.ERROR)
                 raise Exception(error_msg)
-            
         except Exception as e:
             PrettyOutput.print(f"Chat failed: {str(e)}", OutputType.ERROR)
             raise e

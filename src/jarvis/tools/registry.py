@@ -8,6 +8,27 @@ from jarvis.tools.base import Tool
 from jarvis.utils import OutputType, PrettyOutput, get_max_context_length
 
 
+tool_call_help = """Tool Usage Format:
+
+<TOOL_CALL>
+name: tool_name
+arguments:
+    param1: value1
+    param2: value2
+</TOOL_CALL>
+
+Strict Rules:
+- Execute only one tool at a time
+- Tool execution must strictly follow the tool usage format
+- Wait for user to provide execution results
+- Don't assume or imagine results
+- Don't create fake dialogues
+- If current information is insufficient, you may ask the user
+- Not all problem-solving steps are mandatory, skip as appropriate
+- Request user guidance when multiple iterations show no progress
+- ALWAYS use | syntax for string parameters to prevent parsing errors
+- If you can start executing the task, please start directly without asking the user if you can begin.
+"""
 
 class ToolRegistry:
     def load_tools(self) -> str:
@@ -19,17 +40,7 @@ class ToolRegistry:
                 tools_prompt += f"- Name: {tool['name']}\n"
                 tools_prompt += f"  Description: {tool['description']}\n"
                 tools_prompt += f"  Parameters: {tool['parameters']}\n"
-            tools_prompt += """
-    Tool Usage Format:
-
-    <TOOL_CALL>
-    name: tool_name
-    arguments:
-        param1: value1
-        param2: value2
-    </TOOL_CALL>
-    ---------------------------------------------
-    """
+            tools_prompt += tool_call_help
             return tools_prompt
         return ""
 
@@ -193,11 +204,14 @@ arguments:
 
             # Display tool call information
             PrettyOutput.section(f"Executing tool: {name}", OutputType.TOOL)
+            params = "Parameters:\n"
             if isinstance(args, dict):
                 for key, value in args.items():
-                    PrettyOutput.print(f"Parameter: {key} = {value}", OutputType.DEBUG)
+                    params += f"{key} = {value}\n"
             else:
-                PrettyOutput.print(f"Parameter: {args}", OutputType.DEBUG)
+                params += f"{args}"
+
+            PrettyOutput.print(params, OutputType.INFO)
             
             # Execute tool call
             result = self.execute_tool(name, args)

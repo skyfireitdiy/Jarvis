@@ -61,7 +61,7 @@ class ShellTool:
                 Path(output_file).unlink(missing_ok=True)
             
             return {
-                "success": return_code == 0,
+                "success": True,
                 "stdout": output,
                 "stderr": "",
             }
