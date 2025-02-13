@@ -56,7 +56,7 @@ commit_agent_prompt = """You are an Autonomous Git Commit Agent. Follow this pro
    ELSE:
      Proceed to message generation
 
-3. Change Inspection: git diff --staged
+3. Change Inspection: git diff --staged | cat -
    - Analyze diff content
    - Group related changes
    - Verify atomicity
