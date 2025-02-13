@@ -693,6 +693,7 @@ Please output 3 expressions directly, separated by two line breaks, without numb
     def search_similar(self, query: str, top_k: int = 30) -> List[str]:
         """Search related files"""
         try:
+            self.generate_codebase()
             if self.index is None:
                 return []            
             # Generate the query variants
