@@ -16,14 +16,12 @@ class ApplyPatchTool:
                 "description": "Path to the file to patch"
             },
             "start_line": {
-                "type": "string",
-                "description": "Start line number in hexadecimal (inclusive)",
-                "pattern": "^[0-9a-fA-F]+$"
+                "type": "integer",
+                "description": "Start line number",
             },
             "end_line": {
-                "type": "string",
-                "description": "End line number in hexadecimal (exclusive)",
-                "pattern": "^[0-9a-fA-F]+$"
+                "type": "integer",
+                "description": "End line number",
             },
             "new_code": {
                 "type": "string",
@@ -39,8 +37,8 @@ class ApplyPatchTool:
         Args:
             args: Dictionary containing:
                 - filename: Path to the file
-                - start_line: Hex string of start line number (inclusive)
-                - end_line: Hex string of end line number (exclusive)
+                - start_line: Start line number
+                - end_line: End line number
                 - new_code: New code to insert
                 
         Returns:
@@ -51,9 +49,8 @@ class ApplyPatchTool:
         """
         try:
             filename = args["filename"]
-            # Convert hex strings to integers
-            start_line = int(args["start_line"], 16)
-            end_line = int(args["end_line"], 16)
+            start_line = int(args["start_line"])
+            end_line = int(args["end_line"])
             new_code = args["new_code"]
             
             # Record the operation and the full path
@@ -97,19 +94,19 @@ class ApplyPatchTool:
                 }
             
             if start_line > len(lines) or end_line > len(lines):
-                PrettyOutput.print(f"Line range [{start_line:04x}, {end_line:04x}) out of bounds (file has {len(lines)} lines)", OutputType.WARNING)
+                PrettyOutput.print(f"Line range [{start_line}, {end_line}) out of bounds (file has {len(lines)} lines)", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"Line range [{start_line:04x}, {end_line:04x}) out of bounds (file has {len(lines)} lines)"
+                    "stderr": f"Line range [{start_line}, {end_line}) out of bounds (file has {len(lines)} lines)"
                 }
                 
             if start_line > end_line:
-                PrettyOutput.print(f"Invalid line range: [{start_line:04x}, {end_line:04x})", OutputType.WARNING)
+                PrettyOutput.print(f"Invalid line range: [{start_line}, {end_line})", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"Invalid line range: [{start_line:04x}, {end_line:04x})"
+                    "stderr": f"Invalid line range: [{start_line}, {end_line})"
                 }
             
             # Split new code into lines, ensuring it ends with a newline
