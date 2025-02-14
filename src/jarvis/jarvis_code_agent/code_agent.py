@@ -9,7 +9,7 @@ from jarvis.jarvis_code_agent.file_select import select_files
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools.git_commiter import GitCommitTool
 from jarvis.tools.registry import ToolRegistry
-from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, get_single_line_input, has_uncommitted_changes, init_env, find_git_root
+from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, get_single_line_input, has_uncommitted_changes, init_env, find_git_root, is_disable_codebase
 from jarvis.jarvis_codebase.main import CodeBase
 
 code_system_prompt = """
@@ -28,10 +28,11 @@ class CodeAgent:
 
     def _find_relevant_files(self, user_input) -> List[str]:
         try:
-            
-            PrettyOutput.print("Find files from codebase...", OutputType.INFO)
-            codebase = CodeBase(self.root_dir)
-            files1 = codebase.search_similar(user_input)
+            files1 = []
+            if not is_disable_codebase():
+                PrettyOutput.print("Find files from codebase...", OutputType.INFO)
+                codebase = CodeBase(self.root_dir)
+                files1 = codebase.search_similar(user_input)
 
             PrettyOutput.print("Find files by agent...", OutputType.INFO)
             find_file_tool_registry = ToolRegistry()
