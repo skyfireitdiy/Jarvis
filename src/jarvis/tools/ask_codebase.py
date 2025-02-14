@@ -50,9 +50,6 @@ class AskCodebaseTool:
             # Create new CodeBase instance
             git_root = find_git_root()
             codebase = CodeBase(git_root)
-            
-
-            codebase.generate_codebase()
 
             # Use ask_codebase method
             response = codebase.ask_codebase(question, top_k)

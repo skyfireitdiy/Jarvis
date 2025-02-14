@@ -96,7 +96,7 @@ class ReadCodeTool:
             formatted_lines = []
             for i, line in enumerate(lines[start_line:end_line]):
                 line_num = start_line + i
-                formatted_lines.append(f"{line_num:04x}{line}")
+                formatted_lines.append(f"{line_num:04x}:{line}")
                 
             content = "".join(formatted_lines)
 

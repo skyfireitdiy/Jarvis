@@ -16,7 +16,7 @@ class Agent:
     def __del__(self):
         delete_current_agent()
         
-    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False, tool_registry: Optional[ToolRegistry] = None, platform: Optional[BasePlatform] = None):
+    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False, tool_registry: Optional[ToolRegistry] = None, platform: Optional[BasePlatform] = None, summary_prompt: Optional[str] = None, auto_complete: Optional[bool] = None, record_methodology: Optional[bool] = None):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -33,14 +33,30 @@ class Agent:
         else:
             self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         self.tool_registry = tool_registry if tool_registry else ToolRegistry()
+        self.record_methodology = record_methodology if record_methodology else True
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
         # Load configuration from environment variables
+
+        self.summary_prompt = summary_prompt if summary_prompt else f"""Please generate a concise summary report of the task execution, including:
+
+1. Task Objective: Task restatement
+2. Execution Result: Success/Failure
+3. Key Information: Important information extracted during execution
+4. Important Findings: Any noteworthy discoveries
+5. Follow-up Suggestions: If any
+
+Please describe in concise bullet points, highlighting important information.
+"""
         
         self.max_context_length = get_max_context_length()
+
+        self.auto_complete = auto_complete if auto_complete else is_auto_complete()
+
+
         
             
         # Initialize methodology related attributes
@@ -50,6 +66,26 @@ class Agent:
         tools = self.tool_registry.get_all_tools()
         if tools:
             PrettyOutput.section(f"Available tools: {', '.join([tool['name'] for tool in tools])}", OutputType.SYSTEM)
+
+
+        # Load methodology
+        
+        tools_prompt = self.tool_registry.load_tools()
+        complete_prompt = """"""
+        if self.auto_complete:
+            complete_prompt = """
+            When the task is completed, you should print the following message:
+            <!!!COMPLETE!!!>
+            """
+
+        self.model.set_system_message(f"""
+{self.system_prompt}
+
+{tools_prompt}
+
+{complete_prompt}
+""")
+        self.first = True
 
     @staticmethod
     def extract_tool_calls(content: str) -> List[Dict]:
@@ -157,44 +193,35 @@ Please continue the task based on the above information.
         PrettyOutput.section("Task completed", OutputType.SUCCESS)
         
         if not self.is_sub_agent:
+            if self.record_methodology:
 
-            try:
-                # 让模型判断是否需要生成方法论
-                analysis_prompt = """The current task has ended, please analyze whether a methodology needs to be generated.
-If you think a methodology should be generated, first determine whether to create a new methodology or update an existing one. If updating an existing methodology, use 'update', otherwise use 'add'.
-If you think a methodology is not needed, please explain why.
-The methodology should be applicable to general scenarios, do not include task-specific information such as code commit messages.
-The methodology should include: problem restatement, optimal solution, notes (as needed), and nothing else.
-Only output the methodology tool call instruction, or the explanation for not generating a methodology. Do not output anything else.
-"""
-                self.prompt = analysis_prompt
-                response = self._call_model(self.prompt)
-                
-                # 检查是否包含工具调用
                 try:
-                    tool_calls = Agent.extract_tool_calls(response)
-                    if tool_calls:
-                        self.tool_registry.handle_tool_calls(tool_calls)
+                    # 让模型判断是否需要生成方法论
+                    analysis_prompt = """The current task has ended, please analyze whether a methodology needs to be generated.
+    If you think a methodology should be generated, first determine whether to create a new methodology or update an existing one. If updating an existing methodology, use 'update', otherwise use 'add'.
+    If you think a methodology is not needed, please explain why.
+    The methodology should be applicable to general scenarios, do not include task-specific information such as code commit messages.
+    The methodology should include: problem restatement, optimal solution, notes (as needed), and nothing else.
+    Only output the methodology tool call instruction, or the explanation for not generating a methodology. Do not output anything else.
+    """
+                    self.prompt = analysis_prompt
+                    response = self._call_model(self.prompt)
+                    
+                    # 检查是否包含工具调用
+                    try:
+                        tool_calls = Agent.extract_tool_calls(response)
+                        if tool_calls:
+                            self.tool_registry.handle_tool_calls(tool_calls)
+                    except Exception as e:
+                        PrettyOutput.print(f"Failed to handle methodology generation: {str(e)}", OutputType.ERROR)
+                    
                 except Exception as e:
-                    PrettyOutput.print(f"Failed to handle methodology generation: {str(e)}", OutputType.ERROR)
-                
-            except Exception as e:
-                PrettyOutput.print(f"Error generating methodology: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"Error generating methodology: {str(e)}", OutputType.ERROR)
             
             return "Task completed"
         
-        # 生成任务总结
-        summary_prompt = f"""Please generate a concise summary report of the task execution, including:
-
-1. Task Objective: Task restatement
-2. Execution Result: Success/Failure
-3. Key Information: Important information extracted during execution
-4. Important Findings: Any noteworthy discoveries
-5. Follow-up Suggestions: If any
-
-Please describe in concise bullet points, highlighting important information.
-"""
-        self.prompt = summary_prompt
+        
+        self.prompt = self.summary_prompt
         return self._call_model(self.prompt)
 
 
@@ -209,38 +236,21 @@ Please describe in concise bullet points, highlighting important information.
             str: Task summary report
         """
 
-        complete_prompt = """"""
-
-        if is_auto_complete():
-            complete_prompt = """
-            When the task is completed, you should print the following message:
-            <!!!COMPLETE!!!>
-            """
+        
 
         try:
             PrettyOutput.section("Preparing environment", OutputType.PLANNING)
             if file_list:
                 self.model.upload_files(file_list)
 
-            # Load methodology
-            methodology_prompt = load_methodology(user_input)
-            tools_prompt = self.tool_registry.load_tools()
-
             # 显示任务开始
             PrettyOutput.section(f"Starting new task: {self.name}", OutputType.PLANNING)
 
-            self.clear_history()  
-
-            self.model.set_system_message(f"""
-{self.system_prompt}
-
-{tools_prompt}
-
-{methodology_prompt}
-
-{complete_prompt}
-""")
-            self.prompt = f"{user_input}"
+            if self.first:
+                self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
+                self.first = False
+            else:
+                self.prompt = f"{user_input}"
 
             while True:
                 try:
@@ -270,7 +280,7 @@ Please describe in concise bullet points, highlighting important information.
                         self.prompt = tool_result
                         continue
 
-                    if is_auto_complete() and "<!!!COMPLETE!!!>" in current_response:
+                    if self.auto_complete and "<!!!COMPLETE!!!>" in current_response:
                         return self._complete_task()
                     
                     # 获取用户输入

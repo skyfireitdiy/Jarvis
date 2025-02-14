@@ -59,7 +59,7 @@ class CodeBase:
         """Get the list of files in the git repository, excluding the .jarvis-codebase directory"""
         files = os.popen("git ls-files").read().splitlines()
         # Filter out files in the .jarvis-codebase directory
-        return [f for f in files if not f.startswith(".jarvis-")]
+        return [f for f in files if not f.startswith(".jarvis")]
 
     def is_text_file(self, file_path: str):
         with open(file_path, "r", encoding="utf-8") as f:
