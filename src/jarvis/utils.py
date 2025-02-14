@@ -55,12 +55,14 @@ custom_theme = Theme({
 console = Console(theme=custom_theme)
 
 def add_agent(agent_name: str):
+    PrettyOutput.print(f"Add agent: {agent_name}", OutputType.INFO)
     current_agent.append(agent_name)
 
 def get_agent_list():
     return ']['.join(current_agent) if current_agent else "No Agent"
 
 def delete_current_agent():
+    PrettyOutput.print(f"Delete agent: {current_agent[-1]}", OutputType.INFO)
     current_agent.pop()
 
 class OutputType(Enum):
