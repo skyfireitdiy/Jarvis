@@ -152,9 +152,8 @@ class PrettyOutput:
         
         # Add timestamp and agent info
         if timestamp:
-            formatted.append(f"[{get_agent_list()}]", style="blue")
             formatted.append(f"[{datetime.now().strftime('%H:%M:%S')}] ", style="white")
-        
+        formatted.append(f"[{get_agent_list()}]", style="blue")
         # Add icon
         icon = PrettyOutput.ICONS.get(output_type, "")
         formatted.append(f"{icon} ", style=output_type.value)
@@ -165,52 +164,14 @@ class PrettyOutput:
     def print(text: str, output_type: OutputType, timestamp: bool = True):
         """Print formatted output using rich console"""
         # Get formatted header
+        lang = PrettyOutput._detect_language(text, default_lang='markdown')
         header = PrettyOutput.format("", output_type, timestamp)
-        console.print(header)
 
-        # Create panel with content
-        if output_type == OutputType.CODE:
-            lang = PrettyOutput._detect_language(text)
-            content = Syntax(text, lang, theme="monokai", line_numbers=True)
+        content = Syntax(text, lang, theme="monokai", line_numbers=True)
             
-        elif output_type == OutputType.ERROR:
-            lang = PrettyOutput._detect_language(text)
-            content = Syntax(text, lang, theme="monokai")
-            
-        elif output_type == OutputType.PLANNING:
-            lang = PrettyOutput._detect_language(text, default_lang='markdown')
-            content = Syntax(text, lang, theme="monokai")
-            
-        elif output_type == OutputType.RESULT:
-            lang = PrettyOutput._detect_language(text)
-            content = Syntax(text, lang, theme="monokai")
-            
-        elif output_type == OutputType.SYSTEM:
-            lang = PrettyOutput._detect_language(text, default_lang='markdown')
-            content = Syntax(text, lang, theme="monokai")
-            
-        elif output_type == OutputType.TOOL:
-            lang = PrettyOutput._detect_language(text, default_lang='yaml')
-            content = Syntax(text, lang, theme="monokai")
-            
-        elif output_type in (OutputType.INFO, OutputType.WARNING, OutputType.SUCCESS, OutputType.DEBUG):
-            lang = PrettyOutput._detect_language(text)
-            content = Syntax(text, lang, theme="monokai")
-            
-        elif output_type == OutputType.PROGRESS:
-            content = Text(text, style="blue")
-            
-        elif output_type == OutputType.USER:
-            lang = PrettyOutput._detect_language(text)
-            content = Syntax(text, lang, theme="monokai")
-            
-        else:
-            lang = PrettyOutput._detect_language(text)
-            content = Syntax(text, lang, theme="monokai")
-
         # Print panel with appropriate border style
         border_style = "red" if output_type == OutputType.ERROR else output_type.value
-        console.print(Panel(content, border_style=border_style))
+        console.print(Panel(content, border_style=border_style, title=header, title_align="left"))
         
         # Print stack trace for errors
         if output_type == OutputType.ERROR:
