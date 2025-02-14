@@ -66,6 +66,7 @@ class ApplyPatchTool:
             
             # Check if file exists
             if not os.path.exists(filename):
+                PrettyOutput.print(f"File does not exist: {filename}", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
@@ -79,6 +80,7 @@ class ApplyPatchTool:
                 if lines and not lines[-1].endswith('\n'):
                     lines[-1] += '\n'
             except UnicodeDecodeError:
+                PrettyOutput.print("Failed to decode file with UTF-8 encoding", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
@@ -87,6 +89,7 @@ class ApplyPatchTool:
                 
             # Validate line range
             if start_line < 0 or end_line < 0:
+                PrettyOutput.print("Line numbers cannot be negative", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
@@ -94,6 +97,7 @@ class ApplyPatchTool:
                 }
             
             if start_line > len(lines) or end_line > len(lines):
+                PrettyOutput.print(f"Line range [{start_line:04x}, {end_line:04x}) out of bounds (file has {len(lines)} lines)", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
@@ -101,6 +105,7 @@ class ApplyPatchTool:
                 }
                 
             if start_line > end_line:
+                PrettyOutput.print(f"Invalid line range: [{start_line:04x}, {end_line:04x})", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
@@ -120,6 +125,7 @@ class ApplyPatchTool:
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.writelines(new_content)
             except Exception as e:
+                PrettyOutput.print(f"Failed to write file: {str(e)}", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
@@ -139,12 +145,14 @@ class ApplyPatchTool:
             }
             
         except ValueError as e:
+            PrettyOutput.print(f"Invalid hexadecimal line number: {str(e)}", OutputType.WARNING)
             return {
                 "success": False,
                 "stdout": "",
                 "stderr": f"Invalid hexadecimal line number: {str(e)}"
             }
         except Exception as e:
+            PrettyOutput.print(f"Failed to apply patch: {str(e)}", OutputType.WARNING)
             return {
                 "success": False,
                 "stdout": "",
