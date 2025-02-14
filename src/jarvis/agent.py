@@ -276,23 +276,23 @@ Please continue the task based on the above information.
                         continue
                     else:
                         current_response = self._call_model(self.prompt)
-                        self.conversation_length += len(current_response)  # Add response length
+                        self.prompt = ""
+                        self.conversation_length += len(current_response) 
+
+                    for filter in self.output_filter:
+                        self.prompt += filter(current_response) + "\n"
+
                     try:
                         result = Agent.extract_tool_calls(current_response)
                     except Exception as e:
                         PrettyOutput.print(f"Tool call error: {str(e)}", OutputType.ERROR)
-                        self.prompt = f"Tool call error: {str(e)}"
+                        self.prompt += f"Tool call error: {str(e)}"
                         continue
                     
                     if len(result) > 0:
                         PrettyOutput.print("Executing tool call...", OutputType.PROGRESS)
                         tool_result = self.tool_registry.handle_tool_calls(result)
-                        self.prompt = tool_result
-                        continue
-                    
-                    self.prompt = ""
-                    for filter in self.output_filter:
-                        self.prompt += filter(current_response)
+                        self.prompt += tool_result
                     
                     if self.prompt:
                         continue
