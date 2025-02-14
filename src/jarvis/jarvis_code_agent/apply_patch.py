@@ -8,7 +8,7 @@ from jarvis.utils import OutputType, PrettyOutput
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """Parse patches from string with format:
     <PATCH>
-    > /path/to/file [start_line, end_line)
+    > /path/to/file start_line,end_line
     content_line1
     content_line2
     ...
@@ -28,7 +28,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             continue
             
         # Extract file path and line range
-        match = re.match(r'>\s*([^\[]+)\s*\[(\d+),\s*(\d+)\)', file_info)
+        match = re.match(r'>\s*([^\s]+)\s+(\d+),(\d+)', file_info)
         if not match:
             continue
             
@@ -48,8 +48,11 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             'end_line': end_line,
             'content': content
         })
+    
+    # Sort patches by start line in reverse order to apply from bottom to top
     for filepath in result:
         result[filepath].sort(key=lambda x: x['start_line'], reverse=True)
+    
     return result
 
 
