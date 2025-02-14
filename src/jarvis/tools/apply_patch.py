@@ -18,11 +18,11 @@ class ApplyPatchTool:
             },
             "start_line": {
                 "type": "integer",
-                "description": "Start line number",
+                "description": "Start line number, 0 for the first line",
             },
             "end_line": {
                 "type": "integer",
-                "description": "End line number",
+                "description": "End line number, 0 for the last line",
             },
             "new_code": {
                 "type": "string",
