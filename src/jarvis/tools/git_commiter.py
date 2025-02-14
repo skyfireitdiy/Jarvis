@@ -28,7 +28,7 @@ class GitCommitTool:
         """Execute automatic commit process"""
         try:
             PrettyOutput.print("Add files to commit...", OutputType.SYSTEM)
-            os.popen("git add .")
+            os.system("git add .")
             PrettyOutput.print("Get diff...", OutputType.SYSTEM)
             diff = os.popen("git diff --cached --exit-code").read()
             PrettyOutput.print(diff, OutputType.CODE)
@@ -42,7 +42,6 @@ class GitCommitTool:
 
             {diff}
             '''
-            PrettyOutput.print(prompt, OutputType.CODE)
             PrettyOutput.print("Generate commit message...", OutputType.SYSTEM)
             platform = PlatformRegistry().get_codegen_platform()
             commit_message = platform.chat_until_success(prompt)
