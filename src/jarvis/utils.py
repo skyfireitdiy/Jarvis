@@ -167,7 +167,7 @@ class PrettyOutput:
         lang = PrettyOutput._detect_language(text, default_lang='markdown')
         header = PrettyOutput.format("", output_type, timestamp)
 
-        content = Syntax(text, lang, theme="monokai", line_numbers=True)
+        content = Syntax(text, lang, theme="monokai")
             
         # Print panel with appropriate border style
         border_style = "red" if output_type == OutputType.ERROR else output_type.value
