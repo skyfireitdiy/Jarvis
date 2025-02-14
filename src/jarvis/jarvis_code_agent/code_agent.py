@@ -28,6 +28,7 @@ class CodeAgent:
 
     def _find_relevant_files(self, user_input) -> List[str]:
         try:
+            
             PrettyOutput.print("Find files from codebase...", OutputType.INFO)
             codebase = CodeBase(self.root_dir)
             files1 = codebase.search_similar(user_input)
