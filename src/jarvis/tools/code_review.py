@@ -30,8 +30,8 @@ class CodeReviewTool:
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            commit_sha = args["commit_sha"]
-            requirement = args["requirement_desc"]
+            commit_sha = args["commit_sha"].strip()
+            requirement = args["requirement_desc"].strip()
             
             system_prompt = """You are an autonomous code review expert. Perform in-depth analysis following these guidelines:
 

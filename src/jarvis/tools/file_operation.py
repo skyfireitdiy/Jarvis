@@ -37,8 +37,8 @@ class FileOperationTool:
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute file operations"""
         try:
-            operation = args["operation"]
-            filepath = args["filepath"]
+            operation = args["operation"].strip()
+            filepath = args["filepath"].strip()
             encoding = args.get("encoding", "utf-8")
             
             # Record the operation and the full path

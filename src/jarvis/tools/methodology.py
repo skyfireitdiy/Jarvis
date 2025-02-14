@@ -73,9 +73,9 @@ class MethodologyTool:
         Returns:
             Dict[str, Any]: A dictionary containing the execution result
         """
-        operation = args.get("operation")
-        problem_type = args.get("problem_type")
-        content = args.get("content")
+        operation = args.get("operation", "").strip()
+        problem_type = args.get("problem_type", "").strip()
+        content = args.get("content", "").strip()
         
         if not operation or not problem_type:
             return {

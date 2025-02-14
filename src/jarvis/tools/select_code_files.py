@@ -30,8 +30,8 @@ class CodeFileSelecterTool:
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute interactive file selection"""
         try:
-            related_files = args["related_files"]
-            root_dir = args.get("root_dir", ".")
+            related_files = args.get("related_files", [])
+            root_dir = args.get("root_dir", ".").strip()
 
             PrettyOutput.print("Starting interactive file selection...", OutputType.INFO)
 

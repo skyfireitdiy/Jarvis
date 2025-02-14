@@ -20,7 +20,7 @@ class WebpageTool:
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Read webpage content"""
         try:
-            url = args["url"]
+            url = args["url"].strip()   
             
             # Set request headers
             headers = {

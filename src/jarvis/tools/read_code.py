@@ -45,7 +45,7 @@ class ReadCodeTool:
                 - stderr: Error message if any
         """
         try:
-            filepath = args["filepath"]
+            filepath = args["filepath"].strip()
             start_line = args.get("start_line", 0)
             end_line = args.get("end_line", -1)
             
@@ -96,7 +96,7 @@ class ReadCodeTool:
             formatted_lines = []
             for i, line in enumerate(lines[start_line:end_line]):
                 line_num = start_line + i
-                formatted_lines.append(f"{line_num}:{line}")
+                formatted_lines.append(f"{line_num:>5}:{line}")
                 
             content = "".join(formatted_lines)
 
