@@ -99,7 +99,7 @@ class ApplyPatchTool:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"Line range [{start_line}, {end_line}) out of bounds (file has {len(lines)} lines)"
+                    "stderr": f"Line range [{start_line}, {end_line}) out of bounds (file has {len(lines)} lines), File: {filename}"
                 }
                 
             if start_line > end_line:

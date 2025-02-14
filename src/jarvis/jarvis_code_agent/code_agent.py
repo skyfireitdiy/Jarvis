@@ -120,6 +120,7 @@ class CodeAgent:
                                - The indentation is consistent
                                - The changes follow clean code principles
                                - The modification is well-documented where needed
+                               - The filename is correct
                                """)
                 if has_uncommitted_changes():
                     if self._user_comfirm("Do you want to commit the code?", default=True):
