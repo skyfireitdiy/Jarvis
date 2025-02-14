@@ -4,10 +4,10 @@ from jarvis.utils import OutputType, PrettyOutput
 
 
 class ReadCodeTool:
-    """Read code file with hexadecimal line numbers"""
+    """Read code file with line numbers"""
     
     name = "read_code"
-    description = "Read code file with hexadecimal line numbers (4 digits)"
+    description = "Read code file with line numbers"
     parameters = {
         "type": "object",
         "properties": {
@@ -96,11 +96,11 @@ class ReadCodeTool:
             formatted_lines = []
             for i, line in enumerate(lines[start_line:end_line]):
                 line_num = start_line + i
-                formatted_lines.append(f"{line_num:04x}:{line}")
+                formatted_lines.append(f"{line_num}:{line}")
                 
             content = "".join(formatted_lines)
 
-            PrettyOutput.print(f"File: {filepath}\nLines: [{start_line:04x}, {end_line:04x})\n{content}", OutputType.CODE)
+            PrettyOutput.print(f"File: {filepath}\nLines: [{start_line}, {end_line})\n{content}", OutputType.CODE)
             
             return {
                 "success": True,
