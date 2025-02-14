@@ -117,36 +117,42 @@ class CodeAgent:
 Files related to the requirement: 
 {files_prompt}
 
-Please analyze the requirement and the files, and then provide a plan for the code modification.
+## Analysis Phase
+Please analyze the requirement and the files, then provide a plan for the code modification.
 
-Tips:
-- For large file(>200 lines), you can use shell command `ctags/grep` to find key location, then use `read_code` tool to read the part of code.
-- For small file(>100 lines), you can use `read_code` tool to read the code and analyze the code.
-- If you can't find the key location, you can use `ask_user` tool to ask the user for help.
+### File Analysis Tips
+- For large files (>200 lines):
+  - Use shell commands (ctags/grep) to locate key sections
+  - Then use `read_code` to examine specific parts
+- For small files (<100 lines):
+  - Use `read_code` to analyze the entire file
+- If key locations are unclear:
+  - Use `ask_user` to get guidance
 
-After you provide the plan, you can generate patches to modify the code.
+## Implementation Guidelines
 
-Follow these clean code principles when making changes:
-1. Keep functions small and focused on a single task
-2. Use meaningful and descriptive names for variables, functions, and classes
-3. Maintain consistent code style and indentation
+### Clean Code Principles
+1. Keep functions small and focused
+2. Use meaningful and descriptive names
+3. Maintain consistent code style
 4. Add clear comments for complex logic
-5. Follow DRY (Don't Repeat Yourself) principle
+5. Follow DRY (Don't Repeat Yourself)
 6. Keep code modular and maintainable
 7. Handle errors appropriately
 8. Write self-documenting code
-9. Keep the code simple and readable
-10. Follow the project's existing patterns and conventions
+9. Keep code simple and readable
+10. Follow project patterns and conventions
 
-Before applying the patch, verify that:
-- The changes are minimal and focused
-- The code style matches the existing codebase
-- The indentation is consistent
-- The changes follow clean code principles
-- The modification is well-documented where needed
-- The filename is correct
+### Pre-Patch Checklist
+- Changes are minimal and focused
+- Code style matches existing codebase
+- Indentation is consistent
+- Changes follow clean code principles
+- Modifications are well-documented
+- Filenames are correct
 
-Patches format:
+## Patch Format
+Patches should follow this format:
 <PATCH>
 > /path/to/file start_line,end_line
 content_line1
@@ -154,9 +160,11 @@ content_line2
 ...
 </PATCH> 
 
-This patch will replace the content of the file from start_line(included) to end_line(excluded) with the content.
+Notes:
+- The patch replaces content from start_line (included) to end_line (excluded)
+- You can output multiple patches
+- <PATCH> and <TOOL_CALL> can only appear once in the output, if both appear, the <PATCH> will be ignored.
 
-You can output multiple patches.
 """
         while True:
             self.agent.run(prompt)
