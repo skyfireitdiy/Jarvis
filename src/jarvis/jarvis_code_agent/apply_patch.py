@@ -46,7 +46,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             'content': content
         })
     for filepath in result:
-        result[filepath].sort(key=lambda x: x['start_line'])
+        result[filepath].sort(key=lambda x: x['start_line'], reverse=True)
     return result
 
 
