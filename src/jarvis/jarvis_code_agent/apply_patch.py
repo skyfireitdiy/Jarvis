@@ -38,6 +38,9 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         
         # Get content lines (skip the first line with file info)
         content = '\n'.join(lines[1:])
+
+        if filepath not in result:
+            result[filepath] = []
         
         # Store in result dictionary
         result[filepath].append({
