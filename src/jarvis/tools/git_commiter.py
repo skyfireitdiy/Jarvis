@@ -44,6 +44,7 @@ class GitCommitTool:
             '''
             PrettyOutput.print("Generate commit message...", OutputType.SYSTEM)
             platform = PlatformRegistry().get_codegen_platform()
+            platform.set_suppress_output(True)
             commit_message = platform.chat_until_success(prompt)
             commit_message = self._extract_commit_message(commit_message)
             PrettyOutput.print("Commit...", OutputType.INFO)
