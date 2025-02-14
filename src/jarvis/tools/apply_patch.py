@@ -1,5 +1,6 @@
 from typing import Dict, Any
 import os
+from jarvis.tools.read_code import ReadCodeTool
 from jarvis.utils import OutputType, PrettyOutput
 
 
@@ -119,8 +120,29 @@ class ApplyPatchTool:
             
             # Write back to file
             try:
-                with open(filename, 'w', encoding='utf-8') as f:
-                    f.writelines(new_content)
+                open(filename, 'w', encoding='utf-8').writelines(new_content)
+                new_start = max(0, start_line - 2)
+                new_end = min(len(new_content), end_line + 2)
+                read_code_tool = ReadCodeTool()
+                code = read_code_tool.execute({
+                    "filename": filename,
+                    "start_line": new_start,
+                    "end_line": new_end
+                })
+                # Update success message based on operation type
+                if start_line == end_line:
+                    message = f"Successfully inserted code at line {start_line:04x}"
+                else:
+                    message = f"Successfully replaced lines [{start_line:04x}, {end_line:04x})"
+
+                if code["success"]:
+                    message += f"\n\nCode after patch:\n{code['stdout']}\n\nPlease verify the code is correct."
+
+                return {
+                    "success": True,
+                    "stdout": message,
+                    "stderr": ""
+                }
             except Exception as e:
                 PrettyOutput.print(f"Failed to write file: {str(e)}", OutputType.WARNING)
                 return {
@@ -129,17 +151,6 @@ class ApplyPatchTool:
                     "stderr": f"Failed to write file: {str(e)}"
                 }
             
-            # Update success message based on operation type
-            if start_line == end_line:
-                message = f"Successfully inserted code at line {start_line:04x}"
-            else:
-                message = f"Successfully replaced lines [{start_line:04x}, {end_line:04x})"
-            
-            return {
-                "success": True,
-                "stdout": message,
-                "stderr": ""
-            }
             
         except ValueError as e:
             PrettyOutput.print(f"Invalid hexadecimal line number: {str(e)}", OutputType.WARNING)

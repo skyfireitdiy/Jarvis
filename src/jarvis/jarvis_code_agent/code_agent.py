@@ -86,7 +86,7 @@ class CodeAgent:
             git_commiter.execute({})
 
     def _user_comfirm(self, tip:str, default=True):
-        ret = get_single_line_input(f"{tip}" + "[Y/n]" if default else "[y/N]")
+        ret = get_single_line_input(f"{tip}" + "[Y/n]" if default else "[y/N]" + ": ")
         if ret == "":
             return default
         else:
