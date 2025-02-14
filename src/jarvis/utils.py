@@ -510,3 +510,6 @@ def load_methodology(user_input: str) -> str:
     
 def is_auto_complete() -> bool:
     return os.getenv('JARVIS_AUTO_COMPLETE', 'false') == 'true'
+
+def is_disable_codebase() -> bool:
+    return os.getenv('JARVIS_DISABLE_CODEBASE', 'false') == 'true'
