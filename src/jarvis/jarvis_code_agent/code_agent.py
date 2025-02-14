@@ -5,6 +5,7 @@ from typing import List
 
 import yaml
 from jarvis.agent import Agent
+from jarvis.jarvis_code_agent.apply_patch import apply_patch
 from jarvis.jarvis_code_agent.file_select import select_files
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools.git_commiter import GitCommitTool
@@ -24,7 +25,14 @@ class CodeAgent:
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
         tool_registry.use_tools(["read_code", "execute_shell", "search", "code_review", "ask_user"])
-        self.agent = Agent(system_prompt=code_system_prompt, name="CodeAgent", auto_complete=False, is_sub_agent=False, tool_registry=tool_registry, platform=PlatformRegistry().get_codegen_platform(), record_methodology=False)
+        self.agent = Agent(system_prompt=code_system_prompt, 
+                           name="CodeAgent", 
+                           auto_complete=False,
+                           is_sub_agent=False, 
+                           tool_registry=tool_registry, 
+                           platform=PlatformRegistry().get_codegen_platform(), 
+                           record_methodology=False,
+                           output_filter=[apply_patch])
 
     def _find_relevant_files(self, user_input) -> List[str]:
         try:
