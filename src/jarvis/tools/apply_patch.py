@@ -8,7 +8,7 @@ class ApplyPatchTool:
     """Apply code patch tool with hexadecimal line numbers"""
     
     name = "apply_patch"
-    description = "Apply code patch by replacing code within specified hexadecimal line range"
+    description = "Apply code patch by replacing code within specified line range, start line will be replaced, end line will not be replaced"
     parameters = {
         "type": "object",
         "properties": {
@@ -18,11 +18,11 @@ class ApplyPatchTool:
             },
             "start_line": {
                 "type": "integer",
-                "description": "Start line number(0-based)",
+                "description": "Start line number(0-based), this line will be replaced",
             },
             "end_line": {
                 "type": "integer",
-                "description": "End line number(0-based)",
+                "description": "End line number(0-based), this line will not be replaced",
             },
             "new_code": {
                 "type": "string",
@@ -58,9 +58,9 @@ class ApplyPatchTool:
             abs_path = os.path.abspath(filename)
             PrettyOutput.print(f"Applying patch to: {abs_path}", OutputType.INFO)
             if start_line == end_line:
-                PrettyOutput.print(f"Inserting at line {start_line:04x}", OutputType.INFO)
+                PrettyOutput.print(f"Inserting at line {start_line:04}", OutputType.INFO)
             else:
-                PrettyOutput.print(f"Replacing lines [{start_line:04x}, {end_line:04x})", OutputType.INFO)
+                PrettyOutput.print(f"Replacing lines [{start_line:04}, {end_line:04})", OutputType.INFO)
             
             # Check if file exists
             if not os.path.exists(filename):
@@ -131,9 +131,9 @@ class ApplyPatchTool:
                 })
                 # Update success message based on operation type
                 if start_line == end_line:
-                    message = f"Successfully inserted code at line {start_line:04x}"
+                    message = f"Successfully inserted code at line {start_line}"
                 else:
-                    message = f"Successfully replaced lines [{start_line:04x}, {end_line:04x})"
+                    message = f"Successfully replaced lines [{start_line}, {end_line})"
 
                 if code["success"]:
                     message += f"\n\nCode after patch:\n{code['stdout']}\n\nPlease verify the code is correct."
