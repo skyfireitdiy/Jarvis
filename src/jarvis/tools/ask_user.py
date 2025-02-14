@@ -35,13 +35,6 @@ class AskUserTool:
             # Get user input
             user_response = get_multiline_input("Please enter your answer (input empty line to end)")
             
-            if user_response == "__interrupt__":
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "User canceled input"
-                }
-            
             return {
                 "success": True,
                 "stdout": user_response,

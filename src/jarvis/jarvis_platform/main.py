@@ -57,7 +57,7 @@ def chat_with_model(platform_name: str, model_name: str):
             user_input = get_multiline_input("")
             
             # Check if input is cancelled
-            if user_input == "__interrupt__" or user_input.strip() == "/bye":
+            if user_input.strip() == "/bye":
                 PrettyOutput.print("Bye!", OutputType.SUCCESS)
                 break
                 

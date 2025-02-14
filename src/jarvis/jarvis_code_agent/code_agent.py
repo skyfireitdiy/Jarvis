@@ -207,7 +207,7 @@ def main():
         while True:
             try:
                 user_input = get_multiline_input("Please enter your requirement (input empty line to exit):")
-                if not user_input or user_input == "__interrupt__":
+                if not user_input:
                     break
                 agent = CodeAgent()
                 agent.run(user_input)

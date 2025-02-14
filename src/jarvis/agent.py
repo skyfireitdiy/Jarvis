@@ -302,9 +302,6 @@ Please continue the task based on the above information.
                     
                     # 获取用户输入
                     user_input = get_multiline_input(f"{self.name}: You can continue to input, or enter an empty line to end the current task")
-                    if user_input == "__interrupt__":
-                        PrettyOutput.print("Task cancelled by user", OutputType.WARNING)
-                        return "Task cancelled by user"
 
                     if user_input:
                         self.prompt = user_input
@@ -467,7 +464,7 @@ def main():
         while True:
             try:
                 user_input = get_multiline_input("Please enter your task (input empty line to exit):")
-                if not user_input or user_input == "__interrupt__":
+                if not user_input:
                     break
                 agent.run(user_input, args.files)
             except Exception as e:
