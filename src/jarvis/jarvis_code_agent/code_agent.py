@@ -23,7 +23,7 @@ class CodeAgent:
     def __init__(self):
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
-        tool_registry.use_tools(["read_code", "execute_shell", "search", "code_review", "ask_user", "apply_patch"])
+        tool_registry.use_tools(["read_code", "execute_shell", "search", "code_review", "ask_user"])
         self.agent = Agent(system_prompt=code_system_prompt, name="CodeAgent", auto_complete=False, is_sub_agent=False, tool_registry=tool_registry, platform=PlatformRegistry().get_codegen_platform(), record_methodology=False)
 
     def _find_relevant_files(self, user_input) -> List[str]:
@@ -115,55 +115,63 @@ Tips:
 - For large file(>200 lines), you can use shell command `ctags/grep` to find key location, then use `read_code` tool to read the part of code.
 - For small file(>100 lines), you can use `read_code` tool to read the code and analyze the code.
 - If you can't find the key location, you can use `ask_user` tool to ask the user for help.
+
+After you provide the plan, you can generate patches to modify the code.
+
+Follow these clean code principles when making changes:
+1. Keep functions small and focused on a single task
+2. Use meaningful and descriptive names for variables, functions, and classes
+3. Maintain consistent code style and indentation
+4. Add clear comments for complex logic
+5. Follow DRY (Don't Repeat Yourself) principle
+6. Keep code modular and maintainable
+7. Handle errors appropriately
+8. Write self-documenting code
+9. Keep the code simple and readable
+10. Follow the project's existing patterns and conventions
+
+Before applying the patch, verify that:
+- The changes are minimal and focused
+- The code style matches the existing codebase
+- The indentation is consistent
+- The changes follow clean code principles
+- The modification is well-documented where needed
+- The filename is correct
+
+Patches format:
+<PATCH>
+> /path/to/file [start_line, end_line)
+content_line1
+content_line2
+...
+</PATCH> 
+
+You can output multiple patches.
 """
         while True:
             self.agent.run(prompt)
-            user_input = self._user_comfirm("Do you want to modify the code?", default=True)
-            if user_input:
-                self.agent.run("""Please make above modification use `apply_patch` tool. Only make ONE patch every time.
-                               
-                               Follow these clean code principles when making changes:
-                               1. Keep functions small and focused on a single task
-                               2. Use meaningful and descriptive names for variables, functions, and classes
-                               3. Maintain consistent code style and indentation
-                               4. Add clear comments for complex logic
-                               5. Follow DRY (Don't Repeat Yourself) principle
-                               6. Keep code modular and maintainable
-                               7. Handle errors appropriately
-                               8. Write self-documenting code
-                               9. Keep the code simple and readable
-                               10. Follow the project's existing patterns and conventions
-                               
-                               Before applying the patch, verify that:
-                               - The changes are minimal and focused
-                               - The code style matches the existing codebase
-                               - The indentation is consistent
-                               - The changes follow clean code principles
-                               - The modification is well-documented where needed
-                               - The filename is correct
-                               """)
-                if has_uncommitted_changes():
-                    if self._user_comfirm("Do you want to commit the code?", default=True):
-                        git_commiter = GitCommitTool()
-                        commit_result = git_commiter.execute({})
-                        commit_id = ""
-                        commit_message = ""
-                        if commit_result["success"]:
-                            structed_data = yaml.safe_load(commit_result["stdout"])
-                            commit_id = structed_data["commit_id"]
-                            commit_message = structed_data["commit_message"]
-                        if self._user_comfirm("Do you want to continue?", default=False):
-                            new_requirement = get_multiline_input("Please input new requirement. (empty line to exit)")
-                            if new_requirement == "":
-                                break
-                            
-                            prompt = f"User has apply patches, commit id: '{commit_id}' commit message: '{commit_message}'\n\nPlease analyze the new requirement, and then provide a plan for the code modification."
-                            continue
-                    else:
-                        os.system("git reset --hard")
-                        advice = get_multiline_input("Please provide advice for the code modification. (empty line to exit)")
-                        if advice:
-                            self.agent.run(f"User reject this patch, code has been reset. user advice: {advice}\n Please re-analyze the requirement and the files, and then provide a plan for the code modification.")
+            if has_uncommitted_changes():
+                if self._user_comfirm("Do you want to commit the code?", default=True):
+                    git_commiter = GitCommitTool()
+                    commit_result = git_commiter.execute({})
+                    commit_id = ""
+                    commit_message = ""
+                    if commit_result["success"]:
+                        structed_data = yaml.safe_load(commit_result["stdout"])
+                        commit_id = structed_data["commit_id"]
+                        commit_message = structed_data["commit_message"]
+                    if self._user_comfirm("Do you want to continue?", default=False):
+                        new_requirement = get_multiline_input("Please input new requirement. (empty line to exit)")
+                        if new_requirement == "":
+                            break
+                        
+                        prompt = f"User has apply patches, commit id: '{commit_id}' commit message: '{commit_message}'\n\nPlease analyze the new requirement, and then provide a plan for the code modification."
+                        continue
+                else:
+                    os.system("git reset --hard")
+                    advice = get_multiline_input("Please provide advice for the code modification. (empty line to exit)")
+                    if advice:
+                        self.agent.run(f"User reject this patch, code has been reset. user advice: {advice}\n Please re-analyze the requirement and the files, and then provide a plan for the code modification.")
             else:
                 prompt = get_multiline_input("Please input your advice for the code modification. (empty line to exit)")
                 if not prompt:
