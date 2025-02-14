@@ -48,7 +48,7 @@ class ApplyPatchTool:
                 - stderr: Error message if any
         """
         try:
-            filename = args["filename"]
+            filename = args["filename"].strip()
             start_line = int(args["start_line"])
             end_line = int(args["end_line"])
             new_code = args["new_code"]

@@ -31,7 +31,7 @@ class ChdirTool:
             - error: 失败时的错误信息
         """
         try:
-            path = os.path.expanduser(args["path"])  # 展开 ~ 等路径
+            path = os.path.expanduser(args["path"].strip())  # 展开 ~ 等路径
             path = os.path.abspath(path)  # 转换为绝对路径
             
             # 检查目录是否存在

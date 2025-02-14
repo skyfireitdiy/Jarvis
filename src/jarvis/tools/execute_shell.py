@@ -29,7 +29,7 @@ class ShellTool:
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute shell command"""
         try:
-            command = args["command"]
+            command = args["command"].strip()
             
             # Generate temporary file name
             output_file = os.path.join(tempfile.gettempdir(), f"jarvis_shell_{os.getpid()}.log")

@@ -47,7 +47,7 @@ class TestAgentTool:
             )
 
             result = test_agent.run(
-                f"Analyze and test changes in commit {args['commit_sha']}"
+                f"Analyze and test changes in commit {args['commit_sha'].strip()}"
             )
 
             return {
