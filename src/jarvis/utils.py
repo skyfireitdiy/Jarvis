@@ -171,7 +171,7 @@ class PrettyOutput:
             
         # Print panel with appropriate border style
         border_style = "red" if output_type == OutputType.ERROR else output_type.value
-        console.print(Panel(content, border_style=border_style, title=header, title_align="left"))
+        console.print(Panel(content, border_style=border_style, title=header, title_align="left", highlight=True))
         
         # Print stack trace for errors
         if output_type == OutputType.ERROR:
