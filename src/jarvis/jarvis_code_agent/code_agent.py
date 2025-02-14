@@ -100,7 +100,27 @@ class CodeAgent:
             self.agent.run(prompt)
             user_input = self._user_comfirm("Do you want to modify the code?", default=True)
             if user_input:
-                self.agent.run("Please make above modification use `apply_patch` tool. only make ONE patch every time.")
+                self.agent.run("""Please make above modification use `apply_patch` tool. Only make ONE patch every time.
+                               
+                               Follow these clean code principles when making changes:
+                               1. Keep functions small and focused on a single task
+                               2. Use meaningful and descriptive names for variables, functions, and classes
+                               3. Maintain consistent code style and indentation
+                               4. Add clear comments for complex logic
+                               5. Follow DRY (Don't Repeat Yourself) principle
+                               6. Keep code modular and maintainable
+                               7. Handle errors appropriately
+                               8. Write self-documenting code
+                               9. Keep the code simple and readable
+                               10. Follow the project's existing patterns and conventions
+                               
+                               Before applying the patch, verify that:
+                               - The changes are minimal and focused
+                               - The code style matches the existing codebase
+                               - The indentation is consistent
+                               - The changes follow clean code principles
+                               - The modification is well-documented where needed
+                               """)
                 if has_uncommitted_changes():
                     if self._user_comfirm("Do you want to commit the code?", default=True):
                         git_commiter = GitCommitTool()
@@ -124,7 +144,9 @@ class CodeAgent:
                         if advice:
                             self.agent.run(f"User reject this patch, code has been reset. user advice: {advice}\n Please re-analyze the requirement and the files, and then provide a plan for the code modification.")
             else:
-                break
+                prompt = get_multiline_input("Please input your advice for the code modification. (empty line to exit)")
+                if not prompt:
+                    break
 
 
 def main():
