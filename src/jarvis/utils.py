@@ -1,7 +1,5 @@
-from ast import List, Str
 import hashlib
 from pathlib import Path
-import sys
 import time
 import os
 from enum import Enum
@@ -18,17 +16,15 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import torch
 import yaml
 import faiss
+from pygments.lexers import guess_lexer
+from pygments.util import ClassNotFound
 
 from rich.console import Console
 from rich.theme import Theme
 from rich.panel import Panel
 from rich.text import Text
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.traceback import install as install_rich_traceback
-from rich.markdown import Markdown
 from rich.syntax import Syntax
-from rich.padding import Padding
 
 # 初始化colorama
 colorama.init()
@@ -100,6 +96,52 @@ class PrettyOutput:
         OutputType.TOOL: "🔧",      # Wrench - Tool
     }
 
+    # Common language mapping dictionary
+    _lang_map = {
+        'Python': 'python',
+        'JavaScript': 'javascript',
+        'TypeScript': 'typescript',
+        'Java': 'java',
+        'C++': 'cpp',
+        'C#': 'csharp',
+        'Ruby': 'ruby',
+        'PHP': 'php',
+        'Go': 'go',
+        'Rust': 'rust',
+        'Bash': 'bash',
+        'HTML': 'html',
+        'CSS': 'css',
+        'SQL': 'sql',
+        'R': 'r',
+        'Kotlin': 'kotlin',
+        'Swift': 'swift',
+        'Scala': 'scala',
+        'Perl': 'perl',
+        'Lua': 'lua',
+        'YAML': 'yaml',
+        'JSON': 'json',
+        'XML': 'xml',
+        'Markdown': 'markdown',
+        'Text': 'text',
+        'Shell': 'bash',
+        'Dockerfile': 'dockerfile',
+        'Makefile': 'makefile',
+        'INI': 'ini',
+        'TOML': 'toml',
+    }
+
+    @staticmethod
+    def _detect_language(text: str, default_lang: str = 'markdown') -> str:
+        """Helper method to detect language and map it to syntax highlighting name"""
+        try:
+            lexer = guess_lexer(text)
+            detected_lang = lexer.name
+            return PrettyOutput._lang_map.get(detected_lang, default_lang)
+        except ClassNotFound:
+            return default_lang
+        except Exception:
+            return default_lang
+
     @staticmethod
     def format(text: str, output_type: OutputType, timestamp: bool = True) -> Text:
         """Format output text using rich Text"""
@@ -126,68 +168,51 @@ class PrettyOutput:
 
         # Create panel with content
         if output_type == OutputType.CODE:
-            # Syntax highlighting for code
-            code = Syntax(text, "python", theme="monokai", line_numbers=True)
-            console.print(Panel(code, border_style=output_type.value))
+            lang = PrettyOutput._detect_language(text)
+            content = Syntax(text, lang, theme="monokai", line_numbers=True)
             
         elif output_type == OutputType.ERROR:
-            # Error messages with stack trace
-            console.print(Panel(Text(text, style="red bold"), border_style="red"))
-            console.print_exception()
+            lang = PrettyOutput._detect_language(text)
+            content = Syntax(text, lang, theme="monokai")
             
         elif output_type == OutputType.PLANNING:
-            # Markdown formatting for planning
-            console.print(Panel(Markdown(text), border_style=output_type.value))
+            lang = PrettyOutput._detect_language(text, default_lang='markdown')
+            content = Syntax(text, lang, theme="monokai")
             
         elif output_type == OutputType.RESULT:
-            # Syntax highlighting for results if it looks like code
-            if text.strip().startswith(("def ", "class ", "import ", "from ")):
-                result = Syntax(text, "python", theme="monokai")
-            else:
-                result = Text(text, style="blue")
-            console.print(Panel(result, border_style=output_type.value))
+            lang = PrettyOutput._detect_language(text)
+            content = Syntax(text, lang, theme="monokai")
             
         elif output_type == OutputType.SYSTEM:
-            # Assistant messages with markdown support
-            console.print(Panel(Markdown(text), border_style=output_type.value))
-            
-        elif output_type == OutputType.INFO:
-            # Info messages with yellow highlight
-            console.print(Panel(Text(text, style="yellow"), border_style=output_type.value))
-            
-        elif output_type == OutputType.WARNING:
-            # Warning messages in yellow box
-            console.print(Panel(Text(text, style="yellow"), border_style=output_type.value))
-            
-        elif output_type == OutputType.SUCCESS:
-            # Success messages in green
-            console.print(Panel(Text(text, style="green bold"), border_style=output_type.value))
-            
-        elif output_type == OutputType.PROGRESS:
-            # Progress messages with spinner
-            console.print(Panel(
-                Text(text, style="blue"),
-                border_style=output_type.value
-            ))
+            lang = PrettyOutput._detect_language(text, default_lang='markdown')
+            content = Syntax(text, lang, theme="monokai")
             
         elif output_type == OutputType.TOOL:
-            # Tool calls in yellow box with code style
-            console.print(Panel(
-                Syntax(text, "yaml", theme="monokai"),
-                border_style=output_type.value
-            ))
+            lang = PrettyOutput._detect_language(text, default_lang='yaml')
+            content = Syntax(text, lang, theme="monokai")
             
-        elif output_type == OutputType.DEBUG:
-            # Debug messages in blue
-            console.print(Panel(Text(text, style="blue dim"), border_style=output_type.value))
+        elif output_type in (OutputType.INFO, OutputType.WARNING, OutputType.SUCCESS, OutputType.DEBUG):
+            lang = PrettyOutput._detect_language(text)
+            content = Syntax(text, lang, theme="monokai")
+            
+        elif output_type == OutputType.PROGRESS:
+            content = Text(text, style="blue")
             
         elif output_type == OutputType.USER:
-            # User input in green
-            console.print(Panel(Text(text, style="green"), border_style=output_type.value))
+            lang = PrettyOutput._detect_language(text)
+            content = Syntax(text, lang, theme="monokai")
             
         else:
-            # Default text output with header
-            console.print(Panel(Text(text, style=output_type.value), border_style=output_type.value))
+            lang = PrettyOutput._detect_language(text)
+            content = Syntax(text, lang, theme="monokai")
+
+        # Print panel with appropriate border style
+        border_style = "red" if output_type == OutputType.ERROR else output_type.value
+        console.print(Panel(content, border_style=border_style))
+        
+        # Print stack trace for errors
+        if output_type == OutputType.ERROR:
+            console.print_exception()
 
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):

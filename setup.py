@@ -30,6 +30,7 @@ setup(
         "docx>=0.2.4",
         "yaspin>=2.5.0",
         "rich>=13.3.1",
+        "pygments>=2.15.0",
     ],
     entry_points={
         "console_scripts": [
