@@ -92,10 +92,30 @@ class CodeAgent:
         else:
             return ret == "y"
         
+    def _get_file_line_count(self, filename: str) -> int:
+        try:
+            return len(open(filename, "r", encoding="utf-8").readlines())
+        except Exception as e:
+            return 0
+        
     def run(self, user_input):
         self._init_env()
         files = self._find_relevant_files(user_input)
-        prompt = f"User requirement: {user_input}\n\nFiles related to the requirement: {files}\n\nPlease analyze the requirement and the files, and then provide a plan for the code modification."
+        files_prompt = ""
+        for file in files:
+            files_prompt += f"- {file} ({self._get_file_line_count(file)} lines)\n"   
+        prompt = f"""User requirement: {user_input}
+
+Files related to the requirement: 
+{files_prompt}
+
+Please analyze the requirement and the files, and then provide a plan for the code modification.
+
+Tips:
+- For large file(>200 lines), you can use shell command `ctags/grep` to find key location, then use `read_code` tool to read the part of code.
+- For small file(>100 lines), you can use `read_code` tool to read the code and analyze the code.
+- If you can't find the key location, you can use `ask_user` tool to ask the user for help.
+"""
         while True:
             self.agent.run(prompt)
             user_input = self._user_comfirm("Do you want to modify the code?", default=True)
