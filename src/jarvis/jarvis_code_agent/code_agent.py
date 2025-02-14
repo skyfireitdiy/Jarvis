@@ -166,6 +166,7 @@ Notes:
 - <PATCH> and <TOOL_CALL> can only appear once in the output, if both appear, the <PATCH> will be ignored.
 
 """
+        output = ""
         while True:
             self.agent.run(prompt)
             if has_uncommitted_changes():
@@ -181,19 +182,26 @@ Notes:
                     if self._user_comfirm("Do you want to continue?", default=False):
                         new_requirement = get_multiline_input("Please input new requirement. (empty line to exit)")
                         if new_requirement == "":
-                            break
+                            output += "Task cancelled by user"
+                            return output
                         
                         prompt = f"User has apply patches, commit id: '{commit_id}' commit message: '{commit_message}'\n\nPlease analyze the new requirement, and then provide a plan for the code modification."
+                        output += prompt
                         continue
+                    else:
+                        output += "Task completed"
+                        return output
                 else:
-                    os.system("git reset --hard")
+                    os.system("git reset HEAD")
+                    os.system("git checkout -- .")
                     advice = get_multiline_input("Please provide advice for the code modification. (empty line to exit)")
                     if advice:
                         self.agent.run(f"User reject this patch, code has been reset. user advice: {advice}\n Please re-analyze the requirement and the files, and then provide a plan for the code modification.")
             else:
                 prompt = get_multiline_input("Please input your advice for the code modification. (empty line to exit)")
                 if not prompt:
-                    break
+                    output += "User cancelled the task, code has been reset"
+                    return output
 
 
 def main():
