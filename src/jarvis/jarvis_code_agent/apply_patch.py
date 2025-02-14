@@ -73,9 +73,8 @@ def apply_patch(output_str: str) -> str:
                 continue
                 
             # Read original file content
-            with open(filepath, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-                
+            lines = open(filepath, 'r', encoding='utf-8').readlines()
+            
             # Apply patch
             for patch in patch_info:
                 start_line = patch['start_line']
@@ -88,12 +87,10 @@ def apply_patch(output_str: str) -> str:
                     continue
                     
                 # Create new content
-                result_lines = lines[:start_line]
-                result_lines.extend(line + '\n' for line in new_content)
-                result_lines.extend(lines[end_line:])
+                lines[start_line:end_line] = new_content
                 
                 # Write back to file
-                open(filepath, 'w', encoding='utf-8').writelines(result_lines)
+                open(filepath, 'w', encoding='utf-8').writelines(lines)
 
                 verify_start_line = min(start_line-2, 0)
                 verify_end_line = max(end_line+2, len(lines))
@@ -105,7 +102,7 @@ def apply_patch(output_str: str) -> str:
                 })
 
                 result.append(f"Applied patch to {filepath} successfully, new content:\n{verify_result['stdout']}\n")
-                PrettyOutput.section(f"Applied patch to {filepath} successfully, new content:\n{verify_result['stdout']}\n", OutputType.SUCCESS)
+                PrettyOutput.print(f"Applied patch to {filepath} successfully\n", OutputType.SUCCESS)
             
         except Exception as e:
             PrettyOutput.print(f"Error applying patch to {filepath}: {str(e)}", OutputType.ERROR)
