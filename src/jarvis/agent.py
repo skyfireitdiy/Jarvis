@@ -1,6 +1,6 @@
 import argparse
 import time
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from prompt_toolkit import prompt
 import yaml
@@ -16,7 +16,16 @@ class Agent:
     def __del__(self):
         delete_current_agent()
         
-    def __init__(self, system_prompt: str, name: str = "Jarvis", is_sub_agent: bool = False, tool_registry: Optional[ToolRegistry] = None, platform: Optional[BasePlatform] = None, summary_prompt: Optional[str] = None, auto_complete: Optional[bool] = None, record_methodology: Optional[bool] = None):
+    def __init__(self, 
+                 system_prompt: str, 
+                 name: str = "Jarvis", 
+                 is_sub_agent: bool = False, 
+                 tool_registry: Optional[ToolRegistry] = None, 
+                 platform: Optional[BasePlatform] = None, 
+                 summary_prompt: Optional[str] = None, 
+                 auto_complete: Optional[bool] = None, 
+                 record_methodology: Optional[bool] = None,
+                 output_filter: Optional[List[Callable]] = None):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -40,6 +49,7 @@ class Agent:
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
         # Load configuration from environment variables
+        self.output_filter = output_filter if output_filter else []
 
         self.summary_prompt = summary_prompt if summary_prompt else f"""Please generate a concise summary report of the task execution, including:
 
@@ -278,6 +288,13 @@ Please continue the task based on the above information.
                         PrettyOutput.print("Executing tool call...", OutputType.PROGRESS)
                         tool_result = self.tool_registry.handle_tool_calls(result)
                         self.prompt = tool_result
+                        continue
+                    
+                    self.prompt = ""
+                    for filter in self.output_filter:
+                        self.prompt += filter(current_response)
+                    
+                    if self.prompt:
                         continue
 
                     if self.auto_complete and "<!!!COMPLETE!!!>" in current_response:
