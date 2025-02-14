@@ -148,11 +148,13 @@ Before applying the patch, verify that:
 
 Patches format:
 <PATCH>
-> /path/to/file [start_line, end_line)
+> /path/to/file start_line,end_line
 content_line1
 content_line2
 ...
 </PATCH> 
+
+This patch will replace the content of the file from start_line(included) to end_line(excluded) with the content.
 
 You can output multiple patches.
 """
