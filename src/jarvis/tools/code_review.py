@@ -95,8 +95,20 @@ OUTPUT REQUIREMENTS:
 - Highlight security risks clearly
 - Separate technical debt from blockers"""
 
+            summary_prompt = """Please generate a concise summary report of the code review, format as yaml:
+<REPORT>
+- file: xxxx.py
+  location: [start_line_number, end_line_number]
+  description: 
+  severity: 
+  suggestion: 
+</REPORT>
+
+Please describe in concise bullet points, highlighting important information.
+"""
+
             tool_registry = ToolRegistry()
-            tool_registry.use_tools(["execute_shell", "file_operation", "ask_user", "ask_codebase", "find_in_codebase", "create_ctags_agent"])
+            tool_registry.use_tools(["execute_shell", "read_code", "ask_user", "ask_codebase", "find_in_codebase", "create_ctags_agent"])
             tool_registry.dont_use_tools(["code_review"])
 
             review_agent = Agent(
@@ -104,7 +116,9 @@ OUTPUT REQUIREMENTS:
                 platform=PlatformRegistry().get_thinking_platform(),
                 system_prompt=system_prompt,
                 is_sub_agent=True,
-                tool_registry=tool_registry
+                tool_registry=tool_registry,
+                summary_prompt=summary_prompt,
+                auto_complete=True
             )
             
             result = review_agent.run(

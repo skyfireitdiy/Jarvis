@@ -1,4 +1,3 @@
-
 import os
 import re
 from typing import Dict, List
@@ -64,25 +63,23 @@ def _get_file_completer(root_dir: str) -> Completer:
             self.root_dir = root_dir
             
         def get_completions(self, document, complete_event):
-            # Get the text of the current input
             text = document.text_before_cursor
             
-            # If the input is empty, return all files in the root directory
             if not text:
                 for path in self._list_files(""):
                     yield Completion(path, start_position=0)
                 return
                 
-            # Get the current directory and partial file name
-            current_dir = os.path.dirname(text)
-            file_prefix = os.path.basename(text)
-            
-            # List matching files
-            search_dir = os.path.join(self.root_dir, current_dir) if current_dir else self.root_dir
-            if os.path.isdir(search_dir):
-                for path in self._list_files(current_dir):
-                    if path.startswith(text):
-                        yield Completion(path, start_position=-len(text))
+            # Generate fuzzy matching pattern
+            pattern = '.*'.join(map(re.escape, text))
+            try:
+                regex = re.compile(pattern, re.IGNORECASE)
+            except re.error:
+                return
+                
+            for path in self._list_files(""):
+                if regex.search(path):
+                    yield Completion(path, start_position=-len(text))
         
         def _list_files(self, current_dir: str) -> List[str]:
             """List all files in the specified directory (recursively)"""
@@ -93,7 +90,6 @@ def _get_file_completer(root_dir: str) -> Completer:
                 for filename in filenames:
                     full_path = os.path.join(root, filename)
                     rel_path = os.path.relpath(full_path, self.root_dir)
-                    # Ignore .git directory and other hidden files
                     if not any(part.startswith('.') for part in rel_path.split(os.sep)):
                         files.append(rel_path)
             
@@ -133,10 +129,13 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
     """Let the user select and supplement related files"""
     PrettyOutput.section("Related files", OutputType.INFO)
     
+    output = ""
     # Display found files
     selected_files = list(related_files)  # Default select all
     for i, file in enumerate(related_files, 1):
-        PrettyOutput.print(f"[{i}] {file}", OutputType.INFO)
+        output += f"[{i}] {file}\n"
+
+    PrettyOutput.print(output, OutputType.INFO)
     
     # Ask the user if they need to adjust the file list
     user_input = get_single_line_input("Do you need to adjust the file list? (y/n) [n]").strip().lower() or 'n'

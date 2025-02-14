@@ -254,7 +254,7 @@ def get_multiline_input(tip: str) -> str:
             
     except KeyboardInterrupt:
         PrettyOutput.print("Input cancelled", OutputType.INFO)
-        return "__interrupt__"
+        return ""
     
     return "\n".join(lines)
 
@@ -307,6 +307,13 @@ def find_git_root(dir="."):
     ret = os.popen("git rev-parse --show-toplevel").read().strip()
     os.chdir(curr_dir)
     return ret
+
+def has_uncommitted_changes():
+    # Check working directory changes
+    working_changes = os.popen("git diff --exit-code").read().strip() != ""
+    # Check staged changes
+    staged_changes = os.popen("git diff --cached --exit-code").read().strip() != ""
+    return working_changes or staged_changes
 
 def load_embedding_model():
     model_name = "BAAI/bge-m3"
@@ -429,7 +436,7 @@ def load_methodology(user_input: str) -> str:
         return ""
     
     def make_methodology_prompt(data: Dict) -> str:
-        ret = """This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it:\n""" 
+        ret = """This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it, if not,just ignore it:\n""" 
         for key, value in data.items():
             ret += f"Problem: {key}\nMethodology: {value}\n"
         return ret
@@ -470,7 +477,7 @@ def load_methodology(user_input: str) -> str:
             methodology_index = faiss.IndexIDMap(hnsw_index)
             methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
             query_embedding = _create_methodology_embedding(embedding_model, user_input)
-            k = min(5, len(methodology_data))
+            k = min(3, len(methodology_data))
             PrettyOutput.print(f"Retrieving methodology...", OutputType.INFO)
             distances, indices = methodology_index.search(
                 query_embedding.reshape(1, -1), k
