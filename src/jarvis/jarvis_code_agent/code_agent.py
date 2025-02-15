@@ -142,7 +142,7 @@ Then provide the necessary patches in the specified format.
                            tool_registry=tool_registry, 
                            platform=PlatformRegistry().get_codegen_platform(), 
                            record_methodology=False,
-                           output_filter=[apply_patch],
+                           output_handler_before_tool=[apply_patch],
                            need_summary=False)
 
     

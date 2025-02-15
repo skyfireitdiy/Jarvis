@@ -19,8 +19,8 @@ class Agent:
     def set_summary_prompt(self, summary_prompt: str):
         self.summary_prompt = summary_prompt
 
-    def set_output_filter(self, output_filter: List[Callable]):
-        self.output_filter = output_filter
+    def set_output_handler_before_tool(self, handler: List[Callable]):
+        self.output_handler_before_tool = handler
         
     def __init__(self, 
                  system_prompt: str, 
@@ -31,7 +31,8 @@ class Agent:
                  summary_prompt: Optional[str] = None, 
                  auto_complete: bool = False, 
                  record_methodology: bool = True,
-                 output_filter: Optional[List[Callable]] = None,
+                 output_handler_before_tool: Optional[List[Callable]] = None,
+                 output_handler_after_tool: Optional[List[Callable]] = None,
                  need_summary: bool = True):
         """Initialize Agent with a model, optional tool registry and name
         
@@ -57,7 +58,8 @@ class Agent:
         self.system_prompt = system_prompt
         self.need_summary = need_summary
         # Load configuration from environment variables
-        self.output_filter = output_filter if output_filter else []
+        self.output_handler_before_tool = output_handler_before_tool if output_handler_before_tool else []
+        self.output_handler_after_tool = output_handler_after_tool if output_handler_after_tool else []
 
         self.summary_prompt = summary_prompt if summary_prompt else f"""Please generate a concise summary report of the task execution, including:
 
@@ -289,8 +291,8 @@ Please continue the task based on the above information.
                         self.prompt = ""
                         self.conversation_length += len(current_response) 
 
-                    for filter in self.output_filter:
-                        self.prompt += filter(current_response)
+                    for handler in self.output_handler_before_tool:
+                        self.prompt += handler(current_response)
 
                     try:
                         result = Agent.extract_tool_calls(current_response)
@@ -303,6 +305,9 @@ Please continue the task based on the above information.
                         PrettyOutput.print("Executing tool call...", OutputType.PROGRESS)
                         tool_result = self.tool_registry.handle_tool_calls(result)
                         self.prompt += tool_result
+
+                    for handler in self.output_handler_after_tool:
+                        self.prompt += handler(current_response)
                     
                     if self.prompt:
                         continue
