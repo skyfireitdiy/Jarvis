@@ -501,3 +501,17 @@ def is_auto_complete() -> bool:
 
 def is_disable_codebase() -> bool:
     return os.getenv('JARVIS_DISABLE_CODEBASE', 'false') == 'true'
+
+def user_confirm(tip: str, default: bool = True) -> bool:
+    """Prompt the user for confirmation.
+    
+    Args:
+        tip: The message to show to the user
+        default: The default response if user hits enter
+        
+    Returns:
+        bool: True if user confirmed, False otherwise
+    """
+    suffix = "[Y/n]" if default else "[y/N]"
+    ret = get_single_line_input(f"{tip} {suffix}: ")
+    return default if ret == "" else ret.lower() == "y"
