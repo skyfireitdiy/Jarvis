@@ -15,6 +15,12 @@ class Agent:
 
     def __del__(self):
         delete_current_agent()
+
+    def set_summary_prompt(self, summary_prompt: str):
+        self.summary_prompt = summary_prompt
+
+    def set_output_filter(self, output_filter: List[Callable]):
+        self.output_filter = output_filter
         
     def __init__(self, 
                  system_prompt: str, 
