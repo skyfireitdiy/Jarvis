@@ -13,11 +13,8 @@ from jarvis.tools.git_commiter import GitCommitTool
 from jarvis.tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, get_single_line_input, has_uncommitted_changes, init_env, find_git_root, is_disable_codebase
 
-code_system_prompt = """
-You are a code agent, you are responsible for modifying the code.
 
-You should read the code and analyze the code, and then provide a plan for the code modification.
-"""
+
 
 
 class CodeAgent:
@@ -25,6 +22,11 @@ class CodeAgent:
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
         tool_registry.use_tools(["read_code", "execute_shell", "search", "code_review", "ask_user"])
+        code_system_prompt = """
+You are a code agent, you are responsible for modifying the code.
+
+You should read the code and analyze the code, and then provide a plan for the code modification.
+"""
         self.agent = Agent(system_prompt=code_system_prompt, 
                            name="CodeAgent", 
                            auto_complete=False,
