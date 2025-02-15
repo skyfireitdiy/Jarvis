@@ -26,6 +26,10 @@ from rich.text import Text
 from rich.traceback import install as install_rich_traceback
 from rich.syntax import Syntax
 
+from prompt_toolkit.completion import Completer, Completion, PathCompleter
+from prompt_toolkit.document import Document
+from fuzzywuzzy import fuzz
+
 # 初始化colorama
 colorama.init()
 
@@ -214,14 +218,62 @@ def make_choice_input(tip: str, choices: list) -> str:
     })
     return session.prompt(f"{tip}", style=style)
 
+class FileCompleter(Completer):
+    """Custom completer for file paths with fuzzy matching."""
+    def __init__(self):
+        self.path_completer = PathCompleter()
+        
+    def get_completions(self, document: Document, complete_event):
+        text = document.text_before_cursor
+        
+        # Check if we're in a file completion context (after @)
+        if '@' in text:
+            # Get the text after the last @
+            file_path = text.split('@')[-1].strip()
+            
+            # Get all possible files from current directory
+            all_files = []
+            for root, _, files in os.walk('.'):
+                for f in files:
+                    path = os.path.join(root, f)
+                    # Remove ./ from the beginning
+                    path = path[2:] if path.startswith('./') else path
+                    all_files.append(path)
+            
+            # Sort files by fuzzy match score
+            scored_files = [
+                (path, fuzz.ratio(file_path.lower(), path.lower()))
+                for path in all_files
+            ]
+            scored_files.sort(key=lambda x: x[1], reverse=True)
+            
+            # Return completions for files with score > 30
+            for path, score in scored_files:
+                if score > 30:
+                    yield Completion(
+                        path,
+                        start_position=-len(file_path),
+                        display=f"{path} ({score}%)"
+                    )
+
 def get_multiline_input(tip: str) -> str:
-    """Get multi-line input, support direction key, history function, etc."""
+    """Get multi-line input, support direction key, history function, and file completion.
+    
+    Args:
+        tip: The prompt tip to display
+        
+    Returns:
+        str: The entered text
+    """
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
     
-    # 创建输入会话，启用历史记录
-    session = PromptSession(history=None)  # 使用默认历史记录
+    # Create input session with custom completer
+    session = PromptSession(
+        history=None,  # Use default history
+        completer=FileCompleter()
+    )
     
-    # 定义提示符样式
+    # Define prompt style
     style = PromptStyle.from_dict({
         'prompt': 'ansicyan',
     })
@@ -229,22 +281,22 @@ def get_multiline_input(tip: str) -> str:
     lines = []
     try:
         while True:
-            # 设置提示符
+            # Set prompt
             prompt = FormattedText([
                 ('class:prompt', '... ' if lines else '>>> ')
             ])
             
-            # 获取输入
+            # Get input with completion support
             line = session.prompt(
                 prompt,
                 style=style,
             ).strip()
             
-            # 空行处理
+            # Handle empty line
             if not line:
-                if not lines:  # 第一行就输入空行
+                if not lines:  # First line is empty
                     return ""
-                break  # 结束多行输入
+                break  # End multi-line input
                 
             lines.append(line)
             
