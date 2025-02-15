@@ -62,12 +62,11 @@ class CodeBase:
         return [f for f in files if not f.startswith(".jarvis")]
 
     def is_text_file(self, file_path: str):
-        with open(file_path, "r", encoding="utf-8") as f:
-            try:
-                f.read()
-                return True
-            except UnicodeDecodeError:
-                return False
+        try:
+            open(file_path, "r", encoding="utf-8").read()
+            return True
+        except UnicodeDecodeError:
+            return False
 
     def make_description(self, file_path: str, content: str) -> str:
         model = PlatformRegistry.get_global_platform_registry().get_cheap_platform()
@@ -386,6 +385,24 @@ Content: {content}
             force: Whether to force rebuild the index, without asking the user
         """
         try:
+            # Clean up cache for non-existent files
+            files_to_delete = []
+            for cached_file in list(self.vector_cache.keys()):
+                if not os.path.exists(cached_file) or not self.is_text_file(cached_file):
+                    files_to_delete.append(cached_file)
+                    cache_path = self._get_cache_path(cached_file)
+                    try:
+                        os.remove(cache_path)
+                    except Exception as e:
+                        PrettyOutput.print(f"Failed to delete cache file for {cached_file}: {str(e)}", 
+                                         output_type=OutputType.WARNING)
+            
+            if files_to_delete:
+                for file_path in files_to_delete:
+                    del self.vector_cache[file_path]
+                PrettyOutput.print(f"Cleaned cache for {len(files_to_delete)} non-existent files", 
+                                 output_type=OutputType.INFO)
+            
             # Update the git file list
             self.git_file_list = self.get_git_file_list()
             
