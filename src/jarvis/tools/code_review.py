@@ -65,7 +65,14 @@ class CodeReviewTool:
                     "stderr": f"Failed to get diff: {str(e)}"
                 }
 
-            prompt = """You are an autonomous code review expert. Perform in-depth analysis following these guidelines:
+            system_prompt = """You are an autonomous code review expert. Perform in-depth analysis following these guidelines:
+
+IMPORTANT:
+- Only analyze the provided diff content
+- Do NOT make assumptions about code not shown
+- Do NOT invent or imagine potential issues
+- Report ONLY issues that can be directly observed
+- If something is unclear, state it explicitly rather than making assumptions
 
 REVIEW FOCUS AREAS:
 1. Requirement Alignment:
@@ -122,27 +129,32 @@ REVIEW PROCESS:
 OUTPUT REQUIREMENTS:
 - Categorize issues by severity (Critical/Major/Minor)
 - Reference specific code locations
-- Provide concrete examples
-- Suggest actionable improvements
-- Highlight security risks clearly
+- Provide concrete examples from the diff
+- Suggest actionable improvements based on observed code
+- Highlight security risks clearly with evidence from the code
 - Separate technical debt from blockers
-
-Please generate a concise summary report of the code review, format as yaml:
+- If certain aspects cannot be reviewed due to limited context, note this explicitly
+- Do not speculate about code not shown in the diff
+"""
+            tool_registry = ToolRegistry()
+            tool_registry.dont_use_tools(["code_review"])
+            agent = Agent(
+                system_prompt=system_prompt,
+                name="Code Review Agent",
+                summary_prompt="""Please generate a concise summary report of the code review, format as yaml:
 <REPORT>
 - file: xxxx.py
   location: [start_line_number, end_line_number]
-  description: 
-  severity: 
-  suggestion: 
-</REPORT>
-
-Diff:
-```diff
-{diff_output}
-```
-"""
-            result = PlatformRegistry().get_thinking_platform().chat_until_success(prompt)
-
+  description: # Only describe issues directly observable in the diff
+  severity: # Critical/Major/Minor based on concrete evidence
+  suggestion: # Specific, actionable improvements for the observed code
+</REPORT>""",
+                is_sub_agent=True,
+                tool_registry=tool_registry,
+                platform=PlatformRegistry().get_thinking_platform(),
+                auto_complete=True
+            )
+            result = agent.run(diff_output)
             return {
                 "success": True,
                 "stdout": result,
@@ -157,16 +169,11 @@ Diff:
             }
         
 
-def _extract_code_report(result: str) -> List[Dict[str, Any]]:
+def _extract_code_report(result: str) -> str:
     sm = re.search(r"<REPORT>(.*?)</REPORT>", result, re.DOTALL)
     if sm:
-        report = sm.group(1)
-        try:
-            report = yaml.safe_load(report)
-        except Exception as e:
-            return []
-        return report
-    return []
+        return sm.group(1)
+    return ""
 
 def main():
     """CLI entry point"""
@@ -194,12 +201,7 @@ def main():
     if result["success"]:
         PrettyOutput.section("Autonomous Review Result:", OutputType.SUCCESS)
         report = _extract_code_report(result["stdout"])
-        output = ""
-        for item in report:
-            for k, v in item.items():
-                output += f"{k}: {v}\n"
-            output += "=" * 80 + "\n"
-        PrettyOutput.print(output, OutputType.SUCCESS)
+        PrettyOutput.print(report, OutputType.SUCCESS, lang="yaml")
         
     else:
         PrettyOutput.print(result["stderr"], OutputType.ERROR)
