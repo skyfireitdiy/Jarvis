@@ -718,7 +718,7 @@ Please output 3 expressions directly, separated by two line breaks, without numb
             message = "Found related files:\n"
             for path, score, _ in initial_results:
                 message += f"File: {path} Similarity: {score:.3f}\n"
-            PrettyOutput.print(message.rstrip(), output_type=OutputType.INFO)
+            PrettyOutput.print(message.rstrip(), output_type=OutputType.INFO, lang="markdown")
                 
             # Reorder the preliminary results
             return self.pick_results(query, [path for path, _, _ in initial_results])
@@ -737,7 +737,7 @@ Please output 3 expressions directly, separated by two line breaks, without numb
         message = "Found related files:\n"
         for path in results:
             message += f"File: {path}\n"
-        PrettyOutput.print(message.rstrip(), output_type=OutputType.SUCCESS)
+        PrettyOutput.print(message.rstrip(), output_type=OutputType.SUCCESS, lang="markdown")
         
         prompt = f"""You are a code expert, please answer the user's question based on the following file information:
 """
@@ -862,8 +862,8 @@ def main():
             
         output = "Search Results:\n"
         for path in results:
-            output += f"""{path}\n"""
-        PrettyOutput.print(output, output_type=OutputType.INFO)
+            output += f"""- {path}\n"""
+        PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
 
     elif args.command == 'ask':            
         response = codebase.ask_codebase(args.question, args.top_k)

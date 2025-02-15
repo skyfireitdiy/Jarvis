@@ -699,7 +699,7 @@ Content: {doc.content}
                 output = f"""File: {doc.metadata['file_path']}\n"""
                 output += f"""Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}\n"""
                 output += f"""Content:\n{doc.content}\n"""
-                PrettyOutput.print(output, output_type=OutputType.INFO)
+                PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
 
             # Build base prompt
             base_prompt = f"""Please answer the user's question based on the following document fragments. If the document content is not sufficient to answer the question completely, please clearly indicate.
@@ -792,7 +792,7 @@ def main():
                     output = f"""File: {doc.metadata['file_path']}\n"""
                     output += f"""Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}\n"""
                     output += f"""Content:\n{doc.content}\n"""
-                    PrettyOutput.print(output, output_type=OutputType.INFO)
+                    PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
                 return 0
 
             if args.ask:

@@ -82,25 +82,17 @@ Jarvis 支持通过环境变量进行配置，可以在 `~/.jarvis/env` 文件�
 
 ## 🎯 使用方法
 
-### 基本使用
+### 代码修改
 ```bash
+# 使用主代理
 jarvis
+
+# 直接使用代码代理
+jarvis-code-agent
 ```
 
-### 指定模型使用
+### 代码库查询
 ```bash
-jarvis -p kimi  # 使用 Kimi 平台
-jarvis -p openai  # 使用 OpenAI 平台
-```
-
-### 代码库搜索
-```bash
-# 生成代码库索引
-jarvis-codebase generate
-
-# 搜索相似代码
-jarvis-codebase search "搜索关键词"
-
 # 询问代码库相关问题
 jarvis-codebase ask "你的问题"
 ```
@@ -110,25 +102,41 @@ jarvis-codebase ask "你的问题"
 # 构建文档索引
 jarvis-rag --dir /path/to/documents --build
 
-# 搜索文档
-jarvis-rag --query "搜索关键词"
+# 询问文档相关问题
+jarvis-rag --query "你的问题"
 ```
 
-### 搜索工具
+### 智能命令行
 ```bash
-# 基本搜索
-jarvis-search "搜索关键词"
+# 使用完整名称
+jarvis-smart-shell "描述你想要执行的操作"
 
-# 仅显示网址
-jarvis-search "搜索关键词" --url-only
-
-# 限制结果数量
-jarvis-search "搜索关键词" --max 3
+# 使用简写
+jss "描述你想要执行的操作"
 ```
 
-### 保留聊天历史
+### 开发工具
 ```bash
-jarvis --keep-history  # 完成后不删除聊天会话
+# 管理 git 提交
+jarvis-git-commit
+
+# 生成和管理 ctags
+jarvis-ctags
+
+# 管理 AI 平台
+jarvis-platform
+```
+
+每个命令都支持 `--help` 参数来获取详细使用说明：
+```bash
+jarvis --help
+jarvis-code-agent --help
+jarvis-codebase --help
+jarvis-rag --help
+jarvis-smart-shell --help
+jarvis-platform --help
+jarvis-git-commit --help
+jarvis-ctags --help
 ```
 
 ## 🛠️ 工具
@@ -137,13 +145,14 @@ jarvis --keep-history  # 完成后不删除聊天会话
 
 | 工具 | 描述 |
 |------|-------------|
+| read_code | 支持行号和范围的代码文件读取 |
 | execute_shell | 执行系统命令并捕获输出 |
-| file_operation | 文件操作（读/写/追加/删除） |
-| generate_tool | AI 驱动的工具生成和集成 |
-| methodology | 经验积累和方法论管理 |
-| create_sub_agent | 创建特定任务的专门子代理 |
-| coder | 自动代码修改和生成工具 |
-| codebase | 代码库管理和搜索工具 |
+| search | 开发相关的网络搜索 |
+| ask_user | 交互式用户输入收集 |
+| ask_codebase | 智能代码库查询和分析 |
+| code_review | 多维度的自动代码审查 |
+| file_operation | 基础文件操作（读取/存在性检查） |
+| git_commiter | 自动化 git 提交处理 |
 
 ### 工具位置
 - 内置工具：`src/jarvis/tools/`
@@ -151,33 +160,40 @@ jarvis --keep-history  # 完成后不删除聊天会话
 
 ### 核心功能
 
-#### 1. 自我扩展能力
-- 通过自然语言描述生成工具
-- 自动代码生成和集成
-- 通过子代理动态扩展能力
-- 自动代码修改与版本控制
-- 代码库索引和语义搜索
+#### 1. 代码智能
+- 基于需求的智能文件选择和分析
+- 语义化代码库搜索和查询
+- 具有上下文感知的大文件高效处理
+- 精确的基于补丁的代码修改
+- 自动化的 git 提交管理
 
-#### 2. 方法论学习
-- 从交互中自动积累经验
-- 模式识别和方法论提取
-- 通过使用持续改进
-- 代码修改历史跟踪
-- 代码库分析和文档生成
+#### 2. 多模型架构
+- 支持多个 AI 平台（Kimi/OpenAI/AI8/OYI/Ollama）
+- 针对不同任务的平台特定优化
+- 专门用于代码生成、思考和通用任务的模型
+- 流式响应支持以提供更好的交互
+- 自动的模型回退和重试机制
 
-#### 3. 自适应问题解决
-- 上下文感知的子代理创建
-- 动态工具组合
-- 从执行反馈中学习
+#### 3. RAG 能力
+- 文档索引和语义搜索
+- 大型文档的智能上下文管理
+- 自动文件变更检测
+- 高效的缓存机制
+- 多格式文档支持
+
+#### 4. 开发工具
+- 交互式命令行生成
+- 多维度的代码审查
 - 基于代码库的问题解决
-- 复杂任务的多模型协作
+- 具有安全检查的文件操作
+- 进度跟踪和错误处理
 
-#### 4. 代码智能
-- 自动代码库索引
-- 语义代码搜索
-- 集成 git 的代码修改
-- 代码分析和文档
-- 多模型代码生成
+#### 5. 用户体验
+- 支持彩色输出的精美控制台
+- 交互式多行输入
+- 长时间操作的进度指示
+- 清晰的错误消息和处理
+- 上下文感知的响应格式化
 
 ## 🎯 扩展 Jarvis
 

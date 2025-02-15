@@ -29,7 +29,7 @@ def list_platforms():
                         output += f"  • {model_name} - {description}\n"
                     else:
                         output += f"  • {model_name}\n"
-                PrettyOutput.print(output, OutputType.SUCCESS)
+                PrettyOutput.print(output, OutputType.SUCCESS, lang="markdown")
             else:
                 PrettyOutput.print("  • No available model information", OutputType.WARNING)
                 

@@ -45,6 +45,7 @@ setup(
             "jarvis-platform=jarvis.jarvis_platform.main:main",
             "jarvis-git-commit=jarvis.tools.git_commiter:main",
             "jarvis-ctags=jarvis.tools.create_ctags_agent:main",
+            "jarvis-code-review=jarvis.tools.code_review:main",
         ],
     },
     python_requires=">=3.8",

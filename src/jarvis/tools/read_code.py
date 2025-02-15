@@ -114,34 +114,3 @@ class ReadCodeTool:
                 "stdout": "",
                 "stderr": f"Failed to read code: {str(e)}"
             }
-
-
-def main():
-    """Command line interface for the tool"""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Read code file with line numbers')
-    parser.add_argument('filepath', help='Path to the code file')
-    parser.add_argument('--start', type=int, default=0, help='Start line number (0-based)')
-    parser.add_argument('--end', type=int, default=-1, help='End line number (0-based)')
-    
-    args = parser.parse_args()
-    
-    tool = ReadCodeTool()
-    result = tool.execute({
-        "filepath": args.filepath,
-        "start_line": args.start,
-        "end_line": args.end
-    })
-    
-    if result["success"]:
-        print(result["stdout"])
-    else:
-        PrettyOutput.print(result["stderr"], OutputType.ERROR)
-        return 1
-        
-    return 0
-
-
-if __name__ == "__main__":
-    main()

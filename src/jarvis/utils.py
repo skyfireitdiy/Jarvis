@@ -4,7 +4,7 @@ import time
 import os
 from enum import Enum
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import colorama
 from colorama import Fore, Style as ColoramaStyle
 import numpy as np
@@ -163,10 +163,10 @@ class PrettyOutput:
         return formatted
 
     @staticmethod
-    def print(text: str, output_type: OutputType, timestamp: bool = True):
+    def print(text: str, output_type: OutputType, timestamp: bool = True, lang: Optional[str] = None):
         """Print formatted output using rich console"""
         # Get formatted header
-        lang = PrettyOutput._detect_language(text, default_lang='markdown')
+        lang = lang if lang is not None else PrettyOutput._detect_language(text, default_lang='markdown')
         header = PrettyOutput.format("", output_type, timestamp)
 
         content = Syntax(text, lang, theme="monokai")

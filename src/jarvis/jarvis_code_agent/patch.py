@@ -108,6 +108,8 @@ def handle_commit_workflow()->bool:
     Returns:
         tuple[bool, str, str]: (continue_execution, commit_id, commit_message)
     """
+    diff = os.popen("git diff HEAD").read()
+    PrettyOutput.print(diff, OutputType.CODE, lang="diff")
     if not user_confirm("Do you want to commit the code?", default=True):
         os.system("git reset HEAD")
         os.system("git checkout -- .")

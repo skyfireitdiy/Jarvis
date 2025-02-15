@@ -31,7 +31,7 @@ class GitCommitTool:
             os.system("git add .")
             PrettyOutput.print("Get diff...", OutputType.SYSTEM)
             diff = os.popen("git diff --cached --exit-code").read()
-            PrettyOutput.print(diff, OutputType.CODE)
+            PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             prompt = f'''Please generate a commit message for the following changes.
             Format:
             <COMMIT_MESSAGE>

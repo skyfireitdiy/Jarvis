@@ -76,33 +76,3 @@ class FindInCodebaseTool:
                 "stdout": "",
                 "stderr": f"Failed to execute search: {str(e)}"
             }
-
-def main():
-    """Command line interface for the tool"""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Search for relevant files in codebase')
-    parser.add_argument('query', help='Search query or requirement description')
-    parser.add_argument('--top-k', type=int, default=20, help='Maximum number of results to return')
-    
-    args = parser.parse_args()
-    
-    tool = FindInCodebaseTool()
-    result = tool.execute({
-        "query": args.query,
-        "top_k": args.top_k
-    })
-    
-    if result["success"]:
-        if result["stdout"]:
-            print(result["stdout"])
-        else:
-            PrettyOutput.print("No relevant files found", OutputType.WARNING)
-    else:
-        PrettyOutput.print(result["stderr"], OutputType.ERROR)
-        return 1
-        
-    return 0
-
-if __name__ == "__main__":
-    exit(main())

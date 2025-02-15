@@ -162,15 +162,3 @@ class CtagsTool:
                 "stdout": "",
                 "stderr": f"Analysis failed: {str(e)}"
             }
-
-def main():
-    """CLI testing"""
-    init_env()
-    tool = CtagsTool()
-    query = get_multiline_input("Please enter your query:")
-    result = tool.execute({
-        "query": query
-    })
-    PrettyOutput.print(yaml.dump(result, default_style='|'), OutputType.INFO)
-if __name__ == "__main__":
-    main()
