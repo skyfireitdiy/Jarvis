@@ -135,7 +135,7 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
     for i, file in enumerate(related_files, 1):
         output += f"[{i}] {file}\n"
 
-    PrettyOutput.print(output, OutputType.INFO)
+    PrettyOutput.print(output, OutputType.INFO, lang="markdown")
     
     # Ask the user if they need to adjust the file list
     user_input = get_single_line_input("Do you need to adjust the file list? (y/n) [n]").strip().lower() or 'n'

@@ -87,13 +87,10 @@ def main():
     })
     
     if result["success"]:
-        print(result["stdout"])
+        PrettyOutput.print(result["stdout"], OutputType.INFO, lang="markdown")
     else:
         PrettyOutput.print(result["stderr"], OutputType.ERROR)
-        return 1
         
-    return 0
-
 
 if __name__ == "__main__":
     main()

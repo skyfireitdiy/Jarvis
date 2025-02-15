@@ -133,7 +133,7 @@ def main():
     })
     
     if result["success"]:
-        PrettyOutput.print(f"Answer: {result['stdout']}", OutputType.INFO)
+        PrettyOutput.print(f"{result['stdout']}", OutputType.INFO, lang="markdown")
     else:
         PrettyOutput.print(result["stderr"], OutputType.ERROR)
 
