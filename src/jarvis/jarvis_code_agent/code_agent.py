@@ -71,7 +71,10 @@ new_content_line2
 </PATCH>
 
 2. Rules:
-- The patch replaces content from start_line (inclusive) to end_line (exclusive)
+- Line Numbers Behavior:
+  * start_line (first number): This line WILL be replaced
+  * end_line (second number): This line will NOT be replaced
+  * The patch replaces content from start_line (inclusive) to end_line (exclusive)
 - Use absolute paths relative to the project root
 - Maintain consistent indentation
 - Include enough context for precise location
@@ -80,28 +83,31 @@ new_content_line2
 3. Example:
 Before:
 ```
-old_content_line0
-old_content_line1
+Line 0: first line
+Line 1: second line
+Line 2: third line
 ```
 
 Patch:
 ```
 <PATCH>
-> /path/to/file 0,1
-new_content_line0
-new_content_line1
+> /path/to/file 0,2
+new first line
+new second line
 </PATCH>
 ```
 
 After:
 ```
-new_content_line0
-new_content_line1
-old_content_line1
-
+new first line
+new second line
+Line 2: third line
 ```
 
-Because the patch replaced [0,1), the content of old_content_line1 is not changed.
+Note: In this example:
+- Line 0 was replaced (inclusive)
+- Line 1 was replaced
+- Line 2 was NOT replaced (exclusive)
 
 ## Implementation Guidelines
 
