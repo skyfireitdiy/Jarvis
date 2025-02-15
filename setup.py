@@ -31,6 +31,7 @@ setup(
         "yaspin>=2.5.0",
         "rich>=13.3.1",
         "pygments>=2.15.0",
+        "fuzzywuzzy>=0.18.0",
     ],
     entry_points={
         "console_scripts": [
