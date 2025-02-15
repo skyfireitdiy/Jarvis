@@ -19,7 +19,7 @@ setup(
         "prompt_toolkit>=3.0.0",
         "openai>=1.20.0",
         "playwright>=1.41.1",
-        "numpy>=1.24.0",
+        "numpy==1.17.4",
         "faiss-cpu>=1.8.0",
         "sentence-transformers>=2.2.2",
         "bs4>=0.0.1",

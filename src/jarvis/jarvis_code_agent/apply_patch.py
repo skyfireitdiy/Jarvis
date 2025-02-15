@@ -79,8 +79,10 @@ def apply_patch(output_str: str) -> str:
             for patch in patch_info:
                 start_line = patch['start_line']
                 end_line = patch['end_line']
-                new_content = patch['content'].split('\n')
-                
+                new_content = patch['content'].splitlines(keepends=True)
+
+                if new_content and new_content[-1] and new_content[-1][-1] != '\n':
+                    new_content[-1] += '\n'
                 # Validate line numbers
                 if start_line < 0 or end_line > len(lines) + 1 or start_line > end_line:
                     PrettyOutput.print(f"Invalid line range [{start_line}, {end_line}) for file: {filepath}", OutputType.WARNING)
