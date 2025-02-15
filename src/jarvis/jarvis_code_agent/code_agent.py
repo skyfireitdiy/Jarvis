@@ -5,7 +5,7 @@ from typing import List
 
 import yaml
 from jarvis.agent import Agent
-from jarvis.jarvis_code_agent.apply_patch import apply_patch
+from jarvis.jarvis_code_agent.patch import apply_patch
 from jarvis.jarvis_code_agent.file_select import select_files
 from jarvis.jarvis_code_agent.relevant_files import find_relevant_files
 from jarvis.models.registry import PlatformRegistry
