@@ -71,17 +71,14 @@ You should read the code and analyze the code, and then provide a plan for the c
         try:
             self._init_env()
             files = find_relevant_files(user_input, self.root_dir)
-            self._edit_code(files)
+            self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files)))
             
         except Exception as e:
             return f"Error during execution: {str(e)}"
         
-    def _edit_code(self, edit_plan: List[str]):
-        edit_prompt = self._build_first_edit_prompt()
-        self.agent.run(edit_prompt)
 
 
-    def _build_first_edit_prompt(self) -> str:
+    def _build_first_edit_prompt(self, user_input: str, files_prompt: str) -> str:
         """Build the initial prompt for the agent.
         
         Args:
@@ -92,7 +89,6 @@ You should read the code and analyze the code, and then provide a plan for the c
             str: The formatted prompt
         """
         return f"""
-        Now you are going to modify the code based on the plan. use the following format to output the patch:
         <PATCH>
         > /path/to/file 1,2
         content_line1
