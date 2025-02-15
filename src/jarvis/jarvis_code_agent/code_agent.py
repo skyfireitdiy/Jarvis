@@ -48,6 +48,19 @@ b. Plan the specific modifications
 c. Write the patch in the required format
 d. Review the patch for correctness
 
+## File Reading Guidelines
+
+1. For Large Files (>200 lines):
+- Do NOT read the entire file at once using 'read_code'
+- First use 'execute_shell' with grep/find to locate relevant sections
+- Then use 'read_code' with specific line ranges to read only necessary portions
+- Example: 
+  * Use: execute_shell("grep -n 'function_name' path/to/file")
+  * Then: read_code("path/to/file", start_line=found_line-10, end_line=found_line+20)
+
+2. For Small Files:
+- Can read entire file using 'read_code' directly
+
 ## Patch Format and Guidelines
 
 1. Basic Format:
