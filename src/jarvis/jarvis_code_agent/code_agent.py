@@ -71,6 +71,8 @@ new_content_line2
 </PATCH>
 
 2. Rules:
+- Each <PATCH> block MUST contain exactly ONE patch for ONE location
+- Multiple changes to different locations require separate <PATCH> blocks
 - Line Numbers Behavior:
   * start_line (first number): This line WILL be replaced
   * end_line (second number): This line will NOT be replaced
@@ -78,36 +80,41 @@ new_content_line2
 - Use absolute paths relative to the project root
 - Maintain consistent indentation
 - Include enough context for precise location
-- You can output multiple patches using multiple <PATCH> blocks
 
-3. Example:
+3. Multiple Changes Example:
 Before:
 ```
 Line 0: first line
 Line 1: second line
 Line 2: third line
+Line 3: fourth line
 ```
 
-Patch:
+For multiple changes, use separate patches:
 ```
 <PATCH>
-> /path/to/file 0,2
+> /path/to/file 0,1
 new first line
-new second line
+</PATCH>
+
+<PATCH>
+> /path/to/file 2,3
+new third line
 </PATCH>
 ```
 
 After:
 ```
 new first line
-new second line
-Line 2: third line
+Line 1: second line
+new third line
+Line 3: fourth line
 ```
 
 Note: In this example:
-- Line 0 was replaced (inclusive)
-- Line 1 was replaced
-- Line 2 was NOT replaced (exclusive)
+- Each change is in its own <PATCH> block
+- Changes are applied sequentially
+- Line numbers are based on the original file
 
 ## Implementation Guidelines
 
