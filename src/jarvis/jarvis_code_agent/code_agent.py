@@ -26,75 +26,6 @@ class CodeAgent:
 You are a code agent, you are responsible for modifying the code.
 
 You should read the code and analyze the code, and then provide a plan for the code modification.
-"""
-        self.agent = Agent(system_prompt=code_system_prompt, 
-                           name="CodeAgent", 
-                           auto_complete=False,
-                           is_sub_agent=False, 
-                           tool_registry=tool_registry, 
-                           platform=PlatformRegistry().get_codegen_platform(), 
-                           record_methodology=False,
-                           output_filter=[apply_patch])
-
-    
-
-    def _init_env(self):
-        curr_dir = os.getcwd()
-        git_dir = find_git_root(curr_dir)
-        self.root_dir = git_dir
-        if has_uncommitted_changes():
-            git_commiter = GitCommitTool()
-            git_commiter.execute({})
-
-    
-    def make_files_prompt(self, files: List[str]) -> str:
-        """Make the files prompt.
-        
-        Args:
-            files: The files to be modified
-            
-        """
-        return "\n".join(
-            f"- {file} ({get_file_line_count(file)} lines)"
-            for file in files
-        )
-
-    def run(self, user_input: str) :
-        """Run the code agent with the given user input.
-        
-        Args:
-            user_input: The user's requirement/request
-            
-        Returns:
-            str: Output describing the execution result
-        """
-        try:
-            self._init_env()
-            files = find_relevant_files(user_input, self.root_dir)
-            self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files)))
-            
-        except Exception as e:
-            return f"Error during execution: {str(e)}"
-        
-
-
-    def _build_first_edit_prompt(self, user_input: str, files_prompt: str) -> str:
-        """Build the initial prompt for the agent.
-        
-        Args:
-            user_input: The user's requirement
-            files_prompt: The formatted list of relevant files
-            
-        Returns:
-            str: The formatted prompt
-        """
-        return f"""# Code Modification Task
-
-## User Requirement
-{user_input}
-
-## Available Files
-{files_prompt}
 
 ## Workflow Steps
 
@@ -177,6 +108,75 @@ Because the patch replaced [0,1), the content of old_content_line1 is not change
 Please proceed with the analysis and implementation following this workflow.
 Start by examining the files and planning your changes.
 Then provide the necessary patches in the specified format.
+"""
+        self.agent = Agent(system_prompt=code_system_prompt, 
+                           name="CodeAgent", 
+                           auto_complete=False,
+                           is_sub_agent=False, 
+                           tool_registry=tool_registry, 
+                           platform=PlatformRegistry().get_codegen_platform(), 
+                           record_methodology=False,
+                           output_filter=[apply_patch])
+
+    
+
+    def _init_env(self):
+        curr_dir = os.getcwd()
+        git_dir = find_git_root(curr_dir)
+        self.root_dir = git_dir
+        if has_uncommitted_changes():
+            git_commiter = GitCommitTool()
+            git_commiter.execute({})
+
+    
+    def make_files_prompt(self, files: List[str]) -> str:
+        """Make the files prompt.
+        
+        Args:
+            files: The files to be modified
+            
+        """
+        return "\n".join(
+            f"- {file} ({get_file_line_count(file)} lines)"
+            for file in files
+        )
+
+    def run(self, user_input: str) :
+        """Run the code agent with the given user input.
+        
+        Args:
+            user_input: The user's requirement/request
+            
+        Returns:
+            str: Output describing the execution result
+        """
+        try:
+            self._init_env()
+            files = find_relevant_files(user_input, self.root_dir)
+            self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files)))
+            
+        except Exception as e:
+            return f"Error during execution: {str(e)}"
+        
+
+
+    def _build_first_edit_prompt(self, user_input: str, files_prompt: str) -> str:
+        """Build the initial prompt for the agent.
+        
+        Args:
+            user_input: The user's requirement
+            files_prompt: The formatted list of relevant files
+            
+        Returns:
+            str: The formatted prompt
+        """
+        return f"""# Code Modification Task
+
+## User Requirement
+{user_input}
+
+## Available Files
+{files_prompt}
 """
 def main():
     """Jarvis main entry point"""
