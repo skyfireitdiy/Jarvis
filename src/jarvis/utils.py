@@ -602,3 +602,12 @@ def get_file_line_count(filename: str) -> int:
         return len(open(filename, "r", encoding="utf-8").readlines())
     except Exception as e:
         return 0
+    
+def is_use_methodology() -> bool:
+    return os.getenv('JARVIS_USE_METHODOLOGY', 'true') == 'true'
+
+def is_record_methodology() -> bool:
+    return os.getenv('JARVIS_RECORD_METHODOLOGY', 'true') == 'true'
+
+def is_need_summary() -> bool:
+    return os.getenv('JARVIS_NEED_SUMMARY', 'true') == 'true'

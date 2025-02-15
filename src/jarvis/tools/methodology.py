@@ -1,7 +1,7 @@
 import os
 import yaml
 from typing import Dict, Optional, Any
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.utils import OutputType, PrettyOutput, is_use_methodology
 
 
 class MethodologyTool:
@@ -29,6 +29,11 @@ class MethodologyTool:
         },
         "required": ["operation", "problem_type"]
     }
+
+    @staticmethod
+    def check()->bool:
+        """Check if the methodology is enabled"""
+        return is_use_methodology()
     
     def __init__(self):
         """Initialize the experience management tool"""

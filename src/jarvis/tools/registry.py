@@ -8,7 +8,7 @@ from jarvis.tools.base import Tool
 from jarvis.utils import OutputType, PrettyOutput, get_max_context_length
 
 
-tool_call_help = """Tool Usage Format:
+tool_call_help = """## Tool Usage Format
 
 <TOOL_CALL>
 name: tool_name
@@ -49,7 +49,7 @@ class ToolRegistry:
         """Load tools"""
         tools = self.get_all_tools()
         if tools:
-            tools_prompt = "Available tools:\n"
+            tools_prompt = "## Available tools:\n"
             for tool in tools:
                 tools_prompt += f"- Name: {tool['name']}\n"
                 tools_prompt += f"  Description: {tool['description']}\n"
