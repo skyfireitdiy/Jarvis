@@ -36,11 +36,11 @@ class CodeAgent:
 
     def _find_relevant_files(self, user_input) -> List[str]:
         try:
-            files1 = []
+            files_from_codebase = []
             if not is_disable_codebase():
                 PrettyOutput.print("Find files from codebase...", OutputType.INFO)
                 codebase = CodeBase(self.root_dir)
-                files1 = codebase.search_similar(user_input)
+                files_from_codebase = codebase.search_similar(user_input)
 
             PrettyOutput.print("Find files by agent...", OutputType.INFO)
             find_file_tool_registry = ToolRegistry()
@@ -65,22 +65,22 @@ class CodeAgent:
                 - file_path2
                 </FILE_PATH>
                 """)
-            output = find_file_agent.run(f"Find files related about '{user_input}'")
+            prompt = f"Find files related about '{user_input}'\n"
+            if files_from_codebase:
+                prompt += f"\n\nFiles maybe related: {files_from_codebase}\n\n Please read above files first"
+            output = find_file_agent.run(prompt)
 
-            files = re.findall(r'<FILE_PATH>(.*?)</FILE_PATH>', output, re.DOTALL)
-            files2 = []
-            if files:
+            rsp_from_agent = re.findall(r'<FILE_PATH>(.*?)</FILE_PATH>', output, re.DOTALL)
+            files_from_agent = []
+            if rsp_from_agent:
                 try:
-                    files2 = yaml.safe_load(files[0])
+                    files_from_agent = yaml.safe_load(rsp_from_agent[0])
                 except Exception as e:
-                    files2 = []
+                    files_from_agent = []
             else:
-                files2 = []
-            
+                files_from_agent = []
 
-            final_files = set(files1) | set(files2)
-
-            selected_files = select_files(list(final_files), os.getcwd())
+            selected_files = select_files(files_from_agent, os.getcwd())
             return selected_files
         except Exception as e:
             return []
@@ -162,7 +162,7 @@ content_line2
 
 Notes:
 - The patch replaces content from start_line (included) to end_line (excluded)
-- You can output multiple patches
+- You can output multiple patches, use multiple <PATCH> blocks
 - <PATCH> and <TOOL_CALL> can only appear once in the output, if both appear, the <PATCH> will be ignored.
 
 """
