@@ -9,7 +9,7 @@ from jarvis.models.registry import PlatformRegistry
 import concurrent.futures
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_file_md5, get_max_context_length, get_single_line_input, get_thread_count, load_embedding_model, load_rerank_model
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_file_md5, get_max_context_length, get_single_line_input, get_thread_count, load_embedding_model, load_rerank_model, user_confirm
 from jarvis.utils import init_env
 import argparse
 import pickle
@@ -443,16 +443,9 @@ Content: {content}
 
                 # If force is True, continue directly
                 if not force:
-                    # Ask the user whether to continue
-                    while True:
-                        response = get_single_line_input("Rebuild the index? [y/N]").lower().strip()
-                        if response in ['y', 'yes']:
-                            break
-                        elif response in ['', 'n', 'no']:
-                            PrettyOutput.print("Cancel rebuilding the index", output_type=OutputType.INFO)
-                            return
-                        else:
-                            PrettyOutput.print("Please input y or n", output_type=OutputType.WARNING)
+                    if not user_confirm("Rebuild the index?", False):
+                        PrettyOutput.print("Cancel rebuilding the index", output_type=OutputType.INFO)
+                        return
                 
                 # Clean deleted files
                 for file_path in files_to_delete:
