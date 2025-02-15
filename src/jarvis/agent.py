@@ -29,9 +29,10 @@ class Agent:
                  tool_registry: Optional[ToolRegistry] = None, 
                  platform: Optional[BasePlatform] = None, 
                  summary_prompt: Optional[str] = None, 
-                 auto_complete: Optional[bool] = None, 
-                 record_methodology: Optional[bool] = None,
-                 output_filter: Optional[List[Callable]] = None):
+                 auto_complete: bool = False, 
+                 record_methodology: bool = True,
+                 output_filter: Optional[List[Callable]] = None,
+                 need_summary: bool = True):
         """Initialize Agent with a model, optional tool registry and name
         
         Args:
@@ -48,12 +49,13 @@ class Agent:
         else:
             self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         self.tool_registry = tool_registry if tool_registry else ToolRegistry()
-        self.record_methodology = record_methodology if record_methodology else True
+        self.record_methodology = record_methodology
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
+        self.need_summary = need_summary
         # Load configuration from environment variables
         self.output_filter = output_filter if output_filter else []
 
@@ -70,7 +72,7 @@ Please describe in concise bullet points, highlighting important information.
         
         self.max_context_length = get_max_context_length()
 
-        self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
+        self.auto_complete = auto_complete
 
 
         
@@ -236,9 +238,11 @@ Please continue the task based on the above information.
             
             return "Task completed"
         
+        if self.need_summary:
+            self.prompt = self.summary_prompt
+            return self._call_model(self.prompt)
         
-        self.prompt = self.summary_prompt
-        return self._call_model(self.prompt)
+        return "Task completed"
 
 
     def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str:
