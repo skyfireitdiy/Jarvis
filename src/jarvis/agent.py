@@ -286,7 +286,7 @@ Please continue the task based on the above information.
                         self.conversation_length += len(current_response) 
 
                     for filter in self.output_filter:
-                        self.prompt += filter(current_response) + "\n"
+                        self.prompt += filter(current_response)
 
                     try:
                         result = Agent.extract_tool_calls(current_response)

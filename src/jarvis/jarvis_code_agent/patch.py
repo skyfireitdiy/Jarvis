@@ -1,8 +1,9 @@
 import re
 from typing import Dict, Any, List, Tuple
 import os
+from jarvis.tools.git_commiter import GitCommitTool
 from jarvis.tools.read_code import ReadCodeTool
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.utils import OutputType, PrettyOutput, has_uncommitted_changes, make_choice_input, user_confirm
 
 
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
@@ -56,15 +57,12 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     return result
 
 
-def apply_patch(output_str: str) -> str:
+def apply_patch(output_str: str)->str:
     """Apply patches to files"""
     patches = _parse_patch(output_str)
     if not patches:
         return ""
         
-    read_tool = ReadCodeTool()
-    result = []
-    
     for filepath, patch_info in patches.items():
         try:
             # Check if file exists
@@ -94,21 +92,27 @@ def apply_patch(output_str: str) -> str:
                 # Write back to file
                 open(filepath, 'w', encoding='utf-8').writelines(lines)
 
-                verify_start_line = min(start_line-2, 0)
-                verify_end_line = max(end_line+2, len(lines))
-
-                verify_result = read_tool.execute({
-                    "filepath": filepath,
-                    "start_line": verify_start_line,
-                    "end_line": verify_end_line
-                })
-
-                result.append(f"Applied patch to {filepath} successfully, new content:\n{verify_result['stdout']}\n")
                 PrettyOutput.print(f"Applied patch to {filepath} successfully\n", OutputType.SUCCESS)
             
         except Exception as e:
             PrettyOutput.print(f"Error applying patch to {filepath}: {str(e)}", OutputType.ERROR)
             continue
     
-    return "\n".join(result) + "Please check the changes if they are correct."
+    if has_uncommitted_changes():
+        handle_commit_workflow()
+    return ""
     
+def handle_commit_workflow()->bool:
+    """Handle the git commit workflow and return the commit details.
+    
+    Returns:
+        tuple[bool, str, str]: (continue_execution, commit_id, commit_message)
+    """
+    if not user_confirm("Do you want to commit the code?", default=True):
+        os.system("git reset HEAD")
+        os.system("git checkout -- .")
+        return False
+
+    git_commiter = GitCommitTool()
+    commit_result = git_commiter.execute({})
+    return commit_result["success"]
