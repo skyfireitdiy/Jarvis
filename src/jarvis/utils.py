@@ -222,39 +222,63 @@ class FileCompleter(Completer):
     """Custom completer for file paths with fuzzy matching."""
     def __init__(self):
         self.path_completer = PathCompleter()
+        self.last_completion_pos = -1
         
     def get_completions(self, document: Document, complete_event):
         text = document.text_before_cursor
+        cursor_pos = document.cursor_position
         
-        # Check if we're in a file completion context (after @)
-        if '@' in text:
-            # Get the text after the last @
-            file_path = text.split('@')[-1].strip()
+        # Find all @ positions in text
+        at_positions = [i for i, char in enumerate(text) if char == '@']
+        
+        if not at_positions:
+            return
             
-            # Get all possible files from current directory
-            all_files = []
-            for root, _, files in os.walk('.'):
-                for f in files:
-                    path = os.path.join(root, f)
-                    # Remove ./ from the beginning
-                    path = path[2:] if path.startswith('./') else path
-                    all_files.append(path)
+        # Find the last @ before cursor that hasn't been completed
+        current_at_pos = None
+        for pos in reversed(at_positions):
+            if pos > self.last_completion_pos and pos < cursor_pos:
+                current_at_pos = pos
+                break
+                
+        if current_at_pos is None:
+            return
             
-            # Sort files by fuzzy match score
+        # Get the text after the current @
+        file_path = text[current_at_pos + 1:cursor_pos].strip()
+        
+        # Get all possible files from current directory
+        all_files = []
+        for root, _, files in os.walk('.'):
+            for f in files:
+                path = os.path.join(root, f)
+                # Remove ./ from the beginning
+                path = path[2:] if path.startswith('./') else path
+                all_files.append(path)
+        
+        # If no input after @, show all files
+        # Otherwise use fuzzy matching
+        if not file_path:
+            scored_files = [(path, 100) for path in all_files]
+        else:
             scored_files = [
                 (path, fuzz.ratio(file_path.lower(), path.lower()))
                 for path in all_files
             ]
             scored_files.sort(key=lambda x: x[1], reverse=True)
-            
-            # Return completions for files with score > 30
-            for path, score in scored_files:
-                if score > 30:
-                    yield Completion(
-                        path,
-                        start_position=-len(file_path),
-                        display=f"{path} ({score}%)"
-                    )
+        
+        # Return completions for files
+        for path, score in scored_files:
+            if not file_path or score > 30:  # Show all if no input, otherwise filter by score
+                completion = Completion(
+                    path,
+                    start_position=-len(file_path),
+                    display=f"{path}" if not file_path else f"{path} ({score}%)"
+                )
+                # Mark this @ as completed when user selects a completion
+                if complete_event.completion_requested:
+                    self.last_completion_pos = current_at_pos
+                yield completion
 
 def get_multiline_input(tip: str) -> str:
     """Get multi-line input, support direction key, history function, and file completion.
