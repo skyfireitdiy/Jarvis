@@ -65,7 +65,7 @@ class CodeBase:
         try:
             open(file_path, "r", encoding="utf-8").read()
             return True
-        except UnicodeDecodeError:
+        except Exception:
             return False
 
     def make_description(self, file_path: str, content: str) -> str:
