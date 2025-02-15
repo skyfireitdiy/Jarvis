@@ -32,6 +32,7 @@ setup(
         "rich>=13.3.1",
         "pygments>=2.15.0",
         "fuzzywuzzy>=0.18.0",
+        "python-Levenshtein>=0.26.1",
     ],
     entry_points={
         "console_scripts": [
