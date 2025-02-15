@@ -206,6 +206,14 @@ def get_single_line_input(tip: str) -> str:
     })
     return session.prompt(f"{tip}", style=style)
 
+def make_choice_input(tip: str, choices: list) -> str:
+    """Get choice input, support direction key, history function, etc."""
+    session = PromptSession(history=None)
+    style = PromptStyle.from_dict({
+        'prompt': 'ansicyan',
+    })
+    return session.prompt(f"{tip}", style=style)
+
 def get_multiline_input(tip: str) -> str:
     """Get multi-line input, support direction key, history function, etc."""
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
@@ -515,3 +523,9 @@ def user_confirm(tip: str, default: bool = True) -> bool:
     suffix = "[Y/n]" if default else "[y/N]"
     ret = get_single_line_input(f"{tip} {suffix}: ")
     return default if ret == "" else ret.lower() == "y"
+
+def get_file_line_count(filename: str) -> int:
+    try:
+        return len(open(filename, "r", encoding="utf-8").readlines())
+    except Exception as e:
+        return 0
