@@ -8,7 +8,7 @@ import yaml
 from jarvis.models.base import BasePlatform
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools.registry import ToolRegistry, tool_call_help
-from jarvis.utils import PrettyOutput, OutputType, is_auto_complete, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env
+from jarvis.utils import PrettyOutput, OutputType, is_auto_complete, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env, is_use_methodology
 import os
 
 class Agent:
@@ -29,12 +29,15 @@ class Agent:
                  tool_registry: Optional[ToolRegistry] = None, 
                  platform: Optional[BasePlatform] = None, 
                  summary_prompt: Optional[str] = None, 
-                 auto_complete: bool = False, 
-                 record_methodology: bool = True,
+                 auto_complete: Optional[bool] = None, 
                  output_handler_before_tool: Optional[List[Callable]] = None,
                  output_handler_after_tool: Optional[List[Callable]] = None,
-                 need_summary: bool = True):
-        """Initialize Agent with a model, optional tool registry and name
+                 use_methodology: Optional[bool] = None,
+                 record_methodology: Optional[bool] = None,
+                 need_summary: Optional[bool] = None,
+                 max_context_length: Optional[int] = None):
+        """
+        Initialize Agent with a model, optional tool registry and name
         
         Args:
             system_prompt: System prompt
@@ -42,6 +45,12 @@ class Agent:
             is_sub_agent: Whether it is a sub-agent, default is False
             tool_registry: Tool registry instance
             platform: Optional platform instance, default uses normal platform
+            summary_prompt: Optional summary prompt, default is None
+            auto_complete: Optional auto complete, default is None
+            output_handler_before_tool: Optional output handler before tool, default is None
+            output_handler_after_tool: Optional output handler after tool, default is None
+            use_methodology: Optional use methodology, default is None
+            record_methodology: Optional record methodology, default is None
         """
         add_agent(name)
         PrettyOutput.print(f"Welcome to Jarvis, your AI assistant, Initiating...", OutputType.SYSTEM)
@@ -50,13 +59,14 @@ class Agent:
         else:
             self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         self.tool_registry = tool_registry if tool_registry else ToolRegistry()
-        self.record_methodology = record_methodology
+        self.record_methodology = record_methodology if record_methodology is not None else is_record_methodology()
+        self.use_methodology = use_methodology if use_methodology is not None else is_use_methodology()
         self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
-        self.need_summary = need_summary
+        self.need_summary = need_summary if need_summary is not None else is_need_summary()
         # Load configuration from environment variables
         self.output_handler_before_tool = output_handler_before_tool if output_handler_before_tool else []
         self.output_handler_after_tool = output_handler_after_tool if output_handler_after_tool else []
@@ -72,28 +82,22 @@ class Agent:
 Please describe in concise bullet points, highlighting important information.
 """
         
-        self.max_context_length = get_max_context_length()
+        self.max_context_length = max_context_length if max_context_length is not None else get_max_context_length()
 
-        self.auto_complete = auto_complete
-
-
-        
-            
-        # Initialize methodology related attributes
-        self.methodology_data = []
+        self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
 
         PrettyOutput.section(f"Jarvis initialized - With {self.model.name()}", OutputType.SYSTEM)
+
         tools = self.tool_registry.get_all_tools()
         if tools:
             PrettyOutput.section(f"Available tools: {', '.join([tool['name'] for tool in tools])}", OutputType.SYSTEM)
 
-
-        # Load methodology
         
         tools_prompt = self.tool_registry.load_tools()
         complete_prompt = """"""
         if self.auto_complete:
             complete_prompt = """
+            ## Task Completion
             When the task is completed, you should print the following message:
             <!!!COMPLETE!!!>
             """
@@ -268,7 +272,7 @@ Please continue the task based on the above information.
             # 显示任务开始
             PrettyOutput.section(f"Starting new task: {self.name}", OutputType.PLANNING)
 
-            if self.first:
+            if self.first and self.use_methodology:
                 self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
                 self.first = False
             else:
@@ -380,14 +384,16 @@ def load_tasks() -> dict:
         except Exception as e:
             PrettyOutput.print(f"Error loading .jarvis/pre-command file: {str(e)}", OutputType.ERROR)
 
-    # Read methodology
-    method_path = os.path.expanduser("~/.jarvis/methodology")
-    if os.path.exists(method_path):
-        with open(method_path, "r", encoding="utf-8") as f:
-            methodology = yaml.safe_load(f)
-        if isinstance(methodology, dict):
-            for name, desc in methodology.items():
-                tasks[f"Run Methodology: {str(name)}\n {str(desc)}" ] = str(desc)
+    
+    if is_use_methodology():
+        # Read methodology
+        method_path = os.path.expanduser("~/.jarvis/methodology")
+        if os.path.exists(method_path):
+            with open(method_path, "r", encoding="utf-8") as f:
+                methodology = yaml.safe_load(f)
+            if isinstance(methodology, dict):
+                for name, desc in methodology.items():
+                    tasks[f"Run Methodology: {str(name)}\n {str(desc)}" ] = str(desc)
     
     return tasks
 
