@@ -70,7 +70,7 @@ Please describe in concise bullet points, highlighting important information.
         
         self.max_context_length = get_max_context_length()
 
-        self.auto_complete = auto_complete if auto_complete else is_auto_complete()
+        self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
 
 
         
