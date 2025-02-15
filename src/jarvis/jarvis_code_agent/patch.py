@@ -60,9 +60,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
 def apply_patch(output_str: str)->str:
     """Apply patches to files"""
     patches = _parse_patch(output_str)
-    if not patches:
-        return ""
-        
+
     for filepath, patch_info in patches.items():
         try:
             # Check if file exists
