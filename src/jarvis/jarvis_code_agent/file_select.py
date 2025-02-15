@@ -3,7 +3,7 @@ import re
 from typing import Dict, List
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter, Completer, Completion
-from jarvis.utils import OutputType, PrettyOutput, get_single_line_input
+from jarvis.utils import OutputType, PrettyOutput, get_single_line_input, user_confirm
 
 
 def _parse_file_selection(input_str: str, max_index: int) -> List[int]:
@@ -138,8 +138,7 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
     PrettyOutput.print(output, OutputType.INFO, lang="markdown")
     
     # Ask the user if they need to adjust the file list
-    user_input = get_single_line_input("Do you need to adjust the file list? (y/n) [n]").strip().lower() or 'n'
-    if user_input == 'y':
+    if user_confirm("Do you need to adjust the file list?", False):
         # Let the user select files
         numbers = get_single_line_input("Please enter the file numbers to include (support: 1,3-6 format, press Enter to keep the current selection)").strip()
         if numbers:
@@ -150,8 +149,7 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
                 PrettyOutput.print("No valid files selected, keep the current selection", OutputType.WARNING)
     
     # Ask if they need to supplement files
-    user_input = get_single_line_input("Do you need to supplement other files? (y/n) [n]").strip().lower() or 'n'
-    if user_input == 'y':
+    if user_confirm("Do you need to supplement other files?", False):
         # Create file completion session
         session = PromptSession(
             completer=_get_file_completer(root_dir),
