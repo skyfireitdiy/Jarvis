@@ -161,9 +161,30 @@ content_line2
 </PATCH> 
 
 Notes:
-- The patch replaces content from start_line (included) to end_line (excluded)
+- The patch replaces content from start_line (will replace this line) to end_line (will not replace this line)
+    Example:
+    
+    Before:
+    ```
+    content_line1
+    content_line2
+    ```
+
+    Patch:
+    ```
+    > /path/to/file 1,2
+    content_line1
+    content_line2
+    ```
+    
+    After:
+    ```
+    content_line1
+    content_line2
+    content_line2
+    ```
+    </PATCH> 
 - You can output multiple patches, use multiple <PATCH> blocks
-- <PATCH> and <TOOL_CALL> can only appear once in the output, if both appear, the <PATCH> will be ignored.
 
 """
         output = ""
