@@ -83,20 +83,18 @@ Jarvis supports configuration through environment variables that can be set in t
 
 ## 🎯 Usage
 
-### Main Assistant
+### Code Modification
 ```bash
+# Using main agent
 jarvis
+
+# Using code agent directly
+jarvis-code-agent
 ```
 
-### Codebase Search
+### Codebase Query
 ```bash
-# Generate codebase index
-jarvis-codebase generate
-
-# Search similar code
-jarvis-codebase search "your search query"
-
-# Ask questions about codebase
+# Ask questions about the codebase
 jarvis-codebase ask "your question"
 ```
 
@@ -105,71 +103,98 @@ jarvis-codebase ask "your question"
 # Build document index
 jarvis-rag --dir /path/to/documents --build
 
-# Search documents
-jarvis-rag --query "your search query"
+# Ask questions about documents
+jarvis-rag --query "your question"
 ```
 
-### Search Tool
+### Smart Shell
 ```bash
-# Basic search
-jarvis-search "your query"
+# Using full name
+jarvis-smart-shell "describe what you want to do"
 
-# Show only URLs
-jarvis-search "your query" --url-only
+# Using shorthand
+jss "describe what you want to do"
+```
 
-# Limit results
-jarvis-search "your query" --max 3
+### Development Tools
+```bash
+# Manage git commits
+jarvis-git-commit
+
+# Generate and manage ctags
+jarvis-ctags
+
+# Manage AI platforms
+jarvis-platform
+```
+
+Each command supports `--help` flag for detailed usage information:
+```bash
+jarvis --help
+jarvis-code-agent --help
+jarvis-codebase --help
+jarvis-rag --help
+jarvis-smart-shell --help
+jarvis-platform --help
+jarvis-git-commit --help
+jarvis-ctags --help
 ```
 
 ## 🛠️ Tools
-
 
 ### Built-in Tools
 
 | Tool | Description |
 |------|-------------|
+| read_code | Read code files with line numbers and range support |
 | execute_shell | Execute system commands and capture output |
-| file_operation | File operations (read/write/append/delete) |
-| generate_tool | AI-powered tool generation and integration |
-| methodology | Experience accumulation and methodology management |
-| create_sub_agent | Create specialized sub-agents for specific tasks |
-| coder | Automatic code modification and generation tool |
-| codebase | Codebase management and search tool |
+| search | Web search for development related queries |
+| ask_user | Interactive user input collection |
+| ask_codebase | Intelligent codebase querying and analysis |
+| code_review | Automated code review with multi-dimensional analysis |
+| file_operation | Basic file operations (read/exists) |
+| git_commiter | Automated git commit handling |
 
 ### Tool Locations
 - Built-in tools: `src/jarvis/tools/`
 - User tools: `~/.jarvis/tools/`
 
-
 ### Key Features
 
-#### 1. Self-Extending Capabilities
-- Tool generation through natural language description
-- Automatic code generation and integration
-- Dynamic capability expansion through sub-agents
-- Automatic code modification with version control
-- Codebase indexing and semantic search
+#### 1. Code Intelligence
+- Smart file selection and analysis based on requirements
+- Semantic codebase search and querying
+- Efficient handling of large files with context-aware reading
+- Precise patch-based code modifications
+- Automated git commit management
 
-#### 2. Methodology Learning
-- Automatic experience accumulation from interactions
-- Pattern recognition and methodology extraction
-- Continuous refinement through usage
-- Code modification history tracking
-- Codebase analysis and documentation generation
+#### 2. Multi-Model Architecture
+- Support for multiple AI platforms (Kimi/OpenAI/AI8/OYI/Ollama)
+- Platform-specific optimizations for different tasks
+- Specialized models for code generation, thinking, and general tasks
+- Streaming response support for better interaction
+- Automatic model fallback and retry mechanisms
 
-#### 3. Adaptive Problem Solving
-- Context-aware sub-agent creation
-- Dynamic tool composition
-- Learning from execution feedback
+#### 3. RAG Capabilities
+- Document indexing and semantic search
+- Smart context management for large documents
+- Automatic file change detection
+- Efficient caching mechanisms
+- Multi-format document support
+
+#### 4. Development Tools
+- Interactive shell command generation
+- Code review with multi-dimensional analysis
 - Codebase-aware problem solving
-- Multi-model collaboration for complex tasks
+- File operations with safety checks
+- Progress tracking and error handling
 
-#### 4. Code Intelligence
-- Automatic codebase indexing
-- Semantic code search
-- Code modification with git integration
-- Code analysis and documentation
-- Multi-model code generation
+#### 5. User Experience
+- Beautiful console output with color support
+- Interactive multi-line input
+- Progress indicators for long operations
+- Clear error messages and handling
+- Context-aware response formatting
 
 ## 🎯 Extending Jarvis
 

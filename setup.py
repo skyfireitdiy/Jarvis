@@ -43,7 +43,6 @@ setup(
             "jarvis-smart-shell=jarvis.jarvis_smart_shell.main:main",
             "jss=jarvis.jarvis_smart_shell.main:main",
             "jarvis-platform=jarvis.jarvis_platform.main:main",
-            "jarvis-gh=jarvis.jarvis_github.main:main",
             "jarvis-git-commit=jarvis.tools.git_commiter:main",
             "jarvis-ctags=jarvis.tools.create_ctags_agent:main",
         ],
