@@ -222,7 +222,6 @@ class FileCompleter(Completer):
     """Custom completer for file paths with fuzzy matching."""
     def __init__(self):
         self.path_completer = PathCompleter()
-        self.last_completion_pos = -1
         
     def get_completions(self, document: Document, complete_event):
         text = document.text_before_cursor
@@ -234,18 +233,20 @@ class FileCompleter(Completer):
         if not at_positions:
             return
             
-        # Find the last @ before cursor that hasn't been completed
-        current_at_pos = None
-        for pos in reversed(at_positions):
-            if pos > self.last_completion_pos and pos < cursor_pos:
-                current_at_pos = pos
-                break
-                
-        if current_at_pos is None:
+        # Get the last @ position
+        current_at_pos = at_positions[-1]
+        
+        # If cursor is not after the last @, don't complete
+        if cursor_pos <= current_at_pos:
+            return
+            
+        # Check if there's a space after @
+        text_after_at = text[current_at_pos + 1:cursor_pos]
+        if ' ' in text_after_at:
             return
             
         # Get the text after the current @
-        file_path = text[current_at_pos + 1:cursor_pos].strip()
+        file_path = text_after_at.strip()
         
         # Get all possible files from current directory
         all_files = []
@@ -271,13 +272,11 @@ class FileCompleter(Completer):
         for path, score in scored_files:
             if not file_path or score > 30:  # Show all if no input, otherwise filter by score
                 completion = Completion(
-                    path,
+                    text=path,
                     start_position=-len(file_path),
-                    display=f"{path}" if not file_path else f"{path} ({score}%)"
+                    display=f"{path}" if not file_path else f"{path} ({score}%)",
+                    display_meta="File"
                 )
-                # Mark this @ as completed when user selects a completion
-                if complete_event.completion_requested:
-                    self.last_completion_pos = current_at_pos
                 yield completion
 
 def get_multiline_input(tip: str) -> str:
@@ -291,12 +290,6 @@ def get_multiline_input(tip: str) -> str:
     """
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
     
-    # Create input session with custom completer
-    session = PromptSession(
-        history=None,  # Use default history
-        completer=FileCompleter()
-    )
-    
     # Define prompt style
     style = PromptStyle.from_dict({
         'prompt': 'ansicyan',
@@ -309,6 +302,12 @@ def get_multiline_input(tip: str) -> str:
             prompt = FormattedText([
                 ('class:prompt', '... ' if lines else '>>> ')
             ])
+            
+            # Create new session with new completer for each line
+            session = PromptSession(
+                history=None,  # Use default history
+                completer=FileCompleter()  # New completer instance for each line
+            )
             
             # Get input with completion support
             line = session.prompt(
