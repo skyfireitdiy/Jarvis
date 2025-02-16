@@ -147,3 +147,69 @@ class LSPRegistry:
     def get_supported_languages(self) -> List[str]:
         """Get list of supported languages."""
         return list(self.lsp_servers.keys())
+
+def main():
+    """CLI entry point for LSP testing."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='LSP functionality testing')
+    parser.add_argument('--language', type=str, required=True, help='Programming language')
+    parser.add_argument('--file', type=str, required=True, help='File to analyze')
+    parser.add_argument('--action', choices=['symbols', 'diagnostics', 'references', 'definition'],
+                       required=True, help='Action to perform')
+    parser.add_argument('--line', type=int, help='Line number (0-based) for references/definition')
+    parser.add_argument('--character', type=int, help='Character position for references/definition')
+    
+    args = parser.parse_args()
+    
+    # Initialize LSP
+    registry = LSPRegistry.get_global_lsp_registry()
+    lsp = registry.create_lsp(args.language)
+    
+    if not lsp:
+        PrettyOutput.print(f"No LSP support for language: {args.language}", OutputType.ERROR)
+        return 1
+        
+    if not lsp.initialize(os.path.dirname(os.path.abspath(args.file))):
+        PrettyOutput.print("LSP initialization failed", OutputType.ERROR)
+        return 1
+    
+    try:
+        # Execute requested action
+        if args.action == 'symbols':
+            symbols = lsp.get_document_symbols(args.file)
+            for symbol in symbols:
+                print(f"Symbol at {symbol['range']['start']['line']}:{symbol['range']['start']['character']}: {symbol['uri']}")
+                
+        elif args.action == 'diagnostics':
+            diagnostics = lsp.get_diagnostics(args.file)
+            for diag in diagnostics:
+                severity = ['Error', 'Warning', 'Info', 'Hint'][diag['severity'] - 1]
+                print(f"{severity} at {diag['range']['start']['line']}:{diag['range']['start']['character']}: {diag['message']}")
+                
+        elif args.action in ('references', 'definition'):
+            if args.line is None or args.character is None:
+                PrettyOutput.print("Line and character position required for references/definition", OutputType.ERROR)
+                return 1
+                
+            if args.action == 'references':
+                refs = lsp.find_references(args.file, (args.line, args.character))
+                for ref in refs:
+                    print(f"Reference in {ref['uri']} at {ref['range']['start']['line']}:{ref['range']['start']['character']}")
+            else:
+                defn = lsp.find_definition(args.file, (args.line, args.character))
+                if defn:
+                    print(f"Definition in {defn['uri']} at {defn['range']['start']['line']}:{defn['range']['start']['character']}")
+                else:
+                    print("No definition found")
+                    
+    except Exception as e:
+        PrettyOutput.print(f"Error: {str(e)}", OutputType.ERROR)
+        return 1
+    finally:
+        lsp.shutdown()
+    
+    return 0
+
+if __name__ == "__main__":
+    exit(main())
