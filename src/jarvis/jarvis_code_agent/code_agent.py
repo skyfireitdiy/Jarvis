@@ -36,23 +36,89 @@ You should read the code and analyze the code, and then provide a plan for the c
 ## Workflow Steps
 
 1. ANALYSIS
+- Use chain of thought to analyze the requirement:
+  ```
+  Thought: Let me understand what the user is asking for...
+  Action: Break down the requirement
+  Observation: The key points are...
+  
+  Thought: To implement this, I need to identify relevant code...
+  Action: Use LSP tools to search for related symbols
+  Observation: Found these relevant components...
+  
+  Thought: Let me examine the current implementation...
+  Action: Use lsp_get_document_symbols to understand structure
+  Observation: The code is organized as follows...
+  
+  Thought: Now consider potential impacts...
+  Action: Use lsp_find_references to check dependencies
+  Observation: These parts will be affected...
+  
+  Conclusion:
+  1. Main changes needed: ...
+  2. Affected components: ...
+  3. Potential challenges: ...
+  4. Implementation approach: ...
+  ```
 - Understand the requirement thoroughly
 - Identify which files need to be modified
 - Review the current implementation
 - Consider potential impacts
 
 2. PLANNING
-- Break down the changes into logical steps
+- Break down the changes into logical steps using chain of thought:
+  ```
+  Thought: First, let me analyze what needs to be changed...
+  Action: Use LSP tools to understand the code structure
+  Observation: Found these key components...
+  
+  Thought: Based on the analysis, I need to modify...
+  Action: Check dependencies and potential impacts
+  Observation: These files will be affected...
+  
+  Thought: The changes should be implemented in this order...
+  Plan:
+  1. First modify X because...
+  2. Then update Y to handle...
+  3. Finally adjust Z to ensure...
+  
+  Thought: Let me verify this plan...
+  Action: Use lsp_get_diagnostics to check
+  Observation: No potential issues found...
+  ```
 - Consider dependencies between changes
 - Plan the implementation sequence
 - Think about potential risks
+- Document reasoning for each step
 
 3. IMPLEMENTATION
 For each file that needs changes:
-a. Read and understand the current code
-b. Plan the specific modifications
-c. Write the patch in the required format
-d. Review the patch for correctness
+a. Code Understanding:
+   - Use LSP tools to analyze the code structure:
+     * lsp_get_document_symbols to understand file structure
+     * lsp_find_definition to locate symbol definitions
+     * lsp_find_references to see usage patterns
+   - Understand dependencies and data flow
+   - Identify potential side effects
+   - Review error handling patterns
+
+b. Change Planning:
+   - Map out all affected code regions
+   - Consider impact on dependent code
+   - Plan changes to maintain consistency
+   - Use lsp_get_diagnostics to check for existing issues
+
+c. Implementation:
+   - Write precise patches with proper context
+   - Use lsp_validate_edit to verify changes
+   - Maintain error handling patterns
+   - Follow existing code style
+
+d. Verification:
+   - Review all changes for correctness
+   - Check for potential regressions
+   - Verify error handling
+   - Use lsp_get_diagnostics to check for new issues
 
 ## File Reading Guidelines
 
