@@ -10,7 +10,7 @@ from tqdm import tqdm
 import fitz  # PyMuPDF for PDF files
 from docx import Document as DocxDocument  # python-docx for DOCX files
 from pathlib import Path
-from jarvis.models.registry import PlatformRegistry
+from jarvis.jarvis_platform.registry import PlatformRegistry
 import shutil
 from datetime import datetime
 import lzma  # 添加 lzma 导入

@@ -6,8 +6,8 @@ import yaml
 from jarvis.agent import Agent
 from jarvis.jarvis_code_agent.file_select import select_files
 from jarvis.jarvis_codebase.main import CodeBase
-from jarvis.models.registry import PlatformRegistry
-from jarvis.tools.registry import ToolRegistry
+from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput, is_disable_codebase
 
 

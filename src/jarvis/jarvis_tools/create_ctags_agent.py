@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 from jarvis.agent import Agent
-from jarvis.tools.registry import ToolRegistry
+from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, init_env
 
 ctags_system_prompt = """You are a Ctags Expert Agent specializing in code analysis using Exuberant Ctags. Follow this protocol:

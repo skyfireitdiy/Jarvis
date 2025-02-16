@@ -1,4 +1,4 @@
-from jarvis.models.registry import PlatformRegistry
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType, init_env, get_multiline_input
 
 def list_platforms():

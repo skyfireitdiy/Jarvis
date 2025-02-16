@@ -7,7 +7,7 @@ from typing import Optional
 from yaspin import yaspin # type: ignore
 from yaspin.spinners import Spinners # type: ignore
 
-from jarvis.models.registry import PlatformRegistry
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType, get_shell_name, init_env
 
 def execute_command(command: str) -> None:

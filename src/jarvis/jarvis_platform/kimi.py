@@ -4,7 +4,7 @@ import json
 import os
 import mimetypes
 import time
-from jarvis.models.base import BasePlatform
+from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType
 from jarvis.utils import while_success
 
