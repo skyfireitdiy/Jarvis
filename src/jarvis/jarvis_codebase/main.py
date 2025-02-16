@@ -777,6 +777,10 @@ Please answer the user's question in Chinese using professional language. If the
 """
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
         response = model.chat_until_success(prompt)
+        response += "\n\n"
+        response += "### Relevant files:"
+        for path in results_from_agent:
+            response += f"- {path}\n"
         return response
 
     def is_index_generated(self) -> bool:
