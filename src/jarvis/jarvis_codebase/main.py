@@ -774,13 +774,11 @@ File content:
 User question: {query}
 
 Please answer the user's question in Chinese using professional language. If the provided file content is insufficient to answer the user's question, please inform the user. Never make up information.
+
+Add reference files and code snippets at the end of the answer.
 """
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
         response = model.chat_until_success(prompt)
-        response += "\n\n"
-        response += "### Relevant files:"
-        for path in results_from_agent:
-            response += f"- {path}\n"
         return response
 
     def is_index_generated(self) -> bool:
