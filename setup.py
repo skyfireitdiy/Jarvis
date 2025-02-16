@@ -45,7 +45,6 @@ setup(
             "jss=jarvis.jarvis_smart_shell.main:main",
             "jarvis-platform-manager=jarvis.jarvis_platform_manager.main:main",
             "jarvis-git-commit=jarvis.jarvis_tools.git_commiter:main",
-            "jarvis-ctags=jarvis.jarvis_tools.create_ctags_agent:main",
             "jarvis-code-review=jarvis.jarvis_tools.code_review:main",
         ],
     },
