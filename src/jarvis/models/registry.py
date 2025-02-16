@@ -4,7 +4,7 @@ import os
 import sys
 from typing import Dict, Type, Optional, List
 from jarvis.models.base import BasePlatform
-from jarvis.utils import PrettyOutput, OutputType
+from jarvis.utils import PrettyOutput, OutputType, get_cheap_model_name, get_cheap_platform_name, get_codegen_model_name, get_codegen_platform_name, get_normal_model_name, get_normal_platform_name, get_thinking_model_name, get_thinking_platform_name
 
 REQUIRED_METHODS = [
     ('chat', ['message']),           # 方法名和参数列表
@@ -155,29 +155,29 @@ class PlatformRegistry:
         
 
     def get_normal_platform(self) -> BasePlatform:
-        platform_name = os.environ.get("JARVIS_PLATFORM", "kimi")
-        model_name = os.environ.get("JARVIS_MODEL", "kimi")
+        platform_name = get_normal_platform_name()
+        model_name = get_normal_model_name()
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name) # type: ignore
         return platform # type: ignore
     
     def get_codegen_platform(self) -> BasePlatform:
-        platform_name = os.environ.get("JARVIS_CODEGEN_PLATFORM", os.environ.get("JARVIS_PLATFORM", "kimi"))
-        model_name = os.environ.get("JARVIS_CODEGEN_MODEL", os.environ.get("JARVIS_MODEL", "kimi"))
+        platform_name = get_codegen_platform_name()
+        model_name = get_codegen_model_name()
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name) # type: ignore
         return platform # type: ignore
     
     def get_cheap_platform(self) -> BasePlatform:
-        platform_name = os.environ.get("JARVIS_CHEAP_PLATFORM", os.environ.get("JARVIS_PLATFORM", "kimi"))
-        model_name = os.environ.get("JARVIS_CHEAP_MODEL", os.environ.get("JARVIS_MODEL", "kimi"))
+        platform_name = get_cheap_platform_name()
+        model_name = get_cheap_model_name()
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name) # type: ignore
         return platform # type: ignore
     
     def get_thinking_platform(self) -> BasePlatform:
-        platform_name = os.environ.get("JARVIS_THINKING_PLATFORM", os.environ.get("JARVIS_PLATFORM", "kimi"))
-        model_name = os.environ.get("JARVIS_THINKING_MODEL", os.environ.get("JARVIS_MODEL", "kimi"))
+        platform_name = get_thinking_platform_name()
+        model_name = get_thinking_model_name()
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name) # type: ignore
         return platform # type: ignore
