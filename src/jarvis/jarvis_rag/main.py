@@ -629,82 +629,64 @@ class RAGTool:
         unchanged_documents = [doc for doc in self.documents 
                             if doc.metadata['file_path'] in unchanged_files]
 
-        # Process files in parallel with optimized vectorization
+        # Process files one by one with optimized vectorization
         if files_to_process:
             PrettyOutput.print(f"Processing {len(files_to_process)} files...", OutputType.INFO)
             
-            # Step 1: 并行提取文本内容
-            documents_to_process = []
-            with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
-                futures = {
-                    executor.submit(self._process_file, file_path): file_path 
-                    for file_path in files_to_process
-                }
+            new_documents = []
+            new_vectors = []
+            
+            with tqdm(total=len(files_to_process), desc="Processing files") as pbar:
+                for file_path in files_to_process:
+                    try:
+                        # Process single file
+                        file_docs = self._process_file(file_path)
+                        if file_docs:
+                            # Vectorize documents from this file
+                            texts_to_vectorize = [
+                                f"File:{doc.metadata['file_path']} Content:{doc.content}"
+                                for doc in file_docs
+                            ]
+                            file_vectors = self._get_embedding_batch(texts_to_vectorize)
+                            
+                            # Save cache for this file
+                            self._save_cache(file_path, file_docs, file_vectors)
+                            
+                            # Accumulate documents and vectors
+                            new_documents.extend(file_docs)
+                            new_vectors.append(file_vectors)
+                            
+                    except Exception as e:
+                        PrettyOutput.print(f"Failed to process {file_path}: {str(e)}", OutputType.ERROR)
+                    
+                    pbar.update(1)
+
+            # Update documents list
+            self.documents.extend(new_documents)
+
+            # Build final index
+            if new_vectors:
+                all_new_vectors = np.vstack(new_vectors)
                 
-                with tqdm(total=len(files_to_process), desc="Extracting text") as pbar:
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            docs = future.result()
-                            if docs:
-                                documents_to_process.extend(docs)
-                            pbar.update(1)
-                        except Exception as e:
-                            PrettyOutput.print(f"File processing failed: {str(e)}", OutputType.ERROR)
-                            pbar.update(1)
-
-            # Step 2: 优化的批量向量化
-            if documents_to_process:
-                PrettyOutput.print(f"Vectorizing {len(documents_to_process)} documents...", OutputType.INFO)
-                
-                # 准备向量化的文本
-                texts_to_vectorize = []
-                for doc in documents_to_process:
-                    # 优化文本组合，减少内存使用
-                    combined_text = f"File:{doc.metadata['file_path']} Content:{doc.content}"
-                    texts_to_vectorize.append(combined_text)
-
-                # 使用较小的初始批处理大小
-                initial_batch_size = min(
-                    32,  # 最大批次大小
-                    max(4, len(texts_to_vectorize) // 8),  # 基于文档数的批次大小
-                    len(texts_to_vectorize)  # 不超过总文档数
-                )
-                
-                # 批量处理向量
-                vectors = self._get_embedding_batch(texts_to_vectorize, initial_batch_size)
-
-                # 更新文档和索引
-                self.documents.extend(documents_to_process)
-
-                # 构建最终索引
                 if self.flat_index is not None:
-                    # 获取未更改文档的向量
+                    # Get vectors for unchanged documents
                     unchanged_vectors = self._get_unchanged_vectors(unchanged_documents)
                     if unchanged_vectors is not None:
-                        final_vectors = np.vstack([unchanged_vectors, vectors])
+                        final_vectors = np.vstack([unchanged_vectors, all_new_vectors])
                     else:
-                        final_vectors = vectors
+                        final_vectors = all_new_vectors
                 else:
-                    final_vectors = vectors
+                    final_vectors = all_new_vectors
 
-                # 构建索引并保存缓存
+                # Build index
                 self._build_index(final_vectors)
-                
-                # 按文件分别保存缓存
-                for file_path in files_to_process:
-                    file_docs = [doc for doc in documents_to_process if doc.metadata['file_path'] == file_path]
-                    if file_docs:
-                        doc_vectors = vectors[len(self.documents)-len(documents_to_process):][
-                            [i for i, doc in enumerate(documents_to_process) if doc.metadata['file_path'] == file_path]
-                        ]
-                        self._save_cache(file_path, file_docs, doc_vectors)
 
-                PrettyOutput.print(
-                    f"Indexed {len(self.documents)} documents "
-                    f"(New/Modified: {len(documents_to_process)}, "
-                    f"Unchanged: {len(unchanged_documents)})", 
-                    OutputType.SUCCESS
-                )
+            PrettyOutput.print(
+                f"Indexed {len(self.documents)} documents "
+                f"(New/Modified: {len(new_documents)}, "
+                f"Unchanged: {len(unchanged_documents)})", 
+                OutputType.SUCCESS
+            )
 
     def _get_unchanged_vectors(self, unchanged_documents: List[Document]) -> Optional[np.ndarray]:
         """Get vectors for unchanged documents from existing index"""
