@@ -13,8 +13,6 @@ import os
 
 class Agent:
 
-    def __del__(self):
-        delete_current_agent()
 
     def set_summary_prompt(self, summary_prompt: str):
         self.summary_prompt = summary_prompt
@@ -52,7 +50,6 @@ class Agent:
             use_methodology: Optional use methodology, default is None
             record_methodology: Optional record methodology, default is None
         """
-        add_agent(name)
         PrettyOutput.print(f"Welcome to Jarvis, your AI assistant, Initiating...", OutputType.SYSTEM)
         if platform is not None:
             self.model = platform
@@ -262,7 +259,7 @@ Please continue the task based on the above information.
             str: Task summary report
         """
 
-        
+        add_agent(self.name)
 
         try:
             PrettyOutput.section("Preparing environment", OutputType.PLANNING)
@@ -337,6 +334,8 @@ Please continue the task based on the above information.
             PrettyOutput.print(str(e), OutputType.ERROR)
             return f"Task failed: {str(e)}"
         
+        finally:
+            delete_current_agent()
 
     def clear_history(self):
         """Clear conversation history, only keep system prompt"""
