@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 import concurrent.futures
 import re
+import hashlib
 
 @dataclass
 class Document:
@@ -163,15 +164,18 @@ class RAGTool:
             PrettyOutput.print(f"Failed to load model: {str(e)}", output_type=OutputType.ERROR)
             raise
 
-        # Initialize cache and index
-        self.cache_path = os.path.join(self.data_dir, "cache.pkl")
+        # 修改缓存相关初始化
+        self.cache_dir = os.path.join(self.data_dir, "cache")
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+            
         self.documents: List[Document] = []
-        self.index = None  # IVF index for search
-        self.flat_index = None  # Store original vectors
-        self.file_md5_cache = {}  # Store file MD5 values
+        self.index = None
+        self.flat_index = None
+        self.file_md5_cache = {}
         
-        # Load cache
-        self._load_cache()
+        # 加载缓存索引
+        self._load_cache_index()
 
         # Register file processors
         self.file_processors = [
@@ -230,62 +234,99 @@ class RAGTool:
             
         return config
 
-    def _load_cache(self):
-        """Load cache data"""
-        if os.path.exists(self.cache_path):
+    def _get_cache_path(self, file_path: str) -> str:
+        """Get cache file path for a document
+        
+        Args:
+            file_path: Original file path
+            
+        Returns:
+            str: Cache file path
+        """
+        # 使用文件路径的哈希作为缓存文件名
+        file_hash = hashlib.md5(file_path.encode()).hexdigest()
+        return os.path.join(self.cache_dir, f"{file_hash}.cache")
+
+    def _load_cache_index(self):
+        """Load cache index"""
+        index_path = os.path.join(self.data_dir, "index.pkl")
+        if os.path.exists(index_path):
             try:
-                with lzma.open(self.cache_path, 'rb') as f:
+                with lzma.open(index_path, 'rb') as f:
                     cache_data = pickle.load(f)
-                    self.documents = cache_data["documents"]
-                    vectors = cache_data["vectors"]
-                    self.file_md5_cache = cache_data.get("file_md5_cache", {})  # 加载MD5缓存
+                    self.file_md5_cache = cache_data.get("file_md5_cache", {})
                     
-                # 重建索引
-                if vectors is not None:
-                    self._build_index(vectors)
+                # 从各个缓存文件加载文档
+                for file_path in self.file_md5_cache:
+                    cache_path = self._get_cache_path(file_path)
+                    if os.path.exists(cache_path):
+                        try:
+                            with lzma.open(cache_path, 'rb') as f:
+                                file_cache = pickle.load(f)
+                                self.documents.extend(file_cache["documents"])
+                        except Exception as e:
+                            PrettyOutput.print(f"Failed to load cache for {file_path}: {str(e)}", 
+                                            output_type=OutputType.WARNING)
+                
+                # 重建向量索引
+                if self.documents:
+                    vectors = []
+                    for doc in self.documents:
+                        cache_path = self._get_cache_path(doc.metadata['file_path'])
+                        if os.path.exists(cache_path):
+                            with lzma.open(cache_path, 'rb') as f:
+                                file_cache = pickle.load(f)
+                                doc_idx = next((i for i, d in enumerate(file_cache["documents"]) 
+                                            if d.metadata['chunk_index'] == doc.metadata['chunk_index']), None)
+                                if doc_idx is not None:
+                                    vectors.append(file_cache["vectors"][doc_idx])
+                    
+                    if vectors:
+                        vectors = np.vstack(vectors)
+                        self._build_index(vectors)
+                        
                 PrettyOutput.print(f"Loaded {len(self.documents)} document fragments", 
                                 output_type=OutputType.INFO)
+                                
             except Exception as e:
-                PrettyOutput.print(f"Failed to load cache: {str(e)}", 
+                PrettyOutput.print(f"Failed to load cache index: {str(e)}", 
                                 output_type=OutputType.WARNING)
                 self.documents = []
                 self.index = None
                 self.flat_index = None
                 self.file_md5_cache = {}
 
-    def _save_cache(self, vectors: np.ndarray):
-        """Optimize cache saving"""
+    def _save_cache(self, file_path: str, documents: List[Document], vectors: np.ndarray):
+        """Save cache for a single file
+        
+        Args:
+            file_path: File path
+            documents: List of documents
+            vectors: Document vectors
+        """
         try:
+            # 保存文件缓存
+            cache_path = self._get_cache_path(file_path)
             cache_data = {
-                "version": "1.0",
-                "timestamp": datetime.now().isoformat(),
-                "documents": self.documents,
-                "vectors": vectors.copy() if vectors is not None else None,  # Create a copy of the array
-                "file_md5_cache": dict(self.file_md5_cache),  # Create a copy of the dictionary
-                "metadata": {
-                    "vector_dim": self.vector_dim,
-                    "total_docs": len(self.documents),
-                    "model_name": self.embedding_model.__class__.__name__
-                }
+                "documents": documents,
+                "vectors": vectors
             }
-            
-            # First serialize the data to a byte stream
-            data = pickle.dumps(cache_data, protocol=pickle.HIGHEST_PROTOCOL)
-            
-            # Then use LZMA to compress the byte stream
-            with lzma.open(self.cache_path, 'wb') as f:
-                f.write(data)
-            
-            # Create a backup
-            backup_path = f"{self.cache_path}.backup"
-            shutil.copy2(self.cache_path, backup_path)
-            
-            PrettyOutput.print(f"Cache saved: {len(self.documents)} document fragments", 
+            with lzma.open(cache_path, 'wb') as f:
+                pickle.dump(cache_data, f)
+                
+            # 更新并保存索引
+            index_path = os.path.join(self.data_dir, "index.pkl")
+            index_data = {
+                "file_md5_cache": self.file_md5_cache
+            }
+            with lzma.open(index_path, 'wb') as f:
+                pickle.dump(index_data, f)
+                
+            PrettyOutput.print(f"Cache saved: {len(documents)} document fragments", 
                             output_type=OutputType.INFO)
+                            
         except Exception as e:
-            PrettyOutput.print(f"Failed to save cache: {str(e)}", 
-                            output_type=OutputType.ERROR)
-            raise
+            PrettyOutput.print(f"Failed to save cache: {str(e)}", output_type=OutputType.ERROR)
 
     def _build_index(self, vectors: np.ndarray):
         """Build FAISS index"""
@@ -378,56 +419,72 @@ class RAGTool:
                 import torch
                 torch.cuda.empty_cache()
                 
-                # 使用较小的批处理大小
-                optimal_batch_size = min(16, len(texts))
+                # 使用更保守的批处理大小
+                optimal_batch_size = min(8, len(texts))
                 all_embeddings = []
                 
                 with tqdm(total=len(texts), desc="Vectorizing") as pbar:
                     for i in range(0, len(texts), optimal_batch_size):
                         try:
                             batch = texts[i:i + optimal_batch_size]
+                            
+                            # 临时将模型移到 CPU 以清理 GPU 内存
+                            self.embedding_model.to('cpu')
+                            torch.cuda.empty_cache()
+                            
+                            # 分批处理文本
                             embeddings = self.embedding_model.encode(
                                 batch,
                                 normalize_embeddings=True,
                                 show_progress_bar=False,
-                                batch_size=4,  # 减小内部批处理大小
-                                convert_to_tensor=True
+                                batch_size=2,  # 使用更小的内部批处理大小
+                                convert_to_tensor=False  # 直接返回 numpy 数组
                             )
-                            # 立即移动到 CPU
-                            embeddings = embeddings.cpu().numpy()
+                            
                             all_embeddings.append(embeddings)
                             pbar.update(len(batch))
                             
-                            # 清理 GPU 缓存
-                            torch.cuda.empty_cache()
-                            
                         except RuntimeError as e:
                             if "out of memory" in str(e):
-                                # 如果内存不足，减小批次大小重试
-                                if optimal_batch_size > 4:
+                                # 如果内存不足，减小批次大小
+                                if optimal_batch_size > 2:
                                     optimal_batch_size //= 2
                                     PrettyOutput.print(
                                         f"CUDA out of memory, reducing batch size to {optimal_batch_size}", 
                                         OutputType.WARNING
                                     )
-                                    i -= optimal_batch_size  # 重试当前批次
+                                    # 清理内存并重试
+                                    torch.cuda.empty_cache()
+                                    self.embedding_model.to('cpu')
+                                    i -= optimal_batch_size
                                     continue
+                                else:
+                                    # 如果批次已经最小，切换到 CPU 模式
+                                    PrettyOutput.print(
+                                        "Switching to CPU mode due to memory constraints",
+                                        OutputType.WARNING
+                                    )
+                                    self.embedding_model.to('cpu')
+                                    return self._get_embedding_batch_cpu(texts[i:])
                             raise
                             
                 return np.vstack(all_embeddings)
             else:
-                # CPU 模式
-                return self.embedding_model.encode(
-                    texts,
-                    normalize_embeddings=True,
-                    show_progress_bar=True,
-                    batch_size=8,
-                    convert_to_tensor=False
-                )
+                return self._get_embedding_batch_cpu(texts)
                 
         except Exception as e:
             PrettyOutput.print(f"Batch embedding failed: {str(e)}", OutputType.ERROR)
             return np.zeros((len(texts), self.vector_dim), dtype=np.float32) # type: ignore
+
+    def _get_embedding_batch_cpu(self, texts: List[str]) -> np.ndarray:
+        """Get embeddings using CPU only"""
+        return self.embedding_model.encode(
+            texts,
+            normalize_embeddings=True,
+            show_progress_bar=True,
+            batch_size=4,
+            convert_to_tensor=False
+        )
 
     def _process_document_batch(self, documents: List[Document]) -> np.ndarray:
         """Process a batch of documents using shared memory
@@ -632,7 +689,15 @@ class RAGTool:
 
                 # 构建索引并保存缓存
                 self._build_index(final_vectors)
-                self._save_cache(final_vectors)
+                
+                # 按文件分别保存缓存
+                for file_path in files_to_process:
+                    file_docs = [doc for doc in documents_to_process if doc.metadata['file_path'] == file_path]
+                    if file_docs:
+                        doc_vectors = vectors[len(self.documents)-len(documents_to_process):][
+                            [i for i, doc in enumerate(documents_to_process) if doc.metadata['file_path'] == file_path]
+                        ]
+                        self._save_cache(file_path, file_docs, doc_vectors)
 
                 PrettyOutput.print(
                     f"Indexed {len(self.documents)} documents "
