@@ -341,7 +341,7 @@ def init_env():
             with open(env_file, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
-                    if line and not line.startswith("#"):
+                    if line and not line.startswith(("#", ";")):
                         try:
                             key, value = line.split("=", 1)
                             os.environ[key.strip()] = value.strip().strip("'").strip('"')
