@@ -611,3 +611,39 @@ def is_record_methodology() -> bool:
 
 def is_need_summary() -> bool:
     return os.getenv('JARVIS_NEED_SUMMARY', 'true') == 'true'
+
+def get_min_paragraph_length() -> int:
+    return int(os.getenv('JARVIS_MIN_PARAGRAPH_LENGTH', '50'))
+
+def get_max_paragraph_length() -> int:
+    return int(os.getenv('JARVIS_MAX_PARAGRAPH_LENGTH', '1000'))
+
+def get_context_window() -> int:
+    return int(os.getenv('JARVIS_CONTEXT_WINDOW', '5'))
+
+def get_shell_name() -> str:
+    return os.getenv('SHELL', 'bash')
+
+def get_normal_platform_name() -> str:
+    return os.getenv('JARVIS_PLATFORM', 'kimi')
+
+def get_normal_model_name() -> str:
+    return os.getenv('JARVIS_MODEL', 'kimi')
+
+def get_codegen_platform_name() -> str:
+    return os.getenv('JARVIS_CODEGEN_PLATFORM', os.getenv('JARVIS_PLATFORM', 'kimi'))
+
+def get_codegen_model_name() -> str:
+    return os.getenv('JARVIS_CODEGEN_MODEL', os.getenv('JARVIS_MODEL', 'kimi'))
+
+def get_thinking_platform_name() -> str:
+    return os.getenv('JARVIS_THINKING_PLATFORM', os.getenv('JARVIS_PLATFORM', 'kimi'))
+
+def get_thinking_model_name() -> str:
+    return os.getenv('JARVIS_THINKING_MODEL', os.getenv('JARVIS_MODEL', 'kimi'))
+
+def get_cheap_platform_name() -> str:
+    return os.getenv('JARVIS_CHEAP_PLATFORM', os.getenv('JARVIS_PLATFORM', 'kimi'))
+
+def get_cheap_model_name() -> str:
+    return os.getenv('JARVIS_CHEAP_MODEL', os.getenv('JARVIS_MODEL', 'kimi'))

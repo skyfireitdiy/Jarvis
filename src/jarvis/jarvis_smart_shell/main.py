@@ -8,7 +8,7 @@ from yaspin import yaspin # type: ignore
 from yaspin.spinners import Spinners # type: ignore
 
 from jarvis.models.registry import PlatformRegistry
-from jarvis.utils import PrettyOutput, OutputType, init_env
+from jarvis.utils import PrettyOutput, OutputType, get_shell_name, init_env
 
 def execute_command(command: str) -> None:
     """Show command and allow user to edit, then execute, Ctrl+C to cancel"""
@@ -42,7 +42,7 @@ def process_request(request: str) -> Optional[str]:
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(True)
 
-        shell = os.environ.get("SHELL") or "bash"
+        shell = get_shell_name()
         current_path = os.getcwd()
         
         # Set system prompt

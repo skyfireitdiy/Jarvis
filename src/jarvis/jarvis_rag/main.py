@@ -3,7 +3,7 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, get_file_md5, get_max_context_length, load_embedding_model, load_rerank_model
+from jarvis.utils import OutputType, PrettyOutput, get_context_window, get_file_md5, get_max_context_length, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, load_embedding_model, load_rerank_model
 from jarvis.utils import init_env
 from dataclasses import dataclass
 from tqdm import tqdm
@@ -142,9 +142,9 @@ class RAGTool:
         os.chdir(self.root_dir)
         
         # Initialize configuration
-        self.min_paragraph_length = int(os.environ.get("JARVIS_MIN_PARAGRAPH_LENGTH", "50"))  # Minimum paragraph length
-        self.max_paragraph_length = int(os.environ.get("JARVIS_MAX_PARAGRAPH_LENGTH", "1000"))  # Maximum paragraph length
-        self.context_window = int(os.environ.get("JARVIS_CONTEXT_WINDOW", "5"))  # Context window size, default前后各5个片段
+        self.min_paragraph_length = get_min_paragraph_length()  # Minimum paragraph length
+        self.max_paragraph_length = get_max_paragraph_length()  # Maximum paragraph length
+        self.context_window = get_context_window()  # Context window size, default前后各5个片段
         self.max_context_length = int(get_max_context_length() * 0.8)
         
         # Initialize data directory
@@ -179,7 +179,7 @@ class RAGTool:
         ]
 
         # Add thread related configuration
-        self.thread_count = int(os.environ.get("JARVIS_THREAD_COUNT", os.cpu_count() or 4))
+        self.thread_count = get_thread_count()
         self.vector_lock = Lock()  # Protect vector list concurrency
 
     def _load_cache(self):
