@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import os
+import re
 import sys
 from typing import Dict, Type, Optional, List
 from jarvis.jarvis_lsp.base import BaseLSP
@@ -147,6 +148,21 @@ class LSPRegistry:
     def get_supported_languages(self) -> List[str]:
         """Get list of supported languages."""
         return list(self.lsp_servers.keys())
+    
+    @staticmethod
+    def get_text_at_position(file_path: str, line: int, start_character: int) -> str:
+        """Get text at position."""
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+            symbol = re.search(r'\b\w+\b', lines[line][start_character:])
+            return symbol.group() if symbol else ""
+        
+    @staticmethod
+    def get_line_at_position(file_path: str, line: int) -> str:
+        """Get line at position."""
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+            return lines[line]
 
 def main():
     """CLI entry point for LSP testing."""
@@ -179,7 +195,7 @@ def main():
         if args.action == 'symbols':
             symbols = lsp.get_document_symbols(args.file)
             for symbol in symbols:
-                print(f"Symbol at {symbol['range']['start']['line']}:{symbol['range']['start']['character']}: {symbol['uri']}")
+                print(f"Symbol {LSPRegistry.get_text_at_position(args.file, symbol['range']['start']['line'], symbol['range']['start']['character'])} at {symbol['range']['start']['line']}:{symbol['range']['start']['character']}: {symbol['uri']}")
                 
         elif args.action == 'diagnostics':
             diagnostics = lsp.get_diagnostics(args.file)
@@ -195,11 +211,11 @@ def main():
             if args.action == 'references':
                 refs = lsp.find_references(args.file, (args.line, args.character))
                 for ref in refs:
-                    print(f"Reference in {ref['uri']} at {ref['range']['start']['line']}:{ref['range']['start']['character']}")
+                    print(f"Reference in {ref['uri']} at {ref['range']['start']['line']}:{ref['range']['start']['character']}\nLine: {LSPRegistry.get_line_at_position(ref['uri'], ref['range']['start']['line'])}")
             else:
                 defn = lsp.find_definition(args.file, (args.line, args.character))
                 if defn:
-                    print(f"Definition in {defn['uri']} at {defn['range']['start']['line']}:{defn['range']['start']['character']}")
+                    print(f"Definition in {defn['uri']} at {defn['range']['start']['line']}:{defn['range']['start']['character']}\nLine: {LSPRegistry.get_line_at_position(defn['uri'], defn['range']['start']['line'])}")
                 else:
                     print("No definition found")
                     
