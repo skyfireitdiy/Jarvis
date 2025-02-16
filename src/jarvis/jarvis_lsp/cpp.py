@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from typing import List, Dict, Optional, Tuple, Any
 import json
@@ -9,6 +10,11 @@ class CPPLSP(BaseLSP):
     """C++ LSP implementation using clangd."""
     
     language = "cpp"
+
+    @staticmethod
+    def check() -> bool:
+        """Check if clangd is installed."""
+        return shutil.which("clangd") is not None
     
     def __init__(self):
         self.workspace_path = ""
