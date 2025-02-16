@@ -159,9 +159,8 @@ def find_relevant_files(user_input: str, root_dir: str) -> List[str]:
         PrettyOutput.print("Find files by agent...", OutputType.INFO)
 
         files_from_agent = find_relevant_files_from_agent(user_input, files_from_codebase)
-        final_files = list(set(files_from_codebase + files_from_agent))
 
-        selected_files = select_files(final_files, os.getcwd())
+        selected_files = select_files(files_from_agent, os.getcwd())
         return selected_files
     except Exception as e:
         return []
