@@ -1,10 +1,8 @@
 import os
 from typing import Dict, Any
 from jarvis.jarvis_lsp.registry import LSPRegistry
-from jarvis.jarvis_tools.base import Tool
-from jarvis.utils import PrettyOutput, OutputType
 
-class LSPFindDefinitionTool(Tool):
+class LSPFindDefinitionTool:
     """Tool for finding symbol definitions in code using LSP."""
     
     name = "lsp_find_definition"

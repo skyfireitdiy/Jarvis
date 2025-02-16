@@ -1,10 +1,8 @@
 import os
 from typing import Dict, Any
 from jarvis.jarvis_lsp.registry import LSPRegistry
-from jarvis.jarvis_tools.base import Tool
-from jarvis.utils import PrettyOutput, OutputType
 
-class LSPGetDocumentSymbolsTool(Tool):
+class LSPGetDocumentSymbolsTool:
     """Tool for getting document symbols in code files using LSP."""
     
     name = "lsp_get_document_symbols"
