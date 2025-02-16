@@ -678,13 +678,6 @@ class RAGTool:
             if not results:
                 return None
             
-            # 显示找到的文档
-            for doc, score in results:
-                output = f"""File: {doc.metadata['file_path']} (Score: {score:.3f})\n"""
-                output += f"""Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}\n"""
-                output += f"""Content:\n{doc.content}\n"""
-                PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
-            
             # 构建提示词
             prompt = f"""Based on the following document fragments, please answer the user's question accurately and comprehensively.
 
@@ -702,6 +695,10 @@ Relevant documents (ordered by relevance):
 {doc.content}
 ---
 """
+                prompt += "Answer Format:\n"
+                prompt += "1. Answer the question accurately and comprehensively.\n"
+                prompt += "2. If the documents don't fully answer the question, please indicate what information is missing.\n"
+                prompt += "3. Reference the documents in the answer.\n"
                 if current_length + len(doc_content) > available_length:
                     PrettyOutput.print(
                         "Due to context length limit, some fragments were omitted", 
