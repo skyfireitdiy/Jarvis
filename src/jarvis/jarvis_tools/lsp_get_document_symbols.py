@@ -9,7 +9,7 @@ class LSPGetDocumentSymbolsTool:
     description = "Get document symbols (functions, classes, variables) in code files"
     parameters = {
         "file_path": "Path to the file to analyze",
-        "language": "Programming language of the file (python/cpp/go/rust)"
+        "language": f"Programming language of the file ({', '.join(LSPRegistry.get_global_lsp_registry().get_supported_languages())})"
     }
     
     @staticmethod
