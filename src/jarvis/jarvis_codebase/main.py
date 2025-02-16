@@ -524,7 +524,7 @@ Content: {content}
         score = len(matched_keywords) / len(keywords)
         return score
 
-    def pick_results(self, query: str, initial_results: List[str]) -> List[str]:
+    def pick_results(self, query: List[str], initial_results: List[str]) -> List[str]:
         """Use a large model to pick the search results
         
         Args:
@@ -538,7 +538,7 @@ Content: {content}
             return []
             
         try:
-            PrettyOutput.print(f"Picking results for query: {query}", output_type=OutputType.INFO)
+            PrettyOutput.print(f"Picking results for query: \n" + "\n".join(query), output_type=OutputType.INFO)
             
             # Maximum content length per batch
             max_batch_length = self.max_context_length - 1000  # Reserve space for prompt
@@ -564,7 +564,7 @@ Content: {content}
                     if current_length + file_length > max_batch_length:
                         # Process current batch
                         if current_batch:
-                            selected = self._process_batch(query, current_batch)
+                            selected = self._process_batch('\n'.join(query), current_batch)
                             all_selected_files.update(selected)
                         # Start new batch
                         current_batch = [file_info]
@@ -579,7 +579,7 @@ Content: {content}
             
             # Process final batch
             if current_batch:
-                selected = self._process_batch(query, current_batch)
+                selected = self._process_batch('\n'.join(query), current_batch)
                 all_selected_files.update(selected)
             
             # Convert set to list and maintain original order
@@ -591,30 +591,37 @@ Content: {content}
             return initial_results
             
     def _process_batch(self, query: str, files_info: List[str]) -> List[str]:
-        """Process a batch of files
-        
-        Args:
-            query: Search query
-            files_info: List of file information strings
-            
-        Returns:
-            List[str]: Selected file paths from this batch
-        """
-        prompt = f"""Please analyze the following code files and determine which files are most relevant to the given query. Consider file paths and code content to make your judgment.
+        """Process a batch of files"""
+        prompt = f"""As a code analysis expert, please help identify the most relevant files for the given query using chain-of-thought reasoning.
 
 Query: {query}
 
 Available files:
 {''.join(files_info)}
 
-Please output a YAML list of relevant file paths, ordered by relevance (most relevant first). Only include files that are truly relevant to the query.
-Output format:
+Think through this step by step:
+1. First, analyze the query to identify key requirements and technical concepts
+2. For each file:
+   - Examine its path and content
+   - Assess how it relates to the query's requirements
+   - Consider both direct and indirect relationships
+   - Rate its relevance (high/medium/low)
+3. Select only files with clear relevance to the query
+4. Order files by relevance, with most relevant first
+
+Please output your selection in YAML format:
 <FILES>
-- path/to/file1.py
-- path/to/file2.py
+- path/to/most/relevant.py
+- path/to/next/relevant.py
 </FILES>
 
-Note: Only include files that have a strong connection to the query."""
+Important:
+- Only include files that are truly relevant
+- Exclude files with weak or unclear connections
+- Focus on implementation rather than test files
+- Consider both file paths and content
+- Only output the file paths, no other text
+"""
 
         # Use a large model to evaluate
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
@@ -626,7 +633,6 @@ Note: Only include files that have a strong connection to the query."""
         if not files_match:
             return []
 
-        # Extract the file list
         try:
             selected_files = yaml.safe_load(files_match.group(1))
             return selected_files if selected_files else []
@@ -644,7 +650,7 @@ Note: Only include files that have a strong connection to the query."""
             List[str]: The query variants list
         """
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        prompt = f"""Please generate 3 different expressions optimized for vector search based on the following query. Each expression should:
+        prompt = f"""Please generate 10 different expressions optimized for vector search based on the following query. Each expression should:
 
 1. Focus on key technical concepts and terminology
 2. Use clear and specific language
@@ -653,7 +659,8 @@ Note: Only include files that have a strong connection to the query."""
 5. Maintain semantic similarity with original query
 6. Be suitable for embedding-based search
 
-Original query: {query}
+Original query: 
+{query}
 
 Example transformations:
 Query: "How to handle user login?"
@@ -754,14 +761,16 @@ Please provide 10 search-optimized expressions in the specified format.
             # Sort by similarity and take top_k
             all_results.sort(key=lambda x: x[1], reverse=True)
             results = all_results[:top_k]
-            
+
             # Display results with scores
             message = "Found related files:\n"
             for path, score, _ in results:
                 message += f"File: {path} (Score: {score:.3f})\n"
             PrettyOutput.print(message.rstrip(), output_type=OutputType.INFO, lang="markdown")
+
+            results = self.pick_results(query_variants, [path for path, _, _ in results])
             
-            return [path for path, _, _ in results]
+            return results
             
         except Exception as e:
             PrettyOutput.print(f"Failed to search: {str(e)}", output_type=OutputType.ERROR)
@@ -771,15 +780,12 @@ Please provide 10 search-optimized expressions in the specified format.
         """Query the codebase with enhanced context building"""
         files_from_codebase = self.search_similar(query, top_k)
         
-        from jarvis.jarvis_code_agent.relevant_files import find_relevant_files_from_agent
-        files_from_agent = find_relevant_files_from_agent(query, files_from_codebase)
-
-        if not files_from_agent:
+        if not files_from_codebase:
             PrettyOutput.print("No related files found", output_type=OutputType.WARNING)
             return ""
         
         output = "Found related files:\n"
-        for path in files_from_agent:
+        for path in files_from_codebase:
             output += f"- {path}\n"
         PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
         
@@ -800,7 +806,7 @@ Relevant code files (ordered by relevance):
         available_length = self.max_context_length - len(prompt) - 1000  # Reserve space for answer
         current_length = 0
         
-        for path in files_from_agent:
+        for path in files_from_codebase:
             try:
                 content = open(path, "r", encoding="utf-8").read()
                 file_content = f"""
