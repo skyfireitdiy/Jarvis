@@ -98,7 +98,9 @@ def find_relevant_files(user_input: str, root_dir: str) -> List[str]:
         else:
             files_from_agent = []
 
-        selected_files = select_files(files_from_agent, os.getcwd())
+        final_files = list(set(files_from_codebase + files_from_agent))
+
+        selected_files = select_files(final_files, os.getcwd())
         return selected_files
     except Exception as e:
         return []
