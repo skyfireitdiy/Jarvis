@@ -614,10 +614,10 @@ def get_min_paragraph_length() -> int:
     return int(os.getenv('JARVIS_MIN_PARAGRAPH_LENGTH', '50'))
 
 def get_max_paragraph_length() -> int:
-    return int(os.getenv('JARVIS_MAX_PARAGRAPH_LENGTH', '1000'))
+    return int(os.getenv('JARVIS_MAX_PARAGRAPH_LENGTH', '128000'))
 
 def get_context_window() -> int:
-    return int(os.getenv('JARVIS_CONTEXT_WINDOW', '5'))
+    return int(os.getenv('JARVIS_CONTEXT_WINDOW', '1'))
 
 def get_shell_name() -> str:
     return os.getenv('SHELL', 'bash')
