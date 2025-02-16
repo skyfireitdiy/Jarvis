@@ -83,8 +83,8 @@ Jarvis 支持通过环境变量进行配置，可以在 `~/.jarvis/env` 文件�
 | JARVIS_NEED_SUMMARY | 生成摘要 | true | 否 |
 | JARVIS_DONT_USE_LOCAL_MODEL | 避免使用本地模型 | false | 否 |
 | OPENAI_API_KEY | OpenAI 平台的 API 密钥 | - | OpenAI 必需 |
-| OPENAI_API_BASE | OpenAI API 的基础 URL | https://api.deepseek.com | 否 |
-| OPENAI_MODEL_NAME | OpenAI 的模型名称 | deepseek-chat | 否 |
+| OPENAI_API_BASE | OpenAI API 的基础 URL | https://api.openai.com | 否 |
+| OPENAI_MODEL_NAME | OpenAI 的模型名称 | gpt-4o | 否 |
 | AI8_API_KEY | AI8 平台的 API 密钥 | - | AI8 必需 |
 | KIMI_API_KEY | Kimi 平台的 API 密钥 | - | Kimi 必需 |
 | OYI_API_KEY | OYI 平台的 API 密钥 | - | OYI 必需 |

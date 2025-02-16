@@ -83,8 +83,8 @@ Jarvis supports configuration through environment variables that can be set in t
 | JARVIS_NEED_SUMMARY | Generate summaries | true | No |
 | JARVIS_DONT_USE_LOCAL_MODEL | Avoid using local models | false | No |
 | OPENAI_API_KEY | API key for OpenAI platform | - | Required for OpenAI |
-| OPENAI_API_BASE | Base URL for OpenAI API | https://api.deepseek.com | No |
-| OPENAI_MODEL_NAME | Model name for OpenAI | deepseek-chat | No |
+| OPENAI_API_BASE | Base URL for OpenAI API | https://api.openai.com | No |
+| OPENAI_MODEL_NAME | Model name for OpenAI | gpt-4o | No |
 | AI8_API_KEY | API key for AI8 platform | - | Required for AI8 |
 | KIMI_API_KEY | API key for Kimi platform | - | Required for Kimi |
 | OYI_API_KEY | API key for OYI platform | - | Required for OYI |
