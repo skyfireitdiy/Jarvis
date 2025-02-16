@@ -4,7 +4,6 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 
-from jarvis.jarvis_code_agent.relevant_files import find_relevant_files_from_agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
@@ -740,6 +739,7 @@ Please output 3 expressions directly, separated by two line breaks, without numb
         """Query the codebase"""
         reuslts_from_codebase = self.search_similar(query, top_k)
         
+        from jarvis.jarvis_code_agent.relevant_files import find_relevant_files_from_agent
         results_from_agent = find_relevant_files_from_agent(query, reuslts_from_codebase)
 
         final_results = list(set(reuslts_from_codebase + results_from_agent))
