@@ -7,7 +7,7 @@ from typing import List, Tuple, Optional, Dict
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_file_md5, get_max_context_length, get_thread_count, load_embedding_model, user_confirm
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_embedding, get_file_md5, get_max_context_length, get_thread_count, load_embedding_model, user_confirm
 from jarvis.utils import init_env
 import argparse
 import pickle
@@ -209,19 +209,6 @@ Code content:
         
         return cached_data["vector"]
 
-    def get_embedding(self, text: str) -> np.ndarray:
-        """Use the transformers model to get the vector representation of text"""
-        # Truncate long text
-        max_length = 512  # Or other suitable length
-        text = ' '.join(text.split()[:max_length])
-        
-        # Get the embedding vector
-        embedding = self.embedding_model.encode(text, 
-                                                 normalize_embeddings=True,  # L2 normalization
-                                                 show_progress_bar=False)
-        vector = np.array(embedding, dtype=np.float32)
-        return vector
-
     def vectorize_file(self, file_path: str, description: str) -> np.ndarray:
         """Vectorize the file content and description"""
         try:
@@ -239,7 +226,7 @@ File path: {file_path}
 Description: {description}
 Content: {content}
 """
-            vector = self.get_embedding(combined_text)
+            vector = get_embedding(self.embedding_model, combined_text)
             
             # Save to cache
             self.cache_vector(file_path, vector, description)
@@ -708,7 +695,7 @@ Please provide 10 search-optimized expressions in the specified format.
         """
         results = {}
         for query in query_variants:
-            query_vector = self.get_embedding(query)
+            query_vector = get_embedding(self.embedding_model, query)
             query_vector = query_vector.reshape(1, -1)
             
             distances, indices = self.index.search(query_vector, top_k) # type: ignore
@@ -744,7 +731,7 @@ Please provide 10 search-optimized expressions in the specified format.
             
             for variant in query_variants:
                 # Get vector for each variant
-                query_vector = self.get_embedding(variant)
+                query_vector = get_embedding(self.embedding_model, variant)
                 query_vector = query_vector.reshape(1, -1)
                 
                 # Search with current variant

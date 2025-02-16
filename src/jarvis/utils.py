@@ -4,7 +4,7 @@ import time
 import os
 from enum import Enum
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import colorama
 from colorama import Fore, Style as ColoramaStyle
 import numpy as np
@@ -12,13 +12,14 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
 from prompt_toolkit.formatted_text import FormattedText
 from sentence_transformers import SentenceTransformer
+from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import torch
 import yaml
 import faiss
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
-
+import psutil
 from rich.console import Console
 from rich.theme import Theme
 from rich.panel import Panel
@@ -586,6 +587,136 @@ def get_file_line_count(filename: str) -> int:
     except Exception as e:
         return 0
     
+
+def init_gpu_config() -> Dict:
+    """Initialize GPU configuration based on available hardware
+    
+    Returns:
+        Dict: GPU configuration including memory sizes and availability
+    """
+    config = {
+        "has_gpu": False,
+        "shared_memory": 0,
+        "device_memory": 0,
+        "memory_fraction": 0.8  # 默认使用80%的可用内存
+    }
+    
+    try:
+        import torch
+        if torch.cuda.is_available():
+            # 获取GPU信息
+            gpu_mem = torch.cuda.get_device_properties(0).total_memory
+            config["has_gpu"] = True
+            config["device_memory"] = gpu_mem
+            
+            # 估算共享内存 (通常是系统内存的一部分)
+            
+            system_memory = psutil.virtual_memory().total
+            config["shared_memory"] = min(system_memory * 0.5, gpu_mem * 2)  # 取系统内存的50%或GPU内存的2倍中的较小值
+            
+            # 设置CUDA内存分配
+            torch.cuda.set_per_process_memory_fraction(config["memory_fraction"])
+            torch.cuda.empty_cache()
+            
+            PrettyOutput.print(
+                f"GPU initialized: {torch.cuda.get_device_name(0)}\n"
+                f"Device Memory: {gpu_mem / 1024**3:.1f}GB\n"
+                f"Shared Memory: {config['shared_memory'] / 1024**3:.1f}GB", 
+                output_type=OutputType.SUCCESS
+            )
+        else:
+            PrettyOutput.print("No GPU available, using CPU mode", output_type=OutputType.WARNING)
+    except Exception as e:
+        PrettyOutput.print(f"GPU initialization failed: {str(e)}", output_type=OutputType.WARNING)
+        
+    return config
+
+
+def get_embedding(embedding_model: Any, text: str) -> np.ndarray:
+    """Get the vector representation of the text"""
+    embedding = embedding_model.encode(text, 
+                                        normalize_embeddings=True,
+                                        show_progress_bar=False)
+    return np.array(embedding, dtype=np.float32)
+
+def get_embedding_batch(embedding_model: Any, texts: List[str], batch_size: int = 32) -> np.ndarray:
+    """Get embeddings for a batch of texts efficiently"""
+    try:
+        gpu_config = init_gpu_config()
+        if gpu_config["has_gpu"]:
+            import torch
+            torch.cuda.empty_cache()
+            
+            # 使用更保守的批处理大小
+            optimal_batch_size = min(8, len(texts))
+            all_embeddings = []
+            
+            with tqdm(total=len(texts), desc="Vectorizing") as pbar:
+                for i in range(0, len(texts), optimal_batch_size):
+                    try:
+                        batch = texts[i:i + optimal_batch_size]
+                        
+                        # 临时将模型移到 CPU 以清理 GPU 内存
+                        embedding_model.to('cpu')
+                        torch.cuda.empty_cache()
+                        
+                        # 分批处理文本
+                        embeddings = embedding_model.encode(
+                            batch,
+                            normalize_embeddings=True,
+                            show_progress_bar=False,
+                            batch_size=2,  # 使用更小的内部批处理大小
+                            convert_to_tensor=False  # 直接返回 numpy 数组
+                        )
+                        
+                        all_embeddings.append(embeddings)
+                        pbar.update(len(batch))
+                        
+                    except RuntimeError as e:
+                        if "out of memory" in str(e):
+                            # 如果内存不足，减小批次大小
+                            if optimal_batch_size > 2:
+                                optimal_batch_size //= 2
+                                PrettyOutput.print(
+                                    f"CUDA out of memory, reducing batch size to {optimal_batch_size}", 
+                                    OutputType.WARNING
+                                )
+                                # 清理内存并重试
+                                torch.cuda.empty_cache()
+                                embedding_model.to('cpu')
+                                i -= optimal_batch_size
+                                continue
+                            else:
+                                # 如果批次已经最小，切换到 CPU 模式
+                                PrettyOutput.print(
+                                    "Switching to CPU mode due to memory constraints",
+                                    OutputType.WARNING
+                                )
+                                embedding_model.to('cpu')
+                                return _get_embedding_batch_cpu(embedding_model, texts[i:])
+                        raise
+                        
+            return np.vstack(all_embeddings)
+        else:
+            return _get_embedding_batch_cpu(embedding_model, texts)
+            
+    except Exception as e:
+        PrettyOutput.print(f"Batch embedding failed: {str(e)}", OutputType.ERROR)
+        return np.zeros((len(texts), self.vector_dim), dtype=np.float32) # type: ignore
+
+def _get_embedding_batch_cpu(embedding_model: Any, texts: List[str]) -> np.ndarray:
+    """Get embeddings using CPU only"""
+    return embedding_model.encode(
+        texts,
+        normalize_embeddings=True,
+        show_progress_bar=False,
+        batch_size=4,
+        convert_to_tensor=False
+    )
+
+
+
+    
 def get_max_context_length():
     return int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '131072'))  # 默认128k
     
@@ -645,3 +776,5 @@ def get_cheap_platform_name() -> str:
 
 def get_cheap_model_name() -> str:
     return os.getenv('JARVIS_CHEAP_MODEL', os.getenv('JARVIS_MODEL', 'kimi'))
+
+

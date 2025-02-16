@@ -3,7 +3,7 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, get_context_window, get_file_md5, get_max_context_length, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, load_embedding_model, load_rerank_model
+from jarvis.utils import OutputType, PrettyOutput, get_context_window, get_embedding, get_embedding_batch, get_file_md5, get_max_context_length, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model, load_rerank_model
 from jarvis.utils import init_env
 from dataclasses import dataclass
 from tqdm import tqdm
@@ -189,50 +189,8 @@ class RAGTool:
         self.vector_lock = Lock()  # Protect vector list concurrency
 
         # 初始化 GPU 内存配置
-        self.gpu_config = self._init_gpu_config()
+        self.gpu_config = init_gpu_config()
 
-    def _init_gpu_config(self) -> Dict:
-        """Initialize GPU configuration based on available hardware
-        
-        Returns:
-            Dict: GPU configuration including memory sizes and availability
-        """
-        config = {
-            "has_gpu": False,
-            "shared_memory": 0,
-            "device_memory": 0,
-            "memory_fraction": 0.8  # 默认使用80%的可用内存
-        }
-        
-        try:
-            import torch
-            if torch.cuda.is_available():
-                # 获取GPU信息
-                gpu_mem = torch.cuda.get_device_properties(0).total_memory
-                config["has_gpu"] = True
-                config["device_memory"] = gpu_mem
-                
-                # 估算共享内存 (通常是系统内存的一部分)
-                import psutil
-                system_memory = psutil.virtual_memory().total
-                config["shared_memory"] = min(system_memory * 0.5, gpu_mem * 2)  # 取系统内存的50%或GPU内存的2倍中的较小值
-                
-                # 设置CUDA内存分配
-                torch.cuda.set_per_process_memory_fraction(config["memory_fraction"])
-                torch.cuda.empty_cache()
-                
-                PrettyOutput.print(
-                    f"GPU initialized: {torch.cuda.get_device_name(0)}\n"
-                    f"Device Memory: {gpu_mem / 1024**3:.1f}GB\n"
-                    f"Shared Memory: {config['shared_memory'] / 1024**3:.1f}GB", 
-                    output_type=OutputType.SUCCESS
-                )
-            else:
-                PrettyOutput.print("No GPU available, using CPU mode", output_type=OutputType.WARNING)
-        except Exception as e:
-            PrettyOutput.print(f"GPU initialization failed: {str(e)}", output_type=OutputType.WARNING)
-            
-        return config
 
     def _get_cache_path(self, file_path: str) -> str:
         """Get cache file path for a document
@@ -405,86 +363,6 @@ class RAGTool:
         
         return paragraphs
 
-    def _get_embedding(self, text: str) -> np.ndarray:
-        """Get the vector representation of the text"""
-        embedding = self.embedding_model.encode(text, 
-                                            normalize_embeddings=True,
-                                            show_progress_bar=False)
-        return np.array(embedding, dtype=np.float32)
-
-    def _get_embedding_batch(self, texts: List[str], batch_size: int = 32) -> np.ndarray:
-        """Get embeddings for a batch of texts efficiently"""
-        try:
-            if self.gpu_config["has_gpu"]:
-                import torch
-                torch.cuda.empty_cache()
-                
-                # 使用更保守的批处理大小
-                optimal_batch_size = min(8, len(texts))
-                all_embeddings = []
-                
-                with tqdm(total=len(texts), desc="Vectorizing") as pbar:
-                    for i in range(0, len(texts), optimal_batch_size):
-                        try:
-                            batch = texts[i:i + optimal_batch_size]
-                            
-                            # 临时将模型移到 CPU 以清理 GPU 内存
-                            self.embedding_model.to('cpu')
-                            torch.cuda.empty_cache()
-                            
-                            # 分批处理文本
-                            embeddings = self.embedding_model.encode(
-                                batch,
-                                normalize_embeddings=True,
-                                show_progress_bar=False,
-                                batch_size=2,  # 使用更小的内部批处理大小
-                                convert_to_tensor=False  # 直接返回 numpy 数组
-                            )
-                            
-                            all_embeddings.append(embeddings)
-                            pbar.update(len(batch))
-                            
-                        except RuntimeError as e:
-                            if "out of memory" in str(e):
-                                # 如果内存不足，减小批次大小
-                                if optimal_batch_size > 2:
-                                    optimal_batch_size //= 2
-                                    PrettyOutput.print(
-                                        f"CUDA out of memory, reducing batch size to {optimal_batch_size}", 
-                                        OutputType.WARNING
-                                    )
-                                    # 清理内存并重试
-                                    torch.cuda.empty_cache()
-                                    self.embedding_model.to('cpu')
-                                    i -= optimal_batch_size
-                                    continue
-                                else:
-                                    # 如果批次已经最小，切换到 CPU 模式
-                                    PrettyOutput.print(
-                                        "Switching to CPU mode due to memory constraints",
-                                        OutputType.WARNING
-                                    )
-                                    self.embedding_model.to('cpu')
-                                    return self._get_embedding_batch_cpu(texts[i:])
-                            raise
-                            
-                return np.vstack(all_embeddings)
-            else:
-                return self._get_embedding_batch_cpu(texts)
-                
-        except Exception as e:
-            PrettyOutput.print(f"Batch embedding failed: {str(e)}", OutputType.ERROR)
-            return np.zeros((len(texts), self.vector_dim), dtype=np.float32) # type: ignore
-
-    def _get_embedding_batch_cpu(self, texts: List[str]) -> np.ndarray:
-        """Get embeddings using CPU only"""
-        return self.embedding_model.encode(
-            texts,
-            normalize_embeddings=True,
-            show_progress_bar=True,
-            batch_size=4,
-            convert_to_tensor=False
-        )
 
     def _process_document_batch(self, documents: List[Document]) -> np.ndarray:
         """Process a batch of documents using shared memory
@@ -519,7 +397,7 @@ class RAGTool:
                 combined_text = f"File:{doc.metadata['file_path']} Content:{doc.content}"
                 texts.append(combined_text)
                 
-            return self._get_embedding_batch(texts)
+            return get_embedding_batch(self.embedding_model, texts)
             
         except Exception as e:
             PrettyOutput.print(f"Batch processing failed: {str(e)}", OutputType.ERROR)
@@ -647,7 +525,7 @@ class RAGTool:
                                 f"File:{doc.metadata['file_path']} Content:{doc.content}"
                                 for doc in file_docs
                             ]
-                            file_vectors = self._get_embedding_batch(texts_to_vectorize)
+                            file_vectors = get_embedding_batch(self.embedding_model, texts_to_vectorize)
                             
                             # Save cache for this file
                             self._save_cache(file_path, file_docs, file_vectors)
@@ -716,7 +594,7 @@ class RAGTool:
             self.build_index(self.root_dir)
             
         # Get query vector
-        query_vector = self._get_embedding(query)
+        query_vector = get_embedding(self.embedding_model, query)
         query_vector = query_vector.reshape(1, -1)
         
         # Search with more candidates
