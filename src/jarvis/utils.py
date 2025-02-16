@@ -468,15 +468,12 @@ def is_long_context(files: list) -> bool:
             
     return total_chars > threshold
 
-def get_thread_count():
-    return int(os.getenv('JARVIS_THREAD_COUNT', '1'))  
+
 
 def get_file_md5(filepath: str)->str:    
     return hashlib.md5(open(filepath, "rb").read(100*1024*1024)).hexdigest()
 
 
-def dont_use_local_model():
-    return os.getenv('JARVIS_DONT_USE_LOCAL_MODEL', 'false') == 'true'
 
 
 def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -> np.ndarray:
@@ -576,12 +573,7 @@ def load_methodology(user_input: str) -> str:
         import traceback
         PrettyOutput.print(f"Error trace: {traceback.format_exc()}", OutputType.INFO)
         return ""
-    
-def is_auto_complete() -> bool:
-    return os.getenv('JARVIS_AUTO_COMPLETE', 'false') == 'true'
 
-def is_disable_codebase() -> bool:
-    return os.getenv('JARVIS_DISABLE_CODEBASE', 'false') == 'true'
 
 def user_confirm(tip: str, default: bool = True) -> bool:
     """Prompt the user for confirmation.
@@ -602,6 +594,18 @@ def get_file_line_count(filename: str) -> int:
         return len(open(filename, "r", encoding="utf-8").readlines())
     except Exception as e:
         return 0
+    
+def get_thread_count():
+    return int(os.getenv('JARVIS_THREAD_COUNT', '1'))  
+
+def dont_use_local_model():
+    return os.getenv('JARVIS_DONT_USE_LOCAL_MODEL', 'false') == 'true'
+    
+def is_auto_complete() -> bool:
+    return os.getenv('JARVIS_AUTO_COMPLETE', 'false') == 'true'
+
+def is_disable_codebase() -> bool:
+    return os.getenv('JARVIS_DISABLE_CODEBASE', 'false') == 'true'
     
 def is_use_methodology() -> bool:
     return os.getenv('JARVIS_USE_METHODOLOGY', 'true') == 'true'
