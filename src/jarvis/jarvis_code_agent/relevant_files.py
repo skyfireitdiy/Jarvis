@@ -21,7 +21,14 @@ def find_relevant_files(user_input: str, root_dir: str) -> List[str]:
 
         PrettyOutput.print("Find files by agent...", OutputType.INFO)
         find_file_tool_registry = ToolRegistry()
-        find_file_tool_registry.use_tools(["read_code", "execute_shell"])
+        find_file_tool_registry.use_tools(["read_code", 
+                                           "execute_shell", 
+                                           "lsp_get_document_symbols", 
+                                           "lsp_get_diagnostics", 
+                                           "lsp_find_references", 
+                                           "lsp_find_definition", 
+                                           "lsp_prepare_rename", 
+                                           "lsp_validate_edit"])
         find_file_agent = Agent(
             system_prompt="""You are a file agent, you are responsible for finding files related to the user's requirement.
 
