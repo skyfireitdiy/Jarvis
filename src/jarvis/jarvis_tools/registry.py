@@ -136,7 +136,8 @@ class ToolRegistry:
                     if (isinstance(item, type) and 
                         hasattr(item, 'name') and 
                         hasattr(item, 'description') and 
-                        hasattr(item, 'parameters')):
+                        hasattr(item, 'parameters') and
+                        hasattr(item, 'execute')):
 
                         if hasattr(item, "check"):
                             if not item.check():
