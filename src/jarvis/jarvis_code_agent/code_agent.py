@@ -1,17 +1,13 @@
-from enum import auto
 import os
-import re
 from typing import List
 
-import yaml
 from jarvis.agent import Agent
 from jarvis.jarvis_code_agent.patch import apply_patch
-from jarvis.jarvis_code_agent.file_select import select_files
 from jarvis.jarvis_code_agent.relevant_files import find_relevant_files
 from jarvis.models.registry import PlatformRegistry
 from jarvis.tools.git_commiter import GitCommitTool
 from jarvis.tools.registry import ToolRegistry
-from jarvis.utils import OutputType, PrettyOutput, get_file_line_count, get_multiline_input, get_single_line_input, has_uncommitted_changes, init_env, find_git_root, is_disable_codebase, make_choice_input, user_confirm
+from jarvis.utils import OutputType, PrettyOutput, get_file_line_count, get_multiline_input, has_uncommitted_changes, init_env, find_git_root
 
 
 

@@ -1,9 +1,8 @@
 import re
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 import os
 from jarvis.tools.git_commiter import GitCommitTool
-from jarvis.tools.read_code import ReadCodeTool
-from jarvis.utils import OutputType, PrettyOutput, has_uncommitted_changes, make_choice_input, user_confirm
+from jarvis.utils import OutputType, PrettyOutput, has_uncommitted_changes, user_confirm
 
 
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
