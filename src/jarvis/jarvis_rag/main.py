@@ -728,12 +728,7 @@ class RAGTool:
             return None
 
     def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
-        """Search documents using vector similarity
-        
-        Args:
-            query: Search query
-            top_k: Number of results to return
-        """
+        """Search documents with context window"""
         if not self.index:
             PrettyOutput.print("Index not built, building...", output_type=OutputType.INFO)
             self.build_index(self.root_dir)
@@ -746,22 +741,62 @@ class RAGTool:
         initial_k = min(top_k * 4, len(self.documents))
         distances, indices = self.index.search(query_vector, initial_k) # type: ignore
         
-        # Process results
+        # Process results with context window
         results = []
         seen_files = set()
+        
         for idx, dist in zip(indices[0], distances[0]):
             if idx != -1:
                 doc = self.documents[idx]
                 similarity = 1.0 / (1.0 + float(dist))
-                if similarity > 0.3:  # 降低过滤阈值以获取更多结果
+                if similarity > 0.3:
                     file_path = doc.metadata['file_path']
                     if file_path not in seen_files:
                         seen_files.add(file_path)
-                        results.append((doc, similarity))
-                        if len(results) >= top_k:
+                        
+                        # Add context window
+                        chunk_idx = doc.metadata['chunk_index']
+                        total_chunks = doc.metadata['total_chunks']
+                        window_docs = []
+                        
+                        # Add previous chunks
+                        start_idx = max(0, chunk_idx - self.context_window)
+                        for i in range(start_idx, chunk_idx):
+                            prev_doc = next((d for d in self.documents 
+                                           if d.metadata['file_path'] == file_path 
+                                           and d.metadata['chunk_index'] == i), None)
+                            if prev_doc:
+                                window_docs.append((prev_doc, similarity * 0.9))
+                        
+                        # Add current chunk
+                        window_docs.append((doc, similarity))
+                        
+                        # Add following chunks
+                        end_idx = min(total_chunks, chunk_idx + self.context_window + 1)
+                        for i in range(chunk_idx + 1, end_idx):
+                            next_doc = next((d for d in self.documents 
+                                           if d.metadata['file_path'] == file_path 
+                                           and d.metadata['chunk_index'] == i), None)
+                            if next_doc:
+                                window_docs.append((next_doc, similarity * 0.9))
+                        
+                        results.extend(window_docs)
+                        if len(results) >= top_k * (2 * self.context_window + 1):
                             break
         
-        return results
+        # Sort by similarity and deduplicate
+        results.sort(key=lambda x: x[1], reverse=True)
+        seen = set()
+        final_results = []
+        for doc, score in results:
+            key = (doc.metadata['file_path'], doc.metadata['chunk_index'])
+            if key not in seen:
+                seen.add(key)
+                final_results.append((doc, score))
+                if len(final_results) >= top_k:
+                    break
+                    
+        return final_results
 
     def query(self, query: str) -> List[Document]:
         """Query related documents
