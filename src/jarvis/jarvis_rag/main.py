@@ -148,7 +148,7 @@ class RAGTool:
         self.max_context_length = int(get_max_context_length() * 0.8)
         
         # Initialize data directory
-        self.data_dir = os.path.join(self.root_dir, ".jarvis-rag")
+        self.data_dir = os.path.join(self.root_dir, ".jarvis/rag")
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
             
@@ -423,11 +423,14 @@ Content: {doc.content}
         # Get all files
         all_files = []
         for root, _, files in os.walk(dir):
-            if any(ignored in root for ignored in ['.git', '__pycache__', 'node_modules']) or \
+            # Skip .jarvis directories and other ignored paths
+            if any(ignored in root for ignored in ['.git', '__pycache__', 'node_modules', '.jarvis']) or \
                any(part.startswith('.jarvis-') for part in root.split(os.sep)):
                 continue
+                
             for file in files:
-                if file.startswith('.jarvis-'):
+                # Skip .jarvis files
+                if file.startswith('.jarvis-') or '.jarvis' in root:
                     continue
                     
                 file_path = os.path.join(root, file)
