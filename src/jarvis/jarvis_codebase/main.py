@@ -648,7 +648,7 @@ Note: Only include files that have a strong connection to the query."""
             return []
 
     def _generate_query_variants(self, query: str) -> List[str]:
-        """Generate different expressions of the query
+        """Generate different expressions of the query optimized for vector search
         
         Args:
             query: Original query
@@ -657,14 +657,43 @@ Note: Only include files that have a strong connection to the query."""
             List[str]: The query variants list
         """
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        prompt = f"""Please generate 3 different expressions based on the following query in English, each expression should fully convey the meaning of the original query. These expressions will be used for code search, maintain professionalism and accuracy.
+        prompt = f"""Please generate 3 different expressions optimized for vector search based on the following query. Each expression should:
+
+1. Focus on key technical concepts and terminology
+2. Use clear and specific language
+3. Include important contextual terms
+4. Avoid general or ambiguous words
+5. Maintain semantic similarity with original query
+6. Be suitable for embedding-based search
+
 Original query: {query}
 
-Please output 3 expressions directly, separated by two line breaks, without numbering or other markers.
+Example transformations:
+Query: "How to handle user login?"
+Output format:
+<QUESTION>
+- user authentication implementation and flow
+- login system architecture and components
+- credential validation and session management
+</QUESTION>
+
+Please provide 5 search-optimized expressions in the specified format.
 """
-        variants = model.chat_until_success(prompt).strip().split('\n\n')
-        variants.append(query)  # Add the original query
-        return variants
+        response = model.chat_until_success(prompt)
+        
+        # Parse the response using YAML format
+        import yaml
+        variants = []
+        question_match = re.search(r'<QUESTION>\n(.*?)</QUESTION>', response, re.DOTALL)
+        if question_match:
+            try:
+                variants = yaml.safe_load(question_match.group(1))
+            except Exception as e:
+                PrettyOutput.print(f"Failed to parse variants: {str(e)}", OutputType.ERROR)
+        
+        # Add original query
+        variants.append(query)
+        return variants if variants else [query]
 
     def _vector_search(self, query_variants: List[str], top_k: int) -> Dict[str, Tuple[str, float, str]]:
         """Use vector search to find related files
