@@ -15,13 +15,21 @@ class CodeReviewTool:
         "properties": {
             "review_type": {
                 "type": "string",
-                "description": "Type of review: 'commit' for specific commit, 'current' for current changes",
-                "enum": ["commit", "current"],
+                "description": "Type of review: 'commit' for specific commit, 'current' for current changes, 'range' for commit range",
+                "enum": ["commit", "current", "range"],
                 "default": "current"
             },
             "commit_sha": {
                 "type": "string",
                 "description": "Target commit SHA to analyze (required for review_type='commit')"
+            },
+            "start_commit": {
+                "type": "string",
+                "description": "Start commit SHA (required for review_type='range')"
+            },
+            "end_commit": {
+                "type": "string",
+                "description": "End commit SHA (required for review_type='range')"
             }
         },
         "required": []
@@ -45,6 +53,16 @@ class CodeReviewTool:
                     }
                 commit_sha = args["commit_sha"].strip()
                 diff_cmd = f"git show {commit_sha} | cat -"
+            elif review_type == "range":
+                if "start_commit" not in args or "end_commit" not in args:
+                    return {
+                        "success": False,
+                        "stdout": {},
+                        "stderr": "start_commit and end_commit are required for range review type"
+                    }
+                start_commit = args["start_commit"].strip()
+                end_commit = args["end_commit"].strip()
+                diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
             else:  # current changes
                 diff_cmd = "git diff HEAD | cat -"
             
@@ -180,14 +198,18 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Autonomous code review tool')
-    parser.add_argument('--type', choices=['commit', 'current'], default='current',
-                      help='Type of review: commit or current changes')
+    parser.add_argument('--type', choices=['commit', 'current', 'range'], default='current',
+                      help='Type of review: commit, current changes, or commit range')
     parser.add_argument('--commit', help='Commit SHA to review (required for commit type)')
+    parser.add_argument('--start-commit', help='Start commit SHA (required for range type)')
+    parser.add_argument('--end-commit', help='End commit SHA (required for range type)')
     args = parser.parse_args()
     
     # Validate arguments
     if args.type == 'commit' and not args.commit:
         parser.error("--commit is required when type is 'commit'")
+    if args.type == 'range' and (not args.start_commit or not args.end_commit):
+        parser.error("--start-commit and --end-commit are required when type is 'range'")
     
     tool = CodeReviewTool()
     tool_args = {
@@ -195,6 +217,10 @@ def main():
     }
     if args.commit:
         tool_args["commit_sha"] = args.commit
+    if args.start_commit:
+        tool_args["start_commit"] = args.start_commit
+    if args.end_commit:
+        tool_args["end_commit"] = args.end_commit
     
     result = tool.execute(tool_args)
     
