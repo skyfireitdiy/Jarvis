@@ -11,7 +11,7 @@ class LSPFindReferencesTool:
         "file_path": "Path to the file containing the symbol",
         "line": "Line number (0-based) of the symbol",
         "character": "Character position in the line",
-        "language": "Programming language of the file (python/cpp/go/rust)"
+        "language": f"Programming language of the file ({', '.join(LSPRegistry.get_global_lsp_registry().get_supported_languages())})"
     }
     
     @staticmethod
