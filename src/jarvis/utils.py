@@ -164,7 +164,7 @@ class PrettyOutput:
         return formatted
 
     @staticmethod
-    def print(text: str, output_type: OutputType, timestamp: bool = True, lang: Optional[str] = None):
+    def print(text: str, output_type: OutputType, timestamp: bool = True, lang: Optional[str] = None, traceback: bool = False):
         """Print formatted output using rich console"""
         # Get formatted header
         lang = lang if lang is not None else PrettyOutput._detect_language(text, default_lang='markdown')
@@ -177,7 +177,7 @@ class PrettyOutput:
         console.print(Panel(content, border_style=border_style, title=header, title_align="left", highlight=True))
         
         # Print stack trace for errors
-        if output_type == OutputType.ERROR:
+        if traceback:
             console.print_exception()
 
     @staticmethod
@@ -639,81 +639,17 @@ def get_embedding(embedding_model: Any, text: str) -> np.ndarray:
                                         show_progress_bar=False)
     return np.array(embedding, dtype=np.float32)
 
-def get_embedding_batch(embedding_model: Any, texts: List[str], batch_size: int = 32) -> np.ndarray:
+def get_embedding_batch(embedding_model: Any, texts: List[str]) -> np.ndarray:
     """Get embeddings for a batch of texts efficiently"""
     try:
-        gpu_config = init_gpu_config()
-        if gpu_config["has_gpu"]:
-            import torch
-            torch.cuda.empty_cache()
-            
-            # 使用更保守的批处理大小
-            optimal_batch_size = min(8, len(texts))
-            all_embeddings = []
-            
-            with tqdm(total=len(texts), desc="Vectorizing") as pbar:
-                for i in range(0, len(texts), optimal_batch_size):
-                    try:
-                        batch = texts[i:i + optimal_batch_size]
-                        
-                        # 临时将模型移到 CPU 以清理 GPU 内存
-                        embedding_model.to('cpu')
-                        torch.cuda.empty_cache()
-                        
-                        # 分批处理文本
-                        embeddings = embedding_model.encode(
-                            batch,
-                            normalize_embeddings=True,
-                            show_progress_bar=False,
-                            batch_size=2,  # 使用更小的内部批处理大小
-                            convert_to_tensor=False  # 直接返回 numpy 数组
-                        )
-                        
-                        all_embeddings.append(embeddings)
-                        pbar.update(len(batch))
-                        
-                    except RuntimeError as e:
-                        if "out of memory" in str(e):
-                            # 如果内存不足，减小批次大小
-                            if optimal_batch_size > 2:
-                                optimal_batch_size //= 2
-                                PrettyOutput.print(
-                                    f"CUDA out of memory, reducing batch size to {optimal_batch_size}", 
-                                    OutputType.WARNING
-                                )
-                                # 清理内存并重试
-                                torch.cuda.empty_cache()
-                                embedding_model.to('cpu')
-                                i -= optimal_batch_size
-                                continue
-                            else:
-                                # 如果批次已经最小，切换到 CPU 模式
-                                PrettyOutput.print(
-                                    "Switching to CPU mode due to memory constraints",
-                                    OutputType.WARNING
-                                )
-                                embedding_model.to('cpu')
-                                return _get_embedding_batch_cpu(embedding_model, texts[i:])
-                        raise
-                        
-            return np.vstack(all_embeddings)
-        else:
-            return _get_embedding_batch_cpu(embedding_model, texts)
-            
+        all_vectors = []
+        for text in texts:
+            vectors = get_embedding_with_chunks(embedding_model, text)
+            all_vectors.extend(vectors)
+        return np.vstack(all_vectors)
     except Exception as e:
         PrettyOutput.print(f"Batch embedding failed: {str(e)}", OutputType.ERROR)
-        return np.zeros((len(texts), self.vector_dim), dtype=np.float32) # type: ignore
-
-def _get_embedding_batch_cpu(embedding_model: Any, texts: List[str]) -> np.ndarray:
-    """Get embeddings using CPU only"""
-    return embedding_model.encode(
-        texts,
-        normalize_embeddings=True,
-        show_progress_bar=False,
-        batch_size=4,
-        convert_to_tensor=False
-    )
-
+        return np.zeros((0, embedding_model.get_sentence_embedding_dimension()), dtype=np.float32)
 
 
     
@@ -747,9 +683,6 @@ def get_min_paragraph_length() -> int:
 def get_max_paragraph_length() -> int:
     return int(os.getenv('JARVIS_MAX_PARAGRAPH_LENGTH', '12800'))
 
-def get_context_window() -> int:
-    return int(os.getenv('JARVIS_CONTEXT_WINDOW', '1'))
-
 def get_shell_name() -> str:
     return os.getenv('SHELL', 'bash')
 
@@ -776,5 +709,35 @@ def get_cheap_platform_name() -> str:
 
 def get_cheap_model_name() -> str:
     return os.getenv('JARVIS_CHEAP_MODEL', os.getenv('JARVIS_MODEL', 'kimi'))
+
+def split_text_into_chunks(text: str, max_length: int = 512) -> List[str]:
+    """Split text into chunks with overlapping windows"""
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + max_length
+        # Find the nearest sentence boundary
+        if end < len(text):
+            while end > start and text[end] not in {'.', '!', '?', '\n'}:
+                end -= 1
+            if end == start:  # No punctuation found, hard cut
+                end = start + max_length
+        chunk = text[start:end]
+        chunks.append(chunk)
+        # Overlap 20% of the window
+        start = end - int(max_length * 0.2)
+    return chunks
+
+def get_embedding_with_chunks(embedding_model: Any, text: str) -> List[np.ndarray]:
+    """Get embeddings for text chunks"""
+    chunks = split_text_into_chunks(text, 512)
+    if not chunks:
+        return []
+    
+    vectors = []
+    for chunk in chunks:
+        vector = get_embedding(embedding_model, chunk)
+        vectors.append(vector)
+    return vectors
 
 

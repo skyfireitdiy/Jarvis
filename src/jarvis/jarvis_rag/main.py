@@ -3,7 +3,7 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, get_context_window, get_embedding, get_embedding_batch, get_file_md5, get_max_context_length, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model, load_rerank_model
+from jarvis.utils import OutputType, PrettyOutput, get_embedding, get_embedding_batch, get_file_md5, get_max_context_length, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model
 from jarvis.utils import init_env
 from dataclasses import dataclass
 from tqdm import tqdm
@@ -11,13 +11,8 @@ import fitz  # PyMuPDF for PDF files
 from docx import Document as DocxDocument  # python-docx for DOCX files
 from pathlib import Path
 from jarvis.jarvis_platform.registry import PlatformRegistry
-import shutil
-from datetime import datetime
 import lzma  # 添加 lzma 导入
-from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
-import concurrent.futures
-import re
 import hashlib
 
 @dataclass
@@ -147,7 +142,7 @@ class RAGTool:
         # Initialize configuration
         self.min_paragraph_length = get_min_paragraph_length()  # Minimum paragraph length
         self.max_paragraph_length = get_max_paragraph_length()  # Maximum paragraph length
-        self.context_window = get_context_window()  # Context window size, default前后各5个片段
+        self.context_window = 5  # Fixed context window size
         self.max_context_length = int(get_max_context_length() * 0.8)
         
         # Initialize data directory
@@ -279,9 +274,6 @@ class RAGTool:
             }
             with lzma.open(index_path, 'wb') as f:
                 pickle.dump(index_data, f)
-                
-            PrettyOutput.print(f"Cache saved: {len(documents)} document fragments", 
-                            output_type=OutputType.INFO)
                             
         except Exception as e:
             PrettyOutput.print(f"Failed to save cache: {str(e)}", output_type=OutputType.ERROR)
@@ -365,40 +357,30 @@ class RAGTool:
 
 
     def _process_document_batch(self, documents: List[Document]) -> np.ndarray:
-        """Process a batch of documents using shared memory
-        
-        Args:
-            documents: List of documents to process
-            
-        Returns:
-            np.ndarray: Document vectors
-        """
+        """Process a batch of documents using shared memory"""
         try:
-            import torch
-            
-            # 估算内存需求
-            total_content_size = sum(len(doc.content) for doc in documents)
-            est_memory_needed = total_content_size * 4  # 粗略估计
-            
-            # 如果预估内存超过共享内存限制，分批处理
-            if est_memory_needed > self.gpu_config["shared_memory"] * 0.7:
-                batch_size = max(1, int(len(documents) * (self.gpu_config["shared_memory"] * 0.7 / est_memory_needed)))
-                
-                all_vectors = []
-                for i in range(0, len(documents), batch_size):
-                    batch = documents[i:i + batch_size]
-                    vectors = self._process_document_batch(batch)
-                    all_vectors.append(vectors)
-                return np.vstack(all_vectors)
-            
-            # 正常处理单个批次
             texts = []
-            for doc in documents:
-                combined_text = f"File:{doc.metadata['file_path']} Content:{doc.content}"
-                texts.append(combined_text)
-                
-            return get_embedding_batch(self.embedding_model, texts)
+            self.documents = []  # Reset documents to store chunks
             
+            for doc in documents:
+                # Split original document into chunks
+                chunks = self._split_text(doc.content)
+                for chunk_idx, chunk in enumerate(chunks):
+                    # Create new Document for each chunk
+                    new_metadata = doc.metadata.copy()
+                    new_metadata.update({
+                        'chunk_index': chunk_idx,
+                        'total_chunks': len(chunks),
+                        'original_length': len(doc.content)
+                    })
+                    self.documents.append(Document(
+                        content=chunk,
+                        metadata=new_metadata,
+                        md5=doc.md5
+                    ))
+                    texts.append(f"File:{doc.metadata['file_path']} Chunk:{chunk_idx} Content:{chunk}")
+            
+            return get_embedding_batch(self.embedding_model, texts)
         except Exception as e:
             PrettyOutput.print(f"Batch processing failed: {str(e)}", OutputType.ERROR)
             return np.zeros((0, self.vector_dim), dtype=np.float32) # type: ignore
@@ -614,31 +596,18 @@ class RAGTool:
                     if file_path not in seen_files:
                         seen_files.add(file_path)
                         
-                        # Add context window
-                        chunk_idx = doc.metadata['chunk_index']
-                        total_chunks = doc.metadata['total_chunks']
-                        window_docs = []
-                        
-                        # Add previous chunks
-                        start_idx = max(0, chunk_idx - self.context_window)
-                        for i in range(start_idx, chunk_idx):
-                            prev_doc = next((d for d in self.documents 
-                                           if d.metadata['file_path'] == file_path 
-                                           and d.metadata['chunk_index'] == i), None)
-                            if prev_doc:
-                                window_docs.append((prev_doc, similarity * 0.9))
-                        
-                        # Add current chunk
-                        window_docs.append((doc, similarity))
-                        
-                        # Add following chunks
-                        end_idx = min(total_chunks, chunk_idx + self.context_window + 1)
-                        for i in range(chunk_idx + 1, end_idx):
-                            next_doc = next((d for d in self.documents 
-                                           if d.metadata['file_path'] == file_path 
-                                           and d.metadata['chunk_index'] == i), None)
-                            if next_doc:
-                                window_docs.append((next_doc, similarity * 0.9))
+                        # Get full context from original document
+                        original_doc = next((d for d in self.documents 
+                                           if d.metadata['file_path'] == file_path), None)
+                        if original_doc:
+                            window_docs = []  # Add this line to initialize the list
+                            full_content = original_doc.content
+                            # Find all chunks from this file
+                            file_chunks = [d for d in self.documents 
+                                         if d.metadata['file_path'] == file_path]
+                            # Add all related chunks
+                            for chunk_doc in file_chunks:
+                                window_docs.append((chunk_doc, similarity * 0.9))
                         
                         results.extend(window_docs)
                         if len(results) >= top_k * (2 * self.context_window + 1):
