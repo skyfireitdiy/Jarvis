@@ -11,6 +11,8 @@ class BaseLSP(ABC):
     4. Symbol analysis
     """
     
+    language: str = ""  # Language identifier, should be overridden by subclasses
+    
     @abstractmethod
     def initialize(self, workspace_path: str) -> bool:
         """Initialize LSP server for the workspace.
