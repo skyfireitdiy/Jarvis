@@ -1,5 +1,7 @@
 from typing import Dict, Any
 from jarvis.agent import Agent
+from jarvis.jarvis_code_agent.patch import apply_patch
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
 import subprocess
 
@@ -26,6 +28,16 @@ class TestAgentTool:
         "required": ["name", "test_scope", "commit_sha"]
     }
 
+    def _build_summary_prompt(self) -> str:
+        return f"""
+        Summary test result in yaml format:
+        <TEST_RESULT>
+        - Name: [test_name]
+          Result: [test_result]
+          Description: [test_description]
+        </TEST_RESULT>
+        """
+
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute commit-focused testing"""
         try:
@@ -43,7 +55,11 @@ class TestAgentTool:
                 system_prompt=self._build_system_prompt(args),
                 name=f"TestAgent({args['name']})",
                 is_sub_agent=True,
-                tool_registry=tool_registry
+                tool_registry=tool_registry,
+                platform=PlatformRegistry().get_codegen_platform(),
+                record_methodology=False,
+                output_handler_before_tool=[apply_patch],
+                summary_prompt=self._build_summary_prompt()
             )
 
             result = test_agent.run(
