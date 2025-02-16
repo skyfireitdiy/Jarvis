@@ -20,6 +20,7 @@ class CodeAgent:
         tool_registry.use_tools(["read_code",
                                  "execute_shell", 
                                  "search", 
+                                 "create_code_agent",
                                  "ask_user", 
                                  "ask_codebase", 
                                  "lsp_get_document_symbols", 
@@ -42,33 +43,41 @@ You should read the code and analyze the code, and then provide a plan for the c
   Action: Break down the requirement into specific tasks
   Observation: The key tasks are...
   
-  Thought: I need to identify the relevant code...
-  Action: Use LSP tools to locate code components
-  Observation: Found these components in the codebase...
+  Thought: Assess task complexity...
+  Action: Evaluate each task's scope and dependencies
+  Observation: Task complexity analysis shows...
   
-  Thought: Let me examine the actual implementation...
-  Action: Read the code and use LSP to understand structure
-  Observation: The current implementation shows...
-  
-  Thought: Analyze integration points and dependencies...
-  Action: Use LSP to trace all connections
-  Observation: This code integrates with other components via...
+  Thought: Determine if task splitting is needed...
+  Action: Consider using multiple create_code_agent calls
+  Observation: Based on complexity, the approach should be...
   
   Conclusion:
-  1. Current implementation: [only facts from code]
-  2. Integration points: [actual connections found]
-  3. Required changes: [based on requirement]
-  4. Compatibility concerns: [based on real dependencies]
+  1. Task Breakdown: [list of specific tasks]
+  2. Complexity Assessment: [simple/complex]
+  3. Development Approach: [single/multiple agents]
+  4. Task Dependencies: [dependency order]
   ```
 
-IMPORTANT:
-- NEVER assume or imagine code implementation
-- ONLY state what is directly visible in the code
-- Understand existing integration patterns
-- Verify all dependencies and interfaces
-- Follow established code patterns
-- Maintain compatibility with existing systems
-- If integration points are unclear, ask for clarification
+IMPORTANT TASK MANAGEMENT:
+- For complex requirements:
+  * Break down into smaller, manageable tasks
+  * Use create_code_agent for each sub-task
+  * Maintain proper task ordering
+  * Ensure integration between sub-tasks
+  
+Example Task Split:
+```
+1. For complex task "Implement new logging system":
+   a. First create_code_agent: "Create basic logging interface"
+   b. Second create_code_agent: "Implement file logging backend"
+   c. Third create_code_agent: "Add log rotation support"
+   
+2. Benefits:
+   - Focused development for each part
+   - Clear progress tracking
+   - Easier code review
+   - Better error handling
+```
 
 2. PLANNING
 - Break down the changes into logical steps using chain of thought:
