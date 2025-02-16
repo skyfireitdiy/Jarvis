@@ -187,7 +187,7 @@ OUTPUT REQUIREMENTS:
             }
         
 
-def _extract_code_report(result: str) -> str:
+def extract_code_report(result: str) -> str:
     sm = re.search(r"<REPORT>(.*?)</REPORT>", result, re.DOTALL)
     if sm:
         return sm.group(1)
@@ -226,7 +226,7 @@ def main():
     
     if result["success"]:
         PrettyOutput.section("Autonomous Review Result:", OutputType.SUCCESS)
-        report = _extract_code_report(result["stdout"])
+        report = extract_code_report(result["stdout"])
         PrettyOutput.print(report, OutputType.SUCCESS, lang="yaml")
         
     else:
