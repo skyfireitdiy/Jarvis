@@ -614,7 +614,7 @@ def get_min_paragraph_length() -> int:
     return int(os.getenv('JARVIS_MIN_PARAGRAPH_LENGTH', '50'))
 
 def get_max_paragraph_length() -> int:
-    return int(os.getenv('JARVIS_MAX_PARAGRAPH_LENGTH', '128000'))
+    return int(os.getenv('JARVIS_MAX_PARAGRAPH_LENGTH', '12800'))
 
 def get_context_window() -> int:
     return int(os.getenv('JARVIS_CONTEXT_WINDOW', '1'))
