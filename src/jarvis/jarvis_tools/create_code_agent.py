@@ -2,9 +2,8 @@ import os
 from typing import Dict, Any
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
-from jarvis.jarvis_tools.code_review import CodeReviewTool
+from jarvis.jarvis_tools.code_review import CodeReviewTool, extract_code_report
 from jarvis.utils import OutputType, PrettyOutput, has_uncommitted_changes
-import subprocess
 
 class CreateCodeAgentTool:
     """Tool for managing the code development workflow."""
@@ -14,6 +13,10 @@ class CreateCodeAgentTool:
     parameters = {
         "requirement": "The development requirement or task description"
     }
+    
+    def _get_current_commit(self) -> str:
+        """Get current commit hash."""
+        return os.popen("git rev-parse HEAD").read().strip()
     
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -39,7 +42,7 @@ class CreateCodeAgentTool:
                     }
             
             # Get current commit hash
-            start_commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+            start_commit = self._get_current_commit()
             
             # Step 2: Development
             PrettyOutput.print("Starting development...", OutputType.INFO)
@@ -47,7 +50,7 @@ class CreateCodeAgentTool:
             agent.run(requirement)
             
             # Get new commit hash after development
-            end_commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+            end_commit = self._get_current_commit()
             
             # Step 3: Code Review
             PrettyOutput.print("Starting code review...", OutputType.INFO)
@@ -75,7 +78,7 @@ Requirement:
 {requirement}
 
 Code Review Result:
-{review_result["stdout"]}
+{extract_code_report(review_result["stdout"])}
 """
             
             return {
