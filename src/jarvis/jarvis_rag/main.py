@@ -430,7 +430,7 @@ Content: {doc.content}
                 
             for file in files:
                 # Skip .jarvis files
-                if file.startswith('.jarvis-') or '.jarvis' in root:
+                if '.jarvis' in root:
                     continue
                     
                 file_path = os.path.join(root, file)
