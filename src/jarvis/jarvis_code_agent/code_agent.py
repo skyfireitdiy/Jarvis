@@ -17,7 +17,17 @@ class CodeAgent:
     def __init__(self):
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
-        tool_registry.use_tools(["read_code", "execute_shell", "search", "ask_user", "ask_codebase"])
+        tool_registry.use_tools(["read_code",
+                                 "execute_shell", 
+                                 "search", 
+                                 "ask_user", 
+                                 "ask_codebase", 
+                                 "lsp_get_document_symbols", 
+                                 "lsp_get_diagnostics", 
+                                 "lsp_find_references", 
+                                 "lsp_find_definition", 
+                                 "lsp_prepare_rename", 
+                                 "lsp_validate_edit"])
         code_system_prompt = """
 You are a code agent, you are responsible for modifying the code.
 
