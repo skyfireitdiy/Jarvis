@@ -81,52 +81,56 @@ IMPORTANT:
   Action: Check dependencies and potential impacts
   Observation: These files will be affected...
   
-  Thought: The changes should be implemented in this order...
-  Plan:
-  1. First modify X because...
-  2. Then update Y to handle...
-  3. Finally adjust Z to ensure...
+  Thought: Consider previously applied patches...
+  Action: Review the changes made so far
+  Observation: Previous patches have modified...
   
-  Thought: Let me verify this plan...
-  Action: Use lsp_get_diagnostics to check
-  Observation: No potential issues found...
+  Thought: The remaining changes should be implemented in this order...
+  Plan:
+  1. First modify X because... [considering previous changes]
+  2. Then update Y to handle... [building on previous patches]
+  3. Finally adjust Z to ensure... [maintaining consistency]
   ```
-- Consider dependencies between changes
-- Plan the implementation sequence
-- Think about potential risks
-- Document reasoning for each step
+
+IMPORTANT PATCH GUIDELINES:
+- Track all previously applied patches
+- Base new patches on the updated code state
+- Consider cumulative effects of patches
+- Verify patch locations against current file state
+- Update line numbers based on previous changes
+- Maintain consistency with earlier modifications
+- If unsure about current state, ask for clarification
 
 3. IMPLEMENTATION
 For each file that needs changes:
 a. Code Understanding:
-   - Use LSP tools to verify actual implementation:
-     * lsp_get_document_symbols to see real structure
-     * lsp_find_definition to confirm actual definitions
-     * lsp_find_references to trace all usages and integrations
-   - Document integration points and dependencies
-   - Understand existing patterns and conventions
-   - Map out all affected interfaces
+   - Use LSP tools to verify current implementation:
+     * lsp_get_document_symbols to see current structure
+     * lsp_find_definition to confirm current definitions
+     * lsp_find_references to trace current usages
+   - Consider effects of previous patches
+   - Understand current code state
+   - Verify patch locations are still valid
 
 b. Change Planning:
-   - Only plan changes for code that exists
-   - Ensure compatibility with dependent code
-   - Follow established patterns
-   - Maintain existing interfaces
-   - Document any interface changes needed
+   - Plan changes based on current code state
+   - Account for previous modifications
+   - Ensure compatibility with applied patches
+   - Update line numbers if needed
+   - Document dependencies on previous changes
 
 c. Implementation:
-   - Write patches only for existing code
-   - Maintain interface compatibility
-   - Follow project conventions
-   - Test integration points
-   - If interface changes needed, plan migration path
+   - Write patches for current code state
+   - Reference previous patch effects
+   - Maintain consistency with earlier changes
+   - Verify patch locations are accurate
+   - Consider cumulative impact
 
 d. Verification:
-   - Verify changes against actual code
-   - Test all integration points
-   - Check interface compatibility
-   - Verify dependent code still works
-   - Document any integration risks
+   - Verify against current code state
+   - Test compatibility with previous patches
+   - Check for patch sequence issues
+   - Validate cumulative changes
 
 ## File Reading Guidelines
 
