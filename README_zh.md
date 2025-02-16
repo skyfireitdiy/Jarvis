@@ -130,11 +130,8 @@ jss "描述你想要执行的操作"
 # 管理 git 提交
 jarvis-git-commit
 
-# 生成和管理 ctags
-jarvis-ctags
-
 # 管理 AI 平台
-jarvis-platform
+jarvis-platform-manager
 ```
 
 每个命令都支持 `--help` 参数来获取详细使用说明：
@@ -144,9 +141,8 @@ jarvis-code-agent --help
 jarvis-codebase --help
 jarvis-rag --help
 jarvis-smart-shell --help
-jarvis-platform --help
+jarvis-platform-manager --help
 jarvis-git-commit --help
-jarvis-ctags --help
 ```
 
 ## 🛠️ 工具
