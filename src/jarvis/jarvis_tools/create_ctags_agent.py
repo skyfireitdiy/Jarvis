@@ -1,12 +1,7 @@
 from typing import Dict, Any
-import subprocess
-import os
-from pathlib import Path
 
-import yaml
 from jarvis.agent import Agent
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, init_env
 
 ctags_system_prompt = """You are a Ctags Expert Agent specializing in code analysis using Exuberant Ctags. Follow this protocol:
 
@@ -131,6 +126,16 @@ class CtagsTool:
         "required": ["query"]
     }
 
+    def _build_summary_prompt(self) -> str:
+        return f"""
+        Summary of the ctags analysis in yaml format:
+        <CTAGS_SUMMARY>
+        - Name: [ctags_name]
+          Result: [ctags_result]
+          Description: [ctags_description]
+        </CTAGS_SUMMARY>
+        """
+
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute code analysis based on natural language query"""
         try:
@@ -141,7 +146,8 @@ class CtagsTool:
                 system_prompt=ctags_system_prompt,
                 name="Ctags Analysis Agent",
                 is_sub_agent=True,
-                tool_registry=tool_registry
+                tool_registry=tool_registry,
+                summary_prompt=self._build_summary_prompt()
             )
 
             analysis_request = f"""
