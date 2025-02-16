@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from typing import List, Dict, Optional, Tuple, Any
 import json
@@ -9,6 +10,11 @@ class GoLSP(BaseLSP):
     """Go LSP implementation using gopls."""
     
     language = "go"
+
+    @staticmethod
+    def check() -> bool:
+        """Check if gopls is installed."""
+        return shutil.which("gopls") is not None
     
     def __init__(self):
         self.workspace_path = ""

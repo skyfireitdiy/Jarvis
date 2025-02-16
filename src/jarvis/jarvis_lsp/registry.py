@@ -98,6 +98,9 @@ class LSPRegistry:
                             hasattr(obj, 'language')):
                             if not LSPRegistry.check_lsp_implementation(obj):
                                 continue
+                            if hasattr(obj, 'check'):
+                                if not obj.check(): # type: ignore
+                                    continue
                             lsp_servers[obj.language] = obj
                             break
                 except Exception as e:
