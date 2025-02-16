@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple
 import os
 from openai import OpenAI
-from jarvis.models.base import BasePlatform
+from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType
 
 class OpenAIModel(BasePlatform):

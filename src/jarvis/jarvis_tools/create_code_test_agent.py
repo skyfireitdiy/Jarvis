@@ -1,6 +1,6 @@
 from typing import Dict, Any
 from jarvis.agent import Agent
-from jarvis.tools.registry import ToolRegistry
+from jarvis.jarvis_tools.registry import ToolRegistry
 import subprocess
 
 class TestAgentTool:

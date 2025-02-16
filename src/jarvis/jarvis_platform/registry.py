@@ -3,7 +3,7 @@ import inspect
 import os
 import sys
 from typing import Dict, Type, Optional, List
-from jarvis.models.base import BasePlatform
+from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.utils import PrettyOutput, OutputType, get_cheap_model_name, get_cheap_platform_name, get_codegen_model_name, get_codegen_platform_name, get_normal_model_name, get_normal_platform_name, get_thinking_model_name, get_thinking_platform_name
 
 REQUIRED_METHODS = [
@@ -98,7 +98,7 @@ class PlatformRegistry:
         # 获取目录的包名
         package_name = None
         if directory == os.path.dirname(__file__):
-            package_name = "jarvis.models"
+            package_name = "jarvis.jarvis_platform"
             
         # 添加目录到Python路径
         if directory not in sys.path:

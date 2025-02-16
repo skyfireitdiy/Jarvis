@@ -5,9 +5,9 @@ from typing import Callable, Dict, List, Optional
 from prompt_toolkit import prompt
 import yaml
 
-from jarvis.models.base import BasePlatform
-from jarvis.models.registry import PlatformRegistry
-from jarvis.tools.registry import ToolRegistry, tool_call_help
+from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_tools.registry import ToolRegistry, tool_call_help
 from jarvis.utils import PrettyOutput, OutputType, is_auto_complete, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env, is_use_methodology
 import os
 

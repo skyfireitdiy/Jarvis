@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from jarvis.tools.base import Tool
+from jarvis.jarvis_tools.base import Tool
 from jarvis.utils import get_multiline_input, PrettyOutput, OutputType
 
 class AskUserTool:

@@ -1,7 +1,7 @@
 import re
 from typing import Dict, Any, List
 import os
-from jarvis.tools.git_commiter import GitCommitTool
+from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.utils import OutputType, PrettyOutput, has_uncommitted_changes, user_confirm
 
 

@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 
 from jarvis.agent import Agent, origin_agent_system_prompt
-from jarvis.tools.registry import ToolRegistry
+from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput
 
 

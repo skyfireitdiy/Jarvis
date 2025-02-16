@@ -4,8 +4,8 @@ from typing import Dict, Any
 
 import yaml
 from jarvis.agent import Agent
-from jarvis.models.registry import PlatformRegistry
-from jarvis.tools.registry import ToolRegistry
+from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput, init_env
 import sys
 

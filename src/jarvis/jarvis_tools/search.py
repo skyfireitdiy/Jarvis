@@ -1,7 +1,7 @@
 from typing import Dict, Any, List
-from jarvis.models.registry import PlatformRegistry
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType
-from jarvis.tools.read_webpage import WebpageTool
+from jarvis.jarvis_tools.read_webpage import WebpageTool
 from playwright.sync_api import sync_playwright
 from urllib.parse import quote
 

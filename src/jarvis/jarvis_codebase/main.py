@@ -5,7 +5,7 @@ import faiss
 from typing import List, Tuple, Optional, Dict
 
 import yaml
-from jarvis.models.registry import PlatformRegistry
+from jarvis.jarvis_platform.registry import PlatformRegistry
 import concurrent.futures
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
