@@ -742,20 +742,18 @@ Please output 3 expressions directly, separated by two line breaks, without numb
         from jarvis.jarvis_code_agent.relevant_files import find_relevant_files_from_agent
         results_from_agent = find_relevant_files_from_agent(query, reuslts_from_codebase)
 
-        final_results = list(set(reuslts_from_codebase + results_from_agent))
-
-        if not final_results:
+        if not results_from_agent:
             PrettyOutput.print("No related files found", output_type=OutputType.WARNING)
             return ""
         
         message = "Found related files:\n"
-        for path in final_results:
+        for path in results_from_agent:
             message += f"File: {path}\n"
         PrettyOutput.print(message.rstrip(), output_type=OutputType.SUCCESS, lang="markdown")
         
         prompt = f"""You are a code expert, please answer the user's question based on the following file information:
 """
-        for path in final_results:
+        for path in results_from_agent:
             try:
                 if len(prompt) > self.max_context_length:
                     PrettyOutput.print(f"Avoid context overflow, discard low-related file: {path}", OutputType.WARNING)
