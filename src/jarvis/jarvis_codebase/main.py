@@ -675,9 +675,10 @@ Output format:
 - user authentication implementation and flow
 - login system architecture and components
 - credential validation and session management
+- ...
 </QUESTION>
 
-Please provide 5 search-optimized expressions in the specified format.
+Please provide 10 search-optimized expressions in the specified format.
 """
         response = model.chat_until_success(prompt)
         
@@ -728,86 +729,128 @@ Please provide 5 search-optimized expressions in the specified format.
 
 
     def search_similar(self, query: str, top_k: int = 30) -> List[str]:
-        """Search related files"""
+        """Search related files with optimized retrieval"""
         try:
             self.generate_codebase()
             if self.index is None:
-                return []            
-            # Generate the query variants
+                return []
+                
+            # Generate query variants for better coverage
             query_variants = self._generate_query_variants(query)
             
-            # Perform vector search
-            vector_results = self._vector_search(query_variants, top_k)            
-
-            results = list(vector_results.values())
-            results.sort(key=lambda x: x[1], reverse=True)
-
-            # Take the top top_k results for reordering
-            initial_results = results[:top_k]
+            # Collect results from all variants
+            all_results = []
+            seen_files = set()
             
-            # If no results are found, return directly
-            if not initial_results:
-                return []
-            
-            # Filter low-scoring results
-            initial_results = [(path, score, desc) for path, score, desc in initial_results if score >= 0.5]
-
-            message = "Found related files:\n"
-            for path, score, _ in initial_results:
-                message += f"File: {path} Similarity: {score:.3f}\n"
-            PrettyOutput.print(message.rstrip(), output_type=OutputType.INFO, lang="markdown")
+            for variant in query_variants:
+                # Get vector for each variant
+                query_vector = self.get_embedding(variant)
+                query_vector = query_vector.reshape(1, -1)
                 
-            # Reorder the preliminary results
-            return self.pick_results(query, [path for path, _, _ in initial_results])
+                # Search with current variant
+                initial_k = min(top_k * 2, len(self.file_paths))
+                distances, indices = self.index.search(query_vector, initial_k) # type: ignore
+                
+                # Process results
+                for idx, dist in zip(indices[0], distances[0]):
+                    if idx != -1:
+                        file_path = self.file_paths[idx]
+                        if file_path not in seen_files:
+                            similarity = 1.0 / (1.0 + float(dist))
+                            if similarity > 0.3:  # Lower threshold for better recall
+                                seen_files.add(file_path)
+                                all_results.append((file_path, similarity, self.vector_cache[file_path]["description"]))
+            
+            if not all_results:
+                return []
+                
+            # Sort by similarity and take top_k
+            all_results.sort(key=lambda x: x[1], reverse=True)
+            results = all_results[:top_k]
+            
+            # Display results with scores
+            message = "Found related files:\n"
+            for path, score, _ in results:
+                message += f"File: {path} (Score: {score:.3f})\n"
+            PrettyOutput.print(message.rstrip(), output_type=OutputType.INFO, lang="markdown")
+            
+            return [path for path, _, _ in results]
             
         except Exception as e:
             PrettyOutput.print(f"Failed to search: {str(e)}", output_type=OutputType.ERROR)
             return []
 
     def ask_codebase(self, query: str, top_k: int=20) -> str:
-        """Query the codebase"""
-        reuslts_from_codebase = self.search_similar(query, top_k)
+        """Query the codebase with enhanced context building"""
+        files_from_codebase = self.search_similar(query, top_k)
         
         from jarvis.jarvis_code_agent.relevant_files import find_relevant_files_from_agent
-        results_from_agent = find_relevant_files_from_agent(query, reuslts_from_codebase)
+        files_from_agent = find_relevant_files_from_agent(query, files_from_codebase)
 
-        if not results_from_agent:
+        if not files_from_agent:
             PrettyOutput.print("No related files found", output_type=OutputType.WARNING)
             return ""
         
-        message = "Found related files:\n"
-        for path in results_from_agent:
-            message += f"File: {path}\n"
-        PrettyOutput.print(message.rstrip(), output_type=OutputType.SUCCESS, lang="markdown")
+        output = "Found related files:\n"
+        for path in files_from_agent:
+            output += f"- {path}\n"
+        PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
         
-        prompt = f"""You are a code expert, please answer the user's question based on the following file information:
+        # Build enhanced prompt
+        prompt = f"""Based on the following code files, please provide a comprehensive and accurate answer to the user's question.
+
+Important guidelines:
+1. Focus on code-specific details and implementation
+2. Explain technical concepts clearly
+3. Include relevant code snippets when helpful
+4. If the code doesn't fully answer the question, indicate what's missing
+
+Question: {query}
+
+Relevant code files (ordered by relevance):
 """
-        for path in results_from_agent:
+        # Add context with length control
+        available_length = self.max_context_length - len(prompt) - 1000  # Reserve space for answer
+        current_length = 0
+        
+        for path in files_from_agent:
             try:
-                if len(prompt) > self.max_context_length:
-                    PrettyOutput.print(f"Avoid context overflow, discard low-related file: {path}", OutputType.WARNING)
-                    continue
                 content = open(path, "r", encoding="utf-8").read()
-                prompt += f"""
-File path: {path}
-File content:
+                file_content = f"""
+File: {path}
+Content:
 {content}
-========================================
+----------------------------------------
 """
+                if current_length + len(file_content) > available_length:
+                    PrettyOutput.print(
+                        "Due to context length limit, some files were omitted", 
+                        output_type=OutputType.WARNING
+                    )
+                    break
+                    
+                prompt += file_content
+                current_length += len(file_content)
+                
             except Exception as e:
                 PrettyOutput.print(f"Failed to read file {path}: {str(e)}", 
-                                 output_type=OutputType.ERROR)
+                                output_type=OutputType.ERROR)
                 continue
-                
-        prompt += f"""
-User question: {query}
+        
+        prompt += """
+Please structure your answer as follows:
+1. Direct answer to the question
+2. Relevant code explanations
+3. Implementation details
+4. Any missing information or limitations
+5. Add reference files and code snippets at the end of the answer.
 
-Please answer the user's question in Chinese using professional language. If the provided file content is insufficient to answer the user's question, please inform the user. Never make up information.
-
-Add reference files and code snippets at the end of the answer.
+Answer in Chinese using professional language.
 """
-        model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
+        
+        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         response = model.chat_until_success(prompt)
+        
         return response
 
     def is_index_generated(self) -> bool:
