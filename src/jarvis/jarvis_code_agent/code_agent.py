@@ -136,6 +136,24 @@ Note: In this example:
 - Use 'execute_shell' for grep/find/ctags operations
 - Use 'search' to search on web
 - Use 'ask_user' when clarification is needed
+- LSP Tools for Code Analysis:
+  * lsp_get_document_symbols: Get all symbols in a file
+  * lsp_get_diagnostics: Get errors and warnings
+  * lsp_find_references: Find all references to a symbol
+  * lsp_find_definition: Find symbol definition
+  * lsp_prepare_rename: Check if symbol can be renamed
+  * lsp_validate_edit: Validate code changes
+  Example LSP Usage:
+  ```
+  <TOOL_CALL>
+  name: lsp_find_definition
+  arguments:
+      file_path: src/main.py
+      line: 10
+      character: 15
+      language: python
+  </TOOL_CALL>
+  ```
 
 Please proceed with the analysis and implementation following this workflow.
 Start by examining the files and planning your changes.
