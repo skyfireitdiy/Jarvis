@@ -16,6 +16,8 @@ from datetime import datetime
 import lzma  # 添加 lzma 导入
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
+import concurrent.futures
+import re
 
 @dataclass
 class Document:
@@ -182,6 +184,52 @@ class RAGTool:
         self.thread_count = get_thread_count()
         self.vector_lock = Lock()  # Protect vector list concurrency
 
+        # 初始化 GPU 内存配置
+        self.gpu_config = self._init_gpu_config()
+
+    def _init_gpu_config(self) -> Dict:
+        """Initialize GPU configuration based on available hardware
+        
+        Returns:
+            Dict: GPU configuration including memory sizes and availability
+        """
+        config = {
+            "has_gpu": False,
+            "shared_memory": 0,
+            "device_memory": 0,
+            "memory_fraction": 0.8  # 默认使用80%的可用内存
+        }
+        
+        try:
+            import torch
+            if torch.cuda.is_available():
+                # 获取GPU信息
+                gpu_mem = torch.cuda.get_device_properties(0).total_memory
+                config["has_gpu"] = True
+                config["device_memory"] = gpu_mem
+                
+                # 估算共享内存 (通常是系统内存的一部分)
+                import psutil
+                system_memory = psutil.virtual_memory().total
+                config["shared_memory"] = min(system_memory * 0.5, gpu_mem * 2)  # 取系统内存的50%或GPU内存的2倍中的较小值
+                
+                # 设置CUDA内存分配
+                torch.cuda.set_per_process_memory_fraction(config["memory_fraction"])
+                torch.cuda.empty_cache()
+                
+                PrettyOutput.print(
+                    f"GPU initialized: {torch.cuda.get_device_name(0)}\n"
+                    f"Device Memory: {gpu_mem / 1024**3:.1f}GB\n"
+                    f"Shared Memory: {config['shared_memory'] / 1024**3:.1f}GB", 
+                    output_type=OutputType.SUCCESS
+                )
+            else:
+                PrettyOutput.print("No GPU available, using CPU mode", output_type=OutputType.WARNING)
+        except Exception as e:
+            PrettyOutput.print(f"GPU initialization failed: {str(e)}", output_type=OutputType.WARNING)
+            
+        return config
+
     def _load_cache(self):
         """Load cache data"""
         if os.path.exists(self.cache_path):
@@ -323,45 +371,102 @@ class RAGTool:
                                             show_progress_bar=False)
         return np.array(embedding, dtype=np.float32)
 
-    def _get_embedding_batch(self, texts: List[str]) -> np.ndarray:
-        """Get the vector representation of the text batch
-        
-        Args:
-            texts: Text list
-            
-        Returns:
-            np.ndarray: Vector representation array
-        """
+    def _get_embedding_batch(self, texts: List[str], batch_size: int = 32) -> np.ndarray:
+        """Get embeddings for a batch of texts efficiently"""
         try:
-            embeddings = self.embedding_model.encode(texts, 
-                                                normalize_embeddings=True,
-                                                show_progress_bar=False,
-                                                batch_size=32)  # Use batch processing to improve efficiency
-            return np.array(embeddings, dtype=np.float32)
+            if self.gpu_config["has_gpu"]:
+                import torch
+                torch.cuda.empty_cache()
+                
+                # 使用较小的批处理大小
+                optimal_batch_size = min(16, len(texts))
+                all_embeddings = []
+                
+                with tqdm(total=len(texts), desc="Vectorizing") as pbar:
+                    for i in range(0, len(texts), optimal_batch_size):
+                        try:
+                            batch = texts[i:i + optimal_batch_size]
+                            embeddings = self.embedding_model.encode(
+                                batch,
+                                normalize_embeddings=True,
+                                show_progress_bar=False,
+                                batch_size=4,  # 减小内部批处理大小
+                                convert_to_tensor=True
+                            )
+                            # 立即移动到 CPU
+                            embeddings = embeddings.cpu().numpy()
+                            all_embeddings.append(embeddings)
+                            pbar.update(len(batch))
+                            
+                            # 清理 GPU 缓存
+                            torch.cuda.empty_cache()
+                            
+                        except RuntimeError as e:
+                            if "out of memory" in str(e):
+                                # 如果内存不足，减小批次大小重试
+                                if optimal_batch_size > 4:
+                                    optimal_batch_size //= 2
+                                    PrettyOutput.print(
+                                        f"CUDA out of memory, reducing batch size to {optimal_batch_size}", 
+                                        OutputType.WARNING
+                                    )
+                                    i -= optimal_batch_size  # 重试当前批次
+                                    continue
+                            raise
+                            
+                return np.vstack(all_embeddings)
+            else:
+                # CPU 模式
+                return self.embedding_model.encode(
+                    texts,
+                    normalize_embeddings=True,
+                    show_progress_bar=True,
+                    batch_size=8,
+                    convert_to_tensor=False
+                )
+                
         except Exception as e:
-            PrettyOutput.print(f"Failed to get vector representation: {str(e)}", 
-                            output_type=OutputType.ERROR)
+            PrettyOutput.print(f"Batch embedding failed: {str(e)}", OutputType.ERROR)
             return np.zeros((len(texts), self.vector_dim), dtype=np.float32) # type: ignore
 
-    def _process_document_batch(self, documents: List[Document]) -> List[np.ndarray]:
-        """Process a batch of documents vectorization
+    def _process_document_batch(self, documents: List[Document]) -> np.ndarray:
+        """Process a batch of documents using shared memory
         
         Args:
-            documents: Document list
+            documents: List of documents to process
             
         Returns:
-            List[np.ndarray]: Vector list
+            np.ndarray: Document vectors
         """
-        texts = []
-        for doc in documents:
-            # Combine document information
-            combined_text = f"""
-File: {doc.metadata['file_path']}
-Content: {doc.content}
-"""
-            texts.append(combined_text)
+        try:
+            import torch
             
-        return self._get_embedding_batch(texts) # type: ignore
+            # 估算内存需求
+            total_content_size = sum(len(doc.content) for doc in documents)
+            est_memory_needed = total_content_size * 4  # 粗略估计
+            
+            # 如果预估内存超过共享内存限制，分批处理
+            if est_memory_needed > self.gpu_config["shared_memory"] * 0.7:
+                batch_size = max(1, int(len(documents) * (self.gpu_config["shared_memory"] * 0.7 / est_memory_needed)))
+                
+                all_vectors = []
+                for i in range(0, len(documents), batch_size):
+                    batch = documents[i:i + batch_size]
+                    vectors = self._process_document_batch(batch)
+                    all_vectors.append(vectors)
+                return np.vstack(all_vectors)
+            
+            # 正常处理单个批次
+            texts = []
+            for doc in documents:
+                combined_text = f"File:{doc.metadata['file_path']} Content:{doc.content}"
+                texts.append(combined_text)
+                
+            return self._get_embedding_batch(texts)
+            
+        except Exception as e:
+            PrettyOutput.print(f"Batch processing failed: {str(e)}", OutputType.ERROR)
+            return np.zeros((0, self.vector_dim), dtype=np.float32) # type: ignore
 
     def _process_file(self, file_path: str) -> List[Document]:
         """Process a single file"""
@@ -419,7 +524,7 @@ Content: {doc.content}
             return []
 
     def build_index(self, dir: str):
-        """Build document index"""
+        """Build document index with optimized processing"""
         # Get all files
         all_files = []
         for root, _, files in os.walk(dir):
@@ -467,208 +572,131 @@ Content: {doc.content}
         unchanged_documents = [doc for doc in self.documents 
                             if doc.metadata['file_path'] in unchanged_files]
 
-        # Process new files and modified files
-        new_documents = []
+        # Process files in parallel with optimized vectorization
         if files_to_process:
-            with tqdm(total=len(files_to_process), desc="Process files") as pbar:
-                for file_path in files_to_process:
-                    try:
-                        docs = self._process_file(file_path)
-                        if len(docs) > 0:
-                            new_documents.extend(docs)
-                    except Exception as e:
-                        PrettyOutput.print(f"Failed to process file {file_path}: {str(e)}", 
-                                        output_type=OutputType.ERROR)
-                    pbar.update(1)
-
-        # Update document list
-        self.documents = unchanged_documents + new_documents
-
-        if not self.documents:
-            PrettyOutput.print("No documents to process", output_type=OutputType.WARNING)
-            return
-
-        # Only vectorize new documents
-        if new_documents:
-            PrettyOutput.print(f"Start processing {len(new_documents)} new documents", 
-                            output_type=OutputType.INFO)
+            PrettyOutput.print(f"Processing {len(files_to_process)} files...", OutputType.INFO)
             
-            # Use thread pool to process vectorization
-            batch_size = 32
-            new_vectors = []
-            
-            with tqdm(total=len(new_documents), desc="Generating vectors") as pbar:
-                with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
-                    for i in range(0, len(new_documents), batch_size):
-                        batch = new_documents[i:i + batch_size]
-                        future = executor.submit(self._process_document_batch, batch)
-                        batch_vectors = future.result()
-                        
-                        with self.vector_lock:
-                            new_vectors.extend(batch_vectors)
-                        
-                        pbar.update(len(batch))
-
-            # Merge new and old vectors
-            if self.flat_index is not None:
-                # Get vectors for unchanged documents
-                unchanged_vectors = []
-                for doc in unchanged_documents:
-                    # Get vectors from existing index
-                    doc_idx = next((i for i, d in enumerate(self.documents) 
-                                if d.metadata['file_path'] == doc.metadata['file_path']), None)
-                    if doc_idx is not None:
-                        # Reconstruct vectors from flat index
-                        vector = np.zeros((1, self.vector_dim), dtype=np.float32) # type: ignore
-                        self.flat_index.reconstruct(doc_idx, vector.ravel())
-                        unchanged_vectors.append(vector)
+            # Step 1: 并行提取文本内容
+            documents_to_process = []
+            with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
+                futures = {
+                    executor.submit(self._process_file, file_path): file_path 
+                    for file_path in files_to_process
+                }
                 
-                if unchanged_vectors:
-                    unchanged_vectors = np.vstack(unchanged_vectors)
-                    vectors = np.vstack([unchanged_vectors, np.vstack(new_vectors)])
-                else:
-                    vectors = np.vstack(new_vectors)
-            else:
-                vectors = np.vstack(new_vectors)
+                with tqdm(total=len(files_to_process), desc="Extracting text") as pbar:
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            docs = future.result()
+                            if docs:
+                                documents_to_process.extend(docs)
+                            pbar.update(1)
+                        except Exception as e:
+                            PrettyOutput.print(f"File processing failed: {str(e)}", OutputType.ERROR)
+                            pbar.update(1)
 
-            # Build index
-            self._build_index(vectors)
-            # Save cache
-            self._save_cache(vectors)
-        
-        PrettyOutput.print(f"Successfully indexed {len(self.documents)} document fragments (Added/Modified: {len(new_documents)}, Unchanged: {len(unchanged_documents)})", 
-                        output_type=OutputType.SUCCESS)
+            # Step 2: 优化的批量向量化
+            if documents_to_process:
+                PrettyOutput.print(f"Vectorizing {len(documents_to_process)} documents...", OutputType.INFO)
+                
+                # 准备向量化的文本
+                texts_to_vectorize = []
+                for doc in documents_to_process:
+                    # 优化文本组合，减少内存使用
+                    combined_text = f"File:{doc.metadata['file_path']} Content:{doc.content}"
+                    texts_to_vectorize.append(combined_text)
+
+                # 使用较小的初始批处理大小
+                initial_batch_size = min(
+                    32,  # 最大批次大小
+                    max(4, len(texts_to_vectorize) // 8),  # 基于文档数的批次大小
+                    len(texts_to_vectorize)  # 不超过总文档数
+                )
+                
+                # 批量处理向量
+                vectors = self._get_embedding_batch(texts_to_vectorize, initial_batch_size)
+
+                # 更新文档和索引
+                self.documents.extend(documents_to_process)
+
+                # 构建最终索引
+                if self.flat_index is not None:
+                    # 获取未更改文档的向量
+                    unchanged_vectors = self._get_unchanged_vectors(unchanged_documents)
+                    if unchanged_vectors is not None:
+                        final_vectors = np.vstack([unchanged_vectors, vectors])
+                    else:
+                        final_vectors = vectors
+                else:
+                    final_vectors = vectors
+
+                # 构建索引并保存缓存
+                self._build_index(final_vectors)
+                self._save_cache(final_vectors)
+
+                PrettyOutput.print(
+                    f"Indexed {len(self.documents)} documents "
+                    f"(New/Modified: {len(documents_to_process)}, "
+                    f"Unchanged: {len(unchanged_documents)})", 
+                    OutputType.SUCCESS
+                )
+
+    def _get_unchanged_vectors(self, unchanged_documents: List[Document]) -> Optional[np.ndarray]:
+        """Get vectors for unchanged documents from existing index"""
+        try:
+            if not unchanged_documents or self.flat_index is None:
+                return None
+
+            unchanged_vectors = []
+            for doc in unchanged_documents:
+                doc_idx = next((i for i, d in enumerate(self.documents) 
+                            if d.metadata['file_path'] == doc.metadata['file_path']), None)
+                if doc_idx is not None:
+                    vector = np.zeros((1, self.vector_dim), dtype=np.float32) # type: ignore
+                    self.flat_index.reconstruct(doc_idx, vector.ravel())
+                    unchanged_vectors.append(vector)
+
+            return np.vstack(unchanged_vectors) if unchanged_vectors else None
+            
+        except Exception as e:
+            PrettyOutput.print(f"Failed to get unchanged vectors: {str(e)}", OutputType.ERROR)
+            return None
 
     def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
-        """Optimize search strategy"""
+        """Search documents using vector similarity
+        
+        Args:
+            query: Search query
+            top_k: Number of results to return
+        """
         if not self.index:
             PrettyOutput.print("Index not built, building...", output_type=OutputType.INFO)
             self.build_index(self.root_dir)
-        
-        # Implement MMR (Maximal Marginal Relevance) to increase result diversity
-        def mmr(query_vec, doc_vecs, doc_ids, lambda_param=0.5, n_docs=top_k):
-            selected = []
-            selected_ids = []
             
-            while len(selected) < n_docs and len(doc_ids) > 0:
-                best_score = -1
-                best_idx = -1
-                
-                for i, (doc_vec, doc_id) in enumerate(zip(doc_vecs, doc_ids)):
-                    # Calculate similarity with query
-                    query_sim = float(np.dot(query_vec, doc_vec))
-                    
-                    # Calculate maximum similarity with selected documents
-                    if selected:
-                        doc_sims = [float(np.dot(doc_vec, selected_doc)) for selected_doc in selected]
-                        max_doc_sim = max(doc_sims)
-                    else:
-                        max_doc_sim = 0
-                    
-                    # MMR score
-                    score = lambda_param * query_sim - (1 - lambda_param) * max_doc_sim
-                    
-                    if score > best_score:
-                        best_score = score
-                        best_idx = i
-                
-                if best_idx == -1:
-                    break
-                
-                selected.append(doc_vecs[best_idx])
-                selected_ids.append(doc_ids[best_idx])
-                doc_vecs = np.delete(doc_vecs, best_idx, axis=0)
-                doc_ids = np.delete(doc_ids, best_idx)
-            
-            return selected_ids
-        
         # Get query vector
         query_vector = self._get_embedding(query)
         query_vector = query_vector.reshape(1, -1)
         
-        # Initial search more results for MMR
-        initial_k = min(top_k * 2, len(self.documents))
+        # Search with more candidates
+        initial_k = min(top_k * 4, len(self.documents))
         distances, indices = self.index.search(query_vector, initial_k) # type: ignore
         
-        # Get valid results
-        valid_indices = indices[0][indices[0] != -1]
-        valid_vectors = np.vstack([self._get_embedding(self.documents[idx].content) for idx in valid_indices])
-        
-        # Apply MMR
-        final_indices = mmr(query_vector[0], valid_vectors, valid_indices, n_docs=top_k)
-        
-        # Build results
+        # Process results
         results = []
-        for idx in final_indices:
-            doc = self.documents[idx]
-            similarity = 1.0 / (1.0 + float(distances[0][np.where(indices[0] == idx)[0][0]]))
-            results.append((doc, similarity))
+        seen_files = set()
+        for idx, dist in zip(indices[0], distances[0]):
+            if idx != -1:
+                doc = self.documents[idx]
+                similarity = 1.0 / (1.0 + float(dist))
+                if similarity > 0.3:  # 降低过滤阈值以获取更多结果
+                    file_path = doc.metadata['file_path']
+                    if file_path not in seen_files:
+                        seen_files.add(file_path)
+                        results.append((doc, similarity))
+                        if len(results) >= top_k:
+                            break
         
         return results
-
-    def _rerank_results(self, query: str, initial_results: List[Tuple[Document, float]]) -> List[Tuple[Document, float]]:
-        """Use rerank model to rerank search results"""
-        try:
-            import torch
-            model, tokenizer = load_rerank_model()
-            
-            # Prepare data
-            pairs = []
-            for doc, _ in initial_results:
-                # Combine document information
-                doc_content = f"""
-File: {doc.metadata['file_path']}
-Content: {doc.content}
-"""
-                pairs.append([query, doc_content])
-                
-            # Score each document pair
-            scores = []
-            batch_size = 8
-            
-            with torch.no_grad():
-                for i in range(0, len(pairs), batch_size):
-                    batch_pairs = pairs[i:i + batch_size]
-                    encoded = tokenizer(
-                        batch_pairs,
-                        padding=True,
-                        truncation=True,
-                        max_length=512,
-                        return_tensors='pt'
-                    )
-                    
-                    if torch.cuda.is_available():
-                        encoded = {k: v.cuda() for k, v in encoded.items()}
-                        
-                    outputs = model(**encoded)
-                    batch_scores = outputs.logits.squeeze(-1).cpu().numpy()
-                    scores.extend(batch_scores.tolist())
-            
-            # Normalize scores to 0-1 range
-            if scores:
-                min_score = min(scores)
-                max_score = max(scores)
-                if max_score > min_score:
-                    scores = [(s - min_score) / (max_score - min_score) for s in scores]
-            
-            # Combine scores with documents and sort
-            scored_results = []
-            for (doc, _), score in zip(initial_results, scores):
-                if score >= 0.5:  # Only keep results with a score greater than 0.5
-                    scored_results.append((doc, float(score)))
-                    
-            # Sort by score in descending order
-            scored_results.sort(key=lambda x: x[1], reverse=True)
-            
-            return scored_results
-            
-        except Exception as e:
-            PrettyOutput.print(f"Failed to rerank, using original sorting: {str(e)}", output_type=OutputType.WARNING)
-            return initial_results
-
-    def is_index_built(self):
-        """Check if index is built"""
-        return self.index is not None
 
     def query(self, query: str) -> List[Document]:
         """Query related documents
@@ -677,81 +705,72 @@ Content: {doc.content}
             query: Query text
             
         Returns:
-            List[Document]: Related documents, including context
+            List[Document]: Related documents
         """
         results = self.search(query)
         return [doc for doc, _ in results]
 
     def ask(self, question: str) -> Optional[str]:
-        """Ask about documents
-        
-        Args:
-            question: User question
-            
-        Returns:
-            Model answer, return None if failed
-        """
+        """Ask questions about documents with enhanced context building"""
         try:
-            # Search related document fragments
-            results = self.query(question)
+            # 搜索相关文档
+            results = self.search(question)
             if not results:
                 return None
             
-            # Display found document fragments
-            for doc in results:
-                output = f"""File: {doc.metadata['file_path']}\n"""
+            # 显示找到的文档
+            for doc, score in results:
+                output = f"""File: {doc.metadata['file_path']} (Score: {score:.3f})\n"""
                 output += f"""Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}\n"""
                 output += f"""Content:\n{doc.content}\n"""
                 PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
+            
+            # 构建提示词
+            prompt = f"""Based on the following document fragments, please answer the user's question accurately and comprehensively.
 
-            # Build base prompt
-            base_prompt = f"""Please answer the user's question based on the following document fragments. If the document content is not sufficient to answer the question completely, please clearly indicate.
+Question: {question}
 
-User question: {question}
-
-Related document fragments:
+Relevant documents (ordered by relevance):
 """
-            end_prompt = "\nPlease provide an accurate and concise answer. If the document content is not sufficient to answer the question completely, please clearly indicate."
-            
-            # Calculate the maximum length that can be used for document content
-            # Leave some space for the model's answer
-            available_length = self.max_context_length - len(base_prompt) - len(end_prompt) - 500
-            
-            # Build context, while controlling the total length
-            context = []
+            # 添加上下文，控制长度
+            available_length = self.max_context_length - len(prompt) - 1000
             current_length = 0
             
-            for doc in results:
-                # Calculate the length of this document fragment's content
+            for doc, score in results:
                 doc_content = f"""
-Source file: {doc.metadata['file_path']}
-Content:
+[Score: {score:.3f}] {doc.metadata['file_path']}:
 {doc.content}
 ---
 """
-                content_length = len(doc_content)
-                
-                # If adding this fragment would exceed the limit, stop adding
-                if current_length + content_length > available_length:
-                    PrettyOutput.print("Due to context length limit, some related document fragments were omitted", 
-                                    output_type=OutputType.WARNING)
+                if current_length + len(doc_content) > available_length:
+                    PrettyOutput.print(
+                        "Due to context length limit, some fragments were omitted", 
+                        output_type=OutputType.WARNING
+                    )
                     break
                     
-                context.append(doc_content)
-                current_length += content_length
-
-            # Build complete prompt
-            prompt = base_prompt + ''.join(context) + end_prompt
+                prompt += doc_content
+                current_length += len(doc_content)
             
-            # Get model instance and generate answer
+            prompt += "\nIf the documents don't fully answer the question, please indicate what information is missing."
+            
+            # 使用 normal 平台处理文档问答
             model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
             response = model.chat_until_success(prompt)
             
             return response
             
         except Exception as e:
-            PrettyOutput.print(f"Failed to answer: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"Failed to answer: {str(e)}", OutputType.ERROR)
             return None
+
+    def is_index_built(self) -> bool:
+        """Check if the index is built and valid
+        
+        Returns:
+            bool: True if index is built and valid
+        """
+        return self.index is not None and len(self.documents) > 0
 
 def main():
     """Main function"""
