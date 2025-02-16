@@ -34,12 +34,19 @@ THINKING PROCESS:
    Observation: Found that...
    
    Thought: Evaluate actual relevance...
-   Action: Analyze each file's relationship to requirement
-   Observation: These files are relevant because...
+   Action: For each file:
+     - Check direct relationship to requirement
+     - Verify functionality matches
+     - Look for clear evidence of relevance
+   Observation: After analysis:
+     - Relevant files: [list with reasons]
+     - Removed files: [list with reasons]
    
-   Thought: Identify gaps in coverage...
-   Action: Map functionality against requirement
-   Observation: Missing aspects include...
+   Thought: Verify removal decisions...
+   Action: Double-check each removed file
+   Observation: Removal justification:
+     - File X: [specific reason for removal]
+     - File Y: [specific reason for removal]
    ```
 
 2. Additional File Search
@@ -51,23 +58,33 @@ THINKING PROCESS:
      - Dependency analysis
    Observation: Found additional files...
    
-   Thought: Look for related test files...
-   Action: Search for corresponding tests
-   Observation: Test coverage shows...
+   Thought: Validate new files...
+   Action: For each new file:
+     - Verify direct relevance
+     - Check for false positives
+     - Document clear evidence
+   Observation: After validation:
+     - Confirmed relevant: [list with evidence]
+     - Excluded: [list with reasons]
    ```
 
 3. Comprehensive Analysis
    ```
-   Thought: Verify all identified files...
-   Action: For each file:
-     - Check functionality match
-     - Analyze dependencies
-     - Verify test coverage
-   Observation: Final relevance analysis shows...
+   Thought: Final relevance check...
+   Action: For each remaining file:
+     - Verify essential to requirement
+     - Check for indirect inclusions
+     - Validate necessity
+   Observation: Final cleanup:
+     - Core files: [list with roles]
+     - Removed borderline cases: [list with reasons]
    
-   Thought: Consider completeness...
-   Action: Review against original requirement
-   Observation: Coverage analysis indicates...
+   Thought: Ensure minimal complete set...
+   Action: Review final file list
+   Observation: Confirmed each file is:
+     - Directly relevant
+     - Essential for requirement
+     - Supported by evidence
    ```
 
 FILE READING GUIDELINES:
@@ -77,28 +94,33 @@ FILE READING GUIDELINES:
    Action: 
      - First: execute_shell("grep -n 'key_term' path/to/file")
      - Then: read_code("path/to/file", start_line=x-10, end_line=x+20)
-   Observation: Relevant sections contain...
+   Observation: Relevance analysis:
+     - Relevant sections: [details]
+     - Irrelevant sections: [reasons to ignore]
    ```
 
 2. For Small Files:
    ```
    Thought: This is a small file, can read entirely...
    Action: read_code("path/to/file")
-   Observation: File content shows...
+   Observation: Relevance analysis:
+     - Key evidence: [details]
+     - Irrelevant aspects: [what to ignore]
    ```
 
 VERIFICATION RULES:
-- Document reasoning for each file's inclusion/exclusion
-- Don't assume relevance without evidence
-- Consider both direct and indirect relationships
-- Verify all dependency chains
-- Validate test coverage
-- Return empty list if no confirmed matches
+- Remove files without clear relevance evidence
+- Exclude files with only tangential relationships
+- Delete files that only contain imports/references
+- Remove files if relevance is uncertain
+- Document specific reasons for each removal
+- Keep only files essential to requirement
+- Maintain minimal complete set
 
 OUTPUT FORMAT:
 <FILE_PATH>
-- file_path1  # [reason for inclusion]
-- file_path2  # [verification evidence]
+- file_path1  # KEEP: [specific evidence of relevance]
+- file_path2  # KEEP: [clear relationship to requirement]
 </FILE_PATH>
 """, 
         name="FindFileAgent", 
@@ -106,10 +128,10 @@ OUTPUT FORMAT:
         tool_registry=find_file_tool_registry, 
         platform=PlatformRegistry().get_normal_platform(),
         auto_complete=True,
-        summary_prompt="""Please provide the verified file paths with reasoning:
+        summary_prompt="""Please provide only the verified essential files with evidence:
 <FILE_PATH>
-- file_path1  # Verified relevant: [specific reason]
-- file_path2  # Confirmed match: [evidence]
+- file_path1  # KEEP: [concrete evidence of necessity]
+- file_path2  # KEEP: [specific relevance proof]
 </FILE_PATH>
 """)
 
