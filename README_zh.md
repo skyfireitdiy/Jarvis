@@ -63,15 +63,25 @@ Jarvis 支持通过环境变量进行配置，可以在 `~/.jarvis/env` 文件�
 
 | 环境变量 | 描述 | 默认值 | 是否必需 |
 |---------|------|--------|------|
-| JARVIS_PLATFORM | 使用的 AI 平台，支持 kimi/openai/ai8 等 | kimi | 是 |
-| JARVIS_MODEL | 使用的模型名称 | - | 否 |
-| JARVIS_CODEGEN_PLATFORM | 代码生成使用的 AI 平台 | 同 JARVIS_PLATFORM | 否 |
-| JARVIS_CODEGEN_MODEL | 代码生成使用的模型名称 | 同 JARVIS_MODEL | 否 |
-| JARVIS_CHEAP_PLATFORM | 低成本操作使用的 AI 平台 | 同 JARVIS_PLATFORM | 否 |
-| JARVIS_CHEAP_MODEL | 低成本操作使用的模型名称 | 同 JARVIS_MODEL | 否 |
-| JARVIS_THINKING_PLATFORM | 思考使用的 AI 平台 | 同 JARVIS_PLATFORM | 否 |
-| JARVIS_THINKING_MODEL | 思考使用的模型名称 | 同 JARVIS_MODEL | 否 |
-| JARVIS_THREAD_COUNT | 并行处理使用的线程数量 | 10 | 否 |
+| JARVIS_PLATFORM | 使用的 AI 平台 | kimi | 是 |
+| JARVIS_MODEL | 使用的模型名称 | kimi | 否 |
+| JARVIS_CODEGEN_PLATFORM | 代码生成使用的平台 | 同 JARVIS_PLATFORM | 否 |
+| JARVIS_CODEGEN_MODEL | 代码生成使用的模型 | 同 JARVIS_MODEL | 否 |
+| JARVIS_THINKING_PLATFORM | 思考任务使用的平台 | 同 JARVIS_PLATFORM | 否 |
+| JARVIS_THINKING_MODEL | 思考任务使用的模型 | 同 JARVIS_MODEL | 否 |
+| JARVIS_CHEAP_PLATFORM | 低成本操作使用的平台 | 同 JARVIS_PLATFORM | 否 |
+| JARVIS_CHEAP_MODEL | 低成本操作使用的模型 | 同 JARVIS_MODEL | 否 |
+| JARVIS_THREAD_COUNT | 线程数量 | 1 | 否 |
+| JARVIS_MAX_CONTEXT_LENGTH | 最大上下文长度 | 131072 | 否 |
+| JARVIS_MIN_PARAGRAPH_LENGTH | 最小段落长度 | 50 | 否 |
+| JARVIS_MAX_PARAGRAPH_LENGTH | 最大段落长度 | 1000 | 否 |
+| JARVIS_CONTEXT_WINDOW | 上下文窗口大小 | 5 | 否 |
+| JARVIS_AUTO_COMPLETE | 启用自动完成 | false | 否 |
+| JARVIS_DISABLE_CODEBASE | 禁用代码库功能 | false | 否 |
+| JARVIS_USE_METHODOLOGY | 启用方法论 | true | 否 |
+| JARVIS_RECORD_METHODOLOGY | 记录方法论 | true | 否 |
+| JARVIS_NEED_SUMMARY | 生成摘要 | true | 否 |
+| JARVIS_DONT_USE_LOCAL_MODEL | 避免使用本地模型 | false | 否 |
 | OPENAI_API_KEY | OpenAI 平台的 API 密钥 | - | OpenAI 必需 |
 | OPENAI_API_BASE | OpenAI API 的基础 URL | https://api.deepseek.com | 否 |
 | OPENAI_MODEL_NAME | OpenAI 的模型名称 | deepseek-chat | 否 |

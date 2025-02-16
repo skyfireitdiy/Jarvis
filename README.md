@@ -63,15 +63,25 @@ Jarvis supports configuration through environment variables that can be set in t
 
 | Environment Variable | Description | Default Value | Required |
 |---------|------|--------|------|
-| JARVIS_PLATFORM | AI platform to use, supports kimi/openai/ai8 etc | kimi | Yes |
-| JARVIS_MODEL | Model name to use | - | No |
-| JARVIS_CODEGEN_PLATFORM | AI platform for code generation | Same as JARVIS_PLATFORM | No |
-| JARVIS_CODEGEN_MODEL | Model name for code generation | Same as JARVIS_MODEL | No |
-| JARVIS_CHEAP_PLATFORM | AI platform for cheap operations | Same as JARVIS_PLATFORM | No |
-| JARVIS_CHEAP_MODEL | Model name for cheap operations | Same as JARVIS_MODEL | No |
-| JARVIS_THINKING_PLATFORM | AI platform for thinking | Same as JARVIS_PLATFORM | No |
-| JARVIS_THINKING_MODEL | Model name for thinking | Same as JARVIS_MODEL | No |
-| JARVIS_THREAD_COUNT | Number of threads for parallel processing | 10 | No |
+| JARVIS_PLATFORM | AI platform to use | kimi | Yes |
+| JARVIS_MODEL | Model name to use | kimi | No |
+| JARVIS_CODEGEN_PLATFORM | Platform for code generation | Same as JARVIS_PLATFORM | No |
+| JARVIS_CODEGEN_MODEL | Model for code generation | Same as JARVIS_MODEL | No |
+| JARVIS_THINKING_PLATFORM | Platform for thinking tasks | Same as JARVIS_PLATFORM | No |
+| JARVIS_THINKING_MODEL | Model for thinking tasks | Same as JARVIS_MODEL | No |
+| JARVIS_CHEAP_PLATFORM | Platform for cheap operations | Same as JARVIS_PLATFORM | No |
+| JARVIS_CHEAP_MODEL | Model for cheap operations | Same as JARVIS_MODEL | No |
+| JARVIS_THREAD_COUNT | Number of threads | 1 | No |
+| JARVIS_MAX_CONTEXT_LENGTH | Maximum context length | 131072 | No |
+| JARVIS_MIN_PARAGRAPH_LENGTH | Minimum paragraph length | 50 | No |
+| JARVIS_MAX_PARAGRAPH_LENGTH | Maximum paragraph length | 1000 | No |
+| JARVIS_CONTEXT_WINDOW | Context window size | 5 | No |
+| JARVIS_AUTO_COMPLETE | Enable auto completion | false | No |
+| JARVIS_DISABLE_CODEBASE | Disable codebase features | false | No |
+| JARVIS_USE_METHODOLOGY | Enable methodology | true | No |
+| JARVIS_RECORD_METHODOLOGY | Record methodology | true | No |
+| JARVIS_NEED_SUMMARY | Generate summaries | true | No |
+| JARVIS_DONT_USE_LOCAL_MODEL | Avoid using local models | false | No |
 | OPENAI_API_KEY | API key for OpenAI platform | - | Required for OpenAI |
 | OPENAI_API_BASE | Base URL for OpenAI API | https://api.deepseek.com | No |
 | OPENAI_MODEL_NAME | Model name for OpenAI | deepseek-chat | No |
