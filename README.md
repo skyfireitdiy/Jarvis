@@ -131,11 +131,8 @@ jss "describe what you want to do"
 # Manage git commits
 jarvis-git-commit
 
-# Generate and manage ctags
-jarvis-ctags
-
 # Manage AI platforms
-jarvis-platform
+jarvis-platform-manager
 ```
 
 Each command supports `--help` flag for detailed usage information:
@@ -145,9 +142,8 @@ jarvis-code-agent --help
 jarvis-codebase --help
 jarvis-rag --help
 jarvis-smart-shell --help
-jarvis-platform --help
+jarvis-platform-manager --help
 jarvis-git-commit --help
-jarvis-ctags --help
 ```
 
 ## 🛠️ Tools
