@@ -659,7 +659,7 @@ Note: Only include files that have a strong connection to the query."""
             List[str]: The query variants list
         """
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        prompt = f"""Please generate 3 different expressions based on the following query, each expression should fully convey the meaning of the original query. These expressions will be used for code search, maintain professionalism and accuracy.
+        prompt = f"""Please generate 3 different expressions based on the following query in English, each expression should fully convey the meaning of the original query. These expressions will be used for code search, maintain professionalism and accuracy.
 Original query: {query}
 
 Please output 3 expressions directly, separated by two line breaks, without numbering or other markers.
