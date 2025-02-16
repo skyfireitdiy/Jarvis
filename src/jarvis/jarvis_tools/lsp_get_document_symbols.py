@@ -4,11 +4,11 @@ from jarvis.jarvis_lsp.registry import LSPRegistry
 from jarvis.jarvis_tools.base import Tool
 from jarvis.utils import PrettyOutput, OutputType
 
-class LSPFindSymbolsTool(Tool):
-    """Tool for finding symbols in code files using LSP."""
+class LSPGetDocumentSymbolsTool(Tool):
+    """Tool for getting document symbols in code files using LSP."""
     
-    name = "lsp_find_symbols"
-    description = "Find symbols (functions, classes, variables) in code files"
+    name = "lsp_get_document_symbols"
+    description = "Get document symbols (functions, classes, variables) in code files"
     parameters = {
         "file_path": "Path to the file to analyze",
         "language": "Programming language of the file (python/cpp/go/rust)"
