@@ -13,11 +13,20 @@ import os
 
 class Agent:
 
-
     def set_summary_prompt(self, summary_prompt: str):
+        """Set the summary prompt for task completion.
+        
+        Args:
+            summary_prompt: The prompt template for generating task summaries
+        """
         self.summary_prompt = summary_prompt
 
     def set_output_handler_before_tool(self, handler: List[Callable]):
+        """Set handlers to process output before tool execution.
+        
+        Args:
+            handler: List of callable functions to process output
+        """
         self.output_handler_before_tool = handler
         
     def __init__(self, 
@@ -34,21 +43,22 @@ class Agent:
                  record_methodology: Optional[bool] = None,
                  need_summary: Optional[bool] = None,
                  max_context_length: Optional[int] = None):
-        """
-        Initialize Agent with a model, optional tool registry and name
+        """Initialize an Agent instance.
         
         Args:
-            system_prompt: System prompt
-            name: Agent name, default is "Jarvis"
-            is_sub_agent: Whether it is a sub-agent, default is False
-            tool_registry: Tool registry instance
-            platform: Optional platform instance, default uses normal platform
-            summary_prompt: Optional summary prompt, default is None
-            auto_complete: Optional auto complete, default is None
-            output_handler_before_tool: Optional output handler before tool, default is None
-            output_handler_after_tool: Optional output handler after tool, default is None
-            use_methodology: Optional use methodology, default is None
-            record_methodology: Optional record methodology, default is None
+            system_prompt: The system prompt defining agent behavior
+            name: Agent name, defaults to "Jarvis"
+            is_sub_agent: Whether this is a sub-agent
+            tool_registry: Registry of available tools
+            platform: AI platform to use
+            summary_prompt: Template for generating summaries
+            auto_complete: Whether to enable auto-completion
+            output_handler_before_tool: Handlers to process output before tool execution
+            output_handler_after_tool: Handlers to process output after tool execution
+            use_methodology: Whether to use methodology
+            record_methodology: Whether to record methodology
+            need_summary: Whether to generate summaries
+            max_context_length: Maximum context length
         """
         PrettyOutput.print(f"Welcome to Jarvis, your AI assistant, Initiating...", OutputType.SYSTEM)
         if platform is not None:
@@ -109,8 +119,18 @@ Please describe in concise bullet points, highlighting important information.
         self.first = True
 
     @staticmethod
-    def extract_tool_calls(content: str) -> List[Dict]:
-        """Extract tool calls from content, if multiple tool calls are detected, raise an exception, and return the content before the tool call and the tool call"""
+    def _extract_tool_calls(content: str) -> List[Dict]:
+        """Extract tool calls from content.
+        
+        Args:
+            content: The content containing tool calls
+            
+        Returns:
+            List[Dict]: List of extracted tool calls with name and arguments
+            
+        Raises:
+            Exception: If tool call is missing necessary fields
+        """
         # Split content into lines
         lines = content.split('\n')
         tool_call_lines = []
@@ -146,7 +166,17 @@ Please describe in concise bullet points, highlighting important information.
         return []
 
     def _call_model(self, message: str) -> str:
-        """Call model to get response"""
+        """Call the AI model with retry logic.
+        
+        Args:
+            message: The input message for the model
+            
+        Returns:
+            str: Model's response
+            
+        Note:
+            Will retry with exponential backoff up to 30 seconds between retries
+        """
         sleep_time = 5
         while True:
             ret = self.model.chat_until_success(message)
@@ -162,16 +192,17 @@ Please describe in concise bullet points, highlighting important information.
 
 
     def _summarize_and_clear_history(self) -> None:
-        """
-        [System message]
-        Summarize current conversation history and clear history, only keep system message and summary
+        """Summarize current conversation and clear history.
         
         This method will:
-        1. Request the model to summarize the key information from the current conversation
+        1. Generate a summary of key information
         2. Clear the conversation history
         3. Keep the system message
-        4. Add the summary as new context
-        5. Reset the conversation round
+        4. Add summary as new context
+        5. Reset conversation length
+        
+        Note:
+            Used when context length exceeds maximum
         """
         # Create a new model instance to summarize, avoid affecting the main conversation
 
@@ -206,10 +237,14 @@ Please continue the task based on the above information.
             PrettyOutput.print(f"Failed to summarize conversation history: {str(e)}", OutputType.ERROR)
 
     def _complete_task(self) -> str:
-        """Complete task and generate summary
+        """Complete the current task and generate summary if needed.
         
         Returns:
             str: Task summary or completion status
+            
+        Note:
+            - For main agent: May generate methodology if enabled
+            - For sub-agent: May generate summary if enabled
         """
         PrettyOutput.section("Task completed", OutputType.SUCCESS)
         
@@ -230,7 +265,7 @@ Please continue the task based on the above information.
                     
                     # 检查是否包含工具调用
                     try:
-                        tool_calls = Agent.extract_tool_calls(response)
+                        tool_calls = Agent._extract_tool_calls(response)
                         if tool_calls:
                             self.tool_registry.handle_tool_calls(tool_calls)
                     except Exception as e:
@@ -249,14 +284,20 @@ Please continue the task based on the above information.
 
 
     def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str:
-        """Process user input and return response, return task summary report
+        """Process user input and execute the task.
         
         Args:
-            user_input: User input task description
-            file_list: Optional file list, default is None
-        
+            user_input: User's task description or request
+            file_list: Optional list of files to process
+            
         Returns:
             str: Task summary report
+            
+        Note:
+            - Handles context management
+            - Processes tool calls
+            - Manages conversation flow
+            - Supports interactive mode
         """
 
         add_agent(self.name)
@@ -296,7 +337,7 @@ Please continue the task based on the above information.
                         self.prompt += handler(current_response)
 
                     try:
-                        result = Agent.extract_tool_calls(current_response)
+                        result = Agent._extract_tool_calls(current_response)
                     except Exception as e:
                         PrettyOutput.print(f"Tool call error: {str(e)}", OutputType.ERROR)
                         self.prompt += f"Tool call error: {str(e)}"
@@ -337,8 +378,14 @@ Please continue the task based on the above information.
         finally:
             delete_current_agent()
 
-    def clear_history(self):
-        """Clear conversation history, only keep system prompt"""
+    def _clear_history(self):
+        """Clear conversation history while preserving system prompt.
+        
+        This will:
+        1. Clear the prompt
+        2. Reset the model
+        3. Reset conversation length counter
+        """
         self.prompt = "" 
         self.model.reset()
         self.conversation_length = 0  # Reset conversation length
@@ -346,7 +393,7 @@ Please continue the task based on the above information.
 
 
 
-def load_tasks() -> dict:
+def _load_tasks() -> dict:
     """Load tasks from .jarvis files in user home and current directory."""
     tasks = {}
     
@@ -396,7 +443,7 @@ def load_tasks() -> dict:
     
     return tasks
 
-def select_task(tasks: dict) -> str:
+def _select_task(tasks: dict) -> str:
     """Let user select a task from the list or skip. Returns task description if selected."""
     if not tasks:
         return ""
@@ -472,9 +519,9 @@ def main():
         agent = Agent(system_prompt=origin_agent_system_prompt, tool_registry=ToolRegistry())
 
         # 加载预定义任务
-        tasks = load_tasks()
+        tasks = _load_tasks()
         if tasks:
-            selected_task = select_task(tasks)
+            selected_task = _select_task(tasks)
             if selected_task:
                 PrettyOutput.print(f"\nExecute task: {selected_task}", OutputType.INFO)
                 agent.run(selected_task, args.files)

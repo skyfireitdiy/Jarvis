@@ -85,7 +85,7 @@ class PrettyOutput:
     """Pretty output using rich"""
     
     # Icons for different output types
-    ICONS = {
+    _ICONS = {
         OutputType.SYSTEM: "🤖",    # Robot - AI assistant
         OutputType.CODE: "📝",      # Notebook - Code
         OutputType.RESULT: "✨",    # Flash - Result
@@ -147,7 +147,7 @@ class PrettyOutput:
             return default_lang
 
     @staticmethod
-    def format(text: str, output_type: OutputType, timestamp: bool = True) -> Text:
+    def _format(text: str, output_type: OutputType, timestamp: bool = True) -> Text:
         """Format output text using rich Text"""
         # Create rich Text object
         formatted = Text()
@@ -157,7 +157,7 @@ class PrettyOutput:
             formatted.append(f"[{datetime.now().strftime('%H:%M:%S')}] ", style="white")
         formatted.append(f"[{get_agent_list()}]", style="blue")
         # Add icon
-        icon = PrettyOutput.ICONS.get(output_type, "")
+        icon = PrettyOutput._ICONS.get(output_type, "")
         formatted.append(f"{icon} ", style=output_type.value)
         
         return formatted
@@ -167,7 +167,7 @@ class PrettyOutput:
         """Print formatted output using rich console"""
         # Get formatted header
         lang = lang if lang is not None else PrettyOutput._detect_language(text, default_lang='markdown')
-        header = PrettyOutput.format("", output_type, timestamp)
+        header = PrettyOutput._format("", output_type, timestamp)
 
         content = Syntax(text, lang, theme="monokai")
             
@@ -202,14 +202,6 @@ class PrettyOutput:
 
 def get_single_line_input(tip: str) -> str:
     """Get single line input, support direction key, history function, etc."""
-    session = PromptSession(history=None)
-    style = PromptStyle.from_dict({
-        'prompt': 'ansicyan',
-    })
-    return session.prompt(f"{tip}", style=style)
-
-def make_choice_input(tip: str, choices: list) -> str:
-    """Get choice input, support direction key, history function, etc."""
     session = PromptSession(history=None)
     style = PromptStyle.from_dict({
         'prompt': 'ansicyan',
@@ -445,8 +437,7 @@ def load_rerank_model():
     
     return model, tokenizer
 
-def get_max_context_length():
-    return int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '131072'))  # 默认128k
+
 
 def is_long_context(files: list) -> bool:
     """Check if the file list belongs to a long context (total characters exceed 80% of the maximum context length)"""
@@ -594,6 +585,9 @@ def get_file_line_count(filename: str) -> int:
         return len(open(filename, "r", encoding="utf-8").readlines())
     except Exception as e:
         return 0
+    
+def get_max_context_length():
+    return int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '131072'))  # 默认128k
     
 def get_thread_count():
     return int(os.getenv('JARVIS_THREAD_COUNT', '1'))  
