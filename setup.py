@@ -34,6 +34,7 @@ setup(
         "fuzzywuzzy>=0.18.0",
         "python-Levenshtein>=0.25.0",
         "jedi>=0.17.2",
+        "psutil>=7.0.0",
     ],
     entry_points={
         "console_scripts": [
