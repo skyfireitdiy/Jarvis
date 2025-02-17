@@ -90,6 +90,15 @@ Jarvis 支持通过环境变量进行配置，可以在 `~/.jarvis/env` 文件�
 | OYI_API_KEY | OYI 平台的 API 密钥 | - | OYI 必需 |
 | OLLAMA_API_BASE | Ollama API 的基础 URL | http://localhost:11434 | 否 |
 
+## 最小化配置（openai兼容接口为例）
+
+```bash
+JARVIS_PLATFORM=openai
+JARVIS_MODEL=deepseek-chat
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_BASE=https://api.deepseek.com/v1
+```
+
 ## 🎯 使用方法
 
 ### 代码修改
