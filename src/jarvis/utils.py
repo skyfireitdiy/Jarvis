@@ -371,6 +371,7 @@ def find_git_root(dir="."):
     return ret
 
 def has_uncommitted_changes():
+    os.system("git add .")
     # Check working directory changes
     working_changes = os.popen("git diff --exit-code").read().strip() != ""
     # Check staged changes
