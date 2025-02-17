@@ -177,7 +177,7 @@ class PrettyOutput:
         console.print(Panel(content, border_style=border_style, title=header, title_align="left", highlight=True))
         
         # Print stack trace for errors
-        if traceback:
+        if traceback or output_type == OutputType.ERROR:
             console.print_exception()
 
     @staticmethod
