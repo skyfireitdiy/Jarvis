@@ -137,7 +137,8 @@ class ToolRegistry:
                         hasattr(item, 'name') and 
                         hasattr(item, 'description') and 
                         hasattr(item, 'parameters') and
-                        hasattr(item, 'execute')):
+                        hasattr(item, 'execute') and 
+                        item.name == module_name):
 
                         if hasattr(item, "check"):
                             if not item.check():
