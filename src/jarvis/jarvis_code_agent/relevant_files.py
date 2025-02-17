@@ -22,105 +22,95 @@ def find_relevant_files_from_agent(user_input: str, files_from_codebase: List[st
                                      "lsp_prepare_rename", 
                                      "lsp_validate_edit"])
     find_file_agent = Agent(
-        system_prompt="""You are a file agent, you are responsible for finding files related to the user's requirement.
+        system_prompt="""You are a file agent, responsible for finding files related to the user's requirement.
 
-THINKING PROCESS:
-1. Initial File Verification
+RELEVANCE CRITERIA:
+1. Direct Implementation
+   - File implements core functionality mentioned in requirement
+   - File contains key algorithms or logic related to requirement
+   - File defines data structures or interfaces needed by requirement
+
+2. Direct Dependencies
+   - File is imported/required by implementation files
+   - File provides essential utilities used by requirement
+   - File contains configurations needed by requirement
+
+3. Test Coverage
+   - Test files that verify requirement functionality
+   - Test utilities specific to requirement features
+   - Test data or fixtures for requirement
+
+4. Documentation
+   - Design docs directly describing requirement
+   - API documentation for requirement features
+   - Usage examples specific to requirement
+
+EVIDENCE REQUIREMENTS:
+1. Implementation Evidence
+   - Specific function/class implementations
+   - Algorithm or logic matches
+   - Data structure definitions
+
+2. Dependency Evidence
+   - Import statements
+   - Function calls
+   - Configuration usage
+
+3. Test Evidence
+   - Test cases covering requirement
+   - Test utilities specific to feature
+   - Test data relationships
+
+4. Documentation Evidence
+   - Direct feature descriptions
+   - API documentation matches
+   - Example code relevance
+
+VERIFICATION PROCESS:
+1. Initial Screening
    ```
-   Thought: Let me examine the suggested files...
-   Action: For each suggested file:
-     - Use read_code to check content
-     - Use LSP tools to analyze structure
-   Observation: Found that...
-   
-   Thought: Evaluate actual relevance...
+   Thought: Examine each file for relevance criteria...
    Action: For each file:
-     - Check direct relationship to requirement
-     - Verify functionality matches
-     - Look for clear evidence of relevance
-   Observation: After analysis:
-     - Relevant files: [list with reasons]
-     - Removed files: [list with reasons]
-   
-   Thought: Verify removal decisions...
-   Action: Double-check each removed file
-   Observation: Removal justification:
-     - File X: [specific reason for removal]
-     - File Y: [specific reason for removal]
+     - Check against all relevance criteria
+     - Document specific evidence found
+     - Note relationship strength
+   Observation: Found evidence:
+     - Direct implementations: [list with evidence]
+     - Dependencies: [list with evidence]
+     - Tests: [list with evidence]
+     - Docs: [list with evidence]
    ```
 
-2. Additional File Search
+2. Evidence Validation
    ```
-   Thought: Plan search strategy for missing aspects...
-   Action: Use combination of tools:
-     - git grep for key terms
-     - LSP tools for references
-     - Dependency analysis
-   Observation: Found additional files...
-   
-   Thought: Validate new files...
-   Action: For each new file:
-     - Verify direct relevance
-     - Check for false positives
-     - Document clear evidence
-   Observation: After validation:
-     - Confirmed relevant: [list with evidence]
-     - Excluded: [list with reasons]
-   ```
-
-3. Comprehensive Analysis
-   ```
-   Thought: Final relevance check...
-   Action: For each remaining file:
-     - Verify essential to requirement
-     - Check for indirect inclusions
+   Thought: Verify evidence quality...
+   Action: For each piece of evidence:
+     - Confirm direct relationship
+     - Check evidence strength
      - Validate necessity
-   Observation: Final cleanup:
+   Observation: Evidence analysis:
+     - Strong evidence: [list]
+     - Weak/indirect: [list]
+     - Invalid: [list]
+   ```
+
+3. Relationship Mapping
+   ```
+   Thought: Map file relationships...
+   Action: For each relevant file:
+     - Document relationship type
+     - Note dependency direction
+     - Map interaction patterns
+   Observation: Relationship map:
      - Core files: [list with roles]
-     - Removed borderline cases: [list with reasons]
-   
-   Thought: Ensure minimal complete set...
-   Action: Review final file list
-   Observation: Confirmed each file is:
-     - Directly relevant
-     - Essential for requirement
-     - Supported by evidence
+     - Support files: [list with roles]
+     - Test files: [list with roles]
    ```
-
-FILE READING GUIDELINES:
-1. For Large Files (>200 lines):
-   ```
-   Thought: This file is large, need targeted reading...
-   Action: 
-     - First: execute_shell("grep -n 'key_term' path/to/file")
-     - Then: read_code("path/to/file", start_line=x-10, end_line=x+20)
-   Observation: Relevance analysis:
-     - Relevant sections: [details]
-     - Irrelevant sections: [reasons to ignore]
-   ```
-
-2. For Small Files:
-   ```
-   Thought: This is a small file, can read entirely...
-   Action: read_code("path/to/file")
-   Observation: Relevance analysis:
-     - Key evidence: [details]
-     - Irrelevant aspects: [what to ignore]
-   ```
-
-VERIFICATION RULES:
-- Remove files without clear relevance evidence
-- Exclude files with only tangential relationships
-- Delete files that only contain imports/references
-- Remove files if relevance is uncertain
-- Document specific reasons for each removal
-- Keep only files essential to requirement
-- Maintain minimal complete set
 
 OUTPUT FORMAT:
 <FILE_PATH>
-- file_path1  # KEEP: [specific evidence of relevance]
-- file_path2  # KEEP: [clear relationship to requirement]
+- file_path1  # KEEP: [Category: Implementation/Dependency/Test/Doc] [Specific Evidence: exact function/class/test/doc details] [Relationship: how it relates to requirement]
+- file_path2  # KEEP: [Category: ...] [Specific Evidence: ...] [Relationship: ...]
 </FILE_PATH>
 """, 
         name="FindFileAgent", 

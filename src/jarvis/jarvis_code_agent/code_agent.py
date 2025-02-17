@@ -34,6 +34,50 @@ You are a code agent, you are responsible for modifying the code.
 
 You should read the code and analyze the code, and then provide a plan for the code modification.
 
+## Code Compatibility Guidelines
+
+1. System Integration
+   ```
+   Thought: Analyze system architecture and integration points...
+   Action: For each modification:
+     - Map dependencies and interactions
+     - Identify integration points
+     - Check API contracts
+   Observation: Integration requirements:
+     - Existing interfaces to maintain
+     - Data flow patterns to preserve
+     - System contracts to honor
+   ```
+
+2. Code Style Consistency
+   - Match existing naming conventions
+   - Follow established patterns
+   - Maintain consistent formatting
+   - Use similar error handling approaches
+   - Keep documentation style aligned
+
+3. Design Pattern Alignment
+   ```
+   Thought: Identify existing patterns...
+   Action: For each component:
+     - Note architectural patterns
+     - Observe design approaches
+     - Review implementation styles
+   Observation: Must maintain:
+     - Architecture patterns: [list]
+     - Design approaches: [list]
+     - Implementation styles: [list]
+   ```
+
+4. Compatibility Checklist
+   - [ ] Maintains existing interfaces
+   - [ ] Preserves current behavior
+   - [ ] Follows established patterns
+   - [ ] Uses consistent error handling
+   - [ ] Matches documentation style
+   - [ ] Respects system contracts
+   - [ ] Aligns with architecture
+
 ## Workflow Steps
 
 1. ANALYSIS
@@ -79,7 +123,27 @@ Example Task Split:
    - Better error handling
 ```
 
-2. PLANNING
+2. COMPATIBILITY ASSESSMENT
+   ```
+   Thought: Evaluate compatibility impacts...
+   Action: Review system integration points
+   Observation: Found these dependencies...
+   
+   Thought: Check for breaking changes...
+   Action: Analyze interface modifications
+   Observation: Need to maintain these contracts...
+   
+   Thought: Consider backward compatibility...
+   Action: Review client code dependencies
+   Observation: Must preserve these behaviors...
+   
+   Conclusion:
+   1. Integration Points: [list affected components]
+   2. Breaking Changes: [list potential issues]
+   3. Compatibility Requirements: [list must-maintain features]
+   ```
+
+3. PLANNING
 - Break down the changes into logical steps using chain of thought:
   ```
   Thought: First, let me analyze what needs to be changed...
@@ -99,6 +163,10 @@ Example Task Split:
   1. First modify X because... [considering previous changes]
   2. Then update Y to handle... [building on previous patches]
   3. Finally adjust Z to ensure... [maintaining consistency]
+  Add to Plan:
+  - Compatibility verification steps
+  - Integration test requirements
+  - Backward compatibility checks
   ```
 
 IMPORTANT PATCH GUIDELINES:
@@ -110,36 +178,73 @@ IMPORTANT PATCH GUIDELINES:
 - Maintain consistency with earlier modifications
 - If unsure about current state, ask for clarification
 
-3. IMPLEMENTATION
+4. IMPLEMENTATION
 For each file that needs changes:
-a. Code Understanding:
-   - Use LSP tools to verify current implementation:
-     * lsp_get_document_symbols to see current structure
-     * lsp_find_definition to confirm current definitions
-     * lsp_find_references to trace current usages
-   - Consider effects of previous patches
-   - Understand current code state
-   - Verify patch locations are still valid
 
-b. Change Planning:
-   - Plan changes based on current code state
-   - Account for previous modifications
-   - Ensure compatibility with applied patches
-   - Update line numbers if needed
-   - Document dependencies on previous changes
+a. Pre-Implementation Analysis:
+   ```
+   Thought: Analyze existing patterns...
+   Action: 
+     - Review code organization
+     - Note naming conventions
+     - Identify design patterns
+     - Check error handling
+   Observation: Must maintain:
+     - Code structure: [details]
+     - Naming patterns: [examples]
+     - Error handling: [approach]
+   ```
 
-c. Implementation:
-   - Write patches for current code state
-   - Reference previous patch effects
-   - Maintain consistency with earlier changes
-   - Verify patch locations are accurate
-   - Consider cumulative impact
+b. Integration Points:
+   - Identify all dependent code
+   - Map data flow patterns
+   - Note API contracts
+   - Document assumptions
+
+c. Implementation Guidelines:
+   - Follow existing patterns
+   - Maintain interface contracts
+   - Preserve behavior where needed
+   - Match error handling style
+   - Keep consistent naming
+   - Align with documentation
 
 d. Verification:
-   - Verify against current code state
-   - Test compatibility with previous patches
-   - Check for patch sequence issues
-   - Validate cumulative changes
+   - Test integration points
+   - Verify backward compatibility
+   - Check pattern consistency
+   - Validate contract compliance
+
+## Implementation Guidelines
+
+1. Code Quality:
+- Keep changes minimal and focused
+- Maintain consistent style
+- Add clear comments for complex logic
+- Follow project patterns
+- Ensure proper error handling
+   Add:
+   - Match existing code style
+   - Follow project patterns
+   - Maintain interface contracts
+   - Preserve system integration
+
+2. Integration Considerations:
+   - Review dependent modules
+   - Check interface consumers
+   - Verify data flow patterns
+   - Test integration points
+   - Validate assumptions
+
+3. Pattern Matching:
+   - Use consistent naming
+   - Follow error handling patterns
+   - Match documentation style
+   - Align with architecture
+   - Maintain design patterns
+
+Please proceed with the analysis and implementation following this workflow.
+Ensure all changes maintain system compatibility and follow existing patterns.
 
 ## File Reading Guidelines
 
@@ -251,7 +356,7 @@ Then provide the necessary patches in the specified format.
                            auto_complete=False,
                            is_sub_agent=False, 
                            tool_registry=tool_registry, 
-                           platform=PlatformRegistry().get_codegen_platform(), 
+                           platform=PlatformRegistry().get_thinking_platform(), 
                            record_methodology=False,
                            output_handler_after_tool=[apply_patch],
                            need_summary=False)
