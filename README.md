@@ -90,6 +90,14 @@ Jarvis supports configuration through environment variables that can be set in t
 | OYI_API_KEY | API key for OYI platform | - | Required for OYI |
 | OLLAMA_API_BASE | Base URL for Ollama API | http://localhost:11434 | No |
 
+## Minimal Configuration (Example with OpenAI-compatible Interface)
+
+```bash
+JARVIS_PLATFORM=openai
+JARVIS_MODEL=deepseek-chat
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_BASE=https://api.deepseek.com/v1
+```
 
 ## 🎯 Usage
 
