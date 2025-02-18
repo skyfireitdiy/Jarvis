@@ -62,15 +62,6 @@ def apply_patch(output_str: str)->str:
 
     for filepath, patch_info in patches.items():
         try:
-            # Check if file exists
-            if not os.path.exists(filepath):
-                PrettyOutput.print(f"File not found: {filepath}", OutputType.WARNING)
-                continue
-                
-            # Read original file content
-            lines = open(filepath, 'r', encoding='utf-8').readlines()
-            
-            # Apply patch
             for patch in patch_info:
                 start_line = patch['start_line']
                 end_line = patch['end_line']
@@ -78,6 +69,25 @@ def apply_patch(output_str: str)->str:
 
                 if new_content and new_content[-1] and new_content[-1][-1] != '\n':
                     new_content[-1] += '\n'
+
+                # Handle file creation when start=end=0
+                if start_line == 0 and end_line == 0:
+                    # Create directory if it doesn't exist
+                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                    # Write new file
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        f.writelines(new_content)
+                    PrettyOutput.print(f"Created new file {filepath} successfully\n", OutputType.SUCCESS)
+                    continue
+
+                # Regular patch logic for existing files
+                if not os.path.exists(filepath):
+                    PrettyOutput.print(f"File not found: {filepath}", OutputType.WARNING)
+                    continue
+                    
+                # Read original file content
+                lines = open(filepath, 'r', encoding='utf-8').readlines()
+                
                 # Validate line numbers
                 if start_line < 0 or end_line > len(lines) + 1 or start_line > end_line:
                     PrettyOutput.print(f"Invalid line range [{start_line}, {end_line}) for file: {filepath}", OutputType.WARNING)
