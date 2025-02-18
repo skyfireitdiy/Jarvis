@@ -100,11 +100,12 @@ class ReadCodeTool:
                 
             content = "".join(formatted_lines)
 
-            PrettyOutput.print(f"File: {filepath}\nLines: [{start_line}, {end_line})\n{content}", OutputType.CODE)
+            output = f"File: {filepath}\nLines: [{start_line}, {end_line})\n{content}";
+            PrettyOutput.print(output, OutputType.CODE)
             
             return {
                 "success": True,
-                "stdout": content,
+                "stdout": output,
                 "stderr": ""
             }
             
