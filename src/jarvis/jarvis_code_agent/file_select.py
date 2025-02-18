@@ -137,16 +137,17 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
 
     PrettyOutput.print(output, OutputType.INFO, lang="markdown")
     
-    # Ask the user if they need to adjust the file list
-    if user_confirm("Do you need to adjust the file list?", False):
-        # Let the user select files
-        numbers = get_single_line_input("Please enter the file numbers to include (support: 1,3-6 format, press Enter to keep the current selection)").strip()
-        if numbers:
-            selected_indices = _parse_file_selection(numbers, len(related_files))
-            if selected_indices:
-                selected_files = [related_files[i] for i in selected_indices]
-            else:
-                PrettyOutput.print("No valid files selected, keep the current selection", OutputType.WARNING)
+    if len(related_files) > 0:
+        # Ask the user if they need to adjust the file list
+        if user_confirm("Do you need to adjust the file list?", False):
+            # Let the user select files
+            numbers = get_single_line_input("Please enter the file numbers to include (support: 1,3-6 format, press Enter to keep the current selection)").strip()
+            if numbers:
+                selected_indices = _parse_file_selection(numbers, len(related_files))
+                if selected_indices:
+                    selected_files = [related_files[i] for i in selected_indices]
+                else:
+                    PrettyOutput.print("No valid files selected, keep the current selection", OutputType.WARNING)
     
     # Ask if they need to supplement files
     if user_confirm("Do you need to supplement other files?", False):

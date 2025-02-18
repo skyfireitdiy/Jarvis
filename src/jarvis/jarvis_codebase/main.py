@@ -625,6 +625,7 @@ Important:
 
         # Use a large model to evaluate
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        model.set_suppress_output(True)
         response = model.chat_until_success(prompt)
 
         # Parse the response
@@ -650,6 +651,7 @@ Important:
             List[str]: The query variants list
         """
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        model.set_suppress_output(True)
         prompt = f"""Please generate 10 different expressions optimized for vector search based on the following query. Each expression should:
 
 1. Focus on key technical concepts and terminology
