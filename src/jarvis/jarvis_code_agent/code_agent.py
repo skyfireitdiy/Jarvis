@@ -6,8 +6,9 @@ from jarvis.jarvis_code_agent.patch import apply_patch
 from jarvis.jarvis_code_agent.relevant_files import find_relevant_files
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
+from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.utils import OutputType, PrettyOutput, get_file_line_count, get_multiline_input, has_uncommitted_changes, init_env, find_git_root
+from jarvis.utils import OutputType, PrettyOutput, get_file_line_count, get_multiline_input, has_uncommitted_changes, init_env, find_git_root, get_max_token_count, get_context_token_count
 
 
 class CodeAgent:
@@ -120,16 +121,52 @@ Code Changes Must:
 
     
     def make_files_prompt(self, files: List[str]) -> str:
-        """Make the files prompt.
+        """Make the files prompt with content that fits within token limit.
         
         Args:
             files: The files to be modified
             
+        Returns:
+            str: A prompt containing file paths and contents within token limit
         """
-        return "\n".join(
+        max_tokens = get_max_token_count() * 0.8  # Use 80% of max tokens
+        current_tokens = 0
+        prompt_parts = []
+        
+        # First add file paths and line counts
+        paths_prompt = "\n".join(
             f"- {file} ({get_file_line_count(file)} lines)"
             for file in files
         )
+        prompt_parts.append(paths_prompt)
+        current_tokens = get_context_token_count(paths_prompt)
+
+        # Then try to add file contents
+        for file in files:
+            try:
+                content = ReadCodeTool().execute({
+                    "file_path": file,
+                    "start_line": 0,
+                    "end_line": -1
+                })
+                
+                if content["success"]:
+                    file_section = content["stdout"]
+                    section_tokens = get_context_token_count(file_section)
+                    
+                # Check if adding this file would exceed token limit
+                if current_tokens + section_tokens > max_tokens:
+                    prompt_parts.append("\n\nRemaining files are too large to include contents.")
+                    break
+                    
+                prompt_parts.append(file_section)
+                current_tokens += section_tokens
+                
+            except Exception as e:
+                PrettyOutput.print(f"Error reading file {file}: {str(e)}", OutputType.WARNING)
+                continue
+                
+        return "\n".join(prompt_parts)
 
     def run(self, user_input: str) :
         """Run the code agent with the given user input.
