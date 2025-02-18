@@ -400,6 +400,26 @@ def load_embedding_model():
     
     return embedding_model
 
+def load_tokenizer():
+    """Load tokenizer"""
+    model_name = "gpt2"
+    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+    
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            cache_dir=cache_dir,
+            local_files_only=True
+        )
+    except Exception as e:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            cache_dir=cache_dir,
+            local_files_only=False
+        )
+    
+    return tokenizer
+
 def load_rerank_model():
     """Load reranking model"""
     model_name = "BAAI/bge-reranker-v2-m3"
@@ -445,21 +465,21 @@ def is_long_context(files: list) -> bool:
     """Check if the file list belongs to a long context (total characters exceed 80% of the maximum context length)"""
     max_length = get_max_context_length()
     threshold = max_length * 0.8
-    total_chars = 0
+    total_tokens = 0
     
     for file_path in files:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-                total_chars += len(content)
+                total_tokens += get_context_token_count(content)
                 
-                if total_chars > threshold:
+                if total_tokens > threshold:
                     return True
         except Exception as e:
             PrettyOutput.print(f"Failed to read file {file_path}: {e}", OutputType.WARNING)
             continue
             
-    return total_chars > threshold
+    return total_tokens > threshold
 
 
 
@@ -740,5 +760,27 @@ def get_embedding_with_chunks(embedding_model: Any, text: str) -> List[np.ndarra
         vector = get_embedding(embedding_model, chunk)
         vectors.append(vector)
     return vectors
+
+
+def get_context_token_count(text: str) -> int:
+    """Get the token count of the text using the tokenizer
+    
+    Args:
+        text: The input text to count tokens for
+        
+    Returns:
+        int: The number of tokens in the text
+    """
+    try:
+        # Use a fast tokenizer that's good at general text
+        tokenizer = load_tokenizer()
+        tokens = tokenizer.encode(text)
+        return len(tokens)
+        
+    except Exception as e:
+        PrettyOutput.print(f"Error counting tokens: {str(e)}", OutputType.WARNING)
+        # Fallback to rough character-based estimate
+        return len(text) // 4  # Rough estimate of 4 chars per token
+
 
 

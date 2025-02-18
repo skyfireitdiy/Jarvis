@@ -3,7 +3,7 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, get_embedding, get_embedding_batch, get_file_md5, get_max_context_length, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model
+from jarvis.utils import OutputType, PrettyOutput, get_context_token_count, get_embedding, get_embedding_batch, get_file_md5, get_max_context_length, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model
 from jarvis.utils import init_env
 from dataclasses import dataclass
 from tqdm import tqdm
@@ -655,8 +655,8 @@ Question: {question}
 Relevant documents (ordered by relevance):
 """
             # 添加上下文，控制长度
-            available_length = self.max_context_length - len(prompt) - 1000
-            current_length = 0
+            available_count = self.max_context_length - get_context_token_count(prompt) - 1000
+            current_count = 0
             
             for doc, score in results:
                 doc_content = f"""
@@ -668,7 +668,7 @@ Relevant documents (ordered by relevance):
                 prompt += "1. Answer the question accurately and comprehensively.\n"
                 prompt += "2. If the documents don't fully answer the question, please indicate what information is missing.\n"
                 prompt += "3. Reference the documents in the answer.\n"
-                if current_length + len(doc_content) > available_length:
+                if current_count + get_context_token_count(doc_content) > available_count:
                     PrettyOutput.print(
                         "Due to context length limit, some fragments were omitted", 
                         output_type=OutputType.WARNING
@@ -676,7 +676,7 @@ Relevant documents (ordered by relevance):
                     break
                     
                 prompt += doc_content
-                current_length += len(doc_content)
+                current_count += get_context_token_count(doc_content)
             
             prompt += "\nIf the documents don't fully answer the question, please indicate what information is missing."
             

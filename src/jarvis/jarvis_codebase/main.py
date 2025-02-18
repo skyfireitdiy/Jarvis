@@ -7,7 +7,7 @@ from typing import List, Tuple, Optional, Dict
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_embedding, get_file_md5, get_max_context_length, get_thread_count, load_embedding_model, user_confirm
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_context_token_count, get_embedding, get_file_md5, get_max_context_length, get_thread_count, load_embedding_model, user_confirm
 from jarvis.utils import init_env
 import argparse
 import pickle
@@ -547,31 +547,31 @@ Content: {content}
             # Process files in batches
             all_selected_files = set()
             current_batch = []
-            current_length = 0
+            current_token_count = 0
             
             for path in initial_results:
                 try:
                     content = open(path, "r", encoding="utf-8").read()
                     # Truncate large files
-                    if len(content) > max_file_length:
+                    if get_context_token_count(content) > max_file_length:
                         PrettyOutput.print(f"Truncating large file: {path}", OutputType.WARNING)
                         content = content[:max_file_length] + "\n... (content truncated)"
                     
                     file_info = f"File: {path}\nContent: {content}\n\n"
-                    file_length = len(file_info)
+                    tokens_count = get_context_token_count(file_info)
                     
                     # If adding this file would exceed batch limit
-                    if current_length + file_length > max_batch_length:
+                    if current_token_count + tokens_count > max_batch_length:
                         # Process current batch
                         if current_batch:
                             selected = self._process_batch('\n'.join(query), current_batch)
                             all_selected_files.update(selected)
                         # Start new batch
                         current_batch = [file_info]
-                        current_length = file_length
+                        current_token_count = tokens_count
                     else:
                         current_batch.append(file_info)
-                        current_length += file_length
+                        current_token_count += tokens_count
                         
                 except Exception as e:
                     PrettyOutput.print(f"Failed to read file {path}: {str(e)}", OutputType.ERROR)
@@ -805,8 +805,8 @@ Question: {query}
 Relevant code files (ordered by relevance):
 """
         # Add context with length control
-        available_length = self.max_context_length - len(prompt) - 1000  # Reserve space for answer
-        current_length = 0
+        available_count = self.max_context_length - get_context_token_count(prompt) - 1000  # Reserve space for answer
+        current_count = 0
         
         for path in files_from_codebase:
             try:
@@ -817,7 +817,7 @@ Content:
 {content}
 ----------------------------------------
 """
-                if current_length + len(file_content) > available_length:
+                if current_count + get_context_token_count(file_content) > available_count:
                     PrettyOutput.print(
                         "Due to context length limit, some files were omitted", 
                         output_type=OutputType.WARNING
@@ -825,7 +825,7 @@ Content:
                     break
                     
                 prompt += file_content
-                current_length += len(file_content)
+                current_count += get_context_token_count(file_content)
                 
             except Exception as e:
                 PrettyOutput.print(f"Failed to read file {path}: {str(e)}", 
