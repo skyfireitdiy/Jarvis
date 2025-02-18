@@ -2,7 +2,7 @@ import mimetypes
 import os
 from typing import Dict, List, Tuple
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.utils import PrettyOutput, OutputType, get_max_context_length
+from jarvis.utils import PrettyOutput, OutputType
 import requests
 import json
 

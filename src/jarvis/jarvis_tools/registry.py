@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.base import Tool
-from jarvis.utils import OutputType, PrettyOutput, get_context_token_count, get_max_context_length
+from jarvis.utils import OutputType, PrettyOutput, get_context_token_count, get_max_token_count
 
 
 tool_call_help = """## Tool Usage Format
@@ -64,8 +64,8 @@ class ToolRegistry:
         # Load built-in tools and external tools
         self._load_builtin_tools()
         self._load_external_tools()
-        # Ensure max_context_length is an integer
-        self.max_context_length = int(get_max_context_length() * 0.8)
+        # Ensure max_token_count is an integer
+        self.max_token_count = int(get_max_token_count() * 0.8)
 
     def use_tools(self, name: List[str]):
         """Use specified tools"""
@@ -248,13 +248,13 @@ arguments:
                 PrettyOutput.section("Execution successful", OutputType.SUCCESS)
                 
                 # If the output exceeds 4k characters, use a large model to summarize
-                if get_context_token_count(output) > self.max_context_length:
+                if get_context_token_count(output) > self.max_token_count:
                     try:
                         PrettyOutput.print("Output is too long, summarizing...", OutputType.PROGRESS)
                         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
                         
                         # If the output exceeds the maximum context length, only take the last part
-                        max_count = self.max_context_length
+                        max_count = self.max_token_count
                         if get_context_token_count(output) > max_count:
                             output_to_summarize = output[-max_count:]
                             truncation_notice = f"\n(Note: Due to the length of the output, only the last {max_count} characters are summarized)"

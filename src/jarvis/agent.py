@@ -8,7 +8,7 @@ import yaml
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry, tool_call_help
-from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env, is_use_methodology
+from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology
 import os
 
 class Agent:
@@ -89,7 +89,7 @@ class Agent:
 Please describe in concise bullet points, highlighting important information.
 """
         
-        self.max_context_length = max_context_length if max_context_length is not None else get_max_context_length()
+        self.max_token_count = max_context_length if max_context_length is not None else get_max_token_count()
 
         self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
 
@@ -325,7 +325,7 @@ Please continue the task based on the above information.
                     self.conversation_length += get_context_token_count(self.prompt)
                     
                     # 如果对话历史长度超过限制，在提示中添加提醒
-                    if self.conversation_length > self.max_context_length:
+                    if self.conversation_length > self.max_token_count:
                         current_response = self._summarize_and_clear_history()
                         continue
                     else:

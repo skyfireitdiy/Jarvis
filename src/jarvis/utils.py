@@ -463,8 +463,8 @@ def load_rerank_model():
 
 def is_long_context(files: list) -> bool:
     """Check if the file list belongs to a long context (total characters exceed 80% of the maximum context length)"""
-    max_length = get_max_context_length()
-    threshold = max_length * 0.8
+    max_token_count = get_max_token_count()
+    threshold = max_token_count * 0.8
     total_tokens = 0
     
     for file_path in files:
@@ -674,8 +674,8 @@ def get_embedding_batch(embedding_model: Any, texts: List[str]) -> np.ndarray:
 
 
     
-def get_max_context_length():
-    return int(os.getenv('JARVIS_MAX_CONTEXT_LENGTH', '131072'))  # 默认128k
+def get_max_token_count():
+    return int(os.getenv('JARVIS_MAX_TOKEN_COUNT', '131072'))  # 默认128k
     
 def get_thread_count():
     return int(os.getenv('JARVIS_THREAD_COUNT', '1'))  

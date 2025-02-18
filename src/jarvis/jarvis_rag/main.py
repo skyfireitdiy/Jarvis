@@ -3,7 +3,7 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, get_context_token_count, get_embedding, get_embedding_batch, get_file_md5, get_max_context_length, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model
+from jarvis.utils import OutputType, PrettyOutput, get_context_token_count, get_embedding, get_embedding_batch, get_file_md5, get_max_token_count, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model
 from jarvis.utils import init_env
 from dataclasses import dataclass
 from tqdm import tqdm
@@ -143,7 +143,7 @@ class RAGTool:
         self.min_paragraph_length = get_min_paragraph_length()  # Minimum paragraph length
         self.max_paragraph_length = get_max_paragraph_length()  # Maximum paragraph length
         self.context_window = 5  # Fixed context window size
-        self.max_context_length = int(get_max_context_length() * 0.8)
+        self.max_token_count = int(get_max_token_count() * 0.8)
         
         # Initialize data directory
         self.data_dir = os.path.join(self.root_dir, ".jarvis/rag")
@@ -655,7 +655,7 @@ Question: {question}
 Relevant documents (ordered by relevance):
 """
             # 添加上下文，控制长度
-            available_count = self.max_context_length - get_context_token_count(prompt) - 1000
+            available_count = self.max_token_count - get_context_token_count(prompt) - 1000
             current_count = 0
             
             for doc, score in results:
