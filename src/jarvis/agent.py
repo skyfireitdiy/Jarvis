@@ -8,7 +8,7 @@ import yaml
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry, tool_call_help
-from jarvis.utils import PrettyOutput, OutputType, is_auto_complete, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env, is_use_methodology
+from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_context_length, get_multiline_input, init_env, is_use_methodology
 import os
 
 class Agent:
@@ -322,7 +322,7 @@ Please continue the task based on the above information.
                     PrettyOutput.print("Analyzing task...", OutputType.PROGRESS)
                     
                     # 累加对话长度
-                    self.conversation_length += len(self.prompt)
+                    self.conversation_length += get_context_token_count(self.prompt)
                     
                     # 如果对话历史长度超过限制，在提示中添加提醒
                     if self.conversation_length > self.max_context_length:
@@ -331,7 +331,7 @@ Please continue the task based on the above information.
                     else:
                         current_response = self._call_model(self.prompt)
                         self.prompt = ""
-                        self.conversation_length += len(current_response) 
+                        self.conversation_length += get_context_token_count(current_response)
 
                     for handler in self.output_handler_before_tool:
                         self.prompt += handler(current_response)
