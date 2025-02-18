@@ -41,6 +41,25 @@ Key Rules:
 • Same start/end number: insert before that line
 • Start=0, end=0: create new file with content
 
+# Code Compatibility
+1. System Integration
+   • Maintain existing API contracts
+   • Preserve function signatures
+   • Keep data structures compatible
+   • Honor return types and exceptions
+
+2. Style Consistency
+   • Match naming conventions
+   • Follow indentation patterns
+   • Use existing import style
+   • Keep comment format
+
+3. Pattern Alignment
+   • Use similar error handling
+   • Follow existing design patterns
+   • Match logging approach
+   • Keep configuration style
+
 # Development Process
 1. ANALYZE
    • Break down requirements
