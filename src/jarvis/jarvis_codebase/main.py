@@ -7,7 +7,7 @@ from typing import List, Tuple, Optional, Dict
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_context_token_count, get_embedding, get_file_md5, get_max_context_length, get_thread_count, load_embedding_model, user_confirm
+from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_context_token_count, get_embedding, get_file_md5, get_max_token_count, get_thread_count, load_embedding_model, user_confirm
 from jarvis.utils import init_env
 import argparse
 import pickle
@@ -21,7 +21,7 @@ class CodeBase:
         self.root_dir = root_dir
         os.chdir(self.root_dir)
         self.thread_count = get_thread_count()
-        self.max_context_length = get_max_context_length()
+        self.max_token_count = get_max_token_count()
         self.index = None
             
         # 初始化数据目录
@@ -218,7 +218,7 @@ Code content:
                 return cached_vector
                 
             # Read the file content and combine information
-            content = open(file_path, "r", encoding="utf-8").read()[:self.max_context_length]  # Limit the file content length
+            content = open(file_path, "r", encoding="utf-8").read()[:self.max_token_count]  # Limit the file content length
             
             # Combine file information, including file content
             combined_text = f"""
@@ -541,7 +541,7 @@ Content: {content}
             PrettyOutput.print(f"Picking results for query: \n" + "\n".join(query), output_type=OutputType.INFO)
             
             # Maximum content length per batch
-            max_batch_length = self.max_context_length - 1000  # Reserve space for prompt
+            max_batch_length = self.max_token_count - 1000  # Reserve space for prompt
             max_file_length = max_batch_length // 3  # Limit individual file size
             
             # Process files in batches
@@ -805,7 +805,7 @@ Question: {query}
 Relevant code files (ordered by relevance):
 """
         # Add context with length control
-        available_count = self.max_context_length - get_context_token_count(prompt) - 1000  # Reserve space for answer
+        available_count = self.max_token_count - get_context_token_count(prompt) - 1000  # Reserve space for answer
         current_count = 0
         
         for path in files_from_codebase:
