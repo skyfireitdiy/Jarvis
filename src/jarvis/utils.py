@@ -774,8 +774,8 @@ def get_context_token_count(text: str) -> int:
     try:
         # Use a fast tokenizer that's good at general text
         tokenizer = load_tokenizer()
-        tokens = tokenizer.encode(text)
-        return len(tokens)
+        chunks = split_text_into_chunks(text, 512)
+        return sum([len(tokenizer.encode(chunk)) for chunk in chunks])
         
     except Exception as e:
         PrettyOutput.print(f"Error counting tokens: {str(e)}", OutputType.WARNING)
