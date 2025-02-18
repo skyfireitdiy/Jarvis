@@ -132,14 +132,6 @@ Code Changes Must:
         max_tokens = get_max_token_count() * 0.8  # Use 80% of max tokens
         current_tokens = 0
         prompt_parts = []
-        
-        # First add file paths and line counts
-        paths_prompt = "\n".join(
-            f"- {file} ({get_file_line_count(file)} lines)"
-            for file in files
-        )
-        prompt_parts.append(paths_prompt)
-        current_tokens = get_context_token_count(paths_prompt)
 
         # Then try to add file contents
         for file in files:
@@ -156,7 +148,7 @@ Code Changes Must:
                     
                 # Check if adding this file would exceed token limit
                 if current_tokens + section_tokens > max_tokens:
-                    prompt_parts.append("\n\nRemaining files are too large to include contents.")
+                    PrettyOutput.print("Remaining files are too large to include contents.", OutputType.WARNING)
                     break
                     
                 prompt_parts.append(file_section)
