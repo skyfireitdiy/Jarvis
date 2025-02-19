@@ -830,7 +830,7 @@ Content:
                                 output_type=OutputType.ERROR)
                 continue
         
-        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
         return files_from_codebase, model.chat_until_success(prompt)
 
     def is_index_generated(self) -> bool:
