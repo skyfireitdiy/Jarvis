@@ -1,78 +1,95 @@
+import json
+import os
 from datetime import datetime
 from typing import List, Dict, Optional
-from jarvis.jarvis_tools.file_operation import FileOperationTool
-from jarvis.utils import OutputType, PrettyOutput
-import json
-
-class Task:
-    """任务数据模型"""
-    def __init__(self, owner: str, name: str, content: str, due_date: str):
-        self.owner = owner
-        self.name = name
-        self.content = content
-        self.due_date = datetime.fromisoformat(due_date)  # 强制ISO8601格式
-
 class TaskManager:
-    """任务管理核心类"""
-    _TASK_FILE = "tasks.json"
+    """Task management tool for creating and querying tasks"""
     
     def __init__(self):
-        self.file_tool = FileOperationTool()
-        
-    def _load_tasks(self) -> List[Dict]:
-        """加载所有任务"""
-        result = self.file_tool.execute({
-            "operation": "read",
-            "filepath": self._TASK_FILE
-        })
-        if not result["success"]:
-            return []
-        return json.loads(result["stdout"])
+        self.storage_path = os.path.expanduser("~/.jarvis/tasks.json")
+        self._initialize_storage()
     
-    def create_task(self, owner: str, name: str, content: str, due_date: str) -> Dict:
-        """创建新任务"""
-        # 验证日期格式
-        try:
-            datetime.fromisoformat(due_date)
-        except ValueError:
-            return {"success": False, "error": "日期格式必须为YYYY-MM-DD"}
+    def _initialize_storage(self):
+        """Initialize task storage file if it doesn't exist"""
+        if not os.path.exists(self.storage_path):
+            with open(self.storage_path, 'w') as f:
+                json.dump([], f)
+    
+    def create_task(self, owner: str, name: str, content: str, deadline: str) -> Dict:
+        """
+        Create a new task with validation
+        
+        Args:
+            owner: Task owner/assignee
+            name: Task name
+            content: Task description
+            deadline: Task deadline in YYYY-MM-DD format
             
-        new_task = {
+        Returns:
+            Created task details
+        """
+        # Validate inputs
+        if not all([owner, name, content, deadline]):
+            raise ValueError("All fields are required")
+            
+        try:
+            deadline_date = datetime.strptime(deadline, "%Y-%m-%d")
+            if deadline_date < datetime.now():
+                raise ValueError("Deadline cannot be in the past")
+        except ValueError:
+            raise ValueError("Invalid date format. Use YYYY-MM-DD")
+            
+        # Create task object
+        task = {
             "owner": owner,
             "name": name,
             "content": content,
-            "due_date": due_date,
-            "created_at": datetime.now().isoformat()
+            "deadline": deadline,
+            "created_at": datetime.now().strftime("%Y-%m-%d")
         }
         
-        # 读取现有任务并追加
+        # Save task
         tasks = self._load_tasks()
-        tasks.append(new_task)
+        tasks.append(task)
+        self._save_tasks(tasks)
         
-        # 写入文件
-        save_result = self.file_tool.execute({
-            "operation": "write",
-            "filepath": self._TASK_FILE,
-            "content": json.dumps(tasks, ensure_ascii=False)
-        })
-        
-        return {
-            "success": save_result["success"],
-            "task_id": len(tasks) - 1,
-            "error": save_result.get("stderr", "")
-        }
+        return task
     
     def query_tasks(self, owner: str, start_date: str, end_date: str) -> List[Dict]:
-        """查询任务"""
-        try:
-            start = datetime.fromisoformat(start_date)
-            end = datetime.fromisoformat(end_date)
-        except ValueError:
-            return []
+        """
+        Query tasks by owner and date range
+        
+        Args:
+            owner: Task owner to filter by
+            start_date: Start date in YYYY-MM-DD format
+            end_date: End date in YYYY-MM-DD format
             
-        all_tasks = self._load_tasks()
+        Returns:
+            List of matching tasks
+        """
+        # Validate date format
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            end = datetime.strptime(end_date, "%Y-%m-%d")
+            if start > end:
+                raise ValueError("Start date cannot be after end date")
+        except ValueError:
+            raise ValueError("Invalid date format. Use YYYY-MM-DD")
+            
+        # Load and filter tasks
+        tasks = self._load_tasks()
         return [
-            task for task in all_tasks
-            if task["owner"] == owner
-            and start <= datetime.fromisoformat(task["due_date"]) <= end
+            task for task in tasks
+            if task["owner"] == owner and
+            start <= datetime.strptime(task["created_at"], "%Y-%m-%d") <= end
         ]
+    
+    def _load_tasks(self) -> List[Dict]:
+        """Load tasks from storage"""
+        with open(self.storage_path, 'r') as f:
+            return json.load(f)
+    
+    def _save_tasks(self, tasks: List[Dict]):
+        """Save tasks to storage"""
+        with open(self.storage_path, 'w') as f:
+            json.dump(tasks, f, indent=2)
