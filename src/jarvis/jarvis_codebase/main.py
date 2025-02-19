@@ -831,6 +831,15 @@ Content:
                 continue
         
         model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
+
+        prompt += """
+Output Format:
+- question: the question to answer
+  answer: the answer to the question
+- question: the question to answer
+  answer: the answer to the question
+"""
+
         return files_from_codebase, model.chat_until_success(prompt)
 
     def is_index_generated(self) -> bool:
