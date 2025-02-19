@@ -2,7 +2,7 @@ import os
 import re
 from typing import Dict, List
 from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter, Completer, Completion
+from prompt_toolkit.completion import Completer, Completion
 from jarvis.utils import OutputType, PrettyOutput, get_single_line_input, user_confirm
 
 
@@ -125,7 +125,7 @@ def _fuzzy_match_files(root_dir: str, pattern: str) -> List[str]:
     
     return sorted(matches)
 
-def select_files(related_files: List[str], root_dir: str) -> List[str]:
+def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dict[str, str]]:
     """Let the user select and supplement related files"""
     PrettyOutput.section("Related files", OutputType.INFO)
     
@@ -133,7 +133,7 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
     # Display found files
     selected_files = list(related_files)  # Default select all
     for i, file in enumerate(related_files, 1):
-        output += f"[{i}] {file}\n"
+        output += f"[{i}] {file['file']} ({file['reason']})\n"
 
     PrettyOutput.print(output, OutputType.INFO, lang="markdown")
     
@@ -199,7 +199,7 @@ def select_files(related_files: List[str], root_dir: str) -> List[str]:
                     continue
                 
                 try:
-                    selected_files.append(path)
+                    selected_files.append({"file": path, "reason": "User Added"})
                     PrettyOutput.print(f"File added: {path}", OutputType.SUCCESS)
                 except Exception as e:
                     PrettyOutput.print(f"Failed to read file: {str(e)}", OutputType.ERROR)

@@ -524,7 +524,7 @@ Content: {content}
         score = len(matched_keywords) / len(keywords)
         return score
 
-    def pick_results(self, query: List[str], initial_results: List[str]) -> List[str]:
+    def pick_results(self, query: List[str], initial_results: List[str]) -> List[Dict[str,str]]:
         """Use a large model to pick the search results
         
         Args:
@@ -545,7 +545,7 @@ Content: {content}
             max_file_length = max_batch_length // 3  # Limit individual file size
             
             # Process files in batches
-            all_selected_files = set()
+            all_selected_files = []
             current_batch = []
             current_token_count = 0
             
@@ -565,7 +565,7 @@ Content: {content}
                         # Process current batch
                         if current_batch:
                             selected = self._process_batch('\n'.join(query), current_batch)
-                            all_selected_files.update(selected)
+                            all_selected_files.extend(selected)
                         # Start new batch
                         current_batch = [file_info]
                         current_token_count = tokens_count
@@ -580,17 +580,16 @@ Content: {content}
             # Process final batch
             if current_batch:
                 selected = self._process_batch('\n'.join(query), current_batch)
-                all_selected_files.update(selected)
+                all_selected_files.extend(selected)
             
             # Convert set to list and maintain original order
-            final_results = [path for path in initial_results if path in all_selected_files]
-            return final_results
+            return all_selected_files
 
         except Exception as e:
             PrettyOutput.print(f"Failed to pick: {str(e)}", OutputType.ERROR)
-            return initial_results
+            return [{"file": f, "reason": "" } for f in initial_results]
             
-    def _process_batch(self, query: str, files_info: List[str]) -> List[str]:
+    def _process_batch(self, query: str, files_info: List[str]) -> List[Dict[str, str]]:
         """Process a batch of files"""
         prompt = f"""As a code analysis expert, please help identify the most relevant files for the given query using chain-of-thought reasoning.
 
@@ -611,8 +610,10 @@ Think through this step by step:
 
 Please output your selection in YAML format:
 <FILES>
-- path/to/most/relevant.py
+- file: path/to/most/relevant.py
+  reason: xxxxxxxxxx
 - path/to/next/relevant.py
+  reason: yyyyyyyyyy
 </FILES>
 
 Important:
@@ -724,7 +725,7 @@ Please provide 10 search-optimized expressions in the specified format.
         return results
 
 
-    def search_similar(self, query: str, top_k: int = 30) -> List[str]:
+    def search_similar(self, query: str, top_k: int = 30) -> List[Dict[str, str]]:
         """Search related files with optimized retrieval"""
         try:
             self.generate_codebase()
@@ -787,8 +788,8 @@ Please provide 10 search-optimized expressions in the specified format.
             return ""
         
         output = "Found related files:\n"
-        for path in files_from_codebase:
-            output += f"- {path}\n"
+        for file in files_from_codebase:
+            output += f'''- {file['file']} ({file['reason']})\n'''
         PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
         
         # Build enhanced prompt
@@ -810,9 +811,9 @@ Relevant code files (ordered by relevance):
         
         for path in files_from_codebase:
             try:
-                content = open(path, "r", encoding="utf-8").read()
+                content = open(path["file"], "r", encoding="utf-8").read()
                 file_content = f"""
-File: {path}
+File: {path["file"]}
 Content:
 {content}
 ----------------------------------------
