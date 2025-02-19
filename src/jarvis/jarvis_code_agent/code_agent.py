@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import Dict, List
 
 from jarvis.agent import Agent
 from jarvis.jarvis_code_agent.patch import apply_patch
@@ -120,7 +120,7 @@ Code Changes Must:
             git_commiter.execute({})
 
     
-    def make_files_prompt(self, files: List[str]) -> str:
+    def make_files_prompt(self, files: List[Dict[str, str]]) -> str:
         """Make the files prompt with content that fits within token limit.
         
         Args:
@@ -129,34 +129,11 @@ Code Changes Must:
         Returns:
             str: A prompt containing file paths and contents within token limit
         """
-        max_tokens = get_max_token_count() * 0.8  # Use 80% of max tokens
-        current_tokens = 0
         prompt_parts = []
 
         # Then try to add file contents
         for file in files:
-            try:
-                content = ReadCodeTool().execute({
-                    "file_path": file,
-                    "start_line": 0,
-                    "end_line": -1
-                })
-                
-                if content["success"]:
-                    file_section = content["stdout"]
-                    section_tokens = get_context_token_count(file_section)
-                    
-                # Check if adding this file would exceed token limit
-                if current_tokens + section_tokens > max_tokens:
-                    PrettyOutput.print("Remaining files are too large to include contents.", OutputType.WARNING)
-                    break
-                    
-                prompt_parts.append(file_section)
-                current_tokens += section_tokens
-                
-            except Exception as e:
-                PrettyOutput.print(f"Error reading file {file}: {str(e)}", OutputType.WARNING)
-                continue
+            prompt_parts.append(f'''- {file['file']} ({file['reason']})''')
                 
         return "\n".join(prompt_parts)
 
@@ -194,7 +171,7 @@ Code Changes Must:
 ## User Requirement
 {user_input}
 
-## Available Files
+## Maybe Relevant Files
 {files_prompt}
 """
 def main():

@@ -8,7 +8,7 @@ import yaml
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry, tool_call_help
-from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology
+from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, user_confirm
 import os
 
 class Agent:
@@ -42,7 +42,8 @@ class Agent:
                  use_methodology: Optional[bool] = None,
                  record_methodology: Optional[bool] = None,
                  need_summary: Optional[bool] = None,
-                 max_context_length: Optional[int] = None):
+                 max_context_length: Optional[int] = None,
+                 execute_tool_confirm: Optional[bool] = None):
         """Initialize an Agent instance.
         
         Args:
@@ -77,6 +78,8 @@ class Agent:
         # Load configuration from environment variables
         self.output_handler_before_tool = output_handler_before_tool if output_handler_before_tool else []
         self.output_handler_after_tool = output_handler_after_tool if output_handler_after_tool else []
+
+        self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
 
         self.summary_prompt = summary_prompt if summary_prompt else f"""Please generate a concise summary report of the task execution, including:
 
@@ -344,10 +347,11 @@ Please continue the task based on the above information.
                         continue
                     
                     if len(result) > 0:
-                        PrettyOutput.print("Executing tool call...", OutputType.PROGRESS)
-                        tool_result = self.tool_registry.handle_tool_calls(result)
-                        self.prompt += tool_result
-
+                        if not self.execute_tool_confirm or user_confirm(f"Execute tool call: {result[0]['name']}?"):
+                            PrettyOutput.print("Executing tool call...", OutputType.PROGRESS)
+                            tool_result = self.tool_registry.handle_tool_calls(result)
+                            self.prompt += tool_result
+                            
                     for handler in self.output_handler_after_tool:
                         self.prompt += handler(current_response)
                     

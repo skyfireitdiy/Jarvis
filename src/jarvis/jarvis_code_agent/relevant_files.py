@@ -1,17 +1,12 @@
 import os
-import re
-from typing import List
+from typing import Dict, List
 
-import yaml
-from jarvis.agent import Agent
 from jarvis.jarvis_code_agent.file_select import select_files
 from jarvis.jarvis_codebase.main import CodeBase
-from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.utils import OutputType, PrettyOutput, is_disable_codebase
 
 
-def find_relevant_files(user_input: str, root_dir: str) -> List[str]:
+def find_relevant_files(user_input: str, root_dir: str) -> List[Dict[str, str]]:
     try:
         files_from_codebase = []
         if not is_disable_codebase():

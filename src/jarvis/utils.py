@@ -376,6 +376,7 @@ def has_uncommitted_changes():
     working_changes = os.popen("git diff --exit-code").read().strip() != ""
     # Check staged changes
     staged_changes = os.popen("git diff --cached --exit-code").read().strip() != ""
+    os.system("git reset HEAD")
     return working_changes or staged_changes
 
 def load_embedding_model():
@@ -731,6 +732,9 @@ def get_cheap_platform_name() -> str:
 def get_cheap_model_name() -> str:
     return os.getenv('JARVIS_CHEAP_MODEL', os.getenv('JARVIS_MODEL', 'kimi'))
 
+def is_execute_tool_confirm() -> bool:
+    return os.getenv('JARVIS_EXECUTE_TOOL_CONFIRM', 'false') == 'true'
+
 def split_text_into_chunks(text: str, max_length: int = 512) -> List[str]:
     """Split text into chunks with overlapping windows"""
     chunks = []
@@ -774,7 +778,7 @@ def get_context_token_count(text: str) -> int:
     try:
         # Use a fast tokenizer that's good at general text
         tokenizer = load_tokenizer()
-        chunks = split_text_into_chunks(text, 512)
+        chunks = split_text_into_chunks(text, 1024)
         return sum([len(tokenizer.encode(chunk)) for chunk in chunks])
         
     except Exception as e:
