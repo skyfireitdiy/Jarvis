@@ -61,7 +61,7 @@ Output Format:
 [Write 3-5 specific questions in English, ensuring each includes full context for someone with no prior knowledge of the requirement]
 </QUESTION>
 """
-    model = PlatformRegistry().get_thinking_platform()
+    model = PlatformRegistry().get_normal_platform()
     response = model.chat_until_success(prompt)
     response = re.search(r'<QUESTION>(.*?)</QUESTION>', response, re.DOTALL)
     if response is None:
