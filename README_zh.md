@@ -77,7 +77,6 @@ Jarvis 支持通过环境变量进行配置，可以在 `~/.jarvis/env` 文件�
 | JARVIS_MAX_PARAGRAPH_LENGTH | 最大段落长度 | 1000 | 否 |
 | JARVIS_CONTEXT_WINDOW | 上下文窗口大小 | 5 | 否 |
 | JARVIS_AUTO_COMPLETE | 启用自动完成 | false | 否 |
-| JARVIS_DISABLE_CODEBASE | 禁用代码库功能 | false | 否 |
 | JARVIS_USE_METHODOLOGY | 启用方法论 | true | 否 |
 | JARVIS_RECORD_METHODOLOGY | 记录方法论 | true | 否 |
 | JARVIS_NEED_SUMMARY | 生成摘要 | true | 否 |
