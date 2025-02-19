@@ -16,39 +16,46 @@ def make_question(requirement: str) -> Optional[str]:
     Returns:
         str: A formatted string containing relevant questions
     """
-    prompt = """You are a helpful assistant that analyze the user's requirement and make a question to 
-    gather necessary information for the requirement.
+    prompt = f"""You are a helpful assistant that analyzes user requirements and generates SPECIFIC questions about implementation details.
 
-    To better understand and implement this requirement, please consider:
+Key Instructions:
+1. Focus on the SPECIFIC details of THIS requirement
+2. Ask about CONCRETE implementation aspects
+3. DO NOT use generic/abstract questions
+4. Questions should help understand HOW to implement the requirement
 
-1. Code Structure Questions:
-   - Which components or modules need to be modified?
-   - Are there existing patterns or conventions to follow?
-   - What interfaces or APIs are affected?
+For example:
+BAD (too generic): "What components need to be modified?"
+GOOD (specific): "How does the current error handling mechanism work in the file_handler.py module?"
 
-2. Implementation Details:
-   - What are the specific changes needed?
-   - Are there any dependencies to consider?
-   - What error cases need to be handled?
+Consider these aspects when forming questions:
 
-3. Integration Concerns:
-   - How will these changes affect other parts of the system?
-   - Are there any backward compatibility issues?
-   - What tests need to be updated?
+1. Current Implementation:
+   - What specific functions/methods handle this functionality now?
+   - How is the data currently structured in relevant modules?
+   - What existing patterns or utilities are used for similar features?
 
-4. Performance and Quality:
-   - Are there any performance implications?
-   - What edge cases should be considered?
-   - How can we validate the changes?
+2. Technical Details:
+   - What exact parameters need to be added/modified?
+   - Which specific error cases occur in this context?
+   - What data types and structures should be used?
 
-Please analyze the requirement based on these questions.
+3. Integration Points:
+   - Which specific functions call this code?
+   - What exact dependencies need to be updated?
+   - How do related modules interact with this code?
+
+4. Validation Requirements:
+   - What specific test cases should be added?
+   - Which edge cases are particularly relevant?
+   - How can we verify the changes work correctly?
 
 User Requirement:
 {requirement}
 
 Output Format:
 <QUESTION>
-{question}
+[Write 3-5 specific, concrete questions that directly relate to implementing this requirement]
 </QUESTION>
 """
     model = PlatformRegistry().get_thinking_platform()
