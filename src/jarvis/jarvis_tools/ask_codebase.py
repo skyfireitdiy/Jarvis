@@ -52,7 +52,7 @@ class AskCodebaseTool:
             codebase = CodeBase(git_root)
 
             # Use ask_codebase method
-            response = codebase.ask_codebase(question, top_k)
+            _, response = codebase.ask_codebase(question, top_k)
 
             return {
                 "success": True,

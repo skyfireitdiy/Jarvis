@@ -77,7 +77,6 @@ Jarvis supports configuration through environment variables that can be set in t
 | JARVIS_MAX_PARAGRAPH_LENGTH | Maximum paragraph length | 1000 | No |
 | JARVIS_CONTEXT_WINDOW | Context window size | 5 | No |
 | JARVIS_AUTO_COMPLETE | Enable auto completion | false | No |
-| JARVIS_DISABLE_CODEBASE | Disable codebase features | false | No |
 | JARVIS_USE_METHODOLOGY | Enable methodology | true | No |
 | JARVIS_RECORD_METHODOLOGY | Record methodology | true | No |
 | JARVIS_NEED_SUMMARY | Generate summaries | true | No |

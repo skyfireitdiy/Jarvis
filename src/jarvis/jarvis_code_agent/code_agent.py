@@ -3,12 +3,11 @@ from typing import Dict, List
 
 from jarvis.agent import Agent
 from jarvis.jarvis_code_agent.patch import apply_patch
-from jarvis.jarvis_code_agent.relevant_files import find_relevant_files
+from jarvis.jarvis_code_agent.relevant_files import find_relevant_information
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
-from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.utils import OutputType, PrettyOutput, get_file_line_count, get_multiline_input, has_uncommitted_changes, init_env, find_git_root, get_max_token_count, get_context_token_count
+from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root
 
 
 class CodeAgent:
@@ -148,15 +147,15 @@ Code Changes Must:
         """
         try:
             self._init_env()
-            files = find_relevant_files(user_input, self.root_dir)
-            self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files)))
+            files, information = find_relevant_information(user_input, self.root_dir)
+            self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files), information))
             
         except Exception as e:
             return f"Error during execution: {str(e)}"
         
 
 
-    def _build_first_edit_prompt(self, user_input: str, files_prompt: str) -> str:
+    def _build_first_edit_prompt(self, user_input: str, files_prompt: str, information: str) -> str:
         """Build the initial prompt for the agent.
         
         Args:
@@ -166,6 +165,7 @@ Code Changes Must:
         Returns:
             str: The formatted prompt
         """
+
         return f"""# Code Modification Task
 
 ## User Requirement
@@ -173,6 +173,9 @@ Code Changes Must:
 
 ## Maybe Relevant Files
 {files_prompt}
+
+## Some Information
+{information}
 """
 def main():
     """Jarvis main entry point"""

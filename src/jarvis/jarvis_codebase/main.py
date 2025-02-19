@@ -538,7 +538,7 @@ Content: {content}
             return []
             
         try:
-            PrettyOutput.print(f"Picking results for query: \n" + "\n".join(query), output_type=OutputType.INFO)
+            PrettyOutput.print(f"Picking results ...", output_type=OutputType.INFO)
             
             # Maximum content length per batch
             max_batch_length = self.max_token_count - 1000  # Reserve space for prompt
@@ -765,13 +765,13 @@ Please provide 10 search-optimized expressions in the specified format.
             all_results.sort(key=lambda x: x[1], reverse=True)
             results = all_results[:top_k]
 
-            # Display results with scores
-            message = "Found related files:\n"
-            for path, score, _ in results:
-                message += f"File: {path} (Score: {score:.3f})\n"
-            PrettyOutput.print(message.rstrip(), output_type=OutputType.INFO, lang="markdown")
-
             results = self.pick_results(query_variants, [path for path, _, _ in results])
+
+            output = "Found related files:\n"
+            for file in results:
+                output += f'''- {file['file']} ({file['reason']})\n'''
+            PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
+
             
             return results
             
@@ -779,18 +779,13 @@ Please provide 10 search-optimized expressions in the specified format.
             PrettyOutput.print(f"Failed to search: {str(e)}", output_type=OutputType.ERROR)
             return []
 
-    def ask_codebase(self, query: str, top_k: int=20) -> str:
+    def ask_codebase(self, query: str, top_k: int=20) -> Tuple[List[Dict[str, str]], str]:
         """Query the codebase with enhanced context building"""
         files_from_codebase = self.search_similar(query, top_k)
         
         if not files_from_codebase:
             PrettyOutput.print("No related files found", output_type=OutputType.WARNING)
-            return ""
-        
-        output = "Found related files:\n"
-        for file in files_from_codebase:
-            output += f'''- {file['file']} ({file['reason']})\n'''
-        PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
+            return [],""
         
         # Build enhanced prompt
         prompt = f"""Based on the following code files, please provide a comprehensive and accurate answer to the user's question.
@@ -800,6 +795,8 @@ Important guidelines:
 2. Explain technical concepts clearly
 3. Include relevant code snippets when helpful
 4. If the code doesn't fully answer the question, indicate what's missing
+5. Answer in user's language.
+6. Answer with professional language.
 
 Question: {query}
 
@@ -833,21 +830,8 @@ Content:
                                 output_type=OutputType.ERROR)
                 continue
         
-        prompt += """
-Please structure your answer as follows:
-1. Direct answer to the question
-2. Relevant code explanations
-3. Implementation details
-4. Any missing information or limitations
-5. Add reference files and code snippets at the end of the answer.
-
-Answer in Chinese using professional language.
-"""
-        
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        response = model.chat_until_success(prompt)
-        
-        return response
+        return files_from_codebase, model.chat_until_success(prompt)
 
     def is_index_generated(self) -> bool:
         """Check if the index has been generated"""
@@ -949,7 +933,7 @@ def main():
 
     elif args.command == 'ask':            
         response = codebase.ask_codebase(args.question, args.top_k)
-        output = f"""Answer:\n{response}"""
+        output = f"""{response}"""
         PrettyOutput.print(output, output_type=OutputType.INFO)
 
     else:

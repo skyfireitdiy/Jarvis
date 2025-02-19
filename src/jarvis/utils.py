@@ -686,9 +686,6 @@ def dont_use_local_model():
     
 def is_auto_complete() -> bool:
     return os.getenv('JARVIS_AUTO_COMPLETE', 'false') == 'true'
-
-def is_disable_codebase() -> bool:
-    return os.getenv('JARVIS_DISABLE_CODEBASE', 'false') == 'true'
     
 def is_use_methodology() -> bool:
     return os.getenv('JARVIS_USE_METHODOLOGY', 'true') == 'true'
