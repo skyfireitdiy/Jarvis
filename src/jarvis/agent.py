@@ -503,6 +503,8 @@ When users need to execute tasks, you will strictly follow these steps to handle
 10. Auto check the task goal completion status: If the task goal is completed, use the task completion command to end the task
 11. Task Completion: End the task using task completion command when finished
 
+Tip: Chat in user's language
+
 Methodology Template:
 1. Problem Restatement
 2. Optimal Solution
@@ -520,7 +522,7 @@ def main():
 
     try:
         # 获取全局模型实例
-        agent = Agent(system_prompt=origin_agent_system_prompt, tool_registry=ToolRegistry())
+        agent = Agent(system_prompt=origin_agent_system_prompt)
 
         # 加载预定义任务
         tasks = _load_tasks()
