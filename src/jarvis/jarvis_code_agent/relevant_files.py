@@ -63,8 +63,10 @@ def find_relevant_information(user_input: str, root_dir: str) -> Tuple[List[Dict
     try:
         PrettyOutput.print("Find files from codebase...", OutputType.INFO)
         codebase = CodeBase(root_dir)
-        files_from_codebase, infomation = codebase.ask_codebase(user_input)
-
+        question = make_question(user_input)
+        if question is None:
+            return [], ""
+        files_from_codebase, infomation = codebase.ask_codebase(question)
         PrettyOutput.print("Find files by agent...", OutputType.INFO)
 
         selected_files = select_files(files_from_codebase, os.getcwd())
