@@ -103,7 +103,7 @@ Code Changes Must:
                            is_sub_agent=False, 
                            use_methodology=False,
                            tool_registry=tool_registry, 
-                           platform=PlatformRegistry().get_thinking_platform(), 
+                           platform=PlatformRegistry().get_codegen_platform(), 
                            record_methodology=False,
                            output_handler_after_tool=[apply_patch],
                            need_summary=False)
