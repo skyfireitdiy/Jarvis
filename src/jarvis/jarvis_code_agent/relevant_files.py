@@ -16,46 +16,49 @@ def make_question(requirement: str) -> Optional[str]:
     Returns:
         str: A formatted string containing relevant questions
     """
-    prompt = f"""You are a helpful assistant that analyzes user requirements and generates SPECIFIC questions about implementation details.
+    prompt = f"""You are a helpful assistant that generates SPECIFIC questions in English for a code analysis team. The analysis team:
+- Has access to the codebase but NO CONTEXT about the requirement
+- Will search and analyze code based on your questions
+- Needs complete context to understand what to look for
 
 Key Instructions:
-1. Focus on the SPECIFIC details of THIS requirement
-2. Ask about CONCRETE implementation aspects
-3. DO NOT use generic/abstract questions
-4. Questions should help understand HOW to implement the requirement
+1. Write questions in clear, professional English
+2. Include necessary CONTEXT in each question
+3. Be SPECIFIC about what needs to be found/analyzed
+4. Provide enough background for someone with no prior knowledge
 
 For example:
-BAD (too generic): "What components need to be modified?"
-GOOD (specific): "How does the current error handling mechanism work in the file_handler.py module?"
+BAD: "How is error handling implemented?"
+GOOD: "Given that we need to add retry logic to the file upload feature, how does the current error handling work in upload_handler.py, specifically around network failures and timeout scenarios?"
 
 Consider these aspects when forming questions:
 
-1. Current Implementation:
-   - What specific functions/methods handle this functionality now?
-   - How is the data currently structured in relevant modules?
-   - What existing patterns or utilities are used for similar features?
+1. Implementation Context:
+   - "What is the current implementation of [specific feature]?"
+   - "Which modules/classes handle [specific functionality]?"
+   - "What is the existing workflow for [specific operation]?"
 
-2. Technical Details:
-   - What exact parameters need to be added/modified?
-   - Which specific error cases occur in this context?
-   - What data types and structures should be used?
+2. Technical Investigation:
+   - "How does the system currently handle [specific scenario]?"
+   - "What patterns are used for [specific behavior]?"
+   - "Where are the configuration settings for [specific feature]?"
 
-3. Integration Points:
-   - Which specific functions call this code?
-   - What exact dependencies need to be updated?
-   - How do related modules interact with this code?
+3. Integration Details:
+   - "Which components call or depend on [specific module]?"
+   - "What is the data flow between [component A] and [component B]?"
+   - "How are errors propagated from [specific component]?"
 
-4. Validation Requirements:
-   - What specific test cases should be added?
-   - Which edge cases are particularly relevant?
-   - How can we verify the changes work correctly?
+4. Requirements Context:
+   - "Given [specific requirement], what are the current limitations?"
+   - "For [specific change], what validation rules apply?"
+   - "In the context of [feature], what edge cases exist?"
 
 User Requirement:
 {requirement}
 
 Output Format:
 <QUESTION>
-[Write 3-5 specific, concrete questions that directly relate to implementing this requirement]
+[Write 3-5 specific questions in English, ensuring each includes full context for someone with no prior knowledge of the requirement]
 </QUESTION>
 """
     model = PlatformRegistry().get_thinking_platform()

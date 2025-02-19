@@ -122,6 +122,7 @@ def handle_commit_workflow()->bool:
     if not user_confirm("Do you want to commit the code?", default=True):
         os.system("git reset HEAD")
         os.system("git checkout -- .")
+        os.system("git clean -fd")
         return False
 
     git_commiter = GitCommitTool()
