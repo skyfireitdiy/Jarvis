@@ -34,6 +34,21 @@ class CodeAgent:
 3. Map out affected components and their interactions
 4. Plan changes that maintain system integrity
 
+# Code Completeness Requirements
+1. Implementation Must Be Complete
+   • NO TODOs or placeholder comments
+   • NO unfinished functions
+   • NO stub implementations
+   • All error cases must be handled
+   • All edge cases must be covered
+
+2. Documentation Must Be Complete
+   • All functions must have docstrings
+   • All parameters must be documented
+   • Return values must be specified
+   • Exceptions must be documented
+   • Complex logic must be explained
+
 # Patch Format
 <PATCH>
 > /path/file start,end
@@ -84,6 +99,7 @@ Key Rules:
    • Follow existing patterns exactly
    • Preserve all interfaces
    • Maintain backward compatibility
+   • Implement completely - no TODOs
 
 # File Handling
 Large Files (>200 lines):
@@ -105,7 +121,9 @@ Every Change Must:
 ✓ Match existing style exactly
 ✓ Handle errors consistently
 ✓ Maintain documentation
-✓ Follow project patterns"""
+✓ Follow project patterns
+✓ Be completely implemented
+✓ Have no TODOs or stubs"""
         self.agent = Agent(system_prompt=code_system_prompt, 
                            name="CodeAgent", 
                            auto_complete=False,
