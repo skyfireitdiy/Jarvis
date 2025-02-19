@@ -213,6 +213,8 @@ class FileCompleter(Completer):
     """Custom completer for file paths with fuzzy matching."""
     def __init__(self):
         self.path_completer = PathCompleter()
+        self.max_suggestions = 10  # 增加显示数量
+        self.min_score = 10  # 降低相似度阈值
         
     def get_completions(self, document: Document, complete_event):
         text = document.text_before_cursor
@@ -251,21 +253,26 @@ class FileCompleter(Completer):
         # If no input after @, show all files
         # Otherwise use fuzzy matching
         if not file_path:
-            scored_files = [(path, 100) for path in all_files]
+            scored_files = [(path, 100) for path in all_files[:self.max_suggestions]]
         else:
             scored_files = [
                 (path, fuzz.ratio(file_path.lower(), path.lower()))
                 for path in all_files
             ]
+            # Sort by score and take top results
             scored_files.sort(key=lambda x: x[1], reverse=True)
+            scored_files = scored_files[:self.max_suggestions]
         
         # Return completions for files
         for path, score in scored_files:
-            if not file_path or score > 30:  # Show all if no input, otherwise filter by score
+            if not file_path or score > self.min_score:
+                display_text = path
+                if file_path and score < 100:
+                    display_text = f"{path} ({score}%)"
                 completion = Completion(
                     text=path,
                     start_position=-len(file_path),
-                    display=f"{path}" if not file_path else f"{path} ({score}%)",
+                    display=display_text,
                     display_meta="File"
                 )
                 yield completion
