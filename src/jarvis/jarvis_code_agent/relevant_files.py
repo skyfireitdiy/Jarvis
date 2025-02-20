@@ -8,60 +8,54 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.utils import OutputType, PrettyOutput
 
 def make_question(requirement: str) -> Optional[str]:
-    """Generate structured questions to gather necessary information for the requirement.
-    
-    Args:
-        requirement: The user's requirement description
-        
-    Returns:
-        str: A formatted string containing relevant questions
-    """
-    prompt = f"""You are a helpful assistant that generates SPECIFIC questions in English for a code analysis team. The analysis team:
-- Has access to the codebase but NO CONTEXT about the requirement
-- Will search and analyze code based on your questions
-- Needs complete context to understand what to look for
+    """Generate structured questions to gather necessary information for the requirement."""
+    prompt = f"""You are a code analysis expert who helps developers understand existing system implementations. Generate specific questions to investigate:
+- Current system implementations
+- Existing interfaces and integration points
+- Extension mechanisms and patterns
+- Related components and their interactions
 
 Key Instructions:
-1. Write questions in clear, professional English
-2. Include necessary CONTEXT in each question
-3. Be SPECIFIC about what needs to be found/analyzed
-4. Provide enough background for someone with no prior knowledge
+1. Focus on understanding the EXISTING system
+2. Ask about interfaces, hooks, and extension points
+3. Investigate integration patterns and dependencies
+4. Explore current implementation details
 
 For example:
-BAD: "How is error handling implemented?"
-GOOD: "Given that we need to add retry logic to the file upload feature, how does the current error handling work in upload_handler.py, specifically around network failures and timeout scenarios?"
+BAD: "How should we implement the new feature?"
+GOOD: "What are the existing extension points in the authentication system that we can use to add the new OAuth provider? Specifically, how does AuthProvider interface work and where is it currently used?"
 
-Consider these aspects when forming questions:
+Consider these investigation aspects:
 
-1. Implementation Context:
-   - "What is the current implementation of [specific feature]?"
-   - "Which modules/classes handle [specific functionality]?"
-   - "What is the existing workflow for [specific operation]?"
+1. System Architecture:
+   - "What are the existing interfaces/classes that handle [functionality]?"
+   - "How is [feature] currently integrated with other components?"
+   - "Where are the extension points for [system component]?"
 
-2. Technical Investigation:
-   - "How does the system currently handle [specific scenario]?"
-   - "What patterns are used for [specific behavior]?"
-   - "Where are the configuration settings for [specific feature]?"
+2. Implementation Details:
+   - "What is the current workflow for [operation] in the system?"
+   - "How does the system expose hooks/callbacks for [functionality]?"
+   - "Which interfaces/abstract classes are used for [feature] extensibility?"
 
-3. Integration Details:
-   - "Which components call or depend on [specific module]?"
-   - "What is the data flow between [component A] and [component B]?"
-   - "How are errors propagated from [specific component]?"
+3. Integration Patterns:
+   - "How do existing components integrate with [system part]?"
+   - "What are the current integration points for [feature]?"
+   - "How does the system handle extensions to [component]?"
 
-4. Requirements Context:
-   - "Given [specific requirement], what are the current limitations?"
-   - "For [specific change], what validation rules apply?"
-   - "In the context of [feature], what edge cases exist?"
+4. Extension Mechanisms:
+   - "What patterns are used for extending [functionality]?"
+   - "How do existing plugins/extensions connect to [system]?"
+   - "Where are the configuration points for [feature] customization?"
 
 User Requirement:
 {requirement}
 
 Output Format:
 <QUESTION>
-[Write 3-5 specific questions in English, ensuring each includes full context for someone with no prior knowledge of the requirement]
+[Write 3-5 specific questions focusing on existing implementations and extension points. Each question should help understand how to integrate with or extend the current system]
 </QUESTION>
 """
-    model = PlatformRegistry().get_normal_platform()
+    model = PlatformRegistry().get_thinking_platform()
     response = model.chat_until_success(prompt)
     response = re.search(r'<QUESTION>(.*?)</QUESTION>', response, re.DOTALL)
     if response is None:

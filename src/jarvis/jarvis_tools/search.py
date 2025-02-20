@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.utils import PrettyOutput, OutputType
+from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, get_max_token_count
 from jarvis.jarvis_tools.read_webpage import WebpageTool
 from playwright.sync_api import sync_playwright
 from urllib.parse import quote
@@ -111,23 +111,84 @@ class SearchTool:
 
     def _extract_info(self, contents: List[str], question: str) -> str:
         """Use language model to extract key information from web content"""
-        prompt = f"""Please answer the question based on the following search results: {question}
-
-Search results content:
-{'-' * 40}
-{''.join(contents)}
-{'-' * 40}
-
-Please provide a concise and accurate answer, focusing on information directly related to the question. If there is no relevant information in the search results, please clearly state that.
-When answering, pay attention to:
-1. Maintain objectivity, providing information based solely on search results
-2. If there are conflicts between different sources, point out the differences
-3. Appropriately cite information sources
-4. If the information is incomplete or uncertain, please explain"""
-
         try:
-            response = self.model.chat_until_success(prompt)
-            return response
+            # Reserve tokens for prompt and response
+            max_tokens = get_max_token_count()
+            reserved_tokens = 2000  # Reserve tokens for prompt template and response
+            available_tokens = max_tokens - reserved_tokens
+            
+            # Split contents into batches
+            batches = []
+            current_batch = []
+            current_tokens = 0
+            
+            for content in contents:
+                content_tokens = get_context_token_count(content)
+                
+                # If adding this content would exceed limit, start new batch
+                if current_tokens + content_tokens > available_tokens:
+                    if current_batch:
+                        batches.append(current_batch)
+                    current_batch = [content]
+                    current_tokens = content_tokens
+                else:
+                    current_batch.append(content)
+                    current_tokens += content_tokens
+            
+            # Add final batch
+            if current_batch:
+                batches.append(current_batch)
+
+            # Process each batch
+            batch_results = []
+            for i, batch in enumerate(batches, 1):
+                PrettyOutput.print(f"Processing batch {i}/{len(batches)}...", OutputType.PROGRESS)
+                
+                prompt = f"""Please analyze these search results to answer the question: {question}
+
+Search results content (Batch {i}/{len(batches)}):
+{'-' * 40}
+{''.join(batch)}
+{'-' * 40}
+
+Please extract key information related to the question. Focus on:
+1. Relevant facts and details
+2. Maintaining objectivity
+3. Citing sources when appropriate
+4. Noting any uncertainties
+
+Format your response as a clear summary of findings from this batch."""
+
+                response = self.model.chat_until_success(prompt)
+                batch_results.append(response)
+
+            # If only one batch, return its result directly
+            if len(batch_results) == 1:
+                return batch_results[0]
+
+            # Synthesize results from all batches
+            batch_findings = '\n\n'.join(f'Batch {i+1}:\n{result}' for i, result in enumerate(batch_results))
+            separator = '-' * 40
+            
+            synthesis_prompt = f"""Please provide a comprehensive answer to the original question by synthesizing the findings from multiple batches of search results.
+
+Original Question: {question}
+
+Findings from each batch:
+{separator}
+{batch_findings}
+{separator}
+
+Please synthesize a final answer that:
+1. Combines key insights from all batches
+2. Resolves any contradictions between sources
+3. Maintains clear source attribution
+4. Acknowledges any remaining uncertainties
+5. Provides a coherent and complete response to the original question"""
+
+            final_response = self.model.chat_until_success(synthesis_prompt)
+            return final_response
+
         except Exception as e:
             return f"Information extraction failed: {str(e)}"
 

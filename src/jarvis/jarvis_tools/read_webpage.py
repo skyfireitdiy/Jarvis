@@ -5,7 +5,7 @@ from jarvis.utils import PrettyOutput, OutputType
 
 class WebpageTool:
     name = "read_webpage"
-    description = "Read webpage content, extract title and text"
+    description = "Read webpage content, extract title, text and hyperlinks"
     parameters = {
         "type": "object",
         "properties": {
@@ -46,16 +46,29 @@ class WebpageTool:
             title = soup.title.string if soup.title else ""
             title = title.strip() if title else "No title"
             
-            # Extract text
-            text = soup.get_text(separator='\n', strip=True)
-            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            # Extract text and links
+            text_parts = []
+            links = []
+            
+            # Process content and collect links
+            for element in soup.descendants:
+                if element.name == 'a' and element.get('href'): # type: ignore
+                    href = element.get('href') # type: ignore
+                    text = element.get_text(strip=True)
+                    if text and href:
+                        links.append(f"[{text}]({href})")
+                elif isinstance(element, str) and element.strip():
+                    text_parts.append(element.strip())
             
             # Build output
             output = [
                 f"Title: {title}",
                 "",
                 "Text content:",
-                "\n".join(lines)
+                "\n".join(text_parts),
+                "",
+                "Links found:",
+                "\n".join(links) if links else "No links found"
             ]
             
             return {
