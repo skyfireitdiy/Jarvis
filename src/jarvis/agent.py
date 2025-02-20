@@ -39,6 +39,7 @@ class Agent:
                  auto_complete: Optional[bool] = None, 
                  output_handler_before_tool: Optional[List[Callable]] = None,
                  output_handler_after_tool: Optional[List[Callable]] = None,
+                 input_handler: Optional[List[Callable]] = None,
                  use_methodology: Optional[bool] = None,
                  record_methodology: Optional[bool] = None,
                  need_summary: Optional[bool] = None,
@@ -75,6 +76,7 @@ class Agent:
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
         self.need_summary = need_summary if need_summary is not None else is_need_summary()
+        self.input_handler = input_handler if input_handler is not None else []
         # Load configuration from environment variables
         self.output_handler_before_tool = output_handler_before_tool if output_handler_before_tool else []
         self.output_handler_after_tool = output_handler_after_tool if output_handler_after_tool else []
@@ -181,6 +183,10 @@ Please describe in concise bullet points, highlighting important information.
             Will retry with exponential backoff up to 30 seconds between retries
         """
         sleep_time = 5
+
+        for handler in self.input_handler:
+            message = handler(message)
+
         while True:
             ret = self.model.chat_until_success(message)
             if ret:
@@ -222,7 +228,7 @@ Please describe in concise bullet points, highlighting important information. Do
 """
         
         try:
-            summary = self.model.chat_until_success(self.prompt + "\n" + prompt)
+            summary = self._call_model(self.prompt + "\n" + prompt)
             
             # 清空当前对话历史，但保留系统消息
             self.conversation_length = 0  # Reset conversation length
