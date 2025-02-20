@@ -1,11 +1,10 @@
 """
 Tool Generator Tool - Automatically creates new tools using LLM
 """
-import json
 from pathlib import Path
+import re
 from typing import Dict, Any
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.utils import PrettyOutput, OutputType
 
 class ToolGenerator:
     name = "tool_generator"
@@ -32,7 +31,7 @@ class ToolGenerator:
     def execute(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Generate and save a new tool using LLM"""
         # Get fresh model instance for each execution
-        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
         
         try:
             tool_name = arguments["tool_name"]
@@ -83,66 +82,93 @@ class ToolGenerator:
     
     def _create_prompt(self, tool_name: str, description: str, input_spec: str) -> str:
         """Create the LLM prompt for tool generation"""
-        return f"""Create a Python tool class that integrates with the Jarvis system. Follow these requirements:
+        example_code = '''
+<TOOL>
+from typing import Dict, Any
+from jarvis.utils import OutputType, PrettyOutput
+from jarvis.jarvis_platform.registry import PlatformRegistry
+
+class CustomTool:
+    name = "Tool name"              # Tool name used when calling
+    description = "Tool description"       # Tool purpose
+    parameters = {                # Parameters JSON Schema
+        "type": "object",
+        "properties": {
+            "param1": {
+                "type": "string",
+                "description": "Parameter description"
+            }
+        },
+        "required": ["param1"]
+    }
+
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the tool functionality
+        
+        Args:
+            args: Parameters passed to the tool
+            
+        Returns:
+            {
+                "success": bool,
+                "stdout": str,
+                "stderr": str,
+            }
+        """
+        try:
+            # Implement the tool logic here
+            # Use LLM
+            # model = PlatformRegistry.get_global_platform_registry().get_codegen_platform() 
+            # result = model.chat_until_success(prompt)
+
+            result = "Tool result"
+            return {
+                "success": True,
+                "stdout": result,
+                "stderr": ""
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": str(e)
+            }
+</TOOL>
+'''
+
+
+        return f'''Create a Python tool class that integrates with the Jarvis system. Follow these requirements:
 1. Class name: {tool_name.capitalize()}Tool
 2. Description: {description}
 3. Input specification: {input_spec}
-4. Must extend the Tool class from jarvis.jarvis_tools.base
-5. Must include these class attributes:
+4. Must include these class attributes:
    - name: str (tool identifier)
    - description: str (tool purpose)
    - parameters: dict (JSON schema for inputs)
-6. Must implement execute(self, args: Dict) -> Dict method
-7. The execute method MUST return a dictionary with these exact fields:
+5. Must implement execute(self, args: Dict) -> Dict method
+6. The execute method MUST return a dictionary with these exact fields:
    - success: bool (indicating operation success)
    - stdout: str (primary output/result)
    - stderr: str (error message if any)
-8. Must handle errors gracefully
-Return ONLY the Python implementation code
-The code should be complete and ready to use."""
+7. Must handle errors gracefully
+8. Return ONLY the Python implementation code
+9. The code should be complete and ready to use.
+10. Output the code in the following format:
+<TOOL>
+{example_code}
+</TOOL>
+
+Example:
+{example_code}
+'''
     
     def _extract_code(self, response: str) -> str:
         """Flexibly extract Python code from LLM response"""
-        # Look for code blocks
-        lines = response.split("\n")
-        code_blocks = []
-        in_code_block = False
-        
-        for line in lines:
-            # Check for code block start
-            if line.strip().startswith("```python"):
-                in_code_block = True
-                continue
-            # Check for code block end
-            if in_code_block and line.strip().startswith("```"):
-                break
-            # Collect code lines
-            if in_code_block:
-                code_blocks.append(line)
-        
-        # If found code block, return it
-        if code_blocks:
-            return "\n".join(code_blocks)
-        
-        # If no code block, try to find class definition
-        class_lines = []
-        found_class = False
-        for line in lines:
-            if line.strip().startswith("class "):
-                found_class = True
-            if found_class:
-                class_lines.append(line)
-                if line.strip().endswith(":"):
-                    break
-        
-        if class_lines:
-            # Try to find the rest of the implementation
-            for line in lines[lines.index(class_lines[-1]) + 1:]:
-                class_lines.append(line)
-            return "\n".join(class_lines)
-        
-        # If all else fails, return the whole response
-        return response
+        # Find the first occurrence of <TOOL> and </TOOL>
+        sm = re.search(r'<TOOL>(.*?)</TOOL>', response, re.DOTALL)
+        if sm:
+            return sm.group(1)
+        return ""
     
     def _validate_return_value_format(self, code: str) -> bool:
         """Validate that execute method returns correct format"""
