@@ -165,17 +165,61 @@ class PrettyOutput:
 
     @staticmethod
     def print(text: str, output_type: OutputType, timestamp: bool = True, lang: Optional[str] = None, traceback: bool = False):
-        """Print formatted output using rich console"""
+        """Print formatted output using rich console with styling
+        
+        Args:
+            text: The text content to print
+            output_type: The type of output (affects styling)
+            timestamp: Whether to show timestamp
+            lang: Language for syntax highlighting
+            traceback: Whether to show traceback for errors
+        """
+        from rich.style import Style as RichStyle
+        
+        # Define styles for different output types
+        styles = {
+            OutputType.SYSTEM: RichStyle(color="cyan", bold=True),
+            OutputType.CODE: RichStyle(color="green"),
+            OutputType.RESULT: RichStyle(color="blue"),
+            OutputType.ERROR: RichStyle(color="red", bold=True),
+            OutputType.INFO: RichStyle(color="yellow"),
+            OutputType.PLANNING: RichStyle(color="magenta"),
+            OutputType.PROGRESS: RichStyle(color="white"),
+            OutputType.SUCCESS: RichStyle(color="green", bold=True),
+            OutputType.WARNING: RichStyle(color="yellow", bold=True),
+            OutputType.DEBUG: RichStyle(color="blue", dim=True),
+            OutputType.USER: RichStyle(color="green"),
+            OutputType.TOOL: RichStyle(color="yellow", italic=True)
+        }
+        
         # Get formatted header
         lang = lang if lang is not None else PrettyOutput._detect_language(text, default_lang='markdown')
         header = PrettyOutput._format("", output_type, timestamp)
-
-        content = Syntax(text, lang, theme="monokai")
-            
-        # Print panel with appropriate border style
-        console.print(Panel(content, title=header, title_align="left", highlight=True, expand=False))
         
-        # Print stack trace for errors
+        # Create syntax highlighted content
+        content = Syntax(
+            text,
+            lang,
+            theme="monokai",
+            word_wrap=True,
+            background_color="default"
+        )
+        
+        # Create panel with styling
+        panel = Panel(
+            content,
+            style=styles[output_type],
+            border_style=styles[output_type],
+            title=header,
+            title_align="left",
+            padding=(1, 2),
+            highlight=True
+        )
+        
+        # Print panel
+        console.print(panel)
+        
+        # Print stack trace for errors if requested
         if traceback or output_type == OutputType.ERROR:
             console.print_exception()
 
