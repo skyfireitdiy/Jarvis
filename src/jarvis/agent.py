@@ -484,7 +484,7 @@ def _select_task(tasks: dict) -> str:
                 selected_name = task_names[choice - 1]
                 return tasks[selected_name]  # Return the task description
             else:
-                PrettyOutput.print("无效的选择。请选择列表中的一个号码。", OutputType.ERROR)
+                PrettyOutput.print("无效的选择。请选择列表中的一个号码。", OutputType.WARNING)
                 
         except KeyboardInterrupt:
             return ""  # Return empty on Ctrl+C
