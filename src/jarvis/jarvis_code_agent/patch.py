@@ -8,7 +8,7 @@ from jarvis.utils import OutputType, PrettyOutput, has_uncommitted_changes, user
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """Parse patches from string with format:
     <PATCH>
-    > /path/to/file start_line,end_line
+    > path/to/file start_line,end_line
     content_line1
     content_line2
     ...
