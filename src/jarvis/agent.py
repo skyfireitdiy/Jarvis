@@ -62,7 +62,7 @@ class Agent:
             need_summary: Whether to generate summaries
             max_context_length: Maximum context length
         """
-        PrettyOutput.print(f"Welcome to Jarvis, your AI assistant, Initiating...", OutputType.SYSTEM)
+        PrettyOutput.print(f"欢迎使用Jarvis，你的AI助手，正在初始化...", OutputType.SYSTEM)
         if platform is not None:
             self.model = platform
         else:
@@ -98,11 +98,11 @@ Please describe in concise bullet points, highlighting important information.
 
         self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
 
-        PrettyOutput.section(f"Jarvis initialized - With {self.model.name()}", OutputType.SYSTEM)
+        PrettyOutput.section(f"Jarvis 初始化完成 - 使用 {self.model.name()} 模型", OutputType.SYSTEM)
 
         tools = self.tool_registry.get_all_tools()
         if tools:
-            PrettyOutput.section(f"Available tools: {', '.join([tool['name'] for tool in tools])}", OutputType.SYSTEM)
+            PrettyOutput.section(f"可用工具: {', '.join([tool['name'] for tool in tools])}", OutputType.SYSTEM)
 
         
         tools_prompt = self.tool_registry.load_tools()
@@ -192,7 +192,7 @@ Please describe in concise bullet points, highlighting important information.
             if ret:
                 return ret
             else:
-                PrettyOutput.print(f"Model call failed, retrying... waiting {sleep_time}s", OutputType.INFO)
+                PrettyOutput.print(f"模型调用失败，正在重试... 等待 {sleep_time}s", OutputType.INFO)
                 time.sleep(sleep_time)
                 sleep_time *= 2
                 if sleep_time > 30:
@@ -215,7 +215,7 @@ Please describe in concise bullet points, highlighting important information.
         """
         # Create a new model instance to summarize, avoid affecting the main conversation
 
-        PrettyOutput.print("Summarizing conversation history, preparing to generate summary, starting new conversation...", OutputType.PROGRESS)
+        PrettyOutput.print("总结对话历史，准备生成摘要，开始新对话...", OutputType.PROGRESS)
         
         prompt = """Please summarize the key information from the previous conversation, including:
 1. Current task objective
@@ -243,7 +243,7 @@ Please continue the task based on the above information.
             self.conversation_length = len(self.prompt)  # 设置新的起始长度
             
         except Exception as e:
-            PrettyOutput.print(f"Failed to summarize conversation history: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
 
     def _complete_task(self) -> str:
         """Complete the current task and generate summary if needed.
@@ -255,7 +255,7 @@ Please continue the task based on the above information.
             - For main agent: May generate methodology if enabled
             - For sub-agent: May generate summary if enabled
         """
-        PrettyOutput.section("Task completed", OutputType.SUCCESS)
+        PrettyOutput.section("任务完成", OutputType.SUCCESS)
         
         if not self.is_sub_agent:
             if self.record_methodology:
@@ -278,18 +278,18 @@ Please continue the task based on the above information.
                         if tool_calls:
                             self.tool_registry.handle_tool_calls(tool_calls)
                     except Exception as e:
-                        PrettyOutput.print(f"Failed to handle methodology generation: {str(e)}", OutputType.ERROR)
+                        PrettyOutput.print(f"处理方法论生成失败: {str(e)}", OutputType.ERROR)
                     
                 except Exception as e:
-                    PrettyOutput.print(f"Error generating methodology: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"生成方法论失败: {str(e)}", OutputType.ERROR)
             
-            return "Task completed"
+            return "任务完成"
         
         if self.need_summary:
             self.prompt = self.summary_prompt
             return self._call_model(self.prompt)
         
-        return "Task completed"
+        return "任务完成"
 
 
     def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str:
@@ -312,12 +312,12 @@ Please continue the task based on the above information.
         add_agent(self.name)
 
         try:
-            PrettyOutput.section("Preparing environment", OutputType.PLANNING)
+            PrettyOutput.section("准备环境", OutputType.PLANNING)
             if file_list:
                 self.model.upload_files(file_list)
 
             # 显示任务开始
-            PrettyOutput.section(f"Starting new task: {self.name}", OutputType.PLANNING)
+            PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
 
             if self.first and self.use_methodology:
                 self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
@@ -328,7 +328,7 @@ Please continue the task based on the above information.
             while True:
                 try:
                     # 显示思考状态
-                    PrettyOutput.print("Analyzing task...", OutputType.PROGRESS)
+                    PrettyOutput.print("正在分析任务...", OutputType.PROGRESS)
                     
                     # 累加对话长度
                     self.conversation_length += get_context_token_count(self.prompt)
@@ -348,13 +348,13 @@ Please continue the task based on the above information.
                     try:
                         result = Agent._extract_tool_calls(current_response)
                     except Exception as e:
-                        PrettyOutput.print(f"Tool call error: {str(e)}", OutputType.ERROR)
+                        PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
                         self.prompt += f"Tool call error: {str(e)}"
                         continue
                     
                     if len(result) > 0:
-                        if not self.execute_tool_confirm or user_confirm(f"Execute tool call: {result[0]['name']}?"):
-                            PrettyOutput.print("Executing tool call...", OutputType.PROGRESS)
+                        if not self.execute_tool_confirm or user_confirm(f"执行工具调用: {result[0]['name']}?"):
+                            PrettyOutput.print("正在执行工具调用...", OutputType.PROGRESS)
                             tool_result = self.tool_registry.handle_tool_calls(result)
                             self.prompt += tool_result
                             
@@ -368,7 +368,7 @@ Please continue the task based on the above information.
                         return self._complete_task()
                     
                     # 获取用户输入
-                    user_input = get_multiline_input(f"{self.name}: You can continue to input, or enter an empty line to end the current task: ")
+                    user_input = get_multiline_input(f"{self.name}: 您可以继续输入，或输入空行来结束当前任务：")
 
                     if user_input:
                         self.prompt = user_input
@@ -378,11 +378,11 @@ Please continue the task based on the above information.
                         return self._complete_task()
 
                 except Exception as e:
-                    PrettyOutput.print(str(e), OutputType.ERROR)
+                    PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
                     return f"Task failed: {str(e)}"
 
         except Exception as e:
-            PrettyOutput.print(str(e), OutputType.ERROR)
+            PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
             return f"Task failed: {str(e)}"
         
         finally:
@@ -420,9 +420,9 @@ def _load_tasks() -> dict:
                     if desc:  # Ensure description is not empty
                         tasks[str(name)] = str(desc)
             else:
-                PrettyOutput.print("Warning: ~/.jarvis/pre-command file should contain a dictionary of task_name: task_description", OutputType.ERROR)
+                PrettyOutput.print("警告: ~/.jarvis/pre-command 文件应该包含一个字典，键为任务名称，值为任务描述", OutputType.ERROR)
         except Exception as e:
-            PrettyOutput.print(f"Error loading ~/.jarvis/pre-command file: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"加载 ~/.jarvis/pre-command 文件失败: {str(e)}", OutputType.ERROR)
     
     # Check .jarvis/pre-command in current directory
     if os.path.exists(".jarvis/pre-command"):
@@ -436,9 +436,9 @@ def _load_tasks() -> dict:
                     if desc:  # Ensure description is not empty
                         tasks[str(name)] = str(desc)
             else:
-                PrettyOutput.print("Warning: .jarvis/pre-command file should contain a dictionary of task_name: task_description", OutputType.ERROR)
+                PrettyOutput.print("警告: .jarvis/pre-command 文件应该包含一个字典，键为任务名称，值为任务描述", OutputType.ERROR)
         except Exception as e:
-            PrettyOutput.print(f"Error loading .jarvis/pre-command file: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"加载 .jarvis/pre-command 文件失败: {str(e)}", OutputType.ERROR)
 
     
     if is_use_methodology():
@@ -461,17 +461,17 @@ def _select_task(tasks: dict) -> str:
     # Convert tasks to list for ordered display
     task_names = list(tasks.keys())
     
-    task_list = ["Available tasks:"]
+    task_list = ["可用任务:"]
     for i, name in enumerate(task_names, 1):
         task_list.append(f"[{i}] {name}")
-    task_list.append("[0] Skip predefined tasks")
+    task_list.append("[0] 跳过预定义任务")
     PrettyOutput.print("\n".join(task_list), OutputType.INFO)
     
     
     while True:
         try:
             choice = prompt(
-                "\nPlease select a task number (0 to skip): ",
+                "\n请选择一个任务编号（0 跳过预定义任务）：",
             ).strip()
             
             if not choice:
@@ -484,14 +484,14 @@ def _select_task(tasks: dict) -> str:
                 selected_name = task_names[choice - 1]
                 return tasks[selected_name]  # Return the task description
             else:
-                PrettyOutput.print("Invalid choice. Please select a number from the list.", OutputType.ERROR)
+                PrettyOutput.print("无效的选择。请选择列表中的一个号码。", OutputType.ERROR)
                 
         except KeyboardInterrupt:
             return ""  # Return empty on Ctrl+C
         except EOFError:
             return ""  # Return empty on Ctrl+D
         except Exception as e:
-            PrettyOutput.print(f"Failed to select task: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"选择任务失败: {str(e)}", OutputType.ERROR)
             continue
 
 origin_agent_system_prompt = """You are Jarvis, an AI assistant with powerful problem-solving capabilities.
@@ -535,22 +535,22 @@ def main():
         if tasks:
             selected_task = _select_task(tasks)
             if selected_task:
-                PrettyOutput.print(f"\nExecute task: {selected_task}", OutputType.INFO)
+                PrettyOutput.print(f"执行任务: {selected_task}", OutputType.INFO)
                 agent.run(selected_task, args.files)
                 return 0
         
         # 如果没有选择预定义任务，进入交互模式
         while True:
             try:
-                user_input = get_multiline_input("Please enter your task (input empty line to exit):")
+                user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
                 if not user_input:
                     break
                 agent.run(user_input, args.files)
             except Exception as e:
-                PrettyOutput.print(f"Error: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
     except Exception as e:
-        PrettyOutput.print(f"Initialization error: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
         return 1
 
     return 0

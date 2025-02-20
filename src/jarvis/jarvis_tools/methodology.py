@@ -47,7 +47,7 @@ class MethodologyTool:
                 with open(self.methodology_file, 'w', encoding='utf-8') as f:
                     yaml.safe_dump({}, f, allow_unicode=True)
             except Exception as e:
-                PrettyOutput.print(f"Failed to create methodology file: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"创建方法论文件失败：{str(e)}", OutputType.ERROR)
                 
     def _load_methodologies(self) -> Dict:
         """Load all methodologies"""
@@ -55,7 +55,7 @@ class MethodologyTool:
             with open(self.methodology_file, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
-            PrettyOutput.print(f"Failed to load methodologies: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
             return {}
             
     def _save_methodologies(self, methodologies: Dict):
@@ -64,7 +64,7 @@ class MethodologyTool:
             with open(self.methodology_file, 'w', encoding='utf-8') as f:
                 yaml.safe_dump(methodologies, f, allow_unicode=True)
         except Exception as e:
-            PrettyOutput.print(f"Failed to save methodologies: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"保存方法论失败: {str(e)}", OutputType.ERROR)
             
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the operation of managing methodologies

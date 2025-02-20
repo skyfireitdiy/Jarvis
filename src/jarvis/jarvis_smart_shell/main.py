@@ -13,7 +13,7 @@ from jarvis.utils import PrettyOutput, OutputType, get_shell_name, init_env
 def execute_command(command: str) -> None:
     """Show command and allow user to edit, then execute, Ctrl+C to cancel"""
     try:
-        print("Generated command (can be edited, press Enter to execute, Ctrl+C to cancel):")
+        print("生成的命令 (可以编辑, 按回车执行, Ctrl+C 取消):")
         # Pre-fill input line
         readline.set_startup_hook(lambda: readline.insert_text(command))
         try:
@@ -21,11 +21,11 @@ def execute_command(command: str) -> None:
             if edited_command.strip():  # Ensure command is not empty
                 os.system(edited_command)
         except KeyboardInterrupt:
-            print("Execution cancelled")
+            PrettyOutput.print("执行取消", OutputType.INFO)
         finally:
             readline.set_startup_hook()  # Clear pre-filled
     except Exception as e:
-        PrettyOutput.print(f"Failed to execute command: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"执行命令失败: {str(e)}", OutputType.WARNING)
 
 
 def process_request(request: str) -> Optional[str]:
@@ -85,14 +85,14 @@ Remember: Only return the command itself, without any additional content.
             return None
         
     except Exception as e:
-        PrettyOutput.print(f"Failed to process request: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"处理请求失败: {str(e)}", OutputType.WARNING)
         return None
 
 def main():
     # 创建参数解析器
     init_env()
     parser = argparse.ArgumentParser(
-        description="Convert natural language requirements to shell commands",
+        description="将自然语言要求转换为shell命令",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example:
@@ -104,7 +104,7 @@ Example:
     # 添加参数
     parser.add_argument(
         "request",
-        help="Describe the operation you want to perform in natural language"
+        help="描述您想要执行的操作, 用自然语言描述"
     )
     
     # 解析参数

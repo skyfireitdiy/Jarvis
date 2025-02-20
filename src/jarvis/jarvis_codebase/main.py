@@ -37,9 +37,9 @@ class CodeBase:
             self.embedding_model.encode([test_text], 
                                      convert_to_tensor=True,
                                      normalize_embeddings=True)
-            PrettyOutput.print("Model loaded successfully", output_type=OutputType.SUCCESS)
+            PrettyOutput.print("模型加载成功", output_type=OutputType.SUCCESS)
         except Exception as e:
-            PrettyOutput.print(f"Failed to load model: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"加载模型失败: {str(e)}", output_type=OutputType.ERROR)
             raise
             
         self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
@@ -71,7 +71,7 @@ class CodeBase:
         if self.thread_count > 1:
             model.set_suppress_output(True)
         else:
-            PrettyOutput.print(f"Make description for {file_path} ...", output_type=OutputType.PROGRESS)
+            PrettyOutput.print(f"为 {file_path} 生成描述 ...", output_type=OutputType.PROGRESS)
         prompt = f"""Please analyze the following code file and generate a detailed description. The description should include:
 1. Overall file functionality description
 2. description for each global variable, function, type definition, class, method, and other code elements
@@ -129,7 +129,7 @@ Code content:
                         self.file_paths.append(file_path)
                         vectors.append(cache_data["vector"])
                 except Exception as e:
-                    PrettyOutput.print(f"Failed to load cache file {cache_file}: {str(e)}", 
+                    PrettyOutput.print(f"加载缓存文件 {cache_file} 失败: {str(e)}", 
                                      output_type=OutputType.WARNING)
                     continue
             
@@ -142,14 +142,14 @@ Code content:
                 self.index = faiss.IndexIDMap(hnsw_index)
                 self.index.add_with_ids(vectors_array, np.array(range(len(vectors)))) # type: ignore
                 
-                PrettyOutput.print(f"Loaded {len(self.vector_cache)} vector cache and rebuilt index", 
+                PrettyOutput.print(f"加载 {len(self.vector_cache)} 个向量缓存并重建索引", 
                                  output_type=OutputType.INFO)
             else:
                 self.index = None
-                PrettyOutput.print("No valid cache files found", output_type=OutputType.WARNING)
+                PrettyOutput.print("没有找到有效的缓存文件", output_type=OutputType.WARNING)
                 
         except Exception as e:
-            PrettyOutput.print(f"Failed to load cache directory: {str(e)}", 
+            PrettyOutput.print(f"加载缓存目录失败: {str(e)}", 
                              output_type=OutputType.WARNING)
             self.vector_cache = {}
             self.file_paths = []
@@ -161,7 +161,7 @@ Code content:
             with open(file_path, "rb") as f:
                 file_md5 = hashlib.md5(f.read()).hexdigest()
         except Exception as e:
-            PrettyOutput.print(f"Failed to calculate MD5 for {file_path}: {str(e)}", 
+            PrettyOutput.print(f"计算 {file_path} 的MD5失败: {str(e)}", 
                               output_type=OutputType.ERROR)
             file_md5 = ""
         
@@ -182,7 +182,7 @@ Code content:
             with lzma.open(cache_path, 'wb') as f:
                 pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
         except Exception as e:
-            PrettyOutput.print(f"Failed to save cache for {file_path}: {str(e)}", 
+            PrettyOutput.print(f"保存 {file_path} 的缓存失败: {str(e)}", 
                              output_type=OutputType.ERROR)
 
     def get_cached_vector(self, file_path: str, description: str) -> Optional[np.ndarray]:
@@ -195,7 +195,7 @@ Code content:
             with open(file_path, "rb") as f:
                 current_md5 = hashlib.md5(f.read()).hexdigest()
         except Exception as e:
-            PrettyOutput.print(f"Failed to calculate MD5 for {file_path}: {str(e)}", 
+            PrettyOutput.print(f"计算 {file_path} 的MD5失败: {str(e)}", 
                               output_type=OutputType.ERROR)
             return None
         
@@ -232,7 +232,7 @@ Content: {content}
             self.cache_vector(file_path, vector, description)
             return vector
         except Exception as e:
-            PrettyOutput.print(f"Error vectorizing file {file_path}: {str(e)}", 
+            PrettyOutput.print(f"向量化 {file_path} 失败: {str(e)}", 
                              output_type=OutputType.ERROR)
             return np.zeros(self.vector_dim, dtype=np.float32) # type: ignore
 
@@ -257,7 +257,7 @@ Content: {content}
             return bool(files_to_delete)
             
         except Exception as e:
-            PrettyOutput.print(f"Failed to clean cache: {str(e)}", 
+            PrettyOutput.print(f"清理缓存失败: {str(e)}", 
                              output_type=OutputType.ERROR)
             return False
 
@@ -293,7 +293,7 @@ Content: {content}
             return file_path
             
         except Exception as e:
-            PrettyOutput.print(f"Failed to process file {file_path}: {str(e)}", 
+            PrettyOutput.print(f"处理 {file_path} 失败: {str(e)}", 
                              output_type=OutputType.ERROR)
             return None
 
@@ -318,13 +318,13 @@ Content: {content}
             
             for i, (file_path, data) in enumerate(self.vector_cache.items()):
                 if "vector" not in data:
-                    PrettyOutput.print(f"Invalid cache data for {file_path}: missing vector", 
+                    PrettyOutput.print(f"无效的缓存数据 {file_path}: 缺少向量", 
                                      output_type=OutputType.WARNING)
                     continue
                     
                 vector = data["vector"]
                 if not isinstance(vector, np.ndarray):
-                    PrettyOutput.print(f"Invalid vector type for {file_path}: {type(vector)}", 
+                    PrettyOutput.print(f"无效的向量类型 {file_path}: {type(vector)}", 
                                      output_type=OutputType.WARNING)
                     continue
                     
@@ -335,26 +335,26 @@ Content: {content}
             if vectors:
                 vectors = np.vstack(vectors)
                 if len(vectors) != len(ids):
-                    PrettyOutput.print(f"Vector count mismatch: {len(vectors)} vectors vs {len(ids)} ids", 
+                    PrettyOutput.print(f"向量数量不匹配: {len(vectors)} 个向量 vs {len(ids)} 个ID", 
                                      output_type=OutputType.ERROR)
                     self.index = None
                     return
                     
                 try:
                     self.index.add_with_ids(vectors, np.array(ids)) # type: ignore
-                    PrettyOutput.print(f"Successfully built index with {len(vectors)} vectors", 
+                    PrettyOutput.print(f"成功构建包含 {len(vectors)} 个向量的索引", 
                                      output_type=OutputType.SUCCESS)
                 except Exception as e:
-                    PrettyOutput.print(f"Failed to add vectors to index: {str(e)}", 
+                    PrettyOutput.print(f"添加向量到索引失败: {str(e)}", 
                                      output_type=OutputType.ERROR)
                     self.index = None
             else:
-                PrettyOutput.print("No valid vectors found, index not built", 
+                PrettyOutput.print("没有找到有效的向量, 索引未构建", 
                                  output_type=OutputType.WARNING)
                 self.index = None
                 
         except Exception as e:
-            PrettyOutput.print(f"Failed to build index: {str(e)}", 
+            PrettyOutput.print(f"构建索引失败: {str(e)}", 
                              output_type=OutputType.ERROR)
             self.index = None
 
@@ -379,20 +379,20 @@ Content: {content}
                     try:
                         os.remove(cache_path)
                     except Exception as e:
-                        PrettyOutput.print(f"Failed to delete cache file for {cached_file}: {str(e)}", 
+                        PrettyOutput.print(f"删除缓存文件 {cached_file} 失败: {str(e)}", 
                                          output_type=OutputType.WARNING)
             
             if files_to_delete:
                 for file_path in files_to_delete:
                     del self.vector_cache[file_path]
-                PrettyOutput.print(f"Cleaned cache for {len(files_to_delete)} non-existent files", 
+                PrettyOutput.print(f"清理了 {len(files_to_delete)} 个不存在的文件的缓存", 
                                  output_type=OutputType.INFO)
             
             # Update the git file list
             self.git_file_list = self.get_git_file_list()
             
             # Check file changes
-            PrettyOutput.print("Check file changes...", output_type=OutputType.INFO)
+            PrettyOutput.print("检查文件变化...", output_type=OutputType.INFO)
             changes_detected = False
             new_files = []
             modified_files = []
@@ -424,36 +424,36 @@ Content: {content}
                             modified_files.append(file_path)
                             changes_detected = True
                     except Exception as e:
-                        PrettyOutput.print(f"Failed to check file {file_path}: {str(e)}", 
+                        PrettyOutput.print(f"检查 {file_path} 失败: {str(e)}", 
                                          output_type=OutputType.ERROR)
                     progress.advance(task)
             
             # If changes are detected, display changes and ask the user
             if changes_detected:
-                output_lines = ["Detected the following changes:"]
+                output_lines = ["检测到以下变化:"]
                 if new_files:
-                    output_lines.append("New files:")
+                    output_lines.append("新文件:")
                     output_lines.extend(f"  {f}" for f in new_files)
                 if modified_files:
-                    output_lines.append("Modified files:")
+                    output_lines.append("修改的文件:")
                     output_lines.extend(f"  {f}" for f in modified_files)
                 if deleted_files:
-                    output_lines.append("Deleted files:")
+                    output_lines.append("删除的文件:")
                     output_lines.extend(f"  {f}" for f in deleted_files)
                 
                 PrettyOutput.print("\n".join(output_lines), output_type=OutputType.WARNING)
 
                 # If force is True, continue directly
                 if not force:
-                    if not user_confirm("Rebuild the index?", False):
-                        PrettyOutput.print("Cancel rebuilding the index", output_type=OutputType.INFO)
+                    if not user_confirm("重建索引?", False):
+                        PrettyOutput.print("取消重建索引", output_type=OutputType.INFO)
                         return
                 
                 # Clean deleted files
                 for file_path in files_to_delete:
                     del self.vector_cache[file_path]
                 if files_to_delete:
-                    PrettyOutput.print(f"Cleaned the cache of {len(files_to_delete)} files", 
+                    PrettyOutput.print(f"清理了 {len(files_to_delete)} 个文件的缓存", 
                                      output_type=OutputType.INFO)
                 
                 # Process new and modified files
@@ -482,19 +482,19 @@ Content: {content}
                             pbar.update(1)
 
                 if processed_files:
-                    PrettyOutput.print("Rebuilding the vector database...", output_type=OutputType.INFO)
+                    PrettyOutput.print("重建向量数据库...", output_type=OutputType.INFO)
                     self.gen_vector_db_from_cache()
-                    PrettyOutput.print(f"Successfully generated the index for {len(processed_files)} files", 
+                    PrettyOutput.print(f"成功生成了 {len(processed_files)} 个文件的索引", 
                                     output_type=OutputType.SUCCESS)
             else:
-                PrettyOutput.print("No file changes detected, no need to rebuild the index", output_type=OutputType.INFO)
+                PrettyOutput.print("没有检测到文件变化, 不需要重建索引", output_type=OutputType.INFO)
                 
         except Exception as e:
             # Try to save the cache when an exception occurs
             try:
                 self._load_all_cache()
             except Exception as save_error:
-                PrettyOutput.print(f"Failed to save cache: {str(save_error)}", 
+                PrettyOutput.print(f"保存缓存失败: {str(save_error)}", 
                                 output_type=OutputType.ERROR)
             raise e  # Re-raise the original exception
 
@@ -574,7 +574,7 @@ Content: {content}
                         current_token_count += tokens_count
                         
                 except Exception as e:
-                    PrettyOutput.print(f"Failed to read file {path}: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"读取 {path} 失败: {str(e)}", OutputType.ERROR)
                     continue
             
             # Process final batch
@@ -586,7 +586,7 @@ Content: {content}
             return all_selected_files
 
         except Exception as e:
-            PrettyOutput.print(f"Failed to pick: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"选择失败: {str(e)}", OutputType.ERROR)
             return [{"file": f, "reason": "" } for f in initial_results]
             
     def _process_batch(self, query: str, files_info: List[str]) -> List[Dict[str, str]]:
@@ -639,7 +639,7 @@ Important:
             selected_files = yaml.safe_load(files_match.group(1))
             return selected_files if selected_files else []
         except Exception as e:
-            PrettyOutput.print(f"Failed to parse response: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"解析响应失败: {str(e)}", OutputType.ERROR)
             return []
 
     def _generate_query_variants(self, query: str) -> List[str]:
@@ -687,7 +687,7 @@ Please provide 10 search-optimized expressions in the specified format.
             try:
                 variants = yaml.safe_load(question_match.group(1))
             except Exception as e:
-                PrettyOutput.print(f"Failed to parse variants: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"解析变体失败: {str(e)}", OutputType.ERROR)
         
         # Add original query
         variants.append(query)
@@ -776,7 +776,7 @@ Please provide 10 search-optimized expressions in the specified format.
             return results
             
         except Exception as e:
-            PrettyOutput.print(f"Failed to search: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"搜索失败: {str(e)}", output_type=OutputType.ERROR)
             return []
 
     def ask_codebase(self, query: str, top_k: int=20) -> Tuple[List[Dict[str, str]], str]:
@@ -784,7 +784,7 @@ Please provide 10 search-optimized expressions in the specified format.
         files_from_codebase = self.search_similar(query, top_k)
         
         if not files_from_codebase:
-            PrettyOutput.print("No related files found", output_type=OutputType.WARNING)
+            PrettyOutput.print("没有找到相关文件", output_type=OutputType.WARNING)
             return [],""
         
         # Build enhanced prompt
@@ -817,7 +817,7 @@ Content:
 """
                 if current_count + get_context_token_count(file_content) > available_count:
                     PrettyOutput.print(
-                        "Due to context length limit, some files were omitted", 
+                        "由于上下文长度限制, 一些文件被省略", 
                         output_type=OutputType.WARNING
                     )
                     break
@@ -826,7 +826,7 @@ Content:
                 current_count += get_context_token_count(file_content)
                 
             except Exception as e:
-                PrettyOutput.print(f"Failed to read file {path}: {str(e)}", 
+                PrettyOutput.print(f"读取 {path} 失败: {str(e)}", 
                                 output_type=OutputType.ERROR)
                 continue
         
@@ -880,7 +880,7 @@ Output Format:
             return True
             
         except Exception as e:
-            PrettyOutput.print(f"Error checking index status: {str(e)}", 
+            PrettyOutput.print(f"检查索引状态失败: {str(e)}", 
                              output_type=OutputType.ERROR)
             return False
 
@@ -925,17 +925,17 @@ def main():
     if args.command == 'generate':
         try:
             codebase.generate_codebase(force=args.force)
-            PrettyOutput.print("Codebase generation completed", output_type=OutputType.SUCCESS)
+            PrettyOutput.print("代码库生成完成", output_type=OutputType.SUCCESS)
         except Exception as e:
-            PrettyOutput.print(f"Error during codebase generation: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"代码库生成失败: {str(e)}", output_type=OutputType.ERROR)
     
     elif args.command == 'search':
         results = codebase.search_similar(args.query, args.top_k)
         if not results:
-            PrettyOutput.print("No similar files found", output_type=OutputType.WARNING)
+            PrettyOutput.print("没有找到相似的文件", output_type=OutputType.WARNING)
             return
             
-        output = "Search Results:\n"
+        output = "搜索结果:\n"
         for path in results:
             output += f"""- {path}\n"""
         PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")

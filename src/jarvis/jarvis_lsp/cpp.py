@@ -41,7 +41,7 @@ class CPPLSP(BaseLSP):
             
             return True
         except Exception as e:
-            PrettyOutput.print(f"C++ LSP initialization failed: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"C++ LSP 初始化失败: {str(e)}", OutputType.ERROR)
             return False
     
     def _send_request(self, method: str, params: Dict) -> Optional[Dict]:

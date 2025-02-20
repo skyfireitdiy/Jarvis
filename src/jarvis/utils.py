@@ -322,7 +322,7 @@ def get_multiline_input(tip: str) -> str:
             lines.append(line)
             
     except KeyboardInterrupt:
-        PrettyOutput.print("Input cancelled", OutputType.INFO)
+        PrettyOutput.print("输入已取消", OutputType.INFO)
         return ""
     
     return "\n".join(lines)
@@ -348,7 +348,7 @@ def init_env():
                         except ValueError:
                             continue
         except Exception as e:
-            PrettyOutput.print(f"Warning: Failed to read {env_file}: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"警告: 读取 {env_file} 失败: {e}", OutputType.WARNING)
     
     
 def while_success(func, sleep_time: float = 0.1):
@@ -356,7 +356,7 @@ def while_success(func, sleep_time: float = 0.1):
         try:
             return func()
         except Exception as e:
-            PrettyOutput.print(f"Execution failed: {str(e)}, retry in {sleep_time}s...", OutputType.ERROR)
+            PrettyOutput.print(f"执行失败: {str(e)}, 等待 {sleep_time}s...", OutputType.ERROR)
             time.sleep(sleep_time)
             continue
 
@@ -366,7 +366,7 @@ def while_true(func, sleep_time: float = 0.1):
         ret = func()
         if ret:
             break
-        PrettyOutput.print(f"Execution failed, retry in {sleep_time}s...", OutputType.WARNING)
+        PrettyOutput.print(f"执行失败, 等待 {sleep_time}s...", OutputType.WARNING)
         time.sleep(sleep_time)
     return ret
 
@@ -433,7 +433,7 @@ def load_rerank_model():
     model_name = "BAAI/bge-reranker-v2-m3"
     cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
     
-    PrettyOutput.print(f"Loading reranking model: {model_name}...", OutputType.INFO)
+    PrettyOutput.print(f"加载重排序模型: {model_name}...", OutputType.INFO)
     
     try:
         # Load model and tokenizer
@@ -484,7 +484,7 @@ def is_long_context(files: list) -> bool:
                 if total_tokens > threshold:
                     return True
         except Exception as e:
-            PrettyOutput.print(f"Failed to read file {file_path}: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"读取文件 {file_path} 失败: {e}", OutputType.WARNING)
             continue
             
     return total_tokens > threshold
@@ -511,13 +511,13 @@ def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -
         vector = np.array(embedding.cpu().numpy(), dtype=np.float32)
         return vector[0]  # Return first vector, because we only encoded one text
     except Exception as e:
-        PrettyOutput.print(f"Failed to create methodology embedding vector: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"创建方法论嵌入向量失败: {str(e)}", OutputType.ERROR)
         return np.zeros(1536, dtype=np.float32)
 
 
 def load_methodology(user_input: str) -> str:
     """Load methodology and build vector index"""
-    PrettyOutput.print("Loading methodology...", OutputType.PROGRESS)
+    PrettyOutput.print("加载方法论...", OutputType.PROGRESS)
     user_jarvis_methodology = os.path.expanduser("~/.jarvis/methodology")
     if not os.path.exists(user_jarvis_methodology):
         return ""
@@ -565,7 +565,7 @@ def load_methodology(user_input: str) -> str:
             methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
             query_embedding = _create_methodology_embedding(embedding_model, user_input)
             k = min(3, len(methodology_data))
-            PrettyOutput.print(f"Retrieving methodology...", OutputType.INFO)
+            PrettyOutput.print(f"检索方法论...", OutputType.INFO)
             distances, indices = methodology_index.search(
                 query_embedding.reshape(1, -1), k
             ) # type: ignore
@@ -590,9 +590,7 @@ def load_methodology(user_input: str) -> str:
         return make_methodology_prompt(data)
 
     except Exception as e:
-        PrettyOutput.print(f"Error loading methodology: {str(e)}", OutputType.ERROR)
-        import traceback
-        PrettyOutput.print(f"Error trace: {traceback.format_exc()}", OutputType.INFO)
+        PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
         return ""
 
 
@@ -648,15 +646,15 @@ def init_gpu_config() -> Dict:
             torch.cuda.empty_cache()
             
             PrettyOutput.print(
-                f"GPU initialized: {torch.cuda.get_device_name(0)}\n"
-                f"Device Memory: {gpu_mem / 1024**3:.1f}GB\n"
-                f"Shared Memory: {config['shared_memory'] / 1024**3:.1f}GB", 
+                f"GPU已初始化: {torch.cuda.get_device_name(0)}\n"
+                f"设备内存: {gpu_mem / 1024**3:.1f}GB\n"
+                f"共享内存: {config['shared_memory'] / 1024**3:.1f}GB", 
                 output_type=OutputType.SUCCESS
             )
         else:
-            PrettyOutput.print("No GPU available, using CPU mode", output_type=OutputType.WARNING)
+            PrettyOutput.print("没有GPU可用, 使用CPU模式", output_type=OutputType.WARNING)
     except Exception as e:
-        PrettyOutput.print(f"GPU initialization failed: {str(e)}", output_type=OutputType.WARNING)
+        PrettyOutput.print(f"GPU初始化失败: {str(e)}", output_type=OutputType.WARNING)
         
     return config
 
@@ -677,7 +675,7 @@ def get_embedding_batch(embedding_model: Any, texts: List[str]) -> np.ndarray:
             all_vectors.extend(vectors)
         return np.vstack(all_vectors)
     except Exception as e:
-        PrettyOutput.print(f"Batch embedding failed: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"批量嵌入失败: {str(e)}", OutputType.ERROR)
         return np.zeros((0, embedding_model.get_sentence_embedding_dimension()), dtype=np.float32)
 
 
@@ -786,7 +784,7 @@ def get_context_token_count(text: str) -> int:
         return sum([len(tokenizer.encode(chunk)) for chunk in chunks])
         
     except Exception as e:
-        PrettyOutput.print(f"Error counting tokens: {str(e)}", OutputType.WARNING)
+        PrettyOutput.print(f"计算token失败: {str(e)}", OutputType.WARNING)
         # Fallback to rough character-based estimate
         return len(text) // 4  # Rough estimate of 4 chars per token
 

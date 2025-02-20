@@ -65,16 +65,15 @@ Output Format:
 
 def find_relevant_information(user_input: str, root_dir: str) -> Tuple[List[Dict[str, str]], str]:
     try:
-        PrettyOutput.print("Find files from codebase...", OutputType.INFO)
+        PrettyOutput.print("从代码库中查找文件...", OutputType.INFO)
         codebase = CodeBase(root_dir)
         question = make_question(user_input)
         if question is None:
             return [], ""
         files_from_codebase, infomation = codebase.ask_codebase(question)
-        PrettyOutput.print("Find files by agent...", OutputType.INFO)
 
         selected_files = select_files(files_from_codebase, os.getcwd())
         return selected_files, infomation
     except Exception:
-        PrettyOutput.print("Failed to find relevant files", OutputType.ERROR)
+        PrettyOutput.print("查找相关文件失败", OutputType.ERROR)
         return [], ""

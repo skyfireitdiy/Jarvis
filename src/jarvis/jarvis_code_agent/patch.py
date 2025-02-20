@@ -77,12 +77,12 @@ def apply_patch(output_str: str)->str:
                     # Write new file
                     with open(filepath, 'w', encoding='utf-8') as f:
                         f.writelines(new_content)
-                    PrettyOutput.print(f"Created new file {filepath} successfully\n", OutputType.SUCCESS)
+                    PrettyOutput.print(f"成功创建新文件 {filepath}", OutputType.SUCCESS)
                     continue
 
                 # Regular patch logic for existing files
                 if not os.path.exists(filepath):
-                    PrettyOutput.print(f"File not found: {filepath}", OutputType.WARNING)
+                    PrettyOutput.print(f"文件不存在: {filepath}", OutputType.WARNING)
                     continue
                     
                 # Read original file content
@@ -90,7 +90,7 @@ def apply_patch(output_str: str)->str:
                 
                 # Validate line numbers
                 if start_line < 0 or end_line > len(lines) + 1 or start_line > end_line:
-                    PrettyOutput.print(f"Invalid line range [{start_line}, {end_line}) for file: {filepath}", OutputType.WARNING)
+                    PrettyOutput.print(f"无效的行范围 [{start_line}, {end_line}) 对于文件: {filepath}", OutputType.WARNING)
                     continue
                     
                 # Create new content
@@ -99,10 +99,10 @@ def apply_patch(output_str: str)->str:
                 # Write back to file
                 open(filepath, 'w', encoding='utf-8').writelines(lines)
 
-                PrettyOutput.print(f"Applied patch to {filepath} successfully\n", OutputType.SUCCESS)
+                PrettyOutput.print(f"成功应用补丁到 {filepath}", OutputType.SUCCESS)
             
         except Exception as e:
-            PrettyOutput.print(f"Error applying patch to {filepath}: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"应用补丁到 {filepath} 失败: {str(e)}", OutputType.ERROR)
             continue
     ret = ""
     if has_uncommitted_changes():
@@ -110,7 +110,7 @@ def apply_patch(output_str: str)->str:
             ret += "Successfully applied the patch"
         else:
             ret += "User rejected the patch"
-        user_input = get_multiline_input("You can continue to input: ")
+        user_input = get_multiline_input("你可以继续输入: ")
         if user_input:
             ret += user_input
     return ret
@@ -125,7 +125,7 @@ def handle_commit_workflow()->bool:
     diff = os.popen("git diff HEAD").read()
     os.system("git reset HEAD")
     PrettyOutput.print(diff, OutputType.CODE, lang="diff")
-    if not user_confirm("Do you want to commit the code?", default=True):
+    if not user_confirm("是否要提交代码？", default=True):
         os.system("git reset HEAD")
         os.system("git checkout -- .")
         os.system("git clean -fd")

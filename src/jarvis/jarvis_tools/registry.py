@@ -71,7 +71,7 @@ class ToolRegistry:
         """Use specified tools"""
         missing_tools = [tool_name for tool_name in name if tool_name not in self.tools]
         if missing_tools:
-            PrettyOutput.print(f"Tools {missing_tools} do not exist, available tools: {', '.join(self.tools.keys())}", OutputType.WARNING)
+            PrettyOutput.print(f"工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}", OutputType.WARNING)
         self.tools = {tool_name: self.tools[tool_name] for tool_name in name}
 
     def dont_use_tools(self, names: List[str]):
@@ -116,7 +116,7 @@ class ToolRegistry:
         try:
             p_file_path = Path(file_path).resolve()  # Get the absolute path
             if not p_file_path.exists() or not p_file_path.is_file():
-                PrettyOutput.print(f"File does not exist: {p_file_path}", OutputType.ERROR)
+                PrettyOutput.print(f"文件不存在: {p_file_path}", OutputType.ERROR)
                 return False
                 
             # Add the parent directory to sys.path temporarily
@@ -167,7 +167,7 @@ class ToolRegistry:
                 sys.path.remove(parent_dir)
                 
         except Exception as e:
-            PrettyOutput.print(f"Failed to load tool from {Path(file_path).name}: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"从 {Path(file_path).name} 加载工具失败: {str(e)}", OutputType.ERROR)
             return False
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
@@ -215,12 +215,12 @@ arguments:
                 try:
                     args = json.loads(args)
                 except json.JSONDecodeError:
-                    PrettyOutput.print(f"Invalid tool parameters format: {name} {tool_call_help}", OutputType.ERROR)
+                    PrettyOutput.print(f"工具参数格式无效: {name} {tool_call_help}", OutputType.ERROR)
                     return ""
 
             # Display tool call information
-            PrettyOutput.section(f"Executing tool: {name}", OutputType.TOOL)
-            params = "Parameters:\n"
+            PrettyOutput.section(f"执行工具: {name}", OutputType.TOOL)
+            params = "参数:\n"
             if isinstance(args, dict):
                 for key, value in args.items():
                     params += f"{key} = {value}\n"
@@ -245,12 +245,12 @@ arguments:
             # Process the result
             if result["success"]:
                 
-                PrettyOutput.section("Execution successful", OutputType.SUCCESS)
+                PrettyOutput.section("执行成功", OutputType.SUCCESS)
                 
                 # If the output exceeds 4k characters, use a large model to summarize
                 if get_context_token_count(output) > self.max_token_count:
                     try:
-                        PrettyOutput.print("Output is too long, summarizing...", OutputType.PROGRESS)
+                        PrettyOutput.print("输出过长，正在总结...", OutputType.PROGRESS)
                         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
                         
                         # If the output exceeds the maximum context length, only take the last part
@@ -282,11 +282,11 @@ Please provide a summary:"""
 --- Summary ends ---"""
                         
                     except Exception as e:
-                        PrettyOutput.print(f"Summary failed: {str(e)}", OutputType.ERROR)
+                        PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
                         output = f"Output is too long ({len(output)} characters), it is recommended to view the original output.\nPreview of the first 300 characters:\n{output[:300]}..."
             
             else:
-                PrettyOutput.section("Execution failed", OutputType.WARNING)
+                PrettyOutput.section("执行失败", OutputType.WARNING)
                 PrettyOutput.print(result["stderr"], OutputType.WARNING)
             
             if len(tool_calls) > 1:
@@ -294,5 +294,5 @@ Please provide a summary:"""
             return output
             
         except Exception as e:
-            PrettyOutput.print(f"Tool execution failed: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"工具执行失败：{str(e)}", OutputType.ERROR)
             return f"Tool call failed: {str(e)}"

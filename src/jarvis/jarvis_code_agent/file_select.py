@@ -42,7 +42,7 @@ def _parse_file_selection(input_str: str, max_index: int) -> List[int]:
                 if start <= end:
                     selected.update(range(start, end + 1))
             except ValueError:
-                PrettyOutput.print(f"Ignore invalid range expression: {part}", OutputType.WARNING)
+                PrettyOutput.print(f"忽略无效的范围表达式: {part}", OutputType.WARNING)
         # Process single number
         else:
             try:
@@ -50,9 +50,9 @@ def _parse_file_selection(input_str: str, max_index: int) -> List[int]:
                 if 0 <= index < max_index:
                     selected.add(index)
                 else:
-                    PrettyOutput.print(f"Ignore index out of range: {part}", OutputType.WARNING)
+                    PrettyOutput.print(f"忽略超出范围的索引: {part}", OutputType.WARNING)
             except ValueError:
-                PrettyOutput.print(f"Ignore invalid number: {part}", OutputType.WARNING)
+                PrettyOutput.print(f"忽略无效的数字: {part}", OutputType.WARNING)
     
     return sorted(list(selected))
 
@@ -127,8 +127,8 @@ def _fuzzy_match_files(root_dir: str, pattern: str) -> List[str]:
 
 def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dict[str, str]]:
     """Let the user select and supplement related files"""
-    PrettyOutput.section("Related files", OutputType.INFO)
-    
+    PrettyOutput.section("相关文件", OutputType.INFO)
+
     output = ""
     # Display found files
     selected_files = list(related_files)  # Default select all
@@ -139,18 +139,18 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
     
     if len(related_files) > 0:
         # Ask the user if they need to adjust the file list
-        if user_confirm("Do you need to adjust the file list?", False):
+        if user_confirm("是否需要调整文件列表？", False):
             # Let the user select files
-            numbers = get_single_line_input("Please enter the file numbers to include (support: 1,3-6 format, press Enter to keep the current selection)").strip()
+            numbers = get_single_line_input("请输入要包含的文件编号（支持: 1,3-6格式, 按回车保持当前选择）").strip()
             if numbers:
                 selected_indices = _parse_file_selection(numbers, len(related_files))
                 if selected_indices:
                     selected_files = [related_files[i] for i in selected_indices]
                 else:
-                    PrettyOutput.print("No valid files selected, keep the current selection", OutputType.WARNING)
+                    PrettyOutput.print("没有有效的文件被选择, 保持当前选择", OutputType.WARNING)
     
     # Ask if they need to supplement files
-    if user_confirm("Do you need to supplement other files?", False):
+    if user_confirm("是否需要补充其他文件？", False):
         # Create file completion session
         session = PromptSession(
             completer=_get_file_completer(root_dir),
@@ -158,7 +158,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
         )
         
         while True:
-            PrettyOutput.print("Please enter the file path to supplement (support Tab completion and *? wildcard, input empty line to end):", OutputType.INFO)
+            PrettyOutput.print("请输入要补充的文件路径（支持Tab补全和*?通配符, 输入空行结束）", OutputType.INFO)
             try:
                 file_path = session.prompt(">>> ").strip()
             except KeyboardInterrupt:
@@ -171,16 +171,16 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
             if '*' in file_path or '?' in file_path:
                 matches = _fuzzy_match_files(root_dir, file_path)
                 if not matches:
-                    PrettyOutput.print("No matching files found", OutputType.WARNING)
+                    PrettyOutput.print("没有找到匹配的文件", OutputType.WARNING)
                     continue
                     
                 # Display matching files
-                PrettyOutput.print("Found the following matching files:", OutputType.INFO)
+                PrettyOutput.print("找到以下匹配的文件:", OutputType.INFO)
                 for i, path in enumerate(matches, 1):
                     PrettyOutput.print(f"[{i}] {path}", OutputType.INFO)
                     
                 # Let the user select
-                numbers = get_single_line_input("Please select the file numbers to add (support: 1,3-6 format, press Enter to select all)").strip()
+                numbers = get_single_line_input("请选择要添加的文件编号（支持: 1,3-6格式, 按回车选择所有）").strip()
                 if numbers:
                     indices = _parse_file_selection(numbers, len(matches))
                     if not indices:
@@ -195,13 +195,13 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
             for path in paths_to_add:
                 full_path = os.path.join(root_dir, path)
                 if not os.path.isfile(full_path):
-                    PrettyOutput.print(f"File does not exist: {path}", OutputType.ERROR)
+                    PrettyOutput.print(f"文件不存在: {path}", OutputType.ERROR)
                     continue
                 
                 try:
                     selected_files.append({"file": path, "reason": "User Added"})
-                    PrettyOutput.print(f"File added: {path}", OutputType.SUCCESS)
+                    PrettyOutput.print(f"文件已添加: {path}", OutputType.SUCCESS)
                 except Exception as e:
-                    PrettyOutput.print(f"Failed to read file: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"读取文件失败: {str(e)}", OutputType.ERROR)
     
     return selected_files

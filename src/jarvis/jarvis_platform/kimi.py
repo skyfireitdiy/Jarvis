@@ -26,24 +26,24 @@ class KimiModel(BasePlatform):
         self.api_key = os.getenv("KIMI_API_KEY")
         if not self.api_key:
             message = (
-                "Need to set KIMI_API_KEY to use Jarvis. Please follow the steps below:\n"
-                "1. Get Kimi API Key:\n"
-                "   • Visit Kimi AI platform: https://kimi.moonshot.cn\n"
-                "   • Login to your account\n" 
-                "   • Open browser developer tools (F12 or right-click -> Inspect)\n"
-                "   • Switch to the Network tab\n"
-                "   • Send any message\n"
-                "   • Find the Authorization header in the request\n"
-                "   • Copy the token value (remove the 'Bearer ' prefix)\n"
-                "2. Set environment variable:\n"
-                "   • Method 1: Create or edit ~/.jarvis/env file:\n"
+                "需要设置 KIMI_API_KEY 才能使用 Jarvis。请按照以下步骤操作：\n"
+                "1. 获取 Kimi API Key:\n"
+                "   • 访问 Kimi AI 平台: https://kimi.moonshot.cn\n"
+                "   • 登录您的账户\n" 
+                "   • 打开浏览器开发者工具 (F12 或右键 -> 检查)\n"
+                "   • 切换到网络标签\n"
+                "   • 发送任意消息\n"
+                "   • 在请求中找到 Authorization 头\n"
+                "   • 复制 token 值（去掉 'Bearer ' 前缀）\n"
+                "2. 设置环境变量:\n"
+                "   • 方法 1: 创建或编辑 ~/.jarvis/env 文件:\n"
                 "   echo 'KIMI_API_KEY=your_key_here' > ~/.jarvis/env\n"
-                "   • Method 2: Set environment variable directly:\n"
+                "   • 方法 2: 直接设置环境变量:\n"
                 "   export KIMI_API_KEY=your_key_here\n"
-                "After setting, run Jarvis again."
+                "设置后，重新运行 Jarvis。"
             )
             PrettyOutput.print(message, OutputType.INFO)
-            PrettyOutput.print("KIMI_API_KEY is not set", OutputType.WARNING)
+            PrettyOutput.print("KIMI_API_KEY 未设置", OutputType.WARNING)
         self.auth_header = f"Bearer {self.api_key}"
         self.chat_id = ""
         self.uploaded_files = []  # 存储已上传文件的信息
@@ -75,7 +75,7 @@ class KimiModel(BasePlatform):
             self.chat_id = response.json()["id"]
             return True
         except Exception as e:
-            PrettyOutput.print(f"Error: Failed to create chat: {e}", OutputType.ERROR)
+            PrettyOutput.print(f"错误：创建会话失败：{e}", OutputType.ERROR)
             return False
 
     def _get_presigned_url(self, filename: str, action: str) -> Dict:
@@ -105,7 +105,7 @@ class KimiModel(BasePlatform):
                 response = while_success(lambda: requests.put(presigned_url, data=content), sleep_time=5)
                 return response.status_code == 200
         except Exception as e:
-            PrettyOutput.print(f"Error: Failed to upload file: {e}", OutputType.ERROR)
+            PrettyOutput.print(f"错误：上传文件失败：{e}", OutputType.ERROR)
             return False
 
     def _get_file_info(self, file_data: Dict, name: str, file_type: str) -> Dict:
@@ -202,7 +202,7 @@ class KimiModel(BasePlatform):
                     else:
                         uploaded_files.append(file_info)
                 else:
-                    PrettyOutput.print(f"Error: 文件上传失败: {file_path}", OutputType.ERROR)
+                    PrettyOutput.print(f"错误：文件上传失败: {file_path}", OutputType.ERROR)
                     
             except Exception as e:
                 PrettyOutput.print(f"✗ 处理文件出错 {file_path}: {str(e)}", OutputType.ERROR)

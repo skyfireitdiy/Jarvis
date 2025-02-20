@@ -1,8 +1,6 @@
-import os
 from typing import List, Dict, Optional, Tuple, Any
 import jedi
 from jarvis.jarvis_lsp.base import BaseLSP
-from jarvis.utils import PrettyOutput, OutputType
 
 class PythonLSP(BaseLSP):
     """Python LSP implementation using jedi."""

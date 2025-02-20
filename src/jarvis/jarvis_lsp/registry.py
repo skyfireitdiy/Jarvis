@@ -33,7 +33,7 @@ class LSPRegistry:
                 with open(os.path.join(user_lsp_dir, "__init__.py"), "w") as f:
                     pass
             except Exception as e:
-                PrettyOutput.print(f"Create LSP directory failed: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"创建 LSP 目录失败: {str(e)}", OutputType.ERROR)
                 return ""
         return user_lsp_dir
 
@@ -72,7 +72,7 @@ class LSPRegistry:
         lsp_servers = {}
         
         if not os.path.exists(directory):
-            PrettyOutput.print(f"LSP directory does not exist: {directory}", OutputType.ERROR)
+            PrettyOutput.print(f"LSP 目录不存在: {directory}", OutputType.ERROR)
             return lsp_servers
             
         package_name = None
@@ -104,7 +104,7 @@ class LSPRegistry:
                             lsp_servers[obj.language] = obj
                             break
                 except Exception as e:
-                    PrettyOutput.print(f"Load LSP {module_name} failed: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"加载 LSP {module_name} 失败: {str(e)}", OutputType.ERROR)
         
         return lsp_servers
 
@@ -138,14 +138,14 @@ class LSPRegistry:
     def create_lsp(self, language: str) -> Optional[BaseLSP]:
         """Create LSP instance for specified language."""
         if language not in self.lsp_servers:
-            PrettyOutput.print(f"LSP not found for language: {language}", OutputType.ERROR)
+            PrettyOutput.print(f"没有找到 LSP 支持的语言: {language}", OutputType.ERROR)
             return None
             
         try:
             lsp = self.lsp_servers[language]()
             return lsp
         except Exception as e:
-            PrettyOutput.print(f"Create LSP failed: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"创建 LSP 失败: {str(e)}", OutputType.ERROR)
             return None
 
     def get_supported_languages(self) -> List[str]:
@@ -186,11 +186,11 @@ def main():
     lsp = registry.create_lsp(args.language)
     
     if not lsp:
-        PrettyOutput.print(f"No LSP support for language: {args.language}", OutputType.ERROR)
+        PrettyOutput.print(f"没有 LSP 支持的语言: {args.language}", OutputType.ERROR)
         return 1
         
     if not lsp.initialize(os.path.dirname(os.path.abspath(args.file))):
-        PrettyOutput.print("LSP initialization failed", OutputType.ERROR)
+        PrettyOutput.print("LSP 初始化失败", OutputType.ERROR)
         return 1
     
     try:
@@ -204,26 +204,26 @@ def main():
             diagnostics = lsp.get_diagnostics(args.file)
             for diag in diagnostics:
                 severity = ['Error', 'Warning', 'Info', 'Hint'][diag['severity'] - 1]
-                print(f"{severity} at {diag['range']['start']['line']}:{diag['range']['start']['character']}: {diag['message']}")
+                PrettyOutput.print(f"{severity} 在 {diag['range']['start']['line']}:{diag['range']['start']['character']}: {diag['message']}", OutputType.INFO)
                 
         elif args.action in ('references', 'definition'):
             if args.line is None or args.character is None:
-                PrettyOutput.print("Line and character position required for references/definition", OutputType.ERROR)
+                PrettyOutput.print("需要行和字符位置用于 references/definition", OutputType.ERROR)
                 return 1
                 
             if args.action == 'references':
                 refs = lsp.find_references(args.file, (args.line, args.character))
                 for ref in refs:
-                    print(f"Reference in {ref['uri']} at {ref['range']['start']['line']}:{ref['range']['start']['character']}\nLine: {LSPRegistry.get_line_at_position(ref['uri'], ref['range']['start']['line'])}")
+                    PrettyOutput.print(f"引用在 {ref['uri']} 在 {ref['range']['start']['line']}:{ref['range']['start']['character']}\n行: {LSPRegistry.get_line_at_position(ref['uri'], ref['range']['start']['line'])}", OutputType.INFO)
             else:
                 defn = lsp.find_definition(args.file, (args.line, args.character))
                 if defn:
-                    print(f"Definition in {defn['uri']} at {defn['range']['start']['line']}:{defn['range']['start']['character']}\nLine: {LSPRegistry.get_line_at_position(defn['uri'], defn['range']['start']['line'])}")
+                    PrettyOutput.print(f"定义在 {defn['uri']} 在 {defn['range']['start']['line']}:{defn['range']['start']['character']}\n行: {LSPRegistry.get_line_at_position(defn['uri'], defn['range']['start']['line'])}", OutputType.INFO)
                 else:
-                    print("No definition found")
+                    PrettyOutput.print("没有找到定义", OutputType.WARNING)
                     
     except Exception as e:
-        PrettyOutput.print(f"Error: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
         return 1
     finally:
         lsp.shutdown()

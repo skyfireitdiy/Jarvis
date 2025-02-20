@@ -45,7 +45,7 @@ class AskCodebaseTool:
             question = args["question"]
             top_k = args.get("top_k", 20)
 
-            PrettyOutput.print(f"Analyzing codebase for question: {question}", OutputType.INFO)
+            PrettyOutput.print(f"正在分析代码库以回答问题: {question}", OutputType.INFO)
 
             # Create new CodeBase instance
             git_root = find_git_root()
@@ -61,8 +61,8 @@ class AskCodebaseTool:
             }
 
         except Exception as e:
-            error_msg = f"Failed to analyze codebase: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            error_msg = f"分析代码库失败: {str(e)}"
+            PrettyOutput.print(error_msg, OutputType.WARNING)
             return {
                 "success": False,
                 "stdout": "",

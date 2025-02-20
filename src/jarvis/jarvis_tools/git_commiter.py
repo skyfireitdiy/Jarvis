@@ -25,7 +25,7 @@ class GitCommitTool:
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute automatic commit process"""
         try:
-            PrettyOutput.print("Add files to commit...", OutputType.SYSTEM)
+            PrettyOutput.print("准备添加文件到提交...", OutputType.SYSTEM)
             os.system("git add .")
             PrettyOutput.print("Get diff...", OutputType.SYSTEM)
             diff = os.popen("git diff --cached --exit-code").read()
@@ -40,17 +40,17 @@ class GitCommitTool:
 
             {diff}
             '''
-            PrettyOutput.print("Generate commit message...", OutputType.SYSTEM)
+            PrettyOutput.print("生成提交消息...", OutputType.SYSTEM)
             platform = PlatformRegistry().get_codegen_platform()
             platform.set_suppress_output(True)
             commit_message = platform.chat_until_success(prompt)
             commit_message = self._extract_commit_message(commit_message)
-            PrettyOutput.print("Commit...", OutputType.INFO)
+            PrettyOutput.print("提交...", OutputType.INFO)
             os.popen(f"git commit -m '{commit_message}'")
 
             commit_hash = self._get_last_commit_hash()
 
-            PrettyOutput.section(f"Commit hash: {commit_hash}\nCommit message: {commit_message}", OutputType.SUCCESS)
+            PrettyOutput.section(f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS)
 
             return {"success": True, "stdout": yaml.safe_dump({"commit_hash": commit_hash, "commit_message": commit_message}), "stderr": ""}
 

@@ -40,7 +40,7 @@ class ShellTool:
             # Modify command to use script
             tee_command = f"script -q -c '{escaped_command}' {output_file}"
             
-            PrettyOutput.print(f"Execute command: {command}", OutputType.INFO)
+            PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
             
             # Execute command
             return_code = os.system(tee_command)
@@ -55,7 +55,7 @@ class ShellTool:
                         if len(lines) > 2:
                             output = "\n".join(lines[1:-1])
             except Exception as e:
-                output = f"Failed to read output file: {str(e)}"
+                output = f"读取输出文件失败: {str(e)}"
             finally:
                 # Clean up temporary file
                 Path(output_file).unlink(missing_ok=True)

@@ -33,7 +33,7 @@ class CodeFileSelecterTool:
             related_files = args.get("related_files", [])
             root_dir = args.get("root_dir", ".").strip()
 
-            PrettyOutput.print("Starting interactive file selection...", OutputType.INFO)
+            PrettyOutput.print("开始交互式文件选择...", OutputType.INFO)
 
             # Use file_select module to handle file selection
             selected_files = select_files(

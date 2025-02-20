@@ -50,7 +50,7 @@ class SubAgentTool:
             goal = args.get("goal", "")
             files = args.get("files", [])
 
-            PrettyOutput.print(f"Create sub-agent: {agent_name}", OutputType.INFO)
+            PrettyOutput.print(f"创建子代理: {agent_name}", OutputType.INFO)
 
             # Build task description
             task_description = task
@@ -68,7 +68,7 @@ class SubAgentTool:
             )
 
             # Run sub-agent, pass file list
-            PrettyOutput.print("Sub-agent starts executing task...", OutputType.INFO)
+            PrettyOutput.print("子代理开始执行任务...", OutputType.INFO)
             result = sub_agent.run(task_description, file_list=files)
 
             return {

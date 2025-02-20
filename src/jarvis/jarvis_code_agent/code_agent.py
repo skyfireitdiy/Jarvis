@@ -214,17 +214,17 @@ def main():
         # Interactive mode
         while True:
             try:
-                user_input = get_multiline_input("Please enter your requirement (input empty line to exit):")
+                user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
                 if not user_input:
                     break
                 agent = CodeAgent()
                 agent.run(user_input)
                 
             except Exception as e:
-                PrettyOutput.print(f"Error: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
     except Exception as e:
-        PrettyOutput.print(f"Initialization error: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
         return 1
 
     return 0

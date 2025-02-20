@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import re
 from typing import Dict, List, Tuple
 
-from jarvis.utils import OutputType, PrettyOutput, while_success, while_true
+from jarvis.utils import while_success, while_true
 
 
 class BasePlatform(ABC):

@@ -43,7 +43,7 @@ class FileOperationTool:
             
             # Record the operation and the full path
             abs_path = os.path.abspath(filepath)
-            PrettyOutput.print(f"File operation: {operation} - {abs_path}", OutputType.INFO)
+            PrettyOutput.print(f"文件操作: {operation} - {abs_path}", OutputType.INFO)
             
             if operation == "exists":
                 exists = os.path.exists(filepath)

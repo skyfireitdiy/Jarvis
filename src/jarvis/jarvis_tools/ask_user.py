@@ -30,10 +30,10 @@ class AskUserTool:
             question = args["question"]
             
             # Display the question
-            PrettyOutput.print(f"Question: {question}", OutputType.SYSTEM)
+            PrettyOutput.print(f"问题: {question}", OutputType.SYSTEM)
             
             # Get user input
-            user_response = get_multiline_input("Please enter your answer (input empty line to end)")
+            user_response = get_multiline_input("请输入您的答案 (输入空行结束)")
             
             return {
                 "success": True,

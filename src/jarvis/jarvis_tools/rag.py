@@ -87,11 +87,11 @@ class RAGTool:
             
             # If you need to rebuild the index or the index does not exist
             if rebuild_index or not rag.is_index_built():
-                PrettyOutput.print("Building document index...", OutputType.INFO)
+                PrettyOutput.print("正在构建文档索引...", OutputType.INFO)
                 rag.build_index(dir_path)
             
             # Execute question and answer
-            PrettyOutput.print(f"Question: {question}", OutputType.INFO)
+            PrettyOutput.print(f"问题: {question}", OutputType.INFO)
             response = rag.ask(question)
             
             if response is None:
@@ -108,7 +108,7 @@ class RAGTool:
             }
             
         except Exception as e:
-            PrettyOutput.print(f"Document question and answer failed: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"文档问答失败：{str(e)}", OutputType.ERROR)
             return {
                 "success": False,
                 "stdout": "",

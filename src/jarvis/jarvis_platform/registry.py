@@ -36,7 +36,7 @@ class PlatformRegistry:
 
                 pass
             except Exception as e:
-                PrettyOutput.print(f"Create platform directory failed: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"创建平台目录失败: {str(e)}", OutputType.ERROR)
                 return ""
         return user_platform_dir
 
@@ -71,7 +71,7 @@ class PlatformRegistry:
         
         if missing_methods:
             PrettyOutput.print(
-                f"Platform {platform_class.__name__} is missing necessary methods: {', '.join(missing_methods)}", 
+                f"平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}", 
                 OutputType.ERROR
             )
             return False
@@ -92,7 +92,7 @@ class PlatformRegistry:
         
         # 确保目录存在
         if not os.path.exists(directory):
-            PrettyOutput.print(f"Platform directory does not exist: {directory}", OutputType.ERROR)
+            PrettyOutput.print(f"平台目录不存在: {directory}", OutputType.ERROR)
             return platforms
             
         # 获取目录的包名
@@ -128,7 +128,7 @@ class PlatformRegistry:
                             platforms[obj.platform_name] = obj # type: ignore
                             break
                 except Exception as e:
-                    PrettyOutput.print(f"Load platform {module_name} failed: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(f"加载平台 {module_name} 失败: {str(e)}", OutputType.ERROR)
         
         return platforms
 
@@ -201,7 +201,7 @@ class PlatformRegistry:
             BasePlatform: Platform instance
         """
         if name not in self.platforms:
-            PrettyOutput.print(f"Platform not found: {name}", OutputType.ERROR)
+            PrettyOutput.print(f"未找到平台: {name}", OutputType.ERROR)
             return None
             
         try:
@@ -209,7 +209,7 @@ class PlatformRegistry:
             platform = self.platforms[name]()
             return platform
         except Exception as e:
-            PrettyOutput.print(f"Create platform failed: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"创建平台失败: {str(e)}", OutputType.ERROR)
             return None
 
     def get_available_platforms(self) -> List[str]:

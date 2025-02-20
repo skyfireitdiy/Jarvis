@@ -28,7 +28,7 @@ class WebpageTool:
             }
             
             # Send request
-            PrettyOutput.print(f"Reading webpage: {url}", OutputType.INFO)
+            PrettyOutput.print(f"正在读取网页：{url}", OutputType.INFO)
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             

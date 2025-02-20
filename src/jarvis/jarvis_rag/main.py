@@ -154,9 +154,9 @@ class RAGTool:
         try:
             self.embedding_model = load_embedding_model()
             self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
-            PrettyOutput.print("Model loaded", output_type=OutputType.SUCCESS)
+            PrettyOutput.print("模型加载完成", output_type=OutputType.SUCCESS)
         except Exception as e:
-            PrettyOutput.print(f"Failed to load model: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"加载模型失败: {str(e)}", output_type=OutputType.ERROR)
             raise
 
         # 修改缓存相关初始化
@@ -218,7 +218,7 @@ class RAGTool:
                                 file_cache = pickle.load(f)
                                 self.documents.extend(file_cache["documents"])
                         except Exception as e:
-                            PrettyOutput.print(f"Failed to load cache for {file_path}: {str(e)}", 
+                            PrettyOutput.print(f"加载缓存失败,文件路径:{file_path}: {str(e)}", 
                                             output_type=OutputType.WARNING)
                 
                 # 重建向量索引
@@ -238,11 +238,11 @@ class RAGTool:
                         vectors = np.vstack(vectors)
                         self._build_index(vectors)
                         
-                PrettyOutput.print(f"Loaded {len(self.documents)} document fragments", 
+                PrettyOutput.print(f"加载 {len(self.documents)} 个文档片段", 
                                 output_type=OutputType.INFO)
                                 
             except Exception as e:
-                PrettyOutput.print(f"Failed to load cache index: {str(e)}", 
+                PrettyOutput.print(f"加载缓存索引失败: {str(e)}", 
                                 output_type=OutputType.WARNING)
                 self.documents = []
                 self.index = None
@@ -276,7 +276,7 @@ class RAGTool:
                 pickle.dump(index_data, f)
                             
         except Exception as e:
-            PrettyOutput.print(f"Failed to save cache: {str(e)}", output_type=OutputType.ERROR)
+            PrettyOutput.print(f"保存缓存失败: {str(e)}", output_type=OutputType.ERROR)
 
     def _build_index(self, vectors: np.ndarray):
         """Build FAISS index"""
@@ -382,7 +382,7 @@ class RAGTool:
             
             return get_embedding_batch(self.embedding_model, texts)
         except Exception as e:
-            PrettyOutput.print(f"Batch processing failed: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"批量处理失败: {str(e)}", OutputType.ERROR)
             return np.zeros((0, self.vector_dim), dtype=np.float32) # type: ignore
 
     def _process_file(self, file_path: str) -> List[Document]:
@@ -436,7 +436,7 @@ class RAGTool:
             return documents
             
         except Exception as e:
-            PrettyOutput.print(f"Failed to process file {file_path}: {str(e)}", 
+            PrettyOutput.print(f"处理文件失败: {file_path}: {str(e)}", 
                             output_type=OutputType.ERROR)
             return []
 
@@ -517,7 +517,7 @@ class RAGTool:
                             new_vectors.append(file_vectors)
                             
                     except Exception as e:
-                        PrettyOutput.print(f"Failed to process {file_path}: {str(e)}", OutputType.ERROR)
+                        PrettyOutput.print(f"处理文件失败: {file_path}: {str(e)}", OutputType.ERROR)
                     
                     pbar.update(1)
 
@@ -542,9 +542,9 @@ class RAGTool:
                 self._build_index(final_vectors)
 
             PrettyOutput.print(
-                f"Indexed {len(self.documents)} documents "
-                f"(New/Modified: {len(new_documents)}, "
-                f"Unchanged: {len(unchanged_documents)})", 
+                f"索引 {len(self.documents)} 个文档 "
+                f"(新/修改: {len(new_documents)}, "
+                f"不变: {len(unchanged_documents)})", 
                 OutputType.SUCCESS
             )
 
@@ -566,13 +566,13 @@ class RAGTool:
             return np.vstack(unchanged_vectors) if unchanged_vectors else None
             
         except Exception as e:
-            PrettyOutput.print(f"Failed to get unchanged vectors: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"获取不变向量失败: {str(e)}", OutputType.ERROR)
             return None
 
     def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
         """Search documents with context window"""
         if not self.index:
-            PrettyOutput.print("Index not built, building...", output_type=OutputType.INFO)
+            PrettyOutput.print("索引未构建,正在构建...", output_type=OutputType.INFO)
             self.build_index(self.root_dir)
             
         # Get query vector
@@ -670,7 +670,7 @@ Relevant documents (ordered by relevance):
                 prompt += "3. Reference the documents in the answer.\n"
                 if current_count + get_context_token_count(doc_content) > available_count:
                     PrettyOutput.print(
-                        "Due to context length limit, some fragments were omitted", 
+                        "由于上下文长度限制，部分内容被省略",
                         output_type=OutputType.WARNING
                     )
                     break
@@ -687,7 +687,7 @@ Relevant documents (ordered by relevance):
             return response
             
         except Exception as e:
-            PrettyOutput.print(f"Failed to answer: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"回答失败：{str(e)}", OutputType.ERROR)
             return None
 
     def is_index_built(self) -> bool:
@@ -724,7 +724,7 @@ def main():
             args.dir = current_dir
 
         if args.dir and args.build:
-            PrettyOutput.print(f"Processing directory: {args.dir}", output_type=OutputType.INFO)
+            PrettyOutput.print(f"正在处理目录: {args.dir}", output_type=OutputType.INFO)
             rag.build_index(args.dir)
             return 0
 
@@ -733,13 +733,13 @@ def main():
             if args.search:
                 results = rag.query(args.search)
                 if not results:
-                    PrettyOutput.print("No related content found", output_type=OutputType.WARNING)
+                    PrettyOutput.print("未找到相关内容", output_type=OutputType.WARNING)
                     return 1
                     
                 for doc in results:
-                    output = f"""File: {doc.metadata['file_path']}\n"""
-                    output += f"""Fragment {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}\n"""
-                    output += f"""Content:\n{doc.content}\n"""
+                    output = f"""文件: {doc.metadata['file_path']}\n"""
+                    output += f"""片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']}\n"""
+                    output += f"""内容:\n{doc.content}\n"""
                     PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
                 return 0
 
@@ -747,19 +747,19 @@ def main():
                 # Call ask method
                 response = rag.ask(args.ask)
                 if not response:
-                    PrettyOutput.print("Failed to get answer", output_type=OutputType.WARNING)
+                    PrettyOutput.print("获取答案失败", output_type=OutputType.WARNING)
                     return 1
                     
                 # Display answer
-                output = f"""Answer:\n{response}"""
+                output = f"""答案:\n{response}"""
                 PrettyOutput.print(output, output_type=OutputType.INFO)
                 return 0
 
-        PrettyOutput.print("Please specify operation parameters. Use -h to view help.", output_type=OutputType.WARNING)
+        PrettyOutput.print("请指定操作参数。使用 -h 查看帮助。", output_type=OutputType.WARNING)
         return 1
 
     except Exception as e:
-        PrettyOutput.print(f"Failed to execute: {str(e)}", output_type=OutputType.ERROR)
+        PrettyOutput.print(f"执行失败: {str(e)}", output_type=OutputType.ERROR)
         return 1
 
 if __name__ == "__main__":

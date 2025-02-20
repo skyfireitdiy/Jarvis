@@ -51,7 +51,7 @@ class ReadCodeTool:
             
             # Record the operation and the full path
             abs_path = os.path.abspath(filepath)
-            PrettyOutput.print(f"Reading code file: {abs_path}", OutputType.INFO)
+            PrettyOutput.print(f"正在读取代码文件：{abs_path}", OutputType.INFO)
             
             # Check if file exists
             if not os.path.exists(filepath):

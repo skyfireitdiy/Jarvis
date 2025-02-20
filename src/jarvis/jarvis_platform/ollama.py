@@ -26,21 +26,21 @@ class OllamaPlatform(BasePlatform):
             
             if not available_models:
                 message = (
-                    "Need to download Ollama model first to use:\n"
-                    "1. Install Ollama: https://ollama.ai\n"
-                    "2. Download model:\n"
+                    "需要先下载 Ollama 模型才能使用:\n"
+                    "1. 安装 Ollama: https://ollama.ai\n"
+                    "2. 下载模型:\n"
                     f"   ollama pull {self.model_name}"
                 )
                 PrettyOutput.print(message, OutputType.INFO)
-                PrettyOutput.print("Ollama has no available models", OutputType.WARNING)
+                PrettyOutput.print("Ollama 没有可用的模型", OutputType.WARNING)
                 
         except requests.exceptions.ConnectionError:
             message = (
-                "Ollama service is not started or cannot be connected\n"
-                "Please ensure that you have:\n"
-                "1. Installed Ollama: https://ollama.ai\n"
-                "2. Started Ollama service\n"
-                "3. Service address configured correctly (default: http://localhost:11434)"
+                "Ollama 服务未启动或无法连接\n"
+                "请确保您已:\n"
+                "1. 安装 Ollama: https://ollama.ai\n"
+                "2. 启动 Ollama 服务\n"
+                "3. 正确配置服务地址 (默认: http://localhost:11434)"
             )
             PrettyOutput.print(message, OutputType.WARNING)
             
@@ -108,12 +108,12 @@ class OllamaPlatform(BasePlatform):
             return full_response
             
         except Exception as e:
-            PrettyOutput.print(f"Chat failed: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"对话失败: {str(e)}", OutputType.ERROR)
             raise Exception(f"Chat failed: {str(e)}")
 
     def upload_files(self, file_list: List[str]) -> List[Dict]:
         """Upload files (Ollama does not support file upload)"""
-        PrettyOutput.print("Ollama does not support file upload", output_type=OutputType.WARNING)
+        PrettyOutput.print("Ollama 不支持文件上传", output_type=OutputType.WARNING)
         return []
         
     def reset(self):
@@ -142,10 +142,10 @@ if __name__ == "__main__":
         ollama = OllamaPlatform()
         while True:
             try:
-                message = get_single_line_input("Input question (Ctrl+C to exit)")
+                message = get_single_line_input("输入问题 (Ctrl+C 退出)")
                 ollama.chat_until_success(message)
             except KeyboardInterrupt:
-                print("Goodbye!")
+                print("再见!")
                 break
     except Exception as e:
-        PrettyOutput.print(f"Program exited with an exception: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(f"程序异常退出: {str(e)}", OutputType.ERROR)

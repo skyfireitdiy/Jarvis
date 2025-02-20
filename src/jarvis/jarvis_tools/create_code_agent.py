@@ -31,7 +31,7 @@ class CreateCodeAgentTool:
             # Step 1: Handle uncommitted changes
             start_commit = None
             if has_uncommitted_changes():
-                PrettyOutput.print("Found uncommitted changes, committing first...", OutputType.INFO)
+                PrettyOutput.print("发现未提交的更改，正在提交...", OutputType.INFO)
                 git_commiter = GitCommitTool()
                 result = git_commiter.execute({})
                 if not result["success"]:
@@ -45,7 +45,7 @@ class CreateCodeAgentTool:
             start_commit = self._get_current_commit()
             
             # Step 2: Development
-            PrettyOutput.print("Starting development...", OutputType.INFO)
+            PrettyOutput.print("开始开发...", OutputType.INFO)
             agent = CodeAgent()
             agent.run(requirement)
             
@@ -53,7 +53,7 @@ class CreateCodeAgentTool:
             end_commit = self._get_current_commit()
             
             # Step 3: Code Review
-            PrettyOutput.print("Starting code review...", OutputType.INFO)
+            PrettyOutput.print("开始代码审查...", OutputType.INFO)
             reviewer = CodeReviewTool()
             review_result = reviewer.execute({
                 "review_type": "range",
@@ -69,15 +69,15 @@ class CreateCodeAgentTool:
                 }
             
             # Step 4: Generate Summary
-            summary = f"""Development Summary:
+            summary = f"""开发总结:
             
-Start Commit: {start_commit}
-End Commit: {end_commit}
+开始提交: {start_commit}
+结束提交: {end_commit}
 
-Requirement:
+需求:
 {requirement}
 
-Code Review Result:
+代码审查结果:
 {extract_code_report(review_result["stdout"])}
 """
             
