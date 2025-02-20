@@ -173,8 +173,7 @@ class PrettyOutput:
         content = Syntax(text, lang, theme="monokai")
             
         # Print panel with appropriate border style
-        border_style = "red" if output_type == OutputType.ERROR else output_type.value
-        console.print(Panel(content, border_style=border_style, title=header, title_align="left", highlight=True))
+        console.print(Panel(content, title=header, title_align="left", highlight=True, expand=False))
         
         # Print stack trace for errors
         if traceback or output_type == OutputType.ERROR:
