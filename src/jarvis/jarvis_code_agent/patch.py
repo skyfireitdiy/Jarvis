@@ -2,7 +2,7 @@ import re
 from typing import Dict, Any, List
 import os
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
-from jarvis.utils import OutputType, PrettyOutput, has_uncommitted_changes, user_confirm
+from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, user_confirm
 
 
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
@@ -104,10 +104,16 @@ def apply_patch(output_str: str)->str:
         except Exception as e:
             PrettyOutput.print(f"Error applying patch to {filepath}: {str(e)}", OutputType.ERROR)
             continue
-    
+    ret = ""
     if has_uncommitted_changes():
-        handle_commit_workflow()
-    return ""
+        if handle_commit_workflow():
+            ret += "Successfully applied the patch"
+        else:
+            ret += "User rejected the patch"
+        user_input = get_multiline_input("You can continue to input: ")
+        if user_input:
+            ret += user_input
+    return ret
     
 def handle_commit_workflow()->bool:
     """Handle the git commit workflow and return the commit details.

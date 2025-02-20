@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Dict, Any
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.utils import PrettyOutput, OutputType
-from .base import Tool
-class ToolGenerator(Tool):
+
+class ToolGenerator:
     name = "tool_generator"
     description = "Generates new tools using LLM that integrate with the system"
     parameters = {
