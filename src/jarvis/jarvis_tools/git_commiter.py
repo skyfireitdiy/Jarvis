@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 import yaml
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.utils import OutputType, PrettyOutput, init_env
+from jarvis.utils import OutputType, PrettyOutput, has_uncommitted_changes, init_env
 import sys
 
 
@@ -25,6 +25,9 @@ class GitCommitTool:
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute automatic commit process"""
         try:
+            if not has_uncommitted_changes():
+                PrettyOutput.print("没有未提交的更改", OutputType.SUCCESS)
+                return {"success": True, "stdout": "No uncommitted changes", "stderr": ""}
             PrettyOutput.print("准备添加文件到提交...", OutputType.SYSTEM)
             os.system("git add .")
             PrettyOutput.print("Get diff...", OutputType.SYSTEM)

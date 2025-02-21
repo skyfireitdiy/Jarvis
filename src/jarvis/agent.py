@@ -1,4 +1,5 @@
 import argparse
+from ast import Tuple
 import time
 from typing import Callable, Dict, List, Optional
 
@@ -33,8 +34,9 @@ class Agent:
                  system_prompt: str, 
                  name: str = "Jarvis", 
                  is_sub_agent: bool = False, 
-                 tool_registry: Optional[ToolRegistry] = None, 
-                 platform: Optional[BasePlatform] = None, 
+                 tool_registry: Optional[ToolRegistry|List[str]] = None, 
+                 platform: Optional[BasePlatform]|Optional[str] = None, 
+                 model_name: Optional[str] = None,
                  summary_prompt: Optional[str] = None, 
                  auto_complete: Optional[bool] = None, 
                  output_handler_before_tool: Optional[List[Callable]] = None,
@@ -63,11 +65,34 @@ class Agent:
             max_context_length: Maximum context length
         """
         PrettyOutput.print(f"欢迎使用Jarvis，你的AI助手，正在初始化...", OutputType.SYSTEM)
+
+        # 初始化平台和模型
         if platform is not None:
-            self.model = platform
+            if isinstance(platform, str):
+                self.model = PlatformRegistry().create_platform(platform)
+                if self.model is None:
+                    PrettyOutput.print(f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING)
+                    self.model = PlatformRegistry().get_normal_platform()
+            else:
+                self.model = platform
         else:
             self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        self.tool_registry = tool_registry if tool_registry else ToolRegistry()
+
+        if model_name is not None:
+            self.model.set_model_name(model_name)
+
+
+        # 初始化工具
+        if tool_registry is not None:
+            if isinstance(tool_registry, ToolRegistry):
+                self.tool_registry = tool_registry
+            elif isinstance(tool_registry, List):
+                self.tool_registry = ToolRegistry()
+                self.tool_registry.use_tools(tool_registry)
+        else:
+            self.tool_registry = ToolRegistry()
+
+        
         self.record_methodology = record_methodology if record_methodology is not None else is_record_methodology()
         self.use_methodology = use_methodology if use_methodology is not None else is_use_methodology()
         self.name = name
@@ -188,7 +213,7 @@ Please describe in concise bullet points, highlighting important information.
             message = handler(message)
 
         while True:
-            ret = self.model.chat_until_success(message)
+            ret = self.model.chat_until_success(message) # type: ignore
             if ret:
                 return ret
             else:
@@ -314,7 +339,7 @@ Please continue the task based on the above information.
         try:
             PrettyOutput.section("准备环境", OutputType.PLANNING)
             if file_list:
-                self.model.upload_files(file_list)
+                self.model.upload_files(file_list) # type: ignore
 
             # 显示任务开始
             PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
@@ -397,7 +422,7 @@ Please continue the task based on the above information.
         3. Reset conversation length counter
         """
         self.prompt = "" 
-        self.model.reset()
+        self.model.reset() # type: ignore
         self.conversation_length = 0  # Reset conversation length
 
 
