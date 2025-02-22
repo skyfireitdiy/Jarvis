@@ -87,7 +87,7 @@ Please coordinate the team effectively to deliver quality results."""
         ])
         return tools
 
-    def analyze_requirement(self, requirement: str) -> Dict[str, Any]:
+    def complete_requirement(self, requirement: str) -> Dict[str, Any]:
         """Analyze development requirement"""
         try:
             # Create analysis prompt

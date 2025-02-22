@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional, Union, Callable
 from jarvis.agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.utils import PrettyOutput, OutputType, init_env, user_confirm
+from jarvis.utils import PrettyOutput, OutputType, get_multiline_input, init_env, user_confirm
 
 from jarvis.jarvis_dev.pm import ProductManager
 from jarvis.jarvis_dev.ba import BusinessAnalyst
@@ -43,96 +43,18 @@ class DevTeam:
         try:
             # Let PM analyze and plan the development process
             PrettyOutput.section("\n=== Product Manager Analysis ===", OutputType.INFO)
-            pm_result = self.pm.analyze_requirement(requirement)
-            if not pm_result["success"]:
-                return pm_result
-            
-            PrettyOutput.print(pm_result["analysis"], OutputType.INFO)
-            
-            # PM will coordinate with other roles through messages
-            # Each role can decide next steps and send messages to others
-            # Development flow is determined by role interactions
-            
-            # Track development state
-            state = {
-                "requirement": requirement,
-                "pm_analysis": pm_result,
-                "current_stage": "analysis"
+            self.pm.complete_requirement(requirement)
+            return {
+                "success": True,
+                "result": "Product Manager completed the requirement"
             }
-            
-            # Let roles collaborate until completion
-            while True:
-                if state.get("completed"):
-                    return {
-                        "success": True,
-                        "result": state
-                    }
-                    
-                if state.get("failed"):
-                    return {
-                        "success": False,
-                        "error": state.get("error", "Development failed")
-                    }
-                    
-                # Wait for user confirmation before continuing
-                if not user_confirm("Continue development?"):
-                    return {
-                        "success": False,
-                        "error": "Development cancelled by user"
-                    }
-    
         except Exception as e:
             return {
                 "success": False, 
                 "error": f"Development process failed: {str(e)}"
             }
 
-    def _check_qa_passed(self, verification: Dict) -> bool:
-        """Check if QA verification passed"""
-        try:
-            # Check unit tests
-            unit_tests = verification["test_results"]["unit_tests"]
-            for suite in unit_tests:
-                if suite["failed"] > 0:
-                    return False
-                
-            # Check integration tests    
-            integration_tests = verification["test_results"]["integration_tests"]
-            for suite in integration_tests:
-                for scenario in suite["scenarios"]:
-                    if scenario["status"] == "Fail":
-                        return False
-                        
-            # Check critical issues
-            if verification["recommendations"]["critical_issues"]:
-                return False
-                
-            return True
             
-        except Exception:
-            return False
-            
-    def _update_design_with_qa_feedback(self, design: str, qa_feedback: Dict) -> str:
-        """Update design based on QA feedback"""
-        try:
-            # Create feedback prompt
-            prompt = f"""Please update this system design based on QA feedback:
-
-Current Design:
-{design}
-
-QA Feedback:
-{qa_feedback}
-
-Please provide updated design maintaining the same YAML format."""
-
-            # Get updated design
-            result = self.sa.agent.run(prompt)
-            return result
-            
-        except Exception as e:
-            PrettyOutput.print(f"Failed to update design: {str(e)}", OutputType.ERROR)
-            return design
 
     def handle_message(self, message: Message) -> Dict[str, Any]:
         """Handle inter-role message"""
@@ -169,22 +91,24 @@ Please provide updated design maintaining the same YAML format."""
 
 def main():
     """CLI entry point"""
-    import argparse
-
     init_env()
     
-    parser = argparse.ArgumentParser(description='Development team automation')
-    parser.add_argument('requirement', help='Development requirement')
-    args = parser.parse_args()
-    
     team = DevTeam()
-    result = team.handle_requirement(args.requirement)
     
-    if result["success"]:
-        PrettyOutput.print("Development completed successfully!", OutputType.SUCCESS)
-        PrettyOutput.print(result["result"], OutputType.INFO)
-    else:
-        PrettyOutput.print(f"Development failed: {result['error']}", OutputType.ERROR)
+    while True:
+        # 获取用户输入
+        requirement = get_multiline_input("\n请输入开发需求 (输入空行退出):\n>>> ")
+        if not requirement:
+            break
+            
+        # 处理需求
+        result = team.handle_requirement(requirement)
+        
+        if result["success"]:
+            PrettyOutput.print("开发任务完成!", OutputType.SUCCESS)
+            PrettyOutput.print(result["result"], OutputType.INFO)
+        else:
+            PrettyOutput.print(f"开发任务失败: {result['error']}", OutputType.ERROR)
 
 if __name__ == "__main__":
     main()
