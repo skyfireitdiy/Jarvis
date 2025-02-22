@@ -37,7 +37,7 @@ context:  # optional
             use_methodology=False,
             record_methodology=False,
             need_summary=False,
-            execute_tool_confirm=True,
+            execute_tool_confirm=False,
         )
 
     def send_message(self, to_role: str, msg_type: MessageType, 
