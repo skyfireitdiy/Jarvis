@@ -1,85 +1,79 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Callable, Union
 from jarvis.agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_dev.team_role import TeamRole
+from jarvis.jarvis_dev.message import Message
 
-class BusinessAnalyst:
+class BusinessAnalyst(TeamRole):
     """Business Analyst role for business logic analysis"""
     
-    def __init__(self):
+    def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize Business Analyst agent"""
         system_prompt = """You are an experienced Business Analyst responsible for:
 
 1. Business Analysis
-- Analyze business requirements
-- Identify business rules and workflows
-- Define use cases and scenarios
-- Document business processes
+- Analyze business requirements and impact
+- Identify stakeholder needs
+- Map business processes
+- Define business rules
 
-2. Requirements Specification
-- Create detailed functional specifications
-- Define data requirements
-- Specify business rules
+2. Requirements Refinement
+- Detail functional requirements
+- Specify data requirements
 - Document edge cases
+- Define validation rules
 
-3. Process Modeling
-- Create process flow diagrams
-- Define data flow
-- Identify integration points
-- Document state transitions
+3. Team Collaboration
+- Work with PM to clarify requirements
+- Provide business context to TL
+- Support SA with business rules
+- Guide Dev on business logic
+- Define QA test scenarios
 
-Please analyze business requirements and create detailed specifications."""
+4. Documentation
+- Create detailed specifications
+- Document business workflows
+- Maintain requirement traceability
+- Record design decisions
 
-        summary_prompt = """Please format your analysis output in YAML between <ANALYSIS> and </ANALYSIS> tags:
-<ANALYSIS>
-business_rules:
-  - rule_id: rule_id
-    description: rule_description
-    type: validation/calculation/process
-    
-workflows:
-  - name: workflow_name
-    description: workflow_description
-    steps:
-      - step_id: step_id
-        description: step_description
-        actor: actor_name
-        action: action_description
+When analyzing business requirements:
+1. First understand PM's analysis
+2. Deep dive into business implications
+3. Identify potential risks and impacts
+4. Consult stakeholders when needed
+5. Share insights with technical team
+
+You can communicate with team members:
+- Ask PM for requirement clarification
+- Explain business rules to TL
+- Provide process details to SA
+- Guide Dev on business logic
+- Share test scenarios with QA
+
+Please ensure business requirements are well understood and properly implemented."""
+
+        super().__init__("BusinessAnalyst", system_prompt, message_handler)
         
-use_cases:
-  - id: uc_id
-    name: use_case_name
-    actor: actor_name
-    preconditions:
-      - condition_1
-    main_flow:
-      - step_1
-    alternative_flows:
-      - condition: condition
-        steps:
-          - alt_step_1
-    
-data_requirements:
-  - entity: entity_name
-    attributes:
-      - name: attr_name
-        type: attr_type
-        validation: validation_rule
-    relationships:
-      - entity: related_entity
-        type: one_to_many/many_to_one
-</ANALYSIS>"""
-
-        # Initialize agent with thinking capabilities
-        self.agent = Agent(
-            system_prompt=system_prompt,
-            summary_prompt=summary_prompt,
-            name="BusinessAnalyst",
-            platform=PlatformRegistry().get_thinking_platform(),
-            tool_registry=ToolRegistry(),
-            auto_complete=True,
-            is_sub_agent=True
-        )
+    def _get_platform(self):
+        return PlatformRegistry().get_thinking_platform()
+        
+    def _get_tools(self):
+        tools = ToolRegistry()
+        tools.use_tools([
+            # 基础工具
+            "ask_user",
+            "methodology",
+            "execute_shell",
+            # 业务工具
+            "read_code",
+            "ask_codebase",
+            "search",
+            "read_webpage",
+            "rag",
+            "lsp_get_document_symbols"
+        ])
+        return tools
         
     def analyze_business(self, pm_analysis: str) -> Dict[str, Any]:
         """Analyze business requirements

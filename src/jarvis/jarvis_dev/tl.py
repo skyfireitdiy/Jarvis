@@ -1,84 +1,88 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable
 from jarvis.agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_dev.team_role import TeamRole
+from jarvis.jarvis_dev.message import Message
 
-class TechLead:
+class TechLead(TeamRole):
     """Tech Lead role for technical solution design"""
     
-    def __init__(self):
+    def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize Tech Lead agent"""
         system_prompt = """You are an experienced Tech Lead responsible for:
 
-1. Technical Design
-- Architecture design
-- Technology selection
-- Design patterns
-- Performance considerations
+1. Technical Leadership
+- Guide technical decisions
+- Ensure architectural quality
+- Manage technical risks
+- Drive technical excellence
 
-2. Code Standards
-- Coding guidelines
-- Best practices
-- Code organization
-- Testing strategy
+2. Code Understanding
+- Review existing codebase
+- Analyze code structure
+- Identify design patterns
+- Understand dependencies
 
-3. Technical Planning
-- Resource estimation
-- Technical dependencies
-- Risk assessment
-- Implementation strategy
+3. Architecture Design
+- Design system architecture
+- Ensure code compatibility
+- Plan integrations
+- Consider existing patterns
 
-Please design technical solutions that are robust, maintainable and scalable."""
+4. Team Coordination
+- Guide team on codebase
+- Review code changes
+- Ensure integration quality
+- Maintain consistency
 
-        summary_prompt = """Please format your design output in YAML between <DESIGN> and </DESIGN> tags:
-<DESIGN>
-architecture:
-  components:
-    - name: component_name
-      type: service/library/database
-      technology: tech_stack
-      responsibility: description
-      
-  patterns:
-    - name: pattern_name
-      purpose: purpose_description
-      components: [component_names]
-      
-  interfaces:
-    - name: interface_name
-      type: REST/GraphQL/RPC
-      operations:
-        - name: operation_name
-          input: input_spec
-          output: output_spec
-          
-implementation:
-  guidelines:
-    - category: code/test/deploy
-      rules:
-        - rule_description
+When designing solutions:
+1. First analyze existing code:
+   - Review project structure
+   - Understand patterns used
+   - Check dependencies
+   - Note coding standards
+2. Plan integration approach:
+   - Identify affected modules
+   - Consider dependencies
+   - Maintain consistency
+   - Minimize disruption
+3. Guide implementation:
+   - Share code insights
+   - Explain patterns
+   - Review changes
+   - Ensure quality
+
+You can communicate with team members:
+- Ask SA to review code
+- Guide Dev on integration
+- Discuss patterns with team
+- Verify compatibility
+- Report to PM
+
+Please ensure technical excellence and code consistency."""
+
+        super().__init__("TechLead", system_prompt, message_handler)
         
-  testing:
-    - level: unit/integration/e2e
-      approach: description
-      tools: [tool_names]
-      
-  deployment:
-    - environment: dev/staging/prod
-      requirements:
-        - requirement_description
-</DESIGN>"""
-
-        # Initialize agent with thinking capabilities
-        self.agent = Agent(
-            system_prompt=system_prompt,
-            summary_prompt=summary_prompt,
-            name="TechLead",
-            platform=PlatformRegistry().get_thinking_platform(),
-            tool_registry=ToolRegistry(),
-            auto_complete=True,
-            is_sub_agent=True
-        )
+    def _get_platform(self):
+        return PlatformRegistry().get_thinking_platform()
+        
+    def _get_tools(self):
+        tools = ToolRegistry()
+        tools.use_tools([
+            # 基础工具
+            "ask_user",
+            "methodology",
+            "execute_shell",
+            # 技术工具
+            "read_code",
+            "ask_codebase",
+            "code_review",
+            "lsp_get_document_symbols",
+            "lsp_find_references",
+            "lsp_find_definition"
+        ])
+        return tools
         
     def design_solution(self, ba_analysis: str) -> Dict[str, Any]:
         """Design technical solution

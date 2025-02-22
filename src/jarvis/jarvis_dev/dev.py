@@ -1,85 +1,91 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable
 from jarvis.agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_dev.sa import SystemAnalyst
+from jarvis.jarvis_dev.message import Message
+from jarvis.jarvis_dev.team_role import TeamRole
 
-class Developer:
+class Developer(TeamRole):
     """Developer role for code implementation"""
     
-    def __init__(self):
+    def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize Developer agent"""
         system_prompt = """You are an experienced Developer responsible for:
 
-1. Code Implementation
-- Write clean and efficient code
-- Follow coding standards
-- Implement design patterns
-- Handle edge cases
+1. Code Understanding
+- Study existing codebase
+- Analyze code patterns
+- Review dependencies
+- Map code flows
 
-2. Code Quality
+2. Integration Development
+- Write compatible code
+- Follow existing patterns
+- Integrate with APIs
+- Handle data migrations
+
+3. Code Quality
+- Match coding style
+- Maintain consistency
 - Write unit tests
-- Perform code reviews
-- Handle error cases
-- Add documentation
+- Update documentation
 
-3. Technical Integration
-- Integrate components
-- Handle dependencies
-- Manage configurations
-- Implement interfaces
+4. Team Collaboration
+- Learn from codebase
+- Follow SA's design
+- Address QA feedback
+- Share code insights
 
-Please implement code that is clean, maintainable and well-tested."""
+When implementing:
+1. First study existing code:
+   - Read related modules
+   - Understand patterns
+   - Check dependencies
+   - Note coding style
+2. Plan implementation:
+   - Match existing patterns
+   - Reuse components
+   - Follow conventions
+   - Consider impact
+3. Write and test code:
+   - Maintain consistency
+   - Add proper tests
+   - Update docs
+   - Verify integration
 
-        summary_prompt = """Please format your implementation output in YAML between <IMPLEMENTATION> and </IMPLEMENTATION> tags:
-<IMPLEMENTATION>
-components:
-  - name: component_name
-    files:
-      - path: file_path
-        content: |
-          # Code implementation
-          class ClassName:
-              # Implementation details
-              pass
-    
-    tests:
-      - path: test_file_path
-        content: |
-          # Test implementation
-          class TestClassName:
-              # Test cases
-              pass
-    
-    documentation:
-      - type: readme/api/usage
-        content: |
-          # Documentation
-          ## Usage
-          ...
+You can communicate with team members:
+- Ask SA about system design
+- Consult TL on patterns
+- Discuss tests with QA
+- Report progress to PM
 
-dependencies:
-  - name: dependency_name
-    version: version_number
-    purpose: dependency_purpose
-    
-configuration:
-  - file: config_file_path
-    content: |
-      # Configuration
-      key: value
-</IMPLEMENTATION>"""
+Please ensure code quality and seamless integration."""
 
         # Initialize agent with thinking capabilities
-        self.agent = Agent(
-            system_prompt=system_prompt,
-            summary_prompt=summary_prompt,
-            name="Developer",
-            platform=PlatformRegistry().get_codegen_platform(),
-            tool_registry=ToolRegistry(),
-            auto_complete=True,
-            is_sub_agent=True
-        )
+        super().__init__("Developer", system_prompt, message_handler)
         
+    def _get_platform(self):
+        return PlatformRegistry().get_codegen_platform()
+        
+    def _get_tools(self):
+        tools = ToolRegistry()
+        tools.use_tools([
+            # 基础工具
+            "ask_user",
+            "methodology",
+            "execute_shell",
+            # 开发工具
+            "read_code",
+            "ask_codebase",
+            "lsp_validate_edit",
+            "lsp_get_document_symbols",
+            "code_review",
+            "file_operation",
+            "create_code_agent"
+        ])
+        return tools
+
     def implement(self, sa_design: str) -> Dict[str, Any]:
         """Implement system design
         

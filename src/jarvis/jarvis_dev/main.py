@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Union, Callable
 from jarvis.agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -10,146 +10,80 @@ from jarvis.jarvis_dev.tl import TechLead
 from jarvis.jarvis_dev.sa import SystemAnalyst
 from jarvis.jarvis_dev.dev import Developer
 from jarvis.jarvis_dev.qa import QualityAssurance
+from jarvis.jarvis_dev.message import Message, MessageType
 
 class DevTeam:
     """Development team with multiple roles"""
     
     def __init__(self):
         """Initialize development team"""
-        self.pm = ProductManager()
-        self.tl = TechLead()
-        self.ba = BusinessAnalyst()
-        self.sa = SystemAnalyst() 
-        self.dev = Developer()
-        self.qa = QualityAssurance()
+        # Create typed message handler
+        message_handler: Callable[[Message], Dict[str, Any]] = lambda msg: self.handle_message(msg)
+        
+        # Initialize roles
+        self.pm = ProductManager(message_handler=message_handler)
+        self.ba = BusinessAnalyst(message_handler=message_handler)
+        self.tl = TechLead(message_handler=message_handler)
+        self.sa = SystemAnalyst(message_handler=message_handler)
+        self.dev = Developer(message_handler=message_handler)
+        self.qa = QualityAssurance(message_handler=message_handler)
+        
+        # Role mapping
+        self.roles = {
+            "ProductManager": self.pm,
+            "BusinessAnalyst": self.ba,
+            "TechLead": self.tl,
+            "SystemAnalyst": self.sa,
+            "Developer": self.dev,
+            "QualityAssurance": self.qa
+        }
         
     def handle_requirement(self, requirement: str) -> Dict[str, Any]:
         """Handle development requirement with team collaboration"""
         try:
-            while True:  # Main development loop
-                # Show stage selection menu
-                PrettyOutput.print("\n=== Development Stages ===", OutputType.INFO)
-                stages = [
-                    "1. Product Manager Analysis",
-                    "2. Business Analyst Analysis", 
-                    "3. Tech Lead Design",
-                    "4. System Analyst Design",
-                    "5. Development & QA",
-                    "6. Exit"
-                ]
-
-                stage_out = '\n'.join(stages)
-                PrettyOutput.print(stage_out, OutputType.INFO)
-                
-                choice = input("\nSelect stage to execute (1-6): ").strip()
-                
-                if choice == "6":
-                    return {"success": False, "error": "Development cancelled by user"}
-                
-                if choice == "1":
-                    # PM Analysis
-                    PrettyOutput.section("\n=== Product Manager Analysis ===", OutputType.INFO)
-                    pm_result = self.pm.analyze_requirement(requirement)
-                    if not pm_result["success"]:
-                        return pm_result
+            # Let PM analyze and plan the development process
+            PrettyOutput.section("\n=== Product Manager Analysis ===", OutputType.INFO)
+            pm_result = self.pm.analyze_requirement(requirement)
+            if not pm_result["success"]:
+                return pm_result
+            
+            PrettyOutput.print(pm_result["analysis"], OutputType.INFO)
+            
+            # PM will coordinate with other roles through messages
+            # Each role can decide next steps and send messages to others
+            # Development flow is determined by role interactions
+            
+            # Track development state
+            state = {
+                "requirement": requirement,
+                "pm_analysis": pm_result,
+                "current_stage": "analysis"
+            }
+            
+            # Let roles collaborate until completion
+            while True:
+                if state.get("completed"):
+                    return {
+                        "success": True,
+                        "result": state
+                    }
                     
-                    PrettyOutput.print(pm_result["analysis"], OutputType.INFO)
-                    if not user_confirm("Continue to next stage?"):
-                        continue
-                
-                if choice <= "2":
-                    # BA Analysis
-                    PrettyOutput.section("\n=== Business Analyst Analysis ===", OutputType.INFO)
-                    ba_result = self.ba.analyze_business(pm_result["tasks"])
-                    if not ba_result["success"]:
-                        return ba_result
+                if state.get("failed"):
+                    return {
+                        "success": False,
+                        "error": state.get("error", "Development failed")
+                    }
                     
-                    PrettyOutput.print(ba_result["analysis"], OutputType.INFO)
-                    if not user_confirm("Continue to next stage?"):
-                        continue
-                
-                if choice <= "3":
-                    # TL Design
-                    PrettyOutput.section("\n=== Tech Lead Design ===", OutputType.INFO)
-                    tl_result = self.tl.design_solution(ba_result["analysis"])
-                    if not tl_result["success"]:
-                        return tl_result
-                    
-                    PrettyOutput.print(tl_result["design"], OutputType.INFO)
-                    if not user_confirm("Continue to next stage?"):
-                        continue
-                
-                if choice <= "4":
-                    # SA Design
-                    PrettyOutput.section("\n=== System Analyst Design ===", OutputType.INFO)
-                    sa_result = self.sa.design_system(tl_result["design"])
-                    if not sa_result["success"]:
-                        return sa_result
-                    
-                    PrettyOutput.print(sa_result["design"], OutputType.INFO)
-                    if not user_confirm("Continue to next stage?"):
-                        continue
-                
-                if choice <= "5":
-                    # Dev & QA iterations
-                    max_iterations = 3
-                    iteration = 0
-                    
-                    while iteration < max_iterations:
-                        iteration += 1
-                        PrettyOutput.section(f"\n=== Development Iteration {iteration} ===", OutputType.INFO)
-                        
-                        dev_result = self.dev.implement(sa_result["design"])
-                        if not dev_result["success"]:
-                            return dev_result
-                        
-                        PrettyOutput.print(dev_result["implementation"], OutputType.INFO)
-                        if not user_confirm("Continue with implementation?"):
-                            break
-                        
-                        PrettyOutput.section("\n=== QA Verification ===", OutputType.INFO)
-                        qa_result = self.qa.verify(dev_result["implementation"])
-                        if not qa_result["success"]:
-                            return qa_result
-                        
-                        PrettyOutput.print(qa_result["verification"], OutputType.INFO)
-                        
-                        if "verification" in qa_result and "test_results" in qa_result["verification"]:
-                            if self._check_qa_passed(qa_result["verification"]):
-                                if user_confirm("QA verification passed. Complete development?"):
-                                    return {
-                                        "success": True,
-                                        "result": {
-                                            "requirement": requirement,
-                                            "pm_analysis": pm_result,
-                                            "ba_analysis": ba_result,
-                                            "tl_design": tl_result,
-                                            "sa_design": sa_result,
-                                            "dev_implementation": dev_result,
-                                            "qa_verification": qa_result,
-                                            "iterations": iteration
-                                        }
-                                    }
-                        
-                        if iteration == max_iterations:
-                            if not user_confirm("Max iterations reached. Return to previous stage?"):
-                                return {
-                                    "success": False,
-                                    "error": "Max iterations reached without passing QA"
-                                }
-                            break
-                        
-                        if not user_confirm("Start next iteration?"):
-                            break
-                        
-                        sa_result["design"] = self._update_design_with_qa_feedback(
-                            sa_result["design"], 
-                            qa_result["verification"]
-                        )
-                
+                # Wait for user confirmation before continuing
+                if not user_confirm("Continue development?"):
+                    return {
+                        "success": False,
+                        "error": "Development cancelled by user"
+                    }
+    
         except Exception as e:
             return {
-                "success": False,
+                "success": False, 
                 "error": f"Development process failed: {str(e)}"
             }
 
@@ -199,6 +133,39 @@ Please provide updated design maintaining the same YAML format."""
         except Exception as e:
             PrettyOutput.print(f"Failed to update design: {str(e)}", OutputType.ERROR)
             return design
+
+    def handle_message(self, message: Message) -> Dict[str, Any]:
+        """Handle inter-role message"""
+        if message.to_role not in self.roles:
+            return {
+                "success": False,
+                "error": f"Unknown recipient role: {message.to_role}"
+            }
+        
+        # Get recipient role and handle message
+        recipient = self.roles[message.to_role]
+        result = recipient.handle_message(message)
+        
+        if result["success"]:
+            PrettyOutput.print(f"\n{message.to_role}'s Response:", OutputType.INFO)
+            PrettyOutput.print(result["response"], OutputType.INFO)
+        
+        return result
+
+    def send_message(self, from_role: str, to_role: str,
+                    msg_type: MessageType, content: str,
+                    context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Send message between roles"""
+        if from_role not in self.roles:
+            return {
+                "success": False,
+                "error": f"Unknown sender role: {from_role}"
+            }
+            
+        # Create and send message
+        sender = self.roles[from_role]
+        message = sender.send_message(to_role, msg_type, content, context)
+        return self.handle_message(message)
 
 def main():
     """CLI entry point"""

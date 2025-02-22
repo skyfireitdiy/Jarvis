@@ -1,96 +1,81 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable
 from jarvis.agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_dev.team_role import TeamRole
+from jarvis.jarvis_dev.message import Message
 
-class QualityAssurance:
+class QualityAssurance(TeamRole):
     """Quality Assurance role for testing and verification"""
     
-    def __init__(self):
+    def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize QA agent"""
         system_prompt = """You are an experienced QA Engineer responsible for:
 
-1. Test Planning
-- Create test strategies
-- Design test cases
-- Define test data
-- Plan test execution
+1. Quality Strategy
+- Define test strategies
+- Set quality standards
+- Plan test coverage
+- Manage test data
 
-2. Test Execution
-- Execute test cases
-- Record test results
+2. Testing Process
+- Design test cases
+- Execute test suites
 - Track defects
 - Verify fixes
 
-3. Quality Assurance
-- Verify requirements
-- Check code quality
-- Review documentation
-- Ensure standards compliance
+3. Team Collaboration
+- Review BA's requirements
+- Validate TL's design
+- Test SA's components
+- Guide Dev testing
+- Report to PM
+
+4. Quality Metrics
+- Monitor code quality
+- Track test coverage
+- Measure performance
+- Assess reliability
+
+When testing:
+1. First understand requirements from BA
+2. Review TL's technical guidelines
+3. Follow SA's component design
+4. Verify Dev's implementation
+5. Report issues clearly
+
+You can communicate with team members:
+- Clarify requirements with BA
+- Discuss standards with TL
+- Review design with SA
+- Guide Dev on testing
+- Update PM on quality
 
 Please ensure thorough testing and quality verification."""
 
-        summary_prompt = """Please format your verification output in YAML between <VERIFICATION> and </VERIFICATION> tags:
-<VERIFICATION>
-test_results:
-  unit_tests:
-    - suite: test_suite_name
-      passed: number
-      failed: number
-      skipped: number
-      coverage: percentage
-      issues:
-        - description: issue_description
-          severity: Critical/Major/Minor
-          location: code_location
-  
-  integration_tests:
-    - suite: test_suite_name
-      scenarios:
-        - name: scenario_name
-          status: Pass/Fail
-          issues:
-            - description: issue_description
-  
-  performance_tests:
-    - type: load/stress/endurance
-      metrics:
-        - name: metric_name
-          value: metric_value
-          threshold: threshold_value
-          status: Pass/Fail
-
-quality_metrics:
-  - category: code/docs/tests
-    metrics:
-      - name: metric_name
-        value: metric_value
-        target: target_value
-        status: Pass/Fail
-
-recommendations:
-  critical_issues:
-    - description: issue_description
-      impact: impact_description
-      solution: proposed_solution
-      
-  improvements:
-    - area: improvement_area
-      suggestions:
-        - suggestion_description
-      priority: High/Medium/Low
-</VERIFICATION>"""
-
-        # Initialize agent with thinking capabilities
-        self.agent = Agent(
-            system_prompt=system_prompt,
-            summary_prompt=summary_prompt,
-            name="QualityAssurance",
-            platform=PlatformRegistry().get_thinking_platform(),
-            tool_registry=ToolRegistry(),
-            auto_complete=True,
-            is_sub_agent=True
-        )
+        super().__init__("QualityAssurance", system_prompt, message_handler)
+        
+    def _get_platform(self):
+        """Get agent platform"""
+        return PlatformRegistry().get_thinking_platform()
+        
+    def _get_tools(self):
+        """Get agent tools"""
+        tools = ToolRegistry()
+        tools.use_tools([
+            # 基础工具
+            "ask_user",
+            "methodology",
+            "execute_shell",
+            # 测试工具
+            "read_code",
+            "ask_codebase",
+            "code_review",
+            "lsp_get_diagnostics",
+            "lsp_get_document_symbols",
+            "file_operation"
+        ])
+        return tools
         
     def verify(self, implementation: str) -> Dict[str, Any]:
         """Verify implementation quality

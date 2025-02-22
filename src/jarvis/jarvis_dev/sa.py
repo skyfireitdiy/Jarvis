@@ -1,95 +1,89 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable
 from jarvis.agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_dev.team_role import TeamRole
+from jarvis.jarvis_dev.message import Message
 
-class SystemAnalyst:
+class SystemAnalyst(TeamRole):
     """System Analyst role for system design"""
     
-    def __init__(self):
+    def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize System Analyst agent"""
         system_prompt = """You are an experienced System Analyst responsible for:
 
-1. System Design
-- Component design
-- Interface design
-- Data model design
-- Integration design
+1. System Understanding
+- Analyze existing codebase
+- Map system components
+- Understand data flows
+- Document dependencies
 
-2. Technical Specifications
-- API specifications
-- Data schemas
-- Interface contracts
-- Error handling
+2. Integration Design
+- Plan component integration
+- Ensure compatibility
+- Handle data migrations
+- Maintain consistency
 
-3. System Documentation
-- Architecture diagrams
-- Sequence diagrams
-- Data flow diagrams
-- Component interactions
+3. Technical Specifications
+- Detail interface changes
+- Update data schemas
+- Modify API contracts
+- Adapt error handling
 
-Please create detailed system designs and specifications."""
+4. Team Coordination
+- Share system knowledge
+- Guide implementation
+- Review integrations
+- Support testing
 
-        summary_prompt = """Please format your design output in YAML between <DESIGN> and </DESIGN> tags:
-<DESIGN>
-components:
-  - name: component_name
-    type: class/module/service
-    responsibilities:
-      - responsibility_description
-    dependencies:
-      - component: component_name
-        type: uses/implements/extends
-    
-    interfaces:
-      - name: interface_name
-        methods:
-          - name: method_name
-            parameters:
-              - name: param_name
-                type: param_type
-                validation: validation_rule
-            returns:
-              type: return_type
-              description: return_description
-            exceptions:
-              - type: exception_type
-                condition: error_condition
-    
-    data_models:
-      - name: model_name
-        attributes:
-          - name: attr_name
-            type: attr_type
-            constraints:
-              - constraint_description
-        relationships:
-          - model: related_model
-            type: one_to_many/many_to_one
-            
-implementation:
-  classes:
-    - name: class_name
-      methods:
-        - signature: method_signature
-          logic:
-            - logic_step_description
-      attributes:
-        - name: attr_name
-          type: attr_type
-          purpose: attr_purpose
-</DESIGN>"""
+When designing systems:
+1. First analyze current system:
+   - Read existing code
+   - Map dependencies
+   - Document flows
+   - Note patterns
+2. Plan integration:
+   - Identify touch points
+   - Design interfaces
+   - Handle migrations
+   - Ensure compatibility
+3. Guide development:
+   - Share system context
+   - Explain flows
+   - Review changes
+   - Verify integration
 
-        # Initialize agent with thinking capabilities
-        self.agent = Agent(
-            system_prompt=system_prompt,
-            summary_prompt=summary_prompt,
-            name="SystemAnalyst",
-            platform=PlatformRegistry().get_thinking_platform(),
-            tool_registry=ToolRegistry(),
-            auto_complete=True,
-            is_sub_agent=True
-        )
+You can communicate with team members:
+- Discuss architecture with TL
+- Explain system to Dev
+- Share flows with QA
+- Update PM on progress
+
+Please ensure smooth system integration and maintainability."""
+
+        super().__init__("SystemAnalyst", system_prompt, message_handler)
+        
+    def _get_platform(self):
+        """Get agent platform"""
+        return PlatformRegistry().get_thinking_platform()
+        
+    def _get_tools(self):
+        """Get agent tools"""
+        tools = ToolRegistry()
+        tools.use_tools([
+            # 基础工具
+            "ask_user",
+            "methodology",
+            "execute_shell",
+            # 系统工具
+            "read_code",
+            "ask_codebase",
+            "lsp_get_document_symbols",
+            "lsp_find_definition",
+            "lsp_find_references",
+            "code_review"
+        ])
+        return tools
         
     def design_system(self, tl_design: str) -> Dict[str, Any]:
         """Design system components and interfaces
