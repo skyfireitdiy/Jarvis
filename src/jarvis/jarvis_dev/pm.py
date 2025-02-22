@@ -83,7 +83,8 @@ Please coordinate the team effectively to deliver quality results."""
             "ask_codebase",
             "search",
             "read_webpage",
-            "rag"
+            "rag",
+            "file_operation"
         ])
         return tools
 

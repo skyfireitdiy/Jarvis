@@ -81,7 +81,8 @@ Please ensure smooth system integration and maintainability."""
             "lsp_get_document_symbols",
             "lsp_find_definition",
             "lsp_find_references",
-            "code_review"
+            "code_review",
+            "file_operation"
         ])
         return tools
         

@@ -70,6 +70,7 @@ Please ensure business requirements are well understood and properly implemented
             "ask_codebase",
             "search",
             "read_webpage",
+            "file_operation",
             "rag",
             "lsp_get_document_symbols"
         ])

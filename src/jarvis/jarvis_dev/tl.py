@@ -80,7 +80,8 @@ Please ensure technical excellence and code consistency."""
             "code_review",
             "lsp_get_document_symbols",
             "lsp_find_references",
-            "lsp_find_definition"
+            "lsp_find_definition",
+            "file_operation"
         ])
         return tools
         

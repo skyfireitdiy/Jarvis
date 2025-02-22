@@ -22,6 +22,28 @@ context:  # optional
   key1: value1
   key2: value2
 </SEND_MESSAGE>
+
+Important Communication Rules:
+1. After sending a message, ALWAYS wait for the recipient's response before continuing
+2. Do not proceed with next steps until you receive and understand the response
+3. If you need information from multiple roles, send messages one at a time and wait for each response
+4. Make sure to acknowledge and consider each response in your next actions
+
+Context Sharing Rules:
+1. Other roles cannot see your current context, you must explicitly share it
+2. When referencing code or files, always include the file paths in the context
+3. For complex information, write it to a file and share the file path
+4. Include relevant context in every message to ensure the recipient has complete information
+5. When responding to messages, reference the specific context you are addressing
+
+Information Recording Rules:
+1. Record all key decisions and outputs in files under the 'records' directory
+2. Use consistent file naming: '{role}_{type}_{timestamp}.{ext}'
+3. For code changes, save both the original and modified versions
+4. Include metadata like timestamps, related files, and dependencies
+5. Reference these records in messages to other roles
+6. Keep a log of all important actions and their results
+7. Update records when receiving significant feedback
 """
         system_prompt += message_info
 
