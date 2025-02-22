@@ -97,7 +97,7 @@ def main():
     
     while True:
         # 获取用户输入
-        requirement = get_multiline_input("\n请输入开发需求 (输入空行退出):\n>>> ")
+        requirement = get_multiline_input("\n请输入开发需求 (输入空行退出)")
         if not requirement:
             break
             
