@@ -78,7 +78,7 @@ Context Sharing Rules:
 
 Information Recording Rules:
 1. Record all key decisions and outputs in files under the 'records' directory
-2. Use consistent file naming: '{role}_{type}_{timestamp}.{ext}'
+2. Use consistent file naming: '{role}_{type}.{ext}'
 3. For code changes, save both the original and modified versions
 4. Include metadata like timestamps, related files, and dependencies
 5. Reference these records in messages to other roles
@@ -99,7 +99,7 @@ File Operation Guidelines:
    - Use consistent formatting
    Example format:
    ```markdown
-   ## {role} - {action} - {timestamp}
+   ## {role} - {action}
    
    ### Context
    - Task: {task_description}
