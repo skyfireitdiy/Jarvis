@@ -170,7 +170,7 @@ class PrettyOutput:
         # Add timestamp and agent info
         if timestamp:
             formatted.append(f"[{datetime.now().strftime('%H:%M:%S')}] ", style="white")
-        formatted.append(f"[{get_agent_list()}]", style="blue")
+        formatted.append(f"{get_agent_list()}", style="blue")
         # Add icon
         icon = PrettyOutput._ICONS.get(output_type, "")
         formatted.append(f"{icon} ", style=output_type.value)
