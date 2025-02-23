@@ -686,6 +686,8 @@ Please provide 10 search-optimized expressions in the specified format.
         if question_match:
             try:
                 variants = yaml.safe_load(question_match.group(1))
+                if not isinstance(variants, list):
+                    variants = [str(variants)]
             except Exception as e:
                 PrettyOutput.print(f"解析变体失败: {str(e)}", OutputType.ERROR)
         

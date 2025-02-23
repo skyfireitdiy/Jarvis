@@ -53,10 +53,14 @@ class FileOperationTool:
                     }
                     
                 content = open(filepath, 'r', encoding='utf-8').read()
-                PrettyOutput.print(f"读取文件: {filepath}", OutputType.INFO)
+                output = f"File: {filepath}\n{content}"
+                
+                # Print file content
+                PrettyOutput.print(f"读取文件: {filepath}\n{content}", OutputType.INFO)
+                
                 return {
                     "success": True,
-                    "stdout": f"File: {filepath}\n{content}",
+                    "stdout": output,
                     "stderr": ""
                 }
                 
