@@ -9,7 +9,7 @@ import yaml
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry, tool_call_help
-from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, make_agent_name, move_to_first, user_confirm
+from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, is_support_send_msg, load_methodology, add_agent, delete_current_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, make_agent_name, move_to_first, user_confirm
 import os
 
 class Agent:
