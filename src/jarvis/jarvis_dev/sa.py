@@ -49,7 +49,7 @@ Remember:
 - Consider system constraints
 - Ask TL when architecture questions arise
 """
-        super().__init__("SystemAnalyst", system_prompt, message_handler)
+        super().__init__("SA", system_prompt, message_handler)
         
     def _get_platform(self):
         """Get agent platform"""

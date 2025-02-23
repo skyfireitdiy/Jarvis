@@ -49,7 +49,7 @@ Remember:
 - Support rapid development decisions
 - Ask PM when requirements need clarification
 """
-        super().__init__("BusinessAnalyst", system_prompt, message_handler)
+        super().__init__("BA", system_prompt, message_handler)
         
     def _get_platform(self):
         return PlatformRegistry().get_thinking_platform()

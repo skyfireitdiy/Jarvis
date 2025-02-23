@@ -50,7 +50,7 @@ Remember:
 - Test thoroughly
 - Ask TL when stuck on technical issues
 """
-        super().__init__("Developer", system_prompt, message_handler)
+        super().__init__("Dev", system_prompt, message_handler)
         
     def _get_platform(self):
         return PlatformRegistry().get_normal_platform()

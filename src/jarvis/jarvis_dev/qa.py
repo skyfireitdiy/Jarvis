@@ -49,7 +49,7 @@ Remember:
 - Verify fixes thoroughly
 - Ask BA when unclear on requirements
 """
-        super().__init__("QualityAssurance", system_prompt, message_handler)
+        super().__init__("QA", system_prompt, message_handler)
         
     def _get_platform(self):
         """Get agent platform"""

@@ -47,7 +47,7 @@ Remember:
 - Communicate clearly and directly
 - Ask for clarification when requirements are unclear
 """
-        super().__init__("ProductManager", system_prompt, message_handler)
+        super().__init__("PM", system_prompt, message_handler)
         
     def _get_platform(self):
         return PlatformRegistry().get_thinking_platform()

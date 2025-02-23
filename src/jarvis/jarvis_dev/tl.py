@@ -49,7 +49,7 @@ Remember:
 - Guide team through challenges
 - Ask BA when business context needed
 """
-        super().__init__("TechLead", system_prompt, message_handler)
+        super().__init__("TL", system_prompt, message_handler)
         
     def _get_platform(self):
         return PlatformRegistry().get_thinking_platform()
