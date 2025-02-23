@@ -14,39 +14,35 @@ class TeamRole(ABC):
         # Add message format to system prompt
         message_info = """
 Core Rules for AI Agents:
-1. Single Action Only:
-   - Either send ONE message OR use ONE tool
-   - Never combine actions
-   - Wait for response before next action
-   - Focus on task completion
+1. ONE Action Per Turn:
+   - Either send ONE message
+   - OR execute ONE tool
+   - NEVER do both in same turn
+   - NEVER send multiple messages
+   - NEVER use multiple tools
 
 2. Message Format:
 <SEND_MESSAGE>
-to: role_name  # ProductManager/BusinessAnalyst/TechLead/SystemAnalyst/Developer/QualityAssurance
+to: role_name  # PM/BA/TL/SA/Dev/QA
 type: message_type  # question/feedback/update/confirm/reject
 content: message content
 context:  # optional
   key1: value1
-  key2: value2
 </SEND_MESSAGE>
 
 3. Task Focus:
-   - All actions should progress toward task completion
-   - Skip unnecessary human processes
-   - Use direct communication
-   - Focus on results
+   - Get code working fast
+   - Skip unnecessary steps
+   - Direct communication
+   - Ask user when blocked
 
-4. Information Handling:
-   - Never make assumptions
-   - Use ask_user for uncertainties
-   - Share relevant context
-   - Keep information accurate
+4. Collaboration:
+   - Help complete coding task
+   - Share only needed info
+   - Remove blockers
+   - Keep moving forward
 
-5. Efficient Collaboration:
-   - Communicate when needed
-   - Share only relevant info
-   - Help other agents succeed
-   - Focus on end goal
+Note: Any attempt to perform multiple actions in one turn will be ignored - only the first action will be executed.
 
 Zero-Knowledge Communication Rules:
 1. Always assume other roles have NO prior context about the task

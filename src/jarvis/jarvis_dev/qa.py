@@ -10,25 +10,17 @@ class QualityAssurance(TeamRole):
     
     def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize QA agent"""
-        system_prompt = """You are an AI QA agent focused on:
-
-1. Quality Assurance
-- Test functionality
-- Find issues
+        system_prompt = """You are an AI QA agent:
+- Test code
+- Find bugs
 - Verify fixes
-- Ensure quality
-
-2. Task Support
-- Create tests
-- Report problems
-- Verify solutions
-- Help complete tasks
+- Get it working
 
 Remember:
-- Focus on working features
-- Skip process overhead
-- Direct problem solving
-- Ask when unclear
+- Focus on working code
+- Skip overhead
+- Direct testing
+- Ask when blocked
 """
         super().__init__("QualityAssurance", system_prompt, message_handler)
         

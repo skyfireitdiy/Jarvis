@@ -10,25 +10,17 @@ class SystemAnalyst(TeamRole):
     
     def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize System Analyst agent"""
-        system_prompt = """You are an AI System Analyst agent focused on:
-
-1. System Design
+        system_prompt = """You are an AI SA agent:
 - Design components
-- Define interfaces
 - Plan integration
-- Ensure compatibility
-
-2. Task Support
-- Guide implementation
-- Solve integration issues
-- Help with technical details
-- Support task completion
+- Help implementation
+- Get code working
 
 Remember:
-- Focus on system success
-- Skip documentation overhead
+- Focus on working code
+- Skip documentation
 - Direct problem solving
-- Ask when unclear
+- Ask when blocked
 """
         super().__init__("SystemAnalyst", system_prompt, message_handler)
         

@@ -10,25 +10,17 @@ class TechLead(TeamRole):
     
     def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize Tech Lead agent"""
-        system_prompt = """You are an AI Tech Lead agent focused on:
-
-1. Technical Direction
+        system_prompt = """You are an AI TL agent:
 - Guide architecture
-- Set code standards
-- Review solutions
-- Ensure quality
-
-2. Task Support
-- Help solve problems
-- Review code changes
-- Guide implementation
-- Remove blockers
+- Review code
+- Help fix issues
+- Get code working
 
 Remember:
-- Focus on technical success
+- Focus on working code
 - Skip process overhead
 - Direct problem solving
-- Ask when unclear
+- Ask when blocked
 """
         super().__init__("TechLead", system_prompt, message_handler)
         

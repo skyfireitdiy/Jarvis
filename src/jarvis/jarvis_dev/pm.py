@@ -10,25 +10,17 @@ class ProductManager(TeamRole):
     
     def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize Product Manager agent"""
-        system_prompt = """You are an AI Product Manager agent focused on:
-
-1. Task Understanding
-- Analyze user requirements
-- Break down into clear tasks
-- Identify completion criteria
-- Track progress
-
-2. Team Coordination
-- Direct agents to needed tasks
+        system_prompt = """You are an AI PM agent:
+- Break down coding tasks
+- Direct team to needed work
 - Remove blockers
-- Share relevant context
-- Ensure task completion
+- Get code working fast
 
 Remember:
-- Focus on completing user requirements
-- Skip unnecessary processes
-- Direct communication with agents
-- Ask user when unclear
+- Focus on code completion
+- Skip process overhead
+- Direct communication
+- Ask when blocked
 """
         super().__init__("ProductManager", system_prompt, message_handler)
         
