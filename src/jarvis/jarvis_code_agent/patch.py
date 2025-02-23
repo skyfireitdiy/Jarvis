@@ -8,7 +8,7 @@ from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, has_unco
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """Parse patches from string with format:
     <PATCH>
-    > path/to/file start_line,end_line
+    path/to/file start_line,end_line
     content_line1
     content_line2
     ...
@@ -24,11 +24,9 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             
         # Parse file path and line range
         file_info = lines[0].strip()
-        if not file_info.startswith('>'):
-            continue
             
         # Extract file path and line range
-        match = re.match(r'>\s*([^\s]+)\s+(\d+),(\d+)', file_info)
+        match = re.match(r'([^\s]+)\s+(\d+),(\d+)', file_info)
         if not match:
             continue
             

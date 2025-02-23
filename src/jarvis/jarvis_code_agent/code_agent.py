@@ -51,7 +51,7 @@ class CodeAgent:
 
 # Patch Format
 <PATCH>
-> path/file start,end
+path/file start,end
 new_content
 </PATCH>
 
