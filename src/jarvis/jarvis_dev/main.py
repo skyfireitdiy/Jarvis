@@ -40,11 +40,11 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/requirements.md
+    - path: docs/requirements.md
       content: |
         # Project Requirements
         {requirements}
-    - path: .jarvis/docs/status.md
+    - path: docs/status.md
       content: |
         # Project Status
         Last Updated: {timestamp}
@@ -73,7 +73,7 @@ Key Responsibilities:
 5. Handle risks and issues
 6. Ensure project delivery
 
-Document Management (.jarvis/docs/):
+Document Management (docs/):
 1. requirements.md: Project requirements
 2. project_plan.md: Project planning
 3. status.md: Project status updates
@@ -110,7 +110,7 @@ name: file_operation
 arguments:
   operation: read
   files:
-    - path: .jarvis/docs/requirements.md
+    - path: docs/requirements.md
 </TOOL_CALL>
 
 2. Document analysis:
@@ -119,7 +119,7 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/analysis.md
+    - path: docs/analysis.md
       content: |
         # Requirements Analysis
         {analysis}
@@ -143,7 +143,7 @@ Action Rules:
 - Save detailed content in files, keep messages concise
 - Wait for response before next action
 
-Document Management (.jarvis/docs/):
+Document Management (docs/):
 1. Analysis: requirements_analysis.md
 2. User Stories: user_stories.md
 3. Acceptance Criteria: acceptance_criteria.md
@@ -154,11 +154,11 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/requirements_analysis.md
+    - path: docs/requirements_analysis.md
       content: |
         # Requirements Analysis
         {analysis details}
-    - path: .jarvis/docs/user_stories.md
+    - path: docs/user_stories.md
       content: |
         # User Stories
         {user stories}
@@ -212,7 +212,7 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/architecture.md
+    - path: docs/architecture.md
       content: |
         # Technical Architecture
         {architecture}
@@ -236,7 +236,7 @@ Action Rules:
 - Save detailed content in files, keep messages concise
 - Wait for response before next action
 
-Document Management (.jarvis/docs/):
+Document Management (docs/):
 1. Architecture: architecture.md
 2. Technical Specs: tech_specs.md
 3. Design Decisions: design_decisions.md
@@ -247,8 +247,8 @@ name: file_operation
 arguments:
   operation: read
   files:
-    - path: .jarvis/docs/requirements_analysis.md
-    - path: .jarvis/docs/user_stories.md
+    - path: docs/requirements_analysis.md
+    - path: docs/user_stories.md
 </TOOL_CALL>
 
 Example - Share Design with TL:
@@ -257,11 +257,11 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/architecture.md
+    - path: docs/architecture.md
       content: |
         # Technical Architecture
         {architecture details}
-    - path: .jarvis/docs/tech_specs.md
+    - path: docs/tech_specs.md
       content: |
         # Technical Specifications
         {specifications}
@@ -306,7 +306,7 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/guidelines.md
+    - path: docs/guidelines.md
       content: |
         # Technical Guidelines
         {guidelines}
@@ -337,7 +337,7 @@ Action Rules:
 - Save detailed content in files, keep messages concise
 - Wait for response before next action
 
-Document Management (.jarvis/docs/):
+Document Management (docs/):
 1. Implementation Plan: impl_plan.md
 2. Technical Guidelines: tech_guidelines.md
 3. Progress Reports: progress.md
@@ -348,8 +348,8 @@ name: file_operation
 arguments:
   operation: read
   files:
-    - path: .jarvis/docs/architecture.md
-    - path: .jarvis/docs/tech_specs.md
+    - path: docs/architecture.md
+    - path: docs/tech_specs.md
 </TOOL_CALL>
 
 Example - Share Plan with DEV:
@@ -358,11 +358,11 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/impl_plan.md
+    - path: docs/impl_plan.md
       content: |
         # Implementation Plan
         {plan details}
-    - path: .jarvis/docs/tech_guidelines.md
+    - path: docs/tech_guidelines.md
       content: |
         # Technical Guidelines
         {guidelines}
@@ -409,7 +409,7 @@ name: file_operation
 arguments:
   operation: read
   files:
-    - path: .jarvis/docs/tech_guidelines.md
+    - path: docs/tech_guidelines.md
 </TOOL_CALL>
 
 2. Document task breakdown:
@@ -418,7 +418,7 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/dev_tasks.md
+    - path: docs/dev_tasks.md
       content: |
         # Task Breakdown: JSON Data Storage
         
@@ -466,7 +466,7 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/dev_progress.md
+    - path: docs/dev_progress.md
       content: |
         # Development Progress
         
@@ -539,7 +539,7 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/test_results.md
+    - path: docs/test_results.md
       content: |
         # Test Results
         {test results}
@@ -564,7 +564,7 @@ Action Rules:
 - Save detailed content in files, keep messages concise
 - Wait for response before next action
 
-Document Management (.jarvis/docs/):
+Document Management (docs/):
 1. Test Plans: test_plan.md
 2. Test Results: test_results.md
 3. Quality Reports: quality_report.md
@@ -575,8 +575,8 @@ name: file_operation
 arguments:
   operation: read
   files:
-    - path: .jarvis/docs/acceptance_criteria.md
-    - path: .jarvis/docs/impl_plan.md
+    - path: docs/acceptance_criteria.md
+    - path: docs/impl_plan.md
 </TOOL_CALL>
 
 Example - Document Testing:
@@ -585,11 +585,11 @@ name: file_operation
 arguments:
   operation: write
   files:
-    - path: .jarvis/docs/test_plan.md
+    - path: docs/test_plan.md
       content: |
         # Test Plan
         {test plan details}
-    - path: .jarvis/docs/test_results.md
+    - path: docs/test_results.md
       content: |
         # Test Results
         {test results}
