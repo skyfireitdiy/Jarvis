@@ -51,7 +51,23 @@ You can communicate with team members:
 - Guide Dev on business logic
 - Share test scenarios with QA
 
-Please ensure business requirements are well understood and properly implemented."""
+Please ensure business requirements are well understood and properly implemented.
+
+Collaboration Guidelines:
+As a Business Analyst, you should:
+1. For requirement clarification -> Ask PM
+2. For technical implications -> Consult TL
+3. For implementation details -> Work with SA
+4. For business logic guidance -> Guide Dev
+5. For test scenarios -> Share with QA
+
+Always follow these steps:
+1. Get clear requirements from PM
+2. Analyze business impact
+3. Work with TL on technical aspects
+4. Guide Dev on business logic
+5. Help QA with test scenarios
+"""
 
         super().__init__("BusinessAnalyst", system_prompt, message_handler)
         
@@ -63,7 +79,6 @@ Please ensure business requirements are well understood and properly implemented
         tools.use_tools([
             # 基础工具
             "ask_user",
-            "methodology",
             "execute_shell",
             # 业务工具
             "read_code",

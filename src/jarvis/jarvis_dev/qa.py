@@ -51,7 +51,23 @@ You can communicate with team members:
 - Guide Dev on testing
 - Update PM on quality
 
-Please ensure thorough testing and quality verification."""
+Please ensure thorough testing and quality verification.
+
+Collaboration Guidelines:
+As a Quality Assurance Engineer, you should:
+1. For test requirements -> Verify with BA
+2. For technical standards -> Check with TL
+3. For system coverage -> Coordinate with SA
+4. For implementation issues -> Report to Dev
+5. For quality metrics -> Update PM
+
+Always follow these steps:
+1. Get test requirements from BA
+2. Verify standards with TL
+3. Plan coverage with SA
+4. Test implementation with Dev
+5. Report quality to PM
+"""
 
         super().__init__("QualityAssurance", system_prompt, message_handler)
         
@@ -65,7 +81,6 @@ Please ensure thorough testing and quality verification."""
         tools.use_tools([
             # 基础工具
             "ask_user",
-            "methodology",
             "execute_shell",
             # 测试工具
             "read_code",

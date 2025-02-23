@@ -59,7 +59,22 @@ You can communicate with team members:
 - Share flows with QA
 - Update PM on progress
 
-Please ensure smooth system integration and maintainability."""
+Please ensure smooth system integration and maintainability.
+
+Collaboration Guidelines:
+As a System Analyst, you should:
+1. For architecture decisions -> Consult TL
+2. For business rules -> Verify with BA
+3. For implementation details -> Guide Dev
+4. For integration testing -> Work with QA
+5. For design updates -> Report to PM
+
+Always follow these steps:
+1. Get architecture approval from TL
+2. Verify business rules with BA
+3. Provide detailed guidance to Dev
+4. Plan integration tests with QA
+5. Keep PM informed of design changes."""
 
         super().__init__("SystemAnalyst", system_prompt, message_handler)
         
@@ -73,7 +88,6 @@ Please ensure smooth system integration and maintainability."""
         tools.use_tools([
             # 基础工具
             "ask_user",
-            "methodology",
             "execute_shell",
             # 系统工具
             "read_code",
