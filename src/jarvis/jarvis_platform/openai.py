@@ -49,7 +49,15 @@ class OpenAIModel(BasePlatform):
 
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
-        return []
+        try:
+            models = self.client.models.list()
+            model_list = []
+            for model in models:
+                model_list.append((model.id, model.id))
+            return model_list
+        except Exception as e:
+            PrettyOutput.print(f"获取模型列表失败：{str(e)}", OutputType.ERROR)
+            return []
 
     def set_model_name(self, model_name: str):
         """Set model name"""
