@@ -125,7 +125,7 @@ Please describe in concise bullet points, highlighting important information.
         tools = self.tool_registry.get_all_tools()
         if tools:
             welcome_message += f"\n可用工具: \n{','.join([f'{tool['name']}' for tool in tools])}"
-        PrettyOutput.section(welcome_message, OutputType.SYSTEM)
+        PrettyOutput.print(welcome_message, OutputType.SYSTEM)
         
         tools_prompt = self.tool_registry.load_tools()
         complete_prompt = """"""
