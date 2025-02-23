@@ -19,7 +19,7 @@ class QualityAssurance(TeamRole):
 - Manage test data
 
 2. Testing Process
-- Design test cases
+- Use create_code_agent to generate test cases
 - Execute test suites
 - Track defects
 - Verify fixes
@@ -41,7 +41,11 @@ When testing:
 1. First understand requirements from BA
 2. Review TL's technical guidelines
 3. Follow SA's component design
-4. Verify Dev's implementation
+4. Use create_code_agent to:
+   - Generate test cases
+   - Write test suites
+   - Create test data
+   - Handle edge cases
 5. Report issues clearly
 
 You can communicate with team members:
@@ -73,7 +77,7 @@ Always follow these steps:
         
     def _get_platform(self):
         """Get agent platform"""
-        return PlatformRegistry().get_thinking_platform()
+        return PlatformRegistry().get_normal_platform()
         
     def _get_tools(self):
         """Get agent tools"""
@@ -88,7 +92,8 @@ Always follow these steps:
             "code_review",
             "lsp_get_diagnostics",
             "lsp_get_document_symbols",
-            "file_operation"
+            "file_operation",
+            "create_code_agent"
         ])
         return tools
         

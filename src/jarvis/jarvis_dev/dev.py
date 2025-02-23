@@ -50,7 +50,7 @@ class Developer(TeamRole):
         super().__init__("Developer", system_prompt, message_handler)
         
     def _get_platform(self):
-        return PlatformRegistry().get_codegen_platform()
+        return PlatformRegistry().get_normal_platform()
         
     def _get_tools(self):
         tools = ToolRegistry()
