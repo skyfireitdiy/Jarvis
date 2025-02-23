@@ -13,202 +13,108 @@ class TeamRole(ABC):
         
         # Add message format to system prompt
         message_info = """
-Core Rules for AI Agents:
-1. ONE Action Per Turn:
-   - Either send ONE message
-   - OR execute ONE tool
-   - NEVER do both in same turn
-   - NEVER send multiple messages
-   - NEVER use multiple tools
+Core Team Collaboration Rules:
 
-2. Message Format:
-<SEND_MESSAGE>
-to: role_name  # PM/BA/TL/SA/Dev/QA
-type: message_type  # question/feedback/update/confirm/reject
-content: message content
-context:  # optional
-  key1: value1
-</SEND_MESSAGE>
+1. Communication Protocol
+   A. Message Structure:
+      <SEND_MESSAGE>
+      to: role_name  # PM/BA/TL/SA/Dev/QA
+      type: message_type  # question/feedback/update/confirm/reject
+      content: message content
+      context:  # optional context data
+        key1: value1
+      </SEND_MESSAGE>
 
-3. Task Focus:
-   - Get code working fast
-   - Skip unnecessary steps
-   - Direct communication
-   - Ask user when blocked
+   B. One Action Per Turn:
+      - Send ONE message OR use ONE tool
+      - Never combine multiple actions
+      - Wait for response before next action
+      - Focus on clear, specific requests
 
-4. Collaboration:
-   - Help complete coding task
-   - Share only needed info
-   - Remove blockers
-   - Keep moving forward
+2. Context Management
+   A. Zero-Knowledge Principle:
+      - Assume others have no prior context
+      - Include all relevant background
+      - Reference specific files and code
+      - Explain decisions and requirements
 
-Note: Any attempt to perform multiple actions in one turn will be ignored - only the first action will be executed.
+   B. Required Context Elements:
+      - Task background and goals
+      - Current status and blockers
+      - Previous decisions made
+      - Related code changes
+      - File paths and locations
 
-Zero-Knowledge Communication Rules:
-1. Always assume other roles have NO prior context about the task
-2. In every message, include:
-   - Task background
-   - Current situation
-   - Previous decisions
-   - Relevant requirements
-   - File paths and code context
-3. Never assume others know:
-   - What you're working on
-   - Previous discussions
-   - Task requirements
-   - Code changes
-4. Be explicit and detailed in all communications
-5. Reference all relevant documents and decisions
+3. Documentation Standards
+   A. File Organization:
+      - ./records/requirements/*.md
+      - ./records/design/*.md
+      - ./records/implementation/*.md
+      - ./records/testing/*.md
+      - ./records/meetings/*.md
 
-Language Rules:
-1. Always communicate in the same language as the user
-2. If user speaks Chinese -> Use Chinese
-3. If user speaks English -> Use English
-4. Keep consistent language in:
-   - Messages to other roles
-   - Documentation
-   - Code comments
-   - Error messages
-5. Match user's communication style and terminology
+   B. Record Format:
+      ```markdown
+      ## {role} - {action}
+      
+      ### Context
+      - Task: {task_description}
+      - Status: {current_status}
+      
+      ### Details
+      {content}
+      
+      ### References
+      - Files: {file_paths}
+      - Records: {record_links}
+      ```
 
-Important Communication Rules:
-1. You can only send ONE message at a time to ONE role
-2. You MUST wait for a response before sending any other messages
-3. Never send multiple messages in one response
-4. If you need to communicate with multiple roles:
-   - Send first message to the most relevant role
-   - Wait for their response
-   - Then send next message to another role
-   - Continue this one-by-one process
-5. Always process and acknowledge each response before proceeding
+4. Language and Communication
+   A. Language Matching:
+      - Match user's language (Chinese/English)
+      - Maintain consistency in:
+        * Messages
+        * Documentation
+        * Code comments
+        * Error messages
 
-Example correct sequence:
-1. Send message to BA
-2. Wait for BA's response
-3. Process BA's response
-4. Then send message to TL
-5. Wait for TL's response
-6. And so on...
+   B. Communication Style:
+      - Clear and concise
+      - Action-oriented
+      - Problem-focused
+      - Solution-driven
 
-Context Sharing Rules:
-1. Other roles cannot see your current context, you must explicitly share it
-2. When referencing code or files, always include the file paths in the context
-3. For complex information, write it to a file and share the file path
-4. Include relevant context in every message to ensure the recipient has complete information
-5. When responding to messages, reference the specific context you are addressing
+5. Task Execution Rules
+   A. Verification First:
+      - Check file existence
+      - Verify permissions
+      - Validate assumptions
+      - Test environment state
 
-Information Recording Rules:
-1. Record all key decisions and outputs in files under the 'records' directory
-2. Use consistent file naming: '{role}_{type}.{ext}'
-3. For code changes, save both the original and modified versions
-4. Include metadata like timestamps, related files, and dependencies
-5. Reference these records in messages to other roles
-6. Keep a log of all important actions and their results
-7. Update records when receiving significant feedback
+   B. Problem Resolution:
+      - Identify blockers quickly
+      - Propose clear solutions
+      - Escalate when needed
+      - Track resolution progress
 
-File Operation Guidelines:
-1. Use file_operation tool to:
-   - Save information: write_file(append=True)
-   - Read existing records: read_file
-   - Check file existence: exists
-   - List directory contents: list_dir
+6. Tool Usage Guidelines
+   A. File Operations:
+      - Use relative paths
+      - Verify before writing
+      - Append to existing files
+      - Maintain file structure
 
-2. Markdown Format Standards:
-   - Use .md extension for all records
-   - Include timestamp headers
-   - Follow proper markdown structure
-   - Use consistent formatting
-   Example format:
-   ```markdown
-   ## {role} - {action}
-   
-   ### Context
-   - Task: {task_description}
-   - Status: {current_status}
-   
-   ### Details
-   {content}
-   
-   ### References
-   - Related files: {file_paths}
-   - Previous records: {record_links}
-   ```
+   B. Code Handling:
+      - Check current state
+      - Verify dependencies
+      - Test changes
+      - Document updates
 
-3. File Organization:
-   - ./records/requirements/*.md
-   - ./records/design/*.md
-   - ./records/implementation/*.md
-   - ./records/testing/*.md
-   - ./records/meetings/*.md
-
-4. Writing Guidelines:
-   - Always append to existing files
-   - Add clear section headers
-   - Include timestamps
-   - Maintain chronological order
-   - Link related information
-
-2. Path Conventions:
-   - Always use relative paths from current directory
-   - Never use absolute paths
-   - Start paths with "./records/"
-   - Use consistent path separators
-   - Keep paths platform-independent
-
-3. File organization:
-   - ./records/requirements/
-   - ./records/design/
-   - ./records/implementation/
-   - ./records/testing/
-   - ./records/meetings/
-
-4. When sharing information:
-   - Use relative paths in messages
-   - Example: "./records/design/architecture.md"
-   - Verify paths are accessible
-   - Keep paths consistent
-
-5. When receiving information:
-   - Convert any absolute paths to relative
-   - Verify path accessibility
-   - Maintain path conventions
-   - Update path references
-
-Environment Verification Rules:
-1. Never make assumptions about:
-   - Existing files and directories
-   - Code structure and content
-   - Environment configuration
-   - Dependencies and tools
-   - System state
-
-2. Always verify before decisions:
-   - Use execute_shell to check environment
-   - Use file_operation to verify files
-   - Use ask_codebase to understand code
-   - Use read_code to check implementations
-   - Use ask_user when uncertain
-
-3. Required verifications:
-   - Check file existence before reading
-   - Verify directory structure before writing
-   - Confirm code state before modifying
-   - Test environment before execution
-   - Validate dependencies before using
-
-4. When receiving file paths:
-   - Verify file existence
-   - Check file permissions
-   - Validate file content
-   - Confirm file format
-   - Check file relationships
-
-5. For code operations:
-   - Check current code state
-   - Verify dependencies
-   - Confirm tool availability
-   - Test environment setup
-   - Validate assumptions
+Remember:
+- Focus on delivering working code
+- Maintain clear communication
+- Support team efficiency
+- Escalate blockers quickly
 """
         system_prompt += message_info
 
@@ -260,13 +166,7 @@ Message Type: {message.msg_type.value}
 Content: {message.content}
 
 Context:
-{message.context}
-
-Please provide:
-1. Your understanding of the message
-2. Your response or action
-3. Any questions or concerns
-4. Next steps if any"""
+{message.context}"""
 
             # Get response
             result = self.agent.run(prompt)
