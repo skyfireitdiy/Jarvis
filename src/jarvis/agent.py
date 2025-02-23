@@ -154,7 +154,8 @@ Please describe in concise bullet points, highlighting important information.
             2. Message Format:
             <SEND_MESSAGE>
             to: agent_name  # Target agent name
-            content: message_content  # Message content
+            content: |
+              message_content  # Message content, multi-line must be separated by newlines
             </SEND_MESSAGE>
             
             3. Message Handling:
