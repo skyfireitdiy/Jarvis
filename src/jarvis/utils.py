@@ -36,7 +36,9 @@ colorama.init()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-current_agent = []
+global_agent_name = []
+
+global_agents = {}
 
 # Install rich traceback handler
 install_rich_traceback()
@@ -60,30 +62,35 @@ custom_theme = Theme({
 console = Console(theme=custom_theme)
 
 def make_agent_name(agent_name: str):
-    if agent_name in current_agent:
+    if agent_name in global_agent_name:
         i = 1
-        while f"{agent_name}_{i}" in current_agent:
+        while f"{agent_name}_{i}" in global_agent_name:
             i += 1
         return f"{agent_name}_{i}"
     else:
         return agent_name
 
-def add_agent(agent_name: str):
-    current_agent.append(agent_name)
+def add_agent(agent_name: str, agent: Any):
+    global_agent_name.append(agent_name)
+    global_agents[agent_name] = agent
 
 def move_to_last(agent_name: str):
-    current_agent.remove(agent_name)
-    current_agent.append(agent_name)
+    global_agent_name.remove(agent_name)
+    global_agent_name.append(agent_name)
 
 def move_to_first(agent_name: str):
-    current_agent.remove(agent_name)
-    current_agent.insert(0, agent_name)
+    global_agent_name.remove(agent_name)
+    global_agent_name.insert(0, agent_name)
 
 def get_agent_list():
-    return ']['.join(current_agent) if current_agent else "No Agent"
+    return ']['.join(global_agent_name) if global_agent_name else "No Agent"
 
 def delete_current_agent():
-    current_agent.pop()
+    name = global_agent_name.pop()
+    del global_agents[name]
+
+def send_message_to_agent(agent_name: str, message: str):
+    global_agents[agent_name].run(message)
 
 class OutputType(Enum):
     SYSTEM = "system"      # AI assistant message
@@ -762,7 +769,7 @@ def is_need_summary() -> bool:
     return os.getenv('JARVIS_NEED_SUMMARY', 'true') == 'true'
 
 def is_support_send_msg() -> bool:
-    return os.getenv('JARVIS_SUPPORT_SEND_MSG', 'true') == 'true'
+    return os.getenv('JARVIS_SUPPORT_SEND_MSG', 'false') == 'true'
 
 def get_min_paragraph_length() -> int:
     return int(os.getenv('JARVIS_MIN_PARAGRAPH_LENGTH', '50'))

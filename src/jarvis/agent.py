@@ -1,5 +1,6 @@
 import argparse
 from ast import Tuple
+import re
 import time
 from typing import Callable, Dict, List, Optional
 
@@ -133,7 +134,19 @@ Please describe in concise bullet points, highlighting important information.
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
         
         tools_prompt = self.tool_registry.load_tools()
-        complete_prompt = """"""
+
+        send_msg_prompt = ""
+        if self.support_send_msg:
+            send_msg_prompt = """
+            ## Send Message
+            You can send messages to other roles using the following command:
+            <SEND_MESSAGE>
+            to: role_name
+            content: message_content
+            </SEND_MESSAGE>
+            """
+
+        complete_prompt = ""
         if self.auto_complete:
             complete_prompt = """
             ## Task Completion
@@ -146,9 +159,29 @@ Please describe in concise bullet points, highlighting important information.
 
 {tools_prompt}
 
+{send_msg_prompt}
+
 {complete_prompt}
 """)
         self.first = True
+
+    @staticmethod
+    def _extract_send_msg(content: str) -> List[Dict]:
+        """Extract send message from content.
+        
+        Args:
+            content: The content containing send message
+        """
+        data = re.findall(r'<SEND_MESSAGE>(.*?)</SEND_MESSAGE>', content, re.DOTALL)
+        ret = []
+        for item in data:
+            try:
+                msg = yaml.safe_load(item)
+                if 'to' in msg and 'content' in msg:
+                    ret.append(msg)
+            except Exception as e:
+                continue
+        return ret
 
     @staticmethod
     def _extract_tool_calls(content: str) -> List[Dict]:
@@ -164,39 +197,17 @@ Please describe in concise bullet points, highlighting important information.
             Exception: If tool call is missing necessary fields
         """
         # Split content into lines
-        lines = content.split('\n')
-        tool_call_lines = []
-        in_tool_call = False
-
-
-        # Process line by line
-        for line in lines:
-            if '<TOOL_CALL>' in line:
-                in_tool_call = True
+        data = re.findall(r'<TOOL_CALL>(.*?)</TOOL_CALL>', content, re.DOTALL)
+        ret = []
+        for item in data:
+            try:
+                msg = yaml.safe_load(item)
+                if 'name' in msg and 'arguments' in msg:
+                    ret.append(msg)
+            except Exception as e:
                 continue
-            elif '</TOOL_CALL>' in line:
-                if in_tool_call and tool_call_lines:
-                    # Parse YAML directly
-                    tool_call_text = '\n'.join(tool_call_lines)
-                    tool_call_data = yaml.safe_load(tool_call_text)
-                    
-                    # Validate necessary fields
-                    if "name" in tool_call_data and "arguments" in tool_call_data:
-                        # Return content before tool call and tool call
-                        return [{
-                            "name": tool_call_data["name"],
-                            "arguments": tool_call_data["arguments"]
-                        }]
-                    else:
-                        raise Exception("Tool call missing necessary fields")
-                in_tool_call = False
-                continue
-            
-            if in_tool_call:
-                tool_call_lines.append(line)
-        
-        return []
-
+        return ret
+    
     def _call_model(self, message: str) -> str:
         """Call the AI model with retry logic.
         
@@ -353,7 +364,7 @@ Please continue the task based on the above information.
                 if self.use_methodology:
                     self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
                 self.first = False
-                add_agent(self.name)
+                add_agent(self.name, self)
                 need_remove_agent = True
 
 
