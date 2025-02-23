@@ -341,14 +341,14 @@ Please continue the task based on the above information.
             # 显示任务开始
             PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
 
+            self.prompt = f"{user_input}"
+
             if self.first :
                 if self.use_methodology:
                     self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
                 self.first = False
                 add_agent(self.name)
                 need_remove_agent = True
-            else:
-                self.prompt = f"{user_input}"
 
 
             while True:

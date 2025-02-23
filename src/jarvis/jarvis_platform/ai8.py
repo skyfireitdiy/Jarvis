@@ -161,7 +161,7 @@ class AI8Model(BasePlatform):
             )
             
             if response.status_code != 200:
-                error_msg = f"Failed to chat: {response.status_code}"
+                error_msg = f"Failed to chat: {response.status_code} {response.text}"
                 PrettyOutput.print(error_msg, OutputType.ERROR)
                 raise Exception(error_msg)
             
