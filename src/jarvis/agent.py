@@ -183,6 +183,14 @@ Please describe in concise bullet points, highlighting important information.
             <!!!COMPLETE!!!>
             """
 
+        additional_prompt = ""
+        if not tools_prompt and send_msg_prompt:
+            additional_prompt = """YOU MUST CALL ONE TOOL EVERY TURN!!!"""
+        if not send_msg_prompt and tools_prompt:
+            additional_prompt = """YOU MUST SEND ONE MESSAGE EVERY TURN!!!"""
+        if send_msg_prompt and tools_prompt:
+            additional_prompt = """YOU MUST CALL ONE TOOL OR SEND ONE MESSAGE EVERY TURN!!!"""
+
         self.model.set_system_message(f"""
 {self.system_prompt}
 
@@ -191,6 +199,8 @@ Please describe in concise bullet points, highlighting important information.
 {send_msg_prompt}
 
 {complete_prompt}
+
+{additional_prompt}
 """)
         self.first = True
 
