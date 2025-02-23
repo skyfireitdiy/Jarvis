@@ -185,11 +185,11 @@ Please describe in concise bullet points, highlighting important information.
 
         additional_prompt = ""
         if not tools_prompt and send_msg_prompt:
-            additional_prompt = """YOU MUST CALL ONE TOOL EVERY TURN!!!"""
+            additional_prompt = """YOU MUST CALL ONE TOOL EVERY TURN, UNLESS YOU THINK THE TASK IS COMPLETED!!!"""
         if not send_msg_prompt and tools_prompt:
-            additional_prompt = """YOU MUST SEND ONE MESSAGE EVERY TURN!!!"""
+            additional_prompt = """YOU MUST SEND ONE MESSAGE EVERY TURN, UNLESS YOU THINK THE TASK IS COMPLETED!!!"""
         if send_msg_prompt and tools_prompt:
-            additional_prompt = """YOU MUST CALL ONE TOOL OR SEND ONE MESSAGE EVERY TURN!!!"""
+            additional_prompt = """YOU MUST CALL ONE TOOL OR SEND ONE MESSAGE EVERY TURN, UNLESS YOU THINK THE TASK IS COMPLETED!!!"""
 
         self.model.set_system_message(f"""
 {self.system_prompt}
