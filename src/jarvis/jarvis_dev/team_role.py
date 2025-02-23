@@ -267,19 +267,29 @@ Please provide:
         import yaml
         
         # Extract messages
-        msg_matches = re.finditer(r'<SEND_MESSAGE>\s*(.*?)\s*</SEND_MESSAGE>', output, re.DOTALL)
-        for match in msg_matches:
-            try:
-                msg_yaml = yaml.safe_load(match.group(1))
-                message = Message(
-                    from_role=self.name,
-                    to_role=msg_yaml["to"],
-                    msg_type=MessageType(msg_yaml["type"]),
-                    content=msg_yaml["content"],
-                    context=msg_yaml.get("context")
-                )
-                self.message_handler(message)
-            except:
-                pass
+        msg_matches = list(re.finditer(r'<SEND_MESSAGE>\s*(.*?)\s*</SEND_MESSAGE>', output, re.DOTALL))
+        
+        if not msg_matches:
+            return output
+        
+        # Only process first message
+        try:
+            first_msg = msg_matches[0]
+            msg_yaml = yaml.safe_load(first_msg.group(1))
+            message = Message(
+                from_role=self.name,
+                to_role=msg_yaml["to"],
+                msg_type=MessageType(msg_yaml["type"]),
+                content=msg_yaml["content"],
+                context=msg_yaml.get("context")
+            )
+            self.message_handler(message)
             
+            # If there are more messages, add warning
+            if len(msg_matches) > 1:
+                return output + "\n\nWARNING: Only sent first message. Additional messages were ignored as per communication rules."
+            
+        except Exception:
+            pass
+        
         return output 
