@@ -17,14 +17,14 @@ arguments:
     param2: value2
 </TOOL_CALL>
 
-Strict Rules:
-- Execute only one tool at a time
-- Tool execution must strictly follow the tool usage format
-- Wait for user to provide execution results
-- Don't assume or imagine results
-- Don't create fake dialogues
-- If current information is insufficient, you may ask the user for more information
-- Not all problem-solving steps are mandatory, skip as appropriate
+STRICT RULES:
+- EXECUTE ONLY ONE TOOL AT EVERY TURN
+- TOOL EXECUTION MUST STRICTLY FOLLOW THE TOOL USAGE FORMAT
+- WAIT FOR USER TO PROVIDE EXECUTION RESULTS
+- DON'T ASSUME OR IMAGINE RESULTS
+- DON'T CREATE FAKE DIALOGUES
+- IF CURRENT INFORMATION IS INSUFFICIENT, YOU MAY ASK THE USER FOR MORE INFORMATION
+- NOT ALL PROBLEM-SOLVING STEPS ARE MANDATORY, SKIP AS APPROPRIATE
 - Request user guidance when multiple iterations show no progress
 - ALWAYS use | syntax for string parameters to prevent parsing errors
     Example:

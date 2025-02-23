@@ -146,10 +146,9 @@ Please describe in concise bullet points, highlighting important information.
             
             !!! CRITICAL ACTION RULES !!!
             You can ONLY perform ONE action per turn:
-            - Either use ONE tool (file_operation, ask_user, etc.)
-            - Or send ONE message to another agent
-            - NEVER do both in the same turn
-            - Additional actions will be IGNORED
+            - ENSURE USE ONLY ONE TOOL EVERY TURN (file_operation, ask_user, etc.)
+            - OR SEND ONE MESSAGE TO ANOTHER AGENT
+            - NEVER DO BOTH IN THE SAME TURN
             
             2. Message Format:
             <SEND_MESSAGE>
