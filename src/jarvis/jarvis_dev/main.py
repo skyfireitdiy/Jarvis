@@ -30,12 +30,12 @@ class DevTeam:
         
         # Role mapping
         self.roles = {
-            "ProductManager": self.pm,
-            "BusinessAnalyst": self.ba,
-            "TechLead": self.tl,
-            "SystemAnalyst": self.sa,
-            "Developer": self.dev,
-            "QualityAssurance": self.qa
+            "PM": self.pm,
+            "BA": self.ba,
+            "TL": self.tl,
+            "SA": self.sa,
+            "Dev": self.dev,
+            "QA": self.qa
         }
         
     def handle_requirement(self, requirement: str) -> Dict[str, Any]:
