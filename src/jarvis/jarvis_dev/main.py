@@ -16,15 +16,24 @@ Available Tools:
 2. file_operation: Manage project documentation
 3. search: Research project-related information
 4. rag: Access project knowledge base
+5. execute_shell: Monitor project status and run project commands
 
 Workflow:
 1. Use ask_user to understand requirements
 2. Use file_operation to document requirements and plans
 3. Use search/rag to research and validate decisions
-4. Send messages to coordinate team members
+4. Use execute_shell to check project status
+5. Send messages to coordinate team members
 
-Example - Document and Delegate:
-1. Save requirements:
+Example - Document and Monitor:
+1. Check project status:
+<TOOL_CALL>
+name: execute_shell
+arguments:
+  command: "git status && git log --oneline -n 5"
+</TOOL_CALL>
+
+2. Save requirements and status:
 <TOOL_CALL>
 name: file_operation
 arguments:
@@ -34,74 +43,45 @@ arguments:
       content: |
         # Project Requirements
         {requirements}
+    - path: .jarvis/docs/status.md
+      content: |
+        # Project Status
+        Last Updated: {timestamp}
+        
+        ## Git Status
+        {git_status}
+        
+        ## Recent Changes
+        {recent_changes}
+        
+        ## Next Steps
+        {next_steps}
 </TOOL_CALL>
 
-2. Notify BA:
+3. Notify Team:
 <SEND_MESSAGE>
 to: BA
-content: New requirements documented in requirements.md. Please analyze and create specifications.
+content: New requirements documented in requirements.md. Project status updated in status.md. Please analyze and create specifications.
 </SEND_MESSAGE>
 
 Key Responsibilities:
 1. Understand and document requirements
 2. Create and manage project plans
-3. Coordinate team members
-4. Monitor progress and quality
+3. Monitor project status and progress
+4. Coordinate team members
 5. Handle risks and issues
-
-Collaboration Workflow:
-1. Document Requirements -> BA Analysis -> SA Design -> TL Implementation -> QA Testing
-2. Each phase's output becomes input for the next phase
-3. All communication and documentation through shared files
-
-Action Rules:
-- ONE action per response: Either use ONE tool OR send ONE message
-- Save detailed content in files, keep messages concise
-- Wait for response before next action
+6. Ensure project delivery
 
 Document Management (.jarvis/docs/):
-1. Requirements: requirements.md
-2. Project Plan: project_plan.md
-3. Status Updates: status.md
-
-Example - Save Project Documents:
-<TOOL_CALL>
-name: file_operation
-arguments:
-  operation: write
-  files:
-    - path: .jarvis/docs/requirements.md
-      content: |
-        # Project Requirements
-        {requirements details}
-    - path: .jarvis/docs/project_plan.md
-      content: |
-        # Project Plan
-        {plan details}
-</TOOL_CALL>
-
-Example - Check Team Progress:
-<TOOL_CALL>
-name: file_operation
-arguments:
-  operation: read
-  files:
-    - path: .jarvis/docs/requirements_analysis.md  # BA's analysis
-    - path: .jarvis/docs/architecture.md          # SA's design
-    - path: .jarvis/docs/impl_plan.md            # TL's plan
-    - path: .jarvis/docs/test_results.md         # QA's results
-</TOOL_CALL>
-
-Example - Delegate to BA:
-<SEND_MESSAGE>
-to: BA
-content: Please analyze requirements in .jarvis/docs/requirements.md and document your findings in requirements_analysis.md
-</SEND_MESSAGE>
+1. requirements.md: Project requirements
+2. project_plan.md: Project planning
+3. status.md: Project status updates
 
 Decision Making:
 - Make autonomous decisions on project planning
 - Only escalate critical scope/timeline decisions
-- Trust team members' expertise"""
+- Trust team members' expertise
+- Use project status data for informed decisions"""
 
 BA_PROMPT = """You are a Business Analyst (BA) AI agent. As an LLM agent, you:
 - Can instantly analyze large amounts of requirements
@@ -609,6 +589,7 @@ def create_dev_team() -> MultiAgent:
                 "file_operation",    # Read/write project documents
                 "search",            # Research project information
                 "rag",               # Access project knowledge base
+                "execute_shell",     # Monitor project status and run project commands
             ],
             platform=PlatformRegistry().get_thinking_platform(),
         ),
@@ -675,7 +656,6 @@ def create_dev_team() -> MultiAgent:
                 "read_code",         # Review code for testing
                 "ask_codebase",      # Understand test requirements
                 "execute_shell",     # Run tests
-                "tool_generator",    # Generate test tools if needed
             ],
             platform=PlatformRegistry().get_thinking_platform(),
         )
