@@ -121,10 +121,11 @@ Please describe in concise bullet points, highlighting important information.
         
         self.max_token_count = max_context_length if max_context_length is not None else get_max_token_count()
         self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
-        PrettyOutput.section(f"{name} 初始化完成 - 使用 {self.model.name()} 模型", OutputType.SYSTEM)        
+        welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"
         tools = self.tool_registry.get_all_tools()
         if tools:
-            PrettyOutput.print(f"可用工具: \n{'\n'.join([f'{tool['name']}: {tool['description']}' for tool in tools])}", OutputType.SYSTEM)
+            welcome_message += f"\n可用工具: \n{','.join([f'{tool['name']}' for tool in tools])}"
+        PrettyOutput.section(welcome_message, OutputType.SYSTEM)
         
         tools_prompt = self.tool_registry.load_tools()
         complete_prompt = """"""
