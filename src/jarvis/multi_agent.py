@@ -65,6 +65,9 @@ Please handle this message:
 from: {last_agent}
 content: {msg['content']}
 """
+                if msg['to'] not in self.agents:
+                    msg = self.agents[last_agent].run(f"The agent {msg['to']} is not found, agent list: {self.agents.keys()}")
+                    continue
                 last_agent = self.agents[msg['to']]
                 msg = self.agents[msg['to']].run(prompt)
         return ""
