@@ -9,7 +9,7 @@ import yaml
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry, tool_call_help
-from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, user_confirm
+from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, load_methodology, add_agent, delete_current_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, make_agent_name, move_to_first, user_confirm
 import os
 
 class Agent:
@@ -65,6 +65,8 @@ class Agent:
             max_context_length: Maximum context length
         """
 
+        self.name = make_agent_name(name)
+
         # 初始化平台和模型
         if platform is not None:
             if isinstance(platform, str):
@@ -94,7 +96,6 @@ class Agent:
         
         self.record_methodology = record_methodology if record_methodology is not None else is_record_methodology()
         self.use_methodology = use_methodology if use_methodology is not None else is_use_methodology()
-        self.name = name
         self.is_sub_agent = is_sub_agent
         self.prompt = ""
         self.conversation_length = 0  # Use length counter instead
@@ -329,9 +330,10 @@ Please continue the task based on the above information.
             - Supports interactive mode
         """
 
-        add_agent(self.name)
+        
 
         try:
+            need_remove_agent = False
             PrettyOutput.section("准备环境", OutputType.PLANNING)
             if file_list:
                 self.model.upload_files(file_list) # type: ignore
@@ -339,11 +341,15 @@ Please continue the task based on the above information.
             # 显示任务开始
             PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
 
-            if self.first and self.use_methodology:
-                self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
+            if self.first :
+                if self.use_methodology:
+                    self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
                 self.first = False
+                add_agent(self.name)
+                need_remove_agent = True
             else:
                 self.prompt = f"{user_input}"
+
 
             while True:
                 try:
@@ -406,7 +412,10 @@ Please continue the task based on the above information.
             return f"Task failed: {str(e)}"
         
         finally:
-            delete_current_agent()
+            if need_remove_agent:
+                delete_current_agent()
+            else:
+                move_to_first(self.name)
 
     def _clear_history(self):
         """Clear conversation history while preserving system prompt.

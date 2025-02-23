@@ -59,8 +59,25 @@ custom_theme = Theme({
 
 console = Console(theme=custom_theme)
 
+def make_agent_name(agent_name: str):
+    if agent_name in current_agent:
+        i = 1
+        while f"{agent_name}_{i}" in current_agent:
+            i += 1
+        return f"{agent_name}_{i}"
+    else:
+        return agent_name
+
 def add_agent(agent_name: str):
     current_agent.append(agent_name)
+
+def move_to_last(agent_name: str):
+    current_agent.remove(agent_name)
+    current_agent.append(agent_name)
+
+def move_to_first(agent_name: str):
+    current_agent.remove(agent_name)
+    current_agent.insert(0, agent_name)
 
 def get_agent_list():
     return ']['.join(current_agent) if current_agent else "No Agent"
