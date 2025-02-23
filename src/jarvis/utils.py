@@ -78,9 +78,10 @@ def get_agent_list():
     return "[" + str(len(global_agents)) + "]" + current_agent_name if global_agents else "No Agent"
 
 def delete_agent(agent_name: str):
-    global_agents.remove(agent_name)
-    global current_agent_name
-    current_agent_name = ""
+    if agent_name in global_agents:
+        global_agents.remove(agent_name)
+        global current_agent_name
+        current_agent_name = ""
 
 class OutputType(Enum):
     SYSTEM = "system"      # AI assistant message
