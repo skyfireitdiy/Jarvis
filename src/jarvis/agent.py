@@ -36,6 +36,7 @@ class Agent:
     def __init__(self, 
                  system_prompt: str, 
                  name: str = "Jarvis", 
+                 description: str = "",
                  is_sub_agent: bool = False, 
                  tool_registry: Optional[ToolRegistry|List[str]] = None, 
                  platform: Optional[BasePlatform]|Optional[str] = None, 
@@ -56,6 +57,7 @@ class Agent:
         Args:
             system_prompt: The system prompt defining agent behavior
             name: Agent name, defaults to "Jarvis"
+            description: Agent description, defaults to ""
             is_sub_agent: Whether this is a sub-agent
             tool_registry: Registry of available tools
             platform: AI platform to use
@@ -72,7 +74,7 @@ class Agent:
         """
 
         self.name = make_agent_name(name)
-
+        self.description = description
         # 初始化平台和模型
         if platform is not None:
             if isinstance(platform, str):
