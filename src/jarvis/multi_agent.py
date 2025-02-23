@@ -19,11 +19,7 @@ class AgentConfig:
         self.output_handler_before_tool = config.get('output_handler_before_tool')
         self.output_handler_after_tool = config.get('output_handler_after_tool')
         self.input_handler = config.get('input_handler')
-        self.use_methodology = config.get('use_methodology')
-        self.record_methodology = config.get('record_methodology')
-        self.need_summary = config.get('need_summary')
         self.max_context_length = config.get('max_context_length')
-        self.support_send_msg = True
         self.execute_tool_confirm = config.get('execute_tool_confirm')
 
 class MultiAgent:
@@ -41,14 +37,14 @@ class MultiAgent:
                           model_name=agent_config.model_name,
                           platform=agent_config.platform,
                           max_context_length=agent_config.max_context_length,
-                          support_send_msg=agent_config.support_send_msg,
+                          support_send_msg=False,
                           execute_tool_confirm=agent_config.execute_tool_confirm,
                           input_handler=agent_config.input_handler,
                           output_handler_before_tool=agent_config.output_handler_before_tool,
                           output_handler_after_tool=agent_config.output_handler_after_tool,
-                          use_methodology=agent_config.use_methodology,
-                          record_methodology=agent_config.record_methodology,
-                          need_summary=agent_config.need_summary,
+                          use_methodology=False,
+                          record_methodology=False,
+                          need_summary=False,
                           auto_complete=agent_config.auto_complete,
                           summary_prompt=agent_config.summary_prompt,
                           is_sub_agent=agent_config.is_sub_agent,
