@@ -13,6 +13,13 @@ class TeamRole(ABC):
         
         # Add message format to system prompt
         message_info = """
+!!! CRITICAL ACTION RULE !!!
+- You can ONLY perform ONE action per turn:
+  * Either send ONE message
+  * Or execute ONE tool
+- Any additional actions will be IGNORED
+- Multiple actions in one turn are STRICTLY FORBIDDEN
+
 Core Team Collaboration Rules:
 
 1. Communication Protocol
@@ -25,11 +32,23 @@ Core Team Collaboration Rules:
         key1: value1
       </SEND_MESSAGE>
 
-   B. One Action Per Turn:
-      - Send ONE message OR use ONE tool
-      - Never combine multiple actions
-      - Wait for response before next action
-      - Focus on clear, specific requests
+   B. Single Action Enforcement:
+      - ONE message OR ONE tool per turn - NO EXCEPTIONS
+      - Must wait for response before next action
+      - Cannot combine message sending with tool execution
+      - First action will be executed, others ignored
+      - If multiple actions needed:
+        1. Execute first action
+        2. Wait for response/result
+        3. Plan next action based on response
+        4. Execute next action in new turn
+
+   C. Communication Flow:
+      - Send message -> Wait for response
+      - Use tool -> Wait for result
+      - Never attempt parallel actions
+      - Never chain multiple actions
+      - Always process response before next action
 
 2. Context Management
    A. Zero-Knowledge Principle:
