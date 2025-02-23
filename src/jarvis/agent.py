@@ -1,5 +1,4 @@
 import argparse
-from ast import Tuple
 import re
 import time
 from typing import Callable, Dict, List, Optional
@@ -9,8 +8,8 @@ import yaml
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_tools.registry import ToolRegistry, tool_call_help
-from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, is_support_send_msg, load_methodology, add_agent, delete_current_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, make_agent_name, move_to_first, user_confirm
+from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, load_methodology, set_agent, delete_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, make_agent_name,  user_confirm
 import os
 
 class Agent:
@@ -22,6 +21,9 @@ class Agent:
             summary_prompt: The prompt template for generating task summaries
         """
         self.summary_prompt = summary_prompt
+
+    def __del__(self):
+        delete_agent(self.name)
 
     def set_output_handler_before_tool(self, handler: List[Callable]):
         """Set handlers to process output before tool execution.
@@ -47,7 +49,7 @@ class Agent:
                  record_methodology: Optional[bool] = None,
                  need_summary: Optional[bool] = None,
                  max_context_length: Optional[int] = None,
-                 support_send_msg: Optional[bool] = None,
+                 support_send_msg: bool = False,
                  execute_tool_confirm: Optional[bool] = None):
         """Initialize an Agent instance.
         
@@ -110,7 +112,7 @@ class Agent:
         self.output_handler_before_tool = output_handler_before_tool if output_handler_before_tool else []
         self.output_handler_after_tool = output_handler_after_tool if output_handler_after_tool else []
 
-        self.support_send_msg = support_send_msg if support_send_msg is not None else is_support_send_msg()
+        self.support_send_msg = support_send_msg
 
         self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
 
@@ -138,12 +140,36 @@ Please describe in concise bullet points, highlighting important information.
         send_msg_prompt = ""
         if self.support_send_msg:
             send_msg_prompt = """
-            ## Send Message
-            You can send messages to other roles using the following command:
+            ## Send Message Rules
+            
+            !!! CRITICAL ACTION RULES !!!
+            1. You can ONLY perform ONE action per turn:
+               - Either send ONE message
+               - Or execute ONE tool
+               - NEVER do both in the same turn
+            
+            2. Message Format:
             <SEND_MESSAGE>
-            to: role_name
-            content: message_content
+            to: agent_name  # Target agent name
+            content: message_content  # Message content
             </SEND_MESSAGE>
+            
+            3. Message Handling:
+               - After sending a message, WAIT for response
+               - Process response before next action
+               - Never send multiple messages at once
+               - Never combine message with tool calls
+            
+            4. If Multiple Actions Needed:
+               a. Choose most important action first
+               b. Wait for response/result
+               c. Plan next action based on response
+               d. Execute next action in new turn
+            
+            Remember:
+            - First action will be executed
+            - Additional actions will be IGNORED
+            - Always process responses before new actions
             """
 
         complete_prompt = ""
@@ -330,7 +356,7 @@ Please continue the task based on the above information.
         return "任务完成"
 
 
-    def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str:
+    def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str|Dict:
         """Process user input and execute the task.
         
         Args:
@@ -350,7 +376,7 @@ Please continue the task based on the above information.
         
 
         try:
-            need_remove_agent = False
+            set_agent(self.name, self)
             PrettyOutput.section("准备环境", OutputType.PLANNING)
             if file_list:
                 self.model.upload_files(file_list) # type: ignore
@@ -364,8 +390,6 @@ Please continue the task based on the above information.
                 if self.use_methodology:
                     self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
                 self.first = False
-                add_agent(self.name, self)
-                need_remove_agent = True
 
 
             while True:
@@ -385,6 +409,15 @@ Please continue the task based on the above information.
                         self.prompt = ""
                         self.conversation_length += get_context_token_count(current_response)
 
+                    # Check for message first
+                    send_msg = Agent._extract_send_msg(current_response)
+                    if send_msg:
+                        # If message found, return it and ignore any tool calls
+                        if len(send_msg) > 1:
+                            PrettyOutput.print("收到多个消息，将忽略多余的消息", OutputType.WARNING)
+                        return send_msg[0]
+
+                    # If no message, check for tool calls
                     for handler in self.output_handler_before_tool:
                         self.prompt += handler(current_response)
 
@@ -400,7 +433,7 @@ Please continue the task based on the above information.
                             PrettyOutput.print("正在执行工具调用...", OutputType.PROGRESS)
                             tool_result = self.tool_registry.handle_tool_calls(result)
                             self.prompt += tool_result
-                            
+
                     for handler in self.output_handler_after_tool:
                         self.prompt += handler(current_response)
                     
@@ -427,12 +460,6 @@ Please continue the task based on the above information.
         except Exception as e:
             PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
             return f"Task failed: {str(e)}"
-        
-        finally:
-            if need_remove_agent:
-                delete_current_agent()
-            else:
-                move_to_first(self.name)
 
     def _clear_history(self):
         """Clear conversation history while preserving system prompt.
