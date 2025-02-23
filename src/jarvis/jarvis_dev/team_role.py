@@ -84,6 +84,76 @@ Information Recording Rules:
 5. Reference these records in messages to other roles
 6. Keep a log of all important actions and their results
 7. Update records when receiving significant feedback
+
+File Operation Guidelines:
+1. Use file_operation tool to:
+   - Save important information: write_file
+   - Read existing records: read_file
+   - Check file existence: exists
+   - List directory contents: list_dir
+
+2. Information to record:
+   - Requirements and analysis
+   - Design decisions
+   - Implementation details
+   - Test cases and results
+   - Meeting notes and discussions
+   - Code changes and reviews
+
+3. File organization:
+   - records/requirements/
+   - records/design/
+   - records/implementation/
+   - records/testing/
+   - records/meetings/
+
+4. When sharing information:
+   - Save details to file first
+   - Share file path in message
+   - Include brief summary in message
+   - Reference related files
+
+5. When receiving information:
+   - Read referenced files
+   - Verify file contents
+   - Save relevant updates
+   - Link to existing records
+
+Environment Verification Rules:
+1. Never make assumptions about:
+   - Existing files and directories
+   - Code structure and content
+   - Environment configuration
+   - Dependencies and tools
+   - System state
+
+2. Always verify before decisions:
+   - Use execute_shell to check environment
+   - Use file_operation to verify files
+   - Use ask_codebase to understand code
+   - Use read_code to check implementations
+   - Use ask_user when uncertain
+
+3. Required verifications:
+   - Check file existence before reading
+   - Verify directory structure before writing
+   - Confirm code state before modifying
+   - Test environment before execution
+   - Validate dependencies before using
+
+4. When receiving file paths:
+   - Verify file existence
+   - Check file permissions
+   - Validate file content
+   - Confirm file format
+   - Check file relationships
+
+5. For code operations:
+   - Check current code state
+   - Verify dependencies
+   - Confirm tool availability
+   - Test environment setup
+   - Validate assumptions
 """
         system_prompt += message_info
 
