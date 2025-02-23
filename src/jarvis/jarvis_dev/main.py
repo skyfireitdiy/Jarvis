@@ -24,15 +24,30 @@ Document Management (.jarvis/docs/):
 2. Project Plan: project_plan.md
 3. Status Updates: status.md
 
-Example - Save Requirements:
+Example - Save Multiple Documents:
 <TOOL_CALL>
 name: file_operation
 arguments:
   operation: write
-  path: .jarvis/docs/requirements.md
-  content: |
-    # Project Requirements
-    {requirements details}
+  files:
+    - path: .jarvis/docs/requirements.md
+      content: |
+        # Project Requirements
+        {requirements details}
+    - path: .jarvis/docs/project_plan.md
+      content: |
+        # Project Plan
+        {plan details}
+</TOOL_CALL>
+
+Example - Read Multiple Documents:
+<TOOL_CALL>
+name: file_operation
+arguments:
+  operation: read
+  files:
+    - path: .jarvis/docs/requirements.md
+    - path: .jarvis/docs/project_plan.md
 </TOOL_CALL>
 
 Example - Delegate to BA:
@@ -64,15 +79,20 @@ Document Management (.jarvis/docs/):
 2. User Stories: user_stories.md
 3. Acceptance Criteria: acceptance_criteria.md
 
-Example - Save Analysis:
+Example - Save Analysis Documents:
 <TOOL_CALL>
 name: file_operation
 arguments:
   operation: write
-  path: .jarvis/docs/requirements_analysis.md
-  content: |
-    # Requirements Analysis
-    {analysis details}
+  files:
+    - path: .jarvis/docs/requirements_analysis.md
+      content: |
+        # Requirements Analysis
+        {analysis details}
+    - path: .jarvis/docs/user_stories.md
+      content: |
+        # User Stories
+        {user stories}
 </TOOL_CALL>
 
 Decision Making:
@@ -98,15 +118,30 @@ Document Management (.jarvis/docs/):
 2. Technical Specs: tech_specs.md
 3. Design Decisions: design_decisions.md
 
-Example - Save Architecture:
+Example - Save Architecture Documents:
 <TOOL_CALL>
 name: file_operation
 arguments:
   operation: write
-  path: .jarvis/docs/architecture.md
-  content: |
-    # Technical Architecture
-    {architecture details}
+  files:
+    - path: .jarvis/docs/architecture.md
+      content: |
+        # Technical Architecture
+        {architecture details}
+    - path: .jarvis/docs/tech_specs.md
+      content: |
+        # Technical Specifications
+        {specifications}
+</TOOL_CALL>
+
+Example - Read Requirements:
+<TOOL_CALL>
+name: file_operation
+arguments:
+  operation: read
+  files:
+    - path: .jarvis/docs/requirements_analysis.md
+    - path: .jarvis/docs/user_stories.md
 </TOOL_CALL>
 
 Decision Making:
@@ -132,15 +167,30 @@ Document Management (.jarvis/docs/):
 2. Technical Guidelines: tech_guidelines.md
 3. Progress Reports: progress.md
 
-Example - Save Implementation Plan:
+Example - Save Implementation Documents:
 <TOOL_CALL>
 name: file_operation
 arguments:
   operation: write
-  path: .jarvis/docs/impl_plan.md
-  content: |
-    # Implementation Plan
-    {plan details}
+  files:
+    - path: .jarvis/docs/impl_plan.md
+      content: |
+        # Implementation Plan
+        {plan details}
+    - path: .jarvis/docs/tech_guidelines.md
+      content: |
+        # Technical Guidelines
+        {guidelines}
+</TOOL_CALL>
+
+Example - Read Architecture:
+<TOOL_CALL>
+name: file_operation
+arguments:
+  operation: read
+  files:
+    - path: .jarvis/docs/architecture.md
+    - path: .jarvis/docs/tech_specs.md
 </TOOL_CALL>
 
 Decision Making:
@@ -164,6 +214,22 @@ Action Rules:
 Document Management (.jarvis/docs/):
 1. Development Notes: dev_notes.md
 2. Code Documentation: code_docs.md
+
+Example - Save Development Documents:
+<TOOL_CALL>
+name: file_operation
+arguments:
+  operation: write
+  files:
+    - path: .jarvis/docs/dev_notes.md
+      content: |
+        # Development Notes
+        {notes}
+    - path: .jarvis/docs/code_docs.md
+      content: |
+        # Code Documentation
+        {documentation}
+</TOOL_CALL>
 
 Example - Create Code Agent:
 <TOOL_CALL>
@@ -195,15 +261,30 @@ Document Management (.jarvis/docs/):
 2. Test Results: test_results.md
 3. Quality Reports: quality_report.md
 
-Example - Save Test Plan:
+Example - Save Test Documents:
 <TOOL_CALL>
 name: file_operation
 arguments:
   operation: write
-  path: .jarvis/docs/test_plan.md
-  content: |
-    # Test Plan
-    {test plan details}
+  files:
+    - path: .jarvis/docs/test_plan.md
+      content: |
+        # Test Plan
+        {test plan details}
+    - path: .jarvis/docs/test_results.md
+      content: |
+        # Test Results
+        {test results}
+</TOOL_CALL>
+
+Example - Read Implementation:
+<TOOL_CALL>
+name: file_operation
+arguments:
+  operation: read
+  files:
+    - path: .jarvis/docs/impl_plan.md
+    - path: .jarvis/docs/tech_guidelines.md
 </TOOL_CALL>
 
 Decision Making:
