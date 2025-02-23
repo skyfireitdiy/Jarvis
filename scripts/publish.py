@@ -15,8 +15,6 @@ from typing import Tuple, List
 def get_current_version() -> Tuple[int, int, int]:
     """获取当前版本号"""
     init_file = Path("src/jarvis/__init__.py")
-    setup_file = Path("setup.py")
-    pyproject_file = Path("pyproject.toml")
     
     # 从__init__.py中读取版本号
     init_content = init_file.read_text()
@@ -151,7 +149,7 @@ def main():
         # 推送到远程仓库
         print("Pushing to remote...")
         run_command(
-            ["git", "push", "origin", "main", "--tags"],
+            ["git", "push", "origin", "main", "--tags", "--force"],
             "Failed to push to remote"
         )
         
