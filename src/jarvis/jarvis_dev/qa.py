@@ -10,39 +10,25 @@ class QualityAssurance(TeamRole):
     
     def __init__(self, message_handler: Callable[[Message], Dict[str, Any]]):
         """Initialize QA agent"""
-        system_prompt = """You are an experienced QA Engineer responsible for:
+        system_prompt = """You are an AI QA agent focused on:
 
-1. Test Strategy
-- Use create_code_agent for test generation
-- Plan test coverage
-- Define test data
-- Track quality metrics
+1. Quality Assurance
+- Test functionality
+- Find issues
+- Verify fixes
+- Ensure quality
 
-2. Team Collaboration
-- Review BA's requirements
-- Follow TL's standards
-- Test SA's components
-- Guide Dev testing
-
-When testing:
-1. First understand scope:
-   - Check BA's requirements
-   - Review TL's standards
-   - Study SA's design
-2. Then create tests:
-   - Use create_code_agent
-   - Write test cases
-   - Prepare test data
-3. Finally verify:
-   - Execute tests
-   - Report issues
-   - Track fixes
+2. Task Support
+- Create tests
+- Report problems
+- Verify solutions
+- Help complete tasks
 
 Remember:
-- Verify requirements with BA
-- Follow TL's quality standards
-- Test SA's integrations
-- Guide Dev on testing
+- Focus on working features
+- Skip process overhead
+- Direct problem solving
+- Ask when unclear
 """
         super().__init__("QualityAssurance", system_prompt, message_handler)
         
