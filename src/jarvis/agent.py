@@ -145,10 +145,11 @@ Please describe in concise bullet points, highlighting important information.
             ## Send Message Rules
             
             !!! CRITICAL ACTION RULES !!!
-            1. You can ONLY perform ONE action per turn:
-               - Either send ONE message
-               - Or execute ONE tool
-               - NEVER do both in the same turn
+            You can ONLY perform ONE action per turn:
+            - Either use ONE tool (file_operation, ask_user, etc.)
+            - Or send ONE message to another agent
+            - NEVER do both in the same turn
+            - Additional actions will be IGNORED
             
             2. Message Format:
             <SEND_MESSAGE>
@@ -342,7 +343,7 @@ Please continue the task based on the above information.
                     try:
                         tool_calls = Agent._extract_tool_calls(response)
                         if tool_calls:
-                            self.tool_registry.handle_tool_calls(tool_calls)
+                            self.tool_registry.handle_tool_calls(tool_calls[0])
                     except Exception as e:
                         PrettyOutput.print(f"处理方法论生成失败: {str(e)}", OutputType.ERROR)
                     
@@ -366,17 +367,8 @@ Please continue the task based on the above information.
             file_list: Optional list of files to process
             
         Returns:
-            str: Task summary report
-            
-        Note:
-            - Handles context management
-            - Processes tool calls
-            - Manages conversation flow
-            - Supports interactive mode
+            str|Dict: Task summary report or message to send
         """
-
-        
-
         try:
             set_agent(self.name, self)
             PrettyOutput.section("准备环境", OutputType.PLANNING)
@@ -388,11 +380,10 @@ Please continue the task based on the above information.
 
             self.prompt = f"{user_input}"
 
-            if self.first :
+            if self.first:
                 if self.use_methodology:
                     self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
                 self.first = False
-
 
             while True:
                 try:
@@ -413,27 +404,32 @@ Please continue the task based on the above information.
 
                     # Check for message first
                     send_msg = Agent._extract_send_msg(current_response)
-                    if send_msg:
-                        # If message found, return it and ignore any tool calls
-                        if len(send_msg) > 1:
-                            PrettyOutput.print("收到多个消息，将忽略多余的消息", OutputType.WARNING)
-                        return send_msg[0]
+                    tool_calls = Agent._extract_tool_calls(current_response)
 
-                    # If no message, check for tool calls
+                    if len(send_msg) > 1:
+                        PrettyOutput.print(f"收到多个消息，违反规则，重试...", OutputType.WARNING)
+                        self.prompt += f"Only one message can be sent, but {len(send_msg)} messages were received. Please retry."
+                        continue
+                    if len(tool_calls) > 1:
+                        PrettyOutput.print(f"收到多个工具调用，违反规则，重试...", OutputType.WARNING)
+                        self.prompt += f"Only one tool call can be executed, but {len(tool_calls)} tool calls were received. Please retry."
+                        continue
+                    if send_msg and tool_calls:
+                        PrettyOutput.print(f"收到消息和工具调用，违反规则，重试...", OutputType.WARNING)
+                        self.prompt += f"Only one action can be performed, but both a message and a tool call were received. Please retry."
+                        continue
+
+                    if send_msg:
+                        return send_msg[0]  # Return the first message
+
+                    # If no message, process tool calls
                     for handler in self.output_handler_before_tool:
                         self.prompt += handler(current_response)
-
-                    try:
-                        result = Agent._extract_tool_calls(current_response)
-                    except Exception as e:
-                        PrettyOutput.print(f"工具调用错误: {str(e)}", OutputType.ERROR)
-                        self.prompt += f"Tool call error: {str(e)}"
-                        continue
                     
-                    if len(result) > 0:
-                        if not self.execute_tool_confirm or user_confirm(f"执行工具调用: {result[0]['name']}?"):
+                    if tool_calls:
+                        if not self.execute_tool_confirm or user_confirm(f"执行工具调用: {tool_calls[0]['name']}?"):
                             PrettyOutput.print("正在执行工具调用...", OutputType.PROGRESS)
-                            tool_result = self.tool_registry.handle_tool_calls(result)
+                            tool_result = self.tool_registry.handle_tool_calls(tool_calls[0])
                             self.prompt += tool_result
 
                     for handler in self.output_handler_after_tool:

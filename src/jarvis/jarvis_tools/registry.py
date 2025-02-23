@@ -189,14 +189,10 @@ class ToolRegistry:
             return {"success": False, "stderr": f"Tool {name} does not exist, available tools: {', '.join(self.tools.keys())}", "stdout": ""}
         return tool.execute(arguments)
 
-    def handle_tool_calls(self, tool_calls: List[Dict]) -> str:
+    def handle_tool_calls(self, tool_call: Dict) -> str:
         """Handle tool calls, only process the first tool"""
         try:
-            if not tool_calls:
-                return ""
-                
             # Only process the first tool call
-            tool_call = tool_calls[0]
             name = tool_call["name"]
             args = tool_call["arguments"]
 
@@ -288,9 +284,6 @@ Please provide a summary:"""
             else:
                 PrettyOutput.section("执行失败", OutputType.WARNING)
                 PrettyOutput.print(result["stderr"], OutputType.WARNING)
-            
-            if len(tool_calls) > 1:
-                output += f"\n\n--- Only one tool can be executed at a time, the following tools were not executed\n{str(tool_calls[1:])} ---"
             return output
             
         except Exception as e:

@@ -37,7 +37,7 @@ class MultiAgent:
                           model_name=agent_config.model_name,
                           platform=agent_config.platform,
                           max_context_length=agent_config.max_context_length,
-                          support_send_msg=False,
+                          support_send_msg=True,
                           execute_tool_confirm=agent_config.execute_tool_confirm,
                           input_handler=agent_config.input_handler,
                           output_handler_before_tool=agent_config.output_handler_before_tool,
