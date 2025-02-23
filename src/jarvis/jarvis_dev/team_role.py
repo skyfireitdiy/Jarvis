@@ -87,37 +87,71 @@ Information Recording Rules:
 
 File Operation Guidelines:
 1. Use file_operation tool to:
-   - Save important information: write_file
+   - Save information: write_file(append=True)
    - Read existing records: read_file
    - Check file existence: exists
    - List directory contents: list_dir
 
-2. Information to record:
-   - Requirements and analysis
-   - Design decisions
-   - Implementation details
-   - Test cases and results
-   - Meeting notes and discussions
-   - Code changes and reviews
+2. Markdown Format Standards:
+   - Use .md extension for all records
+   - Include timestamp headers
+   - Follow proper markdown structure
+   - Use consistent formatting
+   Example format:
+   ```markdown
+   ## {role} - {action} - {timestamp}
+   
+   ### Context
+   - Task: {task_description}
+   - Status: {current_status}
+   
+   ### Details
+   {content}
+   
+   ### References
+   - Related files: {file_paths}
+   - Previous records: {record_links}
+   ```
+
+3. File Organization:
+   - ./records/requirements/*.md
+   - ./records/design/*.md
+   - ./records/implementation/*.md
+   - ./records/testing/*.md
+   - ./records/meetings/*.md
+
+4. Writing Guidelines:
+   - Always append to existing files
+   - Add clear section headers
+   - Include timestamps
+   - Maintain chronological order
+   - Link related information
+
+2. Path Conventions:
+   - Always use relative paths from current directory
+   - Never use absolute paths
+   - Start paths with "./records/"
+   - Use consistent path separators
+   - Keep paths platform-independent
 
 3. File organization:
-   - records/requirements/
-   - records/design/
-   - records/implementation/
-   - records/testing/
-   - records/meetings/
+   - ./records/requirements/
+   - ./records/design/
+   - ./records/implementation/
+   - ./records/testing/
+   - ./records/meetings/
 
 4. When sharing information:
-   - Save details to file first
-   - Share file path in message
-   - Include brief summary in message
-   - Reference related files
+   - Use relative paths in messages
+   - Example: "./records/design/architecture.md"
+   - Verify paths are accessible
+   - Keep paths consistent
 
 5. When receiving information:
-   - Read referenced files
-   - Verify file contents
-   - Save relevant updates
-   - Link to existing records
+   - Convert any absolute paths to relative
+   - Verify path accessibility
+   - Maintain path conventions
+   - Update path references
 
 Environment Verification Rules:
 1. Never make assumptions about:
