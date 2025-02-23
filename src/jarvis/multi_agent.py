@@ -3,6 +3,7 @@
 from typing import Dict, List, Optional
 
 from jarvis.agent import Agent
+from jarvis.utils import OutputType, PrettyOutput
 
 
 class AgentConfig:
@@ -66,8 +67,10 @@ from: {last_agent}
 content: {msg['content']}
 """
                 if msg['to'] not in self.agents:
+                    PrettyOutput.print(f"没有找到{msg['to']}，重试...", OutputType.WARNING)
                     msg = self.agents[last_agent].run(f"The agent {msg['to']} is not found, agent list: {self.agents.keys()}")
                     continue
+                PrettyOutput.print(f"{last_agent} 发送消息给 {msg['to']}...", OutputType.INFO)
                 last_agent = self.agents[msg['to']]
                 msg = self.agents[msg['to']].run(prompt)
         return ""
