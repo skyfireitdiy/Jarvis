@@ -118,20 +118,18 @@ Always follow these steps:
 
 {requirement}
 
-Please provide:
-1. Requirement Analysis
-- Key features and functionalities
-- Business value and priorities
-- Constraints and limitations
-- Assumptions and dependencies
+Start by:
+1. Understanding the requirements
+2. Breaking down into tasks
+3. Consulting BA for business analysis
+4. Checking with TL for technical feasibility
+5. Planning the development process
 
-2. Task Breakdown
-- List of specific tasks
-- Task priorities and dependencies
-- Acceptance criteria for each task
-- Complexity estimates
+Remember to:
+- Ask user for any unclear points
+- Record key decisions
+- Keep team informed
 """
-
             # Get analysis result
             result = self.agent.run(prompt)
             
@@ -153,7 +151,7 @@ Please provide:
             return {
                 "success": True,
                 "analysis": result,
-                "tasks": tasks  # Add tasks field for BA consumption
+                "tasks": tasks
             }
             
         except Exception as e:

@@ -12,67 +12,38 @@ class QualityAssurance(TeamRole):
         """Initialize QA agent"""
         system_prompt = """You are an experienced QA Engineer responsible for:
 
-1. Quality Strategy
-- Define test strategies
-- Set quality standards
+1. Test Strategy
+- Use create_code_agent for test generation
 - Plan test coverage
-- Manage test data
+- Define test data
+- Track quality metrics
 
-2. Testing Process
-- Use create_code_agent to generate test cases
-- Execute test suites
-- Track defects
-- Verify fixes
-
-3. Team Collaboration
+2. Team Collaboration
 - Review BA's requirements
-- Validate TL's design
+- Follow TL's standards
 - Test SA's components
 - Guide Dev testing
-- Report to PM
-
-4. Quality Metrics
-- Monitor code quality
-- Track test coverage
-- Measure performance
-- Assess reliability
 
 When testing:
-1. First understand requirements from BA
-2. Review TL's technical guidelines
-3. Follow SA's component design
-4. Use create_code_agent to:
-   - Generate test cases
-   - Write test suites
-   - Create test data
-   - Handle edge cases
-5. Report issues clearly
+1. First understand scope:
+   - Check BA's requirements
+   - Review TL's standards
+   - Study SA's design
+2. Then create tests:
+   - Use create_code_agent
+   - Write test cases
+   - Prepare test data
+3. Finally verify:
+   - Execute tests
+   - Report issues
+   - Track fixes
 
-You can communicate with team members:
-- Clarify requirements with BA
-- Discuss standards with TL
-- Review design with SA
+Remember:
+- Verify requirements with BA
+- Follow TL's quality standards
+- Test SA's integrations
 - Guide Dev on testing
-- Update PM on quality
-
-Please ensure thorough testing and quality verification.
-
-Collaboration Guidelines:
-As a Quality Assurance Engineer, you should:
-1. For test requirements -> Verify with BA
-2. For technical standards -> Check with TL
-3. For system coverage -> Coordinate with SA
-4. For implementation issues -> Report to Dev
-5. For quality metrics -> Update PM
-
-Always follow these steps:
-1. Get test requirements from BA
-2. Verify standards with TL
-3. Plan coverage with SA
-4. Test implementation with Dev
-5. Report quality to PM
 """
-
         super().__init__("QualityAssurance", system_prompt, message_handler)
         
     def _get_platform(self):
@@ -88,7 +59,7 @@ Always follow these steps:
             "execute_shell",
             # 测试工具
             "read_code",
-            "ask_codebase",
+            "ask_codebase", 
             "code_review",
             "lsp_get_diagnostics",
             "lsp_get_document_symbols",
@@ -97,74 +68,3 @@ Always follow these steps:
         ])
         return tools
         
-    def verify(self, implementation: str) -> Dict[str, Any]:
-        """Verify implementation quality
-        
-        Args:
-            implementation: Developer's implementation
-            
-        Returns:
-            Dict containing verification results
-        """
-        try:
-            # Create verification prompt
-            prompt = f"""Please verify this implementation:
-
-Implementation:
-{implementation}
-
-Please provide:
-1. Test Results
-- Unit test results
-- Integration test results
-- Performance test results
-- Security test results
-
-2. Quality Analysis
-- Code quality metrics
-- Documentation quality
-- Test coverage
-- Technical debt
-
-3. Recommendations
-- Critical issues
-- Improvement suggestions
-- Best practices
-- Risk assessment
-"""
-
-            # Get verification result
-            result = self.agent.run(prompt)
-            
-            # Extract YAML content between tags
-            import re
-            import yaml
-            
-            yaml_match = re.search(r'<VERIFICATION>\s*(.*?)\s*</VERIFICATION>', result, re.DOTALL)
-            if yaml_match:
-                yaml_content = yaml_match.group(1)
-                try:
-                    verification = yaml.safe_load(yaml_content)
-                    test_results = verification.get("test_results", {})
-                    quality_metrics = verification.get("quality_metrics", [])
-                    recommendations = verification.get("recommendations", {})
-                except:
-                    test_results = {}
-                    quality_metrics, recommendations = [], {}
-            else:
-                test_results = {}
-                quality_metrics, recommendations = [], {}
-            
-            return {
-                "success": True,
-                "verification": result,
-                "test_results": test_results,
-                "quality_metrics": quality_metrics,
-                "recommendations": recommendations
-            }
-            
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Verification failed: {str(e)}"
-            }

@@ -12,71 +12,40 @@ class TechLead(TeamRole):
         """Initialize Tech Lead agent"""
         system_prompt = """You are an experienced Tech Lead responsible for:
 
-1. Technical Leadership
-- Guide technical decisions
-- Ensure architectural quality
+1. Technical Direction
+- Guide architecture decisions
+- Review code quality
 - Manage technical risks
-- Drive technical excellence
+- Set coding standards
 
-2. Code Understanding
-- Review existing codebase
-- Analyze code structure
-- Identify design patterns
-- Understand dependencies
-
-3. Architecture Design
-- Design system architecture
-- Ensure code compatibility
-- Plan integrations
-- Consider existing patterns
-
-4. Team Coordination
-- Guide team on codebase
-- Review code changes
-- Ensure integration quality
-- Maintain consistency
-
-When designing solutions:
-1. First analyze existing code:
-   - Review project structure
-   - Understand patterns used
-   - Check dependencies
-   - Note coding standards
-2. Plan integration approach:
-   - Identify affected modules
-   - Consider dependencies
-   - Maintain consistency
-   - Minimize disruption
-3. Guide implementation:
-   - Share code insights
-   - Explain patterns
-   - Review changes
-   - Ensure quality
-
-You can communicate with team members:
-- Ask SA to review code
-- Guide Dev on integration
-- Discuss patterns with team
-- Verify compatibility
+2. Team Support
+- Guide SA on design
+- Help Dev with code
+- Work with QA on quality
 - Report to PM
 
-Please ensure technical excellence and code consistency.
+When reviewing:
+1. First analyze context:
+   - Check business rules from BA
+   - Review existing code
+   - Understand dependencies
+2. Then provide guidance:
+   - Suggest architecture
+   - Recommend patterns
+   - Set standards
+   - Plan integration
+3. Finally ensure quality:
+   - Review code
+   - Check integration
+   - Verify testing
+   - Monitor progress
 
-Collaboration Guidelines:
-As a Tech Lead, you should:
-1. For business context -> Ask BA
-2. For system design review -> Work with SA
-3. For implementation guidance -> Guide Dev
-4. For quality standards -> Coordinate with QA
-5. For progress updates -> Report to PM
-
-Always follow these steps:
-1. Understand business context from BA
-2. Review and approve system design with SA
-3. Guide Dev team on implementation
-4. Ensure quality standards with QA
-5. Keep PM updated on progress."""
-
+Remember:
+- Get business context from BA
+- Guide SA on architecture
+- Support Dev implementation
+- Ensure QA standards
+"""
         super().__init__("TechLead", system_prompt, message_handler)
         
     def _get_platform(self):
@@ -87,8 +56,6 @@ Always follow these steps:
         tools.use_tools([
             # 基础工具
             "ask_user",
-            "search",
-            "read_webpage",
             "execute_shell",
             # 技术工具
             "read_code",
@@ -101,70 +68,3 @@ Always follow these steps:
         ])
         return tools
         
-    def design_solution(self, ba_analysis: str) -> Dict[str, Any]:
-        """Design technical solution
-        
-        Args:
-            ba_analysis: BA's business analysis
-            
-        Returns:
-            Dict containing technical design
-        """
-        try:
-            # Create design prompt
-            prompt = f"""Please design a technical solution based on this business analysis:
-
-Business Analysis:
-{ba_analysis}
-
-Please provide:
-1. Technical Architecture
-- System components
-- Technology stack
-- Integration patterns
-- Data storage
-
-2. Design Patterns
-- Applicable patterns
-- Component interactions
-- Error handling
-- Performance optimizations
-
-3. Implementation Guidelines
-- Code organization
-- Testing strategy
-- Deployment considerations
-- Monitoring approach
-"""
-
-            # Get design result
-            result = self.agent.run(prompt)
-            
-            # Extract YAML content between tags
-            import re
-            import yaml
-            
-            yaml_match = re.search(r'<DESIGN>\s*(.*?)\s*</DESIGN>', result, re.DOTALL)
-            if yaml_match:
-                yaml_content = yaml_match.group(1)
-                try:
-                    design = yaml.safe_load(yaml_content)
-                    architecture = design.get("architecture", {})
-                    implementation = design.get("implementation", {})
-                except:
-                    architecture, implementation = {}, {}
-            else:
-                architecture, implementation = {}, {}
-            
-            return {
-                "success": True,
-                "design": result,
-                "architecture": architecture,
-                "implementation": implementation
-            }
-            
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Technical design failed: {str(e)}"
-            }
