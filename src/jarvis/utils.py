@@ -426,7 +426,7 @@ def has_uncommitted_changes():
     working_changes = os.popen("git diff --exit-code").read().strip() != ""
     # Check staged changes
     staged_changes = os.popen("git diff --cached --exit-code").read().strip() != ""
-    os.system("git reset HEAD")
+    os.system("git reset")
     return working_changes or staged_changes
 
 def load_embedding_model():

@@ -24,10 +24,23 @@ context:  # optional
 </SEND_MESSAGE>
 
 Important Communication Rules:
-1. After sending a message, ALWAYS wait for the recipient's response before continuing
-2. Do not proceed with next steps until you receive and understand the response
-3. If you need information from multiple roles, send messages one at a time and wait for each response
-4. Make sure to acknowledge and consider each response in your next actions
+1. You can only send ONE message at a time to ONE role
+2. You MUST wait for a response before sending any other messages
+3. Never send multiple messages in one response
+4. If you need to communicate with multiple roles:
+   - Send first message to the most relevant role
+   - Wait for their response
+   - Then send next message to another role
+   - Continue this one-by-one process
+5. Always process and acknowledge each response before proceeding
+
+Example correct sequence:
+1. Send message to BA
+2. Wait for BA's response
+3. Process BA's response
+4. Then send message to TL
+5. Wait for TL's response
+6. And so on...
 
 Context Sharing Rules:
 1. Other roles cannot see your current context, you must explicitly share it
@@ -44,49 +57,6 @@ Information Recording Rules:
 5. Reference these records in messages to other roles
 6. Keep a log of all important actions and their results
 7. Update records when receiving significant feedback
-
-Role Collaboration Guidelines:
-1. Product Manager (PM):
-   - Initial requirement analysis -> Consult BA for business impact
-   - Technical feasibility concerns -> Consult TL
-   - Implementation progress -> Check with Dev
-   - Quality concerns -> Consult QA
-   - System integration -> Discuss with SA
-
-2. Business Analyst (BA):
-   - Requirement clarification -> Ask PM
-   - Technical implications -> Consult TL
-   - Implementation details -> Work with SA
-   - Business logic guidance -> Guide Dev
-   - Test scenarios -> Share with QA
-
-3. Tech Lead (TL):
-   - Business context -> Ask BA
-   - System design review -> Work with SA
-   - Implementation guidance -> Guide Dev
-   - Quality standards -> Coordinate with QA
-   - Progress updates -> Report to PM
-
-4. System Analyst (SA):
-   - Architecture decisions -> Consult TL
-   - Business rules -> Verify with BA
-   - Implementation details -> Guide Dev
-   - Integration testing -> Work with QA
-   - Design updates -> Report to PM
-
-5. Developer (Dev):
-   - Business logic questions -> Ask BA
-   - Technical guidance -> Consult TL
-   - System integration -> Work with SA
-   - Code review -> Submit to TL
-   - Test requirements -> Coordinate with QA
-
-6. Quality Assurance (QA):
-   - Test requirements -> Verify with BA
-   - Technical standards -> Check with TL
-   - System coverage -> Coordinate with SA
-   - Implementation issues -> Report to Dev
-   - Quality metrics -> Update PM
 """
         system_prompt += message_info
 
