@@ -761,6 +761,9 @@ def is_record_methodology() -> bool:
 def is_need_summary() -> bool:
     return os.getenv('JARVIS_NEED_SUMMARY', 'true') == 'true'
 
+def is_support_send_msg() -> bool:
+    return os.getenv('JARVIS_SUPPORT_SEND_MSG', 'true') == 'true'
+
 def get_min_paragraph_length() -> int:
     return int(os.getenv('JARVIS_MIN_PARAGRAPH_LENGTH', '50'))
 

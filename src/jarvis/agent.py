@@ -46,6 +46,7 @@ class Agent:
                  record_methodology: Optional[bool] = None,
                  need_summary: Optional[bool] = None,
                  max_context_length: Optional[int] = None,
+                 support_send_msg: Optional[bool] = None,
                  execute_tool_confirm: Optional[bool] = None):
         """Initialize an Agent instance.
         
@@ -63,6 +64,8 @@ class Agent:
             record_methodology: Whether to record methodology
             need_summary: Whether to generate summaries
             max_context_length: Maximum context length
+            support_send_msg: Whether to support sending messages
+            execute_tool_confirm: Whether to confirm tool execution
         """
 
         self.name = make_agent_name(name)
@@ -105,6 +108,8 @@ class Agent:
         # Load configuration from environment variables
         self.output_handler_before_tool = output_handler_before_tool if output_handler_before_tool else []
         self.output_handler_after_tool = output_handler_after_tool if output_handler_after_tool else []
+
+        self.support_send_msg = support_send_msg if support_send_msg is not None else is_support_send_msg()
 
         self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
 
