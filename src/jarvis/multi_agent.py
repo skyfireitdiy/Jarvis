@@ -71,6 +71,6 @@ content: {msg['content']}
                     msg = self.agents[last_agent].run(f"The agent {msg['to']} is not found, agent list: {self.agents.keys()}")
                     continue
                 PrettyOutput.print(f"{last_agent} 发送消息给 {msg['to']}...", OutputType.INFO)
-                last_agent = self.agents[msg['to']]
+                last_agent = self.agents[msg['to']].name
                 msg = self.agents[msg['to']].run(prompt)
         return ""

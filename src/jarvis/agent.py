@@ -173,6 +173,7 @@ Please describe in concise bullet points, highlighting important information.
             - First action will be executed
             - Additional actions will be IGNORED
             - Always process responses before new actions
+            - You should send message to other to continue the task if you are nothing to do
             """
 
         complete_prompt = ""
