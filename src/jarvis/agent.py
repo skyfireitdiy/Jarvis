@@ -174,6 +174,7 @@ Please describe in concise bullet points, highlighting important information.
             - Additional actions will be IGNORED
             - Always process responses before new actions
             - You should send message to other to continue the task if you are nothing to do
+            - If you receive a message from other agent, you should handle it and reply to sender
             """
 
         complete_prompt = ""
@@ -606,11 +607,13 @@ def main():
     init_env()
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
     parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
+    parser.add_argument('-p', '--platform', type=str, help='Platform to use')
+    parser.add_argument('-m', '--model', type=str, help='Model to use')
     args = parser.parse_args()
 
     try:
         # 获取全局模型实例
-        agent = Agent(system_prompt=origin_agent_system_prompt)
+        agent = Agent(system_prompt=origin_agent_system_prompt, platform=args.platform, model_name=args.model)
 
         # 加载预定义任务
         tasks = _load_tasks()

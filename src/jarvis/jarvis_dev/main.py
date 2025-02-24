@@ -563,7 +563,7 @@ def create_dev_team() -> MultiAgent:
                 "rag",               # Access project knowledge base
                 "execute_shell",     # Monitor project status and run project commands
             ],
-            platform=PlatformRegistry().get_thinking_platform(),
+            platform=PlatformRegistry().get_normal_platform(),
         ),
         AgentConfig(
             name="BA",
@@ -575,7 +575,7 @@ def create_dev_team() -> MultiAgent:
                 "search",            # Research similar solutions
                 "rag",               # Access domain knowledge
             ],
-            platform=PlatformRegistry().get_thinking_platform(),
+            platform=PlatformRegistry().get_normal_platform(),
         ),
         AgentConfig(
             name="SA",
@@ -589,7 +589,7 @@ def create_dev_team() -> MultiAgent:
                 "ask_codebase",      # Understand existing codebase
                 "lsp_get_document_symbols",  # Analyze code organization
             ],
-            platform=PlatformRegistry().get_thinking_platform(),
+            platform=PlatformRegistry().get_normal_platform(),
         ),
         AgentConfig(
             name="TL",
@@ -603,7 +603,7 @@ def create_dev_team() -> MultiAgent:
                 "lsp_find_references",  # Analyze dependencies
                 "lsp_find_definition",  # Navigate code
             ],
-            platform=PlatformRegistry().get_thinking_platform(),
+            platform=PlatformRegistry().get_normal_platform(),
         ),
         AgentConfig(
             name="DEV",
@@ -629,7 +629,7 @@ def create_dev_team() -> MultiAgent:
                 "ask_codebase",      # Understand test requirements
                 "execute_shell",     # Run tests
             ],
-            platform=PlatformRegistry().get_thinking_platform(),
+            platform=PlatformRegistry().get_normal_platform(),
         )
     ]
     
