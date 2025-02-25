@@ -50,9 +50,9 @@ def test_chat(api_base, model, stream=False, interactive=False):
                 if stream:
                     response = client.chat.completions.create(
                         model=model,
-                        messages=messages,
+                        messages=messages, # type: ignore
                         stream=True
-                    )
+                    ) # type: ignore
                     
                     # Process the streaming response
                     assistant_response = ""
@@ -65,13 +65,13 @@ def test_chat(api_base, model, stream=False, interactive=False):
                 else:
                     response = client.chat.completions.create(
                         model=model,
-                        messages=messages
+                        messages=messages # type: ignore
                     )
                     assistant_response = response.choices[0].message.content
                     print(assistant_response)
                 
                 # Add assistant response to history
-                messages.append({"role": "assistant", "content": assistant_response})
+                messages.append({"role": "assistant", "content": assistant_response}) # type: ignore
                 print()
             
             print("=" * 50)
@@ -91,9 +91,9 @@ def test_chat(api_base, model, stream=False, interactive=False):
                 # Use the OpenAI client for streaming
                 response = client.chat.completions.create(
                     model=model,
-                    messages=messages,
+                    messages=messages, # type: ignore
                     stream=True
-                )
+                ) # type: ignore
                 
                 # Process the streaming response
                 full_content = ""
@@ -109,7 +109,7 @@ def test_chat(api_base, model, stream=False, interactive=False):
                 print("Response:")
                 response = client.chat.completions.create(
                     model=model,
-                    messages=messages
+                    messages=messages # type: ignore
                 )
                 print(response.choices[0].message.content)
         
