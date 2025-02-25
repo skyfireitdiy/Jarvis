@@ -3,8 +3,8 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 import pickle
-from jarvis.utils import OutputType, PrettyOutput, get_context_token_count, get_embedding, get_embedding_batch, get_file_md5, get_max_token_count, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model
-from jarvis.utils import init_env
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_context_token_count, get_embedding, get_embedding_batch, get_file_md5, get_max_token_count, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model
+from jarvis.jarvis_utils import init_env
 from dataclasses import dataclass
 from tqdm import tqdm
 import fitz  # PyMuPDF for PDF files

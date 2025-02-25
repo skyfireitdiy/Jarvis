@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple
 import os
 from openai import OpenAI
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.utils import PrettyOutput, OutputType
+from jarvis.jarvis_utils import PrettyOutput, OutputType
 
 class OpenAIModel(BasePlatform):
     platform_name = "openai"

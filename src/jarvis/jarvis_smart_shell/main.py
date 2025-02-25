@@ -8,7 +8,7 @@ from yaspin import yaspin # type: ignore
 from yaspin.spinners import Spinners # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.utils import PrettyOutput, OutputType, get_shell_name, init_env
+from jarvis.jarvis_utils import PrettyOutput, OutputType, get_shell_name, init_env
 
 def execute_command(command: str) -> None:
     """Show command and allow user to edit, then execute, Ctrl+C to cancel"""

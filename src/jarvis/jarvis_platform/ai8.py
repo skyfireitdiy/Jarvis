@@ -1,7 +1,7 @@
 import os
 from typing import Dict, List, Tuple
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.utils import PrettyOutput, OutputType
+from jarvis.jarvis_utils import PrettyOutput, OutputType
 import requests
 import json
 import base64

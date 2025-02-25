@@ -1,5 +1,5 @@
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.utils import PrettyOutput, OutputType, init_env, get_multiline_input
+from jarvis.jarvis_utils import PrettyOutput, OutputType, init_env, get_multiline_input
 
 def list_platforms():
     """List all supported platforms and models"""

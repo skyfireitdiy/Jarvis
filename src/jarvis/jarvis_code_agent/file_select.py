@@ -3,7 +3,7 @@ import re
 from typing import Dict, List
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
-from jarvis.utils import OutputType, PrettyOutput, get_single_line_input, user_confirm
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_single_line_input, user_confirm
 
 
 def _parse_file_selection(input_str: str, max_index: int) -> List[int]:

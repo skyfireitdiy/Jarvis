@@ -1,8 +1,31 @@
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 import os
+from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
-from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, user_confirm
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, user_confirm
+
+
+class PatchOutputHandler(OutputHandler):
+    def name(self) -> str:
+        return "PATCH"
+
+    def handle(self, response: str) -> Tuple[bool, Any]:
+        return False, apply_patch(response)
+    
+    def can_handle(self, response: str) -> bool:
+        if _parse_patch(response):
+            return True
+        return False
+    
+    def prompt(self) -> str:
+        return """
+<PATCH>
+path/to/file start,end
+new_content
+</PATCH>
+
+"""
 
 
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:

@@ -1,15 +1,16 @@
 import argparse
 import re
 import time
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from prompt_toolkit import prompt
 import yaml
 
+from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, load_methodology, set_agent, delete_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, make_agent_name,  user_confirm
+from jarvis.jarvis_utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, load_methodology, set_agent, delete_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, make_agent_name,  user_confirm
 import os
 
 class Agent:
@@ -25,32 +26,22 @@ class Agent:
     def __del__(self):
         delete_agent(self.name)
 
-    def set_output_handler_before_tool(self, handler: List[Callable]):
-        """Set handlers to process output before tool execution.
-        
-        Args:
-            handler: List of callable functions to process output
-        """
-        self.output_handler_before_tool = handler
         
     def __init__(self, 
                  system_prompt: str, 
                  name: str = "Jarvis", 
                  description: str = "",
                  is_sub_agent: bool = False, 
-                 tool_registry: Optional[ToolRegistry|List[str]] = None, 
-                 platform: Optional[BasePlatform]|Optional[str] = None, 
+                 platform: Union[Optional[BasePlatform], Optional[str]] = None, 
                  model_name: Optional[str] = None,
                  summary_prompt: Optional[str] = None, 
                  auto_complete: Optional[bool] = None, 
-                 output_handler_before_tool: Optional[List[Callable]] = None,
-                 output_handler_after_tool: Optional[List[Callable]] = None,
+                 output_handler: List[OutputHandler] = [],
                  input_handler: Optional[List[Callable]] = None,
                  use_methodology: Optional[bool] = None,
                  record_methodology: Optional[bool] = None,
                  need_summary: Optional[bool] = None,
                  max_context_length: Optional[int] = None,
-                 support_send_msg: bool = False,
                  execute_tool_confirm: Optional[bool] = None):
         """Initialize an Agent instance.
         
@@ -91,15 +82,7 @@ class Agent:
             self.model.set_model_name(model_name)
 
 
-        # 初始化工具
-        if tool_registry is not None:
-            if isinstance(tool_registry, ToolRegistry):
-                self.tool_registry = tool_registry
-            elif isinstance(tool_registry, List):
-                self.tool_registry = ToolRegistry()
-                self.tool_registry.use_tools(tool_registry)
-        else:
-            self.tool_registry = ToolRegistry()
+        self.output_handler = output_handler
 
         
         self.record_methodology = record_methodology if record_methodology is not None else is_record_methodology()
@@ -111,10 +94,7 @@ class Agent:
         self.need_summary = need_summary if need_summary is not None else is_need_summary()
         self.input_handler = input_handler if input_handler is not None else []
         # Load configuration from environment variables
-        self.output_handler_before_tool = output_handler_before_tool if output_handler_before_tool else []
-        self.output_handler_after_tool = output_handler_after_tool if output_handler_after_tool else []
 
-        self.support_send_msg = support_send_msg
 
         self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
 
@@ -132,50 +112,14 @@ Please describe in concise bullet points, highlighting important information.
         self.max_token_count = max_context_length if max_context_length is not None else get_max_token_count()
         self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
         welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"
-        tools = self.tool_registry.get_all_tools()
-        if tools:
-            welcome_message += f"\n可用工具: \n{','.join([f'{tool['name']}' for tool in tools])}"
+
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
         
-        tools_prompt = self.tool_registry.load_tools()
+        tool_prompt = f"""You can do the following actions: {','.join([handler.name() for handler in self.output_handler])}"""
 
-        send_msg_prompt = ""
-        if self.support_send_msg:
-            send_msg_prompt = """
-            ## Send Message Rules
-            
-            !!! CRITICAL ACTION RULES !!!
-            You can ONLY perform ONE action per turn:
-            - ENSURE USE ONLY ONE TOOL EVERY TURN (file_operation, ask_user, etc.)
-            - OR SEND ONE MESSAGE TO ANOTHER AGENT
-            - NEVER DO BOTH IN THE SAME TURN
-            
-            2. Message Format:
-            <SEND_MESSAGE>
-            to: agent_name  # Target agent name
-            content: |
-              message_content  # Message content, multi-line must be separated by newlines
-            </SEND_MESSAGE>
-            
-            3. Message Handling:
-               - After sending a message, WAIT for response
-               - Process response before next action
-               - Never send multiple messages at once
-               - Never combine message with tool calls
-            
-            4. If Multiple Actions Needed:
-               a. Choose most important action first
-               b. Wait for response/result
-               c. Plan next action based on response
-               d. Execute next action in new turn
-            
-            Remember:
-            - First action will be executed
-            - Additional actions will be IGNORED
-            - Always process responses before new actions
-            - You should send message to other to continue the task if you are nothing to do
-            - If you receive a message from other agent, you should handle it and reply to sender
-            """
+        for handler in self.output_handler:
+            tool_prompt += f"\n## {handler.name()}:\n"
+            tool_prompt += handler.prompt()
 
         complete_prompt = ""
         if self.auto_complete:
@@ -185,69 +129,16 @@ Please describe in concise bullet points, highlighting important information.
             <!!!COMPLETE!!!>
             """
 
-        additional_prompt = ""
-        if not tools_prompt and send_msg_prompt:
-            additional_prompt = """YOU MUST CALL ONE TOOL EVERY TURN, UNLESS YOU THINK THE TASK IS COMPLETED!!!"""
-        if not send_msg_prompt and tools_prompt:
-            additional_prompt = """YOU MUST SEND ONE MESSAGE EVERY TURN, UNLESS YOU THINK THE TASK IS COMPLETED!!!"""
-        if send_msg_prompt and tools_prompt:
-            additional_prompt = """YOU MUST CALL ONE TOOL OR SEND ONE MESSAGE EVERY TURN, UNLESS YOU THINK THE TASK IS COMPLETED!!!"""
-
         self.model.set_system_message(f"""
 {self.system_prompt}
 
-{tools_prompt}
-
-{send_msg_prompt}
+{tool_prompt}
 
 {complete_prompt}
-
-{additional_prompt}
 """)
         self.first = True
 
-    @staticmethod
-    def _extract_send_msg(content: str) -> List[Dict]:
-        """Extract send message from content.
-        
-        Args:
-            content: The content containing send message
-        """
-        data = re.findall(r'<SEND_MESSAGE>(.*?)</SEND_MESSAGE>', content, re.DOTALL)
-        ret = []
-        for item in data:
-            try:
-                msg = yaml.safe_load(item)
-                if 'to' in msg and 'content' in msg:
-                    ret.append(msg)
-            except Exception as e:
-                continue
-        return ret
 
-    @staticmethod
-    def _extract_tool_calls(content: str) -> List[Dict]:
-        """Extract tool calls from content.
-        
-        Args:
-            content: The content containing tool calls
-            
-        Returns:
-            List[Dict]: List of extracted tool calls with name and arguments
-            
-        Raises:
-            Exception: If tool call is missing necessary fields
-        """
-        # Split content into lines
-        data = re.findall(r'<TOOL_CALL>(.*?)</TOOL_CALL>', content, re.DOTALL)
-        ret = []
-        for item in data:
-            try:
-                msg = yaml.safe_load(item)
-                if 'name' in msg and 'arguments' in msg:
-                    ret.append(msg)
-            except Exception as e:
-                continue
-        return ret
     
     def _call_model(self, message: str) -> str:
         """Call the AI model with retry logic.
@@ -324,6 +215,18 @@ Please continue the task based on the above information.
         except Exception as e:
             PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
 
+    def _call_tools(self, response: str) -> Tuple[bool, Any]:
+        tool_list = []
+        for handler in self.output_handler:
+            if handler.can_handle(response):
+                tool_list.append(handler)
+        if len(tool_list) > 1:
+            return False, "Do multiple actions, please only do one action at a time. (you do actions: " + ", ".join([handler.name() for handler in tool_list]) + ")"
+        if len(tool_list) == 0:
+            return False, ""
+        return tool_list[0].handle(response)
+        
+
     def _complete_task(self) -> str:
         """Complete the current task and generate summary if needed.
         
@@ -351,13 +254,7 @@ Please continue the task based on the above information.
                     self.prompt = analysis_prompt
                     response = self._call_model(self.prompt)
                     
-                    # 检查是否包含工具调用
-                    try:
-                        tool_calls = Agent._extract_tool_calls(response)
-                        if tool_calls:
-                            self.tool_registry.handle_tool_calls(tool_calls[0])
-                    except Exception as e:
-                        PrettyOutput.print(f"处理方法论生成失败: {str(e)}", OutputType.ERROR)
+                    self._call_tools(response)
                     
                 except Exception as e:
                     PrettyOutput.print(f"生成方法论失败: {str(e)}", OutputType.ERROR)
@@ -371,7 +268,7 @@ Please continue the task based on the above information.
         return "任务完成"
 
 
-    def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str|Dict:
+    def run(self, user_input: str, file_list: Optional[List[str]] = None) -> Any:
         """Process user input and execute the task.
         
         Args:
@@ -414,38 +311,10 @@ Please continue the task based on the above information.
                         self.prompt = ""
                         self.conversation_length += get_context_token_count(current_response)
 
-                    # Check for message first
-                    send_msg = Agent._extract_send_msg(current_response)
-                    tool_calls = Agent._extract_tool_calls(current_response)
+                    need_return, self.prompt = self._call_tools(current_response)
 
-                    if len(send_msg) > 1:
-                        PrettyOutput.print(f"收到多个消息，违反规则，重试...", OutputType.WARNING)
-                        self.prompt += f"Only one message can be sent, but {len(send_msg)} messages were received. Please retry."
-                        continue
-                    if len(tool_calls) > 1:
-                        PrettyOutput.print(f"收到多个工具调用，违反规则，重试...", OutputType.WARNING)
-                        self.prompt += f"Only one tool call can be executed, but {len(tool_calls)} tool calls were received. Please retry."
-                        continue
-                    if send_msg and tool_calls:
-                        PrettyOutput.print(f"收到消息和工具调用，违反规则，重试...", OutputType.WARNING)
-                        self.prompt += f"Only one action can be performed, but both a message and a tool call were received. Please retry."
-                        continue
-
-                    if send_msg:
-                        return send_msg[0]  # Return the first message
-
-                    # If no message, process tool calls
-                    for handler in self.output_handler_before_tool:
-                        self.prompt += handler(current_response)
-                    
-                    if tool_calls:
-                        if not self.execute_tool_confirm or user_confirm(f"执行工具调用: {tool_calls[0]['name']}?"):
-                            PrettyOutput.print("正在执行工具调用...", OutputType.PROGRESS)
-                            tool_result = self.tool_registry.handle_tool_calls(tool_calls[0])
-                            self.prompt += tool_result
-
-                    for handler in self.output_handler_after_tool:
-                        self.prompt += handler(current_response)
+                    if need_return:
+                        return self.prompt
                     
                     if self.prompt:
                         continue
@@ -613,7 +482,7 @@ def main():
 
     try:
         # 获取全局模型实例
-        agent = Agent(system_prompt=origin_agent_system_prompt, platform=args.platform, model_name=args.model)
+        agent = Agent(system_prompt=origin_agent_system_prompt, platform=args.platform, model_name=args.model, output_handler=[ToolRegistry()])
 
         # 加载预定义任务
         tasks = _load_tasks()

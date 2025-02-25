@@ -1,13 +1,13 @@
 import os
 from typing import Dict, List
 
-from jarvis.agent import Agent
-from jarvis.jarvis_code_agent.patch import apply_patch
+from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_code_agent.patch import PatchOutputHandler
 from jarvis.jarvis_code_agent.relevant_files import find_relevant_information
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root
 
 
 class CodeAgent:
@@ -48,12 +48,6 @@ class CodeAgent:
    • Return values must be specified
    • Exceptions must be documented
    • Complex logic must be explained
-
-# Patch Format
-<PATCH>
-path/file start,end
-new_content
-</PATCH>
 
 Key Rules:
 • One modification per patch block
@@ -129,10 +123,9 @@ Every Change Must:
                            auto_complete=False,
                            is_sub_agent=False, 
                            use_methodology=False,
-                           tool_registry=tool_registry, 
+                           output_handler=[tool_registry, PatchOutputHandler()], 
                            platform=PlatformRegistry().get_codegen_platform(), 
                            record_methodology=False,
-                           output_handler_after_tool=[apply_patch],
                            need_summary=False)
 
     

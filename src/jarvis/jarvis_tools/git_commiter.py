@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 import yaml
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.utils import OutputType, PrettyOutput, has_uncommitted_changes, init_env
+from jarvis.jarvis_utils import OutputType, PrettyOutput, has_uncommitted_changes, init_env
 import sys
 
 

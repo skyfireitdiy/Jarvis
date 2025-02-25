@@ -5,7 +5,7 @@ import re
 import sys
 from typing import Dict, Type, Optional, List
 from jarvis.jarvis_lsp.base import BaseLSP
-from jarvis.utils import PrettyOutput, OutputType
+from jarvis.jarvis_utils import PrettyOutput, OutputType
 
 REQUIRED_METHODS = [
     ('initialize', ['workspace_path']),

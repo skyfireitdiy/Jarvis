@@ -1,8 +1,6 @@
-from typing import List, Optional
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.multi_agent import MultiAgent, AgentConfig
-from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.utils import get_multiline_input, init_env
+from jarvis.jarvis_multi_agent import MultiAgent, AgentConfig
+from jarvis.jarvis_utils import get_multiline_input, init_env
 
 # Define system prompts for each role
 PM_PROMPT = """You are a Project Manager (PM) AI agent. As an LLM agent, you:

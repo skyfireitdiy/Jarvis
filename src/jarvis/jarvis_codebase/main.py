@@ -7,8 +7,8 @@ from typing import List, Tuple, Optional, Dict
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.utils import OutputType, PrettyOutput, find_git_root, get_context_token_count, get_embedding, get_file_md5, get_max_token_count, get_thread_count, load_embedding_model, user_confirm
-from jarvis.utils import init_env
+from jarvis.jarvis_utils import OutputType, PrettyOutput, find_git_root, get_context_token_count, get_embedding, get_file_md5, get_max_token_count, get_thread_count, load_embedding_model, user_confirm
+from jarvis.jarvis_utils import init_env
 import argparse
 import pickle
 import lzma  # 添加 lzma 导入

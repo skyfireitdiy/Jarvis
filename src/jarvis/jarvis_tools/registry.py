@@ -1,15 +1,19 @@
 import json
 from pathlib import Path
+import re
 import sys
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
+import yaml
+
+from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.base import Tool
-from jarvis.utils import OutputType, PrettyOutput, get_context_token_count, get_max_token_count
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_context_token_count, get_max_token_count
 
 
-tool_call_help = """## Tool Usage Format
-
+tool_call_help = """
+Tool Usage Format
 <TOOL_CALL>
 name: tool_name
 arguments:
@@ -44,8 +48,17 @@ STRICT RULES:
 - If you can start executing the task, please start directly without asking the user if you can begin.
 """
 
-class ToolRegistry:
-    def load_tools(self) -> str:
+class ToolRegistry(OutputHandler):
+
+    def name(self) -> str:
+        return "TOOL_CALL"
+
+    def can_handle(self, response: str) -> bool:
+        if self._extract_tool_calls(response):
+            return True
+        return False
+    
+    def prompt(self) -> str:
         """Load tools"""
         tools = self.get_all_tools()
         if tools:
@@ -57,6 +70,15 @@ class ToolRegistry:
             tools_prompt += tool_call_help
             return tools_prompt
         return ""
+    
+    def handle(self, response: str) -> Tuple[bool, Any]:
+        tool_calls = self._extract_tool_calls(response)
+        if len(tool_calls) > 1:
+            return False, f"Error: Handle multiple tool calls, please ONLY handle one tool call at a time."
+        if len(tool_calls) == 0:
+            return False, ""
+        tool_call = tool_calls[0]
+        return False, self.handle_tool_calls(tool_call)
 
     def __init__(self):
         """Initialize tool registry"""
@@ -169,6 +191,30 @@ class ToolRegistry:
         except Exception as e:
             PrettyOutput.print(f"从 {Path(file_path).name} 加载工具失败: {str(e)}", OutputType.ERROR)
             return False
+    @staticmethod
+    def _extract_tool_calls(content: str) -> List[Dict]:
+        """Extract tool calls from content.
+        
+        Args:
+            content: The content containing tool calls
+            
+        Returns:
+            List[Dict]: List of extracted tool calls with name and arguments
+            
+        Raises:
+            Exception: If tool call is missing necessary fields
+        """
+        # Split content into lines
+        data = re.findall(r'<TOOL_CALL>(.*?)</TOOL_CALL>', content, re.DOTALL)
+        ret = []
+        for item in data:
+            try:
+                msg = yaml.safe_load(item)
+                if 'name' in msg and 'arguments' in msg:
+                    ret.append(msg)
+            except Exception as e:
+                continue
+        return ret
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
         """Register a new tool"""

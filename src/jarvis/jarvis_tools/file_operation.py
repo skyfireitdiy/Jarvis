@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, Union
 import os
 
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.jarvis_utils import OutputType, PrettyOutput
 
 
 class FileOperationTool:

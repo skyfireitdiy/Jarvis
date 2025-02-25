@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Tuple
 from jarvis.jarvis_code_agent.file_select import select_files
 from jarvis.jarvis_codebase.main import CodeBase
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.jarvis_utils import OutputType, PrettyOutput
 
 def make_question(requirement: str) -> Optional[str]:
     """Generate structured questions to gather necessary information for the requirement."""

@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-from jarvis.utils import OutputType, PrettyOutput
+from jarvis.jarvis_utils import OutputType, PrettyOutput
 from jarvis.jarvis_code_agent.file_select import select_files
 
 

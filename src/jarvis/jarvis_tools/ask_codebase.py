@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from jarvis.utils import OutputType, PrettyOutput, dont_use_local_model, find_git_root
+from jarvis.jarvis_utils import OutputType, PrettyOutput, dont_use_local_model, find_git_root
 from jarvis.jarvis_codebase.main import CodeBase
 
 class AskCodebaseTool:

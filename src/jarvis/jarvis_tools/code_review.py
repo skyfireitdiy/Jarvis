@@ -3,8 +3,8 @@ import subprocess
 import yaml
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.utils import OutputType, PrettyOutput, init_env, find_git_root
-from jarvis.agent import Agent
+from jarvis.jarvis_utils import OutputType, PrettyOutput, init_env, find_git_root
+from jarvis.jarvis_agent import Agent
 import re
 
 class CodeReviewTool:
@@ -168,7 +168,7 @@ OUTPUT REQUIREMENTS:
   suggestion: # Specific, actionable improvements for the observed code
 </REPORT>""",
                 is_sub_agent=True,
-                tool_registry=tool_registry,
+                output_handler=[tool_registry],
                 platform=PlatformRegistry().get_thinking_platform(),
                 auto_complete=True
             )
