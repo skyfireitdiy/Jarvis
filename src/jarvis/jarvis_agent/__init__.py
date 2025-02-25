@@ -224,7 +224,9 @@ Please continue the task based on the above information.
             return False, "Do multiple actions, please only do one action at a time. (you do actions: " + ", ".join([handler.name() for handler in tool_list]) + ")"
         if len(tool_list) == 0:
             return False, ""
-        return tool_list[0].handle(response)
+        if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
+            return tool_list[0].handle(response)
+        return False, ""
         
 
     def _complete_task(self) -> str:
