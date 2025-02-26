@@ -2,6 +2,7 @@ import os
 from typing import Dict, List
 
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_code_agent.file_select import file_input_handler
 from jarvis.jarvis_code_agent.patch import PatchOutputHandler
 from jarvis.jarvis_code_agent.relevant_files import find_relevant_information
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -127,6 +128,7 @@ Every Change Must:
                            output_handler=[tool_registry, PatchOutputHandler()], 
                            platform=PlatformRegistry().get_codegen_platform(), 
                            record_methodology=False,
+                           input_handler=[file_input_handler],
                            need_summary=False)
 
     
