@@ -3,6 +3,7 @@ import re
 from typing import Dict, List
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
+from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_utils import OutputType, PrettyOutput, get_single_line_input, user_confirm
 
 
@@ -208,3 +209,17 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                     PrettyOutput.print(f"读取文件失败: {str(e)}", OutputType.ERROR)
     selected_files = [f for f in selected_files if os.path.isfile(os.path.join(root_dir, f["file"]))]
     return selected_files
+
+def file_input_handler(user_input: str) -> str:
+    prompt = user_input
+    files = []
+    sm = re.findall(r'@(.*?)\s', user_input)
+    if sm:
+        for s in sm:
+            if os.path.isfile(s[0]):
+                files.append(s[0])
+    result = ReadCodeTool().execute({"files": files})
+    if result["success"]:
+        return result["stdout"] + "\n" + prompt
+    
+    return prompt

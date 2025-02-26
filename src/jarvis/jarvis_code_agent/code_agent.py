@@ -155,7 +155,7 @@ Every Change Must:
         for file in files:
             prompt_parts.append(f'''- {file['file']} ({file['reason']})''')
 
-        result = ReadCodeTool().execute({"files": files})
+        result = ReadCodeTool().execute({"files": [{"file": file["file"], "reason": file["reason"]} for file in files]})
         if result["success"]:
             prompt_parts.append(result["stdout"])
                 
