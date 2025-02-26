@@ -328,7 +328,7 @@ class FileCompleter(Completer):
                 if file_path and score < 100:
                     display_text = f"{path} ({score}%)"
                 completion = Completion(
-                    text=path,
+                    text=path + " ",  # Add space after completion
                     start_position=-len(file_path),
                     display=display_text,
                     display_meta="File"
