@@ -135,6 +135,9 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
     for i, file in enumerate(related_files, 1):
         output += f"[{i}] {file['file']} ({file['reason']})\n"
 
+    # Filter out files that do not exist
+    related_files = [f for f in related_files if os.path.isfile(os.path.join(root_dir, f["file"]))]
+
     PrettyOutput.print(output, OutputType.INFO, lang="markdown")
     
     if len(related_files) > 0:
@@ -203,5 +206,5 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                     PrettyOutput.print(f"文件已添加: {path}", OutputType.SUCCESS)
                 except Exception as e:
                     PrettyOutput.print(f"读取文件失败: {str(e)}", OutputType.ERROR)
-    
+    selected_files = [f for f in selected_files if os.path.isfile(os.path.join(root_dir, f["file"]))]
     return selected_files
