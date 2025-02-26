@@ -29,7 +29,7 @@ from rich.syntax import Syntax
 
 from prompt_toolkit.completion import Completer, Completion, PathCompleter
 from prompt_toolkit.document import Document
-from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 # 初始化colorama
 colorama.init()
@@ -299,23 +299,30 @@ class FileCompleter(Completer):
         # Get the text after the current @
         file_path = text_after_at.strip()
         
-        # Get all possible files from current directory
+        # Get all possible files using git ls-files only
         all_files = []
-        for root, _, files in os.walk('.'):
-            for f in files:
-                path = os.path.join(root, f)
-                # Remove ./ from the beginning
-                path = path[2:] if path.startswith('./') else path
-                all_files.append(path)
+        try:
+            # Use git ls-files to get tracked files
+            import subprocess
+            result = subprocess.run(['git', 'ls-files'], 
+                                   stdout=subprocess.PIPE, 
+                                   stderr=subprocess.PIPE,
+                                   text=True)
+            if result.returncode == 0:
+                all_files = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        except Exception:
+            # If git command fails, just use an empty list
+            pass
         
         # If no input after @, show all files
         # Otherwise use fuzzy matching
         if not file_path:
             scored_files = [(path, 100) for path in all_files[:self.max_suggestions]]
         else:
+            scored_files_data = process.extract(file_path, all_files, limit=self.max_suggestions)
             scored_files = [
-                (path, fuzz.ratio(file_path.lower(), path.lower()))
-                for path in all_files
+                (m[0], m[1])
+                for m in scored_files_data
             ]
             # Sort by score and take top results
             scored_files.sort(key=lambda x: x[1], reverse=True)
