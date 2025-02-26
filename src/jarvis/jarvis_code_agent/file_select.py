@@ -213,7 +213,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
 def file_input_handler(user_input: str) -> str:
     prompt = user_input
     files = []
-    sm = re.findall(r'@(.*?)\s', user_input)
+    sm = re.findall(r'`(.*?)`', user_input)
     if sm:
         for s in sm:
             if os.path.isfile(s[0]):

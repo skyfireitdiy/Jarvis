@@ -272,8 +272,8 @@ class FileCompleter(Completer):
     """Custom completer for file paths with fuzzy matching."""
     def __init__(self):
         self.path_completer = PathCompleter()
-        self.max_suggestions = 10  # 增加显示数量
-        self.min_score = 10  # 降低相似度阈值
+        self.max_suggestions = 10
+        self.min_score = 10
         
     def get_completions(self, document: Document, complete_event):
         text = document.text_before_cursor
@@ -299,6 +299,9 @@ class FileCompleter(Completer):
             
         # Get the text after the current @
         file_path = text_after_at.strip()
+        
+        # 计算需要删除的字符数（包括@符号）
+        replace_length = len(text_after_at) + 1  # +1 包含@符号
         
         # Get all possible files using git ls-files only
         all_files = []
@@ -332,12 +335,12 @@ class FileCompleter(Completer):
         # Return completions for files
         for path, score in scored_files:
             if not file_path or score > self.min_score:
-                display_text = path
+                display_text = path  # 显示时不带反引号
                 if file_path and score < 100:
                     display_text = f"{path} ({score}%)"
                 completion = Completion(
-                    text=path + " ",  # Add space after completion
-                    start_position=-len(file_path),
+                    text=f"`{path}`",  # 添加反引号包裹路径
+                    start_position=-replace_length,
                     display=display_text,
                     display_meta="File"
                 )
