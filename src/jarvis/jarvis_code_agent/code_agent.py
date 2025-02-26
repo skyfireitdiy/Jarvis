@@ -7,6 +7,7 @@ from jarvis.jarvis_code_agent.relevant_files import find_relevant_information
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root
 
 
@@ -153,6 +154,10 @@ Every Change Must:
         # Then try to add file contents
         for file in files:
             prompt_parts.append(f'''- {file['file']} ({file['reason']})''')
+
+        result = ReadCodeTool().execute({"files": files})
+        if result["success"]:
+            prompt_parts.append(result["stdout"])
                 
         return "\n".join(prompt_parts)
 
