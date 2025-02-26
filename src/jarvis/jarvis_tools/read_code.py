@@ -51,17 +51,19 @@ class ReadCodeTool:
             Dict containing operation result
         """
         try:
-            abs_path = os.path.abspath(filepath)
+            abs_path = os.path.abspath(filepath.strip())
             PrettyOutput.print(f"正在读取代码文件：{abs_path}", OutputType.INFO)
             
-            if not os.path.exists(filepath):
+            if not os.path.exists(abs_path):
+                PrettyOutput.print(f"文件不存在: {abs_path}", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"File does not exist: {filepath}"
+                    "stderr": f"File does not exist: {abs_path}"
                 }
                 
-            if os.path.getsize(filepath) > 10 * 1024 * 1024:  # 10MB
+            if os.path.getsize(abs_path) > 10 * 1024 * 1024:  # 10MB
+                PrettyOutput.print(f"文件太大: {abs_path}", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
@@ -69,13 +71,20 @@ class ReadCodeTool:
                 }
                 
             try:
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
+                lines = open(abs_path, 'r', encoding='utf-8').readlines()
             except UnicodeDecodeError:
+                PrettyOutput.print(f"文件解码失败: {abs_path}", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
                     "stderr": "Failed to decode file with UTF-8 encoding"
+                }
+            except Exception as e:
+                PrettyOutput.print(f"读取文件失败: {abs_path}", OutputType.WARNING)
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Failed to read file: {str(e)}"
                 }
                 
             if start_line < 0:
@@ -83,6 +92,7 @@ class ReadCodeTool:
             if end_line == -1 or end_line > len(lines):
                 end_line = len(lines)
             if start_line >= end_line:
+                PrettyOutput.print(f"无效的行范围: [{start_line}, {end_line})", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
@@ -96,7 +106,7 @@ class ReadCodeTool:
                 
             content = "".join(formatted_lines)
             output = f"File: {filepath}\nLines: [{start_line}, {end_line})\n{content}"
-            
+            PrettyOutput.print(output, OutputType.CODE)
             return {
                 "success": True,
                 "stdout": output,
@@ -104,6 +114,7 @@ class ReadCodeTool:
             }
             
         except Exception as e:
+            PrettyOutput.print(f"读取代码失败: {filepath}", OutputType.WARNING)
             return {
                 "success": False,
                 "stdout": "",

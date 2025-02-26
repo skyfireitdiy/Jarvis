@@ -38,25 +38,27 @@ class FileOperationTool:
             PrettyOutput.print(f"文件操作: {operation} - {abs_path}", OutputType.INFO)
             
             if operation == "read":
-                if not os.path.exists(filepath):
+                if not os.path.exists(abs_path):
+                    PrettyOutput.print(f"文件不存在: {abs_path}", OutputType.WARNING)
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"文件不存在: {filepath}"
+                        "stderr": f"文件不存在: {abs_path}"
                     }
                     
-                if os.path.getsize(filepath) > 10 * 1024 * 1024:  # 10MB
+                if os.path.getsize(abs_path) > 10 * 1024 * 1024:  # 10MB
+                    PrettyOutput.print(f"文件太大: {abs_path}", OutputType.WARNING)
                     return {
                         "success": False,
                         "stdout": "",
                         "stderr": "File too large (>10MB)"
                     }
                     
-                content = open(filepath, 'r', encoding='utf-8').read()
-                output = f"File: {filepath}\n{content}"
+                content = open(abs_path, 'r', encoding='utf-8').read()
+                output = f"File: {abs_path}\n{content}"
                 
                 # Print file content
-                PrettyOutput.print(f"读取文件: {filepath}\n{content}", OutputType.INFO)
+                PrettyOutput.print(f"读取文件: {abs_path}\n{content}", OutputType.INFO)
                 
                 return {
                     "success": True,
@@ -65,17 +67,17 @@ class FileOperationTool:
                 }
                 
             elif operation == "write":
-                os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
-                with open(filepath, 'w', encoding='utf-8') as f:
+                os.makedirs(os.path.dirname(os.path.abspath(abs_path)), exist_ok=True)
+                with open(abs_path, 'w', encoding='utf-8') as f:
                     f.write(content)
                 
-                PrettyOutput.print(f"写入文件: {filepath}", OutputType.INFO)
+                PrettyOutput.print(f"写入文件: {abs_path}", OutputType.INFO)
                 return {
                     "success": True,
-                    "stdout": f"Successfully wrote content to {filepath}",
+                    "stdout": f"Successfully wrote content to {abs_path}",
                     "stderr": ""
                 }
-            
+            PrettyOutput.print(f"未知操作: {operation}", OutputType.WARNING)
             return {
                 "success": False,
                 "stdout": "",
@@ -87,7 +89,7 @@ class FileOperationTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"File operation failed for {filepath}: {str(e)}"
+                "stderr": f"File operation failed for {abs_path}: {str(e)}"
             }
 
     def execute(self, args: Dict) -> Dict[str, Any]:
@@ -120,7 +122,7 @@ class FileOperationTool:
                     continue
                 
                 content = file_info.get("content", "") if operation == "write" else ""
-                result = self._handle_single_file(operation, file_info["path"], content)
+                result = self._handle_single_file(operation, file_info["path"].strip(), content)
                 
                 if result["success"]:
                     all_outputs.append(result["stdout"])
