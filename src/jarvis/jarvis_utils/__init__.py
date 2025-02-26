@@ -30,6 +30,7 @@ from rich.syntax import Syntax
 from prompt_toolkit.completion import Completer, Completion, PathCompleter
 from prompt_toolkit.document import Document
 from fuzzywuzzy import process
+from prompt_toolkit.key_binding import KeyBindings
 
 # 初始化colorama
 colorama.init()
@@ -343,54 +344,59 @@ class FileCompleter(Completer):
                 yield completion
 
 def get_multiline_input(tip: str) -> str:
-    """Get multi-line input, support direction key, history function, and file completion.
+    """Get multi-line input with enhanced completion confirmation"""
+    # 单行输入说明
+    PrettyOutput.section("用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交", OutputType.USER)
     
-    Args:
-        tip: The prompt tip to display
-        
-    Returns:
-        str: The entered text
-    """
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
     
-    # Define prompt style
+    # 自定义按键绑定
+    bindings = KeyBindings()
+    
+    @bindings.add('enter')
+    def _(event):
+        # 当有补全菜单时，回车键确认补全
+        if event.current_buffer.complete_state:
+            event.current_buffer.apply_completion(event.current_buffer.complete_state.current_completion)
+        else:
+            # 没有补全菜单时插入换行
+            event.current_buffer.insert_text('\n')
+
+    @bindings.add('c-j')  # 修改为支持的按键组合
+    def _(event):
+        # 使用 Ctrl+J 提交输入
+        event.current_buffer.validate_and_handle()
+
     style = PromptStyle.from_dict({
         'prompt': 'ansicyan',
     })
-    
-    lines = []
+
     try:
-        while True:
-            # Set prompt
-            prompt = FormattedText([
-                ('class:prompt', '... ' if lines else '>>> ')
-            ])
-            
-            # Create new session with new completer for each line
-            session = PromptSession(
-                history=None,  # Use default history
-                completer=FileCompleter()  # New completer instance for each line
-            )
-            
-            # Get input with completion support
-            line = session.prompt(
-                prompt,
-                style=style,
-            ).strip()
-            
-            # Handle empty line
-            if not line:
-                if not lines:  # First line is empty
-                    return ""
-                break  # End multi-line input
-                
-            lines.append(line)
-            
+        session = PromptSession(
+            history=None,
+            completer=FileCompleter(),
+            key_bindings=bindings,
+            complete_while_typing=True,
+            multiline=True,  # 启用原生多行支持
+            vi_mode=False,
+            mouse_support=False
+        )
+        
+        prompt = FormattedText([
+            ('class:prompt', '>>> ')
+        ])
+        
+        # 单次获取多行输入
+        text = session.prompt(
+            prompt,
+            style=style,
+        ).strip()
+        
+        return text
+        
     except KeyboardInterrupt:
         PrettyOutput.print("输入已取消", OutputType.INFO)
         return ""
-    
-    return "\n".join(lines)
 
 def init_env():
     """Load environment variables from ~/.jarvis/env"""
