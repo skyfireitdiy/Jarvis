@@ -53,7 +53,7 @@ class GitCommitTool:
 
             commit_hash = self._get_last_commit_hash()
 
-            PrettyOutput.section(f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS)
+            PrettyOutput.print(f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS)
 
             return {"success": True, "stdout": yaml.safe_dump({"commit_hash": commit_hash, "commit_message": commit_message}), "stderr": ""}
 
