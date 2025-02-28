@@ -316,7 +316,7 @@ def service_command(args):
         else:
             # Get chat response
             try:
-                response_text = platform.chat(message_text)
+                response_text = platform.chat_until_success(message_text)
                 
                 # Create response in OpenAI format
                 completion_id = f"chatcmpl-{str(uuid.uuid4())}"
@@ -391,7 +391,7 @@ def service_command(args):
         
         try:
             # 直接获取聊天响应，而不是尝试捕获stdout
-            response = platform.chat(message)
+            response = platform.chat_until_success(message)
             
             # 记录完整响应
             full_response = ""
