@@ -179,9 +179,10 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                     continue
                     
                 # Display matching files
-                PrettyOutput.print("找到以下匹配的文件:", OutputType.INFO)
+                tips = "找到以下匹配的文件:"
                 for i, path in enumerate(matches, 1):
-                    PrettyOutput.print(f"[{i}] {path}", OutputType.INFO)
+                    tips += f"\n[{i}] {path}"
+                PrettyOutput.print(tips, OutputType.INFO)
                     
                 # Let the user select
                 numbers = get_single_line_input("请选择要添加的文件编号（支持: 1,3-6格式, 按回车选择所有）").strip()
