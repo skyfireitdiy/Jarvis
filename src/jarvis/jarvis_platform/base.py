@@ -34,8 +34,8 @@ class BasePlatform(ABC):
                 with yaspin(Spinners.dots, text="Thinking", color="yellow") as spinner:
                     response = self.chat(message)
                     response = re.sub(r'<think>(.*?)</think>', '', response, flags=re.DOTALL)
-                PrettyOutput.print(response, OutputType.SYSTEM)    
-                return response
+                    spinner.ok("✓")
+                    return response
             else:
                 response = self.chat(message)
                 response = re.sub(r'<think>(.*?)</think>', '', response, flags=re.DOTALL)
