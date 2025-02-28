@@ -221,7 +221,7 @@ Please continue the task based on the above information.
             if handler.can_handle(response):
                 tool_list.append(handler)
         if len(tool_list) > 1:
-            return False, "Do multiple actions, please only do one action at a time. (you do actions: " + ", ".join([handler.name() for handler in tool_list]) + ")"
+            return False, f"Action failed: Multiple actions detected. Please only perform one action at a time. Actions attempted: {', '.join([handler.name() for handler in tool_list])}"
         if len(tool_list) == 0:
             return False, ""
         if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):

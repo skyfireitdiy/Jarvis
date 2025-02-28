@@ -120,7 +120,7 @@ class MultiAgent(OutputHandler):
                           auto_complete=agent_config.auto_complete,
                           summary_prompt=agent_config.summary_prompt,
                           is_sub_agent=agent_config.is_sub_agent,
-                          output_handler=[agent_config.output_handler, self],
+                          output_handler=[*agent_config.output_handler, self],
                           )
             
             self.agents[agent_config.name] = agent

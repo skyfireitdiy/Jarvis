@@ -1,5 +1,6 @@
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_multi_agent import MultiAgent, AgentConfig
+from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils import get_multiline_input, init_env
 
 # Define system prompts for each role
@@ -547,6 +548,24 @@ Decision Making:
 
 def create_dev_team() -> MultiAgent:
     """Create a development team with multiple agents."""
+
+    PM_output_handler = ToolRegistry()
+    PM_output_handler.use_tools(["ask_user", "file_operation", "search", "rag", "execute_shell"])
+
+    BA_output_handler = ToolRegistry()
+    BA_output_handler.use_tools(["ask_user", "file_operation", "search", "rag"])
+
+    SA_output_handler = ToolRegistry()
+    SA_output_handler.use_tools(["read_code", "file_operation", "search", "rag", "ask_codebase", "lsp_get_document_symbols"])
+    
+    TL_output_handler = ToolRegistry()
+    TL_output_handler.use_tools(["read_code", "file_operation", "ask_codebase", "lsp_get_diagnostics", "lsp_find_references", "lsp_find_definition"])
+    
+    DEV_output_handler = ToolRegistry()
+    DEV_output_handler.use_tools(["create_code_agent", "file_operation", "read_code", "ask_codebase", "tool_generator"])
+    
+    QA_output_handler = ToolRegistry()
+    QA_output_handler.use_tools(["create_code_agent", "file_operation", "read_code", "ask_codebase", "execute_shell"])
     
     # Create configurations for each role
     configs = [
@@ -554,80 +573,43 @@ def create_dev_team() -> MultiAgent:
             name="PM",
             description="Project Manager - Coordinates team and manages project delivery",
             system_prompt=PM_PROMPT,
-            tool_registry=[
-                "ask_user",          # Get user requirements and feedback
-                "file_operation",    # Read/write project documents
-                "search",            # Research project information
-                "rag",               # Access project knowledge base
-                "execute_shell",     # Monitor project status and run project commands
-            ],
-            platform=PlatformRegistry().get_normal_platform(),
+            output_handler=[PM_output_handler],
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         AgentConfig(
             name="BA",
             description="Business Analyst - Analyzes and documents requirements",
             system_prompt=BA_PROMPT,
-            tool_registry=[
-                "ask_user",          # Get requirement clarification
-                "file_operation",    # Read/write analysis documents
-                "search",            # Research similar solutions
-                "rag",               # Access domain knowledge
-            ],
-            platform=PlatformRegistry().get_normal_platform(),
+            output_handler=[BA_output_handler],
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         AgentConfig(
             name="SA",
             description="Solution Architect - Designs technical solutions",
             system_prompt=SA_PROMPT,
-            tool_registry=[
-                "read_code",         # Analyze code structure
-                "file_operation",    # Read/write architecture documents
-                "search",            # Research technical solutions
-                "rag",               # Access technical knowledge
-                "ask_codebase",      # Understand existing codebase
-                "lsp_get_document_symbols",  # Analyze code organization
-            ],
-            platform=PlatformRegistry().get_normal_platform(),
+            output_handler=[SA_output_handler],
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         AgentConfig(
             name="TL",
             description="Technical Lead - Leads development team and ensures technical quality",
             system_prompt=TL_PROMPT,
-            tool_registry=[
-                "read_code",         # Review code
-                "file_operation",    # Read/write technical documents
-                "ask_codebase",      # Understand codebase
-                "lsp_get_diagnostics", # Check code quality
-                "lsp_find_references",  # Analyze dependencies
-                "lsp_find_definition",  # Navigate code
-            ],
-            platform=PlatformRegistry().get_normal_platform(),
+            output_handler=[TL_output_handler],
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         AgentConfig(
             name="DEV",
             description="Developer - Implements features and writes code",
             system_prompt=DEV_PROMPT,
-            tool_registry=[
-                "create_code_agent", # Create agents for coding tasks
-                "file_operation",    # Read/write development docs
-                "read_code",         # Read existing code
-                "ask_codebase",      # Understand codebase
-                "tool_generator",    # Generate new tools if needed
-            ],
-            platform=PlatformRegistry().get_normal_platform(),
+            output_handler=[DEV_output_handler],
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         AgentConfig(
             name="QA",
             description="Quality Assurance - Ensures product quality through testing",
             system_prompt=QA_PROMPT,
-            tool_registry=[
-                "create_code_agent", # Create agents for testing
-                "file_operation",    # Read/write test documents
-                "read_code",         # Review code for testing
-                "ask_codebase",      # Understand test requirements
-                "execute_shell",     # Run tests
-            ],
-            platform=PlatformRegistry().get_normal_platform(),
+            output_handler=[QA_output_handler],
+            platform=PlatformRegistry().get_thinking_platform(),
         )
     ]
     
