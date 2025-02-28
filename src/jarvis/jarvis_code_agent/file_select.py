@@ -197,18 +197,20 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                 paths_to_add = [file_path]
             
             # Add selected files
+            tips = "添加以下文件:"
             for path in paths_to_add:
                 full_path = os.path.join(root_dir, path)
                 if not os.path.isfile(full_path):
-                    PrettyOutput.print(f"文件不存在: {path}", OutputType.ERROR)
+                    tips += f"\n文件不存在: {path}"
                     continue
                 
                 try:
                     selected_files.append({"file": path, "reason": "User Added"})
-                    PrettyOutput.print(f"文件已添加: {path}", OutputType.SUCCESS)
+                    tips += f"\n文件已添加: {path}"
                 except Exception as e:
-                    PrettyOutput.print(f"读取文件失败: {str(e)}", OutputType.ERROR)
+                    tips += f"\n读取文件失败: {str(e)}"
     selected_files = [f for f in selected_files if os.path.isfile(os.path.join(root_dir, f["file"]))]
+    PrettyOutput.print(tips, OutputType.INFO)
     return selected_files
 
 def file_input_handler(user_input: str) -> str:
