@@ -3,6 +3,8 @@ import re
 from typing import Dict, List, Tuple
 
 from jarvis.jarvis_utils import while_success, while_true
+from yaspin import yaspin
+from yaspin.spinners import Spinners
 
 
 class BasePlatform(ABC):
@@ -28,9 +30,16 @@ class BasePlatform(ABC):
 
     def chat_until_success(self, message: str) -> str:
         def _chat():
-            response = self.chat(message)
-            response = re.sub(r'<think>(.*?)</think>', '', response, flags=re.DOTALL)
-            return response
+            if self.suppress_output:
+                with yaspin(Spinners.dots, text="Thinking", color="yellow") as spinner:
+                    response = self.chat(message)
+                    response = re.sub(r'<think>(.*?)</think>', '', response, flags=re.DOTALL)
+                    return response
+            else:
+                response = self.chat(message)
+                response = re.sub(r'<think>(.*?)</think>', '', response, flags=re.DOTALL)
+                return response
+                
         return while_true(lambda: while_success(lambda: _chat(), 5), 5)
 
     @abstractmethod

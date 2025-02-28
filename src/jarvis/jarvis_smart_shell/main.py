@@ -70,19 +70,14 @@ Remember: Only return the command itself, without any additional content.
         prefix = f"Current path: {current_path}\n"
         prefix += f"Current shell: {shell}\n"
         
-        # 使用yaspin显示Thinking状态
-        with yaspin(Spinners.dots, text="Thinking", color="yellow") as spinner:
-            # 处理请求
-            result = model.chat_until_success(prefix + request)
-            
-            # 提取命令
-            if result and isinstance(result, str):
-                command = result.strip()
-                spinner.ok("✓")
-                return command
-            
-            spinner.fail("✗")
-            return None
+        result = model.chat_until_success(prefix + request)
+        
+        # 提取命令
+        if result and isinstance(result, str):
+            command = result.strip()
+            return command
+        
+        return None
         
     except Exception as e:
         PrettyOutput.print(f"处理请求失败: {str(e)}", OutputType.WARNING)
