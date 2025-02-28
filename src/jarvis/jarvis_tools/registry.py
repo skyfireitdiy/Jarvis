@@ -74,7 +74,8 @@ class ToolRegistry(OutputHandler):
     def handle(self, response: str) -> Tuple[bool, Any]:
         tool_calls = self._extract_tool_calls(response)
         if len(tool_calls) > 1:
-            return False, f"Error: Handle multiple tool calls, please ONLY handle one tool call at a time."
+            PrettyOutput.print(f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([tool_call['name'] for tool_call in tool_calls])}", OutputType.WARNING)
+            return False, f"Call failed: Handle multiple tool calls, please ONLY handle one tool call at a time."
         if len(tool_calls) == 0:
             return False, ""
         tool_call = tool_calls[0]

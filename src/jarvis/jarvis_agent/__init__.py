@@ -221,6 +221,7 @@ Please continue the task based on the above information.
             if handler.can_handle(response):
                 tool_list.append(handler)
         if len(tool_list) > 1:
+            PrettyOutput.print(f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}", OutputType.ERROR)
             return False, f"Action failed: Multiple actions detected. Please only perform one action at a time. Actions attempted: {', '.join([handler.name() for handler in tool_list])}"
         if len(tool_list) == 0:
             return False, ""
