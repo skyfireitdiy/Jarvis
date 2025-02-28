@@ -260,7 +260,7 @@ class AI8Model(BasePlatform):
             }
             
             response = requests.get(
-                f"{self.BASE_URL}/api/chat/template",
+                f"{self.BASE_URL}/api/chat/tmpl",
                 headers=headers
             )
             
