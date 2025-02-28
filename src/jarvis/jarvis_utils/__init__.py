@@ -228,6 +228,7 @@ class PrettyOutput:
             border_style=styles[output_type],
             title=header,
             title_align="left",
+            padding=(1, 1),
             highlight=True
         )
         
