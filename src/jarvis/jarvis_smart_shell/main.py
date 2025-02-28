@@ -8,7 +8,7 @@ from yaspin import yaspin # type: ignore
 from yaspin.spinners import Spinners # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils import PrettyOutput, OutputType, get_shell_name, init_env
+from jarvis.jarvis_utils import PrettyOutput, OutputType, get_multiline_input, get_shell_name, init_env
 
 def execute_command(command: str) -> None:
     """Show command and allow user to edit, then execute, Ctrl+C to cancel"""
@@ -101,14 +101,20 @@ Example:
   %(prog)s "Find documents modified in the last week"
 """)
     
-    # 添加参数
+    # 修改为可选参数，添加从stdin读取的支持
     parser.add_argument(
         "request",
-        help="描述您想要执行的操作, 用自然语言描述"
+        nargs='?',  # 设置为可选参数
+        help="描述您想要执行的操作（用自然语言描述），如果未提供则从标准输入读取"
     )
     
     # 解析参数
     args = parser.parse_args()
+    
+    # 添加标准输入处理
+    if not args.request:
+        # 检查是否在交互式终端中运行
+        args.request = get_multiline_input(tip="请输入您要执行的功能：")
     
     # 处理请求
     command = process_request(args.request)

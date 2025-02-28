@@ -374,8 +374,8 @@ def service_command(args):
         logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
         os.makedirs(logs_dir, exist_ok=True)
         
-        # Send the initial chunk with role
-        yield f"data: {json.dumps({
+        # 修改第一个yield语句的格式
+        initial_data = {
             'id': completion_id,
             'object': 'chat.completion.chunk',
             'created': created_time,
@@ -385,7 +385,9 @@ def service_command(args):
                 'delta': {'role': 'assistant'},
                 'finish_reason': None
             }]
-        })}\n\n"
+        }
+        res = json.dumps(initial_data)
+        yield f"data: {res}\n\n"
         
         try:
             # 直接获取聊天响应，而不是尝试捕获stdout
@@ -435,8 +437,8 @@ def service_command(args):
                 yield f"data: {json.dumps(chunk_data)}\n\n"
                 full_response = "No response from model."
             
-            # 发送最终块
-            yield f"data: {json.dumps({
+            # 修改最终yield语句的格式
+            final_data = {
                 'id': completion_id,
                 'object': 'chat.completion.chunk',
                 'created': created_time,
@@ -446,7 +448,8 @@ def service_command(args):
                     'delta': {},
                     'finish_reason': 'stop'
                 }]
-            })}\n\n"
+            }
+            yield f"data: {json.dumps(final_data)}\n\n"
             
             # 发送[DONE]标记
             yield "data: [DONE]\n\n"
@@ -472,8 +475,8 @@ def service_command(args):
             # 发送错误消息
             error_msg = f"Error: {str(e)}"
             print(f"Streaming error: {error_msg}")
-            
-            yield f"data: {json.dumps({
+
+            res = json.dumps({
                 'id': completion_id,
                 'object': 'chat.completion.chunk',
                 'created': created_time,
@@ -483,8 +486,8 @@ def service_command(args):
                     'delta': {'content': error_msg},
                     'finish_reason': 'stop'
                 }]
-            })}\n\n"
-            
+            })
+            yield f"data: {res}\n\n"
             yield f"data: {json.dumps({'error': {'message': error_msg, 'type': 'server_error'}})}\n\n"
             yield "data: [DONE]\n\n"
             
