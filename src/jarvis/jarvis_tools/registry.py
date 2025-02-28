@@ -17,14 +17,12 @@ tool_call_help = """
 You are using a tool execution system that requires precise formatting and strict rules.
 
 # 📋 Tool Call Format
-```yaml
 <TOOL_CALL>
 name: tool_name
 arguments:
     param1: value1
     param2: value2
 </TOOL_CALL>
-```
 
 # ❗ Critical Rules
 1. ONE Tool Per Turn
@@ -51,14 +49,12 @@ arguments:
 # 📝 String Parameter Format
 ALWAYS use | syntax for string parameters:
 
-```yaml
 <TOOL_CALL>
 name: execute_shell
 arguments:
     command: |
         git status --porcelain
 </TOOL_CALL>
-```
 
 # 💡 Best Practices
 - Start execution immediately when ready
@@ -275,14 +271,13 @@ class ToolRegistry(OutputHandler):
 You are using a tool execution system that requires precise formatting and strict rules.
 
 # 📋 Tool Call Format
-```yaml
+
 <TOOL_CALL>
 name: tool_name
 arguments:
     param1: value1
     param2: value2
 </TOOL_CALL>
-```
 
 # ❗ Critical Rules
 1. ONE Tool Per Turn
@@ -309,14 +304,12 @@ arguments:
 # 📝 String Parameter Format
 ALWAYS use | syntax for string parameters:
 
-```yaml
 <TOOL_CALL>
 name: execute_shell
 arguments:
     command: |
         git status --porcelain
 </TOOL_CALL>
-```
 
 # 💡 Best Practices
 - Start execution immediately when ready

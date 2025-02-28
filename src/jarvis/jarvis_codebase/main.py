@@ -809,7 +809,6 @@ You are a code analysis expert who provides comprehensive and accurate answers a
 - Use professional terminology
 
 ## Response Format
-```yaml
 - question: [Restate the question]
   answer: |
     [Detailed technical answer with:
@@ -821,7 +820,6 @@ You are a code analysis expert who provides comprehensive and accurate answers a
 - question: [Follow-up question if needed]
   answer: |
     [Additional technical details]
-```
 
 # 🔍 Analysis Context
 Question: {query}
