@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import re
 from typing import Dict, List, Tuple
 
-from jarvis.jarvis_utils import while_success, while_true
+from jarvis.jarvis_utils import OutputType, PrettyOutput, while_success, while_true
 from yaspin import yaspin
 from yaspin.spinners import Spinners
 
@@ -12,7 +12,7 @@ class BasePlatform(ABC):
     
     def __init__(self):
         """Initialize model"""
-        self.suppress_output = False  # 添加输出控制标志
+        self.suppress_output = True  # 添加输出控制标志
 
     def __del__(self):
         """Destroy model"""
@@ -34,6 +34,7 @@ class BasePlatform(ABC):
                 with yaspin(Spinners.dots, text="Thinking", color="yellow") as spinner:
                     response = self.chat(message)
                     response = re.sub(r'<think>(.*?)</think>', '', response, flags=re.DOTALL)
+                    PrettyOutput.print(response, OutputType.SYSTEM)
                     return response
             else:
                 response = self.chat(message)
