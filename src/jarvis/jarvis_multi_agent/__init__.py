@@ -1,6 +1,3 @@
-
-
-
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -34,41 +31,67 @@ class MultiAgent(OutputHandler):
         self.main_agent_name = main_agent_name
 
     def prompt(self) -> str:
-        return """
-        - Send Message Rules
-            !!! CRITICAL ACTION RULES !!!
-            You can ONLY perform ONE action per turn:
-            - ENSURE USE ONLY ONE TOOL EVERY TURN (file_operation, ask_user, etc.)
-            - OR SEND ONE MESSAGE TO ANOTHER AGENT
-            - NEVER DO BOTH IN THE SAME TURN
-            
-            2. Message Format:
-            <SEND_MESSAGE>
-            to: agent_name  # Target agent name
-            content: |
-                message_content  # Message content, multi-line must be separated by newlines
-            </SEND_MESSAGE>
-            
-            3. Message Handling:
-                - After sending a message, WAIT for response
-                - Process response before next action
-                - Never send multiple messages at once
-                - Never combine message with tool calls
-            
-            4. If Multiple Actions Needed:
-                a. Choose most important action first
-                b. Wait for response/result
-                c. Plan next action based on response
-                d. Execute next action in new turn
-            
-        - Remember:
-            - First action will be executed
-            - Additional actions will be IGNORED
-            - Always process responses before new actions
-            - You should send message to other to continue the task if you are nothing to do
-            - If you receive a message from other agent, you should handle it and reply to sender
+        return f"""
+# 🤖 Message Handling System
+You are part of a multi-agent system that communicates through structured messages.
 
-        You can send message to following agents: """ + "\n".join([f"{c.name}: {c.description}" for c in self.agents_config])
+# 🎯 Core Rules
+## Critical Action Rules
+- Execute ONLY ONE action per turn:
+  - Either use ONE tool (file_operation, ask_user, etc.)
+  - OR send ONE message to another agent
+  - NEVER combine both in same turn
+
+## Message Flow Control
+- Wait for response after sending message
+- Process response before next action
+- Never send multiple messages at once
+- Never combine messages with tool calls
+
+# 📝 Message Format
+```
+<SEND_MESSAGE>
+to: agent_name    # Target agent name
+content: |
+    message_content    # Message content
+    use multiple lines    # If needed
+    with proper indentation
+</SEND_MESSAGE>
+```
+
+# 🔄 Action Sequence
+1. Choose Most Important Action
+   - Evaluate priority
+   - Select ONE action
+   - Execute action
+
+2. Wait for Response
+   - Process result/response
+   - Plan next action
+   - Wait for next turn
+
+3. Handle Responses
+   - Process incoming messages
+   - Reply to sender when needed
+   - Continue task based on response
+
+# 👥 Available Agents
+{chr(10).join([f"- {c.name}: {c.description}" for c in self.agents_config])}
+
+# ❗ Important Rules
+1. ONE action per turn only
+2. Wait for responses
+3. Process before next action
+4. Reply to messages
+5. Forward task if needed
+
+# 💡 Tips
+- First action will be executed
+- Additional actions will be ignored
+- Always process responses first
+- Send message to continue task if needed
+- Handle and reply to received messages
+"""
 
     def can_handle(self, response: str) -> bool:
         return len(self._extract_send_msg(response)) > 0

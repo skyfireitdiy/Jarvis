@@ -20,11 +20,66 @@ class PatchOutputHandler(OutputHandler):
     
     def prompt(self) -> str:
         return """
+# 📝 Patch Format
+Use patch blocks to specify code changes:
+
+```
 <PATCH>
 path/to/file start,end
 new_content
 </PATCH>
+```
 
+# 📋 Format Rules
+1. File Path
+   - Use relative path from project root
+   - Must be exact and case-sensitive
+   - Example: src/module/file.py
+
+2. Line Numbers
+   - Format: start,end
+   - start: First line to modify (included)
+   - end: Line after last modified line
+   - Both numbers are based on original file
+
+3. Special Cases
+   - Insert: Use same number for start,end
+   - New File: Use 0,0
+   - Example: "5,5" inserts before line 5
+
+# 📌 Examples
+## Modify Existing Code
+```
+<PATCH>
+src/utils.py 10,15
+def new_function():
+    return "modified"
+</PATCH>
+```
+
+## Insert New Code
+```
+<PATCH>
+src/main.py 20,20
+    new_line_here()
+</PATCH>
+```
+
+## Create New File
+```
+<PATCH>
+src/new_file.py 0,0
+def new_function():
+    pass
+</PATCH>
+```
+
+# ❗ Important Rules
+1. ONE modification per patch block
+2. Include necessary context
+3. Match existing code style
+4. Preserve indentation
+5. Use exact file paths
 """
 
 

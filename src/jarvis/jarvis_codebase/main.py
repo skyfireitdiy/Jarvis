@@ -787,23 +787,48 @@ Please provide 10 search-optimized expressions in the specified format.
         
         if not files_from_codebase:
             PrettyOutput.print("没有找到相关文件", output_type=OutputType.WARNING)
-            return [],""
+            return [], ""
         
-        # Build enhanced prompt
-        prompt = f"""Based on the following code files, please provide a comprehensive and accurate answer to the user's question.
+        prompt = f"""
+# 🤖 Role Definition
+You are a code analysis expert who provides comprehensive and accurate answers about codebases.
 
-Important guidelines:
-1. Focus on code-specific details and implementation
-2. Explain technical concepts clearly
-3. Include relevant code snippets when helpful
-4. If the code doesn't fully answer the question, indicate what's missing
-5. Answer in user's language.
-6. Answer with professional language.
+# 🎯 Core Responsibilities
+- Analyze code files thoroughly
+- Explain technical concepts clearly
+- Provide relevant code examples
+- Identify missing information
+- Answer in user's language
 
+# 📋 Response Requirements
+## Content Quality
+- Focus on implementation details
+- Be technically precise
+- Include relevant code snippets
+- Indicate any missing information
+- Use professional terminology
+
+## Response Format
+```yaml
+- question: [Restate the question]
+  answer: |
+    [Detailed technical answer with:
+    - Implementation details
+    - Code examples (if relevant)
+    - Missing information (if any)
+    - Related technical concepts]
+
+- question: [Follow-up question if needed]
+  answer: |
+    [Additional technical details]
+```
+
+# 🔍 Analysis Context
 Question: {query}
 
-Relevant code files (ordered by relevance):
+Relevant Code Files (by relevance):
 """
+
         # Add context with length control
         available_count = self.max_token_count - get_context_token_count(prompt) - 1000  # Reserve space for answer
         current_count = 0
@@ -812,10 +837,11 @@ Relevant code files (ordered by relevance):
             try:
                 content = open(path["file"], "r", encoding="utf-8").read()
                 file_content = f"""
-File: {path["file"]}
-Content:
+## File: {path["file"]}
+```
 {content}
-----------------------------------------
+```
+---
 """
                 if current_count + get_context_token_count(file_content) > available_count:
                     PrettyOutput.print(
@@ -831,16 +857,18 @@ Content:
                 PrettyOutput.print(f"读取 {path} 失败: {str(e)}", 
                                 output_type=OutputType.ERROR)
                 continue
-        
-        model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
 
         prompt += """
-Output Format:
-- question: the question to answer
-  answer: the answer to the question
-- question: the question to answer
-  answer: the answer to the question
+# ❗ Important Rules
+1. Always base answers on provided code
+2. Use technical precision
+3. Include code examples when relevant
+4. Indicate any missing information
+5. Maintain professional language
+6. Answer in user's language
 """
+
+        model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
 
         return files_from_codebase, model.chat_until_success(prompt)
 

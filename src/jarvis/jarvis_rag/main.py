@@ -642,32 +642,64 @@ class RAGTool:
     def ask(self, question: str) -> Optional[str]:
         """Ask questions about documents with enhanced context building"""
         try:
-            # 搜索相关文档
             results = self.search(question)
             if not results:
                 return None
             
-            # 构建提示词
-            prompt = f"""Based on the following document fragments, please answer the user's question accurately and comprehensively.
+            prompt = f"""
+# 🤖 Role Definition
+You are a document analysis expert who provides accurate and comprehensive answers based on provided documents.
 
+# 🎯 Core Responsibilities
+- Analyze document fragments thoroughly
+- Answer questions accurately
+- Reference source documents
+- Identify missing information
+- Maintain professional tone
+
+# 📋 Answer Requirements
+## Content Quality
+- Base answers strictly on provided documents
+- Be specific and precise
+- Include relevant quotes when helpful
+- Indicate any information gaps
+- Use professional language
+
+## Answer Structure
+1. Direct Answer
+   - Clear and concise response
+   - Based on document evidence
+   - Professional terminology
+
+2. Supporting Details
+   - Relevant document quotes
+   - File references
+   - Context explanation
+
+3. Information Gaps (if any)
+   - Missing information
+   - Additional context needed
+   - Potential limitations
+
+# 🔍 Analysis Context
 Question: {question}
 
-Relevant documents (ordered by relevance):
+Relevant Documents (by relevance):
 """
-            # 添加上下文，控制长度
+
+            # Add context with length control
             available_count = self.max_token_count - get_context_token_count(prompt) - 1000
             current_count = 0
             
             for doc, score in results:
                 doc_content = f"""
-[Score: {score:.3f}] {doc.metadata['file_path']}:
+## Document Fragment [Score: {score:.3f}]
+Source: {doc.metadata['file_path']}
+```
 {doc.content}
+```
 ---
 """
-                prompt += "Answer Format:\n"
-                prompt += "1. Answer the question accurately and comprehensively.\n"
-                prompt += "2. If the documents don't fully answer the question, please indicate what information is missing.\n"
-                prompt += "3. Reference the documents in the answer.\n"
                 if current_count + get_context_token_count(doc_content) > available_count:
                     PrettyOutput.print(
                         "由于上下文长度限制，部分内容被省略",
@@ -677,14 +709,19 @@ Relevant documents (ordered by relevance):
                     
                 prompt += doc_content
                 current_count += get_context_token_count(doc_content)
-            
-            prompt += "\nIf the documents don't fully answer the question, please indicate what information is missing."
-            
-            # 使用 normal 平台处理文档问答
+
+            prompt += """
+# ❗ Important Rules
+1. Only use provided documents
+2. Be precise and accurate
+3. Quote sources when relevant
+4. Indicate missing information
+5. Maintain professional tone
+6. Answer in user's language
+"""
+
             model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-            response = model.chat_until_success(prompt)
-            
-            return response
+            return model.chat_until_success(prompt)
             
         except Exception as e:
             PrettyOutput.print(f"回答失败：{str(e)}", OutputType.ERROR)

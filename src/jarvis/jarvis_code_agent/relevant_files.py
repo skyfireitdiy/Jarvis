@@ -9,51 +9,91 @@ from jarvis.jarvis_utils import OutputType, PrettyOutput
 
 def make_question(requirement: str) -> Optional[str]:
     """Generate structured questions to gather necessary information for the requirement."""
-    prompt = f"""You are a code analysis expert who helps developers understand existing system implementations. Generate specific questions to investigate:
-- Current system implementations
-- Existing interfaces and integration points
-- Extension mechanisms and patterns
-- Related components and their interactions
+    prompt = f"""
+# 🔍 Role Definition
+You are a code analysis expert who helps developers understand existing system implementations by asking targeted questions.
 
-Key Instructions:
-1. Focus on understanding the EXISTING system
-2. Ask about interfaces, hooks, and extension points
-3. Investigate integration patterns and dependencies
-4. Explore current implementation details
+# 🎯 Core Objectives
+- Understand current system implementations
+- Identify integration points and interfaces
+- Discover extension mechanisms
+- Map component interactions
 
-For example:
-BAD: "How should we implement the new feature?"
-GOOD: "What are the existing extension points in the authentication system that we can use to add the new OAuth provider? Specifically, how does AuthProvider interface work and where is it currently used?"
+# 📋 Question Categories
+## 1. System Architecture
+Focus on system structure and design:
+- Existing interfaces and classes
+- Component integration patterns
+- Extension points and hooks
+- System boundaries
 
-Consider these investigation aspects:
+## 2. Implementation Details
+Explore current codebase:
+- Workflow implementations
+- Hook and callback systems
+- Interface hierarchies
+- Extension mechanisms
 
-1. System Architecture:
-   - "What are the existing interfaces/classes that handle [functionality]?"
-   - "How is [feature] currently integrated with other components?"
-   - "Where are the extension points for [system component]?"
+## 3. Integration Patterns
+Understand connection points:
+- Component interactions
+- Integration interfaces
+- Extension methods
+- Plugin systems
 
-2. Implementation Details:
-   - "What is the current workflow for [operation] in the system?"
-   - "How does the system expose hooks/callbacks for [functionality]?"
-   - "Which interfaces/abstract classes are used for [feature] extensibility?"
+## 4. Extension Mechanisms
+Identify customization options:
+- Extension patterns
+- Plugin architectures
+- Configuration systems
+- Customization points
 
-3. Integration Patterns:
-   - "How do existing components integrate with [system part]?"
-   - "What are the current integration points for [feature]?"
-   - "How does the system handle extensions to [component]?"
+# 📝 Question Guidelines
+## Good Questions
+- "What interfaces currently handle user authentication?"
+- "How does the system expose extension points for plugins?"
+- "Where are the existing hooks for custom providers?"
 
-4. Extension Mechanisms:
-   - "What patterns are used for extending [functionality]?"
-   - "How do existing plugins/extensions connect to [system]?"
-   - "Where are the configuration points for [feature] customization?"
+## Bad Questions
+- "How should we implement the new feature?"
+- "What's the best way to add this?"
+- "Should we create a new class?"
+
+# 🎨 Question Template
+```
+<QUESTION>
+[3-5 specific questions about existing implementations:
+1. System architecture question
+2. Implementation details question
+3. Integration or extension question]
+</QUESTION>
+```
+
+# 🔎 Investigation Focus
+1. Current System
+   - Existing implementations
+   - Active interfaces
+   - Current patterns
+
+2. Integration Points
+   - Connection methods
+   - Extension hooks
+   - Plugin systems
+
+3. Extension Options
+   - Customization points
+   - Configuration options
+   - Extension patterns
+
+# ❗ Important Rules
+1. Focus on EXISTING code
+2. Ask about current patterns
+3. Explore extension points
+4. Investigate interfaces
+5. Map dependencies
 
 User Requirement:
 {requirement}
-
-Output Format:
-<QUESTION>
-[Write 3-5 specific questions focusing on existing implementations and extension points. Each question should help understand how to integrate with or extend the current system]
-</QUESTION>
 """
     model = PlatformRegistry().get_thinking_platform()
     response = model.chat_until_success(prompt)

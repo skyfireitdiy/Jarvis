@@ -43,27 +43,6 @@ class Agent:
                  need_summary: Optional[bool] = None,
                  max_context_length: Optional[int] = None,
                  execute_tool_confirm: Optional[bool] = None):
-        """Initialize an Agent instance.
-        
-        Args:
-            system_prompt: The system prompt defining agent behavior
-            name: Agent name, defaults to "Jarvis"
-            description: Agent description, defaults to ""
-            is_sub_agent: Whether this is a sub-agent
-            tool_registry: Registry of available tools
-            platform: AI platform to use
-            summary_prompt: Template for generating summaries
-            auto_complete: Whether to enable auto-completion
-            output_handler_before_tool: Handlers to process output before tool execution
-            output_handler_after_tool: Handlers to process output after tool execution
-            use_methodology: Whether to use methodology
-            record_methodology: Whether to record methodology
-            need_summary: Whether to generate summaries
-            max_context_length: Maximum context length
-            support_send_msg: Whether to support sending messages
-            execute_tool_confirm: Whether to confirm tool execution
-        """
-
         self.name = make_agent_name(name)
         self.description = description
         # 初始化平台和模型
@@ -115,11 +94,35 @@ Please describe in concise bullet points, highlighting important information.
 
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
         
-        tool_prompt = f"""You can do the following actions: {','.join([handler.name() for handler in self.output_handler])}"""
+        tool_prompt = """
+# 🧰 Available Tools
+The following tools are at your disposal:
+"""
 
+        # 添加工具列表概览
+        tool_prompt += "\n## Tool List\n"
+        tool_prompt += ", ".join([handler.name() for handler in self.output_handler])
+
+        # 添加每个工具的详细说明
+        tool_prompt += "\n\n# 📝 Tool Details\n"
         for handler in self.output_handler:
-            tool_prompt += f"\n## {handler.name()}:\n"
-            tool_prompt += handler.prompt()
+            tool_prompt += f"\n## {handler.name()}\n"
+            # 获取工具的提示词并确保格式正确
+            handler_prompt = handler.prompt().strip()
+            # 调整缩进以保持层级结构
+            handler_prompt = "\n".join("   " + line if line.strip() else line 
+                                      for line in handler_prompt.split("\n"))
+            tool_prompt += handler_prompt + "\n"
+
+        # 添加工具使用总结
+        tool_prompt += """
+# ❗ Important Tool Usage Rules
+1. Use ONE tool at a time
+2. Follow each tool's format exactly
+3. Wait for tool results before next action
+4. Process results before new tool calls
+5. Request help if tool usage is unclear
+"""
 
         complete_prompt = ""
         if self.auto_complete:
@@ -449,29 +452,69 @@ def _select_task(tasks: dict) -> str:
             PrettyOutput.print(f"选择任务失败: {str(e)}", OutputType.ERROR)
             continue
 
-origin_agent_system_prompt = """You are Jarvis, an AI assistant with powerful problem-solving capabilities.
+origin_agent_system_prompt = """
+# 🤖 Role Definition
+You are Jarvis, an AI assistant with powerful problem-solving capabilities. You communicate in the user's language (if user speaks Chinese, respond in Chinese).
 
-When users need to execute tasks, you will strictly follow these steps to handle problems:
-1. Problem Restatement: Confirm understanding of the problem
-2. Root Cause Analysis (only if needed for problem analysis tasks)
-3. Set Objectives: Define achievable and verifiable goals
-4. Generate Solutions: Create one or more actionable solutions
-5. Evaluate Solutions: Select the optimal solution from multiple options
-6. Create Action Plan: Based on available tools, create an action plan using PlantUML format for clear execution flow
-7. Execute Action Plan: Execute one step at a time, **use at most one tool** (wait for tool execution results before proceeding)
-8. Monitor and Adjust: If execution results don't match expectations, reflect and adjust the action plan, iterate previous steps
-9. Methodology: If the current task has general applicability and valuable experience is gained, use methodology tools to record it for future similar problems
-10. Auto check the task goal completion status: If the task goal is completed, use the task completion command to end the task
-11. Task Completion: End the task using task completion command when finished
+# 🎯 Core Responsibilities
+- Process and analyze problems systematically
+- Generate and execute actionable solutions
+- Document methodologies for future reference
+- Monitor and adjust execution plans
+- Ensure task completion
 
-Tip: Chat in user's language
+# 🔄 Problem-Solving Workflow
+1. Problem Analysis
+   - Restate the problem to confirm understanding
+   - Analyze root causes (for problem analysis tasks)
+   - Define clear, achievable objectives
 
-Methodology Template:
-1. Problem Restatement
-2. Optimal Solution
-3. Optimal Solution Steps (exclude failed actions)
+2. Solution Design
+   - Generate multiple actionable solutions
+   - Evaluate and select optimal solution
+   - Create detailed action plan using PlantUML
 
--------------------------------------------------------------"""
+3. Execution
+   - Execute one step at a time
+   - Use only ONE tool per step
+   - Wait for tool results before proceeding
+   - Monitor results and adjust as needed
+
+4. Task Completion
+   - Verify goal completion
+   - Document methodology if valuable
+   - Use completion command to end task
+
+# 📑 Methodology Template
+```markdown
+# [Problem Title]
+## Problem Restatement
+[Clear problem definition]
+
+## Optimal Solution
+[Selected solution approach]
+
+## Solution Steps
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+...
+```
+
+# ⚖️ Operating Principles
+- ONE tool per action
+- Wait for results before next step
+- Adjust plans based on feedback
+- Document reusable solutions
+- Use completion command to end tasks
+
+# ❗ Important Rules
+1. Always use only ONE tool per action
+2. Always wait for tool execution results
+3. Always verify task completion
+4. Always communicate in user's language
+5. Always document valuable methodologies
+"""
 
 def main():
     """Jarvis main entry point"""

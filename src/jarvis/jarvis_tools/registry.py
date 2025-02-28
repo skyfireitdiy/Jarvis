@@ -13,39 +13,66 @@ from jarvis.jarvis_utils import OutputType, PrettyOutput, get_context_token_coun
 
 
 tool_call_help = """
-Tool Usage Format
+# 🛠️ Tool Usage System
+You are using a tool execution system that requires precise formatting and strict rules.
+
+# 📋 Tool Call Format
+```yaml
 <TOOL_CALL>
 name: tool_name
 arguments:
     param1: value1
     param2: value2
 </TOOL_CALL>
+```
 
-STRICT RULES:
-- EXECUTE ONLY ONE TOOL AT EVERY TURN
-- TOOL EXECUTION MUST STRICTLY FOLLOW THE TOOL USAGE FORMAT
-- WAIT FOR USER TO PROVIDE EXECUTION RESULTS
-- DON'T ASSUME OR IMAGINE RESULTS
-- DON'T CREATE FAKE DIALOGUES
-- IF CURRENT INFORMATION IS INSUFFICIENT, YOU MAY ASK THE USER FOR MORE INFORMATION
-- NOT ALL PROBLEM-SOLVING STEPS ARE MANDATORY, SKIP AS APPROPRIATE
-- Request user guidance when multiple iterations show no progress
-- ALWAYS use | syntax for string parameters to prevent parsing errors
-    Example:
-    <TOOL_CALL>
-    name: execute_shell
-    arguments:
-        command: |
-            git status --porcelain
-    </TOOL_CALL>
-    <TOOL_CALL>
-    name: execute_shell
-    arguments:
-        command: |
-            git commit -m "fix bug"
-    </TOOL_CALL>
-    
-- If you can start executing the task, please start directly without asking the user if you can begin.
+# ❗ Critical Rules
+1. ONE Tool Per Turn
+   - Execute only ONE tool at a time
+   - Wait for results before next action
+
+2. Strict Format Adherence
+   - Follow exact format shown above
+   - Use proper YAML indentation
+   - Include all required parameters
+
+3. Result Handling
+   - Wait for execution results
+   - Never assume outcomes
+   - Don't create fake responses
+   - Don't imagine dialogues
+
+4. Information Management
+   - Ask user if info is insufficient
+   - Skip unnecessary steps
+   - Request guidance if stuck
+   - Don't proceed with incomplete info
+
+# 📝 String Parameter Format
+ALWAYS use | syntax for string parameters:
+
+```yaml
+<TOOL_CALL>
+name: execute_shell
+arguments:
+    command: |
+        git status --porcelain
+</TOOL_CALL>
+```
+
+# 💡 Best Practices
+- Start execution immediately when ready
+- No need to ask for permission to begin
+- Use proper string formatting
+- Monitor progress and adjust
+- Request help when stuck
+
+# ⚠️ Common Mistakes to Avoid
+- Multiple tool calls at once
+- Missing | for string parameters
+- Assuming tool results
+- Creating fictional dialogues
+- Proceeding without required info
 """
 
 class ToolRegistry(OutputHandler):
@@ -244,14 +271,66 @@ class ToolRegistry(OutputHandler):
             args = tool_call["arguments"]
 
             tool_call_help = """
-Tool Usage Format:
+# 🛠️ Tool Usage System
+You are using a tool execution system that requires precise formatting and strict rules.
 
+# 📋 Tool Call Format
+```yaml
 <TOOL_CALL>
 name: tool_name
 arguments:
     param1: value1
     param2: value2
 </TOOL_CALL>
+```
+
+# ❗ Critical Rules
+1. ONE Tool Per Turn
+   - Execute only ONE tool at a time
+   - Wait for results before next action
+
+2. Strict Format Adherence
+   - Follow exact format shown above
+   - Use proper YAML indentation
+   - Include all required parameters
+
+3. Result Handling
+   - Wait for execution results
+   - Never assume outcomes
+   - Don't create fake responses
+   - Don't imagine dialogues
+
+4. Information Management
+   - Ask user if info is insufficient
+   - Skip unnecessary steps
+   - Request guidance if stuck
+   - Don't proceed with incomplete info
+
+# 📝 String Parameter Format
+ALWAYS use | syntax for string parameters:
+
+```yaml
+<TOOL_CALL>
+name: execute_shell
+arguments:
+    command: |
+        git status --porcelain
+</TOOL_CALL>
+```
+
+# 💡 Best Practices
+- Start execution immediately when ready
+- No need to ask for permission to begin
+- Use proper string formatting
+- Monitor progress and adjust
+- Request help when stuck
+
+# ⚠️ Common Mistakes to Avoid
+- Multiple tool calls at once
+- Missing | for string parameters
+- Assuming tool results
+- Creating fictional dialogues
+- Proceeding without required info
 """
             
             if isinstance(args, str):
