@@ -235,17 +235,17 @@ def file_input_handler(user_input: str, agent: Any) -> str:
         if ':' in ref:
             file_path, line_range = ref.split(':', 1)
             # Initialize with default values
-            start_line = 0
+            start_line = 1  # 1-based
             end_line = -1
             
             # Process line range if specified
             if ',' in line_range:
                 try:
                     start_line, end_line = map(int, line_range.split(','))
-                    # Convert to 0-based and validate
-                    start_line = max(0, start_line - 1)
-                    end_line = max(-1, end_line - 1)
-                    if start_line < 0 or (end_line != -1 and start_line > end_line):
+                    # Validate
+                    start_line = max(1, start_line)  # Minimum is 1
+                    end_line = max(-1, end_line)
+                    if start_line < 1 or (end_line != -1 and start_line > end_line):
                         raise ValueError
                 except ValueError:
                     PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
@@ -263,7 +263,7 @@ def file_input_handler(user_input: str, agent: Any) -> str:
             if os.path.isfile(ref):
                 files.append({
                     "path": ref,
-                    "start_line": 0,
+                    "start_line": 1,  # 1-based
                     "end_line": -1
                 })
     

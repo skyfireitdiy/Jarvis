@@ -22,12 +22,12 @@ class ReadCodeTool:
                         },
                         "start_line": {
                             "type": "integer",
-                            "description": "Start line number (0-based, inclusive)",
-                            "default": 0
+                            "description": "Start line number (1-based, inclusive)",
+                            "default": 1
                         },
                         "end_line": {
                             "type": "integer",
-                            "description": "End line number (0-based, exclusive). -1 means read to end",
+                            "description": "End line number (1-based, inclusive). -1 means read to end",
                             "default": -1
                         }
                     },
@@ -39,13 +39,13 @@ class ReadCodeTool:
         "required": ["files"]
     }
 
-    def _read_single_file(self, filepath: str, start_line: int = 0, end_line: int = -1) -> Dict[str, Any]:
+    def _read_single_file(self, filepath: str, start_line: int = 1, end_line: int = -1) -> Dict[str, Any]:
         """Read a single code file with line numbers
         
         Args:
             filepath: Path to the file
-            start_line: Start line number (0-based, inclusive)
-            end_line: End line number (0-based, exclusive). -1 means read to end
+            start_line: Start line number (1-based, inclusive)
+            end_line: End line number (1-based, inclusive). -1 means read to end
             
         Returns:
             Dict containing operation result
@@ -87,25 +87,25 @@ class ReadCodeTool:
                     "stderr": f"Failed to read file: {str(e)}"
                 }
                 
-            if start_line < 0:
-                start_line = 0
+            if start_line < 1:
+                start_line = 1
             if end_line == -1 or end_line > len(lines):
                 end_line = len(lines)
-            if start_line >= end_line:
-                PrettyOutput.print(f"无效的行范围: [{start_line}, {end_line})", OutputType.WARNING)
+            if start_line > end_line:
+                PrettyOutput.print(f"无效的行范围: [{start_line}, {end_line}]", OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"Invalid line range: [{start_line}, {end_line})"
+                    "stderr": f"Invalid line range: [{start_line}, {end_line}]"
                 }
                 
             formatted_lines = []
-            for i, line in enumerate(lines[start_line:end_line]):
+            for i, line in enumerate(lines[start_line - 1:end_line]):
                 line_num = start_line + i
                 formatted_lines.append(f"{line_num:>5}:{line}")
                 
             content = "".join(formatted_lines)
-            output = f"File: {filepath}\nLines: [{start_line}, {end_line})\n{content}"
+            output = f"File: {filepath}\nLines: [{start_line}, {end_line}]\n{content}"
             PrettyOutput.print(output, OutputType.CODE)
             return {
                 "success": True,
@@ -151,7 +151,7 @@ class ReadCodeTool:
                 
                 result = self._read_single_file(
                     file_info["path"],
-                    file_info.get("start_line", 0),
+                    file_info.get("start_line", 1),
                     file_info.get("end_line", -1)
                 )
                 

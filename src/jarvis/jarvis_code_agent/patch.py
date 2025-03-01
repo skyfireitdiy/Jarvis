@@ -140,7 +140,7 @@ File: src/old_file.py
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """Parse patches from string with optimized format"""
     result = {}
-    patches = re.findall(r"<(REPLACE|INSERT|DELETE|NEW_FILE|REMOVE_FILE)>(.*?)</\1>", patch_str, re.DOTALL)
+    patches = re.findall(r"<(REPLACE|INSERT|DELETE|NEW_FILE|REMOVE_FILE|MOVE_FILE)>(.*?)</\1>", patch_str, re.DOTALL)
     
     for patch_type, patch in patches:
         lines = patch.strip().split('\n')
@@ -160,13 +160,20 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         if patch_type in ['REPLACE', 'DELETE']:
             line_match = re.match(r"Lines:\s*(\d+)-(\d+)", lines[1])
             if line_match:
-                start_line = int(line_match.group(1))  # 0-based
-                end_line = int(line_match.group(2))    # inclusive
+                start_line = int(line_match.group(1))  # 1-based
+                end_line = int(line_match.group(2))    # 1-based
         elif patch_type == 'INSERT':
             line_match = re.match(r"Line:\s*(\d+)", lines[1])
             if line_match:
-                start_line = int(line_match.group(1))  # 0-based
+                start_line = int(line_match.group(1))  # 1-based
                 end_line = start_line
+        elif patch_type == 'MOVE_FILE':
+            # 解析新路径
+            new_path_match = re.match(r"NewPath:\s*([^\s]+)", lines[1])
+            if new_path_match:
+                new_path = new_path_match.group(1).strip()
+            else:
+                continue
         
         # Get content (after separator)
         separator_index = next((i for i, line in enumerate(lines) if line.strip() == "-----"), -1)
@@ -175,31 +182,55 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         if filepath not in result:
             result[filepath] = []
         
-        result[filepath].append({
-            'type': patch_type,
-            'start_line': start_line,
-            'end_line': end_line,
-            'content': content
-        })
+        # 添加MOVE_FILE的特殊处理
+        if patch_type == 'MOVE_FILE':
+            result[filepath].append({
+                'type': patch_type,
+                'new_path': new_path,
+                'content': content
+            })
+        else:
+            result[filepath].append({
+                'type': patch_type,
+                'start_line': start_line,
+                'end_line': end_line,
+                'content': content
+            })
     
     # Sort patches by start line in reverse order to apply from bottom to top
     for filepath in result:
-        result[filepath].sort(key=lambda x: x['start_line'], reverse=True)
+        result[filepath].sort(key=lambda x: x.get('start_line', 0), reverse=True)
     
     return result
 
 
-def apply_patch(output_str: str)->str:
+def apply_patch(output_str: str) -> str:
     """Apply patches to files"""
     patches = _parse_patch(output_str)
+    ret = ""  # Initialize return value
 
     for filepath, patch_info in patches.items():
         try:
             for patch in patch_info:
                 patch_type = patch['type']
-                start_line = patch['start_line']
-                end_line = patch['end_line']
-                new_content = patch['content'].splitlines(keepends=True)
+                
+                # 处理MOVE_FILE操作
+                if patch_type == 'MOVE_FILE':
+                    new_path = patch['new_path']
+                    # 创建目标目录
+                    os.makedirs(os.path.dirname(new_path), exist_ok=True)
+                    # 移动文件
+                    if os.path.exists(filepath):
+                        os.rename(filepath, new_path)
+                        PrettyOutput.print(f"成功移动文件 {filepath} -> {new_path}", OutputType.SUCCESS)
+                    else:
+                        PrettyOutput.print(f"源文件不存在: {filepath}", OutputType.WARNING)
+                    continue
+                    
+                # 其他操作保持不变
+                start_line = patch.get('start_line', 0)
+                end_line = patch.get('end_line', 0)
+                new_content = patch.get('content', '').splitlines(keepends=True)
 
                 if new_content and new_content[-1] and new_content[-1][-1] != '\n':
                     new_content[-1] += '\n'
@@ -230,17 +261,17 @@ def apply_patch(output_str: str)->str:
                 lines = open(filepath, 'r', encoding='utf-8').readlines()
                 
                 # Validate line numbers
-                if start_line < 0 or end_line > len(lines) + 1 or start_line > end_line:
-                    PrettyOutput.print(f"无效的行范围 [{start_line}, {end_line}) 对于文件: {filepath}", OutputType.WARNING)
+                if start_line < 1 or end_line > len(lines) or start_line > end_line:
+                    PrettyOutput.print(f"无效的行范围 [{start_line}, {end_line}] 对于文件: {filepath}", OutputType.WARNING)
                     continue
                     
                 # Handle different patch types
                 if patch_type == 'REPLACE':
-                    lines[start_line:end_line] = new_content
+                    lines[start_line - 1:end_line] = new_content  # Convert to 0-based
                 elif patch_type == 'DELETE':
-                    lines[start_line:end_line] = []
+                    lines[start_line - 1:end_line] = []  # Convert to 0-based
                 elif patch_type == 'INSERT':
-                    lines[start_line:start_line] = new_content
+                    lines[start_line - 1:start_line - 1] = new_content  # Convert to 0-based
                 
                 # Write back to file
                 open(filepath, 'w', encoding='utf-8').writelines(lines)
@@ -250,7 +281,7 @@ def apply_patch(output_str: str)->str:
         except Exception as e:
             PrettyOutput.print(f"应用{patch_type}操作到 {filepath} 失败: {str(e)}", OutputType.ERROR)
             continue
-    ret = ""
+
     if has_uncommitted_changes():
         if handle_commit_workflow():
             ret += "Successfully applied the patch\n"
@@ -267,7 +298,8 @@ def apply_patch(output_str: str)->str:
             ret += "\n" + user_input
         else:
             return ""
-    return ret
+
+    return ret  # Ensure a string is always returned
     
 def handle_commit_workflow()->bool:
     """Handle the git commit workflow and return the commit details.
