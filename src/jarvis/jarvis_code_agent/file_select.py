@@ -224,7 +224,13 @@ def file_input_handler(user_input: str, agent: Any) -> str:
             # Handle file:start,end format
             if ':' in s:
                 file_path, line_range = s.split(':', 1)
-                start_line = 0
+                # Handle file:start,end format
+                if ':' in s:
+                    file_path, line_range = s.split(':', 1)
+                    # Initialize with default values
+                    start_line = 0
+                    end_line = -1
+                    if ',' in line_range:
                 end_line = -1
                 if ',' in line_range:
                     try:
