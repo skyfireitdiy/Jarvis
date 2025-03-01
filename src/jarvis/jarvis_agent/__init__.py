@@ -157,6 +157,7 @@ The following tools are at your disposal:
         """
         sleep_time = 5
 
+            message = handler(message, self)
         for handler in self.input_handler:
             message = handler(message)
 
