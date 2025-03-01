@@ -229,6 +229,8 @@ def file_input_handler(user_input: str) -> str:
                 if ',' in line_range:
                     try:
                         start_line, end_line = map(int, line_range.split(','))
+                        start_line = max(0, start_line - 1)  # Convert to 0-based
+                        end_line = max(-1, end_line - 1)  # Convert to 0-based
                         if start_line < 0 or start_line > end_line and end_line != -1:
                             raise ValueError
                     except ValueError:
