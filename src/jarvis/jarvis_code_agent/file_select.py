@@ -235,6 +235,7 @@ def file_input_handler(user_input: str, agent: Any) -> str:
                         PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
                         continue
                 if os.path.isfile(file_path):
+                    files.append({"path": file_path, "start_line": start_line, "end_line": end_line})
                 if ',' in line_range:
                     try:
                         start_line, end_line = map(int, line_range.split(','))
