@@ -21,13 +21,42 @@ class PatchOutputHandler(OutputHandler):
     
     def prompt(self) -> str:
         return """
-# 📝 Patch Format
-Use patch blocks to specify code changes:
+# 📝 Code Modification Format
+Use specific blocks for different operations:
 
-<PATCH>
-path/to/file start,end
+# 🔄 REPLACE: Replace existing code
+<REPLACE>
+File: path/to/file
+Lines: start-end
+-----
 new_content
-</PATCH>
+</REPLACE>
+
+# ➕ INSERT: Insert new code
+<INSERT>
+File: path/to/file
+Line: position
+-----
+new_content
+</INSERT>
+
+# 🗑️ DELETE: Remove existing code
+<DELETE>
+File: path/to/file
+Lines: start-end
+</DELETE>
+
+# 🆕 NEW_FILE: Create new file
+<NEW_FILE>
+File: path/to/file
+-----
+new_content
+</NEW_FILE>
+
+# ❌ REMOVE_FILE: Delete entire file
+<REMOVE_FILE>
+File: path/to/file
+</REMOVE_FILE>
 
 # 📋 Format Rules
 1. File Path
@@ -36,148 +65,108 @@ new_content
    - Example: src/module/file.py
 
 2. Line Numbers
-   - Format: start,end
-   - start: First line to modify (included)
-   - end: Line after last modified line
-   - Both numbers are based on original file
+   - Format: start-end (inclusive)
    - Line numbers are 0-based
-   - Range is left-closed and right-open: [start, end)
-   - Example: "10,15" modifies lines 10 to 14 (inclusive)
+   - Use single number for INSERT
+   - Omit for NEW_FILE and REMOVE_FILE
 
-3. Special Cases
-   - Insert: Use same number for start,end
-   - New File: Use 0,0
-   - Example: "5,5" inserts before line 5
+3. Content
+   - Use "-----" separator
+   - Preserve indentation
+   - Match existing code style
 
 # 📌 Detailed Examples
-## Example 1: Modify Existing Code
-<PATCH>
-src/utils.py 10,15
+## Example 1: Replace Code
+<REPLACE>
+File: src/utils.py
+Lines: 9-13
+-----
 def new_function():
-    # This replaces lines 10-14 in src/utils.py
+    # This replaces lines 9-13
     return "modified"
-</PATCH>
+</REPLACE>
 
-Explanation:
-- File: src/utils.py
-- Lines: 10-14 (inclusive)
-- Action: Replace existing code with new content
-- Note: Line numbers are 0-based, range is [10, 15)
-
-## Example 2: Insert New Code
-<PATCH>
-src/main.py 20,20
-    # This inserts before line 20
+## Example 2: Insert Code
+<INSERT>
+File: src/main.py
+Line: 19
+-----
+    # This inserts before line 19
     new_line_here()
-</PATCH>
-
-Explanation:
-- File: src/main.py
-- Lines: 20,20 (same number)
-- Action: Insert new code before line 20
-- Note: Indentation must match surrounding code
+</INSERT>
 
 ## Example 3: Create New File
-<PATCH>
-src/new_file.py 0,0
+<NEW_FILE>
+File: src/new_file.py
+-----
 # This creates a new file
 def new_function():
     pass
-</PATCH>
+</NEW_FILE>
 
-Explanation:
-- File: src/new_file.py
-- Lines: 0,0 (special case)
-- Action: Create new file with content
-- Note: Parent directories will be created if needed
+## Example 4: Delete Code
+<DELETE>
+File: src/utils.py
+Lines: 9-13
+</DELETE>
 
-## Example 4: Complex Modification
-<PATCH>
-src/controller.py 50,55
-def process_request(request):
-    # New implementation
-    try:
-        validate_request(request)
-        return handle_request(request)
-    except Exception as e:
-        log_error(e)
-        raise
-</PATCH>
-
-Explanation:
-- File: src/controller.py
-- Lines: 50-54 (inclusive)
-- Action: Replace existing code with new implementation
-- Note: Line numbers are 0-based, range is [50, 55)
-
-## Example 5: Delete Code
-<PATCH>
-src/utils.py 10,15
-</PATCH>
-
-Explanation:
-- File: src/utils.py
-- Lines: 10-14 (inclusive)
-- Action: Delete code
-- Note: Line numbers are 0-based, range is [10, 15)
+## Example 5: Remove File
+<REMOVE_FILE>
+File: src/old_file.py
+</REMOVE_FILE>
 
 # ❗ Important Rules
-1. ONE modification per patch block
-2. Include necessary context
+1. ONE modification per block
+2. Use correct block type for the operation
 3. Match existing code style
 4. Preserve indentation
 5. Use exact file paths
 6. Handle edge cases
 7. Add proper error handling
 8. Maintain code consistency
-
-# 💡 Best Practices
-- Test changes locally before applying
-- Keep patches focused and small
-- Document complex changes
-- Follow project coding standards
-- Handle edge cases properly
-- Preserve existing functionality
 """
 
 
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
-    """Parse patches from string with format:
-    <PATCH>
-    path/to/file start_line,end_line
-    content_line1
-    content_line2
-    ...
-    </PATCH>
-    """
+    """Parse patches from string with optimized format"""
     result = {}
-    patches = re.findall(r"<PATCH>(.*?)</PATCH>", patch_str, re.DOTALL)
+    patches = re.findall(r"<(REPLACE|INSERT|DELETE|NEW_FILE|REMOVE_FILE)>(.*?)</\1>", patch_str, re.DOTALL)
     
-    for patch in patches:
+    for patch_type, patch in patches:
         lines = patch.strip().split('\n')
         if not lines:
             continue
             
-        # Parse file path and line range
-        file_info = lines[0].strip()
-            
-        # Extract file path and line range
-        match = re.match(r'([^\s]+)\s+(\d+),(\d+)', file_info)
-        if not match:
+        # Parse file path
+        file_match = re.match(r"File:\s*([^\s]+)", lines[0])
+        if not file_match:
             continue
-            
-        filepath = match.group(1).strip()
-        start_line = int(match.group(2))
-        end_line = int(match.group(3))
+        filepath = file_match.group(1).strip()
         
-        # Get content lines (skip the first line with file info)
-        content = '\n'.join(lines[1:])
+        # Initialize line numbers
+        start_line = end_line = 0
+        
+        # Parse line numbers based on operation type
+        if patch_type in ['REPLACE', 'DELETE']:
+            line_match = re.match(r"Lines:\s*(\d+)-(\d+)", lines[1])
+            if line_match:
+                start_line = int(line_match.group(1))  # 0-based
+                end_line = int(line_match.group(2))    # inclusive
+        elif patch_type == 'INSERT':
+            line_match = re.match(r"Line:\s*(\d+)", lines[1])
+            if line_match:
+                start_line = int(line_match.group(1))  # 0-based
+                end_line = start_line
+        
+        # Get content (after separator)
+        separator_index = next((i for i, line in enumerate(lines) if line.strip() == "-----"), -1)
+        content = '\n'.join(lines[separator_index + 1:]) if separator_index != -1 else ''
 
         if filepath not in result:
             result[filepath] = []
         
-        # Store in result dictionary
         result[filepath].append({
+            'type': patch_type,
             'start_line': start_line,
             'end_line': end_line,
             'content': content
@@ -197,6 +186,7 @@ def apply_patch(output_str: str)->str:
     for filepath, patch_info in patches.items():
         try:
             for patch in patch_info:
+                patch_type = patch['type']
                 start_line = patch['start_line']
                 end_line = patch['end_line']
                 new_content = patch['content'].splitlines(keepends=True)
@@ -204,8 +194,8 @@ def apply_patch(output_str: str)->str:
                 if new_content and new_content[-1] and new_content[-1][-1] != '\n':
                     new_content[-1] += '\n'
 
-                # Handle file creation when start=end=0
-                if start_line == 0 and end_line == 0:
+                # Handle different patch types
+                if patch_type == 'NEW_FILE':
                     # Create directory if it doesn't exist
                     os.makedirs(os.path.dirname(filepath), exist_ok=True)
                     # Write new file
@@ -213,8 +203,15 @@ def apply_patch(output_str: str)->str:
                         f.writelines(new_content)
                     PrettyOutput.print(f"成功创建新文件 {filepath}", OutputType.SUCCESS)
                     continue
+                elif patch_type == 'REMOVE_FILE':
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                        PrettyOutput.print(f"成功删除文件 {filepath}", OutputType.SUCCESS)
+                    else:
+                        PrettyOutput.print(f"文件不存在: {filepath}", OutputType.WARNING)
+                    continue
 
-                # Regular patch logic for existing files
+                # For other operations, file must exist
                 if not os.path.exists(filepath):
                     PrettyOutput.print(f"文件不存在: {filepath}", OutputType.WARNING)
                     continue
@@ -227,16 +224,21 @@ def apply_patch(output_str: str)->str:
                     PrettyOutput.print(f"无效的行范围 [{start_line}, {end_line}) 对于文件: {filepath}", OutputType.WARNING)
                     continue
                     
-                # Create new content
-                lines[start_line:end_line] = new_content
+                # Handle different patch types
+                if patch_type == 'REPLACE':
+                    lines[start_line:end_line] = new_content
+                elif patch_type == 'DELETE':
+                    lines[start_line:end_line] = []
+                elif patch_type == 'INSERT':
+                    lines[start_line:start_line] = new_content
                 
                 # Write back to file
                 open(filepath, 'w', encoding='utf-8').writelines(lines)
 
-                PrettyOutput.print(f"成功应用补丁到 {filepath}", OutputType.SUCCESS)
+                PrettyOutput.print(f"成功应用{patch_type}操作到 {filepath}", OutputType.SUCCESS)
             
         except Exception as e:
-            PrettyOutput.print(f"应用补丁到 {filepath} 失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"应用{patch_type}操作到 {filepath} 失败: {str(e)}", OutputType.ERROR)
             continue
     ret = ""
     if has_uncommitted_changes():
