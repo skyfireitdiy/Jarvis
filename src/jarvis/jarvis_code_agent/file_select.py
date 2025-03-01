@@ -244,4 +244,3 @@ def file_input_handler(user_input: str) -> str:
             return result["stdout"] + "\n" + prompt
     
     return prompt
-    return prompt
