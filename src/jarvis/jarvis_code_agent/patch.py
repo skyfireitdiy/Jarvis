@@ -47,32 +47,70 @@ new_content
    - New File: Use 0,0
    - Example: "5,5" inserts before line 5
 
-# 📌 Examples
-## Modify Existing Code
+# 📌 Detailed Examples
+## Example 1: Modify Existing Code
 ```
 <PATCH>
 src/utils.py 10,15
 def new_function():
+    # This replaces lines 10-14 in src/utils.py
     return "modified"
 </PATCH>
 ```
+Explanation:
+- File: src/utils.py
+- Lines: 10-14 (inclusive)
+- Action: Replace existing code with new content
+- Note: Line numbers are 1-based
 
-## Insert New Code
+## Example 2: Insert New Code
 ```
 <PATCH>
 src/main.py 20,20
+    # This inserts before line 20
     new_line_here()
 </PATCH>
 ```
+Explanation:
+- File: src/main.py
+- Lines: 20,20 (same number)
+- Action: Insert new code before line 20
+- Note: Indentation must match surrounding code
 
-## Create New File
+## Example 3: Create New File
 ```
 <PATCH>
 src/new_file.py 0,0
+# This creates a new file
 def new_function():
     pass
 </PATCH>
 ```
+Explanation:
+- File: src/new_file.py
+- Lines: 0,0 (special case)
+- Action: Create new file with content
+- Note: Parent directories will be created if needed
+
+## Example 4: Complex Modification
+```
+<PATCH>
+src/controller.py 50,55
+def process_request(request):
+    # New implementation
+    try:
+        validate_request(request)
+        return handle_request(request)
+    except Exception as e:
+        log_error(e)
+        raise
+</PATCH>
+```
+Explanation:
+- File: src/controller.py
+- Lines: 50-54 (inclusive)
+- Action: Replace existing code with new implementation
+- Note: Preserve indentation and style
 
 # ❗ Important Rules
 1. ONE modification per patch block
@@ -80,6 +118,17 @@ def new_function():
 3. Match existing code style
 4. Preserve indentation
 5. Use exact file paths
+6. Handle edge cases
+7. Add proper error handling
+8. Maintain code consistency
+
+# 💡 Best Practices
+- Test changes locally before applying
+- Keep patches focused and small
+- Document complex changes
+- Follow project coding standards
+- Handle edge cases properly
+- Preserve existing functionality
 """
 
 
