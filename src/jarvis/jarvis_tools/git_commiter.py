@@ -2,6 +2,7 @@ import os
 import re
 import shlex
 from typing import Dict, Any
+import tempfile
 
 import yaml
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -69,10 +70,13 @@ class GitCommitTool:
             commit_message = platform.chat_until_success(prompt)
             commit_message = self._extract_commit_message(commit_message)
             
-            # 使用 -F 参数从标准输入读取提交消息
-            commit_cmd = f"git commit -F - <<EOF\n{commit_message}\nEOF"
-            PrettyOutput.print("提交...", OutputType.INFO)
-            os.system(commit_cmd)
+            # 使用临时文件处理提交消息
+            with tempfile.NamedTemporaryFile(mode='w', delete=True) as tmp_file:
+                tmp_file.write(commit_message)
+                tmp_file.flush()  # 确保内容写入文件
+                commit_cmd = f"git commit -F {tmp_file.name}"
+                PrettyOutput.print("提交...", OutputType.INFO)
+                os.system(commit_cmd)
 
             commit_hash = self._get_last_commit_hash()
             PrettyOutput.print(f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS)
