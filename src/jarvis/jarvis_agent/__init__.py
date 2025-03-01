@@ -398,17 +398,11 @@ def _load_tasks() -> dict:
         except Exception as e:
             PrettyOutput.print(f"加载 .jarvis/pre-command 文件失败: {str(e)}", OutputType.ERROR)
 
-    
-    # Skip methodology task display but keep functionality
-    if is_use_methodology():
-        pass  # Methodology remains available but won't be shown in tasks
     return tasks
-
 def _select_task(tasks: dict) -> str:
     """Let user select a task from the list or skip. Returns task description if selected."""
     if not tasks:
         return ""
-    
     # Convert tasks to list for ordered display
     task_names = list(tasks.keys())
     
