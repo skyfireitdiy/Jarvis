@@ -216,13 +216,32 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
 def file_input_handler(user_input: str) -> str:
     prompt = user_input
     files = []
-    sm = re.findall(r'`(.+?)`', user_input)
+    # Match both file paths and file:start,end format
+    sm = re.findall(r'`([^`]+)`', user_input)
     if sm:
         for s in sm:
-            if os.path.isfile(s[0]):
-                files.append(s[0])
-    result = ReadCodeTool().execute({"files": [{"path": f, "start_line": 0, "end_line": -1} for f in files]})
-    if result["success"]:
-        return result["stdout"] + "\n" + prompt
+            # Handle file:start,end format
+            if ':' in s:
+                file_path, line_range = s.split(':', 1)
+                start_line = 0
+                end_line = -1
+                if ',' in line_range:
+                    try:
+                        start_line, end_line = map(int, line_range.split(','))
+                        if start_line < 0 or end_line < 0 or start_line > end_line:
+                            raise ValueError
+                    except ValueError:
+                        PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
+                        continue
+                if os.path.isfile(file_path):
+                    files.append({"path": file_path, "start_line": start_line, "end_line": end_line})
+            else:
+                if os.path.isfile(s):
+                    files.append({"path": s, "start_line": 0, "end_line": -1})
+    if files:
+        result = ReadCodeTool().execute({"files": files})
+        if result["success"]:
+            return result["stdout"] + "\n" + prompt
     
+    return prompt
     return prompt
