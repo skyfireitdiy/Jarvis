@@ -245,9 +245,12 @@ def file_input_handler(user_input: str, agent: Any) -> str:
                 # Handle simple file path
                 if os.path.isfile(s):
                     files.append({"path": s, "start_line": 0, "end_line": -1})
-            else:
-                # Handle simple file path
-                if os.path.isfile(s):
+    if files:
+        result = ReadCodeTool().execute({"files": files})
+        if result["success"]:
+            return result["stdout"] + "\n" + prompt
+    
+    return prompt
                     files.append({"path": s, "start_line": 0, "end_line": -1})
     if files:
                     except ValueError:
