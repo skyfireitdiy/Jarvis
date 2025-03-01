@@ -2,14 +2,14 @@ import os
 from typing import Dict, List
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_code_agent.file_select import file_input_handler
+from jarvis.jarvis_code_agent.file_select import file_input_handler, select_files
 from jarvis.jarvis_code_agent.patch import PatchOutputHandler
 from jarvis.jarvis_code_agent.relevant_files import find_relevant_information
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
-from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root, user_confirm
 
 
 class CodeAgent:
@@ -187,7 +187,11 @@ Before submitting changes, verify:
         """
         try:
             self._init_env()
-            files, information = find_relevant_information(user_input, self.root_dir)
+            information = ""
+            if user_confirm("是否需要手动选择文件？", False):
+                files = select_files([], self.root_dir)
+            else:
+                files, information = find_relevant_information(user_input, self.root_dir)
             self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files), information))
             
         except Exception as e:
