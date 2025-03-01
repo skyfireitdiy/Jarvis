@@ -210,7 +210,8 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                 except Exception as e:
                     tips += f"\n读取文件失败: {str(e)}"
     selected_files = [f for f in selected_files if os.path.isfile(os.path.join(root_dir, f["file"]))]
-    PrettyOutput.print(tips, OutputType.INFO)
+    if tips:
+        PrettyOutput.print(tips, OutputType.INFO)
     return selected_files
 
 def file_input_handler(user_input: str) -> str:
