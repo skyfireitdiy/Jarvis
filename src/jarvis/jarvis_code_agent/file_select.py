@@ -220,7 +220,7 @@ def file_input_handler(user_input: str) -> str:
         for s in sm:
             if os.path.isfile(s[0]):
                 files.append(s[0])
-    result = ReadCodeTool().execute({"files": files})
+    result = ReadCodeTool().execute({"files": [{"path": f, "start_line": 0, "end_line": -1} for f in files]})
     if result["success"]:
         return result["stdout"] + "\n" + prompt
     
