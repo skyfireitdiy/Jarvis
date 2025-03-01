@@ -153,6 +153,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                 else:
                     PrettyOutput.print("没有有效的文件被选择, 保持当前选择", OutputType.WARNING)
     
+    tips = ""
     # Ask if they need to supplement files
     if user_confirm("是否需要补充其他文件？", False):
         # Create file completion session
