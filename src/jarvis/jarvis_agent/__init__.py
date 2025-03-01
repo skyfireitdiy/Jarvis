@@ -169,12 +169,6 @@ The following tools are at your disposal:
                 if sleep_time > 30:
                     sleep_time = 30
                 continue
-                PrettyOutput.print(f"模型调用失败，正在重试... 等待 {sleep_time}s", OutputType.INFO)
-                time.sleep(sleep_time)
-                sleep_time *= 2
-                if sleep_time > 30:
-                    sleep_time = 30
-                continue
 
 
     def _summarize_and_clear_history(self) -> None:
