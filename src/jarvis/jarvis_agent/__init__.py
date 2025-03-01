@@ -406,8 +406,7 @@ def _load_tasks() -> dict:
             with open(method_path, "r", encoding="utf-8") as f:
                 methodology = yaml.safe_load(f)
             if isinstance(methodology, dict):
-                for name, desc in methodology.items():
-                    tasks[f"Run Methodology: {str(name)}\n {str(desc)}" ] = str(desc)
+                pass  # Skip adding methodology to tasks
     
     return tasks
 
