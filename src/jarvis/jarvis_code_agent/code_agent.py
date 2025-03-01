@@ -170,7 +170,7 @@ Before submitting changes, verify:
         for file in files:
             prompt_parts.append(f'''- {file['file']} ({file['reason']})''')
 
-        result = ReadCodeTool().execute({"files": [file["file"] for file in files]})
+        result = ReadCodeTool().execute({"files": [{"path": file["file"]} for file in files]})
         if result["success"]:
             prompt_parts.append(result["stdout"])
                 
