@@ -170,11 +170,11 @@ Before submitting changes, verify:
         for file in files:
             prompt_parts.append(f'''- {file['file']} ({file['reason']})''')
 
-        result = ReadCodeTool().execute({"files": [{"file": file["file"], "reason": file["reason"]} for file in files]})
+        result = ReadCodeTool().execute({"files": [file["file"] for file in files]})
         if result["success"]:
             prompt_parts.append(result["stdout"])
                 
-        return "\n".join(prompt_parts)
+        return "\n".join(prompt_parts) 
 
     def run(self, user_input: str) :
         """Run the code agent with the given user input.
