@@ -159,6 +159,7 @@ The following tools are at your disposal:
 
         for handler in self.input_handler:
             message = handler(message, self)
+            message = handler(message, self)
         for handler in self.input_handler:
             message = handler(message)
 
