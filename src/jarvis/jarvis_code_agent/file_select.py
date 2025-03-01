@@ -139,7 +139,8 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
     # Filter out files that do not exist
     related_files = [f for f in related_files if os.path.isfile(os.path.join(root_dir, f["file"]))]
 
-    PrettyOutput.print(output, OutputType.INFO, lang="markdown")
+    if output:
+        PrettyOutput.print(output, OutputType.INFO, lang="markdown")
     
     if len(related_files) > 0:
         # Ask the user if they need to adjust the file list
