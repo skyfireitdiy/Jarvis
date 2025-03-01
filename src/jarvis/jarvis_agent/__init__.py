@@ -156,18 +156,19 @@ The following tools are at your disposal:
             Will retry with exponential backoff up to 30 seconds between retries
         """
         sleep_time = 5
-
         for handler in self.input_handler:
             message = handler(message, self)
-            message = handler(message, self)
-        for handler in self.input_handler:
-            message = handler(message)
-
         while True:
             ret = self.model.chat_until_success(message) # type: ignore
             if ret:
                 return ret
             else:
+                PrettyOutput.print(f"模型调用失败，正在重试... 等待 {sleep_time}s", OutputType.INFO)
+                time.sleep(sleep_time)
+                sleep_time *= 2
+                if sleep_time > 30:
+                    sleep_time = 30
+                continue
                 PrettyOutput.print(f"模型调用失败，正在重试... 等待 {sleep_time}s", OutputType.INFO)
                 time.sleep(sleep_time)
                 sleep_time *= 2
