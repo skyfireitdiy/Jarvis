@@ -128,8 +128,6 @@ def _fuzzy_match_files(root_dir: str, pattern: str) -> List[str]:
 
 def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dict[str, str]]:
     """Let the user select and supplement related files"""
-    PrettyOutput.section("相关文件", OutputType.INFO)
-
     output = ""
     # Display found files
     selected_files = list(related_files)  # Default select all
@@ -140,6 +138,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
     related_files = [f for f in related_files if os.path.isfile(os.path.join(root_dir, f["file"]))]
 
     if output:
+        PrettyOutput.section("相关文件", OutputType.INFO)
         PrettyOutput.print(output, OutputType.INFO, lang="markdown")
     
     if len(related_files) > 0:
@@ -161,9 +160,8 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
             completer=_get_file_completer(root_dir),
             complete_while_typing=True
         )
-        
+        PrettyOutput.print("请输入要补充的文件路径（支持Tab补全和*?通配符, 输入空行结束）", OutputType.INFO)
         while True:
-            PrettyOutput.print("请输入要补充的文件路径（支持Tab补全和*?通配符, 输入空行结束）", OutputType.INFO)
             try:
                 file_path = session.prompt(">>> ").strip()
             except KeyboardInterrupt:

@@ -3,6 +3,7 @@ from typing import Dict, Any, List, Tuple
 import os
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
+from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, user_confirm
 
 
@@ -23,12 +24,10 @@ class PatchOutputHandler(OutputHandler):
 # 📝 Patch Format
 Use patch blocks to specify code changes:
 
-```
 <PATCH>
 path/to/file start,end
 new_content
 </PATCH>
-```
 
 # 📋 Format Rules
 1. File Path
@@ -49,28 +48,26 @@ new_content
 
 # 📌 Detailed Examples
 ## Example 1: Modify Existing Code
-```
 <PATCH>
 src/utils.py 10,15
 def new_function():
     # This replaces lines 10-14 in src/utils.py
     return "modified"
 </PATCH>
-```
+
 Explanation:
 - File: src/utils.py
 - Lines: 10-14 (inclusive)
 - Action: Replace existing code with new content
-- Note: Line numbers are 1-based
+- Note: Line numbers are 0-based
 
 ## Example 2: Insert New Code
-```
 <PATCH>
 src/main.py 20,20
     # This inserts before line 20
     new_line_here()
 </PATCH>
-```
+
 Explanation:
 - File: src/main.py
 - Lines: 20,20 (same number)
@@ -78,14 +75,13 @@ Explanation:
 - Note: Indentation must match surrounding code
 
 ## Example 3: Create New File
-```
 <PATCH>
 src/new_file.py 0,0
 # This creates a new file
 def new_function():
     pass
 </PATCH>
-```
+
 Explanation:
 - File: src/new_file.py
 - Lines: 0,0 (special case)
@@ -93,7 +89,6 @@ Explanation:
 - Note: Parent directories will be created if needed
 
 ## Example 4: Complex Modification
-```
 <PATCH>
 src/controller.py 50,55
 def process_request(request):
@@ -105,12 +100,24 @@ def process_request(request):
         log_error(e)
         raise
 </PATCH>
-```
+
 Explanation:
 - File: src/controller.py
 - Lines: 50-54 (inclusive)
 - Action: Replace existing code with new implementation
 - Note: Preserve indentation and style
+
+## Example 5: Delete Code
+<PATCH>
+src/utils.py 10,15
+</PATCH>
+
+Explanation:
+- File: src/utils.py
+- Lines: 10-14 (inclusive)
+- Action: Delete code
+- Note: Line numbers are 0-based
+
 
 # ❗ Important Rules
 1. ONE modification per patch block
@@ -235,20 +242,10 @@ def apply_patch(output_str: str)->str:
             ret += "Successfully applied the patch\n"
             # Get modified line ranges
             modified_ranges = get_modified_line_ranges()
-            read_tool = ReadCodeTool()
-            modified_code = ""
-            
-            # Read modified sections
-            for filepath, (start, end) in modified_ranges.items():
-                result = read_tool._read_single_file(filepath, start, end)
-                if result["success"]:
-                    modified_code += f"\nModified code in {filepath}:\n{result['stdout']}\n"
-            
-            # Get commit details
-            commit_hash = os.popen("git rev-parse HEAD").read().strip()
-            commit_details = os.popen(f"git show {commit_hash} --stat").read()
-            ret += f"Commit details:\n{commit_details}\nModified code sections:\n{modified_code}"
-            ret += f"Commit details:\n{commit_details}"
+            modified_code = ReadCodeTool().execute({"files": [{"path": filepath, "start_line": start, "end_line": end} for filepath, (start, end) in modified_ranges.items()]})
+            if modified_code["success"]:
+                ret += "New code:\n"
+                ret += modified_code["stdout"]
         else:
             ret += "User rejected the patch"
         user_input = get_multiline_input("你可以继续输入: ")
