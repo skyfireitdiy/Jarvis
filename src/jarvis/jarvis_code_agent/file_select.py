@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Dict, List
+from typing import Any, Dict, List
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
 from jarvis.jarvis_tools.read_code import ReadCodeTool
@@ -214,7 +214,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
         PrettyOutput.print(tips, OutputType.INFO)
     return selected_files
 
-def file_input_handler(user_input: str) -> str:
+def file_input_handler(user_input: str, agent: Any) -> str:
     prompt = user_input
     files = []
     # Match both file paths and file:start,end format
