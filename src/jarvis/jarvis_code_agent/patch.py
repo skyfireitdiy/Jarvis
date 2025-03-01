@@ -214,3 +214,28 @@ def handle_commit_workflow()->bool:
     git_commiter = GitCommitTool()
     commit_result = git_commiter.execute({})
     return commit_result["success"]
+
+def get_modified_line_ranges(file_path: str) -> List[Tuple[int, int]]:
+    """Get modified line ranges from git diff for a specific file.
+    
+    Args:
+        file_path: Path to the file relative to repository root
+        
+    Returns:
+        List of tuples with (start_line, end_line) ranges for modified sections
+    """
+    # Get git diff for the file
+    diff_output = os.popen(f"git diff --unified=0 {file_path}").read()
+    
+    # Parse the diff to get modified line ranges
+    ranges = []
+    for line in diff_output.splitlines():
+        # Match lines like "@@ -100,5 +100,7 @@" where the + part shows new lines
+        match = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
+        if match:
+            start_line = int(match.group(1))
+            line_count = int(match.group(2)) if match.group(2) else 1
+            end_line = start_line + line_count
+            ranges.append((start_line, end_line))
+    
+    return ranges
