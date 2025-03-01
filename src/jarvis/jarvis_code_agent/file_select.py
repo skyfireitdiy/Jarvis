@@ -229,7 +229,7 @@ def file_input_handler(user_input: str) -> str:
                 if ',' in line_range:
                     try:
                         start_line, end_line = map(int, line_range.split(','))
-                        if start_line < 0 or end_line < 0 or start_line > end_line:
+                        if start_line < 0 or start_line > end_line and end_line != -1:
                             raise ValueError
                     except ValueError:
                         PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
