@@ -40,6 +40,9 @@ new_content
    - start: First line to modify (included)
    - end: Line after last modified line
    - Both numbers are based on original file
+   - Line numbers are 0-based
+   - Range is left-closed and right-open: [start, end)
+   - Example: "10,15" modifies lines 10 to 14 (inclusive)
 
 3. Special Cases
    - Insert: Use same number for start,end
@@ -59,7 +62,7 @@ Explanation:
 - File: src/utils.py
 - Lines: 10-14 (inclusive)
 - Action: Replace existing code with new content
-- Note: Line numbers are 0-based
+- Note: Line numbers are 0-based, range is [10, 15)
 
 ## Example 2: Insert New Code
 <PATCH>
@@ -105,7 +108,7 @@ Explanation:
 - File: src/controller.py
 - Lines: 50-54 (inclusive)
 - Action: Replace existing code with new implementation
-- Note: Preserve indentation and style
+- Note: Line numbers are 0-based, range is [50, 55)
 
 ## Example 5: Delete Code
 <PATCH>
@@ -116,8 +119,7 @@ Explanation:
 - File: src/utils.py
 - Lines: 10-14 (inclusive)
 - Action: Delete code
-- Note: Line numbers are 0-based
-
+- Note: Line numbers are 0-based, range is [10, 15)
 
 # ❗ Important Rules
 1. ONE modification per patch block
