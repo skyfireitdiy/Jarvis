@@ -399,15 +399,9 @@ def _load_tasks() -> dict:
             PrettyOutput.print(f"加载 .jarvis/pre-command 文件失败: {str(e)}", OutputType.ERROR)
 
     
+    # Skip methodology task display but keep functionality
     if is_use_methodology():
-        # Read methodology
-        method_path = os.path.expanduser("~/.jarvis/methodology")
-        if os.path.exists(method_path):
-            with open(method_path, "r", encoding="utf-8") as f:
-                methodology = yaml.safe_load(f)
-            if isinstance(methodology, dict):
-                pass  # Skip adding methodology to tasks
-    
+        pass  # Methodology remains available but won't be shown in tasks
     return tasks
 
 def _select_task(tasks: dict) -> str:
