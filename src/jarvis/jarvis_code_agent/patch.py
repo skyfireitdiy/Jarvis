@@ -217,27 +217,33 @@ def handle_commit_workflow()->bool:
     commit_result = git_commiter.execute({})
     return commit_result["success"]
 
-def get_modified_line_ranges(file_path: str) -> List[Tuple[int, int]]:
-    """Get modified line ranges from git diff for a specific file.
+def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
+    """Get modified line ranges from git diff for all changed files.
     
-    Args:
-        file_path: Path to the file relative to repository root
-        
     Returns:
-        List of tuples with (start_line, end_line) ranges for modified sections
+        Dictionary mapping file paths to tuple with (start_line, end_line) ranges
+        for modified sections. Line numbers are 0-based.
     """
-    # Get git diff for the file
-    diff_output = os.popen(f"git diff --unified=0 {file_path}").read()
+    # Get git diff for all files
+    diff_output = os.popen("git diff --unified=0").read()
     
-    # Parse the diff to get modified line ranges
-    ranges = []
+    # Parse the diff to get modified files and their line ranges
+    result = {}
+    current_file = None
+    
     for line in diff_output.splitlines():
+        # Match lines like "+++ b/path/to/file"
+        file_match = re.match(r"^\+\+\+ b/(.*)", line)
+        if file_match:
+            current_file = file_match.group(1)
+            continue
+            
         # Match lines like "@@ -100,5 +100,7 @@" where the + part shows new lines
-        match = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
-        if match:
-            start_line = int(match.group(1))
-            line_count = int(match.group(2)) if match.group(2) else 1
+        range_match = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
+        if range_match and current_file:
+            start_line = int(range_match.group(1)) - 1  # Convert to 0-based
+            line_count = int(range_match.group(2)) if range_match.group(2) else 1
             end_line = start_line + line_count
-            ranges.append((start_line, end_line))
+            result[current_file] = (start_line, end_line)
     
-    return ranges
+    return result
