@@ -225,7 +225,7 @@ def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
         for modified sections. Line numbers are 0-based.
     """
     # Get git diff for all files
-    diff_output = os.popen("git diff --unified=0").read()
+    diff_output = os.popen("git show").read()
     
     # Parse the diff to get modified files and their line ranges
     result = {}
