@@ -158,6 +158,7 @@ class ReadCodeTool:
                 if result["success"]:
                     all_outputs.append(result["stdout"])
                     PrettyOutput.print(result["stdout"], OutputType.CODE)
+                    PrettyOutput.print(result["stdout"], OutputType.CODE)
                 else:
                     all_outputs.append(f"Error reading {file_info['path']}: {result['stderr']}")
                 success = success and result["success"]
