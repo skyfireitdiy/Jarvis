@@ -193,6 +193,8 @@ def apply_patch(output_str: str)->str:
         user_input = get_multiline_input("你可以继续输入: ")
         if user_input:
             ret += "\n" + user_input
+        else:
+            return ""
     return ret
     
 def handle_commit_workflow()->bool:
