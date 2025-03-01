@@ -53,6 +53,11 @@ File: path/to/file
 new_content
 </NEW_FILE>
 
+# ➡️ MOVE_FILE: Move a file to a new location
+<MOVE_FILE>
+File: path/to/source/file
+NewPath: path/to/destination/file
+</MOVE_FILE>
 # ❌ REMOVE_FILE: Delete entire file
 <REMOVE_FILE>
 File: path/to/file
@@ -110,6 +115,11 @@ File: src/utils.py
 Lines: 9-13
 </DELETE>
 
+## Example 6: Move File
+<MOVE_FILE>
+File: src/old_location/file.py
+NewPath: src/new_location/file.py
+</MOVE_FILE>
 ## Example 5: Remove File
 <REMOVE_FILE>
 File: src/old_file.py
