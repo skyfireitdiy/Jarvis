@@ -224,6 +224,10 @@ def file_input_handler(user_input: str, agent: Any) -> str:
             # Handle file:start,end format
             if ':' in s:
                 file_path, line_range = s.split(':', 1)
+                # Initialize with default values
+                start_line = 0
+                end_line = -1
+                # Process line range if specified
                 if ',' in line_range:
                     try:
                         start_line, end_line = map(int, line_range.split(','))
@@ -234,12 +238,13 @@ def file_input_handler(user_input: str, agent: Any) -> str:
                     except ValueError:
                         PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
                         continue
+                # Add file if it exists
                 if os.path.isfile(file_path):
                     files.append({"path": file_path, "start_line": start_line, "end_line": end_line})
-                if ',' in line_range:
-                    try:
-                        start_line, end_line = map(int, line_range.split(','))
-                        start_line = max(0, start_line - 1)  # Convert to 0-based
+            else:
+                # Handle simple file path
+                if os.path.isfile(s):
+                    files.append({"path": s, "start_line": 0, "end_line": -1})
                         end_line = max(-1, end_line - 1)  # Convert to 0-based
                         if start_line < 0 or start_line > end_line and end_line != -1:
                             raise ValueError
