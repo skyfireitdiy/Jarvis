@@ -215,58 +215,59 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
     return selected_files
 
 def file_input_handler(user_input: str, agent: Any) -> str:
+    """Handle file input with optional line ranges.
+    
+    Args:
+        user_input: User input string containing file references
+        agent: Agent instance (unused in current implementation)
+        
+    Returns:
+        str: Prompt with file contents prepended if files are found
+    """
     prompt = user_input
     files = []
-    # Match both file paths and file:start,end format
-    sm = re.findall(r'`([^`]+)`', user_input)
-    if sm:
-        for s in sm:
-            # Handle file:start,end format
-            if ':' in s:
-                file_path, line_range = s.split(':', 1)
-                # Initialize with default values
-                start_line = 0
-                end_line = -1
-                # Process line range if specified
-                if ',' in line_range:
-                    try:
-                        start_line, end_line = map(int, line_range.split(','))
-                        start_line = max(0, start_line - 1)  # Convert to 0-based
-                        end_line = max(-1, end_line - 1)  # Convert to 0-based
-                        if start_line < 0 or start_line > end_line and end_line != -1:
-                            raise ValueError
-                    except ValueError:
-                        PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
-                        continue
-                # Add file if it exists
-                if os.path.isfile(file_path):
-                    files.append({"path": file_path, "start_line": start_line, "end_line": end_line})
-            else:
-                # Handle simple file path
-                if os.path.isfile(s):
-                    files.append({"path": s, "start_line": 0, "end_line": -1})
-    if files:
-        result = ReadCodeTool().execute({"files": files})
-        if result["success"]:
-            return result["stdout"] + "\n" + prompt
     
-    return prompt
-            return result["stdout"] + "\n" + prompt
+    # Match file references in backticks
+    file_refs = re.findall(r'`([^`]+)`', user_input)
     
-    return prompt
-            return result["stdout"] + "\n" + prompt
+    for ref in file_refs:
+        # Handle file:start,end format
+        if ':' in ref:
+            file_path, line_range = ref.split(':', 1)
+            # Initialize with default values
+            start_line = 0
+            end_line = -1
+            
+            # Process line range if specified
+            if ',' in line_range:
+                try:
+                    start_line, end_line = map(int, line_range.split(','))
+                    # Convert to 0-based and validate
+                    start_line = max(0, start_line - 1)
+                    end_line = max(-1, end_line - 1)
+                    if start_line < 0 or (end_line != -1 and start_line > end_line):
+                        raise ValueError
+                except ValueError:
+                    PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
+                    continue
+            
+            # Add file if it exists
+            if os.path.isfile(file_path):
+                files.append({
+                    "path": file_path,
+                    "start_line": start_line,
+                    "end_line": end_line
+                })
+        else:
+            # Handle simple file path
+            if os.path.isfile(ref):
+                files.append({
+                    "path": ref,
+                    "start_line": 0,
+                    "end_line": -1
+                })
     
-    return prompt
-                    files.append({"path": s, "start_line": 0, "end_line": -1})
-    if files:
-                    except ValueError:
-                        PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
-                        continue
-                if os.path.isfile(file_path):
-                    files.append({"path": file_path, "start_line": start_line, "end_line": end_line})
-            else:
-                if os.path.isfile(s):
-                    files.append({"path": s, "start_line": 0, "end_line": -1})
+    # Read and process files if any were found
     if files:
         result = ReadCodeTool().execute({"files": files})
         if result["success"]:
