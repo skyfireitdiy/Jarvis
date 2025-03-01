@@ -233,9 +233,21 @@ def apply_patch(output_str: str)->str:
     if has_uncommitted_changes():
         if handle_commit_workflow():
             ret += "Successfully applied the patch\n"
-            # Get the latest commit details
+            # Get modified line ranges
+            modified_ranges = get_modified_line_ranges()
+            read_tool = ReadCodeTool()
+            modified_code = ""
+            
+            # Read modified sections
+            for filepath, (start, end) in modified_ranges.items():
+                result = read_tool._read_single_file(filepath, start, end)
+                if result["success"]:
+                    modified_code += f"\nModified code in {filepath}:\n{result['stdout']}\n"
+            
+            # Get commit details
             commit_hash = os.popen("git rev-parse HEAD").read().strip()
             commit_details = os.popen(f"git show {commit_hash} --stat").read()
+            ret += f"Commit details:\n{commit_details}\nModified code sections:\n{modified_code}"
             ret += f"Commit details:\n{commit_details}"
         else:
             ret += "User rejected the patch"
