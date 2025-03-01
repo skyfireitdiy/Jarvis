@@ -245,9 +245,11 @@ def file_input_handler(user_input: str, agent: Any) -> str:
                 # Handle simple file path
                 if os.path.isfile(s):
                     files.append({"path": s, "start_line": 0, "end_line": -1})
-                        end_line = max(-1, end_line - 1)  # Convert to 0-based
-                        if start_line < 0 or start_line > end_line and end_line != -1:
-                            raise ValueError
+            else:
+                # Handle simple file path
+                if os.path.isfile(s):
+                    files.append({"path": s, "start_line": 0, "end_line": -1})
+    if files:
                     except ValueError:
                         PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
                         continue
