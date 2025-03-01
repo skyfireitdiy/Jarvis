@@ -251,6 +251,9 @@ def file_input_handler(user_input: str, agent: Any) -> str:
             return result["stdout"] + "\n" + prompt
     
     return prompt
+            return result["stdout"] + "\n" + prompt
+    
+    return prompt
                     files.append({"path": s, "start_line": 0, "end_line": -1})
     if files:
                     except ValueError:
