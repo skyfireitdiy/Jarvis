@@ -194,7 +194,6 @@ def apply_patch(output_str: str)->str:
         if user_input:
             ret += "\n" + user_input
     return ret
-    return ret
     
 def handle_commit_workflow()->bool:
     """Handle the git commit workflow and return the commit details.
