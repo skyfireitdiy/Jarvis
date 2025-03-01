@@ -183,12 +183,17 @@ def apply_patch(output_str: str)->str:
     ret = ""
     if has_uncommitted_changes():
         if handle_commit_workflow():
-            ret += "Successfully applied the patch"
+            ret += "Successfully applied the patch\n"
+            # Get the latest commit details
+            commit_hash = os.popen("git rev-parse HEAD").read().strip()
+            commit_details = os.popen(f"git show {commit_hash} --stat").read()
+            ret += f"Commit details:\n{commit_details}"
         else:
             ret += "User rejected the patch"
         user_input = get_multiline_input("你可以继续输入: ")
         if user_input:
-            ret += user_input
+            ret += "\n" + user_input
+    return ret
     return ret
     
 def handle_commit_workflow()->bool:
