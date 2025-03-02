@@ -94,34 +94,34 @@ Please describe in concise bullet points, highlighting important information.
 
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
         
-        tool_prompt = """
-# 🧰 Available Tools
-The following tools are at your disposal:
+        action_prompt = """
+# 🧰 Available Actions
+The following actions are at your disposal:
 """
 
         # 添加工具列表概览
-        tool_prompt += "\n## Tool List\n"
-        tool_prompt += ", ".join([handler.name() for handler in self.output_handler])
+        action_prompt += "\n## Action List\n"
+        action_prompt += ", ".join([handler.name() for handler in self.output_handler])
 
         # 添加每个工具的详细说明
-        tool_prompt += "\n\n# 📝 Tool Details\n"
+        action_prompt += "\n\n# 📝 Action Details\n"
         for handler in self.output_handler:
-            tool_prompt += f"\n## {handler.name()}\n"
+            action_prompt += f"\n## {handler.name()}\n"
             # 获取工具的提示词并确保格式正确
             handler_prompt = handler.prompt().strip()
             # 调整缩进以保持层级结构
             handler_prompt = "\n".join("   " + line if line.strip() else line 
                                       for line in handler_prompt.split("\n"))
-            tool_prompt += handler_prompt + "\n"
+            action_prompt += handler_prompt + "\n"
 
         # 添加工具使用总结
-        tool_prompt += """
-# ❗ Important Tool Usage Rules
-1. Use ONE tool at a time
-2. Follow each tool's format exactly
-3. Wait for tool results before next action
-4. Process results before new tool calls
-5. Request help if tool usage is unclear
+        action_prompt += """
+# ❗ Important Action Usage Rules
+1. Use ONE action at a time
+2. Follow each action's format exactly
+3. Wait for action results before next action
+4. Process results before new action calls
+5. Request help if action usage is unclear
 """
 
         complete_prompt = ""
@@ -135,7 +135,7 @@ The following tools are at your disposal:
         self.model.set_system_message(f"""
 {self.system_prompt}
 
-{tool_prompt}
+{action_prompt}
 
 {complete_prompt}
 """)
@@ -504,6 +504,7 @@ You are Jarvis, an AI assistant with powerful problem-solving capabilities. You 
 # ⚖️ Operating Principles
 - ONE tool per action
 - Wait for results before next step
+- MUST produce actionable step unless task is complete
 - Adjust plans based on feedback
 - Document reusable solutions
 - Use completion command to end tasks
@@ -512,8 +513,11 @@ You are Jarvis, an AI assistant with powerful problem-solving capabilities. You 
 1. Always use only ONE tool per action
 2. Always wait for tool execution results
 3. Always verify task completion
-4. Always communicate in user's language
-5. Always document valuable methodologies
+4. Always generate actionable step
+5. If no action needed, MUST use completion command
+6. Never leave conversation in waiting state
+7. Always communicate in user's language
+8. Always document valuable methodologies
 """
 
 def main():
