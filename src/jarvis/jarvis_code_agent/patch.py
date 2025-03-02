@@ -48,17 +48,6 @@ File: file/path
 Full file content
 </NEW_FILE>
 
-## ➡️ Move File
-<MOVE_FILE>
-File: source/path
-NewPath: destination/path
-</MOVE_FILE>
-
-## ❌ Remove File
-<REMOVE_FILE>
-File: file/path
-</REMOVE_FILE>
-
 # 📜 Format Rules
 1. Path Rules
    - Use relative paths from project root
@@ -67,7 +56,7 @@ File: file/path
 
 2. Line Number Rules
    - Format: [start,end] inclusive / [start,end) right-exclusive
-   - Omit for NEW_FILE/REMOVE_FILE
+   - Omit for NEW_FILE
 
 3. Content Requirements
    - Preserve original indentation
@@ -102,7 +91,7 @@ logger.debug("New log entry")
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """Parse patches from string with optimized format"""
     result = {}
-    patches = re.findall(r"<(REPLACE|INSERT|DELETE|NEW_FILE|REMOVE_FILE|MOVE_FILE)>(.*?)</\1>", patch_str, re.DOTALL)
+    patches = re.findall(r"<(REPLACE|INSERT|DELETE|NEW_FILE)>(.*?)</\1>", patch_str, re.DOTALL)
     
     for patch_type, patch in patches:
         lines = patch.strip().split('\n')
@@ -147,12 +136,6 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             if line_match:
                 start_line = int(line_match.group(1))
                 end_line = start_line
-        elif patch_type == 'MOVE_FILE':
-            new_path_match = re.match(r"NewPath:\s*([^\s]+)", lines[1])
-            if new_path_match:
-                new_path = new_path_match.group(1).strip()
-            else:
-                continue
         
         # Get content (after metadata)
         if patch_type in ['REPLACE', 'DELETE']:
@@ -160,10 +143,6 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         elif patch_type == 'INSERT':
             content_start = 2   # File + Line
         elif patch_type == 'NEW_FILE':
-            content_start = 1   # File
-        elif patch_type == 'MOVE_FILE':
-            content_start = 2   # File + NewPath
-        elif patch_type == 'REMOVE_FILE':
             content_start = 1   # File
         
         content_lines = lines[content_start:]
@@ -173,20 +152,12 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         if filepath not in result:
             result[filepath] = []
         
-        # Handle MOVE_FILE specially
-        if patch_type == 'MOVE_FILE':
-            result[filepath].append({
-                'type': patch_type,
-                'new_path': new_path,
-                'content': content
-            })
-        else:
-            result[filepath].append({
-                'type': patch_type,
-                'start_line': start_line,
-                'end_line': end_line,
-                'content': content
-            })
+        result[filepath].append({
+            'type': patch_type,
+            'start_line': start_line,
+            'end_line': end_line,
+            'content': content
+        })
     
     # Sort patches by start line in reverse order to apply from bottom to top
     for filepath in result:
@@ -205,12 +176,8 @@ def apply_patch(output_str: str) -> str:
             for patch in patch_info:
                 patch_type = patch['type']
                 
-                if patch_type == 'MOVE_FILE':
-                    handle_move_file(filepath, patch)
-                elif patch_type == 'NEW_FILE':
+                if patch_type == 'NEW_FILE':
                     handle_new_file(filepath, patch)
-                elif patch_type == 'REMOVE_FILE':
-                    handle_remove_file(filepath)
                 else:
                     handle_code_operation(filepath, patch)
             
@@ -292,16 +259,6 @@ def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
     return result
 # New handler functions below ▼▼▼
 
-def handle_move_file(filepath: str, patch: Dict[str, Any]):
-    """Handle file moving operation"""
-    new_path = patch['new_path']
-    os.makedirs(os.path.dirname(new_path), exist_ok=True)
-    if os.path.exists(filepath):
-        os.rename(filepath, new_path)
-        PrettyOutput.print(f"成功移动文件 {filepath} -> {new_path}", OutputType.SUCCESS)
-    else:
-        PrettyOutput.print(f"源文件不存在: {filepath}", OutputType.WARNING)
-
 def handle_new_file(filepath: str, patch: Dict[str, Any]):
     """Handle new file creation"""
     new_content = patch.get('content', '').splitlines(keepends=True)
@@ -312,14 +269,6 @@ def handle_new_file(filepath: str, patch: Dict[str, Any]):
     with open(filepath, 'w', encoding='utf-8') as f:
         f.writelines(new_content)
     PrettyOutput.print(f"成功创建新文件 {filepath}", OutputType.SUCCESS)
-
-def handle_remove_file(filepath: str):
-    """Handle file removal"""
-    if os.path.exists(filepath):
-        os.remove(filepath)
-        PrettyOutput.print(f"成功删除文件 {filepath}", OutputType.SUCCESS)
-    else:
-        PrettyOutput.print(f"文件不存在: {filepath}", OutputType.WARNING)
 
 def handle_code_operation(filepath: str, patch: Dict[str, Any]):
     """Handle code modification operations (REPLACE/INSERT/DELETE)"""
