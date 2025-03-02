@@ -525,12 +525,20 @@ def find_git_root(dir="."):
     return ret
 
 def has_uncommitted_changes():
-    os.system("git add .")
+def has_uncommitted_changes():
+    import subprocess
+    # Add all changes silently
+    subprocess.run(["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
     # Check working directory changes
-    working_changes = os.popen("git diff --exit-code").read().strip() != ""
+    working_changes = subprocess.run(["git", "diff", "--exit-code"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+    
     # Check staged changes
-    staged_changes = os.popen("git diff --cached --exit-code").read().strip() != ""
-    os.system("git reset")
+    staged_changes = subprocess.run(["git", "diff", "--cached", "--exit-code"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+    
+    # Reset changes silently
+    subprocess.run(["git", "reset"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
     return working_changes or staged_changes
 
 def load_embedding_model():
