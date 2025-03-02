@@ -23,6 +23,7 @@ import psutil
 from rich.console import Console
 from rich.theme import Theme
 from rich.panel import Panel
+from rich.box import HEAVY
 from rich.text import Text
 from rich.traceback import install as install_rich_traceback
 from rich.syntax import Syntax
@@ -280,7 +281,6 @@ class PrettyOutput:
             lang,
             theme="monokai",
             word_wrap=True,
-            background_color="default"
         )
         
         # Create panel with styling
@@ -291,7 +291,8 @@ class PrettyOutput:
             title=header,
             title_align="left",
             padding=(0, 0),
-            highlight=True
+            highlight=True,
+            box=HEAVY,
         )
         
         # Print panel
