@@ -67,7 +67,6 @@ File: file/path
 
 2. Line Number Rules
    - Format: [start,end] inclusive / [start,end) right-exclusive
-   - 1-based numbering
    - Omit for NEW_FILE/REMOVE_FILE
 
 3. Content Requirements
@@ -146,7 +145,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         elif patch_type == 'INSERT':
             line_match = re.match(r"Line:\s*(\d+)", lines[1])
             if line_match:
-                start_line = int(line_match.group(1))  # 1-based
+                start_line = int(line_match.group(1))
                 end_line = start_line
         elif patch_type == 'MOVE_FILE':
             new_path_match = re.match(r"NewPath:\s*([^\s]+)", lines[1])
