@@ -194,18 +194,75 @@ class PrettyOutput:
         
         # Define styles for different output types
         styles = {
-            OutputType.SYSTEM: RichStyle(color="cyan", bold=True),
-            OutputType.CODE: RichStyle(color="green"),
-            OutputType.RESULT: RichStyle(color="blue"),
-            OutputType.ERROR: RichStyle(color="red", bold=True),
-            OutputType.INFO: RichStyle(color="yellow"),
-            OutputType.PLANNING: RichStyle(color="magenta"),
-            OutputType.PROGRESS: RichStyle(color="white"),
-            OutputType.SUCCESS: RichStyle(color="green", bold=True),
-            OutputType.WARNING: RichStyle(color="yellow", bold=True),
-            OutputType.DEBUG: RichStyle(color="blue", dim=True),
-            OutputType.USER: RichStyle(color="green"),
-            OutputType.TOOL: RichStyle(color="yellow", italic=True)
+            OutputType.SYSTEM: RichStyle(
+                color="bright_cyan", 
+                bold=True, 
+                underline=True,
+                bgcolor="black"
+            ),
+            OutputType.CODE: RichStyle(
+                color="green", 
+                italic=True,
+                bgcolor="#1a1a1a",
+                frame=True
+            ),
+            OutputType.RESULT: RichStyle(
+                color="bright_blue",
+                bold=True,
+                overline=True,
+                bgcolor="navy_blue"
+            ),
+            OutputType.ERROR: RichStyle(
+                color="red", 
+                bold=True,
+                blink=True,
+                bgcolor="dark_red",
+                underline=True
+            ),
+            OutputType.INFO: RichStyle(
+                color="gold1",
+                dim=True,
+                bgcolor="grey11",
+                italic=True
+            ),
+            OutputType.PLANNING: RichStyle(
+                color="purple", 
+                bold=True,
+            ),
+            OutputType.PROGRESS: RichStyle(
+                color="white", 
+                bgcolor="dark_green",
+                encircle=True
+            ),
+            OutputType.SUCCESS: RichStyle(
+                color="bright_green", 
+                bold=True,
+                strike=False,
+                meta={"icon": "✓"}
+            ),
+            OutputType.WARNING: RichStyle(
+                color="yellow", 
+                bold=True,
+                blink2=True,
+                bgcolor="dark_orange"
+            ),
+            OutputType.DEBUG: RichStyle(
+                color="grey58",
+                dim=True,
+                italic=True,
+                conceal=True
+            ),
+            OutputType.USER: RichStyle(
+                color="spring_green2",
+                reverse=True,
+                frame=True
+            ),
+            OutputType.TOOL: RichStyle(
+                color="dark_sea_green4",
+                italic=True,
+                bgcolor="grey19",
+                overline=True
+            )
         }
         
         # Get formatted header
