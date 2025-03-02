@@ -231,7 +231,8 @@ def file_input_handler(user_input: str, agent: Any) -> str:
     file_refs = re.findall(r'`([^`]+)`', user_input)
     
     for ref in file_refs:
-        # Handle file:start,end format
+    for ref in file_refs:
+        # Handle file:start,end or file:start:end format
         if ':' in ref:
             file_path, line_range = ref.split(':', 1)
             # Initialize with default values
@@ -239,10 +240,13 @@ def file_input_handler(user_input: str, agent: Any) -> str:
             end_line = -1
             
             # Process line range if specified
-            if ',' in line_range:
+            if ',' in line_range or ':' in line_range:
                 try:
-                    raw_start, raw_end = map(int, line_range.split(','))
+                    raw_start, raw_end = map(int, re.split(r'[,:]', line_range))
                     
+                    # Handle special values and Python-style negative indices
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        total_lines = len(f.readlines())
                     # Handle special values and Python-style negative indices
                     with open(file_path, 'r', encoding='utf-8') as f:
                         total_lines = len(f.readlines())
