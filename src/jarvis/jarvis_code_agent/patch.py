@@ -90,7 +90,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
 
         filepath = header_match.group(1)
         start = int(header_match.group(2))       # 保持1-based行号
-        end = int(header_match.group(3)) if header_match.group(3) else start
+        end = int(header_match.group(3)) + 1 if header_match.group(3) else start
 
         # 存储参数
         if filepath not in result:
@@ -263,8 +263,8 @@ def validate_and_apply_changes(
     
     max_line = len(lines)
     # 自动修正行号范围
-    start = max(1, min(start, max_line))
-    end = max(start, min(end, max_line))
+    start = max(1, min(start, max_line+1))
+    end = max(start, min(end, max_line+1))
     
     # 执行替换
-    return lines[:start-1] + new_content + lines[end:]
+    return lines[:start-1] + new_content + lines[end-1:]
