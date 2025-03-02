@@ -55,8 +55,6 @@ YOU MUST USE EXACTLY THIS FORMAT:
 <type>(<scope>): <subject>
 
 [Body description in imperative mood]
-
-[Footer with issue references]
 </COMMIT_MESSAGE>
 
 # Format Rules
