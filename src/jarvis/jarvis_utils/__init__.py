@@ -23,7 +23,7 @@ import psutil
 from rich.console import Console
 from rich.theme import Theme
 from rich.panel import Panel
-from rich.box import HEAVY
+from rich.box import SIMPLE_HEAVY
 from rich.text import Text
 from rich.traceback import install as install_rich_traceback
 from rich.syntax import Syntax
@@ -292,7 +292,7 @@ class PrettyOutput:
             title_align="left",
             padding=(0, 0),
             highlight=True,
-            box=HEAVY,
+            box=SIMPLE_HEAVY,
         )
         
         # Print panel
