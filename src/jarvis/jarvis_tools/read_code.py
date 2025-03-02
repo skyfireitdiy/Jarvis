@@ -52,7 +52,7 @@ class ReadCodeTool:
         """
         try:
             abs_path = os.path.abspath(filepath.strip())
-            PrettyOutput.print(f"正在读取代码文件：{abs_path}", OutputType.INFO)
+            PrettyOutput.print(f"正在读取代码文件：{abs_path} [范围: {start_line}-{end_line}]", OutputType.INFO)
             
             if not os.path.exists(abs_path):
                 PrettyOutput.print(f"文件不存在: {abs_path}", OutputType.WARNING)
