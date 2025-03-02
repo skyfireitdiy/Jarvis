@@ -253,7 +253,7 @@ def apply_patch(output_str: str) -> str:
                     handle_code_operation(filepath, patch)
             
         except Exception as e:
-            PrettyOutput.print(f"Application of {patch_type} operation to {filepath} failed: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(f"应用 {patch_type} 操作到 {filepath} 失败: {str(e)}", OutputType.ERROR)
             continue
 
     if has_uncommitted_changes():
@@ -285,7 +285,7 @@ def handle_commit_workflow()->bool:
     diff = os.popen("git diff HEAD").read()
     os.system("git reset HEAD")
     PrettyOutput.print(diff, OutputType.CODE, lang="diff")
-    if not user_confirm("Do you want to commit the code?", default=True):
+    if not user_confirm("是否要提交代码？", default=True):
         os.system("git reset HEAD")
         os.system("git checkout -- .")
         os.system("git clean -fd")
@@ -334,9 +334,9 @@ def handle_move_file(filepath: str, patch: Dict[str, Any]):
     os.makedirs(os.path.dirname(new_path), exist_ok=True)
     if os.path.exists(filepath):
         os.rename(filepath, new_path)
-        PrettyOutput.print(f"Successfully moved file {filepath} -> {new_path}", OutputType.SUCCESS)
+        PrettyOutput.print(f"成功移动文件 {filepath} -> {new_path}", OutputType.SUCCESS)
     else:
-        PrettyOutput.print(f"Source file does not exist: {filepath}", OutputType.WARNING)
+        PrettyOutput.print(f"源文件不存在: {filepath}", OutputType.WARNING)
 
 def handle_new_file(filepath: str, patch: Dict[str, Any]):
     """Handle new file creation"""
@@ -347,15 +347,15 @@ def handle_new_file(filepath: str, patch: Dict[str, Any]):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, 'w', encoding='utf-8') as f:
         f.writelines(new_content)
-    PrettyOutput.print(f"Successfully created new file {filepath}", OutputType.SUCCESS)
+    PrettyOutput.print(f"成功创建新文件 {filepath}", OutputType.SUCCESS)
 
 def handle_remove_file(filepath: str):
     """Handle file removal"""
     if os.path.exists(filepath):
         os.remove(filepath)
-        PrettyOutput.print(f"Successfully removed file {filepath}", OutputType.SUCCESS)
+        PrettyOutput.print(f"成功删除文件 {filepath}", OutputType.SUCCESS)
     else:
-        PrettyOutput.print(f"File does not exist: {filepath}", OutputType.WARNING)
+        PrettyOutput.print(f"文件不存在: {filepath}", OutputType.WARNING)
 
 def handle_code_operation(filepath: str, patch: Dict[str, Any]):
     """Handle code modification operations (REPLACE/INSERT/DELETE)"""
@@ -368,7 +368,7 @@ def handle_code_operation(filepath: str, patch: Dict[str, Any]):
         new_content[-1] += '\n'
 
     if not os.path.exists(filepath):
-        PrettyOutput.print(f"File does not exist: {filepath}", OutputType.WARNING)
+        PrettyOutput.print(f"文件不存在: {filepath}", OutputType.WARNING)
         return
 
     with open(filepath, 'r+', encoding='utf-8') as f:
@@ -378,7 +378,7 @@ def handle_code_operation(filepath: str, patch: Dict[str, Any]):
         f.writelines(lines)
         f.truncate()
 
-    PrettyOutput.print(f"Successfully applied {patch_type} operation to {filepath}", OutputType.SUCCESS)
+    PrettyOutput.print(f"成功对 {filepath} 执行 {patch_type} 操作", OutputType.SUCCESS)
 
 def validate_and_apply_changes(
     patch_type: str,
