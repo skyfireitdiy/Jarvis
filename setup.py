@@ -48,7 +48,7 @@ setup(
             "jarvis-platform-manager=jarvis.jarvis_platform_manager.main:main",
             "jarvis-git-commit=jarvis.jarvis_tools.git_commiter:main",
             "jarvis-code-review=jarvis.jarvis_tools.code_review:main",
-            "jarvis-dev=jarvis.jarvis_dev.main:main",
+            "jgc=jarvis.jarvis_tools.git_commiter:main",
             "jgc=jarvis.jarvis_tools.git_commiter:main",
         ],
     },
