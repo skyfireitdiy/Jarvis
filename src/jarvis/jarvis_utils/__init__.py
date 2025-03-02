@@ -412,7 +412,7 @@ class FileCompleter(Completer):
                 if file_path and score < 100:
                     display_text = f"{path} ({score}%)"
                 completion = Completion(
-                    text=f"`{path}`",  # 添加反引号包裹路径
+                    text=f"'{path}'",  # 添加单引号包裹路径
                     start_position=-replace_length,
                     display=display_text,
                     display_meta="File"
