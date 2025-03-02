@@ -240,6 +240,9 @@ def main():
     # Add argument parser
     init_env()
 
+    curr_dir = os.getcwd()
+    git_dir = find_git_root(curr_dir)
+    PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
 
     try:
         # Interactive mode
