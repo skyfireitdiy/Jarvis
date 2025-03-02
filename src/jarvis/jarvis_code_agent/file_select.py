@@ -247,9 +247,6 @@ def file_input_handler(user_input: str, agent: Any) -> str:
                     # Handle special values and Python-style negative indices
                     with open(file_path, 'r', encoding='utf-8') as f:
                         total_lines = len(f.readlines())
-                    # Handle special values and Python-style negative indices
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        total_lines = len(f.readlines())
                     
                     # Process start line
                     if raw_start == 0:  # 0表示整个文件
