@@ -28,13 +28,13 @@ Code content
 </PATCH>
 
 Operation types:
-- Replace/Delete: [Start line,End line) e.g. [5,8)
+- Replace/Delete: [Start line,End line] e.g. [5,8]
 - Insert: Single line number [5] means insert before line 5
 - New file: [1]
 
 Examples:
 <PATCH>
-src/app.py [5,8)  # 替换5-7行（包含5，不包含8）
+src/app.py [5,8]  # Replace line 5-8
 def new_feature():
     return result * 2
 </PATCH>
@@ -51,7 +51,7 @@ database:
 </PATCH>
 
 <PATCH>
-src/old.py [10,16)  # 删除10-15行
+src/old.py [10,10]  # Delete line 10
 </PATCH>
 """
 
@@ -60,7 +60,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """解析左闭右开格式"""
     result = {}
     header_pattern = re.compile(
-        r'^\s*"?(.+?)"?\s*\[(\d+)(?:,(\d+))?\]\s*$'  # 匹配文件路径和行号
+        r'^\s*"?(.+?)"?\s*\[(\d+)(?:,(\d+))?\]\s*$'  # Match file path and line number
     )
     patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', patch_str, re.DOTALL)
     
