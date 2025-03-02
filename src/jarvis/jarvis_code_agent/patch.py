@@ -21,44 +21,48 @@ class PatchOutputHandler(OutputHandler):
     
     def prompt(self) -> str:
         return """
-# 🛠️ Simplified Patch Format
+# 🛠️ Code Patch Specification
+When making changes, you MUST:
+1. Explain each modification BEFORE the <PATCH> block using:
+   # [OPERATION] on [FILE]: Lines X-Y
+   # Reason: [CLEAR EXPLANATION]
+2. Maintain original code style and compatibility:
+   - Preserve existing indentation levels
+   - Keep surrounding empty lines
+   - Match variable naming conventions
+   - Maintain API compatibility
+3. Follow the exact patch format below
+4. Use separate <PATCH> blocks for different files
+
 <PATCH>
 File path [Operation parameters]
 Code content
 </PATCH>
 
 Operation types:
-- Replace: [Start line,End line] Replace line range (e.g. [5,8] replaces lines 5-8)
-- Delete: [Start line,End line] Delete line range (e.g. [10,10] deletes line 10)
-- Insert: [Line number] Insert before specified line (e.g. [3] inserts before line 3)
-- New file: [1] Create new file
+- Replace: [Start,End] Overwrite lines (e.g. [5,8])
+- Delete: [Start,End] Remove lines (e.g. [10,10])
+- Insert: [Line] Add before line (e.g. [3])
+- New file: [1] Create file
 
-Examples:
-# Replace operation
+Example with style preservation:
+# REPLACE in src/app.py: Lines 5-8
+# Reason: Update calculation with proper indentation
 <PATCH>
 src/app.py [5,8]
-def updated_function():
-    print("Replaced lines 5-8")
-    return new_value * 2
+def calculate(data):
+    # Preserved original 4-space indentation
+    result = (data['value'] 
+              * config.multiplier)  # Kept line break style
+    return result
 </PATCH>
 
-# Delete operation
-<PATCH>
-src/old.py [10,10]
-</PATCH>
-
-# Insert operation
+# INSERT in utils/logger.py: Before line 3 
+# Reason: Add config check with consistent style
 <PATCH>
 utils/logger.py [3]
-print("Inserted before original line 3")
-</PATCH>
-
-# New file creation
-<PATCH>
-config.yaml [1]
-database:
-  host: localhost
-  port: 5432
+if not config.initialized:  # Match existing snake_case naming
+    initialize_config()  # Same indentation as surrounding code
 </PATCH>
 """
 
