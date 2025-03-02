@@ -183,7 +183,6 @@ def handle_commit_workflow(diff:str)->bool:
         subprocess.run(['git', 'checkout', '--', '.'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(['git', 'clean', '-fd'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return False
-        return False
 
     git_commiter = GitCommitTool()
     commit_result = git_commiter.execute({})
