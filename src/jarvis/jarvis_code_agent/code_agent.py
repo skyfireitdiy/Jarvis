@@ -169,7 +169,8 @@ Make it count.
             str: The formatted prompt
         """
 
-        return f"""# Code Modification Task
+        return f"""
+# Code Modification Task
 
 ## User Requirement
 {user_input}
