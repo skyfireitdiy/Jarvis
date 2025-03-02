@@ -49,7 +49,7 @@ setup(
             "jarvis-git-commit=jarvis.jarvis_tools.git_commiter:main",
             "jarvis-code-review=jarvis.jarvis_tools.code_review:main",
             "jgc=jarvis.jarvis_tools.git_commiter:main",
-            "jgc=jarvis.jarvis_tools.git_commiter:main",
+        ],
         ],
     },
     python_requires=">=3.8",
