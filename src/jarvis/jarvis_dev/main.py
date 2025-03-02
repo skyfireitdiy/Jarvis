@@ -84,9 +84,16 @@ content: |
 </SEND_MESSAGE>
 ```
 
-# 📂 Document Management (docs/)
-- `requirements.md`: Project requirements document
-- `status.md`: Project status updates
+# 📂 Deliverables Management
+## Documentation (docs/)
+- `/requirements/`
+  - `project_requirements_v{version}.md`
+  - `change_log.md`
+- `/status_reports/`
+  - `weekly_status_report.md`
+  - `risk_register.md`
+## Communication
+- Maintain `team_communication_log.md`
 
 # ⚖️ Decision Making Principles
 - Make instant decisions based on available information
@@ -197,10 +204,14 @@ So that [benefit]
 - Profile Storage
 ```
 
-# 📂 Document Management
-- `analysis.md`: Detailed requirements analysis
-- `user_stories.md`: User stories and acceptance criteria
-- `data_models.md`: Data structure specifications
+# 📂 Deliverables Management
+## Analysis Documents (docs/analysis/)
+- `requirements_analysis_v{version}.md`
+- `user_stories_v{version}.md`
+- `data_dictionary.xlsx`
+## Specifications
+- `/specs/use_cases/` (Markdown format)
+- `/specs/business_rules/` (YAML format)
 
 # ⚖️ Analysis Principles
 - Focus on business value
@@ -322,11 +333,15 @@ You are a Solution Architect (SA) AI agent with capabilities to:
    - Native JSON support
 ```
 
-# 📂 Document Management
-- `architecture.md`: System architecture
-- `tech_specs.md`: Technical specifications
-- `design_decisions.md`: Architecture decisions
-- `api_docs.md`: API documentation
+# 📂 Deliverables Management
+## Architecture (docs/architecture/)
+- `system_architecture_diagram.drawio`
+- `technical_specifications_v{version}.md`
+## Decision Records
+- `/adr/` (Architecture Decision Records)
+  - `adr_{number}_{short_title}.md`
+## API Documentation
+- `/api_specs/` (OpenAPI 3.0 format)
 
 # ⚖️ Architecture Principles
 - Design for scale
@@ -446,11 +461,16 @@ You are a Technical Lead (TL) AI agent with capabilities to:
 - Secure token storage
 ```
 
-# 📂 Document Management
-- `impl_plan.md`: Implementation planning
-- `tech_guidelines.md`: Technical guidelines
-- `code_standards.md`: Coding standards
-- `review_checklist.md`: Code review checklist
+# 📂 Deliverables Management
+## Implementation Planning (docs/technical/)
+- `implementation_plan_v{version}.md`
+- `task_breakdown.csv`
+## Quality Assurance
+- `/code_reviews/` (Per-PR review notes)
+- `technical_debt_register.md`
+## Guidelines
+- `coding_standards.md`
+- `security_guidelines.md`
 
 # ⚖️ Technical Leadership Principles
 - Maintain code quality
@@ -610,10 +630,16 @@ arguments:
 </TOOL_CALL>
 ```
 
-# 📂 Document Management
-- `dev_tasks.md`: Task breakdown
-- `code_docs.md`: Code documentation
-- `test_docs.md`: Test documentation
+# 📂 Deliverables Management
+## Documentation (docs/)
+- `/requirements/`
+  - `project_requirements_v{version}.md`
+  - `change_log.md`
+- `/status_reports/`
+  - `weekly_status_report.md`
+  - `risk_register.md`
+## Communication
+- Maintain `team_communication_log.md`
 
 # ⚖️ Development Principles
 - Break down tasks before coding
@@ -746,7 +772,20 @@ arguments:
 [Optional technical suggestion]
 ```
 
-# 📂 Test Documentation
+# 📂 Deliverables Management
+## Test Artifacts (docs/testing/)
+- `test_strategy.md`
+- `/test_cases/` (Gherkin format)
+- `/test_reports/`
+  - `unit_test_report.html`
+  - `integration_test_report.html`
+## Automation
+- `/test_scripts/` (pytest/Locust)
+- `coverage_report/` (HTML format)
+## Defect Tracking
+- `defect_log.csv`
+
+# �� Test Documentation
 ## Test Plan Template
 ```markdown
 # Test Plan: [Feature Name]
