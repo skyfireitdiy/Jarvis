@@ -292,7 +292,8 @@ def apply_patch(output_str: str) -> str:
             continue
 
     if has_uncommitted_changes():
-        if handle_commit_workflow():
+        diff = get_diff()
+        if handle_commit_workflow(diff):
             ret += "Successfully applied the patch\n"
             # Get modified line ranges
             modified_ranges = get_modified_line_ranges()
@@ -301,25 +302,27 @@ def apply_patch(output_str: str) -> str:
                 ret += "New code:\n"
                 ret += modified_code["stdout"]
         else:
-            ret += "User rejected the patch"
+            ret += "User rejected the patch\nThis is your patch preview:\n"
+            ret += diff
         user_input = get_multiline_input("你可以继续输入: ")
         if user_input:
             ret += "\n" + user_input
         else:
-            return ""
+            ret += "Please check the patch again"
 
     return ret  # Ensure a string is always returned
-    
-def handle_commit_workflow()->bool:
+
+def get_diff()->str:
+    os.system("git add .")
+    diff = os.popen("git diff HEAD").read()
+    os.system("git reset HEAD")
+    return diff
+def handle_commit_workflow(diff:str)->bool:
     """Handle the git commit workflow and return the commit details.
     
     Returns:
         tuple[bool, str, str]: (continue_execution, commit_id, commit_message)
     """
-    os.system("git add .")
-    diff = os.popen("git diff HEAD").read()
-    os.system("git reset HEAD")
-    PrettyOutput.print(diff, OutputType.CODE, lang="diff")
     if not user_confirm("是否要提交代码？", default=True):
         os.system("git reset HEAD")
         os.system("git checkout -- .")
