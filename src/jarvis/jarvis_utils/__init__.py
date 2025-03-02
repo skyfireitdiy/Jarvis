@@ -47,18 +47,18 @@ install_rich_traceback()
 
 # Create console with custom theme
 custom_theme = Theme({
-    "info": "yellow",
-    "warning": "yellow",
-    "error": "red",
-    "success": "green",
-    "system": "cyan",
-    "code": "green",
-    "result": "blue",
-    "planning": "magenta",
-    "progress": "white",
-    "debug": "blue",
-    "user": "green",
-    "tool": "yellow",
+    "INFO": "yellow",
+    "WARNING": "yellow",
+    "ERROR": "red",
+    "SUCCESS": "green",
+    "SYSTEM": "cyan",
+    "CODE": "green",
+    "RESULT": "blue",
+    "PLANNING": "magenta",
+    "PROGRESS": "white",
+    "DEBUG": "blue",
+    "USER": "green",
+    "TOOL": "yellow",
 })
 
 console = Console(theme=custom_theme)
