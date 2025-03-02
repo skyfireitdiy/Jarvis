@@ -304,7 +304,7 @@ def apply_patch(output_str: str) -> str:
         else:
             ret += "User rejected the patch\nThis is your patch preview:\n"
             ret += diff
-        user_input = get_multiline_input("你可以继续输入: ")
+        user_input = get_multiline_input("你可以继续输入（输入空行重试，Ctrl+C退出）: ")
         if user_input:
             ret += "\n" + user_input
         else:
