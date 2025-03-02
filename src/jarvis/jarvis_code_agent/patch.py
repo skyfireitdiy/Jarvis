@@ -78,15 +78,18 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             continue
         header_line = parts[0].strip()
         content = parts[1] if len(parts) > 1 else ''
-        if not content.endswith('\n'):
+        
+        # 仅在内容非空时添加换行符
+        if content and not content.endswith('\n'):
             content += '\n'
+            
         # 解析文件路径和行号
         header_match = header_pattern.match(header_line)
         if not header_match:
             continue
 
         filepath = header_match.group(1)
-        start = int(header_match.group(2))       # 修正：保持1-based行号
+        start = int(header_match.group(2))       # 保持1-based行号
         end = int(header_match.group(3)) if header_match.group(3) else start
 
         # 存储参数
@@ -96,7 +99,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             'filepath': filepath,
             'start': start,
             'end': end,
-            'content': content  # 保留完整原始内容
+            'content': content  # 保留原始内容（可能为空）
         })
     for filepath in result.keys():
         result[filepath] = sorted(result[filepath], key=lambda x: x['start'], reverse=True)
