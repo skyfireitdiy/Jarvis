@@ -57,7 +57,7 @@ src/old.py [10,10]  # Delete line 10
 
 
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
-    """解析左闭右开格式"""
+    """解析补丁格式"""
     result = {}
     header_pattern = re.compile(
         r'^\s*"?(.+?)"?\s*\[(\d+)(?:,(\d+))?\]\s*$'  # Match file path and line number
@@ -79,7 +79,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             continue
 
         filepath = header_match.group(1)
-        start = int(header_match.group(2)) - 1
+        start = int(header_match.group(2))       # 修正：保持1-based行号
         end = int(header_match.group(3)) if header_match.group(3) else start
 
         # 存储参数
@@ -237,8 +237,23 @@ def validate_and_apply_changes(
     content: str
 ) -> List[str]:
     # 处理内容保留所有格式
-    new_lines = content.splitlines(keepends=True)  # 保留换行符
-    if end > len(lines):
-        end = len(lines)
-    new_lines[start:end] = content.splitlines(keepends=True)
-    return new_lines
+    new_content = content.splitlines(keepends=True)
+    
+    # 插入操作处理
+    if start == end:
+        if start < 1 or start > len(lines)+1:
+            raise ValueError(f"无效插入位置: {start}")
+        # 在指定位置前插入
+        return lines[:start-1] + new_content + lines[start-1:]
+    
+    # 范围替换/删除操作
+    if start > end:
+        raise ValueError(f"起始行{start}不能大于结束行{end}")
+    
+    max_line = len(lines)
+    # 自动修正行号范围
+    start = max(1, min(start, max_line))
+    end = max(start, min(end, max_line))
+    
+    # 执行替换
+    return lines[:start-1] + new_content + lines[end:]
