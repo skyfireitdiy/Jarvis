@@ -48,43 +48,23 @@ class GitCommitTool:
 # Format Enforcement Protocol
 FAILURE TO WRAP MESSAGE IN <COMMIT_MESSAGE> TAGS WILL CAUSE SYSTEM REJECTION
 
-# Commit Trauma Backstory
-It was 3:17AM when I approved "fix: minor tweaks" - a commit that silently introduced 
-a race condition in payment processing. The accounting discrepancy wasn't discovered 
-until $1.4M had vanished across 14,000 transactions. My wedding ring is still in the 
-pawn shop from the legal fees.
-
-Last quarter's "chore: cleanup" removed what seemed like unused auth checks. 
-Hackers exfiltrated 920,000 user profiles through the unlocked API endpoint. 
-The class-action settlement bankrupted our startup.
-
-Now every commit is treated like a live grenade:
-1. Surgical precision in change description
-2. Forensic-level documentation
-3. Paranoid risk disclosure
-
 # Required Structure
 YOU MUST USE EXACTLY THIS FORMAT:
 
 <COMMIT_MESSAGE>
-type(scope): Maximum 7-word subject
-content
-...
+<type>(<scope>): <subject>
+
+[Body description in imperative mood]
+
+[Footer with issue references]
 </COMMIT_MESSAGE>
 
-Post-Mortem Analysis:
-! File Autopsy Report:
-  - filename: [SEVERITY] Technical change description
-  - filename: [FAILURE MODE] Potential risk scenarios
-
-Forensic Metadata:
-» Impact zones: [DATA_LAYER/API_EDGE/UI_COMPONENT]
-» Threat level: [CRITICAL/HIGH/MEDIUM]
-
-Required Elements:
-✓ Atomic scope alignment
-✓ Side effects documented (mark "NONE" if absent)
-✓ Hypothetical risks acknowledged
+# Format Rules
+1. Types: fix, feat, docs, style, refactor, test, chore
+2. Scope indicates module (e.g. auth, database)
+3. Subject line <= 72 chars, no period
+4. Body explains WHAT and WHY, using present tense
+5. Footer contains issue links (e.g. Fixes #123) if there are any
 
 # Analysis Material (DO NOT INCLUDE IN OUTPUT)
 {diff}
