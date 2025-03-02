@@ -402,7 +402,7 @@ def handle_code_operation(filepath: str, patch: Dict[str, Any]):
     if not new_content:
         new_content = ['']
 
-    PrettyOutput.print(f"patch_type: {patch_type}\nstart_line: {start_line}\nend_line: {end_line}\nnew_content:\n{new_content}", OutputType.INFO)
+    PrettyOutput.print(f"patch_type: {patch_type}\nstart_line: {start_line}\nend_line: {end_line}\nnew_content:\n{''.join(new_content)}", OutputType.INFO)
 
     if new_content and new_content[-1] and new_content[-1][-1] != '\n':
         new_content[-1] += '\n'
