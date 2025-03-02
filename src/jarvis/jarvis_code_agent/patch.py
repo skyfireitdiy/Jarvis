@@ -260,11 +260,22 @@ def apply_patch(output_str: str) -> str:
                 # Read original file content
                 lines = open(filepath, 'r', encoding='utf-8').readlines()
                 
-                # Validate line numbers
-                if start_line < 1 or end_line > len(lines) or start_line > end_line:
-                    PrettyOutput.print(f"无效的行范围 [{start_line}, {end_line}] 对于文件: {filepath}", OutputType.WARNING)
-                    continue
-                    
+                # Validate line numbers based on operation type
+                if patch_type in ['REPLACE', 'DELETE']:
+                    # For REPLACE/DELETE: lines must exist in current file
+                    if (start_line < 1 or 
+                        end_line > len(lines) or 
+                        start_line > end_line):
+                        PrettyOutput.print(f"无效的行范围 [{start_line}, {end_line}] 对于文件: {filepath} (总行数: {len(lines)})", OutputType.WARNING)
+                        continue
+                elif patch_type == 'INSERT':
+                    # For INSERT: allow inserting after last line (start_line = len(lines)+1)
+                    if (start_line < 1 or 
+                        start_line > len(lines) + 1 or 
+                        start_line > end_line):  # end_line should equal start_line for INSERT
+                        PrettyOutput.print(f"无效的插入位置 [{start_line}] 对于文件: {filepath} (有效范围: 1-{len(lines)+1})", OutputType.WARNING)
+                        continue
+                
                 # Handle different patch types
                 if patch_type == 'REPLACE':
                     lines[start_line - 1:end_line] = new_content  # Convert to 0-based

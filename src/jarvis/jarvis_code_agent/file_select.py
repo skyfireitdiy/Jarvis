@@ -241,14 +241,38 @@ def file_input_handler(user_input: str, agent: Any) -> str:
             # Process line range if specified
             if ',' in line_range:
                 try:
-                    start_line, end_line = map(int, line_range.split(','))
-                    # Validate
-                    start_line = max(1, start_line)  # Minimum is 1
-                    end_line = max(-1, end_line)
-                    if start_line < 1 or (end_line != -1 and start_line > end_line):
+                    raw_start, raw_end = map(int, line_range.split(','))
+                    
+                    # Handle special values and Python-style negative indices
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        total_lines = len(f.readlines())
+                    
+                    # Process start line
+                    if raw_start == 0:  # 0表示整个文件
+                        start_line = 1
+                        end_line = total_lines
+                    else:
+                        start_line = raw_start if raw_start > 0 else total_lines + raw_start + 1
+                    
+                    # Process end line
+                    if raw_end == 0:  # 0表示整个文件（如果start也是0）
+                        end_line = total_lines
+                    else:
+                        end_line = raw_end if raw_end > 0 else total_lines + raw_end + 1
+                    
+                    # Auto-correct ranges
+                    start_line = max(1, min(start_line, total_lines))
+                    end_line = max(start_line, min(end_line, total_lines))
+                    
+                    # Final validation
+                    if start_line < 1 or end_line > total_lines or start_line > end_line:
                         raise ValueError
-                except ValueError:
-                    PrettyOutput.print(f"忽略无效的行号范围: {line_range}", OutputType.WARNING)
+
+                except (ValueError, FileNotFoundError) as e:
+                    PrettyOutput.print(
+                        f"无效的行号范围: {line_range} (文件总行数: {total_lines})", 
+                        OutputType.WARNING
+                    )
                     continue
             
             # Add file if it exists

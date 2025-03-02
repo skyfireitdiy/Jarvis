@@ -71,7 +71,8 @@ class ReadCodeTool:
                 }
                 
             try:
-                lines = open(abs_path, 'r', encoding='utf-8').readlines()
+                with open(abs_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
             except UnicodeDecodeError:
                 PrettyOutput.print(f"文件解码失败: {abs_path}", OutputType.WARNING)
                 return {
@@ -87,16 +88,29 @@ class ReadCodeTool:
                     "stderr": f"Failed to read file: {str(e)}"
                 }
                 
-            if start_line < 1:
-                start_line = 1
-            if end_line == -1 or end_line > len(lines):
-                end_line = len(lines)
+            total_lines = len(lines)
+            
+            # 处理特殊行号值
+            # 转换负数索引 (Python风格)
+            start_line = start_line if start_line >= 0 else total_lines + start_line + 1
+            end_line = end_line if end_line >= 0 else total_lines + end_line + 1
+            
+            # 自动修正范围
+            start_line = max(1, min(start_line, total_lines))
+            end_line = max(1, min(end_line, total_lines))
+            
+            # 处理-1表示到末尾的情况
+            if end_line == -1:
+                end_line = total_lines
+                
+            # 最终验证
             if start_line > end_line:
-                PrettyOutput.print(f"无效的行范围: [{start_line}, {end_line}]", OutputType.WARNING)
+                error_msg = f"无效的行范围 [{start_line}, {end_line}] (文件总行数: {total_lines})"
+                PrettyOutput.print(error_msg, OutputType.WARNING)
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"Invalid line range: [{start_line}, {end_line}]"
+                    "stderr": error_msg
                 }
                 
             formatted_lines = []
