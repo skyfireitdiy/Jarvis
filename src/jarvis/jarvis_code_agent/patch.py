@@ -164,13 +164,13 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         if patch_type in ['REPLACE', 'DELETE']:
             # 增强正则表达式兼容性
             line_match = re.match(
-                r"^Lines:\s*\[\s*(\d+)\s*,\s*(\d+)\s*([\]\)])\s*$",  # 匹配行尾
+                r"^Lines:\s*\[\s*(\d+)\s*(?:,\s*(\d+)\s*)?([\]\)])\s*$",  # 支持单数字格式
                 lines[1].strip(),  # 去除前后空格
                 re.IGNORECASE
             )
             if line_match:
                 start_line = int(line_match.group(1))
-                end_value = int(line_match.group(2))
+                end_value = int(line_match.group(2) or line_match.group(1))  # 第二个数字不存在时使用第一个
                 bracket_type = line_match.group(3).strip()
                 
                 # 根据括号类型处理区间
