@@ -318,23 +318,15 @@ class PrettyOutput:
     def print_stream(text: str):
         """Print stream output without line break"""
         # 使用进度类型样式
-        style = PrettyOutput._get_style(OutputType.PROGRESS)
-        console.print(
-            Text(" ↳ ", style=style) + 
-            Text(text, style=style, end=""), 
-            soft_wrap=True,
-            end="\r"  # 使用回车符实现原地更新
-        )
+        style = PrettyOutput._get_style(OutputType.SYSTEM)
+        console.print(text, style=style, end="")
 
     @staticmethod
     def print_stream_end():
         """End stream output with line break"""
         # 结束符样式
         end_style = PrettyOutput._get_style(OutputType.SUCCESS)
-        console.print(
-            Text(" ✓", style=end_style), 
-            end="\n\n"
-        )
+        console.print("\n", style=end_style)
         console.file.flush()
 
     @staticmethod
