@@ -235,7 +235,7 @@ def apply_patch(output_str: str) -> str:
         if user_input:
             ret += "\n" + user_input
         else:
-            ret += "Please check the patch again"
+            ret = ""
 
     return ret  # Ensure a string is always returned
 
