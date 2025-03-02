@@ -335,7 +335,7 @@ def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
     
     Returns:
         Dictionary mapping file paths to tuple with (start_line, end_line) ranges
-        for modified sections. Line numbers are 0-based.
+        for modified sections. Line numbers are 1-based.
     """
     # Get git diff for all files
     diff_output = os.popen("git show").read()
@@ -354,13 +354,12 @@ def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
         # Match lines like "@@ -100,5 +100,7 @@" where the + part shows new lines
         range_match = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
         if range_match and current_file:
-            start_line = int(range_match.group(1)) - 1  # Convert to 0-based
+            start_line = int(range_match.group(1))  # Keep as 1-based
             line_count = int(range_match.group(2)) if range_match.group(2) else 1
-            end_line = start_line + line_count
+            end_line = start_line + line_count - 1
             result[current_file] = (start_line, end_line)
     
     return result
-
 # New handler functions below ▼▼▼
 
 def handle_move_file(filepath: str, patch: Dict[str, Any]):
