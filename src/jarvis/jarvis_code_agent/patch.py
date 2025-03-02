@@ -33,44 +33,86 @@ When making changes, you MUST:
    - Maintain API compatibility
 3. Follow the exact patch format below
 4. Use separate <PATCH> blocks for different files
+5. Include ONLY modified lines in content
 
 <PATCH>
 File path [Range]
 Code content
 </PATCH>
 
-Example with style preservation:
+Critical Rules:
+- NEVER include unchanged code in patch content
+- ONLY show lines that are being modified/added
+- Maintain original line breaks around modified sections
+- Preserve surrounding comments unless explicitly modifying them
+
+Examples:
+# ======== REPLACE ========
+# GOOD: Only modified lines
 # REPLACE in src/app.py: Lines 5-8
-# Reason: Update calculation with proper indentation
+# Reason: Update calculation formula
 <PATCH>
 src/app.py [5,8]
-def calculate(data):
-    # Preserved original 4-space indentation
-    result = (data['value'] 
-              * config.multiplier)  # Kept line break style
-    return result
+    result = (base_value * 1.15) + tax
+    logger.debug("New calculation applied")
 </PATCH>
 
+# BAD: Includes unchanged lines
+<PATCH>
+src/app.py [5,8]
+def calculate():
+    # Original comment (should not be included)
+    result = (base_value * 1.15) + tax
+    return result  # Original line
+</PATCH>
+
+# ======== INSERT ========
+# GOOD: Insert single line
 # INSERT in utils/logger.py: Before line 3 
-# Reason: Add config check with consistent style
+# Reason: Add initialization check
 <PATCH>
 utils/logger.py [3]
-if not config.initialized:  # Match existing snake_case naming
-    initialize_config()  # Same indentation as surrounding code
+if not _initialized: initialize()
 </PATCH>
 
-# New file: src/app.py
-# Reason: Add new file with consistent style
+# BAD: Extra empty lines
 <PATCH>
-src/app.py [1]
-if not config.initialized:  # Match existing snake_case naming
-    initialize_config()  # Same indentation as surrounding code
+utils/logger.py [3]
+
+if not _initialized: 
+    initialize()
+
 </PATCH>
 
-# Delete: src/app.py: Lines 5-8
+# ======== NEW FILE ========
+# GOOD: Complete minimal content
+# NEW FILE in config/settings.yaml: Create new config
+<PATCH>
+config/settings.yaml [1]
+database:
+  host: localhost
+  port: 5432
+</PATCH>
+
+# BAD: Placeholder content
+<PATCH>
+config/settings.yaml [1]
+TODO: Add configuration
+</PATCH>
+
+# ======== DELETE ========
+# GOOD: Empty content for deletion
+# DELETE in src/old.py: Lines 10-12 
 # Reason: Remove deprecated function
 <PATCH>
-src/app.py [5,8]
+src/old.py [10,12]
+</PATCH>
+
+# BAD: Comment in delete operation
+<PATCH>
+src/old.py [10,12]
+# Remove these lines
+</PATCH>
 """
 
 
