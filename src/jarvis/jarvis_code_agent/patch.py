@@ -178,9 +178,11 @@ def handle_commit_workflow(diff:str)->bool:
         tuple[bool, str, str]: (continue_execution, commit_id, commit_message)
     """
     if not user_confirm("是否要提交代码？", default=True):
-        os.system("git reset HEAD")
-        os.system("git checkout -- .")
-        os.system("git clean -fd")
+        import subprocess
+        subprocess.run(['git', 'reset', 'HEAD'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['git', 'checkout', '--', '.'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['git', 'clean', '-fd'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return False
         return False
 
     git_commiter = GitCommitTool()
