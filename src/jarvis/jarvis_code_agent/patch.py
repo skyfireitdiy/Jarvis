@@ -254,7 +254,7 @@ def apply_patch(output_str: str) -> str:
                 ret += modified_code["stdout"]
         else:
             ret += "User rejected the patch"
-        user_input = get_multiline_input("You can continue input: ")
+        user_input = get_multiline_input("你可以继续输入: ")
         if user_input:
             ret += "\n" + user_input
         else:
