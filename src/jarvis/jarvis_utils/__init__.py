@@ -175,7 +175,7 @@ class PrettyOutput:
         formatted.append(f"{get_agent_list()}", style="blue")
         # Add icon
         icon = PrettyOutput._ICONS.get(output_type, "")
-        formatted.append(f"{icon} ", style=output_type.value)
+        formatted.append(f"{output_type.value}{icon} ", style=output_type.value)
         
         return formatted
 
