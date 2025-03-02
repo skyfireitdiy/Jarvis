@@ -35,15 +35,9 @@ When making changes, you MUST:
 4. Use separate <PATCH> blocks for different files
 
 <PATCH>
-File path [Operation parameters]
+File path [Range]
 Code content
 </PATCH>
-
-Operation types:
-- Replace: [Start,End] Overwrite lines (e.g. [5,8])
-- Delete: [Start,End] Remove lines (e.g. [10,10])
-- Insert: [Line] Add before line (e.g. [3])
-- New file: [1] Create file
 
 Example with style preservation:
 # REPLACE in src/app.py: Lines 5-8
@@ -64,6 +58,19 @@ utils/logger.py [3]
 if not config.initialized:  # Match existing snake_case naming
     initialize_config()  # Same indentation as surrounding code
 </PATCH>
+
+# New file: src/app.py
+# Reason: Add new file with consistent style
+<PATCH>
+src/app.py [1]
+if not config.initialized:  # Match existing snake_case naming
+    initialize_config()  # Same indentation as surrounding code
+</PATCH>
+
+# Delete: src/app.py: Lines 5-8
+# Reason: Remove deprecated function
+<PATCH>
+src/app.py [5,8]
 """
 
 
