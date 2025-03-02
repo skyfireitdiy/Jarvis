@@ -85,7 +85,7 @@ class OpenAIModel(BasePlatform):
             full_response = ""
             
             for chunk in response:
-                if chunk.choices[0].delta.content:
+                if chunk.choices and chunk.choices[0].delta.content:
                     text = chunk.choices[0].delta.content
                     if not self.suppress_output:
                         PrettyOutput.print_stream(text)
