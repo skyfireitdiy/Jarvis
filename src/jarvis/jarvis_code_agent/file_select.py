@@ -231,7 +231,6 @@ def file_input_handler(user_input: str, agent: Any) -> str:
     file_refs = re.findall(r'`([^`]+)`', user_input)
     
     for ref in file_refs:
-    for ref in file_refs:
         # Handle file:start,end or file:start:end format
         if ':' in ref:
             file_path, line_range = ref.split(':', 1)
