@@ -80,7 +80,6 @@ Post-Mortem Analysis:
   - filename: [FAILURE MODE] Potential risk scenarios
 
 Forensic Metadata:
-» Lines changed: {len(diff.splitlines())}
 » Impact zones: [DATA_LAYER/API_EDGE/UI_COMPONENT]
 » Threat level: [CRITICAL/HIGH/MEDIUM]
 
