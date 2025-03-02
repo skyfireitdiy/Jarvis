@@ -21,170 +21,95 @@ class PatchOutputHandler(OutputHandler):
     
     def prompt(self) -> str:
         return """
-# 🛠️ Operation Templates
-## 🔄 Replace Code
-<REPLACE>
-File: file/path
-Lines: [start,end]
-New code content
-</REPLACE>
+# 🛠️ Simplified Patch Format
+<PATCH>
+File path [Operation position]
+Code content
+</PATCH>
 
-## ➕ Insert Code
-<INSERT>
-File: file/path
-Line: position
-New code content
-</INSERT>
+Operation types:
+- Replace/Delete: [Start line,End line) e.g. [5,8)
+- Insert: Single line number [5] means insert before line 5
+- New file: [0]
 
-## 🗑️ Delete Code
-<DELETE>
-File: file/path
-Lines: [start,end]
-</DELETE>
-
-## 🆕 New File
-<NEW_FILE>
-File: file/path
-Full file content
-</NEW_FILE>
-
-# 📜 Format Rules
-1. Path Rules
-   - Use relative paths from project root
-   - Case-sensitive exact paths
-   - Example: src/module/file.py
-
-2. Line Number Rules
-   - Format: [start,end] inclusive / [start,end) right-exclusive
-   - Omit for NEW_FILE
-
-3. Content Requirements
-   - Preserve original indentation
-   - Provide raw code (no line numbers)
-   - Keep empty lines and comments
-
-# 💡 Usage Examples
-<REPLACE>
-File: src/app.py
-Lines: [23,25]
+Examples:
+<PATCH>
+src/app.py [5,8)  # 替换5-7行（包含5，不包含8）
 def new_feature():
-    print("Updated feature")
-    return True
-</REPLACE>
+    return result * 2
+</PATCH>
 
-<INSERT>
-File: src/utils.py
-Line: 42
-logger.debug("New log entry")
-</INSERT>
+<PATCH>
+utils.py [3]  # Insert before line 3
+logger.info("Inserted content")
+</PATCH>
 
-# ⚠️ Key Requirements
-1. One change per block
-2. Use correct operation type
-3. Maintain code style consistency 
-4. Handle line ranges precisely
-5. Include error handling
-6. Modified code must be executable
+<PATCH>
+config.yaml [0]  # Create/overwrite file
+database:
+  host: 127.0.0.1
+</PATCH>
+
+<PATCH>
+src/old.py [10,16)  # 删除10-15行
+</PATCH>
 """
 
 
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
-    """Parse patches from string with optimized format"""
+    """解析左闭右开格式"""
     result = {}
-    patches = re.findall(r"<(REPLACE|INSERT|DELETE|NEW_FILE)>(.*?)</\1>", patch_str, re.DOTALL)
+    # 使用更精确的正则匹配，支持带空格路径
+    header_pattern = re.compile(
+        r'^"?(.+?)"?\s*\[(\d+)(?:,(\d+))?\]$'  # 支持带引号的路径
+    )
+    patches = re.findall(r'<PATCH>(.*?)</PATCH>', patch_str, re.DOTALL)
     
-    for patch_type, patch in patches:
-        lines = patch.strip().split('\n')
-        if not lines:
+    for patch in patches:
+        lines = [l.strip() for l in patch.strip().split('\n') if l.strip()]
+        if len(lines) < 2:
             continue
-            
-        # Parse file path
-        file_match = re.match(r"File:\s*([^\s]+)", lines[0])
-        if not file_match:
-            continue
-        filepath = file_match.group(1).strip()
-        
-        # Initialize line numbers
-        start_line = end_line = 0
-        
-        # Parse line numbers based on operation type
-        if patch_type in ['REPLACE', 'DELETE']:
-            # 增强正则表达式兼容性
-            line_match = re.match(
-                r"^Lines:\s*\[\s*(\d+)\s*(?:,\s*(\d+)\s*)?([\]\)])\s*$",  # 支持单数字格式
-                lines[1].strip(),  # 去除前后空格
-                re.IGNORECASE
-            )
-            if line_match:
-                start_line = int(line_match.group(1))
-                end_value = int(line_match.group(2) or line_match.group(1))  # 第二个数字不存在时使用第一个
-                bracket_type = line_match.group(3).strip()
-                
-                # 根据括号类型处理区间
-                if bracket_type == ')':  # [m,n)
-                    end_line = end_value - 1
-                else:  # [m,n]
-                    end_line = end_value
-                
-                # 确保 end_line >= start_line
-                end_line = max(end_line, start_line)
-            else:
-                PrettyOutput.print(f"无法解析行号格式: {lines[1]}", OutputType.WARNING)
-                continue
-        elif patch_type == 'INSERT':
-            line_match = re.match(r"Line:\s*(\d+)", lines[1])
-            if line_match:
-                start_line = int(line_match.group(1))
-                end_line = start_line
-        
-        # Get content (after metadata)
-        if patch_type in ['REPLACE', 'DELETE']:
-            content_start = 2  # File + Lines
-        elif patch_type == 'INSERT':
-            content_start = 2   # File + Line
-        elif patch_type == 'NEW_FILE':
-            content_start = 1   # File
-        
-        content_lines = lines[content_start:]
-        # 保留原始缩进和空行
-        content = '\n'.join(content_lines).rstrip('\n') + '\n'  # 保留末尾换行
 
+        # 解析文件路径和行号
+        header_match = header_pattern.match(lines[0])
+        if not header_match:
+            continue
+
+        filepath = header_match.group(1)
+        start = int(header_match.group(2))
+        end = int(header_match.group(3)) + 1 if header_match.group(3) else start
+
+        # 存储参数
         if filepath not in result:
             result[filepath] = []
-        
         result[filepath].append({
-            'type': patch_type,
-            'start_line': start_line,
-            'end_line': end_line,
-            'content': content
+            'filepath': filepath,
+            'start': start,
+            'end': end,
+            'content': '\n'.join(lines[1:]) + '\n'
         })
-    
-    # Sort patches by start line in reverse order to apply from bottom to top
-    for filepath in result:
-        result[filepath].sort(key=lambda x: x.get('start_line', 0), reverse=True)
-    
+
     return result
 
 
 def apply_patch(output_str: str) -> str:
     """Apply patches to files"""
-    patches = _parse_patch(output_str)
-    ret = ""  # Initialize return value
+    try:
+        patches = _parse_patch(output_str)
+    except Exception as e:
+        PrettyOutput.print(f"解析补丁失败: {str(e)}", OutputType.ERROR)
+        return ""
 
-    for filepath, patch_info in patches.items():
-        try:
-            for patch in patch_info:
-                patch_type = patch['type']
-                
-                if patch_type == 'NEW_FILE':
-                    handle_new_file(filepath, patch)
-                else:
-                    handle_code_operation(filepath, patch)
-            
-        except Exception as e:
-            PrettyOutput.print(f"应用 {patch_type} 操作到 {filepath} 失败: {str(e)}", OutputType.ERROR)
-            continue
-
+    ret = ""
+    
+    for filepath, patch_list in patches.items():
+        for patch in patch_list:
+            try:
+                handle_code_operation(filepath, patch)
+                PrettyOutput.print(f"成功处理 操作", OutputType.SUCCESS)
+            except Exception as e:
+                PrettyOutput.print(f"操作失败: {str(e)}", OutputType.ERROR)
+    
     if has_uncommitted_changes():
         diff = get_diff()
         if handle_commit_workflow(diff):
@@ -206,11 +131,21 @@ def apply_patch(output_str: str) -> str:
 
     return ret  # Ensure a string is always returned
 
-def get_diff()->str:
-    os.system("git add .")
-    diff = os.popen("git diff HEAD").read()
-    os.system("git reset HEAD")
-    return diff
+def get_diff() -> str:
+    """使用更安全的subprocess代替os.system"""
+    import subprocess
+    try:
+        subprocess.run(['git', 'add', '.'], check=True)
+        result = subprocess.run(
+            ['git', 'diff', 'HEAD'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout
+    finally:
+        subprocess.run(['git', 'reset', 'HEAD'], check=True)
+
 def handle_commit_workflow(diff:str)->bool:
     """Handle the git commit workflow and return the commit details.
     
@@ -260,63 +195,85 @@ def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
 # New handler functions below ▼▼▼
 
 def handle_new_file(filepath: str, patch: Dict[str, Any]):
-    """Handle new file creation"""
-    new_content = patch.get('content', '').splitlines(keepends=True)
-    if new_content and new_content[-1] and new_content[-1][-1] != '\n':
-        new_content[-1] += '\n'
-    
+    """统一参数格式处理新文件"""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, 'w', encoding='utf-8') as f:
-        f.writelines(new_content)
-    PrettyOutput.print(f"成功创建新文件 {filepath}", OutputType.SUCCESS)
+        f.write(patch['content'])
 
 def handle_code_operation(filepath: str, patch: Dict[str, Any]):
-    """Handle code modification operations (REPLACE/INSERT/DELETE)"""
-    patch_type = patch['type']
-    start_line = patch.get('start_line', 0)
-    end_line = patch.get('end_line', 0)
-    new_content = patch.get('content', '').splitlines(keepends=True)
+    """处理紧凑格式补丁"""
+    try:
+        # 新建文件时强制覆盖
+        if patch['start'] == 0:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            mode = 'w'  # 写模式覆盖文件
+        else:
+            mode = 'r+'
+        
+        with open(filepath, mode, encoding='utf-8') as f:
+            lines = f.readlines() if mode == 'r+' else []
+            
+            new_lines = validate_and_apply_changes(
+                lines,
+                patch['start'],
+                patch['end'],
+                patch['content']
+            )
+            
+            f.seek(0)
+            f.writelines(new_lines)
+            f.truncate()
 
-    if not new_content:
-        new_content = ['']
+        PrettyOutput.print(f"成功更新 {filepath}", OutputType.SUCCESS)
 
-    PrettyOutput.print(f"patch_type: {patch_type}\nstart_line: {start_line}\nend_line: {end_line}\nnew_content:\n{''.join(new_content)}", OutputType.INFO)
-
-    if new_content and new_content[-1] and new_content[-1][-1] != '\n':
-        new_content[-1] += '\n'
-
-    if not os.path.exists(filepath):
-        PrettyOutput.print(f"文件不存在: {filepath}", OutputType.WARNING)
-        return
-
-    with open(filepath, 'r+', encoding='utf-8') as f:
-        lines = f.readlines()
-        validate_and_apply_changes(patch_type, lines, start_line, end_line, new_content)
-        f.seek(0)
-        f.writelines(lines)
-        f.truncate()
-
-    PrettyOutput.print(f"成功对 {filepath} 执行 {patch_type} 操作", OutputType.SUCCESS)
+    except Exception as e:
+        PrettyOutput.print(f"操作失败: {str(e)}", OutputType.ERROR)
 
 def validate_and_apply_changes(
-    patch_type: str,
     lines: List[str],
-    start_line: int,
-    end_line: int,
-    new_content: List[str]
-):
-    """Validate and apply code changes to in-memory file content"""
-    if patch_type in ['REPLACE', 'DELETE']:
-        if start_line < 1 or end_line > len(lines) or start_line > end_line:
-            raise ValueError(f"Invalid line range [{start_line}, {end_line}] (total lines: {len(lines)})")
+    start: int,
+    end: int,
+    content: str
+) -> List[str]:
+    # 插入操作处理
+    if start == end:  # 单个行号插入
+        if start < 1 or start > len(lines)+1:
+            raise ValueError(f"无效插入位置: {start}")
+        lines.insert(start-1, content)
+        return lines
+    
+    # 范围操作处理（保持左闭右开）
+    if 1 <= start < end:  # 现在end是转换后的值
+        # 新增行号范围校验
+        if start < 0 or end < 0:
+            raise ValueError(f"行号不能为负数: [{start}-{end}]")
         
-        if patch_type == 'REPLACE':
-            lines[start_line-1:end_line] = new_content
-        else:  # DELETE
-            lines[start_line-1:end_line] = []
-            
-    elif patch_type == 'INSERT':
-        if start_line < 1 or start_line > len(lines) + 1:
-            raise ValueError(f"Invalid insertion position [{start_line}] (valid range: 1-{len(lines)+1})")
+        # 新增最大行号限制
+        max_lines = len(lines)
+        if max_lines > 0 and end > max_lines + 1:  # 允许插入到文件末尾之后
+            raise ValueError(f"结束行号{end}超出文件范围({max_lines})")
+
+        # 处理空文件插入
+        if not lines and start == 1 and end == 1:
+            return content.splitlines(keepends=True)
         
-        lines[start_line-1:start_line-1] = new_content
+        # 处理删除全部内容
+        if start == 1 and end >= len(lines):
+            return []
+
+        # 新建/覆盖文件
+        if start == 0:
+            # 返回新内容（覆盖旧内容）
+            return content.splitlines(keepends=True)
+        
+        # 自动修正逻辑保持end为切片右边界
+        if end > max_lines:
+            new_end = max_lines
+            PrettyOutput.print(f"警告：结束行号{end+1}超出文件范围，已自动修正为{new_end}", OutputType.WARNING)
+            end = new_end
+        
+        if start <= end <= max_lines:
+            lines[start-1:end-1] = content.splitlines(keepends=True)
+            return lines
+    
+    raise ValueError(f"无效行范围 [{start}-{end})")
