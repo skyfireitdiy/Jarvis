@@ -213,7 +213,6 @@ class PrettyOutput:
                 color="bright_blue",
                 bold=True,
                 italic=True,
-                overline=True,
                 bgcolor="navy_blue"
             ),
             OutputType.ERROR: RichStyle(
@@ -269,7 +268,6 @@ class PrettyOutput:
                 color="dark_sea_green4",
                 italic=True,
                 bgcolor="grey19",
-                overline=True
             )
         }
         
