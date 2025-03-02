@@ -227,8 +227,6 @@ def file_input_handler(user_input: str, agent: Any) -> str:
     prompt = user_input
     files = []
     
-    # Match file references in backticks
-    # Match file references in single quotes
     file_refs = re.findall(r"'([^']+)'", user_input)
     for ref in file_refs:
         # Handle file:start,end or file:start:end format
