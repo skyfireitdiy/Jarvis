@@ -350,8 +350,6 @@ class KimiModel(BasePlatform):
                     output.append("")
 
                 PrettyOutput.print("\n".join(output), OutputType.PROGRESS)
-
-            PrettyOutput.print(full_response, OutputType.RESULT)
             
             return full_response
 
