@@ -441,7 +441,7 @@ Content: {content}
                     output_lines.append("删除的文件:")
                     output_lines.extend(f"  {f}" for f in deleted_files)
                 
-                PrettyOutput.print("\n".join(output_lines), output_type=OutputType.WARNING)
+                PrettyOutput.print("\n".join(output_lines), output_type=OutputType.INFO)
 
                 # If force is True, continue directly
                 if not force:
