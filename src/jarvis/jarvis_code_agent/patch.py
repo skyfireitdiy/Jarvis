@@ -240,7 +240,8 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             content_start = 1   # File
         
         content_lines = lines[content_start:]
-        content = '\n'.join(content_lines).strip()
+        # 保留原始缩进和空行
+        content = '\n'.join(content_lines).rstrip('\n') + '\n'  # 保留末尾换行
 
         if filepath not in result:
             result[filepath] = []
