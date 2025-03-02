@@ -22,13 +22,13 @@ class GitCommitTool:
             message
         )
         if r:
-            # 强制格式清洗
+            # 仅保留必要字符但保持完整结构
             sanitized = re.sub(
-                r'[^\w\s\-:()\[\]#@!$%^&*+=<>?/|\\}{~]', 
+                r'[^\w\s\-:()\[\]#@!$%^&*+=<>?/|\\}{~\n]', 
                 '', 
                 r.group(1)
-            ).strip()
-            return shlex.quote(sanitized[:72])
+            )
+            return shlex.quote(sanitized.strip())  # 移除长度限制
         return "<<FORMAT VIOLATION>> Invalid commit message structure"
     
     def _get_last_commit_hash(self):
