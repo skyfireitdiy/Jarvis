@@ -83,10 +83,10 @@ class OyiModel(BasePlatform):
                     self.conversation = data
                     return True
                 else:
-                    PrettyOutput.print(f"创建会话失败: {data['message']}", OutputType.ERROR)
+                    PrettyOutput.print(f"创建会话失败: {data['message']}", OutputType.WARNING)
                     return False
             else:
-                PrettyOutput.print(f"创建会话失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"创建会话失败: {response.status_code}", OutputType.WARNING)
                 return False
                 
         except Exception as e:
@@ -157,13 +157,13 @@ class OyiModel(BasePlatform):
             
             if response.status_code != 200:
                 error_msg = f"聊天请求失败: {response.status_code}"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                PrettyOutput.print(error_msg, OutputType.WARNING)
                 raise Exception(error_msg)
             
             data = response.json()
             if data['code'] != 200 or data['type'] != 'success':
                 error_msg = f"聊天失败: {data.get('message', '未知错误')}"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                PrettyOutput.print(error_msg, OutputType.WARNING)
                 raise Exception(error_msg)
             
             message_id = data['result'][-1]
@@ -196,7 +196,7 @@ class OyiModel(BasePlatform):
                 return full_response
             else:
                 error_msg = f"获取响应失败: {response.status_code}"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                PrettyOutput.print(error_msg, OutputType.WARNING)
                 raise Exception(error_msg)
         except Exception as e:
             PrettyOutput.print(f"聊天失败: {str(e)}", OutputType.ERROR)
@@ -241,11 +241,11 @@ class OyiModel(BasePlatform):
                     return True
                 else:
                     error_msg = f"删除会话失败: {data.get('message', '未知错误')}"
-                    PrettyOutput.print(error_msg, OutputType.ERROR)
+                    PrettyOutput.print(error_msg, OutputType.WARNING)
                     return False
             else:
                 error_msg = f"删除会话请求失败: {response.status_code}"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                PrettyOutput.print(error_msg, OutputType.WARNING)
                 return False
             
         except Exception as e:
@@ -281,7 +281,7 @@ class OyiModel(BasePlatform):
                 # 检查文件类型
                 file_type = mimetypes.guess_type(file_path)[0]
                 if not file_type or not file_type.startswith(('image/', 'text/', 'application/')):
-                    PrettyOutput.print(f"文件类型 {file_type} 不支持", OutputType.ERROR)
+                    PrettyOutput.print(f"文件类型 {file_type} 不支持", OutputType.WARNING)
                     continue
                 
                 with open(file_path, 'rb') as f:
@@ -300,10 +300,10 @@ class OyiModel(BasePlatform):
                         if data.get('code') == 200:
                             self.files.append(data)
                         else:
-                            PrettyOutput.print(f"文件上传失败: {data.get('message')}", OutputType.ERROR)
+                            PrettyOutput.print(f"文件上传失败: {data.get('message')}", OutputType.WARNING)
                             return []
                     else:
-                        PrettyOutput.print(f"文件上传失败: {response.status_code}", OutputType.ERROR)
+                        PrettyOutput.print(f"文件上传失败: {response.status_code}", OutputType.WARNING)
                         return []
                 
             return self.files
@@ -335,7 +335,7 @@ class OyiModel(BasePlatform):
             )
             
             if response.status_code != 200:
-                PrettyOutput.print(f"获取模型列表失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"获取模型列表失败: {response.status_code}", OutputType.WARNING)
                 return []
             
             data = response.json()

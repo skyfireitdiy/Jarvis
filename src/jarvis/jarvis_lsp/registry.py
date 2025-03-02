@@ -59,8 +59,8 @@ class LSPRegistry:
         
         if missing_methods:
             PrettyOutput.print(
-                f"LSP {lsp_class.__name__} is missing necessary methods: {', '.join(missing_methods)}", 
-                OutputType.ERROR
+                f"LSP {lsp_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}", 
+                OutputType.WARNING
             )
             return False
             
@@ -72,7 +72,7 @@ class LSPRegistry:
         lsp_servers = {}
         
         if not os.path.exists(directory):
-            PrettyOutput.print(f"LSP 目录不存在: {directory}", OutputType.ERROR)
+            PrettyOutput.print(f"LSP 目录不存在: {directory}", OutputType.WARNING)
             return lsp_servers
             
         package_name = None
@@ -138,7 +138,7 @@ class LSPRegistry:
     def create_lsp(self, language: str) -> Optional[BaseLSP]:
         """Create LSP instance for specified language."""
         if language not in self.lsp_servers:
-            PrettyOutput.print(f"没有找到 LSP 支持的语言: {language}", OutputType.ERROR)
+            PrettyOutput.print(f"没有找到 LSP 支持的语言: {language}", OutputType.WARNING)
             return None
             
         try:
@@ -186,11 +186,11 @@ def main():
     lsp = registry.create_lsp(args.language)
     
     if not lsp:
-        PrettyOutput.print(f"没有 LSP 支持的语言: {args.language}", OutputType.ERROR)
+        PrettyOutput.print(f"没有 LSP 支持的语言: {args.language}", OutputType.WARNING)
         return 1
         
     if not lsp.initialize(os.path.dirname(os.path.abspath(args.file))):
-        PrettyOutput.print("LSP 初始化失败", OutputType.ERROR)
+        PrettyOutput.print("LSP 初始化失败", OutputType.WARNING)
         return 1
     
     try:
@@ -208,7 +208,7 @@ def main():
                 
         elif args.action in ('references', 'definition'):
             if args.line is None or args.character is None:
-                PrettyOutput.print("需要行和字符位置用于 references/definition", OutputType.ERROR)
+                PrettyOutput.print("需要行和字符位置用于 references/definition", OutputType.WARNING)
                 return 1
                 
             if args.action == 'references':

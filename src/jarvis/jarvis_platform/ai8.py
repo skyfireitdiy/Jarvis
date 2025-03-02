@@ -60,12 +60,12 @@ class AI8Model(BasePlatform):
             )
             
             if response.status_code != 200:
-                PrettyOutput.print(f"创建会话失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"创建会话失败: {response.status_code}", OutputType.WARNING)
                 return False
             
             data = response.json()
             if data['code'] != 0:
-                PrettyOutput.print(f"创建会话失败: {data.get('msg', '未知错误')}", OutputType.ERROR)
+                PrettyOutput.print(f"创建会话失败: {data.get('msg', '未知错误')}", OutputType.WARNING)
                 return False
             
             self.conversation = data['data']
@@ -93,10 +93,10 @@ class AI8Model(BasePlatform):
                     self.conversation = data['data']
                     return True
                 else:
-                    PrettyOutput.print(f"更新会话设置失败: {data.get('msg', '未知错误')}", OutputType.ERROR)
+                    PrettyOutput.print(f"更新会话设置失败: {data.get('msg', '未知错误')}", OutputType.WARNING)
                     return False
             else:
-                PrettyOutput.print(f"更新会话设置失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"更新会话设置失败: {response.status_code}", OutputType.WARNING)
                 return False
             
         except Exception as e:
@@ -162,7 +162,7 @@ class AI8Model(BasePlatform):
             
             if response.status_code != 200:
                 error_msg = f"Failed to chat: {response.status_code} {response.text}"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                PrettyOutput.print(error_msg, OutputType.WARNING)
                 raise Exception(error_msg)
             
             # 处理流式响应
@@ -229,11 +229,11 @@ class AI8Model(BasePlatform):
                     return True
                 else:
                     error_msg = f"删除会话失败: {data.get('msg', '未知错误')}"
-                    PrettyOutput.print(error_msg, OutputType.ERROR)
+                    PrettyOutput.print(error_msg, OutputType.WARNING)
                     return False
             else:
                 error_msg = f"删除会话请求失败: {response.status_code}"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                PrettyOutput.print(error_msg, OutputType.WARNING)
                 return False
             
         except Exception as e:
@@ -265,12 +265,12 @@ class AI8Model(BasePlatform):
             )
             
             if response.status_code != 200:
-                PrettyOutput.print(f"获取模型列表失败: {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"获取模型列表失败: {response.status_code}", OutputType.WARNING)
                 return []
             
             data = response.json()
             if data['code'] != 0:
-                PrettyOutput.print(f"获取模型列表失败: {data.get('msg', '未知错误')}", OutputType.ERROR)
+                PrettyOutput.print(f"获取模型列表失败: {data.get('msg', '未知错误')}", OutputType.WARNING)
                 return []
             
             # 保存模型信息
@@ -309,6 +309,6 @@ class AI8Model(BasePlatform):
             return list(self.models.keys())
             
         except Exception as e:
-            PrettyOutput.print(f"获取模型列表失败: {str(e)}", OutputType.WARNING)
+            PrettyOutput.print(f"获取模型列表失败: {str(e)}", OutputType.ERROR)
             return []
         

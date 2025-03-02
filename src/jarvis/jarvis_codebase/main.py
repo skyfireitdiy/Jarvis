@@ -336,7 +336,7 @@ Content: {content}
                 vectors = np.vstack(vectors)
                 if len(vectors) != len(ids):
                     PrettyOutput.print(f"向量数量不匹配: {len(vectors)} 个向量 vs {len(ids)} 个ID", 
-                                     output_type=OutputType.ERROR)
+                                     output_type=OutputType.WARNING)
                     self.index = None
                     return
                     

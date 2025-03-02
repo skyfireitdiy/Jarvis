@@ -55,7 +55,7 @@ def chat_with_model(platform_name: str, model_name: str):
     # Create platform instance
     platform = registry.create_platform(platform_name)
     if not platform:
-        PrettyOutput.print(f"创建平台 {platform_name} 失败", OutputType.ERROR)
+        PrettyOutput.print(f"创建平台 {platform_name} 失败", OutputType.WARNING)
         return
     
     try:
@@ -108,7 +108,7 @@ def chat_with_model(platform_name: str, model_name: str):
 # Helper function for platform and model validation
 def validate_platform_model(args):
     if not args.platform or not args.model:
-        PrettyOutput.print("请指定平台和模型。使用 'jarvis info' 查看可用平台和模型。", OutputType.ERROR)
+        PrettyOutput.print("请指定平台和模型。使用 'jarvis info' 查看可用平台和模型。", OutputType.WARNING)
         return False
     return True
 

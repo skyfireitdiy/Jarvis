@@ -241,7 +241,7 @@ def main():
         PrettyOutput.print(report, OutputType.SUCCESS, lang="yaml")
         
     else:
-        PrettyOutput.print(result["stderr"], OutputType.ERROR)
+        PrettyOutput.print(result["stderr"], OutputType.WARNING)
 
 if __name__ == "__main__":
     main()

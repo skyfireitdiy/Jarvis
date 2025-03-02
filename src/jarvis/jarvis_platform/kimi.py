@@ -198,11 +198,11 @@ class KimiModel(BasePlatform):
                         if self._wait_for_parse(file_info["id"]):
                             uploaded_files.append(file_info)
                         else:
-                            PrettyOutput.print(f"✗ 文件解析失败: {file_path}", OutputType.ERROR)
+                            PrettyOutput.print(f"✗ 文件解析失败: {file_path}", OutputType.WARNING)
                     else:
                         uploaded_files.append(file_info)
                 else:
-                    PrettyOutput.print(f"错误：文件上传失败: {file_path}", OutputType.ERROR)
+                    PrettyOutput.print(f"错误：文件上传失败: {file_path}", OutputType.WARNING)
                     
             except Exception as e:
                 PrettyOutput.print(f"✗ 处理文件出错 {file_path}: {str(e)}", OutputType.ERROR)
@@ -375,7 +375,7 @@ class KimiModel(BasePlatform):
                 self.reset()
                 return True
             else:
-                PrettyOutput.print(f"删除会话失败: HTTP {response.status_code}", OutputType.ERROR)
+                PrettyOutput.print(f"删除会话失败: HTTP {response.status_code}", OutputType.WARNING)
                 return False
         except Exception as e:
             PrettyOutput.print(f"删除会话时发生错误: {str(e)}", OutputType.ERROR)

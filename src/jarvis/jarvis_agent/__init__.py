@@ -222,7 +222,7 @@ Please continue the task based on the above information.
             if handler.can_handle(response):
                 tool_list.append(handler)
         if len(tool_list) > 1:
-            PrettyOutput.print(f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}", OutputType.ERROR)
+            PrettyOutput.print(f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}", OutputType.WARNING)
             return False, f"Action failed: Multiple actions detected. Please only perform one action at a time. Actions attempted: {', '.join([handler.name() for handler in tool_list])}"
         if len(tool_list) == 0:
             return False, ""
@@ -376,7 +376,7 @@ def _load_tasks() -> dict:
                     if desc:  # Ensure description is not empty
                         tasks[str(name)] = str(desc)
             else:
-                PrettyOutput.print("警告: ~/.jarvis/pre-command 文件应该包含一个字典，键为任务名称，值为任务描述", OutputType.ERROR)
+                PrettyOutput.print("警告: ~/.jarvis/pre-command 文件应该包含一个字典，键为任务名称，值为任务描述", OutputType.WARNING)
         except Exception as e:
             PrettyOutput.print(f"加载 ~/.jarvis/pre-command 文件失败: {str(e)}", OutputType.ERROR)
     
@@ -392,7 +392,7 @@ def _load_tasks() -> dict:
                     if desc:  # Ensure description is not empty
                         tasks[str(name)] = str(desc)
             else:
-                PrettyOutput.print("警告: .jarvis/pre-command 文件应该包含一个字典，键为任务名称，值为任务描述", OutputType.ERROR)
+                PrettyOutput.print("警告: .jarvis/pre-command 文件应该包含一个字典，键为任务名称，值为任务描述", OutputType.WARNING)
         except Exception as e:
             PrettyOutput.print(f"加载 .jarvis/pre-command 文件失败: {str(e)}", OutputType.ERROR)
 

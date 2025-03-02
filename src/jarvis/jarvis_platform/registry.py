@@ -72,7 +72,7 @@ class PlatformRegistry:
         if missing_methods:
             PrettyOutput.print(
                 f"平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}", 
-                OutputType.ERROR
+                OutputType.WARNING
             )
             return False
             
@@ -92,7 +92,7 @@ class PlatformRegistry:
         
         # 确保目录存在
         if not os.path.exists(directory):
-            PrettyOutput.print(f"平台目录不存在: {directory}", OutputType.ERROR)
+            PrettyOutput.print(f"平台目录不存在: {directory}", OutputType.WARNING)
             return platforms
             
         # 获取目录的包名
@@ -201,7 +201,7 @@ class PlatformRegistry:
             BasePlatform: Platform instance
         """
         if name not in self.platforms:
-            PrettyOutput.print(f"未找到平台: {name}", OutputType.ERROR)
+            PrettyOutput.print(f"未找到平台: {name}", OutputType.WARNING)
             return None
             
         try:
