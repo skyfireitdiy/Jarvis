@@ -78,7 +78,7 @@ def set_agent(agent_name: str, agent: Any):
     current_agent_name = agent_name
 
 def get_agent_list():
-    return "[" + str(len(global_agents)) + "]" + current_agent_name if global_agents else "No Agent"
+    return "[" + str(len(global_agents)) + "]" + current_agent_name if global_agents else ""
 
 def delete_agent(agent_name: str):
     if agent_name in global_agents:
