@@ -170,21 +170,28 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         
         # Parse line numbers based on operation type
         if patch_type in ['REPLACE', 'DELETE']:
-            # 修复正则表达式匹配右括号类型
-            line_match = re.match(r"Lines:\s*\[(\d+),\s*(\d+)([\]\)])]", lines[1])
+            # 增强正则表达式兼容性
+            line_match = re.match(
+                r"^Lines:\s*\[\s*(\d+)\s*,\s*(\d+)\s*([\]\)])\s*$",  # 匹配行尾
+                lines[1].strip(),  # 去除前后空格
+                re.IGNORECASE
+            )
             if line_match:
                 start_line = int(line_match.group(1))
                 end_value = int(line_match.group(2))
-                bracket_type = line_match.group(3)
+                bracket_type = line_match.group(3).strip()
                 
                 # 根据括号类型处理区间
-                if bracket_type == ')':  # [m,n) 左闭右开
+                if bracket_type == ')':  # [m,n)
                     end_line = end_value - 1
-                else:  # [m,n] 闭区间
+                else:  # [m,n]
                     end_line = end_value
                 
                 # 确保 end_line >= start_line
                 end_line = max(end_line, start_line)
+            else:
+                PrettyOutput.print(f"无法解析行号格式: {lines[1]}", OutputType.WARNING)
+                continue
         elif patch_type == 'INSERT':
             line_match = re.match(r"Line:\s*(\d+)", lines[1])
             if line_match:
