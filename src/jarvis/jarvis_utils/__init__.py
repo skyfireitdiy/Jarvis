@@ -525,7 +525,6 @@ def find_git_root(dir="."):
     return ret
 
 def has_uncommitted_changes():
-def has_uncommitted_changes():
     import subprocess
     # Add all changes silently
     subprocess.run(["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
