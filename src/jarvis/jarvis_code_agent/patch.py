@@ -21,154 +21,82 @@ class PatchOutputHandler(OutputHandler):
     
     def prompt(self) -> str:
         return """
-# 🔄 REPLACE: Modify existing code
+# 🛠️ Operation Templates
+## 🔄 Replace Code
 <REPLACE>
-File: path/to/file
-Lines: [start,end] or [start,end)
-[new content]
-...
+File: file/path
+Lines: [start,end]
+New code content
 </REPLACE>
 
-# ➕ INSERT: Add new code
+## ➕ Insert Code
 <INSERT>
-File: path/to/file
+File: file/path
 Line: position
-[new content]
-...
+New code content
 </INSERT>
 
-# 🗑️ DELETE: Remove existing code
+## 🗑️ Delete Code
 <DELETE>
-File: path/to/file
-Lines: [start,end] or [start,end)
+File: file/path
+Lines: [start,end]
 </DELETE>
 
-# 🆕 NEW_FILE: Create new file
+## 🆕 New File
 <NEW_FILE>
-File: path/to/file
-[new content]
-...
+File: file/path
+Full file content
 </NEW_FILE>
 
-# ➡️ MOVE_FILE: Relocate a file
+## ➡️ Move File
 <MOVE_FILE>
-File: path/to/source/file
-NewPath: path/to/destination/file
+File: source/path
+NewPath: destination/path
 </MOVE_FILE>
 
-# ❌ REMOVE_FILE: Delete entire file
+## ❌ Remove File
 <REMOVE_FILE>
-File: path/to/file
+File: file/path
 </REMOVE_FILE>
 
-# 📋 Formatting Rules
-1. File Paths
+# 📜 Format Rules
+1. Path Rules
    - Use relative paths from project root
-   - Must be exact and case-sensitive
+   - Case-sensitive exact paths
    - Example: src/module/file.py
-   
-2. Line Numbers
-   - Format: [start,end] (inclusive) or [start,end) (right-exclusive)
-   - 1-based line numbers
-   - Single number for INSERT
+
+2. Line Number Rules
+   - Format: [start,end] inclusive / [start,end) right-exclusive
+   - 1-based numbering
    - Omit for NEW_FILE/REMOVE_FILE
 
-3. Content
-   - Maintain original indentation
-   - Follow existing code style
+3. Content Requirements
+   - Preserve original indentation
+   - Provide raw code (no line numbers)
+   - Keep empty lines and comments
 
-# 📌 Usage Examples
-## REPLACE Example (Closed Interval)
+# 💡 Usage Examples
 <REPLACE>
-File: src/utils.py
-Lines: [9,13]
-def updated_function():
-    # Replaces lines 9-13 inclusive
-    return "new_implementation"
+File: src/app.py
+Lines: [23,25]
+def new_feature():
+    print("Updated feature")
+    return True
 </REPLACE>
 
-## REPLACE Example (Left-Closed Right-Open)
-<REPLACE>
-File: src/calculator.py
-Lines: [5,8)
-def new_calculation():
-    # Replaces lines 5-7 (excludes line 8)
-    return 42
-</REPLACE>
-
-## INSERT Example
 <INSERT>
-File: src/main.py
-Line: 19
-    # Inserted before line 19
-    new_feature()
+File: src/utils.py
+Line: 42
+logger.debug("New log entry")
 </INSERT>
 
-## NEW_FILE Example
-<NEW_FILE>
-File: src/new_module.py
-# New file creation
-def feature_entry():
-    pass
-</NEW_FILE>
-
-## DELETE Example
-<DELETE>
-File: src/utils.py
-Lines: [9,13]
-</DELETE>
-
-## MOVE_FILE Example
-<MOVE_FILE>
-File: src/old_dir/file.py
-NewPath: src/new_dir/file.py
-</MOVE_FILE>
-
-## REMOVE_FILE Example
-<REMOVE_FILE>
-File: src/obsolete.py
-</REMOVE_FILE>
-
-# 🚨 Critical Requirements
+# ⚠️ Key Requirements
 1. One change per block
 2. Use correct operation type
-3. Match existing code style
-4. Preserve indentation levels
-5. Exact file paths required
-6. Handle edge cases properly
-7. Include error handling
-8. Maintain code consistency
-
-# 🚫 Invalid Format Examples
-## BAD EXAMPLE 1 - Do not use diff format
-<REPLACE>
-File: src/file.py
-Lines: [5,8)
-- old_line_1
-+ new_line_1
-</REPLACE>
-
-## BAD EXAMPLE 2 - Do not include previous and new tags
-<REPLACE>
-File: src/file.py
-Lines: [10,12]
-<PREVIOUS>
-old_code
-</PREVIOUS>
-<NEW>
-new_code
-</NEW>
-</REPLACE>
-
-## BAD EXAMPLE 3 - Do not use comment to explain
-<REPLACE>
-File: src/file.py
-Lines: [15,18]
-# Replace the following code
-old_function()
-# With the new implementation
-new_function()
-</REPLACE>
+3. Maintain code style consistency 
+4. Handle line ranges precisely
+5. Include error handling
+6. Modified code must be executable
 """
 
 
