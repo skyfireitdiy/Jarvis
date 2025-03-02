@@ -364,6 +364,8 @@ def handle_code_operation(filepath: str, patch: Dict[str, Any]):
     end_line = patch.get('end_line', 0)
     new_content = patch.get('content', '').splitlines(keepends=True)
 
+    PrettyOutput.print(f"patch_type: {patch_type}\nstart_line: {start_line}\nend_line: {end_line}\nnew_content:\n{new_content}", OutputType.INFO)
+
     if new_content and new_content[-1] and new_content[-1][-1] != '\n':
         new_content[-1] += '\n'
 
