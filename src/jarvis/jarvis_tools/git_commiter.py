@@ -68,6 +68,9 @@ YOU MUST USE EXACTLY THIS FORMAT:
 
 <COMMIT_MESSAGE>
 type(scope): Maximum 7-word subject
+content
+...
+</COMMIT_MESSAGE>
 
 Post-Mortem Analysis:
 ! File Autopsy Report:
@@ -83,7 +86,6 @@ Required Elements:
 ✓ Linked issue # in first paragraph
 ✓ Side effects documented (mark "NONE" if absent)
 ✓ Hypothetical risks acknowledged
-</COMMIT_MESSAGE>
 
 # Analysis Material (DO NOT INCLUDE IN OUTPUT)
 {diff}
