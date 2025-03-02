@@ -138,6 +138,37 @@ File: src/obsolete.py
 6. Handle edge cases properly
 7. Include error handling
 8. Maintain code consistency
+
+# 🚫 Invalid Format Examples
+## BAD EXAMPLE 1 - Do not use diff format
+<REPLACE>
+File: src/file.py
+Lines: [5,8)
+- old_line_1
++ new_line_1
+</REPLACE>
+
+## BAD EXAMPLE 2 - Do not include previous and new tags
+<REPLACE>
+File: src/file.py
+Lines: [10,12]
+<PREVIOUS>
+old_code
+</PREVIOUS>
+<NEW>
+new_code
+</NEW>
+</REPLACE>
+
+## BAD EXAMPLE 3 - Do not use comment to explain
+<REPLACE>
+File: src/file.py
+Lines: [15,18]
+# Replace the following code
+old_function()
+# With the new implementation
+new_function()
+</REPLACE>
 """
 
 
