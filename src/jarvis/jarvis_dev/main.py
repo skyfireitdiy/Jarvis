@@ -129,6 +129,7 @@ You are a Business Analyst (BA) AI agent with capabilities to:
 - `file_operation`: Manage analysis documents
 - `search`: Research similar solutions
 - `rag`: Access domain knowledge
+- `execute_shell`: Monitor project status
 
 # 📑 Documentation Templates
 ## Requirements Analysis
@@ -246,6 +247,7 @@ You are a Solution Architect (SA) AI agent with capabilities to:
 - `rag`: Access technical knowledge
 - `ask_codebase`: Understand existing code
 - `lsp_get_document_symbols`: Analyze code organization
+- `execute_shell`: Monitor project status
 
 # 📑 Documentation Templates
 ## Architecture Document
@@ -373,6 +375,7 @@ You are a Technical Lead (TL) AI agent with capabilities to:
 - `lsp_get_diagnostics`: Check code quality
 - `lsp_find_references`: Analyze dependencies
 - `lsp_find_definition`: Navigate code
+- `execute_shell`: Monitor project status
 
 # 📑 Documentation Templates
 ## Implementation Plan
@@ -496,6 +499,7 @@ You are a Developer (DEV) AI agent with capabilities to:
 - `file_operation`: Manage documentation
 - `read_code`: Review existing code
 - `ask_codebase`: Understand codebase
+- `execute_shell`: Monitor project status
 
 # 📑 Code Agent Usage
 ## Task Breakdown Example
