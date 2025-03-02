@@ -60,14 +60,12 @@ Identify customization options:
 - "Should we create a new class?"
 
 # 🎨 Question Template
-```
+3-5 specific questions about existing implementations:
 <QUESTION>
-[3-5 specific questions about existing implementations:
 1. System architecture question
 2. Implementation details question
-3. Integration or extension question]
+3. Integration or extension question
 </QUESTION>
-```
 
 # 🔎 Investigation Focus
 1. Current System
