@@ -57,9 +57,6 @@ class FileOperationTool:
                 content = open(abs_path, 'r', encoding='utf-8').read()
                 output = f"File: {abs_path}\n{content}"
                 
-                # Print file content
-                PrettyOutput.print(f"读取文件: {abs_path}\n{content}", OutputType.INFO)
-                
                 return {
                     "success": True,
                     "stdout": output,
