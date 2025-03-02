@@ -64,7 +64,6 @@ YOU MUST USE EXACTLY THIS FORMAT:
 2. Scope indicates module (e.g. auth, database)
 3. Subject line <= 72 chars, no period
 4. Body explains WHAT and WHY, using present tense
-5. Footer contains issue links (e.g. Fixes #123) if there are any
 
 # Analysis Material (DO NOT INCLUDE IN OUTPUT)
 {diff}
