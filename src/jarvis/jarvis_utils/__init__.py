@@ -27,6 +27,7 @@ from rich.box import HEAVY
 from rich.text import Text
 from rich.traceback import install as install_rich_traceback
 from rich.syntax import Syntax
+from rich.style import Style as RichStyle
 
 from prompt_toolkit.completion import Completer, Completion, PathCompleter
 from prompt_toolkit.document import Document
@@ -191,7 +192,7 @@ class PrettyOutput:
             lang: Language for syntax highlighting
             traceback: Whether to show traceback for errors
         """
-        from rich.style import Style as RichStyle
+        
         
         # Define styles for different output types
         styles = {
@@ -316,12 +317,30 @@ class PrettyOutput:
     @staticmethod
     def print_stream(text: str):
         """Print stream output without line break"""
-        console.print(text, style="system", end="")
+        # 使用进度类型样式
+        style = PrettyOutput._get_style(OutputType.PROGRESS)
+        console.print(
+            Text(" ↳ ", style=style) + 
+            Text(text, style=style, end=""), 
+            soft_wrap=True,
+            end="\r"  # 使用回车符实现原地更新
+        )
 
     @staticmethod
     def print_stream_end():
         """End stream output with line break"""
-        console.print()
+        # 结束符样式
+        end_style = PrettyOutput._get_style(OutputType.SUCCESS)
+        console.print(
+            Text(" ✓", style=end_style), 
+            end="\n\n"
+        )
+        console.file.flush()
+
+    @staticmethod
+    def _get_style(output_type: OutputType) -> RichStyle:
+        """Get pre-defined RichStyle for output type"""
+        return console.get_style(output_type.value)
 
 def get_single_line_input(tip: str) -> str:
     """Get single line input, support direction key, history function, etc."""
