@@ -49,7 +49,7 @@ class BasePlatform(ABC):
             PrettyOutput.print(f"对话完成 - 耗时: {duration:.2f}秒, 输出字符数: {char_count}", OutputType.INFO)
             
             # Keep original think tag handling
-            response = re.sub(r'', '', response, flags=re.DOTALL)
+            response = re.sub(r'<<think>>.*?</</think>>', '', response, flags=re.DOTALL)
             return response
                 
         return while_true(lambda: while_success(lambda: _chat(), 5), 5)
