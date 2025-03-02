@@ -202,7 +202,7 @@ Before submitting changes, verify:
         try:
             self._init_env()
             information = ""
-            if user_confirm("是否需要手动选择文件？", False):
+            if user_confirm("是否需要手动选择文件？", True):
                 files = select_files([], self.root_dir)
             else:
                 files, information = find_relevant_information(user_input, self.root_dir)
