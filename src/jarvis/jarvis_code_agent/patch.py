@@ -25,14 +25,16 @@ class PatchOutputHandler(OutputHandler):
 <REPLACE>
 File: path/to/file
 Lines: [start,end] or [start,end)
-new_content
+[new content]
+...
 </REPLACE>
 
 # ➕ INSERT: Add new code
 <INSERT>
 File: path/to/file
 Line: position
-new_content
+[new content]
+...
 </INSERT>
 
 # 🗑️ DELETE: Remove existing code
@@ -44,7 +46,8 @@ Lines: [start,end] or [start,end)
 # 🆕 NEW_FILE: Create new file
 <NEW_FILE>
 File: path/to/file
-new_content
+[new content]
+...
 </NEW_FILE>
 
 # ➡️ MOVE_FILE: Relocate a file
