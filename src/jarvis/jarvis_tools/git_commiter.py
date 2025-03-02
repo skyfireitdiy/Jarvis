@@ -16,19 +16,19 @@ class GitCommitTool:
     parameters = {"properties": {}, "required": []}
 
     def _extract_commit_message(self, message):
-        """Nuclear-grade extraction with format enforcement"""
+        """Secure extraction preserving special characters"""
         r = re.search(
             r"(?i)<COMMIT_MESSAGE>\s*([\s\S]*?)\s*</COMMIT_MESSAGE>", 
             message
         )
         if r:
-            # 仅保留必要字符但保持完整结构
+            # 仅过滤控制字符，保留其他特殊符号
             sanitized = re.sub(
-                r'[^\w\s\-:()\[\]#@!$%^&*+=<>?/|\\}{~\n]', 
+                r'[\x00-\x1f\x7f-\x9f]',  # 仅移除控制字符
                 '', 
                 r.group(1)
             )
-            return shlex.quote(sanitized.strip())  # 移除长度限制
+            return shlex.quote(sanitized.strip())
         return "<<FORMAT VIOLATION>> Invalid commit message structure"
     
     def _get_last_commit_hash(self):
