@@ -85,18 +85,18 @@ def delete_agent(agent_name: str):
         current_agent_name = ""
 
 class OutputType(Enum):
-    SYSTEM = "system"      # AI assistant message
-    CODE = "code"         # Code related
-    RESULT = "result"     # Tool execution result
-    ERROR = "error"       # Error information
-    INFO = "info"         # System prompt
-    PLANNING = "planning" # Task planning
-    PROGRESS = "progress" # Execution progress
-    SUCCESS = "success"   # Success information
-    WARNING = "warning"   # Warning information
-    DEBUG = "debug"       # Debug information
-    USER = "user"         # User input
-    TOOL = "tool"         # Tool call
+    SYSTEM = "SYSTEM"      # AI assistant message
+    CODE = "CODE"         # Code related
+    RESULT = "RESULT"     # Tool execution result
+    ERROR = "ERROR"       # Error information
+    INFO = "INFO"         # System prompt
+    PLANNING = "PLANNING" # Task planning
+    PROGRESS = "PROGRESS" # Execution progress
+    SUCCESS = "SUCCESS"   # Success information
+    WARNING = "WARNING"   # Warning information
+    DEBUG = "DEBUG"       # Debug information
+    USER = "USER"         # User input
+    TOOL = "TOOL"         # Tool call
 
 class PrettyOutput:
     """Pretty output using rich"""
@@ -175,7 +175,7 @@ class PrettyOutput:
         formatted.append(f"{get_agent_list()}", style="blue")
         # Add icon
         icon = PrettyOutput._ICONS.get(output_type, "")
-        formatted.append(f"{output_type.value}{icon} ", style=output_type.value)
+        formatted.append(f"[{output_type.value}] {icon} ", style=output_type.value)
         
         return formatted
 
