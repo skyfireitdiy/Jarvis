@@ -242,9 +242,12 @@ def file_input_handler(user_input: str, agent: Any) -> str:
                     raw_start, raw_end = map(int, re.split(r'[,:]', line_range))
                     
                     # Handle special values and Python-style negative indices
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        total_lines = len(f.readlines())
-                    
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            total_lines = len(f.readlines())
+                    except FileNotFoundError:
+                        PrettyOutput.print(f"文件不存在: {file_path}", OutputType.WARNING)
+                        continue
                     # Process start line
                     if raw_start == 0:  # 0表示整个文件
                         start_line = 1
