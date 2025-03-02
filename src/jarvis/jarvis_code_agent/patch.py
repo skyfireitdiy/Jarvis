@@ -27,7 +27,7 @@ Use specific blocks for different operations:
 # 🔄 REPLACE: Replace existing code
 <REPLACE>
 File: path/to/file
-Lines: start-end
+Lines: [start,end] or [start,end)
 -----
 new_content
 </REPLACE>
@@ -43,7 +43,7 @@ new_content
 # 🗑️ DELETE: Remove existing code
 <DELETE>
 File: path/to/file
-Lines: start-end
+Lines: [start,end] or [start,end)
 </DELETE>
 
 # 🆕 NEW_FILE: Create new file
@@ -68,10 +68,10 @@ File: path/to/file
    - Use relative path from project root
    - Must be exact and case-sensitive
    - Example: src/module/file.py
-
+   
 2. Line Numbers
-   - Format: start-end (inclusive)
-   - Line numbers are 0-based
+   - Format: [start,end] (closed interval) or [start,end) (left-closed, right-open)
+   - Line numbers are 1-based
    - Use single number for INSERT
    - Omit for NEW_FILE and REMOVE_FILE
 
@@ -84,7 +84,7 @@ File: path/to/file
 ## Example 1: Replace Code
 <REPLACE>
 File: src/utils.py
-Lines: 9-13
+Lines: [9,13]
 -----
 def new_function():
     # This replaces lines 9-13
@@ -112,7 +112,7 @@ def new_function():
 ## Example 4: Delete Code
 <DELETE>
 File: src/utils.py
-Lines: 9-13
+Lines: [9,13]
 </DELETE>
 
 ## Example 6: Move File
@@ -158,17 +158,21 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         
         # Parse line numbers based on operation type
         if patch_type in ['REPLACE', 'DELETE']:
-            line_match = re.match(r"Lines:\s*(\d+)-(\d+)", lines[1])
+            # Support [m,n] and [m,n) formats
+            line_match = re.match(r"Lines:\s*\[(\d+),\s*(\d+)(\)?)\]", lines[1])
             if line_match:
-                start_line = int(line_match.group(1))  # 1-based
-                end_line = int(line_match.group(2))    # 1-based
+                start_line = int(line_match.group(1))
+                end_value = int(line_match.group(2))
+                # Adjust end line based on bracket type
+                end_line = end_value if line_match.group(3) else end_value - 1
+                # Ensure end_line >= start_line
+                end_line = max(end_line, start_line)
         elif patch_type == 'INSERT':
             line_match = re.match(r"Line:\s*(\d+)", lines[1])
             if line_match:
                 start_line = int(line_match.group(1))  # 1-based
                 end_line = start_line
         elif patch_type == 'MOVE_FILE':
-            # 解析新路径
             new_path_match = re.match(r"NewPath:\s*([^\s]+)", lines[1])
             if new_path_match:
                 new_path = new_path_match.group(1).strip()
@@ -182,7 +186,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         if filepath not in result:
             result[filepath] = []
         
-        # 添加MOVE_FILE的特殊处理
+        # Handle MOVE_FILE specially
         if patch_type == 'MOVE_FILE':
             result[filepath].append({
                 'type': patch_type,
