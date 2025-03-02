@@ -349,7 +349,7 @@ class FileCompleter(Completer):
 def get_multiline_input(tip: str) -> str:
     """Get multi-line input with enhanced completion confirmation"""
     # 单行输入说明
-    PrettyOutput.section("用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交", OutputType.USER)
+    PrettyOutput.section("用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交，按 Ctrl+C 取消输入", OutputType.USER)
     
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
     
