@@ -176,7 +176,10 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
                 start_line = int(line_match.group(1))
                 end_value = int(line_match.group(2))
                 # 修复区间处理逻辑
-                end_line = end_value - 1 if line_match.group(3) else end_value  # 交换条件判断
+                if line_match.group(3):  # 右开区间 [m,n)
+                    end_line = end_value - 1  # 转换为闭区间 [m, n-1]
+                else:  # 闭区间 [m,n]
+                    end_line = end_value
                 # 确保 end_line >= start_line
                 end_line = max(end_line, start_line)
         elif patch_type == 'INSERT':
