@@ -197,8 +197,6 @@ class PrettyOutput:
             OutputType.SYSTEM: RichStyle(
                 color="bright_cyan", 
                 bold=True, 
-                underline=True,
-                bgcolor="black"
             ),
             OutputType.CODE: RichStyle(
                 color="green", 
@@ -217,7 +215,6 @@ class PrettyOutput:
                 bold=True,
                 blink=True,
                 bgcolor="dark_red",
-                underline=True
             ),
             OutputType.INFO: RichStyle(
                 color="gold1",
