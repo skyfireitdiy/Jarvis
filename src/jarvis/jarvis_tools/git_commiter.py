@@ -83,7 +83,6 @@ Forensic Metadata:
 
 Required Elements:
 ✓ Atomic scope alignment
-✓ Linked issue # in first paragraph
 ✓ Side effects documented (mark "NONE" if absent)
 ✓ Hypothetical risks acknowledged
 
