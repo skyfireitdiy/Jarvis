@@ -170,16 +170,19 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         
         # Parse line numbers based on operation type
         if patch_type in ['REPLACE', 'DELETE']:
-            # Support [m,n] (closed) and [m,n) (half-open)
-            line_match = re.match(r"Lines:\s*\[(\d+),\s*(\d+)(\)?)\]", lines[1])
+            # 修复正则表达式匹配右括号类型
+            line_match = re.match(r"Lines:\s*\[(\d+),\s*(\d+)([\]\)])]", lines[1])
             if line_match:
                 start_line = int(line_match.group(1))
                 end_value = int(line_match.group(2))
-                # 修复区间处理逻辑
-                if line_match.group(3):  # 右开区间 [m,n)
-                    end_line = end_value - 1  # 转换为闭区间 [m, n-1]
-                else:  # 闭区间 [m,n]
+                bracket_type = line_match.group(3)
+                
+                # 根据括号类型处理区间
+                if bracket_type == ')':  # [m,n) 左闭右开
+                    end_line = end_value - 1
+                else:  # [m,n] 闭区间
                     end_line = end_value
+                
                 # 确保 end_line >= start_line
                 end_line = max(end_line, start_line)
         elif patch_type == 'INSERT':
