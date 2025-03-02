@@ -21,14 +21,10 @@ class PatchOutputHandler(OutputHandler):
     
     def prompt(self) -> str:
         return """
-# 📝 Code Modification Format
-Use specific blocks for different operations:
-
 # 🔄 REPLACE: Modify existing code
 <REPLACE>
 File: path/to/file
 Lines: [start,end] or [start,end)
------
 new_content
 </REPLACE>
 
@@ -36,7 +32,6 @@ new_content
 <INSERT>
 File: path/to/file
 Line: position
------
 new_content
 </INSERT>
 
@@ -49,7 +44,6 @@ Lines: [start,end] or [start,end)
 # 🆕 NEW_FILE: Create new file
 <NEW_FILE>
 File: path/to/file
------
 new_content
 </NEW_FILE>
 
@@ -77,7 +71,6 @@ File: path/to/file
    - Omit for NEW_FILE/REMOVE_FILE
 
 3. Content
-   - Use "-----" separator
    - Maintain original indentation
    - Follow existing code style
 
@@ -86,7 +79,6 @@ File: path/to/file
 <REPLACE>
 File: src/utils.py
 Lines: [9,13]
------
 def updated_function():
     # Replaces lines 9-13 inclusive
     return "new_implementation"
@@ -96,7 +88,6 @@ def updated_function():
 <REPLACE>
 File: src/calculator.py
 Lines: [5,8)
------
 def new_calculation():
     # Replaces lines 5-7 (excludes line 8)
     return 42
@@ -106,7 +97,6 @@ def new_calculation():
 <INSERT>
 File: src/main.py
 Line: 19
------
     # Inserted before line 19
     new_feature()
 </INSERT>
@@ -114,7 +104,6 @@ Line: 19
 ## NEW_FILE Example
 <NEW_FILE>
 File: src/new_module.py
------
 # New file creation
 def feature_entry():
     pass
@@ -204,9 +193,20 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             else:
                 continue
         
-        # Get content (after separator)
-        separator_index = next((i for i, line in enumerate(lines) if line.strip() == "-----"), -1)
-        content = '\n'.join(lines[separator_index + 1:]) if separator_index != -1 else ''
+        # Get content (after metadata)
+        if patch_type in ['REPLACE', 'DELETE']:
+            content_start = 2  # File + Lines
+        elif patch_type == 'INSERT':
+            content_start = 2   # File + Line
+        elif patch_type == 'NEW_FILE':
+            content_start = 1   # File
+        elif patch_type == 'MOVE_FILE':
+            content_start = 2   # File + NewPath
+        elif patch_type == 'REMOVE_FILE':
+            content_start = 1   # File
+        
+        content_lines = lines[content_start:]
+        content = '\n'.join(content_lines).strip()
 
         if filepath not in result:
             result[filepath] = []
@@ -363,6 +363,9 @@ def handle_code_operation(filepath: str, patch: Dict[str, Any]):
     start_line = patch.get('start_line', 0)
     end_line = patch.get('end_line', 0)
     new_content = patch.get('content', '').splitlines(keepends=True)
+
+    if not new_content:
+        new_content = ['']
 
     PrettyOutput.print(f"patch_type: {patch_type}\nstart_line: {start_line}\nend_line: {end_line}\nnew_content:\n{new_content}", OutputType.INFO)
 
