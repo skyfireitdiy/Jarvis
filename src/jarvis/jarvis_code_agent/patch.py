@@ -23,35 +23,42 @@ class PatchOutputHandler(OutputHandler):
         return """
 # 🛠️ Simplified Patch Format
 <PATCH>
-File path [Operation position]
+File path [Operation parameters]
 Code content
 </PATCH>
 
 Operation types:
-- Replace/Delete: [Start line,End line] e.g. [5,8]
-- Insert: Single line number [5] means insert before line 5
-- New file: [1]
+- Replace: [Start line,End line] Replace line range (e.g. [5,8] replaces lines 5-8)
+- Delete: [Start line,End line] Delete line range (e.g. [10,10] deletes line 10)
+- Insert: [Line number] Insert before specified line (e.g. [3] inserts before line 3)
+- New file: [1] Create new file
 
 Examples:
+# Replace operation
 <PATCH>
-src/app.py [5,8]  # Replace line 5-8
-def new_feature():
-    return result * 2
+src/app.py [5,8]
+def updated_function():
+    print("Replaced lines 5-8")
+    return new_value * 2
 </PATCH>
 
+# Delete operation
 <PATCH>
-utils.py [3]  # Insert before line 3
-logger.info("Inserted content")
+src/old.py [10,10]
 </PATCH>
 
+# Insert operation
 <PATCH>
-config.yaml [1]  # Create/overwrite file
+utils/logger.py [3]
+print("Inserted before original line 3")
+</PATCH>
+
+# New file creation
+<PATCH>
+config.yaml [1]
 database:
-  host: 127.0.0.1
-</PATCH>
-
-<PATCH>
-src/old.py [10,10]  # Delete line 10
+  host: localhost
+  port: 5432
 </PATCH>
 """
 
