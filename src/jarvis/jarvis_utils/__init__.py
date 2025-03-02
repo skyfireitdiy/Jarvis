@@ -23,7 +23,7 @@ import psutil
 from rich.console import Console
 from rich.theme import Theme
 from rich.panel import Panel
-from rich.box import SIMPLE_HEAVY
+from rich.box import HEAVY
 from rich.text import Text
 from rich.traceback import install as install_rich_traceback
 from rich.syntax import Syntax
@@ -165,7 +165,7 @@ class PrettyOutput:
             return default_lang
 
     @staticmethod
-    def _format(text: str, output_type: OutputType, timestamp: bool = True) -> Text:
+    def _format(output_type: OutputType, timestamp: bool = True) -> Text:
         """Format output text using rich Text"""
         # Create rich Text object
         formatted = Text()
@@ -273,7 +273,7 @@ class PrettyOutput:
         
         # Get formatted header
         lang = lang if lang is not None else PrettyOutput._detect_language(text, default_lang='markdown')
-        header = PrettyOutput._format("", output_type, timestamp)
+        header = PrettyOutput._format(output_type, timestamp)
         
         # Create syntax highlighted content
         content = Syntax(
@@ -292,7 +292,7 @@ class PrettyOutput:
             title_align="left",
             padding=(0, 0),
             highlight=True,
-            box=SIMPLE_HEAVY,
+            box=HEAVY,
         )
         
         # Print panel
