@@ -234,7 +234,6 @@ class PrettyOutput:
             ),
             OutputType.PROGRESS: RichStyle(
                 color="white", 
-                bgcolor="dark_green",
                 encircle=True,
                 italic=True,
             ),
