@@ -16,16 +16,20 @@ class GitCommitTool:
     parameters = {"properties": {}, "required": []}
 
     def _extract_commit_message(self, message):
-        """Extract commit message from response, handling multi-line and special characters"""
-        r = re.search(r"<COMMIT_MESSAGE>(.*?)</COMMIT_MESSAGE>", message, re.DOTALL)
+        """Nuclear-grade extraction with format enforcement"""
+        r = re.search(
+            r"(?i)<COMMIT_MESSAGE>\s*([\s\S]*?)\s*</COMMIT_MESSAGE>", 
+            message
+        )
         if r:
-            # Clean up the message
-            msg = r.group(1).strip()
-            # Remove any extra quotes or backslashes
-            msg = msg.replace('\\"', '"').replace("\\'", "'")
-            # Escape special characters for shell
-            return shlex.quote(msg)
-        return "Unknown commit message"
+            # 强制格式清洗
+            sanitized = re.sub(
+                r'[^\w\s\-:()\[\]#@!$%^&*+=<>?/|\\}{~]', 
+                '', 
+                r.group(1)
+            ).strip()
+            return shlex.quote(sanitized[:72])
+        return "<<FORMAT VIOLATION>> Invalid commit message structure"
     
     def _get_last_commit_hash(self):
         return os.popen("git log -1 --pretty=%H").read().strip()
@@ -44,29 +48,56 @@ class GitCommitTool:
             diff = os.popen("git diff --cached --exit-code").read()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             
-            prompt = f'''Please generate a commit message for the following changes.
-            Format:
-            <COMMIT_MESSAGE>
-            type(scope): description
-            
-            Detailed description:
-            - file1: changes description
-            - file2: changes description
-            </COMMIT_MESSAGE>
-            
-            Notes:
-            1. Use multi-line format for detailed description
-            2. Can include special characters
-            3. First line is the short description
-            4. Following lines are detailed explanation
+            prompt = f'''Generate commit message with the paranoia of someone who's lost production data:
 
-            Changes:
-            {diff}
-            '''
+# Format Enforcement Protocol
+FAILURE TO WRAP MESSAGE IN <COMMIT_MESSAGE> TAGS WILL CAUSE SYSTEM REJECTION
+
+# Commit Trauma Backstory
+It was 3:17AM when I approved "fix: minor tweaks" - a commit that silently introduced 
+a race condition in payment processing. The accounting discrepancy wasn't discovered 
+until $1.4M had vanished across 14,000 transactions. My wedding ring is still in the 
+pawn shop from the legal fees.
+
+Last quarter's "chore: cleanup" removed what seemed like unused auth checks. 
+Hackers exfiltrated 920,000 user profiles through the unlocked API endpoint. 
+The class-action settlement bankrupted our startup.
+
+Now every commit is treated like a live grenade:
+1. Surgical precision in change description
+2. Forensic-level documentation
+3. Paranoid risk disclosure
+
+# Required Structure
+YOU MUST USE EXACTLY THIS FORMAT:
+
+<COMMIT_MESSAGE>
+type(scope): Maximum 7-word subject
+
+Post-Mortem Analysis:
+! File Autopsy Report:
+  - filename: [SEVERITY] Technical change description
+  - filename: [FAILURE MODE] Potential risk scenarios
+
+Forensic Metadata:
+» Lines changed: {len(diff.splitlines())}
+» Impact zones: [DATA_LAYER/API_EDGE/UI_COMPONENT]
+» Threat level: [CRITICAL/HIGH/MEDIUM]
+
+Required Elements:
+✓ Atomic scope alignment
+✓ Linked issue # in first paragraph
+✓ Side effects documented (mark "NONE" if absent)
+✓ Hypothetical risks acknowledged
+</COMMIT_MESSAGE>
+
+# Analysis Material (DO NOT INCLUDE IN OUTPUT)
+{diff}
+'''
             
             PrettyOutput.print("生成提交消息...", OutputType.SYSTEM)
             platform = PlatformRegistry().get_codegen_platform()
-            platform.set_suppress_output(True)
+            # platform.set_suppress_output(True)
             commit_message = platform.chat_until_success(prompt)
             commit_message = self._extract_commit_message(commit_message)
             
