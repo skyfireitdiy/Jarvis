@@ -218,7 +218,7 @@ def handle_code_operation(filepath: str, patch: Dict[str, Any]):
     """处理紧凑格式补丁"""
     try:
         # 新建文件时强制覆盖
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
         if not os.path.exists(filepath):
             open(filepath, 'w', encoding='utf-8').close()
         with open(filepath, 'r+', encoding='utf-8') as f:
