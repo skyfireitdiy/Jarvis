@@ -236,6 +236,7 @@ def validate_and_apply_changes(
     end: int,
     content: str
 ) -> List[str]:
+
     # 处理内容保留所有格式
     new_content = content.splitlines(keepends=True)
     
