@@ -9,9 +9,9 @@ class CreateCodeAgentTool:
     """Tool for managing the code development workflow."""
     
     name = "create_code_agent"
-    description = "Manage code development workflow including commit, development, and review"
+    description = "Technical code implementation and development process management"
     parameters = {
-        "requirement": "The development requirement or task description"
+        "requirement": "Technical specifications for code implementation"
     }
     
     def _get_current_commit(self) -> str:
