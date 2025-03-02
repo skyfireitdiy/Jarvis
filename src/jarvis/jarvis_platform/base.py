@@ -30,16 +30,27 @@ class BasePlatform(ABC):
 
     def chat_until_success(self, message: str) -> str:
         def _chat():
+            import time
+            start_time = time.time()
+            
             if self.suppress_output:
                 with yaspin(Spinners.dots, text="Thinking", color="yellow") as spinner:
                     response = self.chat(message)
-                    response = re.sub(r'<think>(.*?)</think>', '', response, flags=re.DOTALL)
                     spinner.ok("✓")
-                    return response
             else:
                 response = self.chat(message)
-                response = re.sub(r'<think>(.*?)</think>', '', response, flags=re.DOTALL)
-                return response
+            
+            # Calculate statistics
+            end_time = time.time()
+            duration = end_time - start_time
+            char_count = len(response)
+            
+            # Print statistics
+            PrettyOutput.print(f"对话完成 - 耗时: {duration:.2f}秒, 输出字符数: {char_count}", OutputType.INFO)
+            
+            # Keep original think tag handling
+            response = re.sub(r'', '', response, flags=re.DOTALL)
+            return response
                 
         return while_true(lambda: while_success(lambda: _chat(), 5), 5)
 
