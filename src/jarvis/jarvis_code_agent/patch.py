@@ -70,7 +70,7 @@ Critical Rules:
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """解析补丁格式"""
     result = {}
-    # 更新正则表达式以更好地匹配新格式
+    # 更新正则表达式以更好地处理文件路径
     header_pattern = re.compile(
         r'^\s*"?([^\n\r\[]+)"?\s*\[(\d+)(?:,(\d+))?([\],])]\s*$'  # 匹配文件路径和行号
     )
@@ -89,9 +89,11 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         # 解析文件路径和行号
         header_match = header_pattern.match(header_line)
         if not header_match:
+            PrettyOutput.print(f"无法解析补丁头: {header_line}", OutputType.WARNING)
             continue
 
         filepath = header_match.group(1).strip()
+        
         start = int(header_match.group(2))  # 保持1-based行号
         end = int(header_match.group(3)) if header_match.group(3) else start
         range_type = header_match.group(4)  # ] 或 ) 表示范围类型
