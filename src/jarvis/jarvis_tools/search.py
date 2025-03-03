@@ -212,7 +212,6 @@ Please synthesize a final answer that:
                     "stderr": "No search results found"
                 }
             
-            # Collect webpage content
             contents = []
             for i, result in enumerate(results, 1):
                 try:

@@ -91,7 +91,6 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         header_match = header_pattern.match(header_line)
         if not header_match:
             PrettyOutput.print(f"无法解析补丁头: {header_line}", OutputType.WARNING)
-            PrettyOutput.print(f"正则表达式模式: {header_pattern.pattern}", OutputType.DEBUG)
             continue
 
         filepath = header_match.group(1).strip()
