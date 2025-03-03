@@ -57,7 +57,7 @@ class BasePlatform(ABC):
                     )
 
             # Keep original think tag handling
-            response = re.sub(r'<<think>>.*?</</think>>', '', response, flags=re.DOTALL)
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
             return response
                 
         return while_true(lambda: while_success(lambda: _chat(), 5), 5)

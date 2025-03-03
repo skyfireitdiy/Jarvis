@@ -35,8 +35,6 @@ setup(
         "python-Levenshtein>=0.25.0",
         "jedi>=0.17.2",
         "psutil>=7.0.0",
-        "pydantic!=1.8,!=1.8.1,<1.11.0,>=1.7.4",
-        "ollama>=0.4.7",
     ],
     entry_points={
         "console_scripts": [
