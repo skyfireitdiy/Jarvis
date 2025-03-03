@@ -133,14 +133,14 @@ def apply_patch(output_str: str) -> str:
     ret = ""
     
     for filepath, patch_list in patches.items():
-        for patch in patch_list:
+        for i, patch in enumerate(patch_list):
             try:
                 err = handle_code_operation(filepath, patch)
                 if err:
                     PrettyOutput.print(err, OutputType.WARNING)
                     revert_change()
                     return err
-                PrettyOutput.print(f"成功处理 操作", OutputType.SUCCESS)
+                PrettyOutput.print(f"成功为文件{filepath}应用补丁{i+1}/{len(patch_list)}", OutputType.SUCCESS)
             except Exception as e:
                 PrettyOutput.print(f"操作失败: {str(e)}", OutputType.ERROR)
     
