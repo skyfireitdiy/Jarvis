@@ -163,7 +163,7 @@ Make it count.
                 os.system(f"git reset --soft {start_commit}")
                 # Create new commit
                 git_commiter = GitCommitTool()
-                git_commiter.execute({"message": f"Code agent changes: {user_input[:50]}..."})
+                git_commiter.execute({})
                 
         except Exception as e:
             return f"Error during execution: {str(e)}"
