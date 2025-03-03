@@ -528,6 +528,25 @@ def has_uncommitted_changes():
     subprocess.run(["git", "reset"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     return working_changes or staged_changes
+def get_latest_commit_hash() -> str:
+    """Get the latest commit hash of the current git repository
+    
+    Returns:
+        str: The commit hash, or empty string if not in a git repo or error occurs
+    """
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['git', 'rev-parse', 'HEAD'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return ""
+    except Exception:
+        return ""
 
 def load_embedding_model():
     model_name = "BAAI/bge-m3"
