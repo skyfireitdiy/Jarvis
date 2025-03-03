@@ -269,11 +269,7 @@ def file_input_handler(user_input: str, agent: Any) -> str:
                     if start_line < 1 or end_line > total_lines or start_line > end_line:
                         raise ValueError
 
-                except (ValueError, FileNotFoundError) as e:
-                    PrettyOutput.print(
-                        f"无效的行号范围: {line_range} (文件总行数: {total_lines})", 
-                        OutputType.WARNING
-                    )
+                except:
                     continue
             
             # Add file if it exists

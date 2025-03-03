@@ -197,28 +197,25 @@ class PrettyOutput:
         
         
         # Define styles for different output types
+        # Define styles for different output types
         styles = {
             OutputType.SYSTEM: RichStyle(
                 color="bright_cyan", 
-                italic=True,
                 bold=True, 
             ),
             OutputType.CODE: RichStyle(
                 color="green", 
-                italic=True,
                 bgcolor="#1a1a1a",
                 frame=True
             ),
             OutputType.RESULT: RichStyle(
                 color="bright_blue",
                 bold=True,
-                italic=True,
                 bgcolor="navy_blue"
             ),
             OutputType.ERROR: RichStyle(
                 color="red", 
                 bold=True,
-                italic=True,
                 blink=True,
                 bgcolor="dark_red",
             ),
@@ -226,47 +223,39 @@ class PrettyOutput:
                 color="gold1",
                 dim=True,
                 bgcolor="grey11",
-                italic=True
             ),
             OutputType.PLANNING: RichStyle(
                 color="purple", 
-                italic=True,
                 bold=True,
             ),
             OutputType.PROGRESS: RichStyle(
                 color="white", 
                 encircle=True,
-                italic=True,
             ),
             OutputType.SUCCESS: RichStyle(
                 color="bright_green", 
                 bold=True,
                 strike=False,
                 meta={"icon": "✓"},
-                italic=True
             ),
             OutputType.WARNING: RichStyle(
                 color="yellow", 
                 bold=True,
                 blink2=True,
                 bgcolor="dark_orange",
-                italic=True
             ),
             OutputType.DEBUG: RichStyle(
                 color="grey58",
                 dim=True,
-                italic=True,
                 conceal=True
             ),
             OutputType.USER: RichStyle(
                 color="spring_green2",
                 reverse=True,
                 frame=True,
-                italic=True
             ),
             OutputType.TOOL: RichStyle(
                 color="dark_sea_green4",
-                italic=True,
                 bgcolor="grey19",
             )
         }

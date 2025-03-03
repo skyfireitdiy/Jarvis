@@ -1,4 +1,3 @@
-import os
 import re
 import shlex
 import subprocess
@@ -8,13 +7,23 @@ import yaml
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils import OutputType, PrettyOutput, has_uncommitted_changes, init_env
 import sys
+import argparse
 
 
 class GitCommitTool:
     name = "git_commit_agent"
     description = "Automatically generate and execute git commits based on code changes"
-    parameters = {"properties": {}, "required": []}
-
+    parameters = {
+        "type": "object",
+        "properties": {
+            "lang": {
+                "type": "string",
+                "description": "Language for commit message",
+                "default": "Chinese"
+            }
+        },
+        "required": []
+    }
     def _extract_commit_message(self, message):
         """Raw extraction preserving all characters"""
         r = re.search(
@@ -59,26 +68,22 @@ class GitCommitTool:
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             
             prompt = f'''Generate commit message with the paranoia of someone who's lost production data:
-
+            You should write commit message in {args.get('lang', 'Chinese')}
 # Format Enforcement Protocol
 FAILURE TO WRAP MESSAGE IN <COMMIT_MESSAGE> TAGS WILL CAUSE SYSTEM REJECTION
-
 # Required Structure
 YOU MUST USE EXACTLY THIS FORMAT:
-
 <COMMIT_MESSAGE>
 <type>(<scope>): <subject>
-
-[Body description in imperative mood]
+Body description in imperative mood
 </COMMIT_MESSAGE>
-
 # Format Rules
 1. Types: fix, feat, docs, style, refactor, test, chore
 2. Scope indicates module (e.g. auth, database)
 3. Subject line <= 72 chars, no period
-4. Body explains WHAT and WHY, using present tense
-
-# Analysis Material (DO NOT INCLUDE IN OUTPUT)
+4. Body explains WHAT and WHY for every change, using present tense
+5. Do not omit any changes
+# Analysis Material
 {diff}
 '''
             
@@ -121,8 +126,11 @@ YOU MUST USE EXACTLY THIS FORMAT:
 
 def main():
     init_env()
+    parser = argparse.ArgumentParser(description='Git commit tool')
+    parser.add_argument('--lang', type=str, default='Chinese', help='Language for commit messages')
+    args = parser.parse_args()
     tool = GitCommitTool()
-    tool.execute({})
+    tool.execute({"lang": args.lang if hasattr(args, 'lang') else 'Chinese'})
 
 if __name__ == "__main__":
     sys.exit(main())

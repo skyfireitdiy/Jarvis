@@ -7,19 +7,19 @@ name = "jarvis-ai-assistant"
 version = "0.1.123"
 description = "Jarvis: An AI assistant that uses tools to interact with the system"
 readme = "README.md"
-    authors = [{ name = "skyfire", email = "skyfireitdiy@hotmail.com" }]
+authors = [{ name = "skyfire", email = "skyfireitdiy@hotmail.com" }]
 license = { file = "LICENSE" }
-    classifiers = [
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: POSIX :: Linux",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-    ]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
 keywords = ["jarvis", "ai", "assistant", "tools", "automation"]
 dependencies = [
     "requests>=2.25.1",
@@ -28,7 +28,7 @@ dependencies = [
     "prompt_toolkit>=3.0.0",
     "openai>=1.20.0",
     "playwright>=1.41.1",
-    "numpy==1.17.4",
+    "numpy>=1.19.5",
     "faiss-cpu>=1.8.0",
     "sentence-transformers>=2.2.2",
     "bs4>=0.0.1",
@@ -44,6 +44,8 @@ dependencies = [
     "python-Levenshtein>=0.25.0",
     "jedi>=0.17.2",
     "psutil>=7.0.0",
+    "pydantic!=1.8,!=1.8.1,<1.11.0,>=1.7.4",
+    "ollama>=0.4.7",
 ]
 requires-python = ">=3.8"
 

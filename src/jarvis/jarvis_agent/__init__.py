@@ -327,7 +327,7 @@ Please continue the task based on the above information.
                         return self._complete_task()
                     
                     # 获取用户输入
-                    user_input = get_multiline_input(f"{self.name}: 您可以继续输入，或输入空行来结束当前任务：")
+                    user_input = get_multiline_input(f"{self.name}: 请输入，或输入空行来结束当前任务：")
 
                     if user_input:
                         self.prompt = user_input

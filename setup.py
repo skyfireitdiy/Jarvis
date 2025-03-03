@@ -19,7 +19,7 @@ setup(
         "prompt_toolkit>=3.0.0",
         "openai>=1.20.0",
         "playwright>=1.41.1",
-        "numpy==1.17.4",
+        "numpy>=1.19.5",
         "faiss-cpu>=1.8.0",
         "sentence-transformers>=2.2.2",
         "bs4>=0.0.1",
@@ -35,6 +35,8 @@ setup(
         "python-Levenshtein>=0.25.0",
         "jedi>=0.17.2",
         "psutil>=7.0.0",
+        "pydantic!=1.8,!=1.8.1,<1.11.0,>=1.7.4",
+        "ollama>=0.4.7",
     ],
     entry_points={
         "console_scripts": [

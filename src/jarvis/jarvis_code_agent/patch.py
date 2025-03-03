@@ -31,9 +31,12 @@ When making changes, you MUST:
    - Keep surrounding empty lines
    - Match variable naming conventions
    - Maintain API compatibility
-3. Follow the exact patch format below
+3. Strictly follow the exact patch format below
 4. Use separate <PATCH> blocks for different files
 5. Include ONLY modified lines in content
+6. Line number provide rules:
+   Replace/Delete should provide [start, end] (Two numbers)
+   Insert/New file should provide [start] (One number)
 
 <PATCH>
 File path [Range]
@@ -52,18 +55,25 @@ Examples:
 # REPLACE in src/app.py: Lines 5-8
 # Reason: Update calculation formula
 <PATCH>
-src/app.py [5,8]
+code/filename.py [5,8]
     result = (base_value * 1.15) + tax
     logger.debug("New calculation applied")
 </PATCH>
 
 # BAD: Includes unchanged lines
 <PATCH>
-src/app.py [5,8]
+code/filename.py [5,8]
 def calculate():
     # Original comment (should not be included)
     result = (base_value * 1.15) + tax
     return result  # Original line
+</PATCH>
+
+# BAD: Only one line number, This will be Insert operation
+<PATCH>
+code/filename.py [5]
+    result = (base_value * 1.15) + tax
+    logger.debug("New calculation applied")
 </PATCH>
 
 # ======== INSERT ========
@@ -71,13 +81,13 @@ def calculate():
 # INSERT in utils/logger.py: Before line 3 
 # Reason: Add initialization check
 <PATCH>
-utils/logger.py [3]
+code/filename.py [3]
 if not _initialized: initialize()
 </PATCH>
 
 # BAD: Extra empty lines
 <PATCH>
-utils/logger.py [3]
+code/filename.py [3]
 
 if not _initialized: 
     initialize()
@@ -88,7 +98,7 @@ if not _initialized:
 # GOOD: Complete minimal content
 # NEW FILE in config/settings.yaml: Create new config
 <PATCH>
-config/settings.yaml [1]
+code/filename.py [1]
 database:
   host: localhost
   port: 5432
@@ -96,7 +106,7 @@ database:
 
 # BAD: Placeholder content
 <PATCH>
-config/settings.yaml [1]
+code/filename.py [1]
 TODO: Add configuration
 </PATCH>
 
@@ -105,13 +115,18 @@ TODO: Add configuration
 # DELETE in src/old.py: Lines 10-12 
 # Reason: Remove deprecated function
 <PATCH>
-src/old.py [10,12]
+code/filename.py [10,12]
 </PATCH>
 
 # BAD: Comment in delete operation
 <PATCH>
-src/old.py [10,12]
+code/filename.py [10,12]
 # Remove these lines
+</PATCH>
+
+# BAD: Only one line number
+<PATCH>
+code/filename.py [10]
 </PATCH>
 """
 
@@ -172,7 +187,11 @@ def apply_patch(output_str: str) -> str:
     for filepath, patch_list in patches.items():
         for patch in patch_list:
             try:
-                handle_code_operation(filepath, patch)
+                err = handle_code_operation(filepath, patch)
+                if err:
+                    PrettyOutput.print(err, OutputType.WARNING)
+                    revert_change()
+                    return err
                 PrettyOutput.print(f"成功处理 操作", OutputType.SUCCESS)
             except Exception as e:
                 PrettyOutput.print(f"操作失败: {str(e)}", OutputType.ERROR)
@@ -213,6 +232,12 @@ def get_diff() -> str:
     finally:
         subprocess.run(['git', 'reset', 'HEAD'], check=True)
 
+def revert_change():
+    import subprocess
+    subprocess.run(['git', 'reset', 'HEAD'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(['git', 'checkout', '--', '.'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(['git', 'clean', '-fd'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 def handle_commit_workflow(diff:str)->bool:
     """Handle the git commit workflow and return the commit details.
     
@@ -220,10 +245,7 @@ def handle_commit_workflow(diff:str)->bool:
         tuple[bool, str, str]: (continue_execution, commit_id, commit_message)
     """
     if not user_confirm("是否要提交代码？", default=True):
-        import subprocess
-        subprocess.run(['git', 'reset', 'HEAD'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['git', 'checkout', '--', '.'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(['git', 'clean', '-fd'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        revert_change()
         return False
 
     git_commiter = GitCommitTool()
@@ -268,7 +290,7 @@ def handle_new_file(filepath: str, patch: Dict[str, Any]):
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(patch['content'])
 
-def handle_code_operation(filepath: str, patch: Dict[str, Any]):
+def handle_code_operation(filepath: str, patch: Dict[str, Any]) -> str:
     """处理紧凑格式补丁"""
     try:
         # 新建文件时强制覆盖
@@ -288,12 +310,12 @@ def handle_code_operation(filepath: str, patch: Dict[str, Any]):
             f.seek(0)
             f.writelines(new_lines)
             f.truncate()
-
         PrettyOutput.print(f"成功更新 {filepath}", OutputType.SUCCESS)
-
+        return ""
     except Exception as e:
-        PrettyOutput.print(f"操作失败: {str(e)}", OutputType.ERROR)
-
+        error_msg = f"Failed to handle code operation: {str(e)}"
+        PrettyOutput.print(error_msg, OutputType.ERROR)
+        return error_msg
 def validate_and_apply_changes(
     lines: List[str],
     start: int,
