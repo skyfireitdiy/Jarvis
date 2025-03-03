@@ -70,9 +70,10 @@ Critical Rules:
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """解析补丁格式"""
     result = {}
-    # 更新正则表达式以更好地处理文件路径
+    # 更新正则表达式以更好地处理文件路径和范围
     header_pattern = re.compile(
-        r'^\s*"?([^\n\r\[]+)"?\s*\[(\d+)(?:,(\d+))?([\],])]\s*$'  # 匹配文件路径和行号
+        r'^\s*"?([^\n\r\[]+)"?\s*\[(\d+)(?:,(\d+))?([\],])]\s*$',  # 匹配文件路径和行号
+        re.ASCII
     )
     patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', patch_str, re.DOTALL)
     
@@ -90,13 +91,18 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         header_match = header_pattern.match(header_line)
         if not header_match:
             PrettyOutput.print(f"无法解析补丁头: {header_line}", OutputType.WARNING)
+            PrettyOutput.print(f"正则表达式模式: {header_pattern.pattern}", OutputType.DEBUG)
             continue
 
         filepath = header_match.group(1).strip()
         
-        start = int(header_match.group(2))  # 保持1-based行号
-        end = int(header_match.group(3)) if header_match.group(3) else start
-        range_type = header_match.group(4)  # ] 或 ) 表示范围类型
+        try:
+            start = int(header_match.group(2))  # 保持1-based行号
+            end = int(header_match.group(3)) if header_match.group(3) else start
+            range_type = header_match.group(4)  # ] 或 ) 表示范围类型
+        except (ValueError, IndexError) as e:
+            PrettyOutput.print(f"解析行号失败: {str(e)}", OutputType.WARNING)
+            continue
 
         # 根据范围类型调整结束行号
         if range_type == ')':  # 对于 [m,n) 格式，不包括第n行
