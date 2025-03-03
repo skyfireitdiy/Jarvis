@@ -47,6 +47,7 @@ Explain:
 - [CONTENT]: The content of the code to be modified, if the operation is delete, the [CONTENT] is empty
 
 When making changes, you MUST:
+0. Pay attention to context continuity, do not break the existing code structure, pay attention to boundary code situations, such as not including original code when inserting, and not including lines before the replacement when replacing
 1. Maintain original code style and compatibility:
    - Preserve existing indentation levels
    - Keep surrounding empty lines
