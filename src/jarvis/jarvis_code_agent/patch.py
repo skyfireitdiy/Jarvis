@@ -22,112 +22,48 @@ class PatchOutputHandler(OutputHandler):
     def prompt(self) -> str:
         return """
 # 🛠️ Code Patch Specification
+
+## Output Format:
+
+Ouput multiple patches, each patch is a <PATCH> block.
+
+--------------------------------
+# [OPERATION] on [FILE]: Lines [RANGE]
+# Reason: [CLEAR EXPLANATION]
+<PATCH>
+[FILE] [RANGE]
+[CONTENT]
+</PATCH>
+--------------------------------
+
+Explain:
+- [OPERATION]: The operation to be performed, including:
+  - INSERT: Insert code before the specified line, [RANGE] should be [m,m)
+  - REPLACE: Replace code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
+  - DELETE: Delete code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
+  - NEW_FILE: Create a new file, [RANGE] should be [1,1)
+- [FILE]: The path of the file to be modified
+- [RANGE]: The range of the lines to be modified, [m,n] includes both m and n, [m,n) includes m but excludes n
+- [CONTENT]: The content of the code to be modified, if the operation is delete, the [CONTENT] is empty
+
 When making changes, you MUST:
-1. Explain each modification BEFORE the <PATCH> block using:
-   # [OPERATION] on [FILE]: Lines X-Y
-   # Reason: [CLEAR EXPLANATION]
-2. Maintain original code style and compatibility:
+1. Maintain original code style and compatibility:
    - Preserve existing indentation levels
    - Keep surrounding empty lines
    - Match variable naming conventions
    - Maintain API compatibility
-3. Strictly follow the exact patch format below
-4. Use separate <PATCH> blocks for different files
-5. Include ONLY modified lines in content
-6. Line number provide rules:
-   Replace/Delete should provide [start, end] (Two numbers)
-   Insert/New file should provide [start] (One number)
-
-<PATCH>
-File path [Range]
-Code content
-</PATCH>
+2. Strictly follow the exact patch format below
+3. Use separate <PATCH> blocks for different files
+4. Include ONLY modified lines in content
+5. Line number provide rules:
+   - [m,n] includes both m and n
+   - [m,n) includes m but excludes n
 
 Critical Rules:
 - NEVER include unchanged code in patch content
 - ONLY show lines that are being modified/added
 - Maintain original line breaks around modified sections
 - Preserve surrounding comments unless explicitly modifying them
-
-Examples:
-# ======== REPLACE ========
-# GOOD: Only modified lines
-# REPLACE in src/app.py: Lines 5-8
-# Reason: Update calculation formula
-<PATCH>
-code/filename.py [5,8]
-    result = (base_value * 1.15) + tax
-    logger.debug("New calculation applied")
-</PATCH>
-
-# BAD: Includes unchanged lines
-<PATCH>
-code/filename.py [5,8]
-def calculate():
-    # Original comment (should not be included)
-    result = (base_value * 1.15) + tax
-    return result  # Original line
-</PATCH>
-
-# BAD: Only one line number, This will be Insert operation
-<PATCH>
-code/filename.py [5]
-    result = (base_value * 1.15) + tax
-    logger.debug("New calculation applied")
-</PATCH>
-
-# ======== INSERT ========
-# GOOD: Insert single line
-# INSERT in utils/logger.py: Before line 3 
-# Reason: Add initialization check
-<PATCH>
-code/filename.py [3]
-if not _initialized: initialize()
-</PATCH>
-
-# BAD: Extra empty lines
-<PATCH>
-code/filename.py [3]
-
-if not _initialized: 
-    initialize()
-
-</PATCH>
-
-# ======== NEW FILE ========
-# GOOD: Complete minimal content
-# NEW FILE in config/settings.yaml: Create new config
-<PATCH>
-code/filename.py [1]
-database:
-  host: localhost
-  port: 5432
-</PATCH>
-
-# BAD: Placeholder content
-<PATCH>
-code/filename.py [1]
-TODO: Add configuration
-</PATCH>
-
-# ======== DELETE ========
-# GOOD: Empty content for deletion
-# DELETE in src/old.py: Lines 10-12 
-# Reason: Remove deprecated function
-<PATCH>
-code/filename.py [10,12]
-</PATCH>
-
-# BAD: Comment in delete operation
-<PATCH>
-code/filename.py [10,12]
-# Remove these lines
-</PATCH>
-
-# BAD: Only one line number
-<PATCH>
-code/filename.py [10]
-</PATCH>
 """
 
 
@@ -135,19 +71,17 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """解析补丁格式"""
     result = {}
     header_pattern = re.compile(
-        r'^\s*"?(.+?)"?\s*\[(\d+)(?:,(\d+))?\]\s*$'  # Match file path and line number
+        r'^\s*"?(.+?)"?\s*\[(\d+)(?:,(\d+))?([\],])]\s*$'  # 匹配文件路径和行号
     )
     patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', patch_str, re.DOTALL)
     
     for patch in patches:
-        # 分割首行和内容
         parts = patch.split('\n', 1)
         if len(parts) < 1:
             continue
         header_line = parts[0].strip()
         content = parts[1] if len(parts) > 1 else ''
         
-        # 仅在内容非空时添加换行符
         if content and not content.endswith('\n'):
             content += '\n'
             
@@ -157,17 +91,23 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
             continue
 
         filepath = header_match.group(1)
-        start = int(header_match.group(2))       # 保持1-based行号
-        end = int(header_match.group(3)) + 1 if header_match.group(3) else start
+        start = int(header_match.group(2))  # 保持1-based行号
+        end = int(header_match.group(3)) if header_match.group(3) else start
+        range_type = header_match.group(4)  # ] 或 ) 表示范围类型
 
-        # 存储参数
+        # 根据范围类型调整结束行号
+        if range_type == ')':  # 对于 [m,n) 格式，不包括第n行
+            end = end
+        else:  # 对于 [m,n] 格式，包括第n行
+            end = end + 1
+
         if filepath not in result:
             result[filepath] = []
         result[filepath].append({
             'filepath': filepath,
             'start': start,
             'end': end,
-            'content': content  # 保留原始内容（可能为空）
+            'content': content
         })
     for filepath in result.keys():
         result[filepath] = sorted(result[filepath], key=lambda x: x['start'], reverse=True)
@@ -322,14 +262,12 @@ def validate_and_apply_changes(
     end: int,
     content: str
 ) -> List[str]:
-
     new_content = content.splitlines(keepends=True)
     
     # 插入操作处理
     if start == end:
         if start < 1 or start > len(lines)+1:
             raise ValueError(f"无效插入位置: {start}")
-        # 在指定位置前插入
         return lines[:start-1] + new_content + lines[start-1:]
     
     # 范围替换/删除操作
