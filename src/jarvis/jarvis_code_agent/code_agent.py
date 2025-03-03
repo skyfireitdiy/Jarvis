@@ -158,7 +158,7 @@ Make it count.
             self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files), information))
             
             end_commit = get_latest_commit_hash()
-            if start_commit != end_commit and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", True):
+            if start_commit and end_commit and start_commit != end_commit and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", True):
                 # Reset to start commit
                 os.system(f"git reset --soft {start_commit}")
                 # Create new commit
