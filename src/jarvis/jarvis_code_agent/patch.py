@@ -70,8 +70,9 @@ Critical Rules:
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     """解析补丁格式"""
     result = {}
+    # 更新正则表达式以更好地匹配新格式
     header_pattern = re.compile(
-        r'^\s*"?(.+?)"?\s*\[(\d+)(?:,(\d+))?([\],])]\s*$'  # 匹配文件路径和行号
+        r'^\s*"?([^\n\r\[]+)"?\s*\[(\d+)(?:,(\d+))?([\],])]\s*$'  # 匹配文件路径和行号
     )
     patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', patch_str, re.DOTALL)
     
@@ -90,7 +91,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
         if not header_match:
             continue
 
-        filepath = header_match.group(1)
+        filepath = header_match.group(1).strip()
         start = int(header_match.group(2))  # 保持1-based行号
         end = int(header_match.group(3)) if header_match.group(3) else start
         range_type = header_match.group(4)  # ] 或 ) 表示范围类型
