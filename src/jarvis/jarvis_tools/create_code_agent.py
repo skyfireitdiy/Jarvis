@@ -3,7 +3,7 @@ from typing import Dict, Any
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.code_review import CodeReviewTool, extract_code_report
-from jarvis.jarvis_utils import OutputType, PrettyOutput, has_uncommitted_changes
+from jarvis.jarvis_utils import OutputType, PrettyOutput, has_uncommitted_changes, get_latest_commit_hash
 
 class CreateCodeAgentTool:
     """Tool for managing the code development workflow."""
@@ -14,9 +14,6 @@ class CreateCodeAgentTool:
         "requirement": "Technical specifications for code implementation"
     }
     
-    def _get_current_commit(self) -> str:
-        """Get current commit hash."""
-        return os.popen("git rev-parse HEAD").read().strip()
     
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -42,7 +39,7 @@ class CreateCodeAgentTool:
                     }
             
             # Get current commit hash
-            start_commit = self._get_current_commit()
+            start_commit = get_latest_commit_hash()
             
             # Step 2: Development
             PrettyOutput.print("开始开发...", OutputType.INFO)
@@ -50,7 +47,7 @@ class CreateCodeAgentTool:
             agent.run(requirement)
             
             # Get new commit hash after development
-            end_commit = self._get_current_commit()
+            end_commit = get_latest_commit_hash()
             
             # Step 3: Code Review
             PrettyOutput.print("开始代码审查...", OutputType.INFO)
