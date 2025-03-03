@@ -9,6 +9,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root, user_confirm, get_latest_commit_hash
 from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root, user_confirm
 
 
@@ -146,13 +147,24 @@ Make it count.
         """
         try:
             self._init_env()
+            start_commit = get_latest_commit_hash()
+            
             information = ""
             if user_confirm("是否需要手动选择文件？", True):
                 files = select_files([], self.root_dir)
             else:
                 files, information = find_relevant_information(user_input, self.root_dir)
+            
             self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files), information))
             
+            end_commit = get_latest_commit_hash()
+            if start_commit != end_commit and user_confirm("是否合并两个commit之间的提交？", True):
+                # Reset to start commit
+                os.system(f"git reset --soft {start_commit}")
+                # Create new commit
+                git_commiter = GitCommitTool()
+                git_commiter.execute({"message": f"Code agent changes: {user_input[:50]}..."})
+                
         except Exception as e:
             return f"Error during execution: {str(e)}"
         
