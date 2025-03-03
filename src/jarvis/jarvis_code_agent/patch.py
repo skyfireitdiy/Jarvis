@@ -72,7 +72,7 @@ def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
     result = {}
     # 更新正则表达式以更好地处理文件路径和范围
     header_pattern = re.compile(
-        r'^\s*"?([^\n\r\[]+)"?\s*\[(\d+)(?:,(\d+))?([\],])]\s*$',  # 匹配文件路径和行号
+        r'^\s*"?([^\n\r\[]+)"?\s*\[(\d+)(?:,(\d+))?([\]\)])\s*$',  # 匹配文件路径和行号
         re.ASCII
     )
     patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', patch_str, re.DOTALL)
