@@ -69,8 +69,6 @@ class GitCommitTool:
             
             prompt = f'''Generate commit message with the paranoia of someone who's lost production data:
             You should write commit message in {args.get('lang', 'Chinese')}
-# Format Enforcement Protocol
-FAILURE TO WRAP MESSAGE IN <COMMIT_MESSAGE> TAGS WILL CAUSE SYSTEM REJECTION
 # Required Structure
 YOU MUST USE EXACTLY THIS FORMAT:
 <COMMIT_MESSAGE>
