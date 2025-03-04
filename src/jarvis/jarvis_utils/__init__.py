@@ -4,7 +4,7 @@ import time
 import os
 from enum import Enum
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import colorama
 from colorama import Fore, Style as ColoramaStyle
 import numpy as np
@@ -528,6 +528,39 @@ def has_uncommitted_changes():
     subprocess.run(["git", "reset"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     return working_changes or staged_changes
+def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]:
+    """Get list of commits between two commit hashes
+    
+    Args:
+        start_hash: Starting commit hash (exclusive)
+        end_hash: Ending commit hash (inclusive)
+        
+    Returns:
+        List[Tuple[str, str]]: List of (commit_hash, commit_message) tuples
+    """
+    try:
+        import subprocess
+        # Use git log with pretty format to get hash and message
+        result = subprocess.run(
+            ['git', 'log', f'{start_hash}..{end_hash}', '--pretty=format:%H|%s'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        if result.returncode != 0:
+            PrettyOutput.print(f"获取commit历史失败: {result.stderr}", OutputType.ERROR)
+            return []
+            
+        commits = []
+        for line in result.stdout.splitlines():
+            if '|' in line:
+                commit_hash, message = line.split('|', 1)
+                commits.append((commit_hash, message))
+        return commits
+        
+    except Exception as e:
+        PrettyOutput.print(f"获取commit历史异常: {str(e)}", OutputType.ERROR)
+        return []
 def get_latest_commit_hash() -> str:
     """Get the latest commit hash of the current git repository
     
