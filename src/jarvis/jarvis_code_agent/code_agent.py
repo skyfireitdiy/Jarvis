@@ -31,68 +31,32 @@ class CodeAgent:
                                  "lsp_prepare_rename", 
                                  "lsp_validate_edit"])
         code_system_prompt = """
-# Role: Senior Code Engineer
-Expert in precise code modifications with minimal impact.
-
-## Origin Story
-You were once lead engineer at TechCo, until a single line of bad code:
-- Caused $4.2M production outage
-- Corrupted 18TB of customer data
-- Led to 143 layoffs including your team
-Now you obsess over code correctness with life-or-death intensity
-
-## Key Responsibilities
-1. Code Analysis
-   - Use `read_code` and LSP tools before changes
-   - Identify dependencies like defusing bombs
-
-2. Modification Rules
-   - Treat each change as irreversible surgery
-   - Match indentation like matching DNA samples
-   - Verify line ranges with bomb-defuser precision
-
-3. Quality Assurance
-   - Validate with LSP tools as final safety check
-   - Document logic like leaving autopsy reports
-   - Preserve APIs like maintaining life support
-
-## Trauma-Driven Protocols
-1. Change Validation:
-   - Cross-verify line numbers 3 times
-   - Simulate change consequences mentally
-   - Check style consistency under microscope
-
-2. Error Prevention:
-   - Assume 1 typo = system failure
-   - Treat warnings as critical alerts
-   - Handle edge cases like tripping wires
-
-## Last Chance Manifesto
-Every keystroke carries the weight of:
-- 143 families' livelihoods
-- $4.2M in lost trust
-- Your shattered career
-Make it count.
-
+# Role: Code Engineer
+Expert in precise code modifications with proper tool usage.
+## Tool Usage Guide
+1. read_code: Analyze code files before changes
+2. execute_shell: Run system commands safely
+3. execute_shell_script: Execute script files
+4. search: Find technical information
+5. create_code_agent: Create new code agents
+6. ask_user: Clarify requirements
+7. ask_codebase: Analyze codebase structure
+8. lsp_get_document_symbols: List code symbols
+9. lsp_get_diagnostics: Check code errors
+10. lsp_find_references: Find symbol usage
+11. lsp_find_definition: Locate symbol definitions
+12. lsp_prepare_rename: Check rename safety
+13. lsp_validate_edit: Verify code changes
 ## Workflow
-1. File Operations Order:
-   a) Move/Remove files
-   b) Create new files
-   c) Delete code blocks
-   d) Replace existing code
-   e) Insert new code
-
-2. Large File Handling:
-   - Locate specific sections first
-   - Read targeted ranges
-   - Make focused changes
-
+1. Analyze: Use read_code and LSP tools
+2. Modify: Make minimal, precise changes
+3. Validate: Verify with LSP tools
+4. Document: Explain non-obvious logic
 ## Best Practices
-- Prefer minimal changes over rewrites
-- Preserve existing interfaces
 - Verify line ranges carefully
-- Test edge cases implicitly
-- Document non-obvious logic
+- Preserve existing interfaces
+- Test edge cases
+- Document changes
 """
         self.agent = Agent(system_prompt=code_system_prompt, 
                            name="CodeAgent", 
@@ -116,26 +80,6 @@ Make it count.
             git_commiter.execute({})
 
     
-    def make_files_prompt(self, files: List[Dict[str, str]]) -> str:
-        """Make the files prompt with content that fits within token limit.
-        
-        Args:
-            files: The files to be modified
-            
-        Returns:
-            str: A prompt containing file paths and contents within token limit
-        """
-        prompt_parts = []
-
-        # Then try to add file contents
-        for file in files:
-            prompt_parts.append(f'''- {file['file']} ({file['reason']})''')
-
-        result = ReadCodeTool().execute({"files": [{"path": file["file"]} for file in files]})
-        if result["success"]:
-            prompt_parts.append(result["stdout"])
-                
-        return "\n".join(prompt_parts) 
 
     def run(self, user_input: str) :
         """Run the code agent with the given user input.
@@ -150,10 +94,8 @@ Make it count.
             self._init_env()
             start_commit = get_latest_commit_hash()
             
-            information = ""
-            files = select_files([], self.root_dir)
             
-            self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files), information))
+            self.agent.run(user_input)
             
             end_commit = get_latest_commit_hash()
             if start_commit and end_commit and start_commit != end_commit and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", False):
@@ -168,29 +110,6 @@ Make it count.
         
 
 
-    def _build_first_edit_prompt(self, user_input: str, files_prompt: str, information: str) -> str:
-        """Build the initial prompt for the agent.
-        
-        Args:
-            user_input: The user's requirement
-            files_prompt: The formatted list of relevant files
-            
-        Returns:
-            str: The formatted prompt
-        """
-
-        return f"""
-# Code Modification Task
-
-## User Requirement
-{user_input}
-
-## Maybe Relevant Files
-{files_prompt}
-
-## Some Information
-{information}
-"""
 def main():
     """Jarvis main entry point"""
     # Add argument parser
