@@ -25,7 +25,8 @@ class PatchOutputHandler(OutputHandler):
 
 You can output multiple patches, each patch is a <PATCH> block.
 --------------------------------
-# [OPERATION] on [FILE]: Lines [RANGE]
+# [OPERATION] on [FILE]
+# Start Line: [START_LINE], End Line: [END_LINE] [include/exclude], I can verify the line number range is correct
 # Reason: [CLEAR EXPLANATION]
 <PATCH>
 [FILE] [RANGE]
