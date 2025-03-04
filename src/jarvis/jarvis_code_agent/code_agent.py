@@ -102,9 +102,8 @@ Expert in precise code modifications with proper tool usage.
             # Print commit history between start and end commits
             commits = get_commits_between(start_commit, end_commit)
             if commits:
-                PrettyOutput.print("检测到以下提交记录:", OutputType.INFO)
-                for commit_hash, message in commits:
-                    PrettyOutput.print(f"- {commit_hash[:7]}: {message}", OutputType.INFO)
+                commit_messages = "检测到以下提交记录:\n" + "\n".join([f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits])
+                PrettyOutput.print(commit_messages, OutputType.INFO)
             
             if start_commit and end_commit and start_commit != end_commit and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", True):
                 # Reset to start commit
