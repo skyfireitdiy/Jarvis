@@ -506,12 +506,12 @@ def while_true(func, sleep_time: float = 0.1):
         time.sleep(sleep_time)
     return ret
 
-def find_git_root(dir="."):
-    curr_dir = os.getcwd()
-    os.chdir(dir)
-    ret = os.popen("git rev-parse --show-toplevel").read().strip()
-    os.chdir(curr_dir)
-    return ret
+def find_git_root(start_dir="."):
+    """Change to git root directory of the given path"""
+    os.chdir(start_dir)
+    git_root = os.popen("git rev-parse --show-toplevel").read().strip()
+    os.chdir(git_root)
+    return git_root
 
 def has_uncommitted_changes():
     import subprocess
