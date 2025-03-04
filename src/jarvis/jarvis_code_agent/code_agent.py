@@ -1,9 +1,10 @@
+import subprocess
 import os
 from typing import Dict, List
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_code_agent.file_select import file_input_handler, select_files
-from jarvis.jarvis_code_agent.patch import PatchOutputHandler
+from jarvis.jarvis_code_agent.file_select import select_files
+from jarvis.jarvis_code_agent.patch import PatchOutputHandler, file_input_handler
 from jarvis.jarvis_code_agent.relevant_files import find_relevant_information
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
@@ -160,7 +161,7 @@ Make it count.
             end_commit = get_latest_commit_hash()
             if start_commit and end_commit and start_commit != end_commit and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", False):
                 # Reset to start commit
-                os.system(f"git reset --soft {start_commit}")
+                subprocess.run(["git", "reset", "--soft", start_commit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 # Create new commit
                 git_commiter = GitCommitTool()
                 git_commiter.execute({})

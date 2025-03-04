@@ -35,6 +35,8 @@ setup(
         "python-Levenshtein>=0.25.0",
         "jedi>=0.17.2",
         "psutil>=7.0.0",
+        "fastapi>=0.115.4",
+        "uvicorn>=0.33.0",
     ],
     entry_points={
         "console_scripts": [

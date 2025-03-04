@@ -23,48 +23,7 @@ class PatchOutputHandler(OutputHandler):
         return """
 # 🛠️ Code Patch Specification
 
-## Output Format:
-
-Ouput multiple patches, each patch is a <PATCH> block.
-
---------------------------------
-# [OPERATION] on [FILE]: Lines [RANGE]
-# Reason: [CLEAR EXPLANATION]
-<PATCH>
-[FILE] [RANGE]
-[CONTENT]
-</PATCH>
---------------------------------
-
-Explain:
-- [OPERATION]: The operation to be performed, including:
-  - INSERT: Insert code before the specified line, [RANGE] should be [m,m)
-  - REPLACE: Replace code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
-  - DELETE: Delete code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
-  - NEW_FILE: Create a new file, [RANGE] should be [1,1)
-- [FILE]: The path of the file to be modified
-- [RANGE]: The range of the lines to be modified, [m,n] includes both m and n, [m,n) includes m but excludes n
-- [CONTENT]: The content of the code to be modified, if the operation is delete, the [CONTENT] is empty
-
-When making changes, you MUST:
-0. Pay attention to context continuity, do not break the existing code structure, pay attention to boundary code situations, such as not including original code when inserting, and not including lines before the replacement when replacing
-1. Maintain original code style and compatibility:
-   - Preserve existing indentation levels
-   - Keep surrounding empty lines
-   - Match variable naming conventions
-   - Maintain API compatibility
-2. Strictly follow the exact patch format below
-3. Use separate <PATCH> blocks for different files
-4. Include ONLY modified lines in content
-5. Line number provide rules:
-   - [m,n] includes both m and n
-   - [m,n) includes m but excludes n
-
-Critical Rules:
-- NEVER include unchanged code in patch content
-- ONLY show lines that are being modified/added
-- Maintain original line breaks around modified sections
-- Preserve surrounding comments unless explicitly modifying them
+Apply patches to files.
 """
 
 
@@ -290,3 +249,114 @@ def validate_and_apply_changes(
     
     # 执行替换
     return lines[:start-1] + new_content + lines[end-1:]
+
+
+def file_input_handler(user_input: str, agent: Any) -> str:
+    """Handle file input with optional line ranges.
+    
+    Args:
+        user_input: User input string containing file references
+        agent: Agent instance (unused in current implementation)
+        
+    Returns:
+        str: Prompt with file contents prepended if files are found
+    """
+    prompt = user_input
+    files = []
+    
+    file_refs = re.findall(r"'([^']+)'", user_input)
+    for ref in file_refs:
+        # Handle file:start,end or file:start:end format
+        if ':' in ref:
+            file_path, line_range = ref.split(':', 1)
+            # Initialize with default values
+            start_line = 1  # 1-based
+            end_line = -1
+            
+            # Process line range if specified
+            if ',' in line_range or ':' in line_range:
+                try:
+                    raw_start, raw_end = map(int, re.split(r'[,:]', line_range))
+                    
+                    # Handle special values and Python-style negative indices
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            total_lines = len(f.readlines())
+                    except FileNotFoundError:
+                        PrettyOutput.print(f"文件不存在: {file_path}", OutputType.WARNING)
+                        continue
+                    # Process start line
+                    if raw_start == 0:  # 0表示整个文件
+                        start_line = 1
+                        end_line = total_lines
+                    else:
+                        start_line = raw_start if raw_start > 0 else total_lines + raw_start + 1
+                    
+                    # Process end line
+                    if raw_end == 0:  # 0表示整个文件（如果start也是0）
+                        end_line = total_lines
+                    else:
+                        end_line = raw_end if raw_end > 0 else total_lines + raw_end + 1
+                    
+                    # Auto-correct ranges
+                    start_line = max(1, min(start_line, total_lines))
+                    end_line = max(start_line, min(end_line, total_lines))
+                    
+                    # Final validation
+                    if start_line < 1 or end_line > total_lines or start_line > end_line:
+                        raise ValueError
+
+                except:
+                    continue
+            
+            # Add file if it exists
+            if os.path.isfile(file_path):
+                files.append({
+                    "path": file_path,
+                    "start_line": start_line,
+                    "end_line": end_line
+                })
+        else:
+            # Handle simple file path
+            if os.path.isfile(ref):
+                files.append({
+                    "path": ref,
+                    "start_line": 1,  # 1-based
+                    "end_line": -1
+                })
+    
+    # Read and process files if any were found
+    if files:
+        result = ReadCodeTool().execute({"files": files})
+        if result["success"]:
+            return result["stdout"] + "\n" + prompt
+    
+    return prompt + """
+==================================================================
+You can output multiple patches, each patch is a <PATCH> block.
+--------------------------------
+# [OPERATION] on [FILE]: Lines [RANGE]
+# Reason: [CLEAR EXPLANATION]
+<PATCH>
+[FILE] [RANGE]
+[CONTENT]
+</PATCH>
+--------------------------------
+
+Explain:
+- [OPERATION]: The operation to be performed, including:
+  - INSERT: Insert code before the specified line, [RANGE] should be [m,m)
+  - REPLACE: Replace code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
+  - DELETE: Delete code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
+  - NEW_FILE: Create a new file, [RANGE] should be [1,1)
+- [FILE]: The path of the file to be modified
+- [RANGE]: The range of the lines to be modified, [m,n] includes both m and n, [m,n) includes m but excludes n
+- [CONTENT]: The content of the code to be modified, if the operation is delete, the [CONTENT] is empty
+
+Critical Rules:
+- NEVER include unchanged code in patch content
+- ONLY show lines that are being modified/added
+- Maintain original line breaks around modified sections
+- Preserve surrounding comments unless explicitly modifying them
+==================================================================
+"""
