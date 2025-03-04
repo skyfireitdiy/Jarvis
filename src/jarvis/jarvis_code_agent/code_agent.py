@@ -151,10 +151,7 @@ Make it count.
             start_commit = get_latest_commit_hash()
             
             information = ""
-            if user_confirm("是否需要手动选择文件？", True):
-                files = select_files([], self.root_dir)
-            else:
-                files, information = find_relevant_information(user_input, self.root_dir)
+            files = select_files([], self.root_dir)
             
             self.agent.run(self._build_first_edit_prompt(user_input, self.make_files_prompt(files), information))
             
