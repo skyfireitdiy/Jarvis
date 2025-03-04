@@ -48,6 +48,8 @@ Critical Rules:
 - ONLY show lines that are being modified/added
 - Maintain original line breaks around modified sections
 - Preserve surrounding comments unless explicitly modifying them
+- Verify line number range is correct
+- Verify indentation is correct
 """
 
 
@@ -362,5 +364,13 @@ Patch Line Number Range Rules:
 - REPLACE: [m,n] n>=m
 - DELETE: [m,n] n>=m
 - NEW_FILE: [1,1)
+
+Critical Rules:
+- NEVER include unchanged code in patch content
+- ONLY show lines that are being modified/added
+- Maintain original line breaks around modified sections
+- Preserve surrounding comments unless explicitly modifying them
+- Verify line number range is correct
+- Verify indentation is correct
 ==================================================================
 """
