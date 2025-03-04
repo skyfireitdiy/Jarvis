@@ -5,7 +5,6 @@ from typing import Dict, List
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.file_select import select_files
 from jarvis.jarvis_code_agent.patch import PatchOutputHandler, file_input_handler
-from jarvis.jarvis_code_agent.relevant_files import find_relevant_information
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.registry import ToolRegistry
