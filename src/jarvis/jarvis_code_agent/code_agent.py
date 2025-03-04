@@ -9,6 +9,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
+from jarvis.jarvis_utils import get_commits_between
 from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root, user_confirm, get_latest_commit_hash
 from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, init_env, find_git_root, user_confirm
 
@@ -98,7 +99,14 @@ Expert in precise code modifications with proper tool usage.
             self.agent.run(user_input)
             
             end_commit = get_latest_commit_hash()
-            if start_commit and end_commit and start_commit != end_commit and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", False):
+            # Print commit history between start and end commits
+            commits = get_commits_between(start_commit, end_commit)
+            if commits:
+                PrettyOutput.print("检测到以下提交记录:", OutputType.INFO)
+                for commit_hash, message in commits:
+                    PrettyOutput.print(f"- {commit_hash[:7]}: {message}", OutputType.INFO)
+            
+            if start_commit and end_commit and start_commit != end_commit and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", True):
                 # Reset to start commit
                 subprocess.run(["git", "reset", "--soft", start_commit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 # Create new commit
