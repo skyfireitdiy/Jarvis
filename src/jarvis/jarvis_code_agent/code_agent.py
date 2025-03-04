@@ -19,6 +19,7 @@ class CodeAgent:
         tool_registry = ToolRegistry()
         tool_registry.use_tools(["read_code",
                                  "execute_shell", 
+                                 "execute_shell_script",
                                  "search", 
                                  "create_code_agent",
                                  "ask_user", 
