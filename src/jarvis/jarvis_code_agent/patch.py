@@ -23,7 +23,31 @@ class PatchOutputHandler(OutputHandler):
         return """
 # 🛠️ Code Patch Specification
 
-Apply patches to files.
+You can output multiple patches, each patch is a <PATCH> block.
+--------------------------------
+# [OPERATION] on [FILE]: Lines [RANGE]
+# Reason: [CLEAR EXPLANATION]
+<PATCH>
+[FILE] [RANGE]
+[CONTENT]
+</PATCH>
+--------------------------------
+
+Explain:
+- [OPERATION]: The operation to be performed, including:
+  - INSERT: Insert code before the specified line, [RANGE] should be [m,m)
+  - REPLACE: Replace code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
+  - DELETE: Delete code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
+  - NEW_FILE: Create a new file, [RANGE] should be [1,1)
+- [FILE]: The path of the file to be modified
+- [RANGE]: The range of the lines to be modified, [m,n] includes both m and n, [m,n) includes m but excludes n
+- [CONTENT]: The content of the code to be modified, if the operation is delete, the [CONTENT] is empty
+
+Critical Rules:
+- NEVER include unchanged code in patch content
+- ONLY show lines that are being modified/added
+- Maintain original line breaks around modified sections
+- Preserve surrounding comments unless explicitly modifying them
 """
 
 
@@ -333,30 +357,10 @@ def file_input_handler(user_input: str, agent: Any) -> str:
     
     return prompt + """
 ==================================================================
-You can output multiple patches, each patch is a <PATCH> block.
---------------------------------
-# [OPERATION] on [FILE]: Lines [RANGE]
-# Reason: [CLEAR EXPLANATION]
-<PATCH>
-[FILE] [RANGE]
-[CONTENT]
-</PATCH>
---------------------------------
-
-Explain:
-- [OPERATION]: The operation to be performed, including:
-  - INSERT: Insert code before the specified line, [RANGE] should be [m,m)
-  - REPLACE: Replace code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
-  - DELETE: Delete code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
-  - NEW_FILE: Create a new file, [RANGE] should be [1,1)
-- [FILE]: The path of the file to be modified
-- [RANGE]: The range of the lines to be modified, [m,n] includes both m and n, [m,n) includes m but excludes n
-- [CONTENT]: The content of the code to be modified, if the operation is delete, the [CONTENT] is empty
-
-Critical Rules:
-- NEVER include unchanged code in patch content
-- ONLY show lines that are being modified/added
-- Maintain original line breaks around modified sections
-- Preserve surrounding comments unless explicitly modifying them
+Patch Line Number Rules:
+- INSERT: Insert code before the specified line, [RANGE] should be [m,m)
+- REPLACE: Replace code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
+- DELETE: Delete code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
+- NEW_FILE: Create a new file, [RANGE] should be [1,1)
 ==================================================================
 """
