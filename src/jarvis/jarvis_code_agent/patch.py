@@ -36,8 +36,8 @@ You can output multiple patches, each patch is a <PATCH> block.
 Explain:
 - [OPERATION]: The operation to be performed, including:
   - INSERT: Insert code before the specified line, [RANGE] should be [m,m)
-  - REPLACE: Replace code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
-  - DELETE: Delete code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
+  - REPLACE: Replace code in the specified range, [RANGE] should be [m,n] n>=m
+  - DELETE: Delete code in the specified range, [RANGE] should be [m,n] n>=m
   - NEW_FILE: Create a new file, [RANGE] should be [1,1)
 - [FILE]: The path of the file to be modified
 - [RANGE]: The range of the lines to be modified, [m,n] includes both m and n, [m,n) includes m but excludes n
@@ -357,10 +357,10 @@ def file_input_handler(user_input: str, agent: Any) -> str:
     
     return prompt + """
 ==================================================================
-Patch Line Number Rules:
-- INSERT: Insert code before the specified line, [RANGE] should be [m,m)
-- REPLACE: Replace code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
-- DELETE: Delete code in the specified range, [RANGE] should be [m,n] or [m,n), n>m
-- NEW_FILE: Create a new file, [RANGE] should be [1,1)
+Patch Line Number Range Rules:
+- INSERT: [m,m)
+- REPLACE: [m,n] n>=m
+- DELETE: [m,n] n>=m
+- NEW_FILE: [1,1)
 ==================================================================
 """
