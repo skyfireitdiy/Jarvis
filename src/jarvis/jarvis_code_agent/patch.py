@@ -28,6 +28,8 @@ You can output multiple patches, each patch is a <PATCH> block.
 --------------------------------
 # [OPERATION] on [FILE]
 # Start Line: [START_LINE], End Line: [END_LINE] [INCLUDE/EXCLUDE], I can verify the line number range is correct
+# [PREFIX]
+# [SUFFIX]
 # Reason: [CLEAR EXPLANATION]
 <PATCH>
 [FILE] [RANGE]
@@ -45,7 +47,15 @@ Explain:
 - [RANGE]: The range of the lines to be modified, [m,n] includes both m and n, [m,n) includes m but excludes n
 - [START_LINE] is m and [END_LINE] is n
 - [INCLUDE/EXCLUDE]: if [INCLUDE/EXCLUDE] is INCLUDE, the [RANGE] is [m,n], if [INCLUDE/EXCLUDE] is EXCLUDE, the [RANGE] is [m,n)
+- [PREFIX]: The line before replace, if replace first line, the [PREFIX] is <NONE>
+- [SUFFIX]: The line after replace, if replace last line, the [SUFFIX] is <NONE>
 - [CONTENT]: The content of the code to be modified, if the operation is delete, the [CONTENT] is empty
+
+Patch Line Number Range Rules:
+- INSERT: [m,m)
+- REPLACE: [m,n] n>=m
+- DELETE: [m,n] n>=m
+- NEW_FILE: [1,1)
 
 Critical Rules:
 - NEVER include unchanged code in patch content
@@ -54,6 +64,7 @@ Critical Rules:
 - Preserve surrounding comments unless explicitly modifying them
 - Verify line number range is correct
 - Verify indentation is correct
+- [CONTENT] should not contain [PREFIX] and [SUFFIX]
 """
 
 
@@ -382,20 +393,4 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         if result["success"]:
             return result["stdout"] + "\n" + prompt, False
     
-    return prompt + """
-==================================================================
-Patch Line Number Range Rules:
-- INSERT: [m,m)
-- REPLACE: [m,n] n>=m
-- DELETE: [m,n] n>=m
-- NEW_FILE: [1,1)
-
-Critical Rules:
-- NEVER include unchanged code in patch content
-- ONLY show lines that are being modified/added
-- Maintain original line breaks around modified sections
-- Preserve surrounding comments unless explicitly modifying them
-- Verify line number range is correct
-- Verify indentation is correct
-==================================================================
-""", False
+    return prompt, False
