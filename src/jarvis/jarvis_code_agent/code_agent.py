@@ -97,12 +97,16 @@ Expert in precise code modifications with proper tool usage.
             
             end_commit = get_latest_commit_hash()
             # Print commit history between start and end commits
-            commits = get_commits_between(start_commit, end_commit)
+            if start_commit and end_commit:
+                commits = get_commits_between(start_commit, end_commit)
+            else:
+                commits = []
+            
             if commits:
                 commit_messages = "检测到以下提交记录:\n" + "\n".join([f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits])
                 PrettyOutput.print(commit_messages, OutputType.INFO)
             
-            if start_commit and end_commit and start_commit != end_commit and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", True):
+            if len(commits) > 1 and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", True):
                 # Reset to start commit
                 subprocess.run(["git", "reset", "--soft", start_commit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 # Create new commit
