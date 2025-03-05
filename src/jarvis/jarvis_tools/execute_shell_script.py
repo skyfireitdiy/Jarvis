@@ -33,12 +33,10 @@ class ShellScriptTool:
             try:
                 with open(script_path, 'w', encoding='utf-8') as f:
                     f.write(script_content)
-                os.chmod(script_path, 0o755)  # Make script executable
-                
                 # Use execute_shell to run the script
                 from jarvis.jarvis_tools.execute_shell import ShellTool
                 shell_tool = ShellTool()
-                result = shell_tool.execute({"command": script_path})
+                result = shell_tool.execute({"command": f"bash {script_path}"})
                 
                 return {
                     "success": result["success"],

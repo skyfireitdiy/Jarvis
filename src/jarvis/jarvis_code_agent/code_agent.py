@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.file_select import select_files
-from jarvis.jarvis_code_agent.patch import PatchOutputHandler, file_input_handler
+from jarvis.jarvis_code_agent.patch import PatchOutputHandler, file_input_handler, shell_input_handler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -67,7 +67,7 @@ Expert in precise code modifications with proper tool usage.
                            output_handler=[tool_registry, PatchOutputHandler()], 
                            platform=PlatformRegistry().get_codegen_platform(), 
                            record_methodology=False,
-                           input_handler=[file_input_handler],
+                           input_handler=[shell_input_handler, file_input_handler],
                            need_summary=False)
 
     

@@ -2,8 +2,10 @@ import re
 from typing import Dict, Any, List, Tuple
 import os
 from jarvis.jarvis_agent.output_handler import OutputHandler
+from jarvis.jarvis_tools import execute_shell_script
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.read_code import ReadCodeTool
+from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
 from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, user_confirm
 
 
@@ -26,7 +28,7 @@ class PatchOutputHandler(OutputHandler):
 You can output multiple patches, each patch is a <PATCH> block.
 --------------------------------
 # [OPERATION] on [FILE]
-# Start Line: [START_LINE], End Line: [END_LINE] [include/exclude], I can verify the line number range is correct
+# Start Line: [START_LINE], End Line: [END_LINE] [INCLUDE/EXCLUDE], I can verify the line number range is correct
 # Reason: [CLEAR EXPLANATION]
 <PATCH>
 [FILE] [RANGE]
@@ -42,6 +44,8 @@ Explain:
   - NEW_FILE: Create a new file, [RANGE] should be [1,1)
 - [FILE]: The path of the file to be modified
 - [RANGE]: The range of the lines to be modified, [m,n] includes both m and n, [m,n) includes m but excludes n
+- [START_LINE] is m and [END_LINE] is n
+- [INCLUDE/EXCLUDE]: if [INCLUDE/EXCLUDE] is INCLUDE, the [RANGE] is [m,n], if [INCLUDE/EXCLUDE] is EXCLUDE, the [RANGE] is [m,n)
 - [CONTENT]: The content of the code to be modified, if the operation is delete, the [CONTENT] is empty
 
 Critical Rules:
@@ -278,7 +282,28 @@ def validate_and_apply_changes(
     return lines[:start-1] + new_content + lines[end-1:]
 
 
-def file_input_handler(user_input: str, agent: Any) -> str:
+def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
+    """Handle shell input with optional line ranges.
+    
+    Args:
+        user_input: User input string containing shell commands
+        agent: Agent instance (unused in current implementation)
+    """
+    lines = user_input.splitlines()
+    cmdline = [line for line in lines if line.startswith("!")]
+    if len(cmdline) == 0:
+        return user_input, False
+    else:
+        script = '\n'.join([c[1:] for c in cmdline])
+        PrettyOutput.print(script, OutputType.CODE, lang="bash")
+        if user_confirm(f"是否要执行以上shell脚本？", default=True):
+            ShellScriptTool().execute({"script_content": script})
+            return "", True
+        return user_input, False
+    
+
+
+def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     """Handle file input with optional line ranges.
     
     Args:
@@ -356,7 +381,7 @@ def file_input_handler(user_input: str, agent: Any) -> str:
     if files:
         result = ReadCodeTool().execute({"files": files})
         if result["success"]:
-            return result["stdout"] + "\n" + prompt
+            return result["stdout"] + "\n" + prompt, False
     
     return prompt + """
 ==================================================================
@@ -374,4 +399,4 @@ Critical Rules:
 - Verify line number range is correct
 - Verify indentation is correct
 ==================================================================
-"""
+""", False

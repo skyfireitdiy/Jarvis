@@ -37,7 +37,7 @@ class Agent:
                  summary_prompt: Optional[str] = None, 
                  auto_complete: Optional[bool] = None, 
                  output_handler: List[OutputHandler] = [],
-                 input_handler: Optional[List[Callable]] = None,
+                 input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
                  use_methodology: Optional[bool] = None,
                  record_methodology: Optional[bool] = None,
                  need_summary: Optional[bool] = None,
@@ -143,7 +143,7 @@ The following actions are at your disposal:
 
 
     
-    def _call_model(self, message: str) -> str:
+    def _call_model(self, message: str) -> str: # type: ignore
         """Call the AI model with retry logic.
         
         Args:
@@ -155,20 +155,12 @@ The following actions are at your disposal:
         Note:
             Will retry with exponential backoff up to 30 seconds between retries
         """
-        sleep_time = 5
         for handler in self.input_handler:
-            message = handler(message, self)
-        while True:
-            ret = self.model.chat_until_success(message) # type: ignore
-            if ret:
-                return ret
-            else:
-                PrettyOutput.print(f"模型调用失败，正在重试... 等待 {sleep_time}s", OutputType.INFO)
-                time.sleep(sleep_time)
-                sleep_time *= 2
-                if sleep_time > 30:
-                    sleep_time = 30
-                continue
+            message, need_return = handler(message, self)
+            if need_return:
+                return message
+        return self.model.chat_until_success(message)  # type: ignore
+
 
 
     def _summarize_and_clear_history(self) -> None:
