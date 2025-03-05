@@ -830,13 +830,13 @@ def create_dev_team() -> MultiAgent:
     """Create a development team with multiple agents."""
 
     PM_output_handler = ToolRegistry()
-    PM_output_handler.use_tools(["ask_user", "file_operation", "search", "rag", "execute_shell"])
+    PM_output_handler.use_tools(["ask_user", "file_operation", "search_web", "rag", "execute_shell"])
 
     BA_output_handler = ToolRegistry()
-    BA_output_handler.use_tools(["ask_user", "file_operation", "search", "rag", "execute_shell"])
+    BA_output_handler.use_tools(["ask_user", "file_operation", "search_web", "rag", "execute_shell"])
 
     SA_output_handler = ToolRegistry()
-    SA_output_handler.use_tools(["read_code", "file_operation", "search", "rag", "ask_codebase", "lsp_get_document_symbols", "execute_shell"])
+    SA_output_handler.use_tools(["read_code", "file_operation", "search_web", "rag", "ask_codebase", "lsp_get_document_symbols", "execute_shell"])
     
     TL_output_handler = ToolRegistry()
     TL_output_handler.use_tools(["read_code", "file_operation", "ask_codebase", "lsp_get_diagnostics", "lsp_find_references", "lsp_find_definition", "execute_shell"])

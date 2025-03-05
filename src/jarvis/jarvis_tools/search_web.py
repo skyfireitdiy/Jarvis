@@ -62,7 +62,7 @@ def bing_search(query):
         return None
 
 class SearchTool:
-    name = "search"
+    name = "search_web"
     description = "Use Bing search engine to search for information, and extract key information based on the question"
     parameters = {
         "type": "object",
