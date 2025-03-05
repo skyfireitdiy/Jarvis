@@ -65,7 +65,7 @@ class LSPPrepareRenameTool:
             
         try:
             # Initialize LSP
-            if not lsp.initialize(os.path.dirname(os.path.abspath(file_path))):
+            if not lsp.initialize(os.path.abspath(os.getcwd())):
                 return {
                     "success": False,
                     "stderr": "LSP initialization failed",

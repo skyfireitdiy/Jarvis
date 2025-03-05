@@ -189,7 +189,7 @@ def main():
         PrettyOutput.print(f"没有 LSP 支持的语言: {args.language}", OutputType.WARNING)
         return 1
         
-    if not lsp.initialize(os.path.dirname(os.path.abspath(args.file))):
+    if not lsp.initialize(os.path.abspath(os.getcwd())):
         PrettyOutput.print("LSP 初始化失败", OutputType.WARNING)
         return 1
     
