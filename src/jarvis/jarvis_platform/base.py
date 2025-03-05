@@ -3,8 +3,6 @@ import re
 from typing import Dict, List, Tuple
 
 from jarvis.jarvis_utils import OutputType, PrettyOutput, while_success, while_true
-from yaspin import yaspin
-from yaspin.spinners import Spinners
 
 
 class BasePlatform(ABC):

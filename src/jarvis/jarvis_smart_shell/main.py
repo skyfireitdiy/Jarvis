@@ -4,8 +4,6 @@ import os
 import sys
 import readline
 from typing import Optional
-from yaspin import yaspin # type: ignore
-from yaspin.spinners import Spinners # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils import PrettyOutput, OutputType, get_multiline_input, get_shell_name, init_env

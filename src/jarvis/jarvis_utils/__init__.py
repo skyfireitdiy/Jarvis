@@ -12,7 +12,6 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
 from prompt_toolkit.formatted_text import FormattedText
 from sentence_transformers import SentenceTransformer
-from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import torch
 import yaml

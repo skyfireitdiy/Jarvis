@@ -4,7 +4,6 @@ Test script for Jarvis OpenAI-compatible API service.
 """
 
 import argparse
-import os
 import sys
 from openai import OpenAI
 

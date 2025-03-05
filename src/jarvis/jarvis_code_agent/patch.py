@@ -2,7 +2,6 @@ import re
 from typing import Dict, Any, List, Tuple
 import os
 from jarvis.jarvis_agent.output_handler import OutputHandler
-from jarvis.jarvis_tools import execute_shell_script
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool

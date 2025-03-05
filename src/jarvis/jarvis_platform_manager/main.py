@@ -6,11 +6,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import uvicorn
-import io
-from contextlib import redirect_stdout
-import json
-import os
-from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 
 def list_platforms():

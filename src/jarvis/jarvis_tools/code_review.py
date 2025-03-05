@@ -1,6 +1,5 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 import subprocess
-import yaml
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils import OutputType, PrettyOutput, init_env, find_git_root
