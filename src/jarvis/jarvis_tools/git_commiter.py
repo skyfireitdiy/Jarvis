@@ -67,7 +67,7 @@ class GitCommitTool:
             diff = process.communicate()[0].decode()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             
-            prompt = f'''Generate commit message with the paranoia of someone who's lost production data:
+            prompt = f'''Generate commit message by the following rules:
             You should write commit message in {args.get('lang', 'Chinese')}
 # Required Structure
 YOU MUST USE EXACTLY THIS FORMAT:
