@@ -155,14 +155,13 @@ def apply_patch(output_str: str) -> str:
             if modified_code["success"]:
                 ret += "New code:\n"
                 ret += modified_code["stdout"]
+            
+            ret += "Please review the code and confirm if it is correct. if it is uncorrect, you need generate a new patch to fix it.\n"
         else:
             ret += "User rejected the patch\nThis is your patch preview:\n"
             ret += diff
-        user_input = get_multiline_input("你可以继续输入（输入空行重试，Ctrl+C退出）: ")
-        if user_input:
-            ret += "\n" + user_input
-        else:
-            ret = ""
+
+            ret += "Please check the patch and regenerate it if necessary.\n"
 
     return ret  # Ensure a string is always returned
 
