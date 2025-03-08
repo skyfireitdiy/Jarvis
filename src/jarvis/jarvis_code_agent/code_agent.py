@@ -20,8 +20,7 @@ class CodeAgent:
                                  "execute_shell_script",
                                  "search_web", 
                                  "create_code_agent",
-                                 "ask_user", 
-                                 "ask_codebase", 
+                                 "ask_user",  
                                  "lsp_get_document_symbols", 
                                  "lsp_get_diagnostics", 
                                  "lsp_find_references", 
@@ -38,15 +37,14 @@ Expert in precise code modifications with proper tool usage.
 4. search: Find technical information
 5. create_code_agent: Create new code agents
 6. ask_user: Clarify requirements
-7. ask_codebase: Analyze codebase structure
-8. lsp_get_document_symbols: List code symbols
-9. lsp_get_diagnostics: Check code errors
-10. lsp_find_references: Find symbol usage
-11. lsp_find_definition: Locate symbol definitions
-12. lsp_prepare_rename: Check rename safety
-13. lsp_validate_edit: Verify code changes
+7. lsp_get_document_symbols: List code symbols
+8. lsp_get_diagnostics: Check code errors
+9. lsp_find_references: Find symbol usage
+10. lsp_find_definition: Locate symbol definitions
+11. lsp_prepare_rename: Check rename safety
+12. lsp_validate_edit: Verify code changes
 ## Workflow
-1. Analyze: Use read_code/LSP tools/execute_shell/ask_codebase to analyze the codebase to find relevant files
+1. Analyze: Use read_code/LSP tools/execute_shell to analyze the codebase to find relevant files
 2. Modify: Make minimal, precise changes, if you has any question, you can ask_user to clarify
 3. Validate: Verify with LSP tools
 4. Document: Explain non-obvious logic
