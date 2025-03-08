@@ -931,6 +931,9 @@ def get_cheap_model_name() -> str:
 def is_execute_tool_confirm() -> bool:
     return os.getenv('JARVIS_EXECUTE_TOOL_CONFIRM', 'false') == 'true'
 
+def is_confirm_before_apply_patch() -> bool:
+    return os.getenv('JARVIS_CONFIRM_BEFORE_APPLY_PATCH', 'true') == 'true'
+
 def split_text_into_chunks(text: str, max_length: int = 512) -> List[str]:
     """Split text into chunks with overlapping windows"""
     chunks = []

@@ -5,7 +5,7 @@ from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
-from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, user_confirm
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, is_confirm_before_apply_patch, user_confirm
 
 
 class PatchOutputHandler(OutputHandler):
@@ -192,7 +192,7 @@ def handle_commit_workflow(diff:str)->bool:
     Returns:
         tuple[bool, str, str]: (continue_execution, commit_id, commit_message)
     """
-    if not user_confirm("是否要提交代码？", default=True):
+    if is_confirm_before_apply_patch() and not user_confirm("是否要提交代码？", default=True):
         revert_change()
         return False
 
