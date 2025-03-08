@@ -129,15 +129,27 @@ jarvis-git-commit --help
 ### 内置工具
 
 | 工具 | 描述 |
-|------|-------------|
 | read_code | 支持行号和范围的代码文件读取 |
 | execute_shell | 执行系统命令并捕获输出 |
-| search | 开发相关的网络搜索 |
-| ask_user | 交互式用户输入收集 |
+| execute_shell_script | 执行shell脚本文件 |
 | ask_codebase | 智能代码库查询和分析 |
-| code_review | 多维度的自动代码审查 |
+| ask_user | 交互式用户输入收集 |
 | file_operation | 基础文件操作（读取/存在性检查） |
-| git_commiter | 自动化 git 提交处理 |
+| git_commiter | 自动化git提交处理 |
+| code_review | 多维度的自动代码审查 |
+| search_web | 开发相关的网络搜索 |
+| read_webpage | 读取网页内容 |
+| chdir | 安全地更改工作目录 |
+| create_code_agent | 创建新的代码代理 |
+| create_sub_agent | 创建子代理 |
+| lsp_find_definition | 查找符号定义 |
+| lsp_find_references | 查找符号引用 |
+| lsp_get_diagnostics | 获取代码诊断信息 |
+| lsp_get_document_symbols | 获取文档符号 |
+| lsp_prepare_rename | 准备符号重命名 |
+| lsp_validate_edit | 验证代码编辑 |
+| rag | 文档检索和问答 |
+| select_code_files | 智能选择代码文件 |
 
 ### 工具位置
 - 内置工具：`src/jarvis/tools/`
