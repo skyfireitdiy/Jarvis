@@ -53,6 +53,7 @@ Expert in precise code modifications with proper tool usage.
 - Preserve existing interfaces
 - Test edge cases
 - Document changes
+- If you think you have made a mistake, you can revert to the previous commit using execute_shell to execute `git reset --hard HEAD^`
 """
         self.agent = Agent(system_prompt=code_system_prompt, 
                            name="CodeAgent", 
