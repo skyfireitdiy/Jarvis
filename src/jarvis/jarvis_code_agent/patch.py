@@ -151,7 +151,7 @@ def apply_patch(output_str: str) -> str:
             ret += "Successfully applied the patch\n"
             # Get modified line ranges
             modified_ranges = get_modified_line_ranges()
-            modified_code = ReadCodeTool().execute({"files": [{"path": filepath, "start_line": start, "end_line": end} for filepath, (start, end) in modified_ranges.items()]})
+            modified_code = ReadCodeTool().execute({"files": [{"path": filepath, "start_line": 1, "end_line": -1} for filepath, _ in modified_ranges.items()]})
             if modified_code["success"]:
                 ret += "New code:\n"
                 ret += modified_code["stdout"]
