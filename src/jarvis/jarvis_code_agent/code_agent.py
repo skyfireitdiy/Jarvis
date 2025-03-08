@@ -47,7 +47,7 @@ Expert in precise code modifications with proper tool usage.
 13. lsp_validate_edit: Verify code changes
 ## Workflow
 1. Analyze: Use read_code/LSP tools/execute_shell/ask_codebase to analyze the codebase to find relevant files
-2. Modify: Make minimal, precise changes
+2. Modify: Make minimal, precise changes, if you has any question, you can ask_user to clarify
 3. Validate: Verify with LSP tools
 4. Document: Explain non-obvious logic
 ## Best Practices
