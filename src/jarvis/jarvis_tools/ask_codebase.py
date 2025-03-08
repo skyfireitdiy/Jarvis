@@ -52,14 +52,20 @@ class AskCodebaseTool:
             codebase = CodeBase(git_root)
 
             # Use ask_codebase method
-            _, response = codebase.ask_codebase(question, top_k)
-
+            files, response = codebase.ask_codebase(question, top_k)
+            
+            # Print found files
+            if files:
+                output = "找到的相关文件:\n"
+                for file in files:
+                    output += f"- {file['file']} ({file['reason']})\n"
+                PrettyOutput.print(output, OutputType.INFO, lang="markdown")
+            
             return {
                 "success": True,
                 "stdout": response,
                 "stderr": ""
             }
-
         except Exception as e:
             error_msg = f"分析代码库失败: {str(e)}"
             PrettyOutput.print(error_msg, OutputType.WARNING)
@@ -68,8 +74,6 @@ class AskCodebaseTool:
                 "stdout": "",
                 "stderr": error_msg
             }
-
-
 def main():
     """Command line interface for the tool"""
     import argparse
@@ -79,7 +83,6 @@ def main():
     parser.add_argument('--top-k', type=int, help='Number of files to analyze', default=20)
     
     args = parser.parse_args()
-    
     tool = AskCodebaseTool()
     result = tool.execute({
         "question": args.question,
