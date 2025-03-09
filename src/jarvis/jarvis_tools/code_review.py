@@ -165,13 +165,13 @@ PROPOSED DEFENSE:
             agent = Agent(
                 system_prompt=system_prompt,
                 name="Code Review Agent",
-                summary_prompt="""Please generate a concise summary report of the code review, format as yaml:
+                summary_prompt="""Please generate a concise summary report of the code review in Chinese, format as follows:
 <REPORT>
-- file: xxxx.py
-  location: [start_line_number, end_line_number]
-  description: # Only describe issues directly observable in the diff
-  severity: # Critical/Major/Minor based on concrete evidence
-  suggestion: # Specific, actionable improvements for the observed code
+- 文件: xxxx.py
+  位置: [起始行号, 结束行号]
+  描述: # 仅描述在差异中直接观察到的问题
+  严重程度: # 根据具体证据分为严重/重要/次要
+  建议: # 针对观察到的代码的具体改进建议
 </REPORT>""",
                 is_sub_agent=True,
                 output_handler=[tool_registry],
@@ -233,7 +233,7 @@ def main():
     result = tool.execute(tool_args)
     
     if result["success"]:
-        PrettyOutput.section("Autonomous Review Result:", OutputType.SUCCESS)
+        PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
         report = extract_code_report(result["stdout"])
         PrettyOutput.print(report, OutputType.SUCCESS, lang="yaml")
         
