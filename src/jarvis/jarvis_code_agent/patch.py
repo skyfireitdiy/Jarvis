@@ -2,6 +2,7 @@ import re
 from typing import Dict, Any, List, Tuple
 import os
 from jarvis.jarvis_agent.output_handler import OutputHandler
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
@@ -22,104 +23,65 @@ class PatchOutputHandler(OutputHandler):
     
     def prompt(self) -> str:
         return """
-# 🛠️ Code Patch Specification
+# 🛠️ Contextual Code Patch Specification
 
-You can output multiple patches, each patch is a <PATCH> block.
+Use <PATCH> blocks to specify code changes:
 --------------------------------
-# [OPERATION] on [FILE]
-# Start Line: [START_LINE], End Line: [END_LINE] [INCLUDE/EXCLUDE], I can verify the line number range is correct
-# [PREFIX]
-# [SUFFIX]
-# Reason: [CLEAR EXPLANATION]
 <PATCH>
-[FILE] [RANGE]
-[CONTENT]
-</PATCH>
+File: [file_path]
+Reason: [change_reason]
+```language_identifier
+[contextual_code_snippet]
+```
 --------------------------------
 
-Explain:
-- [OPERATION]: The operation to be performed, including:
-  - INSERT: Insert code before the specified line, [RANGE] should be [m,m)
-  - REPLACE: Replace code in the specified range, [RANGE] should be [m,n] n>=m
-  - DELETE: Delete code in the specified range, [RANGE] should be [m,n] n>=m
-  - NEW_FILE: Create a new file, [RANGE] should be [1,1)
-- [FILE]: The path of the file to be modified
-- [RANGE]: The range of the lines to be modified, [m,n] includes both m and n, [m,n) includes m but excludes n
-- [START_LINE] is m and [END_LINE] is n
-- [INCLUDE/EXCLUDE]: if [INCLUDE/EXCLUDE] is INCLUDE, the [RANGE] is [m,n], if [INCLUDE/EXCLUDE] is EXCLUDE, the [RANGE] is [m,n)
-- [PREFIX]: The line before replace, if replace first line, the [PREFIX] is <NONE>
-- [SUFFIX]: The line after replace, if replace last line, the [SUFFIX] is <NONE>
-- [CONTENT]: The content of the code to be modified, if the operation is delete, the [CONTENT] is empty
+Rules:
+1. Code snippets must include sufficient context (3 lines before/after)
+2. Only show modified code sections
+3. Preserve original indentation and formatting
+4. For new files, provide complete code
+5. When modifying existing files, retain surrounding unchanged code
 
-Patch Line Number Range Rules:
-- INSERT: [m,m)
-- REPLACE: [m,n] n>=m
-- DELETE: [m,n] n>=m
-- NEW_FILE: [1,1)
-
-Critical Rules:
-- NEVER include unchanged code in patch content
-- ONLY show lines that are being modified/added
-- Maintain original line breaks around modified sections
-- Preserve surrounding comments unless explicitly modifying them
-- Verify line number range is correct
-- Verify indentation is correct
-- [CONTENT] should not contain [PREFIX] and [SUFFIX]
+Example:
+<PATCH>
+File: src/utils/math.py
+Reason: Fix zero division handling
+```python
+def safe_divide(a, b):
+    # Add parameter validation
+    if b == 0:
+        raise ValueError("Divisor cannot be zero")
+    return a / b
+```
+</PATCH>
 """
 
 
 def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
-    """解析补丁格式"""
+    """解析新的上下文补丁格式"""
     result = {}
-    # 更新正则表达式以更好地处理文件路径和范围
-    header_pattern = re.compile(
-        r'^\s*"?([^\n\r\[]+)"?\s*\[(\d+)(?:,(\d+))?([\]\)])\s*$',  # 匹配文件路径和行号
-        re.ASCII
-    )
     patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', patch_str, re.DOTALL)
     
     for patch in patches:
-        parts = patch.split('\n', 1)
-        if len(parts) < 1:
-            continue
-        header_line = parts[0].strip()
-        content = parts[1] if len(parts) > 1 else ''
+        file_match = re.search(r'^File:\s*(.+)$', patch, re.MULTILINE)
+        reason_match = re.search(r'^Reason:\s*(.+)$', patch, re.MULTILINE)
+        code_match = re.search(r'^(```.*?\n)(.*?)(\n```)?$', patch, re.DOTALL)
         
-        if content and not content.endswith('\n'):
-            content += '\n'
-            
-        # 解析文件路径和行号
-        header_match = header_pattern.match(header_line)
-        if not header_match:
-            PrettyOutput.print(f"无法解析补丁头: {header_line}", OutputType.WARNING)
+        if not file_match or not code_match:
+            PrettyOutput.print("无效的补丁格式", OutputType.WARNING)
             continue
 
-        filepath = header_match.group(1).strip()
+        filepath = file_match.group(1).strip()
+        reason = reason_match.group(1).strip() if reason_match else ""
+        code = code_match.group(2).strip() + '\n'  # 保留原始格式
         
-        try:
-            start = int(header_match.group(2))  # 保持1-based行号
-            end = int(header_match.group(3)) if header_match.group(3) else start
-            range_type = header_match.group(4)  # ] 或 ) 表示范围类型
-        except (ValueError, IndexError) as e:
-            PrettyOutput.print(f"解析行号失败: {str(e)}", OutputType.WARNING)
-            continue
-
-        # 根据范围类型调整结束行号
-        if range_type == ')':  # 对于 [m,n) 格式，不包括第n行
-            end = end
-        else:  # 对于 [m,n] 格式，包括第n行
-            end = end + 1
-
         if filepath not in result:
             result[filepath] = []
         result[filepath].append({
             'filepath': filepath,
-            'start': start,
-            'end': end,
-            'content': content
+            'reason': reason,
+            'content': code
         })
-    for filepath in result.keys():
-        result[filepath] = sorted(result[filepath], key=lambda x: x['start'], reverse=True)
     return result
 
 
@@ -132,77 +94,121 @@ def apply_patch(output_str: str) -> str:
         return ""
 
     ret = ""
+    success_files = []
+    failed_files = []
     
+    # 按文件逐个处理
     for filepath, patch_list in patches.items():
-        for i, patch in enumerate(patch_list):
-            try:
+        file_ret = ""
+        try:
+            PrettyOutput.print(f"应用补丁到文件: {filepath}", OutputType.INFO)
+            
+            # 应用该文件的所有补丁
+            for i, patch in enumerate(patch_list):
                 err = handle_code_operation(filepath, patch)
                 if err:
-                    PrettyOutput.print(err, OutputType.WARNING)
-                    revert_change()
-                    return err
-                PrettyOutput.print(f"成功为文件{filepath}应用补丁{i+1}/{len(patch_list)}", OutputType.SUCCESS)
-            except Exception as e:
-                PrettyOutput.print(f"操作失败: {str(e)}", OutputType.ERROR)
+                    raise Exception(f"补丁{i+1}应用失败: {err}")
+                
+                file_ret += f"✅ 成功应用补丁{i+1}/{len(patch_list)}\n"
+            
+            # 验证文件是否实际修改（使用git状态检查）
+            if not is_file_modified(filepath):
+                file_ret += "⚠️ 补丁未产生实际修改\n"
+                continue
+                
+            success_files.append(filepath)
+            PrettyOutput.print(f"文件 {filepath} 处理完成", OutputType.SUCCESS)
+            
+        except Exception as e:
+            failed_files.append(filepath)
+            revert_file(filepath)  # 回滚单个文件
+            file_ret += f"❌ 文件处理失败: {str(e)}\n"
+            PrettyOutput.print(f"文件 {filepath} 处理失败: {str(e)}", OutputType.ERROR)
+        
+        ret += f"\n=== 文件 {filepath} 处理结果 ===\n{file_ret}"
     
-    has_uncommitted_changes_ = has_uncommitted_changes()
-
-    if len(patches) > 0 and not has_uncommitted_changes_:
-        ret += """Find patches, but apply those patches will not change any files, please check if line number range is correct.
-        Delete: [m,n], m>=n
-        Insert: [m,m),
-        Replace: [m,n] n>=m
-        New File: [1,1)
-        """
-
-    if has_uncommitted_changes():
+    # 整体提交处理
+    final_ret = ""
+    if success_files:
         diff = get_diff()
-        if handle_commit_workflow(diff):
-            ret += "Successfully applied the patch\n"
-            # Get modified line ranges
-            modified_ranges = get_modified_line_ranges()
-            modified_code = ReadCodeTool().execute({"files": [{"path": filepath, "start_line": line_range[0], "end_line": line_range[1]} for filepath, line_range in modified_ranges.items()]})
+        if diff and handle_commit_workflow(diff):
+            final_ret += "✅ 以下文件修改已提交:\n" + "\n".join([f"- {f}" for f in success_files])
+            
+            # 获取修改后的代码内容
+            modified_code = ReadCodeTool().execute({"files": [{"path": f} for f in success_files]})
             if modified_code["success"]:
-                ret += "New code:\n"
-                ret += modified_code["stdout"]
-                ret += "Please review the code and confirm if it is correct. if it is uncorrect, you need generate a new patch to fix it."
-            PrettyOutput.print(ret, OutputType.USER)
-            if user_confirm(f"使用此内容回复？", True):
-                return ret
-            else:
-                ret = get_multiline_input("请输入自定义回复")
+                final_ret += "\n\n修改后代码:\n" + modified_code["stdout"]
         else:
-            ret += "I rejected the patch\nThis is your patch preview:\n"
-            ret += diff
-            ret += "Please check the patch and regenerate it if necessary."
-            PrettyOutput.print(ret, OutputType.USER)
-            if user_confirm(f"使用此内容回复？", True):
-                return ret
-            else:
-                ret = get_multiline_input("请输入自定义回复")
+            final_ret += "❌ 用户取消了提交操作"
+            revert_change()  # 回滚所有修改
+    
+    if failed_files:
+        final_ret += "\n\n❌ 以下文件处理失败:\n" + "\n".join([f"- {f}" for f in failed_files])
+    
+    if not success_files and not failed_files:
+        final_ret += "⚠️ 所有补丁未产生实际文件修改，可能原因：\n- 代码片段缺少有效修改\n- 新文件内容与已有文件相同"
+    
+    # 用户确认最终结果
+    PrettyOutput.print(final_ret, OutputType.USER)
+    if user_confirm("是否使用此回复？", default=True):
+        return final_ret
+    return get_multiline_input("请输入自定义回复")
 
-    return ret  # Ensure a string is always returned
-
-def get_diff() -> str:
-    """使用更安全的subprocess代替os.system"""
+def revert_file(filepath: str):
+    """增强版git恢复，处理新文件"""
     import subprocess
     try:
-        subprocess.run(['git', 'add', '.'], check=True)
+        # 检查文件是否在版本控制中
         result = subprocess.run(
-            ['git', 'diff', 'HEAD'],
+            ['git', 'ls-files', '--error-unmatch', filepath],
+            stderr=subprocess.PIPE
+        )
+        if result.returncode == 0:
+            subprocess.run(['git', 'checkout', 'HEAD', '--', filepath], check=True)
+        else:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        subprocess.run(['git', 'clean', '-f', '--', filepath], check=True)
+    except subprocess.CalledProcessError as e:
+        PrettyOutput.print(f"恢复文件失败: {str(e)}", OutputType.ERROR)
+
+def is_file_modified(filepath: str) -> bool:
+    """检查工作区或暂存区是否有修改"""
+    import subprocess
+    # 检查工作区修改
+    worktree_diff = subprocess.run(
+        ['git', 'diff', '--name-only', '--', filepath],
+        capture_output=True,
+        text=True
+    )
+    # 检查暂存区修改
+    staged_diff = subprocess.run(
+        ['git', 'diff', '--name-only', '--staged', '--', filepath],
+        capture_output=True,
+        text=True
+    )
+    return filepath in worktree_diff.stdout or filepath in staged_diff.stdout
+
+# 修改后的恢复函数
+def revert_change():
+    import subprocess
+    subprocess.run(['git', 'reset', '--hard', 'HEAD'], check=True)
+    subprocess.run(['git', 'clean', '-fd'], check=True)
+
+# 修改后的获取差异函数
+def get_diff() -> str:
+    """使用git获取暂存区差异"""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['git', 'diff', '--staged'],
             capture_output=True,
             text=True,
             check=True
         )
         return result.stdout
-    finally:
-        subprocess.run(['git', 'reset', 'HEAD'], check=True)
-
-def revert_change():
-    import subprocess
-    subprocess.run(['git', 'reset', 'HEAD'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(['git', 'checkout', '--', '.'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(['git', 'clean', '-fd'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError as e:
+        return f"获取差异失败: {str(e)}"
 
 def handle_commit_workflow(diff:str)->bool:
     """Handle the git commit workflow and return the commit details.
@@ -250,64 +256,54 @@ def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
     return result
 # New handler functions below ▼▼▼
 
-def handle_new_file(filepath: str, patch: Dict[str, Any]):
-    """统一参数格式处理新文件"""
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(patch['content'])
 
-def handle_code_operation(filepath: str, patch: Dict[str, Any]) -> str:
-    """处理紧凑格式补丁"""
+
+def handle_code_operation(filepath: str, patch: List[Dict[str, Any]]) -> str:
+    """处理基于上下文的代码片段"""
     try:
-        # 新建文件时强制覆盖
-        os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
         if not os.path.exists(filepath):
-            open(filepath, 'w', encoding='utf-8').close()
-        with open(filepath, 'r+', encoding='utf-8') as f:
-            lines = f.readlines()
+            # 新建文件
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(patch['content'])
+            return ""
+
+        old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
+        if not old_file_content["success"]:
+            return f"文件读取失败: {old_file_content['stderr']}"
+        
+        prompt = f"""
+You are a code reviewer, please review the following code and merge the code with the context.
+
+Original Code:
+{old_file_content["stdout"]}
+
+Patch:
+"""
+        for patch_item in patch:
+            prompt += f"""
+Patch:
+{patch_item["content"]}
+"""
+        prompt += f"""
+Please merge the code with the context and return the fully merged code.
+
+Output Format:
+```[language]
+[merged_code]
+```
+"""
+        response = PlatformRegistry().get_codegen_platform().chat_until_success(prompt)
+        merged_code = re.search(r"```.*?\n(.*)```", response, re.DOTALL).group(1)
+        if not merged_code:
+            return f"代码合并失败: {response}"
+        # 写入合并后的代码
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(merged_code)
             
-            new_lines = validate_and_apply_changes(
-                lines,
-                patch['start'],
-                patch['end'],
-                patch['content']
-            )
-            
-            f.seek(0)
-            f.writelines(new_lines)
-            f.truncate()
-        PrettyOutput.print(f"成功更新 {filepath}", OutputType.SUCCESS)
         return ""
     except Exception as e:
-        error_msg = f"Failed to handle code operation: {str(e)}"
-        PrettyOutput.print(error_msg, OutputType.ERROR)
-        return error_msg
-def validate_and_apply_changes(
-    lines: List[str],
-    start: int,
-    end: int,
-    content: str
-) -> List[str]:
-    new_content = content.splitlines(keepends=True)
-    
-    # 插入操作处理
-    if start == end:
-        if start < 1 or start > len(lines)+1:
-            raise ValueError(f"无效插入位置: {start}")
-        return lines[:start-1] + new_content + lines[start-1:]
-    
-    # 范围替换/删除操作
-    if start > end:
-        raise ValueError(f"起始行{start}不能大于结束行{end}")
-    
-    max_line = len(lines)
-    # 自动修正行号范围
-    start = max(1, min(start, max_line+1))
-    end = max(start, min(end, max_line+1))
-    
-    # 执行替换
-    return lines[:start-1] + new_content + lines[end-1:]
-
+        return f"文件操作失败: {str(e)}"
 
 def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     lines = user_input.splitlines()
