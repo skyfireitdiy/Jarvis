@@ -194,13 +194,17 @@ Expert in precise code modifications with proper tool usage.
             if commits:
                 commit_messages = "检测到以下提交记录:\n" + "\n".join([f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits])
                 PrettyOutput.print(commit_messages, OutputType.INFO)
-            
-            if len(commits) > 1 and user_confirm("检测到多个提交，是否要合并为一个更清晰的提交记录？", True):
-                # Reset to start commit
-                subprocess.run(["git", "reset", "--soft", start_commit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                # Create new commit
-                git_commiter = GitCommitTool()
-                git_commiter.execute({})
+
+            if commits and user_confirm("是否接受以上提交记录？", True):
+                if len(commits) > 1 and user_confirm("是否要合并为一个更清晰的提交记录？", True):
+                    # Reset to start commit
+                    subprocess.run(["git", "reset", "--soft", start_commit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    # Create new commit
+                    git_commiter = GitCommitTool()
+                    git_commiter.execute({})
+            elif start_commit:
+                os.system(f"git reset --hard {start_commit}")
+                PrettyOutput.print("已重置到初始提交", OutputType.INFO)
                 
         except Exception as e:
             return f"Error during execution: {str(e)}"
