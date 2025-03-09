@@ -33,7 +33,7 @@ Reason: [change_reason]
 --------------------------------
 Rules:
 1. Code snippets must include sufficient context (3 lines before/after)
-2. Only show modified code sections
+2. I can see full code, so only show modified code sections
 3. Preserve original indentation and formatting
 4. For new files, provide complete code
 5. When modifying existing files, retain surrounding unchanged code
@@ -47,6 +47,9 @@ def safe_divide(a, b):
     if b == 0:
         raise ValueError("Divisor cannot be zero")
     return a / b
+# existing code ...
+def add(a, b):
+    return a + b
 ```
 </PATCH>
 """
