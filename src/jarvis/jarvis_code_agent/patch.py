@@ -57,31 +57,16 @@ def safe_divide(a, b):
 """
 
 
-def _parse_patch(patch_str: str) -> Dict[str, List[Dict[str, Any]]]:
+def _parse_patch(patch_str: str) -> Dict[str, str]:
     """解析新的上下文补丁格式"""
     result = {}
     patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', patch_str, re.DOTALL)
-    
-    for patch in patches:
-        file_match = re.search(r'^File:\s*(.+)$', patch, re.MULTILINE)
-        reason_match = re.search(r'^Reason:\s*(.+)$', patch, re.MULTILINE)
-        code_match = re.search(r'^(```.*?\n)(.*?)(\n```)?$', patch, re.DOTALL)
-        
-        if not file_match or not code_match:
-            PrettyOutput.print("无效的补丁格式", OutputType.WARNING)
-            continue
-
-        filepath = file_match.group(1).strip()
-        reason = reason_match.group(1).strip() if reason_match else ""
-        code = code_match.group(2).strip() + '\n'  # 保留原始格式
-        
-        if filepath not in result:
-            result[filepath] = []
-        result[filepath].append({
-            'filepath': filepath,
-            'reason': reason,
-            'content': code
-        })
+    if patches:
+        for patch in patches:
+            file_match = re.search(r'^File:\s*(.+)$', patch, re)
+            if file_match:
+                filepath = file_match.group(1).strip()
+                result[filepath] = patch
     return result
 
 
@@ -94,11 +79,10 @@ def apply_patch(output_str: str) -> str:
         return ""
     
     # 按文件逐个处理
-    for filepath, patch_list in patches.items():
-        file_ret = ""
+    for filepath, patch_content in patches.items():
         try:
             PrettyOutput.print(f"应用补丁到文件: {filepath}", OutputType.INFO)
-            handle_code_operation(filepath, patch_list)
+            handle_code_operation(filepath, patch_content)
             PrettyOutput.print(f"文件 {filepath} 处理完成", OutputType.SUCCESS)
         except Exception as e:
             revert_file(filepath)  # 回滚单个文件
@@ -206,15 +190,13 @@ def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
 
 
 
-def handle_code_operation(filepath: str, patch: List[Dict[str, Any]]) -> str:
+def handle_code_operation(filepath: str, patch_content: str) -> str:
     """处理基于上下文的代码片段"""
     try:
         if not os.path.exists(filepath):
             # 新建文件
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(patch['content'])
-            return ""
+            open(filepath, 'w', encoding='utf-8').close()
 
         old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
         if not old_file_content["success"]:
@@ -227,11 +209,7 @@ Original Code:
 {old_file_content["stdout"]}
 
 Patch:
-"""
-        for patch_item in patch:
-            prompt += f"""
-Patch:
-{patch_item["content"]}
+{patch_content}
 """
         prompt += f"""
 Please merge the code with the context and return the fully merged code.
