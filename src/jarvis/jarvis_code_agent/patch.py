@@ -5,7 +5,7 @@ from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
-from jarvis.jarvis_utils import OutputType, PrettyOutput, has_uncommitted_changes, is_confirm_before_apply_patch, user_confirm
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, is_confirm_before_apply_patch, user_confirm
 
 
 class PatchOutputHandler(OutputHandler):
@@ -165,13 +165,19 @@ def apply_patch(output_str: str) -> str:
             if modified_code["success"]:
                 ret += "New code:\n"
                 ret += modified_code["stdout"]
-            
-            ret += "Please review the code and confirm if it is correct. if it is uncorrect, you need generate a new patch to fix it.\n"
+                ret += "Please review the code and confirm if it is correct. if it is uncorrect, you need generate a new patch to fix it."
+            if user_confirm(f"{ret}\n使用此内容回复？", True):
+                return ret
+            else:
+                ret += get_multiline_input("请输入自定义回复")
         else:
             ret += "I rejected the patch\nThis is your patch preview:\n"
             ret += diff
-
-            ret += "Please check the patch and regenerate it if necessary.\n"
+            ret += "Please check the patch and regenerate it if necessary."
+            if user_confirm(f"{ret}\n使用此内容回复？", True):
+                return ret
+            else:
+                ret += get_multiline_input("请输入自定义回复")
 
     return ret  # Ensure a string is always returned
 
