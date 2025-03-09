@@ -6,7 +6,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
-from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, is_confirm_before_apply_patch, user_confirm
+from jarvis.jarvis_utils import OutputType, PrettyOutput, get_commits_between, get_latest_commit_hash, get_multiline_input, has_uncommitted_changes, is_confirm_before_apply_patch, user_confirm
 
 class PatchOutputHandler(OutputHandler):
     def name(self) -> str:
