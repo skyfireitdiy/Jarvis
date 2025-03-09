@@ -168,7 +168,7 @@ def apply_patch(output_str: str) -> str:
             
             ret += "Please review the code and confirm if it is correct. if it is uncorrect, you need generate a new patch to fix it.\n"
         else:
-            ret += "User rejected the patch\nThis is your patch preview:\n"
+            ret += "I rejected the patch\nThis is your patch preview:\n"
             ret += diff
 
             ret += "Please check the patch and regenerate it if necessary.\n"
