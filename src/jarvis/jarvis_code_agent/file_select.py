@@ -7,21 +7,6 @@ from jarvis.jarvis_utils import OutputType, PrettyOutput, get_single_line_input,
 
 
 def _parse_file_selection(input_str: str, max_index: int) -> List[int]:
-    """Parse file selection expression
-    
-    Supported formats:
-    - Single number: "1"
-    - Comma-separated: "1,3,5"
-    - Range: "1-5"
-    - Combination: "1,3-5,7"
-    
-    Args:
-        input_str: User input selection expression
-        max_index: Maximum selectable index
-        
-    Returns:
-        List[int]: Selected index list (starting from 0)
-    """
     selected = set()
     
     # Remove all whitespace characters
@@ -204,7 +189,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                     continue
                 
                 try:
-                    selected_files.append({"file": path, "reason": "User Added"})
+                    selected_files.append({"file": path, "reason": "I Added"})
                     tips += f"\n文件已添加: {path}"
                 except Exception as e:
                     tips += f"\n读取文件失败: {str(e)}"

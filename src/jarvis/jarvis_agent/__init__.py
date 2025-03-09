@@ -266,7 +266,7 @@ Please continue the task based on the above information.
         """Process user input and execute the task.
         
         Args:
-            user_input: User's task description or request
+            user_input: My task description or request
             file_list: Optional list of files to process
             
         Returns:

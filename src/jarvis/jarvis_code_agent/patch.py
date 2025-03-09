@@ -302,12 +302,6 @@ def validate_and_apply_changes(
 
 
 def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
-    """Handle shell input with optional line ranges.
-    
-    Args:
-        user_input: User input string containing shell commands
-        agent: Agent instance (unused in current implementation)
-    """
     lines = user_input.splitlines()
     cmdline = [line for line in lines if line.startswith("!")]
     if len(cmdline) == 0:

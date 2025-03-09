@@ -16,15 +16,6 @@ from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, h
 
 
 def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
-    """Handle file input with optional line ranges.
-    
-    Args:
-        user_input: User input string containing file references
-        agent: Agent instance (unused in current implementation)
-        
-    Returns:
-        str: Prompt with file contents prepended if files are found
-    """
     prompt = user_input
     files = []
     
