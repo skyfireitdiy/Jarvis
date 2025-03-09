@@ -94,10 +94,12 @@ def apply_patch(output_str: str) -> str:
     diff = get_diff()
     if diff:
         PrettyOutput.print(diff, OutputType.CODE, lang="diff")
-    if diff and handle_commit_workflow():
-        final_ret += "✅ The patches have been applied"
+        if handle_commit_workflow():
+            final_ret += "✅ The patches have been applied"
+        else:
+            final_ret += "❌ I don't want to commit the code"
     else:
-        final_ret += "❌ I don't want to commit the code"
+        final_ret += "❌ There are no changes to commit"
 
     # 用户确认最终结果
     PrettyOutput.print(final_ret, OutputType.USER)
@@ -135,7 +137,7 @@ def get_diff() -> str:
     import subprocess
     try:
         result = subprocess.run(
-            ['git', 'diff', '--staged'],
+            ['git', 'diff'],
             capture_output=True,
             text=True,
             check=True
