@@ -1,6 +1,8 @@
 import re
 from typing import Dict, Any, List, Tuple
 import os
+
+import yaspin
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
@@ -195,28 +197,33 @@ Output Format:
         start_line = -1
         end_line = -1
         response = []
-        while count > 0:
-            count -= 1
-            response.extend(model.chat_until_success(prompt).splitlines())
-            try:
-                start_line = response.index("<MERGED_CODE>") + 1
-            except:
-                pass
-            try:
-                end_line = response.index("</MERGED_CODE>")
-            except:
-                pass
-            if start_line == -1:
-                return f"代码合并失败"
-            if end_line == -1:
-                last_line = response[-1]
-                prompt = f"""
-                continue with the last line:
-                {last_line}
-                """
-                continue
-            break
-
+        with yaspin(text=f"正在为文件 {filepath} 应用补丁...") as spinner:
+            while count > 0:
+                count -= 1
+                response.extend(model.chat_until_success(prompt).splitlines())
+                try:
+                    start_line = response.index("<MERGED_CODE>") + 1
+                except:
+                    pass
+                try:
+                    end_line = response.index("</MERGED_CODE>")
+                except:
+                    pass
+                if start_line == -1:
+                    spinner.fail(f"❌ 为文件 {filepath} 应用补丁失败")
+                    return f"代码合并失败"
+                if end_line == -1:
+                    last_line = response[-1]
+                    prompt = f"""
+                    continue with the last line:
+                    {last_line}
+                    """
+                    continue
+                if end_line < start_line:
+                    spinner.fail(f"❌ 为文件 {filepath} 应用补丁失败")
+                    return f"代码合并失败"
+                break
+            spinner.ok(f"✅ 为文件 {filepath} 应用补丁成功")
         # 写入合并后的代码
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write("\n".join(response[start_line:end_line]))
