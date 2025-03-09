@@ -79,7 +79,6 @@ def apply_patch(output_str: str) -> str:
     # 按文件逐个处理
     for filepath, patch_content in patches.items():
         try:
-            PrettyOutput.print(f"应用补丁到文件: {filepath}", OutputType.INFO)
             handle_code_operation(filepath, patch_content)
             PrettyOutput.print(f"文件 {filepath} 处理完成", OutputType.SUCCESS)
         except Exception as e:
@@ -190,7 +189,9 @@ Output Format:
 [merged_code]
 </MERGED_CODE>
 """
-        response = PlatformRegistry().get_codegen_platform().chat_until_success(prompt)
+        model = PlatformRegistry().get_codegen_platform()
+        model.set_suppress_output(True)
+        response = model.chat_until_success(prompt)
         merged_code = re.search(r"<MERGED_CODE>\n?(.*?)\n?</MERGED_CODE>", response, re.DOTALL).group(1)
         if not merged_code:
             return f"代码合并失败: {response}"
