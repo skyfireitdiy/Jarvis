@@ -119,7 +119,7 @@ class ReadCodeTool:
                 formatted_lines.append(f"{line_num:>5}:{line}")
                 
             content = "".join(formatted_lines)
-            output = f"\n\nFile: {filepath}\nLines: [{start_line}, {end_line}]\n{content}"
+            output = f"\n\nFile: {filepath}\nLines: [{start_line}, {end_line}]\n{content} \n\n" + "="*80 + "\n\n"
             return {
                 "success": True,
                 "stdout": output,
