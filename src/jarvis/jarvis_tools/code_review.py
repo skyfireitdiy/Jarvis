@@ -34,10 +34,6 @@ class CodeReviewTool:
         "required": []
     }
 
-    def __init__(self):
-        init_env()
-        self.repo_root = find_git_root()
-
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
             review_type = args.get("review_type", "current").strip()
@@ -206,6 +202,8 @@ def extract_code_report(result: str) -> str:
 def main():
     """CLI entry point"""
     import argparse
+
+    init_env()
     
     parser = argparse.ArgumentParser(description='Autonomous code review tool')
     parser.add_argument('--type', choices=['commit', 'current', 'range'], default='current',
