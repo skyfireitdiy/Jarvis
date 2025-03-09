@@ -191,13 +191,35 @@ Output Format:
 """
         model = PlatformRegistry().get_codegen_platform()
         model.set_suppress_output(True)
-        response = model.chat_until_success(prompt)
-        merged_code = re.search(r"<MERGED_CODE>\n?(.*?)\n?</MERGED_CODE>", response, re.DOTALL).group(1)
-        if not merged_code:
-            return f"代码合并失败: {response}"
+        count = 5
+        start_line = -1
+        end_line = -1
+        response = []
+        while count > 0:
+            count -= 1
+            response.extend(model.chat_until_success(prompt).splitlines())
+            try:
+                start_line = response.index("<MERGED_CODE>") + 1
+            except:
+                pass
+            try:
+                end_line = response.index("</MERGED_CODE>")
+            except:
+                pass
+            if start_line == -1:
+                return f"代码合并失败"
+            if end_line == -1:
+                last_line = response[-1]
+                prompt = f"""
+                continue with the last line:
+                {last_line}
+                """
+                continue
+            break
+
         # 写入合并后的代码
         with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(merged_code)
+            f.write("\n".join(response[start_line:end_line]))
             
         return ""
     except Exception as e:
