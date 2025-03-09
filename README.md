@@ -15,57 +15,46 @@
 ## 🚀 快速开始
 ### 安装
 ```bash
-pip install jarvis-ai-assistant
+pip install jarvis-ai-assistant # 安装jarvis-ai-assistant
+playwright install # 安装playwright
 ```
 ### 最小化配置
 ```bash
-JARVIS_PLATFORM=openai
-JARVIS_MODEL=deepseek-chat
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_API_BASE=https://api.deepseek.com/v1
+JARVIS_PLATFORM=openai # 设置AI平台
+JARVIS_MODEL=deepseek-chat # 设置AI模型
+OPENAI_API_KEY=your_openai_api_key # 设置OpenAI API密钥
+OPENAI_API_BASE=https://api.deepseek.com/v1 # 设置OpenAI API基础URL
 ```
+以上配置编写到`~/.jarvis/env`文件中。
+
 ### 基本使用
 ```bash
-# 使用主代理
+# 使用通用代理
 jarvis
-# 直接使用代码代理
+# 使用代码代理
 jarvis-code-agent
-# 查看帮助信息
-jarvis --help
+# 或者 jca
+# 使用codebase的功能
+jarvis-codebase --help
+# 使用rag的功能
+jarvis-rag --help
+# 使用智能shell的功能
+jarvis-smart-shell --help
+# 或者 jss
+# 使用平台管理的功能
+jarvis-platform-manager --help
+# 使用自动化git commit的功能
+jarvis-git-commit --help
+# 或者 jgc
+# 使用代码审查的功能
+jarvis-code-review --help
+# 使用dev功能（开发中）
+jarvis-dev --help
+# 使用git squash的功能
+jarvis-git-squash --help
 ```
 ---
-## 🎯 核心功能
-### 代码智能
-- 基于需求的智能文件选择和分析
-- 语义化代码库搜索和查询
-- 具有上下文感知的大文件高效处理
-- 精确的基于补丁的代码修改
-- 自动化的 git 提交管理
-### 多模型架构
-- 支持多个 AI 平台（Kimi/OpenAI/AI8/OYI/Ollama）
-- 针对不同任务的平台特定优化
-- 专门用于代码生成、思考和通用任务的模型
-- 流式响应支持以提供更好的交互
-- 自动的模型回退和重试机制
-### RAG 能力
-- 文档索引和语义搜索
-- 大型文档的智能上下文管理
-- 自动文件变更检测
-- 高效的缓存机制
-- 多格式文档支持
-### 开发工具
-- 交互式命令行生成
-- 多维度的代码审查
-- 基于代码库的问题解决
-- 具有安全检查的文件操作
-- 进度跟踪和错误处理
-### 用户体验
-- 支持彩色输出的精美控制台
-- 交互式多行输入
-- 长时间操作的进度指示
-- 清晰的错误消息和处理
-- 上下文感知的响应格式化
----
+
 ## ⚙️ 配置说明
 ### 环境变量配置
 | 分类 | 变量名称 | 默认值 | 说明 |
@@ -89,16 +78,6 @@ jarvis --help
 | 方法论配置 | `JARVIS_NEED_SUMMARY` | true | 是否自动生成摘要 |
 | 文本处理 | `JARVIS_MIN_PARAGRAPH_LENGTH` | 50 | 文本处理的最小段落长度 |
 | 文本处理 | `JARVIS_MAX_PARAGRAPH_LENGTH` | 12800 | 文本处理的最大段落长度 |
-### 配置文件
-在`~/.jarvis/env`文件中配置环境变量：
-```bash
-# 示例配置
-JARVIS_MAX_TOKEN_COUNT=262144
-JARVIS_AUTO_COMPLETE=true
-JARVIS_CODEGEN_MODEL=gpt-4
-JARVIS_THINKING_PLATFORM=openai
-JARVIS_THREAD_COUNT=4
-```
 ---
 ## 🛠️ 工具说明
 ### 内置工具
@@ -109,12 +88,12 @@ JARVIS_THREAD_COUNT=4
 | execute_shell_script | 执行shell脚本文件 |
 | ask_codebase | 智能代码库查询和分析 |
 | ask_user | 交互式用户输入收集 |
-| file_operation | 基础文件操作（读取/存在性检查） |
+| file_operation | 基础文件操作（读取/写入/存在性检查） |
 | git_commiter | 自动化git提交处理 |
 | code_review | 多维度的自动代码审查 |
-| search_web | 开发相关的网络搜索 |
+| search_web | 使用bing进行网络搜索 |
 | read_webpage | 读取网页内容 |
-| chdir | 安全地更改工作目录 |
+| chdir | 更改工作目录 |
 | create_code_agent | 创建新的代码代理 |
 | create_sub_agent | 创建子代理 |
 | lsp_find_definition | 查找符号定义 |
@@ -124,14 +103,14 @@ JARVIS_THREAD_COUNT=4
 | lsp_prepare_rename | 准备符号重命名 |
 | lsp_validate_edit | 验证代码编辑 |
 | rag | 文档检索和问答 |
-| select_code_files | 智能选择代码文件 |
+| select_code_files | 选择代码文件 |
 ### 工具位置
 - 内置工具：`src/jarvis/tools/`
 - 用户工具：`~/.jarvis/tools/`
 ---
 ## 🛠️ 扩展开发
 ### 添加新工具
-在 `~/.jarvis/tools/` 或 `src/jarvis/tools/` 中创建新的 Python 文件：
+在 `~/.jarvis/tools/` 中创建新的 Python 文件：
 ```python
 from typing import Dict, Any
 from jarvis.utils import OutputType, PrettyOutput
@@ -177,20 +156,53 @@ class CustomTool:
                 "stderr": str(e)
             }
 ```
-### 开发指南
-1. **工具开发**
-   - 使用描述性名称和文档
-   - 定义清晰的参数模式
-   - 优雅处理错误
-   - 返回标准化结果
-   - 保持工具功能集中和简单
-2. **最佳实践**
-   - 使用 PrettyOutput 进行控制台输出
-   - 编写代码文档
-   - 添加类型提示
-   - 充分测试
-   - 处理边界情况
----
+
+### 添加新大模型平台
+在 `~/.jarvis/platforms/` 中创建新的 Python 文件：
+```python
+from jarvis.jarvis_platform.base import BasePlatform
+class CustomPlatform(BasePlatform):
+    def __init__(self):
+        # 初始化平台
+        pass
+
+    def __del__(self):
+        # 销毁平台
+        pass
+
+    def chat(self, message: str) -> str:
+        # 执行对话
+        pass
+
+    def upload_files(self, file_list: List[str]) -> List[Dict]:
+        # 上传文件
+        pass
+
+    def reset(self):
+        # 重置平台
+        pass
+
+    def delete_chat(self):
+        # 删除对话
+        pass
+
+    def set_model_name(self, model_name: str):
+        # 设置模型名称
+        pass
+
+    def set_system_message(self, message: str):
+        # 设置系统消息
+        pass
+
+    def get_model_list(self) -> List[Tuple[str, str]]:
+        # 获取模型列表
+        pass
+
+    def name(self) -> str:
+        # 获取平台名称
+        pass
+```
+
 ## 🤝 贡献指南
 1. Fork 仓库
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
@@ -199,6 +211,7 @@ class CustomTool:
 5. 开启 Pull Request
 ---
 ## 📄 许可证
+
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 ---
 <div align="center">
