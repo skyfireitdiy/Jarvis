@@ -92,62 +92,27 @@ def apply_patch(output_str: str) -> str:
     except Exception as e:
         PrettyOutput.print(f"解析补丁失败: {str(e)}", OutputType.ERROR)
         return ""
-
-    ret = ""
-    success_files = []
-    failed_files = []
     
     # 按文件逐个处理
     for filepath, patch_list in patches.items():
         file_ret = ""
         try:
             PrettyOutput.print(f"应用补丁到文件: {filepath}", OutputType.INFO)
-            
-            # 应用该文件的所有补丁
-            for i, patch in enumerate(patch_list):
-                err = handle_code_operation(filepath, patch)
-                if err:
-                    raise Exception(f"补丁{i+1}应用失败: {err}")
-                
-                file_ret += f"✅ 成功应用补丁{i+1}/{len(patch_list)}\n"
-            
-            # 验证文件是否实际修改（使用git状态检查）
-            if not is_file_modified(filepath):
-                file_ret += "⚠️ 补丁未产生实际修改\n"
-                continue
-                
-            success_files.append(filepath)
+            handle_code_operation(filepath, patch_list)
             PrettyOutput.print(f"文件 {filepath} 处理完成", OutputType.SUCCESS)
-            
         except Exception as e:
-            failed_files.append(filepath)
             revert_file(filepath)  # 回滚单个文件
-            file_ret += f"❌ 文件处理失败: {str(e)}\n"
             PrettyOutput.print(f"文件 {filepath} 处理失败: {str(e)}", OutputType.ERROR)
-        
-        ret += f"\n=== 文件 {filepath} 处理结果 ===\n{file_ret}"
     
-    # 整体提交处理
     final_ret = ""
-    if success_files:
-        diff = get_diff()
-        if diff and handle_commit_workflow(diff):
-            final_ret += "✅ 以下文件修改已提交:\n" + "\n".join([f"- {f}" for f in success_files])
-            
-            # 获取修改后的代码内容
-            modified_code = ReadCodeTool().execute({"files": [{"path": f} for f in success_files]})
-            if modified_code["success"]:
-                final_ret += "\n\n修改后代码:\n" + modified_code["stdout"]
-        else:
-            final_ret += "❌ 用户取消了提交操作"
-            revert_change()  # 回滚所有修改
-    
-    if failed_files:
-        final_ret += "\n\n❌ 以下文件处理失败:\n" + "\n".join([f"- {f}" for f in failed_files])
-    
-    if not success_files and not failed_files:
-        final_ret += "⚠️ 所有补丁未产生实际文件修改，可能原因：\n- 代码片段缺少有效修改\n- 新文件内容与已有文件相同"
-    
+    diff = get_diff()
+    if diff:
+        PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+    if diff and handle_commit_workflow():
+        final_ret += "✅ The patches have been applied"
+    else:
+        final_ret += "❌ I don't want to commit the code"
+
     # 用户确认最终结果
     PrettyOutput.print(final_ret, OutputType.USER)
     if user_confirm("是否使用此回复？", default=True):
@@ -172,23 +137,6 @@ def revert_file(filepath: str):
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(f"恢复文件失败: {str(e)}", OutputType.ERROR)
 
-def is_file_modified(filepath: str) -> bool:
-    """检查工作区或暂存区是否有修改"""
-    import subprocess
-    # 检查工作区修改
-    worktree_diff = subprocess.run(
-        ['git', 'diff', '--name-only', '--', filepath],
-        capture_output=True,
-        text=True
-    )
-    # 检查暂存区修改
-    staged_diff = subprocess.run(
-        ['git', 'diff', '--name-only', '--staged', '--', filepath],
-        capture_output=True,
-        text=True
-    )
-    return filepath in worktree_diff.stdout or filepath in staged_diff.stdout
-
 # 修改后的恢复函数
 def revert_change():
     import subprocess
@@ -210,7 +158,7 @@ def get_diff() -> str:
     except subprocess.CalledProcessError as e:
         return f"获取差异失败: {str(e)}"
 
-def handle_commit_workflow(diff:str)->bool:
+def handle_commit_workflow()->bool:
     """Handle the git commit workflow and return the commit details.
     
     Returns:
