@@ -136,13 +136,16 @@ def get_diff() -> str:
     """使用git获取暂存区差异"""
     import subprocess
     try:
+        subprocess.run(['git', 'add', '.'], check=True)
         result = subprocess.run(
-            ['git', 'diff'],
+            ['git', 'diff', '--cached'],
             capture_output=True,
             text=True,
             check=True
         )
-        return result.stdout
+        ret = result.stdout
+        subprocess.run(['git', "reset", "--soft", "HEAD"], check=True)
+        return ret
     except subprocess.CalledProcessError as e:
         return f"获取差异失败: {str(e)}"
 
