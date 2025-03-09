@@ -5,6 +5,8 @@ import sys
 import readline
 from typing import Optional
 
+import yaspin
+
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils import PrettyOutput, OutputType, get_multiline_input, get_shell_name, init_env
 
@@ -93,7 +95,9 @@ Output: find . -name "*.py"
         prefix = f"Current path: {current_path}\n"
         prefix += f"Current shell: {shell}\n"
         
-        result = model.chat_until_success(prefix + request)
+        with yaspin(text="正在生成命令...") as spinner:
+            result = model.chat_until_success(prefix + request)
+            spinner.ok("✅ 命令生成成功")
         
         # 提取命令
         if result and isinstance(result, str):
