@@ -145,13 +145,23 @@ def apply_patch(output_str: str) -> str:
             except Exception as e:
                 PrettyOutput.print(f"操作失败: {str(e)}", OutputType.ERROR)
     
+    has_uncommitted_changes_ = has_uncommitted_changes()
+
+    if len(patches) > 0 and not has_uncommitted_changes_:
+        ret += """Find patches, but apply those patches will not change any files, please check if line number range is correct.
+        Delete: [m,n], m>=n
+        Insert: [m,m),
+        Replace: [m,n] n>=m
+        New File: [1,1)
+        """
+
     if has_uncommitted_changes():
         diff = get_diff()
         if handle_commit_workflow(diff):
             ret += "Successfully applied the patch\n"
             # Get modified line ranges
             modified_ranges = get_modified_line_ranges()
-            modified_code = ReadCodeTool().execute({"files": [{"path": filepath, "start_line": 1, "end_line": -1} for filepath, _ in modified_ranges.items()]})
+            modified_code = ReadCodeTool().execute({"files": [{"path": filepath, "start_line": line_range[0], "end_line": line_range[1]} for filepath, line_range in modified_ranges.items()]})
             if modified_code["success"]:
                 ret += "New code:\n"
                 ret += modified_code["stdout"]
