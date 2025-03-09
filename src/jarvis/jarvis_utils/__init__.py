@@ -200,62 +200,75 @@ class PrettyOutput:
         styles = {
             OutputType.SYSTEM: RichStyle(
                 color="bright_cyan", 
-                bold=True, 
+                bgcolor="#1a1a1a",
+                frame=True,
+                meta={"icon": "🤖"}
             ),
             OutputType.CODE: RichStyle(
                 color="green", 
                 bgcolor="#1a1a1a",
-                frame=True
+                frame=True,
+                meta={"icon": "📝"}
             ),
             OutputType.RESULT: RichStyle(
                 color="bright_blue",
-                bold=True,
-                bgcolor="navy_blue"
+                bgcolor="#1a1a1a",
+                frame=True,
+                meta={"icon": "✨"}
             ),
             OutputType.ERROR: RichStyle(
                 color="red", 
-                bold=True,
-                blink=True,
+                frame=True,
                 bgcolor="dark_red",
+                meta={"icon": "❌"}
             ),
             OutputType.INFO: RichStyle(
                 color="gold1",
-                dim=True,
+                frame=True,
                 bgcolor="grey11",
+                meta={"icon": "ℹ️"}
             ),
             OutputType.PLANNING: RichStyle(
                 color="purple", 
                 bold=True,
+                frame=True,
+                meta={"icon": "📋"}
             ),
             OutputType.PROGRESS: RichStyle(
                 color="white", 
                 encircle=True,
+                frame=True,
+                meta={"icon": "⏳"}
             ),
             OutputType.SUCCESS: RichStyle(
                 color="bright_green", 
                 bold=True,
                 strike=False,
-                meta={"icon": "✓"},
+                meta={"icon": "✅"},
             ),
             OutputType.WARNING: RichStyle(
                 color="yellow", 
                 bold=True,
                 blink2=True,
                 bgcolor="dark_orange",
+                meta={"icon": "⚠️"}
             ),
             OutputType.DEBUG: RichStyle(
                 color="grey58",
                 dim=True,
-                conceal=True
+                conceal=True,
+                meta={"icon": "🔍"}
             ),
             OutputType.USER: RichStyle(
                 color="spring_green2",
-                reverse=True,
                 frame=True,
+                meta={"icon": "👤"}
             ),
             OutputType.TOOL: RichStyle(
                 color="dark_sea_green4",
                 bgcolor="grey19",
+                frame=True,
+                meta={"icon": "🔧"}
             )
         }
         
