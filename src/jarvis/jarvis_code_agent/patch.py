@@ -197,7 +197,7 @@ Output Format:
         start_line = -1
         end_line = -1
         response = []
-        with yaspin(text=f"正在为文件 {filepath} 应用补丁...") as spinner:
+        with yaspin(text=f"为文件 {filepath} 应用补丁中...") as spinner:
             while count > 0:
                 count -= 1
                 response.extend(model.chat_until_success(prompt).splitlines())
