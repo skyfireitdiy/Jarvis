@@ -27,9 +27,8 @@ Use <PATCH> blocks to specify code changes:
 <PATCH>
 File: [file_path]
 Reason: [change_reason]
-```language_identifier
 [contextual_code_snippet]
-```
+</PATCH>
 --------------------------------
 Rules:
 1. Code snippets must include sufficient context (3 lines before/after)
@@ -41,7 +40,6 @@ Example:
 <PATCH>
 File: src/utils/math.py
 Reason: Fix zero division handling
-```python
 def safe_divide(a, b):
     # Add parameter validation
     if b == 0:
@@ -50,7 +48,6 @@ def safe_divide(a, b):
 # existing code ...
 def add(a, b):
     return a + b
-```
 </PATCH>
 """
 
@@ -219,12 +216,12 @@ Patch:
         prompt += f"""
 Please merge the code with the context and return the fully merged code.
 Output Format:
-```[language]
+<MERGED_CODE>
 [merged_code]
-```
+</MERGED_CODE>
 """
         response = PlatformRegistry().get_codegen_platform().chat_until_success(prompt)
-        merged_code = re.search(r"```.*?\n(.*)```", response, re.DOTALL).group(1)
+        merged_code = re.search(r"<MERGED_CODE>\n?(.*?)\n?</MERGED_CODE>", response, re.DOTALL).group(1)
         if not merged_code:
             return f"代码合并失败: {response}"
         # 写入合并后的代码
