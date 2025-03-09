@@ -169,7 +169,7 @@ def apply_patch(output_str: str) -> str:
             if user_confirm(f"{ret}\n使用此内容回复？", True):
                 return ret
             else:
-                ret += get_multiline_input("请输入自定义回复")
+                ret = get_multiline_input("请输入自定义回复")
         else:
             ret += "I rejected the patch\nThis is your patch preview:\n"
             ret += diff
@@ -177,7 +177,7 @@ def apply_patch(output_str: str) -> str:
             if user_confirm(f"{ret}\n使用此内容回复？", True):
                 return ret
             else:
-                ret += get_multiline_input("请输入自定义回复")
+                ret = get_multiline_input("请输入自定义回复")
 
     return ret  # Ensure a string is always returned
 
