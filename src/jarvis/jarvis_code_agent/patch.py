@@ -63,10 +63,12 @@ def _parse_patch(patch_str: str) -> Dict[str, str]:
     patches = re.findall(r'<PATCH>\n?(.*?)\n?</PATCH>', patch_str, re.DOTALL)
     if patches:
         for patch in patches:
-            file_match = re.search(r'^File:\s*(.+)$', patch, re)
-            if file_match:
-                filepath = file_match.group(1).strip()
-                result[filepath] = patch
+            first_line = patch.splitlines()[0]
+            if not re.match(r'^File:\s*(.+)$', first_line):
+                PrettyOutput.print("无效的补丁格式", OutputType.WARNING)
+                continue
+            filepath = re.search(r'^File:\s*(.+)$', first_line).group(1).strip()
+            result[filepath] = patch
     return result
 
 
