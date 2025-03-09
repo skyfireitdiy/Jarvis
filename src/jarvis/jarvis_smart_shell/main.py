@@ -5,7 +5,7 @@ import sys
 import readline
 from typing import Optional
 
-import yaspin
+from yaspin import yaspin
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils import PrettyOutput, OutputType, get_multiline_input, get_shell_name, init_env

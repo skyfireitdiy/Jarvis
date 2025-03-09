@@ -2,7 +2,7 @@ import re
 from typing import Dict, Any, List, Tuple
 import os
 
-import yaspin
+from yaspin import yaspin
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
