@@ -166,7 +166,8 @@ def apply_patch(output_str: str) -> str:
                 ret += "New code:\n"
                 ret += modified_code["stdout"]
                 ret += "Please review the code and confirm if it is correct. if it is uncorrect, you need generate a new patch to fix it."
-            if user_confirm(f"{ret}\n使用此内容回复？", True):
+            PrettyOutput.print(ret, OutputType.USER)
+            if user_confirm(f"使用此内容回复？", True):
                 return ret
             else:
                 ret = get_multiline_input("请输入自定义回复")
@@ -174,7 +175,8 @@ def apply_patch(output_str: str) -> str:
             ret += "I rejected the patch\nThis is your patch preview:\n"
             ret += diff
             ret += "Please check the patch and regenerate it if necessary."
-            if user_confirm(f"{ret}\n使用此内容回复？", True):
+            PrettyOutput.print(ret, OutputType.USER)
+            if user_confirm(f"使用此内容回复？", True):
                 return ret
             else:
                 ret = get_multiline_input("请输入自定义回复")
