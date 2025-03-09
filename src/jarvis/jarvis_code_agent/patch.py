@@ -5,7 +5,7 @@ from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
-from jarvis.jarvis_utils import OutputType, PrettyOutput, get_multiline_input, has_uncommitted_changes, is_confirm_before_apply_patch, user_confirm
+from jarvis.jarvis_utils import OutputType, PrettyOutput, has_uncommitted_changes, is_confirm_before_apply_patch, user_confirm
 
 
 class PatchOutputHandler(OutputHandler):
@@ -311,85 +311,3 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         return user_input, False
     
 
-
-def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
-    """Handle file input with optional line ranges.
-    
-    Args:
-        user_input: User input string containing file references
-        agent: Agent instance (unused in current implementation)
-        
-    Returns:
-        str: Prompt with file contents prepended if files are found
-    """
-    prompt = user_input
-    files = []
-    
-    file_refs = re.findall(r"'([^']+)'", user_input)
-    for ref in file_refs:
-        # Handle file:start,end or file:start:end format
-        if ':' in ref:
-            file_path, line_range = ref.split(':', 1)
-            # Initialize with default values
-            start_line = 1  # 1-based
-            end_line = -1
-            
-            # Process line range if specified
-            if ',' in line_range or ':' in line_range:
-                try:
-                    raw_start, raw_end = map(int, re.split(r'[,:]', line_range))
-                    
-                    # Handle special values and Python-style negative indices
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            total_lines = len(f.readlines())
-                    except FileNotFoundError:
-                        PrettyOutput.print(f"文件不存在: {file_path}", OutputType.WARNING)
-                        continue
-                    # Process start line
-                    if raw_start == 0:  # 0表示整个文件
-                        start_line = 1
-                        end_line = total_lines
-                    else:
-                        start_line = raw_start if raw_start > 0 else total_lines + raw_start + 1
-                    
-                    # Process end line
-                    if raw_end == 0:  # 0表示整个文件（如果start也是0）
-                        end_line = total_lines
-                    else:
-                        end_line = raw_end if raw_end > 0 else total_lines + raw_end + 1
-                    
-                    # Auto-correct ranges
-                    start_line = max(1, min(start_line, total_lines))
-                    end_line = max(start_line, min(end_line, total_lines))
-                    
-                    # Final validation
-                    if start_line < 1 or end_line > total_lines or start_line > end_line:
-                        raise ValueError
-
-                except:
-                    continue
-            
-            # Add file if it exists
-            if os.path.isfile(file_path):
-                files.append({
-                    "path": file_path,
-                    "start_line": start_line,
-                    "end_line": end_line
-                })
-        else:
-            # Handle simple file path
-            if os.path.isfile(ref):
-                files.append({
-                    "path": ref,
-                    "start_line": 1,  # 1-based
-                    "end_line": -1
-                })
-    
-    # Read and process files if any were found
-    if files:
-        result = ReadCodeTool().execute({"files": files})
-        if result["success"]:
-            return result["stdout"] + "\n" + prompt, False
-    
-    return prompt, False
