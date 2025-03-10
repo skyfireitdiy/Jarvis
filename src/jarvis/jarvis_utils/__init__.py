@@ -946,7 +946,7 @@ def is_execute_tool_confirm() -> bool:
     return os.getenv('JARVIS_EXECUTE_TOOL_CONFIRM', 'false') == 'true'
 
 def is_confirm_before_apply_patch() -> bool:
-    return os.getenv('JARVIS_CONFIRM_BEFORE_APPLY_PATCH', 'true') == 'true'
+    return os.getenv('JARVIS_CONFIRM_BEFORE_APPLY_PATCH', 'false') == 'true'
 
 def split_text_into_chunks(text: str, max_length: int = 512) -> List[str]:
     """Split text into chunks with overlapping windows"""

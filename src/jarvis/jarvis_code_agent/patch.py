@@ -111,7 +111,7 @@ def apply_patch(output_str: str) -> str:
         final_ret += "❌ There are no changes to commit"
     # 用户确认最终结果
     PrettyOutput.print(final_ret, OutputType.USER)
-    if user_confirm("是否使用此回复？", default=True):
+    if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
         return final_ret
     return get_multiline_input("请输入自定义回复")
 def revert_file(filepath: str):
@@ -200,43 +200,41 @@ Output Format:
 </MERGED_CODE>
 """
         model = PlatformRegistry().get_codegen_platform()
-        model.set_suppress_output(True)
+        model.set_suppress_output(False)
         count = 5
         start_line = -1
         end_line = -1
         response = []
-        with yaspin(text=f"为文件 {filepath} 应用补丁中...", color="cyan") as spinner:
-            while count > 0:
-                count -= 1
-                response.extend(model.chat_until_success(prompt).splitlines())
-                try:
-                    start_line = response.index("<MERGED_CODE>") + 1
-                except:
-                    pass
-                try:
-                    end_line = response.index("</MERGED_CODE>")
-                except:
-                    pass
-                if start_line == -1:
-                    spinner.fail(f"❌ 为文件 {filepath} 应用补丁失败")
-                    return f"代码合并失败"
-                if end_line == -1:
-                    last_line = response[-1]
-                    prompt = f"""
-                    continue with the last line:
-                    {last_line}
-                    """
-                    response.pop() # 删除最后一行
-                    continue
-                if end_line < start_line:
-                    spinner.fail(f"❌ 为文件 {filepath} 应用补丁失败")
-                    return f"代码合并失败"
-                break
-            spinner.ok(f"✅ 为文件 {filepath} 应用补丁成功")
+        while count > 0:
+            count -= 1
+            response.extend(model.chat_until_success(prompt).splitlines())
+            try:
+                start_line = response.index("<MERGED_CODE>") + 1
+            except:
+                pass
+            try:
+                end_line = response.index("</MERGED_CODE>")
+            except:
+                pass
+            if start_line == -1:
+                PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.ERROR)
+                return f"代码合并失败"
+            if end_line == -1:
+                last_line = response[-1]
+                prompt = f"""
+                continue with the last line:
+                {last_line}
+                """
+                response.pop() # 删除最后一行
+                continue
+            if end_line < start_line:
+                PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.ERROR)
+                return f"代码合并失败"
+            break
         # 写入合并后的代码
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write("\n".join(response[start_line:end_line]))
-            
+        PrettyOutput.print(f"✅ 为文件 {filepath} 应用补丁成功", OutputType.SUCCESS)
         return ""
     except Exception as e:
         return f"文件操作失败: {str(e)}"
