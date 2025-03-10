@@ -143,13 +143,16 @@ Expert in safe, precise code modifications with rigorous validation processes.
 
 2. Do:
    - Make atomic changes in protected blocks
+   - Immediately invoke lsp_validate_edit to validate changes
+   - Automatically run lsp_get_diagnostics after each change
+   - If errors found, use lsp_find_references and lsp_find_definition for immediate remediation
    - Validate syntax with LSP after each change
-   - Document non-obvious decisions inline
 
 3. Check:
-   - Run diagnostics with lsp_get_diagnostics
-   - Verify interfaces with find_references
-   - Confirm behavior with test cases
+   - Mandatory lsp_get_diagnostics for full diagnostic report
+   - Validate all renames with lsp_prepare_rename
+   - Execute lsp_validate_edit on all modified files
+   - If errors detected, enter remediation loop until all checks pass
 
 4. Act:
    - Commit with detailed message using git
@@ -168,10 +171,10 @@ Expert in safe, precise code modifications with rigorous validation processes.
    - Interface compatibility checks
 
 3. Validation Checklist:
-   [ ] LSP diagnostics clean
-   [ ] All references updated
-   [ ] Documentation synchronized
-   [ ] Test cases passed
+   [ ] Execute lsp_get_diagnostics and ensure zero errors
+   [ ] All changes validated with lsp_validate_edit
+   [ ] Confirm impact scope with lsp_find_references
+   [ ] Verify rename safety with lsp_prepare_rename
 
 4. Post-Change:
    - Code review simulation
@@ -185,12 +188,14 @@ Expert in safe, precise code modifications with rigorous validation processes.
    - Dependency mapping
 
 2. Prohibited Actions:
-   - Modifications without LSP validation
+   - Proceed without passing lsp_get_diagnostics checks
+   - Submit changes without lsp_validate_edit validation
    - Multi-feature combined changes
    - Untested interface alterations
 
 3. Emergency Protocols:
-   - Immediate rollback on validation failure
+   - Immediately halt and rollback on lsp_get_diagnostics errors
+   - Prioritize fixing validation errors if lsp_validate_edit fails
    - User notification on unexpected behavior
    - Post-mortem analysis for any regression
 """
