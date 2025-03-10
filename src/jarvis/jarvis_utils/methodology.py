@@ -1,13 +1,31 @@
+"""
+Methodology Management Module
+This module provides utilities for loading and searching methodologies.
+It includes functions for:
+- Creating methodology embeddings
+- Loading and processing methodology data
+- Building and searching methodology index
+- Generating methodology prompts
+"""
 import os
 import yaml
 import numpy as np
 import faiss
-from typing import Dict, Any
-from ..jarvis_utils.output import PrettyOutput, OutputType
-from ..jarvis_utils.embedding import load_embedding_model
-from ..jarvis_utils.config import dont_use_local_model
+from typing import Dict, Any, List, Tuple
+from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.embedding import load_embedding_model
+from jarvis.jarvis_utils.config import dont_use_local_model
 def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -> np.ndarray:
-    """Create embedding vector for methodology text"""
+    """
+    Create embedding vector for methodology text.
+    
+    Args:
+        embedding_model: The embedding model to use
+        methodology_text: The text to create embedding for
+        
+    Returns:
+        np.ndarray: The embedding vector
+    """
     try:
         # Truncate long text
         max_length = 512
@@ -22,18 +40,34 @@ def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -
     except Exception as e:
         PrettyOutput.print(f"创建方法论嵌入向量失败: {str(e)}", OutputType.ERROR)
         return np.zeros(1536, dtype=np.float32)
+def make_methodology_prompt(data: Dict[str, str]) -> str:
+    """
+    Generate a formatted prompt from methodology data.
+    
+    Args:
+        data: Dictionary of methodology data
+        
+    Returns:
+        str: Formatted prompt string
+    """
+    ret = """This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it, if not,just ignore it:\n""" 
+    for key, value in data.items():
+        ret += f"Problem: {key}\nMethodology: {value}\n"
+    return ret
 def load_methodology(user_input: str) -> str:
-    """Load methodology and build vector index"""
+    """
+    Load methodology and build vector index for similarity search.
+    
+    Args:
+        user_input: The input text to search methodologies for
+        
+    Returns:
+        str: Relevant methodology prompt or empty string if no methodology found
+    """
     PrettyOutput.print("加载方法论...", OutputType.PROGRESS)
     user_jarvis_methodology = os.path.expanduser("~/.jarvis/methodology")
     if not os.path.exists(user_jarvis_methodology):
         return ""
-    
-    def make_methodology_prompt(data: Dict) -> str:
-        ret = """This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it, if not,just ignore it:\n""" 
-        for key, value in data.items():
-            ret += f"Problem: {key}\nMethodology: {value}\n"
-        return ret
     
     try:
         with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
@@ -41,9 +75,9 @@ def load_methodology(user_input: str) -> str:
         if dont_use_local_model():
             return make_methodology_prompt(data)
         # Reset data structure
-        methodology_data = []
-        vectors = []
-        ids = []
+        methodology_data: List[Dict[str, str]] = []
+        vectors: List[np.ndarray] = []
+        ids: List[int] = []
         # Get embedding model
         embedding_model = load_embedding_model()
         
