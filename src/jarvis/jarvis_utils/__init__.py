@@ -1,3 +1,16 @@
+"""
+Jarvis Utils Module
+This module provides utility functions and classes used throughout the Jarvis system.
+It includes various helper functions, configuration management, and common operations.
+The module is organized into several submodules:
+- config: Configuration management
+- embedding: Text embedding utilities
+- git_utils: Git repository operations
+- input: User input handling
+- methodology: Methodology management
+- output: Output formatting
+- utils: General utilities
+"""
 import hashlib
 from pathlib import Path
 import re
@@ -92,8 +105,9 @@ from .utils import (
     get_context_token_count,
     is_long_context
 )
-# Initialize colorama
+# Initialize colorama for cross-platform colored text
 colorama.init()
+# Disable tokenizers parallelism to avoid issues with multiprocessing
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-# Install rich traceback handler
+# Install rich traceback handler for better error messages
 install_rich_traceback()
