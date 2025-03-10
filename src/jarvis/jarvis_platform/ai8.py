@@ -1,10 +1,11 @@
 import os
 from typing import Dict, List, Tuple
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils import PrettyOutput, OutputType
 import requests
 import json
 import base64
+
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class AI8Model(BasePlatform):
     """AI8 model implementation"""

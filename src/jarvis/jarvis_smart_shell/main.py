@@ -8,7 +8,10 @@ from typing import Optional
 from yaspin import yaspin
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils import PrettyOutput, OutputType, get_multiline_input, get_shell_name, init_env
+from jarvis.jarvis_utils.config import get_shell_name
+from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 def execute_command(command: str) -> None:
     """Show command and allow user to edit, then execute, Ctrl+C to cancel"""

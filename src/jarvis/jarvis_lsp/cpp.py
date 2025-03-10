@@ -4,7 +4,7 @@ import subprocess
 from typing import List, Dict, Optional, Tuple, Any
 import json
 from jarvis.jarvis_lsp.base import BaseLSP
-from jarvis.jarvis_utils import PrettyOutput, OutputType
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class CPPLSP(BaseLSP):
     """C++ LSP implementation using clangd."""

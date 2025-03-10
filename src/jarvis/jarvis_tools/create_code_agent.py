@@ -2,7 +2,8 @@ from typing import Dict, Any
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.code_review import CodeReviewTool, extract_code_report
-from jarvis.jarvis_utils import OutputType, PrettyOutput, has_uncommitted_changes, get_latest_commit_hash
+from jarvis.jarvis_utils.git_utils import get_latest_commit_hash, has_uncommitted_changes
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class CreateCodeAgentTool:
     """Tool for managing the code development workflow."""

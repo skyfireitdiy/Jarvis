@@ -1,5 +1,4 @@
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils import PrettyOutput, OutputType, init_env, get_multiline_input
 import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -7,6 +6,10 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+
+from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 def list_platforms():
     """List all supported platforms and models"""

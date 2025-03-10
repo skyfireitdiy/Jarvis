@@ -1,9 +1,11 @@
 import requests
 from typing import List, Dict, Tuple
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils import OutputType, PrettyOutput, get_single_line_input
 import os
 import json
+
+from jarvis.jarvis_utils.input import get_single_line_input
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class OllamaPlatform(BasePlatform):
     """Ollama platform implementation"""

@@ -5,9 +5,12 @@ from typing import Dict, Any
 import tempfile
 import yaml
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils import OutputType, PrettyOutput, has_uncommitted_changes, init_env
 import sys
 import argparse
+
+from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 
 class GitCommitTool:

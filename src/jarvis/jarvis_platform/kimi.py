@@ -5,9 +5,8 @@ import os
 import mimetypes
 import time
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils import PrettyOutput, OutputType
-from jarvis.jarvis_utils import while_success
-
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import while_success
 class KimiModel(BasePlatform):
     """Kimi model implementation"""
 

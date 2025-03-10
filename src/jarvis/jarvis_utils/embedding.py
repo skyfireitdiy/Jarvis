@@ -5,7 +5,30 @@ from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from typing import List, Any, Tuple
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-from jarvis.jarvis_utils.utils import split_text_into_chunks
+
+
+
+
+def get_context_token_count(text: str) -> int:
+    """Get the token count of the text using the tokenizer.
+    
+    Args:
+        text: The input text to count tokens for
+        
+    Returns:
+        int: The number of tokens in the text
+    """
+    try:
+        # Use a fast tokenizer that's good at general text
+        tokenizer = load_tokenizer()
+        chunks = split_text_into_chunks(text, 512)
+        return sum([len(tokenizer.encode(chunk)) for chunk in chunks]) # type: ignore
+        
+    except Exception as e:
+        PrettyOutput.print(f"计算token失败: {str(e)}", OutputType.WARNING)
+        # Fallback to rough character-based estimate
+        return len(text) // 4  # Rough estimate of 4 chars per token
+
 def load_embedding_model() -> SentenceTransformer:
     """
     Load the sentence embedding model.
@@ -65,6 +88,33 @@ def get_embedding_batch(embedding_model: Any, texts: List[str]) -> np.ndarray:
     except Exception as e:
         PrettyOutput.print(f"批量嵌入失败: {str(e)}", OutputType.ERROR)
         return np.zeros((0, embedding_model.get_sentence_embedding_dimension()), dtype=np.float32)
+    
+def split_text_into_chunks(text: str, max_length: int = 512) -> List[str]:
+    """Split text into chunks with overlapping windows.
+    
+    Args:
+        text: The input text to split
+        max_length: Maximum length of each chunk
+        
+    Returns:
+        List[str]: List of text chunks
+    """
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + max_length
+        # Find the nearest sentence boundary
+        if end < len(text):
+            while end > start and text[end] not in {'.', '!', '?', '\n'}:
+                end -= 1
+            if end == start:  # No punctuation found, hard cut
+                end = start + max_length
+        chunk = text[start:end]
+        chunks.append(chunk)
+        # Overlap 20% of the window
+        start = end - int(max_length * 0.2)
+    return chunks
+
 def get_embedding_with_chunks(embedding_model: Any, text: str) -> List[np.ndarray]:
     """
     Generate embeddings for text chunks.

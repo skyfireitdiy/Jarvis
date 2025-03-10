@@ -4,7 +4,8 @@ import os
 import sys
 from typing import Dict, Type, Optional, List
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils import PrettyOutput, OutputType, get_cheap_model_name, get_cheap_platform_name, get_codegen_model_name, get_codegen_platform_name, get_normal_model_name, get_normal_platform_name, get_thinking_model_name, get_thinking_platform_name
+from jarvis.jarvis_utils.config import get_cheap_model_name, get_cheap_platform_name, get_codegen_model_name, get_codegen_platform_name, get_normal_model_name, get_normal_platform_name, get_thinking_model_name, get_thinking_platform_name
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 REQUIRED_METHODS = [
     ('chat', ['message']),           # 方法名和参数列表

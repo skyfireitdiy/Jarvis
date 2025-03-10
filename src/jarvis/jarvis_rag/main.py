@@ -3,8 +3,6 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 import pickle
-from jarvis.jarvis_utils import OutputType, PrettyOutput, get_context_token_count, get_embedding, get_embedding_batch, get_file_md5, get_max_token_count, get_max_paragraph_length, get_min_paragraph_length, get_thread_count, init_gpu_config, load_embedding_model
-from jarvis.jarvis_utils import init_env
 from dataclasses import dataclass
 from tqdm import tqdm
 import fitz  # PyMuPDF for PDF files
@@ -14,6 +12,11 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 import lzma  # 添加 lzma 导入
 from threading import Lock
 import hashlib
+
+from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_thread_count
+from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import  get_file_md5, init_env, init_gpu_config
 
 @dataclass
 class Document:

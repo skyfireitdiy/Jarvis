@@ -1,7 +1,8 @@
 from typing import Dict, Any
 import os
-from jarvis.jarvis_utils import OutputType, PrettyOutput, dont_use_local_model
 from jarvis.jarvis_rag.main import RAGTool as RAGCore
+from jarvis.jarvis_utils.config import dont_use_local_model
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class RAGTool:
     name = "rag"

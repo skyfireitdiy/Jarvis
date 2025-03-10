@@ -7,13 +7,17 @@ from typing import List, Tuple, Optional, Dict
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
-from jarvis.jarvis_utils import OutputType, PrettyOutput, find_git_root, get_context_token_count, get_embedding, get_file_md5, get_max_token_count, get_thread_count, load_embedding_model, user_confirm
-from jarvis.jarvis_utils import init_env
 import argparse
 import pickle
 import lzma  # 添加 lzma 导入
 from tqdm import tqdm
 import re
+
+from jarvis.jarvis_utils.config import get_max_token_count, get_thread_count
+from jarvis.jarvis_utils.embedding import get_embedding, load_embedding_model, get_context_token_count
+from jarvis.jarvis_utils.git_utils import find_git_root
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import  get_file_md5, init_env, user_confirm
 
 class CodeBase:
     def __init__(self, root_dir: str):

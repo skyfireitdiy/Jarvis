@@ -2,7 +2,9 @@ from typing import Dict, Any
 import os
 import tempfile
 from pathlib import Path
-from jarvis.jarvis_utils import OutputType, PrettyOutput
+
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 
 class ShellScriptTool:
     name = "execute_shell_script"

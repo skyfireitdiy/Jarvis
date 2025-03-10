@@ -5,7 +5,7 @@ import yaml
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.output_handler import OutputHandler
-from jarvis.jarvis_utils import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class AgentConfig:

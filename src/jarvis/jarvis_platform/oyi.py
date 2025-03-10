@@ -2,9 +2,10 @@ import mimetypes
 import os
 from typing import Dict, List, Tuple
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils import PrettyOutput, OutputType
 import requests
 import json
+
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class OyiModel(BasePlatform):
     """Oyi model implementation"""

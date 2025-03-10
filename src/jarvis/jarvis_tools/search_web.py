@@ -1,9 +1,12 @@
 from typing import Dict, Any, List
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils import PrettyOutput, OutputType, get_context_token_count, get_max_token_count
 from jarvis.jarvis_tools.read_webpage import WebpageTool
 from playwright.sync_api import sync_playwright
 from urllib.parse import quote
+
+from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 def bing_search(query):
     try:

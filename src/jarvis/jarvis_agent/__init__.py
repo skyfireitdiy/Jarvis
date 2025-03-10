@@ -8,7 +8,15 @@ from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils import PrettyOutput, OutputType, get_context_token_count, is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, load_methodology, set_agent, delete_agent, get_max_token_count, get_multiline_input, init_env, is_use_methodology, make_agent_name,  user_confirm
+from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.config import is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, is_use_methodology
+from jarvis.jarvis_utils.methodology import load_methodology
+from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
+from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import user_confirm
 import os
 
 class Agent:
@@ -141,7 +149,7 @@ The following actions are at your disposal:
 
 
     
-    def _call_model(self, message: str) -> str: # type: ignore
+    def _call_model(self, message: str) -> str: 
         """Call the AI model with retry logic.
         
         Args:
@@ -157,7 +165,7 @@ The following actions are at your disposal:
             message, need_return = handler(message, self)
             if need_return:
                 return message
-        return self.model.chat_until_success(message)  # type: ignore
+        return self.model.chat_until_success(message)   # type: ignore
 
 
 

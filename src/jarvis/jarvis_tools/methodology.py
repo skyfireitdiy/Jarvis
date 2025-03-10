@@ -1,7 +1,10 @@
 import os
 import yaml
 from typing import Dict, Optional, Any
-from jarvis.jarvis_utils import OutputType, PrettyOutput, is_use_methodology
+
+from jarvis.jarvis_utils.config import is_use_methodology
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 
 
 class MethodologyTool:

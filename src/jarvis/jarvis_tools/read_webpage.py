@@ -1,7 +1,8 @@
 from typing import Dict, Any
 import requests
 from bs4 import BeautifulSoup
-from jarvis.jarvis_utils import PrettyOutput, OutputType
+
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class WebpageTool:
     name = "read_webpage"

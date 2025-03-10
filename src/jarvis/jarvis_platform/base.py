@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
 import re
 from typing import Dict, List, Tuple
-
-from yaspin import yaspin
-
-from jarvis.jarvis_utils import OutputType, PrettyOutput, while_success, while_true
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
 
 
 class BasePlatform(ABC):
@@ -40,7 +38,6 @@ class BasePlatform(ABC):
             
             # Calculate token count and tokens per second
             try:
-                from jarvis.jarvis_utils import get_context_token_count
                 token_count = get_context_token_count(response)
                 tokens_per_second = token_count / duration if duration > 0 else 0
             except Exception as e:

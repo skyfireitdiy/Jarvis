@@ -2,13 +2,16 @@ import re
 from typing import Dict, Any, Tuple
 import os
 
-from yaspin import yaspin
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
-from jarvis.jarvis_utils import OutputType, PrettyOutput, get_commits_between, get_latest_commit_hash, get_multiline_input, has_uncommitted_changes, is_confirm_before_apply_patch, user_confirm
+from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
+from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
+from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import user_confirm
 
 class PatchOutputHandler(OutputHandler):
     def name(self) -> str:

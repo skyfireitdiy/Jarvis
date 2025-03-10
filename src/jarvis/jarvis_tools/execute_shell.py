@@ -3,7 +3,9 @@ import os
 import tempfile
 from pathlib import Path
 
-from jarvis.jarvis_utils import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
+
 
 
 class ShellTool:

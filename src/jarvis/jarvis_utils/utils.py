@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, List
 import psutil
 from jarvis.jarvis_utils.config import get_max_token_count
-from jarvis.jarvis_utils.embedding import load_tokenizer
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def init_env():
@@ -127,50 +127,8 @@ def init_gpu_config() -> Dict:
         PrettyOutput.print(f"GPU初始化失败: {str(e)}", output_type=OutputType.WARNING)
         
     return config
-def split_text_into_chunks(text: str, max_length: int = 512) -> List[str]:
-    """Split text into chunks with overlapping windows.
-    
-    Args:
-        text: The input text to split
-        max_length: Maximum length of each chunk
-        
-    Returns:
-        List[str]: List of text chunks
-    """
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + max_length
-        # Find the nearest sentence boundary
-        if end < len(text):
-            while end > start and text[end] not in {'.', '!', '?', '\n'}:
-                end -= 1
-            if end == start:  # No punctuation found, hard cut
-                end = start + max_length
-        chunk = text[start:end]
-        chunks.append(chunk)
-        # Overlap 20% of the window
-        start = end - int(max_length * 0.2)
-    return chunks
-def get_context_token_count(text: str) -> int:
-    """Get the token count of the text using the tokenizer.
-    
-    Args:
-        text: The input text to count tokens for
-        
-    Returns:
-        int: The number of tokens in the text
-    """
-    try:
-        # Use a fast tokenizer that's good at general text
-        tokenizer = load_tokenizer()
-        chunks = split_text_into_chunks(text, 512)
-        return sum([len(tokenizer.encode(chunk)) for chunk in chunks]) # type: ignore
-        
-    except Exception as e:
-        PrettyOutput.print(f"计算token失败: {str(e)}", OutputType.WARNING)
-        # Fallback to rough character-based estimate
-        return len(text) // 4  # Rough estimate of 4 chars per token
+
+
 def is_long_context(files: list) -> bool:
     """Check if the file list belongs to a long context (total characters exceed 80% of the maximum context length)"""
     max_token_count = get_max_token_count()
