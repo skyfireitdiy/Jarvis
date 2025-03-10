@@ -166,7 +166,7 @@ def get_context_token_count(text: str) -> int:
         # Use a fast tokenizer that's good at general text
         tokenizer = load_tokenizer()
         chunks = split_text_into_chunks(text, 512)
-        return sum([len(tokenizer.encode(chunk)) for chunk in chunks])
+        return sum([len(tokenizer.encode(chunk)) for chunk in chunks]) # type: ignore
         
     except Exception as e:
         PrettyOutput.print(f"计算token失败: {str(e)}", OutputType.WARNING)

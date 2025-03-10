@@ -108,7 +108,7 @@ def load_tokenizer() -> AutoTokenizer:
             local_files_only=False
         )
     
-    return tokenizer
+    return tokenizer # type: ignore
 def load_rerank_model() -> Tuple[AutoModelForSequenceClassification, AutoTokenizer]:
     """
     Load the reranking model and tokenizer.
@@ -148,4 +148,4 @@ def load_rerank_model() -> Tuple[AutoModelForSequenceClassification, AutoTokeniz
         model = model.cuda()
     model.eval()
     
-    return model, tokenizer
+    return model, tokenizer # type: ignore
