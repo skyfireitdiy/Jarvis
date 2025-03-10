@@ -1,3 +1,4 @@
+from typing import Any
 import colorama
 import os
 from rich.console import Console
