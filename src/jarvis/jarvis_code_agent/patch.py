@@ -217,7 +217,7 @@ Output Format:
             except:
                 pass
             if start_line == -1:
-                PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.ERROR)
+                PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.WARNING)
                 return f"代码合并失败"
             if end_line == -1:
                 last_line = response[-1]
@@ -228,7 +228,7 @@ Output Format:
                 response.pop() # 删除最后一行
                 continue
             if end_line < start_line:
-                PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.ERROR)
+                PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.WARNING)
                 return f"代码合并失败"
             break
         # 写入合并后的代码
