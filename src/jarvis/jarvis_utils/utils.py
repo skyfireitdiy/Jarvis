@@ -2,16 +2,19 @@ import os
 import time
 import hashlib
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import psutil
 import torch
-
 from jarvis.jarvis_utils.config import get_max_token_count
 from jarvis.jarvis_utils.embedding import load_tokenizer
 from jarvis.jarvis_utils.input import get_single_line_input
-from ..jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def init_env():
-    """Load environment variables from ~/.jarvis/env"""
+    """Initialize environment variables from ~/.jarvis/env file.
+    
+    Creates the .jarvis directory if it doesn't exist and loads environment variables
+    from the env file. Handles file reading errors gracefully.
+    """
     jarvis_dir = Path.home() / ".jarvis"
     env_file = jarvis_dir / "env"
     
@@ -49,9 +52,17 @@ def while_true(func, sleep_time: float = 0.1):
         time.sleep(sleep_time)
     return ret
 def get_file_md5(filepath: str)->str:    
+    """Calculate the MD5 hash of a file's content.
+    
+    Args:
+        filepath: Path to the file to hash
+        
+    Returns:
+        str: MD5 hash of the file's content
+    """
     return hashlib.md5(open(filepath, "rb").read(100*1024*1024)).hexdigest()
 def user_confirm(tip: str, default: bool = True) -> bool:
-    """Prompt the user for confirmation.
+    """Prompt the user for confirmation with a yes/no question.
     
     Args:
         tip: The message to show to the user
@@ -64,12 +75,20 @@ def user_confirm(tip: str, default: bool = True) -> bool:
     ret = get_single_line_input(f"{tip} {suffix}: ")
     return default if ret == "" else ret.lower() == "y"
 def get_file_line_count(filename: str) -> int:
+    """Count the number of lines in a file.
+    
+    Args:
+        filename: Path to the file to count lines for
+        
+    Returns:
+        int: Number of lines in the file, 0 if file cannot be read
+    """
     try:
         return len(open(filename, "r", encoding="utf-8").readlines())
     except Exception as e:
         return 0
 def init_gpu_config() -> Dict:
-    """Initialize GPU configuration based on available hardware
+    """Initialize GPU configuration based on available hardware.
     
     Returns:
         Dict: GPU configuration including memory sizes and availability
@@ -110,7 +129,15 @@ def init_gpu_config() -> Dict:
         
     return config
 def split_text_into_chunks(text: str, max_length: int = 512) -> List[str]:
-    """Split text into chunks with overlapping windows"""
+    """Split text into chunks with overlapping windows.
+    
+    Args:
+        text: The input text to split
+        max_length: Maximum length of each chunk
+        
+    Returns:
+        List[str]: List of text chunks
+    """
     chunks = []
     start = 0
     while start < len(text):
@@ -127,7 +154,7 @@ def split_text_into_chunks(text: str, max_length: int = 512) -> List[str]:
         start = end - int(max_length * 0.2)
     return chunks
 def get_context_token_count(text: str) -> int:
-    """Get the token count of the text using the tokenizer
+    """Get the token count of the text using the tokenizer.
     
     Args:
         text: The input text to count tokens for
