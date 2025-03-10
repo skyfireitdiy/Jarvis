@@ -16,7 +16,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import colorama
 from rich.traceback import install as install_rich_traceback
 # Re-export from new modules
-from .globals import (
+# These imports are required for project functionality and may be used dynamically
+from .globals import (  # noqa: F401
     global_agents,
     current_agent_name,
     console,
@@ -25,22 +26,22 @@ from .globals import (
     get_agent_list,
     delete_agent
 )
-from .output import OutputType, PrettyOutput
-from .input import get_single_line_input, get_multiline_input, FileCompleter
-from .git_utils import (
+from .output import OutputType, PrettyOutput  # noqa: F401
+from .input import get_single_line_input, get_multiline_input, FileCompleter  # noqa: F401
+from .git_utils import (  # noqa: F401
     find_git_root,
     has_uncommitted_changes,
     get_commits_between,
     get_latest_commit_hash,
     get_modified_line_ranges
 )
-from .embedding import (
+from .embedding import (  # noqa: F401
     load_embedding_model,
     get_embedding,
     get_embedding_batch,
     get_embedding_with_chunks
 )
-from .config import (
+from .config import (  # noqa: F401
     get_max_token_count,
     get_thread_count,
     dont_use_local_model,
@@ -62,8 +63,8 @@ from .config import (
     is_execute_tool_confirm,
     is_confirm_before_apply_patch
 )
-from .methodology import load_methodology
-from .utils import (
+from .methodology import load_methodology  # noqa: F401
+from .utils import (  # noqa: F401
     init_env,
     while_success,
     while_true,
