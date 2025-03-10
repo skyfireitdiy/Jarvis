@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, Tuple
 import os
 
 from yaspin import yaspin
