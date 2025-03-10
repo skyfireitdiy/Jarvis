@@ -1,5 +1,4 @@
 import os
-from typing import Union
 """
 Configuration Management Module
 This module provides functions to retrieve various configuration settings for the Jarvis system.

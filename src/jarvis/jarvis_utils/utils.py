@@ -2,9 +2,8 @@ import os
 import time
 import hashlib
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 import psutil
-import torch
 from jarvis.jarvis_utils.config import get_max_token_count
 from jarvis.jarvis_utils.embedding import load_tokenizer
 from jarvis.jarvis_utils.input import get_single_line_input

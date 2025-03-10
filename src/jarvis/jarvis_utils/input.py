@@ -7,7 +7,6 @@ It includes:
 - File path completion with fuzzy matching
 - Custom key bindings for input control
 """
-from typing import Optional
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
 from prompt_toolkit.formatted_text import FormattedText
@@ -46,7 +45,7 @@ class FileCompleter(Completer):
         self.path_completer = PathCompleter()
         self.max_suggestions = 10
         self.min_score = 10
-    def get_completions(self, document: Document, complete_event) -> Completion:
+    def get_completions(self, document: Document, complete_event) -> Completion: # type: ignore
         """
         Generate completions for file paths with fuzzy matching.
         
@@ -107,7 +106,7 @@ class FileCompleter(Completer):
                     start_position=-replace_length,
                     display=display_text,
                     display_meta="File"
-                )
+                ) # type: ignore
 def get_multiline_input(tip: str) -> str:
     """
     Get multi-line input with enhanced completion and confirmation.

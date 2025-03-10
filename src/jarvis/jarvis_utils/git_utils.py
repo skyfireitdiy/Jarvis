@@ -12,7 +12,7 @@ import os
 import re
 import subprocess
 from typing import List, Tuple, Dict
-from ..jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def find_git_root(start_dir="."):
     """Change to git root directory of the given path"""
     os.chdir(start_dir)

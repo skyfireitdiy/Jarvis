@@ -11,7 +11,7 @@ import os
 import yaml
 import numpy as np
 import faiss
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.embedding import load_embedding_model
 from jarvis.jarvis_utils.config import dont_use_local_model
