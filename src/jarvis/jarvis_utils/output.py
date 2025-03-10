@@ -1,8 +1,6 @@
 from enum import Enum
 from datetime import datetime
 from typing import Optional
-from rich.console import Console
-from rich.theme import Theme
 from rich.panel import Panel
 from rich.box import HEAVY
 from rich.text import Text
@@ -10,7 +8,7 @@ from rich.syntax import Syntax
 from rich.style import Style as RichStyle
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
-from ..jarvis_utils import get_agent_list, console
+from .globals import console, get_agent_list
 class OutputType(Enum):
     SYSTEM = "SYSTEM"      # AI assistant message
     CODE = "CODE"         # Code related
