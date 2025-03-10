@@ -95,7 +95,7 @@ Output: find . -name "*.py"
         prefix = f"Current path: {current_path}\n"
         prefix += f"Current shell: {shell}\n"
         
-        with yaspin(text="正在生成命令...") as spinner:
+        with yaspin(text="正在生成命令...", color="cyan") as spinner:
             result = model.chat_until_success(prefix + request)
             spinner.ok("✅ 命令生成成功")
         

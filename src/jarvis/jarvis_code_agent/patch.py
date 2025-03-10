@@ -60,10 +60,11 @@ def _parse_patch(patch_str: str) -> Dict[str, str]:
     if patches:
         for patch in patches:
             first_line = patch.splitlines()[0]
-            if not re.match(r'^File:\s*(.+)$', first_line):
+            sm = re.match(r'^File:\s*(.+)$', first_line)
+            if not sm:
                 PrettyOutput.print("无效的补丁格式", OutputType.WARNING)
                 continue
-            filepath = re.search(r'^File:\s*(.+)$', first_line).group(1).strip()
+            filepath = sm.group(1).strip()
             result[filepath] = patch
     return result
 
@@ -186,6 +187,13 @@ Patch:
 """
         prompt += f"""
 Please merge the code with the context and return the fully merged code.
+
+Requirements:
+1. Strictly preserve original code formatting and indentation
+2. Only include actual code content in <MERGED_CODE> block
+3. Absolutely NO markdown code blocks (```) or backticks
+4. Maintain exact line numbers from original code except for changes
+
 Output Format:
 <MERGED_CODE>
 [merged_code]
@@ -197,7 +205,7 @@ Output Format:
         start_line = -1
         end_line = -1
         response = []
-        with yaspin(text=f"为文件 {filepath} 应用补丁中...") as spinner:
+        with yaspin(text=f"为文件 {filepath} 应用补丁中...", color="cyan") as spinner:
             while count > 0:
                 count -= 1
                 response.extend(model.chat_until_success(prompt).splitlines())
@@ -218,6 +226,7 @@ Output Format:
                     continue with the last line:
                     {last_line}
                     """
+                    response.pop() # 删除最后一行
                     continue
                 if end_line < start_line:
                     spinner.fail(f"❌ 为文件 {filepath} 应用补丁失败")

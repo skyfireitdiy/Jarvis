@@ -1,5 +1,6 @@
 import hashlib
 from pathlib import Path
+import re
 import time
 import os
 from enum import Enum
