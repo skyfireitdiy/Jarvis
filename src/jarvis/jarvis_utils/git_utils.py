@@ -1,3 +1,13 @@
+"""
+Git Utilities Module
+This module provides utilities for interacting with Git repositories.
+It includes functions for:
+- Finding the root directory of a Git repository
+- Checking for uncommitted changes
+- Retrieving commit history between two hashes
+- Getting the latest commit hash
+- Extracting modified line ranges from Git diffs
+"""
 import os
 import re
 import subprocess
