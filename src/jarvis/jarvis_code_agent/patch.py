@@ -6,7 +6,7 @@ from yaspin import yaspin
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
-from jarvis.jarvis_tools.read_code import ReadCodeTool
+from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
 from jarvis.jarvis_utils import OutputType, PrettyOutput, get_commits_between, get_latest_commit_hash, get_multiline_input, has_uncommitted_changes, is_confirm_before_apply_patch, user_confirm
 
@@ -174,7 +174,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> str:
             # 新建文件
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
             open(filepath, 'w', encoding='utf-8').close()
-        old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
+        old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
         if not old_file_content["success"]:
             return f"文件读取失败: {old_file_content['stderr']}"
         
