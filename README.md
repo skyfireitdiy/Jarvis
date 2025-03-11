@@ -2,19 +2,15 @@
 <p align="center">
   <img src="docs/images/jarvis-logo.png" alt="Jarvis Logo" width="200"/>
 </p>
-
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 *您的智能开发和系统交互助手*
-
-* [快速开始](#-快速开始)
-* [配置说明](#%EF%B8%8F-配置说明)
-* [工具说明](#%EF%B8%8F-工具说明)
-* [扩展开发](#%EF%B8%8F-扩展开发)
-* [贡献指南](#-贡献指南)
-
+[快速开始](#-快速开始) •
+[核心功能](#-核心功能) •
+[配置说明](#-配置说明) •
+[工具说明](#-工具说明) •
+[扩展开发](#-扩展开发) •
+[贡献指南](#-贡献指南)
 ---
 ## 🚀 快速开始
 ### 安装
