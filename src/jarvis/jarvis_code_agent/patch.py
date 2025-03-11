@@ -192,10 +192,9 @@ Patch:
 Please merge the code with the context and return the fully merged code.
 
 Requirements:
-1. Strictly preserve original code formatting and indentation
-2. Only include actual code content in <MERGED_CODE> block
+1. Strictly preserve original code formatting, blank lines and indentation
+2. Only include actual code content in <MERGED_CODE> block, including blank lines and indentation
 3. Absolutely NO markdown code blocks (```) or backticks EXCEPT when modifying markdown files
-4. Maintain exact line numbers from original code except for changes
 
 Output Format:
 <MERGED_CODE>
