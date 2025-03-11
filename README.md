@@ -99,7 +99,7 @@ jarvis-git-squash --help
 | ask_user | 交互式用户输入收集 |
 | file_operation | 基础文件操作（读取/写入/存在性检查） |
 | git_commiter | 自动化git提交处理 |
-| code_rereview | 多维度的自动代码审查 |
+| code_review | 多维度的自动代码审查 |
 | search_web | 使用bing进行网络搜索 |
 | read_webpage | 读取网页内容 |
 | chdir | 更改工作目录 |
