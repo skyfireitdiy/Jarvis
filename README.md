@@ -8,17 +8,17 @@
 
 *您的智能开发和系统交互助手*
 
-[快速开始](#-快速开始) •
-[配置说明](#配置说明) •
-[工具说明](#工具说明) •
-[扩展开发](#扩展开发) •
-[贡献指南](#贡献指南) •
-[许可证](#许可证) •
+[快速开始](#quick-start) •
+[配置说明](#configuration) •
+[工具说明](#tools) •
+[扩展开发](#extensions) •
+[贡献指南](#contributing) •
+[许可证](#license) •
 </div>
 
 ---
 
-## 🚀 快速开始
+## 🚀 快速开始 <a id="quick-start"></a>
 ### 安装
 ```bash
 pip install jarvis-ai-assistant # 安装jarvis-ai-assistant
@@ -64,7 +64,7 @@ jarvis-git-squash --help
 
 ---
 
-## ⚙️ 配置说明
+## ⚙️ 配置说明 <a id="configuration"></a>
 ### 环境变量配置
 | 分类 | 变量名称 | 默认值 | 说明 |
 |------|----------|--------|------|
@@ -79,16 +79,16 @@ jarvis-git-squash --help
 | 模型配置 | `JARVIS_CODEGEN_PLATFORM` | JARVIS_PLATFORM | 代码生成任务使用的平台 |
 | 模型配置 | `JARVIS_CODEGEN_MODEL` | JARVIS_MODEL | 代码生成任务使用的模型 |
 | 模型配置 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 思考任务使用的平台 |
-| 模型配置 | `JARVIS_THINKING_MODEL》 | JARVIS_MODEL | 思考任务使用的模型 |
-| 模型配置 | `JARVIS_CHEAP_PLATFORM》 | JARVIS_PLATFORM | 低成本任务使用的平台 |
-| 模型配置 | `JARVIS_CHEAP_MODEL》 | JARVIS_MODEL | 低成本任务使用的模型 |
-| 方法论配置 | `JARVIS_USE_METHODOLOGY》 | true | 是否启用方法论系统 |
-| 方法论配置 | `JARVIS_RECORD_METHODOLOGY》 | true | 是否记录方法论 |
-| 方法论配置 | `JARVIS_NEED_SUMMARY》 | true | 是否自动生成摘要 |
-| 文本处理 | `JARVIS_MIN_PARAGRAPH_LENGTH》 | 50 | 文本处理的最小段落长度 |
-| 文本处理 | `JARVIS_MAX_PARAGRAPH_LENGTH》 | 12800 | 文本处理的最大段落长度 |
+| 模型配置 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 思考任务使用的模型 |
+| 模型配置 | `JARVIS_CHEAP_PLATFORM` | JARVIS_PLATFORM | 低成本任务使用的平台 |
+| 模型配置 | `JARVIS_CHEAP_MODEL` | JARVIS_MODEL | 低成本任务使用的模型 |
+| 方法论配置 | `JARVIS_USE_METHODOLOGY` | true | 是否启用方法论系统 |
+| 方法论配置 | `JARVIS_RECORD_METHODOLOGY` | true | 是否记录方法论 |
+| 方法论配置 | `JARVIS_NEED_SUMMARY` | true | 是否自动生成摘要 |
+| 文本处理 | `JARVIS_MIN_PARAGRAPH_LENGTH` | 50 | 文本处理的最小段落长度 |
+| 文本处理 | `JARVIS_MAX_PARAGRAPH_LENGTH` | 12800 | 文本处理的最大段落长度 |
 ---
-## 🛠️ 工具说明
+## 🛠️ 工具说明 <a id="tools"></a>
 ### 内置工具
 | 工具名称 | 描述 |
 |----------|------|
@@ -99,7 +99,7 @@ jarvis-git-squash --help
 | ask_user | 交互式用户输入收集 |
 | file_operation | 基础文件操作（读取/写入/存在性检查） |
 | git_commiter | 自动化git提交处理 |
-| code_review | 多维度的自动代码审查 |
+| code_rereview | 多维度的自动代码审查 |
 | search_web | 使用bing进行网络搜索 |
 | read_webpage | 读取网页内容 |
 | chdir | 更改工作目录 |
@@ -117,9 +117,9 @@ jarvis-git-squash --help
 - 内置工具：`src/jarvis/tools/`
 - 用户工具：`~/.jarvis/tools/`
 ---
-## 🛠️ 扩展开发
+## 🛠️ 扩展开发 <a id="extensions"></a>
 ### 添加新工具
-在 `~/.jarvis/tools/` 中创建新的 Python 文件：
+在 `~/.jarvis/tools/》 中创建新的 Python 文件：
 ```python
 from typing import Dict, Any
 from jarvis.utils import OutputType, PrettyOutput
@@ -168,7 +168,7 @@ class CustomTool:
 
 
 ### 添加新大模型平台
-在 `~/.jarvis/platforms/` 中创建新的 Python 文件：
+在 `~/.jarvis/platforms/》 中创建新的 Python 文件：
 ```python
 from jarvis.jarvis_platform.base import BasePlatform
 class CustomPlatform(BasePlatform):
@@ -214,7 +214,7 @@ class CustomPlatform(BasePlatform):
 ```
 
 
-## 🤝 贡献指南
+## 🤝 贡献指南 <a id="contributing"></a>
 1. Fork 仓库
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改 (`git commit -m '添加某个很棒的特性'`)
@@ -223,7 +223,7 @@ class CustomPlatform(BasePlatform):
 
 ---
 
-## 📄 许可证
+## 📄 许可证 <a id="license"></a>
 
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
