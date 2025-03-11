@@ -1,3 +1,4 @@
+================================================================================File: /home/skyfire/code/Jarvis/README.md
 # 🤖 Jarvis AI 助手
 <p align="center">
   <img src="docs/images/jarvis-logo.png" alt="Jarvis Logo" width="200"/>
@@ -9,11 +10,11 @@
 *您的智能开发和系统交互助手*
 
 [快速开始](#-快速开始) •
-[配置说明](#-配置说明) •
-[工具说明](#-工具说明) •
-[扩展开发](#-扩展开发) •
-[贡献指南](#-贡献指南) •
-[许可证](#-许可证) •
+[配置说明](#配置说明) •
+[工具说明](#工具说明) •
+[扩展开发](#扩展开发) •
+[贡献指南](#贡献指南) •
+[许可证](#许可证) •
 </div>
 
 ---
@@ -24,6 +25,8 @@
 pip install jarvis-ai-assistant # 安装jarvis-ai-assistant
 playwright install # 安装playwright
 ```
+
+
 ### 最小化配置
 ```bash
 JARVIS_PLATFORM=openai # 设置AI平台
@@ -31,6 +34,8 @@ JARVIS_MODEL=deepseek-chat # 设置AI模型
 OPENAI_API_KEY=your_openai_api_key # 设置OpenAI API密钥
 OPENAI_API_BASE=https://api.deepseek.com/v1 # 设置OpenAI API基础URL
 ```
+
+
 以上配置编写到`~/.jarvis/env`文件中。
 
 ### 基本使用
@@ -59,6 +64,8 @@ jarvis-dev --help
 # 使用git squash的功能
 jarvis-git-squash --help
 ```
+
+
 ---
 
 ## ⚙️ 配置说明
@@ -76,9 +83,9 @@ jarvis-git-squash --help
 | 模型配置 | `JARVIS_CODEGEN_PLATFORM` | JARVIS_PLATFORM | 代码生成任务使用的平台 |
 | 模型配置 | `JARVIS_CODEGEN_MODEL` | JARVIS_MODEL | 代码生成任务使用的模型 |
 | 模型配置 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 思考任务使用的平台 |
-| 模型配置 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 思考任务使用的模型 |
-| 模型配置 | `JARVIS_CHEAP_PLATFORM` | JARVIS_PLATFORM | 低成本任务使用的平台 |
-| 模型配置 | `JARVIS_CHEAP_MODEL` | JARVIS_MODEL | 低成本任务使用的模型 |
+| 模型配置 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 思考任务使用的模型 |  {{ edit_1 }}
+| 模型配置 | `JARVIS_CHEAP_PLATFORM` | JARVIS_PLATFORM | 低成本任务使用的平台 |  {{ edit_2 }}
+| 模型配置 | `JARVIS_CHEAP_MODEL` | JARVIS_MODEL | 低成本任务使用的模型 |  {{ edit_3 }}
 | 方法论配置 | `JARVIS_USE_METHODOLOGY` | true | 是否启用方法论系统 |
 | 方法论配置 | `JARVIS_RECORD_METHODOLOGY` | true | 是否记录方法论 |
 | 方法论配置 | `JARVIS_NEED_SUMMARY` | true | 是否自动生成摘要 |
@@ -163,6 +170,8 @@ class CustomTool:
             }
 ```
 
+
+
 ### 添加新大模型平台
 在 `~/.jarvis/platforms/` 中创建新的 Python 文件：
 ```python
@@ -208,6 +217,8 @@ class CustomPlatform(BasePlatform):
         # 获取平台名称
         pass
 ```
+
+
 
 ## 🤝 贡献指南
 1. Fork 仓库
