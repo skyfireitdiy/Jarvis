@@ -2,16 +2,22 @@
 <p align="center">
   <img src="docs/images/jarvis-logo.png" alt="Jarvis Logo" width="200"/>
 </p>
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<div align="center">
+
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 *您的智能开发和系统交互助手*
+
 [快速开始](#-快速开始) •
-[核心功能](#-核心功能) •
 [配置说明](#-配置说明) •
 [工具说明](#-工具说明) •
 [扩展开发](#-扩展开发) •
-[贡献指南](#-贡献指南)
+[贡献指南](#-贡献指南) •
+[许可证](#-许可证) •
+</div>
+
 ---
+
 ## 🚀 快速开始
 ### 安装
 ```bash
@@ -209,10 +215,13 @@ class CustomPlatform(BasePlatform):
 3. 提交更改 (`git commit -m '添加某个很棒的特性'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 开启 Pull Request
+
 ---
+
 ## 📄 许可证
 
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+
 ---
 <div align="center">
 由 Jarvis 团队用 ❤️ 制作
