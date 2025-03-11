@@ -169,6 +169,7 @@ class AI8Model(BasePlatform):
             # 处理流式响应
             full_response = ""
             for line in response.iter_lines():
+                print(line)
                 if line:
                     line = line.decode('utf-8')
                     if line.startswith('data: '):
