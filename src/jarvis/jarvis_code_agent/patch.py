@@ -114,9 +114,11 @@ def apply_patch(output_str: str) -> str:
             else:
                 final_ret += "✅ The patches have been applied (no new commits)"
         else:
-            final_ret += "❌ I don't want to commit the code"
+            final_ret += "❌ I don't want to commit the code\n"
+            final_ret += "Previous code:\n"
+            final_ret += diff
     else:
-        final_ret += "❌ There are no changes to commit"
+        final_ret += "❌ There are no changes to commit\n"
     # 用户确认最终结果
     PrettyOutput.print(final_ret, OutputType.USER)
     if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
