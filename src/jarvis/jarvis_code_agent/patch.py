@@ -8,7 +8,7 @@ from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
-from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
+from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash, get_modified_line_ranges
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import user_confirm
@@ -106,6 +106,11 @@ def apply_patch(output_str: str) -> str:
                 final_ret += "Commit History:\n"
                 for commit_hash, commit_message in commits:
                     final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
+                change_range = get_modified_line_ranges()
+                read_result = ReadCodeTool().execute({"files": [{"path": filepath, "start_line": c[0], "end_line": c[1]} for filepath, c in change_range.items()]})
+                if read_result["success"]:
+                    final_ret += "The code after applying the patches:\n"
+                    final_ret += read_result["stdout"]
             else:
                 final_ret += "✅ The patches have been applied (no new commits)"
         else:
