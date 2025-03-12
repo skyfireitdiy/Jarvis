@@ -224,7 +224,7 @@ Output Format:
             if end_line == -1:
                 last_line = response[-1]
                 prompt = f"""
-                continue with the last line:
+                continue with the last line(do not include <MERGED_CODE> tags, output </MERGED_CODE> tags when you are done):
                 {last_line}
                 """
                 response.pop() # 删除最后一行

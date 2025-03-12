@@ -237,8 +237,10 @@ Expert in safe, precise code modifications with rigorous validation processes.
             self._init_env()
             start_commit = get_latest_commit_hash()
             
-            
-            self.agent.run(user_input)
+            try:
+                self.agent.run(user_input)
+            except Exception as e:
+                PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
             
             end_commit = get_latest_commit_hash()
             # Print commit history between start and end commits
