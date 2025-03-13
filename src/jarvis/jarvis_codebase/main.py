@@ -320,7 +320,7 @@ Content: {content}
             ids = []
             self.file_paths = []  # Reset the file path list
             
-            for i, (file_path, data) in enumerate(self.vector_cache.items()):
+            for i, ( file_path, data) in enumerate(self.vector_cache.items()):
                 if "vector" not in data:
                     PrettyOutput.print(f"无效的缓存数据 {file_path}: 缺少向量", 
                                      output_type=OutputType.WARNING)
@@ -595,24 +595,24 @@ Content: {content}
             
     def _process_batch(self, query: str, files_info: List[str]) -> List[Dict[str, str]]:
         """Process a batch of files"""
-        prompt = f"""As a code analysis expert, please help identify the most relevant files for the given query using chain-of-thought reasoning.
+        prompt = f"""作为一名代码分析专家，请使用链式思维推理帮助识别与给定查询最相关的文件。
 
-Query: {query}
+查询: {query}
 
-Available files:
+可用文件:
 {''.join(files_info)}
 
-Think through this step by step:
-1. First, analyze the query to identify key requirements and technical concepts
-2. For each file:
-   - Examine its path and content
-   - Assess how it relates to the query's requirements
-   - Consider both direct and indirect relationships
-   - Rate its relevance (high/medium/low)
-3. Select only files with clear relevance to the query
-4. Order files by relevance, with most relevant first
+请按以下步骤思考：
+1. 首先，分析查询以识别关键需求和技术概念
+2. 对于每个文件：
+   - 检查其路径和内容
+   - 评估其与查询需求的关系
+   - 考虑直接和间接关系
+   - 评估其相关性（高/中/低）
+3. 仅选择与查询明确相关的文件
+4. 按相关性排序，最相关的文件在前
 
-Please output your selection in YAML format:
+请以YAML格式输出您的选择：
 <FILES>
 - file: path/to/most/relevant.py
   reason: xxxxxxxxxx
@@ -620,12 +620,12 @@ Please output your selection in YAML format:
   reason: yyyyyyyyyy
 </FILES>
 
-Important:
-- Only include files that are truly relevant
-- Exclude files with weak or unclear connections
-- Focus on implementation rather than test files
-- Consider both file paths and content
-- Only output the file paths, no other text
+重要提示：
+- 仅包含真正相关的文件
+- 排除连接不明确或较弱的文件
+- 重点关注实现文件而非测试文件
+- 同时考虑文件路径和内容
+- 仅输出文件路径，不要包含其他文本
 """
 
         # Use a large model to evaluate
