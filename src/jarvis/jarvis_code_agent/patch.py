@@ -89,9 +89,9 @@ def apply_patch(output_str: str) -> str:
         try:
             with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
                 if not handle_code_operation(filepath, patch_content):
-                    spinner.fail("❌ ")
+                    spinner.fail(f"❌ {filepath} 补丁应用失败")
                 else:
-                    spinner.ok("✅ ")
+                    spinner.ok(f"✅ {filepath} 补丁应用成功")
         except Exception as e:
             revert_file(filepath)  # 回滚单个文件
             PrettyOutput.print(f"文件 {filepath} 处理失败: {str(e)}", OutputType.ERROR)
