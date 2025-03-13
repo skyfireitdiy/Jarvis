@@ -3,15 +3,15 @@ from typing import Dict, Any
 from jarvis.jarvis_lsp.registry import LSPRegistry
 
 class LSPFindDefinitionTool:
-    """Tool for finding symbol definitions in code using LSP."""
+    """使用LSP在代码中查找符号定义的工具"""
     
     name = "lsp_find_definition"
-    description = "Find the definition of a symbol in code"
+    description = "在代码中查找符号的定义"
     parameters = {
-        "file_path": "Path to the file containing the symbol",
-        "line": "Line number (0-based) of the symbol",
-        "character": "Character position in the line",
-        "language": f"Programming language of the file ({', '.join(LSPRegistry.get_global_lsp_registry().get_supported_languages())})"
+        "file_path": "包含符号的文件路径",
+        "line": "符号所在的行号（从0开始）",
+        "character": "符号在行中的字符位置",
+        "language": f"文件的编程语言（{', '.join(LSPRegistry.get_global_lsp_registry().get_supported_languages())}）"
     }
     
     @staticmethod
