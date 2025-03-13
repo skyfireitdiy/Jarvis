@@ -6,21 +6,21 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class RAGTool:
     name = "rag"
-    description = "Ask questions based on a document directory, supporting multiple document formats (txt, pdf, docx, etc.)"
+    description = "基于文档目录进行问答，支持多种文档格式（txt、pdf、docx等）"
     parameters = {
         "type": "object",
         "properties": {
             "dir": {
                 "type": "string",
-                "description": "Document directory path, supports both relative and absolute paths"
+                "description": "文档目录路径，支持相对路径和绝对路径"
             },
             "question": {
                 "type": "string",
-                "description": "The question to ask"
+                "description": "要询问的问题"
             },
             "rebuild_index": {
                 "type": "boolean",
-                "description": "Whether to rebuild the index",
+                "description": "是否重建索引",
                 "default": False
             }
         },
@@ -145,4 +145,4 @@ def main():
         PrettyOutput.print(result["stderr"], OutputType.WARNING)
 
 if __name__ == "__main__":
-    main() 
+    main()
