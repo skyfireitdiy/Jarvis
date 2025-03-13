@@ -8,25 +8,25 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class MethodologyTool:
-    """Experience management tool"""
+    """经验管理工具"""
     
     name = "methodology"
-    description = "Manage problem-solving methodologies, supporting add, update, and delete operations"
+    description = "管理问题解决方法论，支持添加、更新和删除操作"
     parameters = {
         "type": "object",
         "properties": {
             "operation": {
                 "type": "string",
-                "description": "Operation type (delete/update/add)",
+                "description": "操作类型（delete/update/add）",
                 "enum": ["delete", "update", "add"]
             },
             "problem_type": {
                 "type": "string",
-                "description": "Problem type, e.g., code_review, bug_fix, etc."
+                "description": "问题类型，例如：code_review, bug_fix 等"
             },
             "content": {
                 "type": "string",
-                "description": "Methodology content (required for update/add)",
+                "description": "方法论内容（更新和添加时必填）",
                 "optional": True
             }
         },
@@ -58,9 +58,9 @@ class MethodologyTool:
             with open(self.methodology_file, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
-            PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
-            return {}
-            
+                PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
+                return {}
+                
     def _save_methodologies(self, methodologies: Dict):
         """Save all methodologies"""
         try:
