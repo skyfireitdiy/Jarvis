@@ -45,7 +45,7 @@ class ChdirTool:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"Directory does not exist: {path}"
+                    "stderr": f"目录不存在: {path}"
                 }
                 
             # Ensure the path points to a directory, not a file
@@ -53,7 +53,7 @@ class ChdirTool:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"The path is not a directory: {path}"
+                    "stderr": f"路径不是目录: {path}"
                 }
                 
             # Capture current directory and attempt to change to new path
@@ -62,7 +62,7 @@ class ChdirTool:
             
             return {
                 "success": True,
-                "stdout": f"Changed working directory:\nFrom: {old_path}\nTo: {path}",
+                "stdout": f"成功切换工作目录:\n原目录: {old_path}\n新目录: {path}",
                 "stderr": ""
             }
             
@@ -71,12 +71,12 @@ class ChdirTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"No permission to access directory: {path}"
+                "stderr": f"无权限访问目录: {path}"
             }
         # Catch-all for any other unexpected errors during directory change
         except Exception as e:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Failed to switch directory: {str(e)}"
+                "stderr": f"切换目录失败: {str(e)}"
             }
