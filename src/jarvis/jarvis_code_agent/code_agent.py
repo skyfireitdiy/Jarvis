@@ -6,8 +6,9 @@ from typing import Any, Tuple
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.patch import PatchOutputHandler, shell_input_handler
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
-from jarvis.jarvis_tools.read_code import ReadCodeTool
+
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.git_utils import find_git_root, get_commits_between, get_latest_commit_hash, has_uncommitted_changes
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -84,7 +85,7 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     
     # Read and process files if any were found
     if files:
-        result = ReadCodeTool().execute({"files": files})
+        result = FileOperationTool().execute({"operation":"read","files": files})
         if result["success"]:
             return result["stdout"] + "\n" + prompt, False
     
@@ -96,8 +97,7 @@ class CodeAgent:
     def __init__(self):
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
-        tool_registry.use_tools(["read_code",
-                                 "execute_shell", 
+        tool_registry.use_tools(["execute_shell", 
                                  "execute_shell_script",
                                  "search_web", 
                                  "create_code_agent",
