@@ -8,7 +8,7 @@ from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
-from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash, get_modified_line_ranges
+from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import user_confirm
@@ -102,23 +102,21 @@ def apply_patch(output_str: str) -> str:
             
             # 添加提交信息到final_ret
             if commits:
-                final_ret += "✅ The patches have been applied\n"
-                final_ret += "Commit History:\n"
+                final_ret += "✅ 补丁已应用\n"
+                final_ret += "提交历史:\n"
                 for commit_hash, commit_message in commits:
                     final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
-                change_range = get_modified_line_ranges()
-                read_result = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath, "start_line": c[0], "end_line": c[1]} for filepath, c in change_range.items()]})
-                if read_result["success"]:
-                    final_ret += "The code after applying the patches:\n"
-                    final_ret += read_result["stdout"]
+                
+                final_ret += f"应用补丁后的代码:\n{diff}"
+                 
             else:
-                final_ret += "✅ The patches have been applied (no new commits)"
+                final_ret += "✅ 补丁已应用（没有新的提交）"
         else:
-            final_ret += "❌ I don't want to commit the code\n"
-            final_ret += "Previous code:\n"
+            final_ret += "❌ 我不想提交代码\n"
+            final_ret += "之前的代码:\n"
             final_ret += diff
     else:
-        final_ret += "❌ There are no changes to commit\n"
+        final_ret += "❌ 没有要提交的更改\n"
     # 用户确认最终结果
     PrettyOutput.print(final_ret, OutputType.USER)
     if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
