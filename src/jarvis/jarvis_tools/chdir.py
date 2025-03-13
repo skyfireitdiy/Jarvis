@@ -3,13 +3,13 @@ import os
 
 class ChdirTool:
     name = "chdir"
-    description = "Change current working directory"
+    description = "更改当前工作目录"
     parameters = {
         "type": "object",
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Directory path to switch to, supports both relative and absolute paths"
+                "description": "要切换到的目录路径，支持相对路径和绝对路径"
             }
         },
         "required": ["path"]

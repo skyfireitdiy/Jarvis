@@ -103,7 +103,7 @@ def apply_patch(output_str: str) -> str:
             # 添加提交信息到final_ret
             if commits:
                 final_ret += "✅ 补丁已应用\n"
-                final_ret += "提交历史:\n"
+                final_ret += "提交信息:\n"
                 for commit_hash, commit_message in commits:
                     final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
                 
