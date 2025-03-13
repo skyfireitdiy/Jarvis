@@ -58,8 +58,8 @@ class MethodologyTool:
             with open(self.methodology_file, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
-                PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
-                return {}
+            PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
+            return {}
                 
     def _save_methodologies(self, methodologies: Dict):
         """Save all methodologies"""
