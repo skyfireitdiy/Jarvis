@@ -270,42 +270,42 @@ class ToolRegistry(OutputHandler):
             args = tool_call["arguments"]
 
             tool_call_help = """
-# 🛠️ Tool Usage System
-You are using a tool execution system that requires precise formatting and strict rules.
+# 🛠️ 工具使用系统
+您正在使用一个需要精确格式和严格规则的工具执行系统。
 
-# 📋 Tool Call Format
+# 📋 工具调用格式
 
 <TOOL_CALL>
-name: tool_name
+name: 工具名称
 arguments:
-    param1: value1
-    param2: value2
+    param1: 值1
+    param2: 值2
 </TOOL_CALL>
 
-# ❗ Critical Rules
-1. ONE Tool Per Turn
-   - Execute only ONE tool at a time
-   - Wait for results before next action
+# ❗ 关键规则
+1. 每次只使用一个工具
+   - 一次只执行一个工具
+   - 等待结果后再进行下一步
 
-2. Strict Format Adherence
-   - Follow exact format shown above
-   - Use proper YAML indentation
-   - Include all required parameters
+2. 严格遵守格式
+   - 完全按照上述格式
+   - 使用正确的YAML缩进
+   - 包含所有必需参数
 
-3. Result Handling
-   - Wait for execution results
-   - Never assume outcomes
-   - Don't create fake responses
-   - Don't imagine dialogues
+3. 结果处理
+   - 等待执行结果
+   - 不要假设结果
+   - 不要创建虚假响应
+   - 不要想象对话
 
-4. Information Management
-   - Ask user if info is insufficient
-   - Skip unnecessary steps
-   - Request guidance if stuck
-   - Don't proceed with incomplete info
+4. 信息管理
+   - 如果信息不足，询问用户
+   - 跳过不必要的步骤
+   - 如果卡住，请求指导
+   - 不要在没有完整信息的情况下继续
 
-# 📝 String Parameter Format
-ALWAYS use | syntax for string parameters:
+# 📝 字符串参数格式
+始终使用 | 语法表示字符串参数：
 
 <TOOL_CALL>
 name: execute_shell
@@ -314,19 +314,19 @@ arguments:
         git status --porcelain
 </TOOL_CALL>
 
-# 💡 Best Practices
-- Start execution immediately when ready
-- No need to ask for permission to begin
-- Use proper string formatting
-- Monitor progress and adjust
-- Request help when stuck
+# 💡 最佳实践
+- 准备好后立即开始执行
+- 无需请求许可即可开始
+- 使用正确的字符串格式
+- 监控进度并调整
+- 遇到困难时请求帮助
 
-# ⚠️ Common Mistakes to Avoid
-- Multiple tool calls at once
-- Missing | for string parameters
-- Assuming tool results
-- Creating fictional dialogues
-- Proceeding without required info
+# ⚠️ 常见错误
+- 同时调用多个工具
+- 字符串参数缺少 |
+- 假设工具结果
+- 创建虚构对话
+- 在没有所需信息的情况下继续
 """
             
             if isinstance(args, str):
@@ -354,11 +354,11 @@ arguments:
             stderr = result.get("stderr", "")
             output_parts = []
             if stdout:
-                output_parts.append(f"Output:\n{stdout}")
+                output_parts.append(f"输出:\n{stdout}")
             if stderr:
-                output_parts.append(f"Error:\n{stderr}")
+                output_parts.append(f"错误:\n{stderr}")
             output = "\n\n".join(output_parts)
-            output = "no output and error" if not output else output
+            output = "无输出和错误" if not output else output
             
             # Process the result
             if result["success"]:
@@ -375,33 +375,33 @@ arguments:
                         max_count = self.max_token_count
                         if get_context_token_count(output) > max_count:
                             output_to_summarize = output[-max_count:]
-                            truncation_notice = f"\n(Note: Due to the length of the output, only the last {max_count} characters are summarized)"
+                            truncation_notice = f"\n(注意：由于输出过长，仅总结最后 {max_count} 个字符)"
                         else:
                             output_to_summarize = output
                             truncation_notice = ""
 
-                        prompt = f"""Please summarize the execution result of the following tool, extracting key information and important results. Note:
-1. Keep all important numerical values, paths, error information, etc.
-2. Maintain the accuracy of the results
-3. Describe the main content in concise language
-4. If there is error information, ensure it is included in the summary
+                        prompt = f"""请总结以下工具的执行结果，提取关键信息和重要结果。注意：
+1. 保留所有重要的数值、路径、错误信息等
+2. 保持结果的准确性
+3. 用简洁的语言描述主要内容
+4. 如果有错误信息，确保包含在总结中
 
-Tool name: {name}
-Execution result:
+工具名称: {name}
+执行结果:
 {output_to_summarize}
 
-Please provide a summary:"""
+请提供总结:"""
 
                         summary = model.chat_until_success(prompt)
-                        output = f"""--- Original output is too long, here is the summary ---{truncation_notice}
+                        output = f"""--- 原始输出过长，以下是总结 ---{truncation_notice}
 
 {summary}
 
---- Summary ends ---"""
+--- 总结结束 ---"""
                         
                     except Exception as e:
                         PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
-                        output = f"Output is too long ({len(output)} characters), it is recommended to view the original output.\nPreview of the first 300 characters:\n{output[:300]}..."
+                        output = f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
             
             else:
                 PrettyOutput.section("执行失败", OutputType.WARNING)
@@ -410,4 +410,4 @@ Please provide a summary:"""
             
         except Exception as e:
             PrettyOutput.print(f"工具执行失败：{str(e)}", OutputType.ERROR)
-            return f"Tool call failed: {str(e)}"
+            return f"工具调用失败: {str(e)}"
