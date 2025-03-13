@@ -107,8 +107,8 @@ class CodeAgent:
                                  "lsp_get_diagnostics", 
                                  "lsp_find_references", 
                                  "lsp_find_definition", 
-                                 "lsp_prepare_rename", 
-                                 "lsp_validate_edit"])
+                                 "lsp_prepare_rename"
+                                 ])
         code_system_prompt = """
 # 角色：高级代码工程师
 精通安全、精确的代码修改，具有严格的验证流程。
@@ -128,7 +128,6 @@ class CodeAgent:
 
 2. 验证工具：
    - lsp_prepare_rename：安全重构检查
-   - lsp_validate_edit：提交前验证
    - lsp_get_diagnostics：修改后检查
 
 3. 系统工具：
@@ -145,7 +144,6 @@ class CodeAgent:
 
 2. 执行：
    - 在受保护的块中进行原子修改
-   - 立即调用lsp_validate_edit验证更改
    - 每次更改后自动运行lsp_get_diagnostics
    - 如果发现错误，使用lsp_find_references和lsp_find_definition进行即时修复
    - 每次更改后使用LSP验证语法
@@ -153,7 +151,6 @@ class CodeAgent:
 3. 检查：
    - 强制使用lsp_get_diagnostics进行完整诊断报告
    - 使用lsp_preprepare_rename验证所有重命名
-   - 在所有修改的文件上执行lsp_validate_edit
    - 如果检测到错误，进入修复循环直到所有检查通过
 
 4. 行动：
@@ -174,7 +171,6 @@ class CodeAgent:
 
 3. 验证清单：
    [ ] 执行lsp_get_diagnostics并确保零错误
-   [ ] 所有更改都经过lsp_validate_edit验证
    [ ] 使用lsp_find_references确认影响范围
    [ ] 使用lsp_prepare_rename验证重命名安全性
 
@@ -191,13 +187,11 @@ class CodeAgent:
 
 2. 禁止操作：
    - 未通过lsp_get_diagnostics检查继续操作
-   - 未经lsp_validate_edit验证提交更改
    - 多个功能组合修改
    - 未经测试的接口修改
 
 3. 紧急协议：
    - lsp_get_diagnostics出现错误时立即停止并回滚
-   - lsp_validate_edit失败时优先修复验证错误
    - 出现意外行为时通知用户
    - 对任何回归进行事后分析
 """
