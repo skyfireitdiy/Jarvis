@@ -110,7 +110,7 @@ class GitCommitTool:
                     ).wait()
 
                 commit_hash = self._get_last_commit_hash()
-                spinner.ok("✅ ")
+                spinner.ok("✅")
 
             PrettyOutput.print(f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS)
 
