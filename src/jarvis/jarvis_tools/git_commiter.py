@@ -4,6 +4,7 @@ import subprocess
 from typing import Dict, Any
 import tempfile
 import yaml
+from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import sys
 import argparse
@@ -54,59 +55,63 @@ class GitCommitTool:
                 PrettyOutput.print("没有未提交的更改", OutputType.SUCCESS)
                 return {"success": True, "stdout": "No changes to commit", "stderr": ""}
             
-            PrettyOutput.print("准备添加文件到提交...", OutputType.SYSTEM)
-            subprocess.Popen(
-                ["git", "add", "."],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            ).wait()
-            
-            PrettyOutput.print("获取差异...", OutputType.SYSTEM)
-            process = subprocess.Popen(
-                ["git", "diff", "--cached", "--exit-code"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            diff = process.communicate()[0].decode()
-            PrettyOutput.print(diff, OutputType.CODE, lang="diff")
-            
-            prompt = f'''根据以下规则生成提交信息：
-            提交信息应使用{args.get('lang', '中文')}书写
-# 必需结构
-必须使用以下格式：
-<COMMIT_MESSAGE>
-<类型>(<范围>): <主题>
-使用祈使语气描述变更内容
-</COMMIT_MESSAGE>
-# 格式规则
-1. 类型: fix, feat, docs, style, refactor, test, chore
-2. 范围表示模块 (例如: auth, database)
-3. 主题行 <= 72个字符，不以句号结尾
-4. 正文使用现在时态解释每个变更的内容和原因
-5. 不要遗漏任何变更
-# 分析材料
-{diff}
-'''
-            
-            PrettyOutput.print("生成提交消息...", OutputType.SYSTEM)
-            platform = PlatformRegistry().get_codegen_platform()
-            platform.set_suppress_output(True)
-            commit_message = platform.chat_until_success(prompt)
-            commit_message = self._extract_commit_message(commit_message)
-            
-            # 使用临时文件处理提交消息
-            with tempfile.NamedTemporaryFile(mode='w', delete=True) as tmp_file:
-                tmp_file.write(commit_message)
-                tmp_file.flush()  # 确保内容写入文件
-                commit_cmd = ["git", "commit", "-F", tmp_file.name]
-                PrettyOutput.print("提交...", OutputType.INFO)
+            with yaspin(text="处理中...", color="cyan") as spinner:
                 subprocess.Popen(
-                    commit_cmd,
+                    ["git", "add", "."],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 ).wait()
 
-            commit_hash = self._get_last_commit_hash()
+                spinner.write("✅ 添加文件到提交")
+                
+                process = subprocess.Popen(
+                    ["git", "diff", "--cached", "--exit-code"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                diff = process.communicate()[0].decode()
+                
+                spinner.write("✅ 获取差异")
+                
+                prompt = f'''根据以下规则生成提交信息：
+                提交信息应使用{args.get('lang', '中文')}书写
+    # 必需结构
+    必须使用以下格式：
+    <COMMIT_MESSAGE>
+    <类型>(<范围>): <主题>
+    使用祈使语气描述变更内容
+    </COMMIT_MESSAGE>
+    # 格式规则
+    1. 类型: fix, feat, docs, style, refactor, test, chore
+    2. 范围表示模块 (例如: auth, database)
+    3. 主题行 <= 72个字符，不以句号结尾
+    4. 正文使用现在时态解释每个变更的内容和原因
+    5. 不要遗漏任何变更
+    # 分析材料
+    {diff}
+    '''
+                
+                spinner.write("✅ 生成提交消息")
+                platform = PlatformRegistry().get_codegen_platform()
+                platform.set_suppress_output(True)
+                commit_message = platform.chat_until_success(prompt)
+                commit_message = self._extract_commit_message(commit_message)
+                
+                # 使用临时文件处理提交消息
+                with tempfile.NamedTemporaryFile(mode='w', delete=True) as tmp_file:
+                    tmp_file.write(commit_message)
+                    tmp_file.flush()  # 确保内容写入文件
+                    commit_cmd = ["git", "commit", "-F", tmp_file.name]
+                    spinner.write("✅ 提交")
+                    subprocess.Popen(
+                        commit_cmd,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    ).wait()
+
+                commit_hash = self._get_last_commit_hash()
+                spinner.ok("✅ ")
+
             PrettyOutput.print(f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS)
 
             return {
@@ -116,7 +121,7 @@ class GitCommitTool:
                     "commit_message": commit_message
                 }),
                 "stderr": ""
-            }
+                }
 
         except Exception as e:
             return {

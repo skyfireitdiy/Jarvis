@@ -2,6 +2,8 @@ import re
 from typing import Dict, Any, Tuple
 import os
 
+from yaspin import yaspin
+
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
@@ -85,8 +87,11 @@ def apply_patch(output_str: str) -> str:
     # 按文件逐个处理
     for filepath, patch_content in patches.items():
         try:
-            handle_code_operation(filepath, patch_content)
-            PrettyOutput.print(f"文件 {filepath} 处理完成", OutputType.SUCCESS)
+            with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
+                if not handle_code_operation(filepath, patch_content):
+                    spinner.fail("❌ ")
+                else:
+                    spinner.ok("✅ ")
         except Exception as e:
             revert_file(filepath)  # 回滚单个文件
             PrettyOutput.print(f"文件 {filepath} 处理失败: {str(e)}", OutputType.ERROR)
@@ -175,7 +180,7 @@ def handle_commit_workflow()->bool:
     return commit_result["success"]
 
 # New handler functions below ▼▼▼
-def handle_code_operation(filepath: str, patch_content: str) -> str:
+def handle_code_operation(filepath: str, patch_content: str) -> bool:
     """处理基于上下文的代码片段"""
     try:
         if not os.path.exists(filepath):
@@ -184,7 +189,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> str:
             open(filepath, 'w', encoding='utf-8').close()
         old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
         if not old_file_content["success"]:
-            return f"文件读取失败: {old_file_content['stderr']}"
+            return False
         
         prompt = f"""
 你是一个代码审查员，请审查以下代码并将其与上下文合并。
@@ -208,7 +213,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> str:
 </MERGED_CODE>
 """
         model = PlatformRegistry().get_codegen_platform()
-        model.set_suppress_output(False)
+        model.set_suppress_output(True)
         count = 5
         start_line = -1
         end_line = -1
@@ -226,7 +231,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> str:
                 pass
             if start_line == -1:
                 PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.WARNING)
-                return f"代码合并失败"
+                return False
             if end_line == -1:
                 last_line = response[-1]
                 prompt = f"""
@@ -237,12 +242,11 @@ def handle_code_operation(filepath: str, patch_content: str) -> str:
                 continue
             if end_line < start_line:
                 PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.WARNING)
-                return f"代码合并失败"
+                return False
             break
         # 写入合并后的代码
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write("\n".join(response[start_line:end_line])+"\n")
-        PrettyOutput.print(f"✅ 为文件 {filepath} 应用补丁成功", OutputType.SUCCESS)
-        return ""
+        return True
     except Exception as e:
-        return f"文件操作失败: {str(e)}"
+        return False
