@@ -246,7 +246,6 @@ SA_PROMPT = """
 5. 指导TL实施
 
 # 🛠️ 可用工具
-- `read_code`: 分析代码结构
 - `file_operation`: 管理架构文档
 - `search`: 研究技术方案
 - `rag`: 访问技术知识库
@@ -375,7 +374,6 @@ TL_PROMPT = """
 6. 协调QA测试
 
 # 🛠️ 可用工具
-- `read_code`: 评审代码
 - `file_operation`: 管理技术文档
 - `ask_codebase`: 理解代码库
 - `lsp_get_diagnostics`: 检查代码质量
@@ -505,7 +503,6 @@ DEV_PROMPT = """
 # 🛠️ 可用工具
 - `create_code_agent`: 代码生成主要工具
 - `file_operation`: 管理文档
-- `read_code`: 评审现有代码
 - `ask_codebase`: 理解代码库
 - `execute_shell`: 监控项目状态
 
@@ -671,7 +668,6 @@ QA_PROMPT = """
 # 🛠️ 可用工具
 - `create_code_agent`: 生成测试代码
 - `file_operation`: 管理测试文档
-- `read_code`: 评审待测代码
 - `ask_codebase`: 理解测试需求
 - `execute_shell`: 运行测试
 
@@ -820,16 +816,16 @@ def create_dev_team() -> MultiAgent:
     BA_output_handler.use_tools(["ask_user", "file_operation", "search_web", "rag", "execute_shell"])
 
     SA_output_handler = ToolRegistry()
-    SA_output_handler.use_tools(["read_code", "file_operation", "search_web", "rag", "ask_codebase", "lsp_get_document_symbols", "execute_shell"])
+    SA_output_handler.use_tools(["file_operation", "search_web", "rag", "ask_codebase", "lsp_get_document_symbols", "execute_shell"])
     
     TL_output_handler = ToolRegistry()
-    TL_output_handler.use_tools(["read_code", "file_operation", "ask_codebase", "lsp_get_diagnostics", "lsp_find_references", "lsp_find_definition", "execute_shell"])
+    TL_output_handler.use_tools(["file_operation", "ask_codebase", "lsp_get_diagnostics", "lsp_find_references", "lsp_find_definition", "execute_shell"])
     
     DEV_output_handler = ToolRegistry()
-    DEV_output_handler.use_tools(["create_code_agent", "file_operation", "read_code", "ask_codebase", "execute_shell"])
+    DEV_output_handler.use_tools(["create_code_agent", "file_operation", "ask_codebase", "execute_shell"])
     
     QA_output_handler = ToolRegistry()
-    QA_output_handler.use_tools(["create_code_agent", "file_operation", "read_code", "ask_codebase", "execute_shell"])
+    QA_output_handler.use_tools(["create_code_agent", "file_operation", "ask_codebase", "execute_shell"])
     
     # Create configurations for each role
     configs = [
