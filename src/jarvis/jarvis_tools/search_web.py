@@ -66,21 +66,21 @@ def bing_search(query):
 
 class SearchTool:
     name = "search_web"
-    description = "Use Bing search engine to search for information, and extract key information based on the question"
+    description = "使用Bing搜索引擎搜索信息，并根据问题提取关键信息"
     parameters = {
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "Search keywords"
+                "description": "搜索关键词"
             },
             "question": {
                 "type": "string",
-                "description": "Specific question to answer, used to extract relevant information from search results"
+                "description": "要回答的具体问题，用于从搜索结果中提取相关信息"
             },
             "max_results": {
                 "type": "integer",
-                "description": "Maximum number of search results",
+                "description": "最大搜索结果数量",
                 "default": 3
             }
         },
@@ -293,4 +293,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main()

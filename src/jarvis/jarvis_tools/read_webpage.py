@@ -6,13 +6,13 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class WebpageTool:
     name = "read_webpage"
-    description = "Read webpage content, extract title, text and hyperlinks"
+    description = "读取网页内容，提取标题、文本和超链接"
     parameters = {
         "type": "object",
         "properties": {
             "url": {
                 "type": "string",
-                "description": "The URL of the webpage to read"
+                "description": "要读取的网页URL"
             }
         },
         "required": ["url"]

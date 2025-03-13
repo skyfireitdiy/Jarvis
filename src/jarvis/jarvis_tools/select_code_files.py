@@ -6,7 +6,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class CodeFileSelecterTool:
     name = "select_code_files"
-    description = "Select and manage code files for modification with interactive file selection"
+    description = "通过交互式文件选择工具选择和修改代码文件"
     parameters = {
         "type": "object",
         "properties": {
@@ -15,12 +15,12 @@ class CodeFileSelecterTool:
                 "items": {
                     "type": "string",
                 },
-                "description": "List of initially related files",
+                "description": "初始相关的文件列表",
                 "default": []
             },
             "root_dir": {
                 "type": "string",
-                "description": "Root directory of the codebase",
+                "description": "代码库的根目录",
                 "default": "."
             }
         },
