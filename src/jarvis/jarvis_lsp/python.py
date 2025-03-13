@@ -100,34 +100,6 @@ class PythonLSP(BaseLSP):
             return None
         return None
     
-    def validate_edit(self, file_path: str, edit: Dict[str, Any]) -> bool:
-        try:
-            # Simple syntax check of the edited content
-            content = ""
-            with open(file_path, 'r') as f:
-                content = f.read()
-            
-            # Apply edit
-            start = edit["range"]["start"]
-            end = edit["range"]["end"]
-            new_text = edit["newText"]
-            
-            lines = content.splitlines(True)
-            before = "".join(lines[:start["line"]])
-            after = "".join(lines[end["line"] + 1:])
-            current_line = lines[start["line"]]
-            
-            edited_line = (current_line[:start["character"]] + 
-                         new_text + 
-                         current_line[end["character"]:])
-            
-            new_content = before + edited_line + after
-            
-            # Check if new content is valid Python
-            jedi.Script(code=new_content)
-            return True
-        except Exception:
-            return False
     
     def shutdown(self):
         self.script_cache.clear()

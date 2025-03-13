@@ -14,7 +14,6 @@ REQUIRED_METHODS = [
     ('get_document_symbols', ['file_path']),
     ('get_diagnostics', ['file_path']),
     ('prepare_rename', ['file_path', 'position']),
-    ('validate_edit', ['file_path', 'edit']),
     ('shutdown', [])
 ]
 

@@ -122,15 +122,6 @@ class RustLSP(BaseLSP):
         })
         return result
     
-    def validate_edit(self, file_path: str, edit: Dict[str, Any]) -> bool:
-        # Send workspace/willRenameFiles request to check validity
-        result = self._send_request("workspace/willRenameFiles", {
-            "files": [{
-                "oldUri": f"file://{file_path}",
-                "newUri": f"file://{file_path}.tmp"
-            }]
-        })
-        return bool(result)
     
     def shutdown(self):
         if self.analyzer_process:

@@ -125,18 +125,6 @@ class BaseLSP(ABC):
         """
         return None
     
-    @abstractmethod
-    def validate_edit(self, file_path: str, edit: Dict[str, Any]) -> bool:
-        """Validate if proposed edit is syntactically correct.
-        
-        Args:
-            file_path: Path to the file
-            edit: Edit operation in LSP format
-            
-        Returns:
-            bool: True if edit is valid
-        """
-        return False
     
     def shutdown(self):
         """Shutdown LSP server cleanly."""
