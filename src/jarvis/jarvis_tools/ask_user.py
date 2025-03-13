@@ -5,13 +5,13 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class AskUserTool:
     name="ask_user"
-    description="""Ask the user when information needed to complete the task is missing or when critical decision information is lacking. Users can input multiple lines of text, ending with an empty line. Use cases: 1. Need user to provide more information to complete the task; 2. Need user to make critical decisions; 3. Need user to confirm important operations; 4. Need user to provide additional information"""
+    description="""当完成任务所需的信息缺失或关键决策信息不足时，向用户提问。用户可以输入多行文本，以空行结束。使用场景：1. 需要用户提供更多信息以完成任务；2. 需要用户做出关键决策；3. 需要用户确认重要操作；4. 需要用户提供额外信息"""
     parameters={
         "type": "object",
         "properties": {
             "question": {
                 "type": "string",
-                "description": "The question to ask the user"
+                "description": "要向用户提出的问题"
             }
         },
         "required": ["question"]
