@@ -657,29 +657,28 @@ Content: {content}
         """
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(True)
-        prompt = f"""Please generate 10 different expressions optimized for vector search based on the following query. Each expression should:
+        prompt = f"""请基于以下查询生成10个针对向量搜索优化的不同表达。每个表达应满足：
+1. 聚焦关键技术概念和术语
+2. 使用清晰明确的语言
+3. 包含重要的上下文术语
+4. 避免使用通用或模糊的词语
+5. 保持与原始查询的语义相似性
+6. 适合基于嵌入的搜索
 
-1. Focus on key technical concepts and terminology
-2. Use clear and specific language
-3. Include important contextual terms
-4. Avoid general or ambiguous words
-5. Maintain semantic similarity with original query
-6. Be suitable for embedding-based search
-
-Original query: 
+原始查询: 
 {query}
 
-Example transformations:
-Query: "How to handle user login?"
-Output format:
+示例转换：
+查询: "如何处理用户登录？"
+输出格式:
 <QUESTION>
-- user authentication implementation and flow
-- login system architecture and components
-- credential validation and session management
+- 用户认证的实现与流程
+- 登录系统架构与组件
+- 凭证验证与会话管理
 - ...
 </QUESTION>
 
-Please provide 10 search-optimized expressions in the specified format.
+请以指定格式提供10个搜索优化的表达。
 """
         response = model.chat_until_success(prompt)
         
@@ -726,7 +725,7 @@ Please provide 10 search-optimized expressions in the specified format.
                 if file_path not in results:
                     if similarity > 0.5:
                         data = self.vector_cache[file_path]
-                        results[file_path] = (file_path, similarity, data["description"])
+                        results[file_path] = (file path, similarity, data["description"])
         
         return results
 
