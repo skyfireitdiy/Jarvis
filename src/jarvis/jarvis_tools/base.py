@@ -7,7 +7,7 @@ class Tool:
         """
         初始化工具对象
         
-        Args:
+        参数:
             name (str): 工具名称
             description (str): 工具描述
             parameters (Dict): 工具参数定义
@@ -28,10 +28,10 @@ class Tool:
         """
         执行工具函数
         
-        Args:
+        参数:
             arguments (Dict): 工具执行所需的参数
             
-        Returns:
+        返回:
             Dict[str, Any]: 工具执行结果
         """
         return self.func(arguments)
