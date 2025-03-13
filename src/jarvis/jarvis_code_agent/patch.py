@@ -26,31 +26,31 @@ class PatchOutputHandler(OutputHandler):
     
     def prompt(self) -> str:
         return """
-# 🛠️ Contextual Code Patch Specification
-Use <PATCH> blocks to specify code changes:
+# 🛠️ 上下文代码补丁规范
+使用<PATCH>块来指定代码更改：
 --------------------------------
 <PATCH>
-File: [file_path]
-Reason: [change_reason]
-[contextual_code_snippet]
+文件: [文件路径]
+原因: [修改原因]
+[上下文代码片段]
 </PATCH>
 --------------------------------
-Rules:
-1. Code snippets must include sufficient context (3 lines before/after)
-2. I can see full code, so only show modified code sections
-3. Preserve original indentation and formatting
-4. For new files, provide complete code
-5. When modifying existing files, retain surrounding unchanged code
-Example:
+规则：
+1. 代码片段必须包含足够的上下文（前后各3行）
+2. 我可以看到完整代码，所以只需显示修改的代码部分
+3. 保留原始缩进和格式
+4. 对于新文件，提供完整代码
+5. 修改现有文件时，保留周围未更改的代码
+示例：
 <PATCH>
-File: src/utils/math.py
-Reason: Fix zero division handling
+文件: src/utils/math.py
+原因: 修复除零处理
 def safe_divide(a, b):
-    # Add parameter validation
+    # 添加参数验证
     if b == 0:
-        raise ValueError("Divisor cannot be zero")
+        raise ValueError("除数不能为零")
     return a / b
-# existing code ...
+# 现有代码 ...
 def add(a, b):
     return a + b
 </PATCH>
@@ -189,22 +189,22 @@ def handle_code_operation(filepath: str, patch_content: str) -> str:
             return f"文件读取失败: {old_file_content['stderr']}"
         
         prompt = f"""
-You are a code reviewer, please review the following code and merge the code with the context.
-Original Code:
+你是一个代码审查员，请审查以下代码并将其与上下文合并。
+原始代码:
 {old_file_content["stdout"]}
-Patch:
+补丁内容:
 {patch_content}
 """
         prompt += f"""
-Please merge the code with the context and return the fully merged code.
+请将代码与上下文合并并返回完整的合并代码。
 
-Requirements:
-1. Strictly preserve original code formatting, blank lines and indentation
-2. Only include actual code content in <MERGED_CODE> block, including blank lines and indentation
-3. Absolutely NO markdown code blocks (```) or backticks EXCEPT when modifying markdown files
-4. Don't output any other text except the merged code
+要求:
+1. 严格保留原始代码的格式、空行和缩进
+2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
+3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
+4. 除了合并后的代码，不要输出任何其他文本
 
-Output Format:
+输出格式:
 <MERGED_CODE>
 [merged_code]
 </MERGED_CODE>
@@ -232,7 +232,7 @@ Output Format:
             if end_line == -1:
                 last_line = response[-1]
                 prompt = f"""
-                continue with the last line(do not include <MERGED_CODE> tags, output </MERGED_CODE> tags when you are done):
+                继续从最后一行开始（不要包含<MERGED_CODE>标签，完成后输出</MERGED_CODE>标签）：
                 {last_line}
                 """
                 response.pop() # 删除最后一行
