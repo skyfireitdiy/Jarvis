@@ -121,7 +121,6 @@ class CodeAgent:
 
 ## 工具使用协议
 1. 分析工具：
-   - read_code：在修改前检查代码片段
    - lsp_get_document_symbols：映射代码结构
    - lsp_find_references：理解使用模式
    - lsp_find_definition：追踪实现细节
