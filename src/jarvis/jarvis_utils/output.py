@@ -184,6 +184,7 @@ class PrettyOutput:
             highlight=True,
             box=HEAVY,
         )
+        console.print()
         console.print(panel)
         if traceback or output_type == OutputType.ERROR:
             console.print_exception()
