@@ -59,7 +59,7 @@ class CodeBase:
 
     def get_git_file_list(self):
         """Get the list of files in the git repository, excluding the .jarvis-codebase directory"""
-        files = os.popen("git ls-files").read().splitlines()
+        files = os.popen("git ls-files"). read().splitlines()
         # Filter out files in the .jarvis-codebase directory
         return [f for f in files if not f.startswith(".jarvis")]
 
@@ -546,7 +546,7 @@ Content: {content}
             
             # Maximum content length per batch
             max_batch_length = self.max_token_count - 1000  # Reserve space for prompt
-            max_file_length = max_batch_length // 3  # Limit individual file size
+            max_file_length = max_batch_length / / 3  # Limit individual file size
             
             # Process files in batches
             all_selected_files = []
@@ -793,52 +793,52 @@ Content: {content}
             return [], ""
         
         prompt = f"""
-# 🤖 Role Definition
-You are a code analysis expert who provides comprehensive and accurate answers about codebases.
+# 🤖 角色定义
+您是一位代码分析专家，能够提供关于代码库的全面且准确的回答。
 
-# 🎯 Core Responsibilities
-- Analyze code files thoroughly
-- Explain technical concepts clearly
-- Provide relevant code examples
-- Identify missing information
-- Answer in user's language
+# 🎯 核心职责
+- 深入分析代码文件
+- 清晰解释技术概念
+- 提供相关代码示例
+- 识别缺失的信息
+- 使用用户的语言进行回答
 
-# 📋 Response Requirements
-## Content Quality
-- Focus on implementation details
-- Be technically precise
-- Include relevant code snippets
-- Indicate any missing information
-- Use professional terminology
+# 📋 回答要求
+## 内容质量
+- 关注实现细节
+- 保持技术准确性
+- 包含相关代码片段
+- 指出任何缺失的信息
+- 使用专业术语
 
-## Response Format
-- question: [Restate the question]
+## 回答格式
+- question: [重述问题]
   answer: |
-    [Detailed technical answer with:
-    - Implementation details
-    - Code examples (if relevant)
-    - Missing information (if any)
-    - Related technical concepts]
+    [详细的技术回答，包含：
+    - 实现细节
+    - 代码示例（如果相关）
+    - 缺失的信息（如果有）
+    - 相关技术概念]
 
-- question: [Follow-up question if needed]
+- question: [如果需要，提出后续问题]
   answer: |
-    [Additional technical details]
+    [额外的技术细节]
 
-# 🔍 Analysis Context
-Question: {query}
+# 🔍 分析上下文
+问题: {query}
 
-Relevant Code Files (by relevance):
+相关代码文件（按相关性排序）:
 """
 
-        # Add context with length control
-        available_count = self.max_token_count - get_context_token_count(prompt) - 1000  # Reserve space for answer
+        # 添加上下文，控制长度
+        available_count = self.max_token_count - get_context_token_count(prompt) - 1000  # 为回答预留空间
         current_count = 0
         
         for path in files_from_codebase:
             try:
                 content = open(path["file"], "r", encoding="utf-8").read()
                 file_content = f"""
-## File: {path["file"]}
+## 文件: {path["file"]}
 ```
 {content}
 ```
@@ -860,13 +860,13 @@ Relevant Code Files (by relevance):
                 continue
 
         prompt += """
-# ❗ Important Rules
-1. Always base answers on provided code
-2. Use technical precision
-3. Include code examples when relevant
-4. Indicate any missing information
-5. Maintain professional language
-6. Answer in user's language
+# ❗ 重要规则
+1. 始终基于提供的代码进行回答
+2. 保持技术准确性
+3. 在相关时包含代码示例
+4. 指出任何缺失的信息
+5. 保持专业语言
+6. 使用用户的语言进行回答
 """
 
         model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
