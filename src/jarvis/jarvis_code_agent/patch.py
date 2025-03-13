@@ -6,7 +6,7 @@ from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
-from jarvis.jarvis_tools.read_code import ReadCodeTool
+from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash, get_modified_line_ranges
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -107,7 +107,7 @@ def apply_patch(output_str: str) -> str:
                 for commit_hash, commit_message in commits:
                     final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
                 change_range = get_modified_line_ranges()
-                read_result = ReadCodeTool().execute({"files": [{"path": filepath, "start_line": c[0], "end_line": c[1]} for filepath, c in change_range.items()]})
+                read_result = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath, "start_line": c[0], "end_line": c[1]} for filepath, c in change_range.items()]})
                 if read_result["success"]:
                     final_ret += "The code after applying the patches:\n"
                     final_ret += read_result["stdout"]
@@ -184,7 +184,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> str:
             # 新建文件
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
             open(filepath, 'w', encoding='utf-8').close()
-        old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
+        old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
         if not old_file_content["success"]:
             return f"文件读取失败: {old_file_content['stderr']}"
         

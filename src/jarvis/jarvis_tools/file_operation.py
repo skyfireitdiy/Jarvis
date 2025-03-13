@@ -78,7 +78,7 @@ class FileOperationTool:
                     }
                 
                 content = "".join(lines[start_line - 1:end_line])
-                output = f"File: {abs_path}\n{content}"
+                output = f"File: {abs_path}\nLines: {start_line} - {end_line}\n{content}" + "\n\n" + "="*80 + "\n\n"
                 
                 return {
                     "success": True,
