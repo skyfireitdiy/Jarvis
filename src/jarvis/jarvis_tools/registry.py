@@ -16,41 +16,41 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 tool_call_help = """
-# 🛠️ Tool Usage System
-You are using a tool execution system that requires precise formatting and strict rules.
+# 🛠️ 工具使用系统
+您正在使用一个需要精确格式和严格规则的工具执行系统。
 
-# 📋 Tool Call Format
+# 📋 工具调用格式
 <TOOL_CALL>
-name: tool_name
+name: 工具名称
 arguments:
-    param1: value1
-    param2: value2
+    param1: 值1
+    param2: 值2
 </TOOL_CALL>
 
-# ❗ Critical Rules
-1. ONE Tool Per Turn
-   - Execute only ONE tool at a time
-   - Wait for results before next action
+# ❗ 关键规则
+1. 每次只使用一个工具
+   - 一次只执行一个工具
+   - 等待结果后再进行下一步
 
-2. Strict Format Adherence
-   - Follow exact format shown above
-   - Use proper YAML indentation
-   - Include all required parameters
+2. 严格遵守格式
+   - 完全按照上述格式
+   - 使用正确的YAML缩进
+   - 包含所有必需参数
 
-3. Result Handling
-   - Wait for execution results
-   - Never assume outcomes
-   - Don't create fake responses
-   - Don't imagine dialogues
+3. 结果处理
+   - 等待执行结果
+   - 不要假设结果
+   - 不要创建虚假响应
+   - 不要想象对话
 
-4. Information Management
-   - Ask user if info is insufficient
-   - Skip unnecessary steps
-   - Request guidance if stuck
-   - Don't proceed with incomplete info
+4. 信息管理
+   - 如果信息不足，询问用户
+   - 跳过不必要的步骤
+   - 如果卡住，请求指导
+   - 不要在没有完整信息的情况下继续
 
-# 📝 String Parameter Format
-ALWAYS use | syntax for string parameters:
+# 📝 字符串参数格式
+始终使用 | 语法表示字符串参数：
 
 <TOOL_CALL>
 name: execute_shell
@@ -59,19 +59,19 @@ arguments:
         git status --porcelain
 </TOOL_CALL>
 
-# 💡 Best Practices
-- Start execution immediately when ready
-- No need to ask for permission to begin
-- Use proper string formatting
-- Monitor progress and adjust
-- Request help when stuck
+# 💡 最佳实践
+- 准备好后立即开始执行
+- 无需请求许可即可开始
+- 使用正确的字符串格式
+- 监控进度并调整
+- 遇到困难时请求帮助
 
-# ⚠️ Common Mistakes to Avoid
-- Multiple tool calls at once
-- Missing | for string parameters
-- Assuming tool results
-- Creating fictional dialogues
-- Proceeding without required info
+# ⚠️ 常见错误
+- 同时调用多个工具
+- 字符串参数缺少 |
+- 假设工具结果
+- 创建虚构对话
+- 在没有所需信息的情况下继续
 """
 
 class ToolRegistry(OutputHandler):
@@ -85,14 +85,14 @@ class ToolRegistry(OutputHandler):
         return False
     
     def prompt(self) -> str:
-        """Load tools"""
+        """加载工具"""
         tools = self.get_all_tools()
         if tools:
-            tools_prompt = "## Available tools:\n"
+            tools_prompt = "## 可用工具:\n"
             for tool in tools:
-                tools_prompt += f"- Name: {tool['name']}\n"
-                tools_prompt += f"  Description: {tool['description']}\n"
-                tools_prompt += f"  Parameters: {tool['parameters']}\n"
+                tools_prompt += f"- 名称: {tool['name']}\n"
+                tools_prompt += f"  描述: {tool['description']}\n"
+                tools_prompt += f"  参数: {tool['parameters']}\n"
             tools_prompt += tool_call_help
             return tools_prompt
         return ""
@@ -101,87 +101,87 @@ class ToolRegistry(OutputHandler):
         tool_calls = self._extract_tool_calls(response)
         if len(tool_calls) > 1:
             PrettyOutput.print(f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([tool_call['name'] for tool_call in tool_calls])}", OutputType.WARNING)
-            return False, f"Call failed: Handle multiple tool calls, please ONLY handle one tool call at a time."
+            return False, f"调用失败：请一次只处理一个工具调用。"
         if len(tool_calls) == 0:
             return False, ""
         tool_call = tool_calls[0]
         return False, self.handle_tool_calls(tool_call)
 
     def __init__(self):
-        """Initialize tool registry"""
+        """初始化工具注册表"""
         self.tools: Dict[str, Tool] = {}
-        # Load built-in tools and external tools
+        # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
-        # Ensure max_token_count is an integer
+        # 确保max_token_count是整数
         self.max_token_count = int(get_max_token_count() * 0.8)
 
     def use_tools(self, name: List[str]):
-        """Use specified tools"""
+        """使用指定工具"""
         missing_tools = [tool_name for tool_name in name if tool_name not in self.tools]
         if missing_tools:
             PrettyOutput.print(f"工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}", OutputType.WARNING)
         self.tools = {tool_name: self.tools[tool_name] for tool_name in name}
 
     def dont_use_tools(self, names: List[str]):
-        """Remove specified tools from the registry"""
+        """从注册表中移除指定工具"""
         self.tools = {name: tool for name, tool in self.tools.items() if name not in names}
 
     def _load_builtin_tools(self):
-        """Load tools from the built-in tools directory"""
+        """从内置工具目录加载工具"""
         tools_dir = Path(__file__).parent
         
-        # Iterate through all .py files in the directory
+        # 遍历目录中的所有.py文件
         for file_path in tools_dir.glob("*.py"):
-            # Skip base.py and __init__.py
+            # 跳过base.py和__init__.py
             if file_path.name in ["base.py", "__init__.py", "registry.py"]:
                 continue
                 
             self.register_tool_by_file(str(file_path))
 
     def _load_external_tools(self):
-        """Load external tools from ~/.jarvis/tools"""
+        """从~/.jarvis/tools加载外部工具"""
         external_tools_dir = Path.home() / '.jarvis/tools'
         if not external_tools_dir.exists():
             return
             
-        # Iterate through all .py files in the directory
+        # 遍历目录中的所有.py文件
         for file_path in external_tools_dir.glob("*.py"):
-            # Skip __init__.py
+            # 跳过__init__.py
             if file_path.name == "__init__.py":
                 continue
                 
             self.register_tool_by_file(str(file_path))
 
     def register_tool_by_file(self, file_path: str):
-        """Load and register tools from a specified file
+        """从指定文件加载并注册工具
         
-        Args:
-            file_path: The path of the tool file
+        参数:
+            file_path: 工具文件的路径
             
-        Returns:
-            bool: Whether the tool is loaded successfully
+        返回:
+            bool: 工具是否加载成功
         """
         try:
-            p_file_path = Path(file_path).resolve()  # Get the absolute path
+            p_file_path = Path(file_path).resolve()  # 获取绝对路径
             if not p_file_path.exists() or not p_file_path.is_file():
                 PrettyOutput.print(f"文件不存在: {p_file_path}", OutputType.ERROR)
                 return False
                 
-            # Add the parent directory to sys.path temporarily
+            # 临时将父目录添加到sys.path
             parent_dir = str(p_file_path.parent)
             sys.path.insert(0, parent_dir)
             
             try:
-                # Import the module using standard import mechanism
+                # 使用标准导入机制导入模块
                 module_name = p_file_path.stem
                 module = __import__(module_name)
                 
-                # Find the tool class in the module
+                # 在模块中查找工具类
                 tool_found = False
                 for item_name in dir(module):
                     item = getattr(module, item_name)
-                    # Check if it is a class and has the necessary attributes
+                    # 检查是否是类并具有必要属性
                     if (isinstance(item, type) and 
                         hasattr(item, 'name') and 
                         hasattr(item, 'description') and 
@@ -193,10 +193,10 @@ class ToolRegistry(OutputHandler):
                             if not item.check():
                                 continue
                         
-                        # Instantiate the tool class
+                        # 实例化工具类
                         tool_instance = item()
                         
-                        # Register the tool
+                        # 注册工具
                         self.register_tool(
                             name=tool_instance.name,
                             description=tool_instance.description,
@@ -212,7 +212,7 @@ class ToolRegistry(OutputHandler):
                 return True
                 
             finally:
-                # Remove the directory from sys.path
+                # 从sys.path中移除目录
                 sys.path.remove(parent_dir)
                 
         except Exception as e:
@@ -220,18 +220,18 @@ class ToolRegistry(OutputHandler):
             return False
     @staticmethod
     def _extract_tool_calls(content: str) -> List[Dict]:
-        """Extract tool calls from content.
+        """从内容中提取工具调用。
         
-        Args:
-            content: The content containing tool calls
+        参数:
+            content: 包含工具调用的内容
             
-        Returns:
-            List[Dict]: List of extracted tool calls with name and arguments
+        返回:
+            List[Dict]: 包含名称和参数的提取工具调用列表
             
-        Raises:
-            Exception: If tool call is missing necessary fields
+        异常:
+            Exception: 如果工具调用缺少必要字段
         """
-        # Split content into lines
+        # 将内容拆分为行
         data = re.findall(r'<TOOL_CALL>(.*?)</TOOL_CALL>', content, re.DOTALL)
         ret = []
         for item in data:
@@ -244,28 +244,28 @@ class ToolRegistry(OutputHandler):
         return ret
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
-        """Register a new tool"""
+        """注册新工具"""
         self.tools[name] = Tool(name, description, parameters, func)
 
     def get_tool(self, name: str) -> Optional[Tool]:
-        """Get a tool"""
+        """获取工具"""
         return self.tools.get(name)
 
     def get_all_tools(self) -> List[Dict]:
-        """Get all tools in Ollama format definition"""
+        """获取所有工具（Ollama格式定义）"""
         return [tool.to_dict() for tool in self.tools.values()]
 
     def execute_tool(self, name: str, arguments: Dict) -> Dict[str, Any]:
-        """Execute a specified tool"""
+        """执行指定工具"""
         tool = self.get_tool(name)
         if tool is None:
-            return {"success": False, "stderr": f"Tool {name} does not exist, available tools: {', '.join(self.tools.keys())}", "stdout": ""}
+            return {"success": False, "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self.tools.keys())}", "stdout": ""}
         return tool.execute(arguments)
 
     def handle_tool_calls(self, tool_call: Dict) -> str:
-        """Handle tool calls, only process the first tool"""
+        """处理工具调用，只处理第一个工具"""
         try:
-            # Only process the first tool call
+            # 只处理第一个工具调用
             name = tool_call["name"]
             args = tool_call["arguments"]
 
