@@ -7,14 +7,14 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class FileOperationTool:
     name = "file_operation"
-    description = "File operations for reading and writing multiple files"
+    description = "用于读写多个文件的操作工具"
     parameters = {
         "type": "object",
         "properties": {
             "operation": {
                 "type": "string",
                 "enum": ["read", "write"],
-                "description": "Type of file operation to perform (read or write multiple files)"
+                "description": "要执行的文件操作类型（读取或写入多个文件）"
             },
             "files": {
                 "type": "array",
@@ -26,7 +26,7 @@ class FileOperationTool:
                     },
                     "required": ["path"]
                 },
-                "description": "List of files to operate on"
+                "description": "要操作的文件列表"
             }
         },
         "required": ["operation", "files"]

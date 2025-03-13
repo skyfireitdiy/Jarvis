@@ -19,13 +19,13 @@ class ShellTool:
         parameters: JSON schema for command parameters
     """
     name = "execute_shell"
-    description = """Execute shell command and return result"""
+    description = "执行Shell命令并返回结果"
     parameters = {
         "type": "object",
         "properties": {
             "command": {
                 "type": "string",
-                "description": "Shell command to execute"
+                "description": "要执行的Shell命令"
             }
         },
         "required": ["command"]

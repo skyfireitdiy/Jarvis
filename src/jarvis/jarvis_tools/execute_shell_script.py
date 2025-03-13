@@ -8,13 +8,13 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class ShellScriptTool:
     name = "execute_shell_script"
-    description = """Execute shell script file and return result"""
+    description = "执行Shell脚本文件并返回结果"
     parameters = {
         "type": "object",
         "properties": {
             "script_content": {
                 "type": "string",
-                "description": "Content of the shell script to execute"
+                "description": "要执行的Shell脚本内容"
             }
         },
         "required": ["script_content"]
