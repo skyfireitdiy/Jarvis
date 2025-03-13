@@ -30,8 +30,8 @@ class PatchOutputHandler(OutputHandler):
 使用<PATCH>块来指定代码更改：
 --------------------------------
 <PATCH>
-文件: [文件路径]
-原因: [修改原因]
+File: [文件路径]
+Reason: [修改原因]
 [上下文代码片段]
 </PATCH>
 --------------------------------
@@ -43,8 +43,8 @@ class PatchOutputHandler(OutputHandler):
 5. 修改现有文件时，保留周围未更改的代码
 示例：
 <PATCH>
-文件: src/utils/math.py
-原因: 修复除零处理
+File: src/utils/math.py
+Reason: 修复除零处理
 def safe_divide(a, b):
     # 添加参数验证
     if b == 0:
