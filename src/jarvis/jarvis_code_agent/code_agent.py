@@ -4,7 +4,7 @@ import os
 from typing import Any, Tuple
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_code_agent import shell_input_handler
+from jarvis.jarvis_code_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_code_agent.patch import PatchOutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.file_operation import FileOperationTool
