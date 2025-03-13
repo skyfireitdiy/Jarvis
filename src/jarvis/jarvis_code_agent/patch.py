@@ -241,7 +241,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> str:
             break
         # 写入合并后的代码
         with open(filepath, 'w', encoding='utf-8') as f:
-            f.write("\n".join(response[start_line:end_line]))
+            f.write("\n".join(response[start_line:end_line])+"\n")
         PrettyOutput.print(f"✅ 为文件 {filepath} 应用补丁成功", OutputType.SUCCESS)
         return ""
     except Exception as e:
