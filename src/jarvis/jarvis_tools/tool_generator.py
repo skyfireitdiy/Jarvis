@@ -8,21 +8,21 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 
 class ToolGenerator:
     name = "tool_generator"
-    description = "Generates new tools using LLM that integrate with the system"
+    description = "使用LLM自动生成与系统集成的新工具"
     parameters = {
         "type": "object",
         "properties": {
             "tool_name": {
                 "type": "string",
-                "description": "Name of the new tool"
+                "description": "新工具的名称"
             },
             "description": {
                 "type": "string", 
-                "description": "Description of the tool's purpose"
+                "description": "工具用途描述"
             },
             "input_spec": {
                 "type": "string",
-                "description": "Specification of required inputs and functionality"
+                "description": "所需输入和功能的规范说明"
             }
         },
         "required": ["tool_name", "description", "input_spec"]
@@ -81,7 +81,7 @@ class ToolGenerator:
             }
     
     def _create_prompt(self, tool_name: str, description: str, input_spec: str) -> str:
-        """Create the LLM prompt for tool generation"""
+        """创建用于工具生成的LLM提示"""
         example_code = '''
 <TOOL>
 from typing import Dict, Any
@@ -89,24 +89,24 @@ from jarvis.utils import OutputType, PrettyOutput
 from jarvis.jarvis_platform.registry import PlatformRegistry
 
 class CustomTool:
-    name = "Tool name"              # Tool name used when calling
-    description = "Tool description"       # Tool purpose
-    parameters = {                # Parameters JSON Schema
+    name = "工具名称"              # 调用时使用的工具名称
+    description = "工具描述"       # 工具用途
+    parameters = {                # 参数JSON Schema
         "type": "object",
         "properties": {
             "param1": {
                 "type": "string",
-                "description": "Parameter description"
+                "description": "参数描述"
             }
         },
         "required": ["param1"]
     }
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute the tool functionality
+        """执行工具功能
         
         Args:
-            args: Parameters passed to the tool
+            args: 传递给工具的参数
             
         Returns:
             {
@@ -116,12 +116,12 @@ class CustomTool:
             }
         """
         try:
-            # Implement the tool logic here
-            # Use LLM
+            # 在此实现工具逻辑
+            # 使用LLM
             # model = PlatformRegistry.get_global_platform_registry().get_codegen_platform() 
             # result = model.chat_until_success(prompt)
 
-            result = "Tool result"
+            result = "工具执行结果"
             return {
                 "success": True,
                 "stdout": result,
@@ -136,29 +136,28 @@ class CustomTool:
 </TOOL>
 '''
 
-
-        return f'''Create a Python tool class that integrates with the Jarvis system. Follow these requirements:
-1. Class name: {tool_name.capitalize()}Tool
-2. Description: {description}
-3. Input specification: {input_spec}
-4. Must include these class attributes:
-   - name: str (tool identifier)
-   - description: str (tool purpose)
-   - parameters: dict (JSON schema for inputs)
-5. Must implement execute(self, args: Dict) -> Dict method
-6. The execute method MUST return a dictionary with these exact fields:
-   - success: bool (indicating operation success)
-   - stdout: str (primary output/result)
-   - stderr: str (error message if any)
-7. Must handle errors gracefully
-8. Return ONLY the Python implementation code
-9. The code should be complete and ready to use.
-10. Output the code in the following format:
+        return f'''创建一个与Jarvis系统集成的Python工具类。请遵循以下要求：
+1. 类名: {tool_name.capitalize()}Tool
+2. 描述: {description}
+3. 输入规范: {input_spec}
+4. 必须包含以下类属性：
+   - name: str (工具标识符)
+   - description: str (工具用途)
+   - parameters: dict (输入的JSON schema)
+5. 必须实现 execute(self, args: Dict) -> Dict 方法
+6. execute方法必须返回包含以下字段的字典：
+   - success: bool (指示操作是否成功)
+   - stdout: str (主要输出/结果)
+   - stderr: str (错误信息，如果有)
+7. 必须优雅地处理错误
+8. 仅返回Python实现代码
+9. 代码应该是完整且可直接使用的
+10. 按照以下格式输出代码：
 <TOOL>
 {example_code}
 </TOOL>
 
-Example:
+示例：
 {example_code}
 '''
     
