@@ -32,7 +32,8 @@ class FileOperationTool:
         "required": ["operation", "files"]
     }
 
-    def _handle_single_file(self, operation: str, filepath: str, content: str = "") -> Dict[str, Any]:
+    def _handle_single_file(self, operation: str, filepath: str, content: str = "", 
+                          start_line: int = 1, end_line: int = -1) -> Dict[str, Any]:
         """Handle operations for a single file"""
         try:
             abs_path = os.path.abspath(filepath)
@@ -55,7 +56,28 @@ class FileOperationTool:
                         "stderr": "File too large (>10MB)"
                     }
                     
-                content = open(abs_path, 'r', encoding='utf-8').read()
+                with open(abs_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                
+                # Handle line range
+                total_lines = len(lines)
+                start_line = start_line if start_line >= 0 else total_lines + start_line + 1
+                end_line = end_line if end_line >= 0 else total_lines + end_line + 1
+                start_line = max(1, min(start_line, total_lines))
+                end_line = max(1, min(end_line, total_lines))
+                if end_line == -1:
+                    end_line = total_lines
+                
+                if start_line > end_line:
+                    error_msg = f"无效的行范围 [{start_line, end_line}] (文件总行数: {total_lines})"
+                    PrettyOutput.print(error_msg, OutputType.WARNING)
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": error_msg
+                    }
+                
+                content = "".join(lines[start_line - 1:end_line])
                 output = f"File: {abs_path}\n{content}"
                 
                 return {
@@ -120,7 +142,13 @@ class FileOperationTool:
                     continue
                 
                 content = file_info.get("content", "") if operation == "write" else ""
-                result = self._handle_single_file(operation, file_info["path"].strip(), content)
+                result = self._handle_single_file(
+                    operation,
+                    file_info["path"].strip(),
+                    content,
+                    file_info.get("start_line", 1),
+                    file_info.get("end_line", -1)
+                )
                 
                 if result["success"]:
                     all_outputs.append(result["stdout"])
@@ -143,4 +171,4 @@ class FileOperationTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"File operation failed: {str(e)}"
-            } 
+            }
