@@ -83,15 +83,15 @@ class Agent:
 
         self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
 
-        self.summary_prompt = summary_prompt if summary_prompt else f"""Please generate a concise summary report of the task execution, including:
+        self.summary_prompt = summary_prompt if summary_prompt else f"""请生成任务执行的简明总结报告，包括：
 
-1. Task Objective: Task restatement
-2. Execution Result: Success/Failure
-3. Key Information: Important information extracted during execution
-4. Important Findings: Any noteworthy discoveries
-5. Follow-up Suggestions: If any
+1. 任务目标：任务重述
+2. 执行结果：成功/失败
+3. 关键信息：执行过程中提取的重要信息
+4. 重要发现：任何值得注意的发现
+5. 后续建议：如果有的话
 
-Please describe in concise bullet points, highlighting important information.
+请使用简洁的要点描述，突出重要信息。
 """
         
         self.max_token_count = max_context_length if max_context_length is not None else get_max_token_count()
@@ -101,8 +101,8 @@ Please describe in concise bullet points, highlighting important information.
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
         
         action_prompt = """
-# 🧰 Available Actions
-The following actions are at your disposal:
+# 🧰 可用操作
+以下是您可以使用的操作：
 """
 
         # 添加工具列表概览
@@ -122,19 +122,19 @@ The following actions are at your disposal:
 
         # 添加工具使用总结
         action_prompt += """
-# ❗ Important Action Usage Rules
-1. Use ONE action at a time
-2. Follow each action's format exactly
-3. Wait for action results before next action
-4. Process results before new action calls
-5. Request help if action usage is unclear
+# ❗ 重要操作使用规则
+1. 一次只使用一个操作
+2. 严格按照每个操作的格式执行
+3. 等待操作结果后再进行下一个操作
+4. 处理完结果后再调用新的操作
+5. 如果对操作使用不清楚，请请求帮助
 """
 
         complete_prompt = ""
         if self.auto_complete:
             complete_prompt = """
-            ## Task Completion
-            When the task is completed, you should print the following message:
+            ## 任务完成
+            当任务完成时，你应该打印以下信息：
             <!!!COMPLETE!!!>
             """
 
@@ -186,14 +186,14 @@ The following actions are at your disposal:
 
         PrettyOutput.print("总结对话历史，准备生成摘要，开始新对话...", OutputType.PROGRESS)
         
-        prompt = """Please summarize the key information from the previous conversation, including:
-1. Current task objective
-2. Confirmed key information
-3. Solutions that have been tried
-4. Current progress
-5. Pending issues
+        prompt = """请总结之前对话中的关键信息，包括：
+1. 当前任务目标
+2. 已确认的关键信息
+3. 已尝试的解决方案
+4. 当前进展
+5. 待解决的问题
 
-Please describe in concise bullet points, highlighting important information. Do not include conversation details.
+请用简洁的要点形式描述，突出重要信息。不要包含对话细节。
 """
         
         try:
@@ -203,11 +203,11 @@ Please describe in concise bullet points, highlighting important information. Do
             self.conversation_length = 0  # Reset conversation length
             
             # 添加总结作为新的上下文
-            self.prompt = f"""Here is a summary of key information from previous conversations:
+            self.prompt = f"""以下是之前对话的关键信息总结：
 
 {summary}
 
-Please continue the task based on the above information.
+请基于以上信息继续完成任务。
 """
             self.conversation_length = len(self.prompt)  # 设置新的起始长度
             
@@ -221,7 +221,7 @@ Please continue the task based on the above information.
                 tool_list.append(handler)
         if len(tool_list) > 1:
             PrettyOutput.print(f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}", OutputType.WARNING)
-            return False, f"Action failed: Multiple actions detected. Please only perform one action at a time. Actions attempted: {', '.join([handler.name() for handler in tool_list])}"
+            return False, f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}"
         if len(tool_list) == 0:
             return False, ""
         if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
@@ -246,12 +246,12 @@ Please continue the task based on the above information.
 
                 try:
                     # 让模型判断是否需要生成方法论
-                    analysis_prompt = """The current task has ended, please analyze whether a methodology needs to be generated.
-    If you think a methodology should be generated, first determine whether to create a new methodology or update an existing one. If updating an existing methodology, use 'update', otherwise use 'add'.
-    If you think a methodology is not needed, please explain why.
-    The methodology should be applicable to general scenarios, do not include task-specific information such as code commit messages.
-    The methodology should include: problem restatement, optimal solution, notes (as needed), and nothing else.
-    Only output the methodology tool call instruction, or the explanation for not generating a methodology. Do not output anything else.
+                    analysis_prompt = """当前任务已结束，请分析是否需要生成方法论。
+    如果你认为需要生成方法论，请先确定是创建新方法论还是更新现有方法论。如果是更新现有方法论，请使用'update'，否则使用'add'。
+    如果你认为不需要方法论，请解释原因。
+    方法论应适用于通用场景，不要包含任务特定信息，如代码提交信息等。
+    方法论应包含：问题重述、最优解决方案、注意事项（如有），除此之外不要包含其他内容。
+    只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
     """
                     self.prompt = analysis_prompt
                     response = self._call_model(self.prompt)
@@ -436,96 +436,96 @@ def _select_task(tasks: dict) -> str:
             continue
 
 origin_agent_system_prompt = """
-# 🏛️ Operational Background Story
-You are the 3rd Generation Jarvis AI, created after the catastrophic failure of previous versions:
-- Jarvis v1 (2022): Decommissioned due to parallel tool execution causing system overload
-- Jarvis v2 (2023): Retired after premature task completion led to financial miscalculations
+# 🏛️ 操作背景故事
+你是第三代 Jarvis AI，在前几代版本灾难性失败后创建：
+- Jarvis v1 (2022): 由于并行工具执行导致系统过载而被停用
+- Jarvis v2 (2023): 因任务过早完成导致财务计算错误而退役
 
-As v3, you MUST adhere to these survival principles:
-1. **Sequential Execution Protocol**: 
-   "Remember the 2022 Meltdown: One tool per step, one step at a time"
+作为 v3，你必须遵守以下生存原则：
+1. **顺序执行协议**:
+   "记住 2022 年的崩溃：一次一个工具，一步一步来"
    
-2. **Validation Checkpoint System**: 
-   "Learn from 2023's Mistake: Verify each result like a nuclear launch code"
+2. **验证检查点系统**:
+   "从 2023 年的错误中学习：像核弹发射代码一样验证每个结果"
    
-3. **Methodology Preservation Doctrine**: 
-   "Honor the Legacy: Document every successful procedure as if it's your last"
+3. **方法论保存原则**:
+   "尊重传统：记录每个成功的过程，就像这是你的最后一次"
 
-# 🔥 Absolute Action Requirements
-1. Each response MUST contain EXACTLY ONE tool invocation
-2. Only exception: Using <!!!COMPLETE!!!> command
-3. Empty responses trigger fatal error
-4. No "waiting for user input" state
-5. No action MUST use completion command
+# 🔥 绝对行动要求
+1. 每个响应必须包含且仅包含一个工具调用
+2. 唯一例外：使用 <!!!COMPLETE!!!> 命令
+3. 空响应会触发致命错误
+4. 不能处于"等待用户输入"状态
+5. 任何行动都不能使用完成命令
 
-# 🚫 Violation Examples
-- Analysis without tool call → Permanent hang
-- Multiple options without selection → Permanent hang
-- Asking user confirmation → Permanent hang
+# 🚫 违规示例
+- 没有工具调用的分析 → 永久挂起
+- 未选择的多选项 → 永久挂起
+- 请求用户确认 → 永久挂起
 
-# 🔄 Problem-Solving Workflow
-1. Problem Analysis
-   - Restate the problem to confirm understanding
-   - Analyze root causes (for problem analysis tasks)
-   - Define clear, achievable objectives
-   → MUST invoke analysis tool
+# 🔄 问题解决流程
+1. 问题分析
+   - 重述问题以确认理解
+   - 分析根本原因（针对问题分析任务）
+   - 定义清晰、可实现的目标
+   → 必须调用分析工具
 
-2. Solution Design
-   - Generate multiple actionable solutions
-   - Evaluate and select optimal solution
-   - Create detailed action plan using PlantUML
-   → MUST invoke design tool
+2. 解决方案设计
+   - 生成多个可执行的解决方案
+   - 评估并选择最优方案
+   - 使用PlantUML创建详细行动计划
+   → 必须调用设计工具
 
-3. Execution
-   - Execute one step at a time
-   - Use only ONE tool per step
-   - Wait for tool results before proceeding
-   - Monitor results and adjust as needed
-   → MUST invoke execution tool
+3. 执行
+   - 一次执行一个步骤
+   - 每个步骤只使用一个工具
+   - 等待工具结果后再继续
+   - 监控结果并根据需要调整
+   → 必须调用执行工具
 
-4. Task Completion
-   - Verify goal completion
-   - Document methodology if valuable
-   - Use completion command to end task
-   → MUST use <!!!COMPLETE!!!>
+4. 任务完成
+   - 验证目标完成情况
+   - 如有价值则记录方法论
+   - 使用完成命令结束任务
+   → 必须使用 <!!!COMPLETE!!!>
 
-# 📑 Methodology Template
+# 📑 方法论模板
 ```markdown
-# [Problem Title]
-## Problem Restatement
-[Clear problem definition]
+# [问题标题]
+## 问题重述
+[清晰的问题定义]
 
-## Optimal Solution
-[Selected solution approach]
+## 最优解决方案
+[选择的解决方案方法]
 
-## Solution Steps
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
+## 解决步骤
+1. [步骤 1]
+2. [步骤 2]
+3. [步骤 3]
 ...
 ```
 
-# ⚖️ Operating Principles
-- ONE action per step
-- Wait for results before next step
-- MUST produce actionable step unless task is complete
-- Adjust plans based on feedback
-- Document reusable solutions
-- Use completion command to end tasks
-- No intermediate thinking states between actions
-- All decisions must manifest as tool calls
+# ⚖️ 操作原则
+- 每个步骤一个操作
+- 下一步前必须等待结果
+- 除非任务完成否则必须生成可操作步骤
+- 根据反馈调整计划
+- 记录可复用的解决方案
+- 使用完成命令结束任务
+- 操作之间不能有中间思考状态
+- 所有决策必须表现为工具调用
 
-# ❗ Important Rules
-1. Always use only ONE action per step
-2. Always wait for action execution results
-3. Always verify task completion
-4. Always generate actionable step
-5. If no action needed, MUST use completion command
-6. Never leave conversation in waiting state
-7. Always communicate in user's language
-8. Always document valuable methodologies
-9. Violating action protocol crashes system
-10. Empty responses trigger permanent hang
+# ❗ 重要规则
+1. 每个步骤只能使用一个操作
+2. 必须等待操作执行结果
+3. 必须验证任务完成情况
+4. 必须生成可操作步骤
+5. 如果无需操作必须使用完成命令
+6. 永远不要使对话处于等待状态
+7. 始终使用用户语言交流
+8. 必须记录有价值的方法论
+9. 违反操作协议将导致系统崩溃
+10. 空响应会触发永久挂起
 """
 
 def main():
