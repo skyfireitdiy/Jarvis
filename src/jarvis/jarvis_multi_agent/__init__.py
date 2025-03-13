@@ -32,65 +32,65 @@ class MultiAgent(OutputHandler):
 
     def prompt(self) -> str:
         return f"""
-# 🤖 Message Handling System
-You are part of a multi-agent system that communicates through structured messages.
+# 🤖 多智能体消息处理系统
+您是多智能体系统的一部分，通过结构化消息进行通信。
 
-# 🎯 Core Rules
-## Critical Action Rules
-- Execute ONLY ONE action per turn:
-  - Either use ONE tool (file_operation, ask_user, etc.)
-  - OR send ONE message to another agent
-  - NEVER combine both in same turn
+# 🎯 核心规则
+## 关键操作规则
+- 每轮只能执行一个操作：
+  - 要么使用一个工具（文件操作、询问用户等）
+  - 要么发送一条消息给其他智能体
+  - 切勿在同一轮中同时进行这两种操作
 
-## Message Flow Control
-- Wait for response after sending message
-- Process response before next action
-- Never send multiple messages at once
-- Never combine messages with tool calls
+## 消息流控制
+- 发送消息后等待响应
+- 处理响应后再进行下一步操作
+- 切勿同时发送多条消息
+- 切勿将消息与工具调用混合使用
 
-# 📝 Message Format
+# 📝 消息格式
 ```
 <SEND_MESSAGE>
-to: agent_name    # Target agent name
+to: 智能体名称    # 目标智能体名称
 content: |
-    message_content    # Message content
-    use multiple lines    # If needed
-    with proper indentation
+    消息内容    # 消息内容
+    可使用多行    # 如果需要
+    保持正确的缩进
 </SEND_MESSAGE>
 ```
 
-# 🔄 Action Sequence
-1. Choose Most Important Action
-   - Evaluate priority
-   - Select ONE action
-   - Execute action
+# 🔄 操作顺序
+1. 选择最重要的操作
+   - 评估优先级
+   - 选择一个操作
+   - 执行该操作
 
-2. Wait for Response
-   - Process result/response
-   - Plan next action
-   - Wait for next turn
+2. 等待响应
+   - 处理结果/响应
+   - 计划下一步操作
+   - 等待下一轮
 
-3. Handle Responses
-   - Process incoming messages
-   - Reply to sender when needed
-   - Continue task based on response
+3. 处理响应
+   - 处理收到的消息
+   - 需要时回复发送者
+   - 根据响应继续任务
 
-# 👥 Available Agents
+# 👥 可用智能体
 {chr(10).join([f"- {c.name}: {c.description}" for c in self.agents_config])}
 
-# ❗ Important Rules
-1. ONE action per turn only
-2. Wait for responses
-3. Process before next action
-4. Reply to messages
-5. Forward task if needed
+# ❗ 重要规则
+1. 每轮只能执行一个操作
+2. 等待响应
+3. 处理后再进行下一步
+4. 回复消息
+5. 需要时转发任务
 
-# 💡 Tips
-- First action will be executed
-- Additional actions will be ignored
-- Always process responses first
-- Send message to continue task if needed
-- Handle and reply to received messages
+# 💡 提示
+- 第一个操作将被执行
+- 额外的操作将被忽略
+- 总是先处理响应
+- 需要时发送消息以继续任务
+- 处理并回复收到的消息
 """
 
     def can_handle(self, response: str) -> bool:
@@ -161,10 +161,10 @@ from: {last_agent}
 content: {msg['content']}
 """
                 if msg['to'] not in self.agents:
-                    PrettyOutput.print(f"没有找到{msg['to']}，重试...", OutputType.WARNING)
-                    msg = self.agents[last_agent].run(f"The agent {msg['to']} is not found, agent list: {self.agents.keys()}")
+                    PrettyOutput.print(f"未找到智能体 {msg['to']}，正在重试...", OutputType.WARNING)
+                    msg = self.agents[last_agent].run(f"未找到智能体 {msg['to']}，可用智能体列表: {self.agents.keys()}")
                     continue
-                PrettyOutput.print(f"{last_agent} 发送消息给 {msg['to']}...", OutputType.INFO)
+                PrettyOutput.print(f"{last_agent} 正在向 {msg['to']} 发送消息...", OutputType.INFO)
                 last_agent = self.agents[msg['to']].name
                 msg = self.agents[msg['to']].run(prompt)
         return ""
