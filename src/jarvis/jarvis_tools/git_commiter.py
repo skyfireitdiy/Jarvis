@@ -15,13 +15,13 @@ from jarvis.jarvis_utils.utils import init_env
 
 class GitCommitTool:
     name = "git_commit_agent"
-    description = "Automatically generate and execute git commits based on code changes"
+    description = "根据代码变更自动生成并执行Git提交"
     parameters = {
         "type": "object",
         "properties": {
             "lang": {
                 "type": "string",
-                "description": "Language for commit message",
+                "description": "提交信息的语言",
                 "default": "Chinese"
             }
         },
@@ -70,21 +70,21 @@ class GitCommitTool:
             diff = process.communicate()[0].decode()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             
-            prompt = f'''Generate commit message by the following rules:
-            You should write commit message in {args.get('lang', 'Chinese')}
-# Required Structure
-YOU MUST USE EXACTLY THIS FORMAT:
+            prompt = f'''根据以下规则生成提交信息：
+            提交信息应使用{args.get('lang', '中文')}书写
+# 必需结构
+必须使用以下格式：
 <COMMIT_MESSAGE>
-<type>(<scope>): <subject>
-Body description in imperative mood
+<类型>(<范围>): <主题>
+使用祈使语气描述变更内容
 </COMMIT_MESSAGE>
-# Format Rules
-1. Types: fix, feat, docs, style, refactor, test, chore
-2. Scope indicates module (e.g. auth, database)
-3. Subject line <= 72 chars, no period
-4. Body explains WHAT and WHY for every change, using present tense
-5. Do not omit any changes
-# Analysis Material
+# 格式规则
+1. 类型: fix, feat, docs, style, refactor, test, chore
+2. 范围表示模块 (例如: auth, database)
+3. 主题行 <= 72个字符，不以句号结尾
+4. 正文使用现在时态解释每个变更的内容和原因
+5. 不要遗漏任何变更
+# 分析材料
 {diff}
 '''
             
