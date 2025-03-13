@@ -42,17 +42,17 @@ def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -
         return np.zeros(1536, dtype=np.float32)
 def make_methodology_prompt(data: Dict[str, str]) -> str:
     """
-    Generate a formatted prompt from methodology data.
+    从方法论数据生成格式化提示
     
     Args:
-        data: Dictionary of methodology data
+        data: 方法论数据字典
         
     Returns:
-        str: Formatted prompt string
+        str: 格式化后的提示字符串
     """
-    ret = """This is the standard methodology for handling previous problems, if the current task is similar, you can refer to it, if not,just ignore it:\n""" 
+    ret = """这是处理以往问题的标准方法论，如果当前任务类似，可以参考使用，如果不相关，请忽略：\n""" 
     for key, value in data.items():
-        ret += f"Problem: {key}\nMethodology: {value}\n"
+        ret += f"问题: {key}\n方法论: {value}\n"
     return ret
 def load_methodology(user_input: str) -> str:
     """
