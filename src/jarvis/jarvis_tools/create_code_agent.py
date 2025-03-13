@@ -6,12 +6,12 @@ from jarvis.jarvis_utils.git_utils import get_latest_commit_hash, has_uncommitte
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class CreateCodeAgentTool:
-    """Tool for managing the code development workflow."""
+    """用于管理代码开发工作流的工具"""
     
     name = "create_code_agent"
-    description = "Technical code implementation and development process management"
+    description = "技术代码实现和开发过程管理工具"
     parameters = {
-        "requirement": "Technical specifications for code implementation"
+        "requirement": "代码实现的技术规范"
     }
     
     

@@ -8,32 +8,32 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class SubAgentTool:
     name = "create_sub_agent"
-    description = "Create a sub-agent to handle specific tasks, the sub-agent will generate a task summary report"
+    description = "创建子代理以处理特定任务，子代理将生成任务总结报告"
     parameters = {
         "type": "object",
         "properties": {
             "agent_name": {
                 "type": "string",
-                "description": "Sub-agent name"
+                "description": "子代理名称"
             },
             "task": {
                 "type": "string",
-                "description": "Specific task to complete"
+                "description": "要完成的特定任务"
             },
             "context": {
                 "type": "string",
-                "description": "Context information related to the task",
+                "description": "与任务相关的上下文信息",
                 "default": ""
             },
             "goal": {
                 "type": "string",
-                "description": "Completion goal of the task",
+                "description": "任务的完成目标",
                 "default": ""
             },
             "files": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Related file path list, used for file question answering and processing",
+                "description": "相关文件路径列表，用于文件问答和处理",
                 "default": []
             }
         },
@@ -83,4 +83,4 @@ class SubAgentTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"Sub-agent execution failed: {str(e)}"
-            } 
+            }

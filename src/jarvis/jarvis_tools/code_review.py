@@ -10,27 +10,27 @@ from jarvis.jarvis_utils.utils import init_env
 
 class CodeReviewTool:
     name = "code_review"
-    description = "Autonomous code review agent for code changes analysis"
+    description = "自动代码审查工具，用于分析代码变更"
     parameters = {
         "type": "object",
         "properties": {
             "review_type": {
                 "type": "string",
-                "description": "Type of review: 'commit' for specific commit, 'current' for current changes, 'range' for commit range",
+                "description": "审查类型：'commit' 审查特定提交，'current' 审查当前变更，'range' 审查提交范围",
                 "enum": ["commit", "current", "range"],
                 "default": "current"
             },
             "commit_sha": {
                 "type": "string",
-                "description": "Target commit SHA to analyze (required for review_type='commit')"
+                "description": "要分析的提交SHA（review_type='commit'时必填）"
             },
             "start_commit": {
                 "type": "string",
-                "description": "Start commit SHA (required for review_type='range')"
+                "description": "起始提交SHA（review_type='range'时必填）"
             },
             "end_commit": {
                 "type": "string",
-                "description": "End commit SHA (required for review_type='range')"
+                "description": "结束提交SHA（review_type='range'时必填）"
             }
         },
         "required": []
