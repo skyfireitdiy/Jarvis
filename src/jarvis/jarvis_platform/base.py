@@ -46,10 +46,11 @@ class BasePlatform(ABC):
                 tokens_per_second = 0
 
             # Print statistics
-            PrettyOutput.print(
-                f"对话完成 - 耗时: {duration:.2f}秒, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}",
-                OutputType.INFO,
-            )
+            if not self.suppress_output:
+                PrettyOutput.print(
+                    f"对话完成 - 耗时: {duration:.2f}秒, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}",
+                    OutputType.INFO,
+                )
 
             # Keep original think tag handling
             response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
