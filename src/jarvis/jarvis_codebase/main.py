@@ -76,13 +76,13 @@ class CodeBase:
             model.set_suppress_output(True)
         else:
             PrettyOutput.print(f"为 {file_path} 生成描述 ...", output_type=OutputType.PROGRESS)
-        prompt = f"""Please analyze the following code file and generate a detailed description. The description should include:
-1. Overall file functionality description
-2. description for each global variable, function, type definition, class, method, and other code elements
+        prompt = f"""请分析以下代码文件并生成详细描述。描述应包含：
+1. 文件整体功能描述
+2. 对每个全局变量、函数、类型定义、类、方法和其他代码元素的描述
 
-Please use concise and professional language, emphasizing technical functionality to facilitate subsequent code retrieval.
-File path: {file_path}
-Code content:
+请使用简洁专业的语言，强调技术功能，以便于后续代码检索。
+文件路径: {file_path}
+代码内容:
 {content}
 """
         response = model.chat_until_success(prompt)
