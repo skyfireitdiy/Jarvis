@@ -5,20 +5,20 @@ from jarvis.jarvis_utils.git_utils import find_git_root
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class AskCodebaseTool:
-    """Tool for intelligent codebase querying and analysis using CodeBase"""
-    
+    """用于智能代码库查询和分析的工具"""
+
     name = "ask_codebase"
-    description = "Ask questions about the codebase and get detailed analysis"
+    description = "查询代码库问题并获取详细分析"
     parameters = {
         "type": "object",
         "properties": {
             "question": {
                 "type": "string",
-                "description": "Question about the codebase"
+                "description": "关于代码库的问题"
             },
             "top_k": {
                 "type": "integer",
-                "description": "Number of most relevant files to analyze (optional)",
+                "description": "要分析的最相关文件数量（可选）",
                 "default": 20
             }
         },
