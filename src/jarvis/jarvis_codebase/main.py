@@ -59,7 +59,7 @@ class CodeBase:
 
     def get_git_file_list(self):
         """Get the list of files in the git repository, excluding the .jarvis-codebase directory"""
-        files = os.popen("git ls-files"). read().splitlines()
+        files = os.popen("git ls-files").read().splitlines()
         # Filter out files in the .jarvis-codebase directory
         return [f for f in files if not f.startswith(".jarvis")]
 
@@ -546,7 +546,7 @@ Content: {content}
             
             # Maximum content length per batch
             max_batch_length = self.max_token_count - 1000  # Reserve space for prompt
-            max_file_length = max_batch_length / / 3  # Limit individual file size
+            max_file_length = max_batch_length // 3  # Limit individual file size
             
             # Process files in batches
             all_selected_files = []
@@ -725,7 +725,7 @@ Content: {content}
                 if file_path not in results:
                     if similarity > 0.5:
                         data = self.vector_cache[file_path]
-                        results[file_path] = (file path, similarity, data["description"])
+                        results[file_path] = (file_path, similarity, data["description"])
         
         return results
 
