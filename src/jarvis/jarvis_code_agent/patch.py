@@ -2,8 +2,6 @@ import re
 from typing import Dict, Any, Tuple
 import os
 
-from yaspin import yaspin
-
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
@@ -87,11 +85,7 @@ def apply_patch(output_str: str) -> str:
     # 按文件逐个处理
     for filepath, patch_content in patches.items():
         try:
-            with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
-                if not handle_code_operation(filepath, patch_content):
-                    spinner.fail(f"❌ {filepath} 补丁应用失败")
-                else:
-                    spinner.ok(f"✅ {filepath} 补丁应用成功")
+            handle_code_operation(filepath, patch_content)
         except Exception as e:
             revert_file(filepath)  # 回滚单个文件
             PrettyOutput.print(f"文件 {filepath} 处理失败: {str(e)}", OutputType.ERROR)
@@ -199,13 +193,14 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
 {patch_content}
 """
         prompt += f"""
-请将代码与上下文合并并返回完整的合并代码。
+请将代码与上下文合并并返回完整的合并代码，每次最多输出300行代码。
 
 要求:
 1. 严格保留原始代码的格式、空行和缩进
 2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
 3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
 4. 除了合并后的代码，不要输出任何其他文本
+5. 所有代码输出完成后，输出<!!!FINISHED!!!>
 
 输出格式:
 <MERGED_CODE>
@@ -214,39 +209,38 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
 """
         model = PlatformRegistry().get_codegen_platform()
         model.set_suppress_output(True)
-        count = 5
+        count = 30
         start_line = -1
         end_line = -1
-        response = []
-        while count > 0:
+        code = []
+        while count>0:
             count -= 1
-            response.extend(model.chat_until_success(prompt).splitlines())
+            response = model.chat_until_success(prompt).splitlines()
             try:
                 start_line = response.index("<MERGED_CODE>") + 1
             except:
-                pass
+                return False
             try:
                 end_line = response.index("</MERGED_CODE>")
             except:
-                pass
-            if start_line == -1:
-                PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.WARNING)
                 return False
-            if end_line == -1:
-                last_line = response[-1]
-                prompt = f"""
-                继续从最后一行开始（不要包含<MERGED_CODE>标签，完成后输出</MERGED_CODE>标签）：
-                {last_line}
+            code = response[start_line:end_line]
+            try: 
+                response.index("<!!!FINISHED!!!>")
+                break
+            except:
+                prompt += f"""继续输出接下来的300行代码
+                要求：
+                1. 严格保留原始代码的格式、空行和缩进
+                2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
+                3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
+                4. 除了合并后的代码，不要输出任何其他文本
+                5. 所有代码输出完成后，输出<!!!FINISHED!!!>
                 """
-                response.pop() # 删除最后一行
-                continue
-            if end_line < start_line:
-                PrettyOutput.print(f"❌ 为文件 {filepath} 应用补丁失败", OutputType.WARNING)
-                return False
-            break
+                pass
         # 写入合并后的代码
         with open(filepath, 'w', encoding='utf-8') as f:
-            f.write("\n".join(response[start_line:end_line])+"\n")
+            f.write("\n".join(code)+"\n")
         return True
     except Exception as e:
         return False
