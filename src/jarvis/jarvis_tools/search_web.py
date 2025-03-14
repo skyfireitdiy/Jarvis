@@ -1,4 +1,7 @@
 from typing import Dict, Any, List
+
+from regex import W
+from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.read_webpage import WebpageTool
 from playwright.sync_api import sync_playwright
@@ -12,52 +15,72 @@ def bing_search(query):
     try:
         with sync_playwright() as p:
             # Set parameters when starting the browser
-            browser = p.chromium.launch(
-                headless=True,  # Headless mode
-                args=['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
-            )
+            with yaspin(text="正在启动浏览器...", color="cyan") as spinner:
+                browser = p.chromium.launch(
+                    headless=True,  # Headless mode
+                    args=['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
+                )
+                spinner.text = "浏览器启动完成"
+                spinner.ok("✅")
             
             # Create a new page and set timeout
-            page = browser.new_page(
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                viewport={'width': 1920, 'height': 1080}
-            )
+            with yaspin(text="正在创建新页面...", color="cyan") as spinner:
+                page = browser.new_page(
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                    viewport={'width': 1920, 'height': 1080}
+                )
+                spinner.text = "新页面创建完成"
+                spinner.ok("✅")
             
             # Set page timeout
-            page.set_default_timeout(60000)
+            with yaspin(text="正在设置页面超时...", color="cyan") as spinner:
+                page.set_default_timeout(60000)
+                spinner.text = "页面超时设置完成"
+                spinner.ok("✅")
             
             # Visit search page
-            url = f"https://www.bing.com/search?q={quote(query)}&form=QBLH&sp=-1"
-            page.goto(url, wait_until="networkidle")
+            with yaspin(text=f"正在搜索 {query}...", color="cyan") as spinner:
+                url = f"https://www.bing.com/search?q={quote(query)}&form=QBLH&sp=-1"
+                page.goto(url, wait_until="networkidle")
+                spinner.text = "搜索完成"
+                spinner.ok("✅")
             
             # Wait for search results to load
-            page.wait_for_selector("#b_results", state="visible", timeout=30000)
-            
-            # Wait for a moment to ensure the results are fully loaded
-            page.wait_for_timeout(1000)
+            with yaspin(text="正在等待搜索结果加载...", color="cyan") as spinner:
+                page.wait_for_selector("#b_results", state="visible", timeout=30000)
+                # Wait for a moment to ensure the results are fully loaded
+                page.wait_for_timeout(1000)
+                spinner.text = "搜索结果加载完成"
+                spinner.ok("✅")
             
             # Extract search results
-            summaries = page.evaluate("""() => {
-                const results = [];
-                const elements = document.querySelectorAll("#b_results > .b_algo");
-                
-                for (const el of elements) {
-                    const titleEl = el.querySelector("h2");
-                    const linkEl = titleEl ? titleEl.querySelector("a") : null;
-                    const abstractEl = el.querySelector(".b_caption p");
+            with yaspin(text="正在提取搜索结果...", color="cyan") as spinner:
+                summaries = page.evaluate("""() => {
+                    const results = [];
+                    const elements = document.querySelectorAll("#b_results > .b_algo");
                     
-                    if (linkEl) {
-                        results.push({
-                            title: titleEl.innerText.trim(),
-                            href: linkEl.href,
-                            abstract: abstractEl ? abstractEl.innerText.trim() : ""
-                        });
+                    for (const el of elements) {
+                        const titleEl = el.querySelector("h2");
+                        const linkEl = titleEl ? titleEl.querySelector("a") : null;
+                        const abstractEl = el.querySelector(".b_caption p");
+                        
+                        if (linkEl) {
+                            results.push({
+                                title: titleEl.innerText.trim(),
+                                href: linkEl.href,
+                                abstract: abstractEl ? abstractEl.innerText.trim() : ""
+                            });
+                        }
                     }
-                }
-                return results;
-            }""")
-            
-            browser.close()
+                    return results;
+                }""")
+                spinner.text = "搜索结果提取完成"
+                spinner.ok("✅")
+
+            with yaspin(text="正在关闭浏览器...", color="cyan") as spinner:
+                browser.close()
+                spinner.text = "浏览器关闭完成"
+                spinner.ok("✅")
             return summaries
             
     except Exception as error:
@@ -235,8 +258,10 @@ Please synthesize a final answer that:
                 }
             
             # Extract information
-            PrettyOutput.print("正在分析搜索结果...", OutputType.PROGRESS)
-            analysis = self._extract_info(contents, question)
+            with yaspin(text="正在提取信息...", color="cyan") as spinner:   
+                analysis = self._extract_info(contents, question)
+                spinner.text = "信息提取完成"
+                spinner.ok("✅")
             
             return {
                 "success": True,

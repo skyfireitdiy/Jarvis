@@ -4,6 +4,8 @@ Tool Generator Tool - Automatically creates new tools using LLM
 from pathlib import Path
 import re
 from typing import Dict, Any
+
+from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 
 class ToolGenerator:
@@ -39,33 +41,45 @@ class ToolGenerator:
             input_spec = arguments["input_spec"]
             
             # Generate tool implementation using LLM
-            prompt = self._create_prompt(tool_name, description, input_spec)
-            llm_response = model.chat_until_success(prompt)
+            with yaspin(text="正在生成工具...", color="cyan") as spinner:
+                prompt = self._create_prompt(tool_name, description, input_spec)
+                llm_response = model.chat_until_success(prompt)
+                spinner.text = "工具生成完成"
+                spinner.ok("✅")
             
             # Extract implementation with more flexible parsing
-            implementation = self._extract_code(llm_response)
-            if not implementation:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "Could not extract valid Python code from LLM response"
-                }
+            with yaspin(text="正在提取工具实现...", color="cyan") as spinner:
+                implementation = self._extract_code(llm_response)
+                if not implementation:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "Could not extract valid Python code from LLM response"
+                    }
+                spinner.text = "工具实现提取完成"
+                spinner.ok("✅")
             
             # Validate return value format
-            if not self._validate_return_value_format(implementation):
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "Generated tool does not follow required return value format"
-                }
+            with yaspin(text="正在验证工具返回值格式...", color="cyan") as spinner:
+                if not self._validate_return_value_format(implementation):
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "Generated tool does not follow required return value format"
+                    }
+                spinner.text = "工具返回值格式验证完成"
+                spinner.ok("✅")
             
             # Save the new tool
-            tools_dir = Path.home() / ".jarvis" / "tools"
-            tools_dir.mkdir(parents=True, exist_ok=True)
-            tool_file = tools_dir / f"{tool_name}.py"
-            
-            with open(tool_file, "w") as f:
-                f.write(implementation)
+            with yaspin(text="正在保存工具...", color="cyan") as spinner:
+                tools_dir = Path.home() / ".jarvis" / "tools"
+                tools_dir.mkdir(parents=True, exist_ok=True)
+                tool_file = tools_dir / f"{tool_name}.py"
+                
+                with open(tool_file, "w") as f:
+                    f.write(implementation)
+                spinner.text = "工具保存完成"
+                spinner.ok("✅")
             
             return {
                 "success": True,
