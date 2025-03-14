@@ -245,33 +245,39 @@ class Agent:
             - For main agent: May generate methodology if enabled
             - For sub-agent: May generate summary if enabled
         """
-        PrettyOutput.section("任务完成", OutputType.SUCCESS)
-        
         if not self.is_sub_agent:
             if self.record_methodology:
+                with yaspin(text="正在生成方法论...", color="cyan") as spinner:
+                    try:
+                        
+                        # 让模型判断是否需要生成方法论
+                        analysis_prompt = """当前任务已结束，请分析是否需要生成方法论。
+        如果你认为需要生成方法论，请先确定是创建新方法论还是更新现有方法论。如果是更新现有方法论，请使用'update'，否则使用'add'。
+        如果你认为不需要方法论，请解释原因。
+        方法论应适用于通用场景，不要包含任务特定信息，如代码提交信息等。
+        方法论应包含：问题重述、最优解决方案、注意事项（如有），除此之外不要包含其他内容。
+        只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
+        """
+                        self.prompt = analysis_prompt
+                        response = self._call_model(self.prompt)
 
-                try:
-                    # 让模型判断是否需要生成方法论
-                    analysis_prompt = """当前任务已结束，请分析是否需要生成方法论。
-    如果你认为需要生成方法论，请先确定是创建新方法论还是更新现有方法论。如果是更新现有方法论，请使用'update'，否则使用'add'。
-    如果你认为不需要方法论，请解释原因。
-    方法论应适用于通用场景，不要包含任务特定信息，如代码提交信息等。
-    方法论应包含：问题重述、最优解决方案、注意事项（如有），除此之外不要包含其他内容。
-    只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
-    """
-                    self.prompt = analysis_prompt
-                    response = self._call_model(self.prompt)
-                    
-                    self._call_tools(response)
-                    
-                except Exception as e:
-                    PrettyOutput.print(f"生成方法论失败: {str(e)}", OutputType.ERROR)
-            
+                        with spinner.hidden():
+                            self._call_tools(response)
+                        spinner.text = "方法论生成完成"
+                        spinner.ok("✅")
+                    except Exception as e:
+                        spinner.text = "方法论生成失败"
+                        spinner.fail("❌")
             return "任务完成"
         
         if self.need_summary:
-            self.prompt = self.summary_prompt
-            return self._call_model(self.prompt)
+            with yaspin(text="正在生成总结...", color="cyan") as spinner:
+                self.prompt = self.summary_prompt
+                with spinner.hidden():
+                    ret = self._call_model(self.prompt)
+                    spinner.text = "总结生成完成"
+                    spinner.ok("✅")
+                    return ret
         
         return "任务完成"
 
@@ -292,7 +298,8 @@ class Agent:
                 if file_list:
                     self.model.upload_files(file_list) # type: ignore
                     spinner.text = "环境准备完成"
-
+                    spinner.ok("✅")
+            
             self.prompt = f"{user_input}"
 
             if self.first:
@@ -361,39 +368,43 @@ class Agent:
 def _load_tasks() -> dict:
     """Load tasks from .jarvis files in user home and current directory."""
     tasks = {}
-    
+
     # Check .jarvis/pre-command in user directory
     user_jarvis = os.path.expanduser("~/.jarvis/pre-command")
     if os.path.exists(user_jarvis):
-        try:
-            with open(user_jarvis, "r", encoding="utf-8") as f:
-                user_tasks = yaml.safe_load(f)
-                
-            if isinstance(user_tasks, dict):
-                # Validate and add user directory tasks
-                for name, desc in user_tasks.items():
-                    if desc:  # Ensure description is not empty
-                        tasks[str(name)] = str(desc)
-            else:
-                PrettyOutput.print("警告: ~/.jarvis/pre-command 文件应该包含一个字典，键为任务名称，值为任务描述", OutputType.WARNING)
-        except Exception as e:
-            PrettyOutput.print(f"加载 ~/.jarvis/pre-command 文件失败: {str(e)}", OutputType.ERROR)
-    
+        with yaspin(text=f"从{user_jarvis}加载预定义任务...", color="cyan") as spinner:
+            try:
+                with open(user_jarvis, "r", encoding="utf-8") as f:
+                    user_tasks = yaml.safe_load(f)
+                    
+                if isinstance(user_tasks, dict):
+                    # Validate and add user directory tasks
+                    for name, desc in user_tasks.items():
+                        if desc:  # Ensure description is not empty
+                            tasks[str(name)] = str(desc)
+                spinner.text = "预定义任务加载完成"
+                spinner.ok("✅")
+            except Exception as e:
+                spinner.text = "预定义任务加载失败"
+                spinner.fail("❌")
+        
     # Check .jarvis/pre-command in current directory
     if os.path.exists(".jarvis/pre-command"):
-        try:
-            with open(".jarvis/pre-command", "r", encoding="utf-8") as f:
-                local_tasks = yaml.safe_load(f)
-                
-            if isinstance(local_tasks, dict):
-                # Validate and add current directory tasks, overwrite user directory tasks if there is a name conflict
-                for name, desc in local_tasks.items():
-                    if desc:  # Ensure description is not empty
-                        tasks[str(name)] = str(desc)
-            else:
-                PrettyOutput.print("警告: .jarvis/pre-command 文件应该包含一个字典，键为任务名称，值为任务描述", OutputType.WARNING)
-        except Exception as e:
-            PrettyOutput.print(f"加载 .jarvis/pre-command 文件失败: {str(e)}", OutputType.ERROR)
+        with yaspin(text=f"从{os.path.abspath('.jarvis/pre-command')}加载预定义任务...", color="cyan") as spinner:
+            try:
+                with open(".jarvis/pre-command", "r", encoding="utf-8") as f:
+                    local_tasks = yaml.safe_load(f)
+                    
+                if isinstance(local_tasks, dict):
+                    # Validate and add current directory tasks, overwrite user directory tasks if there is a name conflict
+                    for name, desc in local_tasks.items():
+                        if desc:  # Ensure description is not empty
+                            tasks[str(name)] = str(desc)
+                spinner.text = "预定义任务加载完成"
+                spinner.ok("✅")
+            except Exception as e:
+                spinner.text = "预定义任务加载失败"
+                spinner.fail("❌")
 
     return tasks
 def _select_task(tasks: dict) -> str:
