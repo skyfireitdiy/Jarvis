@@ -103,7 +103,9 @@ def apply_patch(output_str: str) -> str:
         diff = get_diff()
         if diff:
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
-            if handle_commit_workflow():
+            with spinner.hidden():
+                commited = handle_commit_workflow()
+            if commited:
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()
                 commits = get_commits_between(start_hash, end_hash)
