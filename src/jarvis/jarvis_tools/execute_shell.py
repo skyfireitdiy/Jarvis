@@ -73,9 +73,6 @@ class ShellTool:
             # Use script command to capture both stdout and stderr
             tee_command = f"script -q -c '{escaped_command}' {output_file}"
             
-            # Log command execution
-            PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
-            
             # Execute command and capture return code
             return_code = os.system(tee_command)
             
