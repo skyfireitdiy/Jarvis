@@ -597,6 +597,7 @@ Content: {content}
                     selected = self._process_batch('\n'.join(query), current_batch)
                     all_selected_files.extend(selected)
                 
+                spinner.write("✅ 结果筛选完成")
                 # Convert set to list and maintain original order
                 return all_selected_files
 
@@ -742,57 +743,70 @@ Content: {content}
 
     def search_similar(self, query: str, top_k: int = 30) -> List[Dict[str, str]]:
         """Search related files with optimized retrieval"""
-        try:
-            self.generate_codebase()
-            if self.index is None:
+        with yaspin(text="正在搜索相关文件...", color="cyan") as spinner:
+            try:
+                with spinner.hidden():
+                    self.generate_codebase()
+                if self.index is None:
+                    spinner.text = "没有找到有效的缓存文件"
+                    spinner.ok("✅")
+                    return []
+                    
+                # Generate query variants for better coverage
+                spinner.text = "生成查询变体..."
+                query_variants = self._generate_query_variants(query)
+                spinner.write("✅ 查询变体生成完成")
+                
+                # Collect results from all variants
+                spinner.text = "收集结果..."
+                all_results = []
+                seen_files = set()
+                
+                for variant in query_variants:
+                    # Get vector for each variant
+                    query_vector = get_embedding(self.embedding_model, variant)
+                    query_vector = query_vector.reshape(1, -1)
+                    
+                    # Search with current variant
+                    initial_k = min(top_k * 2, len(self.file_paths))
+                    distances, indices = self.index.search(query_vector, initial_k) # type: ignore
+                    
+                    # Process results
+                    for idx, dist in zip(indices[0], distances[0]):
+                        if idx != -1:
+                            file_path = self.file_paths[idx]
+                            if file_path not in seen_files:
+                                similarity = 1.0 / (1.0 + float(dist))
+                                if similarity > 0.3:  # Lower threshold for better recall
+                                    seen_files.add(file_path)
+                                    all_results.append((file_path, similarity, self.vector_cache[file_path]["description"]))
+                spinner.write("✅ 结果收集完成")
+                if not all_results:
+                    spinner.text = "没有找到相关文件"
+                    spinner.ok("✅")
+                    return []
+                    
+                spinner.text = "排序..."
+                # Sort by similarity and take top_k
+                all_results.sort(key=lambda x: x[1], reverse=True)
+                results = all_results[:top_k]
+                spinner.write("✅ 排序完成")
+                
+                with spinner.hidden():
+                    results = self.pick_results(query_variants, [path for path, _, _ in results])
+
+                output = "Found related files:\n"
+                for file in results:
+                    output += f'''- {file['file']} ({file['reason']})\n'''
+
+                spinner.write("✅ 结果输出完成")
+                spinner.ok("✅")
+                return results
+                
+            except Exception as e:
+                spinner.text = f"搜索失败: {str(e)}"
+                spinner.fail("❌")
                 return []
-                
-            # Generate query variants for better coverage
-            query_variants = self._generate_query_variants(query)
-            
-            # Collect results from all variants
-            all_results = []
-            seen_files = set()
-            
-            for variant in query_variants:
-                # Get vector for each variant
-                query_vector = get_embedding(self.embedding_model, variant)
-                query_vector = query_vector.reshape(1, -1)
-                
-                # Search with current variant
-                initial_k = min(top_k * 2, len(self.file_paths))
-                distances, indices = self.index.search(query_vector, initial_k) # type: ignore
-                
-                # Process results
-                for idx, dist in zip(indices[0], distances[0]):
-                    if idx != -1:
-                        file_path = self.file_paths[idx]
-                        if file_path not in seen_files:
-                            similarity = 1.0 / (1.0 + float(dist))
-                            if similarity > 0.3:  # Lower threshold for better recall
-                                seen_files.add(file_path)
-                                all_results.append((file_path, similarity, self.vector_cache[file_path]["description"]))
-            
-            if not all_results:
-                return []
-                
-            # Sort by similarity and take top_k
-            all_results.sort(key=lambda x: x[1], reverse=True)
-            results = all_results[:top_k]
-
-            results = self.pick_results(query_variants, [path for path, _, _ in results])
-
-            output = "Found related files:\n"
-            for file in results:
-                output += f'''- {file['file']} ({file['reason']})\n'''
-            PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
-
-            
-            return results
-            
-        except Exception as e:
-            PrettyOutput.print(f"搜索失败: {str(e)}", output_type=OutputType.ERROR)
-            return []
 
     def ask_codebase(self, query: str, top_k: int=20) -> Tuple[List[Dict[str, str]], str]:
         """Query the codebase with enhanced context building"""
@@ -840,48 +854,49 @@ Content: {content}
 相关代码文件（按相关性排序）:
 """
 
-        # 添加上下文，控制长度
-        available_count = self.max_token_count - get_context_token_count(prompt) - 1000  # 为回答预留空间
-        current_count = 0
-        
-        for path in files_from_codebase:
-            try:
-                content = open(path["file"], "r", encoding="utf-8").read()
-                file_content = f"""
-## 文件: {path["file"]}
-```
-{content}
-```
----
-"""
-                if current_count + get_context_token_count(file_content) > available_count:
-                    PrettyOutput.print(
-                        "由于上下文长度限制, 一些文件被省略", 
-                        output_type=OutputType.WARNING
-                    )
-                    break
+        with yaspin(text="正在生成回答...", color="cyan") as spinner:
+            # 添加上下文，控制长度
+            spinner.text = "添加上下文..."
+            available_count = self.max_token_count - get_context_token_count(prompt) - 1000  # 为回答预留空间
+            current_count = 0
+            
+            for path in files_from_codebase:
+                try:
+                    content = open(path["file"], "r", encoding="utf-8").read()
+                    file_content = f"""
+    ## 文件: {path["file"]}
+    ```
+    {content}
+    ```
+    ---
+    """
+                    if current_count + get_context_token_count(file_content) > available_count:
+                        spinner.write("⚠️ 由于上下文长度限制, 一些文件被省略")
+                        break
+                        
+                    prompt += file_content
+                    current_count += get_context_token_count(file_content)
                     
-                prompt += file_content
-                current_count += get_context_token_count(file_content)
-                
-            except Exception as e:
-                PrettyOutput.print(f"读取 {path} 失败: {str(e)}", 
-                                output_type=OutputType.ERROR)
-                continue
+                except Exception as e:
+                    spinner.write(f"❌ 读取 {path} 失败: {str(e)}")
+                    continue
 
-        prompt += """
-# ❗ 重要规则
-1. 始终基于提供的代码进行回答
-2. 保持技术准确性
-3. 在相关时包含代码示例
-4. 指出任何缺失的信息
-5. 保持专业语言
-6. 使用用户的语言进行回答
-"""
+            prompt += """
+    # ❗ 重要规则
+    1. 始终基于提供的代码进行回答
+    2. 保持技术准确性
+    3. 在相关时包含代码示例
+    4. 指出任何缺失的信息
+    5. 保持专业语言
+    6. 使用用户的语言进行回答
+    """
 
-        model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
+            model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
 
-        return files_from_codebase, model.chat_until_success(prompt)
+            ret = files_from_codebase, model.chat_until_success(prompt)
+            spinner.text = "回答生成完成"
+            spinner.ok("✅")
+            return ret
 
     def is_index_generated(self) -> bool:
         """Check if the index has been generated"""

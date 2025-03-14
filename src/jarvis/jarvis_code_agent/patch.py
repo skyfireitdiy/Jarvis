@@ -83,21 +83,21 @@ def apply_patch(output_str: str) -> str:
             return ""
         
         # 获取当前提交hash作为起始点
-        spinner.write("开始获取当前提交hash...")
+        spinner.text= "开始获取当前提交hash..."
         start_hash = get_latest_commit_hash()
-        spinner.write("当前提交hash获取完成")
+        spinner.write("✅ 当前提交hash获取完成")
         
         # 按文件逐个处理
         for filepath, patch_content in patches.items():
             try:
-                spinner.write(f"正在处理文件: {filepath}")
+                spinner.text = f"正在处理文件: {filepath}"
                 with spinner.hidden():
                     handle_code_operation(filepath, patch_content)
-                spinner.write(f"文件 {filepath} 处理完成")
+                spinner.write(f"✅ 文件 {filepath} 处理完成")
             except Exception as e:
-                spinner.write(f"文件 {filepath} 处理失败: {str(e)}, 回滚文件")
+                spinner.text = f"文件 {filepath} 处理失败: {str(e)}, 回滚文件"
                 revert_file(filepath)  # 回滚单个文件
-                spinner.write(f"文件 {filepath} 回滚完成")
+                spinner.write(f"✅ 文件 {filepath} 回滚完成")
         
         final_ret = ""
         diff = get_diff()
@@ -189,13 +189,13 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
         try:
             if not os.path.exists(filepath):
                 # 新建文件
-                spinner.write("文件不存在，正在创建文件...")
+                spinner.text = "文件不存在，正在创建文件..."
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 open(filepath, 'w', encoding='utf-8').close()
-                spinner.write("文件创建完成")
+                spinner.write("✅ 文件创建完成")
             old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
             if not old_file_content["success"]:
-                spinner.write("文件读取失败")
+                spinner.write("❌ 文件读取失败")
                 return False
             
             prompt = f"""
@@ -226,7 +226,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
             end_line = -1
             code = []
             finished = False
-            spinner.write("开始生成代码...")
+            spinner.text="生成代码..."
             while count>0:
                 count -= 1
                 response = model.chat_until_success(prompt).splitlines()
@@ -258,10 +258,10 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
                 spinner.fail("❌")
                 return False
             # 写入合并后的代码
-            spinner.write("正在写入合并后的代码...")
+            spinner.text = "写入合并后的代码..."
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write("\n".join(code)+"\n")
-            spinner.write("合并后的代码写入完成")
+            spinner.write("✅ 合并后的代码写入完成")
             spinner.text = "代码修改完成"
             spinner.ok("✅")
             return True
