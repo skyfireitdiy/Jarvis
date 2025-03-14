@@ -129,21 +129,15 @@ def load_methodology(user_input: str) -> str:
                 
                 with yaspin(text="处理搜索结果...", color="yellow") as spinner:
                     relevant_methodologies = {}
-                    output_lines = []
                     for dist, idx in zip(distances[0], indices[0]):
                         if idx >= 0:
                             similarity = 1.0 / (1.0 + float(dist))
                             methodology = methodology_data[idx]
-                            output_lines.append(
-                                f"Methodology '{methodology['key']}' similarity: {similarity:.3f}"
-                            )
                             if similarity >= 0.5:
                                 relevant_methodologies[methodology["key"]] = methodology["value"]
                     spinner.text = "处理搜索结果完成"
                     spinner.ok("✅")
 
-                if output_lines:
-                    PrettyOutput.print("\n".join(output_lines), OutputType.INFO)
                 
                 if relevant_methodologies:
                     return make_methodology_prompt(relevant_methodologies)

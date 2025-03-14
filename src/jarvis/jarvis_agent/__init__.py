@@ -67,9 +67,9 @@ class Agent:
         if model_name is not None:
             self.model.set_model_name(model_name)
 
+        self.model.set_suppress_output(False)
 
         self.output_handler = output_handler
-
         
         self.record_methodology = record_methodology if record_methodology is not None else is_record_methodology()
         self.use_methodology = use_methodology if use_methodology is not None else is_use_methodology()
@@ -166,11 +166,8 @@ class Agent:
             message, need_return = handler(message, self)
             if need_return:
                 return message
-        with yaspin(text="正在与大模型交互...", color="cyan") as spinner:
-            ret = self.model.chat_until_success(message)   # type: ignore
-            spinner.text = "大模型交互完成"
-            spinner.ok("✅")
-            return ret
+        
+        return self.model.chat_until_success(message)   # type: ignore
 
 
 

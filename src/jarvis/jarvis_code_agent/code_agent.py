@@ -220,11 +220,8 @@ class CodeAgent:
             self.root_dir = git_dir
             if has_uncommitted_changes():
                 with spinner.hidden():
-                    with yaspin(text="检测到未提交的更改，正在提交...", color="cyan") as spinner:
-                        git_commiter = GitCommitTool()
-                        git_commiter.execute({})
-                        spinner.text = "提交完成"
-                        spinner.ok("✅")
+                    git_commiter = GitCommitTool()
+                    git_commiter.execute({})
             else:
                 spinner.text = "环境初始化完成"
             spinner.ok("✅")
