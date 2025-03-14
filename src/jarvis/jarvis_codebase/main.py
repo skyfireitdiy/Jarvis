@@ -43,7 +43,7 @@ class CodeBase:
             spinner.text = "数据目录初始化完成"
             spinner.ok("✅")
             
-        with yaspin("正在初始化嵌入模型", color="cyan") as spinner:
+        with yaspin("正在初始化嵌入模型...", color="cyan") as spinner:
         # 初始化嵌入模型
             try:
                 self.embedding_model = load_embedding_model()
@@ -67,10 +67,8 @@ class CodeBase:
         self.file_paths = []
         
         # 加载所有缓存文件
-        with yaspin(text="正在加载缓存文件...", color="cyan") as spinner:
+        with spinner.hidden():
             self._load_all_cache()
-            spinner.text = "缓存文件加载完成"
-            spinner.ok("✅")
 
     def get_git_file_list(self):
         """Get the list of files in the git repository, excluding the .jarvis-codebase directory"""
@@ -126,50 +124,52 @@ class CodeBase:
 
     def _load_all_cache(self):
         """Load all cache files"""
-        try:
-            # 清空现有缓存和文件路径
-            self.vector_cache = {}
-            self.file_paths = []
-            vectors = []
-            
-            for cache_file in os.listdir(self.cache_dir):
-                if not cache_file.endswith('.cache'):
-                    continue
+        with yaspin(text="正在加载缓存文件...", color="cyan") as spinner:
+            try:
+                # 清空现有缓存和文件路径
+                self.vector_cache = {}
+                self.file_paths = []
+                vectors = []
+                
+                for cache_file in os.listdir(self.cache_dir):
+                    if not cache_file.endswith('.cache'):
+                        continue
+                        
+                    cache_path = os.path.join(self.cache_dir, cache_file)
+                    try:
+                        with lzma.open(cache_path, 'rb') as f:
+                            cache_data = pickle.load(f)
+                            file_path = cache_data["path"]
+                            self.vector_cache[file_path] = cache_data
+                            self.file_paths.append(file_path)
+                            vectors.append(cache_data["vector"])
+                            spinner.write(f"✅ 加载缓存文件成功 {file_path}")
+                    except Exception as e:
+                        spinner.write(f"❌ 加载缓存文件失败 {cache_file} {str(e)}")
+                        continue
+                
+                if vectors:
+                    # 重建索引
+                    vectors_array = np.vstack(vectors)
+                    hnsw_index = faiss.IndexHNSWFlat(self.vector_dim, 16)
+                    hnsw_index.hnsw.efConstruction = 40
+                    hnsw_index.hnsw.efSearch = 16
+                    self.index = faiss.IndexIDMap(hnsw_index)
+                    self.index.add_with_ids(vectors_array, np.array(range(len(vectors)))) # type: ignore
                     
-                cache_path = os.path.join(self.cache_dir, cache_file)
-                try:
-                    with lzma.open(cache_path, 'rb') as f:
-                        cache_data = pickle.load(f)
-                        file_path = cache_data["path"]
-                        self.vector_cache[file_path] = cache_data
-                        self.file_paths.append(file_path)
-                        vectors.append(cache_data["vector"])
-                except Exception as e:
-                    PrettyOutput.print(f"加载缓存文件 {cache_file} 失败: {str(e)}", 
-                                     output_type=OutputType.WARNING)
-                    continue
-            
-            if vectors:
-                # 重建索引
-                vectors_array = np.vstack(vectors)
-                hnsw_index = faiss.IndexHNSWFlat(self.vector_dim, 16)
-                hnsw_index.hnsw.efConstruction = 40
-                hnsw_index.hnsw.efSearch = 16
-                self.index = faiss.IndexIDMap(hnsw_index)
-                self.index.add_with_ids(vectors_array, np.array(range(len(vectors)))) # type: ignore
-                
-                PrettyOutput.print(f"加载 {len(self.vector_cache)} 个向量缓存并重建索引", 
-                                 output_type=OutputType.INFO)
-            else:
+                    spinner.text = f"加载 {len(self.vector_cache)} 个向量缓存并重建索引"
+                    spinner.ok("✅")
+                else:
+                    self.index = None
+                    spinner.text = "没有找到有效的缓存文件"
+                    spinner.ok("✅")
+                    
+            except Exception as e:
+                spinner.text = f"加载缓存目录失败: {str(e)}"
+                spinner.fail("❌")
+                self.vector_cache = {}
+                self.file_paths = []
                 self.index = None
-                PrettyOutput.print("没有找到有效的缓存文件", output_type=OutputType.WARNING)
-                
-        except Exception as e:
-            PrettyOutput.print(f"加载缓存目录失败: {str(e)}", 
-                             output_type=OutputType.WARNING)
-            self.vector_cache = {}
-            self.file_paths = []
-            self.index = None
 
     def cache_vector(self, file_path: str, vector: np.ndarray, description: str):
         """Cache the vector representation of a file"""
@@ -476,7 +476,7 @@ Content: {content}
                 files_to_process = new_files + modified_files
                 processed_files = []
                 
-                with tqdm(total=len(files_to_process), desc="Processing files") as pbar:
+                with yaspin(text="正在处理文件...", color="cyan") as spinner:
                     # Use a thread pool to process files
                     with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
                         # Submit all tasks
@@ -492,16 +492,18 @@ Content: {content}
                                 result = future.result()
                                 if result:
                                     processed_files.append(result)
+                                    spinner.write(f"✅ 处理文件成功 {file}")
                             except Exception as e:
-                                PrettyOutput.print(f"Failed to process file {file}: {str(e)}", 
-                                                output_type=OutputType.ERROR)
-                            pbar.update(1)
+                                spinner.write(f"❌ 处理文件失败 {file}: {str(e)}")
+                                
+                    spinner.text = f"处理完成"
+                    spinner.ok("✅")
 
                 if processed_files:
-                    PrettyOutput.print("重建向量数据库...", output_type=OutputType.INFO)
-                    self.gen_vector_db_from_cache()
-                    PrettyOutput.print(f"成功生成了 {len(processed_files)} 个文件的索引", 
-                                    output_type=OutputType.SUCCESS)
+                    with yaspin(text="重建向量数据库...", color="cyan") as spinner:
+                        self.gen_vector_db_from_cache()
+                        spinner.text = f"成功生成了 {len(processed_files)} 个文件的索引"
+                        spinner.ok("✅")
             else:
                 PrettyOutput.print("没有检测到文件变化, 不需要重建索引", output_type=OutputType.INFO)
                 
