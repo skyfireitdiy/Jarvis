@@ -65,62 +65,75 @@ def load_methodology(user_input: str) -> str:
     Returns:
         str: Relevant methodology prompt or empty string if no methodology found
     """
+    from yaspin import yaspin
     user_jarvis_methodology = os.path.expanduser("~/.jarvis/methodology")
     if not os.path.exists(user_jarvis_methodology):
         return ""
     
     try:
-        with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        if dont_use_local_model():
-            return make_methodology_prompt(data)
-        # Reset data structure
-        methodology_data: List[Dict[str, str]] = []
-        vectors: List[np.ndarray] = []
-        ids: List[int] = []
-        # Get embedding model
-        embedding_model = load_embedding_model()
-        
-        # Create test embedding to get correct dimension
-        test_embedding = _create_methodology_embedding(embedding_model, "test")
-        embedding_dimension = len(test_embedding)
-        # Create embedding vector for each methodology
-        for i, (key, value) in enumerate(data.items()):
-            methodology_text = f"{key}\n{value}"
-            embedding = _create_methodology_embedding(embedding_model, methodology_text)
-            vectors.append(embedding)
-            ids.append(i)
-            methodology_data.append({"key": key, "value": value})
-        if vectors:
-            vectors_array = np.vstack(vectors)
-            # Use correct dimension from test embedding
-            hnsw_index = faiss.IndexHNSWFlat(embedding_dimension, 16)
-            hnsw_index.hnsw.efConstruction = 40
-            hnsw_index.hnsw.efSearch = 16
-            methodology_index = faiss.IndexIDMap(hnsw_index)
-            methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
-            query_embedding = _create_methodology_embedding(embedding_model, user_input)
-            k = min(3, len(methodology_data))
-            distances, indices = methodology_index.search(
-                query_embedding.reshape(1, -1), k
-            ) # type: ignore
-            relevant_methodologies = {}
-            output_lines = []
-            for dist, idx in zip(distances[0], indices[0]):
-                if idx >= 0:
-                    similarity = 1.0 / (1.0 + float(dist))
-                    methodology = methodology_data[idx]
-                    output_lines.append(
-                        f"Methodology '{methodology['key']}' similarity: {similarity:.3f}"
-                    )
-                    if similarity >= 0.5:
-                        relevant_methodologies[methodology["key"]] = methodology["value"]
+        with yaspin(text="加载方法论文件...", color="yellow") as spinner:
+            with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if dont_use_local_model():
+                spinner.ok("✅")
+                return make_methodology_prompt(data)
             
-            if output_lines:
-                PrettyOutput.print("\n".join(output_lines), OutputType.INFO)
-                    
-            if relevant_methodologies:
-                return make_methodology_prompt(relevant_methodologies)
-        return make_methodology_prompt(data)
+            spinner.text = "初始化数据结构..."
+            methodology_data: List[Dict[str, str]] = []
+            vectors: List[np.ndarray] = []
+            ids: List[int] = []
+            
+            spinner.text = "加载嵌入模型..."
+            embedding_model = load_embedding_model()
+            
+            spinner.text = "创建测试嵌入..."
+            test_embedding = _create_methodology_embedding(embedding_model, "test")
+            embedding_dimension = len(test_embedding)
+            
+            spinner.text = "处理方法论数据..."
+            for i, (key, value) in enumerate(data.items()):
+                methodology_text = f"{key}\n{value}"
+                embedding = _create_methodology_embedding(embedding_model, methodology_text)
+                vectors.append(embedding)
+                ids.append(i)
+                methodology_data.append({"key": key, "value": value})
+            
+            if vectors:
+                spinner.text = "构建索引..."
+                vectors_array = np.vstack(vectors)
+                hnsw_index = faiss.IndexHNSWFlat(embedding_dimension, 16)
+                hnsw_index.hnsw.efConstruction = 40
+                hnsw_index.hnsw.efSearch = 16
+                methodology_index = faiss.IndexIDMap(hnsw_index)
+                methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
+                
+                spinner.text = "执行搜索..."
+                query_embedding = _create_methodology_embedding(embedding_model, user_input)
+                k = min(3, len(methodology_data))
+                distances, indices = methodology_index.search(
+                    query_embedding.reshape(1, -1), k
+                ) # type: ignore
+                
+                relevant_methodologies = {}
+                output_lines = []
+                for dist, idx in zip(distances[0], indices[0]):
+                    if idx >= 0:
+                        similarity = 1.0 / (1.0 + float(dist))
+                        methodology = methodology_data[idx]
+                        output_lines.append(
+                            f"Methodology '{methodology['key']}' similarity: {similarity:.3f}"
+                        )
+                        if similarity >= 0.5:
+                            relevant_methodologies[methodology["key"]] = methodology["value"]
+                
+                if output_lines:
+                    PrettyOutput.print("\n".join(output_lines), OutputType.INFO)
+                
+                if relevant_methodologies:
+                    spinner.ok("✅")
+                    return make_methodology_prompt(relevant_methodologies)
+            
+            spinner.ok("✅")
+            return make_methodology_prompt(data)
     except Exception as e:
         return ""
