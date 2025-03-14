@@ -85,7 +85,6 @@ class CodeBase:
 
     def make_description(self, file_path: str, content: str) -> str:
         model = PlatformRegistry.get_global_platform_registry().get_cheap_platform()
-        model.set_suppress_output(True)
         prompt = f"""请分析以下代码文件并生成详细描述。描述应包含：
 1. 文件整体功能描述
 2. 对每个全局变量、函数、类型定义、类、方法和其他代码元素的描述
@@ -554,58 +553,57 @@ Content: {content}
         """
         if not initial_results:
             return []
-            
-        try:
-            PrettyOutput.print(f"Picking results ...", output_type=OutputType.INFO)
-            
-            # Maximum content length per batch
-            max_batch_length = self.max_token_count - 1000  # Reserve space for prompt
-            max_file_length = max_batch_length // 3  # Limit individual file size
-            
-            # Process files in batches
-            all_selected_files = []
-            current_batch = []
-            current_token_count = 0
-            
-            for path in initial_results:
-                try:
-                    content = open(path, "r", encoding="utf-8").read()
-                    # Truncate large files
-                    if get_context_token_count(content) > max_file_length:
-                        PrettyOutput.print(f"Truncating large file: {path}", OutputType.WARNING)
-                        content = content[:max_file_length] + "\n... (content truncated)"
-                    
-                    file_info = f"File: {path}\nContent: {content}\n\n"
-                    tokens_count = get_context_token_count(file_info)
-                    
-                    # If adding this file would exceed batch limit
-                    if current_token_count + tokens_count > max_batch_length:
-                        # Process current batch
-                        if current_batch:
-                            selected = self._process_batch('\n'.join(query), current_batch)
-                            all_selected_files.extend(selected)
-                        # Start new batch
-                        current_batch = [file_info]
-                        current_token_count = tokens_count
-                    else:
-                        current_batch.append(file_info)
-                        current_token_count += tokens_count
+        with yaspin(text="正在筛选结果...", color="cyan") as spinner:
+            try:
+                # Maximum content length per batch
+                max_batch_length = self.max_token_count - 1000  # Reserve space for prompt
+                max_file_length = max_batch_length // 3  # Limit individual file size
+                
+                # Process files in batches
+                all_selected_files = []
+                current_batch = []
+                current_token_count = 0
+                
+                for path in initial_results:
+                    try:
+                        content = open(path, "r", encoding="utf-8").read()
+                        # Truncate large files
+                        if get_context_token_count(content) > max_file_length:
+                            spinner.write(f"❌ 截断大文件: {path}")
+                            content = content[:max_file_length] + "\n... (content truncated)"
                         
-                except Exception as e:
-                    PrettyOutput.print(f"读取 {path} 失败: {str(e)}", OutputType.ERROR)
-                    continue
-            
-            # Process final batch
-            if current_batch:
-                selected = self._process_batch('\n'.join(query), current_batch)
-                all_selected_files.extend(selected)
-            
-            # Convert set to list and maintain original order
-            return all_selected_files
+                        file_info = f"File: {path}\nContent: {content}\n\n"
+                        tokens_count = get_context_token_count(file_info)
+                        
+                        # If adding this file would exceed batch limit
+                        if current_token_count + tokens_count > max_batch_length:
+                            # Process current batch
+                            if current_batch:
+                                selected = self._process_batch('\n'.join(query), current_batch)
+                                all_selected_files.extend(selected)
+                            # Start new batch
+                            current_batch = [file_info]
+                            current_token_count = tokens_count
+                        else:
+                            current_batch.append(file_info)
+                            current_token_count += tokens_count
+                            
+                    except Exception as e:
+                        spinner.write(f"❌ 读取 {path} 失败: {str(e)}")
+                        continue
+                
+                # Process final batch
+                if current_batch:
+                    selected = self._process_batch('\n'.join(query), current_batch)
+                    all_selected_files.extend(selected)
+                
+                # Convert set to list and maintain original order
+                return all_selected_files
 
-        except Exception as e:
-            PrettyOutput.print(f"选择失败: {str(e)}", OutputType.ERROR)
-            return [{"file": f, "reason": "" } for f in initial_results]
+            except Exception as e:
+                spinner.text = f"选择失败: {str(e)}"
+                spinner.fail("❌")
+                return [{"file": f, "reason": "" } for f in initial_results]
             
     def _process_batch(self, query: str, files_info: List[str]) -> List[Dict[str, str]]:
         """Process a batch of files"""
@@ -644,7 +642,6 @@ Content: {content}
 
         # Use a large model to evaluate
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        model.set_suppress_output(True)
         response = model.chat_until_success(prompt)
 
         # Parse the response
@@ -670,7 +667,6 @@ Content: {content}
             List[str]: The query variants list
         """
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        model.set_suppress_output(True)
         prompt = f"""请基于以下查询生成10个针对向量搜索优化的不同表达。每个表达应满足：
 1. 聚焦关键技术概念和术语
 2. 使用清晰明确的语言

@@ -209,7 +209,6 @@ def service_command(args):
                 raise HTTPException(status_code=400, detail=f"Platform {platform_name} not found")
             
             platform.set_model_name(model_name)
-            platform.set_suppress_output(True)  # Suppress console output in server mode
             platform_instances[key] = platform
         
         return platform_instances[key]

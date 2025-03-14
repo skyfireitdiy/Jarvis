@@ -10,7 +10,7 @@ class BasePlatform(ABC):
     
     def __init__(self):
         """Initialize model"""
-        self.suppress_output = False  # 添加输出控制标志
+        self.suppress_output = True  # 添加输出控制标志
 
     def __del__(self):
         """Destroy model"""

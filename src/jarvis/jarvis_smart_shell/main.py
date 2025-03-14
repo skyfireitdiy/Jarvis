@@ -43,7 +43,6 @@ def process_request(request: str) -> Optional[str]:
     try:
         # Get language model instance
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        model.set_suppress_output(True)
 
         shell = get_shell_name()
         current_path = os.getcwd()
