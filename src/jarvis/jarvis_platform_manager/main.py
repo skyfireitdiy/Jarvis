@@ -59,6 +59,7 @@ def chat_with_model(platform_name: str, model_name: str):
     try:
         # Set model
         platform.set_model_name(model_name)
+        platform.set_suppress_output(False)
         PrettyOutput.print(f"连接到 {platform_name} 平台 {model_name} 模型", OutputType.SUCCESS)
         
         # Start conversation loop
