@@ -386,11 +386,7 @@ arguments:
 {summary}
 
 --- 总结结束 ---"""
-                        spinner.text = "总结完成"
-                        spinner.ok("✅")
                     except Exception as e:
-                        spinner.text = "总结失败"
-                        spinner.fail("❌")
                         PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
                         output = f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
             return output
