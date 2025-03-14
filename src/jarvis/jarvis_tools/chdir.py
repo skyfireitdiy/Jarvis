@@ -16,31 +16,31 @@ class ChdirTool:
     }
     
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute directory change operation with comprehensive error handling.
+        """执行目录切换操作，并提供全面的错误处理。
         
-        Args:
-            args: Dictionary containing 'path' key with target directory path
+        参数:
+            args: 包含 'path' 键的字典，目标目录路径
             
-        Returns:
-            Dictionary containing:
-                - success: Boolean indicating operation status
-                - stdout: Success message or empty string
-                - stderr: Error message or empty string
+        返回:
+            字典，包含以下内容：
+                - success: 布尔值，表示操作状态
+                - stdout: 成功消息或空字符串
+                - stderr: 错误消息或空字符串
                 
-        Raises:
-            Handles and returns appropriate error messages for:
-                - Non-existent paths
-                - Non-directory paths
-                - Permission errors
-                - Generic exceptions
+        异常处理:
+            处理并返回适当的错误消息：
+                - 不存在的路径
+                - 非目录路径
+                - 权限错误
+                - 其他通用异常
         """
-        # Main execution block with comprehensive error handling
+        # 主执行块，包含全面的错误处理
         try:
-            # Normalize and expand the input path (handles ~ and relative paths)
+            # 规范化并展开输入路径（处理 ~ 和相对路径）
             path = os.path.expanduser(args["path"].strip())
             path = os.path.abspath(path)
             
-            # Validate that the target path exists
+            # 验证目标路径是否存在
             if not os.path.exists(path):
                 return {
                     "success": False,
@@ -48,7 +48,7 @@ class ChdirTool:
                     "stderr": f"目录不存在: {path}"
                 }
                 
-            # Ensure the path points to a directory, not a file
+            # 确保路径指向的是目录，而不是文件
             if not os.path.isdir(path):
                 return {
                     "success": False,
@@ -56,7 +56,7 @@ class ChdirTool:
                     "stderr": f"路径不是目录: {path}"
                 }
                 
-            # Capture current directory and attempt to change to new path
+            # 获取当前目录并尝试切换到新路径
             old_path = os.getcwd()
             os.chdir(path)
             
@@ -66,14 +66,14 @@ class ChdirTool:
                 "stderr": ""
             }
             
-        # Handle cases where user lacks directory access permissions
+        # 处理用户没有目录访问权限的情况
         except PermissionError:
             return {
                 "success": False,
                 "stdout": "",
                 "stderr": f"无权限访问目录: {path}"
             }
-        # Catch-all for any other unexpected errors during directory change
+        # 捕获在目录切换过程中可能出现的其他意外错误
         except Exception as e:
             return {
                 "success": False,
