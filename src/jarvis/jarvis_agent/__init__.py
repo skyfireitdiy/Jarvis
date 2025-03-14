@@ -297,9 +297,6 @@ class Agent:
 
             while True:
                 try:
-                    # 显示思考状态
-                    PrettyOutput.print("正在分析任务...", OutputType.PROGRESS)
-                    
                     # 累加对话长度
                     self.conversation_length += get_context_token_count(self.prompt)
                     
