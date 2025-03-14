@@ -461,7 +461,6 @@ Content: {content}
                 # If force is True, continue directly
                 if not force:
                     if not user_confirm("重建索引?", False):
-                        PrettyOutput.print("取消重建索引", output_type=OutputType.INFO)
                         return
                 
                 # Clean deleted files
@@ -799,7 +798,7 @@ Content: {content}
                 for file in results:
                     output += f'''- {file['file']} ({file['reason']})\n'''
 
-                spinner.write("✅ 结果输出完成")
+                spinner.text="结果输出完成"
                 spinner.ok("✅")
                 return results
                 
@@ -892,7 +891,7 @@ Content: {content}
     """
 
             model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
-
+            spinner.text = "生成回答..."
             ret = files_from_codebase, model.chat_until_success(prompt)
             spinner.text = "回答生成完成"
             spinner.ok("✅")
@@ -997,9 +996,12 @@ def main():
         PrettyOutput.print(output, output_type=OutputType.INFO, lang="markdown")
 
     elif args.command == 'ask':            
-        response = codebase.ask_codebase(args.question, args.top_k)
-        output = f"""{response}"""
-        PrettyOutput.print(output, output_type=OutputType.INFO)
+        files, answer = codebase.ask_codebase(args.question, args.top_k)
+        output = f"# 相关文件：\n"
+        for file in files:
+            output += f"""- {file['file']} ({file['reason']})\n"""
+        output += f"# 回答：\n{answer}"
+        PrettyOutput.print(output, output_type=OutputType.SYSTEM, lang="markdown")
 
     else:
         parser.print_help()
