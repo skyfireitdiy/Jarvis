@@ -221,42 +221,43 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
     </MERGED_CODE>
     """
             model = PlatformRegistry().get_codegen_platform()
+            model.set_suppress_output(False)
             count = 30
             start_line = -1
             end_line = -1
             code = []
             finished = False
-            spinner.text="生成代码..."
-            while count>0:
-                count -= 1
-                response = model.chat_until_success(prompt).splitlines()
-                try:
-                    start_line = response.index("<MERGED_CODE>") + 1
-                except:
+            with spinner.hidden():
+                while count>0:
+                    count -= 1
+                    response = model.chat_until_success(prompt).splitlines()
+                    try:
+                        start_line = response.index("<MERGED_CODE>") + 1
+                    except:
+                        return False
+                    try:
+                        end_line = response.index("</MERGED_CODE>")
+                    except:
+                        return False
+                    code = response[start_line:end_line]
+                    try: 
+                        response.index("<!!!FINISHED!!!>")
+                        finished = True
+                        break
+                    except:
+                        prompt += f"""继续输出接下来的300行代码
+                        要求：
+                        1. 严格保留原始代码的格式、空行和缩进
+                        2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
+                        3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
+                        4. 除了合并后的代码，不要输出任何其他文本
+                        5. 所有代码输出完成后，输出<!!!FINISHED!!!>
+                        """
+                        pass
+                if not finished:
+                    spinner.text = "生成代码失败"
+                    spinner.fail("❌")
                     return False
-                try:
-                    end_line = response.index("</MERGED_CODE>")
-                except:
-                    return False
-                code = response[start_line:end_line]
-                try: 
-                    response.index("<!!!FINISHED!!!>")
-                    finished = True
-                    break
-                except:
-                    prompt += f"""继续输出接下来的300行代码
-                    要求：
-                    1. 严格保留原始代码的格式、空行和缩进
-                    2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
-                    3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
-                    4. 除了合并后的代码，不要输出任何其他文本
-                    5. 所有代码输出完成后，输出<!!!FINISHED!!!>
-                    """
-                    pass
-            if not finished:
-                spinner.text = "生成代码失败"
-                spinner.fail("❌")
-                return False
             # 写入合并后的代码
             spinner.text = "写入合并后的代码..."
             with open(filepath, 'w', encoding='utf-8') as f:

@@ -1,6 +1,8 @@
 from typing import Dict, Any
 import os
 
+from yaspin import yaspin
+
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -37,67 +39,66 @@ class FileOperationTool:
         """Handle operations for a single file"""
         try:
             abs_path = os.path.abspath(filepath)
-            PrettyOutput.print(f"文件操作: {operation} - {abs_path}", OutputType.INFO)
-            
             if operation == "read":
-                if not os.path.exists(abs_path):
-                    PrettyOutput.print(f"文件不存在: {abs_path}", OutputType.WARNING)
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"文件不存在: {abs_path}"
-                    }
+                with yaspin(text=f"正在读取文件: {abs_path}...", color="cyan") as spinner:
+                    if not os.path.exists(abs_path):
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": f"文件不存在: {abs_path}"
+                        }
+                        
+                    if os.path.getsize(abs_path) > 10 * 1024 * 1024:  # 10MB
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": "File too large (>10MB)"
+                        }
+                        
+                    with open(abs_path, 'r', encoding='utf-8') as f:
+                        lines = f.readlines()
                     
-                if os.path.getsize(abs_path) > 10 * 1024 * 1024:  # 10MB
-                    PrettyOutput.print(f"文件太大: {abs_path}", OutputType.WARNING)
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "File too large (>10MB)"
-                    }
                     
-                with open(abs_path, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
-                
-                # Handle line range
-                total_lines = len(lines)
-                start_line = start_line if start_line >= 0 else total_lines + start_line + 1
-                end_line = end_line if end_line >= 0 else total_lines + end_line + 1
-                start_line = max(1, min(start_line, total_lines))
-                end_line = max(1, min(end_line, total_lines))
-                if end_line == -1:
-                    end_line = total_lines
-                
-                if start_line > end_line:
-                    error_msg = f"无效的行范围 [{start_line, end_line}] (文件总行数: {total_lines})"
-                    PrettyOutput.print(error_msg, OutputType.WARNING)
+                    total_lines = len(lines)
+                    start_line = start_line if start_line >= 0 else total_lines + start_line + 1
+                    end_line = end_line if end_line >= 0 else total_lines + end_line + 1
+                    start_line = max(1, min(start_line, total_lines))
+                    end_line = max(1, min(end_line, total_lines))
+                    if end_line == -1:
+                        end_line = total_lines
+                    
+                    if start_line > end_line:
+                        spinner.text = "无效的行范围"
+                        spinner.fail("❌")
+                        error_msg = f"无效的行范围 [{start_line, end_line}] (文件总行数: {total_lines})"
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": error_msg
+                        }
+                    
+                    content = "".join(lines[start_line - 1:end_line])
+                    output = f"\n文件: {abs_path}\n行: [{start_line}-{end_line}]\n{content}" + "\n\n" + "="*80 + "\n\n"
+                    
+                    spinner.text = f"文件读取完成: {abs_path}"
+                    spinner.ok("✅")
                     return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": error_msg
+                        "success": True,
+                        "stdout": output,
+                        "stderr": ""
                     }
-                
-                content = "".join(lines[start_line - 1:end_line])
-                output = f"\文件: {abs_path}\行: [{start_line}-{end_line}]\n{content}" + "\n\n" + "="*80 + "\n\n"
-                
-                return {
-                    "success": True,
-                    "stdout": output,
-                    "stderr": ""
-                }
-                
             elif operation == "write":
-                os.makedirs(os.path.dirname(os.path.abspath(abs_path)), exist_ok=True)
-                with open(abs_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                
-                PrettyOutput.print(f"写入文件: {abs_path}", OutputType.INFO)
-                return {
-                    "success": True,
-                    "stdout": f"Successfully wrote content to {abs_path}",
-                    "stderr": ""
-                }
-            PrettyOutput.print(f"未知操作: {operation}", OutputType.WARNING)
+                with yaspin(text=f"正在写入文件: {abs_path}...", color="cyan") as spinner:
+                    os.makedirs(os.path.dirname(os.path.abspath(abs_path)), exist_ok=True)
+                    with open(abs_path, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    spinner.text = f"文件写入完成: {abs_path}"
+                    spinner.ok("✅")
+                    return {
+                        "success": True,
+                        "stdout": f"Successfully wrote content to {abs_path}",
+                        "stderr": ""
+                    }
             return {
                 "success": False,
                 "stdout": "",
