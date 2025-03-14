@@ -354,45 +354,45 @@ arguments:
             if result["success"]:
                 # If the output exceeds 4k characters, use a large model to summarize
                 if get_context_token_count(output) > self.max_token_count:
-                    with yaspin(text="正在总结输出...", color="yellow") as spinner:
-                        try:
-                            
-                            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-                            
-                            # If the output exceeds the maximum context length, only take the last part
-                            max_count = self.max_token_count
-                            if get_context_token_count(output) > max_count:
-                                output_to_summarize = output[-max_count:]
-                                truncation_notice = f"\n(注意：由于输出过长，仅总结最后 {max_count} 个字符)"
-                            else:
-                                output_to_summarize = output
-                                truncation_notice = ""
+                    PrettyOutput.section("输出过长，正在总结...", OutputType.SYSTEM)
+                    try:
+                        
+                        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+                        model.set_suppress_output(False)
+                        # If the output exceeds the maximum context length, only take the last part
+                        max_count = self.max_token_count
+                        if get_context_token_count(output) > max_count:
+                            output_to_summarize = output[-max_count:]
+                            truncation_notice = f"\n(注意：由于输出过长，仅总结最后 {max_count} 个字符)"
+                        else:
+                            output_to_summarize = output
+                            truncation_notice = ""
 
-                            prompt = f"""请总结以下工具的执行结果，提取关键信息和重要结果。注意：
-    1. 保留所有重要的数值、路径、错误信息等
-    2. 保持结果的准确性
-    3. 用简洁的语言描述主要内容
-    4. 如果有错误信息，确保包含在总结中
+                        prompt = f"""请总结以下工具的执行结果，提取关键信息和重要结果。注意：
+1. 保留所有重要的数值、路径、错误信息等
+2. 保持结果的准确性
+3. 用简洁的语言描述主要内容
+4. 如果有错误信息，确保包含在总结中
 
-    工具名称: {name}
-    执行结果:
-    {output_to_summarize}
+工具名称: {name}
+执行结果:
+{output_to_summarize}
 
-    请提供总结:"""
+请提供总结:"""
 
-                            summary = model.chat_until_success(prompt)
-                            output = f"""--- 原始输出过长，以下是总结 ---{truncation_notice}
+                        summary = model.chat_until_success(prompt)
+                        output = f"""--- 原始输出过长，以下是总结 ---{truncation_notice}
 
-    {summary}
+{summary}
 
-    --- 总结结束 ---"""
-                            spinner.text = "总结完成"
-                            spinner.ok("✅")
-                        except Exception as e:
-                            spinner.text = "总结失败"
-                            spinner.fail("❌")
-                            PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
-                            output = f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
+--- 总结结束 ---"""
+                        spinner.text = "总结完成"
+                        spinner.ok("✅")
+                    except Exception as e:
+                        spinner.text = "总结失败"
+                        spinner.fail("❌")
+                        PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
+                        output = f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
             return output
             
         except Exception as e:
