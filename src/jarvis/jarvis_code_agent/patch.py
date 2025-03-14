@@ -2,6 +2,8 @@ import re
 from typing import Dict, Any, Tuple
 import os
 
+from yaspin import yaspin
+
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
@@ -73,54 +75,61 @@ def _parse_patch(patch_str: str) -> Dict[str, str]:
 
 def apply_patch(output_str: str) -> str:
     """Apply patches to files"""
-    try:
-        patches = _parse_patch(output_str)
-    except Exception as e:
-        PrettyOutput.print(f"解析补丁失败: {str(e)}", OutputType.ERROR)
-        return ""
-    
-    # 获取当前提交hash作为起始点
-    start_hash = get_latest_commit_hash()
-    
-    # 按文件逐个处理
-    for filepath, patch_content in patches.items():
+    with yaspin(text="正在应用补丁...", color="cyan") as spinner:
         try:
-            handle_code_operation(filepath, patch_content)
+            patches = _parse_patch(output_str)
         except Exception as e:
-            revert_file(filepath)  # 回滚单个文件
-            PrettyOutput.print(f"文件 {filepath} 处理失败: {str(e)}", OutputType.ERROR)
-    
-    final_ret = ""
-    diff = get_diff()
-    if diff:
-        PrettyOutput.print(diff, OutputType.CODE, lang="diff")
-        if handle_commit_workflow():
-            # 获取提交信息
-            end_hash = get_latest_commit_hash()
-            commits = get_commits_between(start_hash, end_hash)
-            
-            # 添加提交信息到final_ret
-            if commits:
-                final_ret += "✅ 补丁已应用\n"
-                final_ret += "提交信息:\n"
-                for commit_hash, commit_message in commits:
-                    final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
+            PrettyOutput.print(f"解析补丁失败: {str(e)}", OutputType.ERROR)
+            return ""
+        
+        # 获取当前提交hash作为起始点
+        spinner.write("开始获取当前提交hash...")
+        start_hash = get_latest_commit_hash()
+        spinner.write("当前提交hash获取完成")
+        
+        # 按文件逐个处理
+        for filepath, patch_content in patches.items():
+            try:
+                spinner.write(f"正在处理文件: {filepath}")
+                with spinner.hidden():
+                    handle_code_operation(filepath, patch_content)
+                spinner.write(f"文件 {filepath} 处理完成")
+            except Exception as e:
+                spinner.write(f"文件 {filepath} 处理失败: {str(e)}, 回滚文件")
+                revert_file(filepath)  # 回滚单个文件
+                spinner.write(f"文件 {filepath} 回滚完成")
+        
+        final_ret = ""
+        diff = get_diff()
+        if diff:
+            PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+            if handle_commit_workflow():
+                # 获取提交信息
+                end_hash = get_latest_commit_hash()
+                commits = get_commits_between(start_hash, end_hash)
                 
-                final_ret += f"应用补丁后的代码:\n{diff}"
-                 
+                # 添加提交信息到final_ret
+                if commits:
+                    final_ret += "✅ 补丁已应用\n"
+                    final_ret += "提交信息:\n"
+                    for commit_hash, commit_message in commits:
+                        final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
+                    
+                    final_ret += f"应用补丁:\n{diff}"
+                    
+                else:
+                    final_ret += "✅ 补丁已应用（没有新的提交）"
             else:
-                final_ret += "✅ 补丁已应用（没有新的提交）"
+                final_ret += "❌ 我不想提交代码\n"
+                final_ret += "补丁预览:\n"
+                final_ret += diff
         else:
-            final_ret += "❌ 我不想提交代码\n"
-            final_ret += "之前的代码:\n"
-            final_ret += diff
-    else:
-        final_ret += "❌ 没有要提交的更改\n"
-    # 用户确认最终结果
-    PrettyOutput.print(final_ret, OutputType.USER)
-    if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
-        return final_ret
-    return get_multiline_input("请输入自定义回复")
+            final_ret += "❌ 没有要提交的更改\n"
+        # 用户确认最终结果
+        PrettyOutput.print(final_ret, OutputType.USER)
+        if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
+            return final_ret
+        return get_multiline_input("请输入自定义回复")
 def revert_file(filepath: str):
     """增强版git恢复，处理新文件"""
     import subprocess
@@ -176,74 +185,88 @@ def handle_commit_workflow()->bool:
 # New handler functions below ▼▼▼
 def handle_code_operation(filepath: str, patch_content: str) -> bool:
     """处理基于上下文的代码片段"""
-    try:
-        if not os.path.exists(filepath):
-            # 新建文件
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            open(filepath, 'w', encoding='utf-8').close()
-        old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
-        if not old_file_content["success"]:
-            return False
-        
-        prompt = f"""
-你是一个代码审查员，请审查以下代码并将其与上下文合并。
-原始代码:
-{old_file_content["stdout"]}
-补丁内容:
-{patch_content}
-"""
-        prompt += f"""
-请将代码与上下文合并并返回完整的合并代码，每次最多输出300行代码。
-
-要求:
-1. 严格保留原始代码的格式、空行和缩进
-2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
-3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
-4. 除了合并后的代码，不要输出任何其他文本
-5. 所有代码输出完成后，输出<!!!FINISHED!!!>
-
-输出格式:
-<MERGED_CODE>
-[merged_code]
-</MERGED_CODE>
-"""
-        model = PlatformRegistry().get_codegen_platform()
-        count = 30
-        start_line = -1
-        end_line = -1
-        code = []
-        finished = False
-        while count>0:
-            count -= 1
-            response = model.chat_until_success(prompt).splitlines()
-            try:
-                start_line = response.index("<MERGED_CODE>") + 1
-            except:
+    with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
+        try:
+            if not os.path.exists(filepath):
+                # 新建文件
+                spinner.write("文件不存在，正在创建文件...")
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                open(filepath, 'w', encoding='utf-8').close()
+                spinner.write("文件创建完成")
+            old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
+            if not old_file_content["success"]:
+                spinner.write("文件读取失败")
                 return False
-            try:
-                end_line = response.index("</MERGED_CODE>")
-            except:
+            
+            prompt = f"""
+    你是一个代码审查员，请审查以下代码并将其与上下文合并。
+    原始代码:
+    {old_file_content["stdout"]}
+    补丁内容:
+    {patch_content}
+    """
+            prompt += f"""
+    请将代码与上下文合并并返回完整的合并代码，每次最多输出300行代码。
+
+    要求:
+    1. 严格保留原始代码的格式、空行和缩进
+    2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
+    3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
+    4. 除了合并后的代码，不要输出任何其他文本
+    5. 所有代码输出完成后，输出<!!!FINISHED!!!>
+
+    输出格式:
+    <MERGED_CODE>
+    [merged_code]
+    </MERGED_CODE>
+    """
+            model = PlatformRegistry().get_codegen_platform()
+            model.set_suppress_output(True)
+            count = 30
+            start_line = -1
+            end_line = -1
+            code = []
+            finished = False
+            spinner.write("开始生成代码...")
+            while count>0:
+                count -= 1
+                response = model.chat_until_success(prompt).splitlines()
+                try:
+                    start_line = response.index("<MERGED_CODE>") + 1
+                except:
+                    return False
+                try:
+                    end_line = response.index("</MERGED_CODE>")
+                except:
+                    return False
+                code = response[start_line:end_line]
+                try: 
+                    response.index("<!!!FINISHED!!!>")
+                    finished = True
+                    break
+                except:
+                    prompt += f"""继续输出接下来的300行代码
+                    要求：
+                    1. 严格保留原始代码的格式、空行和缩进
+                    2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
+                    3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
+                    4. 除了合并后的代码，不要输出任何其他文本
+                    5. 所有代码输出完成后，输出<!!!FINISHED!!!>
+                    """
+                    pass
+            if not finished:
+                spinner.text = "生成代码失败"
+                spinner.fail("❌")
                 return False
-            code = response[start_line:end_line]
-            try: 
-                response.index("<!!!FINISHED!!!>")
-                finished = True
-                break
-            except:
-                prompt += f"""继续输出接下来的300行代码
-                要求：
-                1. 严格保留原始代码的格式、空行和缩进
-                2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
-                3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
-                4. 除了合并后的代码，不要输出任何其他文本
-                5. 所有代码输出完成后，输出<!!!FINISHED!!!>
-                """
-                pass
-        if not finished:
+            # 写入合并后的代码
+            spinner.write("正在写入合并后的代码...")
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("\n".join(code)+"\n")
+            spinner.write("合并后的代码写入完成")
+            spinner.text = "代码修改完成"
+            spinner.ok("✅")
+            return True
+        except Exception as e:
+            spinner.text = "代码修改失败"
+            spinner.fail("❌")
             return False
-        # 写入合并后的代码
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write("\n".join(code)+"\n")
-        return True
-    except Exception as e:
-        return False

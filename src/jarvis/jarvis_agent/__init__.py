@@ -167,7 +167,11 @@ class Agent:
             message, need_return = handler(message, self)
             if need_return:
                 return message
-        return self.model.chat_until_success(message)   # type: ignore
+        with yaspin(text="正在与大模型交互...", color="cyan") as spinner:
+            ret = self.model.chat_until_success(message)   # type: ignore
+            spinner.text = "大模型交互完成"
+            spinner.ok("✅")
+            return ret
 
 
 
@@ -199,7 +203,8 @@ class Agent:
     """
             
             try:
-                summary = self._call_model(self.prompt + "\n" + prompt)
+                with spinner.hidden():
+                    summary = self._call_model(self.prompt + "\n" + prompt)
                 
                 # 清空当前对话历史，但保留系统消息
                 self.conversation_length = 0  # Reset conversation length
@@ -230,7 +235,8 @@ class Agent:
             return False, ""
         if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
             with yaspin(text=f"正在执行{tool_list[0].name()}...", color="cyan") as spinner:
-                tool_list[0].handle(response)
+                with spinner.hidden():
+                    tool_list[0].handle(response)
                 spinner.text = f"{tool_list[0].name()}执行完成"
                 spinner.ok("✅")
         return False, ""
@@ -260,7 +266,8 @@ class Agent:
         只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
         """
                         self.prompt = analysis_prompt
-                        response = self._call_model(self.prompt)
+                        with spinner.hidden():
+                            response = self._call_model(self.prompt)
 
                         with spinner.hidden():
                             self._call_tools(response)

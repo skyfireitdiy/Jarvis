@@ -3,6 +3,8 @@ import subprocess
 import os
 from typing import Any, Tuple
 
+from yaspin import yaspin
+
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_code_agent.patch import PatchOutputHandler
@@ -83,12 +85,15 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                     "start_line": 1,  # 1-based
                     "end_line": -1
                 })
-    
+        
     # Read and process files if any were found
     if files:
-        result = FileOperationTool().execute({"operation":"read","files": files})
-        if result["success"]:
-            return result["stdout"] + "\n" + prompt, False
+        with yaspin(text="正在读取文件...", color="cyan") as spinner:
+            result = FileOperationTool().execute({"operation":"read","files": files})
+            if result["success"]:
+                spinner.text = "文件读取完成"
+                spinner.ok("✅")
+                return result["stdout"] + "\n" + prompt, False
     
     return prompt, False
 
@@ -209,12 +214,20 @@ class CodeAgent:
     
 
     def _init_env(self):
-        curr_dir = os.getcwd()
-        git_dir = find_git_root(curr_dir)
-        self.root_dir = git_dir
-        if has_uncommitted_changes():
-            git_commiter = GitCommitTool()
-            git_commiter.execute({})
+        with yaspin(text="正在初始化环境...", color="cyan") as spinner: 
+            curr_dir = os.getcwd()
+            git_dir = find_git_root(curr_dir)
+            self.root_dir = git_dir
+            if has_uncommitted_changes():
+                with spinner.hidden():
+                    with yaspin(text="检测到未提交的更改，正在提交...", color="cyan") as spinner:
+                        git_commiter = GitCommitTool()
+                        git_commiter.execute({})
+                        spinner.text = "提交完成"
+                        spinner.ok("✅")
+            else:
+                spinner.text = "环境初始化完成"
+            spinner.ok("✅")
 
     
 
@@ -229,6 +242,7 @@ class CodeAgent:
         """
         try:
             self._init_env()
+            
             start_commit = get_latest_commit_hash()
             
             try:
