@@ -208,11 +208,11 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
 </MERGED_CODE>
 """
         model = PlatformRegistry().get_codegen_platform()
-        model.set_suppress_output(True)
         count = 30
         start_line = -1
         end_line = -1
         code = []
+        finished = False
         while count>0:
             count -= 1
             response = model.chat_until_success(prompt).splitlines()
@@ -227,6 +227,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
             code = response[start_line:end_line]
             try: 
                 response.index("<!!!FINISHED!!!>")
+                finished = True
                 break
             except:
                 prompt += f"""继续输出接下来的300行代码
@@ -238,6 +239,8 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
                 5. 所有代码输出完成后，输出<!!!FINISHED!!!>
                 """
                 pass
+        if not finished:
+            return False
         # 写入合并后的代码
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write("\n".join(code)+"\n")
