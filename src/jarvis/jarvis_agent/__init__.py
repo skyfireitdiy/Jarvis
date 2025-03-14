@@ -235,9 +235,10 @@ class Agent:
         if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
             with yaspin(text=f"正在执行{tool_list[0].name()}...", color="cyan") as spinner:
                 with spinner.hidden():
-                    tool_list[0].handle(response)
+                    result = tool_list[0].handle(response)
                 spinner.text = f"{tool_list[0].name()}执行完成"
                 spinner.ok("✅")
+                return result
         return False, ""
         
 

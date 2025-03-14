@@ -75,65 +75,78 @@ def load_methodology(user_input: str) -> str:
             with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             if dont_use_local_model():
+                spinner.text = "加载方法论文件完成"
                 spinner.ok("✅")
                 return make_methodology_prompt(data)
-            
-            spinner.text = "初始化数据结构..."
+        
+        with yaspin(text="初始化数据结构...", color="yellow") as spinner:
             methodology_data: List[Dict[str, str]] = []
             vectors: List[np.ndarray] = []
             ids: List[int] = []
+            spinner.text = "初始化数据结构完成"
+            spinner.ok("✅")
             
-            spinner.text = "加载嵌入模型..."
-            embedding_model = load_embedding_model()
+            with yaspin(text="加载嵌入模型...", color="yellow") as spinner:
+                embedding_model = load_embedding_model()
+                spinner.text = "加载嵌入模型完成"
+                spinner.ok("✅")
             
-            spinner.text = "创建测试嵌入..."
-            test_embedding = _create_methodology_embedding(embedding_model, "test")
-            embedding_dimension = len(test_embedding)
+            with yaspin(text="创建测试嵌入...", color="yellow") as spinner:
+                test_embedding = _create_methodology_embedding(embedding_model, "test")
+                embedding_dimension = len(test_embedding)
+                spinner.text = "创建测试嵌入完成"
+                spinner.ok("✅")
             
-            spinner.text = "处理方法论数据..."
-            for i, (key, value) in enumerate(data.items()):
-                methodology_text = f"{key}\n{value}"
-                embedding = _create_methodology_embedding(embedding_model, methodology_text)
-                vectors.append(embedding)
-                ids.append(i)
-                methodology_data.append({"key": key, "value": value})
+            with yaspin(text="处理方法论数据...", color="yellow") as spinner:
+                for i, (key, value) in enumerate(data.items()):
+                    methodology_text = f"{key}\n{value}"
+                    embedding = _create_methodology_embedding(embedding_model, methodology_text)
+                    vectors.append(embedding)
+                    ids.append(i)
+                    methodology_data.append({"key": key, "value": value})
+                spinner.text = "处理方法论数据完成"
+                spinner.ok("✅")
             
             if vectors:
-                spinner.text = "构建索引..."
-                vectors_array = np.vstack(vectors)
-                hnsw_index = faiss.IndexHNSWFlat(embedding_dimension, 16)
-                hnsw_index.hnsw.efConstruction = 40
-                hnsw_index.hnsw.efSearch = 16
-                methodology_index = faiss.IndexIDMap(hnsw_index)
-                methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
+                with yaspin(text="构建索引...", color="yellow") as spinner:
+                    vectors_array = np.vstack(vectors)
+                    hnsw_index = faiss.IndexHNSWFlat(embedding_dimension, 16)
+                    hnsw_index.hnsw.efConstruction = 40
+                    hnsw_index.hnsw.efSearch = 16
+                    methodology_index = faiss.IndexIDMap(hnsw_index)
+                    methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
+                    spinner.text = "构建索引完成"
+                    spinner.ok("✅")
                 
-                spinner.text = "执行搜索..."
-                query_embedding = _create_methodology_embedding(embedding_model, user_input)
-                k = min(3, len(methodology_data))
-                distances, indices = methodology_index.search(
-                    query_embedding.reshape(1, -1), k
-                ) # type: ignore
+                with yaspin(text="执行搜索...", color="yellow") as spinner:
+                    query_embedding = _create_methodology_embedding(embedding_model, user_input)
+                    k = min(3, len(methodology_data))
+                    distances, indices = methodology_index.search(
+                        query_embedding.reshape(1, -1), k
+                    ) # type: ignore
+                    spinner.text = "执行搜索完成"
+                    spinner.ok("✅")
                 
-                relevant_methodologies = {}
-                output_lines = []
-                for dist, idx in zip(distances[0], indices[0]):
-                    if idx >= 0:
-                        similarity = 1.0 / (1.0 + float(dist))
-                        methodology = methodology_data[idx]
-                        output_lines.append(
-                            f"Methodology '{methodology['key']}' similarity: {similarity:.3f}"
-                        )
-                        if similarity >= 0.5:
-                            relevant_methodologies[methodology["key"]] = methodology["value"]
-                
+                with yaspin(text="处理搜索结果...", color="yellow") as spinner:
+                    relevant_methodologies = {}
+                    output_lines = []
+                    for dist, idx in zip(distances[0], indices[0]):
+                        if idx >= 0:
+                            similarity = 1.0 / (1.0 + float(dist))
+                            methodology = methodology_data[idx]
+                            output_lines.append(
+                                f"Methodology '{methodology['key']}' similarity: {similarity:.3f}"
+                            )
+                            if similarity >= 0.5:
+                                relevant_methodologies[methodology["key"]] = methodology["value"]
+                    spinner.text = "处理搜索结果完成"
+                    spinner.ok("✅")
+
                 if output_lines:
                     PrettyOutput.print("\n".join(output_lines), OutputType.INFO)
                 
                 if relevant_methodologies:
-                    spinner.ok("✅")
                     return make_methodology_prompt(relevant_methodologies)
-            
-            spinner.ok("✅")
             return make_methodology_prompt(data)
     except Exception as e:
         return ""
