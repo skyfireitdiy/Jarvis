@@ -1,4 +1,14 @@
 from setuptools import setup, find_packages
+from setuptools.command.install import install
+import subprocess
+
+# 自定义安装命令
+class CustomInstallCommand(install):
+    def run(self):
+        # 先运行默认的安装逻辑
+        install.run(self)
+        # 安装完成后执行 playwright install
+        subprocess.check_call(["playwright", "install"])
 
 setup(
     name="jarvis-ai-assistant",
@@ -67,4 +77,7 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
     ],
+    cmdclass={
+        'install': CustomInstallCommand,  # 注册自定义安装命令
+    },
 )
