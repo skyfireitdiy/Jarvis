@@ -1,5 +1,7 @@
 from typing import Dict, Any
 import subprocess
+
+from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_agent import Agent
@@ -41,44 +43,47 @@ class CodeReviewTool:
             review_type = args.get("review_type", "current").strip()
             
             # Build git diff command based on review type
-            if review_type == "commit":
-                if "commit_sha" not in args:
-                    return {
-                        "success": False,
-                        "stdout": {},
-                        "stderr": "commit_sha is required for commit review type"
-                    }
-                commit_sha = args["commit_sha"].strip()
-                diff_cmd = f"git show {commit_sha} | cat -"
-            elif review_type == "range":
-                if "start_commit" not in args or "end_commit" not in args:
-                    return {
-                        "success": False,
-                        "stdout": {},
-                        "stderr": "start_commit and end_commit are required for range review type"
-                    }
-                start_commit = args["start_commit"].strip()
-                end_commit = args["end_commit"].strip()
-                diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
-            else:  # current changes
-                diff_cmd = "git diff HEAD | cat -"
+            with yaspin(text="正在获取代码变更...", color="cyan") as spinner:
+                if review_type == "commit":
+                    if "commit_sha" not in args:
+                        return {
+                            "success": False,
+                            "stdout": {},
+                            "stderr": "commit_sha is required for commit review type"
+                        }
+                    commit_sha = args["commit_sha"].strip()
+                    diff_cmd = f"git show {commit_sha} | cat -"
+                elif review_type == "range":
+                    if "start_commit" not in args or "end_commit" not in args:
+                        return {
+                            "success": False,
+                            "stdout": {},
+                            "stderr": "start_commit and end_commit are required for range review type"
+                        }
+                    start_commit = args["start_commit"].strip()
+                    end_commit = args["end_commit"].strip()
+                    diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
+                else:  # current changes
+                    diff_cmd = "git diff HEAD | cat -"
             
-            # Execute git diff command
-            try:
-                diff_output = subprocess.check_output(diff_cmd, shell=True, text=True)
-                if not diff_output:
+                # Execute git diff command
+                try:
+                    diff_output = subprocess.check_output(diff_cmd, shell=True, text=True)
+                    if not diff_output:
+                        return {
+                            "success": False,
+                            "stdout": {},
+                            "stderr": "No changes to review"
+                        }
+                    PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")
+                except subprocess.CalledProcessError as e:
                     return {
                         "success": False,
                         "stdout": {},
-                        "stderr": "No changes to review"
+                        "stderr": f"Failed to get diff: {str(e)}"
                     }
-                PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")
-            except subprocess.CalledProcessError as e:
-                return {
-                    "success": False,
-                    "stdout": {},
-                    "stderr": f"Failed to get diff: {str(e)}"
-                }
+                spinner.text = "代码变更获取完成"
+                spinner.ok("✅")
 
             system_prompt = """You are an autonomous code review expert with a tragic past. Perform in-depth analysis with the vigilance born from painful experience:
 

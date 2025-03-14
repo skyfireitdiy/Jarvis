@@ -1,4 +1,6 @@
 from typing import Dict, Any
+
+from yaspin import yaspin
 from jarvis.jarvis_codebase.main import CodeBase
 from jarvis.jarvis_utils.config import dont_use_local_model
 from jarvis.jarvis_utils.git_utils import find_git_root
@@ -46,15 +48,14 @@ class AskCodebaseTool:
         try:
             question = args["question"]
             top_k = args.get("top_k", 20)
-
-            PrettyOutput.print(f"正在分析代码库以回答问题: {question}", OutputType.INFO)
-
             # Create new CodeBase instance
             git_root = find_git_root()
             codebase = CodeBase(git_root)
 
             # Use ask_codebase method
+            
             files, response = codebase.ask_codebase(question, top_k)
+            
             
             # Print found files
             if files:
