@@ -54,6 +54,7 @@ def make_methodology_prompt(data: Dict[str, str]) -> str:
     for key, value in data.items():
         ret += f"问题: {key}\n方法论: {value}\n"
     return ret
+
 def load_methodology(user_input: str) -> str:
     """
     Load methodology and build vector index for similarity search.
@@ -64,7 +65,6 @@ def load_methodology(user_input: str) -> str:
     Returns:
         str: Relevant methodology prompt or empty string if no methodology found
     """
-    PrettyOutput.print("加载方法论...", OutputType.PROGRESS)
     user_jarvis_methodology = os.path.expanduser("~/.jarvis/methodology")
     if not os.path.exists(user_jarvis_methodology):
         return ""
@@ -101,7 +101,6 @@ def load_methodology(user_input: str) -> str:
             methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
             query_embedding = _create_methodology_embedding(embedding_model, user_input)
             k = min(3, len(methodology_data))
-            PrettyOutput.print(f"检索方法论...", OutputType.INFO)
             distances, indices = methodology_index.search(
                 query_embedding.reshape(1, -1), k
             ) # type: ignore
@@ -124,5 +123,4 @@ def load_methodology(user_input: str) -> str:
                 return make_methodology_prompt(relevant_methodologies)
         return make_methodology_prompt(data)
     except Exception as e:
-        PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
         return ""

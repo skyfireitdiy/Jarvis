@@ -3,6 +3,7 @@ from typing import Any, Callable, List, Optional, Tuple, Union
 
 from prompt_toolkit import prompt
 import yaml
+from yaspin import yaspin
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.base import BasePlatform
@@ -282,12 +283,10 @@ class Agent:
         """
         try:
             set_agent(self.name, self)
-            PrettyOutput.section("准备环境", OutputType.PLANNING)
-            if file_list:
-                self.model.upload_files(file_list) # type: ignore
-
-            # 显示任务开始
-            PrettyOutput.section(f"开始新任务: {self.name}", OutputType.PLANNING)
+            with yaspin(text="准备环境...", color="cyan") as spinner:
+                if file_list:
+                    self.model.upload_files(file_list) # type: ignore
+                    spinner.text = "环境准备完成"
 
             self.prompt = f"{user_input}"
 
