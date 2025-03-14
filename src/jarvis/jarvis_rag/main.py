@@ -8,6 +8,8 @@ from tqdm import tqdm
 import fitz  # PyMuPDF for PDF files
 from docx import Document as DocxDocument  # python-docx for DOCX files
 from pathlib import Path
+
+from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import lzma  # 添加 lzma 导入
 from threading import Lock
@@ -138,56 +140,80 @@ class RAGTool:
         Args:
             root_dir: Project root directory
         """
-        init_env()
-        self.root_dir = root_dir
-        os.chdir(self.root_dir)
+        with yaspin(text="初始化环境...", color="cyan") as spinner:
+            init_env()
+            self.root_dir = root_dir
+            os.chdir(self.root_dir)
+            spinner.text = "环境初始化完成"
+            spinner.ok("✅")
         
         # Initialize configuration
-        self.min_paragraph_length = get_min_paragraph_length()  # Minimum paragraph length
-        self.max_paragraph_length = get_max_paragraph_length()  # Maximum paragraph length
-        self.context_window = 5  # Fixed context window size
-        self.max_token_count = int(get_max_token_count() * 0.8)
+        with yaspin(text="初始化配置...", color="cyan") as spinner:
+            self.min_paragraph_length = get_min_paragraph_length()  # Minimum paragraph length
+            self.max_paragraph_length = get_max_paragraph_length()  # Maximum paragraph length
+            self.context_window = 5  # Fixed context window size
+            self.max_token_count = int(get_max_token_count() * 0.8)
+            spinner.text = "配置初始化完成"
+            spinner.ok("✅")
         
         # Initialize data directory
-        self.data_dir = os.path.join(self.root_dir, ".jarvis/rag")
-        if not os.path.exists(self.data_dir):
-            os.makedirs(self.data_dir)
+        with yaspin(text="初始化数据目录...", color="cyan") as spinner:
+            self.data_dir = os.path.join(self.root_dir, ".jarvis/rag")
+            if not os.path.exists(self.data_dir):
+                os.makedirs(self.data_dir)
+            spinner.text = "数据目录初始化完成"
+            spinner.ok("✅")
             
         # Initialize embedding model
-        try:
-            self.embedding_model = load_embedding_model()
-            self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
-            PrettyOutput.print("模型加载完成", output_type=OutputType.SUCCESS)
-        except Exception as e:
-            PrettyOutput.print(f"加载模型失败: {str(e)}", output_type=OutputType.ERROR)
-            raise
+        with yaspin(text="初始化模型...", color="cyan") as spinner:
+            try:
+                self.embedding_model = load_embedding_model()
+                self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
+                spinner.text = "模型加载完成"
+                spinner.ok("✅")
+            except Exception as e:
+                spinner.text = "模型加载失败"
+                spinner.fail("❌")
+                raise
 
-        # 修改缓存相关初始化
-        self.cache_dir = os.path.join(self.data_dir, "cache")
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
-            
-        self.documents: List[Document] = []
-        self.index = None
-        self.flat_index = None
-        self.file_md5_cache = {}
+        with yaspin(text="初始化缓存目录...", color="cyan") as spinner:
+            self.cache_dir = os.path.join(self.data_dir, "cache")
+            if not os.path.exists(self.cache_dir):
+                os.makedirs(self.cache_dir)
+                
+            self.documents: List[Document] = []
+            self.index = None
+            self.flat_index = None
+            self.file_md5_cache = {}
+            spinner.text = "缓存目录初始化完成"
+            spinner.ok("✅")
         
         # 加载缓存索引
         self._load_cache_index()
 
         # Register file processors
-        self.file_processors = [
-            TextFileProcessor(),
-            PDFProcessor(),
-            DocxProcessor()
-        ]
+        with yaspin(text="初始化文件处理器...", color="cyan") as spinner:
+            self.file_processors = [
+                TextFileProcessor(),
+                PDFProcessor(),
+                DocxProcessor()
+            ]
+            spinner.text = "文件处理器初始化完成"
+            spinner.ok("✅")
+
 
         # Add thread related configuration
-        self.thread_count = get_thread_count()
-        self.vector_lock = Lock()  # Protect vector list concurrency
+        with yaspin(text="初始化线程配置...", color="cyan") as spinner:
+            self.thread_count = get_thread_count()
+            self.vector_lock = Lock()  # Protect vector list concurrency
+            spinner.text = "线程配置初始化完成"
+            spinner.ok("✅")
 
         # 初始化 GPU 内存配置
-        self.gpu_config = init_gpu_config()
+        with yaspin(text="初始化 GPU 内存配置...", color="cyan") as spinner:
+            self.gpu_config = init_gpu_config()
+            spinner.text = "GPU 内存配置初始化完成"
+            spinner.ok("✅")
 
 
     def _get_cache_path(self, file_path: str) -> str:
@@ -208,41 +234,48 @@ class RAGTool:
         index_path = os.path.join(self.data_dir, "index.pkl")
         if os.path.exists(index_path):
             try:
-                with lzma.open(index_path, 'rb') as f:
-                    cache_data = pickle.load(f)
-                    self.file_md5_cache = cache_data.get("file_md5_cache", {})
-                    
+                with yaspin(text="加载缓存索引...", color="cyan") as spinner:
+                    with lzma.open(index_path, 'rb') as f:
+                        cache_data = pickle.load(f)
+                        self.file_md5_cache = cache_data.get("file_md5_cache", {})
+                    spinner.text = "缓存索引加载完成"
+                    spinner.ok("✅")
+                        
                 # 从各个缓存文件加载文档
-                for file_path in self.file_md5_cache:
-                    cache_path = self._get_cache_path(file_path)
-                    if os.path.exists(cache_path):
-                        try:
-                            with lzma.open(cache_path, 'rb') as f:
-                                file_cache = pickle.load(f)
-                                self.documents.extend(file_cache["documents"])
-                        except Exception as e:
-                            PrettyOutput.print(f"加载缓存失败,文件路径:{file_path}: {str(e)}", 
-                                            output_type=OutputType.WARNING)
+                with yaspin(text="加载缓存文件...", color="cyan") as spinner:
+                    for file_path in self.file_md5_cache:
+                        cache_path = self._get_cache_path(file_path)
+                        if os.path.exists(cache_path):
+                            try:
+                                with lzma.open(cache_path, 'rb') as f:
+                                    file_cache = pickle.load(f)
+                                    self.documents.extend(file_cache["documents"])
+                                spinner.write(f"✅ 加载缓存文件: {file_path}")
+                            except Exception as e:
+                                spinner.write(f"❌ 加载缓存文件失败: {file_path}: {str(e)}")
+                    spinner.text = "缓存文件加载完成"
+                    spinner.ok("✅")
                 
                 # 重建向量索引
+
                 if self.documents:
-                    vectors = []
-                    for doc in self.documents:
-                        cache_path = self._get_cache_path(doc.metadata['file_path'])
-                        if os.path.exists(cache_path):
-                            with lzma.open(cache_path, 'rb') as f:
-                                file_cache = pickle.load(f)
-                                doc_idx = next((i for i, d in enumerate(file_cache["documents"]) 
-                                            if d.metadata['chunk_index'] == doc.metadata['chunk_index']), None)
-                                if doc_idx is not None:
-                                    vectors.append(file_cache["vectors"][doc_idx])
-                    
-                    if vectors:
-                        vectors = np.vstack(vectors)
-                        self._build_index(vectors)
+                    with yaspin(text="重建向量索引...", color="cyan") as spinner:
+                        vectors = []
+                        for doc in self.documents:
+                            cache_path = self._get_cache_path(doc.metadata['file_path'])
+                            if os.path.exists(cache_path):
+                                with lzma.open(cache_path, 'rb') as f:
+                                    file_cache = pickle.load(f)
+                                    doc_idx = next((i for i, d in enumerate(file_cache["documents"]) 
+                                                if d.metadata['chunk_index'] == doc.metadata['chunk_index']), None)
+                                    if doc_idx is not None:
+                                        vectors.append(file_cache["vectors"][doc_idx])
                         
-                PrettyOutput.print(f"加载 {len(self.documents)} 个文档片段", 
-                                output_type=OutputType.INFO)
+                        if vectors:
+                            vectors = np.vstack(vectors)
+                            self._build_index(vectors)
+                        spinner.text = "向量索引重建完成，加载 {len(self.documents)} 个文档片段"
+                        spinner.ok("✅")
                                 
             except Exception as e:
                 PrettyOutput.print(f"加载缓存索引失败: {str(e)}", 
@@ -446,37 +479,42 @@ class RAGTool:
     def build_index(self, dir: str):
         """Build document index with optimized processing"""
         # Get all files
-        all_files = []
-        for root, _, files in os.walk(dir):
-            # Skip .jarvis directories and other ignored paths
-            if any(ignored in root for ignored in ['.git', '__pycache__', 'node_modules', '.jarvis']) or \
-               any(part.startswith('.jarvis-') for part in root.split(os.sep)):
-                continue
-                
-            for file in files:
-                # Skip .jarvis files
-                if '.jarvis' in root:
+        with yaspin(text="获取所有文件...", color="cyan") as spinner:
+            all_files = []
+            for root, _, files in os.walk(dir):
+                # Skip .jarvis directories and other ignored paths
+                if any(ignored in root for ignored in ['.git', '__pycache__', 'node_modules', '.jarvis']) or \
+                any(part.startswith('.jarvis-') for part in root.split(os.sep)):
                     continue
                     
-                file_path = os.path.join(root, file)
-                if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
-                    PrettyOutput.print(f"Skip large file: {file_path}", 
-                                    output_type=OutputType.WARNING)
-                    continue
-                all_files.append(file_path)
+                for file in files:
+                    # Skip .jarvis files
+                    if '.jarvis' in root:
+                        continue
+                        
+                    file_path = os.path.join(root, file)
+                    if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
+                        PrettyOutput.print(f"Skip large file: {file_path}", 
+                                        output_type=OutputType.WARNING)
+                        continue
+                    all_files.append(file_path)
+            spinner.text = f"获取所有文件完成，共 {len(all_files)} 个文件"
+            spinner.ok("✅")
 
         # Clean up cache for deleted files
-        deleted_files = set(self.file_md5_cache.keys()) - set(all_files)
-        for file_path in deleted_files:
-            del self.file_md5_cache[file_path]
-            # Remove related documents
-            self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
+        with yaspin(text="清理缓存...", color="cyan") as spinner:
+            deleted_files = set(self.file_md5_cache.keys()) - set(all_files)
+            for file_path in deleted_files:
+                del self.file_md5_cache[file_path]
+                # Remove related documents
+                self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
+            spinner.text = f"清理缓存完成，共 {len(deleted_files)} 个文件"
+            spinner.ok("✅")
 
         # Check file changes
-        files_to_process = []
-        unchanged_files = []
-        
-        with tqdm(total=len(all_files), desc="Check file status") as pbar:
+        with yaspin(text="检查文件变化...", color="cyan") as spinner:
+            files_to_process = []
+            unchanged_files = []
             for file_path in all_files:
                 current_md5 = get_file_md5(file_path)
                 if current_md5:  # Only process files that can successfully calculate MD5
@@ -486,7 +524,9 @@ class RAGTool:
                     else:
                         # New file or modified file
                         files_to_process.append(file_path)
-                pbar.update(1)
+                        spinner.write(f"⚠️ 文件变化: {file_path}")
+            spinner.text = f"检查文件变化完成，共 {len(files_to_process)} 个文件需要处理"
+            spinner.ok("✅")
 
         # Keep documents for unchanged files
         unchanged_documents = [doc for doc in self.documents 
@@ -494,13 +534,12 @@ class RAGTool:
 
         # Process files one by one with optimized vectorization
         if files_to_process:
-            PrettyOutput.print(f"Processing {len(files_to_process)} files...", OutputType.INFO)
-            
             new_documents = []
             new_vectors = []
             
-            with tqdm(total=len(files_to_process), desc="Processing files") as pbar:
-                for file_path in files_to_process:
+            
+            for file_path in files_to_process:
+                with yaspin(text=f"处理文件 {file_path} ...", color="cyan") as spinner:
                     try:
                         # Process single file
                         file_docs = self._process_file(file_path)
@@ -518,31 +557,38 @@ class RAGTool:
                             # Accumulate documents and vectors
                             new_documents.extend(file_docs)
                             new_vectors.append(file_vectors)
+
+                            spinner.text = f"处理文件 {file_path} 完成"
+                            spinner.ok("✅")
                             
                     except Exception as e:
-                        PrettyOutput.print(f"处理文件失败: {file_path}: {str(e)}", OutputType.ERROR)
+                        spinner.text = f"处理文件失败: {file_path}: {str(e)}"
+                        spinner.fail("❌")
                     
-                    pbar.update(1)
-
+                    
             # Update documents list
             self.documents.extend(new_documents)
 
             # Build final index
             if new_vectors:
-                all_new_vectors = np.vstack(new_vectors)
-                
-                if self.flat_index is not None:
-                    # Get vectors for unchanged documents
-                    unchanged_vectors = self._get_unchanged_vectors(unchanged_documents)
-                    if unchanged_vectors is not None:
-                        final_vectors = np.vstack([unchanged_vectors, all_new_vectors])
+                with yaspin(text="构建最终索引...", color="cyan") as spinner:
+                    all_new_vectors = np.vstack(new_vectors)
+                    
+                    if self.flat_index is not None:
+                        # Get vectors for unchanged documents
+                        unchanged_vectors = self._get_unchanged_vectors(unchanged_documents)
+                        if unchanged_vectors is not None:
+                            final_vectors = np.vstack([unchanged_vectors, all_new_vectors])
+                        else:
+                            final_vectors = all_new_vectors
                     else:
                         final_vectors = all_new_vectors
-                else:
-                    final_vectors = all_new_vectors
 
-                # Build index
-                self._build_index(final_vectors)
+                    # Build index
+                    spinner.text = f"构建索引..."
+                    self._build_index(final_vectors)
+                    spinner.text = f"索引构建完成，共 {len(self.documents)} 个文档 "
+                    spinner.ok("✅")
 
             PrettyOutput.print(
                 f"索引 {len(self.documents)} 个文档 "
@@ -575,58 +621,69 @@ class RAGTool:
     def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
         """Search documents with context window"""
         if not self.index:
-            PrettyOutput.print("索引未构建,正在构建...", output_type=OutputType.INFO)
             self.build_index(self.root_dir)
             
         # Get query vector
-        query_vector = get_embedding(self.embedding_model, query)
-        query_vector = query_vector.reshape(1, -1)
+        with yaspin(text="获取查询向量...", color="cyan") as spinner:
+            query_vector = get_embedding(self.embedding_model, query)
+            query_vector = query_vector.reshape(1, -1)
+            spinner.text = "查询向量获取完成"
+            spinner.ok("✅")
         
         # Search with more candidates
-        initial_k = min(top_k * 4, len(self.documents))
-        distances, indices = self.index.search(query_vector, initial_k) # type: ignore
+        with yaspin(text="搜索...", color="cyan") as spinner:
+            initial_k = min(top_k * 4, len(self.documents))
+            distances, indices = self.index.search(query_vector, initial_k) # type: ignore
+            spinner.text = "搜索完成"
+            spinner.ok("✅")
         
         # Process results with context window
-        results = []
-        seen_files = set()
-        
-        for idx, dist in zip(indices[0], distances[0]):
-            if idx != -1:
-                doc = self.documents[idx]
-                similarity = 1.0 / (1.0 + float(dist))
-                if similarity > 0.3:
-                    file_path = doc.metadata['file_path']
-                    if file_path not in seen_files:
-                        seen_files.add(file_path)
-                        
-                        # Get full context from original document
-                        original_doc = next((d for d in self.documents 
-                                           if d.metadata['file_path'] == file_path), None)
-                        if original_doc:
-                            window_docs = []  # Add this line to initialize the list
-                            full_content = original_doc.content
-                            # Find all chunks from this file
-                            file_chunks = [d for d in self.documents 
-                                         if d.metadata['file_path'] == file_path]
-                            # Add all related chunks
-                            for chunk_doc in file_chunks:
-                                window_docs.append((chunk_doc, similarity * 0.9))
-                        
-                        results.extend(window_docs)
-                        if len(results) >= top_k * (2 * self.context_window + 1):
-                            break
+        with yaspin(text="处理结果...", color="cyan") as spinner:
+            results = []
+            seen_files = set()
+            
+            for idx, dist in zip(indices[0], distances[0]):
+                if idx != -1:
+                    doc = self.documents[idx]
+                    similarity = 1.0 / (1.0 + float(dist))
+                    if similarity > 0.3:
+                        file_path = doc.metadata['file_path']
+                        if file_path not in seen_files:
+                            seen_files.add(file_path)
+                            
+                            # Get full context from original document
+                            original_doc = next((d for d in self.documents 
+                                            if d.metadata['file_path'] == file_path), None)
+                            if original_doc:
+                                window_docs = []  # Add this line to initialize the list
+                                full_content = original_doc.content
+                                # Find all chunks from this file
+                                file_chunks = [d for d in self.documents 
+                                            if d.metadata['file_path'] == file_path]
+                                # Add all related chunks
+                                for chunk_doc in file_chunks:
+                                    window_docs.append((chunk_doc, similarity * 0.9))
+                            
+                            results.extend(window_docs)
+                            if len(results) >= top_k * (2 * self.context_window + 1):
+                                break
+            spinner.text = "处理结果完成"
+            spinner.ok("✅")
         
         # Sort by similarity and deduplicate
-        results.sort(key=lambda x: x[1], reverse=True)
-        seen = set()
-        final_results = []
-        for doc, score in results:
-            key = (doc.metadata['file_path'], doc.metadata['chunk_index'])
-            if key not in seen:
-                seen.add(key)
-                final_results.append((doc, score))
-                if len(final_results) >= top_k:
-                    break
+        with yaspin(text="排序...", color="cyan") as spinner:
+            results.sort(key=lambda x: x[1], reverse=True)
+            seen = set()
+            final_results = []
+            for doc, score in results:
+                key = (doc.metadata['file_path'], doc.metadata['chunk_index'])
+                if key not in seen:
+                    seen.add(key)
+                    final_results.append((doc, score))
+                    if len(final_results) >= top_k:
+                        break
+            spinner.text = "排序完成"
+            spinner.ok("✅")
                     
         return final_results
 
@@ -691,40 +748,47 @@ Relevant Documents (by relevance):
 """
 
             # Add context with length control
-            available_count = self.max_token_count - get_context_token_count(prompt) - 1000
-            current_count = 0
-            
-            for doc, score in results:
-                doc_content = f"""
-## Document Fragment [Score: {score:.3f}]
-Source: {doc.metadata['file_path']}
-```
-{doc.content}
-```
----
-"""
-                if current_count + get_context_token_count(doc_content) > available_count:
-                    PrettyOutput.print(
-                        "由于上下文长度限制，部分内容被省略",
-                        output_type=OutputType.WARNING
-                    )
-                    break
-                    
-                prompt += doc_content
-                current_count += get_context_token_count(doc_content)
+            with yaspin(text="添加上下文...", color="cyan") as spinner:
+                available_count = self.max_token_count - get_context_token_count(prompt) - 1000
+                current_count = 0
+                
+                for doc, score in results:
+                    doc_content = f"""
+    ## Document Fragment [Score: {score:.3f}]
+    Source: {doc.metadata['file_path']}
+    ```
+    {doc.content}
+    ```
+    ---
+    """
+                    if current_count + get_context_token_count(doc_content) > available_count:
+                        PrettyOutput.print(
+                            "由于上下文长度限制，部分内容被省略",
+                            output_type=OutputType.WARNING
+                        )
+                        break
+                        
+                    prompt += doc_content
+                    current_count += get_context_token_count(doc_content)
 
-            prompt += """
-# ❗ Important Rules
-1. Only use provided documents
-2. Be precise and accurate
-3. Quote sources when relevant
-4. Indicate missing information
-5. Maintain professional tone
-6. Answer in user's language
-"""
+                prompt += """
+    # ❗ Important Rules
+    1. Only use provided documents
+    2. Be precise and accurate
+    3. Quote sources when relevant
+    4. Indicate missing information
+    5. Maintain professional tone
+    6. Answer in user's language
+    """
+                spinner.text = "添加上下文完成"
+                spinner.ok("✅")
 
-            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-            return model.chat_until_success(prompt)
+            with yaspin(text="回答...", color="cyan") as spinner:
+                model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+                response = model.chat_until_success(prompt)
+                spinner.text = "回答完成"
+                spinner.ok("✅")
+                return response
             
         except Exception as e:
             PrettyOutput.print(f"回答失败：{str(e)}", OutputType.ERROR)
