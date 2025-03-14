@@ -185,35 +185,37 @@ class Agent:
         """
         # Create a new model instance to summarize, avoid affecting the main conversation
 
-        PrettyOutput.print("总结对话历史，准备生成摘要，开始新对话...", OutputType.PROGRESS)
-        
-        prompt = """请总结之前对话中的关键信息，包括：
-1. 当前任务目标
-2. 已确认的关键信息
-3. 已尝试的解决方案
-4. 当前进展
-5. 待解决的问题
-
-请用简洁的要点形式描述，突出重要信息。不要包含对话细节。
-"""
-        
-        try:
-            summary = self._call_model(self.prompt + "\n" + prompt)
+        with yaspin(text="正在总结对话历史...", color="cyan") as spinner:
             
-            # 清空当前对话历史，但保留系统消息
-            self.conversation_length = 0  # Reset conversation length
-            
-            # 添加总结作为新的上下文
-            self.prompt = f"""以下是之前对话的关键信息总结：
+            prompt = """请总结之前对话中的关键信息，包括：
+    1. 当前任务目标
+    2. 已确认的关键信息
+    3. 已尝试的解决方案
+    4. 当前进展
+    5. 待解决的问题
 
-{summary}
-
-请基于以上信息继续完成任务。
-"""
-            self.conversation_length = len(self.prompt)  # 设置新的起始长度
+    请用简洁的要点形式描述，突出重要信息。不要包含对话细节。
+    """
             
-        except Exception as e:
-            PrettyOutput.print(f"总结对话历史失败: {str(e)}", OutputType.ERROR)
+            try:
+                summary = self._call_model(self.prompt + "\n" + prompt)
+                
+                # 清空当前对话历史，但保留系统消息
+                self.conversation_length = 0  # Reset conversation length
+                
+                # 添加总结作为新的上下文
+                self.prompt = f"""以下是之前对话的关键信息总结：
+
+    {summary}
+
+    请基于以上信息继续完成任务。
+    """
+                self.conversation_length = len(self.prompt)  # 设置新的起始长度
+                spinner.text = "总结对话历史完成"
+                spinner.ok("✅")
+            except Exception as e:
+                spinner.text = "总结对话历史失败"
+                spinner.fail("❌")
 
     def _call_tools(self, response: str) -> Tuple[bool, Any]:
         tool_list = []
@@ -226,7 +228,10 @@ class Agent:
         if len(tool_list) == 0:
             return False, ""
         if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
-            return tool_list[0].handle(response)
+            with yaspin(text=f"正在执行{tool_list[0].name()}...", color="cyan") as spinner:
+                tool_list[0].handle(response)
+                spinner.text = f"{tool_list[0].name()}执行完成"
+                spinner.ok("✅")
         return False, ""
         
 
