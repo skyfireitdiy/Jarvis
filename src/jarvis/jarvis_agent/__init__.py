@@ -67,6 +67,7 @@ class Agent:
         if model_name is not None:
             self.model.set_model_name(model_name)
 
+        self.model.set_suppress_output(True)
 
         self.output_handler = output_handler
 
@@ -407,6 +408,7 @@ def _load_tasks() -> dict:
                 spinner.fail("❌")
 
     return tasks
+
 def _select_task(tasks: dict) -> str:
     """Let user select a task from the list or skip. Returns task description if selected."""
     if not tasks:
