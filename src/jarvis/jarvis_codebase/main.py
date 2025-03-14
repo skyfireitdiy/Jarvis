@@ -4,6 +4,8 @@ import numpy as np
 import faiss
 from typing import List, Tuple, Optional, Dict
 
+from yaspin import yaspin
+
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
@@ -21,7 +23,11 @@ from jarvis.jarvis_utils.utils import  get_file_md5, init_env, user_confirm
 
 class CodeBase:
     def __init__(self, root_dir: str):
-        init_env()
+        with yaspin(text="正在初始化环境...", color="cyan") as spinner:
+            init_env()
+            spinner.text = "环境初始化完成"
+            spinner.ok("✅")
+            
         self.root_dir = root_dir
         os.chdir(self.root_dir)
         self.thread_count = get_thread_count()
@@ -29,22 +35,28 @@ class CodeBase:
         self.index = None
             
         # 初始化数据目录
-        self.data_dir = os.path.join(self.root_dir, ".jarvis/codebase")
-        self.cache_dir = os.path.join(self.data_dir, "cache")
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
+        with yaspin(text="正在初始化数据目录...", color="cyan") as spinner:
+            self.data_dir = os.path.join(self.root_dir, ".jarvis/codebase")
+            self.cache_dir = os.path.join(self.data_dir, "cache")
+            if not os.path.exists(self.cache_dir):
+                os.makedirs(self.cache_dir)
+            spinner.text = "数据目录初始化完成"
+            spinner.ok("✅")
             
+        with yaspin("正在初始化嵌入模型", color="cyan") as spinner:
         # 初始化嵌入模型
-        try:
-            self.embedding_model = load_embedding_model()
-            test_text = """This is a test text"""
-            self.embedding_model.encode([test_text], 
-                                     convert_to_tensor=True,
-                                     normalize_embeddings=True)
-            PrettyOutput.print("模型加载成功", output_type=OutputType.SUCCESS)
-        except Exception as e:
-            PrettyOutput.print(f"加载模型失败: {str(e)}", output_type=OutputType.ERROR)
-            raise
+            try:
+                self.embedding_model = load_embedding_model()
+                test_text = """This is a test text"""
+                self.embedding_model.encode([test_text], 
+                                        convert_to_tensor=True,
+                                        normalize_embeddings=True)
+                spinner.text = "嵌入模型初始化完成"
+                spinner.ok("✅")
+            except Exception as e:
+                spinner.text = "嵌入模型初始化失败"
+                spinner.fail("❌")
+                raise
             
         self.vector_dim = self.embedding_model.get_sentence_embedding_dimension()
         self.git_file_list = self.get_git_file_list()
@@ -55,7 +67,10 @@ class CodeBase:
         self.file_paths = []
         
         # 加载所有缓存文件
-        self._load_all_cache()
+        with yaspin(text="正在加载缓存文件...", color="cyan") as spinner:
+            self._load_all_cache()
+            spinner.text = "缓存文件加载完成"
+            spinner.ok("✅")
 
     def get_git_file_list(self):
         """Get the list of files in the git repository, excluding the .jarvis-codebase directory"""
@@ -72,10 +87,7 @@ class CodeBase:
 
     def make_description(self, file_path: str, content: str) -> str:
         model = PlatformRegistry.get_global_platform_registry().get_cheap_platform()
-        if self.thread_count > 1:
-            model.set_suppress_output(True)
-        else:
-            PrettyOutput.print(f"为 {file_path} 生成描述 ...", output_type=OutputType.PROGRESS)
+        model.set_suppress_output(True)
         prompt = f"""请分析以下代码文件并生成详细描述。描述应包含：
 1. 文件整体功能描述
 2. 对每个全局变量、函数、类型定义、类、方法和其他代码元素的描述
