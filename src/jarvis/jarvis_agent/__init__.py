@@ -166,7 +166,7 @@ class Agent:
             message, need_return = handler(message, self)
             if need_return:
                 return message
-        
+        PrettyOutput.section("模型输出", OutputType.SYSTEM)
         return self.model.chat_until_success(message)   # type: ignore
 
 

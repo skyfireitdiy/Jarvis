@@ -222,6 +222,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
     [merged_code]
     </MERGED_CODE>
     """
+            PrettyOutput.section("代码生成", OutputType.SYSTEM)
             model = PlatformRegistry().get_codegen_platform()
             model.set_suppress_output(False)
             count = 30
