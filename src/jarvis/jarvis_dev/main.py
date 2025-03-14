@@ -2,6 +2,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_multi_agent import MultiAgent, AgentConfig
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
 # 定义每个角色的系统提示
@@ -891,13 +892,13 @@ def main():
                 break
                 
             result = dev_team.run("My requirement: " + user_input)
-            print("\nFinal Result:", result)
+            PrettyOutput.print(result, output_type=OutputType.SYSTEM)
             
         except KeyboardInterrupt:
-            print("\nExiting...")
+            PrettyOutput.print("Exiting...", output_type=OutputType.SYSTEM)
             break
         except Exception as e:
-            print(f"\nError: {str(e)}")
+            PrettyOutput.print(f"Error: {str(e)}", output_type=OutputType.SYSTEM)
             continue
 
 if __name__ == "__main__":
