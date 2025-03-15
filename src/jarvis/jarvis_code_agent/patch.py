@@ -202,7 +202,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
 原始代码内容：
 {original_content}
 
-# 变更需求描述
+# 变更描述
 {patch_content}
 
 # 生成要求（必须严格遵守）
@@ -212,7 +212,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
      起始行号,结束行号
      替换代码内容
      </REPLACE>
-   - 行号从1开始，支持负数表示从末尾计数（如-1表示最后一行）
+   - 行号必须从1开始的正整数
    - 代码内容必须保持原始缩进，绝对不要修改周围代码的格式
 
 2. 行号验证：
@@ -236,6 +236,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
    <REPLACE>
    100,105
    ... 
+   </REPLACE>
 
 5. 正确示例：
    ✅ 精确范围：
@@ -245,14 +246,6 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
        if b == 0:  # 新增校验
            return 0
        return a / b
-   </REPLACE>
-
-   ✅ 负数行号：
-   <REPLACE>
-   -5,-3
-   finally:
-       print("Cleanup")
-       logger.info("操作完成")
    </REPLACE>
 
 请严格按上述要求生成替换块，确保机器可解析的准确格式！"""
@@ -289,21 +282,23 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
                     start_line = int(start_str)
                     end_line = int(end_str)
 
-                    # 处理负数行号
-                    if start_line < 0:
-                        start_line = total_lines + start_line + 1
-                    if end_line < 0:
-                        end_line = total_lines + end_line + 1
+                    # 禁止负数行号
+                    if start_line < 1 or end_line < 1:
+                        spinner.text = f"文件{filepath} 修改失败"
+                        spinner.fail(f"❌")
+                        return False
 
                     # 校验行号范围
                     if not (1 <= start_line <= end_line <= total_lines):
-                        raise ValueError(f"无效行号 {start_line}-{end_line} (总行数: {total_lines})")
+                        spinner.text = f"文件{filepath} 修改失败"
+                        spinner.fail(f"❌")
+                        return False
 
                     processed_blocks.append((start_line, end_line, code))
 
                 except Exception as e:
-                    spinner.fail(f"❌ 替换块处理失败: {str(e)}")
-                    revert_file(filepath)
+                    spinner.text = f"文件{filepath} 修改失败"
+                    spinner.fail(f"❌")
                     return False
 
             # 按起始行号降序排序（从后往前处理）
