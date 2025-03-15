@@ -184,93 +184,96 @@ def handle_commit_workflow()->bool:
     commit_result = git_commiter.execute({})
     return commit_result["success"]
 
-# New handler functions below ▼▼▼
 def handle_code_operation(filepath: str, patch_content: str) -> bool:
-    """处理基于上下文的代码片段"""
-    with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
-        try:
-            if not os.path.exists(filepath):
-                # 新建文件
-                spinner.text = "文件不存在，正在创建文件..."
-                os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                open(filepath, 'w', encoding='utf-8').close()
-                spinner.write("✅ 文件创建完成")
-            old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
-            if not old_file_content["success"]:
-                spinner.write("❌ 文件读取失败")
-                return False
+    pass
+
+# # New handler functions below ▼▼▼
+# def handle_code_operation(filepath: str, patch_content: str) -> bool:
+#     """处理基于上下文的代码片段"""
+#     with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
+#         try:
+#             if not os.path.exists(filepath):
+#                 # 新建文件
+#                 spinner.text = "文件不存在，正在创建文件..."
+#                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
+#                 open(filepath, 'w', encoding='utf-8').close()
+#                 spinner.write("✅ 文件创建完成")
+#             old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
+#             if not old_file_content["success"]:
+#                 spinner.write("❌ 文件读取失败")
+#                 return False
             
-            prompt = f"""
-    你是一个代码审查员，请审查以下代码并将其与上下文合并。
-    原始代码:
-    {old_file_content["stdout"]}
-    补丁内容:
-    {patch_content}
-    """
-            prompt += f"""
-    请将代码与上下文合并并返回完整的合并代码，每次最多输出300行代码。
+#             prompt = f"""
+#     你是一个代码审查员，请审查以下代码并将其与上下文合并。
+#     原始代码:
+#     {old_file_content["stdout"]}
+#     补丁内容:
+#     {patch_content}
+#     """
+#             prompt += f"""
+#     请将代码与上下文合并并返回完整的合并代码，每次最多输出300行代码。
 
-    要求:
-    1. 严格保留原始代码的格式、空行和缩进
-    2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
-    3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
-    4. 除了合并后的代码，不要输出任何其他文本
-    5. 所有代码输出完成后，输出<!!!FINISHED!!!>
+#     要求:
+#     1. 严格保留原始代码的格式、空行和缩进
+#     2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
+#     3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
+#     4. 除了合并后的代码，不要输出任何其他文本
+#     5. 所有代码输出完成后，输出<!!!FINISHED!!!>
 
-    输出格式:
-    <MERGED_CODE>
-    [merged_code]
-    </MERGED_CODE>
-    """
-            PrettyOutput.section("代码生成", OutputType.SYSTEM)
-            model = PlatformRegistry().get_codegen_platform()
-            model.set_suppress_output(False)
-            count = 30
-            start_line = -1
-            end_line = -1
-            code = []
-            finished = False
-            with spinner.hidden():
-                while count>0:
-                    count -= 1
-                    response = model.chat_until_success(prompt).splitlines()
-                    try:
-                        start_line = response.index("<MERGED_CODE>") + 1
-                        try:
-                            end_line = response.index("</MERGED_CODE>")
-                            code = response[start_line:end_line]
-                        except:
-                            pass
-                    except:
-                        pass
-                    
-                    try: 
-                        response.index("<!!!FINISHED!!!>")
-                        finished = True
-                        break
-                    except:
-                        prompt += f"""继续输出接下来的300行代码
-                        要求：
-                        1. 严格保留原始代码的格式、空行和缩进
-                        2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
-                        3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
-                        4. 除了合并后的代码，不要输出任何其他文本
-                        5. 所有代码输出完成后，输出<!!!FINISHED!!!>
-                        """
-                        pass
-                if not finished:
-                    spinner.text = "生成代码失败"
-                    spinner.fail("❌")
-                    return False
-            # 写入合并后的代码
-            spinner.text = "写入合并后的代码..."
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write("\n".join(code)+"\n")
-            spinner.write("✅ 合并后的代码写入完成")
-            spinner.text = "代码修改完成"
-            spinner.ok("✅")
-            return True
-        except Exception as e:
-            spinner.text = "代码修改失败"
-            spinner.fail("❌")
-            return False
+#     输出格式:
+#     <MERGED_CODE>
+#     [merged_code]
+#     </MERGED_CODE>
+#     """
+#             PrettyOutput.section("代码生成", OutputType.SYSTEM)
+#             model = PlatformRegistry().get_codegen_platform()
+#             model.set_suppress_output(False)
+#             count = 30
+#             start_line = -1
+#             end_line = -1
+#             code = []
+#             finished = False
+#             with spinner.hidden():
+#                 while count>0:
+#                     count -= 1
+#                     response = model.chat_until_success(prompt).splitlines()
+#                     try:
+#                         start_line = response.index("<MERGED_CODE>") + 1
+#                         try:
+#                             end_line = response.index("</MERGED_CODE>")
+#                             code = response[start_line:end_line]
+#                         except:
+#                             pass
+#                     except:
+#                         pass
+
+#                     try: 
+#                         response.index("<!!!FINISHED!!!>")
+#                         finished = True
+#                         break
+#                     except:
+#                         prompt += f"""继续输出接下来的300行代码
+#                         要求：
+#                         1. 严格保留原始代码的格式、空行和缩进
+#                         2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
+#                         3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
+#                         4. 除了合并后的代码，不要输出任何其他文本
+#                         5. 所有代码输出完成后，输出<!!!FINISHED!!!>
+#                         """
+#                         pass
+#                 if not finished:
+#                     spinner.text = "生成代码失败"
+#                     spinner.fail("❌")
+#                     return False
+#             # 写入合并后的代码
+#             spinner.text = "写入合并后的代码..."
+#             with open(filepath, 'w', encoding='utf-8') as f:
+#                 f.write("\n".join(code)+"\n")
+#             spinner.write("✅ 合并后的代码写入完成")
+#             spinner.text = "代码修改完成"
+#             spinner.ok("✅")
+#             return True
+#         except Exception as e:
+#             spinner.text = "代码修改失败"
+#             spinner.fail("❌")
+#             return False
