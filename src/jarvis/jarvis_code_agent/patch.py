@@ -216,11 +216,13 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
    - 代码内容必须保持原始缩进，绝对不要修改周围代码的格式
 
 2. 行号验证：
-   - 如果需求描述的位置不明确，必须添加注释说明选择依据
+   - 行号的范围是闭区间描述的，例如：1,3表示第1行到第3行
+   - 输出的代码正文中不要带行号
+   - 行号范围内的代码将会严格被替换为新代码，要避免重复或者遗漏
 
 3. 内容规范：
    - 保留被替换代码前后的3行上下文（除非在文件开头/结尾）
-   - 新代码的缩进必须与原始代码完全一致
+   - 新代码的缩进与换行必须与原始代码完全一致
    - 禁止修改与变更需求无关的代码区域
 
 4. 错误示例（禁止出现）：
@@ -279,6 +281,8 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
             new_lines = original_lines.copy()
             total_lines = len(original_lines)
 
+            # 预处理并排序替换块（从后往前）
+            processed_blocks = []
             for block in replace_blocks:
                 start_str, end_str, code = block
                 try:
@@ -295,14 +299,20 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
                     if not (1 <= start_line <= end_line <= total_lines):
                         raise ValueError(f"无效行号 {start_line}-{end_line} (总行数: {total_lines})")
 
-                    # 执行替换
-                    new_code_lines = code.split('\n')
-                    new_lines[start_line-1:end_line] = new_code_lines
+                    processed_blocks.append((start_line, end_line, code))
 
                 except Exception as e:
                     spinner.fail(f"❌ 替换块处理失败: {str(e)}")
                     revert_file(filepath)
                     return False
+
+            # 按起始行号降序排序（从后往前处理）
+            processed_blocks.sort(key=lambda x: x[0], reverse=True)
+
+            # 应用排序后的替换
+            for start_line, end_line, code in processed_blocks:
+                new_code_lines = code.split('\n')
+                new_lines[start_line-1:end_line] = new_code_lines
 
             # 写入新内容
             with open(filepath, 'w', encoding='utf-8') as f:

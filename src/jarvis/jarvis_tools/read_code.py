@@ -54,9 +54,13 @@ class ReadCodeTool:
                 
                 total_lines = len(lines)
                 
-                # 处理行号范围
+                # 处理特殊值-1表示文件末尾
+                if end_line == -1:
+                    end_line = total_lines
+                else:
+                    end_line = max(1, min(end_line, total_lines)) if end_line >= 0 else total_lines + end_line + 1
+                
                 start_line = max(1, min(start_line, total_lines)) if start_line >= 0 else total_lines + start_line + 1
-                end_line = max(1, min(end_line, total_lines)) if end_line >= 0 else total_lines + end_line + 1
                 
                 if start_line > end_line:
                     spinner.fail("❌")
@@ -76,7 +80,7 @@ class ReadCodeTool:
                 # 构建输出格式
                 output = (
                     f"\n🔍 文件: {abs_path}\n"
-                    f"📄 行号范围: {start_line}-{end_line}\n\n"
+                    f"📄 原始行号: {start_line}-{end_line} (共{end_line - start_line + 1}行) | 显示行号: 1-{len(selected_lines)}\n\n"
                     f"{numbered_content}\n"
                     f"{'='*80}\n"
                 )
