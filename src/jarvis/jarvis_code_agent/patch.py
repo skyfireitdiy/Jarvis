@@ -236,13 +236,14 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
                     response = model.chat_until_success(prompt).splitlines()
                     try:
                         start_line = response.index("<MERGED_CODE>") + 1
+                        try:
+                            end_line = response.index("</MERGED_CODE>")
+                            code = response[start_line:end_line]
+                        except:
+                            pass
                     except:
-                        return False
-                    try:
-                        end_line = response.index("</MERGED_CODE>")
-                    except:
-                        return False
-                    code = response[start_line:end_line]
+                        pass
+                    
                     try: 
                         response.index("<!!!FINISHED!!!>")
                         finished = True
