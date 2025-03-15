@@ -9,6 +9,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
+from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -185,7 +186,136 @@ def handle_commit_workflow()->bool:
     return commit_result["success"]
 
 def handle_code_operation(filepath: str, patch_content: str) -> bool:
-    pass
+    """智能代码替换流程（结合大模型生成精确替换块）"""
+    with yaspin(text=f"正在处理 {filepath}...", color="cyan") as spinner:
+        try:
+            # 读取原始文件内容
+            if not os.path.exists(filepath):
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                open(filepath, 'w', encoding='utf-8').close()
+            original_content = ReadCodeTool().execute({"files": [{"path": filepath}]})["stdout"]
+            # 构建模型提示
+            prompt = f"""请严格按以下要求将代码变更转换为精确的行号替换块：
+
+# 原始文件信息
+文件路径：{filepath}
+原始代码内容：
+{original_content}
+
+# 变更需求描述
+{patch_content}
+
+# 生成要求（必须严格遵守）
+1. 格式规范：
+   - 每个<REPLACE>块必须包含：
+     <REPLACE>
+     起始行号,结束行号
+     替换代码内容
+     </REPLACE>
+   - 行号从1开始，支持负数表示从末尾计数（如-1表示最后一行）
+   - 代码内容必须保持原始缩进，绝对不要修改周围代码的格式
+
+2. 行号验证：
+   - 如果需求描述的位置不明确，必须添加注释说明选择依据
+
+3. 内容规范：
+   - 保留被替换代码前后的3行上下文（除非在文件开头/结尾）
+   - 新代码的缩进必须与原始代码完全一致
+   - 禁止修改与变更需求无关的代码区域
+
+4. 错误示例（禁止出现）：
+   ❌ 错误格式：
+   <REPLACE>
+   Line 5-7
+   new code
+   </REPLACE>
+
+   ❌ 行号越界：
+   <REPLACE>
+   100,105
+   ... 
+
+5. 正确示例：
+   ✅ 精确范围：
+   <REPLACE>
+   3,5
+   def safe_divide(a, b):
+       if b == 0:  # 新增校验
+           return 0
+       return a / b
+   </REPLACE>
+
+   ✅ 负数行号：
+   <REPLACE>
+   -5,-3
+   finally:
+       print("Cleanup")
+       logger.info("操作完成")
+   </REPLACE>
+
+请严格按上述要求生成替换块，确保机器可解析的准确格式！"""
+
+            # 调用大模型生成替换块
+            PrettyOutput.section("生成精确替换块", OutputType.SYSTEM)
+            model = PlatformRegistry().get_codegen_platform()
+            model.set_suppress_output(False)
+            response = model.chat_until_success(prompt)
+
+            # 解析生成的替换块
+            replace_blocks = re.findall(
+                r'<REPLACE>\n(\d+),(\d+)\n([\s\S]*?)\n</REPLACE>',
+                response,
+                re.MULTILINE
+            )
+
+            if not replace_blocks:
+                spinner.fail("❌ 未生成有效替换块")
+                return False
+
+            original_content = open(filepath, 'r', encoding='utf-8').read()
+
+            # 应用替换块
+            original_lines = original_content.split('\n')
+            new_lines = original_lines.copy()
+            total_lines = len(original_lines)
+
+            for block in replace_blocks:
+                start_str, end_str, code = block
+                try:
+                    start_line = int(start_str)
+                    end_line = int(end_str)
+
+                    # 处理负数行号
+                    if start_line < 0:
+                        start_line = total_lines + start_line + 1
+                    if end_line < 0:
+                        end_line = total_lines + end_line + 1
+
+                    # 校验行号范围
+                    if not (1 <= start_line <= end_line <= total_lines):
+                        raise ValueError(f"无效行号 {start_line}-{end_line} (总行数: {total_lines})")
+
+                    # 执行替换
+                    new_code_lines = code.split('\n')
+                    new_lines[start_line-1:end_line] = new_code_lines
+
+                except Exception as e:
+                    spinner.fail(f"❌ 替换块处理失败: {str(e)}")
+                    revert_file(filepath)
+                    return False
+
+            # 写入新内容
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(new_lines))
+
+            spinner.text = f"已处理文件：{filepath}"
+            spinner.ok("✅")
+            return True
+
+        except Exception as e:
+            spinner.fail(f"❌ 处理失败: {str(e)}")
+            revert_file(filepath)
+            return False
 
 # # New handler functions below ▼▼▼
 # def handle_code_operation(filepath: str, patch_content: str) -> bool:
