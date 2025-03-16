@@ -6,6 +6,7 @@ from typing import Any, Tuple
 from yaspin import yaspin
 
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_code_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_code_agent.file_input_handler import file_input_handler
 from jarvis.jarvis_code_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_code_agent.patch import PatchOutputHandler
@@ -132,7 +133,7 @@ class CodeAgent:
                            output_handler=[tool_registry, PatchOutputHandler()], 
                            platform=PlatformRegistry().get_codegen_platform(), 
                            record_methodology=False,
-                           input_handler=[shell_input_handler, file_input_handler],
+                           input_handler=[shell_input_handler, file_input_handler, builtin_input_handler],
                            need_summary=False)
 
     

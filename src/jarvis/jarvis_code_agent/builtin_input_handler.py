@@ -24,11 +24,11 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     # 处理每个标记
     for tag in special_tags:
         if tag == "CodeBase":
-            user_input += "\n使用ask_codebase查询代码库"
+            user_input += "\n请使用ask_codebase查询代码库"
         elif tag == "Web":
-            user_input += "\n使用search_web进行网页搜索"
+            user_input += "\n请使用search_web进行网页搜索"
         elif tag == "RAG":
-            user_input += "\n使用RAG进行知识库检索"
+            user_input += "\n请使用RAG进行知识库检索"
         else:
             PrettyOutput.print(f"未知的特殊标记: {tag}", OutputType.WARNING)
     
