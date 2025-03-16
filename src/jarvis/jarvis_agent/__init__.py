@@ -69,7 +69,7 @@ class Agent:
 
         self.model.set_suppress_output(False)
 
-        self.output_handler = output_handler
+        self.output_handler = output_handler if output_handler else [ToolRegistry()]
         
         self.record_methodology = record_methodology if record_methodology is not None else is_record_methodology()
         self.use_methodology = use_methodology if use_methodology is not None else is_use_methodology()
