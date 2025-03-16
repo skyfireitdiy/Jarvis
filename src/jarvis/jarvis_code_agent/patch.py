@@ -225,7 +225,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
     """
             PrettyOutput.section("代码生成", OutputType.SYSTEM)
             model = PlatformRegistry().get_codegen_platform()
-            model.set_suppress_output(False)
+            model.set_suppress_output(True)
             count = 30
             start_line = -1
             end_line = -1
