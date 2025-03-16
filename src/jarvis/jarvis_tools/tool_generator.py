@@ -9,6 +9,8 @@ from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 
 class ToolGenerator:
+    """工具生成器类，用于自动创建与Jarvis系统集成的新工具"""
+    
     name = "tool_generator"
     description = "使用LLM自动生成与系统集成的新工具"
     parameters = {
@@ -31,8 +33,14 @@ class ToolGenerator:
     }
     
     def execute(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate and save a new tool using LLM"""
-        # Get fresh model instance for each execution
+        """
+        执行工具生成过程
+        Args:
+            arguments: 包含工具生成所需参数的字典
+        Returns:
+            包含执行结果的字典，包含success、stdout和stderr字段
+        """
+        # 获取代码生成平台实例
         model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
         
         try:
@@ -40,37 +48,37 @@ class ToolGenerator:
             description = arguments["description"]
             input_spec = arguments["input_spec"]
             
-            # Generate tool implementation using LLM
+            # 使用LLM生成工具实现代码
             with yaspin(text="正在生成工具...", color="cyan") as spinner:
                 prompt = self._create_prompt(tool_name, description, input_spec)
                 llm_response = model.chat_until_success(prompt)
                 spinner.text = "工具生成完成"
                 spinner.ok("✅")
             
-            # Extract implementation with more flexible parsing
+            # 从LLM响应中提取实现代码
             with yaspin(text="正在提取工具实现...", color="cyan") as spinner:
                 implementation = self._extract_code(llm_response)
                 if not implementation:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "Could not extract valid Python code from LLM response"
+                        "stderr": "无法从LLM响应中提取有效的Python代码"
                     }
                 spinner.text = "工具实现提取完成"
                 spinner.ok("✅")
             
-            # Validate return value format
+            # 验证生成的工具代码是否符合返回值格式要求
             with yaspin(text="正在验证工具返回值格式...", color="cyan") as spinner:
                 if not self._validate_return_value_format(implementation):
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "Generated tool does not follow required return value format"
+                        "stderr": "生成的工具不符合要求的返回值格式"
                     }
                 spinner.text = "工具返回值格式验证完成"
                 spinner.ok("✅")
             
-            # Save the new tool
+            # 保存生成的新工具
             with yaspin(text="正在保存工具...", color="cyan") as spinner:
                 tools_dir = Path.home() / ".jarvis" / "tools"
                 tools_dir.mkdir(parents=True, exist_ok=True)
@@ -83,7 +91,7 @@ class ToolGenerator:
             
             return {
                 "success": True,
-                "stdout": f"Tool successfully generated at: {tool_file}",
+                "stdout": f"工具成功生成于: {tool_file}",
                 "stderr": ""
             }
             
@@ -91,11 +99,19 @@ class ToolGenerator:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Tool generation failed: {str(e)}"
+                "stderr": f"工具生成失败: {str(e)}"
             }
     
     def _create_prompt(self, tool_name: str, description: str, input_spec: str) -> str:
-        """创建用于工具生成的LLM提示"""
+        """
+        创建用于工具生成的LLM提示
+        Args:
+            tool_name: 工具名称
+            description: 工具描述
+            input_spec: 输入规范
+        Returns:
+            格式化后的提示字符串
+        """
         example_code = '''
 <TOOL>
 from typing import Dict, Any
@@ -176,20 +192,32 @@ class CustomTool:
 '''
     
     def _extract_code(self, response: str) -> str:
-        """Flexibly extract Python code from LLM response"""
-        # Find the first occurrence of <TOOL> and </TOOL>
+        """
+        从LLM响应中提取Python代码
+        Args:
+            response: LLM的响应字符串
+        Returns:
+            提取到的Python代码字符串
+        """
+        # 查找第一个<TOOL>和</TOOL>标签之间的内容
         sm = re.search(r'<TOOL>(.*?)</TOOL>', response, re.DOTALL)
         if sm:
             return sm.group(1)
         return ""
     
     def _validate_return_value_format(self, code: str) -> bool:
-        """Validate that execute method returns correct format"""
+        """
+        验证execute方法的返回值格式是否正确
+        Args:
+            code: 要验证的代码字符串
+        Returns:
+            布尔值，表示格式是否正确
+        """
         required_fields = ["success", "stdout", "stderr"]
-        # Look for execute method
+        # 检查execute方法是否存在
         if "def execute(self, args: Dict) -> Dict:" not in code and \
            "def execute(self, args: Dict) -> Dict[str, Any]:" not in code:
             return False
         
-        # Check for required fields in return statement
+        # 检查返回值中是否包含所有必需字段
         return all(field in code for field in required_fields)
