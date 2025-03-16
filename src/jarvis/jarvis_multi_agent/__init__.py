@@ -5,6 +5,7 @@ import yaml
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.output_handler import OutputHandler
+from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -138,22 +139,8 @@ content: {msg['content']}
                 msg = self.agents[msg['to']].run(prompt)
         return ""
 
-def get_multiline_input() -> str:
-    """获取多行用户输入
-    
-    Returns:
-        用户输入的内容
-    """
-    print("请输入内容（输入空行结束）：")
-    lines = []
-    while True:
-        line = input()
-        if line == "":
-            break
-        lines.append(line)
-    return "\n".join(lines)
 
-def main() -> str:
+def main():
     """从YAML配置文件初始化并运行多智能体系统
     
     Returns:
@@ -162,7 +149,7 @@ def main() -> str:
     import argparse
     parser = argparse.ArgumentParser(description="多智能体系统启动器")
     parser.add_argument("config", help="YAML配置文件路径")
-    parser.add_argument("input", nargs="?", help="用户输入（可选）")
+    parser.add_argument("--input", "-i", help="用户输入（可选）")
     args = parser.parse_args()
         
     try:
@@ -178,7 +165,9 @@ def main() -> str:
             
         # 创建并运行多智能体系统
         multi_agent = MultiAgent(agents_config, main_agent_name)
-        user_input = args.input if args.input is not None else get_multiline_input()
+        user_input = args.input if args.input is not None else get_multiline_input("请输入内容（输入空行结束）：")
+        if user_input == "":
+            return
         return multi_agent.run(user_input)
         
     except yaml.YAMLError as e:
@@ -189,4 +178,4 @@ def main() -> str:
 
 if __name__ == "__main__":
     result = main()
-    print(result)
+    
