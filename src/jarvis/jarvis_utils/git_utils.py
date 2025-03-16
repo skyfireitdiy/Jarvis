@@ -1,12 +1,12 @@
 """
-Git Utilities Module
-This module provides utilities for interacting with Git repositories.
-It includes functions for:
-- Finding the root directory of a Git repository
-- Checking for uncommitted changes
-- Retrieving commit history between two hashes
-- Getting the latest commit hash
-- Extracting modified line ranges from Git diffs
+Git工具模块
+该模块提供了与Git仓库交互的工具。
+包含以下功能：
+- 查找Git仓库的根目录
+- 检查是否有未提交的更改
+- 获取两个哈希值之间的提交历史
+- 获取最新提交的哈希值
+- 从Git差异中提取修改的行范围
 """
 import os
 import re
@@ -14,42 +14,42 @@ import subprocess
 from typing import List, Tuple, Dict
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def find_git_root(start_dir="."):
-    """Change to git root directory of the given path"""
+    """切换到给定路径的Git根目录"""
     os.chdir(start_dir)
     git_root = os.popen("git rev-parse --show-toplevel").read().strip()
     os.chdir(git_root)
     return git_root
 def has_uncommitted_changes():
-    """Check if there are uncommitted changes in the git repository"""
-    # Add all changes silently
+    """检查Git仓库中是否有未提交的更改"""
+    # 静默添加所有更改
     subprocess.run(["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
-    # Check working directory changes
+    # 检查工作目录更改
     working_changes = subprocess.run(["git", "diff", "--exit-code"], 
                                     stdout=subprocess.DEVNULL, 
                                     stderr=subprocess.DEVNULL).returncode != 0
     
-    # Check staged changes
+    # 检查暂存区更改
     staged_changes = subprocess.run(["git", "diff", "--cached", "--exit-code"], 
                                    stdout=subprocess.DEVNULL, 
                                    stderr=subprocess.DEVNULL).returncode != 0
     
-    # Reset changes silently
+    # 静默重置更改
     subprocess.run(["git", "reset"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     return working_changes or staged_changes
 def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]:
-    """Get list of commits between two commit hashes
+    """获取两个提交哈希值之间的提交列表
     
-    Args:
-        start_hash: Starting commit hash (exclusive)
-        end_hash: Ending commit hash (inclusive)
+    参数：
+        start_hash: 起始提交哈希值（不包含）
+        end_hash: 结束提交哈希值（包含）
         
-    Returns:
-        List[Tuple[str, str]]: List of (commit_hash, commit_message) tuples
+    返回：
+        List[Tuple[str, str]]: (提交哈希值, 提交信息) 元组列表
     """
     try:
-        # Use git log with pretty format to get hash and message
+        # 使用git log和pretty格式获取哈希值和信息
         result = subprocess.run(
             ['git', 'log', f'{start_hash}..{end_hash}', '--pretty=format:%H|%s'],
             stdout=subprocess.PIPE,
@@ -71,10 +71,10 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
         PrettyOutput.print(f"获取commit历史异常: {str(e)}", OutputType.ERROR)
         return []
 def get_latest_commit_hash() -> str:
-    """Get the latest commit hash of the current git repository
+    """获取当前Git仓库的最新提交哈希值
     
-    Returns:
-        str: The commit hash, or empty string if not in a git repo or error occurs
+    返回：
+        str: 提交哈希值，如果不在Git仓库或发生错误则返回空字符串
     """
     try:
         result = subprocess.run(
@@ -89,30 +89,30 @@ def get_latest_commit_hash() -> str:
     except Exception:
         return ""
 def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
-    """Get modified line ranges from git diff for all changed files.
+    """从Git差异中获取所有更改文件的修改行范围
     
-    Returns:
-        Dictionary mapping file paths to tuple with (start_line, end_line) ranges
-        for modified sections. Line numbers are 1-based.
+    返回：
+        字典，将文件路径映射到包含修改部分的（起始行, 结束行）范围元组。
+        行号从1开始。
     """
-    # Get git diff for all files
+    # 获取所有文件的Git差异
     diff_output = os.popen("git show").read()
     
-    # Parse the diff to get modified files and their line ranges
+    # 解析差异以获取修改的文件及其行范围
     result = {}
     current_file = None
     
     for line in diff_output.splitlines():
-        # Match lines like "+++ b/path/to/file"
+        # 匹配类似"+++ b/path/to/file"的行
         file_match = re.match(r"^\+\+\+ b/(.*)", line)
         if file_match:
             current_file = file_match.group(1)
             continue
             
-        # Match lines like "@@ -100,5 +100,7 @@" where the + part shows new lines
+        # 匹配类似"@@ -100,5 +100,7 @@"的行，其中+部分显示新行
         range_match = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
         if range_match and current_file:
-            start_line = int(range_match.group(1))  # Keep as 1-based
+            start_line = int(range_match.group(1))  # 保持从1开始
             line_count = int(range_match.group(2)) if range_match.group(2) else 1
             end_line = start_line + line_count - 1
             result[current_file] = (start_line, end_line)

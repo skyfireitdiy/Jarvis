@@ -1,11 +1,11 @@
 """
-Input Handling Module
-This module provides utilities for handling user input in the Jarvis system.
-It includes:
-- Single line input with history support
-- Multi-line input with enhanced completion
-- File path completion with fuzzy matching
-- Custom key bindings for input control
+输入处理模块
+该模块提供了处理Jarvis系统中用户输入的实用工具。
+包含：
+- 支持历史记录的单行输入
+- 增强补全功能的多行输入
+- 带有模糊匹配的文件路径补全
+- 用于输入控制的自定义键绑定
 """
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
@@ -18,13 +18,13 @@ from colorama import Fore, Style as ColoramaStyle
 from ..jarvis_utils.output import PrettyOutput, OutputType
 def get_single_line_input(tip: str) -> str:
     """
-    Get single line input with history support.
+    获取支持历史记录的单行输入。
     
-    Args:
-        tip: The prompt message to display
+    参数：
+        tip: 要显示的提示信息
         
-    Returns:
-        str: The user's input
+    返回：
+        str: 用户的输入
     """
     session = PromptSession(history=None)
     style = PromptStyle.from_dict({
@@ -33,49 +33,49 @@ def get_single_line_input(tip: str) -> str:
     return session.prompt(f"{tip}", style=style)
 class FileCompleter(Completer):
     """
-    Custom completer for file paths with fuzzy matching.
+    带有模糊匹配的文件路径自定义补全器。
     
-    Attributes:
-        path_completer: Base path completer
-        max_suggestions: Maximum number of suggestions to show
-        min_score: Minimum matching score for suggestions
+    属性：
+        path_completer: 基础路径补全器
+        max_suggestions: 显示的最大建议数量
+        min_score: 建议的最小匹配分数
     """
     def __init__(self):
-        """Initialize the file completer with default settings."""
+        """使用默认设置初始化文件补全器。"""
         self.path_completer = PathCompleter()
         self.max_suggestions = 10
         self.min_score = 10
     def get_completions(self, document: Document, complete_event) -> Completion: # type: ignore
         """
-        Generate completions for file paths with fuzzy matching.
+        生成带有模糊匹配的文件路径补全建议。
         
-        Args:
-            document: The current document being edited
-            complete_event: The completion event
+        参数：
+            document: 当前正在编辑的文档
+            complete_event: 补全事件
             
-        Yields:
-            Completion: Suggested completions
+        生成：
+            Completion: 建议的补全项
         """
         text = document.text_before_cursor
         cursor_pos = document.cursor_position
-        # Find all @ positions in text
+        # 查找文本中的所有@位置
         at_positions = [i for i, char in enumerate(text) if char == '@']
         if not at_positions:
             return
-        # Get the last @ position
+        # 获取最后一个@位置
         current_at_pos = at_positions[-1]
-        # If cursor is not after the last @, don't complete
+        # 如果光标不在最后一个@之后，则不补全
         if cursor_pos <= current_at_pos:
             return
-        # Check if there's a space after @
+        # 检查@之后是否有空格
         text_after_at = text[current_at_pos + 1:cursor_pos]
         if ' ' in text_after_at:
             return
-        # Get the text after the current @
+        # 获取当前@之后的文本
         file_path = text_after_at.strip()
-        # Calculate replacement length
+        # 计算替换长度
         replace_length = len(text_after_at) + 1
-        # Get all possible files using git ls-files
+        # 使用git ls-files获取所有可能的文件
         all_files = []
         try:
             import subprocess
@@ -87,7 +87,7 @@ class FileCompleter(Completer):
                 all_files = [line.strip() for line in result.stdout.splitlines() if line.strip()]
         except Exception:
             pass
-        # Generate completions
+        # 生成补全建议
         if not file_path:
             scored_files = [(path, 100) for path in all_files[:self.max_suggestions]]
         else:
@@ -95,7 +95,7 @@ class FileCompleter(Completer):
             scored_files = [(m[0], m[1]) for m in scored_files_data]
             scored_files.sort(key=lambda x: x[1], reverse=True)
             scored_files = scored_files[:self.max_suggestions]
-        # Yield completions
+        # 生成补全项
         for path, score in scored_files:
             if not file_path or score > self.min_score:
                 display_text = path
@@ -109,31 +109,31 @@ class FileCompleter(Completer):
                 ) # type: ignore
 def get_multiline_input(tip: str) -> str:
     """
-    Get multi-line input with enhanced completion and confirmation.
+    获取带有增强补全和确认功能的多行输入。
     
-    Args:
-        tip: The prompt message to display
+    参数：
+        tip: 要显示的提示信息
         
-    Returns:
-        str: The user's input, or empty string if canceled
+    返回：
+        str: 用户的输入，如果取消则返回空字符串
     """
-    # Display input instructions
+    # 显示输入说明
     PrettyOutput.section("用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交，按 Ctrl+C 取消输入", OutputType.USER)
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
-    # Configure key bindings
+    # 配置键绑定
     bindings = KeyBindings()
     @bindings.add('enter')
     def _(event):
-        """Handle enter key for completion or new line."""
+        """处理回车键以进行补全或换行。"""
         if event.current_buffer.complete_state:
             event.current_buffer.apply_completion(event.current_buffer.complete_state.current_completion)
         else:
             event.current_buffer.insert_text('\n')
     @bindings.add('c-j')
     def _(event):
-        """Handle Ctrl+J for submission."""
+        """处理Ctrl+J以提交输入。"""
         event.current_buffer.validate_and_handle()
-    # Configure prompt session
+    # 配置提示会话
     style = PromptStyle.from_dict({
         'prompt': 'ansicyan',
     })
@@ -150,7 +150,7 @@ def get_multiline_input(tip: str) -> str:
         prompt = FormattedText([
             ('class:prompt', '>>> ')
         ])
-        # Get input
+        # 获取输入
         text = session.prompt(
             prompt,
             style=style,

@@ -1,11 +1,11 @@
 """
-Output Formatting Module
-This module provides rich text formatting and display utilities for the Jarvis system.
-It includes:
-- OutputType enum for categorizing different types of output
-- PrettyOutput class for formatting and displaying styled output
-- Syntax highlighting support for various programming languages
-- Panel-based display for structured output
+输出格式化模块
+该模块为Jarvis系统提供了丰富的文本格式化和显示工具。
+包含：
+- 用于分类不同输出类型的OutputType枚举
+- 用于格式化和显示样式化输出的PrettyOutput类
+- 多种编程语言的语法高亮支持
+- 结构化输出的面板显示
 """
 from enum import Enum
 from datetime import datetime
@@ -20,21 +20,21 @@ from pygments.util import ClassNotFound
 from .globals import console, get_agent_list
 class OutputType(Enum):
     """
-    Enumeration of output types for categorizing and styling different types of messages.
+    输出类型枚举，用于分类和样式化不同类型的消息。
     
-    Attributes:
-        SYSTEM: AI assistant message
-        CODE: Code related output
-        RESULT: Tool execution result
-        ERROR: Error information
-        INFO: System prompt
-        PLANNING: Task planning
-        PROGRESS: Execution progress
-        SUCCESS: Success information
-        WARNING: Warning information
-        DEBUG: Debug information
-        USER: User input
-        TOOL: Tool call
+    属性：
+        SYSTEM: AI助手消息
+        CODE: 代码相关输出
+        RESULT: 工具执行结果
+        ERROR: 错误信息
+        INFO: 系统提示
+        PLANNING: 任务规划
+        PROGRESS: 执行进度
+        SUCCESS: 成功信息
+        WARNING: 警告信息
+        DEBUG: 调试信息
+        USER: 用户输入
+        TOOL: 工具调用
     """
     SYSTEM = "SYSTEM"
     CODE = "CODE"
@@ -50,15 +50,15 @@ class OutputType(Enum):
     TOOL = "TOOL"
 class PrettyOutput:
     """
-    Class for formatting and displaying rich text output using the rich library.
+    使用rich库格式化和显示富文本输出的类。
     
-    Provides methods for:
-    - Formatting different types of output with appropriate styling
-    - Syntax highlighting for code blocks
-    - Panel-based display for structured content
-    - Stream output for progressive display
+    提供以下方法：
+    - 使用适当的样式格式化不同类型的输出
+    - 代码块的语法高亮
+    - 结构化内容的面板显示
+    - 渐进显示的流式输出
     """
-    # Icons for different output types
+    # 不同输出类型的图标
     _ICONS = {
         OutputType.SYSTEM: "🤖",
         OutputType.CODE: "📝",
@@ -73,7 +73,7 @@ class PrettyOutput:
         OutputType.USER: "👤",
         OutputType.TOOL: "🔧",
     }
-    # Language mapping for syntax highlighting
+    # 语法高亮的语言映射
     _lang_map = {
         'Python': 'python',
         'JavaScript': 'javascript',
@@ -109,14 +109,14 @@ class PrettyOutput:
     @staticmethod
     def _detect_language(text: str, default_lang: str = 'markdown') -> str:
         """
-        Detect the programming language of the given text.
+        检测给定文本的编程语言。
         
-        Args:
-            text: The text to analyze
-            default_lang: Default language if detection fails
+        参数：
+            text: 要分析的文本
+            default_lang: 如果检测失败，默认返回的语言
             
-        Returns:
-            str: Detected language name
+        返回：
+            str: 检测到的语言名称
         """
         try:
             lexer = guess_lexer(text)
@@ -127,14 +127,14 @@ class PrettyOutput:
     @staticmethod
     def _format(output_type: OutputType, timestamp: bool = True) -> Text:
         """
-        Format the output header with timestamp and icon.
+        使用时间戳和图标格式化输出头。
         
-        Args:
-            output_type: Type of output
-            timestamp: Whether to include timestamp
+        参数：
+            output_type: 输出类型
+            timestamp: 是否包含时间戳
             
-        Returns:
-            Text: Formatted rich Text object
+        返回：
+            Text: 格式化后的rich Text对象
         """
         formatted = Text()
         if timestamp:
@@ -148,14 +148,14 @@ class PrettyOutput:
     @staticmethod
     def print(text: str, output_type: OutputType, timestamp: bool = True, lang: Optional[str] = None, traceback: bool = False):
         """
-        Print formatted output with styling and syntax highlighting.
+        使用样式和语法高亮打印格式化输出。
         
-        Args:
-            text: The text content to print
-            output_type: The type of output (affects styling)
-            timestamp: Whether to show timestamp
-            lang: Language for syntax highlighting
-            traceback: Whether to show traceback for errors
+        参数：
+            text: 要打印的文本内容
+            output_type: 输出类型（影响样式）
+            timestamp: 是否显示时间戳
+            lang: 语法高亮的语言
+            traceback: 是否显示错误的回溯信息
         """
         styles = {
             OutputType.SYSTEM: RichStyle(color="bright_cyan", bgcolor="#1a1a1a", frame=True, meta={"icon": "🤖"}),
@@ -191,11 +191,11 @@ class PrettyOutput:
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):
         """
-        Print a section title in a styled panel.
+        在样式化面板中打印章节标题。
         
-        Args:
-            title: The section title text
-            output_type: The type of output (affects styling)
+        参数：
+            title: 章节标题文本
+            output_type: 输出类型（影响样式）
         """
         panel = Panel(
             Text(title, style=output_type.value, justify="center"),
@@ -207,17 +207,17 @@ class PrettyOutput:
     @staticmethod
     def print_stream(text: str):
         """
-        Print stream output without line break.
+        打印流式输出，不带换行符。
         
-        Args:
-            text: The text to print
+        参数：
+            text: 要打印的文本
         """
         style = PrettyOutput._get_style(OutputType.SYSTEM)
         console.print(text, style=style, end="")
     @staticmethod
     def print_stream_end():
         """
-        End stream output with line break.
+        结束流式输出，带换行符。
         """
         end_style = PrettyOutput._get_style(OutputType.SUCCESS)
         console.print("\n", style=end_style)
@@ -225,12 +225,12 @@ class PrettyOutput:
     @staticmethod
     def _get_style(output_type: OutputType) -> RichStyle:
         """
-        Get pre-defined RichStyle for output type.
+        获取预定义的RichStyle用于输出类型。
         
-        Args:
-            output_type: The output type to get style for
+        参数：
+            output_type: 要获取样式的输出类型
             
-        Returns:
-            RichStyle: The corresponding style
+        返回：
+            RichStyle: 对应的样式
         """
         return console.get_style(output_type.value)

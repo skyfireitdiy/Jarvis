@@ -130,7 +130,7 @@ def init_gpu_config() -> Dict:
 
 
 def is_long_context(files: list) -> bool:
-    """Check if the file list belongs to a long context (total characters exceed 80% of the maximum context length)"""
+    """检查文件列表是否属于长上下文（总字符数超过最大上下文长度的80%）"""
     max_token_count = get_max_token_count()
     threshold = max_token_count * 0.8
     total_tokens = 0

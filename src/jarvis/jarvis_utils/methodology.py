@@ -1,11 +1,11 @@
 """
-Methodology Management Module
-This module provides utilities for loading and searching methodologies.
-It includes functions for:
-- Creating methodology embeddings
-- Loading and processing methodology data
-- Building and searching methodology index
-- Generating methodology prompts
+方法论管理模块
+该模块提供了加载和搜索方法论的实用工具。
+包含以下功能：
+- 创建方法论嵌入向量
+- 加载和处理方法论数据
+- 构建和搜索方法论索引
+- 生成方法论提示
 """
 import os
 import yaml
@@ -17,17 +17,17 @@ from jarvis.jarvis_utils.embedding import load_embedding_model
 from jarvis.jarvis_utils.config import dont_use_local_model
 def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -> np.ndarray:
     """
-    Create embedding vector for methodology text.
+    为方法论文本创建嵌入向量。
     
-    Args:
-        embedding_model: The embedding model to use
-        methodology_text: The text to create embedding for
+    参数：
+        embedding_model: 使用的嵌入模型
+        methodology_text: 要创建嵌入的文本
         
-    Returns:
-        np.ndarray: The embedding vector
+    返回：
+        np.ndarray: 嵌入向量
     """
     try:
-        # Truncate long text
+        # 截断长文本
         max_length = 512
         text = ' '.join(methodology_text.split()[:max_length])
         
@@ -36,7 +36,7 @@ def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -
                                           convert_to_tensor=True,
                                           normalize_embeddings=True)
         vector = np.array(embedding.cpu().numpy(), dtype=np.float32)
-        return vector[0]  # Return first vector, because we only encoded one text
+        return vector[0]  # 返回第一个向量，因为我们只编码了一个文本
     except Exception as e:
         PrettyOutput.print(f"创建方法论嵌入向量失败: {str(e)}", OutputType.ERROR)
         return np.zeros(1536, dtype=np.float32)
@@ -44,10 +44,10 @@ def make_methodology_prompt(data: Dict[str, str]) -> str:
     """
     从方法论数据生成格式化提示
     
-    Args:
+    参数：
         data: 方法论数据字典
         
-    Returns:
+    返回：
         str: 格式化后的提示字符串
     """
     ret = """这是处理以往问题的标准方法论，如果当前任务类似，可以参考使用，如果不相关，请忽略：\n""" 
@@ -57,13 +57,13 @@ def make_methodology_prompt(data: Dict[str, str]) -> str:
 
 def load_methodology(user_input: str) -> str:
     """
-    Load methodology and build vector index for similarity search.
+    加载方法论并构建向量索引以进行相似性搜索。
     
-    Args:
-        user_input: The input text to search methodologies for
+    参数：
+        user_input: 要搜索方法论的输入文本
         
-    Returns:
-        str: Relevant methodology prompt or empty string if no methodology found
+    返回：
+        str: 相关的方法论提示，如果未找到方法论则返回空字符串
     """
     from yaspin import yaspin
     user_jarvis_methodology = os.path.expanduser("~/.jarvis/methodology")

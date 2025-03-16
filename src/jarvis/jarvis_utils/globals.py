@@ -1,24 +1,24 @@
 """
-Global Variables and Configuration Module
-This module manages global state and configurations for the Jarvis system.
-It includes:
-- Global agent management
-- Console configuration with custom theme
-- Environment initialization
+全局变量和配置模块
+该模块管理Jarvis系统的全局状态和配置。
+包含：
+- 全局代理管理
+- 带有自定义主题的控制台配置
+- 环境初始化
 """
 from typing import Any, Set
 import colorama
 import os
 from rich.console import Console
 from rich.theme import Theme
-# Initialize colorama for cross-platform colored text
+# 初始化colorama以支持跨平台的彩色文本
 colorama.init()
-# Disable tokenizers parallelism to avoid issues with multiprocessing
+# 禁用tokenizers并行以避免多进程问题
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-# Global agent management
+# 全局代理管理
 global_agents: Set[str] = set()
 current_agent_name: str = ""
-# Configure rich console with custom theme
+# 使用自定义主题配置rich控制台
 custom_theme = Theme({
     "INFO": "yellow",
     "WARNING": "yellow",
@@ -36,13 +36,13 @@ custom_theme = Theme({
 console = Console(theme=custom_theme)
 def make_agent_name(agent_name: str) -> str:
     """
-    Generate a unique agent name by appending a suffix if necessary.
+    通过附加后缀生成唯一的代理名称（如果必要）。
     
-    Args:
-        agent_name: The base agent name
+    参数：
+        agent_name: 基础代理名称
         
-    Returns:
-        str: Unique agent name
+    返回：
+        str: 唯一的代理名称
     """
     if agent_name in global_agents:
         i = 1
@@ -52,29 +52,29 @@ def make_agent_name(agent_name: str) -> str:
     return agent_name
 def set_agent(agent_name: str, agent: Any) -> None:
     """
-    Set the current agent and add it to the global agents set.
+    设置当前代理并将其添加到全局代理集合中。
     
-    Args:
-        agent_name: The name of the agent
-        agent: The agent object
+    参数：
+        agent_name: 代理名称
+        agent: 代理对象
     """
     global_agents.add(agent_name)
     global current_agent_name
     current_agent_name = agent_name
 def get_agent_list() -> str:
     """
-    Get a formatted string representing the current agent status.
+    获取表示当前代理状态的格式化字符串。
     
-    Returns:
-        str: Formatted string with agent count and current agent name
+    返回：
+        str: 包含代理数量和当前代理名称的格式化字符串
     """
     return "[" + str(len(global_agents)) + "]" + current_agent_name if global_agents else ""
 def delete_agent(agent_name: str) -> None:
     """
-    Delete an agent from the global agents set.
+    从全局代理集合中删除一个代理。
     
-    Args:
-        agent_name: The name of the agent to delete
+    参数：
+        agent_name: 要删除的代理名称
     """
     if agent_name in global_agents:
         global_agents.remove(agent_name)
