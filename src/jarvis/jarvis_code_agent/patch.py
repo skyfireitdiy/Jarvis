@@ -196,10 +196,11 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 open(filepath, 'w', encoding='utf-8').close()
                 spinner.write("✅ 文件创建完成")
-            old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
-            if not old_file_content["success"]:
-                spinner.write("❌ 文件读取失败")
-                return False
+            with spinner.hidden():
+                old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
+                if not old_file_content["success"]:
+                    spinner.write("❌ 文件读取失败")
+                    return False
             
             prompt = f"""
     你是一个代码审查员，请审查以下代码并将其与上下文合并。
