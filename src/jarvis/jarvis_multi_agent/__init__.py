@@ -148,7 +148,7 @@ def main():
     """
     import argparse
     parser = argparse.ArgumentParser(description="多智能体系统启动器")
-    parser.add_argument("config", help="YAML配置文件路径")
+    parser.add_argument("--config", "-c", required=True, help="YAML配置文件路径")
     parser.add_argument("--input", "-i", help="用户输入（可选）")
     args = parser.parse_args()
         
