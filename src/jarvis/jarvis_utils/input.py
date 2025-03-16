@@ -71,6 +71,22 @@ class FileCompleter(Completer):
         text_after_at = text[current_at_pos + 1:cursor_pos]
         if ' ' in text_after_at:
             return
+        # 添加默认建议
+        if not text_after_at.strip():
+            # 默认建议列表
+            default_suggestions = [
+                ('CodeBase', '查询代码库'),
+                ('Web', '网页搜索'),
+                ('RAG', '知识库检索')
+            ]
+            for name, desc in default_suggestions:
+                yield Completion(
+                    text=f"'{name}'",
+                    start_position=-1,
+                    display=name,
+                    display_meta=desc
+                ) # type: ignore
+            return
         # 获取当前@之后的文本
         file_path = text_after_at.strip()
         # 计算替换长度
