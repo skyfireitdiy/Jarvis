@@ -63,6 +63,8 @@ setup(
             "jgc=jarvis.jarvis_tools.git_commiter:main",
             "jarvis-dev=jarvis.jarvis_dev.main:main",
             "jarvis-git-squash=jarvis.jarvis_git_squash.main:main",
+            "jarvis-multi-agent=jarvis.jarvis_multi_agent:main",
+            "jarvis-agent=jarvis.jarvis_agent.main:main",
         ],
     },
     python_requires=">=3.8",
