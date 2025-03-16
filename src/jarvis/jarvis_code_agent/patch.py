@@ -293,7 +293,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
 
             # 解析生成的替换块
             replace_blocks = re.findall(
-                r'<REPLACE>\n(\d+),(\d+)\n([\s\S]*?)\n</REPLACE>',
+                r'<REPLACE>\n(\d+),(\d+)\n?([\s\S]*?)\n?</REPLACE>',  # 允许行号后直接接结束标签
                 response,
                 re.MULTILINE
             )
