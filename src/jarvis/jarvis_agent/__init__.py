@@ -49,7 +49,8 @@ class Agent:
                  record_methodology: Optional[bool] = None,
                  need_summary: Optional[bool] = None,
                  max_context_length: Optional[int] = None,
-                 execute_tool_confirm: Optional[bool] = None):
+                 execute_tool_confirm: Optional[bool] = None,
+                 multiline_inputer: Optional[Callable[[str], str]] = None):
         self.name = make_agent_name(name)
         self.description = description
         # 初始化平台和模型
@@ -70,6 +71,7 @@ class Agent:
         self.model.set_suppress_output(False)
 
         self.output_handler = output_handler if output_handler else [ToolRegistry()]
+        self.multiline_inputer = multiline_inputer if multiline_inputer else get_multiline_input
         
         self.record_methodology = record_methodology if record_methodology is not None else is_record_methodology()
         self.use_methodology = use_methodology if use_methodology is not None else is_use_methodology()
@@ -338,7 +340,7 @@ class Agent:
                         return self._complete_task()
                     
                     # 获取用户输入
-                    user_input = get_multiline_input(f"{self.name}: 请输入，或输入空行来结束当前任务：")
+                    user_input = self.multiline_inputer(f"{self.name}: 请输入，或输入空行来结束当前任务：")
 
                     if user_input:
                         self.prompt = user_input
