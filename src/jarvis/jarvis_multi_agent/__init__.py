@@ -148,9 +148,9 @@ content: |
             
             self.agents[agent_config.name] = agent
 
-    def run(self, user_input: str, file_list: Optional[List[str]] = None) -> str:
+    def run(self, user_input: str) -> str:
         last_agent = self.main_agent_name
-        msg = self.agents[self.main_agent_name].run(user_input, file_list)
+        msg = self.agents[self.main_agent_name].run(user_input)
         while msg:
             if isinstance(msg, str):
                 return msg
@@ -169,13 +169,12 @@ content: {msg['content']}
                 msg = self.agents[msg['to']].run(prompt)
         return ""
 
-def main(config_file: str, user_input: str, file_list: Optional[List[str]] = None) -> str:
+def main(config_file: str, user_input: str) -> str:
     """从YAML配置文件初始化并运行多智能体系统
     
     Args:
         config_file: YAML配置文件路径
         user_input: 用户输入
-        file_list: 可选文件列表
         
     Returns:
         最终处理结果
@@ -213,7 +212,7 @@ def main(config_file: str, user_input: str, file_list: Optional[List[str]] = Non
             
         # 创建并运行多智能体系统
         multi_agent = MultiAgent(agent_configs, main_agent_name)
-        return multi_agent.run(user_input, file_list)
+        return multi_agent.run(user_input)
         
     except yaml.YAMLError as e:
         raise ValueError(f"YAML配置文件解析错误: {str(e)}")
@@ -226,8 +225,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="多智能体系统启动器")
     parser.add_argument("config", help="YAML配置文件路径")
     parser.add_argument("input", help="用户输入")
-    parser.add_argument("--files", nargs="*", help="可选文件列表")
     args = parser.parse_args()
     
-    result = main(args.config, args.input, args.files)
+    result = main(args.config, args.input)
     print(result)

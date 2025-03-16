@@ -1,0 +1,10 @@
+main_agent: Agent1
+agents:
+  - name: Agent1
+    system_prompt: "你是一个智能助手"
+    model_name: gpt-4
+    platform: openai
+  
+  - name: Agent2
+    description: "专门处理数据分析"
+    is_sub_agent: true
