@@ -8,24 +8,9 @@ from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
-class AgentConfig:
-    def __init__(self, **config):
-        self.system_prompt = config.get('system_prompt', '')
-        self.name = config.get('name', 'Jarvis')
-        self.description = config.get('description', '')
-        self.is_sub_agent = config.get('is_sub_agent', False)
-        self.output_handler = config.get('output_handler', [])
-        self.platform = config.get('platform')
-        self.model_name = config.get('model_name')
-        self.summary_prompt = config.get('summary_prompt')
-        self.auto_complete = config.get('auto_complete', False)
-        self.input_handler = config.get('input_handler')
-        self.max_context_length = config.get('max_context_length')
-        self.execute_tool_confirm = config.get('execute_tool_confirm')
-
 class MultiAgent(OutputHandler):
-    def __init__(self, configs: List[AgentConfig], main_agent_name: str):
-        self.agents_config = configs
+    def __init__(self, agents_config: List[Dict], main_agent_name: str):
+        self.agents_config = agents_config
         self.agents = {}
         self.init_agents()
         self.main_agent_name = main_agent_name
@@ -76,7 +61,7 @@ content: |
    - 根据响应继续任务
 
 # 👥 可用智能体
-{chr(10).join([f"- {c.name}: {c.description}" for c in self.agents_config])}
+{chr(10).join([f"- {c['name']}: {c.get('description', '')}" for c in self.agents_config])}
 
 # ❗ 重要规则
 1. 每轮只能执行一个操作
@@ -128,25 +113,9 @@ content: |
         return ret
 
     def init_agents(self):
-        for agent_config in self.agents_config:
-            agent = Agent(system_prompt=agent_config.system_prompt,
-                          name=agent_config.name,
-                          description=agent_config.description,
-                          model_name=agent_config.model_name,
-                          platform=agent_config.platform,
-                          max_context_length=agent_config.max_context_length,
-                          execute_tool_confirm=agent_config.execute_tool_confirm,
-                          input_handler=agent_config.input_handler,
-                          use_methodology=False,
-                          record_methodology=False,
-                          need_summary=False,
-                          auto_complete=agent_config.auto_complete,
-                          summary_prompt=agent_config.summary_prompt,
-                          is_sub_agent=agent_config.is_sub_agent,
-                          output_handler=[*agent_config.output_handler, self],
-                          )
-            
-            self.agents[agent_config.name] = agent
+        for config in self.agents_config:
+            agent = Agent(**config)
+            self.agents[config['name']] = agent
 
     def run(self, user_input: str) -> str:
         last_agent = self.main_agent_name
@@ -183,35 +152,15 @@ def main(config_file: str, user_input: str) -> str:
         with open(config_file, 'r') as f:
             config_data = yaml.safe_load(f)
             
-        # 解析配置并创建AgentConfig列表
-        agent_configs = []
-        main_agent_name = config_data.get('main_agent', '')
+        # 获取agents配置
+        agents_config = config_data.get('agents', [])
         
-        for agent_config in config_data.get('agents', []):
-            # 使用默认值填充缺失的配置项
-            default_config = {
-                'system_prompt': '',
-                'name': 'Jarvis',
-                'description': '',
-                'is_sub_agent': False,
-                'output_handler': [],
-                'model_name': None,
-                'platform': None,
-                'summary_prompt': None,
-                'auto_complete': False,
-                'input_handler': None,
-                'max_context_length': None,
-                'execute_tool_confirm': None
-            }
-            # 更新默认配置
-            default_config.update(agent_config)
-            agent_configs.append(AgentConfig(**default_config))
-            
+        main_agent_name = config_data.get('main_agent', '')
         if not main_agent_name:
             raise ValueError("必须指定main_agent作为主智能体")
             
         # 创建并运行多智能体系统
-        multi_agent = MultiAgent(agent_configs, main_agent_name)
+        multi_agent = MultiAgent(agents_config, main_agent_name)
         return multi_agent.run(user_input)
         
     except yaml.YAMLError as e:
@@ -229,3 +178,4 @@ if __name__ == "__main__":
     
     result = main(args.config, args.input)
     print(result)
+

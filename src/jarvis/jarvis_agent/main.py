@@ -31,30 +31,6 @@ def load_config(config_path: str) -> dict:
             PrettyOutput.print(f"配置文件解析失败: {str(e)}", OutputType.ERROR)
             return {}
 
-def create_agent_from_config(config: dict) -> Agent:
-    """Create Agent instance from configuration dictionary
-    
-    Args:
-        config: Configuration dictionary
-        
-    Returns:
-        Agent: Initialized Agent instance
-    """
-    return Agent(
-        system_prompt=config.get('system_prompt', origin_agent_system_prompt),
-        name=config.get('name', "Jarvis"),
-        description=config.get('description', ""),
-        platform=config.get('platform'),
-        model_name=config.get('model'),
-        summary_prompt=config.get('summary_prompt'),
-        auto_complete=config.get('auto_complete'),
-        use_methodology=config.get('use_methodology'),
-        record_methodology=config.get('record_methodology'),
-        need_summary=config.get('need_summary'),
-        max_context_length=config.get('max_context_length'),
-        execute_tool_confirm=config.get('execute_tool_confirm')
-    )
-
 def main():
     """Main entry point for Jarvis agent"""
     # Initialize environment
@@ -64,22 +40,21 @@ def main():
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
     parser.add_argument('-c', '--config', type=str, required=True, 
                         help='Path to the YAML configuration file')
-    parser.add_argument('-f', '--files', nargs='*', 
-                        help='List of files to process')
+    parser.add_argument('-t', '--task', type=str,
+                        help='Initial task to execute')
     args = parser.parse_args()
     
     # Load configuration
     config = load_config(args.config)
     
-    # Create agent from configuration
+    # Create and run agent
     try:
-        agent = create_agent_from_config(config)
+        agent = Agent(**config)
         
         # Run agent with initial task if specified
-        initial_task = config.get('initial_task')
-        if initial_task:
-            PrettyOutput.print(f"执行初始任务: {initial_task}", OutputType.INFO)
-            agent.run(initial_task, args.files)
+        if args.task:
+            PrettyOutput.print(f"执行初始任务: {args.task}", OutputType.INFO)
+            agent.run(args.task)
             return 0
         
         # Enter interactive mode if no initial task
@@ -88,7 +63,7 @@ def main():
                 user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
                 if not user_input:
                     break
-                agent.run(user_input, args.files)
+                agent.run(user_input)
             except Exception as e:
                 PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
                 
