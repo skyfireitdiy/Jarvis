@@ -3,6 +3,7 @@ import yaml
 import os
 from typing import Optional, List
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.utils import init_env
 
