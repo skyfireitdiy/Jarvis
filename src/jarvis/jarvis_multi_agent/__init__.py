@@ -138,28 +138,20 @@ content: {msg['content']}
                 msg = self.agents[msg['to']].run(prompt)
         return ""
 
-def main(config_file: str = None, user_input: str = None) -> str:
+def main() -> str:
     """从YAML配置文件初始化并运行多智能体系统
     
-    Args:
-        config_file: YAML配置文件路径
-        user_input: 用户输入
-        
     Returns:
         最终处理结果
     """
-    # 如果参数未提供，则从命令行解析
-    if config_file is None or user_input is None:
-        import argparse
-        parser = argparse.ArgumentParser(description="多智能体系统启动器")
-        parser.add_argument("config", help="YAML配置文件路径")
-        parser.add_argument("input", help="用户输入")
-        args = parser.parse_args()
-        config_file = args.config
-        user_input = args.input
+    import argparse
+    parser = argparse.ArgumentParser(description="多智能体系统启动器")
+    parser.add_argument("config", help="YAML配置文件路径")
+    parser.add_argument("input", help="用户输入")
+    args = parser.parse_args()
         
     try:
-        with open(config_file, 'r') as f:
+        with open(args.config, 'r') as f:
             config_data = yaml.safe_load(f)
             
         # 获取agents配置
@@ -171,7 +163,7 @@ def main(config_file: str = None, user_input: str = None) -> str:
             
         # 创建并运行多智能体系统
         multi_agent = MultiAgent(agents_config, main_agent_name)
-        return multi_agent.run(user_input)
+        return multi_agent.run(args.input)
         
     except yaml.YAMLError as e:
         raise ValueError(f"YAML配置文件解析错误: {str(e)}")
