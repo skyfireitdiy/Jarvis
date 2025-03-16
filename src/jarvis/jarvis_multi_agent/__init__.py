@@ -138,6 +138,21 @@ content: {msg['content']}
                 msg = self.agents[msg['to']].run(prompt)
         return ""
 
+def get_multiline_input() -> str:
+    """获取多行用户输入
+    
+    Returns:
+        用户输入的内容
+    """
+    print("请输入内容（输入空行结束）：")
+    lines = []
+    while True:
+        line = input()
+        if line == "":
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
 def main() -> str:
     """从YAML配置文件初始化并运行多智能体系统
     
@@ -147,7 +162,7 @@ def main() -> str:
     import argparse
     parser = argparse.ArgumentParser(description="多智能体系统启动器")
     parser.add_argument("config", help="YAML配置文件路径")
-    parser.add_argument("input", help="用户输入")
+    parser.add_argument("input", nargs="?", help="用户输入（可选）")
     args = parser.parse_args()
         
     try:
@@ -163,7 +178,8 @@ def main() -> str:
             
         # 创建并运行多智能体系统
         multi_agent = MultiAgent(agents_config, main_agent_name)
-        return multi_agent.run(args.input)
+        user_input = args.input if args.input is not None else get_multiline_input()
+        return multi_agent.run(user_input)
         
     except yaml.YAMLError as e:
         raise ValueError(f"YAML配置文件解析错误: {str(e)}")
