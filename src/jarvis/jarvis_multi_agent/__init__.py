@@ -138,7 +138,7 @@ content: {msg['content']}
                 msg = self.agents[msg['to']].run(prompt)
         return ""
 
-def main(config_file: str, user_input: str) -> str:
+def main(config_file: str = None, user_input: str = None) -> str:
     """从YAML配置文件初始化并运行多智能体系统
     
     Args:
@@ -148,6 +148,16 @@ def main(config_file: str, user_input: str) -> str:
     Returns:
         最终处理结果
     """
+    # 如果参数未提供，则从命令行解析
+    if config_file is None or user_input is None:
+        import argparse
+        parser = argparse.ArgumentParser(description="多智能体系统启动器")
+        parser.add_argument("config", help="YAML配置文件路径")
+        parser.add_argument("input", help="用户输入")
+        args = parser.parse_args()
+        config_file = args.config
+        user_input = args.input
+        
     try:
         with open(config_file, 'r') as f:
             config_data = yaml.safe_load(f)
@@ -170,12 +180,5 @@ def main(config_file: str, user_input: str) -> str:
 
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="多智能体系统启动器")
-    parser.add_argument("config", help="YAML配置文件路径")
-    parser.add_argument("input", help="用户输入")
-    args = parser.parse_args()
-    
-    result = main(args.config, args.input)
+    result = main()
     print(result)
-
