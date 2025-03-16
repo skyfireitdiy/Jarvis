@@ -6,6 +6,9 @@ from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.utils import init_env
 
+# 从__init__.py导入系统提示
+from jarvis.jarvis_agent import origin_agent_system_prompt
+
 def load_config(config_path: str) -> dict:
     """Load configuration from YAML file
     
