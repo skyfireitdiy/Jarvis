@@ -6,7 +6,7 @@ from typing import Any, Tuple
 from yaspin import yaspin
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_code_agent.input_handler import file_input_handler
+from jarvis.jarvis_code_agent.file_input_handler import file_input_handler
 from jarvis.jarvis_code_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_code_agent.patch import PatchOutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
