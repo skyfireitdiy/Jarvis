@@ -289,23 +289,17 @@ class Agent:
         return "任务完成"
 
 
-    def run(self, user_input: str, file_list: Optional[List[str]] = None) -> Any:
+    def run(self, user_input: str) -> Any:
         """Process user input and execute the task.
         
         Args:
             user_input: My task description or request
-            file_list: Optional list of files to process
             
         Returns:
             str|Dict: Task summary report or message to send
         """
         try:
             set_agent(self.name, self)
-            with yaspin(text="准备环境...", color="cyan") as spinner:
-                if file_list:
-                    self.model.upload_files(file_list) # type: ignore
-                    spinner.text = "环境准备完成"
-                    spinner.ok("✅")
             
             self.prompt = f"{user_input}"
 
@@ -553,7 +547,6 @@ def main():
     # Add argument parser
     init_env()
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
-    parser.add_argument('-f', '--files', nargs='*', help='List of files to process')
     parser.add_argument('-p', '--platform', type=str, help='Platform to use')
     parser.add_argument('-m', '--model', type=str, help='Model to use')
     args = parser.parse_args()
@@ -568,7 +561,7 @@ def main():
             selected_task = _select_task(tasks)
             if selected_task:
                 PrettyOutput.print(f"执行任务: {selected_task}", OutputType.INFO)
-                agent.run(selected_task, args.files)
+                agent.run(selected_task)
                 return 0
         
         # 如果没有选择预定义任务，进入交互模式
@@ -577,7 +570,7 @@ def main():
                 user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
                 if not user_input:
                     break
-                agent.run(user_input, args.files)
+                agent.run(user_input)
             except Exception as e:
                 PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
