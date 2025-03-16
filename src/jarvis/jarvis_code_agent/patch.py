@@ -185,238 +185,93 @@ def handle_commit_workflow()->bool:
     commit_result = git_commiter.execute({})
     return commit_result["success"]
 
+
 def handle_code_operation(filepath: str, patch_content: str) -> bool:
-    """智能代码替换流程（结合大模型生成精确替换块）"""
-    with yaspin(text=f"正在处理 {filepath}...", color="cyan") as spinner:
+    """处理基于上下文的代码片段"""
+    with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
         try:
-            # 读取原始文件内容
             if not os.path.exists(filepath):
+                # 新建文件
+                spinner.text = "文件不存在，正在创建文件..."
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 open(filepath, 'w', encoding='utf-8').close()
-            original_content = ReadCodeTool().execute({"files": [{"path": filepath}]})["stdout"]
-            # 构建模型提示（新增示例部分）
+                spinner.write("✅ 文件创建完成")
+            old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
+            if not old_file_content["success"]:
+                spinner.write("❌ 文件读取失败")
+                return False
+            
             prompt = f"""
-# 🛠️ 代码替换块生成规范
-## 关键修改原则
-▌插入操作必须包含锚点行 ▼▼▼
-正确做法：
-<REPLACE>
-5,5  # 在第5行后插入（保留原第5行）
-原第5行内容
-新插入内容  #patch
-</REPLACE>
+    你是一个代码审查员，请审查以下代码并将其与上下文合并。
+    原始代码:
+    {old_file_content["stdout"]}
+    补丁内容:
+    {patch_content}
+    """
+            prompt += f"""
+    请将代码与上下文合并并返回完整的合并代码，每次最多输出300行代码。
 
-错误做法：
-<REPLACE>
-6,5  # 丢失原第5行内容
-新插入内容
-</REPLACE>
+    要求:
+    1. 严格保留原始代码的格式、空行和缩进
+    2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
+    3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
+    4. 除了合并后的代码，不要输出任何其他文本
+    5. 所有代码输出完成后，输出<!!!FINISHED!!!>
 
-## 处理步骤（更新插入规则）
-2. 【行号计算】
-   - 插入操作：
-     a. start=插入位置行号（要保留的行）
-     b. end=start（表示修改该行并在其后追加）
-     c. 替换内容 = 原行内容 + 新内容
-
-## 示例场景（强化插入案例）
-▌安全插入 ▼▼▼
-原代码：
-3:     return result
-
-变更：在return前添加日志记录
-
-正确替换块：
-<REPLACE>
-3,3
-    logger.info("准备返回结果")  #patch
-    return result
-</REPLACE>
-
-应用后代码：
-3:     logger.info("准备返回结果")  #patch
-4:     return result
-
-错误示例：
-<REPLACE>
-4,3  # 错误！丢失原return行
-    logger.info("准备返回结果")
-    return result
-</REPLACE>
-
-## 验证规则新增
-✅ 插入时必须包含锚点行原内容
-❌ 插入后导致原行消失
-
-## 当前任务
-文件路径：{filepath}
-────────────────────────────────────────────
-▼ 原始代码（行号从1开始）▼
-{original_content}
-────────────────────────────────────────────
-▼ 变更描述 ▼
-{patch_content}
-"""
-
-            # 调用大模型生成替换块
-            PrettyOutput.section("生成精确替换块", OutputType.SYSTEM)
+    输出格式:
+    <MERGED_CODE>
+    [merged_code]
+    </MERGED_CODE>
+    """
+            PrettyOutput.section("代码生成", OutputType.SYSTEM)
             model = PlatformRegistry().get_codegen_platform()
             model.set_suppress_output(False)
-            response = model.chat_until_success(prompt)
+            count = 30
+            start_line = -1
+            end_line = -1
+            code = []
+            finished = False
+            with spinner.hidden():
+                while count>0:
+                    count -= 1
+                    response = model.chat_until_success(prompt).splitlines()
+                    try:
+                        start_line = response.index("<MERGED_CODE>") + 1
+                        try:
+                            end_line = response.index("</MERGED_CODE>")
+                            code = response[start_line:end_line]
+                        except:
+                            pass
+                    except:
+                        pass
 
-            # 解析生成的替换块
-            replace_blocks = re.findall(
-                r'<REPLACE>\n(\d{1,4}),(\d{1,4})\n?([\s\S]*?)\n?</REPLACE>',  # 支持最多4位行号
-                response,
-                re.MULTILINE
-            )
-
-            if not replace_blocks:
-                spinner.fail("❌ 未生成有效替换块")
-                return False
-
-            original_content = open(filepath, 'r', encoding='utf-8').read()
-
-            # 应用替换块
-            original_lines = original_content.split('\n')
-            new_lines = original_lines.copy()
-            total_lines = len(original_lines)
-
-            # 预处理并排序替换块（从后往前）
-            processed_blocks = []
-            for block in replace_blocks:
-                start_str, end_str, code = block
-                try:
-                    start_line = int(start_str)
-                    end_line = int(end_str)
-
-                    # 禁止负数行号
-                    if start_line < 1 or end_line < 1:
-                        spinner.text = f"文件{filepath} 修改失败"
-                        spinner.fail(f"❌")
-                        return False
-
-                    # 校验行号范围
-                    if not (1 <= start_line <= end_line <= total_lines):
-                        spinner.text = f"文件{filepath} 修改失败"
-                        spinner.fail(f"❌")
-                        return False
-
-                    processed_blocks.append((start_line, end_line, code))
-
-                except Exception as e:
-                    spinner.text = f"文件{filepath} 修改失败"
-                    spinner.fail(f"❌")
+                    try: 
+                        response.index("<!!!FINISHED!!!>")
+                        finished = True
+                        break
+                    except:
+                        prompt += f"""继续输出接下来的300行代码
+                        要求：
+                        1. 严格保留原始代码的格式、空行和缩进
+                        2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
+                        3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
+                        4. 除了合并后的代码，不要输出任何其他文本
+                        5. 所有代码输出完成后，输出<!!!FINISHED!!!>
+                        """
+                        pass
+                if not finished:
+                    spinner.text = "生成代码失败"
+                    spinner.fail("❌")
                     return False
-
-            # 按起始行号降序排序（从后往前处理）
-            processed_blocks.sort(key=lambda x: x[0], reverse=True)
-
-            # 应用排序后的替换
-            for start_line, end_line, code in processed_blocks:
-                new_code_lines = code.split('\n')
-                new_lines[start_line-1:end_line] = new_code_lines
-
-            # 写入新内容
+            # 写入合并后的代码
+            spinner.text = "写入合并后的代码..."
             with open(filepath, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(new_lines))
-
-            spinner.text = f"已处理文件：{filepath}"
+                f.write("\n".join(code)+"\n")
+            spinner.write("✅ 合并后的代码写入完成")
+            spinner.text = "代码修改完成"
             spinner.ok("✅")
             return True
-
         except Exception as e:
-            spinner.fail(f"❌ 处理失败: {str(e)}")
-            revert_file(filepath)
+            spinner.text = "代码修改失败"
+            spinner.fail("❌")
             return False
-
-# # New handler functions below ▼▼▼
-# def handle_code_operation(filepath: str, patch_content: str) -> bool:
-#     """处理基于上下文的代码片段"""
-#     with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
-#         try:
-#             if not os.path.exists(filepath):
-#                 # 新建文件
-#                 spinner.text = "文件不存在，正在创建文件..."
-#                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
-#                 open(filepath, 'w', encoding='utf-8').close()
-#                 spinner.write("✅ 文件创建完成")
-#             old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
-#             if not old_file_content["success"]:
-#                 spinner.write("❌ 文件读取失败")
-#                 return False
-            
-#             prompt = f"""
-#     你是一个代码审查员，请审查以下代码并将其与上下文合并。
-#     原始代码:
-#     {old_file_content["stdout"]}
-#     补丁内容:
-#     {patch_content}
-#     """
-#             prompt += f"""
-#     请将代码与上下文合并并返回完整的合并代码，每次最多输出300行代码。
-
-#     要求:
-#     1. 严格保留原始代码的格式、空行和缩进
-#     2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
-#     3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
-#     4. 除了合并后的代码，不要输出任何其他文本
-#     5. 所有代码输出完成后，输出<!!!FINISHED!!!>
-
-#     输出格式:
-#     <MERGED_CODE>
-#     [merged_code]
-#     </MERGED_CODE>
-#     """
-#             PrettyOutput.section("代码生成", OutputType.SYSTEM)
-#             model = PlatformRegistry().get_codegen_platform()
-#             model.set_suppress_output(False)
-#             count = 30
-#             start_line = -1
-#             end_line = -1
-#             code = []
-#             finished = False
-#             with spinner.hidden():
-#                 while count>0:
-#                     count -= 1
-#                     response = model.chat_until_success(prompt).splitlines()
-#                     try:
-#                         start_line = response.index("<MERGED_CODE>") + 1
-#                         try:
-#                             end_line = response.index("</MERGED_CODE>")
-#                             code = response[start_line:end_line]
-#                         except:
-#                             pass
-#                     except:
-#                         pass
-
-#                     try: 
-#                         response.index("<!!!FINISHED!!!>")
-#                         finished = True
-#                         break
-#                     except:
-#                         prompt += f"""继续输出接下来的300行代码
-#                         要求：
-#                         1. 严格保留原始代码的格式、空行和缩进
-#                         2. 仅在<MERGED_CODE>块中包含实际代码内容，包括空行和缩进
-#                         3. 绝对不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
-#                         4. 除了合并后的代码，不要输出任何其他文本
-#                         5. 所有代码输出完成后，输出<!!!FINISHED!!!>
-#                         """
-#                         pass
-#                 if not finished:
-#                     spinner.text = "生成代码失败"
-#                     spinner.fail("❌")
-#                     return False
-#             # 写入合并后的代码
-#             spinner.text = "写入合并后的代码..."
-#             with open(filepath, 'w', encoding='utf-8') as f:
-#                 f.write("\n".join(code)+"\n")
-#             spinner.write("✅ 合并后的代码写入完成")
-#             spinner.text = "代码修改完成"
-#             spinner.ok("✅")
-#             return True
-#         except Exception as e:
-#             spinner.text = "代码修改失败"
-#             spinner.fail("❌")
-#             return False
