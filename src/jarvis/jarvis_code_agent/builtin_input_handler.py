@@ -31,13 +31,13 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         
         if tag == "CodeBase":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            user_input += "\n请使用ask_codebase查询代码库"
+            user_input += "\n请使用ask_codebase工具查询代码库"
         elif tag == "Web":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            user_input += "\n请使用search_web进行网页搜索"
+            user_input += "\n请使用search_web工具进行网页搜索"
         elif tag == "RAG":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            user_input += "\n请使用RAG进行知识库检索"
+            user_input += "\n请使用rag工具进行知识库检索"
         # 移除对未知标记的警告输出
     
     return user_input, False
