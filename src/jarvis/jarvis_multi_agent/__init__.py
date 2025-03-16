@@ -168,4 +168,66 @@ content: {msg['content']}
                 last_agent = self.agents[msg['to']].name
                 msg = self.agents[msg['to']].run(prompt)
         return ""
+
+def main(config_file: str, user_input: str, file_list: Optional[List[str]] = None) -> str:
+    """从YAML配置文件初始化并运行多智能体系统
     
+    Args:
+        config_file: YAML配置文件路径
+        user_input: 用户输入
+        file_list: 可选文件列表
+        
+    Returns:
+        最终处理结果
+    """
+    try:
+        with open(config_file, 'r') as f:
+            config_data = yaml.safe_load(f)
+            
+        # 解析配置并创建AgentConfig列表
+        agent_configs = []
+        main_agent_name = config_data.get('main_agent', '')
+        
+        for agent_config in config_data.get('agents', []):
+            # 使用默认值填充缺失的配置项
+            default_config = {
+                'system_prompt': '',
+                'name': 'Jarvis',
+                'description': '',
+                'is_sub_agent': False,
+                'output_handler': [],
+                'model_name': None,
+                'platform': None,
+                'summary_prompt': None,
+                'auto_complete': False,
+                'input_handler': None,
+                'max_context_length': None,
+                'execute_tool_confirm': None
+            }
+            # 更新默认配置
+            default_config.update(agent_config)
+            agent_configs.append(AgentConfig(**default_config))
+            
+        if not main_agent_name:
+            raise ValueError("必须指定main_agent作为主智能体")
+            
+        # 创建并运行多智能体系统
+        multi_agent = MultiAgent(agent_configs, main_agent_name)
+        return multi_agent.run(user_input, file_list)
+        
+    except yaml.YAMLError as e:
+        raise ValueError(f"YAML配置文件解析错误: {str(e)}")
+    except Exception as e:
+        raise RuntimeError(f"多智能体系统初始化失败: {str(e)}")
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="多智能体系统启动器")
+    parser.add_argument("config", help="YAML配置文件路径")
+    parser.add_argument("input", help="用户输入")
+    parser.add_argument("--files", nargs="*", help="可选文件列表")
+    args = parser.parse_args()
+    
+    result = main(args.config, args.input, args.files)
+    print(result)
