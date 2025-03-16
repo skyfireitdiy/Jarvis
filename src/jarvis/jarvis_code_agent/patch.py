@@ -194,7 +194,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 open(filepath, 'w', encoding='utf-8').close()
             original_content = ReadCodeTool().execute({"files": [{"path": filepath}]})["stdout"]
-            # 构建模型提示
+            # 构建模型提示（新增示例部分）
             prompt = f"""请严格按以下要求将代码变更转换为精确的行号替换块：
 
 # 原始文件信息
@@ -221,32 +221,67 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
    - 行号范围内的代码将会严格被替换为新代码，要避免重复或者遗漏
 
 3. 内容规范：
-   - 保留被替换代码前后的3行上下文（除非在文件开头/结尾）
    - 新代码的缩进与换行必须与原始代码完全一致
    - 禁止修改与变更需求无关的代码区域
 
-4. 错误示例（禁止出现）：
-   ❌ 错误格式：
-   <REPLACE>
-   Line 5-7
-   new code
-   </REPLACE>
+# 示例说明
+----------------------------------------
+示例1：新增代码（通过替换单行实现）
+原代码：
+1: def main():
+2:     print("Hello")
+3:     return 0
 
-   ❌ 行号越界：
-   <REPLACE>
-   100,105
-   ... 
-   </REPLACE>
+<REPLACE>
+3,3
+    return 0
+    logger.info("操作完成")
+</REPLACE>
 
-5. 正确示例：
-   ✅ 精确范围：
-   <REPLACE>
-   3,5
-   def safe_divide(a, b):
-       if b == 0:  # 新增校验
-           return 0
-       return a / b
-   </REPLACE>
+应用后代码：
+1: def main():
+2:     print("Hello")
+3:     return 0
+4:     logger.info("操作完成")
+
+----------------------------------------
+示例2：替换多行代码
+原代码：
+5: def calc(a, b):
+6:     sum = a + b
+7:     return sum
+
+<REPLACE>
+6,7
+    sum = a + b
+    if not isinstance(a, int):
+        raise TypeError("a必须是整数")
+    return sum
+</REPLACE>
+
+应用后代码：
+5: def calc(a, b):
+6:     sum = a + b
+7:     if not isinstance(a, int):
+8:         raise TypeError("a必须是整数")
+9:     return sum
+
+----------------------------------------
+示例3：删除代码
+原代码：
+10: def old_func():
+11:     # 已废弃的方法
+12:     print("Deprecated")
+13:     return
+
+<REPLACE>
+11,13
+</REPLACE>
+
+应用后代码：
+10: def old_func():
+
+----------------------------------------
 
 请严格按上述要求生成替换块，确保机器可解析的准确格式！"""
 
