@@ -233,7 +233,7 @@ def handle_commit_workflow()->bool:
 
 def handle_code_operation(filepath: str, patch_content: str) -> bool:
     """处理代码操作"""
-    if get_file_line_count(filepath) < 100:
+    if get_file_line_count(filepath) < 30:
         return handle_small_code_operation(filepath, patch_content)
     else:
         return handle_large_code_operation(filepath, patch_content)
