@@ -114,11 +114,12 @@ def apply_patch(output_str: str) -> str:
                     open(filepath, 'w', encoding='utf-8').close()
                     spinner.write("✅ 文件创建完成")
                 with spinner.hidden():
-                    fileline = get_file_line_count(filepath)
-                    if fileline < 300:
-                        handle_small_code_operation(filepath, patch_content)
-                    else:
-                        handle_large_code_operation(filepath, patch_content)
+                    handle_large_code_operation(filepath, patch_content)
+                    # fileline = get_file_line_count(filepath)
+                    # if fileline < 300:
+                    #     handle_small_code_operation(filepath, patch_content)
+                    # else:
+                    #     handle_large_code_operation(filepath, patch_content)
                 spinner.write(f"✅ 文件 {filepath} 处理完成")
             except Exception as e:
                 spinner.text = f"文件 {filepath} 处理失败: {str(e)}, 回滚文件"
@@ -458,11 +459,13 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
 3. **一致性**：严格保留原始代码的格式、空行和缩进风格
 
 ## 输出格式规范
+- 严格保留原始代码的格式、空行和缩进
 - 对每个区块，使用<REPLACE>标签输出修改后的代码
 - 每个<REPLACE>块必须包含section编号
 - 必须为所有需要修改的区块提供替换代码
 - 不要使用markdown代码块（```）或反引号
 - 除了修改后的代码，不要输出任何其他文本
+- 仅输出需要修改区块的替换代码，不要输出不需要修改区块的代码
 
 ## 输出模板示例
 <REPLACE>
