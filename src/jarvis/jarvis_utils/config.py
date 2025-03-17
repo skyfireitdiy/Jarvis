@@ -171,4 +171,4 @@ def is_confirm_before_apply_patch() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return os.getenv('JARVIS_CONFIRM_BEFORE_APPLY_PATCH', 'false') == 'true'
+    return os.getenv('JARVIS_CONFIRM_BEFORE_APPLY_PATCH', 'true') == 'true'
