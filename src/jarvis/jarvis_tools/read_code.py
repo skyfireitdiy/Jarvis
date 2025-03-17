@@ -84,7 +84,7 @@ class ReadCodeTool:
                     f"{numbered_content}\n"
                     f"{'='*80}\n"
                 )
-                
+                spinner.text = f"文件读取完成: {abs_path}"
                 spinner.ok("✅")
                 return {
                     "success": True,
