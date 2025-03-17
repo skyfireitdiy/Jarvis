@@ -178,7 +178,7 @@ def apply_patch(output_str: str) -> str:
         with spinner.hidden():
             if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
                 return final_ret
-        return get_multiline_input("请输入自定义回复")
+            return get_multiline_input("请输入自定义回复")
 
 def revert_file(filepath: str):
     """增强版git恢复，处理新文件"""
