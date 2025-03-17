@@ -16,7 +16,6 @@ REQUIRED_METHODS = [
     ('set_model_name', ['model_name']),
     ('get_model_list', []),
     ('set_suppress_output', ['suppress']),
-    ('upload_files', ['file_list'])
 ]
 
 class PlatformRegistry:
