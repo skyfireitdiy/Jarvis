@@ -182,7 +182,7 @@ class PrettyOutput:
             title_align="left",
             padding=(0, 0),
             highlight=True,
-            box=HEAVY,
+            # box=HEAVY,
         )
         console.print()
         console.print(panel)
