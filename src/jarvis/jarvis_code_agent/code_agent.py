@@ -149,8 +149,7 @@ class CodeAgent:
                 with spinner.hidden():
                     git_commiter = GitCommitTool()
                     git_commiter.execute({})
-            else:
-                spinner.text = "环境初始化完成"
+            spinner.text = "环境初始化完成"
             spinner.ok("✅")
 
     
