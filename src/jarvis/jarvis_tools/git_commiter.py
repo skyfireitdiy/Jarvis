@@ -9,7 +9,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 import sys
 import argparse
 
-from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
+from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
@@ -51,6 +51,7 @@ class GitCommitTool:
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute automatic commit process with support for multi-line messages and special characters"""
         try:
+            find_git_root()
             if not has_uncommitted_changes():
                 PrettyOutput.print("没有未提交的更改", OutputType.SUCCESS)
                 return {"success": True, "stdout": "No changes to commit", "stderr": ""}
