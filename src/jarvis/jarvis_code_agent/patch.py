@@ -353,8 +353,8 @@ def split_large_file(filepath: str, patch_content: str) -> Optional[List[Tuple[i
     ## 输出格式
     仅输出如下格式的切分结果：
     <SPLIT_FILE>
-    [起始行,结束行]: 需要修改/不修改原因
-    [起始行,结束行]: 需要修改/不修改原因
+    [起始行,结束行]: 修改/不修改
+    [起始行,结束行]: 修改/不修改
     ...
     </SPLIT_FILE>
     """
