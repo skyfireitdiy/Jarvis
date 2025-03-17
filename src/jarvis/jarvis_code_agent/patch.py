@@ -165,7 +165,7 @@ def apply_patch(output_str: str) -> str:
                 else:
                     final_ret += "✅ 补丁已应用（没有新的提交）"
             else:
-                final_ret += "❌ 我不想提交代码\n"
+                final_ret += "❌ 我拒绝应用此补丁\n"
                 final_ret += "补丁预览:\n"
                 final_ret += diff
         else:
