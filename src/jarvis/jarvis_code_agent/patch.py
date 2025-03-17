@@ -315,14 +315,14 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             return False
 
 
-def split_large_file(filepath: str, patch_content: str) -> Optional[List[Tuple[int,int,str]]]:
-    try:         
-        line_count = get_file_line_count(filepath)
-        old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
-        if not old_file_content["success"]:
-            return None
-        # 使用大模型切分文件
-        with yaspin(text="正在切分文件...", color="cyan") as spinner:
+def split_large_file(filepath: str, patch_content: str) -> Optional[List[Tuple[int,int,str]]]:      
+    line_count = get_file_line_count(filepath)
+    old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
+    if not old_file_content["success"]:
+        return None
+    # 使用大模型切分文件
+    with yaspin(text="正在切分文件...", color="cyan") as spinner:
+        try:
             model = PlatformRegistry().get_codegen_platform()
             model.set_suppress_output(True)
         
@@ -368,46 +368,46 @@ def split_large_file(filepath: str, patch_content: str) -> Optional[List[Tuple[i
                 return None
             spinner.text = "文件切分完成"
             spinner.ok("✅")
+        except Exception:
+            spinner.text = "文件切分失败"
+            spinner.fail("❌")
+            return None
+    
+    with yaspin(text="正在验证文件切分...", color="cyan") as spinner:
+        split_content = split_match.group(1).strip().splitlines()
+        file_sections = []
         
-        with yaspin(text="正在验证文件切分...", color="cyan") as spinner:
-            split_content = split_match.group(1).strip().splitlines()
-            file_sections = []
-            
-            for line in split_content:
-                match = re.match(r'\[(\d+),(\d+)\]:\s*(.*)', line)
-                if match:
-                    start_line = int(match.group(1))
-                    end_line = int(match.group(2))
-                    file_sections.append((start_line, end_line, match.group(3)))
-            # 第一个块的起始位置为1
-            if file_sections[0][0] != 1:
-                spinner.text = "第一个块的起始位置不为1"
+        for line in split_content:
+            match = re.match(r'\[(\d+),(\d+)\]:\s*(.*)', line)
+            if match:
+                start_line = int(match.group(1))
+                end_line = int(match.group(2))
+                file_sections.append((start_line, end_line, match.group(3)))
+        # 第一个块的起始位置为1
+        if file_sections[0][0] != 1:
+            spinner.text = "第一个块的起始位置不为1"
+            spinner.fail("❌")
+            return None
+        # 最后一个块的结束位置为文件行数
+        if file_sections[-1][1] != line_count:
+            spinner.text = "最后一个块的结束位置不为文件行数"
+            spinner.fail("❌")
+            return None
+        # 所有切分的块必须连续
+        for i in range(len(file_sections)):
+            if i == 0:
+                continue
+            if file_sections[i][0] != file_sections[i-1][1]+1:
+                spinner.text = "文件切分块不连续"
                 spinner.fail("❌")
                 return None
-            # 最后一个块的结束位置为文件行数
-            if file_sections[-1][1] != line_count:
-                spinner.text = "最后一个块的结束位置不为文件行数"
-                spinner.fail("❌")
-                return None
-            # 所有切分的块必须连续
-            for i in range(len(file_sections)):
-                if i == 0:
-                    continue
-                if file_sections[i][0] != file_sections[i-1][1]+1:
-                    spinner.text = "文件切分块不连续"
-                    spinner.fail("❌")
-                    return None
-            spinner.text = "文件切分验证通过"
-            spinner.ok("✅")
-        output = ""
-        for i, (start_line, end_line, reason) in enumerate(file_sections):
-            output += f"### 区块 {i+1} (行 {start_line}-{end_line}): {reason}\n"
-        PrettyOutput.print(output, OutputType.SYSTEM)
-        return file_sections
-        
-
-    except Exception:
-        pass
+        spinner.text = "文件切分验证通过"
+        spinner.ok("✅")
+    output = ""
+    for i, (start_line, end_line, reason) in enumerate(file_sections):
+        output += f"### 区块 {i+1} (行 {start_line}-{end_line}): {reason}\n"
+    PrettyOutput.print(output, OutputType.SYSTEM)
+    return file_sections
 
 def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
     """处理大型代码文件的补丁操作"""
