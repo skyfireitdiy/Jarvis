@@ -130,16 +130,15 @@ def apply_patch(output_str: str) -> str:
                     open(filepath, 'w', encoding='utf-8').close()
                     spinner.write("✅ 文件创建完成")
                 with spinner.hidden():
-                    while not handle_large_code_operation(filepath, patch_content):
+                    retry_count = 3
+                    while not handle_code_operation(filepath, patch_content):
+                        retry_count -= 1
+                        if retry_count > 0:
+                            continue
                         if user_confirm("补丁应用失败，是否重试？", default=True):
                             pass
                         else:
                             raise Exception("补丁应用失败")
-                    # fileline = get_file_line_count(filepath)
-                    # if fileline < 300:
-                    #     handle_small_code_operation(filepath, patch_content)
-                    # else:
-                    #     handle_large_code_operation(filepath, patch_content)
                 spinner.write(f"✅ 文件 {filepath} 处理完成")
             except Exception as e:
                 spinner.text = f"文件 {filepath} 处理失败: {str(e)}, 回滚文件"
@@ -232,6 +231,14 @@ def handle_commit_workflow()->bool:
     git_commiter = GitCommitTool()
     commit_result = git_commiter.execute({})
     return commit_result["success"]
+
+
+def handle_code_operation(filepath: str, patch_content: str) -> bool:
+    """处理代码操作"""
+    if get_file_line_count(filepath) < 300:
+        return handle_small_code_operation(filepath, patch_content)
+    else:
+        return handle_large_code_operation(filepath, patch_content)
 
 
 def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
@@ -423,23 +430,25 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
                 
                 # 检查搜索文本是否存在于文件中
                 if search_text in modified_content:
+                    # 如果有多处，报错
+                    if modified_content.count(search_text) > 1:
+                        spinner.text = f"补丁 #{patch_count+1} 应用失败：找到多个匹配的代码段"
+                        spinner.fail("❌")
+                        return False
                     # 应用替换
                     modified_content = modified_content.replace(search_text, replace_text)
                     patch_count += 1
-                    spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
+                    spinner.write(f"✅ 补丁 #{patch_count+1} 应用成功")
                 else:
-                    spinner.write(f"❌ 补丁 #{patch_count+1} 应用失败：无法找到匹配的代码段")
-            
-            if patch_count == 0:
-                spinner.text = "没有应用任何补丁"
-                spinner.fail("❌")
-                return False
+                    spinner.text = f"补丁 #{patch_count+1} 应用失败：无法找到匹配的代码段"
+                    spinner.fail("❌")
+                    return False
             
             # 写入修改后的内容
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(modified_content)
             
-            spinner.text = f"文件修改完成，应用了 {patch_count} 个补丁"
+            spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
             spinner.ok("✅")
             return True
             
