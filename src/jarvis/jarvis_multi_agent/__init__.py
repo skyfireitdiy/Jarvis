@@ -5,8 +5,10 @@ import yaml
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.output_handler import OutputHandler
+from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 
 class MultiAgent(OutputHandler):
@@ -113,6 +115,15 @@ content: |
 
     def init_agents(self):
         for config in self.agents_config:
+            output_handler = config.get('output_handler', [])
+            if len(output_handler) == 0:
+                output_handler = [
+                    ToolRegistry(),
+                    self,
+                ]
+            else:
+                output_handler.append(self)
+            config['output_handler'] = output_handler
             agent = Agent(**config)
             self.agents[config['name']] = agent
 
@@ -144,6 +155,7 @@ def main():
     Returns:
         最终处理结果
     """
+    init_env()
     import argparse
     parser = argparse.ArgumentParser(description="多智能体系统启动器")
     parser.add_argument("--config", "-c", required=True, help="YAML配置文件路径")
