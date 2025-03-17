@@ -212,7 +212,7 @@ class PrettyOutput:
         参数：
             text: 要打印的文本
         """
-        style = RichStyle(color="bright_cyan", bgcolor="#1a1a1a", italic=True, frame=True, meta={"icon": "🤖"})
+        style = RichStyle(color="bright_cyan", italic=True, frame=True, meta={"icon": "🤖"})
         console.print(text, style=style, end="")
     @staticmethod
     def print_stream_end():

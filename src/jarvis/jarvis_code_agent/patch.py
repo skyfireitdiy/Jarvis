@@ -399,6 +399,10 @@ def split_large_file(filepath: str, patch_content: str) -> Optional[List[Tuple[i
                     return None
             spinner.text = "文件切分验证通过"
             spinner.ok("✅")
+        output = ""
+        for i, (start_line, end_line, reason) in enumerate(file_sections):
+            output += f"### 区块 {i+1} (行 {start_line}-{end_line}): {reason}\n"
+        PrettyOutput.print(output, OutputType.SYSTEM)
         return file_sections
         
 
@@ -479,18 +483,18 @@ section: 3
             
             # 解析响应，提取所有替换区块
             replace_sections = []
-            for p in re.finditer(r'<REPLACE>\nsection: (\d+)\n(.*?)\n</REPLACE>', response, re.DOTALL):
-                replace_sections.append((p.group(1), p.group(2)))
+            for p in re.finditer(r'<REPLACE>\nsection: (\d+)\n?(.*?)</REPLACE>', response, re.DOTALL):
+                replace_sections.append((p.group(1), p.group(2).splitlines(keepends=True)))
 
             replace_sections.sort(key=lambda x: int(x[0]), reverse=True)
             # 重建文件内容
             for section_num, modified_code in replace_sections:
                 start_line = file_sections[int(section_num)-1][0]
                 end_line = file_sections[int(section_num)-1][1]
-                old_code[start_line-1:end_line] = modified_code.splitlines()
+                old_code[start_line-1:end_line] = modified_code
             
             with open(filepath, 'w', encoding='utf-8') as f:
-                f.write("\n".join(old_code))
+                f.writelines(old_code)
 
             spinner.text = "文件修改完成"
             spinner.ok("✅")
