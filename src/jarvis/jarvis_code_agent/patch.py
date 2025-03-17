@@ -429,6 +429,8 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
             for i, (start_line, end_line, reason) in enumerate(file_sections):
                 sections_info.append(f"### 区块 {i+1} (行 {start_line}-{end_line}): {reason}")
             
+            sections_info = "\n".join(sections_info)
+
             prompt = f"""
 # 代码修改专家指南
 
@@ -441,7 +443,7 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
 {old_file_content["stdout"]}
 
 ### 原始代码区块
-{"\n".join(sections_info)}
+{sections_info}
 
 ### 补丁内容
 {patch_content}
