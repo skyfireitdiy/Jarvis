@@ -23,10 +23,10 @@ import os
 class Agent:
 
     def set_summary_prompt(self, summary_prompt: str):
-        """Set the summary prompt for task completion.
+        """设置任务完成时的总结提示模板。
         
-        Args:
-            summary_prompt: The prompt template for generating task summaries
+        参数:
+            summary_prompt: 用于生成任务总结的提示模板
         """
         self.summary_prompt = summary_prompt
 
