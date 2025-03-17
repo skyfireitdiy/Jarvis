@@ -152,17 +152,17 @@ class Agent:
 
 
     
-    def _call_model(self, message: str) -> str: 
-        """Call the AI model with retry logic.
+    def _call_model(self, message: str) -> str:
+        """调用AI模型并实现重试逻辑。
         
-        Args:
-            message: The input message for the model
+        参数:
+            message: 输入给模型的消息
             
-        Returns:
-            str: Model's response
+        返回:
+            str: 模型的响应
             
-        Note:
-            Will retry with exponential backoff up to 30 seconds between retries
+        注意:
+            将使用指数退避重试，最多重试30秒
         """
         for handler in self.input_handler:
             message, need_return = handler(message, self)
@@ -352,16 +352,16 @@ class Agent:
             return f"Task failed: {str(e)}"
 
     def _clear_history(self):
-        """Clear conversation history while preserving system prompt.
+        """清空对话历史但保留系统提示。
         
-        This will:
-        1. Clear the prompt
-        2. Reset the model
-        3. Reset conversation length counter
+        该方法将：
+        1. 清空当前提示
+        2. 重置模型状态
+        3. 重置对话长度计数器
         """
         self.prompt = "" 
         self.model.reset() # type: ignore
-        self.conversation_length = 0  # Reset conversation length
+        self.conversation_length = 0  # 重置对话长度
 
 
 
