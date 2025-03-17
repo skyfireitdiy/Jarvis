@@ -422,7 +422,7 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
                 return False
             
             model = PlatformRegistry().get_codegen_platform()
-            model.set_suppress_output(True)
+            model.set_suppress_output(False)
             
             
             sections_info = []
