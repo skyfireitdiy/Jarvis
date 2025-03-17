@@ -1,16 +1,13 @@
 import re
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Tuple
 import os
 
-from click import Option
 from yaspin import yaspin
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
-from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
-from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -349,14 +346,14 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
             # 读取原始文件内容
-            old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
+            old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
             if not old_file_content["success"]:
                 spinner.text = "文件读取失败"
                 spinner.fail("❌")
                 return False
             
             model = PlatformRegistry().get_codegen_platform()
-            model.set_suppress_output(True)
+            model.set_suppress_output(False)
             
             prompt = f"""
 # 代码补丁生成专家指南
