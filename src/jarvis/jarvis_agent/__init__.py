@@ -168,7 +168,7 @@ class Agent:
             message, need_return = handler(message, self)
             if need_return:
                 return message
-        print("🤖模型思考：", end='')
+        print("🤖 模型思考：")
         return self.model.chat_until_success(message)   # type: ignore
 
 
