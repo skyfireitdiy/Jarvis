@@ -158,7 +158,7 @@ class PrettyOutput:
             traceback: 是否显示错误的回溯信息
         """
         styles = {
-            OutputType.SYSTEM: RichStyle(color="bright_cyan", bgcolor="#1a1a1a", italic=True, frame=True, meta={"icon": "🤖"}),
+            OutputType.SYSTEM: RichStyle(color="bright_cyan", bgcolor="#1a1a1a", frame=True, meta={"icon": "🤖"}),
             OutputType.CODE: RichStyle(color="green", bgcolor="#1a1a1a", frame=True, meta={"icon": "📝"}),
             OutputType.RESULT: RichStyle(color="bright_blue", bgcolor="#1a1a1a", frame=True, meta={"icon": "✨"}),
             OutputType.ERROR: RichStyle(color="red", frame=True, bgcolor="dark_red", meta={"icon": "❌"}),
@@ -212,7 +212,7 @@ class PrettyOutput:
         参数：
             text: 要打印的文本
         """
-        style = PrettyOutput._get_style(OutputType.SYSTEM)
+        style = RichStyle(color="bright_cyan", bgcolor="#1a1a1a", italic=True, frame=True, meta={"icon": "🤖"})
         console.print(text, style=style, end="")
     @staticmethod
     def print_stream_end():
