@@ -130,7 +130,11 @@ def apply_patch(output_str: str) -> str:
                     open(filepath, 'w', encoding='utf-8').close()
                     spinner.write("✅ 文件创建完成")
                 with spinner.hidden():
-                    handle_large_code_operation(filepath, patch_content)
+                    while not handle_large_code_operation(filepath, patch_content):
+                        if user_confirm("补丁应用失败，是否重试？", default=True):
+                            pass
+                        else:
+                            raise Exception("补丁应用失败")
                     # fileline = get_file_line_count(filepath)
                     # if fileline < 300:
                     #     handle_small_code_operation(filepath, patch_content)
@@ -332,142 +336,9 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             return False
 
 
-def split_large_file(filepath: str, patch_content: str) -> Optional[List[Tuple[int,int,str]]]:      
-    line_count = get_file_line_count(filepath)
-    old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
-    if not old_file_content["success"]:
-        return None
-    # 使用大模型切分文件
-    with yaspin(text="正在切分文件...", color="cyan") as spinner:
-        try:
-            model = PlatformRegistry().get_codegen_platform()
-            model.set_suppress_output(True)
-        
-            split_prompt = f"""
-    # 代码文件切分任务
-
-    ## 任务描述
-    请根据补丁内容，将源文件精确切分为"修改"区块和"不修改"区块。
-
-    ## 输入资料
-    ### 源文件内容
-    ```
-    {old_file_content["stdout"]}
-    ```
-
-    ### 补丁内容
-    ```
-    {patch_content}
-    ```
-
-    ## 核心概念
-    - "修改"区块：包含需要被补丁修改、添加或删除代码的区域
-    - "不修改"区块：补丁不影响的代码区域
-
-    ## 切分要求与规则
-    1. **语法单元独立性**：每个语法单元（函数、类、方法等）必须作为一个独立的区块
-       - 正确示例：一个函数是一个区块，一个类是一个区块
-       - 错误示例：多个函数合并为一个区块，或一个函数被分割成多个区块
-    
-    2. **区块类型交替**：相邻区块必须类型不同
-       - 正确示例：[修改][不修改][修改]
-       - 错误示例：[修改][修改] 或 [不修改][不修改]
-    
-    3. **修改判定规则**：
-       - 如果补丁要在某处添加新代码，则该位置之前的语法单元应标记为"修改"
-       - 如果补丁要修改现有代码，则包含该代码的语法单元应标记为"修改"
-       - 如果补丁要删除代码，则包含该代码的语法单元应标记为"修改"
-    
-    4. **完整覆盖**：
-       - 所有区块必须连续无间隔地覆盖整个文件
-       - 第一个区块必须从第1行开始
-       - 最后一个区块必须到文件最后一行结束
-    
-    5. **最细粒度原则**：
-       - 每个语法单元（函数、类、方法、导入语句组、全局变量定义等）应作为单独的区块
-       - 不要将多个独立的语法单元合并为一个区块，除非必须保持区块类型交替
-       - 文件头部的导入语句和注释可以作为一个区块
-       - 类定义内的每个方法应尽可能作为独立区块
-    
-    6. **详细原因说明**：
-       - 对于每个区块，必须在"修改"或"不修改"后面注明具体原因
-       - 修改区块示例：
-         - "修改: 需要更新函数参数"
-         - "修改: 需要添加新的错误处理"
-         - "修改: 需要重构返回值逻辑"
-       - 不修改区块示例：
-         - "不修改: 辅助函数不受影响"
-         - "不修改: 导入语句无需变更"
-         - "不修改: 类定义保持不变"
-
-    ## 输出格式
-    仅输出如下格式的切分结果（不要包含其他任何解释或说明）：
-    <SPLIT_FILE>
-    [起始行,结束行]: 修改: 具体修改原因
-    [起始行,结束行]: 不修改: 具体不修改原因
-    [起始行,结束行]: 修改: 具体修改原因
-    ...
-    </SPLIT_FILE>
-    """
-            with spinner.hidden():
-                response = model.chat_until_success(split_prompt)
-            split_match = re.search(r'<SPLIT_FILE>\n(.*?)\n</SPLIT_FILE>', response, re.DOTALL)
-            
-            if not split_match:
-                spinner.text = "文件切分失败"
-                spinner.fail("❌")
-                return None
-            spinner.text = "文件切分完成"
-            spinner.ok("✅")
-        except Exception:
-            spinner.text = "文件切分失败"
-            spinner.fail("❌")
-            return None
-    
-    with yaspin(text="正在验证文件切分...", color="cyan") as spinner:
-        split_content = split_match.group(1).strip().splitlines()
-        file_sections = []
-        
-        for line in split_content:
-            match = re.match(r'\[(\d+),(\d+)\]:\s*(.*)', line)
-            if match:
-                start_line = int(match.group(1))
-                end_line = int(match.group(2))
-                file_sections.append((start_line, end_line, match.group(3)))
-        # 第一个块的起始位置为1
-        if file_sections[0][0] != 1:
-            spinner.text = "第一个块的起始位置不为1"
-            spinner.fail("❌")
-            return None
-        # 最后一个块的结束位置为文件行数
-        if file_sections[-1][1] != line_count:
-            spinner.text = "最后一个块的结束位置不为文件行数"
-            spinner.fail("❌")
-            return None
-        # 所有切分的块必须连续
-        for i in range(len(file_sections)):
-            if i == 0:
-                continue
-            if file_sections[i][0] != file_sections[i-1][1]+1:
-                spinner.text = "文件切分块不连续"
-                spinner.fail("❌")
-                return None
-        spinner.text = "文件切分验证通过"
-        spinner.ok("✅")
-    output = ""
-    for i, (start_line, end_line, reason) in enumerate(file_sections):
-        output += f"### 区块 {i+1} (行 {start_line}-{end_line}): {reason}\n"
-    PrettyOutput.print(output, OutputType.SYSTEM)
-    return file_sections
-
 def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
-    """处理大型代码文件的补丁操作"""
-    file_sections = split_large_file(filepath, patch_content)
-    
-    if not file_sections:
-        return False
-    
-    with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
+    """处理大型代码文件的补丁操作，使用差异化补丁格式"""
+    with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
             # 读取原始文件内容
             old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
@@ -477,105 +348,98 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
                 return False
             
             model = PlatformRegistry().get_codegen_platform()
-            model.set_suppress_output(False)
+            model.set_suppress_output(True)
             
-            sections_info = []
-            for i, (start_line, end_line, reason) in enumerate(file_sections):
-                sections_info.append(f"### 区块 {i+1} (行 {start_line}-{end_line}): {reason}")
-            
-            sections_info = "\n".join(sections_info)
-
             prompt = f"""
-# 代码修改专家指南
+# 代码补丁生成专家指南
 
 ## 任务描述
-你是一位精确的代码修改专家，需要根据补丁内容修改特定代码区块。
+你是一位精确的代码补丁生成专家，需要根据补丁描述生成精确的代码差异。
 
 ## 输入资料
-
 ### 原始代码
 ```
 {old_file_content["stdout"]}
 ```
-
-### 原始代码区块信息
-{sections_info}
 
 ### 补丁内容
 ```
 {patch_content}
 ```
 
-## 修改要求
+## 补丁生成要求
 1. **精确性**：严格按照补丁的意图修改代码
 2. **格式一致性**：严格保持原始代码的格式风格
    - 缩进方式（空格或制表符）必须与原代码保持一致
    - 空行数量和位置必须与原代码风格匹配
    - 行尾空格处理必须与原代码一致
-3. **完整性**：对每个标记为"修改"的区块，提供完整的替换代码
-4. **语法完整性**：确保所有修改保持语法的完整性和正确性
-
-## 处理规则
-1. 仅修改那些标记为"修改"的区块，不需要修改标记为"不修改"的区块
-2. 对于每个修改区块，必须提供该区块的完整替换代码，而不仅仅是修改的部分
-3. 每个区块都是一个完整的语法单元（如一个函数、一个类方法、一组导入语句等）
-4. **格式保持原则**：
-   - 如果原代码使用4个空格缩进，修改后的代码也必须使用4个空格缩进
-   - 如果原代码在函数定义后有一个空行，修改后的代码也必须保留这个空行
-   - 如果原代码在行尾没有空格，修改后的代码也不应添加行尾空格
-5. 确保修改后的代码能够正确编译和运行
+3. **最小化修改**：只修改必要的代码部分，保持其他部分不变
+4. **上下文完整性**：提供足够的上下文，确保补丁能准确应用
 
 ## 输出格式规范
-- 使用<REPLACE>标签包围每个修改区块的替换代码
-- 每个<REPLACE>块必须指定区块编号
-- 每个<REPLACE>块必须包含该区块的完整代码，而不仅仅是修改的部分
-- 不要使用markdown代码块（```）标记
-- 仅输出需要修改区块的替换代码，不要输出不需要修改的区块
-- 确保输出的代码保留原始的换行符和缩进格式
+- 使用<DIFF>块包围每个需要修改的代码段
+- 每个<DIFF>块必须包含SEARCH部分和REPLACE部分
+- SEARCH部分是需要查找的原始代码
+- REPLACE部分是替换后的新代码
+- 确保SEARCH部分能在原文件中唯一匹配
+- 如果修改较大，可以使用多个<DIFF>块
 
-## 输出模板示例
-<REPLACE>
-section: 1
-# 区块1的完整替换代码
-def example_function():
-    # 这里是完整的函数代码，包括修改的和未修改的部分
-    # 保持与原代码相同的缩进和空行
-    modified_code = True
-    return modified_code
-</REPLACE>
+## 输出模板
+<DIFF>
+>>>>>> SEARCH
+[需要查找的原始代码，包含足够上下文]
+======
+[替换后的新代码]
+<<<<<< REPLACE
+</DIFF>
 
-<REPLACE>
-section: 3
-# 区块3的完整替换代码
-class ExampleClass:
-    # 这里是完整的类方法代码，包括修改的和未修改的部分
-    # 保持与原代码相同的缩进和空行
-    def example_method(self):
-        return "modified"
-</REPLACE>
+<DIFF>
+>>>>>> SEARCH
+[另一处需要查找的原始代码]
+======
+[另一处替换后的新代码]
+<<<<<< REPLACE
+</DIFF>
 """
-            # 获取所有修改后的代码
+            # 获取补丁内容
             with spinner.hidden():
                 response = model.chat_until_success(prompt)
-
-            old_code = open(filepath, 'r', encoding='utf-8').readlines()
             
-            # 解析响应，提取所有替换区块
-            replace_sections = []
-            for p in re.finditer(r'<REPLACE>\nsection: (\d+)\n?(.*?)</REPLACE>', response, re.DOTALL):
-                replace_sections.append((p.group(1), p.group(2).splitlines(keepends=True)))
-
-            replace_sections.sort(key=lambda x: int(x[0]), reverse=True)
-            # 重建文件内容
-            for section_num, modified_code in replace_sections:
-                start_line = file_sections[int(section_num)-1][0]
-                end_line = file_sections[int(section_num)-1][1]
-                old_code[start_line-1:end_line] = modified_code
+            # 解析差异化补丁
+            diff_blocks = re.finditer(r'<DIFF>\s*>>>>>> SEARCH\s*(.*?)\s*======\s*(.*?)\s*<<<<<< REPLACE\s*</DIFF>', 
+                                     response, re.DOTALL)
             
+            # 读取原始文件内容
+            with open(filepath, 'r', encoding='utf-8') as f:
+                file_content = f.read()
+            
+            # 应用所有差异化补丁
+            modified_content = file_content
+            patch_count = 0
+            
+            for match in diff_blocks:
+                search_text = match.group(1).strip()
+                replace_text = match.group(2).strip()
+                
+                # 检查搜索文本是否存在于文件中
+                if search_text in modified_content:
+                    # 应用替换
+                    modified_content = modified_content.replace(search_text, replace_text)
+                    patch_count += 1
+                    spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
+                else:
+                    spinner.write(f"❌ 补丁 #{patch_count+1} 应用失败：无法找到匹配的代码段")
+            
+            if patch_count == 0:
+                spinner.text = "没有应用任何补丁"
+                spinner.fail("❌")
+                return False
+            
+            # 写入修改后的内容
             with open(filepath, 'w', encoding='utf-8') as f:
-                f.writelines(old_code)
-
-            spinner.text = "文件修改完成"
+                f.write(modified_content)
+            
+            spinner.text = f"文件修改完成，应用了 {patch_count} 个补丁"
             spinner.ok("✅")
             return True
             
@@ -583,3 +447,4 @@ class ExampleClass:
             spinner.text = f"文件修改失败: {str(e)}"
             spinner.fail("❌")
             return False
+
