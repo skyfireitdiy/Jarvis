@@ -406,7 +406,7 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
                 response = model.chat_until_success(prompt)
             
             # 解析差异化补丁
-            diff_blocks = re.finditer(r'<DIFF>\s*>>>>>> SEARCH\s*(.*?)\s*======\s*(.*?)\s*<<<<<< REPLACE\s*</DIFF>', 
+            diff_blocks = re.finditer(r'<DIFF>\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?</DIFF>', 
                                      response, re.DOTALL)
             
             # 读取原始文件内容
