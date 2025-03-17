@@ -1,7 +1,8 @@
 import re
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 import os
 
+from click import Option
 from yaspin import yaspin
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
@@ -14,7 +15,7 @@ from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import user_confirm
+from jarvis.jarvis_utils.utils import get_file_line_count, user_confirm
 
 class PatchOutputHandler(OutputHandler):
     def name(self) -> str:
@@ -106,8 +107,18 @@ def apply_patch(output_str: str) -> str:
         for filepath, patch_content in patches.items():
             try:
                 spinner.text = f"正在处理文件: {filepath}"
+                if not os.path.exists(filepath):
+                    # 新建文件
+                    spinner.text = "文件不存在，正在创建文件..."
+                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                    open(filepath, 'w', encoding='utf-8').close()
+                    spinner.write("✅ 文件创建完成")
                 with spinner.hidden():
-                    handle_code_operation(filepath, patch_content)
+                    fileline = get_file_line_count(filepath)
+                    if fileline < 300:
+                        handle_small_code_operation(filepath, patch_content)
+                    else:
+                        handle_large_code_operation(filepath, patch_content)
                 spinner.write(f"✅ 文件 {filepath} 处理完成")
             except Exception as e:
                 spinner.text = f"文件 {filepath} 处理失败: {str(e)}, 回滚文件"
@@ -147,6 +158,7 @@ def apply_patch(output_str: str) -> str:
         if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
             return final_ret
         return get_multiline_input("请输入自定义回复")
+
 def revert_file(filepath: str):
     """增强版git恢复，处理新文件"""
     import subprocess
@@ -186,6 +198,7 @@ def get_diff() -> str:
         return ret
     except subprocess.CalledProcessError as e:
         return f"获取差异失败: {str(e)}"
+
 def handle_commit_workflow()->bool:
     """Handle the git commit workflow and return the commit details.
     
@@ -200,16 +213,10 @@ def handle_commit_workflow()->bool:
     return commit_result["success"]
 
 
-def handle_code_operation(filepath: str, patch_content: str) -> bool:
+def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
     """处理基于上下文的代码片段"""
     with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
         try:
-            if not os.path.exists(filepath):
-                # 新建文件
-                spinner.text = "文件不存在，正在创建文件..."
-                os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                open(filepath, 'w', encoding='utf-8').close()
-                spinner.write("✅ 文件创建完成")
             with spinner.hidden():
                 old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
                 if not old_file_content["success"]:
@@ -304,5 +311,190 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
             return True
         except Exception as e:
             spinner.text = "代码修改失败"
+            spinner.fail("❌")
+            return False
+
+
+def split_large_file(filepath: str, patch_content: str) -> Optional[List[Tuple[int,int,str]]]:
+    try:         
+        line_count = get_file_line_count(filepath)
+        old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
+        if not old_file_content["success"]:
+            return None
+        # 使用大模型切分文件
+        with yaspin(text="正在切分文件...", color="cyan") as spinner:
+            model = PlatformRegistry().get_codegen_platform()
+            model.set_suppress_output(True)
+        
+            split_prompt = f"""
+    # 代码文件切分任务
+
+    ## 任务描述
+    你需要根据补丁内容，将源文件切分为需要修改和不需要修改的部分。
+
+    ## 输入资料
+    ### 源文件内容
+    ```
+    {old_file_content["stdout"]}
+    ```
+
+    ### 补丁内容
+    ```
+    {patch_content}
+    ```
+
+    ## 切分要求
+    1. 必须按照语法边界切分，如：不能将函数切开
+    2. 按照要修改的和不修改的内容切分，不可以出现连续的不修改内容和修改内容
+    3. 如果需要插入内容，可以将插入内容的前一个语法单元（函数）识别为修改内容
+    4. 所有切分的块必须连续
+    5. 第一个块的起始位置为1，最后一个块的结束位置为文件行数
+
+    ## 输出格式
+    仅输出如下格式的切分结果：
+    <SPLIT_FILE>
+    [起始行,结束行]: 需要修改/不修改原因
+    [起始行,结束行]: 需要修改/不修改原因
+    ...
+    </SPLIT_FILE>
+    """
+            with spinner.hidden():
+                response = model.chat_until_success(split_prompt)
+            split_match = re.search(r'<SPLIT_FILE>\n(.*?)\n</SPLIT_FILE>', response, re.DOTALL)
+            
+            if not split_match:
+                spinner.text = "文件切分失败"
+                spinner.fail("❌")
+                return None
+            spinner.text = "文件切分完成"
+            spinner.ok("✅")
+        
+        with yaspin(text="正在验证文件切分...", color="cyan") as spinner:
+            split_content = split_match.group(1).strip().splitlines()
+            file_sections = []
+            
+            for line in split_content:
+                match = re.match(r'\[(\d+),(\d+)\]:\s*(.*)', line)
+                if match:
+                    start_line = int(match.group(1))
+                    end_line = int(match.group(2))
+                    file_sections.append((start_line, end_line, match.group(3)))
+            # 第一个块的起始位置为1
+            if file_sections[0][0] != 1:
+                spinner.text = "第一个块的起始位置不为1"
+                spinner.fail("❌")
+                return None
+            # 最后一个块的结束位置为文件行数
+            if file_sections[-1][1] != line_count:
+                spinner.text = "最后一个块的结束位置不为文件行数"
+                spinner.fail("❌")
+                return None
+            # 所有切分的块必须连续
+            for i in range(len(file_sections)):
+                if i == 0:
+                    continue
+                if file_sections[i][0] != file_sections[i-1][1]+1:
+                    spinner.text = "文件切分块不连续"
+                    spinner.fail("❌")
+                    return None
+            spinner.text = "文件切分验证通过"
+            spinner.ok("✅")
+        return file_sections
+        
+
+    except Exception:
+        pass
+
+def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
+    """处理大型代码文件的补丁操作"""
+    file_sections = split_large_file(filepath, patch_content)
+    
+    if not file_sections:
+        return False
+    
+    with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
+        try:
+            # 读取原始文件内容
+            old_file_content = ReadCodeTool().execute({"files": [{"path": filepath}]})
+            if not old_file_content["success"]:
+                spinner.text = "文件读取失败"
+                spinner.fail("❌")
+                return False
+            
+            model = PlatformRegistry().get_codegen_platform()
+            model.set_suppress_output(True)
+            
+            
+            sections_info = []
+            for i, (start_line, end_line, reason) in enumerate(file_sections):
+                sections_info.append(f"### 区块 {i+1} (行 {start_line}-{end_line}): {reason}")
+            
+            prompt = f"""
+# 代码修改专家指南
+
+## 任务描述
+你是一位精确的代码修改专家，需要根据补丁内容修改多个代码区块。
+
+## 输入资料
+
+### 原始代码
+{old_file_content["stdout"]}
+
+### 原始代码区块
+{"\n".join(sections_info)}
+
+### 补丁内容
+{patch_content}
+
+## 修改要求
+1. **精确性**：严格按照补丁的意图修改代码
+2. **完整性**：确保输出区块替换后的完整代码
+3. **一致性**：严格保留原始代码的格式、空行和缩进风格
+
+## 输出格式规范
+- 对每个区块，使用<REPLACE>标签输出修改后的代码
+- 每个<REPLACE>块必须包含section编号
+- 必须为所有需要修改的区块提供替换代码
+- 不要使用markdown代码块（```）或反引号
+- 除了修改后的代码，不要输出任何其他文本
+
+## 输出模板示例
+<REPLACE>
+section: 1
+[修改后的代码区块1]
+</REPLACE>
+
+<REPLACE>
+section: 3
+[修改后的代码区块3]
+</REPLACE>
+"""
+            # 获取所有修改后的代码
+            with spinner.hidden():
+                response = model.chat_until_success(prompt)
+
+            old_code = open(filepath, 'r', encoding='utf-8').readlines()
+            
+            # 解析响应，提取所有替换区块
+            replace_sections = []
+            for p in re.finditer(r'<REPLACE>\nsection: (\d+)\n(.*?)\n</REPLACE>', response, re.DOTALL):
+                replace_sections.append((p.group(1), p.group(2)))
+
+            replace_sections.sort(key=lambda x: int(x[0]), reverse=True)
+            # 重建文件内容
+            for section_num, modified_code in replace_sections:
+                start_line = file_sections[int(section_num)-1][0]
+                end_line = file_sections[int(section_num)-1][1]
+                old_code[start_line-1:end_line] = modified_code.splitlines()
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("\n".join(old_code))
+
+            spinner.text = "文件修改完成"
+            spinner.ok("✅")
+            return True
+            
+        except Exception as e:
+            spinner.text = f"文件修改失败: {str(e)}"
             spinner.fail("❌")
             return False
