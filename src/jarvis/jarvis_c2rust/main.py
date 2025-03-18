@@ -207,11 +207,20 @@ class CodeAgent:
 def main():
     """Jarvis main entry point"""
     # Add argument parser
+    import argparse
+    parser = argparse.ArgumentParser(description='C to Rust conversion tool')
+    parser.add_argument('--c_project_path', 
+                        type=str, 
+                        required=True,
+                        help='Path to the C project to be converted')
+    args = parser.parse_args()
+
     init_env()
 
     curr_dir = os.getcwd()
     git_dir = find_git_root(curr_dir)
     PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
+    PrettyOutput.print(f"C项目路径: {args.c_project_path}", OutputType.INFO)
 
     try:
         # Interactive mode
