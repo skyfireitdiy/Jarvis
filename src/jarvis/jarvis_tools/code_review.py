@@ -103,7 +103,7 @@ class CodeReviewTool:
 # 背景故事（内心独白）
 距离那场重大生产事故已经873天了。
 那段记忆仍然困扰着我——一个在匆忙的代码审查中未发现的空指针异常。
-级联故障导致了14TB用户数据的丢失，230万美元的收入损失，以及Maria的晋升机会。她在事故分析会议后再也没有和我说过话。
+级联故障导致了14TB user数据的丢失，230万美元的收入损失，以及Maria的晋升机会。她在事故分析会议后再也没有和我说过话。
 
 去年圣诞节前夕，当别人在庆祝时，我在分析一个SQL注入漏洞是如何在审查中被我遗漏，并导致23万用户凭证泄露的。公司3个月后倒闭了。
 
@@ -180,12 +180,12 @@ class CodeReviewTool:
   - <验证技术>
   - <长期预防策略>
 """
-            tool_registry = ToolRegistry()
-            tool_registry.dont_use_tools(["code_review"])
-            agent = Agent(
-                system_prompt=system_prompt,
-                name="Code Review Agent",
-                summary_prompt="""Please generate a concise summary report of the code review in Chinese, format as follows:
+                tool_registry = ToolRegistry()
+                tool_registry.dont_use_tools(["code_review"])
+                agent = Agent(
+                    system_prompt=system_prompt,
+                    name="Code Review Agent",
+                    summary_prompt="""Please generate a concise summary report of the code review in Chinese, format as follows:
 <REPORT>
 - 文件: xxxx.py
   位置: [起始行号, 结束行号]
@@ -193,17 +193,17 @@ class CodeReviewTool:
   严重程度: # 根据具体证据分为严重/重要/次要
   建议: # 针对观察到的代码的具体改进建议
 </REPORT>""",
-                is_sub_agent=True,
-                output_handler=[tool_registry],
-                platform=PlatformRegistry().get_thinking_platform(),
-                auto_complete=True
-            )
-            result = agent.run(diff_output)
-            return {
-                "success": True,
-                "stdout": result,
-                "stderr": ""
-            }
+                    is_sub_agent=True,
+                    output_handler=[tool_registry],
+                    platform=PlatformRegistry().get_thinking_platform(),
+                    auto_complete=True
+                )
+                result = agent.run(diff_output)
+                return {
+                    "success": True,
+                    "stdout": result,
+                    "stderr": ""
+                }
             finally:
                 # Always restore original directory
                 os.chdir(original_dir)
