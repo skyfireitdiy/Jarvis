@@ -1,3 +1,4 @@
+from posixpath import abspath
 import subprocess
 import os
 
@@ -289,7 +290,7 @@ def main():
 
     # 将C项目路径转换为绝对路径
     c_project_abs_path = os.path.abspath(args.c_project_path)
-    curr_dir = os.getcwd()
+    curr_dir = abspath(os.getcwd())
     git_dir = find_git_root(curr_dir)
     PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
     PrettyOutput.print(f"C项目路径: {c_project_abs_path}", OutputType.INFO)
