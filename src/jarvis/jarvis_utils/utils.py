@@ -59,7 +59,7 @@ def get_file_md5(filepath: str)->str:
     Returns:
         str: MD5 hash of the file's content
     """
-    return hashlib.md5(open(filepath, "rb", errors="ignore").read(100*1024*1024)).hexdigest()
+    return hashlib.md5(open(filepath, "rb").read(100*1024*1024)).hexdigest()
 def user_confirm(tip: str, default: bool = True) -> bool:
     """Prompt the user for confirmation with a yes/no question.
     

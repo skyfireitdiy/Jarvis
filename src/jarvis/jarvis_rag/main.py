@@ -49,7 +49,7 @@ class TextFileProcessor(FileProcessor):
         """Determine if the file is a text file by trying to decode it"""
         try:
             # Read the first part of the file to detect encoding
-            with open(file_path, 'rb', errors="ignore") as f:
+            with open(file_path, 'rb') as f:
                 sample = f.read(TextFileProcessor.SAMPLE_SIZE)
                 
             # Check if it contains null bytes (usually represents a binary file)
@@ -80,7 +80,7 @@ class TextFileProcessor(FileProcessor):
         detected_encoding = None
         try:
             # First try to detect encoding
-            with open(file_path, 'rb', errors="ignore") as f:
+            with open(file_path, 'rb') as f:
                 raw_data = f.read()
                 
             # Try different encodings
