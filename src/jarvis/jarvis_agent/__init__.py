@@ -6,6 +6,10 @@ import yaml
 from yaspin import yaspin
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
+from jarvis.jarvis_code_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_code_agent.file_input_handler import file_input_handler
+from jarvis.jarvis_code_agent.patch import PatchOutputHandler
+from jarvis.jarvis_code_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -553,7 +557,7 @@ def main():
 
     try:
         # 获取全局模型实例
-        agent = Agent(system_prompt=origin_agent_system_prompt, platform=args.platform, model_name=args.model, output_handler=[ToolRegistry()])
+        agent = Agent(system_prompt=origin_agent_system_prompt, platform=args.platform, model_name=args.model, input_handler=[file_input_handler, shell_input_handler, builtin_input_handler] ,output_handler=[ToolRegistry(), PatchOutputHandler()])
 
         # 加载预定义任务
         tasks = _load_tasks()
