@@ -14,9 +14,14 @@ import subprocess
 from typing import List, Tuple, Dict
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def find_git_root(start_dir="."):
-    """切换到给定路径的Git根目录"""
+    """切换到给定路径的Git根目录，如果不是Git仓库则初始化"""
     os.chdir(start_dir)
-    git_root = os.popen("git rev-parse --show-toplevel").read().strip()
+    try:
+        git_root = os.popen("git rev-parse --show-toplevel").read().strip()
+    except subprocess.CalledProcessError:
+        # 如果不是Git仓库，初始化一个新的
+        subprocess.run(["git", "init"], check=True)
+        git_root = os.path.abspath(".")
     os.chdir(git_root)
     return git_root
 def has_uncommitted_changes():
