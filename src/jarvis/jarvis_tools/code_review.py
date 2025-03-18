@@ -33,6 +33,11 @@ class CodeReviewTool:
             "end_commit": {
                 "type": "string",
                 "description": "结束提交SHA（review_type='range'时必填）"
+            },
+            "root_dir": {
+                "type": "string",
+                "description": "代码库根目录路径（可选）",
+                "default": "."
             }
         },
         "required": []
@@ -41,8 +46,16 @@ class CodeReviewTool:
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
             review_type = args.get("review_type", "current").strip()
+            root_dir = args.get("root_dir", ".")
             
-            # Build git diff command based on review type
+            # Store current directory
+            original_dir = os.getcwd()
+            
+            try:
+                # Change to root_dir
+                os.chdir(root_dir)
+                
+                # Build git diff command based on review type
             with yaspin(text="正在获取代码变更...", color="cyan") as spinner:
                 if review_type == "commit":
                     if "commit_sha" not in args:
@@ -191,7 +204,10 @@ class CodeReviewTool:
                 "stdout": result,
                 "stderr": ""
             }
-            
+            finally:
+                # Always restore original directory
+                os.chdir(original_dir)
+                
         except Exception as e:
             return {
                 "success": False,
@@ -218,6 +234,7 @@ def main():
     parser.add_argument('--commit', help='Commit SHA to review (required for commit type)')
     parser.add_argument('--start-commit', help='Start commit SHA (required for range type)')
     parser.add_argument('--end-commit', help='End commit SHA (required for range type)')
+    parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
     args = parser.parse_args()
     
     # Validate arguments
@@ -228,7 +245,8 @@ def main():
     
     tool = CodeReviewTool()
     tool_args = {
-        "review_type": args.type
+        "review_type": args.type,
+        "root_dir": args.root_dir
     }
     if args.commit:
         tool_args["commit_sha"] = args.commit
