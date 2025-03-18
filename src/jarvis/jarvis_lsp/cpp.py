@@ -9,7 +9,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class CPPLSP(BaseLSP):
     """C++ LSP implementation using clangd."""
     
-    language = "cpp"
+    language = ["cpp", "c"]
 
     @staticmethod
     def check() -> bool:

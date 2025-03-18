@@ -98,7 +98,11 @@ class LSPRegistry:
                             if hasattr(obj, 'check'):
                                 if not obj.check(): # type: ignore
                                     continue
-                            lsp_servers[obj.language] = obj
+                            if isinstance(obj.language, str):
+                                lsp_servers[obj.language] = obj
+                            elif isinstance(obj.language, list):
+                                for lang in obj.language: # type: ignore
+                                    lsp_servers[lang] = obj
                             break
                 except Exception as e:
                     PrettyOutput.print(f"加载 LSP {module_name} 失败: {str(e)}", OutputType.ERROR)

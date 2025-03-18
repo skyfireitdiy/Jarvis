@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple, Any, Union
 
 class BaseLSP(ABC):
     """Base class for Language Server Protocol integration.
@@ -11,7 +11,7 @@ class BaseLSP(ABC):
     4. Symbol analysis
     """
     
-    language: str = ""  # Language identifier, should be overridden by subclasses
+    language: Union[str, List[str]] = ""  # Language identifier, should be overridden by subclasses
     
     @abstractmethod
     def initialize(self, workspace_path: str) -> bool:
