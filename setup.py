@@ -1,6 +1,3 @@
-================================================================================
-文件: /home/wangmaobin/code/Jarvis/setup.py
-行: [1-85]
 from setuptools import setup, find_packages
 from setuptools.command.install import install
 import subprocess
@@ -88,6 +85,3 @@ setup(
         'install': CustomInstallCommand,  # 注册自定义安装命令
     },
 )
-
-
-================================================================================
