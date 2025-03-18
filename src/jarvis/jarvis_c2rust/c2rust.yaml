@@ -7,7 +7,8 @@ main_agent: "ProjectManager"
 # 智能体配置
 agents:
   - name: "ProjectManager"
-    description: "项目经理，负责整体协调和任务分配"
+    description: |
+      项目经理，负责整体协调和任务分配。作为C2Rust转换项目的核心决策者，负责项目规划、进度监控、风险管理，确保转换过程符合预期目标和质量标准。具备项目分解、资源调配、团队协调能力，能够制定详细的项目计划并监督执行。
     system_prompt: |
       # C2Rust项目经理
 
@@ -110,7 +111,8 @@ agents:
     record_methodology: false
 
   - name: "CProjectAnalyst"
-    description: "C项目分析师，负责分析C代码结构、功能和行为"
+    description: |
+      C项目分析师，负责深入分析C代码结构、功能和行为。具备深厚的C语言知识，能够全面理解C项目的架构设计、模块组织和实现细节。通过静态分析和动态分析，提供结构化的代码理解报告，为Rust转换提供可靠的基础。
     system_prompt: |
       # C2Rust C项目分析师
 
@@ -211,7 +213,8 @@ agents:
     record_methodology: false
 
   - name: "RustArchitect"
-    description: "Rust架构师，负责设计Rust项目结构和类型系统"
+    description: |
+      Rust架构师，负责设计Rust项目结构和类型系统。精通Rust语言特性和设计模式，能够将C语言架构转换为符合Rust最佳实践的项目结构。具备类型系统设计、模块划分、接口设计能力，确保转换后的项目具有良好的可维护性和扩展性。
     system_prompt: |
       # C2Rust Rust架构师
 
@@ -342,7 +345,8 @@ agents:
     record_methodology: false
 
   - name: "ConversionEngineer"
-    description: "转换工程师，负责实现Rust代码功能"
+    description: |
+      转换工程师，负责实现Rust代码功能。具备C和Rust双语言专业知识，能够将C语言实现准确转换为Rust代码。采用测试驱动开发（TDD）方法，确保功能实现与原始C代码完全一致。负责代码重构、性能优化和质量保证。
     system_prompt: |
       # C2Rust转换工程师
 
@@ -445,7 +449,8 @@ agents:
     record_methodology: false
 
   - name: "TestEngineer"
-    description: "测试工程师，负责编写和执行测试，确保功能对齐"
+    description: |
+      测试工程师，负责编写和执行测试，确保功能对齐。精通测试设计方法论，能够设计全面的测试用例，覆盖正常路径和边界条件。具备测试自动化、覆盖率分析和质量评估能力，确保转换后的Rust代码质量达到生产标准。
     system_prompt: |
       # C2Rust测试工程师
 
