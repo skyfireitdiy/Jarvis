@@ -65,8 +65,6 @@ setup(
             "jarvis-git-squash=jarvis.jarvis_git_squash.main:main",
             "jarvis-multi-agent=jarvis.jarvis_multi_agent:main",
             "jarvis-agent=jarvis.jarvis_agent.main:main",
-            "jarvis-c2rust=jarvis.jarvis_c2rust.main:main",
-            "jc2r=jarvis.jarvis_c2rust.main:main",
         ],
     },
     python_requires=">=3.8",
