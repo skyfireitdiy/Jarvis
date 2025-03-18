@@ -34,7 +34,8 @@ class CodeAgent:
                                  "lsp_get_diagnostics", 
                                  "lsp_find_references", 
                                  "lsp_find_definition",
-                                 "treesitter_analyzer", 
+                                 "treesitter_analyzer",
+                                 "code_review"  # 新增代码审查工具
                                  ])
         code_system_prompt = """
 # 专业代码工程师
@@ -116,6 +117,7 @@ class CodeAgent:
 
 - **验证工具**：
   - lsp_get_diagnostics：用于修改后检查
+  - code_review：用于代码审查
 
 - **系统工具**：
   - execute_shell：用于git操作和grep搜索
