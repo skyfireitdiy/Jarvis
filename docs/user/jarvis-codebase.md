@@ -58,7 +58,3 @@ jarvis-codebase ask "如何处理用户认证？"
 jarvis-codebase export
 ```
 
-## 相关文档
-- [代码库索引管理](codebase-index.md)
-- [代码搜索指南](code-search.md)
-- [代码库问答最佳实践](codebase-qa.md)

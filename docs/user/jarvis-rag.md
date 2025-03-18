@@ -52,8 +52,3 @@ jarvis-rag --search "人工智能发展趋势"
 ```bash
 jarvis-rag --ask "机器学习的主要应用领域有哪些？"
 ```
-
-## 相关文档
-- [文档索引管理](document-indexing.md)
-- [文档搜索指南](document-search.md)
-- [文档问答最佳实践](document-qa.md)

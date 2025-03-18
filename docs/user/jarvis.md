@@ -56,8 +56,3 @@ jarvis --platform openai --model gpt-4
 # 在 ~/.jarvis/pre-command 或 .jarvis/pre-command 中定义任务后
 jarvis
 ```
-
-## 相关文档
-- [Jarvis 执行协议](execution-protocol.md)
-- [任务定义指南](task-definition.md)
-- [方法论模板](methodology-template.md)
