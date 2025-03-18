@@ -223,18 +223,21 @@ def main():
     PrettyOutput.print(f"C项目路径: {args.c_project_path}", OutputType.INFO)
 
     try:
-        # Interactive mode
-        while True:
-            try:
-                user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
-                if not user_input:
-                    break
-                agent = CodeAgent()
-                agent.run(user_input)
-                
-            except Exception as e:
-                PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
+        # 拼接任务提示词
+        task_prompt = f"""
+将位于 {args.c_project_path} 目录下的C项目转换为Rust项目，
+Rust项目将位于当前目录 {curr_dir}。
+请按照以下步骤进行转换：
 
+1. 分析C项目结构
+2. 创建对应的Rust项目结构
+3. 逐个转换C文件到Rust文件
+4. 确保类型安全和内存安全
+5. 保留原有功能的同时优化代码结构
+"""
+        agent = CodeAgent()
+        agent.run(task_prompt)
+                
     except Exception as e:
         PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
         return 1
