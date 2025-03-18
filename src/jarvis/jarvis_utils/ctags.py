@@ -1,20 +1,22 @@
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Tuple
 from functools import lru_cache
 
 @lru_cache(maxsize=128)
-def get_symbol_location(symbol: str, source_dir: str) -> Optional[Tuple[str, int]]:
+def get_symbol_locations(symbol: str, source_dir: str) -> List[Tuple[str, int]]:
     """
-    使用ctags获取指定符号的位置信息
+    使用ctags获取指定符号的所有位置信息
     
     Args:
         symbol (str): 要查找的符号名称
         source_dir (str): 源代码目录路径
     
     Returns:
-        Optional[Tuple[str, int]]: 返回包含文件路径和行号的元组，如果未找到则返回None
+        List[Tuple[str, int]]: 返回包含文件路径和行号的元组列表，如果未找到则返回空列表
     """
+    locations = []
+    
     # 生成tags文件
     tags_file = Path(source_dir) / 'tags'
     try:
@@ -33,6 +35,6 @@ def get_symbol_location(symbol: str, source_dir: str) -> Optional[Tuple[str, int
                 if len(parts) >= 4:
                     file_path = parts[1]
                     line_number = int(parts[3].split(';')[0])
-                    return (file_path, line_number)
+                    locations.append((file_path, line_number))
     
-    return None
+    return locations
