@@ -79,6 +79,7 @@ class FileCompleter(Completer):
                 ('<Web>', '网页搜索'),
                 ('<RAG>', '知识库检索'),
                 ('<Summary>', '总结'),
+                ('<Clear>', '清除历史'),
             ]
             for name, desc in default_suggestions:
                 yield Completion(
