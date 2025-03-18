@@ -2,7 +2,6 @@
 
 from typing import Any, Tuple
 
-from jarvis.jarvis_tools.execute_shell_script import ShellScriptTool
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import user_confirm

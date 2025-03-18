@@ -1,17 +1,14 @@
-import re
 import subprocess
 import os
-from typing import Any, Tuple
 
 from yaspin import yaspin
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_code_agent.builtin_input_handler import builtin_input_handler
-from jarvis.jarvis_code_agent.file_input_handler import file_input_handler
-from jarvis.jarvis_code_agent.shell_input_handler import shell_input_handler
-from jarvis.jarvis_code_agent.patch import PatchOutputHandler
+from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.file_input_handler import file_input_handler
+from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
+from jarvis.jarvis_agent.patch import PatchOutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 
 from jarvis.jarvis_tools.registry import ToolRegistry

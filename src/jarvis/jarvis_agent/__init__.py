@@ -6,10 +6,10 @@ import yaml
 from yaspin import yaspin
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
-from jarvis.jarvis_code_agent.builtin_input_handler import builtin_input_handler
-from jarvis.jarvis_code_agent.file_input_handler import file_input_handler
-from jarvis.jarvis_code_agent.patch import PatchOutputHandler
-from jarvis.jarvis_code_agent.shell_input_handler import shell_input_handler
+from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.file_input_handler import file_input_handler
+from jarvis.jarvis_agent.patch import PatchOutputHandler
+from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
