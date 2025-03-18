@@ -74,7 +74,7 @@ class ShellTool:
             tee_command = f"script -q -c '{escaped_command}' {output_file}"
             
             # Execute command and capture return code
-            return_code = os.system(tee_command)
+            os.system(tee_command)
             
             # Read and process output file
             try:
