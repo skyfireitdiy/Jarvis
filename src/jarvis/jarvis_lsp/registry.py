@@ -11,9 +11,7 @@ REQUIRED_METHODS = [
     ('initialize', ['workspace_path']),
     ('find_references', ['file_path', 'position']),
     ('find_definition', ['file_path', 'position']),
-    ('get_document_symbols', ['file_path']),
     ('get_diagnostics', ['file_path']),
-    ('prepare_rename', ['file_path', 'position']),
     ('shutdown', [])
 ]
 
@@ -192,14 +190,8 @@ def main():
         PrettyOutput.print("LSP 初始化失败", OutputType.WARNING)
         return 1
     
-    try:
-        # Execute requested action
-        if args.action == 'symbols':
-            symbols = lsp.get_document_symbols(args.file)
-            for symbol in symbols:
-                print(f"Symbol {LSPRegistry.get_text_at_position(args.file, symbol['range']['start']['line'], symbol['range']['start']['character'])} at {symbol['range']['start']['line']}:{symbol['range']['start']['character']}: {symbol['uri']}")
-                
-        elif args.action == 'diagnostics':
+    try:        
+        if args.action == 'diagnostics':
             diagnostics = lsp.get_diagnostics(args.file)
             for diag in diagnostics:
                 severity = ['Error', 'Warning', 'Info', 'Hint'][diag['severity'] - 1]

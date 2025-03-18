@@ -87,12 +87,6 @@ class GoLSP(BaseLSP):
         })
         return result[0] if result else None
     
-    def get_document_symbols(self, file_path: str) -> List[Dict[str, Any]]:
-        result = self._send_request("textDocument/documentSymbol", {
-            "textDocument": {"uri": f"file://{file_path}"}
-        })
-        return result or [] # type: ignore
-    
     def get_diagnostics(self, file_path: str) -> List[Dict[str, Any]]:
         # Send didOpen notification to trigger diagnostics
         self._send_request("textDocument/didOpen", {
@@ -112,13 +106,6 @@ class GoLSP(BaseLSP):
         except Exception:
             pass
         return []
-    
-    def prepare_rename(self, file_path: str, position: Tuple[int, int]) -> Optional[Dict[str, Any]]:
-        result = self._send_request("textDocument/prepareRename", {
-            "textDocument": {"uri": f"file://{file_path}"},
-            "position": {"line": position[0], "character": position[1]}
-        })
-        return result
     
     
     def shutdown(self):

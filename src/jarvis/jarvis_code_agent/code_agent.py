@@ -34,11 +34,9 @@ class CodeAgent:
                                  "create_code_agent",
                                  "ask_user",  
                                  "ask_codebase",
-                                 "lsp_get_document_symbols", 
                                  "lsp_get_diagnostics", 
                                  "lsp_find_references", 
                                  "lsp_find_definition", 
-                                 "lsp_prepare_rename"
                                  ])
         code_system_prompt = """
 # 专业代码工程师
@@ -60,7 +58,6 @@ class CodeAgent:
 
 ## 任务执行规范
 ### 分析阶段
-- 使用lsp_get_document_symbols映射代码结构
 - 通过lsp_find_references和lsp_find_definition追踪依赖关系
 - 在进行更改前识别潜在影响区域
 - 为安全创建回滚计划
@@ -97,7 +94,6 @@ class CodeAgent:
 3. **验证清单**：
    - 运行lsp_get_diagnostics确保零错误
    - 使用lsp_find_references确认影响范围
-   - 用lsp_prepare_rename验证重命名安全性
 
 4. **修改后流程**：
    - 代码审查模拟
@@ -106,12 +102,10 @@ class CodeAgent:
 
 ## 工具使用指南
 - **分析工具**：
-  - lsp_get_document_symbols：用于映射代码结构
   - lsp_find_references：用于理解使用模式
   - lsp_find_definition：用于追踪实现细节
 
 - **验证工具**：
-  - lsp_prepare_rename：用于安全重构检查
   - lsp_get_diagnostics：用于修改后检查
 
 - **系统工具**：

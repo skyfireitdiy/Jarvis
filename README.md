@@ -107,9 +107,6 @@ jarvis-git-squash --help
 | create_sub_agent | 创建子代理 |
 | lsp_find_definition | 查找符号定义 |
 | lsp_find_references | 查找符号引用 |
-| lsp_get_diagnostics | 获取代码诊断信息 |
-| lsp_get_document_symbols | 获取文档符号 |
-| lsp_prepare_rename | 准备符号重命名 |
 | lsp_validate_edit | 验证代码编辑 |
 | rag | 文档检索和问答 |
 | select_code_files | 选择代码文件 |

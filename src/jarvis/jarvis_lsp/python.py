@@ -54,16 +54,6 @@ class PythonLSP(BaseLSP):
             }
         }
     
-    def get_document_symbols(self, file_path: str) -> List[Dict[str, Any]]:
-        script = self._get_script(file_path)
-        if not script:
-            return []
-        try:
-            names = script.get_names()
-            return [self._location_to_dict(name) for name in names]
-        except Exception:
-            return []
-    
     def get_diagnostics(self, file_path: str) -> List[Dict[str, Any]]:
         script = self._get_script(file_path)
         if not script:
@@ -81,25 +71,6 @@ class PythonLSP(BaseLSP):
             } for e in errors]
         except Exception:
             return []
-    
-    def prepare_rename(self, file_path: str, position: Tuple[int, int]) -> Optional[Dict[str, Any]]:
-        script = self._get_script(file_path)
-        if not script:
-            return None
-        try:
-            refs = script.get_references(line=position[0] + 1, column=position[1])
-            if refs:
-                ref = refs[0]
-                return {
-                    "range": {
-                        "start": {"line": ref.line - 1, "character": ref.column},
-                        "end": {"line": ref.line - 1, "character": ref.column + len(ref.name)}
-                    }
-                }
-        except Exception:
-            return None
-        return None
-    
     
     def shutdown(self):
         self.script_cache.clear()

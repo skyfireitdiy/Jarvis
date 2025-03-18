@@ -67,17 +67,6 @@ class BaseLSP(ABC):
         """
         return None
     
-    @abstractmethod
-    def get_document_symbols(self, file_path: str) -> List[Dict[str, Any]]:
-        """Get all symbols in document.
-        
-        Args:
-            file_path: Path to the file
-            
-        Returns:
-            List of symbols with their locations and types
-        """
-        return []
     
     @abstractmethod
     def get_diagnostics(self, file_path: str) -> List[Dict[str, Any]]:
@@ -111,19 +100,6 @@ class BaseLSP(ABC):
             ]
         """
         return []
-    
-    @abstractmethod
-    def prepare_rename(self, file_path: str, position: Tuple[int, int]) -> Optional[Dict[str, Any]]:
-        """Check if symbol at position can be renamed.
-        
-        Args:
-            file_path: Path to the file
-            position: Symbol position
-            
-        Returns:
-            Range that would be renamed or None if rename not allowed
-        """
-        return None
     
     
     def shutdown(self):

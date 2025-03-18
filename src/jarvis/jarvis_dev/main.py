@@ -909,7 +909,7 @@ def create_dev_team() -> MultiAgent:
     BA_output_handler.use_tools(["ask_user", "file_operation", "search_web", "rag", "execute_shell"])
 
     SA_output_handler = ToolRegistry()
-    SA_output_handler.use_tools(["file_operation", "search_web", "rag", "ask_codebase", "lsp_get_document_symbols", "execute_shell"])
+    SA_output_handler.use_tools(["file_operation", "search_web", "rag", "ask_codebase", "execute_shell"])
     
     TL_output_handler = ToolRegistry()
     TL_output_handler.use_tools(["file_operation", "ask_codebase", "lsp_get_diagnostics", "lsp_find_references", "lsp_find_definition", "execute_shell"])
