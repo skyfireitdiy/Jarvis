@@ -18,6 +18,9 @@ def find_git_root(start_dir="."):
     os.chdir(start_dir)
     try:
         git_root = os.popen("git rev-parse --show-toplevel").read().strip()
+        if not git_root:
+            subprocess.run(["git", "init"], check=True)
+            git_root = os.path.abspath(".")
     except subprocess.CalledProcessError:
         # 如果不是Git仓库，初始化一个新的
         subprocess.run(["git", "init"], check=True)
