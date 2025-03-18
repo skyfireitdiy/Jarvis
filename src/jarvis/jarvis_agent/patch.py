@@ -99,7 +99,10 @@ def _parse_patch(patch_str: str) -> Dict[str, str]:
                 PrettyOutput.print("无效的补丁格式", OutputType.WARNING)
                 continue
             filepath = sm.group(1).strip()
-            result[filepath] = patch
+            if filepath not in result:
+                result[filepath] = patch
+            else:
+                result[filepath] += "\n\n" + patch
     return result
 
 def apply_patch(output_str: str) -> str:
