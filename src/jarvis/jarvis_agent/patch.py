@@ -211,7 +211,7 @@ def get_diff() -> str:
             check=True
         )
         ret = result.stdout
-        subprocess.run(['git', "reset", "--soft", "HEAD"], check=True)
+        subprocess.run(['git', "reset", "--mixed", "HEAD"], check=True)
         return ret
     except subprocess.CalledProcessError as e:
         return f"获取差异失败: {str(e)}"

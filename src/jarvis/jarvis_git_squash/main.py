@@ -18,7 +18,7 @@ class GitSquashTool:
         """Perform soft reset to specified commit hash"""
         try:
             subprocess.Popen(
-                ["git", "reset", "--soft", commit_hash],
+                ["git", "reset", "--mixed", commit_hash],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             ).wait()

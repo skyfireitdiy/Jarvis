@@ -178,7 +178,7 @@ class CodeAgent:
             if commits and user_confirm("是否接受以上提交记录？", True):
                 if len(commits) > 1 and user_confirm("是否要合并为一个更清晰的提交记录？", True):
                     # Reset to start commit
-                    subprocess.run(["git", "reset", "--soft", start_commit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(["git", "reset", "--mixed", start_commit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     # Create new commit
                     git_commiter = GitCommitTool()
                     git_commiter.execute({})
