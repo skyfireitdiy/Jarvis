@@ -207,6 +207,8 @@ class Agent:
             try:
                 with spinner.hidden():
                     summary = self._call_model(self.prompt + "\n" + prompt)
+
+                self.model.delete_chat() # type: ignore
                 
                 # 清空当前对话历史，但保留系统消息
                 self.conversation_length = 0  # Reset conversation length
