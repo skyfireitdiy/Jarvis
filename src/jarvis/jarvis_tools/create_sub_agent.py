@@ -1,4 +1,5 @@
 from typing import Dict, Any
+import os
 
 
 from jarvis.jarvis_agent import Agent, origin_agent_system_prompt
@@ -30,8 +31,13 @@ class SubAgentTool:
                 "description": "任务的完成目标",
                 "default": ""
             },
+            "root_dir": {
+                "type": "string",
+                "description": "任务执行的根目录路径（可选）",
+                "default": "."
+            }
         },
-        "required": ["agent_name", "task", "context", "goal"]
+        "required": ["agent_name", "task"]
     }
 
 
@@ -42,6 +48,7 @@ class SubAgentTool:
             task = args["task"]
             context = args.get("context", "")
             goal = args.get("goal", "")
+            root_dir = args.get("root_dir", ".")
 
             PrettyOutput.print(f"创建子代理: {agent_name}", OutputType.INFO)
 
@@ -53,22 +60,32 @@ class SubAgentTool:
                 task_description += f"\n\nCompletion goal:\n{goal}"
 
 
-            # Create sub-agent
-            sub_agent = Agent(
-                system_prompt=origin_agent_system_prompt,
-                name=f"Agent({agent_name})",
-                is_sub_agent=True
-            )
+            # Store current directory
+            original_dir = os.getcwd()
 
-            # Run sub-agent, pass file list
-            PrettyOutput.print("子代理开始执行任务...", OutputType.INFO)
-            result = sub_agent.run(task_description)
+            try:
+                # Change to root_dir
+                os.chdir(root_dir)
 
-            return {
-                "success": True,
-                "stdout": f"Sub-agent task completed\n\n{result}",
-                "stderr": ""
-            }
+                # Create sub-agent
+                sub_agent = Agent(
+                    system_prompt=origin_agent_system_prompt,
+                    name=f"Agent({agent_name})",
+                    is_sub_agent=True
+                )
+
+                # Run sub-agent, pass file list
+                PrettyOutput.print("子代理开始执行任务...", OutputType.INFO)
+                result = sub_agent.run(task_description)
+
+                return {
+                    "success": True,
+                    "stdout": f"Sub-agent task completed\n\n{result}",
+                    "stderr": ""
+                }
+            finally:
+                # Always restore original directory
+                os.chdir(original_dir)
 
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
