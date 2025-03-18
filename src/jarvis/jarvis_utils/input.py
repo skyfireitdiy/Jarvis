@@ -77,7 +77,8 @@ class FileCompleter(Completer):
             default_suggestions = [
                 ('<CodeBase>', '查询代码库'),
                 ('<Web>', '网页搜索'),
-                ('<RAG>', '知识库检索')
+                ('<RAG>', '知识库检索'),
+                ('<Summary>', '总结'),
             ]
             for name, desc in default_suggestions:
                 yield Completion(
