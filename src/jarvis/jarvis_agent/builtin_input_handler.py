@@ -63,8 +63,11 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             agent._summarize_and_clear_history()
             if not user_input.strip():
                 return "", True
+        elif tag == "Clear":
+            user_input = user_input.replace(f"'<{tag}>'", "")
+            agent.clear()
+            if not user_input.strip():
+                return "", True
         # 移除对未知标记的警告输出
     
     return user_input, False
-
-
