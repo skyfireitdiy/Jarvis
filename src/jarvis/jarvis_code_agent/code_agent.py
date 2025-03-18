@@ -71,7 +71,6 @@ class CodeAgent:
 
 ### 验证阶段
 - 使用lsp_get_diagnostics进行全面诊断
-- 用lsp_prepare_rename验证所有重命名元素
 - 检查相关代码中的意外副作用
 - 确保必要的向后兼容性
 
