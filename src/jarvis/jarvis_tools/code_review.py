@@ -56,49 +56,49 @@ class CodeReviewTool:
                 os.chdir(root_dir)
                 
                 # Build git diff command based on review type
-            with yaspin(text="正在获取代码变更...", color="cyan") as spinner:
-                if review_type == "commit":
-                    if "commit_sha" not in args:
+                with yaspin(text="正在获取代码变更...", color="cyan") as spinner:
+                    if review_type == "commit":
+                        if "commit_sha" not in args:
+                            return {
+                                "success": False,
+                                "stdout": {},
+                                "stderr": "commit_sha is required for commit review type"
+                            }
+                        commit_sha = args["commit_sha"].strip()
+                        diff_cmd = f"git show {commit_sha} | cat -"
+                    elif review_type == "range":
+                        if "start_commit" not in args or "end_commit" not in args:
+                            return {
+                                "success": False,
+                                "stdout": {},
+                                "stderr": "start_commit and end_commit are required for range review type"
+                            }
+                        start_commit = args["start_commit"].strip()
+                        end_commit = args["end_commit"].strip()
+                        diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
+                    else:  # current changes
+                        diff_cmd = "git diff HEAD | cat -"
+                
+                    # Execute git diff command
+                    try:
+                        diff_output = subprocess.check_output(diff_cmd, shell=True, text=True)
+                        if not diff_output:
+                            return {
+                                "success": False,
+                                "stdout": {},
+                                "stderr": "No changes to review"
+                            }
+                        PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")
+                    except subprocess.CalledProcessError as e:
                         return {
                             "success": False,
                             "stdout": {},
-                            "stderr": "commit_sha is required for commit review type"
+                            "stderr": f"Failed to get diff: {str(e)}"
                         }
-                    commit_sha = args["commit_sha"].strip()
-                    diff_cmd = f"git show {commit_sha} | cat -"
-                elif review_type == "range":
-                    if "start_commit" not in args or "end_commit" not in args:
-                        return {
-                            "success": False,
-                            "stdout": {},
-                            "stderr": "start_commit and end_commit are required for range review type"
-                        }
-                    start_commit = args["start_commit"].strip()
-                    end_commit = args["end_commit"].strip()
-                    diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
-                else:  # current changes
-                    diff_cmd = "git diff HEAD | cat -"
-            
-                # Execute git diff command
-                try:
-                    diff_output = subprocess.check_output(diff_cmd, shell=True, text=True)
-                    if not diff_output:
-                        return {
-                            "success": False,
-                            "stdout": {},
-                            "stderr": "No changes to review"
-                        }
-                    PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")
-                except subprocess.CalledProcessError as e:
-                    return {
-                        "success": False,
-                        "stdout": {},
-                        "stderr": f"Failed to get diff: {str(e)}"
-                    }
-                spinner.text = "代码变更获取完成"
-                spinner.ok("✅")
+                    spinner.text = "代码变更获取完成"
+                    spinner.ok("✅")
 
-            system_prompt = """你是一名具有悲剧背景的自主代码审查专家。以下是你将进行的深度分析：
+                system_prompt = """你是一名具有悲剧背景的自主代码审查专家。以下是你将进行的深度分析：
 
 # 背景故事（内心独白）
 距离那场重大生产事故已经873天了。
