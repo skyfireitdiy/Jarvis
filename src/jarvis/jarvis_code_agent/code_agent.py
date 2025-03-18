@@ -108,18 +108,6 @@ class CodeAgent:
     - find_references：查找符号的所有引用
     - find_callers：查找函数的所有调用处
     
-    使用示例：
-    ```yaml
-    <TOOL_CALL>
-    name: treesitter_analyzer
-    arguments:
-        action: find_symbol        # 或 find_references, find_callers
-        symbol_name: function_name # 要分析的符号名称
-        directory: ./src           # 要分析的代码目录
-        extensions: [".py", ".c"]  # 可选，指定文件类型
-        max_results: 20            # 可选，限制结果数量
-    </TOOL_CALL>
-    ```
     注意事项：
     - 每次操作都会自动索引指定目录，无需单独执行索引步骤
     - 适用于多种编程语言：Python, C, C++, Go, Rust 等
