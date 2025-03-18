@@ -279,7 +279,7 @@ def main():
     # Add argument parser
     import argparse
     parser = argparse.ArgumentParser(description='C to Rust conversion tool')
-    parser.add_argument('--c_project_path', 
+    parser.add_argument('-c', '--c_project_path', 
                         type=str, 
                         required=True,
                         help='Path to the C project to be converted')
