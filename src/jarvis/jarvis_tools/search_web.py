@@ -168,7 +168,7 @@ class SearchTool:
             # Process each batch
             batch_results = []
             for i, batch in enumerate(batches, 1):
-                prompt = f"""Please analyze these search results to answer the question: {question}
+                prompt = f"""请分析以下搜索结果来回答问题：{question}
 
 Search results content (Batch {i}/{len(batches)}):
 {'-' * 40}
@@ -194,7 +194,7 @@ Format your response as a clear summary of findings from this batch."""
             batch_findings = '\n\n'.join(f'Batch {i+1}:\n{result}' for i, result in enumerate(batch_results))
             separator = '-' * 40
             
-            synthesis_prompt = f"""Please provide a comprehensive answer to the original question by synthesizing the findings from multiple batches of search results.
+            synthesis_prompt = f"""请通过综合多个批次的搜索结果，为原始问题提供一个全面的回答。
 
 Original Question: {question}
 
@@ -214,7 +214,7 @@ Please synthesize a final answer that:
             return final_response
 
         except Exception as e:
-            return f"Information extraction failed: {str(e)}"
+            return f"信息提取失败：{str(e)}"
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute search and extract information"""
