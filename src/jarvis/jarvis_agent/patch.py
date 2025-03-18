@@ -429,20 +429,19 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
             for match in diff_blocks:
                 search_text = match.group(1).strip()
                 replace_text = match.group(2).strip()
-                
+                patch_count += 1
                 # 检查搜索文本是否存在于文件中
                 if search_text in modified_content:
                     # 如果有多处，报错
                     if modified_content.count(search_text) > 1:
-                        spinner.text = f"补丁 #{patch_count+1} 应用失败：找到多个匹配的代码段"
+                        spinner.text = f"补丁 #{patch_count} 应用失败：找到多个匹配的代码段"
                         spinner.fail("❌")
                         return False
                     # 应用替换
                     modified_content = modified_content.replace(search_text, replace_text)
-                    patch_count += 1
-                    spinner.write(f"✅ 补丁 #{patch_count+1} 应用成功")
+                    spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
                 else:
-                    spinner.text = f"补丁 #{patch_count+1} 应用失败：无法找到匹配的代码段"
+                    spinner.text = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
                     spinner.fail("❌")
                     return False
             
