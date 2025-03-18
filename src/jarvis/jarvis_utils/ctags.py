@@ -1,7 +1,9 @@
 import subprocess
 from pathlib import Path
 from typing import Optional, Tuple
+from functools import lru_cache
 
+@lru_cache(maxsize=128)
 def get_symbol_location(symbol: str, source_dir: str) -> Optional[Tuple[str, int]]:
     """
     使用ctags获取指定符号的位置信息
