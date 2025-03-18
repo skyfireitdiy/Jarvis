@@ -168,20 +168,20 @@ class SearchTool:
             # Process each batch
             batch_results = []
             for i, batch in enumerate(batches, 1):
-                prompt = f"""请分析以下搜索结果来回答问题：{question}
+                prompt = f"""请根据以下搜索结果回答以下问题：{question}
 
-Search results content (Batch {i}/{len(batches)}):
+搜索结果内容 (第 {i} 批/{len(batches)}):
 {'-' * 40}
 {''.join(batch)}
 {'-' * 40}
 
-Please extract key information related to the question. Focus on:
-1. Relevant facts and details
-2. Maintaining objectivity
-3. Citing sources when appropriate
-4. Noting any uncertainties
+请提取与问题相关的关键信息。重点关注：
+1. 相关事实和细节
+2. 保持客观性
+3. 在适当的时候引用来源
+4. 注明任何不确定性
 
-Format your response as a clear summary of findings from this batch."""
+请将您的回答格式化为对本批次搜索结果的清晰总结。"""
 
                 response = self.model.chat_until_success(prompt)
                 batch_results.append(response)
@@ -196,19 +196,19 @@ Format your response as a clear summary of findings from this batch."""
             
             synthesis_prompt = f"""请通过综合多个批次的搜索结果，为原始问题提供一个全面的回答。
 
-Original Question: {question}
+原始问题: {question}
 
-Findings from each batch:
+各批次的发现:
 {separator}
 {batch_findings}
 {separator}
 
-Please synthesize a final answer that:
-1. Combines key insights from all batches
-2. Resolves any contradictions between sources
-3. Maintains clear source attribution
-4. Acknowledges any remaining uncertainties
-5. Provides a coherent and complete response to the original question"""
+请综合出一个最终答案，要求：
+1. 整合所有批次的关键见解
+2. 解决不同来源之间的矛盾
+3. 保持清晰的来源归属
+4. 承认任何剩余的不确定性
+5. 提供对原始问题的连贯完整的回答"""
 
             final_response = self.model.chat_until_success(synthesis_prompt)
             return final_response
