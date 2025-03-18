@@ -130,11 +130,7 @@ def apply_patch(output_str: str) -> str:
                     open(filepath, 'w', encoding='utf-8').close()
                     spinner.write("✅ 文件创建完成")
                 with spinner.hidden():
-                    retry_count = 3
                     while not handle_code_operation(filepath, patch_content):
-                        retry_count -= 1
-                        if retry_count > 0:
-                            continue
                         if user_confirm("补丁应用失败，是否重试？", default=True):
                             pass
                         else:
@@ -239,7 +235,12 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
     if get_file_line_count(filepath) < 30:
         return handle_small_code_operation(filepath, patch_content)
     else:
-        return handle_large_code_operation(filepath, patch_content)
+        retry_count = 3
+        while retry_count > 0:
+            retry_count -= 1
+            if handle_large_code_operation(filepath, patch_content):
+                return True
+        return handle_small_code_operation(filepath, patch_content)
 
 
 def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
