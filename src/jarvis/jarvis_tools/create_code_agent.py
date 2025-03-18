@@ -1,4 +1,5 @@
 from typing import Dict, Any
+import os
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.code_review import CodeReviewTool, extract_code_report
@@ -30,58 +31,64 @@ class CreateCodeAgentTool:
         try:
             requirement = args.get("requirement", "")
             root_dir = args.get("root_dir", ".")
-======
-            if not requirement:
-                return {
-                    "success": False,
-                    "stderr": "Requirement must be provided",
-                    "stdout": ""
-                }
             
-            # Step 1: Handle uncommitted changes
-            start_commit = None
-            if has_uncommitted_changes():
-                PrettyOutput.print("发现未提交的更改，正在提交...", OutputType.INFO)
-                git_commiter = GitCommitTool()
-                result = git_commiter.execute({})
-                if not result["success"]:
+            # Store current directory
+            original_dir = os.getcwd()
+            
+            try:
+                # Change to root_dir
+                os.chdir(root_dir)
+                if not requirement:
                     return {
                         "success": False,
-                        "stderr": "Failed to commit changes: " + result["stderr"],
+                        "stderr": "Requirement must be provided",
                         "stdout": ""
                     }
-            
-            # Get current commit hash
-            start_commit = get_latest_commit_hash()
-            
-            # Step 2: Development
-            PrettyOutput.print("开始开发...", OutputType.INFO)
-            agent = CodeAgent()
-            agent.run(requirement)
-            
-            # Get new commit hash after development
-            end_commit = get_latest_commit_hash()
-            
-            # Step 3: Code Review
-            PrettyOutput.print("开始代码审查...", OutputType.INFO)
-            reviewer = CodeReviewTool()
-            review_result = reviewer.execute({
-                "review_type": "range",
-                "start_commit": start_commit,
-                "end_commit": end_commit,
-                "root_dir": root_dir
-            })
-            
-            if not review_result["success"]:
-                return {
-                    "success": False,
-                    "stderr": "Code review failed: " + review_result["stderr"],
-                    "stdout": ""
-                }
-            
-            # Step 4: Generate Summary
-            summary = f"""开发总结:
-            
+                
+                # Step 1: Handle uncommitted changes
+                start_commit = None
+                if has_uncommitted_changes():
+                    PrettyOutput.print("发现未提交的更改，正在提交...", OutputType.INFO)
+                    git_commiter = GitCommitTool()
+                    result = git_commiter.execute({})
+                    if not result["success"]:
+                        return {
+                            "success": False,
+                            "stderr": "Failed to commit changes: " + result["stderr"],
+                            "stdout": ""
+                        }
+                
+                # Get current commit hash
+                start_commit = get_latest_commit_hash()
+                
+                # Step 2: Development
+                PrettyOutput.print("开始开发...", OutputType.INFO)
+                agent = CodeAgent()
+                agent.run(requirement)
+                
+                # Get new commit hash after development
+                end_commit = get_latest_commit_hash()
+                
+                # Step 3: Code Review
+                PrettyOutput.print("开始代码审查...", OutputType.INFO)
+                reviewer = CodeReviewTool()
+                review_result = reviewer.execute({
+                    "review_type": "range",
+                    "start_commit": start_commit,
+                    "end_commit": end_commit,
+                    "root_dir": root_dir
+                })
+                
+                if not review_result["success"]:
+                    return {
+                        "success": False,
+                        "stderr": "Code review failed: " + review_result["stderr"],
+                        "stdout": ""
+                    }
+                
+                # Step 4: Generate Summary
+                summary = f"""开发总结:
+                
 开始提交: {start_commit}
 结束提交: {end_commit}
 
@@ -91,12 +98,15 @@ class CreateCodeAgentTool:
 代码审查结果:
 {extract_code_report(review_result["stdout"])}
 """
-            
-            return {
-                "success": True,
-                "stdout": summary,
-                "stderr": ""
-            }
+                
+                return {
+                    "success": True,
+                    "stdout": summary,
+                    "stderr": ""
+                }
+            finally:
+                # Always restore original directory
+                os.chdir(original_dir)
             
         except Exception as e:
             return {
