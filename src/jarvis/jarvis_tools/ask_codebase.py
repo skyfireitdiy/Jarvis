@@ -1,4 +1,5 @@
 from typing import Dict, Any
+import os
 
 from yaspin import yaspin
 from jarvis.jarvis_codebase.main import CodeBase
@@ -22,6 +23,11 @@ class AskCodebaseTool:
                 "type": "integer",
                 "description": "要分析的最相关文件数量（可选）",
                 "default": 20
+            },
+            "root_dir": {
+                "type": "string",
+                "description": "代码库根目录路径（可选）",
+                "default": "."
             }
         },
         "required": ["question"]
@@ -48,9 +54,18 @@ class AskCodebaseTool:
         try:
             question = args["question"]
             top_k = args.get("top_k", 20)
-            # Create new CodeBase instance
-            git_root = find_git_root()
-            codebase = CodeBase(git_root)
+            root_dir = args.get("root_dir", ".")
+            
+            # Store current directory
+            original_dir = os.getcwd()
+            
+            try:
+                # Change to root_dir
+                os.chdir(root_dir)
+                
+                # Create new CodeBase instance
+                git_root = find_git_root()
+                codebase = CodeBase(git_root)
 
             # Use ask_codebase method
             
@@ -69,6 +84,9 @@ class AskCodebaseTool:
                 "stdout": response,
                 "stderr": ""
             }
+            finally:
+                # Always restore original directory
+                os.chdir(original_dir)
         except Exception as e:
             error_msg = f"分析代码库失败: {str(e)}"
             PrettyOutput.print(error_msg, OutputType.WARNING)
@@ -84,12 +102,14 @@ def main():
     parser = argparse.ArgumentParser(description='Ask questions about the codebase')
     parser.add_argument('question', help='Question about the codebase')
     parser.add_argument('--top-k', type=int, help='Number of files to analyze', default=20)
+    parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
     
     args = parser.parse_args()
     tool = AskCodebaseTool()
     result = tool.execute({
         "question": args.question,
-        "top_k": args.top_k
+        "top_k": args.top_k,
+        "root_dir": args.root_dir
     })
     
     if result["success"]:
