@@ -19,11 +19,13 @@ Jarvis Code Agent 是一个专注于代码操作和修改的智能助手，提�
 
 ## 使用方法
 ```bash
-jarvis-code-agent [options]
-jca [options]  # 快捷方式
+jarvis-code-agent
 ```
 
-### 核心功能
+### 交互模式
+启动后，工具将进入交互模式，提示用户输入需求。用户可以直接输入代码修改需求，工具将自动执行相应的操作。
+
+## 技术实现
 - **代码分析**：使用 LSP 工具理解代码结构和依赖关系
 - **代码修改**：生成安全、准确的代码补丁
 - **变更验证**：确保代码变更的正确性和兼容性
@@ -36,19 +38,20 @@ jca [options]  # 快捷方式
 - 支持多种代码操作工具
 
 ## 使用示例
-1. 分析代码文件：
+1. 启动代码助手：
 ```bash
-jarvis-code-agent --file example.py --language python
+jarvis-code-agent
 ```
 
-2. 安全重构代码：
+2. 输入代码修改需求：
 ```bash
-jca --file example.py --language python --refactor
+请输入你的需求（输入空行退出）：
 ```
 
-3. 验证代码变更：
+3. 查看执行结果：
 ```bash
-jarvis-code-agent --file example.py --language python --verify
+检测到以下提交记录:
+- abc1234: 修复代码错误
 ```
 
 ## 相关文档
