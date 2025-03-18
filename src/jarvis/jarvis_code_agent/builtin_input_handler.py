@@ -38,6 +38,9 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         elif tag == "RAG":
             user_input = user_input.replace(f"'<{tag}>'", "")
             user_input += "\n请使用rag工具进行知识库检索"
+        elif tag == "Summary":
+            user_input = user_input.replace(f"'<{tag}>'", "")
+            agent._summarize_and_clear_history()
         # 移除对未知标记的警告输出
     
     return user_input, False
