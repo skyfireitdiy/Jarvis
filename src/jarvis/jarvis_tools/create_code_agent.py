@@ -90,23 +90,3 @@ class CreateCodeAgentTool:
                 "stderr": f"Development workflow failed: {str(e)}",
                 "stdout": ""
             }
-
-def main():
-    """CLI entry point"""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Code development workflow tool')
-    parser.add_argument('requirement', help='Development requirement or task description')
-    
-    args = parser.parse_args()
-    
-    tool = CreateCodeAgentTool()
-    result = tool.execute({"requirement": args.requirement})
-    
-    if result["success"]:
-        PrettyOutput.print(result["stdout"], OutputType.SUCCESS)
-    else:
-        PrettyOutput.print(result["stderr"], OutputType.WARNING)
-
-if __name__ == "__main__":
-    main()
