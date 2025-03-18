@@ -293,7 +293,8 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             finished = False
             while count>0:
                 count -= 1
-                response = model.chat_until_success(prompt).splitlines()
+                with spinner.hidden():
+                    response = model.chat_until_success(prompt).splitlines()
                 try:
                     start_line = response.index("<MERGED_CODE>") + 1
                     try:

@@ -1,22 +1,21 @@
 # Jarvis Code Agent - 代码助手
 
 ## 工具介绍
-Jarvis Code Agent 是一个专注于代码操作的智能助手，提供代码补全、代码重构、代码优化等功能。它集成了多种代码处理工具，帮助开发者提高代码质量和开发效率。
+Jarvis Code Agent 是一个专注于代码操作和修改的智能助手，提供代码分析、重构和验证功能。它严格遵循代码修改协议，确保代码变更的安全性和准确性。
 
 ## 主要功能
-- 代码补全建议
-- 代码重构支持
-- 代码质量检查
-- 代码优化建议
-- 代码格式化
-- 代码文档生成
+- 代码分析和理解
+- 安全代码重构
+- 代码变更验证
+- 自动生成代码补丁
+- 代码变更文档生成
 
 ## 使用场景
-- 代码开发过程中的实时辅助
-- 代码重构和优化
-- 代码质量检查和改进
-- 代码文档自动生成
-- 代码风格统一
+- 代码库维护和优化
+- 自动化代码重构
+- 代码变更验证
+- 代码审查辅助
+- 代码文档生成
 
 ## 使用方法
 ```bash
@@ -24,37 +23,35 @@ jarvis-code-agent [options]
 jca [options]  # 快捷方式
 ```
 
-### 常用选项
-- `--file <path>`: 指定要处理的代码文件
-- `--language <lang>`: 指定代码语言
-- `--refactor`: 启用代码重构功能
-- `--optimize`: 启用代码优化功能
-- `--format`: 启用代码格式化功能
+### 核心功能
+- **代码分析**：使用 LSP 工具理解代码结构和依赖关系
+- **代码修改**：生成安全、准确的代码补丁
+- **变更验证**：确保代码变更的正确性和兼容性
+- **文档生成**：自动生成详细的代码变更文档
 
-## 技术特点
-- **多语言支持**：支持多种主流编程语言
-- **智能建议**：基于上下文提供代码补全和优化建议
-- **重构安全**：确保重构操作的安全性
-- **质量检查**：集成多种代码质量检查工具
-- **文档生成**：自动生成代码文档
+## 技术实现
+- 集成 LSP 工具进行代码分析
+- 使用 git 进行版本控制
+- 遵循严格的代码修改协议
+- 支持多种代码操作工具
 
 ## 使用示例
-1. 分析 Python 代码文件：
+1. 分析代码文件：
 ```bash
 jarvis-code-agent --file example.py --language python
 ```
 
-2. 启用代码重构功能：
+2. 安全重构代码：
 ```bash
 jca --file example.py --language python --refactor
 ```
 
-3. 启用代码优化和格式化：
+3. 验证代码变更：
 ```bash
-jarvis-code-agent --file example.py --language python --optimize --format
+jarvis-code-agent --file example.py --language python --verify
 ```
 
 ## 相关文档
-- [代码规范指南](code-style.md)
-- [重构最佳实践](refactoring.md)
-- [代码质量检查](code-quality.md)
+- [代码修改协议](code-modification-protocol.md)
+- [代码重构指南](code-refactoring.md)
+- [代码验证最佳实践](code-verification.md)
