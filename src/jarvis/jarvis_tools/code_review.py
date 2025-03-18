@@ -19,8 +19,8 @@ class CodeReviewTool:
         "properties": {
             "review_type": {
                 "type": "string",
-                "description": "审查类型：'commit' 审查特定提交，'current' 审查当前变更，'range' 审查提交范围",
-                "enum": ["commit", "current", "range"],
+                "description": "审查类型：'commit' 审查特定提交，'current' 审查当前变更，'range' 审查提交范围，'file' 审查特定文件",
+                "enum": ["commit", "current", "range", "file"],
                 "default": "current"
             },
             "commit_sha": {
@@ -34,6 +34,10 @@ class CodeReviewTool:
             "end_commit": {
                 "type": "string",
                 "description": "结束提交SHA（review_type='range'时必填）"
+            },
+            "file_path": {
+                "type": "string",
+                "description": "要审查的文件路径（review_type='file'时必填）"
             },
             "root_dir": {
                 "type": "string",
@@ -77,6 +81,15 @@ class CodeReviewTool:
                         start_commit = args["start_commit"].strip()
                         end_commit = args["end_commit"].strip()
                         diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
+                    elif review_type == "file":
+                        if "file_path" not in args:
+                            return {
+                                "success": False,
+                                "stdout": {},
+                                "stderr": "file_path is required for file review type"
+                            }
+                        file_path = args["file_path"].strip()
+                        diff_cmd = f"cat {file_path}"
                     else:  # current changes
                         diff_cmd = "git diff HEAD | cat -"
                 
@@ -230,11 +243,12 @@ def main():
     init_env()
     
     parser = argparse.ArgumentParser(description='Autonomous code review tool')
-    parser.add_argument('--type', choices=['commit', 'current', 'range'], default='current',
-                      help='Type of review: commit, current changes, or commit range')
+    parser.add_argument('--type', choices=['commit', 'current', 'range', 'file'], default='current',
+                      help='Type of review: commit, current changes, commit range, or specific file')
     parser.add_argument('--commit', help='Commit SHA to review (required for commit type)')
     parser.add_argument('--start-commit', help='Start commit SHA (required for range type)')
     parser.add_argument('--end-commit', help='End commit SHA (required for range type)')
+    parser.add_argument('--file', help='File path to review (required for file type)')
     parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
     args = parser.parse_args()
     
@@ -243,6 +257,8 @@ def main():
         parser.error("--commit is required when type is 'commit'")
     if args.type == 'range' and (not args.start_commit or not args.end_commit):
         parser.error("--start-commit and --end-commit are required when type is 'range'")
+    if args.type == 'file' and not args.file:
+        parser.error("--file is required when type is 'file'")
     
     tool = CodeReviewTool()
     tool_args = {
@@ -255,6 +271,8 @@ def main():
         tool_args["start_commit"] = args.start_commit
     if args.end_commit:
         tool_args["end_commit"] = args.end_commit
+    if args.file:
+        tool_args["file_path"] = args.file
     
     result = tool.execute(tool_args)
     
