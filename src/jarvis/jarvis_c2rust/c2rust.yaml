@@ -104,7 +104,7 @@ agents:
         - agent: "ProjectManager"
           task: "验证功能对齐和项目总结"
     platform: "ai8"
-    model_name: "deepseek-r1"
+    model_name: "deepseek-coder"
     auto_complete: false
     use_methodology: false
     need_summary: false
@@ -206,7 +206,7 @@ agents:
       - 使用`ask_codebase`查询代码库信息
       - 使用`file_operation`读取和保存分析结果
     platform: "ai8"
-    model_name: "deepseek-r1"
+    model_name: "deepseek-coder"
     auto_complete: false
     use_methodology: false
     need_summary: false
@@ -338,7 +338,7 @@ agents:
       - 使用`file_operation`创建和修改文件
       - 使用`ask_codebase`查询C代码信息
     platform: "ai8"
-    model_name: "deepseek-r1"
+    model_name: "deepseek-coder"
     auto_complete: false
     use_methodology: false
     need_summary: false
@@ -597,7 +597,7 @@ agents:
       - 使用`file_operation`创建和修改测试文件
       - 使用`ask_codebase`查询C代码行为细节
     platform: "ai8"
-    model_name: "deepseek-r1"
+    model_name: "deepseek-coder"
     auto_complete: false
     use_methodology: false
     need_summary: false
