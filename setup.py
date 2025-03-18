@@ -1,3 +1,6 @@
+================================================================================
+文件: /home/wangmaobin/code/Jarvis/setup.py
+行: [1-85]
 from setuptools import setup, find_packages
 from setuptools.command.install import install
 import subprocess
@@ -65,6 +68,8 @@ setup(
             "jarvis-git-squash=jarvis.jarvis_git_squash.main:main",
             "jarvis-multi-agent=jarvis.jarvis_multi_agent:main",
             "jarvis-agent=jarvis.jarvis_agent.main:main",
+            "jarvis-c2rust=jarvis.jarvis_c2rust.main:main",
+            "jc2r=jarvis.jarvis_c2rust.main:main",
         ],
     },
     python_requires=">=3.8",
@@ -83,3 +88,6 @@ setup(
         'install': CustomInstallCommand,  # 注册自定义安装命令
     },
 )
+
+
+================================================================================
