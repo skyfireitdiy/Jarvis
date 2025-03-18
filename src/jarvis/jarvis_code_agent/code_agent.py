@@ -66,6 +66,7 @@ class CodeAgent:
 - 保持一致的代码风格和格式
 - 每次重大更改后运行lsp_get_diagnostics
 - 立即修复任何检测到的问题
+- 确保代码修改后第一时间验证，优先修复错误而不是继续实现新功能
 
 ### 验证阶段
 - 使用lsp_get_diagnostics进行全面诊断
