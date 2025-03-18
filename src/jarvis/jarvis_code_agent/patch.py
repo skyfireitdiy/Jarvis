@@ -171,8 +171,8 @@ def apply_patch(output_str: str) -> str:
         else:
             final_ret += "❌ 没有要提交的更改\n"
         # 用户确认最终结果
-        PrettyOutput.print(final_ret, OutputType.USER)
         with spinner.hidden():
+            PrettyOutput.print(final_ret, OutputType.USER)
             if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
                 return final_ret
             return get_multiline_input("请输入自定义回复")
