@@ -104,7 +104,7 @@ class LSPFindDefinitionTool:
             
             # Get a few lines of context around the definition
             try:
-                with open(defn["uri"], 'r') as f:
+                with open(defn["uri"], 'r', errors="ignore") as f:
                     lines = f.readlines()
                     start = max(0, def_line - 2)
                     end = min(len(lines), def_line + 3)

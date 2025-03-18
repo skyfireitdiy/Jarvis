@@ -49,7 +49,7 @@ class ReadCodeTool:
                     }
                 
                 # 读取文件内容
-                with open(abs_path, 'r', encoding='utf-8') as f:
+                with open(abs_path, 'r', encoding='utf-8', errors="ignore") as f:
                     lines = f.readlines()
                 
                 total_lines = len(lines)

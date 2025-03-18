@@ -27,7 +27,7 @@ class LSPRegistry:
         if not os.path.exists(user_lsp_dir):
             try:
                 os.makedirs(user_lsp_dir)
-                with open(os.path.join(user_lsp_dir, "__init__.py"), "w") as f:
+                with open(os.path.join(user_lsp_dir, "__init__.py"), "w", errors="ignore") as f:
                     pass
             except Exception as e:
                 PrettyOutput.print(f"创建 LSP 目录失败: {str(e)}", OutputType.ERROR)
@@ -156,7 +156,7 @@ class LSPRegistry:
     @staticmethod
     def get_text_at_position(file_path: str, line: int, start_character: int) -> str:
         """Get text at position."""
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', errors="ignore") as file:
             lines = file.readlines()
             symbol = re.search(r'\b\w+\b', lines[line][start_character:])
             return symbol.group() if symbol else ""
@@ -164,7 +164,7 @@ class LSPRegistry:
     @staticmethod
     def get_line_at_position(file_path: str, line: int) -> str:
         """Get line at position."""
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', errors="ignore") as file:
             lines = file.readlines()
             return lines[line]
 

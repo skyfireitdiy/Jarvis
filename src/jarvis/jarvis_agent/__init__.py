@@ -379,7 +379,7 @@ def _load_tasks() -> dict:
     if os.path.exists(user_jarvis):
         with yaspin(text=f"从{user_jarvis}加载预定义任务...", color="cyan") as spinner:
             try:
-                with open(user_jarvis, "r", encoding="utf-8") as f:
+                with open(user_jarvis, "r", encoding="utf-8", errors="ignore") as f:
                     user_tasks = yaml.safe_load(f)
                     
                 if isinstance(user_tasks, dict):
@@ -397,7 +397,7 @@ def _load_tasks() -> dict:
     if os.path.exists(".jarvis/pre-command"):
         with yaspin(text=f"从{os.path.abspath('.jarvis/pre-command')}加载预定义任务...", color="cyan") as spinner:
             try:
-                with open(".jarvis/pre-command", "r", encoding="utf-8") as f:
+                with open(".jarvis/pre-command", "r", encoding="utf-8", errors="ignore") as f:
                     local_tasks = yaml.safe_load(f)
                     
                 if isinstance(local_tasks, dict):

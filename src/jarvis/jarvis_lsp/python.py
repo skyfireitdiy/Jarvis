@@ -18,7 +18,7 @@ class PythonLSP(BaseLSP):
     def _get_script(self, file_path: str):
         if file_path not in self.script_cache:
             try:
-                with open(file_path, 'r') as f:
+                with open(file_path, 'r', errors="ignore") as f:
                     content = f.read()
                 self.script_cache[file_path] = jedi.Script(code=content, path=file_path)
             except Exception:

@@ -22,7 +22,7 @@ def init_env():
         jarvis_dir.mkdir(parents=True)
     if env_file.exists():
         try:
-            with open(env_file, "r", encoding="utf-8") as f:
+            with open(env_file, "r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith(("#", ";")):
@@ -59,7 +59,7 @@ def get_file_md5(filepath: str)->str:
     Returns:
         str: MD5 hash of the file's content
     """
-    return hashlib.md5(open(filepath, "rb").read(100*1024*1024)).hexdigest()
+    return hashlib.md5(open(filepath, "rb", errors="ignore").read(100*1024*1024)).hexdigest()
 def user_confirm(tip: str, default: bool = True) -> bool:
     """Prompt the user for confirmation with a yes/no question.
     
@@ -83,7 +83,7 @@ def get_file_line_count(filename: str) -> int:
         int: Number of lines in the file, 0 if file cannot be read
     """
     try:
-        return len(open(filename, "r", encoding="utf-8").readlines())
+        return len(open(filename, "r", encoding="utf-8", errors="ignore").readlines())
     except Exception as e:
         return 0
 def init_gpu_config() -> Dict:
@@ -137,7 +137,7 @@ def is_long_context(files: list) -> bool:
     
     for file_path in files:
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, 'r', encoding='utf-8', errors="ignore") as f:
                 content = f.read()
                 total_tokens += get_context_token_count(content)
                 

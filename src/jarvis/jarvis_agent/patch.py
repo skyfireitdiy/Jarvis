@@ -334,7 +334,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
                 return False
             # 写入合并后的代码
             spinner.text = "写入合并后的代码..."
-            with open(filepath, 'w', encoding='utf-8') as f:
+            with open(filepath, 'w', encoding='utf-8', errors="ignore") as f:
                 f.write("\n".join(code)+"\n")
             spinner.write("✅ 合并后的代码写入完成")
             spinner.text = "代码修改完成"
@@ -420,7 +420,7 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
                                      response, re.DOTALL)
             
             # 读取原始文件内容
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
                 file_content = f.read()
             
             # 应用所有差异化补丁
@@ -447,7 +447,7 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
                     return False
             
             # 写入修改后的内容
-            with open(filepath, 'w', encoding='utf-8') as f:
+            with open(filepath, 'w', encoding='utf-8', errors="ignore") as f:
                 f.write(modified_content)
             
             spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"

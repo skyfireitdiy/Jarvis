@@ -30,7 +30,7 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                     
                     # Handle special values and Python-style negative indices
                     try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
+                        with open(file_path, 'r', encoding='utf-8', errors="ignore") as f:
                             total_lines = len(f.readlines())
                     except FileNotFoundError:
                         PrettyOutput.print(f"文件不存在: {file_path}", OutputType.WARNING)

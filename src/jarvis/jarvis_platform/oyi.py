@@ -285,7 +285,7 @@ class OyiModel(BasePlatform):
                     PrettyOutput.print(f"文件类型 {file_type} 不支持", OutputType.WARNING)
                     continue
                 
-                with open(file_path, 'rb') as f:
+                with open(file_path, 'rb', errors="ignore") as f:
                     files = {
                         'file': (os.path.basename(file_path), f, file_type)
                     }

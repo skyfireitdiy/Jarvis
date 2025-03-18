@@ -72,7 +72,7 @@ def load_methodology(user_input: str) -> str:
     
     try:
         with yaspin(text="加载方法论文件...", color="yellow") as spinner:
-            with open(user_jarvis_methodology, "r", encoding="utf-8") as f:
+            with open(user_jarvis_methodology, "r", encoding="utf-8", errors="ignore") as f:
                 data = yaml.safe_load(f)
             if dont_use_local_model():
                 spinner.text = "加载方法论文件完成"

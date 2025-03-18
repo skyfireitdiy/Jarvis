@@ -47,7 +47,7 @@ class MethodologyTool:
         """Ensure the methodology file exists"""
         if not os.path.exists(self.methodology_file):
             try:
-                with open(self.methodology_file, 'w', encoding='utf-8') as f:
+                with open(self.methodology_file, 'w', encoding='utf-8', errors="ignore") as f:
                     yaml.safe_dump({}, f, allow_unicode=True)
             except Exception as e:
                 PrettyOutput.print(f"创建方法论文件失败：{str(e)}", OutputType.ERROR)
@@ -55,7 +55,7 @@ class MethodologyTool:
     def _load_methodologies(self) -> Dict:
         """Load all methodologies"""
         try:
-            with open(self.methodology_file, 'r', encoding='utf-8') as f:
+            with open(self.methodology_file, 'r', encoding='utf-8', errors="ignore") as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
             PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
@@ -64,7 +64,7 @@ class MethodologyTool:
     def _save_methodologies(self, methodologies: Dict):
         """Save all methodologies"""
         try:
-            with open(self.methodology_file, 'w', encoding='utf-8') as f:
+            with open(self.methodology_file, 'w', encoding='utf-8', errors="ignore") as f:
                 yaml.safe_dump(methodologies, f, allow_unicode=True)
         except Exception as e:
             PrettyOutput.print(f"保存方法论失败: {str(e)}", OutputType.ERROR)

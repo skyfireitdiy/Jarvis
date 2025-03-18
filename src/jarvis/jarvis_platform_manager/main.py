@@ -219,7 +219,7 @@ def service_command(args):
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         log_file = os.path.join(logs_dir, f"conversation_{conversation_id}_{timestamp}.txt")
 
-        with open(log_file, "w", encoding="utf-8") as f:
+        with open(log_file, "w", encoding="utf-8", errors="ignore") as f:
             f.write(f"Conversation ID: {conversation_id}\n")
             f.write(f"Timestamp: {timestamp}\n")
             f.write(f"Model: {model}\n\n")
@@ -464,7 +464,7 @@ def service_command(args):
                 "response": full_response
             }
             
-            with open(log_file, "w", encoding="utf-8") as f:
+            with open(log_file, "w", encoding="utf-8", errors="ignore") as f:
                 json.dump(log_data, f, ensure_ascii=False, indent=2)
             
             PrettyOutput.print(f"Stream conversation logged to {log_file}", OutputType.INFO)
@@ -501,7 +501,7 @@ def service_command(args):
                 "error": error_msg
             }
             
-            with open(log_file, "w", encoding="utf-8") as f:
+            with open(log_file, "w", encoding="utf-8", errors="ignore") as f:
                 json.dump(log_data, f, ensure_ascii=False, indent=2)
             
             PrettyOutput.print(f"Stream error logged to {log_file}", OutputType.ERROR)

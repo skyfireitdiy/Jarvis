@@ -78,7 +78,7 @@ class CodeBase:
 
     def is_text_file(self, file_path: str):
         try:
-            open(file_path, "r", encoding="utf-8").read()
+            open(file_path, "r", encoding="utf-8", errors="ignore").read()
             return True
         except Exception:
             return False
@@ -233,7 +233,7 @@ class CodeBase:
                 return cached_vector
                 
             # Read the file content and combine information
-            content = open(file_path, "r", encoding="utf-8").read()[:self.max_token_count]  # Limit the file content length
+            content = open(file_path, "r", encoding="utf-8", errors="ignore").read()[:self.max_token_count]  # Limit the file content length
             
             # Combine file information, including file content
             combined_text = f"""
@@ -288,7 +288,7 @@ Content: {content}
             
             md5 = get_file_md5(file_path)
 
-            content = open(file_path, "r", encoding="utf-8").read()
+            content = open(file_path, "r", encoding="utf-8", errors="ignore").read()
             
             # Check if the file has already been processed and the content has not changed
             if file_path in self.vector_cache:
@@ -565,7 +565,7 @@ Content: {content}
                 
                 for path in initial_results:
                     try:
-                        content = open(path, "r", encoding="utf-8").read()
+                        content = open(path, "r", encoding="utf-8", errors="ignore").read()
                         # Truncate large files
                         if get_context_token_count(content) > max_file_length:
                             spinner.write(f"❌ 截断大文件: {path}")
@@ -861,7 +861,7 @@ Content: {content}
             
             for path in files_from_codebase:
                 try:
-                    content = open(path["file"], "r", encoding="utf-8").read()
+                    content = open(path["file"], "r", encoding="utf-8", errors="ignore").read()
                     file_content = f"""
     ## 文件: {path["file"]}
     ```

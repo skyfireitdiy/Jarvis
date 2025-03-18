@@ -107,7 +107,7 @@ class AI8Model(BasePlatform):
     def upload_files(self, file_list: List[str]) -> List[Dict]:
         for file_path in file_list:
             name = os.path.basename(file_path)
-            with open(file_path, 'rb') as f:
+            with open(file_path, 'rb', errors="ignore") as f:
                 file_data = f.read()
             base64_data = base64.b64encode(file_data).decode('utf-8')
             self.files.append({

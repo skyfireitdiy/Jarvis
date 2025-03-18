@@ -99,7 +99,7 @@ class KimiModel(BasePlatform):
     def _upload_file(self, file_path: str, presigned_url: str) -> bool:
         """Upload file to presigned URL"""
         try:
-            with open(file_path, 'rb') as f:
+            with open(file_path, 'rb', errors="ignore") as f:
                 content = f.read()
                 response = while_success(lambda: requests.put(presigned_url, data=content), sleep_time=5)
                 return response.status_code == 200

@@ -84,7 +84,7 @@ class ToolGenerator:
                 tools_dir.mkdir(parents=True, exist_ok=True)
                 tool_file = tools_dir / f"{tool_name}.py"
                 
-                with open(tool_file, "w") as f:
+                with open(tool_file, "w", errors="ignore") as f:
                     f.write(implementation)
                 spinner.text = "工具保存完成"
                 spinner.ok("✅")

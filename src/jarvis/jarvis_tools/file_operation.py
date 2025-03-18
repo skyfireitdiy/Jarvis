@@ -55,7 +55,7 @@ class FileOperationTool:
                             "stderr": "File too large (>10MB)"
                         }
                         
-                    with open(abs_path, 'r', encoding='utf-8') as f:
+                    with open(abs_path, 'r', encoding='utf-8', errors="ignore") as f:
                         lines = f.readlines()
                     
                     
@@ -90,7 +90,7 @@ class FileOperationTool:
             elif operation == "write":
                 with yaspin(text=f"正在写入文件: {abs_path}...", color="cyan") as spinner:
                     os.makedirs(os.path.dirname(os.path.abspath(abs_path)), exist_ok=True)
-                    with open(abs_path, 'w', encoding='utf-8') as f:
+                    with open(abs_path, 'w', encoding='utf-8', errors="ignore") as f:
                         f.write(content)
                     spinner.text = f"文件写入完成: {abs_path}"
                     spinner.ok("✅")

@@ -163,7 +163,7 @@ def main():
     args = parser.parse_args()
         
     try:
-        with open(args.config, 'r') as f:
+        with open(args.config, 'r', errors="ignore") as f:
             config_data = yaml.safe_load(f)
             
         # 获取agents配置

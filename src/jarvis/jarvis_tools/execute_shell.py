@@ -78,7 +78,7 @@ class ShellTool:
             
             # Read and process output file
             try:
-                with open(output_file, 'r', encoding='utf-8', errors='replace') as f:
+                with open(output_file, 'r', encoding='utf-8', errors='ignore') as f:
                     output = f.read()
                     # Remove header and footer added by script command
                     if output:

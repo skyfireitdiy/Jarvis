@@ -33,7 +33,7 @@ class ShellScriptTool:
             # Create temporary script file
             script_path = os.path.join(tempfile.gettempdir(), f"jarvis_script_{os.getpid()}.sh")
             try:
-                with open(script_path, 'w', encoding='utf-8') as f:
+                with open(script_path, 'w', encoding='utf-8', errors="ignore") as f:
                     f.write(script_content)
                 # Use execute_shell to run the script
                 from jarvis.jarvis_tools.execute_shell import ShellTool

@@ -31,7 +31,7 @@ class PlatformRegistry:
             try:
                 os.makedirs(user_platform_dir)
                 # 创建 __init__.py 使其成为 Python 包
-                with open(os.path.join(user_platform_dir, "__init__.py"), "w") as f:
+                with open(os.path.join(user_platform_dir, "__init__.py"), "w", errors="ignore") as f:
                     pass
 
                 pass

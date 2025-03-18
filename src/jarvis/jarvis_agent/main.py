@@ -23,7 +23,7 @@ def load_config(config_path: str) -> dict:
         PrettyOutput.print(f"配置文件 {config_path} 不存在，使用默认配置", OutputType.WARNING)
         return {}
     
-    with open(config_path, 'r', encoding='utf-8') as f:
+    with open(config_path, 'r', encoding='utf-8', errors="ignore") as f:
         try:
             config = yaml.safe_load(f)
             return config if config else {}
