@@ -173,21 +173,6 @@ class CodeAgent:
             
             try:
                 self.agent.run(user_input)
-                
-                # 新增代码验证步骤
-                PrettyOutput.print("正在验证代码修改...", OutputType.INFO)
-                result = self.agent.tool_registry.use_tool("lsp_get_diagnostics", {
-                    "file_path": os.path.join(self.root_dir, "src"),
-                    "language": "python"
-                })
-                if result and result["errors"]:
-                    PrettyOutput.print(f"检测到{len(result['errors'])}个错误，请先修复这些错误再继续开发：", OutputType.WARNING)
-                    for error in result["errors"]:
-                        PrettyOutput.print(f"- {error['message']} at {error['location']}", OutputType.ERROR)
-                    return "代码验证失败，请先修复错误"
-                else:
-                    PrettyOutput.print("代码验证通过，未发现错误", OutputType.SUCCESS)
-                    
             except Exception as e:
                 PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
             
