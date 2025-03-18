@@ -75,7 +75,9 @@ class AskCodebaseTool:
                     output = "找到的相关文件:\n"
                     for file in files:
                         output += f"- {file['file']} ({file['reason']})\n"
-                    PrettyOutput.print(output, OutputType.INFO, lang="markdown")
+                    PrettyOutput.print(output, OutputType.SUCCESS, lang="markdown")
+
+                PrettyOutput.print(response, OutputType.SUCCESS, lang="markdown")
                 
                 return {
                     "success": True,
