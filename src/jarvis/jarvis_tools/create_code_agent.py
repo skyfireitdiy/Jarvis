@@ -17,13 +17,20 @@ class CreateCodeAgentTool:
 3. 本次要实现的feature - 本次开发要完成的具体功能需求
 4. 涉及的文件 - 需要修改或新增的文件列表
 5. 额外需要注意的信息 - 开发时需要额外注意的信息
-"""
+""",
+        "root_dir": {
+            "type": "string",
+            "description": "代码库根目录路径（可选）",
+            "default": "."
+        }
     }
     
     
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
             requirement = args.get("requirement", "")
+            root_dir = args.get("root_dir", ".")
+======
             if not requirement:
                 return {
                     "success": False,
@@ -61,7 +68,8 @@ class CreateCodeAgentTool:
             review_result = reviewer.execute({
                 "review_type": "range",
                 "start_commit": start_commit,
-                "end_commit": end_commit
+                "end_commit": end_commit,
+                "root_dir": root_dir
             })
             
             if not review_result["success"]:
