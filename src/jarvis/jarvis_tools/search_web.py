@@ -168,8 +168,6 @@ class SearchTool:
             # Process each batch
             batch_results = []
             for i, batch in enumerate(batches, 1):
-                PrettyOutput.print(f"正在处理批次 {i}/{len(batches)}...", OutputType.PROGRESS)
-                
                 prompt = f"""Please analyze these search results to answer the question: {question}
 
 Search results content (Batch {i}/{len(batches)}):
