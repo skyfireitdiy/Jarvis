@@ -11,7 +11,12 @@ class LSPFindReferencesTool:
         "file_path": "Path to the file containing the symbol",
         "line": "Line number (0-based) of the symbol",
         "character": "Character position in the line",
-        "language": f"Programming language of the file ({', '.join(LSPRegistry.get_global_lsp_registry().get_supported_languages())})"
+        "language": f"Programming language of the file ({', '.join(LSPRegistry.get_global_lsp_registry().get_supported_languages())})",
+        "root_dir": {
+            "type": "string",
+            "description": "Root directory for LSP operations (optional)",
+            "default": "."
+        }
     }
     
     @staticmethod
@@ -26,6 +31,7 @@ class LSPFindReferencesTool:
         line = args.get("line", None)
         character = args.get("character", None)
         language = args.get("language", "")
+        root_dir = args.get("root_dir", ".")
         
         # Validate inputs
         if not all([file_path, line is not None, character is not None, language]):
@@ -52,60 +58,70 @@ class LSPFindReferencesTool:
                 "stdout": ""
             }
             
-        # Get LSP instance
-        registry = LSPRegistry.get_global_lsp_registry()
-        lsp = registry.create_lsp(language)
+        # Store current directory
+        original_dir = os.getcwd()
         
-        if not lsp:
-            return {
-                "success": False,
-                "stderr": f"No LSP support for language: {language}",
-                "stdout": ""
-            }
-            
         try:
-            # Initialize LSP
-            if not lsp.initialize(os.path.abspath(os.getcwd())):
+            # Change to root_dir
+            os.chdir(root_dir)
+            
+            # Get LSP instance
+            registry = LSPRegistry.get_global_lsp_registry()
+            lsp = registry.create_lsp(language)
+            
+            if not lsp:
                 return {
                     "success": False,
-                    "stderr": "LSP initialization failed",
+                    "stderr": f"No LSP support for language: {language}",
                     "stdout": ""
                 }
                 
-            # Get symbol at position
-            symbol = LSPRegistry.get_text_at_position(file_path, line, character)
-            if not symbol:
+            try:
+                # Initialize LSP
+                if not lsp.initialize(os.path.abspath(os.getcwd())):
+                    return {
+                        "success": False,
+                        "stderr": "LSP initialization failed",
+                        "stdout": ""
+                    }
+                    
+                # Get symbol at position
+                symbol = LSPRegistry.get_text_at_position(file_path, line, character)
+                if not symbol:
+                    return {
+                        "success": False,
+                        "stderr": f"No symbol found at position {line}:{character}",
+                        "stdout": ""
+                    }
+                    
+                # Find references
+                refs = lsp.find_references(file_path, (line, character))
+                
+                # Format output
+                output = [f"References to '{symbol}':\n"]
+                for ref in refs:
+                    ref_line = ref["range"]["start"]["line"]
+                    ref_char = ref["range"]["start"]["character"]
+                    context = LSPRegistry.get_line_at_position(ref["uri"], ref_line).strip()
+                    output.append(f"File: {ref['uri']}")
+                    output.append(f"Line {ref_line + 1}, Col {ref_char + 1}: {context}")
+                    output.append("-" * 40)
+                
                 return {
-                    "success": False,
-                    "stderr": f"No symbol found at position {line}:{character}",
-                    "stdout": ""
+                    "success": True,
+                    "stdout": "\n".join(output) if len(refs) > 0 else f"No references found for '{symbol}'",
+                    "stderr": ""
                 }
                 
-            # Find references
-            refs = lsp.find_references(file_path, (line, character))
-            
-            # Format output
-            output = [f"References to '{symbol}':\n"]
-            for ref in refs:
-                ref_line = ref["range"]["start"]["line"]
-                ref_char = ref["range"]["start"]["character"]
-                context = LSPRegistry.get_line_at_position(ref["uri"], ref_line).strip()
-                output.append(f"File: {ref['uri']}")
-                output.append(f"Line {ref_line + 1}, Col {ref_char + 1}: {context}")
-                output.append("-" * 40)
-            
-            return {
-                "success": True,
-                "stdout": "\n".join(output) if len(refs) > 0 else f"No references found for '{symbol}'",
-                "stderr": ""
-            }
-            
-        except Exception as e:
-            return {
-                "success": False,
-                "stderr": f"Error finding references: {str(e)}",
-                "stdout": ""
-            }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "stderr": f"Error finding references: {str(e)}",
+                    "stdout": ""
+                }
+            finally:
+                if lsp:
+                    lsp.shutdown()
         finally:
-            if lsp:
-                lsp.shutdown()
+            # Always restore original directory
+            os.chdir(original_dir)
