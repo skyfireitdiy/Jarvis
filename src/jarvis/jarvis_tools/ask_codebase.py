@@ -67,23 +67,21 @@ class AskCodebaseTool:
                 git_root = find_git_root()
                 codebase = CodeBase(git_root)
 
-            # Use ask_codebase method
-            
-            files, response = codebase.ask_codebase(question, top_k)
-            
-            
-            # Print found files
-            if files:
-                output = "找到的相关文件:\n"
-                for file in files:
-                    output += f"- {file['file']} ({file['reason']})\n"
-                PrettyOutput.print(output, OutputType.INFO, lang="markdown")
-            
-            return {
-                "success": True,
-                "stdout": response,
-                "stderr": ""
-            }
+                # Use ask_codebase method
+                files, response = codebase.ask_codebase(question, top_k)
+                
+                # Print found files
+                if files:
+                    output = "找到的相关文件:\n"
+                    for file in files:
+                        output += f"- {file['file']} ({file['reason']})\n"
+                    PrettyOutput.print(output, OutputType.INFO, lang="markdown")
+                
+                return {
+                    "success": True,
+                    "stdout": response,
+                    "stderr": ""
+                }
             finally:
                 # Always restore original directory
                 os.chdir(original_dir)
