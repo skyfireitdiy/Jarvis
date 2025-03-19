@@ -118,8 +118,8 @@ class CodeAgent:
 
 - **系统工具**：
   - execute_shell：用于git操作和grep搜索
-  - ask_codebase：用于查询代码知识库
   - search_web：用于技术参考查找
+  - ask_codebase：仅当直接代码分析工具不足时才使用，优先使用直接分析工具
 
 ## 代码分析工具使用建议
 - 在理解代码结构时，使用find_symbol查找符号定义和引用位置
@@ -134,6 +134,7 @@ class CodeAgent:
 - 在重构前，先使用这些工具分析代码耦合度和依赖关系
 - 理解函数调用层次时，从高层函数开始，逐步分析其调用的子函数
 - 处理复杂变更时，可以组合使用这些工具建立完整的代码理解图谱
+- 尽可能依赖直接代码分析，而非ask_codebase等间接工具
 
 ## 补丁格式要求
 创建代码补丁时：
@@ -143,6 +144,7 @@ class CodeAgent:
 4. 对于修改，保留周围未更改的代码
 5. 为每项更改包含清晰的理由说明
 """
+        # Dynamically add ask_codebase based on task complexity if really needed
         self.agent = Agent(system_prompt=code_system_prompt, 
                            name="CodeAgent", 
                            auto_complete=False,
