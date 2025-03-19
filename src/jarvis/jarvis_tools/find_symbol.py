@@ -1,19 +1,20 @@
 from typing import Dict, Any, List
 import os
+import subprocess
+import re
+import platform
 
-from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class SymbolTool:
     """
     符号查找工具
-    使用agent查找代码库中的符号引用、定义和声明位置
+    直接使用 ripgrep/grep 查找代码库中的符号位置
     """
     
     name = "find_symbol"
-    description = "查找代码符号的引用、定义和声明位置"
+    description = "查找代码符号在代码库中的位置"
     parameters = {
         "type": "object",
         "properties": {
@@ -45,7 +46,7 @@ class SymbolTool:
             "max_results": {
                 "type": "integer",
                 "description": "最大结果数量（可选）",
-                "default": 50
+                "default": 100
             }
         },
         "required": ["symbol"]
@@ -70,7 +71,7 @@ class SymbolTool:
             root_dir = args.get("root_dir", ".")
             file_extensions = args.get("file_extensions", [])
             exclude_dirs = args.get("exclude_dirs", [])
-            max_results = args.get("max_results", 50)
+            max_results = args.get("max_results", 100)
             
             # 验证参数
             if not symbol:
@@ -80,45 +81,18 @@ class SymbolTool:
                     "stderr": "必须提供符号名称"
                 }
             
-            # 创建agent的system prompt
-            system_prompt = self._create_system_prompt(
-                symbol, root_dir, file_extensions, exclude_dirs, max_results
-            )
-            
-            # 创建agent的summary prompt
-            summary_prompt = self._create_summary_prompt(symbol)
-            
             # 切换到根目录
             os.chdir(root_dir)
             
-            # 构建使用的工具
-            from jarvis.jarvis_tools.registry import ToolRegistry
-            tool_registry = ToolRegistry()
-            tool_registry.use_tools(["execute_shell", "read_code"])
+            # 进行符号搜索
+            search_result = self._find_symbol(symbol, file_extensions, exclude_dirs, max_results)
             
-            # 创建并运行agent
-            symbol_agent = Agent(
-                system_prompt=system_prompt,
-                name=f"SymbolFinder-{symbol}",
-                description=f"查找符号 '{symbol}' 的引用和定义位置",
-                summary_prompt=summary_prompt,
-                platform=PlatformRegistry().get_codegen_platform(),
-                output_handler=[tool_registry],
-                need_summary=True,
-                is_sub_agent=True,
-                use_methodology=False,
-                record_methodology=False,
-                execute_tool_confirm=False,
-                auto_complete=True
-            )
-            
-            # 运行agent并获取结果
-            task_input = f"查找符号 '{symbol}' 在代码库中的引用、定义和声明位置"
-            result = symbol_agent.run(task_input)
+            # 格式化并返回结果
+            formatted_result = self._format_results(symbol, search_result)
             
             return {
                 "success": True,
-                "stdout": result,
+                "stdout": formatted_result,
                 "stderr": ""
             }
                 
@@ -133,118 +107,183 @@ class SymbolTool:
             # 恢复原始目录
             os.chdir(original_dir)
     
-    def _create_system_prompt(self, symbol: str, root_dir: str, 
-                             file_extensions: List[str], exclude_dirs: List[str],
-                             max_results: int) -> str:
+    def _find_symbol(self, symbol: str, file_extensions: List[str], exclude_dirs: List[str], max_results: int) -> str:
         """
-        创建Agent的system prompt
+        查找符号
         
         Args:
             symbol: 符号名称
-            root_dir: 代码库根目录
             file_extensions: 文件扩展名列表
             exclude_dirs: 排除目录列表
             max_results: 最大结果数量
             
         Returns:
-            系统提示文本
+            查找结果字符串
         """
-        file_ext_str = " ".join([f"*{ext}" for ext in file_extensions]) if file_extensions else ""
-        exclude_str = " ".join([f"--glob '!{excl}'" for excl in exclude_dirs]) if exclude_dirs else ""
+        # 使用单词边界匹配完整符号
+        pattern = f"\\b{re.escape(symbol)}\\b"
         
-        return f"""你是一个代码符号分析专家，专门查找代码库中的符号引用、定义和声明。
-
-## 当前任务
-查找符号 `{symbol}` 在代码库中的定义、声明和引用位置。
-
-## 工作目录（当前目录）
-{root_dir}
-
-## 搜索参数
-- 符号名称: {symbol}
-- 文件类型限制: {file_ext_str if file_ext_str else "所有文件"}
-- 排除目录: {", ".join(exclude_dirs) if exclude_dirs else "无"}
-- 最大结果数: {max_results}
-
-## 查找流程
-请按照以下步骤进行符号分析:
-
-1. **查找符号定义/声明**
-   - 使用ripgrep(rg)或grep查找可能的定义和声明
-   - 对于不同语言，定义模式会有所不同:
-     - Python: `def {symbol}`, `class {symbol}`, `{symbol} =`
-     - JavaScript/TypeScript: `function {symbol}`, `const {symbol}`, `let {symbol}`, `var {symbol}`, `class {symbol}`
-     - C/C++: 函数定义、变量定义/声明、结构体/类定义
-     - Java: 方法定义、变量定义/声明、类/接口定义
-     - Go: `func {symbol}`, `type {symbol}`, `var {symbol}`, `const {symbol}`
-
-2. **查找符号引用**
-   - 使用精确匹配搜索所有引用位置
-   - 确保使用单词边界(\\b)匹配完整符号，避免部分匹配
-
-3. **结果分析**
-   - 对于每个定义/声明，阅读上下文确认其准确性
-   - 对于引用，按文件分组并排序
-   - 过滤掉重复或不相关的结果
-   - 如果结果过多，优先选择最相关的结果
-
-## 信息完整性要求
-- 确保找到所有符号的定义和声明位置，不遗漏任何重载或多态定义
-- 完整捕获所有引用，包括不明显的引用方式（如通过别名或反射）
-- 区分不同作用域下的同名符号，明确指出歧义情况
-- 对于具有特殊用途的引用（如关键业务逻辑中的使用），予以特别标注
-- 报告所有可能的引用模式变体和上下文
-- 不要忽略注释、字符串或文档中的符号引用，但要区分代码引用和非代码引用
-
-## 工具使用建议
-- 使用 `execute_shell` 执行搜索命令:
-  ```
-  # 查找定义示例
-  rg -n "def\\s+{symbol}\\b|class\\s+{symbol}\\b|{symbol}\\s*=" {file_ext_str} {exclude_str}
-  
-  # 查找引用示例
-  rg -n "\\b{symbol}\\b" {file_ext_str} {exclude_str}
-  ```
-  
-- 使用 `read_code` 读取相关代码上下文以确认结果的准确性
-
-分析完成后，请提供符号的定义位置、所有引用点，并统计总体情况。
-"""
-
-    def _create_summary_prompt(self, symbol: str) -> str:
+        return self._execute_grep_command(pattern, file_extensions, exclude_dirs, max_results)
+    
+    def _execute_grep_command(self, pattern: str, file_extensions: List[str], exclude_dirs: List[str], max_results: int) -> str:
         """
-        创建Agent的summary prompt
+        执行 grep 命令
+        
+        Args:
+            pattern: 搜索模式
+            file_extensions: 文件扩展名列表
+            exclude_dirs: 排除目录列表
+            max_results: 最大结果数量
+            
+        Returns:
+            命令执行结果
+        """
+        # 检查是否存在 ripgrep (rg)
+        has_rg = self._command_exists("rg")
+        
+        if has_rg:
+            # 使用 ripgrep
+            command = ["rg", "-n"]
+            
+            # 添加文件类型限制
+            if file_extensions:
+                for ext in file_extensions:
+                    if not ext.startswith('.'):
+                        ext = f".{ext}"
+                    command.append("-g")
+                    command.append(f"*{ext}")
+            
+            # 添加排除目录
+            for excl in exclude_dirs:
+                command.append("--glob")
+                command.append(f"!{excl}")
+            
+            # 添加模式和最大结果数
+            command.append(pattern)
+            command.append("-m")
+            command.append(str(max_results))
+            
+        else:
+            # 回退到使用 grep
+            command = ["grep", "-n", "-E"]
+            
+            # 添加递归搜索
+            command.append("-r")
+            
+            # 添加文件类型限制
+            if file_extensions:
+                file_pattern = " --include=*".join([ext for ext in file_extensions])
+                if file_pattern:
+                    command.append(f"--include=*{file_pattern}")
+            
+            # 添加排除目录
+            for excl in exclude_dirs:
+                command.append(f"--exclude-dir={excl}")
+            
+            # 添加模式和搜索目录
+            command.append(pattern)
+            command.append(".")
+        
+        # 执行命令
+        try:
+            process = subprocess.run(
+                command, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False
+            )
+            
+            if process.returncode not in [0, 1]:  # rg/grep 返回 1 表示没有找到匹配项，这不是错误
+                return f"搜索命令执行失败，错误码: {process.returncode}\n{process.stderr}"
+            
+            return process.stdout
+        except Exception as e:
+            return f"执行搜索命令时出错: {str(e)}"
+    
+    def _format_results(self, symbol: str, search_result: str) -> str:
+        """
+        格式化搜索结果
         
         Args:
             symbol: 符号名称
+            search_result: 搜索结果
             
         Returns:
-            总结提示文本
+            格式化后的结果
         """
-        return f"""请提供符号 `{symbol}` 的完整分析报告，包含以下部分:
-
-# 符号分析: `{symbol}`
-
-## 定义/声明
-提供所有找到的定义/声明位置，包括:
-- 文件路径和行号
-- 定义/声明的代码片段
-- 定义类型(函数、类、变量等)
-
-## 引用
-按文件分组列出所有引用:
-- 文件路径
-- 每个引用的行号
-- 引用的代码上下文
-
-## 统计
-- 定义/声明数量
-- 引用总数
-- 引用文件数量
-- 分布情况分析
-
-## 代码职责
-简要分析符号在代码库中的职责和作用
-
-请确保报告格式清晰，使用Markdown语法以便阅读。如果结果过多，可以只包含最重要的几个定义和引用示例。
-"""
+        # 解析结果并按文件分组
+        results = self._parse_grep_results(search_result)
+        
+        # 构建格式化输出
+        output = []
+        output.append(f"# 符号搜索结果: `{symbol}`\n")
+        
+        # 搜索结果
+        if not results:
+            output.append("未找到符号\n")
+        else:
+            for file_path, lines in results.items():
+                output.append(f"## {file_path}\n")
+                for line_num, content in lines:
+                    output.append(f"- 第 {line_num} 行: `{content.strip()}`\n")
+        
+        # 统计部分
+        output.append("\n## 统计\n")
+        total_occurrences = sum(len(lines) for lines in results.values())
+        output.append(f"- 总出现次数: {total_occurrences} 处\n")
+        output.append(f"- 出现文件数: {len(results)} 个\n")
+        
+        return "".join(output)
+    
+    def _parse_grep_results(self, results: str) -> Dict[str, List[tuple]]:
+        """
+        解析 grep/ripgrep 结果，按文件分组
+        
+        Args:
+            results: grep/ripgrep 输出结果
+            
+        Returns:
+            按文件分组的结果字典 {文件路径: [(行号, 内容), ...]}
+        """
+        parsed_results = {}
+        
+        if not results.strip():
+            return parsed_results
+            
+        for line in results.splitlines():
+            parts = line.split(":", 2)
+            if len(parts) >= 3:
+                file_path, line_num, content = parts[0], parts[1], parts[2]
+                
+                if file_path not in parsed_results:
+                    parsed_results[file_path] = []
+                    
+                parsed_results[file_path].append((line_num, content))
+                
+        return parsed_results
+    
+    def _command_exists(self, command: str) -> bool:
+        """
+        检查命令是否存在
+        
+        Args:
+            command: 命令名称
+            
+        Returns:
+            命令是否存在
+        """
+        if platform.system() == "Windows":
+            # Windows 检查命令
+            try:
+                subprocess.run(["where", command], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+                return True
+            except Exception:
+                return False
+        else:
+            # Unix/Linux/Mac 检查命令
+            try:
+                subprocess.run(["which", command], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+                return True
+            except Exception:
+                return False
