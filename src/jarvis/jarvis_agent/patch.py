@@ -161,6 +161,14 @@ def apply_patch(output_str: str) -> str:
                     
                     final_ret += f"应用补丁:\n{diff}"
                     
+                    # 增加代码变更分析和错误提示
+                    final_ret += "\n\n⚠️ 代码变更分析：\n"
+                    final_ret += "1. 请仔细检查以上变更是否引入了潜在错误\n"
+                    final_ret += "2. 如果发现代码错误，请立即提出修复方案\n"
+                    final_ret += "3. 修复代码错误的优先级高于继续实现功能\n"
+                    final_ret += "4. 常见错误类型：语法错误、逻辑错误、命名错误、路径错误等\n"
+                    final_ret += "5. 确保修改后代码的一致性和完整性\n"
+                    
                 else:
                     final_ret += "✅ 补丁已应用（没有新的提交）"
             else:
