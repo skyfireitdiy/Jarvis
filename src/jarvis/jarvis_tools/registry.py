@@ -13,7 +13,7 @@ from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_max_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, ot, ct
+from jarvis.jarvis_utils.utils import ct, ot, init_env
 
 
 
@@ -27,7 +27,7 @@ name: 工具名称
 arguments:
     param1: 值1
     param2: 值2
-{create_close_tag("TOOL_CALL")}
+{ct("TOOL_CALL")}
 
 # ❗ 关键规则
 1. 每次只使用一个工具
@@ -59,7 +59,7 @@ name: execute_shell
 arguments:
     command: |
         git status --porcelain
-{create_close_tag("TOOL_CALL")}
+{ct("TOOL_CALL")}
 
 # 💡 最佳实践
 - 准备好后立即开始执行
@@ -234,7 +234,7 @@ class ToolRegistry(OutputHandler):
             Exception: 如果工具调用缺少必要字段
         """
         # 将内容拆分为行
-        data = re.findall(ot("TOOL_CALL")+r'(.*?)'+create_close_tag("TOOL_CALL"), content, re.DOTALL)
+        data = re.findall(ot("TOOL_CALL")+r'(.*?)'+ct("TOOL_CALL"), content, re.DOTALL)
         ret = []
         for item in data:
             try:
@@ -282,7 +282,7 @@ name: 工具名称
 arguments:
     param1: 值1
     param2: 值2
-{create_close_tag("TOOL_CALL")}
+{ct("TOOL_CALL")}
 
 # ❗ 关键规则
 1. 每次只使用一个工具
@@ -314,7 +314,7 @@ name: execute_shell
 arguments:
     command: |
         git status --porcelain
-{create_close_tag("TOOL_CALL")}
+{ct("TOOL_CALL")}
 
 # 💡 最佳实践
 - 准备好后立即开始执行
@@ -402,7 +402,7 @@ def main():
     import argparse
     import json
 
-    ct()
+    init_env()
 
     parser = argparse.ArgumentParser(description='Jarvis 工具系统命令行界面')
     subparsers = parser.add_subparsers(dest='command', help='命令')

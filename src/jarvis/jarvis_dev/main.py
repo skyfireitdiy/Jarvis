@@ -3,7 +3,7 @@ from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, ot, ct
+from jarvis.jarvis_utils.utils import ct, ot, init_env
 
 # 定义每个角色的系统提示
 PM_PROMPT = f"""
@@ -80,7 +80,7 @@ content: |
   ## 时间与优先级
   - 优先级：[高/中/低]
   - 期望完成时间：[时间点]
-{create_close_tag("SEND_MESSAGE")}
+{ct("SEND_MESSAGE")}
 
 ## 文档管理规范
 ### 项目文档结构
@@ -568,7 +568,7 @@ arguments:
         - [类型提示]
         - [文档要求]
         - [测试要求]"
-{create_close_tag("TOOL_CALL")}
+{ct("TOOL_CALL")}
 ```
 
 ### 代码审查清单
@@ -612,7 +612,7 @@ arguments:
            - 全面错误处理
            - 详细文档字符串
            - 单元测试覆盖"
-   {create_close_tag("TOOL_CALL")}
+   {ct("TOOL_CALL")}
    ```
 
 4. **代码审查**：评审和优化生成的代码
@@ -640,7 +640,7 @@ arguments:
            - 模拟外部服务
            - 测试正常和异常路径
            - 100%代码覆盖率"
-   {create_close_tag("TOOL_CALL")}
+   {ct("TOOL_CALL")}
    ```
 
 ## 交付物管理规范
@@ -723,7 +723,7 @@ arguments:
         - 模拟外部依赖
         - 验证所有断言
         - 目标覆盖率[百分比]"
-{create_close_tag("TOOL_CALL")}
+{ct("TOOL_CALL")}
 ```
 
 ### 集成测试生成
@@ -741,7 +741,7 @@ arguments:
         - 设置测试环境
         - 处理测试数据
         - 验证系统行为"
-{create_close_tag("TOOL_CALL")}
+{ct("TOOL_CALL")}
 ```
 
 ### 性能测试生成
@@ -759,7 +759,7 @@ arguments:
         - 定义性能基准
         - 模拟真实负载
         - 收集性能指标"
-{create_close_tag("TOOL_CALL")}
+{ct("TOOL_CALL")}
 ```
 
 ## 文档模板规范
@@ -971,7 +971,7 @@ def create_dev_team() -> MultiAgent:
 def main():
     """Main entry point for the development team simulation."""
 
-    ct()
+    init_env()
     
     # Create the development team
     dev_team = create_dev_team()

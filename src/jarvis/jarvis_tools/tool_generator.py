@@ -7,7 +7,7 @@ from typing import Dict, Any
 
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.utils import create_close_tag, ot
+from jarvis.jarvis_utils.utils import ct, ot
 
 class ToolGenerator:
     """工具生成器类，用于自动创建与Jarvis系统集成的新工具"""
@@ -163,7 +163,7 @@ class CustomTool:
                 "stdout": "",
                 "stderr": str(e)
             }
-''' + create_close_tag("TOOL")
+''' + ct("TOOL")
 
         return f'''创建一个与Jarvis系统集成的Python工具类。请遵循以下要求：
 1. 类名: {tool_name.capitalize()}Tool
@@ -184,7 +184,7 @@ class CustomTool:
 10. 按照以下格式输出代码：
 {ot("TOOL")}
 {example_code}
-{create_close_tag("TOOL")}
+{ct("TOOL")}
 
 示例：
 {example_code}
@@ -198,7 +198,7 @@ class CustomTool:
         Returns:
             提取到的Python代码字符串
         """
-        sm = re.search(ot("TOOL")+r'(.*?)'+create_close_tag("TOOL"), response, re.DOTALL)
+        sm = re.search(ot("TOOL")+r'(.*?)'+ct("TOOL"), response, re.DOTALL)
         if sm:
             return sm.group(1)
         return ""

@@ -18,7 +18,7 @@ import hashlib
 from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_thread_count
 from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import  get_file_md5, ct, init_gpu_config
+from jarvis.jarvis_utils.utils import  get_file_md5, init_env, init_gpu_config
 
 @dataclass
 class Document:
@@ -141,7 +141,7 @@ class RAGTool:
             root_dir: Project root directory
         """
         with yaspin(text="初始化环境...", color="cyan") as spinner:
-            ct()
+            init_env()
             self.root_dir = root_dir
             os.chdir(self.root_dir)
             spinner.text = "环境初始化完成"

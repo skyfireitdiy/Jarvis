@@ -8,7 +8,7 @@ from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, ot, ct
+from jarvis.jarvis_utils.utils import ct, ot, init_env
 
 
 class MultiAgent(OutputHandler):
@@ -52,7 +52,7 @@ content: |
     
     ## 期望结果
     [描述期望的输出格式和内容]
-{create_close_tag("SEND_MESSAGE")}
+{ct("SEND_MESSAGE")}
 ```
 
 ## 协作流程规范
@@ -102,7 +102,7 @@ content: |
         Args:
             content: The content containing send message
         """
-        data = re.findall(ot("SEND_MESSAGE")+r'\n(.*?)\n'+create_close_tag("SEND_MESSAGE"), content, re.DOTALL)
+        data = re.findall(ot("SEND_MESSAGE")+r'\n(.*?)\n'+ct("SEND_MESSAGE"), content, re.DOTALL)
         ret = []
         for item in data:
             try:
@@ -155,7 +155,7 @@ def main():
     Returns:
         最终处理结果
     """
-    ct()
+    init_env()
     import argparse
     parser = argparse.ArgumentParser(description="多智能体系统启动器")
     parser.add_argument("--config", "-c", required=True, help="YAML配置文件路径")

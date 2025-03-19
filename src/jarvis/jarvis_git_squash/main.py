@@ -6,7 +6,7 @@ from jarvis.jarvis_tools.git_commiter import GitCommitTool
 import subprocess
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import ct, user_confirm
+from jarvis.jarvis_utils.utils import init_env, user_confirm
 class GitSquashTool:
     name = "git_squash_agent"
     description = "Squash commits interactively using a base commit hash"
@@ -45,7 +45,7 @@ class GitSquashTool:
             PrettyOutput.print(f"压缩提交失败: {str(e)}", OutputType.WARNING)
             
 def main():
-    ct()
+    init_env()
     parser = argparse.ArgumentParser(description='Git squash tool')
     parser.add_argument('commit_hash', type=str, help='Base commit hash to squash from')
     parser.add_argument('--lang', type=str, default='Chinese', help='Language for commit messages')

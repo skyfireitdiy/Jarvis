@@ -9,7 +9,7 @@ from jarvis.jarvis_agent import Agent
 import re
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, ot, ct
+from jarvis.jarvis_utils.utils import ct, ot, init_env
 
 class CodeReviewTool:
     name = "code_review"
@@ -206,7 +206,7 @@ class CodeReviewTool:
   描述: # 仅描述在差异中直接观察到的问题
   严重程度: # 根据具体证据分为严重/重要/次要
   建议: # 针对观察到的代码的具体改进建议
-{create_close_tag("REPORT")}""",
+{ct("REPORT")}""",
                     is_sub_agent=True,
                     output_handler=[tool_registry],
                     platform=PlatformRegistry().get_thinking_platform(),
@@ -231,7 +231,7 @@ class CodeReviewTool:
         
 
 def extract_code_report(result: str) -> str:
-    sm = re.search(ot("REPORT")+r'\n(.*?)\n'+create_close_tag("REPORT"), result, re.DOTALL)
+    sm = re.search(ot("REPORT")+r'\n(.*?)\n'+ct("REPORT"), result, re.DOTALL)
     if sm:
         return sm.group(1)
     return ""
@@ -240,7 +240,7 @@ def main():
     """CLI entry point"""
     import argparse
 
-    ct()
+    init_env()
     
     parser = argparse.ArgumentParser(description='Autonomous code review tool')
     parser.add_argument('--type', choices=['commit', 'current', 'range', 'file'], default='current',

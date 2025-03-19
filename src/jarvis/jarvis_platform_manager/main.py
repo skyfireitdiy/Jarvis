@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import ct
+from jarvis.jarvis_utils.utils import init_env
 
 def list_platforms():
     """List all supported platforms and models"""
@@ -513,7 +513,7 @@ def main():
     """Main function"""
     import argparse
 
-    ct()
+    init_env()
     
     parser = argparse.ArgumentParser(description='Jarvis AI 平台')
     subparsers = parser.add_subparsers(dest='command', help='可用子命令')

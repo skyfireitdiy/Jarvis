@@ -8,7 +8,7 @@ from jarvis.jarvis_utils.config import get_max_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-def ct():
+def init_env():
     """Initialize environment variables from ~/.jarvis/env file.
     
     Creates the .jarvis directory if it doesn't exist and loads environment variables
@@ -161,7 +161,7 @@ def ot(tag_name: str) -> str:
     """
     return f"<{tag_name}>"
 
-def create_close_tag(tag_name: str) -> str:
+def ct(tag_name: str) -> str:
     """Generate an HTML close tag for the given tag name.
     
     Args:

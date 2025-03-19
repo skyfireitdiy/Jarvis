@@ -19,12 +19,12 @@ from jarvis.jarvis_utils.config import get_max_token_count, get_thread_count
 from jarvis.jarvis_utils.embedding import get_embedding, load_embedding_model, get_context_token_count
 from jarvis.jarvis_utils.git_utils import find_git_root
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import  create_close_tag, ot, get_file_md5, ct, user_confirm
+from jarvis.jarvis_utils.utils import  ct, ot, get_file_md5, init_env, user_confirm
 
 class CodeBase:
     def __init__(self, root_dir: str):
         with yaspin(text="正在初始化环境...", color="cyan") as spinner:
-            ct()
+            init_env()
             spinner.text = "环境初始化完成"
             spinner.ok("✅")
             
@@ -630,7 +630,7 @@ Content: {content}
   reason: xxxxxxxxxx
 - path/to/next/relevant.py
   reason: yyyyyyyyyy
-{create_close_tag("FILES")}
+{ct("FILES")}
 
 重要提示：
 - 仅包含真正相关的文件
@@ -646,7 +646,7 @@ Content: {content}
 
         # Parse the response
         import yaml
-        files_match = re.search(ot("FILES")+r'\n(.*?)\n'+create_close_tag("FILES"), response, re.DOTALL)
+        files_match = re.search(ot("FILES")+r'\n(.*?)\n'+ct("FILES"), response, re.DOTALL)
         if not files_match:
             return []
 
@@ -686,7 +686,7 @@ Content: {content}
 - 登录系统架构与组件
 - 凭证验证与会话管理
 - ...
-{create_close_tag("QUESTION")}
+{ct("QUESTION")}
 
 请以指定格式提供10个搜索优化的表达。
 """
@@ -695,7 +695,7 @@ Content: {content}
         # Parse the response using YAML format
         import yaml
         variants = []
-        question_match = re.search(ot("QUESTION")+r'\n(.*?)\n'+create_close_tag("QUESTION"), response, re.DOTALL)
+        question_match = re.search(ot("QUESTION")+r'\n(.*?)\n'+ct("QUESTION"), response, re.DOTALL)
         if question_match:
             try:
                 variants = yaml.safe_load(question_match.group(1))

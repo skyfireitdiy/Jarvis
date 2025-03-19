@@ -19,7 +19,7 @@ from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.config import get_max_token_count
-from jarvis.jarvis_utils.utils import ot, ct
+from jarvis.jarvis_utils.utils import ot, init_env
 from jarvis.jarvis_utils.utils import user_confirm
 import os
 
@@ -565,7 +565,7 @@ origin_agent_system_prompt = """
 def main():
     """Jarvis main entry point"""
     # Add argument parser
-    ct()
+    init_env()
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
     parser.add_argument('-p', '--platform', type=str, help='Platform to use')
     parser.add_argument('-m', '--model', type=str, help='Model to use')

@@ -12,7 +12,7 @@ import os
 
 from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, ot, ct
+from jarvis.jarvis_utils.utils import ct, ot, init_env
 
 
 class GitCommitTool:
@@ -37,7 +37,7 @@ class GitCommitTool:
     def _extract_commit_message(self, message):
         """Raw extraction preserving all characters"""
         r = re.search(
-            r"(?i)" + ot("COMMIT_MESSAGE") + r"\s*([\s\S]*?)\s*" + create_close_tag("COMMIT_MESSAGE"), 
+            r"(?i)" + ot("COMMIT_MESSAGE") + r"\s*([\s\S]*?)\s*" + ct("COMMIT_MESSAGE"), 
             message
         )
         if r:
@@ -100,7 +100,7 @@ class GitCommitTool:
         {ot("COMMIT_MESSAGE")}
         <类型>(<范围>): <主题>
         使用祈使语气描述变更内容
-        {create_close_tag("COMMIT_MESSAGE")}
+        {ct("COMMIT_MESSAGE")}
         # 格式规则
         1. 类型: fix, feat, docs, style, refactor, test, chore
         2. 范围表示模块 (例如: auth, database)
@@ -155,7 +155,7 @@ class GitCommitTool:
             }
 
 def main():
-    ct()
+    init_env()
     parser = argparse.ArgumentParser(description='Git commit tool')
     parser.add_argument('--lang', type=str, default='Chinese', help='Language for commit messages')
     parser.add_argument('--root-dir', type=str, default='.', help='Root directory of the Git repository')

@@ -11,7 +11,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_shell_name
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import ct
+from jarvis.jarvis_utils.utils import init_env
 
 def execute_command(command: str) -> None:
     """Show command and allow user to edit, then execute, Ctrl+C to cancel"""
@@ -114,7 +114,7 @@ Output: find . -name "*.py"
 
 def main():
     # 创建参数解析器
-    ct()
+    init_env()
     parser = argparse.ArgumentParser(
         description="将自然语言要求转换为shell命令",
         formatter_class=argparse.RawDescriptionHelpFormatter,

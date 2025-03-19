@@ -12,7 +12,7 @@ from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, ot, get_file_line_count, user_confirm
+from jarvis.jarvis_utils.utils import ct, ot, get_file_line_count, user_confirm
 
 class PatchOutputHandler(OutputHandler):
     def name(self) -> str:
@@ -36,7 +36,7 @@ class PatchOutputHandler(OutputHandler):
 File: [文件路径]
 Reason: [修改原因]
 [上下文代码片段]
-{create_close_tag("PATCH")}
+{ct("PATCH")}
 ```
 
 ## 核心原则
@@ -76,7 +76,7 @@ def safe_divide(a, b):
 # 现有代码 ...
 def add(a, b):
     return a + b
-{create_close_tag("PATCH")}
+{ct("PATCH")}
 ```
 
 ## 最佳实践
@@ -90,7 +90,7 @@ def add(a, b):
 def _parse_patch(patch_str: str) -> Dict[str, str]:
     """解析新的上下文补丁格式"""
     result = {}
-    patches = re.findall(ot("PATCH")+r'\n?(.*?)\n?'+create_close_tag("PATCH"), patch_str, re.DOTALL)
+    patches = re.findall(ot("PATCH")+r'\n?(.*?)\n?'+ct("PATCH"), patch_str, re.DOTALL)
     if patches:
         for patch in patches:
             first_line = patch.splitlines()[0]
@@ -294,7 +294,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
 ## 输出模板
 {ot("MERGED_CODE")}
 [合并后的完整代码，包括所有空行和缩进]
-{create_close_tag("MERGED_CODE")}
+{ct("MERGED_CODE")}
 """
             model = PlatformRegistry().get_codegen_platform()
             model.set_suppress_output(False)
@@ -310,7 +310,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
                 try:
                     start_line = response.index(ot("MERGED_CODE")) + 1
                     try:
-                        end_line = response.index(create_close_tag("MERGED_CODE"))
+                        end_line = response.index(ct("MERGED_CODE"))
                         code = response[start_line:end_line]
                     except:
                         pass
@@ -409,7 +409,7 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
 ======
 [替换后的新代码]
 <<<<<< REPLACE
-{create_close_tag("DIFF")}
+{ct("DIFF")}
 
 {ot("DIFF")}
 >>>>>> SEARCH
@@ -417,14 +417,14 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
 ======
 [另一处替换后的新代码]
 <<<<<< REPLACE
-{create_close_tag("DIFF")}
+{ct("DIFF")}
 """
             # 获取补丁内容
             with spinner.hidden():
                 response = model.chat_until_success(prompt)
             
             # 解析差异化补丁
-            diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+create_close_tag("DIFF"), 
+            diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"), 
                                      response, re.DOTALL)
             
             # 读取原始文件内容
