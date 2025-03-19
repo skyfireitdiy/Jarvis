@@ -113,8 +113,7 @@ class ToolGenerator:
         Returns:
             格式化后的提示字符串
         """
-        example_code = f'''
-{ot("TOOL")}
+        example_code = ot("TOOL")+'''
 from typing import Dict, Any
 from jarvis.utils import OutputType, PrettyOutput
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -164,8 +163,7 @@ class CustomTool:
                 "stdout": "",
                 "stderr": str(e)
             }
-{create_close_tag("TOOL")}
-'''
+''' + create_close_tag("TOOL")
 
         return f'''创建一个与Jarvis系统集成的Python工具类。请遵循以下要求：
 1. 类名: {tool_name.capitalize()}Tool
