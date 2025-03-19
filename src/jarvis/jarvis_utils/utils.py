@@ -8,7 +8,7 @@ from jarvis.jarvis_utils.config import get_max_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-def init_env():
+def ct():
     """Initialize environment variables from ~/.jarvis/env file.
     
     Creates the .jarvis directory if it doesn't exist and loads environment variables
@@ -150,7 +150,7 @@ def is_long_context(files: list) -> bool:
     return total_tokens > threshold
 
 
-def create_open_tag(tag_name: str) -> str:
+def ot(tag_name: str) -> str:
     """Generate an HTML open tag for the given tag name.
     
     Args:

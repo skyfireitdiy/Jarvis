@@ -5,7 +5,7 @@ from typing import Optional, List
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import ct
 
 # 从__init__.py导入系统提示
 from jarvis.jarvis_agent import origin_agent_system_prompt
@@ -34,7 +34,7 @@ def load_config(config_path: str) -> dict:
 def main():
     """Main entry point for Jarvis agent"""
     # Initialize environment
-    init_env()
+    ct()
     
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')

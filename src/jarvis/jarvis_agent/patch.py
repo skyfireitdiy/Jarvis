@@ -12,7 +12,7 @@ from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag, get_file_line_count, user_confirm
+from jarvis.jarvis_utils.utils import create_close_tag, ot, get_file_line_count, user_confirm
 
 class PatchOutputHandler(OutputHandler):
     def name(self) -> str:
@@ -30,9 +30,9 @@ class PatchOutputHandler(OutputHandler):
 # 代码补丁规范
 
 ## 补丁格式定义
-使用{create_open_tag("PATCH")}块来精确指定代码更改：
+使用{ot("PATCH")}块来精确指定代码更改：
 ```
-{create_open_tag("PATCH")}
+{ot("PATCH")}
 File: [文件路径]
 Reason: [修改原因]
 [上下文代码片段]
@@ -65,7 +65,7 @@ Reason: [修改原因]
 
 ## 补丁示例
 ```
-{create_open_tag("PATCH")}
+{ot("PATCH")}
 File: src/utils/math.py
 Reason: 修复除零错误，增加参数验证以提高函数健壮性
 def safe_divide(a, b):
@@ -90,7 +90,7 @@ def add(a, b):
 def _parse_patch(patch_str: str) -> Dict[str, str]:
     """解析新的上下文补丁格式"""
     result = {}
-    patches = re.findall(create_open_tag("PATCH")+r'\n?(.*?)\n?'+create_close_tag("PATCH"), patch_str, re.DOTALL)
+    patches = re.findall(ot("PATCH")+r'\n?(.*?)\n?'+create_close_tag("PATCH"), patch_str, re.DOTALL)
     if patches:
         for patch in patches:
             first_line = patch.splitlines()[0]
@@ -285,14 +285,14 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
 4. **上下文保留**：保持未修改部分的代码完全不变
 
 ## 输出格式规范
-- 仅在{create_open_tag("MERGED_CODE")}标签内输出合并后的完整代码
+- 仅在{ot("MERGED_CODE")}标签内输出合并后的完整代码
 - 每次最多输出300行代码
 - 不要使用markdown代码块（```）或反引号，除非修改的是markdown文件
 - 除了合并后的代码，不要输出任何其他文本
-- 所有代码输出完成后，输出{create_open_tag("!!!FINISHED!!!")}标记
+- 所有代码输出完成后，输出{ot("!!!FINISHED!!!")}标记
 
 ## 输出模板
-{create_open_tag("MERGED_CODE")}
+{ot("MERGED_CODE")}
 [合并后的完整代码，包括所有空行和缩进]
 {create_close_tag("MERGED_CODE")}
 """
@@ -308,7 +308,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
                 with spinner.hidden():
                     response = model.chat_until_success(prompt).splitlines()
                 try:
-                    start_line = response.index(create_open_tag("MERGED_CODE")) + 1
+                    start_line = response.index(ot("MERGED_CODE")) + 1
                     try:
                         end_line = response.index(create_close_tag("MERGED_CODE"))
                         code = response[start_line:end_line]
@@ -318,7 +318,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
                     pass
 
                 try: 
-                    response.index(create_open_tag("!!!FINISHED!!!"))
+                    response.index(ot("!!!FINISHED!!!"))
                     finished = True
                     break
                 except:
@@ -330,10 +330,10 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
 
 ## 要求
 - 严格保留原始代码的格式、空行和缩进
-- 仅在{create_open_tag("MERGED_CODE")}块中包含实际代码内容
+- 仅在{ot("MERGED_CODE")}块中包含实际代码内容
 - 不要使用markdown代码块（```）或反引号
 - 除了合并后的代码，不要输出任何其他文本
-- 所有代码输出完成后，输出{create_open_tag("!!!FINISHED!!!")}标记
+- 所有代码输出完成后，输出{ot("!!!FINISHED!!!")}标记
 """
                     pass
             if not finished:
@@ -395,15 +395,15 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
 4. **上下文完整性**：提供足够的上下文，确保补丁能准确应用
 
 ## 输出格式规范
-- 使用{create_open_tag("DIFF")}块包围每个需要修改的代码段
-- 每个{create_open_tag("DIFF")}块必须包含SEARCH部分和REPLACE部分
+- 使用{ot("DIFF")}块包围每个需要修改的代码段
+- 每个{ot("DIFF")}块必须包含SEARCH部分和REPLACE部分
 - SEARCH部分是需要查找的原始代码
 - REPLACE部分是替换后的新代码
 - 确保SEARCH部分能在原文件中唯一匹配
-- 如果修改较大，可以使用多个{create_open_tag("DIFF")}块
+- 如果修改较大，可以使用多个{ot("DIFF")}块
 
 ## 输出模板
-{create_open_tag("DIFF")}
+{ot("DIFF")}
 >>>>>> SEARCH
 [需要查找的原始代码，包含足够上下文]
 ======
@@ -411,7 +411,7 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
 <<<<<< REPLACE
 {create_close_tag("DIFF")}
 
-{create_open_tag("DIFF")}
+{ot("DIFF")}
 >>>>>> SEARCH
 [另一处需要查找的原始代码]
 ======
@@ -424,7 +424,7 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
                 response = model.chat_until_success(prompt)
             
             # 解析差异化补丁
-            diff_blocks = re.finditer(create_open_tag("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+create_close_tag("DIFF"), 
+            diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+create_close_tag("DIFF"), 
                                      response, re.DOTALL)
             
             # 读取原始文件内容

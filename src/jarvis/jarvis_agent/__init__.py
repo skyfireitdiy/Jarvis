@@ -19,7 +19,7 @@ from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.config import get_max_token_count
-from jarvis.jarvis_utils.utils import create_open_tag, init_env
+from jarvis.jarvis_utils.utils import ot, ct
 from jarvis.jarvis_utils.utils import user_confirm
 import os
 
@@ -154,7 +154,7 @@ class Agent:
             complete_prompt = f"""
             ## 任务完成
             当任务完成时，你应该打印以下信息：
-            {create_open_tag("!!!COMPLETE!!!")}
+            {ot("!!!COMPLETE!!!")}
             """
 
         self.model.set_system_message(f"""
@@ -354,7 +354,7 @@ class Agent:
                     if self.prompt:
                         continue
 
-                    if self.auto_complete and create_open_tag("!!!COMPLETE!!!") in current_response:
+                    if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
                         return self._complete_task()
                     
                     # 获取用户输入
@@ -565,7 +565,7 @@ origin_agent_system_prompt = """
 def main():
     """Jarvis main entry point"""
     # Add argument parser
-    init_env()
+    ct()
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
     parser.add_argument('-p', '--platform', type=str, help='Platform to use')
     parser.add_argument('-m', '--model', type=str, help='Model to use')

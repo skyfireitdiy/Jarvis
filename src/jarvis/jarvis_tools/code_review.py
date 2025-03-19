@@ -9,7 +9,7 @@ from jarvis.jarvis_agent import Agent
 import re
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag, init_env
+from jarvis.jarvis_utils.utils import create_close_tag, ot, ct
 
 class CodeReviewTool:
     name = "code_review"
@@ -200,7 +200,7 @@ class CodeReviewTool:
                     system_prompt=system_prompt,
                     name="Code Review Agent",
                     summary_prompt=f"""Please generate a concise summary report of the code review in Chinese, format as follows:
-{create_open_tag("REPORT")}
+{ot("REPORT")}
 - 文件: xxxx.py
   位置: [起始行号, 结束行号]
   描述: # 仅描述在差异中直接观察到的问题
@@ -231,7 +231,7 @@ class CodeReviewTool:
         
 
 def extract_code_report(result: str) -> str:
-    sm = re.search(create_open_tag("REPORT")+r'\n(.*?)\n'+create_close_tag("REPORT"), result, re.DOTALL)
+    sm = re.search(ot("REPORT")+r'\n(.*?)\n'+create_close_tag("REPORT"), result, re.DOTALL)
     if sm:
         return sm.group(1)
     return ""
@@ -240,7 +240,7 @@ def main():
     """CLI entry point"""
     import argparse
 
-    init_env()
+    ct()
     
     parser = argparse.ArgumentParser(description='Autonomous code review tool')
     parser.add_argument('--type', choices=['commit', 'current', 'range', 'file'], default='current',

@@ -74,13 +74,13 @@ class FileCompleter(Completer):
         # 添加默认建议
         if not text_after_at.strip():
             # 默认建议列表
-            from jarvis.jarvis_utils.utils import create_open_tag
+            from jarvis.jarvis_utils.utils import ot
             default_suggestions = [
-                (create_open_tag("CodeBase")+r', '+'查询代码库'),
-                (create_open_tag("Web")+r', '+'网页搜索'),
-                (create_open_tag("RAG")+r', '+'知识库检索'),
-                (create_open_tag("Summary")+r', '+'总结'),
-                (create_open_tag("Clear")+r', '+'清除历史'),
+                (ot("CodeBase")+r', '+'查询代码库'),
+                (ot("Web")+r', '+'网页搜索'),
+                (ot("RAG")+r', '+'知识库检索'),
+                (ot("Summary")+r', '+'总结'),
+                (ot("Clear")+r', '+'清除历史'),
             ]
             for name, desc in default_suggestions:
                 yield Completion(

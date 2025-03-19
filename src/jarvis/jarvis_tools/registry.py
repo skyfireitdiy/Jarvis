@@ -13,7 +13,7 @@ from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_max_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag, init_env
+from jarvis.jarvis_utils.utils import create_close_tag, ot, ct
 
 
 
@@ -22,7 +22,7 @@ tool_call_help = f"""
 您正在使用一个需要精确格式和严格规则的工具执行系统。
 
 # 📋 工具调用格式
-{create_open_tag("TOOL_CALL")}
+{ot("TOOL_CALL")}
 name: 工具名称
 arguments:
     param1: 值1
@@ -54,7 +54,7 @@ arguments:
 # 📝 字符串参数格式
 始终使用 | 语法表示字符串参数：
 
-{create_open_tag("TOOL_CALL")}
+{ot("TOOL_CALL")}
 name: execute_shell
 arguments:
     command: |
@@ -234,7 +234,7 @@ class ToolRegistry(OutputHandler):
             Exception: 如果工具调用缺少必要字段
         """
         # 将内容拆分为行
-        data = re.findall(create_open_tag("TOOL_CALL")+r'(.*?)'+create_close_tag("TOOL_CALL"), content, re.DOTALL)
+        data = re.findall(ot("TOOL_CALL")+r'(.*?)'+create_close_tag("TOOL_CALL"), content, re.DOTALL)
         ret = []
         for item in data:
             try:
@@ -277,7 +277,7 @@ class ToolRegistry(OutputHandler):
 
 # 📋 工具调用格式
 
-{create_open_tag("TOOL_CALL")}
+{ot("TOOL_CALL")}
 name: 工具名称
 arguments:
     param1: 值1
@@ -309,7 +309,7 @@ arguments:
 # 📝 字符串参数格式
 始终使用 | 语法表示字符串参数：
 
-{create_open_tag("TOOL_CALL")}
+{ot("TOOL_CALL")}
 name: execute_shell
 arguments:
     command: |
@@ -402,7 +402,7 @@ def main():
     import argparse
     import json
 
-    init_env()
+    ct()
 
     parser = argparse.ArgumentParser(description='Jarvis 工具系统命令行界面')
     subparsers = parser.add_subparsers(dest='command', help='命令')

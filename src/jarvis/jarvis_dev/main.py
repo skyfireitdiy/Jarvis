@@ -3,7 +3,7 @@ from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag, init_env
+from jarvis.jarvis_utils.utils import create_close_tag, ot, ct
 
 # 定义每个角色的系统提示
 PM_PROMPT = f"""
@@ -57,7 +57,7 @@ PM_PROMPT = f"""
 - **execute_shell**：监控项目状态，执行自动化任务
 
 ## 消息传递模板
-{create_open_tag("SEND_MESSAGE")}
+{ot("SEND_MESSAGE")}
 to: [角色]
 content: |
   # [任务主题]
@@ -553,7 +553,7 @@ DEV_PROMPT = f"""
 
 ### 代码代理调用模板
 ```
-{create_open_tag("TOOL_CALL")}
+{ot("TOOL_CALL")}
 name: create_code_agent
 arguments:
   task: "实现[具体功能]：
@@ -598,7 +598,7 @@ arguments:
 
 3. **代码生成**：为每个原子单元创建代码代理
    ```
-   {create_open_tag("TOOL_CALL")}
+   {ot("TOOL_CALL")}
    name: create_code_agent
    arguments:
      task: "实现OAuth2Client基础类：
@@ -626,7 +626,7 @@ arguments:
 
 5. **测试编写**：为功能编写全面测试
    ```
-   {create_open_tag("TOOL_CALL")}
+   {ot("TOOL_CALL")}
    name: create_code_agent
    arguments:
      task: "为OAuth2Client编写单元测试：
@@ -710,7 +710,7 @@ QA_PROMPT = f"""
 ## 测试代码生成指南
 ### 单元测试生成
 ```
-{create_open_tag("TOOL_CALL")}
+{ot("TOOL_CALL")}
 name: create_code_agent
 arguments:
   task: "为[组件/函数]创建单元测试：
@@ -728,7 +728,7 @@ arguments:
 
 ### 集成测试生成
 ```
-{create_open_tag("TOOL_CALL")}
+{ot("TOOL_CALL")}
 name: create_code_agent
 arguments:
   task: "为[功能/流程]创建集成测试：
@@ -746,7 +746,7 @@ arguments:
 
 ### 性能测试生成
 ```
-{create_open_tag("TOOL_CALL")}
+{ot("TOOL_CALL")}
 name: create_code_agent
 arguments:
   task: "为[API/功能]创建性能测试：
@@ -971,7 +971,7 @@ def create_dev_team() -> MultiAgent:
 def main():
     """Main entry point for the development team simulation."""
 
-    init_env()
+    ct()
     
     # Create the development team
     dev_team = create_dev_team()

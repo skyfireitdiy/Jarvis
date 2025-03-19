@@ -7,7 +7,7 @@ from typing import Dict, Any
 
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag
+from jarvis.jarvis_utils.utils import create_close_tag, ot
 
 class ToolGenerator:
     """工具生成器类，用于自动创建与Jarvis系统集成的新工具"""
@@ -114,7 +114,7 @@ class ToolGenerator:
             格式化后的提示字符串
         """
         example_code = f'''
-{create_open_tag("TOOL")}
+{ot("TOOL")}
 from typing import Dict, Any
 from jarvis.utils import OutputType, PrettyOutput
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -184,7 +184,7 @@ class CustomTool:
 8. 仅返回Python实现代码
 9. 代码应该是完整且可直接使用的
 10. 按照以下格式输出代码：
-{create_open_tag("TOOL")}
+{ot("TOOL")}
 {example_code}
 {create_close_tag("TOOL")}
 
@@ -200,7 +200,7 @@ class CustomTool:
         Returns:
             提取到的Python代码字符串
         """
-        sm = re.search(create_open_tag("TOOL")+r'(.*?)'+create_close_tag("TOOL"), response, re.DOTALL)
+        sm = re.search(ot("TOOL")+r'(.*?)'+create_close_tag("TOOL"), response, re.DOTALL)
         if sm:
             return sm.group(1)
         return ""

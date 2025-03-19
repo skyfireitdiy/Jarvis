@@ -15,7 +15,7 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.git_utils import find_git_root, get_commits_between, get_latest_commit_hash, has_uncommitted_changes
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env, user_confirm
+from jarvis.jarvis_utils.utils import ct, user_confirm
 
 
 
@@ -183,7 +183,7 @@ class CodeAgent:
 def main():
     """Jarvis main entry point"""
     # Add argument parser
-    init_env()
+    ct()
 
     curr_dir = os.getcwd()
     git_dir = find_git_root(curr_dir)
