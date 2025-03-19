@@ -1,11 +1,11 @@
-import requests
 from typing import List, Dict, Tuple
 from jarvis.jarvis_platform.base import BasePlatform
 import os
-import json
 
-from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
+
+import ollama
 
 class OllamaPlatform(BasePlatform):
     """Ollama platform implementation"""
@@ -20,11 +20,13 @@ class OllamaPlatform(BasePlatform):
         self.api_base = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-r1:1.5b"
         
+        # Setup client based on availability
+        self.client = None
+        self.client = ollama.Client(host=self.api_base)
+        
         # Check if Ollama service is available
         try:
-            response = requests.get(f"{self.api_base}/api/tags")
-            response.raise_for_status()
-            available_models = [model["name"] for model in response.json().get("models", [])]
+            available_models = self._get_available_models()
             
             if not available_models:
                 message = (
@@ -36,9 +38,9 @@ class OllamaPlatform(BasePlatform):
                 PrettyOutput.print(message, OutputType.INFO)
                 PrettyOutput.print("Ollama 没有可用的模型", OutputType.WARNING)
                 
-        except requests.exceptions.ConnectionError:
+        except Exception as e:
             message = (
-                "Ollama 服务未启动或无法连接\n"
+                f"Ollama 服务未启动或无法连接: {str(e)}\n"
                 "请确保您已:\n"
                 "1. 安装 Ollama: https://ollama.ai\n"
                 "2. 启动 Ollama 服务\n"
@@ -50,11 +52,19 @@ class OllamaPlatform(BasePlatform):
         self.messages = []
         self.system_message = ""
 
+    def _get_available_models(self) -> List[str]:
+        """Get list of available models using appropriate method"""
+        models_response = self.client.list() # type: ignore
+        return [model["model"] for model in models_response.get("models", [])]
+
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
-        response = requests.get(f"{self.api_base}/api/tags")
-        response.raise_for_status()
-        return [(model["name"], "") for model in response.json().get("models", [])]
+        try:
+            models = self._get_available_models()
+            return [(model, "") for model in models]
+        except Exception as e:
+            PrettyOutput.print(f"获取模型列表失败: {str(e)}", OutputType.ERROR)
+            return []
 
     def set_model_name(self, model_name: str):
         """Set model name"""
@@ -69,49 +79,43 @@ class OllamaPlatform(BasePlatform):
                 messages.append({"role": "system", "content": self.system_message})
             messages.extend(self.messages)
             messages.append({"role": "user", "content": message})
-            
-            # 构建请求数据
-            data = {
-                "model": self.model_name,
-                "messages": messages,
-                "stream": True  # 启用流式输出
-            }
-            
-            # 发送请求
-            response = requests.post(
-                f"{self.api_base}/api/chat",
-                json=data,
-                stream=True
-            )
-            response.raise_for_status()
-            
-            # 处理流式响应
-            full_response = ""
-            for line in response.iter_lines():
-                if line:
-                    chunk = line.decode()
-                    try:
-                        result = json.loads(chunk)
-                        if "message" in result and "content" in result["message"]:
-                            text = result["message"]["content"]
-                            if not self.suppress_output:
-                                PrettyOutput.print_stream(text)
-                            full_response += text
-                    except json.JSONDecodeError:
-                        continue
-                        
-            if not self.suppress_output:
-                PrettyOutput.print_stream_end()
-            
-            # 更新消息历史
-            self.messages.append({"role": "user", "content": message})
-            self.messages.append({"role": "assistant", "content": full_response})
-            
-            return full_response
+
+            return self._chat_with_package(messages)
             
         except Exception as e:
             PrettyOutput.print(f"对话失败: {str(e)}", OutputType.ERROR)
             raise Exception(f"Chat failed: {str(e)}")
+
+    def _chat_with_package(self, messages: List[Dict]) -> str:
+        """Chat using the ollama package"""
+        # The client should not be None here due to the check in the chat method
+        if not self.client:
+            raise ValueError("Ollama client is not initialized")
+            
+        # Use ollama-python's streaming API
+        stream = self.client.chat(
+            model=self.model_name,
+            messages=messages,
+            stream=True
+        )
+        
+        # Process the streaming response
+        full_response = ""
+        for chunk in stream:
+            if "message" in chunk and "content" in chunk["message"]:
+                text = chunk["message"]["content"]
+                if not self.suppress_output:
+                    PrettyOutput.print_stream(text)
+                full_response += text
+                    
+        if not self.suppress_output:
+            PrettyOutput.print_stream_end()
+        
+        # Update message history
+        self.messages.append({"role": "user", "content": messages[-1]["content"]})
+        self.messages.append({"role": "assistant", "content": full_response})
+        
+        return full_response
 
     def upload_files(self, file_list: List[str]) -> List[Dict]:
         """Upload files (Ollama does not support file upload)"""
@@ -137,17 +141,3 @@ class OllamaPlatform(BasePlatform):
         """Set system message"""
         self.system_message = message
         self.reset()  # 重置会话以应用新的系统消息 
-
-
-if __name__ == "__main__":
-    try:
-        ollama = OllamaPlatform()
-        while True:
-            try:
-                message = get_single_line_input("输入问题 (Ctrl+C 退出)")
-                ollama.chat_until_success(message)
-            except KeyboardInterrupt:
-                print("再见!")
-                break
-    except Exception as e:
-        PrettyOutput.print(f"程序异常退出: {str(e)}", OutputType.ERROR)
