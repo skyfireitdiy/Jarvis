@@ -243,7 +243,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
     if get_file_line_count(filepath) < 100:
         return handle_small_code_operation(filepath, patch_content)
     else:
-        retry_count = 3
+        retry_count = 5
         while retry_count > 0:
             retry_count -= 1
             if handle_large_code_operation(filepath, patch_content):
