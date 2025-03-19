@@ -35,16 +35,16 @@ class MethodologyTool:
 
     @staticmethod
     def check()->bool:
-        """Check if the methodology is enabled"""
+        """检查是否启用了方法论功能"""
         return is_use_methodology()
     
     def __init__(self):
-        """Initialize the experience management tool"""
+        """初始化经验管理工具"""
         self.methodology_file = os.path.expanduser("~/.jarvis/methodology")
         self._ensure_file_exists()
             
     def _ensure_file_exists(self):
-        """Ensure the methodology file exists"""
+        """确保方法论文件存在"""
         if not os.path.exists(self.methodology_file):
             try:
                 with open(self.methodology_file, 'w', encoding='utf-8', errors="ignore") as f:
@@ -53,7 +53,7 @@ class MethodologyTool:
                 PrettyOutput.print(f"创建方法论文件失败：{str(e)}", OutputType.ERROR)
                 
     def _load_methodologies(self) -> Dict:
-        """Load all methodologies"""
+        """加载所有方法论"""
         try:
             with open(self.methodology_file, 'r', encoding='utf-8', errors="ignore") as f:
                 return yaml.safe_load(f) or {}
@@ -62,7 +62,7 @@ class MethodologyTool:
             return {}
                 
     def _save_methodologies(self, methodologies: Dict):
-        """Save all methodologies"""
+        """保存所有方法论"""
         try:
             with open(self.methodology_file, 'w', encoding='utf-8', errors="ignore") as f:
                 yaml.safe_dump(methodologies, f, allow_unicode=True)
@@ -70,16 +70,16 @@ class MethodologyTool:
             PrettyOutput.print(f"保存方法论失败: {str(e)}", OutputType.ERROR)
             
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute the operation of managing methodologies
+        """执行管理方法论的操作
         
         Args:
-            args: A dictionary containing the operation parameters
-                - operation: The operation type (delete/update/add)
-                - problem_type: The problem type
-                - content: The methodology content (required for update/add)
+            args: 包含操作参数的字典
+                - operation: 操作类型 (delete/update/add)
+                - problem_type: 问题类型
+                - content: 方法论内容 (更新和添加时必填)
             
         Returns:
-            Dict[str, Any]: A dictionary containing the execution result
+            Dict[str, Any]: 包含执行结果的字典
         """
         operation = args.get("operation", "").strip()
         problem_type = args.get("problem_type", "").strip()
@@ -143,13 +143,13 @@ class MethodologyTool:
             }
             
     def get_methodology(self, problem_type: str) -> Optional[str]:
-        """Get the methodology for a specific problem type
+        """获取特定问题类型的方法论
         
         Args:
-            problem_type: The problem type
+            problem_type: 问题类型
             
         Returns:
-            Optional[str]: The methodology content, or None if it does not exist
+            Optional[str]: 方法论内容，如果不存在则返回 None
         """
         methodologies = self._load_methodologies()
         return methodologies.get(problem_type) 
