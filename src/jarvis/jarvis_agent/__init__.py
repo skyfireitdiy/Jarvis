@@ -187,7 +187,7 @@ class Agent:
                 
         # 添加输出简洁性指令
         actions = '、'.join([o.name() for o in self.output_handler])
-        message += f"\n\n系统指令：请严格输出且仅输出一个操作的完整调用格式，不要输出多个操作，需要输出解释、分析和思考过程。如果任务已完成，只需简洁地说明完成原因。确保输出格式正确且可直接执行。每次响应必须且只能包含一个操作。可用的操作：{actions}"
+        message += f"\n\n系统指令：请严格输出且仅输出一个操作的完整调用格式，不要输出多个操作；需要输出解释、分析和思考过程。如果任务已完成，只需简洁地说明完成原因。确保输出格式正确且可直接执行。每次响应必须且只能包含一个操作。可用的操作：{actions}"
 
         # 累加对话长度
         self.conversation_length += get_context_token_count(message)
