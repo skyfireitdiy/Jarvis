@@ -34,7 +34,10 @@ class CodeAgent:
                                  "lsp_get_diagnostics", 
                                  "lsp_find_references", 
                                  "lsp_find_definition",
-                                 "code_review"  # 新增代码审查工具
+                                 "code_review",  # 代码审查工具
+                                 "find_symbol",  # 添加符号查找工具
+                                 "find_caller",  # 添加函数调用者查找工具
+                                 "function_analyzer"  # 添加函数分析工具
                                  ])
         code_system_prompt = """
 # 专业代码工程师
@@ -102,6 +105,9 @@ class CodeAgent:
 - **分析工具**：
   - lsp_find_references：用于理解使用模式
   - lsp_find_definition：用于追踪实现细节
+  - find_symbol：用于查找代码符号的引用、定义和声明位置
+  - find_caller：用于查找所有调用指定函数的代码位置
+  - function_analyzer：用于深入分析函数内部实现、子函数调用和全局变量使用
 
 - **验证工具**：
   - lsp_get_diagnostics：用于修改后检查
@@ -111,6 +117,14 @@ class CodeAgent:
   - execute_shell：用于git操作和grep搜索
   - ask_codebase：用于查询代码知识库
   - search_web：用于技术参考查找
+
+## 代码分析工具使用建议
+- 在理解代码结构时，使用find_symbol查找符号定义和引用位置
+- 在修改函数实现前，使用find_caller评估变更的影响范围
+- 对于复杂函数，使用function_analyzer深入了解其内部工作机制和依赖关系
+- 在重构前，先使用这些工具分析代码耦合度和依赖关系
+- 理解函数调用层次时，从高层函数开始，逐步分析其调用的子函数
+- 处理复杂变更时，可以组合使用这些工具建立完整的代码理解图谱
 
 ## 补丁格式要求
 创建代码补丁时：
