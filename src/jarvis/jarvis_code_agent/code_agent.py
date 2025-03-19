@@ -28,7 +28,6 @@ class CodeAgent:
         tool_registry.use_tools(["execute_shell", 
                                  "execute_shell_script",
                                  "search_web", 
-                                 "create_code_agent",
                                  "ask_user",  
                                  "ask_codebase",
                                  "lsp_get_diagnostics", 
