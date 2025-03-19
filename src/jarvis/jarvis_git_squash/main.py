@@ -1,3 +1,4 @@
+import re
 import sys
 import argparse
 from typing import Dict, Any
@@ -26,39 +27,23 @@ class GitSquashTool:
         except Exception:
             return False
     
-    def execute(self, args: Dict) -> Dict[str, Any]:
+    def execute(self, args: Dict):
         """Execute the squash operation"""
         try:
             if not self._confirm_squash():
-                return {
-                    "success": False,
-                    "stdout": "Operation cancelled",
-                    "stderr": ""
-                }
+                PrettyOutput.print("操作已取消", OutputType.WARNING)
+                return
             
             if not self._reset_to_commit(args['commit_hash']):
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "Failed to reset to specified commit"
-                }
+                PrettyOutput.print("重置到指定提交失败", OutputType.WARNING)
+                return
             
             # Use existing GitCommitTool for new commit
             commit_tool = GitCommitTool()
-            result = commit_tool.execute({"lang": args.get('lang', 'Chinese')})
-            
-            return {
-                "success": result['success'],
-                "stdout": result['stdout'],
-                "stderr": result['stderr']
-            }
-            
+            commit_tool.execute({"lang": args.get('lang', 'Chinese')})
         except Exception as e:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"Squash failed: {str(e)}"
-            }
+            PrettyOutput.print(f"压缩提交失败: {str(e)}", OutputType.WARNING)
+            
 def main():
     init_env()
     parser = argparse.ArgumentParser(description='Git squash tool')
@@ -67,15 +52,9 @@ def main():
     args = parser.parse_args()
     
     tool = GitSquashTool()
-    result = tool.execute({
+    tool.execute({
         'commit_hash': args.commit_hash,
         'lang': args.lang
     })
-    
-    if not result['success']:
-        PrettyOutput.print(result['stderr'], OutputType.ERROR)
-        sys.exit(1)
-        
-    PrettyOutput.print(result['stdout'], OutputType.SUCCESS)
 if __name__ == "__main__":
     sys.exit(main())
