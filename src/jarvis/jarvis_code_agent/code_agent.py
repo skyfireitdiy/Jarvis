@@ -37,7 +37,9 @@ class CodeAgent:
                                  "code_review",  # 代码审查工具
                                  "find_symbol",  # 添加符号查找工具
                                  "find_caller",  # 添加函数调用者查找工具
-                                 "function_analyzer"  # 添加函数分析工具
+                                 "function_analyzer",  # 添加函数分析工具
+                                 "project_analyzer",  # 添加项目分析工具
+                                 "file_analyzer"  # 添加单文件分析工具
                                  ])
         code_system_prompt = """
 # 专业代码工程师
@@ -108,6 +110,8 @@ class CodeAgent:
   - find_symbol：用于查找代码符号的引用、定义和声明位置
   - find_caller：用于查找所有调用指定函数的代码位置
   - function_analyzer：用于深入分析函数内部实现、子函数调用和全局变量使用
+  - project_analyzer：用于分析项目结构、入口点、模块划分等信息，提供项目概览
+  - file_analyzer：用于深入分析单个文件的结构、实现细节和代码质量
 
 - **验证工具**：
   - lsp_get_diagnostics：用于修改后检查
@@ -122,6 +126,12 @@ class CodeAgent:
 - 在理解代码结构时，使用find_symbol查找符号定义和引用位置
 - 在修改函数实现前，使用find_caller评估变更的影响范围
 - 对于复杂函数，使用function_analyzer深入了解其内部工作机制和依赖关系
+- 在开始新项目工作前，使用project_analyzer获取项目的整体结构和模块划分
+- 在深入研究特定文件前，使用file_analyzer评估文件的质量和结构
+- 在对复杂实现进行重构前，先用file_analyzer全面了解文件的设计和质量问题
+- 在代码审查过程中，使用file_analyzer提供客观的代码质量评估
+- 在代码重构前，先用project_analyzer分析项目架构，了解系统组织方式
+- 使用project_analyzer识别项目入口点和关键组件，加快理解项目工作流程
 - 在重构前，先使用这些工具分析代码耦合度和依赖关系
 - 理解函数调用层次时，从高层函数开始，逐步分析其调用的子函数
 - 处理复杂变更时，可以组合使用这些工具建立完整的代码理解图谱
