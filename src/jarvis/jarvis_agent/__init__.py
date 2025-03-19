@@ -187,6 +187,13 @@ class Agent:
                 
         # 添加输出简洁性指令
         message += "\n\n系统指令：请严格输出且仅输出一个操作的完整调用格式，不要输出多个操作，不要输出任何解释、分析或思考过程。如果任务已完成，只需简洁地说明完成原因。确保输出格式正确且可直接执行。每次响应必须且只能包含一个操作。"
+
+        # 累加对话长度
+        self.conversation_length += get_context_token_count(message)
+
+        if self.conversation_length > self.max_token_count:
+            self._summarize_and_clear_history()
+            self.conversation_length += get_context_token_count(message)
         
         print("🤖 模型思考：")
         return self.model.chat_until_success(message)   # type: ignore
@@ -332,17 +339,11 @@ class Agent:
 
             while True:
                 try:
-                    # 累加对话长度
-                    self.conversation_length += get_context_token_count(self.prompt)
-                    
                     # 如果对话历史长度超过限制，在提示中添加提醒
-                    if self.conversation_length > self.max_token_count:
-                        current_response = self._summarize_and_clear_history()
-                        continue
-                    else:
-                        current_response = self._call_model(self.prompt)
-                        self.prompt = ""
-                        self.conversation_length += get_context_token_count(current_response)
+
+                    current_response = self._call_model(self.prompt)
+                    self.prompt = ""
+                    self.conversation_length += get_context_token_count(current_response)
 
                     need_return, self.prompt = self._call_tools(current_response)
 
