@@ -14,7 +14,15 @@ import subprocess
 from typing import List, Tuple, Dict
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def find_git_root(start_dir="."):
-    """切换到给定路径的Git根目录，如果不是Git仓库则初始化"""
+    """
+    切换到给定路径的Git根目录，如果不是Git仓库则初始化。
+    
+    参数:
+        start_dir (str): 起始查找目录，默认为当前目录。
+    
+    返回:
+        str: Git仓库根目录路径。如果目录不是Git仓库，则会初始化一个新的Git仓库。
+    """
     os.chdir(start_dir)
     try:
         git_root = os.popen("git rev-parse --show-toplevel").read().strip()
