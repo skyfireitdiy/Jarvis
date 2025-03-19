@@ -11,10 +11,10 @@ import os
 """
 def get_max_token_count() -> int:
     """
-    获取API请求的最大token数量。
+    获取模型允许的最大token数量。
     
-    返回：
-        int: 最大token数量，默认为131072（128k）
+    返回:
+        int: 模型能处理的最大token数量。
     """
     return int(os.getenv('JARVIS_MAX_TOKEN_COUNT', '131072'))  # 默认128k
     
