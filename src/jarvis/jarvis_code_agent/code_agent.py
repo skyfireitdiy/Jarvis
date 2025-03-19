@@ -34,7 +34,6 @@ class CodeAgent:
                                  "lsp_get_diagnostics", 
                                  "lsp_find_references", 
                                  "lsp_find_definition",
-                                 "treesitter_analyzer",
                                  "code_review"  # 新增代码审查工具
                                  ])
         code_system_prompt = """
@@ -58,7 +57,6 @@ class CodeAgent:
 ## 任务执行规范
 ### 分析阶段
 - 通过lsp_find_references和lsp_find_definition追踪依赖关系
-- 使用treesitter_analyzer深入分析代码结构和关系
 - 在进行更改前识别潜在影响区域
 - 为安全创建回滚计划
 
@@ -104,15 +102,6 @@ class CodeAgent:
 - **分析工具**：
   - lsp_find_references：用于理解使用模式
   - lsp_find_definition：用于追踪实现细节
-  - treesitter_analyzer：用于高级代码分析，支持以下功能：
-    - find_symbol：查找符号定义位置
-    - find_references：查找符号的所有引用
-    - find_callers：查找函数的所有调用处
-    
-    注意事项：
-    - 每次操作都会自动索引指定目录，无需单独执行索引步骤
-    - 适用于多种编程语言：Python, C, C++, Go, Rust 等
-    - 首次使用时会自动下载语法文件，可能需要一些时间
 
 - **验证工具**：
   - lsp_get_diagnostics：用于修改后检查
