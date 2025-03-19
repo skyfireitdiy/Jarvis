@@ -29,6 +29,16 @@ class ReadCodeTool:
     }
 
     def _handle_single_file(self, filepath: str, start_line: int = 1, end_line: int = -1) -> Dict[str, Any]:
+        """处理单个文件的读取操作
+        
+        Args:
+            filepath (str): 文件路径
+            start_line (int): 起始行号，默认为1
+            end_line (int): 结束行号，默认为-1表示文件末尾
+            
+        Returns:
+            Dict[str, Any]: 包含成功状态、输出内容和错误信息的字典
+        """
         try:
             abs_path = os.path.abspath(filepath)
             with yaspin(text=f"正在读取文件: {abs_path}...", color="cyan") as spinner:
@@ -101,6 +111,14 @@ class ReadCodeTool:
             }
 
     def execute(self, args: Dict) -> Dict[str, Any]:
+        """执行代码读取操作
+        
+        Args:
+            args (Dict): 包含文件列表的参数字典
+            
+        Returns:
+            Dict[str, Any]: 包含成功状态、输出内容和错误信息的字典
+        """
         try:
             if "files" not in args or not isinstance(args["files"], list):
                 return {
