@@ -116,7 +116,7 @@ class GrammarBuilder:
             # Execute build script
             logger.info(f"Building grammar for {lang_type.value}")
             result = subprocess.run(
-                ["python", build_script],
+                ["python3", build_script],
                 check=False,
                 capture_output=True,
                 text=True
