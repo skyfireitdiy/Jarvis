@@ -12,7 +12,7 @@ import os
 
 from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag, init_env
 
 
 class GitCommitTool:
@@ -37,7 +37,7 @@ class GitCommitTool:
     def _extract_commit_message(self, message):
         """Raw extraction preserving all characters"""
         r = re.search(
-            r"(?i)<COMMIT_MESSAGE>\s*([\s\S]*?)\s*</COMMIT_MESSAGE>", 
+            r"(?i)" + create_open_tag("COMMIT_MESSAGE") + r"\s*([\s\S]*?)\s*" + create_close_tag("COMMIT_MESSAGE"), 
             message
         )
         if r:
@@ -97,10 +97,10 @@ class GitCommitTool:
                     提交信息应使用{args.get('lang', '中文')}书写
         # 必需结构
         必须使用以下格式：
-        <COMMIT_MESSAGE>
+        {create_open_tag("COMMIT_MESSAGE")}
         <类型>(<范围>): <主题>
         使用祈使语气描述变更内容
-        </COMMIT_MESSAGE>
+        {create_close_tag("COMMIT_MESSAGE")}
         # 格式规则
         1. 类型: fix, feat, docs, style, refactor, test, chore
         2. 范围表示模块 (例如: auth, database)

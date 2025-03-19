@@ -13,21 +13,21 @@ from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_max_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag, init_env
 
 
 
-tool_call_help = """
+tool_call_help = f"""
 # 🛠️ 工具使用系统
 您正在使用一个需要精确格式和严格规则的工具执行系统。
 
 # 📋 工具调用格式
-<TOOL_CALL>
+{create_open_tag("TOOL_CALL")}
 name: 工具名称
 arguments:
     param1: 值1
     param2: 值2
-</TOOL_CALL>
+{create_close_tag("TOOL_CALL")}
 
 # ❗ 关键规则
 1. 每次只使用一个工具
@@ -54,12 +54,12 @@ arguments:
 # 📝 字符串参数格式
 始终使用 | 语法表示字符串参数：
 
-<TOOL_CALL>
+{create_open_tag("TOOL_CALL")}
 name: execute_shell
 arguments:
     command: |
         git status --porcelain
-</TOOL_CALL>
+{create_close_tag("TOOL_CALL")}
 
 # 💡 最佳实践
 - 准备好后立即开始执行
@@ -234,7 +234,7 @@ class ToolRegistry(OutputHandler):
             Exception: 如果工具调用缺少必要字段
         """
         # 将内容拆分为行
-        data = re.findall(r'<TOOL_CALL>(.*?)</TOOL_CALL>', content, re.DOTALL)
+        data = re.findall(create_open_tag("TOOL_CALL")+r'(.*?)'+create_close_tag("TOOL_CALL"), content, re.DOTALL)
         ret = []
         for item in data:
             try:
@@ -271,18 +271,18 @@ class ToolRegistry(OutputHandler):
             name = tool_call["name"]
             args = tool_call["arguments"]
 
-            tool_call_help = """
+            tool_call_help = f"""
 # 🛠️ 工具使用系统
 您正在使用一个需要精确格式和严格规则的工具执行系统。
 
 # 📋 工具调用格式
 
-<TOOL_CALL>
+{create_open_tag("TOOL_CALL")}
 name: 工具名称
 arguments:
     param1: 值1
     param2: 值2
-</TOOL_CALL>
+{create_close_tag("TOOL_CALL")}
 
 # ❗ 关键规则
 1. 每次只使用一个工具
@@ -309,12 +309,12 @@ arguments:
 # 📝 字符串参数格式
 始终使用 | 语法表示字符串参数：
 
-<TOOL_CALL>
+{create_open_tag("TOOL_CALL")}
 name: execute_shell
 arguments:
     command: |
         git status --porcelain
-</TOOL_CALL>
+{create_close_tag("TOOL_CALL")}
 
 # 💡 最佳实践
 - 准备好后立即开始执行

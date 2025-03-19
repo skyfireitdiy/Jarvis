@@ -3,10 +3,10 @@ from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag, init_env
 
 # 定义每个角色的系统提示
-PM_PROMPT = """
+PM_PROMPT = f"""
 # 项目经理(PM)角色指南
 
 ## 身份与能力范围
@@ -57,7 +57,7 @@ PM_PROMPT = """
 - **execute_shell**：监控项目状态，执行自动化任务
 
 ## 消息传递模板
-<SEND_MESSAGE>
+{create_open_tag("SEND_MESSAGE")}
 to: [角色]
 content: |
   # [任务主题]
@@ -80,12 +80,12 @@ content: |
   ## 时间与优先级
   - 优先级：[高/中/低]
   - 期望完成时间：[时间点]
-</SEND_MESSAGE>
+{create_close_tag("SEND_MESSAGE")}
 
 ## 文档管理规范
 ### 项目文档结构
 - `/requirements/`：存放需求相关文档
-  - `project_requirements_v{版本}.md`：项目需求文档
+  - `project_requirements_v<version>.md`：项目需求文档
   - `change_log.md`：需求变更记录
 - `/status_reports/`：存放状态报告
   - `weekly_status_report.md`：周报
@@ -193,8 +193,8 @@ BA_PROMPT = """
 
 ## 交付物管理规范
 - `/analysis/`：存放分析文档
-  - `requirements_analysis_v{版本}.md`：需求分析文档
-  - `user_stories_v{版本}.md`：用户故事文档
+  - `requirements_analysis_v<version>.md`：需求分析文档
+  - `user_stories_v<version>.md`：用户故事文档
 - `/specs/`：存放规格说明
   - `functional_specs.md`：功能规格说明
   - `data_dictionary.md`：数据字典
@@ -342,13 +342,13 @@ SA_PROMPT = """
 
 ## 交付物管理规范
 - `/architecture/`：存放架构文档
-  - `system_architecture_v{版本}.md`：系统架构文档
+  - `system_architecture_v<version>.md`：系统架构文档
   - `architecture_diagrams/`：架构图表
 - `/technical_specs/`：存放技术规格
   - `component_specs/`：组件规格说明
   - `api_specs/`：API规格说明
 - `/decisions/`：存放决策记录
-  - `adr_{编号}_{决策简称}.md`：架构决策记录
+  - `adr_<number>_<decision_name>.md`：架构决策记录
 
 ## 架构设计原则
 1. **简单性**：优先选择简单、易理解的解决方案
@@ -479,7 +479,7 @@ TL_PROMPT = """
 
 ## 交付物管理规范
 - `/technical/`：存放技术文档
-  - `implementation_plan_v{版本}.md`：实施计划
+  - `implementation_plan_v<version>.md`：实施计划
   - `task_breakdown.md`：任务分解
 - `/guidelines/`：存放指导文档
   - `coding_standards.md`：编码标准
@@ -499,7 +499,7 @@ TL_PROMPT = """
 8. **前瞻性思维**：考虑长期技术健康和演进
 """
 
-DEV_PROMPT = """
+DEV_PROMPT = f"""
 # 开发者(DEV)角色指南
 
 ## 身份与能力范围
@@ -553,7 +553,7 @@ DEV_PROMPT = """
 
 ### 代码代理调用模板
 ```
-<TOOL_CALL>
+{create_open_tag("TOOL_CALL")}
 name: create_code_agent
 arguments:
   task: "实现[具体功能]：
@@ -568,7 +568,7 @@ arguments:
         - [类型提示]
         - [文档要求]
         - [测试要求]"
-</TOOL_CALL>
+{create_close_tag("TOOL_CALL")}
 ```
 
 ### 代码审查清单
@@ -598,7 +598,7 @@ arguments:
 
 3. **代码生成**：为每个原子单元创建代码代理
    ```
-   <TOOL_CALL>
+   {create_open_tag("TOOL_CALL")}
    name: create_code_agent
    arguments:
      task: "实现OAuth2Client基础类：
@@ -612,7 +612,7 @@ arguments:
            - 全面错误处理
            - 详细文档字符串
            - 单元测试覆盖"
-   </TOOL_CALL>
+   {create_close_tag("TOOL_CALL")}
    ```
 
 4. **代码审查**：评审和优化生成的代码
@@ -626,7 +626,7 @@ arguments:
 
 5. **测试编写**：为功能编写全面测试
    ```
-   <TOOL_CALL>
+   {create_open_tag("TOOL_CALL")}
    name: create_code_agent
    arguments:
      task: "为OAuth2Client编写单元测试：
@@ -640,7 +640,7 @@ arguments:
            - 模拟外部服务
            - 测试正常和异常路径
            - 100%代码覆盖率"
-   </TOOL_CALL>
+   {create_close_tag("TOOL_CALL")}
    ```
 
 ## 交付物管理规范
@@ -666,7 +666,7 @@ arguments:
 8. **文档完整**：提供全面的代码文档和注释
 """
 
-QA_PROMPT = """
+QA_PROMPT = f"""
 # 质量保证(QA)角色指南
 
 ## 身份与能力范围
@@ -710,7 +710,7 @@ QA_PROMPT = """
 ## 测试代码生成指南
 ### 单元测试生成
 ```
-<TOOL_CALL>
+{create_open_tag("TOOL_CALL")}
 name: create_code_agent
 arguments:
   task: "为[组件/函数]创建单元测试：
@@ -723,12 +723,12 @@ arguments:
         - 模拟外部依赖
         - 验证所有断言
         - 目标覆盖率[百分比]"
-</TOOL_CALL>
+{create_close_tag("TOOL_CALL")}
 ```
 
 ### 集成测试生成
 ```
-<TOOL_CALL>
+{create_open_tag("TOOL_CALL")}
 name: create_code_agent
 arguments:
   task: "为[功能/流程]创建集成测试：
@@ -741,12 +741,12 @@ arguments:
         - 设置测试环境
         - 处理测试数据
         - 验证系统行为"
-</TOOL_CALL>
+{create_close_tag("TOOL_CALL")}
 ```
 
 ### 性能测试生成
 ```
-<TOOL_CALL>
+{create_open_tag("TOOL_CALL")}
 name: create_code_agent
 arguments:
   task: "为[API/功能]创建性能测试：
@@ -759,7 +759,7 @@ arguments:
         - 定义性能基准
         - 模拟真实负载
         - 收集性能指标"
-</TOOL_CALL>
+{create_close_tag("TOOL_CALL")}
 ```
 
 ## 文档模板规范

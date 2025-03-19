@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import re
 from typing import Dict, List, Tuple
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
+from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag, get_context_token_count, while_success, while_true
 
 
 class BasePlatform(ABC):
@@ -53,7 +53,7 @@ class BasePlatform(ABC):
                 )
 
             # Keep original think tag handling
-            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            response = re.sub(create_open_tag("think")+r'.*?'+create_close_tag("think"), '', response, flags=re.DOTALL)
             return response
                 
         return while_true(lambda: while_success(lambda: _chat(), 5), 5)

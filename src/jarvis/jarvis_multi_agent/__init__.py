@@ -8,7 +8,7 @@ from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import create_close_tag, create_open_tag, init_env
 
 
 class MultiAgent(OutputHandler):
@@ -36,7 +36,7 @@ class MultiAgent(OutputHandler):
 
 ### 消息格式标准
 ```
-<SEND_MESSAGE>
+{create_open_tag("SEND_MESSAGE")}
 to: 智能体名称    # 目标智能体名称
 content: |
     # 消息主题
@@ -52,7 +52,7 @@ content: |
     
     ## 期望结果
     [描述期望的输出格式和内容]
-</SEND_MESSAGE>
+{create_close_tag("SEND_MESSAGE")}
 ```
 
 ## 协作流程规范
@@ -102,7 +102,7 @@ content: |
         Args:
             content: The content containing send message
         """
-        data = re.findall(r'<SEND_MESSAGE>(.*?)</SEND_MESSAGE>', content, re.DOTALL)
+        data = re.findall(create_open_tag("SEND_MESSAGE")+r'\n(.*?)\n'+create_close_tag("SEND_MESSAGE"), content, re.DOTALL)
         ret = []
         for item in data:
             try:
