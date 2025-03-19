@@ -148,3 +148,26 @@ def is_long_context(files: list) -> bool:
             continue
             
     return total_tokens > threshold
+
+
+def create_open_tag(tag_name: str) -> str:
+    """Generate an HTML open tag for the given tag name.
+    
+    Args:
+        tag_name: The name of the HTML tag
+        
+    Returns:
+        str: The open tag string
+    """
+    return f"<{tag_name}>"
+
+def create_close_tag(tag_name: str) -> str:
+    """Generate an HTML close tag for the given tag name.
+    
+    Args:
+        tag_name: The name of the HTML tag
+        
+    Returns:
+        str: The close tag string
+    """
+    return f"</{tag_name}>"
