@@ -222,7 +222,7 @@ class Agent:
             
             try:
                 with spinner.hidden():
-                    summary = self._call_model(self.prompt + "\n" + prompt)
+                    summary = self.model.chat_until_success(self.prompt + "\n" + prompt) # type: ignore
 
                 self.model.delete_chat() # type: ignore
                 
@@ -288,7 +288,7 @@ class Agent:
         """
                         self.prompt = analysis_prompt
                         with spinner.hidden():
-                            response = self._call_model(self.prompt)
+                            response = self.model.chat_until_success(self.prompt) # type: ignore
 
                         with spinner.hidden():
                             self._call_tools(response)
@@ -303,7 +303,7 @@ class Agent:
             with yaspin(text="正在生成总结...", color="cyan") as spinner:
                 self.prompt = self.summary_prompt
                 with spinner.hidden():
-                    ret = self._call_model(self.prompt)
+                    ret = self.model.chat_until_success(self.prompt) # type: ignore
                     spinner.text = "总结生成完成"
                     spinner.ok("✅")
                     return ret
