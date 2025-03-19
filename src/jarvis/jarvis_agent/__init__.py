@@ -12,7 +12,6 @@ from jarvis.jarvis_agent.patch import PatchOutputHandler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.config import is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, is_use_methodology
@@ -86,6 +85,7 @@ class Agent:
 
         self.model.set_suppress_output(False)
 
+        from jarvis.jarvis_tools.registry import ToolRegistry
         self.output_handler = output_handler if output_handler else [ToolRegistry()]
         self.multiline_inputer = multiline_inputer if multiline_inputer else get_multiline_input
         
@@ -566,6 +566,7 @@ def main():
     args = parser.parse_args()
 
     try:
+        from jarvis.jarvis_tools.registry import ToolRegistry
         # 获取全局模型实例
         agent = Agent(system_prompt=origin_agent_system_prompt, platform=args.platform, model_name=args.model, input_handler=[file_input_handler, shell_input_handler, builtin_input_handler] ,output_handler=[ToolRegistry(), PatchOutputHandler()])
 

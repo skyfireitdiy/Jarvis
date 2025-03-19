@@ -13,6 +13,7 @@ from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_max_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 
 
@@ -400,6 +401,8 @@ def main():
     """命令行工具入口，提供工具列表查看和工具调用功能"""
     import argparse
     import json
+
+    init_env()
 
     parser = argparse.ArgumentParser(description='Jarvis 工具系统命令行界面')
     subparsers = parser.add_subparsers(dest='command', help='命令')
