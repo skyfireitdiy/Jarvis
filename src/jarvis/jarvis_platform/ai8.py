@@ -284,13 +284,6 @@ class AI8Model(BasePlatform):
                 # 添加标签
                 model_str = f"{model['label']}"
                 
-                # 添加标签和积分信息
-                attrs = []
-                if model['attr'].get('tag'):
-                    attrs.append(model['attr']['tag'])
-                if model['attr'].get('integral'):
-                    attrs.append(model['attr']['integral'])
-                    
                 # 添加特性标记
                 features = []
                 if model['attr'].get('multimodal'):
@@ -299,12 +292,16 @@ class AI8Model(BasePlatform):
                     features.append("Plugin support")
                 if model['attr'].get('onlyImg'):
                     features.append("Image support")
-                if features:
-                    model_str += f" [{'|'.join(features)}]"
-                    
+                if model['attr'].get('tag'):
+                    features.append(model['attr']['tag'])
+                if model['attr'].get('integral'):
+                    features.append(model['attr']['integral'])
                 # 添加备注
                 if model['attr'].get('note'):
                     model_str += f" - {model['attr']['note']}"
+                if features:
+                    model_str += f" [{'|'.join(features)}]"
+                    
                 model['desc'] = model_str
             
             return list(self.models.keys())
