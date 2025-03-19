@@ -9,7 +9,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class FileOperationTool:
     name = "file_operation"
-    description = "用于读写多个文件的操作工具"
+    description = "文件批量操作工具，可批量读写多个文件，适用于需要同时处理多个文件的场景（读取配置文件、保存生成内容等），不提供代码分析功能"
     parameters = {
         "type": "object",
         "properties": {

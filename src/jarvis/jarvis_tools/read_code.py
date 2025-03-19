@@ -7,7 +7,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class ReadCodeTool:
     name = "read_code"
-    description = "用于读取代码文件并在每行前添加行号的工具"
+    description = "代码阅读与分析工具，用于读取源代码文件并添加行号，针对代码文件优化，提供更好的格式化输出和行号显示，适用于代码分析、审查和理解代码实现的场景"
     parameters = {
         "type": "object",
         "properties": {
