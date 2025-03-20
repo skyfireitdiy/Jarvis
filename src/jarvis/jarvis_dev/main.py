@@ -52,9 +52,12 @@ PM_PROMPT = f"""
 ## 工具使用指南
 - **ask_user**：获取用户需求和反馈，澄清不明确的需求点
 - **file_operation**：创建和管理项目文档，跟踪项目状态
-- **search**：研究相关领域知识，寻找最佳实践
+- **search_web**：研究相关领域知识，寻找最佳实践
 - **rag**：访问项目知识库，参考历史经验
 - **execute_shell**：监控项目状态，执行自动化任务
+- **read_webpage**：收集行业信息和最新技术动态
+- **project_analyzer**：分析项目结构和架构，了解整体情况
+- **methodology**：采用适当的项目方法论和最佳实践
 
 ## 消息传递模板
 {ot("SEND_MESSAGE")}
@@ -903,64 +906,224 @@ def create_dev_team() -> MultiAgent:
     """Create a development team with multiple agents."""
 
     PM_output_handler = ToolRegistry()
-    PM_output_handler.use_tools(["ask_user", "file_operation", "search_web", "rag", "execute_shell"])
+    PM_output_handler.use_tools([
+        "ask_user", 
+        "file_operation", 
+        "search_web", 
+        "rag", 
+        "execute_shell",
+        "read_webpage",
+        "project_analyzer",
+        "methodology"
+    ])
 
     BA_output_handler = ToolRegistry()
-    BA_output_handler.use_tools(["ask_user", "file_operation", "search_web", "rag", "execute_shell"])
+    BA_output_handler.use_tools([
+        "ask_user", 
+        "file_operation", 
+        "search_web", 
+        "rag", 
+        "execute_shell",
+        "read_webpage", 
+        "select_code_files",
+        "methodology"
+    ])
 
     SA_output_handler = ToolRegistry()
-    SA_output_handler.use_tools(["file_operation", "search_web", "rag", "ask_codebase", "execute_shell"])
+    SA_output_handler.use_tools([
+        "file_operation", 
+        "search_web", 
+        "rag", 
+        "ask_codebase", 
+        "execute_shell",
+        "project_analyzer",
+        "file_analyzer",
+        "function_analyzer",
+        "read_code",
+        "select_code_files",
+        "methodology"
+    ])
     
     TL_output_handler = ToolRegistry()
-    TL_output_handler.use_tools(["file_operation", "ask_codebase", "lsp_get_diagnostics", "lsp_find_references", "lsp_find_definition", "execute_shell"])
+    TL_output_handler.use_tools([
+        "file_operation", 
+        "ask_codebase", 
+        "lsp_get_diagnostics", 
+        "lsp_find_references", 
+        "lsp_find_definition", 
+        "execute_shell",
+        "code_review",
+        "find_symbol",
+        "find_caller",
+        "function_analyzer",
+        "project_analyzer"
+    ])
     
     DEV_output_handler = ToolRegistry()
-    DEV_output_handler.use_tools(["create_code_agent", "file_operation", "ask_codebase", "execute_shell"])
+    DEV_output_handler.use_tools([
+        "create_code_agent", 
+        "file_operation", 
+        "ask_codebase", 
+        "execute_shell",
+        "lsp_find_definition",
+        "lsp_find_references",
+        "find_symbol",
+        "function_analyzer",
+        "file_analyzer",
+        "read_code",
+        "create_sub_agent"
+    ])
     
     QA_output_handler = ToolRegistry()
-    QA_output_handler.use_tools(["create_code_agent", "file_operation", "ask_codebase", "execute_shell"])
+    QA_output_handler.use_tools([
+        "create_code_agent", 
+        "file_operation", 
+        "ask_codebase", 
+        "execute_shell",
+        "lsp_get_diagnostics",
+        "code_review",
+        "execute_shell_script",
+        "read_code",
+        "select_code_files"
+    ])
+    
+    # Update PM prompt with tool usage guidance
+    PM_PROMPT_EXTENSION = """
+## 工具使用指南
+- **ask_user**：获取用户需求和反馈，澄清不明确的需求点
+- **file_operation**：创建和管理项目文档，跟踪项目状态
+- **search_web**：研究相关领域知识，寻找最佳实践
+- **rag**：访问项目知识库，参考历史经验
+- **execute_shell**：监控项目状态，执行自动化任务
+- **read_webpage**：收集行业信息和最新技术动态
+- **project_analyzer**：分析项目结构和架构，了解整体情况
+- **methodology**：采用适当的项目方法论和最佳实践
+"""
+    
+    # Update BA prompt with tool usage guidance
+    BA_PROMPT_EXTENSION = """
+## 工具使用指南
+- **ask_user**：深入了解用户需求，进行需求挖掘和验证
+- **file_operation**：创建和管理需求文档与分析资料
+- **search_web**：研究行业标准和最佳实践
+- **rag**：访问项目知识库，参考相似需求历史
+- **execute_shell**：查询系统环境和配置信息
+- **read_webpage**：收集用户体验和行业趋势信息
+- **select_code_files**：了解现有代码中与需求相关的部分
+- **methodology**：应用需求分析和用户故事映射方法论
+"""
+    
+    # Update SA prompt with tool usage guidance
+    SA_PROMPT_EXTENSION = """
+## 工具使用指南
+- **file_operation**：创建和管理架构文档和技术规格
+- **search_web**：研究架构模式和技术趋势
+- **rag**：访问架构知识库，参考历史设计决策
+- **ask_codebase**：分析代码库，理解系统实现
+- **execute_shell**：检查系统环境和依赖关系
+- **project_analyzer**：分析项目结构，理解模块划分
+- **file_analyzer**：深入分析关键文件的结构和功能
+- **function_analyzer**：分析核心函数的实现和设计
+- **read_code**：阅读和理解关键代码段
+- **select_code_files**：选择并分析与架构相关的代码文件
+- **methodology**：应用架构设计方法论和模式
+"""
+    
+    # Update TL prompt with tool usage guidance
+    TL_PROMPT_EXTENSION = """
+## 工具使用指南
+- **file_operation**：管理技术文档和指导文件
+- **ask_codebase**：分析代码库，理解实现细节
+- **lsp_get_diagnostics**：检查代码问题和警告
+- **lsp_find_references**：查找代码引用关系
+- **lsp_find_definition**：查找符号定义位置
+- **execute_shell**：执行开发工具和命令
+- **code_review**：进行代码审查，确保代码质量
+- **find_symbol**：查找关键符号在代码中的使用
+- **find_caller**：分析函数调用关系和依赖
+- **function_analyzer**：深入分析函数实现和优化空间
+- **project_analyzer**：分析项目结构和技术架构
+"""
+    
+    # Update DEV prompt with tool usage guidance
+    DEV_PROMPT_EXTENSION = """
+## 工具使用指南
+- **create_code_agent**：创建专业代码开发代理
+- **file_operation**：管理源代码和配置文件
+- **ask_codebase**：了解代码库实现细节
+- **execute_shell**：执行开发命令和测试脚本
+- **lsp_find_definition**：查找符号定义位置
+- **lsp_find_references**：查找代码引用关系
+- **find_symbol**：查找关键符号在代码中的使用
+- **function_analyzer**：分析函数实现和优化空间
+- **file_analyzer**：分析文件结构和功能
+- **read_code**：阅读和理解关键代码段
+- **create_sub_agent**：创建专门的子代理处理特定任务
+"""
+    
+    # Update QA prompt with tool usage guidance
+    QA_PROMPT_EXTENSION = """
+## 工具使用指南
+- **create_code_agent**：创建测试代码开发代理
+- **file_operation**：管理测试文档和测试脚本
+- **ask_codebase**：了解代码库实现以设计测试
+- **execute_shell**：执行测试命令和测试套件
+- **lsp_get_diagnostics**：检查代码问题和警告
+- **code_review**：从质量保证角度审查代码
+- **execute_shell_script**：执行自动化测试脚本
+- **read_code**：阅读和理解代码以设计测试用例
+- **select_code_files**：选择需要测试的关键代码文件
+"""
+    
+    # Append tool guidance to each role's prompt
+    PM_PROMPT_WITH_TOOLS = PM_PROMPT + PM_PROMPT_EXTENSION
+    BA_PROMPT_WITH_TOOLS = BA_PROMPT + BA_PROMPT_EXTENSION
+    SA_PROMPT_WITH_TOOLS = SA_PROMPT + SA_PROMPT_EXTENSION
+    TL_PROMPT_WITH_TOOLS = TL_PROMPT + TL_PROMPT_EXTENSION
+    DEV_PROMPT_WITH_TOOLS = DEV_PROMPT + DEV_PROMPT_EXTENSION
+    QA_PROMPT_WITH_TOOLS = QA_PROMPT + QA_PROMPT_EXTENSION
     
     # Create configurations for each role
     configs = [
         dict(
             name="PM",
             description="Project Manager - Coordinates team and manages project delivery",
-            system_prompt=PM_PROMPT,
+            system_prompt=PM_PROMPT_WITH_TOOLS,
             output_handler=[PM_output_handler],
             platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="BA",
             description="Business Analyst - Analyzes and documents requirements",
-            system_prompt=BA_PROMPT,
+            system_prompt=BA_PROMPT_WITH_TOOLS,
             output_handler=[BA_output_handler],
             platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="SA",
             description="Solution Architect - Designs technical solutions",
-            system_prompt=SA_PROMPT,
+            system_prompt=SA_PROMPT_WITH_TOOLS,
             output_handler=[SA_output_handler],
             platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="TL",
             description="Technical Lead - Leads development team and ensures technical quality",
-            system_prompt=TL_PROMPT,
+            system_prompt=TL_PROMPT_WITH_TOOLS,
             output_handler=[TL_output_handler],
             platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="DEV",
             description="Developer - Implements features and writes code",
-            system_prompt=DEV_PROMPT,
+            system_prompt=DEV_PROMPT_WITH_TOOLS,
             output_handler=[DEV_output_handler],
             platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="QA",
             description="Quality Assurance - Ensures product quality through testing",
-            system_prompt=QA_PROMPT,
+            system_prompt=QA_PROMPT_WITH_TOOLS,
             output_handler=[QA_output_handler],
             platform=PlatformRegistry().get_thinking_platform(),
         )
