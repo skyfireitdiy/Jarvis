@@ -9,10 +9,12 @@ from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def init_env():
-    """Initialize environment variables from ~/.jarvis/env file.
+    """初始化环境变量从~/.jarvis/env文件
     
-    Creates the .jarvis directory if it doesn't exist and loads environment variables
-    from the env file. Handles file reading errors gracefully.
+    功能：
+    1. 创建不存在的.jarvis目录
+    2. 加载环境变量到os.environ
+    3. 处理文件读取异常
     """
     jarvis_dir = Path.home() / ".jarvis"
     env_file = jarvis_dir / "env"
@@ -34,6 +36,15 @@ def init_env():
         except Exception as e:
             PrettyOutput.print(f"警告: 读取 {env_file} 失败: {e}", OutputType.WARNING)
 def while_success(func, sleep_time: float = 0.1):
+    """循环执行函数直到成功
+    
+    参数：
+    func -- 要执行的函数
+    sleep_time -- 每次失败后的等待时间（秒）
+    
+    返回：
+    函数执行结果
+    """
     while True:
         try:
             return func()
@@ -87,10 +98,16 @@ def get_file_line_count(filename: str) -> int:
     except Exception as e:
         return 0
 def init_gpu_config() -> Dict:
-    """Initialize GPU configuration based on available hardware.
+    """初始化GPU配置
     
-    Returns:
-        Dict: GPU configuration including memory sizes and availability
+    功能：
+    1. 检测CUDA可用性
+    2. 计算设备内存和共享内存
+    3. 设置CUDA内存分配策略
+    4. 处理异常情况
+    
+    返回：
+    包含GPU配置信息的字典
     """
     config = {
         "has_gpu": False,
@@ -130,7 +147,17 @@ def init_gpu_config() -> Dict:
 
 
 def is_long_context(files: list) -> bool:
-    """检查文件列表是否属于长上下文（总字符数超过最大上下文长度的80%）"""
+    """检查文件列表是否属于长上下文
+    
+    判断标准：
+    当总token数超过最大上下文长度的80%时视为长上下文
+    
+    参数：
+    files -- 要检查的文件路径列表
+    
+    返回：
+    布尔值表示是否属于长上下文
+    """
     max_token_count = get_max_token_count()
     threshold = max_token_count * 0.8
     total_tokens = 0
@@ -151,23 +178,23 @@ def is_long_context(files: list) -> bool:
 
 
 def ot(tag_name: str) -> str:
-    """Generate an HTML open tag for the given tag name.
+    """生成HTML标签开始标记
     
-    Args:
-        tag_name: The name of the HTML tag
-        
-    Returns:
-        str: The open tag string
+    参数：
+    tag_name -- HTML标签名称
+    
+    返回：
+    格式化的开始标签字符串
     """
     return f"<{tag_name}>"
 
 def ct(tag_name: str) -> str:
-    """Generate an HTML close tag for the given tag name.
+    """生成HTML标签结束标记
     
-    Args:
-        tag_name: The name of the HTML tag
-        
-    Returns:
-        str: The close tag string
+    参数：
+    tag_name -- HTML标签名称
+    
+    返回：
+    格式化的结束标签字符串
     """
     return f"</{tag_name}>"
