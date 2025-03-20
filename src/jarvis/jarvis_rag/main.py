@@ -216,18 +216,32 @@ class RAGTool:
             spinner.ok("✅")
 
 
-    def _get_cache_path(self, file_path: str) -> str:
+    def _get_cache_path(self, file_path: str, cache_type: str = "doc") -> str:
         """Get cache file path for a document
         
         Args:
             file_path: Original file path
+            cache_type: Type of cache ("doc" for documents, "vec" for vectors)
             
         Returns:
             str: Cache file path
         """
         # 使用文件路径的哈希作为缓存文件名
         file_hash = hashlib.md5(file_path.encode()).hexdigest()
-        return os.path.join(self.cache_dir, f"{file_hash}.cache")
+        
+        # 确保不同类型的缓存有不同的目录
+        if cache_type == "doc":
+            cache_subdir = os.path.join(self.cache_dir, "documents")
+        elif cache_type == "vec":
+            cache_subdir = os.path.join(self.cache_dir, "vectors")
+        else:
+            cache_subdir = self.cache_dir
+            
+        # 确保子目录存在
+        if not os.path.exists(cache_subdir):
+            os.makedirs(cache_subdir)
+            
+        return os.path.join(cache_subdir, f"{file_hash}.cache")
 
     def _load_cache_index(self):
         """Load cache index"""
@@ -244,37 +258,64 @@ class RAGTool:
                 # 从各个缓存文件加载文档
                 with yaspin(text="加载缓存文件...", color="cyan") as spinner:
                     for file_path in self.file_md5_cache:
-                        cache_path = self._get_cache_path(file_path)
-                        if os.path.exists(cache_path):
+                        doc_cache_path = self._get_cache_path(file_path, "doc")
+                        if os.path.exists(doc_cache_path):
                             try:
-                                with lzma.open(cache_path, 'rb') as f:
-                                    file_cache = pickle.load(f)
-                                    self.documents.extend(file_cache["documents"])
-                                spinner.write(f"✅ 加载缓存文件: {file_path}")
+                                with lzma.open(doc_cache_path, 'rb') as f:
+                                    doc_cache_data = pickle.load(f)
+                                    self.documents.extend(doc_cache_data["documents"])
+                                spinner.text = "加载文档缓存: {file_path}"
                             except Exception as e:
-                                spinner.write(f"❌ 加载缓存文件失败: {file_path}: {str(e)}")
-                    spinner.text = "缓存文件加载完成"
+                                spinner.write(f"❌ 加载文档缓存失败: {file_path}: {str(e)}")
+                    spinner.text = "文档缓存加载完成"
                     spinner.ok("✅")
                 
                 # 重建向量索引
-
                 if self.documents:
                     with yaspin(text="重建向量索引...", color="cyan") as spinner:
                         vectors = []
+                        
+                        # 按照文档列表顺序加载向量
+                        processed_files = set()
                         for doc in self.documents:
-                            cache_path = self._get_cache_path(doc.metadata['file_path'])
-                            if os.path.exists(cache_path):
-                                with lzma.open(cache_path, 'rb') as f:
-                                    file_cache = pickle.load(f)
-                                    doc_idx = next((i for i, d in enumerate(file_cache["documents"]) 
-                                                if d.metadata['chunk_index'] == doc.metadata['chunk_index']), None)
-                                    if doc_idx is not None:
-                                        vectors.append(file_cache["vectors"][doc_idx])
+                            file_path = doc.metadata['file_path']
+                            
+                            # 避免重复处理同一个文件
+                            if file_path in processed_files:
+                                continue
+                                
+                            processed_files.add(file_path)
+                            vec_cache_path = self._get_cache_path(file_path, "vec")
+                            
+                            if os.path.exists(vec_cache_path):
+                                try:
+                                    # 加载该文件的向量缓存
+                                    with lzma.open(vec_cache_path, 'rb') as f:
+                                        vec_cache_data = pickle.load(f)
+                                        file_vectors = vec_cache_data["vectors"]
+                                    
+                                    # 按照文档的chunk_index检索对应向量
+                                    doc_indices = [d.metadata['chunk_index'] for d in self.documents 
+                                                if d.metadata['file_path'] == file_path]
+                                    
+                                    # 检查向量数量与文档块数量是否匹配
+                                    if len(doc_indices) <= file_vectors.shape[0]:
+                                        for idx in doc_indices:
+                                            if idx < file_vectors.shape[0]:
+                                                vectors.append(file_vectors[idx].reshape(1, -1))
+                                    else:
+                                        spinner.write(f"⚠️ 向量缓存不匹配: {file_path}")
+                                        
+                                    spinner.text = "加载向量缓存: {file_path}"
+                                except Exception as e:
+                                    spinner.write(f"❌ 加载向量缓存失败: {file_path}: {str(e)}")
+                            else:
+                                spinner.write(f"⚠️ 缺少向量缓存: {file_path}")
                         
                         if vectors:
                             vectors = np.vstack(vectors)
-                            self._build_index(vectors)
-                        spinner.text = "向量索引重建完成，加载 {len(self.documents)} 个文档片段"
+                            self._build_index(vectors, spinner)
+                        spinner.text = f"向量索引重建完成，加载 {len(self.documents)} 个文档片段"
                         spinner.ok("✅")
                                 
             except Exception as e:
@@ -285,56 +326,92 @@ class RAGTool:
                 self.flat_index = None
                 self.file_md5_cache = {}
 
-    def _save_cache(self, file_path: str, documents: List[Document], vectors: np.ndarray):
+    def _save_cache(self, file_path: str, documents: List[Document], vectors: np.ndarray, spinner=None):
         """Save cache for a single file
         
         Args:
             file_path: File path
             documents: List of documents
             vectors: Document vectors
+            spinner: Optional spinner for progress display
         """
         try:
-            # 保存文件缓存
-            cache_path = self._get_cache_path(file_path)
-            cache_data = {
-                "documents": documents,
+            # 保存文档缓存
+            if spinner:
+                spinner.text = f"保存 {file_path} 的文档缓存..."
+            doc_cache_path = self._get_cache_path(file_path, "doc")
+            doc_cache_data = {
+                "documents": documents
+            }
+            with lzma.open(doc_cache_path, 'wb') as f:
+                pickle.dump(doc_cache_data, f)
+                
+            # 保存向量缓存
+            if spinner:
+                spinner.text = f"保存 {file_path} 的向量缓存..."
+            vec_cache_path = self._get_cache_path(file_path, "vec")
+            vec_cache_data = {
                 "vectors": vectors
             }
-            with lzma.open(cache_path, 'wb') as f:
-                pickle.dump(cache_data, f)
+            with lzma.open(vec_cache_path, 'wb') as f:
+                pickle.dump(vec_cache_data, f)
                 
             # 更新并保存索引
+            if spinner:
+                spinner.text = f"更新 {file_path} 的索引缓存..."
             index_path = os.path.join(self.data_dir, "index.pkl")
             index_data = {
                 "file_md5_cache": self.file_md5_cache
             }
             with lzma.open(index_path, 'wb') as f:
                 pickle.dump(index_data, f)
+            
+            if spinner:
+                spinner.text = f"{file_path} 的缓存保存完成"
                             
         except Exception as e:
+            if spinner:
+                spinner.text = f"保存 {file_path} 的缓存失败: {str(e)}"
             PrettyOutput.print(f"保存缓存失败: {str(e)}", output_type=OutputType.ERROR)
 
-    def _build_index(self, vectors: np.ndarray):
+    def _build_index(self, vectors: np.ndarray, spinner=None):
         """Build FAISS index"""
         if vectors.shape[0] == 0:
+            if spinner:
+                spinner.text = "向量为空，跳过索引构建"
             self.index = None
             self.flat_index = None
             return
             
         # Create a flat index to store original vectors, for reconstruction
+        if spinner:
+            spinner.text = "创建平面索引用于向量重建..."
         self.flat_index = faiss.IndexFlatIP(self.vector_dim)
         self.flat_index.add(vectors) # type: ignore
         
         # Create an IVF index for fast search
+        if spinner:
+            spinner.text = "创建IVF索引用于快速搜索..."
         nlist = max(4, int(vectors.shape[0] / 1000))  # 每1000个向量一个聚类中心
         quantizer = faiss.IndexFlatIP(self.vector_dim)
         self.index = faiss.IndexIVFFlat(quantizer, self.vector_dim, nlist, faiss.METRIC_INNER_PRODUCT)
         
         # Train and add vectors
+        if spinner:
+            spinner.text = f"训练索引（{vectors.shape[0]}个向量，{nlist}个聚类中心）..."
         self.index.train(vectors) # type: ignore
+        
+        if spinner:
+            spinner.text = "添加向量到索引..."
         self.index.add(vectors) # type: ignore
+        
         # Set the number of clusters to probe during search
+        if spinner:
+            spinner.text = "设置搜索参数..."
         self.index.nprobe = min(nlist, 10)
+        
+        if spinner:
+            spinner.text = f"索引构建完成，共 {vectors.shape[0]} 个向量"
 
     def _split_text(self, text: str) -> List[str]:
         """Use a more intelligent splitting strategy"""
@@ -392,48 +469,27 @@ class RAGTool:
         return paragraphs
 
 
-    def _process_document_batch(self, documents: List[Document]) -> np.ndarray:
-        """Process a batch of documents using shared memory"""
-        try:
-            texts = []
-            self.documents = []  # Reset documents to store chunks
-            
-            for doc in documents:
-                # Split original document into chunks
-                chunks = self._split_text(doc.content)
-                for chunk_idx, chunk in enumerate(chunks):
-                    # Create new Document for each chunk
-                    new_metadata = doc.metadata.copy()
-                    new_metadata.update({
-                        'chunk_index': chunk_idx,
-                        'total_chunks': len(chunks),
-                        'original_length': len(doc.content)
-                    })
-                    self.documents.append(Document(
-                        content=chunk,
-                        metadata=new_metadata,
-                        md5=doc.md5
-                    ))
-                    texts.append(f"File:{doc.metadata['file_path']} Chunk:{chunk_idx} Content:{chunk}")
-            
-            return get_embedding_batch(self.embedding_model, texts)
-        except Exception as e:
-            PrettyOutput.print(f"批量处理失败: {str(e)}", OutputType.ERROR)
-            return np.zeros((0, self.vector_dim), dtype=np.float32) # type: ignore
-
-    def _process_file(self, file_path: str) -> List[Document]:
+    def _process_file(self, file_path: str, spinner=None) -> List[Document]:
         """Process a single file"""
         try:
             # Calculate file MD5
+            if spinner:
+                spinner.text = f"计算文件 {file_path} 的MD5..."
             current_md5 = get_file_md5(file_path)
             if not current_md5:
+                if spinner:
+                    spinner.text = f"文件 {file_path} 计算MD5失败"
                 return []
 
             # Check if the file needs to be reprocessed
             if file_path in self.file_md5_cache and self.file_md5_cache[file_path] == current_md5:
+                if spinner:
+                    spinner.text = f"文件 {file_path} 未发生变化，跳过处理"
                 return []
 
             # Find the appropriate processor
+            if spinner:
+                spinner.text = f"查找适用于 {file_path} 的处理器..."
             processor = None
             for p in self.file_processors:
                 if p.can_handle(file_path):
@@ -442,17 +498,27 @@ class RAGTool:
                     
             if not processor:
                 # If no appropriate processor is found, return an empty document
+                if spinner:
+                    spinner.text = f"没有找到适用于 {file_path} 的处理器，跳过处理"
                 return []
             
             # Extract text content
+            if spinner:
+                spinner.text = f"提取 {file_path} 的文本内容..."
             content = processor.extract_text(file_path)
             if not content.strip():
+                if spinner:
+                    spinner.text = f"文件 {file_path} 没有文本内容，跳过处理"
                 return []
             
             # Split text
+            if spinner:
+                spinner.text = f"分割 {file_path} 的文本..."
             chunks = self._split_text(content)
             
             # Create document objects
+            if spinner:
+                spinner.text = f"为 {file_path} 创建 {len(chunks)} 个文档对象..."
             documents = []
             for i, chunk in enumerate(chunks):
                 doc = Document(
@@ -469,9 +535,13 @@ class RAGTool:
             
             # Update MD5 cache
             self.file_md5_cache[file_path] = current_md5
+            if spinner:
+                spinner.text = f"文件 {file_path} 处理完成，共创建 {len(documents)} 个文档对象"
             return documents
             
         except Exception as e:
+            if spinner:
+                spinner.text = f"处理文件失败: {file_path}: {str(e)}"
             PrettyOutput.print(f"处理文件失败: {file_path}: {str(e)}", 
                             output_type=OutputType.ERROR)
             return []
@@ -590,15 +660,11 @@ class RAGTool:
             
             # 获取需要忽略的路径列表
             ignored_paths = get_rag_ignored_paths()
-            spinner.write(f"忽略路径: {', '.join(ignored_paths)}")
             
             # 检查是否为Git仓库
             is_git_repo = self._is_git_repo()
             if is_git_repo:
-                spinner.write("检测到Git仓库，仅处理Git管理的文件")
                 git_files = self._get_git_managed_files()
-                spinner.write(f"发现 {len(git_files)} 个Git管理的文件")
-                
                 # 过滤掉被忽略的文件
                 for file_path in git_files:
                     if self._should_ignore_path(file_path, ignored_paths):
@@ -635,17 +701,29 @@ class RAGTool:
         # Clean up cache for deleted files
         with yaspin(text="清理缓存...", color="cyan") as spinner:
             deleted_files = set(self.file_md5_cache.keys()) - set(all_files)
+            deleted_count = len(deleted_files)
+            
+            if deleted_count > 0:
+                spinner.write(f"🗑️ 删除不存在文件的缓存: {deleted_count} 个")
+                
             for file_path in deleted_files:
+                # Remove from MD5 cache
                 del self.file_md5_cache[file_path]
                 # Remove related documents
                 self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
-            spinner.text = f"清理缓存完成，共 {len(deleted_files)} 个文件"
+                # Delete cache files
+                self._delete_file_cache(file_path, None)  # Pass None as spinner to not show individual deletions
+                
+            spinner.text = f"清理缓存完成，共删除 {deleted_count} 个不存在文件的缓存"
             spinner.ok("✅")
 
         # Check file changes
         with yaspin(text="检查文件变化...", color="cyan") as spinner:
             files_to_process = []
             unchanged_files = []
+            new_files_count = 0
+            modified_files_count = 0
+            
             for file_path in all_files:
                 current_md5 = get_file_md5(file_path)
                 if current_md5:  # Only process files that can successfully calculate MD5
@@ -655,7 +733,25 @@ class RAGTool:
                     else:
                         # New file or modified file
                         files_to_process.append(file_path)
-                        spinner.write(f"⚠️ 文件变化: {file_path}")
+                        
+                        # 如果是修改的文件，删除旧缓存
+                        if file_path in self.file_md5_cache:
+                            modified_files_count += 1
+                            # 删除旧缓存
+                            self._delete_file_cache(file_path, spinner)
+                            # 从文档列表中移除
+                            self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
+                        else:
+                            new_files_count += 1
+            
+            # 输出汇总信息
+            if unchanged_files:
+                spinner.write(f"📚 已缓存文件: {len(unchanged_files)} 个")
+            if new_files_count > 0:
+                spinner.write(f"🆕 新增文件: {new_files_count} 个")
+            if modified_files_count > 0:
+                spinner.write(f"📝 修改文件: {modified_files_count} 个")
+                
             spinner.text = f"检查文件变化完成，共 {len(files_to_process)} 个文件需要处理"
             spinner.ok("✅")
 
@@ -667,85 +763,166 @@ class RAGTool:
         if files_to_process:
             new_documents = []
             new_vectors = []
+            success_count = 0
+            skipped_count = 0
+            failed_count = 0
             
-            
-            for file_path in files_to_process:
-                with yaspin(text=f"处理文件 {file_path} ...", color="cyan") as spinner:
+            with yaspin(text=f"处理文件中 (0/{len(files_to_process)})...", color="cyan") as spinner:
+                for index, file_path in enumerate(files_to_process):
+                    spinner.text = f"处理文件中 ({index+1}/{len(files_to_process)}): {file_path}"
                     try:
                         # Process single file
-                        file_docs = self._process_file(file_path)
+                        file_docs = self._process_file(file_path, spinner)
                         if file_docs:
                             # Vectorize documents from this file
+                            spinner.text = f"处理文件中 ({index+1}/{len(files_to_process)}): 为 {file_path} 生成向量嵌入..."
                             texts_to_vectorize = [
                                 f"File:{doc.metadata['file_path']} Content:{doc.content}"
                                 for doc in file_docs
                             ]
-                            file_vectors = get_embedding_batch(self.embedding_model, texts_to_vectorize)
+                            
+                            file_vectors = get_embedding_batch(self.embedding_model, f"({index+1}/{len(files_to_process)}){file_path}", texts_to_vectorize, spinner)
                             
                             # Save cache for this file
-                            self._save_cache(file_path, file_docs, file_vectors)
+                            spinner.text = f"处理文件中 ({index+1}/{len(files_to_process)}): 保存 {file_path} 的缓存..."
+                            self._save_cache(file_path, file_docs, file_vectors, spinner)
                             
                             # Accumulate documents and vectors
                             new_documents.extend(file_docs)
                             new_vectors.append(file_vectors)
-
-                            spinner.text = f"处理文件 {file_path} 完成"
-                            spinner.ok("✅")
+                            success_count += 1
+                        else:
+                            # 文件跳过处理
+                            skipped_count += 1
                             
                     except Exception as e:
-                        spinner.text = f"处理文件失败: {file_path}: {str(e)}"
-                        spinner.fail("❌")
-                    
-                    
+                        spinner.write(f"❌ 处理失败: {file_path}: {str(e)}")
+                        failed_count += 1
+                
+                # 输出处理统计
+                spinner.text = f"文件处理完成: 成功 {success_count} 个, 跳过 {skipped_count} 个, 失败 {failed_count} 个"
+                spinner.ok("✅")
+                
             # Update documents list
             self.documents.extend(new_documents)
 
             # Build final index
             if new_vectors:
                 with yaspin(text="构建最终索引...", color="cyan") as spinner:
+                    spinner.text = "合并新向量..."
                     all_new_vectors = np.vstack(new_vectors)
                     
+                    unchanged_vector_count = 0
                     if self.flat_index is not None:
                         # Get vectors for unchanged documents
-                        unchanged_vectors = self._get_unchanged_vectors(unchanged_documents)
+                        spinner.text = "获取未变化文档的向量..."
+                        unchanged_vectors = self._get_unchanged_vectors(unchanged_documents, spinner)
                         if unchanged_vectors is not None:
+                            unchanged_vector_count = unchanged_vectors.shape[0]
+                            spinner.text = f"合并新旧向量（新：{all_new_vectors.shape[0]}，旧：{unchanged_vector_count}）..."
                             final_vectors = np.vstack([unchanged_vectors, all_new_vectors])
                         else:
+                            spinner.text = f"仅使用新向量（{all_new_vectors.shape[0]}）..."
                             final_vectors = all_new_vectors
                     else:
+                        spinner.text = f"仅使用新向量（{all_new_vectors.shape[0]}）..."
                         final_vectors = all_new_vectors
 
                     # Build index
-                    spinner.text = f"构建索引..."
-                    self._build_index(final_vectors)
-                    spinner.text = f"索引构建完成，共 {len(self.documents)} 个文档 "
+                    spinner.text = f"构建索引（向量数量：{final_vectors.shape[0]}）..."
+                    self._build_index(final_vectors, spinner)
+                    spinner.text = f"索引构建完成，共 {len(self.documents)} 个文档片段"
                     spinner.ok("✅")
 
+            # 输出最终统计信息
             PrettyOutput.print(
-                f"索引 {len(self.documents)} 个文档 "
-                f"(新/修改: {len(new_documents)}, "
-                f"不变: {len(unchanged_documents)})", 
+                f"📊 索引统计:\n"
+                f"  • 总文档数: {len(self.documents)} 个文档片段\n"
+                f"  • 已缓存文件: {len(unchanged_files)} 个\n"
+                f"  • 处理文件: {len(files_to_process)} 个\n"
+                f"    - 成功: {success_count} 个\n"
+                f"    - 跳过: {skipped_count} 个\n"
+                f"    - 失败: {failed_count} 个", 
                 OutputType.SUCCESS
             )
 
-    def _get_unchanged_vectors(self, unchanged_documents: List[Document]) -> Optional[np.ndarray]:
+    def _get_unchanged_vectors(self, unchanged_documents: List[Document], spinner=None) -> Optional[np.ndarray]:
         """Get vectors for unchanged documents from existing index"""
         try:
-            if not unchanged_documents or self.flat_index is None:
+            if not unchanged_documents:
+                if spinner:
+                    spinner.text = "没有未变化的文档"
                 return None
 
+            if spinner:
+                spinner.text = f"加载 {len(unchanged_documents)} 个未变化文档的向量..."
+            
+            # 按文件分组处理
+            unchanged_files = set(doc.metadata['file_path'] for doc in unchanged_documents)
             unchanged_vectors = []
-            for doc in unchanged_documents:
-                doc_idx = next((i for i, d in enumerate(self.documents) 
-                            if d.metadata['file_path'] == doc.metadata['file_path']), None)
-                if doc_idx is not None:
-                    vector = np.zeros((1, self.vector_dim), dtype=np.float32) # type: ignore
-                    self.flat_index.reconstruct(doc_idx, vector.ravel())
-                    unchanged_vectors.append(vector)
+            
+            for file_path in unchanged_files:
+                if spinner:
+                    spinner.text = f"加载 {file_path} 的向量..."
+                
+                # 获取该文件所有文档的chunk索引
+                doc_indices = [(i, doc.metadata['chunk_index']) 
+                              for i, doc in enumerate(unchanged_documents) 
+                              if doc.metadata['file_path'] == file_path]
+                
+                if not doc_indices:
+                    continue
+                
+                # 加载该文件的向量
+                vec_cache_path = self._get_cache_path(file_path, "vec")
+                if os.path.exists(vec_cache_path):
+                    try:
+                        with lzma.open(vec_cache_path, 'rb') as f:
+                            vec_cache_data = pickle.load(f)
+                            file_vectors = vec_cache_data["vectors"]
+                        
+                        # 按照chunk_index加载对应的向量
+                        for _, chunk_idx in doc_indices:
+                            if chunk_idx < file_vectors.shape[0]:
+                                unchanged_vectors.append(file_vectors[chunk_idx].reshape(1, -1))
+                            
+                        if spinner:
+                            spinner.text = f"成功加载 {file_path} 的向量"
+                    except Exception as e:
+                        if spinner:
+                            spinner.text = f"加载 {file_path} 向量失败: {str(e)}"
+                else:
+                    if spinner:
+                        spinner.text = f"未找到 {file_path} 的向量缓存"
+                        
+                    # 从flat_index重建向量
+                    if self.flat_index is not None:
+                        if spinner:
+                            spinner.text = f"从索引重建 {file_path} 的向量..."
+                        
+                        for doc_idx, chunk_idx in doc_indices:
+                            idx = next((i for i, d in enumerate(self.documents) 
+                                     if d.metadata['file_path'] == file_path and 
+                                     d.metadata['chunk_index'] == chunk_idx), None)
+                            
+                            if idx is not None:
+                                vector = np.zeros((1, self.vector_dim), dtype=np.float32) # type: ignore
+                                self.flat_index.reconstruct(idx, vector.ravel())
+                                unchanged_vectors.append(vector)
 
-            return np.vstack(unchanged_vectors) if unchanged_vectors else None
+            if not unchanged_vectors:
+                if spinner:
+                    spinner.text = "未能加载任何未变化文档的向量"
+                return None
+                
+            if spinner:
+                spinner.text = f"未变化文档向量加载完成，共 {len(unchanged_vectors)} 个"
+                
+            return np.vstack(unchanged_vectors)
             
         except Exception as e:
+            if spinner:
+                spinner.text = f"获取不变向量失败: {str(e)}"
             PrettyOutput.print(f"获取不变向量失败: {str(e)}", OutputType.ERROR)
             return None
 
@@ -954,6 +1131,33 @@ class RAGTool:
         """
         return self.index is not None and len(self.documents) > 0
 
+    def _delete_file_cache(self, file_path: str, spinner=None):
+        """Delete cache files for a specific file
+        
+        Args:
+            file_path: Path to the original file
+            spinner: Optional spinner for progress information. If None, runs silently.
+        """
+        try:
+            # Delete document cache
+            doc_cache_path = self._get_cache_path(file_path, "doc")
+            if os.path.exists(doc_cache_path):
+                os.remove(doc_cache_path)
+                if spinner is not None:
+                    spinner.write(f"🗑️ 删除文档缓存: {file_path}")
+                    
+            # Delete vector cache
+            vec_cache_path = self._get_cache_path(file_path, "vec")
+            if os.path.exists(vec_cache_path):
+                os.remove(vec_cache_path)
+                if spinner is not None:
+                    spinner.write(f"🗑️ 删除向量缓存: {file_path}")
+                    
+        except Exception as e:
+            if spinner is not None:
+                spinner.write(f"❌ 删除缓存失败: {file_path}: {str(e)}")
+            PrettyOutput.print(f"删除缓存失败: {file_path}: {str(e)}", output_type=OutputType.ERROR)
+
 def main():
     """Main function"""
     import argparse
@@ -980,19 +1184,6 @@ def main():
             args.dir = current_dir
 
         if args.dir and args.build:
-            PrettyOutput.print(f"正在处理目录: {args.dir}", output_type=OutputType.INFO)
-            
-            # 检查是否为Git仓库
-            if rag._is_git_repo():
-                PrettyOutput.print("检测到Git仓库，将只处理Git管理的文件", output_type=OutputType.INFO)
-            
-            config_path = os.path.join(current_dir, '.jarvis', 'rag_ignore.txt')
-            if os.path.exists(config_path):
-                PrettyOutput.print(f"使用配置文件: {config_path}", output_type=OutputType.INFO)
-            else:
-                PrettyOutput.print("未找到忽略配置文件，使用默认忽略列表", output_type=OutputType.INFO)
-                PrettyOutput.print("可以创建 .jarvis/rag_ignore.txt 文件自定义忽略路径", output_type=OutputType.INFO)
-            
             rag.build_index(args.dir)
             return 0
 

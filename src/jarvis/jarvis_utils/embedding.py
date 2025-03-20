@@ -3,7 +3,9 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from typing import List, Any, Tuple
+from typing import List, Any, Optional, Tuple
+
+from yaspin.api import Yaspin
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 
 def get_context_token_count(text: str) -> int:
@@ -67,7 +69,7 @@ def get_embedding(embedding_model: Any, text: str) -> np.ndarray:
                                      show_progress_bar=False)
     return np.array(embedding, dtype=np.float32)
 
-def get_embedding_batch(embedding_model: Any, texts: List[str]) -> np.ndarray:
+def get_embedding_batch(embedding_model: Any, prefix: str,texts: List[str], spinner: Optional[Yaspin] = None) -> np.ndarray:
     """
     为一批文本生成嵌入向量。
     
@@ -80,7 +82,9 @@ def get_embedding_batch(embedding_model: Any, texts: List[str]) -> np.ndarray:
     """
     try:
         all_vectors = []
-        for text in texts:
+        for index, text in enumerate(texts):
+            if spinner:
+                spinner.text = f"{prefix} 处理中 ({index+1}/{len(texts)}) ..."
             vectors = get_embedding_with_chunks(embedding_model, text)
             all_vectors.extend(vectors)
         return np.vstack(all_vectors)
