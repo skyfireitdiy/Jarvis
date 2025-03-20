@@ -88,7 +88,7 @@ def get_embedding(embedding_model: Any, text: str) -> np.ndarray:
 
 def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spinner: Optional[Yaspin] = None, batch_size: int = 8) -> np.ndarray:
     """
-    为一批文本生成嵌入向量，使用高效的批处理。
+    为一批文本生成嵌入向量，使用高效的批处理，针对RAG优化。
     
     参数：
         embedding_model: 使用的嵌入模型
@@ -100,6 +100,10 @@ def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spi
     返回：
         np.ndarray: 堆叠的嵌入向量
     """
+    # 简单嵌入缓存，避免重复计算相同文本块
+    embedding_cache = {}
+    cache_hits = 0
+    
     try:
         # 预处理：将所有文本分块
         all_chunks = []
@@ -109,6 +113,10 @@ def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spi
             if spinner:
                 spinner.text = f"{prefix} 预处理中 ({i+1}/{len(texts)}) ..."
             
+            # 预处理文本：移除多余空白，规范化
+            text = ' '.join(text.split()) if text else ""
+            
+            # 使用更优化的分块函数
             chunks = split_text_into_chunks(text, 512)
             start_idx = len(all_chunks)
             all_chunks.extend(chunks)
@@ -125,24 +133,72 @@ def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spi
                 spinner.text = f"{prefix} 批量处理嵌入 ({i+1}/{len(all_chunks)}) ..."
             
             batch = all_chunks[i:i+batch_size]
-            # 直接使用模型的批处理能力
-            batch_vectors = embedding_model.encode(batch, 
-                                                normalize_embeddings=True,
-                                                show_progress_bar=False,
-                                                convert_to_numpy=True)
+            batch_to_process = []
+            batch_indices = []
             
-            if isinstance(batch_vectors, list):
-                all_vectors.extend(batch_vectors)
-            else:
-                # 如果返回的是单个数组，拆分为列表
-                for j in range(len(batch)):
-                    all_vectors.append(batch_vectors[j])
+            # 检查缓存，避免重复计算
+            for j, chunk in enumerate(batch):
+                chunk_hash = hash(chunk)
+                if chunk_hash in embedding_cache:
+                    all_vectors.append(embedding_cache[chunk_hash])
+                    cache_hits += 1
+                else:
+                    batch_to_process.append(chunk)
+                    batch_indices.append(j)
+            
+            if batch_to_process:
+                # 对未缓存的块处理
+                batch_vectors = embedding_model.encode(
+                    batch_to_process, 
+                    normalize_embeddings=True,
+                    show_progress_bar=False,
+                    convert_to_numpy=True
+                )
+                
+                # 处理结果并更新缓存
+                if len(batch_to_process) == 1:
+                    vec = batch_vectors
+                    chunk_hash = hash(batch_to_process[0])
+                    embedding_cache[chunk_hash] = vec
+                    all_vectors.append(vec)
+                else:
+                    for j, vec in enumerate(batch_vectors):
+                        chunk_hash = hash(batch_to_process[j])
+                        embedding_cache[chunk_hash] = vec
+                        all_vectors.append(vec)
         
         # 组织结果到原始文本顺序
         result_vectors = []
         for start_idx, end_idx in chunk_indices:
-            text_vectors = all_vectors[start_idx:end_idx]
-            result_vectors.extend(text_vectors)
+            text_vectors = []
+            for j in range(start_idx, end_idx):
+                if j < len(all_vectors):
+                    text_vectors.append(all_vectors[j])
+            
+            if text_vectors:
+                # 当一个文本被分成多个块时，采用加权平均
+                if len(text_vectors) > 1:
+                    # 针对RAG优化：对多个块进行加权平均，前面的块权重略高
+                    weights = np.linspace(1.0, 0.8, len(text_vectors))
+                    weights = weights / weights.sum()  # 归一化权重
+                    
+                    # 应用权重并求和
+                    weighted_sum = np.zeros_like(text_vectors[0])
+                    for vec, weight in zip(text_vectors, weights):
+                        weighted_sum += vec * weight
+                    
+                    # 归一化结果向量
+                    norm = np.linalg.norm(weighted_sum)
+                    if norm > 0:
+                        weighted_sum = weighted_sum / norm
+                    
+                    result_vectors.append(weighted_sum)
+                else:
+                    # 单块直接使用
+                    result_vectors.append(text_vectors[0])
+        
+        if spinner and cache_hits > 0:
+            spinner.text = f"{prefix} 缓存命中: {cache_hits}/{len(all_chunks)} 块"
         
         return np.vstack(result_vectors)
     
@@ -151,53 +207,97 @@ def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spi
         return np.zeros((0, embedding_model.get_sentence_embedding_dimension()), dtype=np.float32)
     
 def split_text_into_chunks(text: str, max_length: int = 512) -> List[str]:
-    """将文本分割成带重叠窗口的块。
+    """将文本分割成带重叠窗口的块，优化RAG检索效果。
     
     参数：
         text: 要分割的输入文本
         max_length: 每个块的最大长度
         
     返回：
-        List[str]: 文本块列表
+        List[str]: 文本块列表，每个块的长度尽可能接近但不超过max_length
     """
     if not text or len(text) <= max_length:
         return [text] if text else []
     
+    # 预处理：规范化文本，移除多余空白字符
+    text = ' '.join(text.split())
+    
+    # 中英文标点符号集合，优化RAG召回的句子边界
+    punctuation_marks = {
+        '.', '!', '?', '\n',  # 英文标点
+        '。', '！', '？',     # 中文句末标点
+        '；', '：', '…',      # 中文次级分隔符
+        ',', '，', '、',      # 逗号、顿号（次优先级）
+        ')', '）', ']', '】', '}', '》', '"', "'", # 闭合标点（最低优先级）
+    }
+    
     chunks = []
     start = 0
+    
     while start < len(text):
-        end = start + max_length
-        # 找到最近的句子边界
-        if end < len(text):
-            # 优化：先检查一个小范围内的句子边界，提高性能
-            search_range = min(50, end - start)
-            boundary_found = False
-            
-            for i in range(end, end - search_range, -1):
-                if i < len(text) and text[i] in {'.', '!', '?', '\n'}:
-                    end = i + 1  # 包含标点符号
-                    boundary_found = True
-                    break
-            
-            if not boundary_found:
-                # 如果小范围内没找到，再搜索完整范围
-                while end > start and end < len(text) and text[end] not in {'.', '!', '?', '\n'}:
-                    end -= 1
-                if end == start:  # 未找到标点，强制分割
-                    end = start + max_length
-                else:
-                    end += 1  # 包含标点符号
+        # 初始化结束位置为最大可能长度
+        end = min(start + max_length, len(text))
         
-        chunk = text[start:end]
-        chunks.append(chunk)
-        # 重叠20%的窗口
-        start = end - int(max_length * 0.2)
+        # 只有当不是最后一块且结束位置等于最大长度时，才尝试寻找句子边界
+        if end < len(text) and end == start + max_length:
+            # 优先查找段落边界，这对RAG特别重要
+            paragraph_boundary = text.rfind('\n\n', start, end)
+            if paragraph_boundary > start and paragraph_boundary < end - 20:  # 确保不会切得太短
+                end = paragraph_boundary + 2
+            else:
+                # 向前寻找句子边界，从end-1位置开始
+                found_boundary = False
+                best_boundary = -1
+                
+                # 扩大搜索范围以找到更好的语义边界
+                search_range = min(80, end - start)
+                
+                # 先尝试找主要标点（句号等）
+                for i in range(end-1, max(start, end-search_range), -1):
+                    if text[i] in {'。', '！', '？', '.', '!', '?', '\n'}:
+                        best_boundary = i
+                        found_boundary = True
+                        break
+                
+                # 如果没找到主要标点，再找次要标点（分号、冒号等）
+                if not found_boundary:
+                    for i in range(end-1, max(start, end-search_range), -1):
+                        if text[i] in {'；', '：', '…', ';', ':'}:
+                            best_boundary = i
+                            found_boundary = True
+                            break
+                
+                # 最后考虑逗号和其他可能的边界
+                if not found_boundary:
+                    for i in range(end-1, max(start, end-search_range), -1):
+                        if text[i] in {'，', ',', '、', ')', '）', ']', '】', '}', '》', '"', "'"}:
+                            best_boundary = i
+                            found_boundary = True
+                            break
+                
+                # 如果找到了任何边界，使用它
+                if found_boundary:
+                    end = best_boundary + 1
+        
+        # 添加当前块，并确保删除开头和结尾的空白字符
+        chunk = text[start:end].strip()
+        if chunk:  # 只添加非空块
+            chunks.append(chunk)
+        
+        # 计算下一块的开始位置，调整重叠窗口大小以提高RAG检索质量
+        next_start = end - int(max_length * 0.25)  # 增加重叠到25%以提高上下文连贯性
+        
+        # 确保总是有前进，避免无限循环
+        if next_start <= start:
+            next_start = start + 1
+            
+        start = next_start
     
     return chunks
 
 def get_embedding_with_chunks(embedding_model: Any, text: str, batch_size: int = 8) -> List[np.ndarray]:
     """
-    为文本块生成嵌入向量，使用批处理提高效率。
+    为文本块生成嵌入向量，针对RAG优化，使用批处理提高效率。
     
     参数：
         embedding_model: 使用的嵌入模型
@@ -207,25 +307,83 @@ def get_embedding_with_chunks(embedding_model: Any, text: str, batch_size: int =
     返回：
         List[np.ndarray]: 每个块的嵌入向量列表
     """
+    # 预处理文本
+    text = ' '.join(text.split()) if text else ""
     chunks = split_text_into_chunks(text, 512)
     if not chunks:
         return []
+    
+    # 简单缓存机制，避免重复计算相同文本的嵌入
+    embedding_cache = {}
     
     # 使用批处理模式一次性处理多个块
     vectors = []
     for i in range(0, len(chunks), batch_size):
         batch = chunks[i:i+batch_size]
-        batch_embeddings = embedding_model.encode(batch, 
-                                              normalize_embeddings=True,
-                                              show_progress_bar=False,
-                                              convert_to_numpy=True)
+        batch_to_process = []
+        batch_indices = {}  # 记录原始索引
         
-        # 处理返回结果，确保是向量列表
-        if len(batch) == 1:
-            vectors.append(batch_embeddings)
-        else:
-            for emb in batch_embeddings:
-                vectors.append(emb)
+        # 检查缓存
+        for j, chunk in enumerate(batch):
+            chunk_hash = hash(chunk)
+            if chunk_hash in embedding_cache:
+                vectors.append(embedding_cache[chunk_hash])
+            else:
+                batch_indices[len(batch_to_process)] = j
+                batch_to_process.append(chunk)
+        
+        if batch_to_process:
+            # 处理未缓存的块
+            batch_embeddings = embedding_model.encode(
+                batch_to_process, 
+                normalize_embeddings=True,
+                show_progress_bar=False,
+                convert_to_numpy=True
+            )
+            
+            # 处理返回结果，确保是向量列表
+            if len(batch_to_process) == 1:
+                vec = batch_embeddings
+                chunk_hash = hash(batch_to_process[0])
+                embedding_cache[chunk_hash] = vec
+                
+                # 找到原始位置插入
+                orig_idx = batch_indices[0]
+                while len(vectors) <= i + orig_idx:
+                    vectors.append(None)
+                vectors[i + orig_idx] = vec
+            else:
+                for j, vec in enumerate(batch_embeddings):
+                    chunk_hash = hash(batch_to_process[j])
+                    embedding_cache[chunk_hash] = vec
+                    
+                    # 找到原始位置插入
+                    if j in batch_indices:
+                        orig_idx = batch_indices[j]
+                        while len(vectors) <= i + orig_idx:
+                            vectors.append(None)
+                        vectors[i + orig_idx] = vec
+    
+    # 移除可能的None值
+    vectors = [v for v in vectors if v is not None]
+    
+    # 针对RAG的优化：调整段落权重
+    if len(vectors) > 1:
+        # 前面的块通常包含更重要的信息，给予更高权重
+        adjusted_vectors = []
+        for i, vec in enumerate(vectors):
+            # 根据位置赋予衰减权重（前面的段落权重更高）
+            position_weight = 1.0 - (i * 0.05)  # 最多衰减0.05每个位置
+            position_weight = max(0.7, position_weight)  # 确保最小权重为0.7
+            
+            # 应用权重并重新归一化
+            weighted_vec = vec * position_weight
+            norm = np.linalg.norm(weighted_vec)
+            if norm > 0:
+                weighted_vec = weighted_vec / norm
+            
+            adjusted_vectors.append(weighted_vec)
+        return adjusted_vectors
     
     return vectors
 
