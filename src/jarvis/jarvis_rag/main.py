@@ -476,6 +476,112 @@ class RAGTool:
                             output_type=OutputType.ERROR)
             return []
 
+    def _should_ignore_path(self, path: str, ignored_paths: List[str]) -> bool:
+        """
+        检查路径是否应该被忽略
+        
+        Args:
+            path: 文件或目录路径
+            ignored_paths: 忽略模式列表
+            
+        Returns:
+            bool: 如果路径应该被忽略则返回True
+        """
+        import fnmatch
+        import os
+        
+        # 获取相对路径
+        rel_path = path
+        if os.path.isabs(path):
+            try:
+                rel_path = os.path.relpath(path, self.root_dir)
+            except ValueError:
+                # 如果不能计算相对路径，使用原始路径
+                pass
+                
+        path_parts = rel_path.split(os.sep)
+        
+        # 检查路径的每一部分是否匹配任意忽略模式
+        for part in path_parts:
+            for pattern in ignored_paths:
+                if fnmatch.fnmatch(part, pattern):
+                    return True
+                    
+        # 检查完整路径是否匹配任意忽略模式
+        for pattern in ignored_paths:
+            if fnmatch.fnmatch(rel_path, pattern):
+                return True
+                
+        return False
+        
+    def _is_git_repo(self) -> bool:
+        """
+        检查当前目录是否为Git仓库
+        
+        Returns:
+            bool: 如果是Git仓库则返回True
+        """
+        import subprocess
+        
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--is-inside-work-tree"],
+                cwd=self.root_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False
+            )
+            return result.returncode == 0 and result.stdout.strip() == "true"
+        except Exception:
+            return False
+    
+    def _get_git_managed_files(self) -> List[str]:
+        """
+        获取Git仓库中被管理的文件列表
+        
+        Returns:
+            List[str]: 被Git管理的文件路径列表（相对路径）
+        """
+        import subprocess
+        
+        try:
+            # 获取git索引中的文件
+            result = subprocess.run(
+                ["git", "ls-files"],
+                cwd=self.root_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False
+            )
+            
+            if result.returncode != 0:
+                return []
+                
+            git_files = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            
+            # 添加未暂存但已跟踪的修改文件
+            result = subprocess.run(
+                ["git", "ls-files", "--modified"],
+                cwd=self.root_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False
+            )
+            
+            if result.returncode == 0:
+                modified_files = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+                git_files.extend([f for f in modified_files if f not in git_files])
+            
+            # 转换为绝对路径
+            return [os.path.join(self.root_dir, file) for file in git_files]
+            
+        except Exception as e:
+            PrettyOutput.print(f"获取Git管理的文件失败: {str(e)}", output_type=OutputType.WARNING)
+            return []
+
     def build_index(self, dir: str):
         """Build document index with optimized processing"""
         # Get all files
@@ -486,23 +592,43 @@ class RAGTool:
             ignored_paths = get_rag_ignored_paths()
             spinner.write(f"忽略路径: {', '.join(ignored_paths)}")
             
-            for root, _, files in os.walk(dir):
-                # 检查目录是否匹配忽略模式
-                if self._should_ignore_path(root, ignored_paths):
-                    continue
-                    
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    
-                    # 检查文件是否匹配忽略模式
+            # 检查是否为Git仓库
+            is_git_repo = self._is_git_repo()
+            if is_git_repo:
+                spinner.write("检测到Git仓库，仅处理Git管理的文件")
+                git_files = self._get_git_managed_files()
+                spinner.write(f"发现 {len(git_files)} 个Git管理的文件")
+                
+                # 过滤掉被忽略的文件
+                for file_path in git_files:
                     if self._should_ignore_path(file_path, ignored_paths):
                         continue
                         
                     if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
-                        PrettyOutput.print(f"Skip large file: {file_path}", 
+                        PrettyOutput.print(f"跳过大文件: {file_path}", 
                                         output_type=OutputType.WARNING)
                         continue
                     all_files.append(file_path)
+            else:
+                # 非Git仓库，使用常规文件遍历
+                for root, _, files in os.walk(dir):
+                    # 检查目录是否匹配忽略模式
+                    if self._should_ignore_path(root, ignored_paths):
+                        continue
+                        
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        
+                        # 检查文件是否匹配忽略模式
+                        if self._should_ignore_path(file_path, ignored_paths):
+                            continue
+                            
+                        if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
+                            PrettyOutput.print(f"跳过大文件: {file_path}", 
+                                            output_type=OutputType.WARNING)
+                            continue
+                        all_files.append(file_path)
+                        
             spinner.text = f"获取所有文件完成，共 {len(all_files)} 个文件"
             spinner.ok("✅")
 
@@ -828,44 +954,6 @@ class RAGTool:
         """
         return self.index is not None and len(self.documents) > 0
 
-    def _should_ignore_path(self, path: str, ignored_paths: List[str]) -> bool:
-        """
-        检查路径是否应该被忽略
-        
-        Args:
-            path: 文件或目录路径
-            ignored_paths: 忽略模式列表
-            
-        Returns:
-            bool: 如果路径应该被忽略则返回True
-        """
-        import fnmatch
-        import os
-        
-        # 获取相对路径
-        rel_path = path
-        if os.path.isabs(path):
-            try:
-                rel_path = os.path.relpath(path, self.root_dir)
-            except ValueError:
-                # 如果不能计算相对路径，使用原始路径
-                pass
-                
-        path_parts = rel_path.split(os.sep)
-        
-        # 检查路径的每一部分是否匹配任意忽略模式
-        for part in path_parts:
-            for pattern in ignored_paths:
-                if fnmatch.fnmatch(part, pattern):
-                    return True
-                    
-        # 检查完整路径是否匹配任意忽略模式
-        for pattern in ignored_paths:
-            if fnmatch.fnmatch(rel_path, pattern):
-                return True
-                
-        return False
-
 def main():
     """Main function"""
     import argparse
@@ -893,12 +981,18 @@ def main():
 
         if args.dir and args.build:
             PrettyOutput.print(f"正在处理目录: {args.dir}", output_type=OutputType.INFO)
+            
+            # 检查是否为Git仓库
+            if rag._is_git_repo():
+                PrettyOutput.print("检测到Git仓库，将只处理Git管理的文件", output_type=OutputType.INFO)
+            
             config_path = os.path.join(current_dir, '.jarvis', 'rag_ignore.txt')
             if os.path.exists(config_path):
                 PrettyOutput.print(f"使用配置文件: {config_path}", output_type=OutputType.INFO)
             else:
                 PrettyOutput.print("未找到忽略配置文件，使用默认忽略列表", output_type=OutputType.INFO)
                 PrettyOutput.print("可以创建 .jarvis/rag_ignore.txt 文件自定义忽略路径", output_type=OutputType.INFO)
+            
             rag.build_index(args.dir)
             return 0
 

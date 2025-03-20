@@ -190,6 +190,7 @@ def get_rag_ignored_paths() -> list:
         'node_modules', 
         '.jarvis',
         '.jarvis-*',
+        'target',
         'venv',
         'env',
         '.env',
