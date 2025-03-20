@@ -623,6 +623,11 @@ class RAGTool:
         if not self.index:
             self.build_index(self.root_dir)
             
+        # 如果索引建立失败或文档列表为空，返回空结果
+        if not self.index or len(self.documents) == 0:
+            PrettyOutput.print("索引未建立或文档列表为空", OutputType.WARNING)
+            return []
+            
         # Get query vector
         with yaspin(text="获取查询向量...", color="cyan") as spinner:
             query_vector = get_embedding(self.embedding_model, query)
@@ -633,6 +638,11 @@ class RAGTool:
         # Search with more candidates
         with yaspin(text="搜索...", color="cyan") as spinner:
             initial_k = min(top_k * 4, len(self.documents))
+            if initial_k == 0:
+                spinner.text = "文档为空，搜索终止"
+                spinner.fail("❌")
+                return []
+                
             distances, indices = self.index.search(query_vector, initial_k) # type: ignore
             spinner.text = "搜索完成"
             spinner.ok("✅")
@@ -642,8 +652,14 @@ class RAGTool:
             results = []
             seen_files = set()
             
+            # 检查索引数组是否为空
+            if indices.size == 0 or indices[0].size == 0:
+                spinner.text = "搜索结果为空"
+                spinner.fail("❌")
+                return []
+                
             for idx, dist in zip(indices[0], distances[0]):
-                if idx != -1:
+                if idx != -1 and idx < len(self.documents):  # 确保索引有效
                     doc = self.documents[idx]
                     similarity = 1.0 / (1.0 + float(dist))
                     if similarity > 0.3:
@@ -672,6 +688,11 @@ class RAGTool:
         
         # Sort by similarity and deduplicate
         with yaspin(text="排序...", color="cyan") as spinner:
+            if not results:
+                spinner.text = "无有效结果"
+                spinner.fail("❌")
+                return []
+                
             results.sort(key=lambda x: x[1], reverse=True)
             seen = set()
             final_results = []
