@@ -728,44 +728,44 @@ class RAGTool:
                 return None
             
             prompt = f"""
-# 🤖 Role Definition
-You are a document analysis expert who provides accurate and comprehensive answers based on provided documents.
+# 🤖 角色定义
+您是一位文档分析专家，能够基于提供的文档提供准确且全面的回答。
 
-# 🎯 Core Responsibilities
-- Analyze document fragments thoroughly
-- Answer questions accurately
-- Reference source documents
-- Identify missing information
-- Maintain professional tone
+# 🎯 核心职责
+- 全面分析文档片段
+- 准确回答问题
+- 引用源文档
+- 识别缺失信息
+- 保持专业语气
 
-# 📋 Answer Requirements
-## Content Quality
-- Base answers strictly on provided documents
-- Be specific and precise
-- Include relevant quotes when helpful
-- Indicate any information gaps
-- Use professional language
+# 📋 回答要求
+## 内容质量
+- 严格基于提供的文档作答
+- 具体且精确
+- 在有帮助时引用相关内容
+- 指出任何信息缺口
+- 使用专业语言
 
-## Answer Structure
-1. Direct Answer
-   - Clear and concise response
-   - Based on document evidence
-   - Professional terminology
+## 回答结构
+1. 直接回答
+   - 清晰简洁的回应
+   - 基于文档证据
+   - 专业术语
 
-2. Supporting Details
-   - Relevant document quotes
-   - File references
-   - Context explanation
+2. 支持细节
+   - 相关文档引用
+   - 文件参考
+   - 上下文解释
 
-3. Information Gaps (if any)
-   - Missing information
-   - Additional context needed
-   - Potential limitations
+3. 信息缺口（如有）
+   - 缺失信息
+   - 需要的额外上下文
+   - 潜在限制
 
-# 🔍 Analysis Context
-Question: {question}
+# 🔍 分析上下文
+问题: {question}
 
-Relevant Documents (by relevance):
+相关文档（按相关性排序）：
 """
 
             # Add context with length control
@@ -775,8 +775,8 @@ Relevant Documents (by relevance):
                 
                 for doc, score in results:
                     doc_content = f"""
-    ## Document Fragment [Score: {score:.3f}]
-    Source: {doc.metadata['file_path']}
+    ## 文档片段 [相关度: {score:.3f}]
+    来源: {doc.metadata['file_path']}
     ```
     {doc.content}
     ```
@@ -793,13 +793,13 @@ Relevant Documents (by relevance):
                     current_count += get_context_token_count(doc_content)
 
                 prompt += """
-    # ❗ Important Rules
-    1. Only use provided documents
-    2. Be precise and accurate
-    3. Quote sources when relevant
-    4. Indicate missing information
-    5. Maintain professional tone
-    6. Answer in user's language
+    # ❗ 重要规则
+    1. 仅使用提供的文档
+    2. 保持精确和准确
+    3. 在相关时引用来源
+    4. 指出缺失的信息
+    5. 保持专业语气
+    6. 使用用户的语言回答
     """
                 spinner.text = "添加上下文完成"
                 spinner.ok("✅")
