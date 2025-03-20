@@ -925,7 +925,7 @@ def main():
                     return 1
                     
                 # Display answer
-                output = f"""答案:\n{response}"""
+                output = f"""{response}"""
                 PrettyOutput.print(output, output_type=OutputType.INFO)
                 return 0
 

@@ -87,7 +87,8 @@ class ProjectAnalyzerTool:
                 "find_symbol",
                 "function_analyzer",
                 "find_caller",
-                "file_analyzer"
+                "file_analyzer",
+                "ask_codebase"
             ])
             
             # 创建并运行agent
