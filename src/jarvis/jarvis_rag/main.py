@@ -15,7 +15,7 @@ import lzma  # 添加 lzma 导入
 from threading import Lock
 import hashlib
 
-from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_thread_count
+from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_thread_count, get_rag_ignored_paths
 from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import  get_file_md5, init_env, init_gpu_config
@@ -481,18 +481,23 @@ class RAGTool:
         # Get all files
         with yaspin(text="获取所有文件...", color="cyan") as spinner:
             all_files = []
+            
+            # 获取需要忽略的路径列表
+            ignored_paths = get_rag_ignored_paths()
+            spinner.write(f"忽略路径: {', '.join(ignored_paths)}")
+            
             for root, _, files in os.walk(dir):
-                # Skip .jarvis directories and other ignored paths
-                if any(ignored in root for ignored in ['.git', '__pycache__', 'node_modules', '.jarvis']) or \
-                any(part.startswith('.jarvis-') for part in root.split(os.sep)):
+                # 检查目录是否匹配忽略模式
+                if self._should_ignore_path(root, ignored_paths):
                     continue
                     
                 for file in files:
-                    # Skip .jarvis files
-                    if '.jarvis' in root:
+                    file_path = os.path.join(root, file)
+                    
+                    # 检查文件是否匹配忽略模式
+                    if self._should_ignore_path(file_path, ignored_paths):
                         continue
                         
-                    file_path = os.path.join(root, file)
                     if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
                         PrettyOutput.print(f"Skip large file: {file_path}", 
                                         output_type=OutputType.WARNING)
@@ -823,6 +828,44 @@ class RAGTool:
         """
         return self.index is not None and len(self.documents) > 0
 
+    def _should_ignore_path(self, path: str, ignored_paths: List[str]) -> bool:
+        """
+        检查路径是否应该被忽略
+        
+        Args:
+            path: 文件或目录路径
+            ignored_paths: 忽略模式列表
+            
+        Returns:
+            bool: 如果路径应该被忽略则返回True
+        """
+        import fnmatch
+        import os
+        
+        # 获取相对路径
+        rel_path = path
+        if os.path.isabs(path):
+            try:
+                rel_path = os.path.relpath(path, self.root_dir)
+            except ValueError:
+                # 如果不能计算相对路径，使用原始路径
+                pass
+                
+        path_parts = rel_path.split(os.sep)
+        
+        # 检查路径的每一部分是否匹配任意忽略模式
+        for part in path_parts:
+            for pattern in ignored_paths:
+                if fnmatch.fnmatch(part, pattern):
+                    return True
+                    
+        # 检查完整路径是否匹配任意忽略模式
+        for pattern in ignored_paths:
+            if fnmatch.fnmatch(rel_path, pattern):
+                return True
+                
+        return False
+
 def main():
     """Main function"""
     import argparse
@@ -850,6 +893,12 @@ def main():
 
         if args.dir and args.build:
             PrettyOutput.print(f"正在处理目录: {args.dir}", output_type=OutputType.INFO)
+            config_path = os.path.join(current_dir, '.jarvis', 'rag_ignore.txt')
+            if os.path.exists(config_path):
+                PrettyOutput.print(f"使用配置文件: {config_path}", output_type=OutputType.INFO)
+            else:
+                PrettyOutput.print("未找到忽略配置文件，使用默认忽略列表", output_type=OutputType.INFO)
+                PrettyOutput.print("可以创建 .jarvis/rag_ignore.txt 文件自定义忽略路径", output_type=OutputType.INFO)
             rag.build_index(args.dir)
             return 0
 
