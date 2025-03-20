@@ -393,7 +393,19 @@ class RAGTool:
         # Create an IVF index for fast search
         if spinner:
             spinner.text = "创建IVF索引用于快速搜索..."
-        nlist = max(4, int(vectors.shape[0] / 1000))  # 每1000个向量一个聚类中心
+        # 修改聚类中心的计算方式，小数据量时使用更少的聚类中心
+        # 避免"WARNING clustering X points to Y centroids: please provide at least Z training points"警告
+        num_vectors = vectors.shape[0]
+        if num_vectors < 100:
+            # 对于小于100个向量的情况，使用更少的聚类中心
+            nlist = 1  # 只用1个聚类中心
+        elif num_vectors < 1000:
+            # 对于100-1000个向量的情况，使用较少的聚类中心
+            nlist = max(1, int(num_vectors / 100))  # 每100个向量一个聚类中心
+        else:
+            # 原始逻辑：每1000个向量一个聚类中心，最少4个
+            nlist = max(4, int(num_vectors / 1000))
+            
         quantizer = faiss.IndexFlatIP(self.vector_dim)
         self.index = faiss.IndexIVFFlat(quantizer, self.vector_dim, nlist, faiss.METRIC_INNER_PRODUCT)
         
