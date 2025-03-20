@@ -265,7 +265,7 @@ class RAGTool:
                                 with lzma.open(doc_cache_path, 'rb') as f:
                                     doc_cache_data = pickle.load(f)
                                     self.documents.extend(doc_cache_data["documents"])
-                                spinner.text = "加载文档缓存: {file_path}"
+                                spinner.text = f"加载文档缓存: {file_path}"
                             except Exception as e:
                                 spinner.write(f"❌ 加载文档缓存失败: {file_path}: {str(e)}")
                     spinner.text = "文档缓存加载完成"
@@ -307,7 +307,7 @@ class RAGTool:
                                     else:
                                         spinner.write(f"⚠️ 向量缓存不匹配: {file_path}")
                                         
-                                    spinner.text = "加载向量缓存: {file_path}"
+                                    spinner.text = f"加载向量缓存: {file_path}"
                                 except Exception as e:
                                     spinner.write(f"❌ 加载向量缓存失败: {file_path}: {str(e)}")
                             else:
