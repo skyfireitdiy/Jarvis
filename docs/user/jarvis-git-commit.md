@@ -1,7 +1,7 @@
 # 🚀 Jarvis Git Commit - 智能提交助手
 
 <div align="center">
-  <img src="../images/git-commit.png" alt="Git Commit" width="250" style="margin-bottom: 20px"/>
+  <img src="../images/jarvis-git-commit.png" alt="Git Commit" width="250" style="margin-bottom: 20px"/>
   
   *提升您的Git提交体验*
   

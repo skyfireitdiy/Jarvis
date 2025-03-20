@@ -1,7 +1,7 @@
 # 👨‍💻 Jarvis Code Agent - 智能代码助手
 
 <div align="center">
-  <img src="../images/code-agent.png" alt="Code Agent" width="250" style="margin-bottom: 20px"/>
+  <img src="../images/jarvis-code-agent.png" alt="Code Agent" width="250" style="margin-bottom: 20px"/>
   
   *代码世界的AI合作伙伴*
   

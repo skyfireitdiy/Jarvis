@@ -1,7 +1,7 @@
 # 🌐 Jarvis Platform Manager - AI平台管理中心
 
 <div align="center">
-  <img src="../images/platform-manager.png" alt="Platform Manager" width="250" style="margin-bottom: 20px"/>
+  <img src="../images/jarvis-platform-manager.png" alt="Platform Manager" width="250" style="margin-bottom: 20px"/>
   
   *无缝连接多平台AI能力*
   

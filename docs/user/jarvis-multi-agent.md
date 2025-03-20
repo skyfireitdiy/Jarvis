@@ -1,7 +1,7 @@
 # 🌟 Jarvis Multi-Agent - 多智能体协作框架
 
 <div align="center">
-  <img src="../images/multi-agent.png" alt="Multi-Agent System" width="250" style="margin-bottom: 20px"/>
+  <img src="../images/jarvis-multi-agent.png" alt="Multi-Agent System" width="250" style="margin-bottom: 20px"/>
   
   *构建定制化智能协作系统*
   

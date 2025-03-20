@@ -1,7 +1,7 @@
 # 🔮 Jarvis Smart Shell - 智能命令行助手
 
 <div align="center">
-  <img src="../images/smart-shell.png" alt="Smart Shell" width="250" style="margin-bottom: 20px"/>
+  <img src="../images/jarvis-smart-shell.png" alt="Smart Shell" width="250" style="margin-bottom: 20px"/>
   
   *终端操作的魔法体验*
   

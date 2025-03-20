@@ -1,7 +1,7 @@
 # 📚 Jarvis Codebase - 智能代码库管理
 
 <div align="center">
-  <img src="../images/codebase.png" alt="Codebase Manager" width="250" style="margin-bottom: 20px"/>
+  <img src="../images/jarvis-codebase.png" alt="Codebase Manager" width="250" style="margin-bottom: 20px"/>
   
   *您的代码库知识管家*
   
@@ -135,26 +135,6 @@ jarvis-codebase ask "系统如何处理用户密码重置请求？"
 - src/auth/password_reset.py
 - src/auth/authentication.py
 - src/utils/password_utils.py
-```
-
-## 🔧 高级配置
-Jarvis Codebase 可以通过配置文件 `~/.jarvis/codebase.yaml` 进行自定义：
-```yaml
-# 索引配置
-indexing:
-  exclude_patterns: ["*.min.js", "node_modules/**", "tests/**"]
-  include_comments: true
-  max_file_size: 5MB
-  
-# 向量化配置
-embedding:
-  model: "all-mpnet-base-v2"
-  dimensions: 768
-  
-# 搜索配置
-search:
-  default_top_k: 20
-  min_similarity: 0.6
 ```
 
 ## 💡 专家提示

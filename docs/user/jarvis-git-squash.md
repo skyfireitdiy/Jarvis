@@ -1,7 +1,7 @@
 # 🔄 Jarvis Git Squash - 智能提交合并专家
 
 <div align="center">
-  <img src="../images/git-squash.png" alt="Git Squash" width="250" style="margin-bottom: 20px"/>
+  <img src="../images/jarvis-git-squash.png" alt="Git Squash" width="250" style="margin-bottom: 20px"/>
   
   *清晰整洁的Git历史，一键达成*
   

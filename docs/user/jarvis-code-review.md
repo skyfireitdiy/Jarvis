@@ -1,7 +1,7 @@
 # 🔍 Jarvis Code Review - 代码审查专家
 
 <div align="center">
-  <img src="../images/code-review.png" alt="Code Review" width="250" style="margin-bottom: 20px"/>
+  <img src="../images/jarvis-code-review.png" alt="Code Review" width="250" style="margin-bottom: 20px"/>
   
   *提升代码质量的智能伙伴*
   
@@ -20,7 +20,7 @@ Jarvis Code Review 是一款强大的代码审查助手，它能自动分析您�
 - **安全漏洞扫描** - 主动发现潜在的安全风险
 - **详细报告生成** - 创建全面的代码质量报告
 
-## 💫 使用方法
+## 💫 使用方法jarvis-
 ```bash
 jarvis-code-review [options] <目标路径>
 ```
