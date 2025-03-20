@@ -998,6 +998,16 @@ def create_dev_team() -> MultiAgent:
 - **read_webpage**：收集行业信息和最新技术动态
 - **project_analyzer**：分析项目结构和架构，了解整体情况
 - **methodology**：采用适当的项目方法论和最佳实践
+
+## 文档管理规范
+每一步工作后，必须使用file_operation工具将结论性输出记录到项目文档中：
+1. 需求确认后，创建`/requirements/project_requirements_v<version>.md`记录需求文档
+2. 任务分配后，创建`/status_reports/task_assignments.md`记录任务分配情况
+3. 项目阶段完成后，创建`/status_reports/project_status_report.md`记录项目进度
+4. 遇到的风险和问题，记录到`/status_reports/risk_register.md`
+5. 重要决策和变更，记录到`/communication/decision_log.md`
+
+文档命名需规范，内容需要结构化，使用Markdown格式，便于团队成员理解和跟进。
 """
     
     # Update BA prompt with tool usage guidance
@@ -1011,6 +1021,17 @@ def create_dev_team() -> MultiAgent:
 - **read_webpage**：收集用户体验和行业趋势信息
 - **select_code_files**：了解现有代码中与需求相关的部分
 - **methodology**：应用需求分析和用户故事映射方法论
+
+## 文档管理规范
+每一步分析后，必须使用file_operation工具将结论性输出记录到分析文档中：
+1. 需求分析完成后，创建`/analysis/requirements_analysis_v<version>.md`记录分析结果
+2. 用户故事编写后，创建`/analysis/user_stories_v<version>.md`记录用户故事
+3. 功能规格确定后，创建`/specs/functional_specs.md`记录功能规格
+4. 数据需求确定后，创建`/specs/data_dictionary.md`记录数据字典
+5. 业务流程分析后，创建`/models/process_flows.md`记录业务流程
+6. 数据模型设计后，创建`/models/data_models.md`记录数据模型
+
+文档需要结构化，使用Markdown格式，包含清晰的需求描述、优先级、验收标准和依赖关系。
 """
     
     # Update SA prompt with tool usage guidance
@@ -1027,6 +1048,17 @@ def create_dev_team() -> MultiAgent:
 - **read_code**：阅读和理解关键代码段
 - **select_code_files**：选择并分析与架构相关的代码文件
 - **methodology**：应用架构设计方法论和模式
+
+## 文档管理规范
+每一步架构设计后，必须使用file_operation工具将结论性输出记录到架构文档中：
+1. 系统架构设计后，创建`/architecture/system_architecture_v<version>.md`记录架构文档
+2. 架构图创建后，保存到`/architecture/architecture_diagrams/`目录
+3. 组件规格定义后，创建`/technical_specs/component_specs/<component_name>.md`
+4. API规格设计后，创建`/technical_specs/api_specs/<api_name>.md`
+5. 架构决策后，创建`/decisions/adr_<number>_<decision_name>.md`记录架构决策
+6. 技术选型评估后，创建`/architecture/technology_evaluation.md`记录评估结果
+
+文档需使用图表、表格等方式清晰展示架构设计，包含各组件职责、接口、性能考量及安全措施。
 """
     
     # Update TL prompt with tool usage guidance
@@ -1043,6 +1075,18 @@ def create_dev_team() -> MultiAgent:
 - **find_caller**：分析函数调用关系和依赖
 - **function_analyzer**：深入分析函数实现和优化空间
 - **project_analyzer**：分析项目结构和技术架构
+
+## 文档管理规范
+每一步技术指导或审查后，必须使用file_operation工具将结论性输出记录到技术文档中：
+1. 实施计划制定后，创建`/technical/implementation_plan_v<version>.md`记录实施计划
+2. 任务分解后，创建`/technical/task_breakdown.md`记录任务分解详情
+3. 编码标准制定后，创建`/guidelines/coding_standards.md`记录编码标准
+4. 审查指南制定后，创建`/guidelines/review_guidelines.md`记录审查指南
+5. 代码审查后，创建`/quality/code_review_<date>.md`记录审查结果
+6. 技术债务识别后，更新`/quality/technical_debt.md`记录技术债务
+7. 性能优化后，创建`/quality/performance_metrics.md`记录性能指标
+
+文档需包含清晰的技术指导、代码质量标准、任务分解和时间估计，便于开发团队执行。
 """
     
     # Update DEV prompt with tool usage guidance
@@ -1059,6 +1103,18 @@ def create_dev_team() -> MultiAgent:
 - **file_analyzer**：分析文件结构和功能
 - **read_code**：阅读和理解关键代码段
 - **create_sub_agent**：创建专门的子代理处理特定任务
+
+## 文档管理规范
+每一步代码实现或优化后，必须使用file_operation工具将结论性输出记录到开发文档中：
+1. 功能实现完成后，创建`/src/README.md`或更新模块说明文档，记录实现细节
+2. API实现后，更新`/docs/api/<module_name>.md`记录API使用说明
+3. 复杂算法实现后，创建`/docs/algorithms/<algorithm_name>.md`解释算法原理
+4. 配置变更后，更新`/docs/configuration.md`记录配置项变更
+5. 依赖更新后，更新`/docs/dependencies.md`记录依赖关系
+6. 开发过程中遇到的问题和解决方案，记录到`/docs/troubleshooting.md`
+7. 单元测试完成后，创建`/tests/README.md`记录测试覆盖情况
+
+文档需要包含功能描述、使用示例、参数说明和注意事项，便于其他开发者理解和使用。
 """
     
     # Update QA prompt with tool usage guidance
@@ -1073,6 +1129,18 @@ def create_dev_team() -> MultiAgent:
 - **execute_shell_script**：执行自动化测试脚本
 - **read_code**：阅读和理解代码以设计测试用例
 - **select_code_files**：选择需要测试的关键代码文件
+
+## 文档管理规范
+每一步测试或质量评估后，必须使用file_operation工具将结论性输出记录到测试文档中：
+1. 测试计划制定后，创建`/testing/test_plan.md`记录测试计划
+2. 测试用例设计后，创建`/testing/test_cases/<feature_name>_test_cases.md`记录测试用例
+3. 测试执行后，创建`/testing/test_reports/test_report_<date>.md`记录测试报告
+4. 发现缺陷后，更新`/defects/defect_log.md`记录缺陷详情
+5. 自动化测试脚本开发后，在`/automation/README.md`中记录脚本使用说明
+6. 性能测试结果，记录到`/testing/performance_test_results.md`
+7. 缺陷统计和趋势分析，记录到`/defects/defect_metrics.md`
+
+测试文档需包含测试范围、测试环境、测试用例、预期结果、实际结果和缺陷级别，便于跟踪和修复。
 """
     
     # Append tool guidance to each role's prompt
