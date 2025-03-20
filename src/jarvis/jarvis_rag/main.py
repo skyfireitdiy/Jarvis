@@ -211,7 +211,8 @@ class RAGTool:
 
         # 初始化 GPU 内存配置
         with yaspin(text="初始化 GPU 内存配置...", color="cyan") as spinner:
-            self.gpu_config = init_gpu_config()
+            with spinner.hidden():
+                self.gpu_config = init_gpu_config()
             spinner.text = "GPU 内存配置初始化完成"
             spinner.ok("✅")
 
