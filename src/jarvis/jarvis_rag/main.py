@@ -653,39 +653,21 @@ class RAGTool:
             return []
 
     def build_index(self, dir: str):
-        """Build document index with optimized processing"""
-        # Get all files
-        with yaspin(text="获取所有文件...", color="cyan") as spinner:
-            all_files = []
-            
-            # 获取需要忽略的路径列表
-            ignored_paths = get_rag_ignored_paths()
-            
-            # 检查是否为Git仓库
-            is_git_repo = self._is_git_repo()
-            if is_git_repo:
-                git_files = self._get_git_managed_files()
-                # 过滤掉被忽略的文件
-                for file_path in git_files:
-                    if self._should_ignore_path(file_path, ignored_paths):
-                        continue
-                        
-                    if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
-                        PrettyOutput.print(f"跳过大文件: {file_path}", 
-                                        output_type=OutputType.WARNING)
-                        continue
-                    all_files.append(file_path)
-            else:
-                # 非Git仓库，使用常规文件遍历
-                for root, _, files in os.walk(dir):
-                    # 检查目录是否匹配忽略模式
-                    if self._should_ignore_path(root, ignored_paths):
-                        continue
-                        
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        
-                        # 检查文件是否匹配忽略模式
+        try:
+            """Build document index with optimized processing"""
+            # Get all files
+            with yaspin(text="获取所有文件...", color="cyan") as spinner:
+                all_files = []
+                
+                # 获取需要忽略的路径列表
+                ignored_paths = get_rag_ignored_paths()
+                
+                # 检查是否为Git仓库
+                is_git_repo = self._is_git_repo()
+                if is_git_repo:
+                    git_files = self._get_git_managed_files()
+                    # 过滤掉被忽略的文件
+                    for file_path in git_files:
                         if self._should_ignore_path(file_path, ignored_paths):
                             continue
                             
@@ -694,157 +676,179 @@ class RAGTool:
                                             output_type=OutputType.WARNING)
                             continue
                         all_files.append(file_path)
-                        
-            spinner.text = f"获取所有文件完成，共 {len(all_files)} 个文件"
-            spinner.ok("✅")
-
-        # Clean up cache for deleted files
-        with yaspin(text="清理缓存...", color="cyan") as spinner:
-            deleted_files = set(self.file_md5_cache.keys()) - set(all_files)
-            deleted_count = len(deleted_files)
-            
-            if deleted_count > 0:
-                spinner.write(f"🗑️ 删除不存在文件的缓存: {deleted_count} 个")
-                
-            for file_path in deleted_files:
-                # Remove from MD5 cache
-                del self.file_md5_cache[file_path]
-                # Remove related documents
-                self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
-                # Delete cache files
-                self._delete_file_cache(file_path, None)  # Pass None as spinner to not show individual deletions
-                
-            spinner.text = f"清理缓存完成，共删除 {deleted_count} 个不存在文件的缓存"
-            spinner.ok("✅")
-
-        # Check file changes
-        with yaspin(text="检查文件变化...", color="cyan") as spinner:
-            files_to_process = []
-            unchanged_files = []
-            new_files_count = 0
-            modified_files_count = 0
-            
-            for file_path in all_files:
-                current_md5 = get_file_md5(file_path)
-                if current_md5:  # Only process files that can successfully calculate MD5
-                    if file_path in self.file_md5_cache and self.file_md5_cache[file_path] == current_md5:
-                        # File未变化，记录但不重新处理
-                        unchanged_files.append(file_path)
-                    else:
-                        # New file or modified file
-                        files_to_process.append(file_path)
-                        
-                        # 如果是修改的文件，删除旧缓存
-                        if file_path in self.file_md5_cache:
-                            modified_files_count += 1
-                            # 删除旧缓存
-                            self._delete_file_cache(file_path, spinner)
-                            # 从文档列表中移除
-                            self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
-                        else:
-                            new_files_count += 1
-            
-            # 输出汇总信息
-            if unchanged_files:
-                spinner.write(f"📚 已缓存文件: {len(unchanged_files)} 个")
-            if new_files_count > 0:
-                spinner.write(f"🆕 新增文件: {new_files_count} 个")
-            if modified_files_count > 0:
-                spinner.write(f"📝 修改文件: {modified_files_count} 个")
-                
-            spinner.text = f"检查文件变化完成，共 {len(files_to_process)} 个文件需要处理"
-            spinner.ok("✅")
-
-        # Keep documents for unchanged files
-        unchanged_documents = [doc for doc in self.documents 
-                            if doc.metadata['file_path'] in unchanged_files]
-
-        # Process files one by one with optimized vectorization
-        if files_to_process:
-            new_documents = []
-            new_vectors = []
-            success_count = 0
-            skipped_count = 0
-            failed_count = 0
-            
-            with yaspin(text=f"处理文件中 (0/{len(files_to_process)})...", color="cyan") as spinner:
-                for index, file_path in enumerate(files_to_process):
-                    spinner.text = f"处理文件中 ({index+1}/{len(files_to_process)}): {file_path}"
-                    try:
-                        # Process single file
-                        file_docs = self._process_file(file_path, spinner)
-                        if file_docs:
-                            # Vectorize documents from this file
-                            spinner.text = f"处理文件中 ({index+1}/{len(files_to_process)}): 为 {file_path} 生成向量嵌入..."
-                            texts_to_vectorize = [
-                                f"File:{doc.metadata['file_path']} Content:{doc.content}"
-                                for doc in file_docs
-                            ]
+                else:
+                    # 非Git仓库，使用常规文件遍历
+                    for root, _, files in os.walk(dir):
+                        # 检查目录是否匹配忽略模式
+                        if self._should_ignore_path(root, ignored_paths):
+                            continue
                             
-                            file_vectors = get_embedding_batch(self.embedding_model, f"({index+1}/{len(files_to_process)}){file_path}", texts_to_vectorize, spinner)
+                        for file in files:
+                            file_path = os.path.join(root, file)
                             
-                            # Save cache for this file
-                            spinner.text = f"处理文件中 ({index+1}/{len(files_to_process)}): 保存 {file_path} 的缓存..."
-                            self._save_cache(file_path, file_docs, file_vectors, spinner)
+                            # 检查文件是否匹配忽略模式
+                            if self._should_ignore_path(file_path, ignored_paths):
+                                continue
+                                
+                            if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100MB
+                                PrettyOutput.print(f"跳过大文件: {file_path}", 
+                                                output_type=OutputType.WARNING)
+                                continue
+                            all_files.append(file_path)
                             
-                            # Accumulate documents and vectors
-                            new_documents.extend(file_docs)
-                            new_vectors.append(file_vectors)
-                            success_count += 1
-                        else:
-                            # 文件跳过处理
-                            skipped_count += 1
-                            
-                    except Exception as e:
-                        spinner.write(f"❌ 处理失败: {file_path}: {str(e)}")
-                        failed_count += 1
-                
-                # 输出处理统计
-                spinner.text = f"文件处理完成: 成功 {success_count} 个, 跳过 {skipped_count} 个, 失败 {failed_count} 个"
+                spinner.text = f"获取所有文件完成，共 {len(all_files)} 个文件"
                 spinner.ok("✅")
-                
-            # Update documents list
-            self.documents.extend(new_documents)
 
-            # Build final index
-            if new_vectors:
-                with yaspin(text="构建最终索引...", color="cyan") as spinner:
-                    spinner.text = "合并新向量..."
-                    all_new_vectors = np.vstack(new_vectors)
+            # Clean up cache for deleted files
+            with yaspin(text="清理缓存...", color="cyan") as spinner:
+                deleted_files = set(self.file_md5_cache.keys()) - set(all_files)
+                deleted_count = len(deleted_files)
+                
+                if deleted_count > 0:
+                    spinner.write(f"🗑️ 删除不存在文件的缓存: {deleted_count} 个")
                     
-                    unchanged_vector_count = 0
-                    if self.flat_index is not None:
-                        # Get vectors for unchanged documents
-                        spinner.text = "获取未变化文档的向量..."
-                        unchanged_vectors = self._get_unchanged_vectors(unchanged_documents, spinner)
-                        if unchanged_vectors is not None:
-                            unchanged_vector_count = unchanged_vectors.shape[0]
-                            spinner.text = f"合并新旧向量（新：{all_new_vectors.shape[0]}，旧：{unchanged_vector_count}）..."
-                            final_vectors = np.vstack([unchanged_vectors, all_new_vectors])
+                for file_path in deleted_files:
+                    # Remove from MD5 cache
+                    del self.file_md5_cache[file_path]
+                    # Remove related documents
+                    self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
+                    # Delete cache files
+                    self._delete_file_cache(file_path, None)  # Pass None as spinner to not show individual deletions
+                    
+                spinner.text = f"清理缓存完成，共删除 {deleted_count} 个不存在文件的缓存"
+                spinner.ok("✅")
+
+            # Check file changes
+            with yaspin(text="检查文件变化...", color="cyan") as spinner:
+                files_to_process = []
+                unchanged_files = []
+                new_files_count = 0
+                modified_files_count = 0
+                
+                for file_path in all_files:
+                    current_md5 = get_file_md5(file_path)
+                    if current_md5:  # Only process files that can successfully calculate MD5
+                        if file_path in self.file_md5_cache and self.file_md5_cache[file_path] == current_md5:
+                            # File未变化，记录但不重新处理
+                            unchanged_files.append(file_path)
+                        else:
+                            # New file or modified file
+                            files_to_process.append(file_path)
+                            
+                            # 如果是修改的文件，删除旧缓存
+                            if file_path in self.file_md5_cache:
+                                modified_files_count += 1
+                                # 删除旧缓存
+                                self._delete_file_cache(file_path, spinner)
+                                # 从文档列表中移除
+                                self.documents = [doc for doc in self.documents if doc.metadata['file_path'] != file_path]
+                            else:
+                                new_files_count += 1
+                
+                # 输出汇总信息
+                if unchanged_files:
+                    spinner.write(f"📚 已缓存文件: {len(unchanged_files)} 个")
+                if new_files_count > 0:
+                    spinner.write(f"🆕 新增文件: {new_files_count} 个")
+                if modified_files_count > 0:
+                    spinner.write(f"📝 修改文件: {modified_files_count} 个")
+                    
+                spinner.text = f"检查文件变化完成，共 {len(files_to_process)} 个文件需要处理"
+                spinner.ok("✅")
+
+            # Keep documents for unchanged files
+            unchanged_documents = [doc for doc in self.documents 
+                                if doc.metadata['file_path'] in unchanged_files]
+
+            # Process files one by one with optimized vectorization
+            if files_to_process:
+                new_documents = []
+                new_vectors = []
+                success_count = 0
+                skipped_count = 0
+                failed_count = 0
+                
+                with yaspin(text=f"处理文件中 (0/{len(files_to_process)})...", color="cyan") as spinner:
+                    for index, file_path in enumerate(files_to_process):
+                        spinner.text = f"处理文件中 ({index+1}/{len(files_to_process)}): {file_path}"
+                        try:
+                            # Process single file
+                            file_docs = self._process_file(file_path, spinner)
+                            if file_docs:
+                                # Vectorize documents from this file
+                                spinner.text = f"处理文件中 ({index+1}/{len(files_to_process)}): 为 {file_path} 生成向量嵌入..."
+                                texts_to_vectorize = [
+                                    f"File:{doc.metadata['file_path']} Content:{doc.content}"
+                                    for doc in file_docs
+                                ]
+                                
+                                file_vectors = get_embedding_batch(self.embedding_model, f"({index+1}/{len(files_to_process)}){file_path}", texts_to_vectorize, spinner)
+                                
+                                # Save cache for this file
+                                spinner.text = f"处理文件中 ({index+1}/{len(files_to_process)}): 保存 {file_path} 的缓存..."
+                                self._save_cache(file_path, file_docs, file_vectors, spinner)
+                                
+                                # Accumulate documents and vectors
+                                new_documents.extend(file_docs)
+                                new_vectors.append(file_vectors)
+                                success_count += 1
+                            else:
+                                # 文件跳过处理
+                                skipped_count += 1
+                                
+                        except Exception as e:
+                            spinner.write(f"❌ 处理失败: {file_path}: {str(e)}")
+                            failed_count += 1
+                    
+                    # 输出处理统计
+                    spinner.text = f"文件处理完成: 成功 {success_count} 个, 跳过 {skipped_count} 个, 失败 {failed_count} 个"
+                    spinner.ok("✅")
+                    
+                # Update documents list
+                self.documents.extend(new_documents)
+
+                # Build final index
+                if new_vectors:
+                    with yaspin(text="构建最终索引...", color="cyan") as spinner:
+                        spinner.text = "合并新向量..."
+                        all_new_vectors = np.vstack(new_vectors)
+                        
+                        unchanged_vector_count = 0
+                        if self.flat_index is not None:
+                            # Get vectors for unchanged documents
+                            spinner.text = "获取未变化文档的向量..."
+                            unchanged_vectors = self._get_unchanged_vectors(unchanged_documents, spinner)
+                            if unchanged_vectors is not None:
+                                unchanged_vector_count = unchanged_vectors.shape[0]
+                                spinner.text = f"合并新旧向量（新：{all_new_vectors.shape[0]}，旧：{unchanged_vector_count}）..."
+                                final_vectors = np.vstack([unchanged_vectors, all_new_vectors])
+                            else:
+                                spinner.text = f"仅使用新向量（{all_new_vectors.shape[0]}）..."
+                                final_vectors = all_new_vectors
                         else:
                             spinner.text = f"仅使用新向量（{all_new_vectors.shape[0]}）..."
                             final_vectors = all_new_vectors
-                    else:
-                        spinner.text = f"仅使用新向量（{all_new_vectors.shape[0]}）..."
-                        final_vectors = all_new_vectors
 
-                    # Build index
-                    spinner.text = f"构建索引（向量数量：{final_vectors.shape[0]}）..."
-                    self._build_index(final_vectors, spinner)
-                    spinner.text = f"索引构建完成，共 {len(self.documents)} 个文档片段"
-                    spinner.ok("✅")
+                        # Build index
+                        spinner.text = f"构建索引（向量数量：{final_vectors.shape[0]}）..."
+                        self._build_index(final_vectors, spinner)
+                        spinner.text = f"索引构建完成，共 {len(self.documents)} 个文档片段"
+                        spinner.ok("✅")
 
-            # 输出最终统计信息
-            PrettyOutput.print(
-                f"📊 索引统计:\n"
-                f"  • 总文档数: {len(self.documents)} 个文档片段\n"
-                f"  • 已缓存文件: {len(unchanged_files)} 个\n"
-                f"  • 处理文件: {len(files_to_process)} 个\n"
-                f"    - 成功: {success_count} 个\n"
-                f"    - 跳过: {skipped_count} 个\n"
-                f"    - 失败: {failed_count} 个", 
-                OutputType.SUCCESS
-            )
+                # 输出最终统计信息
+                PrettyOutput.print(
+                    f"📊 索引统计:\n"
+                    f"  • 总文档数: {len(self.documents)} 个文档片段\n"
+                    f"  • 已缓存文件: {len(unchanged_files)} 个\n"
+                    f"  • 处理文件: {len(files_to_process)} 个\n"
+                    f"    - 成功: {success_count} 个\n"
+                    f"    - 跳过: {skipped_count} 个\n"
+                    f"    - 失败: {failed_count} 个", 
+                    OutputType.SUCCESS
+                )
+        except Exception as e:
+            PrettyOutput.print(f"索引构建失败: {str(e)}", 
+                            output_type=OutputType.ERROR)
 
     def _get_unchanged_vectors(self, unchanged_documents: List[Document], spinner=None) -> Optional[np.ndarray]:
         """Get vectors for unchanged documents from existing index"""
@@ -1112,10 +1116,10 @@ class RAGTool:
                 spinner.text = "添加上下文完成"
                 spinner.ok("✅")
 
-            with yaspin(text="回答...", color="cyan") as spinner:
+            with yaspin(text="正在生成答案...", color="cyan") as spinner:
                 model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
                 response = model.chat_until_success(prompt)
-                spinner.text = "回答完成"
+                spinner.text = "答案生成完成"
                 spinner.ok("✅")
                 return response
             
