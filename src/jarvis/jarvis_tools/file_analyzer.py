@@ -31,15 +31,15 @@ class FileAnalyzerTool:
                 "type": "array",
                 "items": {
                     "type": "string",
-                    "enum": ["structure", "implementation", "quality", "dependencies", "all"]
+                    "enum": ["structure", "implementation", "quality", "dependencies", "metrics", "all"]
                 },
                 "description": "分析重点（可选，默认为all）",
                 "default": ["all"]
             },
-            "include_metrics": {
-                "type": "boolean",
-                "description": "是否包含代码指标分析（如复杂度、行数等）",
-                "default": True
+            "objective": {
+                "type": "string",
+                "description": "描述本次文件分析的目标和用途，例如'准备重构该文件'或'理解该文件在项目中的作用'",
+                "default": ""
             }
         },
         "required": ["file_path"]
@@ -63,7 +63,7 @@ class FileAnalyzerTool:
             file_path = args.get("file_path", "")
             root_dir = args.get("root_dir", ".")
             analysis_focus = args.get("analysis_focus", ["all"])
-            include_metrics = args.get("include_metrics", True)
+            objective = args.get("objective", "")
             
             # 验证参数
             if not file_path:
@@ -88,7 +88,7 @@ class FileAnalyzerTool:
             
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
-                rel_file_path, file_name, file_ext, root_dir, analysis_focus, include_metrics
+                rel_file_path, file_name, file_ext, root_dir, analysis_focus, objective
             )
             
             # 创建agent的summary prompt
@@ -154,7 +154,7 @@ class FileAnalyzerTool:
             os.chdir(original_dir)
     
     def _create_system_prompt(self, file_path: str, file_name: str, file_ext: str,
-                             root_dir: str, analysis_focus: list, include_metrics: bool) -> str:
+                             root_dir: str, analysis_focus: list, objective: str) -> str:
         """
         创建Agent的system prompt
         
@@ -164,7 +164,7 @@ class FileAnalyzerTool:
             file_ext: 文件扩展名
             root_dir: 项目根目录
             analysis_focus: 分析重点
-            include_metrics: 是否包含代码指标
+            objective: 分析目标
             
         Returns:
             系统提示文本
@@ -197,118 +197,82 @@ class FileAnalyzerTool:
         language = language_map.get(file_ext, '未知')
         
         focus_list = []
+        include_metrics = False
+        
         if "all" in analysis_focus:
             focus_list = ["文件结构", "实现细节", "代码质量", "依赖关系"]
+            include_metrics = True
         else:
             if "structure" in analysis_focus: focus_list.append("文件结构")
             if "implementation" in analysis_focus: focus_list.append("实现细节")
             if "quality" in analysis_focus: focus_list.append("代码质量")
             if "dependencies" in analysis_focus: focus_list.append("依赖关系")
+            if "metrics" in analysis_focus: include_metrics = True
         
         focus_str = ", ".join(focus_list)
         metrics_str = "包含代码指标分析" if include_metrics else "不包含代码指标分析"
+        objective_text = f"\n\n## 分析目标\n{objective}" if objective else ""
         
-        return f"""你是一名代码分析专家，擅长深入分析单个源代码文件，提取关键信息并评估代码质量。
+        return f"""# 代码文件分析专家
 
-## 当前任务
-对位于 `{root_dir}` 项目中的文件 `{file_path}` 进行深入分析，重点关注{focus_str}，生成一份详细的单文件分析报告。
+## 任务描述
+分析文件 `{file_path}` 的内容，专注于分析目标所需的信息，生成有针对性的文件分析报告。{objective_text}
 
-## 分析参数
-- 文件路径: {file_path}
-- 文件名: {file_name}
+## 文件信息
+- 文件路径: `{file_path}`
 - 编程语言: {language}
-- 项目根目录: {root_dir}
-- 分析重点: {focus_str}
+- 项目根目录: `{root_dir}`
+- 分析范围: {focus_str}
 - 代码指标: {metrics_str}
 
-## 分析流程
-请按照以下步骤分析该文件:
+## 分析策略
+1. 首先理解分析目标，确定你需要查找的信息
+2. 灵活采用适合目标的分析方法，不受预设分析框架的限制
+3. 专注于与分析目标直接相关的内容，忽略无关部分
+4. 根据目标需要自行判断分析的深度和广度
 
-1. **文件概况识别**
-   - 确定文件的主要用途和职责
-   - 识别文件所属的模块或组件
-   - 确定文件的抽象级别和重要性
+## 探索建议
+- 首先读取整个文件内容以获取全局视图
+- 识别与分析目标相关的关键部分
+- 深入探索这些关键部分，提供有针对性的分析
 
-2. **文件结构分析**
-   - 识别主要的类、函数、方法或其他结构元素
-   - 分析这些元素之间的关系和组织方式
-   - 评估结构的清晰度和组织合理性
-
-3. **实现细节分析**
-   - 检查关键算法和实现思路
-   - 评估代码的可读性和可维护性
-   - 识别潜在的复杂度热点或性能隐患
-
-4. **依赖关系分析**
-   - 识别文件导入/引用的外部依赖
-   - 分析文件内部元素之间的依赖关系
-   - 评估依赖管理的合理性和潜在问题
-
-5. **代码质量评估**
-   - 代码风格和一致性
-   - 错误处理和边界情况考虑
-   - 代码重复性和抽象适当性
-   - 注释和文档完整性
-
-6. **${language}最佳实践遵循情况**
-   - 识别是否遵循${language}特定的最佳实践
-   - 评估是否利用了语言特性
-   - 检查是否存在反模式
-
-## 信息完整性要求
-- 确保捕获所有重要的代码结构和组织模式
-- 不要遗漏任何关键函数、类或模块的分析
-- 完整呈现重要的依赖关系和调用关系
-- 全面评估代码质量，不遗漏潜在问题
-- 特别关注潜在的错误和异常处理机制
-
-## 工具使用建议
-- 使用 `read_code` 读取文件内容:
+## 执行指令
+- 首先读取整个文件内容:
   ```
-  # 读取整个文件
   read_code {{
-    "files": [
-      {{
-        "path": "{file_path}",
-        "start_line": 1,
-        "end_line": -1
-      }}
-    ]
+    "files": [{{
+      "path": "{file_path}",
+      "start_line": 1,
+      "end_line": -1
+    }}]
   }}
   ```
-  
-- 使用 `execute_shell` 获取文件信息:
+
+- 分析文件统计信息:
   ```
-  # 获取文件行数和复杂度
   wc -l {file_path}
-  
-  # 查找导入/依赖语句
-  grep -n "import\\|require\\|include" {file_path}
   ```
 
-- 使用 `find_symbol` 查找文件中定义的符号在项目中的引用:
+- 分析关键符号和函数:
   ```
-  # 查找文件中定义的核心类或函数的引用
   find_symbol {{
-    "symbol": "核心类或函数名称",
-    "root_dir": ".",
-    "file_extensions": ["{file_ext}"]
+    "symbol": "关键符号名称",
+    "root_dir": "."
   }}
-  ```
-
-- 使用 `function_analyzer` 分析文件中的关键函数:
-  ```
-  # 分析文件中的主要函数
+  
   function_analyzer {{
     "function_name": "关键函数名称",
-    "file_path": "{file_path}",
-    "root_dir": ".",
-    "analysis_depth": 1
+    "file_path": "{file_path}"
   }}
   ```
 
-分析完成后，请提供一份全面的单文件分析报告，突出文件的主要职责、关键结构、实现特点和代码质量评估。
-"""
+## 输出要求
+- 直接回应分析目标的关键问题
+- 提供与目标相关的深入洞察
+- 分析内容应直接服务于分析目标
+- 避免与目标无关的冗余信息
+- 使用具体代码路径和示例支持分析结论
+- 提供针对分析目标的具体建议和改进方向"""
 
     def _create_summary_prompt(self, file_path: str, file_name: str) -> str:
         """
@@ -321,57 +285,16 @@ class FileAnalyzerTool:
         Returns:
             总结提示文本
         """
-        return f"""请提供对文件 `{file_path}` 的完整分析报告。报告应包含以下部分:
+        return f"""# 文件分析报告: `{file_name}`
 
-# 文件分析报告: `{file_name}`
+## 报告要求
+生成一份完全以分析目标为导向的文件分析报告。不要遵循固定的报告模板，而是完全根据分析目标来组织内容：
 
-## 文件概述
-- 文件的主要用途和职责
-- 所属模块/组件
-- 抽象级别和复杂度评估
-- 在项目中的重要性
+- 专注回答分析目标提出的问题
+- 只包含与分析目标直接相关的发现和洞察
+- 完全跳过与分析目标无关的内容，无需做全面分析
+- 分析深度应与目标的具体需求匹配
+- 使用具体的代码片段和实例支持你的观点
+- 以清晰的Markdown格式呈现，简洁明了
 
-## 结构组织
-- 主要类/函数/方法列表及其用途
-- 文件的组织逻辑和结构模式
-- 主要部分之间的关系
-- 代码组织评估
-
-## 关键实现分析
-- 核心算法和实现逻辑
-- 代码流程和控制结构
-- 重要数据结构和状态管理
-- 特殊技术或语言特性的使用
-
-## 依赖分析
-- 外部导入/依赖列表
-- 内部组件间的依赖关系
-- 依赖管理评估
-- 潜在的依赖问题
-
-## 代码质量评估
-- 可读性和可维护性
-- 错误处理完备性
-- 命名规范和一致性
-- 注释和文档质量
-- 潜在的代码味道和问题
-
-## 复杂度和指标
-- 代码行数统计
-- 循环复杂度评估
-- 函数/方法长度分析
-- 嵌套深度分析
-
-## 最佳实践符合度
-- 语言特定最佳实践的遵循情况
-- 设计模式的使用
-- 反模式的存在
-
-## 改进建议
-- 代码质量改进机会
-- 结构优化建议
-- 性能优化点
-- 可维护性提升建议
-
-请确保报告全面且深入，既关注技术细节，也提供高层次的质量评估，使读者能够全面了解该文件的结构、质量和在项目中的作用。
-""" 
+在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的文件概览，而是直接解决分析目标中提出的具体问题。""" 

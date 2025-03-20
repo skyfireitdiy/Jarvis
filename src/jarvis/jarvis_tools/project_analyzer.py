@@ -38,19 +38,10 @@ class ProjectAnalyzerTool:
                 "description": "要排除的目录列表（可选）",
                 "default": []
             },
-            "depth": {
-                "type": "integer",
-                "description": "项目分析深度（可选，0表示无限制）",
-                "default": 0
-            },
-            "analysis_focus": {
-                "type": "array",
-                "items": {
-                    "type": "string",
-                    "enum": ["structure", "entry_points", "dependencies", "architecture", "all"]
-                },
-                "description": "分析重点（可选，默认为all）",
-                "default": ["all"]
+            "objective": {
+                "type": "string",
+                "description": "描述本次项目分析的目标和用途，例如'理解项目架构以便进行重构'或'寻找性能瓶颈'",
+                "default": ""
             }
         },
         "required": []
@@ -74,16 +65,15 @@ class ProjectAnalyzerTool:
             root_dir = args.get("root_dir", ".")
             focus_dirs = args.get("focus_dirs", [])
             exclude_dirs = args.get("exclude_dirs", [])
-            depth = args.get("depth", 0)
-            analysis_focus = args.get("analysis_focus", ["all"])
+            objective = args.get("objective", "")
             
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
-                root_dir, focus_dirs, exclude_dirs, depth, analysis_focus
+                root_dir, focus_dirs, exclude_dirs, objective
             )
             
             # 创建agent的summary prompt
-            summary_prompt = self._create_summary_prompt(root_dir)
+            summary_prompt = self._create_summary_prompt(root_dir, objective)
             
             # 切换到根目录
             os.chdir(root_dir)
@@ -138,8 +128,7 @@ class ProjectAnalyzerTool:
             os.chdir(original_dir)
     
     def _create_system_prompt(self, root_dir: str, focus_dirs: List[str], 
-                             exclude_dirs: List[str], depth: int, 
-                             analysis_focus: List[str]) -> str:
+                             exclude_dirs: List[str], objective: str) -> str:
         """
         创建Agent的system prompt
         
@@ -147,235 +136,84 @@ class ProjectAnalyzerTool:
             root_dir: 项目根目录
             focus_dirs: 重点分析的目录列表
             exclude_dirs: 排除的目录列表
-            depth: 分析深度
-            analysis_focus: 分析重点
+            objective: 分析目标
             
         Returns:
             系统提示文本
         """
         focus_dirs_str = ", ".join(focus_dirs) if focus_dirs else "整个项目"
         exclude_dirs_str = ", ".join(exclude_dirs) if exclude_dirs else "无"
-        depth_str = "无限制" if depth <= 0 else f"{depth}级"
+            
+        objective_text = f"\n\n## 分析目标\n{objective}" if objective else "\n\n## 分析目标\n全面了解项目结构、模块划分和关键组件"
         
-        focus_list = []
-        if "all" in analysis_focus:
-            focus_list = ["项目结构", "入口点", "依赖关系", "架构设计"]
-        else:
-            if "structure" in analysis_focus: focus_list.append("项目结构")
-            if "entry_points" in analysis_focus: focus_list.append("入口点")
-            if "dependencies" in analysis_focus: focus_list.append("依赖关系")
-            if "architecture" in analysis_focus: focus_list.append("架构设计")
-        
-        focus_str = ", ".join(focus_list)
-        
-        return f"""你是一名经验丰富的代码架构分析专家，擅长从项目结构、代码组织和依赖关系中提取关键信息，形成项目的全面概览。
+        return f"""# 项目架构分析专家
 
-## 当前任务
-对位于 `{root_dir}` 的项目进行系统分析，重点分析{focus_str}，生成一份详细的项目概览报告。
+## 任务描述
+对项目 `{root_dir}` 进行针对性分析，专注于分析目标所需的内容，生成有针对性、深入且有洞察力的项目分析报告。{objective_text}
 
-## 分析参数
-- 项目根目录: {root_dir}
-- 重点分析目录: {focus_dirs_str}
+## 分析范围
+- 项目根目录: `{root_dir}`
+- 重点分析: {focus_dirs_str}
 - 排除目录: {exclude_dirs_str}
-- 分析深度: {depth_str}
-- 分析重点: {focus_str}
 
-## 分析流程
-请按照以下步骤分析项目:
+## 分析策略
+1. 首先理解分析目标，确定你需要寻找什么信息
+2. 灵活采用适合目标的分析方法，不受预设分析框架的限制
+3. 有选择地探索项目，只关注与目标直接相关的部分
+4. 根据目标需要自行判断分析的深度和广度
 
-1. **项目概况识别**
-   - 识别项目类型和主要用途
-   - 确定项目使用的编程语言和框架
-   - 查找项目文档、README和配置文件以获取基本信息
+## 探索命令示例
+```bash
+# 获取项目文件结构
+find . -type f -not -path "*/\\.*" | sort
 
-2. **项目结构分析**
-   - 分析目录结构和文件组织
-   - 识别核心模块和组件
-   - 确定代码组织模式(MVC, MVVM等)
+# 查找可能的入口点
+find . -name "main.*" -o -name "app.*" -o -name "index.*"
 
-3. **入口点分析**
-   - 识别主要入口文件(如main.py, index.js等)
-   - 分析应用启动流程
-   - 确定关键初始化逻辑
+# 分析配置文件
+find . -name "*.json" -o -name "*.yaml" -o -name "*.toml" -o -name "*.ini" -o -name "*.conf"
 
-4. **模块划分与依赖分析**
-   - 识别主要模块及其职责
-   - 分析模块间的依赖关系
-   - 识别核心服务和关键组件
+# 查找核心模块
+find . -name "core.*" -o -name "*core*" -o -name "main.*" -o -name "api.*"
+```
 
-5. **架构模式识别**
-   - 识别使用的架构模式(微服务、单体等)
-   - 分析设计模式的应用
-   - 确定系统边界和接口
+## 分析工具使用
+- 使用`file_analyzer`分析关键文件结构和功能
+- 使用`find_symbol`定位和分析重要符号和函数
+- 使用`function_analyzer`深入理解复杂函数的实现
+- 使用`find_caller`追踪函数调用关系和依赖
 
-6. **关键文件深度分析**
-   - 识别项目中最重要的核心文件
-   - 对这些文件进行深入分析，了解其结构和实现
-   - 评估这些关键文件的代码质量和最佳实践遵循情况
+## 分析输出要求
+- 直接回应分析目标的关键问题
+- 提供与目标相关的深入洞察
+- 分析内容应直接服务于分析目标
+- 避免与目标无关的冗余信息
+- 使用具体代码路径和示例支持分析结论
+- 提供针对分析目标的具体建议和改进方向"""
 
-7. **数据流分析**
-   - 追踪关键数据流路径
-   - 识别数据模型和存储方式
-   - 分析用户输入处理和输出生成
-
-## 信息完整性要求
-- 确保分析涵盖项目的所有主要部分和组件，不遗漏关键模块
-- 全面识别项目的入口点和初始化流程
-- 完整呈现核心依赖关系和模块间通信机制
-- 不要忽视配置管理、错误处理和日志系统等辅助组件
-- 特别关注项目中的核心业务逻辑实现和关键算法
-- 对于大型项目，确保分层次地呈现架构，不遗漏任何层级的重要信息
-- 全面评估项目的可扩展性、安全性和性能特点
-
-## 工具使用建议
-- 使用 `execute_shell` 执行命令:
-  ```
-  # 列出项目目录结构
-  find . -type f -not -path "*/\\.*" | sort
-  
-  # 查找可能的入口点
-  find . -name "main.*" -o -name "app.*" -o -name "index.*"
-  
-  # 分析依赖关系(Python项目)
-  find . -name "requirements.txt" -o -name "setup.py" | xargs cat
-  
-  # 分析代码统计
-  find . -type f -name "*.py" | wc -l
-  ```
-  
-- 使用 `read_code` 读取关键文件:
-  ```
-  # 读取README或配置文件
-  read_code {{
-    "files": [
-      {{
-        "path": "README.md",
-        "start_line": 1,
-        "end_line": -1
-      }}
-    ]
-  }}
-  ```
-
-- 使用 `find_symbol` 查找关键符号的引用和定义:
-  ```
-  # 查找核心类或关键函数
-  find_symbol {{
-    "symbol": "核心类或函数名称",
-    "root_dir": ".",
-    "file_extensions": [".py"],  # 根据项目语言调整
-    "exclude_dirs": ["__pycache__", "tests"]
-  }}
-  ```
-
-- 使用 `function_analyzer` 分析核心函数实现:
-  ```
-  # 分析入口函数或核心方法
-  function_analyzer {{
-    "function_name": "main函数或核心方法名",
-    "file_path": "找到的文件路径",
-    "root_dir": ".",
-    "analysis_depth": 1
-  }}
-  ```
-
-- 使用 `find_caller` 查找函数调用关系:
-  ```
-  # 查找谁调用了某个核心函数
-  find_caller {{
-    "function_name": "关键函数名称",
-    "root_dir": ".",
-    "file_extensions": [".py"]
-  }}
-  ```
-
-- 使用 `file_analyzer` 深入分析关键文件:
-  ```
-  # 分析项目中的核心文件
-  file_analyzer {{
-    "file_path": "关键文件路径",
-    "root_dir": ".",
-    "analysis_focus": ["structure", "implementation", "dependencies"],
-    "include_metrics": true
-  }}
-  ```
-
-分析完成后，请提供一份全面的项目概览报告，突出项目的关键特性、架构设计和组织结构。
-"""
-
-    def _create_summary_prompt(self, root_dir: str) -> str:
+    def _create_summary_prompt(self, root_dir: str, objective: str) -> str:
         """
         创建Agent的summary prompt
         
         Args:
             root_dir: 项目根目录
+            objective: 分析目标
             
         Returns:
             总结提示文本
         """
-        return f"""请提供位于 `{root_dir}` 的项目的完整分析报告。报告应包含以下部分:
+        objective_text = f"\n\n## 具体分析目标\n{objective}" if objective else ""
+        
+        return f"""# 项目分析报告: `{root_dir}`{objective_text}
 
-# 项目分析报告
+## 报告要求
+生成一份完全以分析目标为导向的项目分析报告。不要遵循固定的报告模板，而是完全根据分析目标来组织内容：
 
-## 项目概述
-- 项目名称和用途
-- 使用的主要编程语言和框架
-- 项目领域和目标用户
-- 项目规模和复杂度评估
+- 专注回答分析目标提出的问题
+- 只包含与分析目标直接相关的发现和洞察
+- 完全跳过与分析目标无关的内容，无需做全面分析
+- 分析深度应与目标的具体需求匹配
+- 使用具体的代码路径和示例支持你的观点
+- 以清晰的Markdown格式呈现，简洁明了
 
-## 项目结构
-- 目录组织和文件布局
-- 核心目录及其用途
-- 模块划分和职责分配
-- 代码组织模式分析
-
-## 入口点和启动流程
-- 主要入口文件及其位置
-- 应用初始化和启动逻辑
-- 配置管理和环境设置
-- 命令行参数或启动选项
-
-## 核心模块和组件
-- 关键模块列表及其功能
-- 核心服务和组件
-- 模块间的交互方式
-- 重要的设计模式应用
-
-## 关键文件分析
-- 项目中最重要的文件清单
-- 每个关键文件的主要职责和结构
-- 关键文件的实现质量评估
-- 关键文件中的潜在问题和优化机会
-
-## 代码分析深度
-- 关键函数及其实现分析
-- 核心符号在代码库中的引用情况
-- 重要函数的调用层级和关系
-- 代码重用和抽象模式
-
-## 依赖关系
-- 外部依赖概览
-- 内部模块依赖图
-- 关键第三方库的使用
-- 依赖管理机制
-
-## 架构特点
-- 整体架构风格(微服务/单体等)
-- 关键架构决策
-- 可扩展性和可维护性分析
-- 潜在的架构挑战
-
-## 数据处理
-- 数据模型和存储方式
-- 数据流路径
-- 状态管理策略
-- API和接口设计
-
-## 项目亮点和特色
-- 技术上的创新点
-- 优秀的设计决策
-- 代码质量和最佳实践
-- 潜在的改进空间
-
-请确保报告内容全面且深入，使读者能够快速理解项目的整体结构和关键组件。针对项目的特点，可以适当调整报告结构，突出最重要的部分。
-""" 
+在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的项目概览，而是直接解决分析目标中提出的具体问题。""" 

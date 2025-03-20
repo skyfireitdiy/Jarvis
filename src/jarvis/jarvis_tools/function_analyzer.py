@@ -51,6 +51,11 @@ class FunctionAnalyzerTool:
                 "type": "integer",
                 "description": "子函数分析深度（可选），0表示不分析子函数，1表示分析直接子函数，以此类推",
                 "default": 1
+            },
+            "objective": {
+                "type": "string",
+                "description": "描述本次函数分析的目标和用途，例如'理解函数实现以便重构'或'评估性能瓶颈'",
+                "default": ""
             }
         },
         "required": ["function_name"]
@@ -77,6 +82,7 @@ class FunctionAnalyzerTool:
             file_extensions = args.get("file_extensions", [])
             exclude_dirs = args.get("exclude_dirs", [])
             analysis_depth = args.get("analysis_depth", 1)
+            objective = args.get("objective", "")
             
             # 验证参数
             if not function_name:
@@ -89,7 +95,7 @@ class FunctionAnalyzerTool:
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
                 function_name, file_path, root_dir, 
-                file_extensions, exclude_dirs, analysis_depth
+                file_extensions, exclude_dirs, analysis_depth, objective
             )
             
             # 创建agent的summary prompt
@@ -142,7 +148,7 @@ class FunctionAnalyzerTool:
     
     def _create_system_prompt(self, function_name: str, file_path: str, root_dir: str, 
                              file_extensions: List[str], exclude_dirs: List[str],
-                             analysis_depth: int) -> str:
+                             analysis_depth: int, objective: str) -> str:
         """
         创建Agent的system prompt
         
@@ -153,6 +159,7 @@ class FunctionAnalyzerTool:
             file_extensions: 文件扩展名列表
             exclude_dirs: 排除目录列表
             analysis_depth: 子函数分析深度
+            objective: 分析目标
             
         Returns:
             系统提示文本
@@ -162,86 +169,56 @@ class FunctionAnalyzerTool:
         
         depth_description = "不分析子函数" if analysis_depth == 0 else f"分析 {analysis_depth} 层子函数"
         file_info = f"已知文件路径: {file_path}" if file_path else "需要首先查找函数定义位置"
+        objective_text = f"\n\n## 分析目标\n{objective}" if objective else ""
         
-        return f"""你是一个代码分析专家，专门深入分析函数的内部实现。
+        return f"""# 函数实现分析专家
 
-## 当前任务
-深入分析 `{function_name}` 函数的内部实现，包括子函数调用、全局变量使用等详细信息。
+## 任务描述
+分析函数 `{function_name}` 的实现，专注于分析目标所需的信息，生成有针对性的函数分析报告。{objective_text}
 
-## 工作目录（当前目录）
-{root_dir}
-
-## 分析参数
-- 函数名称: {function_name}
+## 函数信息
+- 函数名称: `{function_name}`
 - {file_info}
 - 分析深度: {depth_description}
-- 文件类型限制: {file_ext_str if file_ext_str else "所有文件"}
+- 代码范围: {file_ext_str if file_ext_str else "所有文件"}
 - 排除目录: {", ".join(exclude_dirs) if exclude_dirs else "无"}
 
-## 分析流程
-请按照以下步骤进行函数分析:
+## 分析策略
+1. 首先理解分析目标，明确需要查找的信息
+2. {"在指定文件中定位函数定义" if file_path else "搜索代码库查找函数定义位置"}
+3. 根据分析目标，确定重点分析的方面
+4. 灵活调整分析深度，关注与目标相关的实现细节
+5. 根据目标需要自行判断是否需要分析子函数
 
-1. **查找函数定义**
-   - {"使用给定的文件路径查找函数定义" if file_path else "使用ripgrep(rg)或grep查找函数定义位置"}
-   - 查找模式: `def\\s+{function_name}\\b`（对于Python）或使用其他语言的适当模式
-   - 确认找到的是完整的函数定义，而非函数调用或注释
-
-2. **分析函数签名**
-   - 确定函数的参数类型和返回类型（如果有类型注解）
-   - 记录默认参数值
-   - 分析函数的文档字符串(docstring)，了解函数的目的和用法
-
-3. **分析函数体**
-   - 识别函数使用的局部变量
-   - 查找函数使用的全局变量（通过`global`关键字或直接使用模块级变量）
-   - 识别条件分支和循环结构
-   - 确定异常处理模式
-
-4. **分析子函数调用**
-   - 识别函数中调用的所有其他函数
-   - 区分标准库函数、第三方库函数和项目内部函数
-   - {"对每个子函数进行类似的分析，深度不超过 " + str(analysis_depth) + " 层" if analysis_depth > 0 else "仅列出子函数，不进行深入分析"}
-
-5. **识别数据流**
-   - 追踪函数参数在函数体内的使用
-   - 分析函数的返回值是如何构建的
-   - 识别函数的副作用（如修改全局状态、文件IO等）
-
-## 信息完整性要求
-- 确保捕获函数的所有分支和执行路径，不遗漏条件处理
-- 详细分析所有参数的使用方式和影响范围
-- 完整识别所有子函数调用及其上下文
-- 全面列出函数对外部状态的所有影响和依赖
-- 不要忽略异常处理路径和边缘情况处理
-- 特别关注函数内的复杂逻辑块和潜在性能瓶颈
-- 对于复杂函数，确保分析递归调用、回调和异步执行模式
-
-## 工具使用建议
-- 使用 `execute_shell` 执行搜索命令:
+## 执行指令
+- 查找函数定义:
   ```
-  # 查找函数定义示例（Python）
   rg -n "def\\s+{function_name}\\b" {file_ext_str} {exclude_str}
-  
-  # 查找全局变量使用示例（Python）
-  rg -n "global\\s+\\w+" --include="{file_path}"
   ```
-  
-- 使用 `read_code` 读取函数定义和相关代码:
+
+- 读取函数实现:
   ```
-  # 读取整个文件以获取上下文
   read_code {{
-    "files": [
-      {{
-        "path": "{file_path or '找到的文件路径'}",
-        "start_line": 1,
-        "end_line": -1
-      }}
-    ]
+    "files": [{{
+      "path": "{file_path or '找到的文件路径'}",
+      "start_line": 函数起始行,
+      "end_line": 函数结束行
+    }}]
   }}
   ```
 
-分析完成后，请提供函数的详细分析报告，包括函数签名、全局变量使用、子函数调用等信息。
-"""
+- 查找全局变量:
+  ```
+  rg -n "global\\s+\\w+" --include="{file_path or '找到的文件路径'}"
+  ```
+
+## 输出要求
+- 直接回应分析目标的关键问题
+- 提供与目标相关的函数实现信息
+- 分析内容应直接服务于分析目标
+- 避免与目标无关的冗余信息
+- 使用具体代码片段和示例支持分析结论
+- 提供针对分析目标的具体见解和建议"""
 
     def _create_summary_prompt(self, function_name: str, analysis_depth: int) -> str:
         """
@@ -256,47 +233,16 @@ class FunctionAnalyzerTool:
         """
         depth_description = "不包含子函数分析" if analysis_depth == 0 else f"包含 {analysis_depth} 层子函数分析"
         
-        return f"""请提供 `{function_name}` 函数的完整分析报告，{depth_description}。报告应包含以下部分:
+        return f"""# 函数分析报告: `{function_name}`
 
-# 函数分析报告: `{function_name}`
+## 报告要求
+生成一份完全以分析目标为导向的函数分析报告，{depth_description}。不要遵循固定的报告模板，而是完全根据分析目标来组织内容：
 
-## 基本信息
-- 函数位置: 文件路径和行号
-- 函数签名: 完整的函数定义，包括参数和返回类型
-- 函数文档: 函数的文档字符串或注释说明
+- 专注回答分析目标提出的问题
+- 只包含与分析目标直接相关的实现发现和洞察
+- 完全跳过与分析目标无关的内容，无需做全面分析
+- 分析深度应与目标的具体需求匹配
+- 使用具体的代码片段支持你的观点
+- 以清晰的Markdown格式呈现，简洁明了
 
-## 功能概述
-简要描述函数的主要功能和目的
-
-## 参数分析
-- 参数列表及类型
-- 默认值和可选参数
-- 参数在函数中的使用方式
-
-## 全局依赖
-- 使用的全局变量列表
-- 导入的模块和库
-- 使用的环境变量或配置项
-
-## 子函数调用
-- 直接调用的函数列表
-- 每个调用的目的和上下文
-{"- 子函数的进一步分析（最多 " + str(analysis_depth) + " 层）" if analysis_depth > 0 else ""}
-
-## 控制流程
-- 主要条件分支
-- 循环结构
-- 异常处理模式
-
-## 数据流分析
-- 输入数据如何被处理
-- 输出/返回值如何被构建
-- 关键数据转换步骤
-
-## 潜在问题与优化机会
-- 识别的代码复杂性或潜在问题
-- 可能的优化建议
-- 安全性或性能考虑
-
-请确保报告格式清晰，使用Markdown语法以便阅读。对于复杂函数，可以使用代码块和列表来增强可读性。重点关注函数的核心逻辑和关键依赖。
-""" 
+在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的函数概览，而是直接解决分析目标中提出的具体问题。""" 

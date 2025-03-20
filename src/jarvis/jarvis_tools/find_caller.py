@@ -42,10 +42,10 @@ class FindCallerTool:
                 "description": "要排除的目录列表（可选）",
                 "default": []
             },
-            "max_results": {
-                "type": "integer",
-                "description": "最大结果数量（可选）",
-                "default": 50
+            "objective": {
+                "type": "string",
+                "description": "描述本次调用者查找的目标和用途，例如'评估修改函数的影响范围'",
+                "default": ""
             }
         },
         "required": ["function_name"]
@@ -70,7 +70,7 @@ class FindCallerTool:
             root_dir = args.get("root_dir", ".")
             file_extensions = args.get("file_extensions", [])
             exclude_dirs = args.get("exclude_dirs", [])
-            max_results = args.get("max_results", 50)
+            objective = args.get("objective", "")
             
             # 验证参数
             if not function_name:
@@ -82,7 +82,7 @@ class FindCallerTool:
             
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
-                function_name, root_dir, file_extensions, exclude_dirs, max_results
+                function_name, root_dir, file_extensions, exclude_dirs, objective
             )
             
             # 创建agent的summary prompt
@@ -135,7 +135,7 @@ class FindCallerTool:
     
     def _create_system_prompt(self, function_name: str, root_dir: str, 
                              file_extensions: List[str], exclude_dirs: List[str],
-                             max_results: int) -> str:
+                             objective: str) -> str:
         """
         创建Agent的system prompt
         
@@ -144,70 +144,49 @@ class FindCallerTool:
             root_dir: 代码库根目录
             file_extensions: 文件扩展名列表
             exclude_dirs: 排除目录列表
-            max_results: 最大结果数量
+            objective: 分析目标
             
         Returns:
             系统提示文本
         """
         file_ext_str = " ".join([f"*{ext}" for ext in file_extensions]) if file_extensions else ""
         exclude_str = " ".join([f"--glob '!{excl}'" for excl in exclude_dirs]) if exclude_dirs else ""
+        objective_text = f"\n\n## 分析目标\n{objective}" if objective else ""
         
         search_pattern = f"\\b{function_name}\\s*\\("
         
-        return f"""你是一个代码分析专家，专门查找代码库中的函数调用关系。
+        return f"""# 函数调用分析专家
 
-## 当前任务
-查找所有调用 `{function_name}` 函数的代码位置。
+## 任务描述
+查找所有调用 `{function_name}` 函数的代码位置，专注于分析目标所需的信息，生成有针对性的调用分析报告。{objective_text}
 
-## 工作目录（当前目录）
-{root_dir}
-
-## 搜索参数
-- 函数名称: {function_name}
-- 文件类型限制: {file_ext_str if file_ext_str else "所有文件"}
+## 工作环境
+- 工作目录: `{root_dir}`
+- 文件类型: {file_ext_str if file_ext_str else "所有文件"}
 - 排除目录: {", ".join(exclude_dirs) if exclude_dirs else "无"}
-- 最大结果数: {max_results}
 
-## 查找流程
-请按照以下步骤进行函数调用者分析:
+## 分析策略
+1. 首先理解分析目标，明确需要查找的信息类型
+2. 使用适当的搜索模式查找函数调用
+3. 验证搜索结果，确认是对目标函数的真正调用
+4. 分析调用上下文，了解调用的目的和方式
+5. 根据分析目标自行确定需要的分析深度和广度
 
-1. **查找直接调用**
-   - 使用ripgrep(rg)或grep查找可能的函数调用位置
-   - 查找模式: `{search_pattern}`
-   - 确保使用单词边界(\\b)匹配完整函数名，避免部分匹配
-   - 注意许多函数可能同名，需要分析上下文确定是否是目标函数
-
-2. **验证调用**
-   - 检查每个匹配位置的上下文，确认是真正的函数调用而非相似字符串或注释
-   - 分析函数调用的上下文和参数，以确定是否与目标函数的签名匹配
-   - 对于同名函数，可能需要分析导入语句或模块前缀来确认
-
-3. **结果分析**
-   - 按文件分组并整理调用位置
-   - 过滤掉重复或不相关的结果
-   - 对于每个调用位置，提供足够的上下文，以便理解调用方式和目的
-   - 如果结果过多，优先列出最明确的调用，最多展示 {max_results} 个结果
-
-## 信息完整性要求
-- 确保找出所有可能的函数调用，不遗漏任何可能的调用代码
-- 识别并报告不同调用模式（直接调用、回调传递、间接引用等）
-- 区分同名函数，确保准确识别目标函数的调用
-- 捕获所有调用上下文和调用方式的变体
-- 即使是不寻常或易被忽视的调用模式也要报告
-- 对于复杂的调用关系，提供清晰的解释以避免遗漏关键信息
-
-## 工具使用建议
-- 使用 `execute_shell` 执行搜索命令:
+## 执行指令
+- 使用ripgrep(rg)或grep搜索函数调用:
   ```
-  # 查找函数调用示例
   rg -n "{search_pattern}" {file_ext_str} {exclude_str}
   ```
-  
-- 使用 `read_code` 读取相关代码上下文，以确认调用关系并理解调用方式
-- 可能需要检查函数定义以确认正确的函数签名
+- 使用`read_code`查看上下文分析调用情况
+- 可能需要先找到函数定义以确认正确的函数签名
 
-分析完成后，请提供所有函数调用位置、调用方式，并统计总体情况。
-"""
+## 输出要求
+- 直接回应分析目标的关键问题
+- 提供与目标相关的调用信息
+- 分析内容应直接服务于分析目标
+- 避免与目标无关的冗余信息
+- 使用具体代码路径和调用示例支持分析结论
+- 提供针对分析目标的具体见解和建议"""
 
     def _create_summary_prompt(self, function_name: str) -> str:
         """
@@ -219,32 +198,16 @@ class FindCallerTool:
         Returns:
             总结提示文本
         """
-        return f"""请提供 `{function_name}` 函数调用分析的完整报告，包含以下部分:
+        return f"""# 函数 `{function_name}` 调用分析报告
 
-# 函数调用分析: `{function_name}`
+## 报告要求
+生成一份完全以分析目标为导向的函数调用分析报告。不要遵循固定的报告模板，而是完全根据分析目标来组织内容：
 
-## 函数定义
-简要描述函数的定义位置和作用(如果能找到)：
-- 所在文件和行号
-- 函数签名
-- 函数功能摘要
+- 专注回答分析目标提出的问题
+- 只包含与分析目标直接相关的调用发现和洞察
+- 完全跳过与分析目标无关的内容，无需做全面分析
+- 分析深度应与目标的具体需求匹配
+- 使用具体的代码调用示例支持你的观点
+- 以清晰的Markdown格式呈现，简洁明了
 
-## 直接调用者
-列出所有直接调用该函数的位置:
-- 调用者文件路径和行号
-- 调用上下文代码片段
-- 调用方式(如何传参、调用目的等)
-
-## 统计信息
-- 直接调用次数
-- 调用者文件数量
-- 最常见的调用模式
-
-## 使用模式分析
-分析函数被调用的主要使用模式：
-- 函数在代码库中扮演的角色
-- 典型的调用场景和目的
-- 常见的参数传递模式
-
-请确保报告格式清晰，使用Markdown语法以便阅读。如果结果过多，可以只包含最重要的几个调用示例，并重点关注高频调用模式。
-"""
+在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的函数调用概览，而是直接解决分析目标中提出的具体问题。"""
