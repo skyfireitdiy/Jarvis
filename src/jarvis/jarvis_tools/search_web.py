@@ -260,10 +260,13 @@ class SearchTool:
                 analysis = self._extract_info(contents, question)
                 spinner.text = "信息提取完成"
                 spinner.ok("✅")
+
+            output = f"分析结果:\n\n{analysis}"
+            PrettyOutput.print(output, OutputType.SUCCESS)
             
             return {
                 "success": True,
-                "stdout": f"Search analysis results:\n\n{analysis}",
+                "stdout": output,
                 "stderr": ""
             }
 
