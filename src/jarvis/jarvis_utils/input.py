@@ -76,11 +76,11 @@ class FileCompleter(Completer):
             # 默认建议列表
             from jarvis.jarvis_utils.utils import ot
             default_suggestions = [
-                (ot("CodeBase")+r', '+'查询代码库'),
-                (ot("Web")+r', '+'网页搜索'),
-                (ot("RAG")+r', '+'知识库检索'),
-                (ot("Summary")+r', '+'总结'),
-                (ot("Clear")+r', '+'清除历史'),
+                (ot("CodeBase"), '查询代码库'),
+                (ot("Web"), '网页搜索'),
+                (ot("RAG"), '知识库检索'),
+                (ot("Summary"), '总结'),
+                (ot("Clear"), '清除历史'),
             ]
             for name, desc in default_suggestions:
                 yield Completion(
