@@ -1047,20 +1047,37 @@ class RAGTool:
 
             # 构建关键词提取提示词
             prompt = f"""
-            请从以下文本中提取最多10个关键词，这些关键词将用于文本搜索。
-            关键词应该捕捉文本的主要概念、主题和实体，以帮助查找相关文档。
-            输出包括中文和英文的关键词，同时考虑适用于代码搜索。
+            请分析以下查询文本，提取用于文档检索的关键词。你的任务是：
+            
+            1. 识别核心概念、主题和实体，包括:
+               - 技术术语和专业名词
+               - 代码相关的函数名、类名、变量名和库名
+               - 重要的业务领域词汇
+               - 操作和动作相关的词汇
+            
+            2. 优先提取与以下场景相关的关键词:
+               - 代码搜索: 编程语言、框架、API、特定功能
+               - 文档检索: 主题、标题词汇、专业名词
+               - 错误排查: 错误信息、异常名称、问题症状
+            
+            3. 同时包含:
+               - 中英文关键词 (尤其是技术领域常用英文术语)
+               - 完整的专业术语和缩写形式
+               - 可能的同义词或相关概念
+            
+            4. 关键词应当精准、具体，数量控制在3-10个之间。
             
             输出格式：
             {ot("KEYWORD")}
-            xxx
-            yyy
+            关键词1
+            关键词2
+            ...
             {ct("KEYWORD")}
             
-            文本:
+            查询文本:
             {query}
 
-            请仅返回关键词，不要包含其他内容。
+            仅返回提取的关键词，不要包含其他内容。
             """
             
             # 调用大模型获取响应
@@ -1068,13 +1085,15 @@ class RAGTool:
             
             if response:
                 # 清理响应，提取关键词
-                sm = re.search(ct('KEYWORD') + r"(.*?)" + ct('KEYWORD'), response, re.DOTALL)
+                sm = re.search(ot('KEYWORD') + r"(.*?)" + ct('KEYWORD'), response, re.DOTALL)
                 if sm:
                     extracted_keywords = sm[1]
                 
                     if extracted_keywords:
                         # 记录检测到的关键词
-                        return extracted_keywords.strip().splitlines()
+                        ret = extracted_keywords.strip().splitlines()
+                        PrettyOutput.print(f"从查询中提取的关键词: {ret}", OutputType.DEBUG)
+                        return ret
                 
             # 如果处理失败，返回空列表
             return []

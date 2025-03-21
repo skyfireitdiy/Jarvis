@@ -66,6 +66,7 @@ setup(
             "jarvis-multi-agent=jarvis.jarvis_multi_agent:main",
             "jarvis-agent=jarvis.jarvis_agent.main:main",
             "jarvis-tool=jarvis.jarvis_tools.registry:main",
+            "jarvis-ask-codebase=jarvis.jarvis_tools.ask_codebase:main",
         ],
     },
     python_requires=">=3.8",

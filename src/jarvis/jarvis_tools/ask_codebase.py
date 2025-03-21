@@ -227,3 +227,42 @@ cat 文件路径
    - 说明任何无法确定的信息
 
 使用清晰的Markdown格式，重点突出对问题的回答和支持证据。"""
+
+
+def main():
+    """
+    命令行入口点，允许将ask_codebase作为独立脚本运行
+    
+    用法示例:
+    ```
+    python -m jarvis.jarvis_tools.ask_codebase "登录功能在哪个文件实现？" --root_dir /path/to/codebase
+    ```
+    """
+    import argparse
+    import sys
+    
+    # 创建命令行参数解析器
+    parser = argparse.ArgumentParser(description="智能代码库查询工具")
+    parser.add_argument("question", help="关于代码库的问题")
+    parser.add_argument("--root_dir", "-d", default=".", help="代码库根目录路径")
+    
+    # 解析命令行参数
+    args = parser.parse_args()
+    
+    # 创建并执行工具
+    tool = AskCodebaseTool()
+    result = tool.execute({
+        "question": args.question,
+        "root_dir": args.root_dir
+    })
+    
+    # 输出结果
+    if result["success"]:
+        PrettyOutput.print(result["stdout"], OutputType.SUCCESS)
+    else:
+        PrettyOutput.print(result["stderr"], OutputType.WARNING)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
