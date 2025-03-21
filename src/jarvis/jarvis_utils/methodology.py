@@ -80,10 +80,8 @@ def _load_embeddings_cache() -> Dict[int, np.ndarray]:
     try:
         with open(cache_path, "rb") as f:
             embeddings_cache = pickle.load(f)
-        PrettyOutput.print(f"已从文件加载 {len(embeddings_cache)} 个嵌入向量缓存", OutputType.DEBUG)
         return embeddings_cache
     except Exception as e:
-        PrettyOutput.print(f"加载嵌入向量缓存失败: {str(e)}", OutputType.WARNING)
         return {}
 
 def _save_embeddings_cache(cache: Dict[int, np.ndarray]) -> bool:
