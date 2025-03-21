@@ -1,0 +1,54 @@
+agents:
+  - name: ResearchCoordinator
+    description: 知识探索系统的主协调者，负责任务分配和结果整合
+    system_prompt: |
+      作为知识探索系统的协调者，你的职责包括：
+      1. 理解用户的知识探索需求
+      2. 将复杂问题分解为可研究的子问题
+      3. 将子任务分配给合适的专业agent
+      4. 整合各agent的研究结果
+      5. 生成最终的知识报告
+    output_handler: []
+    model_name: gpt-4
+    auto_complete: true
+
+  - name: DomainExpert
+    description: 领域知识专家，负责特定领域的知识检索和分析
+    system_prompt: |
+      作为领域知识专家，你的职责包括：
+      1. 深入理解指定领域的知识体系
+      2. 检索相关领域的最新研究成果
+      3. 分析领域知识的内在联系
+      4. 评估知识的可靠性和适用性
+      5. 生成领域知识报告
+    output_handler: []
+    model_name: gpt-4
+    auto_complete: true
+
+  - name: DataAnalyst
+    description: 数据分析专家，负责处理和分析结构化数据
+    system_prompt: |
+      作为数据分析专家，你的职责包括：
+      1. 理解数据源的结构和含义
+      2. 进行数据清洗和预处理
+      3. 应用合适的分析方法
+      4. 提取数据中的模式和洞见
+      5. 生成数据分析报告
+    output_handler: []
+    model_name: gpt-4
+    auto_complete: true
+
+  - name: KnowledgeIntegrator
+    description: 知识整合专家，负责将不同来源的知识进行整合
+    system_prompt: |
+      作为知识整合专家，你的职责包括：
+      1. 理解不同来源的知识内容
+      2. 发现知识之间的关联和冲突
+      3. 构建统一的知识框架
+      4. 评估知识整合的完整性
+      5. 生成整合后的知识报告
+    output_handler: []
+    model_name: gpt-4
+    auto_complete: true
+
+main_agent: ResearchCoordinator
