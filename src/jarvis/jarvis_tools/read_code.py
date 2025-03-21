@@ -83,7 +83,7 @@ class ReadCodeTool:
                 # 添加行号并构建输出内容
                 selected_lines = lines[start_line-1:end_line]
                 numbered_content = "".join(
-                    [f"{i:4d} | {line}" 
+                    [f"{i:4d}:{line}" 
                      for i, line in enumerate(selected_lines, start=start_line)]
                 )
                 
@@ -96,6 +96,9 @@ class ReadCodeTool:
                 )
                 spinner.text = f"文件读取完成: {abs_path}"
                 spinner.ok("✅")
+
+                PrettyOutput.print(output, OutputType.SUCCESS)
+
                 return {
                     "success": True,
                     "stdout": output,

@@ -90,7 +90,7 @@ class AskCodebaseTool:
                 # Create tools registry
                 from jarvis.jarvis_tools.registry import ToolRegistry
                 tool_registry = ToolRegistry()
-                tool_registry.use_tools(["execute_shell", "rag", "read_code"])
+                tool_registry.use_tools(["execute_shell", "read_code", "rag"])
                 
                 # Create and run Agent
                 analyzer_agent = Agent(
@@ -148,33 +148,41 @@ class AskCodebaseTool:
 - 问题: {question}
 - 代码库根目录: {git_root}
 
+## 工具使用优先级
+1. **优先使用 execute_shell**: 首先使用shell命令查找和分析相关文件
+2. **优先使用 read_code**: 找到相关文件后优先使用read_code读取文件内容
+3. **谨慎使用 rag**: 仅在shell命令和直接文件读取无法解决问题时作为辅助手段
+
 ## 分析策略
 1. 首先理解问题，确定需要查找的关键信息和代码组件
-2. 使用文件搜索和目录探索确定潜在相关文件
-3. 使用RAG工具分析找到的文件内容
-4. 根据文件内容提供具体、准确的回答
+2. 使用shell命令(execute_shell)搜索和查找可能相关的文件
+3. 使用read_code工具直接读取和分析相关文件内容
+4. 只有在必要时才使用RAG工具作为辅助手段
+5. 根据文件内容提供具体、准确的回答
 
 ## 分析步骤
 1. **探索代码库结构**:
-   - 了解目录结构，找出可能包含相关功能的位置
+   - 使用shell命令了解目录结构，找出可能包含相关功能的位置
    - 识别主要模块和组件
 
 2. **定位相关文件**:
+   - 优先使用grep、find等shell命令查找关键词
    - 使用文件名、关键词搜索找到潜在相关文件
-   - 分析文件内容确定相关性
 
 3. **深入分析代码**:
+   - 使用read_code工具直接读取文件内容
    - 分析关键文件的实现细节
    - 识别功能的实现方式和关键逻辑
 
 4. **回答问题**:
-   - 提供基于代码的具体回答
+   - 提供基于直接分析代码的具体回答
    - 引用具体文件和代码片段作为依据
 
-## 关于RAG工具
+## 关于RAG工具使用
+- RAG工具应作为最后选择，仅在shell命令和直接文件读取无法解决问题时使用
 - RAG工具返回的信息可能存在偏差或不准确之处
 - 必须通过查看实际代码文件验证RAG返回的每条重要信息
-- 对于关键发现，使用`read_code`工具查看原始文件内容进行求证
+- 对于关键发现，始终使用`read_code`工具查看原始文件内容进行求证
 - 如发现RAG结果与实际代码不符，以实际代码为准
 
 ## 探索命令示例
@@ -184,12 +192,12 @@ find . -type d -not -path "*/\\.*" | sort
 
 # 搜索与问题相关的文件
 find . -type f -name "*.py" -o -name "*.js" | xargs grep -l "关键词"
+grep -r "关键词" --include="*.py" .
 
 # 查看文件内容
 cat 文件路径
-
-# 使用RAG搜索代码库中与问题相关的内容（需要验证其结果）
 ```
+
 
 ## 输出要求
 - 提供准确、具体的回答，避免模糊不清的描述

@@ -168,7 +168,7 @@ class Agent:
 
 
     
-    def _call_model(self, message: str) -> str:
+    def _call_model(self, message: str, need_complete: bool = False) -> str:
         """调用AI模型并实现重试逻辑。
         
         参数:
@@ -187,8 +187,11 @@ class Agent:
                 
         # 添加输出简洁性指令
         actions = '、'.join([o.name() for o in self.output_handler])
-        message += f"\n\n系统指令：请严格输出且仅输出一个操作的完整调用格式，不要输出多个操作；需要输出解释、分析和思考过程。如果任务已完成，只需简洁地说明完成原因。确保输出格式正确且可直接执行。每次响应必须且只能包含一个操作。可用的操作：{actions}"
-
+        message += f"\n\n系统指令：请严格输出且仅输出一个操作的完整调用格式，不要输出多个操作；需要输出解释、分析和思考过程。确保输出格式正确且可直接执行。每次响应必须且只能包含一个操作。可用的操作：{actions}"
+        if need_complete and self.auto_complete:
+            message += f"\n\n如果任务已完成，说明完成原因，并输出{ot('!!!COMPLETE!!!')}"
+        else:
+            message += f"\n\n如果任务已完成，只需简洁地说明完成原因。"
         # 累加对话长度
         self.conversation_length += get_context_token_count(message)
 
@@ -342,7 +345,7 @@ class Agent:
                 try:
                     # 如果对话历史长度超过限制，在提示中添加提醒
 
-                    current_response = self._call_model(self.prompt)
+                    current_response = self._call_model(self.prompt, True)
                     self.prompt = ""
                     self.conversation_length += get_context_token_count(current_response)
 
