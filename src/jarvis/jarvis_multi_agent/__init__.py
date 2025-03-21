@@ -53,6 +53,19 @@ content: |
 {ct("SEND_MESSAGE")}
 ```
 
+或者：
+
+```
+{ot("SEND_MESSAGE")}
+to: 智能体名称    # 目标智能体名称
+content: |
+    # 消息主题
+    
+    ## 任务结果
+    [任务完成结果，用于反馈]
+{ct("SEND_MESSAGE")}
+```
+
 ## 可用智能体资源
 {chr(10).join([f"- **{c['name']}**: {c.get('description', '')}" for c in self.agents_config])}
 """
