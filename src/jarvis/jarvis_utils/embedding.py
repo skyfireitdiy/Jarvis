@@ -465,8 +465,6 @@ def load_rerank_model() -> Tuple[AutoModelForSequenceClassification, AutoTokeniz
     if key in _global_models and f"{key}_tokenizer" in _global_tokenizers:
         return _global_models[key], _global_tokenizers[f"{key}_tokenizer"]
     
-    PrettyOutput.print(f"加载重排序模型: {model_name}...", OutputType.INFO)
-    
     try:
         tokenizer = AutoTokenizer.from_pretrained(
             model_name,

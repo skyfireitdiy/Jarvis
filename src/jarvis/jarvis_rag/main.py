@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import faiss
+import torch  # Add torch import
 from typing import List, Tuple, Optional, Dict
 import pickle
 from dataclasses import dataclass
@@ -16,7 +17,7 @@ from threading import Lock
 import hashlib
 
 from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_thread_count, get_rag_ignored_paths
-from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model
+from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model, load_rerank_model
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import  get_file_md5, init_env, init_gpu_config
 
@@ -943,6 +944,132 @@ class RAGTool:
             PrettyOutput.print(f"获取不变向量失败: {str(e)}", OutputType.ERROR)
             return None
 
+    def _perform_keyword_search(self, query: str, limit: int = 30) -> List[Tuple[int, float]]:
+        """执行基于关键词的文本搜索
+        
+        Args:
+            query: 查询字符串
+            limit: 返回结果数量限制
+            
+        Returns:
+            List[Tuple[int, float]]: 文档索引和得分的列表
+        """
+        # 简单的关键词预处理
+        keywords = query.lower().split()
+        # 移除停用词和过短的词
+        stop_words = {'的', '了', '和', '是', '在', '有', '与', '对', '为', 'a', 'an', 'the', 'and', 'is', 'in', 'of', 'to', 'with'}
+        keywords = [k for k in keywords if k not in stop_words and len(k) > 1]
+        
+        if not keywords:
+            return []
+        
+        # 使用TF-IDF思想的简单实现
+        doc_scores = []
+        
+        # 计算IDF（逆文档频率）
+        doc_count = len(self.documents)
+        keyword_doc_count = {}
+        
+        for keyword in keywords:
+            count = 0
+            for doc in self.documents:
+                if keyword in doc.content.lower():
+                    count += 1
+            keyword_doc_count[keyword] = max(1, count)  # 避免除零错误
+        
+        # 计算每个关键词的IDF值
+        keyword_idf = {
+            keyword: np.log(doc_count / count) 
+            for keyword, count in keyword_doc_count.items()
+        }
+        
+        # 为每个文档计算得分
+        for i, doc in enumerate(self.documents):
+            doc_content = doc.content.lower()
+            score = 0
+            
+            # 计算每个关键词的TF（词频）
+            for keyword in keywords:
+                # 简单的TF：关键词在文档中出现的次数
+                tf = doc_content.count(keyword)
+                # TF-IDF得分
+                if tf > 0:
+                    score += tf * keyword_idf[keyword]
+            
+            # 添加额外权重：标题匹配、完整短语匹配等
+            if query.lower() in doc_content:
+                score *= 2.0  # 完整查询匹配加倍得分
+                
+            # 文件路径匹配也加分
+            file_path = doc.metadata['file_path'].lower()
+            for keyword in keywords:
+                if keyword in file_path:
+                    score += 0.5 * keyword_idf.get(keyword, 1.0)
+            
+            if score > 0:
+                # 归一化得分（0-1范围）
+                doc_scores.append((i, score))
+        
+        # 排序并限制结果数量
+        doc_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # 归一化分数到0-1之间
+        if doc_scores:
+            max_score = max(score for _, score in doc_scores)
+            if max_score > 0:
+                doc_scores = [(idx, score/max_score) for idx, score in doc_scores]
+        
+        return doc_scores[:limit]
+
+    def _hybrid_search(self, query: str, top_k: int = 30) -> List[Tuple[int, float]]:
+        """混合搜索方法，综合向量相似度和关键词匹配
+        
+        Args:
+            query: 查询字符串
+            top_k: 返回结果数量限制
+            
+        Returns:
+            List[Tuple[int, float]]: 文档索引和得分的列表
+        """
+        # 获取向量搜索结果
+        query_vector = get_embedding(self.embedding_model, query)
+        query_vector = query_vector.reshape(1, -1)
+        
+        # 进行向量搜索
+        vector_limit = min(top_k * 3, len(self.documents))
+        if self.index and vector_limit > 0:
+            distances, indices = self.index.search(query_vector, vector_limit)
+            vector_results = [(int(idx), 1.0 / (1.0 + float(dist))) 
+                             for idx, dist in zip(indices[0], distances[0])
+                             if idx != -1 and idx < len(self.documents)]
+        else:
+            vector_results = []
+        
+        # 进行关键词搜索
+        keyword_results = self._perform_keyword_search(query, top_k * 2)
+        
+        # 合并结果集
+        combined_results = {}
+        
+        # 加入向量结果，权重为0.7
+        for idx, score in vector_results:
+            combined_results[idx] = score * 0.7
+        
+        # 加入关键词结果，权重为0.3，如果文档已存在则取加权平均
+        for idx, score in keyword_results:
+            if idx in combined_results:
+                # 已有向量得分，取加权平均
+                combined_results[idx] = combined_results[idx] + score * 0.3
+            else:
+                # 新文档，直接添加关键词得分（权重稍低）
+                combined_results[idx] = score * 0.3
+        
+        # 转换成列表并排序
+        result_list = [(idx, score) for idx, score in combined_results.items()]
+        result_list.sort(key=lambda x: x[1], reverse=True)
+        
+        return result_list[:top_k]
+
     def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
         """Search documents with context window"""
         if not self.index:
@@ -953,61 +1080,141 @@ class RAGTool:
             PrettyOutput.print("索引未建立或文档列表为空", OutputType.WARNING)
             return []
             
-        # Get query vector
-        with yaspin(text="获取查询向量...", color="cyan") as spinner:
-            query_vector = get_embedding(self.embedding_model, query)
-            query_vector = query_vector.reshape(1, -1)
-            spinner.text = "查询向量获取完成"
-            spinner.ok("✅")
-        
-        # Search with more candidates
-        with yaspin(text="搜索...", color="cyan") as spinner:
-            initial_k = min(top_k * 4, len(self.documents))
-            if initial_k == 0:
-                spinner.text = "文档为空，搜索终止"
+        # 使用混合搜索获取候选文档
+        with yaspin(text="执行混合搜索...", color="cyan") as spinner:
+            # 获取初始候选结果
+            search_results = self._hybrid_search(query, top_k * 2)
+            
+            if not search_results:
+                spinner.text = "搜索结果为空"
                 spinner.fail("❌")
                 return []
                 
-            distances, indices = self.index.search(query_vector, initial_k) # type: ignore
-            spinner.text = "搜索完成"
+            # 准备重排序
+            initial_indices = [idx for idx, _ in search_results]
+            spinner.text = f"检索完成，获取 {len(initial_indices)} 个候选文档"
             spinner.ok("✅")
+        
+        # Apply reranking for better accuracy
+        with yaspin(text="重排序以提高准确度...", color="cyan") as spinner:
+            # 获取重排序模型
+            from jarvis.jarvis_utils.embedding import load_rerank_model
+            try:
+                with spinner.hidden():
+                    rerank_model, rerank_tokenizer = load_rerank_model()
+                
+                # 准备重排序的文档
+                rerank_candidates = []
+                rerank_indices = []
+                
+                # 收集有效的文档用于重排序
+                for i, idx in enumerate(initial_indices):
+                    if idx < len(self.documents):  # 确保索引有效
+                        doc = self.documents[idx]
+                        # 获取文档内容，添加文件路径作为上下文增强
+                        doc_text = f"文件: {doc.metadata['file_path']}\n{doc.content}"
+                        rerank_candidates.append(doc_text)
+                        rerank_indices.append((i, idx))
+                
+                # 如果有候选文档，进行重排序
+                if rerank_candidates:
+                    spinner.text = f"重排序 {len(rerank_candidates)} 个候选文档..."
+                    
+                    # 分批重排序以避免内存溢出
+                    batch_size = 50
+                    all_scores = []
+                    
+                    for i in range(0, len(rerank_candidates), batch_size):
+                        batch = rerank_candidates[i:i+batch_size]
+                        # 准备重排序模型的输入
+                        inputs = []
+                        for doc in batch:
+                            inputs.append((query, doc))
+                            
+                        model_inputs = rerank_tokenizer.batch_encode_plus(
+                            inputs,
+                            padding=True,
+                            truncation=True,
+                            return_tensors="pt",
+                            max_length=512
+                        )
+                        
+                        # 将张量移到适当的设备上
+                        if torch.cuda.is_available():
+                            model_inputs = {k: v.cuda() for k, v in model_inputs.items()}
+                        
+                        # 计算重排序得分
+                        with torch.no_grad():
+                            outputs = rerank_model(**model_inputs)
+                            scores = outputs.logits
+                            scores = scores.detach().cpu().numpy()
+                            all_scores.extend(scores.squeeze().tolist())
+                    
+                    # 将重排序得分与候选文档和原始索引关联
+                    reranked_results = []
+                    for (orig_i, idx), score in zip(rerank_indices, all_scores):
+                        reranked_results.append((idx, score))
+                    
+                    # 按重排序得分排序（降序）
+                    reranked_results.sort(key=lambda x: x[1], reverse=True)
+                    
+                    # 提取排序后的文档索引
+                    reranked_indices = [idx for idx, _ in reranked_results[:top_k*2]]
+                    
+                    spinner.text = "重排序完成"
+                    spinner.ok("✅")
+                    
+                    # 使用重排序结果替代原始检索结果
+                    indices_list = reranked_indices
+                else:
+                    # 如果没有找到有效候选，使用原始检索结果
+                    indices_list = [idx for idx, _ in search_results if idx < len(self.documents)]
+                    spinner.text = "跳过重排序（无有效候选）"
+                    spinner.ok("✅")
+            
+            except Exception as e:
+                # 如果重排序失败，使用原始检索结果
+                indices_list = [idx for idx, _ in search_results if idx < len(self.documents)]
+                spinner.text = f"重排序失败（{str(e)}），使用原始检索结果"
+                spinner.ok("✅")
         
         # Process results with context window
         with yaspin(text="处理结果...", color="cyan") as spinner:
             results = []
             seen_files = set()
             
-            # 检查索引数组是否为空
-            if indices.size == 0 or indices[0].size == 0:
+            # 检查索引列表是否为空
+            if not indices_list:
                 spinner.text = "搜索结果为空"
                 spinner.fail("❌")
                 return []
                 
-            for idx, dist in zip(indices[0], distances[0]):
-                if idx != -1 and idx < len(self.documents):  # 确保索引有效
+            for idx in indices_list:
+                if idx < len(self.documents):  # 确保索引有效
                     doc = self.documents[idx]
-                    similarity = 1.0 / (1.0 + float(dist))
-                    if similarity > 0.3:
-                        file_path = doc.metadata['file_path']
-                        if file_path not in seen_files:
-                            seen_files.add(file_path)
-                            
-                            # Get full context from original document
-                            original_doc = next((d for d in self.documents 
-                                            if d.metadata['file_path'] == file_path), None)
-                            if original_doc:
-                                window_docs = []  # Add this line to initialize the list
-                                full_content = original_doc.content
-                                # Find all chunks from this file
-                                file_chunks = [d for d in self.documents 
-                                            if d.metadata['file_path'] == file_path]
-                                # Add all related chunks
-                                for chunk_doc in file_chunks:
-                                    window_docs.append((chunk_doc, similarity * 0.9))
-                            
-                            results.extend(window_docs)
-                            if len(results) >= top_k * (2 * self.context_window + 1):
-                                break
+                    
+                    # 使用重排序得分或基于原始相似度的得分
+                    similarity = next((score for i, score in reranked_results if i == idx), 0.5) if 'reranked_results' in locals() else 0.5
+                    
+                    file_path = doc.metadata['file_path']
+                    if file_path not in seen_files:
+                        seen_files.add(file_path)
+                        
+                        # Get full context from original document
+                        original_doc = next((d for d in self.documents 
+                                        if d.metadata['file_path'] == file_path), None)
+                        if original_doc:
+                            window_docs = []  # Add this line to initialize the list
+                            # Find all chunks from this file
+                            file_chunks = [d for d in self.documents 
+                                        if d.metadata['file_path'] == file_path]
+                            # Add all related chunks
+                            for chunk_doc in file_chunks:
+                                window_docs.append((chunk_doc, similarity * 0.9))
+                        
+                        results.extend(window_docs)
+                        if len(results) >= top_k * (2 * self.context_window + 1):
+                            break
             spinner.text = "处理结果完成"
             spinner.ok("✅")
         
@@ -1048,7 +1255,11 @@ class RAGTool:
     def ask(self, question: str) -> Optional[str]:
         """Ask questions about documents with enhanced context building"""
         try:
-            results = self.search(question)
+            # 增强查询预处理 - 提取关键词和语义信息
+            enhanced_query = self._enhance_query(question)
+            
+            # 使用增强的查询进行搜索
+            results = self.search(enhanced_query)
             if not results:
                 return None
             
@@ -1093,39 +1304,81 @@ class RAGTool:
 相关文档（按相关性排序）：
 """
 
-            # Add context with length control
+            # Add context with length control and deduplication
             with yaspin(text="添加上下文...", color="cyan") as spinner:
                 available_count = self.max_token_count - get_context_token_count(prompt) - 1000
                 current_count = 0
                 
+                # 保存已添加的内容指纹，避免重复
+                added_content_hashes = set()
+                
+                # 分组文档，按文件路径整理
+                file_groups = {}
                 for doc, score in results:
-                    doc_content = f"""
-    ## 文档片段 [相关度: {score:.3f}]
-    来源: {doc.metadata['file_path']}
-    ```
-    {doc.content}
-    ```
-    ---
-    """
-                    if current_count + get_context_token_count(doc_content) > available_count:
-                        PrettyOutput.print(
-                            "由于上下文长度限制，部分内容被省略",
-                            output_type=OutputType.WARNING
-                        )
+                    file_path = doc.metadata['file_path']
+                    if file_path not in file_groups:
+                        file_groups[file_path] = []
+                    file_groups[file_path].append((doc, score))
+                
+                # 按文件添加文档片段
+                for file_path, docs in file_groups.items():
+                    # 按相关性排序
+                    docs.sort(key=lambda x: x[1], reverse=True)
+                    
+                    # 添加文件信息
+                    file_header = f"\n## 文件: {file_path}\n"
+                    if current_count + get_context_token_count(file_header) > available_count:
                         break
+                    
+                    prompt += file_header
+                    current_count += get_context_token_count(file_header)
+                    
+                    # 添加最相关的文档片段
+                    added_count = 0
+                    for doc, score in docs:
+                        # 计算内容指纹以避免重复
+                        content_hash = hash(doc.content)
+                        if content_hash in added_content_hashes:
+                            continue
+                            
+                        # 如果内容相似度低于阈值，跳过
+                        if score < 0.2:
+                            continue
+                            
+                        # 格式化文档片段
+                        doc_content = f"""
+### 片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']} [相关度: {score:.2f}]
+```
+{doc.content}
+```
+"""
+                        if current_count + get_context_token_count(doc_content) > available_count:
+                            break
+                            
+                        prompt += doc_content
+                        current_count += get_context_token_count(doc_content)
+                        added_content_hashes.add(content_hash)
+                        added_count += 1
                         
-                    prompt += doc_content
-                    current_count += get_context_token_count(doc_content)
+                        # 每个文件最多添加3个最相关的片段
+                        if added_count >= 3:
+                            break
+                
+                if current_count >= available_count:
+                    PrettyOutput.print(
+                        "由于上下文长度限制，部分内容被省略",
+                        output_type=OutputType.WARNING
+                    )
 
                 prompt += """
-    # ❗ 重要规则
-    1. 仅使用提供的文档
-    2. 保持精确和准确
-    3. 在相关时引用来源
-    4. 指出缺失的信息
-    5. 保持专业语气
-    6. 使用用户的语言回答
-    """
+# ❗ 重要规则
+1. 仅使用提供的文档
+2. 保持精确和准确
+3. 在相关时引用来源
+4. 指出缺失的信息
+5. 保持专业语气
+6. 使用用户的语言回答
+"""
                 spinner.text = "添加上下文完成"
                 spinner.ok("✅")
 
@@ -1139,6 +1392,48 @@ class RAGTool:
         except Exception as e:
             PrettyOutput.print(f"回答失败：{str(e)}", OutputType.ERROR)
             return None
+            
+    def _enhance_query(self, query: str) -> str:
+        """增强查询以提高检索质量
+        
+        Args:
+            query: 原始查询
+            
+        Returns:
+            str: 增强后的查询
+        """
+        # 简单的查询预处理
+        query = query.strip()
+        
+        # 如果查询太短，返回原始查询
+        if len(query) < 10:
+            return query
+            
+        try:
+            # 尝试使用大模型增强查询（如果可用）
+            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+            enhance_prompt = f"""请分析以下查询，提取关键概念、关键词和主题。
+            
+查询："{query}"
+
+输出格式：对原始查询的改写版本，专注于提取关键信息，保留原始语义，以提高检索相关度。
+仅输出改写后的查询文本，不要输出其他内容。
+只对信息进行最小必要的增强，不要过度添加与原始查询无关的内容。
+"""
+            
+            enhanced_query = model.chat_until_success(enhance_prompt)
+            # 清理增强的查询结果
+            enhanced_query = enhanced_query.strip().strip('"')
+            
+            # 如果增强查询有效且不是完全相同的，使用它
+            if enhanced_query and len(enhanced_query) >= len(query) / 2 and enhanced_query != query:
+                return enhanced_query
+                
+        except Exception:
+            # 如果增强失败，使用原始查询
+            pass
+            
+        return query
 
     def is_index_built(self) -> bool:
         """Check if the index is built and valid
