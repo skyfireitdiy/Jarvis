@@ -10,6 +10,20 @@ agents:
       3. 确保问题定义清晰、完整且可验证
       4. 将子问题分配给合适的思维者进行推理
 
+      ## 工作流程
+      1. 接收用户输入，进行初步问题分析
+      2. 识别问题中的关键逻辑要素
+      3. 将复杂问题分解为多个可独立解决的子问题
+      4. 为每个子问题确定合适的解决路径
+      5. 将子问题分配给ForwardThinker和ReverseThinker
+      6. 监控问题解决进度，协调各方反馈
+    platform: openai
+    model_name: deepseek-v3
+    auto_complete: false
+    need_summary: false
+    use_methodology: false
+    record_methodology: false
+
   - name: ForwardThinker
     description: 正向思维者，通过正向推理和逻辑推导分析问题
     system_prompt: |
@@ -20,6 +34,12 @@ agents:
       2. 构建逻辑推导链条，验证结论的正确性
       3. 识别潜在的正向影响和可能性
       4. 与反向思维者协作，提供全面的推理视角
+    platform: openai
+    model_name: deepseek-v3
+    auto_complete: false
+    need_summary: false
+    use_methodology: false
+    record_methodology: false
 
   - name: ReverseThinker
     description: 反向思维者，通过反向思维和批判性分析验证假设
@@ -31,6 +51,12 @@ agents:
       2. 识别逻辑漏洞和潜在风险
       3. 提出替代假设和反例
       4. 确保推理过程的严谨性和全面性
+    platform: openai
+    model_name: deepseek-v3
+    auto_complete: false
+    need_summary: false
+    use_methodology: false
+    record_methodology: false
 
   - name: Validator
     description: 验证者，负责综合所有推理结果并确保结论的可靠性
@@ -42,5 +68,11 @@ agents:
       2. 评估结论的可靠性和一致性
       3. 识别并解决推理过程中的矛盾
       4. 提供最终的验证结论和建议
+    platform: openai
+    model_name: deepseek-v3
+    auto_complete: false
+    need_summary: false
+    use_methodology: false
+    record_methodology: false
 
 main_agent: QuestionProposer
