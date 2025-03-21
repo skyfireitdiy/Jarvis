@@ -178,7 +178,7 @@ def apply_patch(output_str: str) -> str:
                     final_ret += "✅ 补丁已应用（没有新的提交）"
             else:
                 final_ret += "❌ 补丁应用被拒绝\n"
-                final_ret += "# 补丁预览:\n```diff\n{diff}\n```"
+                final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
         else:
             final_ret += "❌ 没有要提交的更改\n"
         # 用户确认最终结果
