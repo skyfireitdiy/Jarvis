@@ -2,11 +2,14 @@ from typing import Dict, Any
 import os
 import pathlib
 
+from colorama import init
+
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.git_utils import find_git_root
 from jarvis.jarvis_utils.config import dont_use_local_model
+from jarvis.jarvis_utils.utils import init_env
 
 class AskCodebaseTool:
     """用于智能代码库查询和分析的工具
@@ -240,6 +243,8 @@ def main():
     """
     import argparse
     import sys
+
+    init_env()
     
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description="智能代码库查询工具")
