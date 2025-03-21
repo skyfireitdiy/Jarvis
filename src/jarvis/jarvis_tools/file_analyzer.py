@@ -27,15 +27,6 @@ class FileAnalyzerTool:
                 "description": "项目根目录路径（可选）",
                 "default": "."
             },
-            "analysis_focus": {
-                "type": "array",
-                "items": {
-                    "type": "string",
-                    "enum": ["structure", "implementation", "quality", "dependencies", "metrics", "all"]
-                },
-                "description": "分析重点（可选，默认为all）",
-                "default": ["all"]
-            },
             "objective": {
                 "type": "string",
                 "description": "描述本次文件分析的目标和用途，例如'准备重构该文件'或'理解该文件在项目中的作用'",
@@ -62,7 +53,6 @@ class FileAnalyzerTool:
             # 解析参数
             file_path = args.get("file_path", "")
             root_dir = args.get("root_dir", ".")
-            analysis_focus = args.get("analysis_focus", ["all"])
             objective = args.get("objective", "")
             
             # 验证参数
@@ -88,7 +78,7 @@ class FileAnalyzerTool:
             
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
-                rel_file_path, file_name, file_ext, root_dir, analysis_focus, objective
+                rel_file_path, file_name, file_ext, root_dir, objective
             )
             
             # 创建agent的summary prompt
@@ -154,7 +144,7 @@ class FileAnalyzerTool:
             os.chdir(original_dir)
     
     def _create_system_prompt(self, file_path: str, file_name: str, file_ext: str,
-                             root_dir: str, analysis_focus: list, objective: str) -> str:
+                             root_dir: str, objective: str) -> str:
         """
         创建Agent的system prompt
         
@@ -163,7 +153,6 @@ class FileAnalyzerTool:
             file_name: 文件名
             file_ext: 文件扩展名
             root_dir: 项目根目录
-            analysis_focus: 分析重点
             objective: 分析目标
             
         Returns:
@@ -195,22 +184,6 @@ class FileAnalyzerTool:
         }
         
         language = language_map.get(file_ext, '未知')
-        
-        focus_list = []
-        include_metrics = False
-        
-        if "all" in analysis_focus:
-            focus_list = ["文件结构", "实现细节", "代码质量", "依赖关系"]
-            include_metrics = True
-        else:
-            if "structure" in analysis_focus: focus_list.append("文件结构")
-            if "implementation" in analysis_focus: focus_list.append("实现细节")
-            if "quality" in analysis_focus: focus_list.append("代码质量")
-            if "dependencies" in analysis_focus: focus_list.append("依赖关系")
-            if "metrics" in analysis_focus: include_metrics = True
-        
-        focus_str = ", ".join(focus_list)
-        metrics_str = "包含代码指标分析" if include_metrics else "不包含代码指标分析"
         objective_text = f"\n\n## 分析目标\n{objective}" if objective else ""
         
         return f"""# 代码文件分析专家
@@ -222,8 +195,6 @@ class FileAnalyzerTool:
 - 文件路径: `{file_path}`
 - 编程语言: {language}
 - 项目根目录: `{root_dir}`
-- 分析范围: {focus_str}
-- 代码指标: {metrics_str}
 
 ## 分析策略
 1. 首先理解分析目标，确定你需要查找的信息
