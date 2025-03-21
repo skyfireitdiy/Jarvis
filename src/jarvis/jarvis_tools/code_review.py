@@ -176,17 +176,17 @@ class CodeReviewTool:
                     summary_prompt=f"""请生成一份完整的代码审查报告，包含所有发现的问题。将所有问题放在单个REPORT标签内，格式如下：
 
 {ot("REPORT")}
-文件: 文件1路径
+# 文件1路径
 - 位置: [起始行号, 结束行号]
-  描述: 问题详细描述
-  严重程度: 严重/重要/次要
-  建议: 具体改进建议，最好包含代码示例
+- 描述: 问题详细描述
+- 严重程度: 严重/重要/次要
+- 建议: 具体改进建议，最好包含代码示例
 
-文件: 文件2路径
+# 文件2路径
 - 位置: [起始行号, 结束行号]
-  描述: 问题详细描述
-  严重程度: 严重/重要/次要
-  建议: 具体改进建议，最好包含代码示例
+- 描述: 问题详细描述
+- 严重程度: 严重/重要/次要
+- 建议: 具体改进建议，最好包含代码示例
 {ct("REPORT")}
 
 如果没有发现任何问题，请在REPORT标签内注明"未发现问题"。
@@ -263,7 +263,7 @@ def main():
     if result["success"]:
         PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
         report = extract_code_report(result["stdout"])
-        PrettyOutput.print(report, OutputType.SUCCESS, lang="yaml")
+        PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")
         
     else:
         PrettyOutput.print(result["stderr"], OutputType.WARNING)
