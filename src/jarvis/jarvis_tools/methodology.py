@@ -1,5 +1,7 @@
 import os
-import yaml
+import json
+import glob
+import hashlib
 from typing import Dict, Optional, Any
 
 from jarvis.jarvis_utils.config import is_use_methodology
@@ -40,34 +42,51 @@ class MethodologyTool:
     
     def __init__(self):
         """初始化经验管理工具"""
-        self.methodology_file = os.path.expanduser("~/.jarvis/methodology")
-        self._ensure_file_exists()
+        self.methodology_dir = os.path.expanduser("~/.jarvis/methodologies")
+        self._ensure_dir_exists()
             
-    def _ensure_file_exists(self):
-        """确保方法论文件存在"""
-        if not os.path.exists(self.methodology_file):
+    def _ensure_dir_exists(self):
+        """确保方法论目录存在"""
+        if not os.path.exists(self.methodology_dir):
             try:
-                with open(self.methodology_file, 'w', encoding='utf-8', errors="ignore") as f:
-                    yaml.safe_dump({}, f, allow_unicode=True)
+                os.makedirs(self.methodology_dir, exist_ok=True)
             except Exception as e:
-                PrettyOutput.print(f"创建方法论文件失败：{str(e)}", OutputType.ERROR)
+                PrettyOutput.print(f"创建方法论目录失败：{str(e)}", OutputType.ERROR)
+    
+    def _get_methodology_file_path(self, problem_type: str) -> str:
+        """
+        根据问题类型获取对应的方法论文件路径
+        
+        参数:
+            problem_type: 问题类型
+            
+        返回:
+            str: 方法论文件路径
+        """
+        # 使用MD5哈希作为文件名，避免文件名中的特殊字符
+        safe_filename = hashlib.md5(problem_type.encode('utf-8')).hexdigest()
+        return os.path.join(self.methodology_dir, f"{safe_filename}.json")
                 
-    def _load_methodologies(self) -> Dict:
+    def _load_methodologies(self) -> Dict[str, str]:
         """加载所有方法论"""
-        try:
-            with open(self.methodology_file, 'r', encoding='utf-8', errors="ignore") as f:
-                return yaml.safe_load(f) or {}
-        except Exception as e:
-            PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
-            return {}
-                
-    def _save_methodologies(self, methodologies: Dict):
-        """保存所有方法论"""
-        try:
-            with open(self.methodology_file, 'w', encoding='utf-8', errors="ignore") as f:
-                yaml.safe_dump(methodologies, f, allow_unicode=True)
-        except Exception as e:
-            PrettyOutput.print(f"保存方法论失败: {str(e)}", OutputType.ERROR)
+        all_methodologies = {}
+        
+        if not os.path.exists(self.methodology_dir):
+            return all_methodologies
+        
+        for filepath in glob.glob(os.path.join(self.methodology_dir, "*.json")):
+            try:
+                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    methodology = json.load(f)
+                    problem_type = methodology.get("problem_type", "")
+                    content = methodology.get("content", "")
+                    if problem_type and content:
+                        all_methodologies[problem_type] = content
+            except Exception as e:
+                filename = os.path.basename(filepath)
+                PrettyOutput.print(f"加载方法论文件 {filename} 失败: {str(e)}", OutputType.WARNING)
+        
+        return all_methodologies
             
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行管理方法论的操作
@@ -92,16 +111,18 @@ class MethodologyTool:
                 "stderr": "Missing required parameters: operation and problem_type"
             }
             
-        methodologies = self._load_methodologies()
-        
         try:
             if operation == "delete":
-                if problem_type in methodologies:
-                    del methodologies[problem_type]
-                    self._save_methodologies(methodologies)
+                # 获取方法论文件路径
+                file_path = self._get_methodology_file_path(problem_type)
+                
+                # 检查文件是否存在
+                if os.path.exists(file_path):
+                    os.remove(file_path)
                     return {
                         "success": True,
-                        "stdout": f"Deleted methodology for problem type '{problem_type}'"
+                        "stdout": f"Deleted methodology for problem type '{problem_type}'",
+                        "stderr": ""
                     }
                 else:
                     return {
@@ -117,11 +138,21 @@ class MethodologyTool:
                         "stdout": "",
                         "stderr": "Need to provide methodology content"
                     }
-                    
-                methodologies[problem_type] = content
-                self._save_methodologies(methodologies)
                 
-                action = "Update" if problem_type in methodologies else "Add"
+                # 确保目录存在
+                self._ensure_dir_exists()
+                
+                # 获取方法论文件路径
+                file_path = self._get_methodology_file_path(problem_type)
+                
+                # 保存方法论到单独的文件
+                with open(file_path, "w", encoding="utf-8", errors="ignore") as f:
+                    json.dump({
+                        "problem_type": problem_type,
+                        "content": content
+                    }, f, ensure_ascii=False, indent=2)
+                
+                action = "Updated" if os.path.exists(file_path) else "Added"
                 return {
                     "success": True,
                     "stdout": f"{action} methodology for problem type '{problem_type}'",
@@ -151,5 +182,15 @@ class MethodologyTool:
         Returns:
             Optional[str]: 方法论内容，如果不存在则返回 None
         """
-        methodologies = self._load_methodologies()
-        return methodologies.get(problem_type) 
+        file_path = self._get_methodology_file_path(problem_type)
+        
+        if not os.path.exists(file_path):
+            return None
+        
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                methodology = json.load(f)
+                return methodology.get("content")
+        except Exception as e:
+            PrettyOutput.print(f"读取方法论失败: {str(e)}", OutputType.ERROR)
+            return None 
