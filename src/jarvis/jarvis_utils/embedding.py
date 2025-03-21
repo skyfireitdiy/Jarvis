@@ -184,8 +184,10 @@ def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spi
                     
                     # 应用权重并求和
                     weighted_sum = np.zeros_like(text_vectors[0])
-                    for vec, weight in zip(text_vectors, weights):
-                        weighted_sum += vec * weight
+                    for i, vec in enumerate(text_vectors):
+                        # 确保向量形状一致，处理可能的维度不匹配问题
+                        vec_array = np.asarray(vec).reshape(weighted_sum.shape)
+                        weighted_sum += vec_array * weights[i]
                     
                     # 归一化结果向量
                     norm = np.linalg.norm(weighted_sum)
