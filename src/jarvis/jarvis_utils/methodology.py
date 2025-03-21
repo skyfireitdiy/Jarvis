@@ -12,6 +12,7 @@ import yaml
 import glob
 import json
 import hashlib
+import pickle
 import numpy as np
 import faiss
 from typing import Dict, Any, List, Tuple, Optional
@@ -22,6 +23,155 @@ from jarvis.jarvis_utils.config import dont_use_local_model
 # 全局缓存，避免重复计算嵌入向量
 _methodology_embeddings_cache = {}
 _methodology_index_cache: Optional[Tuple[faiss.IndexIDMap, List[Dict[str, str]], str]] = None
+
+def _get_cache_directory() -> str:
+    """
+    获取缓存目录路径，如果不存在则创建
+    
+    返回：
+        str: 缓存目录的路径
+    """
+    cache_dir = os.path.expanduser("~/.jarvis/cache")
+    if not os.path.exists(cache_dir):
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+        except Exception as e:
+            PrettyOutput.print(f"创建缓存目录失败: {str(e)}", OutputType.ERROR)
+    return cache_dir
+
+def _get_embeddings_cache_path() -> str:
+    """
+    获取嵌入向量缓存文件的路径
+    
+    返回：
+        str: 嵌入向量缓存文件的路径
+    """
+    return os.path.join(_get_cache_directory(), "methodology_embeddings.pkl")
+
+def _get_index_cache_path() -> str:
+    """
+    获取索引缓存文件的路径
+    
+    返回：
+        str: 索引缓存文件的路径
+    """
+    return os.path.join(_get_cache_directory(), "methodology_index.faiss")
+
+def _get_index_metadata_path() -> str:
+    """
+    获取索引元数据文件的路径
+    
+    返回：
+        str: 索引元数据文件的路径
+    """
+    return os.path.join(_get_cache_directory(), "methodology_index_metadata.pkl")
+
+def _load_embeddings_cache() -> Dict[int, np.ndarray]:
+    """
+    从文件系统加载嵌入向量缓存
+    
+    返回：
+        Dict[int, np.ndarray]: 嵌入向量缓存字典
+    """
+    cache_path = _get_embeddings_cache_path()
+    if not os.path.exists(cache_path):
+        return {}
+    
+    try:
+        with open(cache_path, "rb") as f:
+            embeddings_cache = pickle.load(f)
+        PrettyOutput.print(f"已从文件加载 {len(embeddings_cache)} 个嵌入向量缓存", OutputType.DEBUG)
+        return embeddings_cache
+    except Exception as e:
+        PrettyOutput.print(f"加载嵌入向量缓存失败: {str(e)}", OutputType.WARNING)
+        return {}
+
+def _save_embeddings_cache(cache: Dict[int, np.ndarray]) -> bool:
+    """
+    将嵌入向量缓存保存到文件系统
+    
+    参数：
+        cache: 要保存的嵌入向量缓存字典
+        
+    返回：
+        bool: 保存是否成功
+    """
+    if not cache:
+        return False
+    
+    cache_path = _get_embeddings_cache_path()
+    
+    try:
+        with open(cache_path, "wb") as f:
+            pickle.dump(cache, f)
+        return True
+    except Exception as e:
+        PrettyOutput.print(f"保存嵌入向量缓存失败: {str(e)}", OutputType.WARNING)
+        return False
+
+def _load_index_cache() -> Optional[Tuple[faiss.IndexIDMap, List[Dict[str, str]], str]]:
+    """
+    从文件系统加载索引缓存
+    
+    返回：
+        Optional[Tuple[faiss.IndexIDMap, List[Dict[str, str]], str]]: 索引缓存元组
+    """
+    index_path = _get_index_cache_path()
+    metadata_path = _get_index_metadata_path()
+    
+    if not os.path.exists(index_path) or not os.path.exists(metadata_path):
+        return None
+    
+    try:
+        # 加载索引
+        index = faiss.read_index(index_path)
+        
+        # 加载元数据
+        with open(metadata_path, "rb") as f:
+            metadata = pickle.load(f)
+            
+        methodology_data = metadata.get("methodology_data", [])
+        methodology_hash = metadata.get("methodology_hash", "")
+        
+        if isinstance(index, faiss.IndexIDMap) and methodology_data and methodology_hash:
+            return index, methodology_data, methodology_hash
+    except Exception as e:
+        PrettyOutput.print(f"加载索引缓存失败: {str(e)}", OutputType.WARNING)
+    
+    return None
+
+def _save_index_cache(index: faiss.IndexIDMap, methodology_data: List[Dict[str, str]], methodology_hash: str) -> bool:
+    """
+    将索引缓存保存到文件系统
+    
+    参数：
+        index: FAISS索引
+        methodology_data: 方法论数据列表
+        methodology_hash: 方法论文件哈希值
+        
+    返回：
+        bool: 保存是否成功
+    """
+    index_path = _get_index_cache_path()
+    metadata_path = _get_index_metadata_path()
+    
+    try:
+        # 保存索引
+        faiss.write_index(index, index_path)
+        
+        # 保存元数据
+        metadata = {
+            "methodology_data": methodology_data,
+            "methodology_hash": methodology_hash
+        }
+        
+        with open(metadata_path, "wb") as f:
+            pickle.dump(metadata, f)
+            
+        return True
+    except Exception as e:
+        PrettyOutput.print(f"保存索引缓存失败: {str(e)}", OutputType.WARNING)
+        return False
 
 def _create_methodology_embedding(embedding_model: Any, methodology_text: str) -> np.ndarray:
     """
@@ -204,6 +354,14 @@ def load_methodology(user_input: str) -> str:
     """
     from yaspin import yaspin
     
+    # 加载嵌入向量缓存
+    global _methodology_embeddings_cache
+    if not _methodology_embeddings_cache:
+        with yaspin(text="加载嵌入向量缓存...", color="yellow") as spinner:
+            _methodology_embeddings_cache = _load_embeddings_cache()
+            spinner.text = f"加载嵌入向量缓存完成 ({len(_methodology_embeddings_cache)} 个向量)"
+            spinner.ok("✅")
+    
     # 检查是否需要从旧格式迁移
     with yaspin(text="检查方法论格式...", color="yellow") as spinner:
         _migrate_from_old_format()
@@ -228,6 +386,17 @@ def load_methodology(user_input: str) -> str:
         
         # 检查缓存的索引是否可用且方法论文件未被修改
         global _methodology_index_cache
+        if _methodology_index_cache is None:
+            # 尝试从文件系统加载索引缓存
+            with yaspin(text="加载索引缓存...", color="yellow") as spinner:
+                _methodology_index_cache = _load_index_cache()
+                if _methodology_index_cache:
+                    spinner.text = "加载索引缓存完成"
+                    spinner.ok("✅")
+                else:
+                    spinner.text = "没有可用的索引缓存"
+                    spinner.fail("❌")
+        
         if _methodology_index_cache is not None:
             cached_index, cached_data, cache_hash = _methodology_index_cache
             if cache_hash == methodology_hash:
@@ -307,6 +476,10 @@ def load_methodology(user_input: str) -> str:
                     methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
                     # 缓存构建好的索引和数据以及时间戳哈希
                     _methodology_index_cache = (methodology_index, methodology_data, methodology_hash)
+                    
+                    # 将索引和嵌入向量缓存保存到文件系统
+                    _save_index_cache(methodology_index, methodology_data, methodology_hash)
+                    
                     spinner.text = "构建索引完成"
                     spinner.ok("✅")
                 
@@ -329,7 +502,15 @@ def load_methodology(user_input: str) -> str:
                                 relevant_methodologies[methodology["key"]] = methodology["value"]
                     spinner.text = "处理搜索结果完成"
                     spinner.ok("✅")
-
+                
+                # 保存嵌入向量缓存到文件系统
+                with yaspin(text="保存嵌入向量缓存...", color="yellow") as spinner:
+                    if _save_embeddings_cache(_methodology_embeddings_cache):
+                        spinner.text = f"保存嵌入向量缓存完成 ({len(_methodology_embeddings_cache)} 个向量)"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = "保存嵌入向量缓存失败"
+                        spinner.fail("❌")
                 
                 if relevant_methodologies:
                     return make_methodology_prompt(relevant_methodologies)

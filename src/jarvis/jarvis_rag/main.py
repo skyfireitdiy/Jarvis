@@ -1,4 +1,5 @@
 import os
+import re
 import numpy as np
 import faiss
 import torch  # Add torch import
@@ -19,7 +20,7 @@ import hashlib
 from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_thread_count, get_rag_ignored_paths
 from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model, load_rerank_model
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import  get_file_md5, init_env, init_gpu_config
+from jarvis.jarvis_utils.utils import  ct, get_file_md5, init_env, init_gpu_config, ot
 
 @dataclass
 class Document:
@@ -954,11 +955,16 @@ class RAGTool:
         Returns:
             List[Tuple[int, float]]: 文档索引和得分的列表
         """
-        # 简单的关键词预处理
-        keywords = query.lower().split()
-        # 移除停用词和过短的词
-        stop_words = {'的', '了', '和', '是', '在', '有', '与', '对', '为', 'a', 'an', 'the', 'and', 'is', 'in', 'of', 'to', 'with'}
-        keywords = [k for k in keywords if k not in stop_words and len(k) > 1]
+        # 使用大模型生成关键词
+        keywords = self._generate_keywords_with_llm(query)
+        
+        # 如果大模型生成失败，回退到简单的关键词提取
+        if not keywords:
+            # 简单的关键词预处理
+            keywords = query.lower().split()
+            # 移除停用词和过短的词
+            stop_words = {'的', '了', '和', '是', '在', '有', '与', '对', '为', 'a', 'an', 'the', 'and', 'is', 'in', 'of', 'to', 'with'}
+            keywords = [k for k in keywords if k not in stop_words and len(k) > 1]
         
         if not keywords:
             return []
@@ -1021,6 +1027,63 @@ class RAGTool:
         
         return doc_scores[:limit]
 
+    def _generate_keywords_with_llm(self, query: str) -> List[str]:
+        """
+        使用大语言模型从查询中提取关键词
+        
+        Args:
+            query: 用户查询
+            
+        Returns:
+            List[str]: 提取的关键词列表
+        """
+        try:
+            from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+            from jarvis.jarvis_platform.registry import PlatformRegistry
+            
+            # 获取平台注册表和模型
+            registry = PlatformRegistry.get_global_platform_registry()
+            model = registry.get_normal_platform()
+
+            # 构建关键词提取提示词
+            prompt = f"""
+            请从以下文本中提取最多10个关键词，这些关键词将用于文本搜索。
+            关键词应该捕捉文本的主要概念、主题和实体，以帮助查找相关文档。
+            输出包括中文和英文的关键词，同时考虑适用于代码搜索。
+            
+            输出格式：
+            {ot("KEYWORD")}
+            xxx
+            yyy
+            {ct("KEYWORD")}
+            
+            文本:
+            {query}
+
+            请仅返回关键词，不要包含其他内容。
+            """
+            
+            # 调用大模型获取响应
+            response = model.chat_until_success(prompt)
+            
+            if response:
+                # 清理响应，提取关键词
+                sm = re.search(ct('KEYWORD') + r"(.*?)" + ct('KEYWORD'), response, re.DOTALL)
+                if sm:
+                    extracted_keywords = sm[1]
+                
+                    if extracted_keywords:
+                        # 记录检测到的关键词
+                        return extracted_keywords.strip().splitlines()
+                
+            # 如果处理失败，返回空列表
+            return []
+            
+        except Exception as e:
+            from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+            PrettyOutput.print(f"使用大模型生成关键词失败: {str(e)}", OutputType.WARNING)
+            return []
+
     def _hybrid_search(self, query: str, top_k: int = 30) -> List[Tuple[int, float]]:
         """混合搜索方法，综合向量相似度和关键词匹配
         
@@ -1038,7 +1101,7 @@ class RAGTool:
         # 进行向量搜索
         vector_limit = min(top_k * 3, len(self.documents))
         if self.index and vector_limit > 0:
-            distances, indices = self.index.search(query_vector, vector_limit)
+            distances, indices = self.index.search(query_vector, vector_limit) # type: ignore
             vector_results = [(int(idx), 1.0 / (1.0 + float(dist))) 
                              for idx, dist in zip(indices[0], distances[0])
                              if idx != -1 and idx < len(self.documents)]
@@ -1131,7 +1194,7 @@ class RAGTool:
                         for doc in batch:
                             inputs.append((query, doc))
                             
-                        model_inputs = rerank_tokenizer.batch_encode_plus(
+                        model_inputs = rerank_tokenizer.batch_encode_plus( # type: ignore
                             inputs,
                             padding=True,
                             truncation=True,
@@ -1145,7 +1208,7 @@ class RAGTool:
                         
                         # 计算重排序得分
                         with torch.no_grad():
-                            outputs = rerank_model(**model_inputs)
+                            outputs = rerank_model(**model_inputs) # type: ignore
                             scores = outputs.logits
                             scores = scores.detach().cpu().numpy()
                             all_scores.extend(scores.squeeze().tolist())
