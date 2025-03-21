@@ -1047,7 +1047,7 @@ class RAGTool:
 
             # 构建关键词提取提示词
             prompt = f"""
-            请分析以下查询文本，提取用于文档检索的关键词。你的任务是：
+            请分析以下查询，提取用于文档检索的关键词。你的任务是：
             
             1. 识别核心概念、主题和实体，包括:
                - 技术术语和专业名词
@@ -1154,12 +1154,13 @@ class RAGTool:
 
     def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
         """Search documents with context window"""
-        if not self.index:
+        if not self.is_index_built():
+            PrettyOutput.print("索引未建立，自动建立索引中...", OutputType.INFO)
             self.build_index(self.root_dir)
             
         # 如果索引建立失败或文档列表为空，返回空结果
-        if not self.index or len(self.documents) == 0:
-            PrettyOutput.print("索引未建立或文档列表为空", OutputType.WARNING)
+        if not self.is_index_built():
+            PrettyOutput.print("索引建立失败或文档列表为空", OutputType.WARNING)
             return []
             
         # 使用混合搜索获取候选文档
@@ -1337,13 +1338,23 @@ class RAGTool:
     def ask(self, question: str) -> Optional[str]:
         """Ask questions about documents with enhanced context building"""
         try:
+            # 检查索引是否已建立，如果没有则自动建立
+            if not self.is_index_built():
+                PrettyOutput.print("索引未建立，自动建立索引中...", OutputType.INFO)
+                self.build_index(self.root_dir)
+                
+                # 如果建立索引后仍未成功，返回错误信息
+                if not self.is_index_built():
+                    PrettyOutput.print("无法建立索引，请检查文档和配置", OutputType.ERROR)
+                    return "无法建立索引，请检查文档和配置。可能的原因：文档目录为空、权限不足或格式不支持。"
+            
             # 增强查询预处理 - 提取关键词和语义信息
             enhanced_query = self._enhance_query(question)
             
             # 使用增强的查询进行搜索
             results = self.search(enhanced_query)
             if not results:
-                return None
+                return "未找到与问题相关的文档。请尝试重新表述问题或确认问题相关内容已包含在索引中。"
             
             prompt = f"""
 # 🤖 角色定义
@@ -1582,6 +1593,14 @@ def main():
             return 0
 
         if args.search or args.ask:
+            # 当需要搜索或提问时，自动检查并建立索引
+            if not rag.is_index_built():
+                PrettyOutput.print(f"索引未建立，自动为目录 '{args.dir}' 建立索引...", OutputType.INFO)
+                rag.build_index(args.dir)
+                
+                if not rag.is_index_built():
+                    PrettyOutput.print("索引建立失败，请检查目录和文件格式", OutputType.ERROR)
+                    return 1
 
             if args.search:
                 results = rag.query(args.search)
