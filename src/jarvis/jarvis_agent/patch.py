@@ -160,14 +160,14 @@ def apply_patch(output_str: str) -> str:
                 # 添加提交信息到final_ret
                 if commits:
                     final_ret += "✅ 补丁已应用\n"
-                    final_ret += "提交信息:\n"
+                    final_ret += "# 提交信息:\n"
                     for commit_hash, commit_message in commits:
                         final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
                     
-                    final_ret += f"应用补丁:\n{diff}"
+                    final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
                     
                     # 增加代码变更分析和错误提示
-                    final_ret += "\n\n⚠️ 代码变更分析：\n"
+                    final_ret += "\n\n# 代码变更分析：\n"
                     final_ret += "1. 请仔细检查以上变更是否引入了潜在错误\n"
                     final_ret += "2. 如果发现代码错误，请立即提出修复方案\n"
                     final_ret += "3. 修复代码错误的优先级高于继续实现功能\n"
@@ -177,17 +177,16 @@ def apply_patch(output_str: str) -> str:
                 else:
                     final_ret += "✅ 补丁已应用（没有新的提交）"
             else:
-                final_ret += "❌ 我拒绝应用此补丁\n"
-                final_ret += "补丁预览:\n"
-                final_ret += diff
+                final_ret += "❌ 补丁应用被拒绝\n"
+                final_ret += "# 补丁预览:\n```diff\n{diff}\n```"
         else:
             final_ret += "❌ 没有要提交的更改\n"
         # 用户确认最终结果
         with spinner.hidden():
-            PrettyOutput.print(final_ret, OutputType.USER)
+            PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
             if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
                 return final_ret
-            return get_multiline_input("请输入自定义回复")
+            return final_ret + "\n\n" + get_multiline_input("请输入自定义回复")
 
 def revert_file(filepath: str):
     """增强版git恢复，处理新文件"""
