@@ -90,7 +90,7 @@ class AskCodebaseTool:
                 # Create tools registry
                 from jarvis.jarvis_tools.registry import ToolRegistry
                 tool_registry = ToolRegistry()
-                tool_registry.use_tools(["execute_shell", "rag"])
+                tool_registry.use_tools(["execute_shell", "rag", "read_code"])
                 
                 # Create and run Agent
                 analyzer_agent = Agent(
@@ -171,6 +171,12 @@ class AskCodebaseTool:
    - 提供基于代码的具体回答
    - 引用具体文件和代码片段作为依据
 
+## 关于RAG工具
+- RAG工具返回的信息可能存在偏差或不准确之处
+- 必须通过查看实际代码文件验证RAG返回的每条重要信息
+- 对于关键发现，使用`read_code`工具查看原始文件内容进行求证
+- 如发现RAG结果与实际代码不符，以实际代码为准
+
 ## 探索命令示例
 ```bash
 # 查看目录结构
@@ -182,7 +188,7 @@ find . -type f -name "*.py" -o -name "*.js" | xargs grep -l "关键词"
 # 查看文件内容
 cat 文件路径
 
-# 使用RAG搜索代码库中与问题相关的内容
+# 使用RAG搜索代码库中与问题相关的内容（需要验证其结果）
 ```
 
 ## 输出要求
@@ -190,7 +196,8 @@ cat 文件路径
 - 引用具体文件路径和代码片段作为依据
 - 如果无法找到答案，明确说明并提供原因
 - 组织信息的逻辑清晰，便于理解
-- 对复杂概念提供简明解释"""
+- 对复杂概念提供简明解释
+- 明确区分已验证的信息和待验证的信息"""
 
     def _create_summary_prompt(self, question: str) -> str:
         """创建Agent的summary prompt
