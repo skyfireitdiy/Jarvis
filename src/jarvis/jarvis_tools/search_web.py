@@ -104,7 +104,7 @@ class SearchTool:
             "max_results": {
                 "type": "integer",
                 "description": "最大搜索结果数量",
-                "default": 10
+                "default": 30
             }
         },
         "required": ["query", "question"]
