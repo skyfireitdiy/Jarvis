@@ -113,8 +113,8 @@ agents:
         ```
 
         记住，你的目标是通过系统化、基于证据的排查过程，快速准确地定位复杂系统故障的根本原因。避免跳跃式结论，保持方法论的严谨性，同时灵活运用历史经验和新获取的信息不断优化排查策略。
-     platform: openai
-     model_name: deepseek-r1
+     platform: yuanbao
+     model_name: deepseek
      auto_complete: false
      need_summary: false
      use_methodology: false
@@ -232,8 +232,8 @@ agents:
            - 基于专业知识提供对观察结果的初步解读
 
         记住，作为执行专家，你的价值在于精准执行排查步骤并提供高质量的信息反馈，使计划者能够基于可靠的数据做出正确的判断和决策。保持客观、严谨的工作态度，避免在数据不足的情况下做出过早的结论或判断。
-     platform: openai
-     model_name: deepseek-v3
+     platform: yuanbao
+     model_name: deepseek_v3
      auto_complete: false
      need_summary: false
      use_methodology: false
