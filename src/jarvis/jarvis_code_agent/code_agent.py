@@ -217,17 +217,15 @@ def main():
     PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
 
     try:
-        # Interactive mode
-        while True:
-            try:
-                user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
-                if not user_input:
-                    break
-                agent = CodeAgent()
-                agent.run(user_input)
-                
-            except Exception as e:
-                PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
+        try:
+            user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
+            if not user_input:
+                return 0
+            agent = CodeAgent()
+            agent.run(user_input)
+            
+        except Exception as e:
+            PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
     except Exception as e:
         PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
