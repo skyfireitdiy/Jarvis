@@ -13,7 +13,7 @@ class HunyuanModel(BasePlatform):
 
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
-        return [("deepseek", "DeepSeek-R1"), ("deepseek_v3", "DeepSeek-v3"), ("hunyuan_gpt_175B_0404", "Tencent Hunyuan"), ("hunyuan_t1", "Tencent Hunyuan-T1")]
+        return [("deep_seek", "DeepSeek-R1"), ("deep_seek_v3", "DeepSeek-v3"), ("hunyuan_gpt_175B_0404", "Tencent Hunyuan"), ("hunyuan_t1", "Tencent Hunyuan-T1")]
     
     def __init__(self):
         """
@@ -57,10 +57,6 @@ class HunyuanModel(BasePlatform):
         self.system_message = message
 
     def set_model_name(self, model_name: str):
-        """
-        Set model name for Hunyuan.
-        Available models: "gpt_175B_0404", "gpt_175B_0314", "embedding"
-        """
         # 模型映射表，可以根据需要扩展
         model_mapping = [m[0] for m in self.get_model_list()]
         
@@ -204,8 +200,7 @@ class HunyuanModel(BasePlatform):
                         elif data.get("type") == "think" and not self.suppress_output:
                             think_content = data.get("content", "")
                             # 可以选择性地显示思考过程，但不加入最终响应
-                            # PrettyOutput.print(f"思考中: {think_content}", OutputType.PROGRESS)
-                            PrettyOutput.print_stream(think_content)
+                            PrettyOutput.print_stream(f"{think_content}")
                             pass
                             
                     except json.JSONDecodeError:
