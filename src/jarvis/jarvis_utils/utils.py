@@ -115,6 +115,8 @@ def init_gpu_config() -> Dict:
         "device_memory": 0,
         "memory_fraction": 0.8  # 默认使用80%的可用内存
     }
+
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     
     try:
         import torch
