@@ -7,10 +7,6 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class OpenAIModel(BasePlatform):
     platform_name = "openai"
 
-    def upload_files(self, file_list: List[str]):
-        """Upload files"""
-        PrettyOutput.print("OpenAI does not support file upload", OutputType.WARNING)
-    
     def __init__(self):
         """
         Initialize OpenAI model

@@ -23,7 +23,6 @@ class AI8Model(BasePlatform):
         super().__init__()
         self.system_message = ""
         self.conversation = {}
-        self.files = []
         self.models = {}  # 存储模型信息
 
         self.token = os.getenv("AI8_API_KEY")
@@ -103,18 +102,6 @@ class AI8Model(BasePlatform):
         except Exception as e:
             PrettyOutput.print(f"创建会话失败: {str(e)}", OutputType.ERROR)
             return False
-        
-    def upload_files(self, file_list: List[str]) -> List[Dict]:
-        for file_path in file_list:
-            name = os.path.basename(file_path)
-            with open(file_path, 'rb') as f:
-                file_data = f.read()
-            base64_data = base64.b64encode(file_data).decode('utf-8')
-            self.files.append({
-                "name": name,
-                "data": f"data:image/png;base64,{base64_data}"
-            })
-        return self.files
     
     def set_system_message(self, message: str):
         """Set system message"""
@@ -145,14 +132,6 @@ class AI8Model(BasePlatform):
                 "files": []
             }
             
-            # 如果有文件需要发送
-            if self.files:
-                for file_data in self.files:
-                    payload["files"].append({
-                        "name": file_data["name"],
-                        "data": file_data["data"]
-                    })
-                self.files = []  # 清空已使用的文件
             
             response = requests.post(
                 f"{self.BASE_URL}/api/chat/completions",
@@ -200,7 +179,6 @@ class AI8Model(BasePlatform):
     def reset(self):
         """Reset model state"""
         self.conversation = None
-        self.files = []  # 清空文件列表
             
     def delete_chat(self) -> bool:
         """Delete current chat session"""

@@ -25,7 +25,6 @@ class OyiModel(BasePlatform):
         self.messages = []
         self.system_message = ""
         self.conversation = None
-        self.files = []
         self.first_chat = True
         
         self.token = os.getenv("OYI_API_KEY")
@@ -132,17 +131,6 @@ class OyiModel(BasePlatform):
             
             # 如果有上传的文件，添加到请求中
             if self.first_chat:
-                if self.files:
-                    for file_data in self.files:
-                        file_info = {
-                            "contentType": 1,  # 1 表示图片
-                            "fileUrl": file_data['result']['url'],
-                            "fileId": file_data['result']['id'],
-                            "fileName": file_data['result']['fileName']
-                        }
-                        payload["contentFiles"].append(file_info)
-                    # 清空已使用的文件列表
-                    self.files = []
                 message = self.system_message + "\n" + message
                 payload["content"] = message
                 self.first_chat = False
@@ -211,7 +199,6 @@ class OyiModel(BasePlatform):
         """Reset model state"""
         self.messages = []
         self.conversation = None
-        self.files = []
         self.first_chat = True
             
     def delete_chat(self) -> bool:
@@ -252,65 +239,6 @@ class OyiModel(BasePlatform):
         except Exception as e:
             PrettyOutput.print(f"删除会话失败: {str(e)}", OutputType.ERROR)
             return False
-    
-    def upload_files(self, file_list: List[str]) -> List[Dict]:
-        """Upload a file to OYI API
-        
-        Args:
-            file_path: Path to the file to upload
-            
-        Returns:
-            Dict: Upload response data
-        """
-        try:
-            # 检查当前模型是否支持文件上传
-            model_info = self.models.get(self.model_name)
-            if not model_info or not model_info.get('uploadFile', False):
-                PrettyOutput.print(f"当前模型 {self.model_name} 不支持文件上传", OutputType.WARNING)
-                return []
-            
-            headers = {
-                'Authorization': f'Bearer {self.token}',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'Accept': '*/*',
-                'DNT': '1',
-                'Origin': 'https://ai.rcouyi.com',
-                'Referer': 'https://ai.rcouyi.com/'
-            }
-            
-            for file_path in file_list:
-                # 检查文件类型
-                file_type = mimetypes.guess_type(file_path)[0]
-                if not file_type or not file_type.startswith(('image/', 'text/', 'application/')):
-                    PrettyOutput.print(f"文件类型 {file_type} 不支持", OutputType.WARNING)
-                    continue
-                
-                with open(file_path, 'rb') as f:
-                    files = {
-                        'file': (os.path.basename(file_path), f, file_type)
-                    }
-                
-                    response = requests.post(
-                        f"{self.BASE_URL}/chatapi/m_file/uploadfile",
-                        headers=headers,
-                        files=files
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('code') == 200:
-                            self.files.append(data)
-                        else:
-                            PrettyOutput.print(f"文件上传失败: {data.get('message')}", OutputType.WARNING)
-                            return []
-                    else:
-                        PrettyOutput.print(f"文件上传失败: {response.status_code}", OutputType.WARNING)
-                        return []
-                
-            return self.files
-        except Exception as e:
-            PrettyOutput.print(f"文件上传失败: {str(e)}", OutputType.ERROR)
-            return []
 
     def get_available_models(self) -> List[str]:
         """Get available model list
@@ -371,9 +299,6 @@ class OyiModel(BasePlatform):
                 if info:
                     model_str += f" - {info}"
                     
-                # 添加文件上传支持标记
-                if model.get('uploadFile'):
-                    model_str += " [Support file upload]"
                 model['desc'] = model_str
                 models.append(model_name)
                 

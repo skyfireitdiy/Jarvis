@@ -45,7 +45,6 @@ class KimiModel(BasePlatform):
             PrettyOutput.print("KIMI_API_KEY 未设置", OutputType.WARNING)
         self.auth_header = f"Bearer {self.api_key}"
         self.chat_id = ""
-        self.uploaded_files = []  # 存储已上传文件的信息
         self.first_chat = True  # 添加标记，用于判断是否是第一次对话
         self.system_message = ""
 
@@ -77,138 +76,6 @@ class KimiModel(BasePlatform):
             PrettyOutput.print(f"错误：创建会话失败：{e}", OutputType.ERROR)
             return False
 
-    def _get_presigned_url(self, filename: str, action: str) -> Dict:
-        """Get presigned upload URL"""
-        url = "https://kimi.moonshot.cn/api/pre-sign-url"
-        
-        
-        
-        payload = json.dumps({
-            "action": action,
-            "name": os.path.basename(filename)
-        }, ensure_ascii=False)
-        
-        headers = {
-            'Authorization': self.auth_header,
-            'Content-Type': 'application/json'
-        }
-        
-        response = while_success(lambda: requests.post(url, headers=headers, data=payload), sleep_time=5)
-        return response.json()
-
-    def _upload_file(self, file_path: str, presigned_url: str) -> bool:
-        """Upload file to presigned URL"""
-        try:
-            with open(file_path, 'rb') as f:
-                content = f.read()
-                response = while_success(lambda: requests.put(presigned_url, data=content), sleep_time=5)
-                return response.status_code == 200
-        except Exception as e:
-            PrettyOutput.print(f"错误：上传文件失败：{e}", OutputType.ERROR)
-            return False
-
-    def _get_file_info(self, file_data: Dict, name: str, file_type: str) -> Dict:
-        """Get file information"""
-        url = "https://kimi.moonshot.cn/api/file"
-        payload = json.dumps({
-            "type": file_type,
-            "name": name,
-            "object_name": file_data["object_name"],
-            "chat_id": self.chat_id,
-            "file_id": file_data.get("file_id", "")
-        }, ensure_ascii=False)
-        
-        headers = {
-            'Authorization': self.auth_header,
-            'Content-Type': 'application/json'
-        }
-        
-        response = while_success(lambda: requests.post(url, headers=headers, data=payload), sleep_time=5)
-        return response.json()
-
-    def _wait_for_parse(self, file_id: str) -> bool:
-        """Wait for file parsing to complete"""
-        url = "https://kimi.moonshot.cn/api/file/parse_process"
-        headers = {
-            'Authorization': self.auth_header,
-            'Content-Type': 'application/json'
-        }
-        
-        max_retries = 30
-        retry_count = 0
-        
-        while retry_count < max_retries:
-            payload = json.dumps({"ids": [file_id]}, ensure_ascii=False)
-            response = while_success(lambda: requests.post(url, headers=headers, data=payload, stream=True), sleep_time=5)
-            
-            for line in response.iter_lines():
-                if not line:
-                    continue
-                    
-                line = line.decode('utf-8')
-                if not line.startswith("data: "):
-                    continue
-                    
-                try:
-                    data = json.loads(line[6:])
-                    if data.get("event") == "resp":
-                        status = data.get("file_info", {}).get("status")
-                        if status == "parsed":
-                            return True
-                        elif status == "failed":
-                            return False
-                except json.JSONDecodeError:
-                    continue
-            
-            retry_count += 1
-            time.sleep(1)
-        
-        return False
-    def upload_files(self, file_list: List[str]) -> List[Dict]:
-        """Upload file list and return file information"""
-        if not file_list:
-            return []
-
-        
-        if not self.chat_id:
-            if not self._create_chat():
-                raise Exception("Failed to create chat session")
-
-        uploaded_files = []
-        for index, file_path in enumerate(file_list, 1):
-            try:
-                PrettyOutput.print(f"处理文件 [{index}/{len(file_list)}]: {file_path}", OutputType.PROGRESS)
-
-                mime_type, _ = mimetypes.guess_type(file_path)
-                action = "image" if mime_type and mime_type.startswith('image/') else "file"
-                
-                # 获取预签名URL
-                presigned_data = self._get_presigned_url(file_path, action)
-                
-                # 上传文件
-                if self._upload_file(file_path, presigned_data["url"]):
-                    # 获取文件信息
-                    file_info = self._get_file_info(presigned_data, os.path.basename(file_path), action)
-                    file_info = self._get_file_info(presigned_data, os.path.basename(file_path), action)
-                    # 等待文件解析
-
-                    # 只有文件需要解析
-                    if action == "file":
-                        if self._wait_for_parse(file_info["id"]):
-                            uploaded_files.append(file_info)
-                        else:
-                            PrettyOutput.print(f"✗ 文件解析失败: {file_path}", OutputType.WARNING)
-                    else:
-                        uploaded_files.append(file_info)
-                else:
-                    PrettyOutput.print(f"错误：文件上传失败: {file_path}", OutputType.WARNING)
-                    
-            except Exception as e:
-                PrettyOutput.print(f"✗ 处理文件出错 {file_path}: {str(e)}", OutputType.ERROR)
-                continue
-        
-        self.uploaded_files = uploaded_files
-        return uploaded_files
 
     def chat(self, message: str) -> str:
         """Send message and get response"""
@@ -218,15 +85,7 @@ class KimiModel(BasePlatform):
 
         url = f"https://kimi.moonshot.cn/api/chat/{self.chat_id}/completion/stream"
         
-        # 只在第一次对话时带上文件引用
-        refs = []
-        refs_file = []
-        if self.first_chat:
-            if self.uploaded_files:
-                refs = [f["id"] for f in self.uploaded_files]
-                refs_file = self.uploaded_files
-            message = self.system_message + "\n" + message
-            self.first_chat = False
+        
         
         payload = {
             "messages": [{"role": "user", "content": message}],
@@ -235,8 +94,8 @@ class KimiModel(BasePlatform):
             "kimiplus_id": "kimi",
             "use_research": False,
             "use_math": False,
-            "refs": refs,
-            "refs_file": refs_file
+            "refs": [],
+            "refs_file": []
         }
 
         headers = {

@@ -59,11 +59,6 @@ class BasePlatform(ABC):
         return while_true(lambda: while_success(lambda: _chat(), 5), 5)
 
     @abstractmethod
-    def upload_files(self, file_list: List[str]) -> List[Dict]:
-        """Upload files"""
-        raise NotImplementedError("upload_files is not implemented")
-
-    @abstractmethod
     def reset(self):
         """Reset model"""
         raise NotImplementedError("reset is not implemented")

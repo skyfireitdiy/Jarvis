@@ -117,10 +117,6 @@ class OllamaPlatform(BasePlatform):
         
         return full_response
 
-    def upload_files(self, file_list: List[str]) -> List[Dict]:
-        """Upload files (Ollama does not support file upload)"""
-        PrettyOutput.print("Ollama 不支持文件上传", output_type=OutputType.WARNING)
-        return []
         
     def reset(self):
         """Reset model state"""
