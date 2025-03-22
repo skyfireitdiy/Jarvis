@@ -50,7 +50,7 @@ class HunyuanModel(BasePlatform):
         
         self.system_message = ""  # 系统消息，用于初始化对话
         self.first_chat = True  # 标识是否为第一次对话
-        self.model_name = "deepseek_v3"  # 默认模型名称
+        self.model_name = "deep_seek_v3"  # 默认模型名称，使用下划线保持一致
 
     def set_system_message(self, message: str):
         """Set system message"""
