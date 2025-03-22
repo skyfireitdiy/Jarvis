@@ -135,6 +135,35 @@ class DocxProcessor(FileProcessor):
         doc = DocxDocument(file_path)
         return "\n".join([paragraph.text for paragraph in doc.paragraphs])
 
+class PPTProcessor(FileProcessor):
+    """PPT file processor"""
+    @staticmethod
+    def can_handle(file_path: str) -> bool:
+        return Path(file_path).suffix.lower() in ['.ppt', '.pptx']
+    
+    @staticmethod
+    def extract_text(file_path: str) -> str:
+        from pptx import Presentation
+        prs = Presentation(file_path)
+        text = []
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if hasattr(shape, "text"):
+                    text.append(shape.text)
+        return "\n".join(text)
+
+class ExcelProcessor(FileProcessor):
+    """Excel file processor"""
+    @staticmethod
+    def can_handle(file_path: str) -> bool:
+        return Path(file_path).suffix.lower() in ['.xls', '.xlsx']
+    
+    @staticmethod
+    def extract_text(file_path: str) -> str:
+        import pandas as pd
+        df = pd.read_excel(file_path)
+        return df.to_string()
+
 class RAGTool:
     def __init__(self, root_dir: str):
         """Initialize RAG tool
@@ -198,7 +227,9 @@ class RAGTool:
             self.file_processors = [
                 TextFileProcessor(),
                 PDFProcessor(),
-                DocxProcessor()
+                DocxProcessor(),
+                PPTProcessor(),
+                ExcelProcessor()
             ]
             spinner.text = "文件处理器初始化完成"
             spinner.ok("✅")
