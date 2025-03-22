@@ -869,7 +869,7 @@ class RAGTool:
             PrettyOutput.print(f"获取不变向量失败: {str(e)}", OutputType.ERROR)
             return None
 
-    def _perform_keyword_search(self, query: str, limit: int = 30) -> List[Tuple[int, float]]:
+    def _perform_keyword_search(self, query: str, limit: int = 15) -> List[Tuple[int, float]]:
         """执行基于关键词的文本搜索
         
         Args:
@@ -1026,7 +1026,7 @@ class RAGTool:
             PrettyOutput.print(f"使用大模型生成关键词失败: {str(e)}", OutputType.WARNING)
             return []
 
-    def _hybrid_search(self, query: str, top_k: int = 30) -> List[Tuple[int, float]]:
+    def _hybrid_search(self, query: str, top_k: int = 15) -> List[Tuple[int, float]]:
         """混合搜索方法，综合向量相似度和关键词匹配
         
         Args:
@@ -1076,7 +1076,7 @@ class RAGTool:
         return result_list[:top_k]
 
 
-    def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
+    def search(self, query: str, top_k: int = 15) -> List[Tuple[Document, float]]:
         """Search documents with context window"""
         if not self.is_index_built():
             PrettyOutput.print("索引未建立，自动建立索引中...", OutputType.INFO)
@@ -1274,7 +1274,9 @@ class RAGTool:
                     file_tokens = get_context_token_count(file_header)
                     
                     # 处理所有相关性足够高的文档
-                    for doc, score in docs:                        
+                    for doc, score in docs:    
+                        if score < 0.2:
+                            continue
                         doc_content = f"""
 ### 片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']} [相关度: {score:.2f}]
 ```
@@ -1324,10 +1326,6 @@ class RAGTool:
                             # 计算内容指纹以避免重复
                             content_hash = hash(doc.content)
                             if content_hash in added_content_hashes:
-                                continue
-                                
-                            # 如果内容相似度低于阈值，跳过
-                            if score < 0.2:
                                 continue
                                 
                             # 格式化文档片段
