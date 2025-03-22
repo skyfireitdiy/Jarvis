@@ -7,6 +7,7 @@ from typing import List, Tuple, Optional, Dict
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
+import contextlib  # 添加 contextlib 导入
 
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -1048,6 +1049,159 @@ class RAGTool:
         
         return result_list[:top_k]
 
+    def _rerank_candidates(self, query: str, initial_indices: List[int], spinner=None) -> Tuple[List[int], List[Tuple[int, float]]]:
+        """对候选文档进行重排序以提高准确度
+        
+        Args:
+            query: 查询文本
+            initial_indices: 初始候选文档索引
+            spinner: 用于显示进度的spinner对象(可选)
+            
+        Returns:
+            Tuple[List[int], List[Tuple[int, float]]]: 重排序后的文档索引及对应评分
+        """
+        try:
+            # 获取重排序模型
+            from jarvis.jarvis_utils.embedding import load_rerank_model
+            
+            with spinner.hidden() if spinner else contextlib.nullcontext():
+                rerank_model, rerank_tokenizer = load_rerank_model()
+            
+            # 准备重排序的文档
+            rerank_candidates = []
+            rerank_indices = []
+            
+            # 收集有效的文档用于重排序
+            for i, idx in enumerate(initial_indices):
+                if idx < len(self.documents):  # 确保索引有效
+                    doc = self.documents[idx]
+                    # 获取文档内容，添加文件路径作为上下文增强
+                    doc_text = f"文件: {doc.metadata['file_path']}\n{doc.content}"
+                    rerank_candidates.append(doc_text)
+                    rerank_indices.append((i, idx))
+            
+            # 如果有候选文档，进行重排序
+            if rerank_candidates:
+                if spinner:
+                    spinner.text = f"重排序 {len(rerank_candidates)} 个候选文档..."
+                
+                # 分批重排序以避免内存溢出
+                batch_size = 50
+                all_scores = []
+                
+                # 先尝试使用GPU进行重排序
+                use_gpu = torch.cuda.is_available()
+                gpu_failed = False
+                
+                try:
+                    for i in range(0, len(rerank_candidates), batch_size):
+                        batch = rerank_candidates[i:i+batch_size]
+                        # 准备重排序模型的输入
+                        inputs = []
+                        for doc in batch:
+                            inputs.append((query, doc))
+                            
+                        model_inputs = rerank_tokenizer.batch_encode_plus( # type: ignore
+                            inputs,
+                            padding=True,
+                            truncation=True,
+                            return_tensors="pt",
+                            max_length=512
+                        )
+                        
+                        # 将张量移到适当的设备上
+                        if use_gpu:
+                            try:
+                                model_inputs = {k: v.cuda() for k, v in model_inputs.items()}
+                            except Exception as gpu_error:
+                                if spinner:
+                                    spinner.text = f"GPU加载失败({str(gpu_error)})，切换到CPU..."
+                                use_gpu = False
+                                gpu_failed = True
+                                # 重新开始本批次，使用CPU
+                                raise RuntimeError("GPU加载失败，切换到CPU") from gpu_error
+                        
+                        # 使用当前设备计算重排序得分
+                        with torch.no_grad():
+                            outputs = rerank_model(**model_inputs) # type: ignore
+                            scores = outputs.logits
+                            scores = scores.detach().cpu().numpy()
+                            all_scores.extend(scores.squeeze().tolist())
+                            
+                        if spinner and i + batch_size < len(rerank_candidates):
+                            spinner.text = f"重排序进度: {i + batch_size}/{len(rerank_candidates)} ({use_gpu and 'GPU' or 'CPU'})"
+                
+                except Exception as e:
+                    # 如果使用GPU失败，尝试切换到CPU重新处理整个任务
+                    if use_gpu or gpu_failed:
+                        if spinner:
+                            spinner.text = f"GPU重排序失败，切换到CPU重试..."
+                        
+                        # 重置得分和使用CPU
+                        all_scores = []
+                        use_gpu = False
+                        
+                        # 使用CPU重新处理所有批次
+                        for i in range(0, len(rerank_candidates), batch_size):
+                            batch = rerank_candidates[i:i+batch_size]
+                            
+                            inputs = []
+                            for doc in batch:
+                                inputs.append((query, doc))
+                                
+                            model_inputs = rerank_tokenizer.batch_encode_plus( # type: ignore
+                                inputs,
+                                padding=True,
+                                truncation=True,
+                                return_tensors="pt",
+                                max_length=512
+                            )
+                            
+                            # 确保在CPU上处理
+                            with torch.no_grad():
+                                outputs = rerank_model(**model_inputs) # type: ignore
+                                scores = outputs.logits
+                                scores = scores.detach().cpu().numpy()
+                                all_scores.extend(scores.squeeze().tolist())
+                                
+                            if spinner and i + batch_size < len(rerank_candidates):
+                                spinner.text = f"CPU重排序进度: {i + batch_size}/{len(rerank_candidates)}"
+                    else:
+                        # 如果CPU也失败，则抛出异常
+                        raise
+                
+                # 将重排序得分与候选文档和原始索引关联
+                reranked_results = []
+                for (orig_i, idx), score in zip(rerank_indices, all_scores):
+                    reranked_results.append((idx, score))
+                
+                # 按重排序得分排序（降序）
+                reranked_results.sort(key=lambda x: x[1], reverse=True)
+                
+                # 提取排序后的文档索引
+                reranked_indices = [idx for idx, _ in reranked_results]
+                
+                if spinner:
+                    spinner.text = f"重排序完成 (使用{'GPU' if use_gpu else 'CPU'})"
+                
+                # 返回重排序结果及评分
+                return reranked_indices, reranked_results
+            else:
+                # 如果没有找到有效候选，返回原始索引
+                if spinner:
+                    spinner.text = "跳过重排序（无有效候选）"
+                
+                # 返回原始结果，没有评分
+                return initial_indices, []
+        
+        except Exception as e:
+            # 如果重排序失败，返回原始索引
+            if spinner:
+                spinner.text = f"重排序失败（{str(e)}），使用原始检索结果"
+            
+            # 返回原始索引，没有评分
+            return initial_indices, []
+
     def search(self, query: str, top_k: int = 30) -> List[Tuple[Document, float]]:
         """Search documents with context window"""
         if not self.is_index_built():
@@ -1076,86 +1230,15 @@ class RAGTool:
         
         # Apply reranking for better accuracy
         with yaspin(text="重排序以提高准确度...", color="cyan") as spinner:
-            # 获取重排序模型
-            from jarvis.jarvis_utils.embedding import load_rerank_model
-            try:
-                with spinner.hidden():
-                    rerank_model, rerank_tokenizer = load_rerank_model()
-                
-                # 准备重排序的文档
-                rerank_candidates = []
-                rerank_indices = []
-                
-                # 收集有效的文档用于重排序
-                for i, idx in enumerate(initial_indices):
-                    if idx < len(self.documents):  # 确保索引有效
-                        doc = self.documents[idx]
-                        # 获取文档内容，添加文件路径作为上下文增强
-                        doc_text = f"文件: {doc.metadata['file_path']}\n{doc.content}"
-                        rerank_candidates.append(doc_text)
-                        rerank_indices.append((i, idx))
-                
-                # 如果有候选文档，进行重排序
-                if rerank_candidates:
-                    spinner.text = f"重排序 {len(rerank_candidates)} 个候选文档..."
-                    
-                    # 分批重排序以避免内存溢出
-                    batch_size = 50
-                    all_scores = []
-                    
-                    for i in range(0, len(rerank_candidates), batch_size):
-                        batch = rerank_candidates[i:i+batch_size]
-                        # 准备重排序模型的输入
-                        inputs = []
-                        for doc in batch:
-                            inputs.append((query, doc))
-                            
-                        model_inputs = rerank_tokenizer.batch_encode_plus( # type: ignore
-                            inputs,
-                            padding=True,
-                            truncation=True,
-                            return_tensors="pt",
-                            max_length=512
-                        )
-                        
-                        # 将张量移到适当的设备上
-                        if torch.cuda.is_available():
-                            model_inputs = {k: v.cuda() for k, v in model_inputs.items()}
-                        
-                        # 计算重排序得分
-                        with torch.no_grad():
-                            outputs = rerank_model(**model_inputs) # type: ignore
-                            scores = outputs.logits
-                            scores = scores.detach().cpu().numpy()
-                            all_scores.extend(scores.squeeze().tolist())
-                    
-                    # 将重排序得分与候选文档和原始索引关联
-                    reranked_results = []
-                    for (orig_i, idx), score in zip(rerank_indices, all_scores):
-                        reranked_results.append((idx, score))
-                    
-                    # 按重排序得分排序（降序）
-                    reranked_results.sort(key=lambda x: x[1], reverse=True)
-                    
-                    # 提取排序后的文档索引
-                    reranked_indices = [idx for idx, _ in reranked_results[:top_k*2]]
-                    
-                    spinner.text = "重排序完成"
-                    spinner.ok("✅")
-                    
-                    # 使用重排序结果替代原始检索结果
-                    indices_list = reranked_indices
-                else:
-                    # 如果没有找到有效候选，使用原始检索结果
-                    indices_list = [idx for idx, _ in search_results if idx < len(self.documents)]
-                    spinner.text = "跳过重排序（无有效候选）"
-                    spinner.ok("✅")
+            # 调用重排序函数
+            indices_list, reranked_results = self._rerank_candidates(query, initial_indices, spinner)
             
-            except Exception as e:
-                # 如果重排序失败，使用原始检索结果
+            if reranked_results:  # 如果重排序成功
+                spinner.text = "重排序完成"
+            else:  # 使用原始检索结果
                 indices_list = [idx for idx, _ in search_results if idx < len(self.documents)]
-                spinner.text = f"重排序失败（{str(e)}），使用原始检索结果"
-                spinner.ok("✅")
+            
+            spinner.ok("✅")
         
         # Process results with context window
         with yaspin(text="处理结果...", color="cyan") as spinner:
@@ -1173,7 +1256,7 @@ class RAGTool:
                     doc = self.documents[idx]
                     
                     # 使用重排序得分或基于原始相似度的得分
-                    similarity = next((score for i, score in reranked_results if i == idx), 0.5) if 'reranked_results' in locals() else 0.5
+                    similarity = next((score for i, score in reranked_results if i == idx), 0.5) if reranked_results else 0.5
                     
                     file_path = doc.metadata['file_path']
                     if file_path not in seen_files:
