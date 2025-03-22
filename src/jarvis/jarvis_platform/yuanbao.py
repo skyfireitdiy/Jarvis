@@ -9,7 +9,7 @@ from jarvis.jarvis_utils.utils import while_success
 class HunyuanModel(BasePlatform):
     """Hunyuan model implementation"""
 
-    platform_name = "hunyuan"
+    platform_name = "yuanbao"
 
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
@@ -28,9 +28,9 @@ class HunyuanModel(BasePlatform):
         
         if not self.cookies:
             message = (
-                "需要设置 HUNYUAN_COOKIES 和 HUNYUAN_AGENT_ID 才能使用 Jarvis 的 Hunyuan 功能。请按照以下步骤操作：\n"
-                "1. 获取 Hunyuan API 参数:\n"
-                "   • 访问 Hunyuan 平台: https://yuanbao.tencent.com\n"
+                "需要设置 HUNYUAN_COOKIES 和 HUNYUAN_AGENT_ID 才能使用 Jarvis 的元宝功能。请按照以下步骤操作：\n"
+                "1. 获取元宝 API 参数:\n"
+                "   • 访问元宝平台: https://yuanbao.tencent.com\n"
                 "   • 登录您的账户\n" 
                 "   • 打开浏览器开发者工具 (F12 或右键 -> 检查)\n"
                 "   • 切换到网络标签\n"
@@ -266,4 +266,4 @@ class HunyuanModel(BasePlatform):
 
     def name(self) -> str:
         """Model name"""
-        return "hunyuan"
+        return "yuanbao"
