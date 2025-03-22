@@ -590,15 +590,13 @@ def main():
                 agent.run(selected_task)
                 return 0
         
-        # 如果没有选择预定义任务，进入交互模式
-        while True:
-            try:
-                user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
-                if not user_input:
-                    break
-                agent.run(user_input)
-            except Exception as e:
-                PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
+        try:
+            user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
+            if not user_input:
+                return 0
+            agent.run(user_input)
+        except Exception as e:
+            PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
     except Exception as e:
         PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
