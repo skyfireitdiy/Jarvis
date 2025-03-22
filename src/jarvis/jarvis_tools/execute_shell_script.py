@@ -31,7 +31,7 @@ class ShellScriptTool:
                 }
             
             # Create temporary script file
-            script_path = os.path.join(tempfile.gettempdir(), f"jarvis_script_{os.getpid()}.sh")
+            script_path = os.path.join(tempfile.gettempdir(), f"jarvis_shell_script_{os.getpid()}.sh")
             try:
                 with open(script_path, 'w', encoding='utf-8', errors="ignore") as f:
                     f.write(script_content)
