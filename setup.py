@@ -47,7 +47,8 @@ setup(
         "psutil>=7.0.0",
         "fastapi>=0.115.4",
         "uvicorn>=0.33.0",
-        "python-pptx>=1.0.0"
+        "python-pptx>=1.0.0",
+        "pandas>=2.0.0",
     ],
     entry_points={
         "console_scripts": [
