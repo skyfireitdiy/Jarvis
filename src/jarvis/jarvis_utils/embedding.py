@@ -406,3 +406,96 @@ def load_rerank_model() -> Tuple[AutoModelForSequenceClassification, AutoTokeniz
     _global_tokenizers[f"{key}_tokenizer"] = tokenizer
     
     return model, tokenizer # type: ignore
+
+def rerank_results(query: str, documents: List[str], initial_scores: Optional[List[float]] = None, 
+                  batch_size: int = 8, spinner: Optional[Yaspin] = None) -> List[float]:
+    """
+    使用交叉编码器重排序检索结果，提高RAG精度。
+    
+    参数：
+        query: 查询文本
+        documents: 要重排序的文档内容列表
+        initial_scores: 初始检索分数，可选。如果提供，将与重排序分数融合
+        batch_size: 批处理大小
+        spinner: 可选的进度指示器
+        
+    返回：
+        List[float]: 重排序后的分数列表，与输入文档对应
+    """
+    try:
+        if not documents:
+            return []
+            
+        # 加载重排序模型
+        if spinner:
+            spinner.text = "加载重排序模型..."
+        model, tokenizer = load_rerank_model()
+        
+        # 准备评分
+        all_scores = []
+        
+        # 批量处理
+        for i in range(0, len(documents), batch_size):
+            if spinner:
+                spinner.text = f"重排序进度: {i}/{len(documents)}..."
+                
+            # 准备当前批次
+            batch_docs = documents[i:i+batch_size]
+            pairs = [(query, doc) for doc in batch_docs]
+            
+            # 编码输入
+            with torch.no_grad():
+                # 使用类型忽略以避免mypy错误
+                inputs = tokenizer(  # type: ignore
+                    pairs,
+                    padding=True,
+                    truncation=True,
+                    return_tensors="pt",
+                    max_length=512
+                )
+                
+                # 使用GPU加速（如果可用）
+                if torch.cuda.is_available():
+                    inputs = {k: v.cuda() for k, v in inputs.items()}
+                
+                # 获取分数
+                outputs = model(**inputs)  # type: ignore
+                scores = outputs.logits.squeeze(-1).cpu().tolist()
+                
+                # 如果只有一个文档，确保返回列表
+                if len(batch_docs) == 1:
+                    all_scores.append(float(scores))
+                else:
+                    all_scores.extend(scores)
+        
+        # 归一化分数到0-1范围
+        if all_scores:
+            min_score = min(all_scores)
+            max_score = max(all_scores)
+            if max_score > min_score:
+                normalized_scores = [(score - min_score) / (max_score - min_score) for score in all_scores]
+            else:
+                normalized_scores = [0.5] * len(all_scores)
+                
+            # 融合初始分数（如果提供）
+            if initial_scores and len(initial_scores) == len(normalized_scores):
+                # 使用加权平均融合分数：初始分数权重0.3，重排序分数权重0.7
+                final_scores = [0.3 * init_score + 0.7 * rerank_score 
+                               for init_score, rerank_score in zip(initial_scores, normalized_scores)]
+                return final_scores
+                
+            return normalized_scores
+            
+        if spinner:
+            spinner.text = "重排序完成"
+            
+        # 如果重排序失败，返回初始分数或默认分数
+        return initial_scores if initial_scores else [0.5] * len(documents)
+        
+    except Exception as e:
+        PrettyOutput.print(f"重排序失败: {str(e)}", OutputType.ERROR)
+        if spinner:
+            spinner.text = f"重排序失败: {str(e)}"
+            
+        # 发生错误时回退到初始分数
+        return initial_scores if initial_scores else [0.5] * len(documents)

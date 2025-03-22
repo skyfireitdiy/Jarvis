@@ -14,11 +14,29 @@ from threading import Lock
 import hashlib
 
 from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_thread_count, get_rag_ignored_paths
-from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model
+from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model, rerank_results
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import  ct, get_file_md5, init_env, init_gpu_config, ot
 
 from .file_processors import TextFileProcessor, PDFProcessor, DocxProcessor, PPTProcessor, ExcelProcessor
+
+"""
+Jarvis RAG (Retrieval-Augmented Generation) Module
+
+这个模块实现了高效的本地RAG系统，具有以下特性：
+1. 多格式文档处理（文本、PDF、Word、PPT、Excel）
+2. 高效向量检索与关键词匹配相结合的混合搜索
+3. 交叉编码器重排序，大幅提升检索准确性
+4. 增量更新检测，避免重复处理
+5. 自动上下文扩展，提供更完整信息
+6. 针对RAG优化的文本分割，保持语义完整性
+7. 缓存机制，提高反复查询性能
+8. 批处理向量化，优化内存和计算资源使用
+9. 多线程处理能力
+10. GPU加速（如果可用）
+
+适用于：代码库文档检索、知识库问答、本地资料分析等场景
+"""
 
 @dataclass
 class Document:
@@ -1102,6 +1120,49 @@ class RAGTool:
             spinner.text = f"检索完成，获取 {len(initial_indices)} 个候选文档"
             spinner.ok("✅")
         
+        indices_list = [idx for idx, _ in search_results if idx < len(self.documents)]
+        
+        # 应用重排序优化检索结果
+        with yaspin(text="执行重排序...", color="cyan") as spinner:
+            # 准备重排序所需文档内容和初始分数
+            docs_to_rerank = []
+            initial_scores = []
+            
+            for idx, score in search_results:
+                if idx < len(self.documents):
+                    doc = self.documents[idx]
+                    # 获取原始文档内容
+                    doc_content = f"File:{doc.metadata['file_path']} Content:{doc.content}"
+                    docs_to_rerank.append(doc_content)
+                    initial_scores.append(score)
+            
+            if not docs_to_rerank:
+                spinner.text = "没有可重排序的文档"
+                spinner.fail("❌")
+                return []
+                
+            # 执行重排序
+            spinner.text = f"重排序 {len(docs_to_rerank)} 个文档..."
+            reranked_scores = rerank_results(
+                query=query,
+                documents=docs_to_rerank,
+                initial_scores=initial_scores,
+                spinner=spinner
+            )
+            
+            # 更新搜索结果的分数
+            search_results = []
+            for i, idx in enumerate(indices_list):
+                if i < len(reranked_scores):
+                    search_results.append((idx, reranked_scores[i]))
+            
+            # 按分数重新排序
+            search_results.sort(key=lambda x: x[1], reverse=True)
+            
+            spinner.text = "重排序完成"
+            spinner.ok("✅")
+        
+        # 重新获取排序后的索引列表
         indices_list = [idx for idx, _ in search_results if idx < len(self.documents)]
         
         # Process results with context window
