@@ -12,19 +12,19 @@ class HunyuanModel(BasePlatform):
     platform_name = "yuanbao"
 
     def get_model_list(self) -> List[Tuple[str, str]]:
-        """Get model list"""
+        """获取支持的模型列表"""
         return [("deep_seek", "DeepSeek-R1"), ("deep_seek_v3", "DeepSeek-v3"), ("hunyuan_gpt_175B_0404", "Tencent Hunyuan"), ("hunyuan_t1", "Tencent Hunyuan-T1")]
     
     def __init__(self):
         """
-        Initialize Hunyuan model
+        初始化Hunyuan模型
         """
         super().__init__()
-        self.conversation_id = ""
-        # Required headers for Hunyuan API
-        self.cookies = os.getenv("YUANBAO_COOKIES")
-        self.agent_id = os.getenv("YUANBAO_AGENT_ID")
-        self.web = os.getenv("YUANBAO_WEB", "false") == "true"
+        self.conversation_id = ""  # 会话ID，用于标识当前对话
+        # 从环境变量中获取必要参数
+        self.cookies = os.getenv("YUANBAO_COOKIES")  # 认证cookies
+        self.agent_id = os.getenv("YUANBAO_AGENT_ID")  # 代理ID
+        self.web = os.getenv("YUANBAO_WEB", "false") == "true"  # 是否启用网页功能
         
         if not self.cookies:
             message = (
@@ -48,9 +48,9 @@ class HunyuanModel(BasePlatform):
             PrettyOutput.print(message, OutputType.INFO)
             PrettyOutput.print("YUANBAO_COOKIES 未设置", OutputType.WARNING)
         
-        self.system_message = ""
-        self.first_chat = True
-        self.model_name = "deepseek_v3"  # 默认模型
+        self.system_message = ""  # 系统消息，用于初始化对话
+        self.first_chat = True  # 标识是否为第一次对话
+        self.model_name = "deepseek_v3"  # 默认模型名称
 
     def set_system_message(self, message: str):
         """Set system message"""
