@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-
+import concurrent.futures
 from regex import W
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -7,7 +7,7 @@ from jarvis.jarvis_tools.read_webpage import WebpageTool
 from playwright.sync_api import sync_playwright
 from urllib.parse import quote
 
-from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.config import get_max_token_count, get_thread_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
@@ -236,18 +236,60 @@ class SearchTool:
                     "stderr": "No search results found"
                 }
             
+            # Read webpages in parallel using ThreadPoolExecutor
             contents = []
-            for i, result in enumerate(results, 1):
+            
+            # Print starting message
+            PrettyOutput.print(f"开始并行读取 {len(results)} 个网页结果...", OutputType.INFO)
+            
+            def fetch_webpage(result_info):
+                """Function to fetch a single webpage in a separate thread"""
+                idx, result = result_info
                 try:
-                    PrettyOutput.print(f"正在读取结果 {i}/{len(results)}... {result['title']} - {result['href']}", OutputType.PROGRESS)
+                    # Removed progress print here to avoid mixed output
                     webpage_result = self.webpage_tool.execute({"url": result["href"]})
                     if webpage_result["success"]:
-                        contents.append(f"\nSource {i}: {result['href']}\n")
-                        contents.append(webpage_result["stdout"])
+                        return idx, result, webpage_result["stdout"], True
+                    return idx, result, None, False
                 except Exception as e:
-                    PrettyOutput.print(f"读取结果失败 {i}: {str(e)}", OutputType.WARNING)
-                    continue
+                    return idx, result, str(e), False
             
+            # Use ThreadPoolExecutor for parallel processing
+            processed_results = []
+            with yaspin(text="正在并行读取网页内容...", color="cyan") as spinner:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=get_thread_count()) as executor:
+                    # Submit all webpage fetch tasks
+                    future_to_result = {
+                        executor.submit(fetch_webpage, (i, result)): i 
+                        for i, result in enumerate(results)
+                    }
+                    
+                    # Collect results as they complete
+                    for future in concurrent.futures.as_completed(future_to_result):
+                        processed_results.append(future.result())
+                        # Update spinner with current progress
+                        spinner.text = f"正在并行读取网页内容... ({len(processed_results)}/{len(results)})"
+                
+                spinner.text = "网页内容读取完成"
+                spinner.ok("✅")
+            
+            # Sort results by original index to maintain ordering
+            processed_results.sort(key=lambda x: x[0])
+            
+            # Print results in order and add to contents
+            PrettyOutput.section("搜索结果概览", OutputType.INFO)
+            
+            output = ""
+            for idx, result, content, success in processed_results:
+                if success:
+                    output += f"✅ 读取结果 {idx+1}/{len(results)} 完成: {result['title']} - {result['href']}\n"
+                    contents.append(f"\nSource {idx+1}: {result['href']}\n")
+                    contents.append(content)
+                else:
+                    output += f"❌ 读取结果 {idx+1}/{len(results)} 失败: {result['title']} - {result['href']} - 错误: {content}\n"
+            
+            PrettyOutput.print(output, OutputType.INFO)
+
             if not contents:
                 return {
                     "success": False,
