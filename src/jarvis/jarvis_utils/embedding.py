@@ -152,7 +152,7 @@ def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spi
                     batch_to_process, 
                     normalize_embeddings=True,
                     show_progress_bar=False,
-                    convert_to_numpy=True
+                    convert_to_numpy=True,
                 )
                 
                 # 处理结果并更新缓存
@@ -324,97 +324,6 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
     
     return chunks
 
-def get_embedding_with_chunks(embedding_model: Any, text: str, batch_size: int = 8) -> List[np.ndarray]:
-    """
-    为文本块生成嵌入向量，针对RAG优化，使用批处理提高效率。
-    
-    参数：
-        embedding_model: 使用的嵌入模型
-        text: 要处理的输入文本
-        batch_size: 批处理大小
-        
-    返回：
-        List[np.ndarray]: 每个块的嵌入向量列表
-    """
-    # 预处理文本
-    text = ' '.join(text.split()) if text else ""
-    chunks = split_text_into_chunks(text, 512)
-    if not chunks:
-        return []
-    
-    # 简单缓存机制，避免重复计算相同文本的嵌入
-    embedding_cache = {}
-    
-    # 使用批处理模式一次性处理多个块
-    vectors = []
-    for i in range(0, len(chunks), batch_size):
-        batch = chunks[i:i+batch_size]
-        batch_to_process = []
-        batch_indices = {}  # 记录原始索引
-        
-        # 检查缓存
-        for j, chunk in enumerate(batch):
-            chunk_hash = hash(chunk)
-            if chunk_hash in embedding_cache:
-                vectors.append(embedding_cache[chunk_hash])
-            else:
-                batch_indices[len(batch_to_process)] = j
-                batch_to_process.append(chunk)
-        
-        if batch_to_process:
-            # 处理未缓存的块
-            batch_embeddings = embedding_model.encode(
-                batch_to_process, 
-                normalize_embeddings=True,
-                show_progress_bar=False,
-                convert_to_numpy=True
-            )
-            
-            # 处理返回结果，确保是向量列表
-            if len(batch_to_process) == 1:
-                vec = batch_embeddings
-                chunk_hash = hash(batch_to_process[0])
-                embedding_cache[chunk_hash] = vec
-                
-                # 找到原始位置插入
-                orig_idx = batch_indices[0]
-                while len(vectors) <= i + orig_idx:
-                    vectors.append(None)
-                vectors[i + orig_idx] = vec
-            else:
-                for j, vec in enumerate(batch_embeddings):
-                    chunk_hash = hash(batch_to_process[j])
-                    embedding_cache[chunk_hash] = vec
-                    
-                    # 找到原始位置插入
-                    if j in batch_indices:
-                        orig_idx = batch_indices[j]
-                        while len(vectors) <= i + orig_idx:
-                            vectors.append(None)
-                        vectors[i + orig_idx] = vec
-    
-    # 移除可能的None值
-    vectors = [v for v in vectors if v is not None]
-    
-    # 针对RAG的优化：调整段落权重
-    if len(vectors) > 1:
-        # 前面的块通常包含更重要的信息，给予更高权重
-        adjusted_vectors = []
-        for i, vec in enumerate(vectors):
-            # 根据位置赋予衰减权重（前面的段落权重更高）
-            position_weight = 1.0 - (i * 0.05)  # 最多衰减0.05每个位置
-            position_weight = max(0.7, position_weight)  # 确保最小权重为0.7
-            
-            # 应用权重并重新归一化
-            weighted_vec = vec * position_weight
-            norm = np.linalg.norm(weighted_vec)
-            if norm > 0:
-                weighted_vec = weighted_vec / norm
-            
-            adjusted_vectors.append(weighted_vec)
-        return adjusted_vectors
-    
-    return vectors
 
 @functools.lru_cache(maxsize=1)
 def load_tokenizer() -> AutoTokenizer:
