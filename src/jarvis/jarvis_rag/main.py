@@ -149,7 +149,7 @@ class PPTProcessor(FileProcessor):
         for slide in prs.slides:
             for shape in slide.shapes:
                 if hasattr(shape, "text"):
-                    text.append(shape.text)
+                    text.append(shape.text)  # type: ignore
         return "\n".join(text)
 
 class ExcelProcessor(FileProcessor):
