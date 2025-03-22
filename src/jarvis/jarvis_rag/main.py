@@ -989,7 +989,6 @@ class RAGTool:
                     if extracted_keywords:
                         # 记录检测到的关键词
                         ret = extracted_keywords.strip().splitlines()
-                        PrettyOutput.print(f"从查询中提取的关键词: {ret}", OutputType.DEBUG)
                         return ret
                 
             # 如果处理失败，返回空列表
