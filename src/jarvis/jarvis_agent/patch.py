@@ -188,7 +188,10 @@ def apply_patch(output_str: str) -> str:
             PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
             if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
                 return final_ret
-            return final_ret + "\n\n" + get_multiline_input("请输入自定义回复")
+            custom_reply = get_multiline_input("请输入自定义回复")
+            if not custom_reply.strip():  # 如果自定义回复为空，返回空字符串
+                return ""
+            return final_ret + "\n\n" + custom_reply
 
 def revert_file(filepath: str):
     """增强版git恢复，处理新文件"""
