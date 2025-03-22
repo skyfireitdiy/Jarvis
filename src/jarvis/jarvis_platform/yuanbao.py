@@ -22,13 +22,13 @@ class HunyuanModel(BasePlatform):
         super().__init__()
         self.conversation_id = ""
         # Required headers for Hunyuan API
-        self.cookies = os.getenv("HUNYUAN_COOKIES")
-        self.agent_id = os.getenv("HUNYUAN_AGENT_ID")
-        self.web = os.getenv("HUNYUAN_WEB", "false") == "true"
+        self.cookies = os.getenv("YUANBAO_COOKIES")
+        self.agent_id = os.getenv("YUANBAO_AGENT_ID")
+        self.web = os.getenv("YUANBAO_WEB", "false") == "true"
         
         if not self.cookies:
             message = (
-                "需要设置 HUNYUAN_COOKIES 和 HUNYUAN_AGENT_ID 才能使用 Jarvis 的元宝功能。请按照以下步骤操作：\n"
+                "需要设置 YUANBAO_COOKIES 和 YUANBAO_AGENT_ID 才能使用 Jarvis 的元宝功能。请按照以下步骤操作：\n"
                 "1. 获取元宝 API 参数:\n"
                 "   • 访问元宝平台: https://yuanbao.tencent.com\n"
                 "   • 登录您的账户\n" 
@@ -38,15 +38,15 @@ class HunyuanModel(BasePlatform):
                 "   • 在请求中找到 X-Uskey 和 T-UserID 头部值\n"
                 "2. 设置环境变量:\n"
                 "   • 方法 1: 创建或编辑 ~/.jarvis/env 文件:\n"
-                "   echo 'HUNYUAN_COOKIES=your_cookies_here' >> ~/.jarvis/env\n"
-                "   echo 'HUNYUAN_AGENT_ID=your_agent_id_here' >> ~/.jarvis/env\n"
+                "   echo 'YUANBAO_COOKIES=your_cookies_here' >> ~/.jarvis/env\n"
+                "   echo 'YUANBAO_AGENT_ID=your_agent_id_here' >> ~/.jarvis/env\n"
                 "   • 方法 2: 直接设置环境变量:\n"
-                "   export HUNYUAN_COOKIES=your_cookies_here\n"
-                "   export HUNYUAN_AGENT_ID=your_agent_id_here\n"
+                "   export YUANBAO_COOKIES=your_cookies_here\n"
+                "   export YUANBAO_AGENT_ID=your_agent_id_here\n"
                 "设置后，重新运行 Jarvis。"
             )
             PrettyOutput.print(message, OutputType.INFO)
-            PrettyOutput.print("HUNYUAN_COOKIES 未设置", OutputType.WARNING)
+            PrettyOutput.print("YUANBAO_COOKIES 未设置", OutputType.WARNING)
         
         self.system_message = ""
         self.first_chat = True
