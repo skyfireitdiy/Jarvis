@@ -191,7 +191,10 @@ def apply_patch(output_str: str) -> str:
             custom_reply = get_multiline_input("请输入自定义回复")
             if not custom_reply.strip():  # 如果自定义回复为空，返回空字符串
                 return ""
-            return final_ret + "\n\n" + custom_reply
+            if not commited:
+                return final_ret + "\n\n" + custom_reply
+            else:
+                return custom_reply
 
 def revert_file(filepath: str):
     """增强版git恢复，处理新文件"""
