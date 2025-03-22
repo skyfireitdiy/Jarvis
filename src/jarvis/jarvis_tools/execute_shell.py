@@ -51,9 +51,7 @@ class ShellTool:
             
             # Write command to script file
             with open(script_file, 'w', encoding='utf-8') as f:
-                f.write(f"#!/bin/bash
-{command}
-")
+                f.write(f"#!/bin/bash\n{command}")
             
             # Use script command to capture both stdout and stderr
             tee_command = f"script -q -c 'bash {script_file}' {output_file}"
