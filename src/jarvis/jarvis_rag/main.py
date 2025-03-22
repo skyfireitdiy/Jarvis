@@ -327,15 +327,26 @@ class RAGTool:
             spinner.text = f"索引构建完成，共 {vectors.shape[0]} 个向量"
 
     def _split_text(self, text: str) -> List[str]:
-        """Use a more intelligent splitting strategy"""
-        # Add overlapping blocks to maintain context consistency
-        overlap_size = min(200, self.max_paragraph_length // 4)
+        """使用基于token计数的更智能的分割策略
         
+        Args:
+            text: 要分割的文本
+            
+        Returns:
+            List[str]: 分割后的段落列表
+        """
+        from jarvis.jarvis_utils.embedding import get_context_token_count
+        
+        # 计算可用的最大和最小token数
+        max_tokens = int(self.max_paragraph_length * 0.25)  # 字符长度转换为大致token数
+        min_tokens = int(self.min_paragraph_length * 0.25)  # 字符长度转换为大致token数
+        
+        # 添加重叠块以保持上下文一致性
         paragraphs = []
         current_chunk = []
-        current_length = 0
+        current_token_count = 0
         
-        # First split by sentence
+        # 首先按句子分割
         sentences = []
         current_sentence = []
         sentence_ends = {'。', '！', '？', '…', '.', '!', '?'}
@@ -353,30 +364,47 @@ class RAGTool:
             if sentence.strip():
                 sentences.append(sentence)
         
-        # Build overlapping blocks based on sentences
+        # 基于句子构建重叠块
         for sentence in sentences:
-            if current_length + len(sentence) > self.max_paragraph_length:
+            # 计算当前句子的token数
+            sentence_token_count = get_context_token_count(sentence)
+            
+            # 检查添加此句子是否会超过最大token限制
+            if current_token_count + sentence_token_count > max_tokens:
                 if current_chunk:
                     chunk_text = ' '.join(current_chunk)
-                    if len(chunk_text) >= self.min_paragraph_length:
+                    chunk_token_count = get_context_token_count(chunk_text)
+                    
+                    if chunk_token_count >= min_tokens:
                         paragraphs.append(chunk_text)
+                    
+                    # 保留一些内容作为重叠
+                    # 保留最后两个句子作为重叠部分
+                    if len(current_chunk) >= 2:
+                        overlap_text = ' '.join(current_chunk[-2:])
+                        overlap_token_count = get_context_token_count(overlap_text)
                         
-                    # Keep some content as overlap
-                    overlap_text = ' '.join(current_chunk[-2:])  # Keep the last two sentences
-                    current_chunk = []
-                    if overlap_text:
-                        current_chunk.append(overlap_text)
-                        current_length = len(overlap_text)
+                        current_chunk = []
+                        if overlap_text:
+                            current_chunk.append(overlap_text)
+                            current_token_count = overlap_token_count
+                        else:
+                            current_token_count = 0
                     else:
-                        current_length = 0
-                        
+                        # 如果当前块中句子不足两个，就重置
+                        current_chunk = []
+                        current_token_count = 0
+            
+            # 添加当前句子到块中
             current_chunk.append(sentence)
-            current_length += len(sentence)
+            current_token_count += sentence_token_count
         
-        # Process the last chunk
+        # 处理最后一个块
         if current_chunk:
             chunk_text = ' '.join(current_chunk)
-            if len(chunk_text) >= self.min_paragraph_length:
+            chunk_token_count = get_context_token_count(chunk_text)
+            
+            if chunk_token_count >= min_tokens:
                 paragraphs.append(chunk_text)
         
         return paragraphs
@@ -1094,6 +1122,23 @@ class RAGTool:
                 gpu_failed = False
                 
                 try:
+                    # 如果使用GPU，先将模型移动到GPU上
+                    if use_gpu:
+                        try:
+                            rerank_model = rerank_model.cuda()
+                            if spinner:
+                                spinner.text = "模型已加载到GPU"
+                        except Exception as e:
+                            if spinner:
+                                spinner.text = f"模型加载到GPU失败({str(e)})，切换到CPU..."
+                            use_gpu = False
+                            gpu_failed = True
+                            # 确保模型在CPU上
+                            rerank_model = rerank_model.cpu() # type: ignore
+                    else:
+                        # 确保模型在CPU上
+                        rerank_model = rerank_model.cpu() # type: ignore
+                    
                     for i in range(0, len(rerank_candidates), batch_size):
                         batch = rerank_candidates[i:i+batch_size]
                         # 准备重排序模型的输入
@@ -1115,17 +1160,18 @@ class RAGTool:
                                 model_inputs = {k: v.cuda() for k, v in model_inputs.items()}
                             except Exception as gpu_error:
                                 if spinner:
-                                    spinner.text = f"GPU加载失败({str(gpu_error)})，切换到CPU..."
+                                    spinner.text = f"张量移动到GPU失败，切换到CPU..."
                                 use_gpu = False
                                 gpu_failed = True
                                 # 重新开始本批次，使用CPU
+                                rerank_model = rerank_model.cpu()
                                 raise RuntimeError("GPU加载失败，切换到CPU") from gpu_error
                         
                         # 使用当前设备计算重排序得分
                         with torch.no_grad():
                             outputs = rerank_model(**model_inputs) # type: ignore
                             scores = outputs.logits
-                            scores = scores.detach().cpu().numpy()
+                            scores = scores.detach().cpu().numpy()  # 始终将结果转回CPU进行处理
                             all_scores.extend(scores.squeeze().tolist())
                             
                         if spinner and i + batch_size < len(rerank_candidates):
@@ -1141,6 +1187,14 @@ class RAGTool:
                         all_scores = []
                         use_gpu = False
                         
+                        # 确保模型在CPU上
+                        try:
+                            rerank_model = rerank_model.cpu() # type: ignore
+                        except Exception:
+                            # 如果移动失败，尝试重新加载模型
+                            with spinner.hidden() if spinner else contextlib.nullcontext():
+                                rerank_model, rerank_tokenizer = load_rerank_model()
+                        
                         # 使用CPU重新处理所有批次
                         for i in range(0, len(rerank_candidates), batch_size):
                             batch = rerank_candidates[i:i+batch_size]
@@ -1153,16 +1207,21 @@ class RAGTool:
                                 inputs,
                                 padding=True,
                                 truncation=True,
-                                return_tensors="pt",
+                                return_tensors="pt",  # 确保张量在CPU上
                                 max_length=512
                             )
                             
                             # 确保在CPU上处理
-                            with torch.no_grad():
-                                outputs = rerank_model(**model_inputs) # type: ignore
-                                scores = outputs.logits
-                                scores = scores.detach().cpu().numpy()
-                                all_scores.extend(scores.squeeze().tolist())
+                            try:
+                                with torch.no_grad():
+                                    outputs = rerank_model(**model_inputs) # type: ignore
+                                    scores = outputs.logits
+                                    scores = scores.detach().cpu().numpy()
+                                    all_scores.extend(scores.squeeze().tolist())
+                            except Exception as cpu_error:
+                                if spinner:
+                                    spinner.text = f"CPU处理也失败 ({str(cpu_error)})，将返回原始结果"
+                                raise
                                 
                             if spinner and i + batch_size < len(rerank_candidates):
                                 spinner.text = f"CPU重排序进度: {i + batch_size}/{len(rerank_candidates)}"
@@ -1334,8 +1393,12 @@ class RAGTool:
             results = self.search(enhanced_query)
             if not results:
                 return "未找到与问题相关的文档。请尝试重新表述问题或确认问题相关内容已包含在索引中。"
+
+            # 模型实例
+            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
             
-            prompt = f"""
+            # 计算基础提示词的token数量
+            base_prompt = f"""
 # 🤖 角色定义
 您是一位文档分析专家，能够基于提供的文档提供准确且全面的回答。
 
@@ -1372,77 +1435,9 @@ class RAGTool:
 
 # 🔍 分析上下文
 问题: {question}
-
-相关文档（按相关性排序）：
 """
-
-            # Add context with length control and deduplication
-            with yaspin(text="添加上下文...", color="cyan") as spinner:
-                available_count = self.max_token_count - get_context_token_count(prompt) - 1000
-                current_count = 0
-                
-                # 保存已添加的内容指纹，避免重复
-                added_content_hashes = set()
-                
-                # 分组文档，按文件路径整理
-                file_groups = {}
-                for doc, score in results:
-                    file_path = doc.metadata['file_path']
-                    if file_path not in file_groups:
-                        file_groups[file_path] = []
-                    file_groups[file_path].append((doc, score))
-                
-                # 按文件添加文档片段
-                for file_path, docs in file_groups.items():
-                    # 按相关性排序
-                    docs.sort(key=lambda x: x[1], reverse=True)
-                    
-                    # 添加文件信息
-                    file_header = f"\n## 文件: {file_path}\n"
-                    if current_count + get_context_token_count(file_header) > available_count:
-                        break
-                    
-                    prompt += file_header
-                    current_count += get_context_token_count(file_header)
-                    
-                    # 添加最相关的文档片段
-                    added_count = 0
-                    for doc, score in docs:
-                        # 计算内容指纹以避免重复
-                        content_hash = hash(doc.content)
-                        if content_hash in added_content_hashes:
-                            continue
-                            
-                        # 如果内容相似度低于阈值，跳过
-                        if score < 0.2:
-                            continue
-                            
-                        # 格式化文档片段
-                        doc_content = f"""
-### 片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']} [相关度: {score:.2f}]
-```
-{doc.content}
-```
-"""
-                        if current_count + get_context_token_count(doc_content) > available_count:
-                            break
-                            
-                        prompt += doc_content
-                        current_count += get_context_token_count(doc_content)
-                        added_content_hashes.add(content_hash)
-                        added_count += 1
-                        
-                        # 每个文件最多添加3个最相关的片段
-                        if added_count >= 3:
-                            break
-                
-                if current_count >= available_count:
-                    PrettyOutput.print(
-                        "由于上下文长度限制，部分内容被省略",
-                        output_type=OutputType.WARNING
-                    )
-
-                prompt += """
+            base_token_count = get_context_token_count(base_prompt)
+            footer_prompt = """
 # ❗ 重要规则
 1. 仅使用提供的文档
 2. 保持精确和准确
@@ -1451,15 +1446,273 @@ class RAGTool:
 5. 保持专业语气
 6. 使用用户的语言回答
 """
-                spinner.text = "添加上下文完成"
+            footer_token_count = get_context_token_count(footer_prompt)
+            
+            # 每批可用的token数，减去一些安全余量
+            available_tokens_per_batch = self.max_token_count - base_token_count - footer_token_count - 1000
+            
+            # 确定是否需要分批处理
+            with yaspin(text="计算文档上下文大小...", color="cyan") as spinner:
+                # 将结果按文件分组
+                file_groups = {}
+                for doc, score in results:
+                    file_path = doc.metadata['file_path']
+                    if file_path not in file_groups:
+                        file_groups[file_path] = []
+                    file_groups[file_path].append((doc, score))
+                
+                # 计算所有文档的总token数
+                total_docs_tokens = 0
+                for file_path, docs in file_groups.items():
+                    file_header = f"\n## 文件: {file_path}\n"
+                    file_tokens = get_context_token_count(file_header)
+                    
+                    for doc, score in docs[:3]:  # 每个文件最多考虑3个片段
+                        if score < 0.2:  # 过滤低相关性的文档
+                            continue
+                        
+                        doc_content = f"""
+### 片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']} [相关度: {score:.2f}]
+```
+{doc.content}
+```
+"""
+                        file_tokens += get_context_token_count(doc_content)
+                    
+                    total_docs_tokens += file_tokens
+                
+                # 确定是否需要分批处理及分几批
+                need_batching = total_docs_tokens > available_tokens_per_batch
+                batch_count = 1
+                if need_batching:
+                    batch_count = (total_docs_tokens + available_tokens_per_batch - 1) // available_tokens_per_batch
+                
+                if need_batching:
+                    spinner.text = f"文档需要分 {batch_count} 批处理 (总计 {total_docs_tokens} tokens)"
+                else:
+                    spinner.text = f"文档无需分批 (总计 {total_docs_tokens} tokens)"
                 spinner.ok("✅")
+            
+            # 单批处理直接使用原方法
+            if not need_batching:
+                with yaspin(text="添加上下文...", color="cyan") as spinner:
+                    prompt = base_prompt
+                    current_count = base_token_count
+                    
+                    # 保存已添加的内容指纹，避免重复
+                    added_content_hashes = set()
+                    
+                    # 按文件添加文档片段
+                    for file_path, docs in file_groups.items():
+                        # 按相关性排序
+                        docs.sort(key=lambda x: x[1], reverse=True)
+                        
+                        # 添加文件信息
+                        file_header = f"\n## 文件: {file_path}\n"
+                        if current_count + get_context_token_count(file_header) > available_tokens_per_batch:
+                            break
+                        
+                        prompt += file_header
+                        current_count += get_context_token_count(file_header)
+                        
+                        # 添加最相关的文档片段
+                        added_count = 0
+                        for doc, score in docs:
+                            # 计算内容指纹以避免重复
+                            content_hash = hash(doc.content)
+                            if content_hash in added_content_hashes:
+                                continue
+                                
+                            # 如果内容相似度低于阈值，跳过
+                            if score < 0.2:
+                                continue
+                                
+                            # 格式化文档片段
+                            doc_content = f"""
+### 片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']} [相关度: {score:.2f}]
+```
+{doc.content}
+```
+"""
+                            if current_count + get_context_token_count(doc_content) > available_tokens_per_batch:
+                                break
+                                
+                            prompt += doc_content
+                            current_count += get_context_token_count(doc_content)
+                            added_content_hashes.add(content_hash)
+                            added_count += 1
+                            
+                            # 每个文件最多添加3个最相关的片段
+                            if added_count >= 3:
+                                break
+                    
+                    prompt += footer_prompt
+                    spinner.text = "添加上下文完成"
+                    spinner.ok("✅")
 
-            with yaspin(text="正在生成答案...", color="cyan") as spinner:
-                model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-                response = model.chat_until_success(prompt)
-                spinner.text = "答案生成完成"
-                spinner.ok("✅")
-                return response
+                # 直接生成答案
+                with yaspin(text="正在生成答案...", color="cyan") as spinner:
+                    response = model.chat_until_success(prompt)
+                    spinner.text = "答案生成完成"
+                    spinner.ok("✅")
+                    return response
+            
+            # 分批处理文档
+            else:
+                batch_responses = []
+                
+                # 准备批次
+                with yaspin(text=f"准备分批处理 (共{batch_count}批)...", color="cyan") as spinner:
+                    batches = []
+                    current_batch = []
+                    current_batch_tokens = 0
+                    
+                    # 按相关性排序处理文件
+                    sorted_files = sorted(file_groups.items(), 
+                                        key=lambda x: max(score for _, score in x[1]) if x[1] else 0, 
+                                        reverse=True)
+                    
+                    for file_path, docs in sorted_files:
+                        # 按相关性排序文档
+                        docs.sort(key=lambda x: x[1], reverse=True)
+                        
+                        # 处理每个文件的文档
+                        file_header = f"\n## 文件: {file_path}\n"
+                        file_header_tokens = get_context_token_count(file_header)
+                        
+                        # 如果当前批次添加这个文件会超过限制，创建新批次
+                        file_docs = []
+                        file_docs_tokens = 0
+                        
+                        # 计算此文件要添加的所有文档
+                        for doc, score in docs[:3]:  # 每个文件最多处理3个片段
+                            if score < 0.2:  # 过滤低相关性文档
+                                continue
+                                
+                            doc_content = f"""
+### 片段 {doc.metadata['chunk_index'] + 1}/{doc.metadata['total_chunks']} [相关度: {score:.2f}]
+```
+{doc.content}
+```
+"""
+                            doc_tokens = get_context_token_count(doc_content)
+                            file_docs.append((doc, score, doc_content, doc_tokens))
+                            file_docs_tokens += doc_tokens
+                        
+                        # 如果此文件的内容加上文件头会导致当前批次超限，创建新批次
+                        if current_batch and (current_batch_tokens + file_header_tokens + file_docs_tokens > available_tokens_per_batch):
+                            batches.append(current_batch)
+                            current_batch = []
+                            current_batch_tokens = 0
+                        
+                        # 将文件及其文档添加到当前批次
+                        if file_docs:  # 如果有要添加的文档
+                            current_batch.append((file_path, file_header, file_docs))
+                            current_batch_tokens += file_header_tokens + file_docs_tokens
+                    
+                    # 添加最后一个批次
+                    if current_batch:
+                        batches.append(current_batch)
+                    
+                    spinner.text = f"分批准备完成，共 {len(batches)} 批"
+                    spinner.ok("✅")
+                
+                # 处理每个批次
+                for batch_idx, batch in enumerate(batches):
+                    with yaspin(text=f"处理批次 {batch_idx+1}/{len(batches)}...", color="cyan") as spinner:
+                        # 构建批次提示词
+                        batch_prompt = base_prompt + f"\n\n## 批次 {batch_idx+1}/{len(batches)} 的相关文档：\n"
+                        
+                        # 添加批次中的文档
+                        for file_path, file_header, file_docs in batch:
+                            batch_prompt += file_header
+                            
+                            for doc, score, doc_content, _ in file_docs:
+                                batch_prompt += doc_content
+                        
+                        # 为最后一个批次添加总结指令，为中间批次添加部分分析指令
+                        if batch_idx == len(batches) - 1:
+                            # 最后一个批次，添加总结所有批次的指令
+                            if len(batches) > 1:
+                                batch_prompt += f"""
+# 📊 汇总分析
+这是最后一批文档。请基于此批次和之前批次的分析，提供一个全面的最终回答。
+"""
+                            batch_prompt += footer_prompt
+                        else:
+                            # 中间批次，添加部分分析指令
+                            batch_prompt += f"""
+# 📝 批次分析
+这是第 {batch_idx+1}/{len(batches)} 批文档。请分析这批文档中与问题相关的信息。
+在你的分析中：
+1. 提取关键信息点
+2. 识别可能对最终答案有帮助的内容
+3. 简明扼要，重点关注与问题直接相关的内容
+4. 忽略与问题无关的内容
+"""
+                        
+                        spinner.text = f"正在分析批次 {batch_idx+1}/{len(batches)}..."
+                        
+                        # 调用模型处理当前批次
+                        batch_response = model.chat_until_success(batch_prompt)
+                        batch_responses.append(batch_response)
+                        
+                        spinner.text = f"批次 {batch_idx+1}/{len(batches)} 分析完成"
+                        spinner.ok("✅")
+                
+                # 如果只有一个批次，直接返回结果
+                if len(batch_responses) == 1:
+                    return batch_responses[0]
+                
+                # 如果有多个批次，需要汇总结果
+                with yaspin(text="汇总多批次分析结果...", color="cyan") as spinner:
+                    # 构建汇总提示词
+                    summary_prompt = f"""
+# 🔄 批次汇总任务
+
+## 原始问题
+{question}
+
+## 多批次分析结果
+你已经对相关文档进行了多批次分析，现在需要将这些分析结果汇总成一个连贯、全面的回答。
+
+以下是各批次的分析结果：
+
+"""
+                    
+                    # 添加每个批次的分析结果
+                    for i, response in enumerate(batch_responses):
+                        summary_prompt += f"""
+### 批次 {i+1} 分析结果
+{response}
+
+"""
+                    
+                    # 添加汇总指导
+                    summary_prompt += """
+## 汇总要求
+请基于以上所有批次的分析结果，提供一个综合、连贯的最终回答：
+
+1. 提取所有批次中的关键信息
+2. 解决可能存在的冲突信息
+3. 按照逻辑顺序组织内容
+4. 确保回答全面、准确
+5. 适当引用相关文档来源
+6. 使用用户的原始语言进行回答
+7. 避免不必要的重复
+
+请直接提供最终回答，不需要解释你的汇总过程。
+"""
+                    
+                    spinner.text = "正在生成最终汇总答案..."
+                    
+                    # 调用模型生成最终汇总
+                    final_response = model.chat_until_success(summary_prompt)
+                    
+                    spinner.text = "汇总答案生成完成"
+                    spinner.ok("✅")
+                    
+                    return final_response
             
         except Exception as e:
             PrettyOutput.print(f"回答失败：{str(e)}", OutputType.ERROR)
