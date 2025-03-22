@@ -104,7 +104,7 @@ class SearchTool:
             "max_results": {
                 "type": "integer",
                 "description": "最大搜索结果数量",
-                "default": 30
+                "default": 10
             }
         },
         "required": ["query", "question"]
@@ -279,16 +279,16 @@ class SearchTool:
             # Print results in order and add to contents
             PrettyOutput.section("搜索结果概览", OutputType.INFO)
             
-            output = ""
+            output = []
             for idx, result, content, success in processed_results:
                 if success:
-                    output += f"✅ 读取结果 {idx+1}/{len(results)} 完成: {result['title']} - {result['href']}\n"
+                    output.append(f"✅ 读取结果 {idx+1}/{len(results)} 完成: {result['title']} - {result['href']}")
                     contents.append(f"\nSource {idx+1}: {result['href']}\n")
                     contents.append(content)
                 else:
-                    output += f"❌ 读取结果 {idx+1}/{len(results)} 失败: {result['title']} - {result['href']} - 错误: {content}\n"
+                    output.append(f"❌ 读取结果 {idx+1}/{len(results)} 失败: {result['title']} - {result['href']}")
             
-            PrettyOutput.print(output, OutputType.INFO)
+            PrettyOutput.print("\n".join(output), OutputType.INFO)
 
             if not contents:
                 return {

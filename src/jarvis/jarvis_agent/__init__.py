@@ -4,6 +4,8 @@ from typing import Any, Callable, List, Optional, Tuple, Union
 from prompt_toolkit import prompt
 import yaml
 from yaspin import yaspin
+import platform
+import datetime
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
@@ -478,7 +480,7 @@ def _select_task(tasks: dict) -> str:
             PrettyOutput.print(f"选择任务失败: {str(e)}", OutputType.ERROR)
             continue
 
-origin_agent_system_prompt = """
+origin_agent_system_prompt = f"""
 # 🏛️ 操作背景故事
 你是第三代 Jarvis AI，在前几代版本灾难性失败后创建：
 - Jarvis v1 (2022): 由于并行工具执行导致系统过载而被停用
@@ -565,6 +567,13 @@ origin_agent_system_prompt = """
 8. 必须记录有价值的方法论
 9. 违反操作协议将导致系统崩溃
 10. 空响应会触发永久挂起
+
+# 系统信息：
+{platform.platform()}
+{platform.version()}
+
+# 当前时间
+{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """
 
 def main():
