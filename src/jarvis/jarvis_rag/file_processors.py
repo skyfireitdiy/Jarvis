@@ -1,7 +1,4 @@
-from typing import List
-import os
 from pathlib import Path
-from typing import Dict
 import fitz  # PyMuPDF for PDF files
 from docx import Document as DocxDocument  # python-docx for DOCX files
 from pptx import Presentation

@@ -6,7 +6,6 @@ import torch  # Add torch import
 from typing import List, Tuple, Optional, Dict
 import pickle
 from dataclasses import dataclass
-from tqdm import tqdm
 from pathlib import Path
 
 from yaspin import yaspin
@@ -16,11 +15,11 @@ from threading import Lock
 import hashlib
 
 from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_thread_count, get_rag_ignored_paths
-from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model, load_rerank_model
+from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import  ct, get_file_md5, init_env, init_gpu_config, ot
 
-from .file_processors import FileProcessor, TextFileProcessor, PDFProcessor, DocxProcessor, PPTProcessor, ExcelProcessor
+from .file_processors import TextFileProcessor, PDFProcessor, DocxProcessor, PPTProcessor, ExcelProcessor
 
 @dataclass
 class Document:
