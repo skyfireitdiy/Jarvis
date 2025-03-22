@@ -41,37 +41,22 @@ class ShellTool:
         """
         return cmd.replace("'", "'\"'\"'")
     def execute(self, args: Dict) -> Dict[str, Any]:
-        """Execute shell command and capture output
-        
-        Steps:
-        1. Validate and clean input command
-        2. Create temporary file for output capture
-        3. Execute command with output redirection
-        4. Read and process output file
-        5. Clean up temporary resources
-        6. Return structured results
-        
-        Args:
-            args: Dictionary containing 'command' parameter
-            
-        Returns:
-            Dictionary with:
-            - success: Boolean indicating command execution status
-            - stdout: Command output
-            - stderr: Error message if execution failed
-        """
         try:
             # Get and clean command input
             command = args["command"].strip()
             
             # Generate temporary file name using process ID for uniqueness
+            script_file = os.path.join(tempfile.gettempdir(), f"jarvis_shell_{os.getpid()}.sh")
             output_file = os.path.join(tempfile.gettempdir(), f"jarvis_shell_{os.getpid()}.log")
             
-            # Escape special characters in command to prevent injection
-            escaped_command = self._escape_command(command)
+            # Write command to script file
+            with open(script_file, 'w', encoding='utf-8') as f:
+                f.write(f"#!/bin/bash
+{command}
+")
             
             # Use script command to capture both stdout and stderr
-            tee_command = f"script -q -c '{escaped_command}' {output_file}"
+            tee_command = f"script -q -c 'bash {script_file}' {output_file}"
             
             # Execute command and capture return code
             os.system(tee_command)
@@ -80,7 +65,7 @@ class ShellTool:
             try:
                 with open(output_file, 'r', encoding='utf-8', errors='ignore') as f:
                     output = f.read()
-                    # Remove header and footer added by script command
+                    # Remove header and footer added by script command (if any)
                     if output:
                         lines = output.splitlines()
                         if len(lines) > 2:
@@ -88,7 +73,8 @@ class ShellTool:
             except Exception as e:
                 output = f"读取输出文件失败: {str(e)}"
             finally:
-                # Clean up temporary file
+                # Clean up temporary files
+                Path(script_file).unlink(missing_ok=True)
                 Path(output_file).unlink(missing_ok=True)
             
             # Return successful result
@@ -99,7 +85,9 @@ class ShellTool:
             }
                 
         except Exception as e:
-            # Ensure temporary file is cleaned up even if error occurs
+            # Ensure temporary files are cleaned up even if error occurs
+            if 'script_file' in locals():
+                Path(script_file).unlink(missing_ok=True)
             if 'output_file' in locals():
                 Path(output_file).unlink(missing_ok=True)
             PrettyOutput.print(str(e), OutputType.ERROR)
@@ -108,3 +96,4 @@ class ShellTool:
                 "stdout": "",
                 "stderr": str(e)
             }
+
