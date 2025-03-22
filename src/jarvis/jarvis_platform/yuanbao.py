@@ -200,7 +200,7 @@ class HunyuanModel(BasePlatform):
                         elif data.get("type") == "think" and not self.suppress_output:
                             think_content = data.get("content", "")
                             # 可以选择性地显示思考过程，但不加入最终响应
-                            PrettyOutput.print_stream(f"{think_content}")
+                            PrettyOutput.print_stream(f"{think_content}", is_thinking=True)
                             pass
                             
                     except json.JSONDecodeError:

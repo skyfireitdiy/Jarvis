@@ -205,7 +205,7 @@ class PrettyOutput:
         console.print(panel)
         console.print()
     @staticmethod
-    def print_stream(text: str):
+    def print_stream(text: str, is_thinking: bool = False):
         """
         打印流式输出，不带换行符。
         
@@ -213,6 +213,8 @@ class PrettyOutput:
             text: 要打印的文本
         """
         style = RichStyle(color="bright_cyan", bold=True, frame=True, meta={"icon": "🤖"})
+        if is_thinking:
+            style = RichStyle(color="grey58", italic=True, frame=True, meta={"icon": "🤖"})
         console.print(text, style=style, end="")
     @staticmethod
     def print_stream_end():
