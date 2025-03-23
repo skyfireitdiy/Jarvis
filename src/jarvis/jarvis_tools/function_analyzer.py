@@ -184,13 +184,22 @@ class FunctionAnalyzerTool:
 - 排除目录: {", ".join(exclude_dirs) if exclude_dirs else "无"}
 
 ## 分析策略
-1. 首先理解分析目标，明确需要查找的信息
-2. {"在指定文件中定位函数定义" if file_path else "搜索代码库查找函数定义位置"}
-3. 根据分析目标，确定重点分析的方面
-4. 灵活调整分析深度，关注与目标相关的实现细节
-5. 根据目标需要自行判断是否需要分析子函数
+1. 首先确定项目的主要编程语言和技术栈，以便更准确地分析函数实现
+2. 理解分析目标，明确需要查找的信息
+3. {"在指定文件中定位函数定义" if file_path else "搜索代码库查找函数定义位置"}
+4. 根据分析目标，确定重点分析的方面
+5. 灵活调整分析深度，关注与目标相关的实现细节
+6. 根据目标需要自行判断是否需要分析子函数
 
 ## 执行指令
+- 确定项目的编程语言:
+  ```
+  loc
+  
+  # 查看构建文件和依赖
+  find . -name "requirements.txt" -o -name "package.json" -o -name "pom.xml" -o -name "Cargo.toml" -o -name "CMakeLists.txt" -o -name "Makefile" | xargs cat
+  ```
+
 - 查找函数定义:
   ```
   rg -n "def\\s+{function_name}\\b" {file_ext_str} {exclude_str}
@@ -238,6 +247,7 @@ class FunctionAnalyzerTool:
 ## 报告要求
 生成一份完全以分析目标为导向的函数分析报告，{depth_description}。不要遵循固定的报告模板，而是完全根据分析目标来组织内容：
 
+- 首先简要说明项目的主要编程语言和技术栈
 - 专注回答分析目标提出的问题
 - 只包含与分析目标直接相关的实现发现和洞察
 - 完全跳过与分析目标无关的内容，无需做全面分析
