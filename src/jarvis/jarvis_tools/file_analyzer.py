@@ -207,35 +207,6 @@ class FileAnalyzerTool:
 - 识别与分析目标相关的关键部分
 - 深入探索这些关键部分，提供有针对性的分析
 
-## 执行指令
-- 首先读取整个文件内容:
-  ```
-  read_code {{
-    "files": [{{
-      "path": "{file_path}",
-      "start_line": 1,
-      "end_line": -1
-    }}]
-  }}
-  ```
-
-- 分析文件统计信息:
-  ```
-  wc -l {file_path}
-  ```
-
-- 分析关键符号和函数:
-  ```
-  find_symbol {{
-    "symbol": "关键符号名称",
-    "root_dir": "."
-  }}
-  
-  function_analyzer {{
-    "function_name": "关键函数名称",
-    "file_path": "{file_path}"
-  }}
-  ```
 
 ## 输出要求
 - 直接回应分析目标的关键问题

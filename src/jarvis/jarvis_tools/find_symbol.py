@@ -171,22 +171,6 @@ class SymbolTool:
 5. 分析符号上下文，了解其用途和使用方式
 6. 根据分析目标自行确定需要的分析深度和广度
 
-## 执行指令
-- 确定项目的编程语言:
-  ```
-  loc 
-  
-  # 查看构建文件和依赖
-  find . -name "requirements.txt" -o -name "package.json" -o -name "pom.xml" -o -name "Cargo.toml" -o -name "CMakeLists.txt" -o -name "Makefile" | xargs cat
-  ```
-
-- 使用ripgrep(rg)或grep工具搜索代码库:
-  ```
-  rg -n "def\\s+{symbol}\\b|class\\s+{symbol}\\b|{symbol}\\s*=" {file_ext_str} {exclude_str}
-  rg -n "\\b{symbol}\\b" {file_ext_str} {exclude_str}
-  ```
-- 使用`read_code`查看上下文确认结果
-
 ## 输出要求
 - 直接回应分析目标的关键问题
 - 提供与目标相关的符号信息

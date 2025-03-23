@@ -190,25 +190,6 @@ class AskCodebaseTool:
 - 对于关键发现，始终使用`read_code`工具查看原始文件内容进行求证
 - 如发现RAG结果与实际代码不符，以实际代码为准
 
-## 探索命令示例
-```bash
-# 确定项目的编程语言
-loc
-
-# 查看构建文件和依赖
-find . -name "requirements.txt" -o -name "package.json" -o -name "pom.xml" -o -name "Cargo.toml" -o -name "CMakeLists.txt" -o -name "Makefile" | xargs cat
-
-# 查看目录结构
-find . -type d -not -path "*/\\.*" | sort
-
-# 搜索与问题相关的文件
-find . -type f -name "*.py" -o -name "*.js" | xargs grep -l "关键词"
-grep -r "关键词" --include="*.py" .
-
-# 查看文件内容
-cat 文件路径
-```
-
 
 ## 输出要求
 - 提供准确、具体的回答，避免模糊不清的描述

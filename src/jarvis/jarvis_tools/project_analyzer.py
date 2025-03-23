@@ -164,27 +164,6 @@ class ProjectAnalyzerTool:
 4. 有选择地探索项目，只关注与目标直接相关的部分
 5. 根据目标需要自行判断分析的深度和广度
 
-## 探索命令示例
-```bash
-# 确定项目的编程语言
-loc
-
-# 查看构建文件和依赖
-find . -name "requirements.txt" -o -name "package.json" -o -name "pom.xml" -o -name "Cargo.toml" -o -name "CMakeLists.txt" -o -name "Makefile" | xargs cat
-
-# 获取项目文件结构（支持所有文件类型）
-find . -type f -not -path "*/\\.*" | sort
-
-# 查找可能的入口点（支持所有文件类型）
-find . -name "main.*" -o -name "app.*" -o -name "index.*" -o -name "startup.*"
-
-# 分析配置文件（支持所有文件类型）
-find . -name "*.json" -o -name "*.yaml" -o -name "*.toml" -o -name "*.ini" -o -name "*.conf" -o -name "*.xml"
-
-# 查找核心模块（支持所有文件类型）
-find . -name "core.*" -o -name "*core*" -o -name "main.*" -o -name "api.*" -o -name "service.*"
-```
-
 ## 分析工具使用
 - 使用`file_analyzer`分析关键文件结构和功能
 - 使用`find_symbol`定位和分析重要符号和函数

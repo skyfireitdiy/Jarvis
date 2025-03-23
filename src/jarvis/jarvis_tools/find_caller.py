@@ -173,22 +173,6 @@ class FindCallerTool:
 5. 分析调用上下文，了解调用的目的和方式
 6. 根据分析目标自行确定需要的分析深度和广度
 
-## 执行指令
-- 确定项目的编程语言:
-  ```
-  loc
-  
-  # 查看构建文件和依赖
-  find . -name "requirements.txt" -o -name "package.json" -o -name "pom.xml" -o -name "Cargo.toml" -o -name "CMakeLists.txt" -o -name "Makefile" | xargs cat
-  ```
-
-- 使用ripgrep(rg)或grep搜索函数调用:
-  ```
-  rg -n "{search_pattern}" {file_ext_str} {exclude_str}
-  ```
-- 使用`read_code`查看上下文分析调用情况
-- 可能需要先找到函数定义以确认正确的函数签名
-
 ## 输出要求
 - 直接回应分析目标的关键问题
 - 提供与目标相关的调用信息

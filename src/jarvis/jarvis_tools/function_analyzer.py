@@ -191,36 +191,6 @@ class FunctionAnalyzerTool:
 5. 灵活调整分析深度，关注与目标相关的实现细节
 6. 根据目标需要自行判断是否需要分析子函数
 
-## 执行指令
-- 确定项目的编程语言:
-  ```
-  loc
-  
-  # 查看构建文件和依赖
-  find . -name "requirements.txt" -o -name "package.json" -o -name "pom.xml" -o -name "Cargo.toml" -o -name "CMakeLists.txt" -o -name "Makefile" | xargs cat
-  ```
-
-- 查找函数定义:
-  ```
-  rg -n "def\\s+{function_name}\\b" {file_ext_str} {exclude_str}
-  ```
-
-- 读取函数实现:
-  ```
-  read_code {{
-    "files": [{{
-      "path": "{file_path or '找到的文件路径'}",
-      "start_line": 函数起始行,
-      "end_line": 函数结束行
-    }}]
-  }}
-  ```
-
-- 查找全局变量:
-  ```
-  rg -n "global\\s+\\w+" --include="{file_path or '找到的文件路径'}"
-  ```
-
 ## 输出要求
 - 直接回应分析目标的关键问题
 - 提供与目标相关的函数实现信息
