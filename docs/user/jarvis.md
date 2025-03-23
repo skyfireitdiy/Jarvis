@@ -32,11 +32,8 @@ jarvis [options]
 ```
 
 ### 📋 常用选项
-- `-p, --platform <平台>` - 指定使用的AI平台（如 openai、azure）
+- `-p, --platform <平台>` - 指定使用的AI平台（如 openai、yuanbao）
 - `-m, --model <模型>` - 指定使用的AI模型（如 gpt-4、claude-3）
-- `--no-methodology` - 禁用方法论记录功能
-- `--no-summary` - 禁用任务总结功能
-- `--execute-confirm` - 执行工具前需要确认
 
 ## 🔄 执行流程
 <div align="center">
@@ -85,16 +82,6 @@ JARVIS_NEED_SUMMARY=true
 
 # 配置上下文窗口大小
 JARVIS_MAX_TOKEN_COUNT=131072
-```
-
-### 与其他工具集成
-Jarvis 可以与生态系统中的其他工具无缝协作：
-```bash
-# 先使用 Jarvis 生成方案
-jarvis "设计一个用户认证系统"
-
-# 再使用 Jarvis Code Agent 实现代码
-jarvis-code-agent "根据之前的设计实现用户认证系统"
 ```
 
 ## 💡 专家提示
