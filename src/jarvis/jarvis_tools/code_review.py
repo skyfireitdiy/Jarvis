@@ -4,6 +4,7 @@ import os
 
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_agent import Agent
 import re
@@ -89,7 +90,7 @@ class CodeReviewTool:
                                 "stderr": "file_path is required for file review type"
                             }
                         file_path = args["file_path"].strip()
-                        diff_cmd = f"cat {file_path}"
+                        diff_cmd = ReadCodeTool().execute({"file_path": file_path})["stdout"]
                     else:  # current changes
                         diff_cmd = "git diff HEAD | cat -"
                 
