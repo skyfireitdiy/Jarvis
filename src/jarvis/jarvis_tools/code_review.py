@@ -262,35 +262,42 @@ def main():
     init_env()
     
     parser = argparse.ArgumentParser(description='Autonomous code review tool')
-    parser.add_argument('--type', choices=['commit', 'current', 'range', 'file'], default='current',
-                      help='Type of review: commit, current changes, commit range, or specific file')
-    parser.add_argument('--commit', help='Commit SHA to review (required for commit type)')
-    parser.add_argument('--start-commit', help='Start commit SHA (required for range type)')
-    parser.add_argument('--end-commit', help='End commit SHA (required for range type)')
-    parser.add_argument('--file', help='File path to review (required for file type)')
-    parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
-    args = parser.parse_args()
+    subparsers = parser.add_subparsers(dest='type')
     
-    # Validate arguments
-    if args.type == 'commit' and not args.commit:
-        parser.error("--commit is required when type is 'commit'")
-    if args.type == 'range' and (not args.start_commit or not args.end_commit):
-        parser.error("--start-commit and --end-commit are required when type is 'range'")
-    if args.type == 'file' and not args.file:
-        parser.error("--file is required when type is 'file'")
+    # Commit subcommand
+    commit_parser = subparsers.add_parser('commit', help='Review specific commit')
+    commit_parser.add_argument('commit', help='Commit SHA to review')
+    
+    # Current subcommand
+    current_parser = subparsers.add_parser('current', help='Review current changes')
+    
+    # Range subcommand
+    range_parser = subparsers.add_parser('range', help='Review commit range')
+    range_parser.add_argument('start_commit', help='Start commit SHA')
+    range_parser.add_argument('end_commit', help='End commit SHA')
+    
+    # File subcommand
+    file_parser = subparsers.add_parser('file', help='Review specific file')
+    file_parser.add_argument('file', help='File path to review')
+    
+    # Common arguments
+    parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
+    
+    # Set default subcommand to 'current'
+    parser.set_defaults(type='current')
+    args = parser.parse_args()
     
     tool = CodeReviewTool()
     tool_args = {
         "review_type": args.type,
         "root_dir": args.root_dir
     }
-    if args.commit:
+    if args.type == 'commit':
         tool_args["commit_sha"] = args.commit
-    if args.start_commit:
+    elif args.type == 'range':
         tool_args["start_commit"] = args.start_commit
-    if args.end_commit:
         tool_args["end_commit"] = args.end_commit
-    if args.file:
+    elif args.type == 'file':
         tool_args["file_path"] = args.file
     
     result = tool.execute(tool_args)
