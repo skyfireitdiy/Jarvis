@@ -9,11 +9,11 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class ProjectAnalyzerTool:
     """
     项目分析工具
-    使用agent分析项目结构、入口点、模块划分等信息
+    使用agent分析项目结构、入口点、模块划分等信息（支持所有文件类型）
     """
     
     name = "project_analyzer"
-    description = "分析项目结构、入口点、模块划分等信息，提供项目概览"
+    description = "分析项目结构、入口点、模块划分等信息，提供项目概览（支持所有文件类型）"
     parameters = {
         "type": "object",
         "properties": {
@@ -165,17 +165,17 @@ class ProjectAnalyzerTool:
 
 ## 探索命令示例
 ```bash
-# 获取项目文件结构
+# 获取项目文件结构（支持所有文件类型）
 find . -type f -not -path "*/\\.*" | sort
 
-# 查找可能的入口点
-find . -name "main.*" -o -name "app.*" -o -name "index.*"
+# 查找可能的入口点（支持所有文件类型）
+find . -name "main.*" -o -name "app.*" -o -name "index.*" -o -name "startup.*"
 
-# 分析配置文件
-find . -name "*.json" -o -name "*.yaml" -o -name "*.toml" -o -name "*.ini" -o -name "*.conf"
+# 分析配置文件（支持所有文件类型）
+find . -name "*.json" -o -name "*.yaml" -o -name "*.toml" -o -name "*.ini" -o -name "*.conf" -o -name "*.xml"
 
-# 查找核心模块
-find . -name "core.*" -o -name "*core*" -o -name "main.*" -o -name "api.*"
+# 查找核心模块（支持所有文件类型）
+find . -name "core.*" -o -name "*core*" -o -name "main.*" -o -name "api.*" -o -name "service.*"
 ```
 
 ## 分析工具使用
