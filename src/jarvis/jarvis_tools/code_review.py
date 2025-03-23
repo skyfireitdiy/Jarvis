@@ -90,7 +90,7 @@ class CodeReviewTool:
                                 "stderr": "file_path is required for file review type"
                             }
                         file_path = args["file_path"].strip()
-                        diff_cmd = ReadCodeTool().execute({"file_path": file_path})["stdout"]
+                        diff_cmd = ReadCodeTool().execute({"files": [{"path": file_path}]})["stdout"]
                     else:  # current changes
                         diff_cmd = "git diff HEAD | cat -"
                 
