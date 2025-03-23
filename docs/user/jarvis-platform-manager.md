@@ -84,7 +84,7 @@ jarvis-platform-manager info
 jarvis-platform-manager chat --platform openai --model gpt-4
 ```
 
-### 启动API服务（默认使用OpenAI）
+### 启动API服务
 ```bash
 jarvis-platform-manager service --port 8000 --platform openai --model gpt-4
 ```

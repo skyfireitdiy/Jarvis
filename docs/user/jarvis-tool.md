@@ -72,29 +72,6 @@ class MyNewTool:
             "stdout": result,
             "stderr": ""
         }
-
-def main():
-    # 命令行直接调用入口
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='我的新工具')
-    parser.add_argument('--param1', required=True, help='第一个参数')
-    parser.add_argument('--param2', type=int, default=0, help='第二个参数')
-    args = parser.parse_args()
-    
-    tool = MyNewTool()
-    result = tool.execute({
-        "param1": args.param1,
-        "param2": args.param2
-    })
-    
-    if result["success"]:
-        PrettyOutput.print(result["stdout"], OutputType.INFO)
-    else:
-        PrettyOutput.print(result["stderr"], OutputType.WARNING)
-
-if __name__ == "__main__":
-    main()
 ```
 
 ### 工具安装位置
