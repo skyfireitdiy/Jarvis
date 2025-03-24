@@ -25,25 +25,6 @@ class PythonLSP(BaseLSP):
                 return None
         return self.script_cache[file_path]
     
-    def find_references(self, file_path: str, position: Tuple[int, int]) -> List[Dict[str, Any]]:
-        script = self._get_script(file_path)
-        if not script:
-            return []
-        try:
-            refs = script.get_references(line=position[0] + 1, column=position[1])
-            return [self._location_to_dict(ref) for ref in refs]
-        except Exception:
-            return []
-    
-    def find_definition(self, file_path: str, position: Tuple[int, int]) -> Optional[Dict[str, Any]]:
-        script = self._get_script(file_path)
-        if not script:
-            return None
-        try:
-            defs = script.goto(line=position[0] + 1, column=position[1])
-            return self._location_to_dict(defs[0]) if defs else None
-        except Exception:
-            return None
     
     def _location_to_dict(self, location) -> Dict[str, Any]:
         return {

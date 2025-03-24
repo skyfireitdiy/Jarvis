@@ -9,8 +9,6 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 REQUIRED_METHODS = [
     ('initialize', ['workspace_path']),
-    ('find_references', ['file_path', 'position']),
-    ('find_definition', ['file_path', 'position']),
     ('get_diagnostics', ['file_path']),
     ('shutdown', [])
 ]
@@ -167,63 +165,3 @@ class LSPRegistry:
         with open(file_path, 'r', errors="ignore") as file:
             lines = file.readlines()
             return lines[line]
-
-def main():
-    """CLI entry point for LSP testing."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='LSP functionality testing')
-    parser.add_argument('--language', type=str, required=True, help='Programming language')
-    parser.add_argument('--file', type=str, required=True, help='File to analyze')
-    parser.add_argument('--action', choices=['symbols', 'diagnostics', 'references', 'definition'],
-                       required=True, help='Action to perform')
-    parser.add_argument('--line', type=int, help='Line number (0-based) for references/definition')
-    parser.add_argument('--character', type=int, help='Character position for references/definition')
-    
-    args = parser.parse_args()
-    
-    # Initialize LSP
-    registry = LSPRegistry.get_global_lsp_registry()
-    lsp = registry.create_lsp(args.language)
-    
-    if not lsp:
-        PrettyOutput.print(f"没有 LSP 支持的语言: {args.language}", OutputType.WARNING)
-        return 1
-        
-    if not lsp.initialize(os.path.abspath(os.getcwd())):
-        PrettyOutput.print("LSP 初始化失败", OutputType.WARNING)
-        return 1
-    
-    try:        
-        if args.action == 'diagnostics':
-            diagnostics = lsp.get_diagnostics(args.file)
-            for diag in diagnostics:
-                severity = ['Error', 'Warning', 'Info', 'Hint'][diag['severity'] - 1]
-                PrettyOutput.print(f"{severity} 在 {diag['range']['start']['line']}:{diag['range']['start']['character']}: {diag['message']}", OutputType.INFO)
-                
-        elif args.action in ('references', 'definition'):
-            if args.line is None or args.character is None:
-                PrettyOutput.print("需要行和字符位置用于 references/definition", OutputType.WARNING)
-                return 1
-                
-            if args.action == 'references':
-                refs = lsp.find_references(args.file, (args.line, args.character))
-                for ref in refs:
-                    PrettyOutput.print(f"引用在 {ref['uri']} 在 {ref['range']['start']['line']}:{ref['range']['start']['character']}\n行: {LSPRegistry.get_line_at_position(ref['uri'], ref['range']['start']['line'])}", OutputType.INFO)
-            else:
-                defn = lsp.find_definition(args.file, (args.line, args.character))
-                if defn:
-                    PrettyOutput.print(f"定义在 {defn['uri']} 在 {defn['range']['start']['line']}:{defn['range']['start']['character']}\n行: {LSPRegistry.get_line_at_position(defn['uri'], defn['range']['start']['line'])}", OutputType.INFO)
-                else:
-                    PrettyOutput.print("没有找到定义", OutputType.WARNING)
-                    
-    except Exception as e:
-        PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
-        return 1
-    finally:
-        lsp.shutdown()
-    
-    return 0
-
-if __name__ == "__main__":
-    exit(main())

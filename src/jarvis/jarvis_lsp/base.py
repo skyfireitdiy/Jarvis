@@ -25,48 +25,6 @@ class BaseLSP(ABC):
         """
         return False
     
-    @abstractmethod
-    def find_references(self, file_path: str, position: Tuple[int, int]) -> List[Dict[str, Any]]:
-        """Find all references of symbol at position.
-        
-        Args:
-            file_path: Path to the file
-            position: (line, character) tuple
-            
-        Returns:
-            List of references with location info:
-            [
-                {
-                    "uri": "file path",
-                    "range": {
-                        "start": {"line": int, "character": int},
-                        "end": {"line": int, "character": int}
-                    }
-                }
-            ]
-        """
-        return []
-    
-    @abstractmethod
-    def find_definition(self, file_path: str, position: Tuple[int, int]) -> Optional[Dict[str, Any]]:
-        """Find definition of symbol at position.
-        
-        Args:
-            file_path: Path to the file
-            position: (line, character) tuple
-            
-        Returns:
-            Location of definition:
-            {
-                "uri": "file path",
-                "range": {
-                    "start": {"line": int, "character": int},
-                    "end": {"line": int, "character": int}
-                }
-            }
-        """
-        return None
-    
     
     @abstractmethod
     def get_diagnostics(self, file_path: str) -> List[Dict[str, Any]]:
