@@ -102,7 +102,7 @@ class SymbolTool:
                 name=f"SymbolFinder-{symbol}",
                 description=f"查找符号 '{symbol}' 的引用和定义位置",
                 summary_prompt=summary_prompt,
-                platform=PlatformRegistry().get_codegen_platform(),
+                platform=PlatformRegistry().get_thinking_platform(),
                 output_handler=[tool_registry],
                 need_summary=True,
                 is_sub_agent=True,

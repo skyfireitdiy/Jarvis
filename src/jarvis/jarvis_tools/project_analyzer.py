@@ -97,7 +97,7 @@ class ProjectAnalyzerTool:
                 name=f"ProjectAnalyzer",
                 description=f"分析项目结构、模块划分和关键组件",
                 summary_prompt=summary_prompt,
-                platform=PlatformRegistry().get_codegen_platform(),
+                platform=PlatformRegistry().get_thinking_platform(),
                 output_handler=[tool_registry],
                 need_summary=True,
                 is_sub_agent=True,

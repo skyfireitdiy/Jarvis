@@ -112,7 +112,7 @@ class FileAnalyzerTool:
                 name=f"FileAnalyzer-{file_name}",
                 description=f"分析 {file_name} 文件的结构和实现",
                 summary_prompt=summary_prompt,
-                platform=PlatformRegistry().get_codegen_platform(),
+                platform=PlatformRegistry().get_thinking_platform(),
                 output_handler=[tool_registry],
                 need_summary=True,
                 is_sub_agent=True,

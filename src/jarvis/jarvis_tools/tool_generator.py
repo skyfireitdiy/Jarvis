@@ -42,7 +42,7 @@ class ToolGenerator:
             包含执行结果的字典，包含success、stdout和stderr字段
         """
         # 获取代码生成平台实例
-        model = PlatformRegistry.get_global_platform_registry().get_codegen_platform()
+        model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
         
         try:
             tool_name = arguments["tool_name"]
@@ -148,7 +148,7 @@ class CustomTool:
         try:
             # 在此实现工具逻辑
             # 使用LLM
-            # model = PlatformRegistry.get_global_platform_registry().get_codegen_platform() 
+            # model = PlatformRegistry.get_global_platform_registry().get_thinking_platform() 
             # result = model.chat_until_success(prompt)
 
             result = "工具执行结果"

@@ -102,7 +102,7 @@ class FindCallerTool:
                 name=f"CallerFinder-{function_name}",
                 description=f"查找 '{function_name}' 函数的所有调用位置",
                 summary_prompt=summary_prompt,
-                platform=PlatformRegistry().get_codegen_platform(),
+                platform=PlatformRegistry().get_thinking_platform(),
                 output_handler=[tool_registry],
                 need_summary=True,
                 is_sub_agent=True,

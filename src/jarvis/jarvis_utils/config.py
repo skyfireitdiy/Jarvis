@@ -100,22 +100,8 @@ def get_normal_model_name() -> str:
         str: 模型名称，默认为'deep_seek'
     """
     return os.getenv('JARVIS_MODEL', 'deep_seek_v3')
-def get_codegen_platform_name() -> str:
-    """
-    获取代码生成的平台名称。
-    
-    返回：
-        str: 平台名称，默认为'yuanbao'
-    """
-    return os.getenv('JARVIS_CODEGEN_PLATFORM', os.getenv('JARVIS_PLATFORM', '  '))
-def get_codegen_model_name() -> str:
-    """
-    获取代码生成的模型名称。
-    
-    返回：
-        str: 模型名称，默认为'deep_seek_v3'
-    """
-    return os.getenv('JARVIS_CODEGEN_MODEL', os.getenv('JARVIS_MODEL', 'deep_seek_v3'))
+
+
 def get_thinking_platform_name() -> str:
     """
     获取思考操作的平台名称。
@@ -132,22 +118,7 @@ def get_thinking_model_name() -> str:
         str: 模型名称，默认为'deep_seek'
     """
     return os.getenv('JARVIS_THINKING_MODEL', os.getenv('JARVIS_MODEL', 'deep_seek'))
-def get_cheap_platform_name() -> str:
-    """
-    获取低成本操作的平台名称。
-    
-    返回：
-        str: 平台名称，默认为'yuanbao'
-    """
-    return os.getenv('JARVIS_CHEAP_PLATFORM', os.getenv('JARVIS_PLATFORM', 'yuanbao'))
-def get_cheap_model_name() -> str:
-    """
-    获取低成本操作的模型名称。
-    
-    返回：
-        str: 模型名称，默认为'deep_seek_v3'
-    """
-    return os.getenv('JARVIS_CHEAP_MODEL', os.getenv('JARVIS_MODEL', 'deep_seek_v3'))
+
 def is_execute_tool_confirm() -> bool:
     """
     检查工具执行是否需要确认。

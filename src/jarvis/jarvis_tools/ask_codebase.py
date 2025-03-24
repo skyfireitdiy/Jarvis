@@ -91,7 +91,7 @@ class AskCodebaseTool:
                     name=f"CodebaseAnalyzer",
                     description=f"分析代码库中的功能实现和定位",
                     summary_prompt=summary_prompt,
-                    platform=PlatformRegistry().get_codegen_platform(),
+                    platform=PlatformRegistry().get_thinking_platform(),
                     output_handler=[tool_registry],
                     need_summary=True,
                     is_sub_agent=True,

@@ -4,7 +4,7 @@ import os
 import sys
 from typing import Dict, Type, Optional, List
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import get_cheap_model_name, get_cheap_platform_name, get_codegen_model_name, get_codegen_platform_name, get_normal_model_name, get_normal_platform_name, get_thinking_model_name, get_thinking_platform_name
+from jarvis.jarvis_utils.config import get_normal_model_name, get_normal_platform_name, get_thinking_model_name, get_thinking_platform_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 REQUIRED_METHODS = [
@@ -157,20 +157,6 @@ class PlatformRegistry:
     def get_normal_platform(self) -> BasePlatform:
         platform_name = get_normal_platform_name()
         model_name = get_normal_model_name()
-        platform = self.create_platform(platform_name)
-        platform.set_model_name(model_name) # type: ignore
-        return platform # type: ignore
-    
-    def get_codegen_platform(self) -> BasePlatform:
-        platform_name = get_codegen_platform_name()
-        model_name = get_codegen_model_name()
-        platform = self.create_platform(platform_name)
-        platform.set_model_name(model_name) # type: ignore
-        return platform # type: ignore
-    
-    def get_cheap_platform(self) -> BasePlatform:
-        platform_name = get_cheap_platform_name()
-        model_name = get_cheap_model_name()
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name) # type: ignore
         return platform # type: ignore

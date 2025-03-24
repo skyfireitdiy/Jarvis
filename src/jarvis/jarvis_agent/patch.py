@@ -313,7 +313,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
 [合并后的完整代码，包括所有空行和缩进]
 {ct("MERGED_CODE")}
 """
-            model = PlatformRegistry().get_codegen_platform()
+            model = PlatformRegistry().get_thinking_platform()
             model.set_suppress_output(True)
             count = 30
             start_line = -1
@@ -381,7 +381,7 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
                 spinner.fail("❌")
                 return False
             
-            model = PlatformRegistry().get_codegen_platform()
+            model = PlatformRegistry().get_thinking_platform()
             model.set_suppress_output(True)
             
             prompt = f"""
