@@ -1,5 +1,6 @@
 import subprocess
 import os
+import argparse
 from token import OP
 from typing import Optional
 
@@ -269,7 +270,6 @@ class CodeAgent:
 def main():
     """Jarvis main entry point"""
     # Add argument parser
-    import argparse
     init_env()
 
     parser = argparse.ArgumentParser(description='Jarvis Code Agent')
