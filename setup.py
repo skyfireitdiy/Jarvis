@@ -55,7 +55,6 @@ setup(
             "jarvis=jarvis.jarvis_agent:main",
             "jarvis-code-agent=jarvis.jarvis_code_agent.code_agent:main",
             "jca=jarvis.jarvis_code_agent.code_agent:main",
-            "jarvis-codebase=jarvis.jarvis_codebase.main:main",
             "jarvis-rag=jarvis.jarvis_rag.main:main",
             "jarvis-smart-shell=jarvis.jarvis_smart_shell.main:main",
             "jss=jarvis.jarvis_smart_shell.main:main",
