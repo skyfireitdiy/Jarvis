@@ -25,7 +25,7 @@ from jarvis.jarvis_utils.utils import init_env, user_confirm
 
 
 class CodeAgent:
-    def __init__(self, platform : Optional[str] = None, model: Optional[str] = None):
+    def __init__(self, platform : Optional[str] = None, model: Optional[str] = None, need_summary: bool = True):
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
         tool_registry.use_tools(["execute_shell", 
@@ -189,7 +189,7 @@ class CodeAgent:
                            output_handler=[tool_registry, PatchOutputHandler()], 
                            platform=platform_instance,
                            input_handler=[shell_input_handler, file_input_handler, builtin_input_handler],
-                           )
+                           need_summary=need_summary)
 
     
 
@@ -272,7 +272,7 @@ def main():
             user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
             if not user_input:
                 return 0
-            agent = CodeAgent(platform=args.platform, model=args.model)
+            agent = CodeAgent(platform=args.platform, model=args.model, need_summary=False)
             agent.run(user_input)
             
         except Exception as e:

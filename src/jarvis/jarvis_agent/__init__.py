@@ -155,6 +155,7 @@ class Agent:
                  input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
                  max_context_length: Optional[int] = None,
                  execute_tool_confirm: Optional[bool] = None,
+                 need_summary: bool = True,
                  multiline_inputer: Optional[Callable[[str], str]] = None):
         self.name = make_agent_name(name)
         self.description = description
@@ -183,6 +184,7 @@ class Agent:
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
         self.input_handler = input_handler if input_handler is not None else []
+        self.need_summary = need_summary 
         # Load configuration from environment variables
 
 
@@ -393,14 +395,14 @@ class Agent:
             except Exception as e:
                 spinner.text = "方法论生成失败"
                 spinner.fail("❌")
-        
-        with yaspin(text="正在生成总结...", color="cyan") as spinner:
-            self.prompt = self.summary_prompt
-            with spinner.hidden():
-                ret = self.model.chat_until_success(self.prompt) # type: ignore
-                spinner.text = "总结生成完成"
-                spinner.ok("✅")
-                return ret
+        if self.need_summary:
+            with yaspin(text="正在生成总结...", color="cyan") as spinner:
+                self.prompt = self.summary_prompt
+                with spinner.hidden():
+                    ret = self.model.chat_until_success(self.prompt) # type: ignore
+                    spinner.text = "总结生成完成"
+                    spinner.ok("✅")
+                    return ret
         
         return "任务完成"
 
