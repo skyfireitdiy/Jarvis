@@ -61,26 +61,6 @@ class MethodologyTool:
         safe_filename = hashlib.md5(problem_type.encode('utf-8')).hexdigest()
         return os.path.join(self.methodology_dir, f"{safe_filename}.json")
                 
-    def _load_methodologies(self) -> Dict[str, str]:
-        """加载所有方法论"""
-        all_methodologies = {}
-        
-        if not os.path.exists(self.methodology_dir):
-            return all_methodologies
-        
-        for filepath in glob.glob(os.path.join(self.methodology_dir, "*.json")):
-            try:
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                    methodology = json.load(f)
-                    problem_type = methodology.get("problem_type", "")
-                    content = methodology.get("content", "")
-                    if problem_type and content:
-                        all_methodologies[problem_type] = content
-            except Exception as e:
-                filename = os.path.basename(filepath)
-                PrettyOutput.print(f"加载方法论文件 {filename} 失败: {str(e)}", OutputType.WARNING)
-        
-        return all_methodologies
             
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行管理方法论的操作
