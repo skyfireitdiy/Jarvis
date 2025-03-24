@@ -75,12 +75,12 @@ class Agent:
             if isinstance(platform, str):
                 self.model = PlatformRegistry().create_platform(platform)
                 if self.model is None:
-                    PrettyOutput.print(f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING)
-                    self.model = PlatformRegistry().get_normal_platform()
+                    PrettyOutput.print(f"平台 {platform} 不存在，将使用推理模型", OutputType.WARNING)
+                    self.model = PlatformRegistry().get_thinking_platform()
             else:
                 self.model = platform
         else:
-            self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+            self.model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
 
         if model_name is not None:
             self.model.set_model_name(model_name)

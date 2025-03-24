@@ -985,7 +985,7 @@ class RAGTool:
             
             # 获取平台注册表和模型
             registry = PlatformRegistry.get_global_platform_registry()
-            model = registry.get_normal_platform()
+            model = registry.get_thinking_platform()
 
             # 构建关键词提取提示词
             prompt = f"""
@@ -1261,7 +1261,7 @@ class RAGTool:
                 return "未找到与问题相关的文档。请尝试重新表述问题或确认问题相关内容已包含在索引中。"
 
             # 模型实例
-            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+            model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
             
             # 计算基础提示词的token数量
             base_prompt = f"""
@@ -1616,7 +1616,7 @@ class RAGTool:
             
         try:
             # 尝试使用大模型增强查询（如果可用）
-            model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+            model = PlatformRegistry.get_global_platform_registry().get_thinking_platform()
             enhance_prompt = f"""请分析以下查询，提取关键概念、关键词和主题。
             
 查询："{query}"
