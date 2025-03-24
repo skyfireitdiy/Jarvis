@@ -374,12 +374,6 @@ def load_methodology(user_input: str) -> str:
         # 获取文件的修改时间戳组合哈希，用于检测文件是否被修改
         methodology_hash = _get_methodology_files_hash()
         
-        with yaspin(text="加载方法论文件...", color="yellow") as spinner:
-            data = _load_all_methodologies()
-            spinner.text = "加载方法论文件完成"
-            spinner.ok("✅")
-            return make_methodology_prompt(data)
-        
         # 检查缓存的索引是否可用且方法论文件未被修改
         global _methodology_index_cache
         if _methodology_index_cache is None:
@@ -431,7 +425,6 @@ def load_methodology(user_input: str) -> str:
                 
                 if relevant_methodologies:
                     return make_methodology_prompt(relevant_methodologies)
-                return make_methodology_prompt(data)
         
         # 如果缓存无效，从头构建索引
         with yaspin(text="初始化数据结构...", color="yellow") as spinner:
@@ -450,6 +443,11 @@ def load_methodology(user_input: str) -> str:
                 test_embedding = _create_methodology_embedding(embedding_model, "test")
                 embedding_dimension = len(test_embedding)
                 spinner.text = "创建测试嵌入完成"
+                spinner.ok("✅")
+
+            with yaspin(text="加载方法论文件...", color="yellow") as spinner:
+                data = _load_all_methodologies()
+                spinner.text = "加载方法论文件完成"
                 spinner.ok("✅")
             
             with yaspin(text="处理方法论数据...", color="yellow") as spinner:
@@ -481,7 +479,7 @@ def load_methodology(user_input: str) -> str:
                 
                 with yaspin(text="执行搜索...", color="yellow") as spinner:
                     query_embedding = _create_methodology_embedding(embedding_model, user_input)
-                    k = min(3, len(methodology_data))
+                    k = min(10, len(methodology_data))
                     distances, indices = methodology_index.search(
                         query_embedding.reshape(1, -1), k
                     ) # type: ignore
@@ -510,7 +508,8 @@ def load_methodology(user_input: str) -> str:
                 
                 if relevant_methodologies:
                     return make_methodology_prompt(relevant_methodologies)
-            return make_methodology_prompt(data)
+                
+        return make_methodology_prompt(data)
     except Exception as e:
         PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
         return ""
