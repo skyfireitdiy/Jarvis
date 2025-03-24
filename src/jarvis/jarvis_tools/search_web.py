@@ -1,6 +1,8 @@
 
 
 
+import os
+import statistics
 from typing import Any, Dict
 from jarvis.jarvis_platform.registry import PlatformRegistry
 
@@ -14,6 +16,12 @@ class SearchWebTool:
             "query": {"type": "string", "description": "具体的问题"}
         }
     }
+
+
+    @staticmethod
+    def check() -> bool:
+        return os.getenv("YUANBAO_COOKIES", "") != "" and os.getenv("YUANBAO_AGENT_ID", "") != ""
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]: # type: ignore
         query = args.get("query")
         model = PlatformRegistry().create_platform("yuanbao")

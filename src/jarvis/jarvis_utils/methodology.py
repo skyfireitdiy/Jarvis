@@ -18,7 +18,6 @@ import faiss
 from typing import Dict, Any, List, Tuple, Optional
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.embedding import load_embedding_model
-from jarvis.jarvis_utils.config import dont_use_local_model
 
 # 全局缓存，避免重复计算嵌入向量
 _methodology_embeddings_cache = {}
@@ -377,10 +376,9 @@ def load_methodology(user_input: str) -> str:
         
         with yaspin(text="加载方法论文件...", color="yellow") as spinner:
             data = _load_all_methodologies()
-            if dont_use_local_model():
-                spinner.text = "加载方法论文件完成"
-                spinner.ok("✅")
-                return make_methodology_prompt(data)
+            spinner.text = "加载方法论文件完成"
+            spinner.ok("✅")
+            return make_methodology_prompt(data)
         
         # 检查缓存的索引是否可用且方法论文件未被修改
         global _methodology_index_cache

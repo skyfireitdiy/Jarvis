@@ -26,14 +26,6 @@ def get_thread_count() -> int:
         int: 线程数，默认为1
     """
     return int(os.getenv('JARVIS_THREAD_COUNT', '1'))  
-def dont_use_local_model() -> bool:
-    """
-    检查是否应避免使用本地模型。
-    
-    返回：
-        bool: 如果不使用本地模型则返回True，默认为False
-    """
-    return os.getenv('JARVIS_DONT_USE_LOCAL_MODEL', 'false') == 'true'
     
 def is_auto_complete() -> bool:
     """

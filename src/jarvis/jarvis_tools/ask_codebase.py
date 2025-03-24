@@ -1,14 +1,11 @@
 from typing import Dict, Any
 import os
-import pathlib
 
-from colorama import init
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.git_utils import find_git_root
-from jarvis.jarvis_utils.config import dont_use_local_model
 from jarvis.jarvis_utils.utils import init_env
 
 class AskCodebaseTool:
@@ -42,10 +39,6 @@ class AskCodebaseTool:
         },
         "required": ["question"]
     }
-
-    @staticmethod
-    def check() -> bool:
-        return not dont_use_local_model()
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Execute codebase analysis using an Agent with execute_shell and rag tools
