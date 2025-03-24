@@ -173,6 +173,11 @@ def apply_patch(output_str: str) -> str:
                     final_ret += "3. 修复代码错误的优先级高于继续实现功能\n"
                     final_ret += "4. 常见错误类型：语法错误、逻辑错误、命名错误、路径错误等\n"
                     final_ret += "5. 确保修改后代码的一致性和完整性\n"
+                    final_ret += "6. 请确认所有相关点是否已修改完成，包括但不限于：\n"
+                    final_ret += "   - 所有需要修改的文件\n"
+                    final_ret += "   - 所有需要更新的函数\n"
+                    final_ret += "   - 所有需要调整的依赖关系\n"
+                    final_ret += "   - 所有需要同步的文档\n"
                     final_ret += "\n\n"
                     final_ret += "如果没有问题，请继续进行下一步修改，如果所有修改都已经完成，请终止"
                     
