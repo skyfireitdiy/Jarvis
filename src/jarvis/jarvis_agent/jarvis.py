@@ -4,7 +4,7 @@ from . import (
     init_env, PrettyOutput, OutputType, 
     file_input_handler, shell_input_handler, builtin_input_handler,
     _load_tasks, _select_task, get_multiline_input,
-    PlatformRegistry, ToolRegistry, PatchOutputHandler, Agent,
+    PlatformRegistry, ToolRegistry, PatchOutputHandler, Agent,  # 显式导入关键组件
     origin_agent_system_prompt
 )
 
