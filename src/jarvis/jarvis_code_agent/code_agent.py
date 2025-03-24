@@ -1,5 +1,7 @@
 import subprocess
 import os
+from token import OP
+from typing import Optional
 
 from yaspin import yaspin
 
@@ -22,7 +24,7 @@ from jarvis.jarvis_utils.utils import init_env, user_confirm
 
 
 class CodeAgent:
-    def __init__(self, platform=None, model=None):
+    def __init__(self, platform : Optional[str] = None, model: Optional[str] = None):
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
         tool_registry.use_tools(["execute_shell", 
@@ -185,9 +187,11 @@ class CodeAgent:
 """
         # Dynamically add ask_codebase based on task complexity if really needed
         # 处理platform参数
-        platform_instance = (PlatformRegistry().get_platform(platform) 
+        platform_instance = (PlatformRegistry().create_platform(platform) 
                             if platform 
                             else PlatformRegistry().get_thinking_platform())
+        if model:
+            platform_instance.set_model_name(model) # type: ignore
         
         self.agent = Agent(system_prompt=code_system_prompt,
                            name="CodeAgent",
@@ -196,7 +200,6 @@ class CodeAgent:
                            use_methodology=False,
                            output_handler=[tool_registry, PatchOutputHandler()], 
                            platform=platform_instance,
-                           model=model,
                            record_methodology=False,
                            input_handler=[shell_input_handler, file_input_handler, builtin_input_handler],
                            need_summary=False)
