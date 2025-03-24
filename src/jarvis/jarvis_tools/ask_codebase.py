@@ -40,6 +40,9 @@ class AskCodebaseTool:
         "required": ["question"]
     }
 
+    def __init__(self, auto_complete: bool = True):
+        self.auto_complete = auto_complete
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Execute codebase analysis using an Agent with execute_shell and rag tools
         
@@ -94,7 +97,7 @@ class AskCodebaseTool:
                     platform=PlatformRegistry().get_normal_platform(),
                     output_handler=[tool_registry],
                     execute_tool_confirm=False,
-                    auto_complete=True
+                    auto_complete=self.auto_complete
                 )
                 
                 # Run agent and get result
@@ -274,7 +277,7 @@ def main():
     args = parser.parse_args()
     
     # 创建并执行工具
-    tool = AskCodebaseTool()
+    tool = AskCodebaseTool(auto_complete=False)
     result = tool.execute({
         "question": args.question,
         "root_dir": args.root_dir

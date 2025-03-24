@@ -118,7 +118,8 @@ def main() -> int:
             platform=args.platform,
             model_name=args.model,
             input_handler=[file_input_handler, shell_input_handler, builtin_input_handler], # type: ignore
-            output_handler=[ToolRegistry(), PatchOutputHandler()]
+            output_handler=[ToolRegistry(), PatchOutputHandler()],
+            need_summary=False
         )
 
         tasks = _load_tasks()
