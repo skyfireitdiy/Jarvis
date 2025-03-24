@@ -25,6 +25,7 @@ from jarvis.jarvis_utils.utils import ot, init_env
 from jarvis.jarvis_utils.utils import user_confirm
 import os
 
+from jarvis.jarvis_tools.registry import ToolRegistry  # 显式导入ToolRegistry
 from .jarvis_platform.registry import PlatformRegistry
 from .patch import PatchOutputHandler
 from . import (
