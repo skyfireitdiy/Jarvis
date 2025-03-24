@@ -269,7 +269,13 @@ class CodeAgent:
 def main():
     """Jarvis main entry point"""
     # Add argument parser
+    import argparse
     init_env()
+
+    parser = argparse.ArgumentParser(description='Jarvis Code Agent')
+    parser.add_argument('--platform', type=str, help='Target platform name', default=None)
+    parser.add_argument('--model', type=str, help='Model name to use', default=None)
+    args = parser.parse_args()
 
     curr_dir = os.getcwd()
     git_dir = find_git_root(curr_dir)
@@ -280,7 +286,7 @@ def main():
             user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
             if not user_input:
                 return 0
-            agent = CodeAgent()
+            agent = CodeAgent(platform=args.platform, model=args.model)
             agent.run(user_input)
             
         except Exception as e:
