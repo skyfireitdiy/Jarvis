@@ -127,8 +127,6 @@ tool_registry.use_tools([
 dev_tools = ToolRegistry()
 dev_tools.use_tools([
     "read_code", 
-    "lsp_find_references", 
-    "lsp_find_definition",
     "code_review"
 ])
 ```

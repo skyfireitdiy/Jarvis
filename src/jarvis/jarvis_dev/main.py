@@ -425,8 +425,6 @@ def create_dev_team() -> MultiAgent:
         "file_operation", 
         "ask_codebase", 
         "lsp_get_diagnostics", 
-        "lsp_find_references", 
-        "lsp_find_definition", 
         "execute_shell",
         "code_review",
         "find_symbol",
@@ -441,8 +439,6 @@ def create_dev_team() -> MultiAgent:
         "file_operation", 
         "ask_codebase", 
         "execute_shell",
-        "lsp_find_definition",
-        "lsp_find_references",
         "find_symbol",
         "function_analyzer",
         "file_analyzer",
@@ -545,8 +541,6 @@ def create_dev_team() -> MultiAgent:
 - **file_operation**：管理技术文档和指导文件
 - **ask_codebase**：分析代码库，理解实现细节
 - **lsp_get_diagnostics**：检查代码问题和警告
-- **lsp_find_references**：查找代码引用关系
-- **lsp_find_definition**：查找符号定义位置
 - **execute_shell**：执行开发工具和命令
 - **code_review**：进行代码审查，确保代码质量
 - **find_symbol**：查找关键符号在代码中的使用
@@ -574,8 +568,6 @@ def create_dev_team() -> MultiAgent:
 - **file_operation**：管理源代码和配置文件
 - **ask_codebase**：了解代码库实现细节
 - **execute_shell**：执行开发命令和测试脚本
-- **lsp_find_definition**：查找符号定义位置
-- **lsp_find_references**：查找代码引用关系
 - **find_symbol**：查找关键符号在代码中的使用
 - **function_analyzer**：分析函数实现和优化空间
 - **file_analyzer**：分析文件结构和功能

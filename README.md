@@ -106,8 +106,6 @@ jarvis-ask-codebase --help
 | chdir | 更改工作目录 |
 | create_code_agent | 创建新的代码代理 |
 | create_sub_agent | 创建子代理 |
-| lsp_find_definition | 查找符号定义 |
-| lsp_find_references | 查找符号引用 |
 | lsp_validate_edit | 验证代码编辑 |
 | rag | 文档检索和问答 |
 | select_code_files | 选择代码文件 |
@@ -180,10 +178,6 @@ class CustomPlatform(BasePlatform):
 
     def chat(self, message: str) -> str:
         # 执行对话
-        pass
-
-    def upload_files(self, file_list: List[str]) -> List[Dict]:
-        # 上传文件
         pass
 
     def reset(self):

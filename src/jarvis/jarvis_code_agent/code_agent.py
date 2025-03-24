@@ -31,8 +31,6 @@ class CodeAgent:
                                  "ask_user",  
                                  "ask_codebase",
                                  "lsp_get_diagnostics", 
-                                 "lsp_find_references", 
-                                 "lsp_find_definition",
                                  "code_review",  # 代码审查工具
                                  "find_symbol",  # 添加符号查找工具
                                  "find_caller",  # 添加函数调用者查找工具
