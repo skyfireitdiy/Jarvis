@@ -18,7 +18,7 @@ from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import  ct, get_file_md5, init_env, init_gpu_config, ot
 
-from .file_processors import TextFileProcessor, PDFProcessor, DocxProcessor, PPTProcessor, ExcelProcessor
+from jarvis.jarvis_rag.file_processors import TextFileProcessor, PDFProcessor, DocxProcessor, PPTProcessor, ExcelProcessor
 
 """
 Jarvis RAG (Retrieval-Augmented Generation) Module

@@ -5,8 +5,7 @@ from prompt_toolkit import prompt
 import yaml
 from yaspin import yaspin
 from jarvis.jarvis_agent import (
-     PrettyOutput, OutputType, 
-    file_input_handler, shell_input_handler, builtin_input_handler,
+     PrettyOutput, OutputType,
      get_multiline_input,
      Agent,  # 显式导入关键组件
      origin_agent_system_prompt
@@ -14,6 +13,9 @@ from jarvis.jarvis_agent import (
 from jarvis.jarvis_agent.patch import PatchOutputHandler
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_agent.file_input_handler import file_input_handler
+from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
+from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 
 
 def _load_tasks() -> dict:

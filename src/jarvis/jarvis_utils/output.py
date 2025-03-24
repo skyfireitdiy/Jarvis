@@ -17,7 +17,7 @@ from rich.syntax import Syntax
 from rich.style import Style as RichStyle
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
-from .globals import console, get_agent_list
+from jarvis.jarvis_utils.globals import console, get_agent_list
 class OutputType(Enum):
     """
     输出类型枚举，用于分类和样式化不同类型的消息。
