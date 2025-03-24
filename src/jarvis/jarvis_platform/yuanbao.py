@@ -24,6 +24,7 @@ class HunyuanModel(BasePlatform):
         # 从环境变量中获取必要参数
         self.cookies = os.getenv("YUANBAO_COOKIES")  # 认证cookies
         self.agent_id = os.getenv("YUANBAO_AGENT_ID")  # 代理ID
+        self.web = os.getenv("YUANBAO_WEB", "false") == "true"  # 是否启用网页功能
         
         if not self.cookies:
             message = (
@@ -142,10 +143,12 @@ class HunyuanModel(BasePlatform):
             "agentId": self.agent_id,
             "supportHint": 1,
             "version": "v2",
-            "supportFunctions": ["supportInternetSearch"],
+            "supportFunctions": [],
             "chatModelId": self.model_name,
         }
 
+        if self.web:
+            payload["supportFunctions"] = ["supportInternetSearch"]
         
         
         # 添加系统消息（如果是第一次对话）
