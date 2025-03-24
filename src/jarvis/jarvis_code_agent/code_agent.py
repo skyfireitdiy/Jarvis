@@ -300,8 +300,8 @@ def main():
     init_env()
 
     parser = argparse.ArgumentParser(description='Jarvis Code Agent')
-    parser.add_argument('--platform', type=str, help='Target platform name', default=None)
-    parser.add_argument('--model', type=str, help='Model name to use', default=None)
+    parser.add_argument('-p', '--platform', type=str, help='Target platform name', default=None)
+    parser.add_argument('-m', '--model', type=str, help='Model name to use', default=None)
     args = parser.parse_args()
 
     curr_dir = os.getcwd()
