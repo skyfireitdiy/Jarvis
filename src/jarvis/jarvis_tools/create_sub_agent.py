@@ -71,7 +71,6 @@ class SubAgentTool:
                 sub_agent = Agent(
                     system_prompt=origin_agent_system_prompt,
                     name=f"Agent({agent_name})",
-                    is_sub_agent=True
                 )
 
                 # Run sub-agent, pass file list
