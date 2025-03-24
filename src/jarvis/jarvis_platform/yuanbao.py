@@ -6,7 +6,7 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
 
-class HunyuanModel(BasePlatform):
+class YuanbaoPlatform(BasePlatform):
     """Hunyuan model implementation"""
 
     platform_name = "yuanbao"
