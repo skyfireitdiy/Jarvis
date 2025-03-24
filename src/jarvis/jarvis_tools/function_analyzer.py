@@ -115,7 +115,7 @@ class FunctionAnalyzerTool:
                 name=f"FunctionAnalyzer-{function_name}",
                 description=f"分析 '{function_name}' 函数的内部实现",
                 summary_prompt=summary_prompt,
-                platform=PlatformRegistry().get_thinking_platform(),
+                platform=PlatformRegistry().get_normal_platform(),
                 output_handler=[tool_registry],
                 execute_tool_confirm=False,
                 auto_complete=True

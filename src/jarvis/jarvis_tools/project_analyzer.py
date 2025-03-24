@@ -97,7 +97,7 @@ class ProjectAnalyzerTool:
                 name=f"ProjectAnalyzer",
                 description=f"分析项目结构、模块划分和关键组件",
                 summary_prompt=summary_prompt,
-                platform=PlatformRegistry().get_thinking_platform(),
+                platform=PlatformRegistry().get_normal_platform(),
                 output_handler=[tool_registry],
                 execute_tool_confirm=False,
                 auto_complete=True
