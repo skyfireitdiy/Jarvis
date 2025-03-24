@@ -5,6 +5,7 @@ import os
 from yaspin import yaspin
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
+from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
@@ -263,7 +264,7 @@ def handle_code_operation(filepath: str, patch_content: str) -> bool:
         retry_count = 5
         while retry_count > 0:
             retry_count -= 1
-            if handle_large_code_operation(filepath, patch_content):
+            if handle_large_code_operation(filepath, patch_content, PlatformRegistry().get_normal_platform() if retry_count > 2 else PlatformRegistry().get_thinking_platform()):
                 return True
         return handle_small_code_operation(filepath, patch_content)
 
@@ -370,7 +371,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             return False
 
 
-def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
+def handle_large_code_operation(filepath: str, patch_content: str, model: BasePlatform) -> bool:
     """处理大型代码文件的补丁操作，使用差异化补丁格式"""
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
@@ -381,7 +382,6 @@ def handle_large_code_operation(filepath: str, patch_content: str) -> bool:
                 spinner.fail("❌")
                 return False
             
-            model = PlatformRegistry().get_thinking_platform()
             model.set_suppress_output(True)
             
             prompt = f"""
