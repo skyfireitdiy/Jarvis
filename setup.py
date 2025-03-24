@@ -52,7 +52,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "jarvis=jarvis.jarvis_agent:main",
+            "jarvis=jarvis.jarvis_agent.jarvis:main",
             "jarvis-code-agent=jarvis.jarvis_code_agent.code_agent:main",
             "jca=jarvis.jarvis_code_agent.code_agent:main",
             "jarvis-rag=jarvis.jarvis_rag.main:main",

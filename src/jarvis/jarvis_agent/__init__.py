@@ -563,42 +563,4 @@ origin_agent_system_prompt = f"""
 {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """
 
-def main():
-    """Jarvis main entry point"""
-    # Add argument parser
-    init_env()
-    parser = argparse.ArgumentParser(description='Jarvis AI assistant')
-    parser.add_argument('-p', '--platform', type=str, help='Platform to use')
-    parser.add_argument('-m', '--model', type=str, help='Model to use')
-    args = parser.parse_args()
 
-    try:
-        from jarvis.jarvis_tools.registry import ToolRegistry
-        # 获取全局模型实例
-        agent = Agent(system_prompt=origin_agent_system_prompt, platform=args.platform, model_name=args.model, input_handler=[file_input_handler, shell_input_handler, builtin_input_handler] ,output_handler=[ToolRegistry(), PatchOutputHandler()])
-
-        # 加载预定义任务
-        tasks = _load_tasks()
-        if tasks:
-            selected_task = _select_task(tasks)
-            if selected_task:
-                PrettyOutput.print(f"执行任务: {selected_task}", OutputType.INFO)
-                agent.run(selected_task)
-                return 0
-        
-        try:
-            user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
-            if not user_input:
-                return 0
-            agent.run(user_input)
-        except Exception as e:
-            PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
-
-    except Exception as e:
-        PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
-        return 1
-
-    return 0
-
-if __name__ == "__main__":
-    exit(main())
