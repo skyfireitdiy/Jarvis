@@ -169,12 +169,11 @@ def apply_patch(output_str: str) -> str:
                     
                     # 增加代码变更分析和错误提示
                     final_ret += "\n\n# 代码变更分析：\n"
-                    final_ret += "1. 请仔细检查以上变更是否引入了潜在错误\n"
+                    final_ret += "1. 请使用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
                     final_ret += "2. 如果发现代码错误，请立即提出修复方案\n"
                     final_ret += "3. 修复代码错误的优先级高于继续实现功能\n"
-                    final_ret += "4. 常见错误类型：语法错误、逻辑错误、命名错误、路径错误等\n"
-                    final_ret += "5. 确保修改后代码的一致性和完整性\n"
-                    final_ret += "6. 请确认所有相关点是否已修改完成，包括但不限于：\n"
+                    final_ret += "4. 确保修改后代码的一致性和完整性\n"
+                    final_ret += "5. 请确认所有相关点是否已修改完成，包括但不限于：\n"
                     final_ret += "   - 所有需要修改的文件\n"
                     final_ret += "   - 所有需要更新的函数\n"
                     final_ret += "   - 所有需要调整的依赖关系\n"
@@ -313,7 +312,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
 [合并后的完整代码，包括所有空行和缩进]
 {ct("MERGED_CODE")}
 """
-            model = PlatformRegistry().get_thinking_platform()
+            model = PlatformRegistry().get_normal_platform()
             model.set_suppress_output(True)
             count = 30
             start_line = -1

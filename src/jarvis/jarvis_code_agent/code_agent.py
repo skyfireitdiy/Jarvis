@@ -94,15 +94,14 @@ class CodeAgent:
   - >200行：按功能拆分，但尽量减少提交次数
 
 ### 5. 实施修改
-- 遵循"先读后写"原则
+- 遵循"先读后写"原则，在修改已有代码前，必须已经读取了对应文件
 - 保持代码风格一致性
 - 自动匹配项目现有命名风格
-- 重要功能变更提供单元测试
 - 允许创建新文件和结构，但不得假设或虚构现有代码
 
 ### 6. 验证
 - 修改后自动验证：
-  1. 优先使用execute_shell运行相关检查命令（如pylint、flake8或单元测试）
+  1. 优先使用execute_shell运行相关静态检查命令（如pylint、flake8或单元测试）
   2. 只有在shell命令不足时才使用lsp_get_diagnostics
   3. 只有在特殊情况下才使用code_review
 - 发现问题自动修复，无需用户指导
@@ -180,7 +179,7 @@ class CodeAgent:
         # 处理platform参数
         platform_instance = (PlatformRegistry().create_platform(platform) 
                             if platform 
-                            else PlatformRegistry().get_thinking_platform())
+                            else PlatformRegistry().get_normal_platform())
         if model:
             platform_instance.set_model_name(model) # type: ignore
         
