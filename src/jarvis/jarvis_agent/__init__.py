@@ -25,6 +25,29 @@ from jarvis.jarvis_utils.utils import ot, init_env
 from jarvis.jarvis_utils.utils import user_confirm
 import os
 
+from .jarvis_platform.registry import PlatformRegistry
+from .patch import PatchOutputHandler
+from . import (
+    Agent, file_input_handler, shell_input_handler, builtin_input_handler,
+    _load_tasks, _select_task, get_multiline_input, origin_agent_system_prompt
+)
+
+__all__ = [
+    'PlatformRegistry',
+    'PatchOutputHandler',
+    'Agent',
+    'file_input_handler',
+    'shell_input_handler',
+    'builtin_input_handler',
+    '_load_tasks',
+    '_select_task',
+    'get_multiline_input',
+    'origin_agent_system_prompt',
+    'init_env',
+    'PrettyOutput',
+    'OutputType'
+]
+
 class Agent:
 
     def set_summary_prompt(self, summary_prompt: str):
