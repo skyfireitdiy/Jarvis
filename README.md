@@ -60,6 +60,8 @@ jarvis-code-review --help
 jarvis-dev --help
 # 使用git squash的功能
 jarvis-git-squash --help
+# 使用代码库查询功能
+jarvis-ask-codebase --help
 ```
 
 ---
