@@ -424,6 +424,7 @@ def load_methodology(user_input: str) -> str:
                     spinner.ok("✅")
                 
                 if relevant_methodologies:
+                    spinner.write(f"找到相关方法论: {', '.join(relevant_methodologies.keys())}")
                     return make_methodology_prompt(relevant_methodologies)
         
         # 如果缓存无效，从头构建索引
