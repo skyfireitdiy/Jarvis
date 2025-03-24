@@ -34,6 +34,7 @@ from . import (
 
 __all__ = [
     'PlatformRegistry',
+    'ToolRegistry',  # 新增缺失的导出项
     'PatchOutputHandler',
     'Agent',
     'file_input_handler',
