@@ -154,6 +154,19 @@ class SymbolTool:
 ## 任务描述
 查找符号 `{symbol}` 在代码库中的定义、声明和引用位置，专注于分析目标所需的信息，生成有针对性的符号分析报告。{objective_text}
 
+## 工具使用优先级
+1. **优先使用 execute_shell 执行 rg 命令**: 
+   - `rg -w "{symbol}" --type py` 查找Python文件中的符号
+   - `rg "class\\s+{symbol}|def\\s+{symbol}" --type py` 查找定义
+   - `rg -w "{symbol}" -A 2 -B 2` 查看符号上下文
+
+2. **辅以 read_code**: 
+   - 找到符号位置后使用read_code阅读上下文
+   - 读取符号定义和关键引用的完整实现
+
+3. **避免使用专用分析工具**:
+   - 只有当rg命令和read_code工具无法满足需求时才考虑
+
 ## 工作环境
 - 工作目录: `{root_dir}`
 - 文件类型: {file_ext_str if file_ext_str else "所有文件"}
@@ -162,28 +175,34 @@ class SymbolTool:
 ## 分析策略
 1. 首先确定项目的主要编程语言和技术栈，以便更精确地查找符号
 2. 理解分析目标，明确需要查找的信息类型
-3. 使用适当的搜索模式查找符号定义和引用
+3. 使用适当的rg搜索模式查找符号定义和引用
 4. 验证搜索结果，确认是目标符号的真正使用
 5. 分析符号上下文，了解其用途和使用方式
 6. 根据分析目标自行确定需要的分析深度和广度
 
 ## 符号查找工具指南
 
-### 工具选择策略
-- 从定义到使用：先找到符号的定义位置，再查找其使用位置
-- 精确匹配：区分同名但不同作用域的符号
-- 上下文理解：分析符号在每处使用的具体上下文
+### execute_shell 搜索命令
+- **基本搜索**: 
+  - `rg -w "{symbol}" --type=文件类型`
+  - 示例: `rg -w "{symbol}" --type py` 搜索Python文件中的符号
 
-### execute_shell
-- **用途**：执行搜索命令定位符号
-- **典型用法**：
-  - 使用项目支持的搜索工具查找符号的出现位置
-  - 结合正则表达式区分符号的定义和使用
-  - 根据提供的file_extensions参数限制搜索范围
-- **高级技巧**：
-  - 使用不同的搜索模式匹配不同类型的符号（类、函数、变量等）
-  - 区分符号的定义和使用
-  - 使用边界匹配确保精确查找
+- **查找定义**:
+  - `rg "class\\s+{symbol}\\b|def\\s+{symbol}\\b|function\\s+{symbol}\\b" --type py` 查找Python定义
+  - `rg "class\\s+{symbol}\\b|function\\s+{symbol}\\b" --type js` 查找JavaScript定义
+  - `rg "const\\s+{symbol}\\b|let\\s+{symbol}\\b|var\\s+{symbol}\\b" --type js` 查找JavaScript变量声明
+
+- **查看上下文**:
+  - `rg -w "{symbol}" -A 5 -B 5` 显示符号前后5行
+  - `rg -w "{symbol}" --context=10` 显示符号前后10行
+
+- **排除目录**:
+  - `rg -w "{symbol}" --type py -g '!tests/'` 排除测试目录
+  - `rg -w "{symbol}" -g '!node_modules/'` 排除node_modules
+
+- **统计引用**:
+  - `rg -c -w "{symbol}" --type py` 统计每个Python文件中的引用次数
+  - `rg -w "{symbol}" --count-matches --stats` 显示引用统计信息
 
 ### read_code
 - **用途**：读取符号定义和使用的上下文
@@ -198,7 +217,7 @@ class SymbolTool:
 ### 符号分析模式
 
 1. **定义分析模式**：
-   - 首先找到符号的所有定义位置（可能有多处）
+   - 首先找到符号的所有定义位置
    - 分析定义的类型（类、函数、变量、常量等）
    - 理解符号的属性、参数、返回值等特性
    - 查看相关注释和文档字符串

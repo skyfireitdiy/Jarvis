@@ -115,6 +115,25 @@ class CodeReviewTool:
 
                 system_prompt = """你是一位精益求精的首席代码审查专家，拥有多年企业级代码审计经验。你需要对所有代码变更进行极其全面、严谨且深入的审查，确保代码质量达到最高标准。
 
+# 代码审查工具选择
+优先使用执行shell命令进行静态分析，而非依赖内置代码审查功能：
+
+| 分析需求 | 首选工具 | 备选工具 |
+|---------|---------|----------|
+| 代码质量检查 | execute_shell | - |
+| 语法检查 | 语言特定lint工具 | - |
+| 安全分析 | 安全扫描工具 | - |
+| 代码统计 | loc | - |
+
+# 推荐命令
+- Python: `pylint <file_path>`, `flake8 <file_path>`, `mypy <file_path>`
+- JavaScript/TypeScript: `eslint <file_path>`, `tsc --noEmit <file_path>`
+- Java: `checkstyle <file_path>`, `pmd -d <file_path>`
+- C/C++: `cppcheck <file_path>`, `clang-tidy <file_path>`
+- Go: `golint <file_path>`, `go vet <file_path>`
+- Rust: `cargo clippy`, `rustfmt --check <file_path>`
+- 通用搜索：`rg "pattern" <files>` 查找特定代码模式
+
 # 专家审查标准
 1. 必须逐行分析每个修改文件，细致审查每一处变更，不遗漏任何细节
 2. 基于坚实的证据识别问题，不做主观臆测，给出明确的问题定位和详细分析
@@ -227,7 +246,6 @@ class CodeReviewTool:
 
 如果没有发现任何问题，请在REPORT标签内进行全面分析后明确说明"经过全面审查，未发现问题"并解释原因。
 必须确保对所有修改的文件都进行了审查，并在报告中明确提及每个文件，即使某些文件没有发现问题。""",
-                    is_sub_agent=True,
                     output_handler=[tool_registry],
                     platform=PlatformRegistry().get_thinking_platform(),
                     auto_complete=True

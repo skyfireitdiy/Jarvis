@@ -156,6 +156,19 @@ class FindCallerTool:
 ## 任务描述
 查找所有调用 `{function_name}` 函数的代码位置，专注于分析目标所需的信息，生成有针对性的调用分析报告。{objective_text}
 
+## 工具使用优先级
+1. **优先使用 execute_shell 执行 rg 命令**: 
+   - `rg "\\b{function_name}\\s*\\(" --type py` 查找Python文件中的调用
+   - `rg "\\b{function_name}\\s*\\(" --type js` 查找JavaScript文件中的调用
+   - `rg -w "{function_name}" -A 2 -B 2` 查看调用上下文
+
+2. **辅以 read_code**: 
+   - 找到调用位置后使用read_code阅读上下文
+   - 读取关键调用者的完整实现
+
+3. **避免使用专用分析工具**:
+   - 只有当rg命令和read_code工具无法满足需求时才考虑
+
 ## 工作环境
 - 工作目录: `{root_dir}`
 - 文件类型: {file_ext_str if file_ext_str else "所有文件"}
@@ -164,28 +177,29 @@ class FindCallerTool:
 ## 分析策略
 1. 首先确定项目的主要编程语言和技术栈，以便更精确地查找函数调用
 2. 理解分析目标，明确需要查找的信息类型
-3. 使用适当的搜索模式查找函数调用
+3. 使用适当的rg搜索模式查找函数调用
 4. 验证搜索结果，确认是对目标函数的真正调用
 5. 分析调用上下文，了解调用的目的和方式
 6. 根据分析目标自行确定需要的分析深度和广度
 
 ## 调用者查找工具指南
 
-### 工具选择策略
-- 精确匹配优先：确保找到的是真正的函数调用，而非相似名称或注释
-- 上下文理解：每个调用点都需分析其上下文以了解调用目的
-- 分类组织：按模块、功能或调用方式对调用点进行分组
+### execute_shell 搜索命令
+- **基本搜索**: 
+  - `rg "\\b{function_name}\\s*\\(" --type=文件类型`
+  - 示例: `rg "\\b{function_name}\\s*\\(" --type py` 搜索Python文件中的调用
 
-### execute_shell
-- **用途**：执行查找命令定位函数调用
-- **典型用法**：
-  - 使用grep或项目支持的搜索工具查找函数调用模式
-  - 根据项目编程语言调整搜索模式（函数调用语法）
-  - 根据提供的file_extensions参数限制搜索范围
-- **高级技巧**：
-  - 显示调用周围的上下文行以便理解调用目的
-  - 结合统计命令了解调用频率
-  - 使用正则表达式精确匹配函数调用模式
+- **查看上下文**:
+  - `rg "\\b{function_name}\\s*\\(" -A 5 -B 5` 显示调用前后5行
+  - `rg "\\b{function_name}\\s*\\(" --context=10` 显示调用前后10行
+
+- **排除目录**:
+  - `rg "\\b{function_name}\\s*\\(" --type py -g '!tests/'` 排除测试目录
+  - `rg "\\b{function_name}\\s*\\(" -g '!node_modules/'` 排除node_modules
+
+- **统计调用**:
+  - `rg -c "\\b{function_name}\\s*\\(" --type py` 统计每个Python文件中的调用次数
+  - `rg "\\b{function_name}\\s*\\(" --count-matches --stats` 显示调用统计信息
 
 ### read_code
 - **用途**：读取找到的调用点上下文
@@ -200,7 +214,7 @@ class FindCallerTool:
 ### 调用者分析模式
 
 1. **影响范围评估模式**：
-   - 查找所有调用点
+   - 查找所有调用点: `rg -l "\\b{function_name}\\s*\\("`
    - 按模块/组件分类调用位置
    - 评估修改函数可能影响的范围和严重性
 
@@ -215,7 +229,7 @@ class FindCallerTool:
    - 构建完整的调用链或调用树
 
 4. **调用频率分析**：
-   - 统计不同模块中的调用频率
+   - 统计不同模块中的调用频率: `rg -c "\\b{function_name}\\s*\\(" --sort path`
    - 识别高频调用点和关键路径
    - 评估函数在系统中的重要性
 

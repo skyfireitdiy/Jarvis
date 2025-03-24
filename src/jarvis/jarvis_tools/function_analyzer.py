@@ -172,6 +172,23 @@ class FunctionAnalyzerTool:
 ## 任务描述
 分析函数 `{function_name}` 的实现，专注于分析目标所需的信息，生成有针对性的函数分析报告。{objective_text}
 
+## 工具使用优先级
+1. **首先使用 execute_shell 执行 rg 命令查找函数定义**: 
+   - `rg "def\\s+{function_name}\\s*\\(" --type py` 查找Python函数定义
+   - `rg "function\\s+{function_name}\\s*\\(" --type js` 查找JavaScript函数定义
+   - `rg "func\\s+{function_name}\\s*\\(" --type go` 查找Go函数定义
+
+2. **优先使用 read_code 阅读函数实现**: 
+   - 找到函数位置后使用read_code阅读完整实现
+   - 对于长函数可分段读取关键部分
+
+3. **使用 rg 搜索子函数调用和使用模式**:
+   - `rg -w "子函数名" --type py` 查找子函数调用
+   - `rg "import|from" 函数所在文件` 查找导入模块
+
+4. **避免使用专用分析工具**:
+   - 只有当rg命令和read_code工具无法满足需求时才考虑
+
 ## 函数信息
 - 函数名称: `{function_name}`
 - {file_info}
@@ -189,21 +206,25 @@ class FunctionAnalyzerTool:
 
 ## 函数分析工具指南
 
-### 工具选择策略
-- 由内而外：先分析函数核心实现，再扩展到相关调用
-- 由简到繁：先理解基本流程，再深入复杂细节
-- 合理分层：根据analysis_depth合理控制子函数分析深度
+### execute_shell 搜索命令
+- **查找函数定义**:
+  - `rg "def\\s+{function_name}\\s*\\(" --type py` 查找Python函数定义
+  - `rg "function\\s+{function_name}\\s*\\(" --type js` 查找JavaScript函数定义
+  - `rg "func\\s+{function_name}\\s*\\(" --type go` 查找Go函数定义
 
-### execute_shell
-- **用途**：定位函数定义和相关组件
-- **典型用法**：
-  - 使用项目支持的搜索工具查找函数定义
-  - 根据项目编程语言调整搜索模式
-  - 根据提供的file_extensions参数限制搜索范围
-- **高级技巧**：
-  - 针对不同编程范式调整函数定义的搜索模式
-  - 结合文件类型优化搜索模式
-  - 使用上下文选项查看函数定义的周围代码
+- **查找函数调用**:
+  - `rg "\\b{function_name}\\s*\\(" --type py` 查找函数调用
+  - `rg -w "{function_name}" -A 2 -B 2` 查看函数调用上下文
+
+- **分析函数依赖**:
+  - `rg "import|from" 函数所在文件` 查找Python导入语句
+  - `rg "require\\(" 函数所在文件` 查找JavaScript导入语句
+  - `rg "import " 函数所在文件` 查找Go导入语句
+
+- **统计分析**:
+  - `loc 函数所在文件` 获取文件代码统计
+  - `rg -c "if|else|elif" 函数所在文件` 统计条件分支数量
+  - `rg -c "for|while" 函数所在文件` 统计循环数量
 
 ### read_code
 - **用途**：读取函数实现和相关代码
