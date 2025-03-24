@@ -191,17 +191,16 @@ def apply_patch(output_str: str) -> str:
             final_ret += "❌ 没有要提交的更改\n"
         # 用户确认最终结果
         with spinner.hidden():
+            if commited:
+                return final_ret
             PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
             if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
                 return final_ret
             custom_reply = get_multiline_input("请输入自定义回复")
             if not custom_reply.strip():  # 如果自定义回复为空，返回空字符串
                 return ""
-            if not commited:
-                return final_ret + "\n\n" + custom_reply
-            else:
-                return custom_reply
-
+            return final_ret + "\n\n" + custom_reply
+            
 def revert_file(filepath: str):
     """增强版git恢复，处理新文件"""
     import subprocess
