@@ -140,7 +140,7 @@ class CodeAgent:
                            is_sub_agent=False, 
                            use_methodology=False,
                            output_handler=[tool_registry, PatchOutputHandler()], 
-                           platform=PlatformRegistry().get_codegen_platform(), 
+                           platform=PlatformRegistry().get_thinking_platform(), 
                            record_methodology=False,
                            input_handler=[shell_input_handler, file_input_handler, builtin_input_handler],
                            need_summary=False)
