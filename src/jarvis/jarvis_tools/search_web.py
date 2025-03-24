@@ -19,4 +19,8 @@ class SearchWebTool:
         model = PlatformRegistry().create_platform("yuanbao")
         model.set_suppress_output(False) # type: ignore
         model.set_model_name("deep_seek") # type: ignore
-        return model.chat_until_success(query) # type: ignore
+        return {
+            "stdout": model.chat_until_success(query), # type: ignore
+            "stderr": "",
+            "success": True,
+        }

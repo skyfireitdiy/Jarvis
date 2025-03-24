@@ -186,7 +186,7 @@ class PrettyOutput:
         )
         console.print()
         console.print(panel)
-        if traceback:
+        if traceback or output_type == OutputType.ERROR:
             console.print_exception()
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):
