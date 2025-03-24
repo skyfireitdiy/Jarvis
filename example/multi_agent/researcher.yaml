@@ -74,9 +74,6 @@ agents:
      platform: yuanbao
      model_name: deepseek
      auto_complete: false
-     need_summary: false
-     use_methodology: false
-     record_methodology: false
 
    - name: TechnologyExpert
      description: 技术专家，负责深入分析技术原理、系统性评估技术方案并提供证据支持的专业判断
@@ -148,9 +145,6 @@ agents:
      platform: yuanbao
      model_name: deepseek
      auto_complete: false
-     need_summary: false
-     use_methodology: false
-     record_methodology: false
 
    - name: ImplementationExpert
      description: 实施专家，负责系统化评估落地可行性、构建实施路径并量化分析投资回报
@@ -222,8 +216,5 @@ agents:
      platform: yuanbao
      model_name: deepseek
      auto_complete: false
-     need_summary: false
-     use_methodology: false
-     record_methodology: false
 
 main_agent: ResearchLead

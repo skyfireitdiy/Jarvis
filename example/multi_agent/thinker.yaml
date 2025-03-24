@@ -66,9 +66,6 @@ agents:
      platform: yuanbao
      model_name: deepseek
      auto_complete: false
-     need_summary: false
-     use_methodology: false
-     record_methodology: false
 
    - name: Reasoner
      description: 严谨的思维链构建者，负责在批判性考验下执行系统化推理并形成可靠的思维链条
@@ -150,8 +147,5 @@ agents:
      platform: yuanbao
      model_name: deepseek
      auto_complete: false
-     need_summary: false
-     use_methodology: false
-     record_methodology: false
 
 main_agent: CriticalQuestioner

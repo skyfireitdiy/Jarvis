@@ -16,7 +16,7 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.config import is_auto_complete, is_execute_tool_confirm, is_need_summary, is_record_methodology, is_use_methodology
+from jarvis.jarvis_utils.config import is_auto_complete, is_execute_tool_confirm
 from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -55,16 +55,12 @@ class Agent:
                  system_prompt: str, 
                  name: str = "Jarvis", 
                  description: str = "",
-                 is_sub_agent: bool = False, 
                  platform: Union[Optional[BasePlatform], Optional[str]] = None, 
                  model_name: Optional[str] = None,
                  summary_prompt: Optional[str] = None, 
                  auto_complete: Optional[bool] = None, 
                  output_handler: List[OutputHandler] = [],
                  input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
-                 use_methodology: Optional[bool] = None,
-                 record_methodology: Optional[bool] = None,
-                 need_summary: Optional[bool] = None,
                  max_context_length: Optional[int] = None,
                  execute_tool_confirm: Optional[bool] = None,
                  multiline_inputer: Optional[Callable[[str], str]] = None):
@@ -91,13 +87,9 @@ class Agent:
         self.output_handler = output_handler if output_handler else [ToolRegistry()]
         self.multiline_inputer = multiline_inputer if multiline_inputer else get_multiline_input
         
-        self.record_methodology = record_methodology if record_methodology is not None else is_record_methodology()
-        self.use_methodology = use_methodology if use_methodology is not None else is_use_methodology()
-        self.is_sub_agent = is_sub_agent
         self.prompt = ""
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
-        self.need_summary = need_summary if need_summary is not None else is_need_summary()
         self.input_handler = input_handler if input_handler is not None else []
         # Load configuration from environment variables
 
@@ -286,42 +278,38 @@ class Agent:
             - For main agent: May generate methodology if enabled
             - For sub-agent: May generate summary if enabled
         """
-        if not self.is_sub_agent:
-            if self.record_methodology:
-                with yaspin(text="正在生成方法论...", color="cyan") as spinner:
-                    try:
-                        
-                        # 让模型判断是否需要生成方法论
-                        analysis_prompt = """当前任务已结束，请分析是否需要生成方法论。
-        如果你认为需要生成方法论，请先确定是创建新方法论还是更新现有方法论。如果是更新现有方法论，请使用'update'，否则使用'add'。
-        如果你认为不需要方法论，请解释原因。
-        方法论应适用于通用场景，不要包含任务特定信息，如代码提交信息等。
-        方法论应包含：问题重述、最优解决方案、注意事项（如有），除此之外不要包含其他内容。
-        方法论中仅记录有实际意义的流程，不要记录执行过程中的错误或无效尝试，只保留最终有效的解决步骤。
-        确保方法论内容严格按照本次任务的成功执行路径编写，保证它对未来类似问题的解决具有指导意义。
-        只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
-        """
-                        self.prompt = analysis_prompt
-                        with spinner.hidden():
-                            response = self.model.chat_until_success(self.prompt) # type: ignore
-
-                        with spinner.hidden():
-                            self._call_tools(response)
-                        spinner.text = "方法论生成完成"
-                        spinner.ok("✅")
-                    except Exception as e:
-                        spinner.text = "方法论生成失败"
-                        spinner.fail("❌")
-            return "任务完成"
-        
-        if self.need_summary:
-            with yaspin(text="正在生成总结...", color="cyan") as spinner:
-                self.prompt = self.summary_prompt
+        with yaspin(text="正在生成方法论...", color="cyan") as spinner:
+            try:
+                
+                # 让模型判断是否需要生成方法论
+                analysis_prompt = """当前任务已结束，请分析是否需要生成方法论。
+如果你认为需要生成方法论，请先确定是创建新方法论还是更新现有方法论。如果是更新现有方法论，请使用'update'，否则使用'add'。
+如果你认为不需要方法论，请解释原因。
+方法论应适用于通用场景，不要包含任务特定信息，如代码提交信息等。
+方法论应包含：问题重述、最优解决方案、注意事项（如有），除此之外不要包含其他内容。
+方法论中仅记录有实际意义的流程，不要记录执行过程中的错误或无效尝试，只保留最终有效的解决步骤。
+确保方法论内容严格按照本次任务的成功执行路径编写，保证它对未来类似问题的解决具有指导意义。
+只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
+"""
+                self.prompt = analysis_prompt
                 with spinner.hidden():
-                    ret = self.model.chat_until_success(self.prompt) # type: ignore
-                    spinner.text = "总结生成完成"
-                    spinner.ok("✅")
-                    return ret
+                    response = self.model.chat_until_success(self.prompt) # type: ignore
+
+                with spinner.hidden():
+                    self._call_tools(response)
+                spinner.text = "方法论生成完成"
+                spinner.ok("✅")
+            except Exception as e:
+                spinner.text = "方法论生成失败"
+                spinner.fail("❌")
+        
+        with yaspin(text="正在生成总结...", color="cyan") as spinner:
+            self.prompt = self.summary_prompt
+            with spinner.hidden():
+                ret = self.model.chat_until_success(self.prompt) # type: ignore
+                spinner.text = "总结生成完成"
+                spinner.ok("✅")
+                return ret
         
         return "任务完成"
 
@@ -341,8 +329,7 @@ class Agent:
             self.prompt = f"{user_input}"
 
             if self.first:
-                if self.use_methodology:
-                    self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
+                self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
                 self.first = False
 
             while True:

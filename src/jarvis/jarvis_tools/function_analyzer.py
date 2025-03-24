@@ -117,10 +117,6 @@ class FunctionAnalyzerTool:
                 summary_prompt=summary_prompt,
                 platform=PlatformRegistry().get_thinking_platform(),
                 output_handler=[tool_registry],
-                need_summary=True,
-                is_sub_agent=True,
-                use_methodology=False,
-                record_methodology=False,
                 execute_tool_confirm=False,
                 auto_complete=True
             )

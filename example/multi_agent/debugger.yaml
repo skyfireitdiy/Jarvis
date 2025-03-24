@@ -116,9 +116,6 @@ agents:
      platform: yuanbao
      model_name: deepseek
      auto_complete: false
-     need_summary: false
-     use_methodology: false
-     record_methodology: false
 
    - name: TroubleshootingExecutor
      description: 故障排查执行专家，按计划执行故障排查步骤并收集关键信息供计划者分析
@@ -235,8 +232,5 @@ agents:
      platform: yuanbao
      model_name: deepseek_v3
      auto_complete: false
-     need_summary: false
-     use_methodology: false
-     record_methodology: false
 
 main_agent: TroubleshootingPlanner

@@ -223,14 +223,11 @@ class CodeAgent:
         
         self.agent = Agent(system_prompt=code_system_prompt,
                            name="CodeAgent",
-                           auto_complete=False,
-                           is_sub_agent=False, 
-                           use_methodology=False,
+                           auto_complete=False, 
                            output_handler=[tool_registry, PatchOutputHandler()], 
                            platform=platform_instance,
-                           record_methodology=False,
                            input_handler=[shell_input_handler, file_input_handler, builtin_input_handler],
-                           need_summary=False)
+                           )
 
     
 

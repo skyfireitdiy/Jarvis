@@ -36,30 +36,7 @@ def is_auto_complete() -> bool:
     """
     return os.getenv('JARVIS_AUTO_COMPLETE', 'false') == 'true'
     
-def is_use_methodology() -> bool:
-    """
-    检查是否应使用方法论。
-    
-    返回：
-        bool: 如果使用方法论则返回True，默认为True
-    """
-    return os.getenv('JARVIS_USE_METHODOLOGY', 'true') == 'true'
-def is_record_methodology() -> bool:
-    """
-    检查是否应记录方法论。
-    
-    返回：
-        bool: 如果记录方法论则返回True，默认为True
-    """
-    return os.getenv('JARVIS_RECORD_METHODOLOGY', 'true') == 'true'
-def is_need_summary() -> bool:
-    """
-    检查是否需要生成摘要。
-    
-    返回：
-        bool: 如果需要摘要则返回True，默认为True
-    """
-    return os.getenv('JARVIS_NEED_SUMMARY', 'true') == 'true'
+
 def get_min_paragraph_length() -> int:
     """
     获取文本处理的最小段落长度。
