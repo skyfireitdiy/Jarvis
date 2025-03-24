@@ -4,7 +4,6 @@ import glob
 import hashlib
 from typing import Dict, Optional, Any
 
-from jarvis.jarvis_utils.config import is_use_methodology
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -34,11 +33,6 @@ class MethodologyTool:
         },
         "required": ["operation", "problem_type"]
     }
-
-    @staticmethod
-    def check()->bool:
-        """检查是否启用了方法论功能"""
-        return is_use_methodology()
     
     def __init__(self):
         """初始化经验管理工具"""
