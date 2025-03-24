@@ -8,11 +8,14 @@ from prompt_toolkit import prompt
 import yaml
 from yaspin import yaspin
 from jarvis.jarvis_agent import (
-    init_env, PrettyOutput, OutputType, 
+     PrettyOutput, OutputType, 
     file_input_handler, shell_input_handler, builtin_input_handler,
      get_multiline_input,
-    ToolRegistry, PatchOutputHandler, Agent,  # 显式导入关键组件
+     Agent,  # 显式导入关键组件
 )
+from jarvis.jarvis_agent.patch import PatchOutputHandler
+from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_utils.utils import init_env
 
 
 def _load_tasks() -> dict:
@@ -210,7 +213,7 @@ def main() -> int:
             system_prompt=origin_agent_system_prompt,
             platform=args.platform,
             model_name=args.model,
-            input_handler=[file_input_handler, shell_input_handler, builtin_input_handler],
+            input_handler=[file_input_handler, shell_input_handler, builtin_input_handler], # type: ignore
             output_handler=[ToolRegistry(), PatchOutputHandler()]
         )
 

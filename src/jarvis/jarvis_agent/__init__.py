@@ -1,17 +1,8 @@
-import argparse
 from typing import Any, Callable, List, Optional, Tuple, Union
 
-from prompt_toolkit import prompt
-import yaml
 from yaspin import yaspin
-import platform
-import datetime
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
-from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
-from jarvis.jarvis_agent.file_input_handler import file_input_handler
-from jarvis.jarvis_agent.patch import PatchOutputHandler
-from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
@@ -21,31 +12,11 @@ from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.config import get_max_token_count
-from jarvis.jarvis_utils.utils import ot, init_env
+from jarvis.jarvis_utils.utils import ot
 from jarvis.jarvis_utils.utils import user_confirm
-import os
 
-from jarvis.jarvis_tools.registry import ToolRegistry  # 显式导入ToolRegistry
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from .patch import PatchOutputHandler
 
-
-__all__ = [
-    'PlatformRegistry',
-    'ToolRegistry',  # 新增缺失的导出项
-    'PatchOutputHandler',
-    'Agent',
-    'file_input_handler',
-    'shell_input_handler',
-    'builtin_input_handler',
-    '_load_tasks',
-    '_select_task',
-    'get_multiline_input',
-    'origin_agent_system_prompt',
-    'init_env',
-    'PrettyOutput',
-    'OutputType'
-]
 
 class Agent:
 
