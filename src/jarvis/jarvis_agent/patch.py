@@ -187,6 +187,7 @@ def apply_patch(output_str: str) -> str:
                 final_ret += "❌ 补丁应用被拒绝\n"
                 final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
         else:
+            commited = False
             final_ret += "❌ 没有要提交的更改\n"
         # 用户确认最终结果
         with spinner.hidden():
