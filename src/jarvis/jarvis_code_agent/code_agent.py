@@ -40,9 +40,6 @@ class CodeAgent:
                                  "function_analyzer",  # 添加函数分析工具
                                  "project_analyzer",  # 添加项目分析工具
                                  "file_analyzer",  # 添加单文件分析工具
-                                 "fd",
-                                 "rg",
-                                 "loc",
                                  "read_code"
                                  ])
         code_system_prompt = """
