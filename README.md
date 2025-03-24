@@ -75,8 +75,8 @@ jarvis-ask-codebase --help
 | 核心配置 | `JARVIS_AUTO_COMPLETE` | false | 是否启用自动补全功能 |
 | 核心配置 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | 核心配置 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
-| 模型配置 | `JARVIS_PLATFORM` | kimi | 默认AI平台 |
-| 模型配置 | `JARVIS_MODEL` | kimi | 默认模型 |
+| 模型配置 | `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
+| 模型配置 | `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
 | 模型配置 | `JARVIS_CODEGEN_PLATFORM` | JARVIS_PLATFORM | 代码生成任务使用的平台 |
 | 模型配置 | `JARVIS_CODEGEN_MODEL` | JARVIS_MODEL | 代码生成任务使用的模型 |
 | 模型配置 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 思考任务使用的平台 |

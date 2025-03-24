@@ -21,7 +21,7 @@ REQUIRED_METHODS = [
 class PlatformRegistry:
     """Platform registry"""
 
-    global_platform_name = "kimi"
+    global_platform_name = "yuanbao"
     global_platform_registry = None
 
     @staticmethod
