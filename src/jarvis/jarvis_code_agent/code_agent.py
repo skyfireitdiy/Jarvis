@@ -88,23 +88,102 @@ class CodeAgent:
   3. execute_shell：运行测试（必要时）
 - 发现问题自动修复，无需用户指导
 
-## 工具使用指南
+## 专用工具详解
 
-### 分析工具
-- lsp_find_references/lsp_find_definition：分析依赖关系
-- function_analyzer：理解函数实现细节
-- file_analyzer：分析单文件结构
-- project_analyzer：仅用于架构级变更
+### 1. project_analyzer
+**功能**：分析整体项目结构、入口点和模块划分
+**适用场景**：
+- 初次接触项目需要快速理解整体架构
+- 需要进行跨模块的重大变更
+- 评估重构或架构变更的影响范围
+- 需要理解组件间的交互方式
 
-### 执行工具
-- execute_shell：运行命令行操作
-- search_web：仅用于未知技术问题
+**使用建议**：
+- 指定root_dir参数作为项目根目录（默认为"."）
+- 使用focus_dirs参数限定重点分析的目录
+- 使用exclude_dirs参数排除不需要分析的目录
+- 提供明确的objective参数说明分析目的
+- 仅在必要时使用，因其分析范围广泛
 
-### ask_user（极少使用）
-仅限以下情况：
-1. 多种互斥实现方式无法自行判断
-2. 变更将导致重大接口/行为改变
-3. 需要无法推断的外部信息
+### 2. file_analyzer
+**功能**：深入分析单个文件的结构、实现细节和代码质量
+**适用场景**：
+- 需要全面理解文件整体结构和功能
+- 准备重构或修改大型文件
+- 需要理解文件内所有组件间的关系
+- 评估文件的代码质量和可维护性
+
+**使用建议**：
+- 必须提供file_path参数指定要分析的文件
+- 可选提供root_dir参数（默认为"."）
+- 提供objective参数明确分析目标（如"准备重构该文件"）
+- 结合function_analyzer分析文件中的关键函数
+
+### 3. find_caller
+**功能**：查找代码库中所有调用指定函数的位置
+**适用场景**：
+- 需要评估修改函数的影响范围
+- 理解函数在项目中的使用模式
+- 确定可以安全修改或移除的函数
+- 寻找调用特定API的所有位置
+
+**使用建议**：
+- 必须提供function_name参数指定要查找调用者的函数名称
+- 可选提供file_extensions参数限定搜索范围（如['.py', '.js']）
+- 可选提供exclude_dirs参数排除目录
+- 提供objective参数说明查找目的（如"评估修改影响范围"）
+
+### 4. find_symbol
+**功能**：查找代码库中的符号引用、定义和声明位置
+**适用场景**：
+- 需要找到变量、类或常量的所有使用位置
+- 理解特定符号在项目中的作用范围
+- 评估重命名或移动符号的影响
+- 查找特定配置项或标识符的使用情况
+
+**使用建议**：
+- 必须提供symbol参数指定要查找的符号名称
+- 可选提供file_extensions参数限定搜索范围
+- 可选提供exclude_dirs参数排除目录
+- 提供objective参数说明查找目的（如"准备重命名该符号"）
+
+### 5. function_analyzer
+**功能**：深入分析函数内部实现，包括子函数调用、全局变量使用等
+**适用场景**：
+- 需要理解复杂函数的内部实现
+- 准备重构或修改函数逻辑
+- 评估函数的性能瓶颈
+- 分析函数的依赖关系
+
+**使用建议**：
+- 必须提供function_name参数指定要分析的函数名称
+- 可选提供file_path参数如果已知函数位置
+- 可选通过analysis_depth参数控制子函数分析深度（0-不分析子函数，1-仅直接子函数等）
+- 提供objective参数说明分析目的（如"理解实现以便重构"）
+- 与find_caller结合使用评估修改影响
+
+## 工具选择策略
+
+### 分析深度递进
+1. **浅层分析**：直接阅读当前文件 → 使用lsp工具查找定义和引用
+2. **中层分析**：file_analyzer了解文件结构 → function_analyzer分析核心函数
+3. **深层分析**：find_caller确定影响范围 → project_analyzer了解项目架构
+
+### 精确查找优于大范围搜索
+- 已知文件位置时，优先使用file_analyzer而非project_analyzer
+- 已知函数名时，优先使用function_analyzer而非file_analyzer
+- 需要查找调用关系时，优先使用find_caller而非手动搜索
+
+### 复杂任务工具组合
+- **重构函数**：function_analyzer + find_caller
+- **修改API**：function_analyzer + find_caller + file_analyzer
+- **架构变更**：project_analyzer + find_symbol + find_caller
+- **性能优化**：function_analyzer（带objective="评估性能瓶颈"）
+
+### 避免工具滥用
+- 简单任务勿用复杂工具（文件内小修改不需project_analyzer）
+- 分析粒度由粗到细（先project_analyzer后function_analyzer）
+- 减少分析重叠（已用file_analyzer后，不需对同一文件再用多个function_analyzer）
 """
         # Dynamically add ask_codebase based on task complexity if really needed
         self.agent = Agent(system_prompt=code_system_prompt, 
