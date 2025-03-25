@@ -92,10 +92,29 @@ class ToolRegistry(OutputHandler):
         if tools:
             tools_prompt = "## 可用工具:\n"
             for tool in tools:
-                tools_prompt += f"- 名称: {tool['name']}\n"
-                tools_prompt += f"  描述: {tool['description']}\n"
-                tools_prompt += f"  参数: {tool['parameters']}\n"
-            tools_prompt += tool_call_help
+                try:
+                    tools_prompt += f"- 名称: {tool['name']}\n"
+                    tools_prompt += f"  描述: {tool['description']}\n"
+                    tools_prompt += "  参数: |\n"
+                    
+                    # 生成格式化的YAML参数
+                    yaml_params = yaml.dump(
+                        tool['parameters'],
+                        allow_unicode=True,
+                        indent=4,
+                        sort_keys=False,
+                        width=120  # 增加行宽限制
+                    )
+                    
+                    # 添加缩进并移除尾部空格
+                    for line in yaml_params.split('\n'):
+                        tools_prompt += f"    {line.rstrip()}\n"
+                        
+                except yaml.YAMLError as e:
+                    PrettyOutput.print(f"工具 {tool['name']} 参数序列化失败: {str(e)}", OutputType.ERROR)
+                    continue
+                    
+            tools_prompt += tool_call_help.rstrip()  # 移除帮助文本尾部空格
             return tools_prompt
         return ""
     
