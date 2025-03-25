@@ -203,10 +203,10 @@ class CodeAgent:
 
     def run(self, user_input: str):
         """Run the code agent with the given user input.
-        
+
         Args:
-            user_input: The user's requirement/request
-            
+            user_input (str): The user's requirement/request
+
         Returns:
             str: Output describing the execution result
         """
