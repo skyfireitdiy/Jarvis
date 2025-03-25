@@ -261,4 +261,4 @@ class YuanbaoPlatform(BasePlatform):
 
     def name(self) -> str:
         """Model name"""
-        return "yuanbao"
+        return self.model_name
