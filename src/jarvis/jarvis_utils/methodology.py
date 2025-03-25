@@ -424,7 +424,8 @@ def load_methodology(user_input: str) -> str:
                     spinner.ok("✅")
                 
                 if relevant_methodologies:
-                    spinner.write(f"找到相关方法论: {', '.join(relevant_methodologies.keys())}")
+                    spinner.text = f"找到相关方法论: {', '.join(relevant_methodologies.keys())}"
+                    spinner.ok("✅")
                     return make_methodology_prompt(relevant_methodologies)
         
         # 如果缓存无效，从头构建索引
@@ -435,81 +436,81 @@ def load_methodology(user_input: str) -> str:
             spinner.text = "初始化数据结构完成"
             spinner.ok("✅")
             
-            with yaspin(text="加载嵌入模型...", color="yellow") as spinner:
-                embedding_model = load_embedding_model()
-                spinner.text = "加载嵌入模型完成"
-                spinner.ok("✅")
-            
-            with yaspin(text="创建测试嵌入...", color="yellow") as spinner:
-                test_embedding = _create_methodology_embedding(embedding_model, "test")
-                embedding_dimension = len(test_embedding)
-                spinner.text = "创建测试嵌入完成"
-                spinner.ok("✅")
+        with yaspin(text="加载嵌入模型...", color="yellow") as spinner:
+            embedding_model = load_embedding_model()
+            spinner.text = "加载嵌入模型完成"
+            spinner.ok("✅")
+        
+        with yaspin(text="创建测试嵌入...", color="yellow") as spinner:
+            test_embedding = _create_methodology_embedding(embedding_model, "test")
+            embedding_dimension = len(test_embedding)
+            spinner.text = "创建测试嵌入完成"
+            spinner.ok("✅")
 
-            with yaspin(text="加载方法论文件...", color="yellow") as spinner:
-                data = _load_all_methodologies()
-                spinner.text = "加载方法论文件完成"
+        with yaspin(text="加载方法论文件...", color="yellow") as spinner:
+            data = _load_all_methodologies()
+            spinner.text = "加载方法论文件完成"
+            spinner.ok("✅")
+        
+        with yaspin(text="处理方法论数据...", color="yellow") as spinner:
+            for i, (key, value) in enumerate(data.items()):
+                methodology_text = f"{key}\n{value}"
+                embedding = _create_methodology_embedding(embedding_model, methodology_text)
+                vectors.append(embedding)
+                ids.append(i)
+                methodology_data.append({"key": key, "value": value})
+            spinner.text = "处理方法论数据完成"
+            spinner.ok("✅")
+        
+        if vectors:
+            with yaspin(text="构建索引...", color="yellow") as spinner:
+                vectors_array = np.vstack(vectors)
+                hnsw_index = faiss.IndexHNSWFlat(embedding_dimension, 16)
+                hnsw_index.hnsw.efConstruction = 40
+                hnsw_index.hnsw.efSearch = 16
+                methodology_index = faiss.IndexIDMap(hnsw_index)
+                methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
+                # 缓存构建好的索引和数据以及时间戳哈希
+                _methodology_index_cache = (methodology_index, methodology_data, methodology_hash)
+                
+                # 将索引和嵌入向量缓存保存到文件系统
+                _save_index_cache(methodology_index, methodology_data, methodology_hash)
+                
+                spinner.text = "构建索引完成"
                 spinner.ok("✅")
             
-            with yaspin(text="处理方法论数据...", color="yellow") as spinner:
-                for i, (key, value) in enumerate(data.items()):
-                    methodology_text = f"{key}\n{value}"
-                    embedding = _create_methodology_embedding(embedding_model, methodology_text)
-                    vectors.append(embedding)
-                    ids.append(i)
-                    methodology_data.append({"key": key, "value": value})
-                spinner.text = "处理方法论数据完成"
+            with yaspin(text="执行搜索...", color="yellow") as spinner:
+                query_embedding = _create_methodology_embedding(embedding_model, user_input)
+                k = min(10, len(methodology_data))
+                distances, indices = methodology_index.search(
+                    query_embedding.reshape(1, -1), k
+                ) # type: ignore
+                spinner.text = "执行搜索完成"
                 spinner.ok("✅")
             
-            if vectors:
-                with yaspin(text="构建索引...", color="yellow") as spinner:
-                    vectors_array = np.vstack(vectors)
-                    hnsw_index = faiss.IndexHNSWFlat(embedding_dimension, 16)
-                    hnsw_index.hnsw.efConstruction = 40
-                    hnsw_index.hnsw.efSearch = 16
-                    methodology_index = faiss.IndexIDMap(hnsw_index)
-                    methodology_index.add_with_ids(vectors_array, np.array(ids)) # type: ignore
-                    # 缓存构建好的索引和数据以及时间戳哈希
-                    _methodology_index_cache = (methodology_index, methodology_data, methodology_hash)
-                    
-                    # 将索引和嵌入向量缓存保存到文件系统
-                    _save_index_cache(methodology_index, methodology_data, methodology_hash)
-                    
-                    spinner.text = "构建索引完成"
+            with yaspin(text="处理搜索结果...", color="yellow") as spinner:
+                relevant_methodologies = {}
+                for dist, idx in zip(distances[0], indices[0]):
+                    if idx >= 0:
+                        similarity = 1.0 / (1.0 + float(dist))
+                        methodology = methodology_data[idx]
+                        if similarity >= 0.5:
+                            relevant_methodologies[methodology["key"]] = methodology["value"]
+                spinner.text = "处理搜索结果完成"
+                spinner.ok("✅")
+            
+            # 保存嵌入向量缓存到文件系统
+            with yaspin(text="保存嵌入向量缓存...", color="yellow") as spinner:
+                if _save_embeddings_cache(_methodology_embeddings_cache):
+                    spinner.text = f"保存嵌入向量缓存完成 ({len(_methodology_embeddings_cache)} 个向量)"
                     spinner.ok("✅")
-                
-                with yaspin(text="执行搜索...", color="yellow") as spinner:
-                    query_embedding = _create_methodology_embedding(embedding_model, user_input)
-                    k = min(10, len(methodology_data))
-                    distances, indices = methodology_index.search(
-                        query_embedding.reshape(1, -1), k
-                    ) # type: ignore
-                    spinner.text = "执行搜索完成"
-                    spinner.ok("✅")
-                
-                with yaspin(text="处理搜索结果...", color="yellow") as spinner:
-                    relevant_methodologies = {}
-                    for dist, idx in zip(distances[0], indices[0]):
-                        if idx >= 0:
-                            similarity = 1.0 / (1.0 + float(dist))
-                            methodology = methodology_data[idx]
-                            if similarity >= 0.5:
-                                relevant_methodologies[methodology["key"]] = methodology["value"]
-                    spinner.text = "处理搜索结果完成"
-                    spinner.ok("✅")
-                
-                # 保存嵌入向量缓存到文件系统
-                with yaspin(text="保存嵌入向量缓存...", color="yellow") as spinner:
-                    if _save_embeddings_cache(_methodology_embeddings_cache):
-                        spinner.text = f"保存嵌入向量缓存完成 ({len(_methodology_embeddings_cache)} 个向量)"
-                        spinner.ok("✅")
-                    else:
-                        spinner.text = "保存嵌入向量缓存失败"
-                        spinner.fail("❌")
-                
-                if relevant_methodologies:
-                    spinner.write(f"找到相关方法论: {', '.join(relevant_methodologies.keys())}")
-                    return make_methodology_prompt(relevant_methodologies)
+                else:
+                    spinner.text = "保存嵌入向量缓存失败"
+                    spinner.fail("❌")
+            
+            if relevant_methodologies:
+                spinner.write(f"找到相关方法论: {', '.join(relevant_methodologies.keys())}")
+                return make_methodology_prompt(relevant_methodologies)
         spinner.write(f"未找到相关的方法论")
         spinner.fail("❌")
         return ""
