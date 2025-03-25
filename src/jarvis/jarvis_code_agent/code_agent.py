@@ -201,7 +201,7 @@ class CodeAgent:
 
     
 
-    def run(self, user_input: str) :
+    def run(self, user_input: str):
         """Run the code agent with the given user input.
         
         Args:
