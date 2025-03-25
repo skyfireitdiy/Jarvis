@@ -91,6 +91,7 @@ def add(a, b):
 - 保持代码风格一致性，遵循项目现有的编码规范
 - 在修改前仔细分析原代码的格式风格，确保补丁与之完全兼容
 - 绝不提供完整文件内容，除非是新建文件
+- 每个文件的修改是独立的，不能出现“参照xxx文件的修改”这样的描述
 """
 
 def _parse_patch(patch_str: str) -> Dict[str, str]:
@@ -258,7 +259,7 @@ def handle_commit_workflow()->bool:
 
 def handle_code_operation(filepath: str, patch_content: str) -> bool:
     """处理代码操作"""
-    if get_file_line_count(filepath) < 100:
+    if get_file_line_count(filepath) < 5:
         return handle_small_code_operation(filepath, patch_content)
     else:
         retry_count = 5
