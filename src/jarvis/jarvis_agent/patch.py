@@ -314,7 +314,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
 {ct("MERGED_CODE")}
 """
             model = PlatformRegistry().get_normal_platform()
-            model.set_suppress_output(True)
+            model.set_suppress_output(False)
             count = 30
             start_line = -1
             end_line = -1
@@ -322,7 +322,8 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             finished = False
             while count>0:
                 count -= 1
-                response = model.chat_until_success(prompt).splitlines()
+                with spinner.hidden():
+                    response = model.chat_until_success(prompt).splitlines()
                 try:
                     start_line = response.index(ot("MERGED_CODE")) + 1
                     try:
@@ -381,7 +382,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                 spinner.fail("❌")
                 return False
             
-            model.set_suppress_output(True)
+            model.set_suppress_output(False)
             
             prompt = f"""
 # 代码补丁生成专家指南
@@ -435,7 +436,8 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 {ct("DIFF")}
 """
             # 获取补丁内容
-            response = model.chat_until_success(prompt)
+            with spinner.hidden():
+                response = model.chat_until_success(prompt)
             
             # 解析差异化补丁
             diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"), 
