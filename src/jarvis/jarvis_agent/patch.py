@@ -181,7 +181,7 @@ def apply_patch(output_str: str) -> str:
                     final_ret += "   - 所有需要调整的依赖关系\n"
                     final_ret += "   - 所有需要同步的文档\n"
                     final_ret += "\n\n"
-                    final_ret += "如果没有问题，请继续进行下一步修改，如果所有修改都已经完成，请终止"
+                    final_ret += "如果没有问题，请继续进行下一步修改，如果用户的需求已经完成，请终止，不要输出新的PATCH"
                     
                 else:
                     final_ret += "✅ 补丁已应用（没有新的提交）"
