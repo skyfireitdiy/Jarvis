@@ -510,8 +510,9 @@ def load_methodology(user_input: str) -> str:
                 if relevant_methodologies:
                     spinner.write(f"找到相关方法论: {', '.join(relevant_methodologies.keys())}")
                     return make_methodology_prompt(relevant_methodologies)
-        spinner.write(f"使用默认方法论：{', '.join(data.keys())}")
-        return make_methodology_prompt(data)
+        spinner.write(f"未找到相关的方法论")
+        spinner.fail("❌")
+        return ""
     except Exception as e:
         PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
         return ""
