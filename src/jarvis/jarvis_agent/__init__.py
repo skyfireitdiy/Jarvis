@@ -273,13 +273,23 @@ class Agent:
             if need_return:
                 return message
                 
-        # 添加输出简洁性指令
-        actions = '、'.join([o.name() for o in self.output_handler])
-        message += f"\n\n系统指令：请严格输出且仅输出一个操作的完整调用格式，不要输出多个操作；需要输出解释、分析和思考过程。确保输出格式正确且可直接执行。每次响应必须且只能包含一个操作。可用的操作：{actions}"
-        if need_complete and self.auto_complete:
-            message += f"\n\n如果任务已完成，说明完成原因，并输出{ot('!!!COMPLETE!!!')}"
-        else:
-            message += f"\n\n如果任务已完成，只需简洁地说明完成原因。"
+        # 结构化系统指令
+        action_handlers = '\n'.join([f'- {handler.name()}' for handler in self.output_handler])
+        message += f"""
+
+**系统指令：**
+- 每次响应必须且只能包含一个操作
+- 严格遵循操作调用格式
+- 必须包含参数和说明
+- 操作结束需等待结果
+
+**可用操作列表：**
+{action_handlers}
+"""
+
+        # 任务完成提示
+        complete_prompt = f"并输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
+        message += f"\n\n如果任务已完成{complete_prompt}，请：\n1. 说明完成原因\n2. 保持输出格式规范"
         # 累加对话长度
         self.conversation_length += get_context_token_count(message)
 
