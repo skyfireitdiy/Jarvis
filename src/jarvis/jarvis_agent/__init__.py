@@ -14,7 +14,7 @@ from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.config import get_max_token_count
-from jarvis.jarvis_utils.utils import ot
+from jarvis.jarvis_utils.utils import ct, ot
 from jarvis.jarvis_utils.utils import user_confirm
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -385,7 +385,7 @@ class Agent:
             try:
                 
                 # 让模型判断是否需要生成方法论
-                analysis_prompt = """当前任务已结束，请分析是否需要生成方法论。
+                analysis_prompt = f"""当前任务已结束，请分析是否需要生成方法论。
 
 如果你认为需要生成方法论，请先确定是创建新方法论还是更新现有方法论。如果是更新现有方法论，请使用'update'，否则使用'add'。
 如果你认为不需要方法论，请解释原因。
@@ -410,6 +410,16 @@ class Agent:
 4. 确保方法论遵循用户认可的执行路径，尤其是用户指出的改进点
 
 只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
+
+方法论格式：
+{ot("TOOL_CALL")}
+name: methodology
+parameters:
+  operation: add/update
+  problem_type: 方法论类型，例如：code_review, bug_fix 等
+  content: |
+    方法论内容
+{ct("TOOL_CALL")}
 """
                 self.prompt = analysis_prompt
                 with spinner.hidden():
