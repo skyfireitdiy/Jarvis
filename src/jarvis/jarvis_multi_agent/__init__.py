@@ -74,7 +74,7 @@ content: |
         return len(self._extract_send_msg(response)) > 0
 
 
-    def handle(self, response: str) -> Tuple[bool, Any]:
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
         send_messages = self._extract_send_msg(response)
         if len(send_messages) > 1:
             return False, f"Send multiple messages, please only send one message at a time."

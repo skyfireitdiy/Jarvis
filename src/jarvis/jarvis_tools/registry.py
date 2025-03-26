@@ -118,7 +118,7 @@ class ToolRegistry(OutputHandler):
             return tools_prompt
         return ""
     
-    def handle(self, response: str) -> Tuple[bool, Any]:
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
         tool_calls = self._extract_tool_calls(response)
         if len(tool_calls) > 1:
             PrettyOutput.print(f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([tool_call['name'] for tool_call in tool_calls])}", OutputType.WARNING)
@@ -126,7 +126,7 @@ class ToolRegistry(OutputHandler):
         if len(tool_calls) == 0:
             return False, ""
         tool_call = tool_calls[0]
-        return False, self.handle_tool_calls(tool_call)
+        return False, self.handle_tool_calls(tool_call, agent)
 
     def __init__(self):
         """初始化工具注册表"""
@@ -283,12 +283,13 @@ class ToolRegistry(OutputHandler):
             return {"success": False, "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self.tools.keys())}", "stdout": ""}
         return tool.execute(arguments)
 
-    def handle_tool_calls(self, tool_call: Dict) -> str:
+    def handle_tool_calls(self, tool_call: Dict, agent: Any) -> str:
         """处理工具调用，只处理第一个工具"""
         try:
             # 只处理第一个工具调用
             name = tool_call["name"]
             args = tool_call["arguments"]
+            args["agent"] = agent
 
             tool_call_help = f"""
 # 🛠️ 工具使用系统

@@ -21,7 +21,7 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 "arguments": {
                     "script_content": script
                 }
-            })
+            }, agent)
             if user_confirm("是否将执行结果反馈给Agent？", default=True):
                 return f"{user_input}\n\n用户执行以下脚本：\n{script}\n\n执行结果：\n{output}", False
             return "", True

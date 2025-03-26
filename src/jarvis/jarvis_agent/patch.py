@@ -2,7 +2,6 @@ import re
 from typing import Dict, Any, Tuple
 import os
 
-from pkg_resources import add_activation_listener
 from yaspin import yaspin
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
@@ -22,8 +21,8 @@ class PatchOutputHandler(OutputHandler):
     def name(self) -> str:
         return "PATCH"
 
-    def handle(self, response: str) -> Tuple[bool, Any]:
-        return False, apply_patch(response)
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
+        return False, apply_patch(response, agent)
 
     def can_handle(self, response: str) -> bool:
         if _parse_patch(response):
@@ -120,7 +119,7 @@ def _parse_patch(patch_str: str) -> Dict[str, str]:
     return result
 
 
-def apply_patch(output_str: str) -> str:
+def apply_patch(output_str: str, agent: Any) -> str:
     """Apply patches to files"""
     with yaspin(text="正在应用补丁...", color="cyan") as spinner:
         try:
@@ -183,13 +182,15 @@ def apply_patch(output_str: str) -> str:
                     final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
 
                     # 增加代码变更分析和错误提示
-                    final_ret += "\n\n"
-                    final_ret += "1. 请调用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
-                    final_ret += "2. 如果发现代码错误，请立即提出修复方案\n"
-                    final_ret += "\n\n"
-                    final_ret += "如果没有问题，请继续进行下一步修改\n"
-                    final_ret += f"如果用户的需求已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
-                    final_ret += "如果有任何信息不清楚，调用工具获取信息\n"
+                    
+                    addon_prompt = "1. 请调用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
+                    addon_prompt += "2. 如果发现代码错误，请立即提出修复方案\n"
+                    addon_prompt += "\n\n"
+                    addon_prompt += "如果没有问题，请继续进行下一步修改\n"
+                    addon_prompt += f"如果用户的需求已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
+                    addon_prompt += "如果有任何信息不清楚，调用工具获取信息\n"
+
+                    agent.set_addon_prompt(addon_prompt)
 
                 else:
                     final_ret += "✅ 补丁已应用（没有新的提交）"
@@ -209,7 +210,8 @@ def apply_patch(output_str: str) -> str:
             custom_reply = get_multiline_input("请输入自定义回复")
             if not custom_reply.strip():  # 如果自定义回复为空，返回空字符串
                 return ""
-            return final_ret + "\n\n" + custom_reply
+            agent.set_addon_prompt(custom_reply)
+            return final_ret
 
 
 def revert_file(filepath: str):

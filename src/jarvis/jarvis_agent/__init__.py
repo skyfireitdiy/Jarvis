@@ -310,11 +310,9 @@ class Agent:
             if need_return:
                 return message
                 
-        
-
-
         if self.addon_prompt:
             message += f"\n\n{self.addon_prompt}"
+            self.addon_prompt = ""
         else:
             message += f"\n\n{self.make_default_addon_prompt(need_complete)}"
 
@@ -393,7 +391,7 @@ class Agent:
         if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
             with yaspin(text=f"正在执行{tool_list[0].name()}...", color="cyan") as spinner:
                 with spinner.hidden():
-                    result = tool_list[0].handle(response)
+                    result = tool_list[0].handle(response, self)
                 spinner.text = f"{tool_list[0].name()}执行完成"
                 spinner.ok("✅")
                 return result

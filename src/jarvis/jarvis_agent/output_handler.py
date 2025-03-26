@@ -7,7 +7,7 @@ from typing import Any, Tuple
 
 class OutputHandler(ABC):
     @abstractmethod
-    def handle(self, response: str) -> Tuple[bool, Any]:
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
         pass
     
     @abstractmethod
