@@ -21,19 +21,16 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env, user_confirm
 
 
-
-
-
 class CodeAgent:
-    def __init__(self, platform : Optional[str] = None, model: Optional[str] = None, need_summary: bool = True):
+    def __init__(self, platform: Optional[str] = None, model: Optional[str] = None, need_summary: bool = True):
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
-        tool_registry.use_tools(["execute_shell", 
+        tool_registry.use_tools(["execute_shell",
                                  "execute_shell_script",
-                                 "search_web", 
-                                 "ask_user",  
+                                 "search_web",
+                                 "ask_user",
                                  "ask_codebase",
-                                 "lsp_get_diagnostics", 
+                                 "lsp_get_diagnostics",
                                  "code_review",  # 代码审查工具
                                  "find_symbol",  # 添加符号查找工具
                                  "find_caller",  # 添加函数调用者查找工具
@@ -168,27 +165,28 @@ class CodeAgent:
 - fd比find更快更易用，应优先使用
 - loc比wc -l提供更多代码统计信息，应优先使用
 - 针对不同编程语言选择对应的代码质量检查工具
+- 不要留下未实现的代码
 """
         # Dynamically add ask_codebase based on task complexity if really needed
         # 处理platform参数
-        platform_instance = (PlatformRegistry().create_platform(platform) 
-                            if platform 
-                            else PlatformRegistry().get_normal_platform())
+        platform_instance = (PlatformRegistry().create_platform(platform)
+                             if platform
+                             else PlatformRegistry().get_normal_platform())
         if model:
-            platform_instance.set_model_name(model) # type: ignore
-        
+            platform_instance.set_model_name(model)  # type: ignore
+
         self.agent = Agent(system_prompt=code_system_prompt,
                            name="CodeAgent",
-                           auto_complete=False, 
-                           output_handler=[tool_registry, PatchOutputHandler()], 
+                           auto_complete=False,
+                           output_handler=[tool_registry,
+                                           PatchOutputHandler()],
                            platform=platform_instance,
-                           input_handler=[shell_input_handler, file_input_handler, builtin_input_handler],
+                           input_handler=[
+                               shell_input_handler, file_input_handler, builtin_input_handler],
                            need_summary=need_summary)
 
-    
-
     def _init_env(self):
-        with yaspin(text="正在初始化环境...", color="cyan") as spinner: 
+        with yaspin(text="正在初始化环境...", color="cyan") as spinner:
             curr_dir = os.getcwd()
             git_dir = find_git_root(curr_dir)
             self.root_dir = git_dir
@@ -198,8 +196,6 @@ class CodeAgent:
                     git_commiter.execute({})
             spinner.text = "环境初始化完成"
             spinner.ok("✅")
-
-    
 
     def run(self, user_input: str):
         """Run the code agent with the given user input.
@@ -212,39 +208,41 @@ class CodeAgent:
         """
         try:
             self._init_env()
-            
+
             start_commit = get_latest_commit_hash()
-            
+
             try:
                 self.agent.run(user_input)
             except Exception as e:
                 PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
-            
+
             end_commit = get_latest_commit_hash()
             # Print commit history between start and end commits
             if start_commit and end_commit:
                 commits = get_commits_between(start_commit, end_commit)
             else:
                 commits = []
-            
+
             if commits:
-                commit_messages = "检测到以下提交记录:\n" + "\n".join([f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits])
+                commit_messages = "检测到以下提交记录:\n" + \
+                    "\n".join(
+                        [f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits])
                 PrettyOutput.print(commit_messages, OutputType.INFO)
 
             if commits and user_confirm("是否接受以上提交记录？", True):
                 if len(commits) > 1 and user_confirm("是否要合并为一个更清晰的提交记录？", True):
                     # Reset to start commit
-                    subprocess.run(["git", "reset", "--mixed", start_commit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(["git", "reset", "--mixed", start_commit],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     # Create new commit
                     git_commiter = GitCommitTool()
                     git_commiter.execute({})
             elif start_commit:
                 os.system(f"git reset --hard {start_commit}")
                 PrettyOutput.print("已重置到初始提交", OutputType.INFO)
-                
+
         except Exception as e:
             return f"Error during execution: {str(e)}"
-        
 
 
 def main():
@@ -253,8 +251,10 @@ def main():
     init_env()
 
     parser = argparse.ArgumentParser(description='Jarvis Code Agent')
-    parser.add_argument('-p', '--platform', type=str, help='Target platform name', default=None)
-    parser.add_argument('-m', '--model', type=str, help='Model name to use', default=None)
+    parser.add_argument('-p', '--platform', type=str,
+                        help='Target platform name', default=None)
+    parser.add_argument('-m', '--model', type=str,
+                        help='Model name to use', default=None)
     args = parser.parse_args()
 
     curr_dir = os.getcwd()
@@ -266,9 +266,10 @@ def main():
             user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
             if not user_input:
                 return 0
-            agent = CodeAgent(platform=args.platform, model=args.model, need_summary=False)
+            agent = CodeAgent(platform=args.platform,
+                              model=args.model, need_summary=False)
             agent.run(user_input)
-            
+
         except Exception as e:
             PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
@@ -277,6 +278,7 @@ def main():
         return 1
 
     return 0
+
 
 if __name__ == "__main__":
     exit(main())
