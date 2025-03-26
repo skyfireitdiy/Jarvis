@@ -1,6 +1,6 @@
-"""Jarvis Code Agent module.
+"""Jarvis代码代理模块。
 
-This module provides the CodeAgent class which handles code modification tasks.
+该模块提供CodeAgent类，用于处理代码修改任务。
 """
 
 import os
@@ -28,9 +28,9 @@ import sys
 
 
 class CodeAgent:
-    """Code modification agent for Jarvis system.
+    """Jarvis系统的代码修改代理。
     
-    Handles code analysis, modification and git operations.
+    负责处理代码分析、修改和git操作。
     """
     
     def __init__(self, platform: Optional[str] = None, 
@@ -255,13 +255,13 @@ class CodeAgent:
             PrettyOutput.print("已重置到初始提交", OutputType.INFO)
 
     def run(self, user_input: str) -> Optional[str]:
-        """Run the code agent with the given user input.
+        """使用给定的用户输入运行代码代理。
 
-        Args:
-            user_input: The user's requirement/request
+        参数:
+            user_input: 用户的需求/请求
 
-        Returns:
-            str: Output describing the execution result or None on success
+        返回:
+            str: 描述执行结果的输出，成功时返回None
         """
         try:
             self._init_env()
@@ -284,7 +284,7 @@ class CodeAgent:
 
 
 def main():
-    """Jarvis main entry point."""
+    """Jarvis主入口点。"""
     init_env()
 
     parser = argparse.ArgumentParser(description='Jarvis Code Agent')
