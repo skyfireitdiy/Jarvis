@@ -186,6 +186,7 @@ class Agent:
         self.input_handler = input_handler if input_handler is not None else []
         self.need_summary = need_summary 
         # Load configuration from environment variables
+        self.addon_prompt = ""
 
 
         self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
@@ -255,6 +256,42 @@ class Agent:
         self.first = True
 
 
+    def set_addon_prompt(self, addon_prompt: str):
+        """设置附加提示。
+        
+        参数:
+            addon_prompt: 附加提示内容
+        """
+        self.addon_prompt = addon_prompt
+
+    def make_default_addon_prompt(self, need_complete: bool) -> str:
+        """生成附加提示。
+        
+        参数:
+            need_complete: 是否需要完成任务
+
+        """
+        # 结构化系统指令
+        action_handlers = '\n'.join([f'- {handler.name()}' for handler in self.output_handler])
+
+        addon_prompt = f"""
+
+**系统指令：**
+- 每次响应必须且只能包含一个操作
+- 严格遵循操作调用格式
+- 必须包含参数和说明
+- 操作结束需等待结果
+- 如果判断任务已经完成，不必输出操作
+
+**可用操作列表：**
+{action_handlers}
+"""
+
+        # 任务完成提示
+        complete_prompt = f"并输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
+        addon_prompt += f"\n\n如果任务已完成{complete_prompt}，请：\n1. 说明完成原因\n2. 保持输出格式规范"
+
+        return addon_prompt
     
     def _call_model(self, message: str, need_complete: bool = False) -> str:
         """调用AI模型并实现重试逻辑。
@@ -273,24 +310,14 @@ class Agent:
             if need_return:
                 return message
                 
-        # 结构化系统指令
-        action_handlers = '\n'.join([f'- {handler.name()}' for handler in self.output_handler])
-        message += f"""
+        
 
-**系统指令：**
-- 每次响应必须且只能包含一个操作
-- 严格遵循操作调用格式
-- 必须包含参数和说明
-- 操作结束需等待结果
-- 如果判断任务已经完成，不必输出操作
 
-**可用操作列表：**
-{action_handlers}
-"""
+        if self.addon_prompt:
+            message += f"\n\n{self.addon_prompt}"
+        else:
+            message += f"\n\n{self.make_default_addon_prompt(need_complete)}"
 
-        # 任务完成提示
-        complete_prompt = f"并输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
-        message += f"\n\n如果任务已完成{complete_prompt}，请：\n1. 说明完成原因\n2. 保持输出格式规范"
         # 累加对话长度
         self.conversation_length += get_context_token_count(message)
 
