@@ -78,7 +78,7 @@ class FileOperationTool:
                         }
                     
                     content = "".join(lines[start_line - 1:end_line])
-                    output = f"\n文件: {abs_path}\n行: [{start_line}-{end_line}]\n{content}" + "\n\n" + "="*80 + "\n\n"
+                    output = f"\n文件: {abs_path}\n行: [{start_line}-{end_line}]\n{content}" + "\n\n" 
                     
                     spinner.text = f"文件读取完成: {abs_path}"
                     spinner.ok("✅")

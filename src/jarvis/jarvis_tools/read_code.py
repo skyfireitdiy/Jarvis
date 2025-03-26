@@ -91,8 +91,7 @@ class ReadCodeTool:
                 output = (
                     f"\n🔍 文件: {abs_path}\n"
                     f"📄 原始行号: {start_line}-{end_line} (共{total_lines}行) \n\n"
-                    f"{numbered_content}\n"
-                    f"{'='*80}\n"
+                    f"{numbered_content}\n\n"
                 )
                 spinner.text = f"文件读取完成: {abs_path}"
                 spinner.ok("✅")
