@@ -157,6 +157,23 @@ class Agent:
                  execute_tool_confirm: Optional[bool] = None,
                  need_summary: bool = True,
                  multiline_inputer: Optional[Callable[[str], str]] = None):
+        """初始化Jarvis Agent实例
+        
+        参数:
+            system_prompt: 系统提示词，定义Agent的行为准则
+            name: Agent名称，默认为"Jarvis"
+            description: Agent描述信息
+            platform: 平台实例或平台名称字符串
+            model_name: 使用的模型名称
+            summary_prompt: 任务总结提示模板
+            auto_complete: 是否自动完成任务
+            output_handler: 输出处理器列表
+            input_handler: 输入处理器列表
+            max_context_length: 最大上下文长度
+            execute_tool_confirm: 执行工具前是否需要确认
+            need_summary: 是否需要生成总结
+            multiline_inputer: 多行输入处理器
+        """
         self.name = make_agent_name(name)
         self.description = description
         # 初始化平台和模型
@@ -294,16 +311,20 @@ class Agent:
         return addon_prompt
     
     def _call_model(self, message: str, need_complete: bool = False) -> str:
-        """调用AI模型并实现重试逻辑。
+        """调用AI模型并实现重试逻辑
         
         参数:
             message: 输入给模型的消息
+            need_complete: 是否需要完成任务标记
             
         返回:
             str: 模型的响应
             
         注意:
-            将使用指数退避重试，最多重试30秒
+            1. 将使用指数退避重试，最多重试30秒
+            2. 会自动处理输入处理器链
+            3. 会自动添加附加提示
+            4. 会检查并处理上下文长度限制
         """
         for handler in self.input_handler:
             message, need_return = handler(message, self)
@@ -328,17 +349,20 @@ class Agent:
 
 
     def _summarize_and_clear_history(self) -> str:
-        """Summarize current conversation and clear history.
+        """总结当前对话并清理历史记录
         
-        This method will:
-        1. Generate a summary of key information
-        2. Clear the conversation history
-        3. Keep the system message
-        4. Add summary as new context
-        5. Reset conversation length
+        该方法将:
+        1. 生成关键信息摘要
+        2. 清除对话历史
+        3. 保留系统消息
+        4. 添加摘要作为新上下文
+        5. 重置对话长度计数器
         
-        Note:
-            Used when context length exceeds maximum
+        返回:
+            str: 包含对话摘要的字符串
+            
+        注意:
+            当上下文长度超过最大值时使用
         """
         # Create a new model instance to summarize, avoid affecting the main conversation
 
@@ -379,6 +403,21 @@ class Agent:
                 return ""
 
     def _call_tools(self, response: str) -> Tuple[bool, Any]:
+        """调用工具执行响应
+        
+        参数:
+            response: 包含工具调用信息的响应字符串
+            
+        返回:
+            Tuple[bool, Any]: 
+                - 第一个元素表示是否需要返回结果
+                - 第二个元素是返回结果或错误信息
+                
+        注意:
+            1. 一次只能执行一个工具
+            2. 如果配置了确认选项，会在执行前请求用户确认
+            3. 使用spinner显示执行状态
+        """
         tool_list = []
         for handler in self.output_handler:
             if handler.can_handle(response):
@@ -399,6 +438,16 @@ class Agent:
         
 
     def _complete_task(self) -> str:
+        """完成任务并生成总结(如果需要)
+        
+        返回:
+            str: 任务总结或完成状态
+            
+        注意:
+            1. 对于主Agent: 可能会生成方法论(如果启用)
+            2. 对于子Agent: 可能会生成总结(如果启用)
+            3. 使用spinner显示生成状态
+        """
         """Complete the current task and generate summary if needed.
         
         Returns:
@@ -472,13 +521,19 @@ parameters:
 
 
     def run(self, user_input: str) -> Any:
-        """Process user input and execute the task.
+        """处理用户输入并执行任务
         
-        Args:
-            user_input: My task description or request
+        参数:
+            user_input: 任务描述或请求
             
-        Returns:
-            str|Dict: Task summary report or message to send
+        返回:
+            str|Dict: 任务总结报告或要发送的消息
+            
+        注意:
+            1. 这是Agent的主运行循环
+            2. 处理完整的任务生命周期
+            3. 包含错误处理和恢复逻辑
+            4. 自动加载相关方法论(如果是首次运行)
         """
         try:
             set_agent(self.name, self)
@@ -527,12 +582,15 @@ parameters:
             return f"Task failed: {str(e)}"
 
     def _clear_history(self):
-        """清空对话历史但保留系统提示。
+        """清空对话历史但保留系统提示
         
         该方法将：
         1. 清空当前提示
         2. 重置模型状态
         3. 重置对话长度计数器
+            
+        注意:
+            用于重置Agent状态而不影响系统消息
         """
         self.prompt = "" 
         self.model.reset() # type: ignore
