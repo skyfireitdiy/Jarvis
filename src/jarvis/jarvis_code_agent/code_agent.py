@@ -18,23 +18,26 @@ from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.patch import PatchOutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.git_commiter import GitCommitTool
-
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils.git_utils import find_git_root, get_commits_between, get_latest_commit_hash, has_uncommitted_changes
+from jarvis.jarvis_utils.git_utils import (
+    find_git_root,
+    get_commits_between,
+    get_latest_commit_hash,
+    has_uncommitted_changes
+)
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env, user_confirm
-import sys
 
 
 class CodeAgent:
     """Jarvis系统的代码修改代理。
-    
+
     负责处理代码分析、修改和git操作。
     """
-    
-    def __init__(self, platform: Optional[str] = None, 
-                model: Optional[str] = None, 
+
+    def __init__(self, platform: Optional[str] = None,
+                model: Optional[str] = None,
                 need_summary: bool = True):
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
@@ -133,7 +136,7 @@ class CodeAgent:
   - `fd -t f -e go` 查找所有Go文件
   - `fd -t f -e rs` 查找所有Rust文件
   - `fd -t f -e c -e cpp -e h -e hpp` 查找所有C/C++文件
-  
+
 - **代码内容搜索**：
   - `rg "pattern" --type py` 在Python文件中搜索
   - `rg "pattern" --type js` 在JavaScript文件中搜索
@@ -199,6 +202,14 @@ class CodeAgent:
                                shell_input_handler, file_input_handler, builtin_input_handler],
                            need_summary=need_summary)
         self.agent.set_addon_prompt("请使用工具充分理解用户需求，然后根据需求一步步执行代码修改/开发")
+
+    def get_root_dir(self) -> str:
+        """获取项目根目录
+
+        返回:
+            str: 项目根目录路径
+        """
+        return self.root_dir
 
     def _init_env(self):
         with yaspin(text="正在初始化环境...", color="cyan") as spinner:
@@ -303,7 +314,7 @@ def main():
         if not user_input:
             sys.exit(0)
         agent = CodeAgent(platform=args.platform,
-                        model=args.model, 
+                        model=args.model,
                         need_summary=False)
         agent.run(user_input)
 
