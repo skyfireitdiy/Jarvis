@@ -2,6 +2,7 @@ import re
 from typing import Dict, Any, Tuple
 import os
 
+from pkg_resources import add_activation_listener
 from yaspin import yaspin
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
@@ -11,7 +12,7 @@ from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
-from jarvis.jarvis_utils.globals import has_read_file
+from jarvis.jarvis_utils.globals import add_read_file_record, has_read_file
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, get_file_line_count, user_confirm
@@ -148,6 +149,7 @@ def apply_patch(output_str: str) -> str:
                     os.makedirs(os.path.dirname(filepath), exist_ok=True)
                     open(filepath, 'w', encoding='utf-8').close()
                     spinner.write("✅ 文件创建完成")
+                    add_read_file_record(filepath)
                 with spinner.hidden():
                     while not handle_code_operation(filepath, patch_content):
                         if user_confirm("补丁应用失败，是否重试？", default=True):
