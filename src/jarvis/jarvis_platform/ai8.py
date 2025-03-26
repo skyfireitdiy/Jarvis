@@ -28,12 +28,7 @@ class AI8Model(BasePlatform):
         self.token = os.getenv("AI8_API_KEY")
         if not self.token:
             PrettyOutput.print("未设置 AI8_API_KEY", OutputType.WARNING)
-        
-        
-        self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
-        if self.model_name not in self.get_available_models():
-            PrettyOutput.print(f"警告: 选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
-
+            
         self.headers = {
             'Authorization': self.token,
             'Content-Type': 'application/json',
@@ -46,6 +41,12 @@ class AI8Model(BasePlatform):
             'Sec-Fetch-Mode': 'cors',
             'Sec-Fetch-Dest': 'empty',
         }
+        
+        self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
+        if self.model_name not in self.get_available_models():
+            PrettyOutput.print(f"警告: 选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
+
+        
         
 
     def set_model_name(self, model_name: str):
