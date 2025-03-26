@@ -48,15 +48,20 @@ class AI8Model(BasePlatform):
                 'Content-Type': 'application/json',
                 'Accept': 'application/json, text/plain, */*',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'X-APP-VERSION': '2.2.2',
+                'X-APP-VERSION': '2.3.0',
                 'Origin': self.BASE_URL,
-                'Referer': f'{self.BASE_URL}/chat?_userMenuKey=chat'
+                'Referer': f'{self.BASE_URL}/chat?_userMenuKey=chat',
+                'Sec-Fetch-Site': 'same-origin',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Dest': 'empty',
+
             }
             
             # 1. 创建会话
             response = requests.post(
                 f"{self.BASE_URL}/api/chat/session",
-                headers=headers
+                headers=headers,
+                json={}
             )
             
             if response.status_code != 200:

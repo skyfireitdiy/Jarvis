@@ -184,7 +184,7 @@ def apply_patch(output_str: str) -> str:
 
                     # 增加代码变更分析和错误提示
                     final_ret += "\n\n"
-                    final_ret += "1. 请使用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
+                    final_ret += "1. 请调用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
                     final_ret += "2. 如果发现代码错误，请立即提出修复方案\n"
                     final_ret += "\n\n"
                     final_ret += "如果没有问题，请继续进行下一步修改\n"

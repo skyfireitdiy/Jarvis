@@ -7,14 +7,13 @@
 - 列出所有方法论
 """
 
+import hashlib
 import os
 import json
 import click
 from jarvis.jarvis_utils.methodology import (
     _get_methodology_directory,
     _load_all_methodologies,
-    _save_embeddings_cache,
-    _save_index_cache,
     _methodology_index_cache,
     _methodology_embeddings_cache
 )
