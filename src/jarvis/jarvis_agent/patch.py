@@ -169,19 +169,11 @@ def apply_patch(output_str: str) -> str:
                     final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
                     
                     # 增加代码变更分析和错误提示
-                    final_ret += "\n\n# 代码变更分析：\n"
+                    final_ret += "\n\n"
                     final_ret += "1. 请使用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
                     final_ret += "2. 如果发现代码错误，请立即提出修复方案\n"
-                    final_ret += "3. 修复代码错误的优先级高于继续实现功能\n"
-                    final_ret += "4. 如果只是引入警告或者建议的修改，可询问用户是否需要修复\n"
-                    final_ret += "5. 确保修改后代码的一致性和完整性\n"
-                    final_ret += "6. 请确认所有相关点是否已修改完成，包括但不限于：\n"
-                    final_ret += "   - 所有需要修改的文件\n"
-                    final_ret += "   - 所有需要更新的函数\n"
-                    final_ret += "   - 所有需要调整的依赖关系\n"
-                    final_ret += "   - 所有需要同步的文档\n"
                     final_ret += "\n\n"
-                    final_ret += "如果没有问题，请继续进行下一步修改，如果用户的需求已经完成，请终止，不要输出新的PATCH"
+                    final_ret += f"如果没有问题，请继续进行下一步修改，如果用户的需求已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容"
                     
                 else:
                     final_ret += "✅ 补丁已应用（没有新的提交）"
