@@ -147,11 +147,7 @@ class CodeAgent:
   - `rg -w "word"` 精确匹配单词
 
 - **代码统计分析**：
-  - `loc <file_path>` 统计单个文件
-  - `loc --include="*.py"` 统计所有Python文件
-  - `loc --include="*.js" --include="*.ts"` 统计所有JavaScript/TypeScript文件
-  - `loc --exclude="test"` 排除测试文件
-  - `loc --sort=code` 按代码量排序
+  - `loc` 统计当前目录代码行数
 
 - **代码质量检查**：
   - Python: `pylint <file_path>`, `flake8 <file_path>`

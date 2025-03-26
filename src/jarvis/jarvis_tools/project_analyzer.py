@@ -161,7 +161,6 @@ class ProjectAnalyzerTool:
 
 3. **优先使用 execute_shell 执行 loc 命令**:
    - `loc` 统计所有代码行数
-   - `loc --include="*.py"` 统计Python代码行数
 
 4. **辅以 read_code 读取关键文件**:
    - 读取README.md、配置文件、主要模块
@@ -232,9 +231,6 @@ class ProjectAnalyzerTool:
 
 ### 代码统计分析
 - `loc` 获取项目总体代码统计
-- `loc --include="*.py"` 统计Python代码量
-- `loc --include="*.js" --include="*.jsx" --include="*.ts" --include="*.tsx"` 统计JavaScript/TypeScript代码量
-- `loc --exclude="test"` 排除测试代码后的统计
 
 ### 依赖分析
 - `read_code requirements.txt` 读取Python依赖

@@ -144,7 +144,7 @@ class AskCodebaseTool:
 1. **绝对优先使用 execute_shell**:
    - 使用 fd 查找文件: `fd -t f -e py` 查找Python文件等
    - 使用 rg 搜索代码: `rg "pattern" --type py` 在Python文件中搜索等
-   - 使用 loc 统计代码: `loc --include="*.py"` 统计Python代码量等
+   - 使用 loc 统计代码: `loc"` 统计代码量
 
 2. **优先使用 read_code**:
    - 找到相关文件后优先使用read_code读取文件内容
