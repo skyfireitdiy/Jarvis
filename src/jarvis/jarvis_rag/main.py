@@ -13,13 +13,13 @@ import lzma  # 添加 lzma 导入
 from threading import Lock
 import hashlib
 
-from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_thread_count, get_rag_ignored_paths
+from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_rag_ignored_paths
 from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model, rerank_results
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import  ct, get_file_md5, init_env, init_gpu_config, ot
+from jarvis.jarvis_utils.utils import  ct, get_file_md5, init_env, ot
 
 from jarvis.jarvis_rag.file_processors import TextFileProcessor, PDFProcessor, DocxProcessor, PPTProcessor, ExcelProcessor
-
+``
 """
 Jarvis RAG (Retrieval-Augmented Generation) Module
 
@@ -115,21 +115,6 @@ class RAGTool:
                 ExcelProcessor()
             ]
             spinner.text = "文件处理器初始化完成"
-            spinner.ok("✅")
-
-
-        # Add thread related configuration
-        with yaspin(text="初始化线程配置...", color="cyan") as spinner:
-            self.thread_count = get_thread_count()
-            self.vector_lock = Lock()  # Protect vector list concurrency
-            spinner.text = "线程配置初始化完成"
-            spinner.ok("✅")
-
-        # 初始化 GPU 内存配置
-        with yaspin(text="初始化 GPU 内存配置...", color="cyan") as spinner:
-            with spinner.hidden():
-                self.gpu_config = init_gpu_config()
-            spinner.text = "GPU 内存配置初始化完成"
             spinner.ok("✅")
 
 

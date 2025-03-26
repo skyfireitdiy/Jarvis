@@ -84,6 +84,7 @@ def user_confirm(tip: str, default: bool = True) -> bool:
     suffix = "[Y/n]" if default else "[y/N]"
     ret = get_single_line_input(f"{tip} {suffix}: ")
     return default if ret == "" else ret.lower() == "y"
+
 def get_file_line_count(filename: str) -> int:
     """Count the number of lines in a file.
     
@@ -97,55 +98,6 @@ def get_file_line_count(filename: str) -> int:
         return len(open(filename, "r", encoding="utf-8", errors="ignore").readlines())
     except Exception as e:
         return 0
-def init_gpu_config() -> Dict:
-    """初始化GPU配置
-    
-    功能：
-    1. 检测CUDA可用性
-    2. 计算设备内存和共享内存
-    3. 设置CUDA内存分配策略
-    4. 处理异常情况
-    
-    返回：
-    包含GPU配置信息的字典
-    """
-    config = {
-        "has_gpu": False,
-        "shared_memory": 0,
-        "device_memory": 0,
-        "memory_fraction": 0.8  # 默认使用80%的可用内存
-    }
-
-    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-    
-    try:
-        import torch
-        if torch.cuda.is_available():
-            # 获取GPU信息
-            gpu_mem = torch.cuda.get_device_properties(0).total_memory
-            config["has_gpu"] = True
-            config["device_memory"] = gpu_mem
-            
-            # 估算共享内存 (通常是系统内存的一部分)
-            system_memory = psutil.virtual_memory().total
-            config["shared_memory"] = min(system_memory * 0.5, gpu_mem * 2)  # 取系统内存的50%或GPU内存的2倍中的较小值
-            
-            # 设置CUDA内存分配
-            torch.cuda.set_per_process_memory_fraction(config["memory_fraction"])
-            torch.cuda.empty_cache()
-            
-            PrettyOutput.print(
-                f"GPU已初始化: {torch.cuda.get_device_name(0)}\n"
-                f"设备内存: {gpu_mem / 1024**3:.1f}GB\n"
-                f"共享内存: {config['shared_memory'] / 1024**3:.1f}GB", 
-                output_type=OutputType.SUCCESS
-            )
-        else:
-            PrettyOutput.print("没有GPU可用, 使用CPU模式", output_type=OutputType.WARNING)
-    except Exception as e:
-        PrettyOutput.print(f"GPU初始化失败: {str(e)}", output_type=OutputType.WARNING)
-        
-    return config
 
 
 def is_long_context(files: list) -> bool:
