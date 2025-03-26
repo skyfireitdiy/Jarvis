@@ -217,6 +217,12 @@ class CodeAgent:
             except Exception as e:
                 PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
 
+            if has_uncommitted_changes():
+                PrettyOutput.print("检测到未提交的修改，是否要提交？", OutputType.WARNING)
+                if user_confirm("是否要提交？", True):
+                    git_commiter = GitCommitTool()
+                    git_commiter.execute({})
+
             end_commit = get_latest_commit_hash()
             # Print commit history between start and end commits
             if start_commit and end_commit:
