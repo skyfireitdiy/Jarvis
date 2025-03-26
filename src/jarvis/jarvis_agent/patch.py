@@ -15,17 +15,19 @@ from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, get_file_line_count, user_confirm
 
+
 class PatchOutputHandler(OutputHandler):
     def name(self) -> str:
         return "PATCH"
+
     def handle(self, response: str) -> Tuple[bool, Any]:
         return False, apply_patch(response)
-    
+
     def can_handle(self, response: str) -> bool:
         if _parse_patch(response):
             return True
         return False
-    
+
     def prompt(self) -> str:
         return f"""
 # 代码补丁规范
@@ -92,12 +94,15 @@ def add(a, b):
 - 在修改前仔细分析原代码的格式风格，确保补丁与之完全兼容
 - 绝不提供完整文件内容，除非是新建文件
 - 每个文件的修改是独立的，不能出现“参照xxx文件的修改”这样的描述
+- 不要出现未实现的代码，如：TODO
 """
+
 
 def _parse_patch(patch_str: str) -> Dict[str, str]:
     """解析新的上下文补丁格式"""
     result = {}
-    patches = re.findall(ot("PATCH")+r'\n?(.*?)\n?'+ct("PATCH"), patch_str, re.DOTALL)
+    patches = re.findall(ot("PATCH")+r'\n?(.*?)\n?' +
+                         ct("PATCH"), patch_str, re.DOTALL)
     if patches:
         for patch in patches:
             first_line = patch.splitlines()[0]
@@ -112,6 +117,7 @@ def _parse_patch(patch_str: str) -> Dict[str, str]:
                 result[filepath] += "\n\n" + patch
     return result
 
+
 def apply_patch(output_str: str) -> str:
     """Apply patches to files"""
     with yaspin(text="正在应用补丁...", color="cyan") as spinner:
@@ -120,12 +126,12 @@ def apply_patch(output_str: str) -> str:
         except Exception as e:
             PrettyOutput.print(f"解析补丁失败: {str(e)}", OutputType.ERROR)
             return ""
-        
+
         # 获取当前提交hash作为起始点
-        spinner.text= "开始获取当前提交hash..."
+        spinner.text = "开始获取当前提交hash..."
         start_hash = get_latest_commit_hash()
         spinner.write("✅ 当前提交hash获取完成")
-        
+
         # 按文件逐个处理
         for filepath, patch_content in patches.items():
             try:
@@ -147,7 +153,7 @@ def apply_patch(output_str: str) -> str:
                 spinner.text = f"文件 {filepath} 处理失败: {str(e)}, 回滚文件"
                 revert_file(filepath)  # 回滚单个文件
                 spinner.write(f"✅ 文件 {filepath} 回滚完成")
-        
+
         final_ret = ""
         diff = get_diff()
         if diff:
@@ -158,16 +164,16 @@ def apply_patch(output_str: str) -> str:
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()
                 commits = get_commits_between(start_hash, end_hash)
-                
+
                 # 添加提交信息到final_ret
                 if commits:
                     final_ret += "✅ 补丁已应用\n"
                     final_ret += "# 提交信息:\n"
                     for commit_hash, commit_message in commits:
                         final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
-                    
+
                     final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
-                    
+
                     # 增加代码变更分析和错误提示
                     final_ret += "\n\n"
                     final_ret += "1. 请使用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
@@ -176,7 +182,7 @@ def apply_patch(output_str: str) -> str:
                     final_ret += "如果没有问题，请继续进行下一步修改\n"
                     final_ret += f"如果用户的需求已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
                     final_ret += "如果有任何信息不清楚，调用工具获取信息\n"
-                    
+
                 else:
                     final_ret += "✅ 补丁已应用（没有新的提交）"
             else:
@@ -196,7 +202,8 @@ def apply_patch(output_str: str) -> str:
             if not custom_reply.strip():  # 如果自定义回复为空，返回空字符串
                 return ""
             return final_ret + "\n\n" + custom_reply
-            
+
+
 def revert_file(filepath: str):
     """增强版git恢复，处理新文件"""
     import subprocess
@@ -207,7 +214,8 @@ def revert_file(filepath: str):
             stderr=subprocess.PIPE
         )
         if result.returncode == 0:
-            subprocess.run(['git', 'checkout', 'HEAD', '--', filepath], check=True)
+            subprocess.run(['git', 'checkout', 'HEAD',
+                           '--', filepath], check=True)
         else:
             if os.path.exists(filepath):
                 os.remove(filepath)
@@ -215,11 +223,15 @@ def revert_file(filepath: str):
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(f"恢复文件失败: {str(e)}", OutputType.ERROR)
 # 修改后的恢复函数
+
+
 def revert_change():
     import subprocess
     subprocess.run(['git', 'reset', '--hard', 'HEAD'], check=True)
     subprocess.run(['git', 'clean', '-fd'], check=True)
 # 修改后的获取差异函数
+
+
 def get_diff() -> str:
     """使用git获取暂存区差异"""
     import subprocess
@@ -237,9 +249,10 @@ def get_diff() -> str:
     except subprocess.CalledProcessError as e:
         return f"获取差异失败: {str(e)}"
 
-def handle_commit_workflow()->bool:
+
+def handle_commit_workflow() -> bool:
     """Handle the git commit workflow and return the commit details.
-    
+
     Returns:
         tuple[bool, str, str]: (continue_execution, commit_id, commit_message)
     """
@@ -269,11 +282,12 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
     with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
         try:
             with spinner.hidden():
-                old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
+                old_file_content = FileOperationTool().execute(
+                    {"operation": "read", "files": [{"path": filepath}]})
                 if not old_file_content["success"]:
                     spinner.write("❌ 文件读取失败")
                     return False
-            
+
             prompt = f"""
 # 代码合并专家指南
 
@@ -316,7 +330,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             end_line = -1
             code = []
             finished = False
-            while count>0:
+            while count > 0:
                 count -= 1
                 with spinner.hidden():
                     response = model.chat_until_success(prompt).splitlines()
@@ -330,7 +344,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
                 except:
                     pass
 
-                try: 
+                try:
                     response.index(ot("!!!FINISHED!!!"))
                     finished = True
                     break
@@ -372,14 +386,15 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
             # 读取原始文件内容
-            old_file_content = FileOperationTool().execute({"operation": "read", "files": [{"path": filepath}]})
+            old_file_content = FileOperationTool().execute(
+                {"operation": "read", "files": [{"path": filepath}]})
             if not old_file_content["success"]:
                 spinner.text = "文件读取失败"
                 spinner.fail("❌")
                 return False
-            
+
             model.set_suppress_output(False)
-            
+
             prompt = f"""
 # 代码补丁生成专家指南
 
@@ -434,19 +449,19 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
             # 获取补丁内容
             with spinner.hidden():
                 response = model.chat_until_success(prompt)
-            
+
             # 解析差异化补丁
-            diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"), 
-                                     response, re.DOTALL)
-            
+            diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
+                                      response, re.DOTALL)
+
             # 读取原始文件内容
             with open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
                 file_content = f.read()
-            
+
             # 应用所有差异化补丁
             modified_content = file_content
             patch_count = 0
-            
+
             for match in diff_blocks:
                 search_text = match.group(1).strip()
                 replace_text = match.group(2).strip()
@@ -459,23 +474,23 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                         spinner.fail("❌")
                         return False
                     # 应用替换
-                    modified_content = modified_content.replace(search_text, replace_text)
+                    modified_content = modified_content.replace(
+                        search_text, replace_text)
                     spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
                 else:
                     spinner.text = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
                     spinner.fail("❌")
                     return False
-            
+
             # 写入修改后的内容
             with open(filepath, 'w', encoding='utf-8', errors="ignore") as f:
                 f.write(modified_content)
-            
+
             spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
             spinner.ok("✅")
             return True
-            
+
         except Exception as e:
             spinner.text = f"文件修改失败: {str(e)}"
             spinner.fail("❌")
             return False
-
