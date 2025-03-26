@@ -16,35 +16,35 @@ class AskUserTool:
         },
         "required": ["question"]
     }
-        
+
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the operation of asking the user
-        
+
         Args:
             args: A dictionary containing the question
-            
+
         Returns:
             Dict: A dictionary containing the user's response
         """
         try:
             question = args["question"]
-            
+
             # Display the question
             PrettyOutput.print(f"问题: {question}", OutputType.SYSTEM)
-            
+
             # Get user input
             user_response = get_multiline_input("请输入您的答案 (输入空行结束)")
-            
+
             return {
                 "success": True,
                 "stdout": user_response,
                 "stderr": ""
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
                 "stdout": "",
                 "stderr": f"Failed to ask user: {str(e)}"
-            } 
+            }

@@ -38,10 +38,10 @@ console = Console(theme=custom_theme)
 def make_agent_name(agent_name: str) -> str:
     """
     通过附加后缀生成唯一的代理名称（如果必要）。
-    
+
     参数：
         agent_name: 基础代理名称
-        
+
     返回：
         str: 唯一的代理名称
     """
@@ -54,7 +54,7 @@ def make_agent_name(agent_name: str) -> str:
 def set_agent(agent_name: str, agent: Any) -> None:
     """
     设置当前代理并将其添加到全局代理集合中。
-    
+
     参数：
         agent_name: 代理名称
         agent: 代理对象
@@ -65,7 +65,7 @@ def set_agent(agent_name: str, agent: Any) -> None:
 def get_agent_list() -> str:
     """
     获取表示当前代理状态的格式化字符串。
-    
+
     返回：
         str: 包含代理数量和当前代理名称的格式化字符串
     """
@@ -73,7 +73,7 @@ def get_agent_list() -> str:
 def delete_agent(agent_name: str) -> None:
     """
     从全局代理集合中删除一个代理。
-    
+
     参数：
         agent_name: 要删除的代理名称
     """

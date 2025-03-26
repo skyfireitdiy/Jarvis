@@ -11,15 +11,15 @@ from jarvis.jarvis_utils.utils import user_confirm
 
 def _parse_file_selection(input_str: str, max_index: int) -> List[int]:
     selected = set()
-    
+
     # Remove all whitespace characters
     input_str = "".join(input_str.split())
-    
+
     # Process comma-separated parts
     for part in input_str.split(","):
         if not part:
             continue
-        
+
         # Process range (e.g.: 3-6)
         if "-" in part:
             try:
@@ -41,7 +41,7 @@ def _parse_file_selection(input_str: str, max_index: int) -> List[int]:
                     PrettyOutput.print(f"忽略超出范围的索引: {part}", OutputType.WARNING)
             except ValueError:
                 PrettyOutput.print(f"忽略无效的数字: {part}", OutputType.WARNING)
-    
+
     return sorted(list(selected))
 
 def _get_file_completer(root_dir: str) -> Completer:
@@ -49,58 +49,58 @@ def _get_file_completer(root_dir: str) -> Completer:
     class FileCompleter(Completer):
         def __init__(self, root_dir: str):
             self.root_dir = root_dir
-            
+
         def get_completions(self, document, complete_event):
             text = document.text_before_cursor
-            
+
             if not text:
                 for path in self._list_files(""):
                     yield Completion(path, start_position=0)
                 return
-                
+
             # Generate fuzzy matching pattern
             pattern = '.*'.join(map(re.escape, text))
             try:
                 regex = re.compile(pattern, re.IGNORECASE)
             except re.error:
                 return
-                
+
             for path in self._list_files(""):
                 if regex.search(path):
                     yield Completion(path, start_position=-len(text))
-        
+
         def _list_files(self, current_dir: str) -> List[str]:
             """List all files in the specified directory (recursively)"""
             files = []
             search_dir = os.path.join(self.root_dir, current_dir)
-            
+
             for root, _, filenames in os.walk(search_dir):
                 for filename in filenames:
                     full_path = os.path.join(root, filename)
                     rel_path = os.path.relpath(full_path, self.root_dir)
                     if not any(part.startswith('.') for part in rel_path.split(os.sep)):
                         files.append(rel_path)
-            
+
             return sorted(files)
 
     return FileCompleter(root_dir)
 
 def _fuzzy_match_files(root_dir: str, pattern: str) -> List[str]:
     """Fuzzy match file path
-    
+
     Args:
         pattern: Matching pattern
-        
+
     Returns:
         List[str]: List of matching file paths
     """
     matches = []
-    
+
     # 将模式转换为正则表达式
     pattern = pattern.replace('.', r'\.').replace('*', '.*').replace('?', '.')
     pattern = f".*{pattern}.*"  # 允许部分匹配
     regex = re.compile(pattern, re.IGNORECASE)
-    
+
     # 遍历所有文件
     for root, _, files in os.walk(root_dir):
         for file in files:
@@ -110,7 +110,7 @@ def _fuzzy_match_files(root_dir: str, pattern: str) -> List[str]:
             if not any(part.startswith('.') for part in rel_path.split(os.sep)):
                 if regex.match(rel_path):
                     matches.append(rel_path)
-    
+
     return sorted(matches)
 
 def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dict[str, str]]:
@@ -127,7 +127,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
     if output:
         PrettyOutput.section("相关文件", OutputType.INFO)
         PrettyOutput.print(output, OutputType.INFO, lang="markdown")
-    
+
     if len(related_files) > 0:
         # Ask the user if they need to adjust the file list
         if user_confirm("是否需要调整文件列表？", False):
@@ -139,7 +139,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                     selected_files = [related_files[i] for i in selected_indices]
                 else:
                     PrettyOutput.print("没有有效的文件被选择, 保持当前选择", OutputType.WARNING)
-    
+
     tips = ""
     # Ask if they need to supplement files
     if user_confirm("是否需要补充其他文件？", False):
@@ -154,23 +154,23 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                 file_path = session.prompt(">>> ").strip()
             except KeyboardInterrupt:
                 break
-                
+
             if not file_path:
                 break
-                
+
             # Process wildcard matching
             if '*' in file_path or '?' in file_path:
                 matches = _fuzzy_match_files(root_dir, file_path)
                 if not matches:
                     PrettyOutput.print("没有找到匹配的文件", OutputType.WARNING)
                     continue
-                    
+
                 # Display matching files
                 tips = "找到以下匹配的文件:"
                 for i, path in enumerate(matches, 1):
                     tips += f"\n[{i}] {path}"
                 PrettyOutput.print(tips, OutputType.INFO)
-                    
+
                 # Let the user select
                 numbers = get_single_line_input("请选择要添加的文件编号（支持: 1,3-6格式, 按回车选择所有）").strip()
                 if numbers:
@@ -182,7 +182,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                     paths_to_add = matches
             else:
                 paths_to_add = [file_path]
-            
+
             # Add selected files
             tips = "添加以下文件:"
             for path in paths_to_add:
@@ -190,7 +190,7 @@ def select_files(related_files: List[Dict[str, str]], root_dir: str) -> List[Dic
                 if not os.path.isfile(full_path):
                     tips += f"\n文件不存在: {path}"
                     continue
-                
+
                 try:
                     selected_files.append({"file": path, "reason": "I Added"})
                     tips += f"\n文件已添加: {path}"

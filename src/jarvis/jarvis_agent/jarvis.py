@@ -29,7 +29,7 @@ def _load_tasks() -> dict:
             try:
                 with open(user_jarvis, "r", encoding="utf-8", errors="ignore") as f:
                     user_tasks = yaml.safe_load(f)
-                    
+
                 if isinstance(user_tasks, dict):
                     # Validate and add user directory tasks
                     for name, desc in user_tasks.items():
@@ -40,14 +40,14 @@ def _load_tasks() -> dict:
             except Exception as e:
                 spinner.text = "预定义任务加载失败"
                 spinner.fail("❌")
-        
+
     # Check .jarvis/pre-command in current directory
     if os.path.exists(".jarvis/pre-command"):
         with yaspin(text=f"从{os.path.abspath('.jarvis/pre-command')}加载预定义任务...", color="cyan") as spinner:
             try:
                 with open(".jarvis/pre-command", "r", encoding="utf-8", errors="ignore") as f:
                     local_tasks = yaml.safe_load(f)
-                    
+
                 if isinstance(local_tasks, dict):
                     # Validate and add current directory tasks, overwrite user directory tasks if there is a name conflict
                     for name, desc in local_tasks.items():
@@ -67,23 +67,23 @@ def _select_task(tasks: dict) -> str:
         return ""
     # Convert tasks to list for ordered display
     task_names = list(tasks.keys())
-    
+
     task_list = ["可用任务:"]
     for i, name in enumerate(task_names, 1):
         task_list.append(f"[{i}] {name}")
     task_list.append("[0] 跳过预定义任务")
     PrettyOutput.print("\n".join(task_list), OutputType.INFO)
-    
-    
+
+
     while True:
         try:
             choice = prompt(
                 "\n请选择一个任务编号（0 跳过预定义任务）：",
             ).strip()
-            
+
             if not choice:
                 return ""
-            
+
             choice = int(choice)
             if choice == 0:
                 return ""
@@ -92,7 +92,7 @@ def _select_task(tasks: dict) -> str:
                 return tasks[selected_name]  # Return the task description
             else:
                 PrettyOutput.print("无效的选择。请选择列表中的一个号码。", OutputType.WARNING)
-                
+
         except KeyboardInterrupt:
             return ""  # Return empty on Ctrl+C
         except EOFError:
@@ -129,7 +129,7 @@ def main() -> int:
                 PrettyOutput.print(f"执行任务: {selected_task}", OutputType.INFO)
                 agent.run(selected_task)
                 return 0
-        
+
         user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
         if user_input:
             agent.run(user_input)

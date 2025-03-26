@@ -12,7 +12,7 @@ class FileAnalyzerTool:
     单文件分析工具
     使用agent深入分析单个文件的结构、实现细节和代码质量
     """
-    
+
     name = "file_analyzer"
     description = "深入分析单个文件的结构、实现细节和代码质量"
     parameters = {
@@ -35,26 +35,26 @@ class FileAnalyzerTool:
         },
         "required": ["file_path"]
     }
-    
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行单文件分析工具
-        
+
         Args:
             args: 包含参数的字典
-            
+
         Returns:
             包含执行结果的字典
         """
         # 存储原始目录
         original_dir = os.getcwd()
-        
+
         try:
             # 解析参数
             file_path = args.get("file_path", "")
             root_dir = args.get("root_dir", ".")
             objective = args.get("objective", "")
-            
+
             # 验证参数
             if not file_path:
                 return {
@@ -62,31 +62,31 @@ class FileAnalyzerTool:
                     "stdout": "",
                     "stderr": "必须提供文件路径"
                 }
-            
+
             # 确保文件路径是相对于root_dir的，如果是绝对路径则转换为相对路径
             abs_file_path = os.path.abspath(file_path)
             abs_root_dir = os.path.abspath(root_dir)
-            
+
             if abs_file_path.startswith(abs_root_dir):
                 rel_file_path = os.path.relpath(abs_file_path, abs_root_dir)
             else:
                 rel_file_path = file_path
-            
+
             # 获取文件扩展名和文件名
             file_ext = pathlib.Path(file_path).suffix
             file_name = os.path.basename(file_path)
-            
+
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
                 rel_file_path, file_name, file_ext, root_dir, objective
             )
-            
+
             # 创建agent的summary prompt
             summary_prompt = self._create_summary_prompt(rel_file_path, file_name)
-            
+
             # 切换到根目录
             os.chdir(root_dir)
-            
+
             # 检查文件是否存在
             if not os.path.isfile(rel_file_path):
                 return {
@@ -94,18 +94,18 @@ class FileAnalyzerTool:
                     "stdout": "",
                     "stderr": f"文件不存在: {rel_file_path}"
                 }
-            
+
             # 构建使用的工具
             from jarvis.jarvis_tools.registry import ToolRegistry
             tool_registry = ToolRegistry()
             tool_registry.use_tools([
-                "execute_shell", 
-                "read_code", 
+                "execute_shell",
+                "read_code",
                 "find_symbol",
-                "function_analyzer", 
+                "function_analyzer",
                 "find_caller"
             ])
-            
+
             # 创建并运行agent
             analyzer_agent = Agent(
                 system_prompt=system_prompt,
@@ -117,17 +117,17 @@ class FileAnalyzerTool:
                 execute_tool_confirm=False,
                 auto_complete=True
             )
-            
+
             # 运行agent并获取结果
             task_input = f"深入分析文件 {rel_file_path} 的结构、实现细节和代码质量"
             result = analyzer_agent.run(task_input)
-            
+
             return {
                 "success": True,
                 "stdout": result,
                 "stderr": ""
             }
-                
+
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
@@ -138,24 +138,24 @@ class FileAnalyzerTool:
         finally:
             # 恢复原始目录
             os.chdir(original_dir)
-    
+
     def _create_system_prompt(self, file_path: str, file_name: str, file_ext: str,
                              root_dir: str, objective: str) -> str:
         """
         创建Agent的system prompt
-        
+
         Args:
             file_path: 文件路径
             file_name: 文件名
             file_ext: 文件扩展名
             root_dir: 代码库根目录
             objective: 分析目标
-            
+
         Returns:
             系统提示文本
         """
         objective_text = f"\n\n## 分析目标\n{objective}" if objective else ""
-        
+
         return f"""# 文件分析专家
 
 ## 任务描述
@@ -164,7 +164,7 @@ class FileAnalyzerTool:
 ## 工具使用优先级
 1. **优先使用 read_code**: 直接读取文件内容是分析文件的首选方式
 2. **优先使用 execute_shell**:
-   - 使用 rg 搜索文件内容: `rg "pattern" {file_path}` 
+   - 使用 rg 搜索文件内容: `rg "pattern" {file_path}`
    - 使用 loc 统计代码: `loc {file_path}`
 3. **仅在必要时使用其他分析工具**
 
@@ -259,11 +259,11 @@ class FileAnalyzerTool:
     def _create_summary_prompt(self, file_path: str, file_name: str) -> str:
         """
         创建Agent的summary prompt
-        
+
         Args:
             file_path: 文件路径
             file_name: 文件名
-            
+
         Returns:
             总结提示文本
         """
@@ -279,4 +279,4 @@ class FileAnalyzerTool:
 - 使用具体的代码片段和实例支持你的观点
 - 以清晰的Markdown格式呈现，简洁明了
 
-在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的文件概览，而是直接解决分析目标中提出的具体问题。""" 
+在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的文件概览，而是直接解决分析目标中提出的具体问题。"""

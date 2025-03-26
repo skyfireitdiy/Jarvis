@@ -11,7 +11,7 @@ class ProjectAnalyzerTool:
     项目分析工具
     使用agent分析项目结构、入口点、模块划分等信息（支持所有文件类型）
     """
-    
+
     name = "project_analyzer"
     description = "分析项目结构、入口点、模块划分等信息，提供项目概览（支持所有文件类型）"
     parameters = {
@@ -46,51 +46,51 @@ class ProjectAnalyzerTool:
         },
         "required": []
     }
-    
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行项目分析工具
-        
+
         Args:
             args: 包含参数的字典
-            
+
         Returns:
             包含执行结果的字典
         """
         # 存储原始目录
         original_dir = os.getcwd()
-        
+
         try:
             # 解析参数
             root_dir = args.get("root_dir", ".")
             focus_dirs = args.get("focus_dirs", [])
             exclude_dirs = args.get("exclude_dirs", [])
             objective = args.get("objective", "")
-            
+
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
                 root_dir, focus_dirs, exclude_dirs, objective
             )
-            
+
             # 创建agent的summary prompt
             summary_prompt = self._create_summary_prompt(root_dir, objective)
-            
+
             # 切换到根目录
             os.chdir(root_dir)
-            
+
             # 构建使用的工具
             from jarvis.jarvis_tools.registry import ToolRegistry
             tool_registry = ToolRegistry()
             tool_registry.use_tools([
-                "execute_shell", 
-                "read_code", 
+                "execute_shell",
+                "read_code",
                 "find_symbol",
                 "function_analyzer",
                 "find_caller",
                 "file_analyzer",
                 "ask_codebase"
             ])
-            
+
             # 创建并运行agent
             analyzer_agent = Agent(
                 system_prompt=system_prompt,
@@ -102,17 +102,17 @@ class ProjectAnalyzerTool:
                 execute_tool_confirm=False,
                 auto_complete=True
             )
-            
+
             # 运行agent并获取结果
             task_input = f"分析项目结构、入口点、模块划分等信息，提供项目概览"
             result = analyzer_agent.run(task_input)
-            
+
             return {
                 "success": True,
                 "stdout": result,
                 "stderr": ""
             }
-                
+
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
@@ -123,47 +123,47 @@ class ProjectAnalyzerTool:
         finally:
             # 恢复原始目录
             os.chdir(original_dir)
-    
-    def _create_system_prompt(self, root_dir: str, focus_dirs: List[str], 
+
+    def _create_system_prompt(self, root_dir: str, focus_dirs: List[str],
                              exclude_dirs: List[str], objective: str) -> str:
         """
         创建Agent的system prompt
-        
+
         Args:
             root_dir: 项目根目录
             focus_dirs: 重点分析的目录列表
             exclude_dirs: 排除的目录列表
             objective: 分析目标
-            
+
         Returns:
             系统提示文本
         """
         focus_dirs_str = ", ".join(focus_dirs) if focus_dirs else "整个项目"
         exclude_dirs_str = ", ".join(exclude_dirs) if exclude_dirs else "无"
-            
+
         objective_text = f"\n\n## 分析目标\n{objective}" if objective else "\n\n## 分析目标\n全面了解项目结构、模块划分和关键组件"
-        
+
         return f"""# 项目架构分析专家
 
 ## 任务描述
 对项目 `{root_dir}` 进行针对性分析，专注于分析目标所需的内容，生成有针对性、深入且有洞察力的项目分析报告。{objective_text}
 
 ## 工具使用优先级
-1. **优先使用 execute_shell 执行 fd 命令**: 
+1. **优先使用 execute_shell 执行 fd 命令**:
    - `fd -t f -e py` 查找所有Python文件
    - `fd -t d` 列出所有目录
    - `fd README.md` 查找所有README文件
 
-2. **优先使用 execute_shell 执行 rg 命令**: 
+2. **优先使用 execute_shell 执行 rg 命令**:
    - `rg "import" --type py` 搜索导入语句
    - `rg "class|def" --type py` 搜索类和函数定义
    - `rg "TODO|FIXME" --type py` 搜索代码注释
 
-3. **优先使用 execute_shell 执行 loc 命令**: 
+3. **优先使用 execute_shell 执行 loc 命令**:
    - `loc` 统计所有代码行数
    - `loc --include="*.py"` 统计Python代码行数
 
-4. **辅以 read_code 读取关键文件**: 
+4. **辅以 read_code 读取关键文件**:
    - 读取README.md、配置文件、主要模块
    - 对于较大的文件，可读取关键部分
 
@@ -280,16 +280,16 @@ class ProjectAnalyzerTool:
     def _create_summary_prompt(self, root_dir: str, objective: str) -> str:
         """
         创建Agent的summary prompt
-        
+
         Args:
             root_dir: 项目根目录
             objective: 分析目标
-            
+
         Returns:
             总结提示文本
         """
         objective_text = f"\n\n## 具体分析目标\n{objective}" if objective else ""
-        
+
         return f"""# 项目分析报告: `{root_dir}`{objective_text}
 
 ## 报告要求
@@ -305,4 +305,4 @@ class ProjectAnalyzerTool:
 - 根据分析目标灵活组织报告结构，不必包含所有传统的项目分析章节
 - 以清晰的Markdown格式呈现，简洁明了
 
-在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的项目概览，而是直接解决分析目标中提出的具体问题。""" 
+在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的项目概览，而是直接解决分析目标中提出的具体问题。"""

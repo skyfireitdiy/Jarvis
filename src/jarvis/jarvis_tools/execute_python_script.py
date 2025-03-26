@@ -29,7 +29,7 @@ class PythonScriptTool:
                     "stdout": "",
                     "stderr": "Missing or empty script_content parameter"
                 }
-            
+
             # Create temporary script file
             script_path = os.path.join(tempfile.gettempdir(), f"jarvis_script_{os.getpid()}.py")
             try:
@@ -39,7 +39,7 @@ class PythonScriptTool:
                 from jarvis.jarvis_tools.execute_shell import ShellTool
                 shell_tool = ShellTool()
                 result = shell_tool.execute({"command": f"python3 {script_path}"})
-                
+
                 return {
                     "success": result["success"],
                     "stdout": result["stdout"],
@@ -48,7 +48,7 @@ class PythonScriptTool:
             finally:
                 # Clean up temporary script file
                 Path(script_path).unlink(missing_ok=True)
-                
+
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {

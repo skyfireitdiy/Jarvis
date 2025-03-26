@@ -15,10 +15,10 @@ _global_tokenizers = {}
 
 def get_context_token_count(text: str) -> int:
     """使用分词器获取文本的token数量。
-    
+
     参数：
         text: 要计算token的输入文本
-        
+
     返回：
         int: 文本中的token数量
     """
@@ -27,7 +27,7 @@ def get_context_token_count(text: str) -> int:
         tokenizer = load_tokenizer()
         chunks = split_text_into_chunks(text, 512)
         return sum([len(tokenizer.encode(chunk)) for chunk in chunks]) # type: ignore
-        
+
     except Exception as e:
         PrettyOutput.print(f"计算token失败: {str(e)}", OutputType.WARNING)
         # 回退到基于字符的粗略估计
@@ -37,17 +37,17 @@ def get_context_token_count(text: str) -> int:
 def load_embedding_model() -> SentenceTransformer:
     """
     加载句子嵌入模型，使用缓存避免重复加载。
-    
+
     返回：
         SentenceTransformer: 加载的嵌入模型
     """
     model_name = "BAAI/bge-m3"
     cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    
+
     # 检查全局缓存中是否已有模型
     if model_name in _global_models:
         return _global_models[model_name]
-    
+
     try:
         embedding_model = SentenceTransformer(
             model_name,
@@ -60,28 +60,28 @@ def load_embedding_model() -> SentenceTransformer:
             cache_folder=cache_dir,
             local_files_only=False
         )
-    
+
     # 如果可用，将模型移到GPU上
     if torch.cuda.is_available():
         embedding_model.to(torch.device("cuda"))
-    
+
     # 保存到全局缓存
     _global_models[model_name] = embedding_model
-    
+
     return embedding_model
 
 def get_embedding(embedding_model: Any, text: str) -> np.ndarray:
     """
     为给定文本生成嵌入向量。
-    
+
     参数：
         embedding_model: 使用的嵌入模型
         text: 要嵌入的输入文本
-        
+
     返回：
         np.ndarray: 嵌入向量
     """
-    embedding = embedding_model.encode(text, 
+    embedding = embedding_model.encode(text,
                                      normalize_embeddings=True,
                                      show_progress_bar=False)
     return np.array(embedding, dtype=np.float32)
@@ -89,53 +89,53 @@ def get_embedding(embedding_model: Any, text: str) -> np.ndarray:
 def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spinner: Optional[Yaspin] = None, batch_size: int = 8) -> np.ndarray:
     """
     为一批文本生成嵌入向量，使用高效的批处理，针对RAG优化。
-    
+
     参数：
         embedding_model: 使用的嵌入模型
         prefix: 进度条前缀
         texts: 要嵌入的文本列表
         spinner: 可选的进度指示器
         batch_size: 批处理大小，更大的值可能更快但需要更多内存
-        
+
     返回：
         np.ndarray: 堆叠的嵌入向量
     """
     # 简单嵌入缓存，避免重复计算相同文本块
     embedding_cache = {}
     cache_hits = 0
-    
+
     try:
         # 预处理：将所有文本分块
         all_chunks = []
         chunk_indices = []  # 跟踪每个原始文本对应的块索引
-        
+
         for i, text in enumerate(texts):
             if spinner:
                 spinner.text = f"{prefix} 预处理中 ({i+1}/{len(texts)}) ..."
-            
+
             # 预处理文本：移除多余空白，规范化
             text = ' '.join(text.split()) if text else ""
-            
+
             # 使用更优化的分块函数
             chunks = split_text_into_chunks(text, 512)
             start_idx = len(all_chunks)
             all_chunks.extend(chunks)
             end_idx = len(all_chunks)
             chunk_indices.append((start_idx, end_idx))
-        
+
         if not all_chunks:
             return np.zeros((0, embedding_model.get_sentence_embedding_dimension()), dtype=np.float32)
-        
+
         # 批量处理所有块
         all_vectors = []
         for i in range(0, len(all_chunks), batch_size):
             if spinner:
                 spinner.text = f"{prefix} 批量处理嵌入 ({i+1}/{len(all_chunks)}) ..."
-            
+
             batch = all_chunks[i:i+batch_size]
             batch_to_process = []
             batch_indices = []
-            
+
             # 检查缓存，避免重复计算
             for j, chunk in enumerate(batch):
                 chunk_hash = hash(chunk)
@@ -145,16 +145,16 @@ def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spi
                 else:
                     batch_to_process.append(chunk)
                     batch_indices.append(j)
-            
+
             if batch_to_process:
                 # 对未缓存的块处理
                 batch_vectors = embedding_model.encode(
-                    batch_to_process, 
+                    batch_to_process,
                     normalize_embeddings=True,
                     show_progress_bar=False,
                     convert_to_numpy=True,
                 )
-                
+
                 # 处理结果并更新缓存
                 if len(batch_to_process) == 1:
                     vec = batch_vectors
@@ -166,7 +166,7 @@ def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spi
                         chunk_hash = hash(batch_to_process[j])
                         embedding_cache[chunk_hash] = vec
                         all_vectors.append(vec)
-        
+
         # 组织结果到原始文本顺序
         result_vectors = []
         for start_idx, end_idx in chunk_indices:
@@ -174,73 +174,73 @@ def get_embedding_batch(embedding_model: Any, prefix: str, texts: List[str], spi
             for j in range(start_idx, end_idx):
                 if j < len(all_vectors):
                     text_vectors.append(all_vectors[j])
-            
+
             if text_vectors:
                 # 当一个文本被分成多个块时，采用加权平均
                 if len(text_vectors) > 1:
                     # 针对RAG优化：对多个块进行加权平均，前面的块权重略高
                     weights = np.linspace(1.0, 0.8, len(text_vectors))
                     weights = weights / weights.sum()  # 归一化权重
-                    
+
                     # 应用权重并求和
                     weighted_sum = np.zeros_like(text_vectors[0])
                     for i, vec in enumerate(text_vectors):
                         # 确保向量形状一致，处理可能的维度不匹配问题
                         vec_array = np.asarray(vec).reshape(weighted_sum.shape)
                         weighted_sum += vec_array * weights[i]
-                    
+
                     # 归一化结果向量
                     norm = np.linalg.norm(weighted_sum)
                     if norm > 0:
                         weighted_sum = weighted_sum / norm
-                    
+
                     result_vectors.append(weighted_sum)
                 else:
                     # 单块直接使用
                     result_vectors.append(text_vectors[0])
-        
+
         if spinner and cache_hits > 0:
             spinner.text = f"{prefix} 缓存命中: {cache_hits}/{len(all_chunks)} 块"
-        
+
         return np.vstack(result_vectors)
-    
+
     except Exception as e:
         PrettyOutput.print(f"批量嵌入失败: {str(e)}", OutputType.ERROR)
         return np.zeros((0, embedding_model.get_sentence_embedding_dimension()), dtype=np.float32)
-    
+
 def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 50) -> List[str]:
     """将文本分割成带重叠窗口的块，优化RAG检索效果。
-    
+
     参数：
         text: 要分割的输入文本
         max_length: 每个块的最大长度
         min_length: 每个块的最小长度（除了最后一块可能较短）
-        
+
     返回：
         List[str]: 文本块列表，每个块的长度尽可能接近但不超过max_length
     """
     if not text:
         return []
-    
+
     # 如果文本长度小于最大长度，直接返回整个文本
     if len(text) <= max_length:
         return [text]
-    
+
     # 预处理：规范化文本，移除多余空白字符
     text = ' '.join(text.split())
-    
+
     # 中英文标点符号集合，优化RAG召回的句子边界
     primary_punctuation = {'.', '!', '?', '\n', '。', '！', '？'}  # 主要句末标点
     secondary_punctuation = {'；', '：', '…', ';', ':'}  # 次级分隔符
     tertiary_punctuation = {',', '，', '、', ')', '）', ']', '】', '}', '》', '"', "'"}  # 最低优先级
-    
+
     chunks = []
     start = 0
-    
+
     while start < len(text):
         # 初始化结束位置为最大可能长度
         end = min(start + max_length, len(text))
-        
+
         # 只有当不是最后一块且结束位置等于最大长度时，才尝试寻找句子边界
         if end < len(text) and end == start + max_length:
             # 优先查找段落边界，这对RAG特别重要
@@ -251,17 +251,17 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
                 # 寻找句子边界，从end-1位置开始
                 found_boundary = False
                 best_boundary = -1
-                
+
                 # 扩大搜索范围以找到更好的语义边界
                 search_range = min(120, end - start - min_length)  # 扩大搜索范围，但确保新块不小于min_length
-                
+
                 # 先尝试找主要标点（句号等）
                 for i in range(end-1, max(start, end-search_range), -1):
                     if text[i] in primary_punctuation:
                         best_boundary = i
                         found_boundary = True
                         break
-                
+
                 # 如果没找到主要标点，再找次要标点（分号、冒号等）
                 if not found_boundary:
                     for i in range(end-1, max(start, end-search_range), -1):
@@ -269,7 +269,7 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
                             best_boundary = i
                             found_boundary = True
                             break
-                
+
                 # 最后考虑逗号和其他可能的边界
                 if not found_boundary:
                     for i in range(end-1, max(start, end-search_range), -1):
@@ -277,11 +277,11 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
                             best_boundary = i
                             found_boundary = True
                             break
-                
+
                 # 如果找到了合适的边界且不会导致太短的块，使用它
                 if found_boundary and (best_boundary - start) >= min_length:
                     end = best_boundary + 1
-        
+
         # 添加当前块，并确保删除开头和结尾的空白字符
         chunk = text[start:end].strip()
         if chunk and len(chunk) >= min_length:  # 只添加符合最小长度的非空块
@@ -295,16 +295,16 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
                 else:
                     # 如果合并会导致太长，添加这个小块（特殊情况）
                     chunks.append(chunk)
-        
+
         # 计算下一块的开始位置，调整重叠窗口大小以提高RAG检索质量
         next_start = end - int(max_length * 0.2)  # 20%的重叠窗口大小
-        
+
         # 确保总是有前进，避免无限循环
         if next_start <= start:
             next_start = start + max(1, min_length // 2)
-            
+
         start = next_start
-    
+
     # 最后检查是否有太短的块，尝试合并相邻的短块
     if len(chunks) > 1:
         merged_chunks = []
@@ -321,7 +321,7 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
             merged_chunks.append(current)
             i += 1
         chunks = merged_chunks
-    
+
     return chunks
 
 
@@ -329,17 +329,17 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
 def load_tokenizer() -> AutoTokenizer:
     """
     加载用于文本处理的分词器，使用缓存避免重复加载。
-    
+
     返回：
         AutoTokenizer: 加载的分词器
     """
     model_name = "gpt2"
     cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    
+
     # 检查全局缓存
     if model_name in _global_tokenizers:
         return _global_tokenizers[model_name]
-    
+
     try:
         tokenizer = AutoTokenizer.from_pretrained(
             model_name,
@@ -352,28 +352,28 @@ def load_tokenizer() -> AutoTokenizer:
             cache_dir=cache_dir,
             local_files_only=False
         )
-    
+
     # 保存到全局缓存
     _global_tokenizers[model_name] = tokenizer
-    
+
     return tokenizer # type: ignore
 
 @functools.lru_cache(maxsize=1)
 def load_rerank_model() -> Tuple[AutoModelForSequenceClassification, AutoTokenizer]:
     """
     加载重排序模型和分词器，使用缓存避免重复加载。
-    
+
     返回：
         Tuple[AutoModelForSequenceClassification, AutoTokenizer]: 加载的模型和分词器
     """
     model_name = "BAAI/bge-reranker-v2-m3"
     cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    
+
     # 检查全局缓存
     key = f"rerank_{model_name}"
     if key in _global_models and f"{key}_tokenizer" in _global_tokenizers:
         return _global_models[key], _global_tokenizers[f"{key}_tokenizer"]
-    
+
     try:
         tokenizer = AutoTokenizer.from_pretrained(
             model_name,
@@ -396,53 +396,53 @@ def load_rerank_model() -> Tuple[AutoModelForSequenceClassification, AutoTokeniz
             cache_dir=cache_dir,
             local_files_only=False
         )
-    
+
     if torch.cuda.is_available():
         model = model.cuda()
     model.eval()
-    
+
     # 保存到全局缓存
     _global_models[key] = model
     _global_tokenizers[f"{key}_tokenizer"] = tokenizer
-    
+
     return model, tokenizer # type: ignore
 
-def rerank_results(query: str, documents: List[str], initial_scores: Optional[List[float]] = None, 
+def rerank_results(query: str, documents: List[str], initial_scores: Optional[List[float]] = None,
                   batch_size: int = 8, spinner: Optional[Yaspin] = None) -> List[float]:
     """
     使用交叉编码器重排序检索结果，提高RAG精度。
-    
+
     参数：
         query: 查询文本
         documents: 要重排序的文档内容列表
         initial_scores: 初始检索分数，可选。如果提供，将与重排序分数融合
         batch_size: 批处理大小
         spinner: 可选的进度指示器
-        
+
     返回：
         List[float]: 重排序后的分数列表，与输入文档对应
     """
     try:
         if not documents:
             return []
-            
+
         # 加载重排序模型
         if spinner:
             spinner.text = "加载重排序模型..."
         model, tokenizer = load_rerank_model()
-        
+
         # 准备评分
         all_scores = []
-        
+
         # 批量处理
         for i in range(0, len(documents), batch_size):
             if spinner:
                 spinner.text = f"重排序进度: {i}/{len(documents)}..."
-                
+
             # 准备当前批次
             batch_docs = documents[i:i+batch_size]
             pairs = [(query, doc) for doc in batch_docs]
-            
+
             # 编码输入
             with torch.no_grad():
                 # 使用类型忽略以避免mypy错误
@@ -453,21 +453,21 @@ def rerank_results(query: str, documents: List[str], initial_scores: Optional[Li
                     return_tensors="pt",
                     max_length=512
                 )
-                
+
                 # 使用GPU加速（如果可用）
                 if torch.cuda.is_available():
                     inputs = {k: v.cuda() for k, v in inputs.items()}
-                
+
                 # 获取分数
                 outputs = model(**inputs)  # type: ignore
                 scores = outputs.logits.squeeze(-1).cpu().tolist()
-                
+
                 # 如果只有一个文档，确保返回列表
                 if len(batch_docs) == 1:
                     all_scores.append(float(scores))
                 else:
                     all_scores.extend(scores)
-        
+
         # 归一化分数到0-1范围
         if all_scores:
             min_score = min(all_scores)
@@ -476,26 +476,26 @@ def rerank_results(query: str, documents: List[str], initial_scores: Optional[Li
                 normalized_scores = [(score - min_score) / (max_score - min_score) for score in all_scores]
             else:
                 normalized_scores = [0.5] * len(all_scores)
-                
+
             # 融合初始分数（如果提供）
             if initial_scores and len(initial_scores) == len(normalized_scores):
                 # 使用加权平均融合分数：初始分数权重0.3，重排序分数权重0.7
-                final_scores = [0.3 * init_score + 0.7 * rerank_score 
+                final_scores = [0.3 * init_score + 0.7 * rerank_score
                                for init_score, rerank_score in zip(initial_scores, normalized_scores)]
                 return final_scores
-                
+
             return normalized_scores
-            
+
         if spinner:
             spinner.text = "重排序完成"
-            
+
         # 如果重排序失败，返回初始分数或默认分数
         return initial_scores if initial_scores else [0.5] * len(documents)
-        
+
     except Exception as e:
         PrettyOutput.print(f"重排序失败: {str(e)}", OutputType.ERROR)
         if spinner:
             spinner.text = f"重排序失败: {str(e)}"
-            
+
         # 发生错误时回退到初始分数
         return initial_scores if initial_scores else [0.5] * len(documents)

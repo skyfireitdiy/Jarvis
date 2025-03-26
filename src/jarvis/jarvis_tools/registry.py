@@ -85,7 +85,7 @@ class ToolRegistry(OutputHandler):
         if self._extract_tool_calls(response):
             return True
         return False
-    
+
     def prompt(self) -> str:
         """加载工具"""
         tools = self.get_all_tools()
@@ -96,7 +96,7 @@ class ToolRegistry(OutputHandler):
                     tools_prompt += f"- 名称: {tool['name']}\n"
                     tools_prompt += f"  描述: {tool['description']}\n"
                     tools_prompt += "  参数: |\n"
-                    
+
                     # 生成格式化的YAML参数
                     yaml_params = yaml.dump(
                         tool['parameters'],
@@ -105,19 +105,19 @@ class ToolRegistry(OutputHandler):
                         sort_keys=False,
                         width=120  # 增加行宽限制
                     )
-                    
+
                     # 添加缩进并移除尾部空格
                     for line in yaml_params.split('\n'):
                         tools_prompt += f"    {line.rstrip()}\n"
-                        
+
                 except yaml.YAMLError as e:
                     PrettyOutput.print(f"工具 {tool['name']} 参数序列化失败: {str(e)}", OutputType.ERROR)
                     continue
-                    
+
             tools_prompt += tool_call_help.rstrip()  # 移除帮助文本尾部空格
             return tools_prompt
         return ""
-    
+
     def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
         tool_calls = self._extract_tool_calls(response)
         if len(tool_calls) > 1:
@@ -151,13 +151,13 @@ class ToolRegistry(OutputHandler):
     def _load_builtin_tools(self):
         """从内置工具目录加载工具"""
         tools_dir = Path(__file__).parent
-        
+
         # 遍历目录中的所有.py文件
         for file_path in tools_dir.glob("*.py"):
             # 跳过base.py和__init__.py
             if file_path.name in ["base.py", "__init__.py", "registry.py"]:
                 continue
-                
+
             self.register_tool_by_file(str(file_path))
 
     def _load_external_tools(self):
@@ -165,21 +165,21 @@ class ToolRegistry(OutputHandler):
         external_tools_dir = Path.home() / '.jarvis/tools'
         if not external_tools_dir.exists():
             return
-            
+
         # 遍历目录中的所有.py文件
         for file_path in external_tools_dir.glob("*.py"):
             # 跳过__init__.py
             if file_path.name == "__init__.py":
                 continue
-                
+
             self.register_tool_by_file(str(file_path))
 
     def register_tool_by_file(self, file_path: str):
         """从指定文件加载并注册工具
-        
+
         参数:
             file_path: 工具文件的路径
-            
+
         返回:
             bool: 工具是否加载成功
         """
@@ -188,35 +188,35 @@ class ToolRegistry(OutputHandler):
             if not p_file_path.exists() or not p_file_path.is_file():
                 PrettyOutput.print(f"文件不存在: {p_file_path}", OutputType.ERROR)
                 return False
-                
+
             # 临时将父目录添加到sys.path
             parent_dir = str(p_file_path.parent)
             sys.path.insert(0, parent_dir)
-            
+
             try:
                 # 使用标准导入机制导入模块
                 module_name = p_file_path.stem
                 module = __import__(module_name)
-                
+
                 # 在模块中查找工具类
                 tool_found = False
                 for item_name in dir(module):
                     item = getattr(module, item_name)
                     # 检查是否是类并具有必要属性
-                    if (isinstance(item, type) and 
-                        hasattr(item, 'name') and 
-                        hasattr(item, 'description') and 
+                    if (isinstance(item, type) and
+                        hasattr(item, 'name') and
+                        hasattr(item, 'description') and
                         hasattr(item, 'parameters') and
-                        hasattr(item, 'execute') and 
+                        hasattr(item, 'execute') and
                         item.name == module_name):
 
                         if hasattr(item, "check"):
                             if not item.check():
                                 continue
-                        
+
                         # 实例化工具类
                         tool_instance = item()
-                        
+
                         # 注册工具
                         self.register_tool(
                             name=tool_instance.name,
@@ -226,29 +226,29 @@ class ToolRegistry(OutputHandler):
                         )
                         tool_found = True
                         break
-                        
+
                 if not tool_found:
                     return False
-                    
+
                 return True
-                
+
             finally:
                 # 从sys.path中移除目录
                 sys.path.remove(parent_dir)
-                
+
         except Exception as e:
             PrettyOutput.print(f"从 {Path(file_path).name} 加载工具失败: {str(e)}", OutputType.ERROR)
             return False
     @staticmethod
     def _extract_tool_calls(content: str) -> List[Dict]:
         """从内容中提取工具调用。
-        
+
         参数:
             content: 包含工具调用的内容
-            
+
         返回:
             List[Dict]: 包含名称和参数的提取工具调用列表
-            
+
         异常:
             Exception: 如果工具调用缺少必要字段
         """
@@ -350,14 +350,14 @@ arguments:
 - 创建虚构对话
 - 在没有所需信息的情况下继续
 """
-            
+
             if isinstance(args, str):
                 try:
                     args = json.loads(args)
                 except json.JSONDecodeError:
                     PrettyOutput.print(f"工具参数格式无效: {name} {tool_call_help}", OutputType.ERROR)
                     return ""
-            
+
             # Execute tool call
             result = self.execute_tool(name, args)
 
@@ -370,14 +370,14 @@ arguments:
                 output_parts.append(f"错误:\n{stderr}")
             output = "\n\n".join(output_parts)
             output = "无输出和错误" if not output else output
-            
+
             # Process the result
             if result["success"]:
                 # If the output exceeds 4k characters, use a large model to summarize
                 if get_context_token_count(output) > self.max_token_count:
                     PrettyOutput.section("输出过长，正在总结...", OutputType.SYSTEM)
                     try:
-                        
+
                         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
                         model.set_suppress_output(False)
                         # If the output exceeds the maximum context length, only take the last part
@@ -411,7 +411,7 @@ arguments:
                         PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
                         output = f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
             return output
-            
+
         except Exception as e:
             PrettyOutput.print(f"工具执行失败：{str(e)}", OutputType.ERROR)
             return f"工具调用失败: {str(e)}"
@@ -439,13 +439,13 @@ def main():
     call_parser.add_argument('--args-file', type=str, help='从文件加载工具参数 (JSON格式)')
 
     args = parser.parse_args()
-    
+
     # 初始化工具注册表
     registry = ToolRegistry()
-    
+
     if args.command == 'list':
         tools = registry.get_all_tools()
-        
+
         if args.json:
             if args.detailed:
                 print(json.dumps(tools, indent=2, ensure_ascii=False))
@@ -465,17 +465,17 @@ def main():
                         req_mark = "*" if param_name in required else ""
                         desc = param_info.get('description', '无描述')
                         print(f"     - {param_name}{req_mark}: {desc}")
-    
+
     elif args.command == 'call':
         tool_name = args.tool_name
         tool = registry.get_tool(tool_name)
-        
+
         if not tool:
             PrettyOutput.print(f"错误: 工具 '{tool_name}' 不存在", OutputType.ERROR)
             available_tools = ", ".join([t["name"] for t in registry.get_all_tools()])
             print(f"可用工具: {available_tools}")
             return 1
-        
+
         # 获取参数
         tool_args = {}
         if args.args:
@@ -484,7 +484,7 @@ def main():
             except json.JSONDecodeError:
                 PrettyOutput.print("错误: 参数必须是有效的JSON格式", OutputType.ERROR)
                 return 1
-        
+
         elif args.args_file:
             try:
                 with open(args.args_file, 'r', encoding='utf-8') as f:
@@ -492,11 +492,11 @@ def main():
             except (json.JSONDecodeError, FileNotFoundError) as e:
                 PrettyOutput.print(f"错误: 无法从文件加载参数: {str(e)}", OutputType.ERROR)
                 return 1
-        
+
         # 检查必需参数
         required_params = tool.parameters.get('required', [])
         missing_params = [p for p in required_params if p not in tool_args]
-        
+
         if missing_params:
             PrettyOutput.print(f"错误: 缺少必需参数: {', '.join(missing_params)}", OutputType.ERROR)
             print("\n参数说明:")
@@ -506,30 +506,30 @@ def main():
                 desc = param_info.get('description', '无描述')
                 print(f"  - {param_name}: {desc}")
             return 1
-        
+
         # 执行工具
         with yaspin(text=f"正在执行工具 {tool_name}...").dots12:
             result = registry.execute_tool(tool_name, tool_args)
-        
+
         # 显示结果
         if result["success"]:
             PrettyOutput.section(f"工具 {tool_name} 执行成功", OutputType.SUCCESS)
         else:
             PrettyOutput.section(f"工具 {tool_name} 执行失败", OutputType.ERROR)
-            
+
         if result.get("stdout"):
             print("\n输出:")
             print(result["stdout"])
-            
+
         if result.get("stderr"):
             PrettyOutput.print("\n错误:", OutputType.ERROR)
             print(result["stderr"])
-            
+
         return 0 if result["success"] else 1
-    
+
     else:
         parser.print_help()
-    
+
     return 0
 
 

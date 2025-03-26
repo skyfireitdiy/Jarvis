@@ -6,20 +6,20 @@ from typing import Any, Tuple
 def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     """
     处理内置的特殊输入标记，并追加相应的提示词
-    
+
     参数：
         user_input: 用户输入
         agent: 代理对象
-        
+
     返回：
         Tuple[str, bool]: 处理后的输入和是否需要进一步处理
     """
     # 查找特殊标记
     special_tags = re.findall(r"'<([^>]+)>'", user_input)
-    
+
     if not special_tags:
         return user_input, False
-    
+
     # 使用集合去重
     processed_tags = set()
     # 处理每个标记
@@ -27,7 +27,7 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         if tag in processed_tags:
             continue
         processed_tags.add(tag)
-        
+
         if tag == "CodeBase":
             user_input = user_input.replace(f"'<{tag}>'", "")
             user_input += """
@@ -79,5 +79,5 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 5. 实现xxx的参考方案有哪些？
 """
         # 移除对未知标记的警告输出
-    
+
     return user_input, False

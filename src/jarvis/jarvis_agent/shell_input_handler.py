@@ -26,4 +26,4 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 return f"{user_input}\n\n用户执行以下脚本：\n{script}\n\n执行结果：\n{output}", False
             return "", True
         return user_input, False
-    
+

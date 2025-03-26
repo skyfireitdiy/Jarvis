@@ -67,20 +67,20 @@ PM_PROMPT = f"""
 to: [角色]
 content: |
   # [任务主题]
-  
+
   ## 背景与目标
   [提供任务背景和期望达成的目标]
-  
+
   ## 相关代码
   - [代码路径及其分析结果]
-  
+
   ## 具体要求
   1. [基于代码事实的明确要求1]
   2. [基于代码事实的明确要求2]
-  
+
   ## 预期交付物
   - [具体交付物及其格式要求]
-  
+
   ## 时间与优先级
   - 优先级：[高/中/低]
   - 期望完成时间：[时间点]
@@ -295,7 +295,7 @@ arguments:
         - [详细功能描述]
         - [输入/输出规范]
         - [错误处理要求]
-        
+
         技术要求：
         - [编程语言/框架]
         - [代码风格]
@@ -360,7 +360,7 @@ arguments:
         - 测试正常功能路径
         - 测试边界条件和异常情况
         - 测试错误处理逻辑
-        
+
         技术要求：
         - 使用[测试框架]
         - 模拟外部依赖
@@ -381,10 +381,10 @@ def create_dev_team() -> MultiAgent:
 
     PM_output_handler = ToolRegistry()
     PM_output_handler.use_tools([
-        "ask_user", 
-        "file_operation", 
-        "search_web", 
-        "rag", 
+        "ask_user",
+        "file_operation",
+        "search_web",
+        "rag",
         "execute_shell",
         "read_webpage",
         "project_analyzer",
@@ -394,22 +394,22 @@ def create_dev_team() -> MultiAgent:
 
     BA_output_handler = ToolRegistry()
     BA_output_handler.use_tools([
-        "ask_user", 
-        "file_operation", 
-        "search_web", 
-        "rag", 
+        "ask_user",
+        "file_operation",
+        "search_web",
+        "rag",
         "execute_shell",
-        "read_webpage", 
+        "read_webpage",
         "methodology",
         "ask_codebase"
     ])
 
     SA_output_handler = ToolRegistry()
     SA_output_handler.use_tools([
-        "file_operation", 
-        "search_web", 
-        "rag", 
-        "ask_codebase", 
+        "file_operation",
+        "search_web",
+        "rag",
+        "ask_codebase",
         "execute_shell",
         "project_analyzer",
         "file_analyzer",
@@ -417,12 +417,12 @@ def create_dev_team() -> MultiAgent:
         "read_code",
         "methodology"
     ])
-    
+
     TL_output_handler = ToolRegistry()
     TL_output_handler.use_tools([
-        "file_operation", 
-        "ask_codebase", 
-        "lsp_get_diagnostics", 
+        "file_operation",
+        "ask_codebase",
+        "lsp_get_diagnostics",
         "execute_shell",
         "code_review",
         "find_symbol",
@@ -430,12 +430,12 @@ def create_dev_team() -> MultiAgent:
         "function_analyzer",
         "project_analyzer"
     ])
-    
+
     DEV_output_handler = ToolRegistry()
     DEV_output_handler.use_tools([
-        "create_code_agent", 
-        "file_operation", 
-        "ask_codebase", 
+        "create_code_agent",
+        "file_operation",
+        "ask_codebase",
         "execute_shell",
         "find_symbol",
         "function_analyzer",
@@ -443,19 +443,19 @@ def create_dev_team() -> MultiAgent:
         "read_code",
         "create_sub_agent"
     ])
-    
+
     QA_output_handler = ToolRegistry()
     QA_output_handler.use_tools([
-        "create_code_agent", 
-        "file_operation", 
-        "ask_codebase", 
+        "create_code_agent",
+        "file_operation",
+        "ask_codebase",
         "execute_shell",
         "lsp_get_diagnostics",
         "code_review",
         "execute_shell_script",
         "read_code",
     ])
-    
+
     # Update PM prompt with tool usage guidance
     PM_PROMPT_EXTENSION = """
 ## 工具使用指南
@@ -479,7 +479,7 @@ def create_dev_team() -> MultiAgent:
 
 文档命名需规范，内容需要结构化，使用Markdown格式，便于团队成员理解和跟进。
 """
-    
+
     # Update BA prompt with tool usage guidance
     BA_PROMPT_EXTENSION = """
 ## 工具使用指南
@@ -503,7 +503,7 @@ def create_dev_team() -> MultiAgent:
 
 文档需要结构化，使用Markdown格式，包含清晰的需求描述、优先级、验收标准和依赖关系。
 """
-    
+
     # Update SA prompt with tool usage guidance
     SA_PROMPT_EXTENSION = """
 ## 工具使用指南
@@ -529,7 +529,7 @@ def create_dev_team() -> MultiAgent:
 
 文档需使用图表、表格等方式清晰展示架构设计，包含各组件职责、接口、性能考量及安全措施。
 """
-    
+
     # Update TL prompt with tool usage guidance
     TL_PROMPT_EXTENSION = """
 ## 工具使用指南
@@ -555,7 +555,7 @@ def create_dev_team() -> MultiAgent:
 
 文档需包含清晰的技术指导、代码质量标准、任务分解和时间估计，便于开发团队执行。
 """
-    
+
     # Update DEV prompt with tool usage guidance
     DEV_PROMPT_EXTENSION = """
 ## 工具使用指南
@@ -581,7 +581,7 @@ def create_dev_team() -> MultiAgent:
 
 文档需要包含功能描述、使用示例、参数说明和注意事项，便于其他开发者理解和使用。
 """
-    
+
     # Update QA prompt with tool usage guidance
     QA_PROMPT_EXTENSION = """
 ## 工具使用指南
@@ -606,7 +606,7 @@ def create_dev_team() -> MultiAgent:
 
 测试文档需包含测试范围、测试环境、测试用例、预期结果、实际结果和缺陷级别，便于跟踪和修复。
 """
-    
+
     # Append tool guidance to each role's prompt
     PM_PROMPT_WITH_TOOLS = PM_PROMPT + PM_PROMPT_EXTENSION
     BA_PROMPT_WITH_TOOLS = BA_PROMPT + BA_PROMPT_EXTENSION
@@ -614,7 +614,7 @@ def create_dev_team() -> MultiAgent:
     TL_PROMPT_WITH_TOOLS = TL_PROMPT + TL_PROMPT_EXTENSION
     DEV_PROMPT_WITH_TOOLS = DEV_PROMPT + DEV_PROMPT_EXTENSION
     QA_PROMPT_WITH_TOOLS = QA_PROMPT + QA_PROMPT_EXTENSION
-    
+
     # Create configurations for each role
     configs = [
         dict(
@@ -660,27 +660,27 @@ def create_dev_team() -> MultiAgent:
             platform=PlatformRegistry().get_thinking_platform(),
         )
     ]
-    
+
     return MultiAgent(configs, "PM")
 
 def main():
     """Main entry point for the development team simulation."""
 
     init_env()
-    
+
     # Create the development team
     dev_team = create_dev_team()
-    
+
     # Start interaction loop
     while True:
         try:
             user_input = get_multiline_input("\nEnter your request (or press Enter to exit): ")
             if not user_input:
                 break
-                
+
             result = dev_team.run("My requirement: " + user_input)
             PrettyOutput.print(result, output_type=OutputType.SYSTEM)
-            
+
         except KeyboardInterrupt:
             PrettyOutput.print("Exiting...", output_type=OutputType.SYSTEM)
             break

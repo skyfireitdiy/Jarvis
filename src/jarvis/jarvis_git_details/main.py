@@ -43,11 +43,11 @@ class GitCommitAnalyzer:
 
             # Store current directory
             original_dir = os.getcwd()
-            
+
             try:
                 # Change to root_dir
                 os.chdir(root_dir)
-                
+
                 # 获取commit详细信息
                 commit_info = subprocess.check_output(
                     f"git show {commit_sha} --pretty=fuller",
@@ -77,7 +77,7 @@ class GitCommitAnalyzer:
 - 提供足够的技术细节
 - 保持结构清晰，便于理解
 - 重点关注关键修改和潜在风险"""
-                
+
                 tool_registry = ToolRegistry()
                 agent = Agent(
                     system_prompt=system_prompt,
@@ -111,7 +111,7 @@ class GitCommitAnalyzer:
                 )
 
                 analysis_result = agent.run(diff_content)
-                
+
                 return {
                     "success": True,
                     "stdout": {
@@ -152,11 +152,11 @@ def main():
     import argparse
 
     init_env()
-    
+
     parser = argparse.ArgumentParser(description='Git Commit Analyzer')
     parser.add_argument('commit', help='Commit SHA to analyze')
     parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
-    
+
     args = parser.parse_args()
 
     analyzer = GitCommitAnalyzer()

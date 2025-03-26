@@ -17,12 +17,12 @@ class OpenAIModel(BasePlatform):
         if not self.api_key:
             message = (
                 "需要设置以下环境变量才能使用 OpenAI 模型:\n"
-                "  • OPENAI_API_KEY: API 密钥\n" 
+                "  • OPENAI_API_KEY: API 密钥\n"
                 "  • OPENAI_API_BASE: (可选) API 基础地址, 默认使用 https://api.openai.com/v1\n"
                 "您可以通过以下方式设置它们:\n"
                 "1. 创建或编辑 ~/.jarvis/env 文件:\n"
                 "   OPENAI_API_KEY=your_api_key\n"
-                "   OPENAI_API_BASE=your_api_base\n" 
+                "   OPENAI_API_BASE=your_api_base\n"
                 "   OPENAI_MODEL_NAME=your_model_name\n"
                 "2. 直接设置环境变量:\n"
                 "   export OPENAI_API_KEY=your_api_key\n"
@@ -31,11 +31,11 @@ class OpenAIModel(BasePlatform):
             )
             PrettyOutput.print(message, OutputType.INFO)
             PrettyOutput.print("OPENAI_API_KEY 未设置", OutputType.WARNING)
-            
+
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
         self.model_name =  os.getenv("JARVIS_MODEL") or "gpt-4o"
 
-            
+
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url
@@ -68,33 +68,33 @@ class OpenAIModel(BasePlatform):
     def chat(self, message: str) -> str:
         """Execute conversation"""
         try:
-            
+
             # Add user message to history
             self.messages.append({"role": "user", "content": message})
-            
+
             response = self.client.chat.completions.create(
                 model=self.model_name,  # Use the configured model name
                 messages=self.messages, # type: ignore
                 stream=True
             ) # type: ignore
-            
+
             full_response = ""
-            
+
             for chunk in response:
                 if chunk.choices and chunk.choices[0].delta.content:
                     text = chunk.choices[0].delta.content
                     if not self.suppress_output:
                         PrettyOutput.print_stream(text)
                     full_response += text
-                    
+
             if not self.suppress_output:
                 PrettyOutput.print_stream_end()
-            
+
             # Add assistant reply to history
             self.messages.append({"role": "assistant", "content": full_response})
-            
+
             return full_response
-            
+
         except Exception as e:
             PrettyOutput.print(f"对话失败：{str(e)}", OutputType.ERROR)
             raise Exception(f"Chat failed: {str(e)}")

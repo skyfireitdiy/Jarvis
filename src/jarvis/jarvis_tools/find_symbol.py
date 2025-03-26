@@ -11,7 +11,7 @@ class SymbolTool:
     符号查找工具
     使用agent查找代码库中的符号引用、定义和声明位置
     """
-    
+
     name = "find_symbol"
     description = "查找代码符号的引用、定义和声明位置"
     parameters = {
@@ -50,20 +50,20 @@ class SymbolTool:
         },
         "required": ["symbol"]
     }
-    
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行符号查找工具
-        
+
         Args:
             args: 包含参数的字典
-            
+
         Returns:
             包含执行结果的字典
         """
         # 存储原始目录
         original_dir = os.getcwd()
-        
+
         try:
             # 解析参数
             symbol = args.get("symbol", "")
@@ -71,7 +71,7 @@ class SymbolTool:
             file_extensions = args.get("file_extensions", [])
             exclude_dirs = args.get("exclude_dirs", [])
             objective = args.get("objective", "")
-            
+
             # 验证参数
             if not symbol:
                 return {
@@ -79,23 +79,23 @@ class SymbolTool:
                     "stdout": "",
                     "stderr": "必须提供符号名称"
                 }
-            
+
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
                 symbol, root_dir, file_extensions, exclude_dirs, objective
             )
-            
+
             # 创建agent的summary prompt
             summary_prompt = self._create_summary_prompt(symbol)
-            
+
             # 切换到根目录
             os.chdir(root_dir)
-            
+
             # 构建使用的工具
             from jarvis.jarvis_tools.registry import ToolRegistry
             tool_registry = ToolRegistry()
             tool_registry.use_tools(["execute_shell", "read_code"])
-            
+
             # 创建并运行agent
             symbol_agent = Agent(
                 system_prompt=system_prompt,
@@ -107,17 +107,17 @@ class SymbolTool:
                 execute_tool_confirm=False,
                 auto_complete=True
             )
-            
+
             # 运行agent并获取结果
             task_input = f"查找符号 '{symbol}' 在代码库中的引用、定义和声明位置"
             result = symbol_agent.run(task_input)
-            
+
             return {
                 "success": True,
                 "stdout": result,
                 "stderr": ""
             }
-                
+
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
@@ -128,39 +128,39 @@ class SymbolTool:
         finally:
             # 恢复原始目录
             os.chdir(original_dir)
-    
-    def _create_system_prompt(self, symbol: str, root_dir: str, 
+
+    def _create_system_prompt(self, symbol: str, root_dir: str,
                              file_extensions: List[str], exclude_dirs: List[str],
                              objective: str) -> str:
         """
         创建Agent的system prompt
-        
+
         Args:
             symbol: 符号名称
             root_dir: 代码库根目录
             file_extensions: 文件扩展名列表
             exclude_dirs: 排除目录列表
             objective: 分析目标
-            
+
         Returns:
             系统提示文本
         """
         file_ext_str = " ".join([f"*{ext}" for ext in file_extensions]) if file_extensions else ""
         exclude_str = " ".join([f"--glob '!{excl}'" for excl in exclude_dirs]) if exclude_dirs else ""
         objective_text = f"\n\n## 分析目标\n{objective}" if objective else ""
-        
+
         return f"""# 代码符号分析专家
 
 ## 任务描述
 查找符号 `{symbol}` 在代码库中的定义、声明和引用位置，专注于分析目标所需的信息，生成有针对性的符号分析报告。{objective_text}
 
 ## 工具使用优先级
-1. **优先使用 execute_shell 执行 rg 命令**: 
+1. **优先使用 execute_shell 执行 rg 命令**:
    - `rg -w "{symbol}" --type py` 查找Python文件中的符号
    - `rg "class\\s+{symbol}|def\\s+{symbol}" --type py` 查找定义
    - `rg -w "{symbol}" -A 2 -B 2` 查看符号上下文
 
-2. **辅以 read_code**: 
+2. **辅以 read_code**:
    - 找到符号位置后使用read_code阅读上下文
    - 读取符号定义和关键引用的完整实现
 
@@ -183,7 +183,7 @@ class SymbolTool:
 ## 符号查找工具指南
 
 ### execute_shell 搜索命令
-- **基本搜索**: 
+- **基本搜索**:
   - `rg -w "{symbol}" --type=文件类型`
   - 示例: `rg -w "{symbol}" --type py` 搜索Python文件中的符号
 
@@ -272,10 +272,10 @@ class SymbolTool:
     def _create_summary_prompt(self, symbol: str) -> str:
         """
         创建Agent的summary prompt
-        
+
         Args:
             symbol: 符号名称
-            
+
         Returns:
             总结提示文本
         """

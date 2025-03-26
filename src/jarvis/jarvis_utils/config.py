@@ -12,35 +12,35 @@ import os
 def get_max_token_count() -> int:
     """
     获取模型允许的最大token数量。
-    
+
     返回:
         int: 模型能处理的最大token数量。
     """
     return int(os.getenv('JARVIS_MAX_TOKEN_COUNT', '64000'))  # 默认64k
-    
+
 def get_thread_count() -> int:
     """
     获取用于并行处理的线程数。
-    
+
     返回：
         int: 线程数，默认为1
     """
-    return int(os.getenv('JARVIS_THREAD_COUNT', '1'))  
-    
+    return int(os.getenv('JARVIS_THREAD_COUNT', '1'))
+
 def is_auto_complete() -> bool:
     """
     检查是否启用了自动补全功能。
-    
+
     返回：
         bool: 如果启用了自动补全则返回True，默认为False
     """
     return os.getenv('JARVIS_AUTO_COMPLETE', 'false') == 'true'
-    
+
 
 def get_min_paragraph_length() -> int:
     """
     获取文本处理的最小段落长度。
-    
+
     返回：
         int: 最小字符长度，默认为50
     """
@@ -48,7 +48,7 @@ def get_min_paragraph_length() -> int:
 def get_max_paragraph_length() -> int:
     """
     获取文本处理的最大段落长度。
-    
+
     返回：
         int: 最大字符长度，默认为12800
     """
@@ -56,7 +56,7 @@ def get_max_paragraph_length() -> int:
 def get_shell_name() -> str:
     """
     获取系统shell名称。
-    
+
     返回：
         str: Shell名称（例如bash, zsh），默认为bash
     """
@@ -64,7 +64,7 @@ def get_shell_name() -> str:
 def get_normal_platform_name() -> str:
     """
     获取正常操作的平台名称。
-    
+
     返回：
         str: 平台名称，默认为'yuanbao'
     """
@@ -72,7 +72,7 @@ def get_normal_platform_name() -> str:
 def get_normal_model_name() -> str:
     """
     获取正常操作的模型名称。
-    
+
     返回：
         str: 模型名称，默认为'deep_seek'
     """
@@ -82,7 +82,7 @@ def get_normal_model_name() -> str:
 def get_thinking_platform_name() -> str:
     """
     获取思考操作的平台名称。
-    
+
     返回：
         str: 平台名称，默认为'yuanbao'
     """
@@ -90,7 +90,7 @@ def get_thinking_platform_name() -> str:
 def get_thinking_model_name() -> str:
     """
     获取思考操作的模型名称。
-    
+
     返回：
         str: 模型名称，默认为'deep_seek'
     """
@@ -99,7 +99,7 @@ def get_thinking_model_name() -> str:
 def is_execute_tool_confirm() -> bool:
     """
     检查工具执行是否需要确认。
-    
+
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
@@ -107,7 +107,7 @@ def is_execute_tool_confirm() -> bool:
 def is_confirm_before_apply_patch() -> bool:
     """
     检查应用补丁前是否需要确认。
-    
+
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
@@ -116,18 +116,18 @@ def is_confirm_before_apply_patch() -> bool:
 def get_rag_ignored_paths() -> list:
     """
     获取RAG索引时需要忽略的路径列表。
-    
+
     首先尝试从.jarvis/rag_ignore.txt文件中读取，
     如果该文件不存在，则返回默认忽略列表。
-    
+
     返回：
         list: 忽略路径的列表，默认包含常见忽略路径
     """
     # 默认忽略路径
     default_ignored = [
-        '.git', 
-        '__pycache__', 
-        'node_modules', 
+        '.git',
+        '__pycache__',
+        'node_modules',
         '.jarvis',
         '.jarvis-*',
         'target',
@@ -164,7 +164,7 @@ def get_rag_ignored_paths() -> list:
         '*.xz',
         '*.rar'
     ]
-    
+
     # 尝试从配置文件中读取
     try:
         config_path = os.path.join('.jarvis', 'rag_ignore.txt')
@@ -174,5 +174,5 @@ def get_rag_ignored_paths() -> list:
                 return custom_ignored
     except Exception:
         pass
-        
+
     return default_ignored

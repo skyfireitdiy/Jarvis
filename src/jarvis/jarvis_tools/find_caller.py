@@ -11,7 +11,7 @@ class FindCallerTool:
     函数调用者查找工具
     使用agent查找代码库中所有调用指定函数的位置
     """
-    
+
     name = "find_caller"
     description = "查找所有调用指定函数的代码位置"
     parameters = {
@@ -50,20 +50,20 @@ class FindCallerTool:
         },
         "required": ["function_name"]
     }
-    
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行调用者查找工具
-        
+
         Args:
             args: 包含参数的字典
-            
+
         Returns:
             包含执行结果的字典
         """
         # 存储原始目录
         original_dir = os.getcwd()
-        
+
         try:
             # 解析参数
             function_name = args.get("function_name", "")
@@ -71,7 +71,7 @@ class FindCallerTool:
             file_extensions = args.get("file_extensions", [])
             exclude_dirs = args.get("exclude_dirs", [])
             objective = args.get("objective", "")
-            
+
             # 验证参数
             if not function_name:
                 return {
@@ -79,23 +79,23 @@ class FindCallerTool:
                     "stdout": "",
                     "stderr": "必须提供函数名称"
                 }
-            
+
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
                 function_name, root_dir, file_extensions, exclude_dirs, objective
             )
-            
+
             # 创建agent的summary prompt
             summary_prompt = self._create_summary_prompt(function_name)
-            
+
             # 切换到根目录
             os.chdir(root_dir)
-            
+
             # 构建使用的工具
             from jarvis.jarvis_tools.registry import ToolRegistry
             tool_registry = ToolRegistry()
             tool_registry.use_tools(["execute_shell", "read_code"])
-            
+
             # 创建并运行agent
             caller_agent = Agent(
                 system_prompt=system_prompt,
@@ -107,17 +107,17 @@ class FindCallerTool:
                 execute_tool_confirm=False,
                 auto_complete=True
             )
-            
+
             # 运行agent并获取结果
             task_input = f"查找所有调用 '{function_name}' 函数的代码位置"
             result = caller_agent.run(task_input)
-            
+
             return {
                 "success": True,
                 "stdout": result,
                 "stderr": ""
             }
-                
+
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
@@ -128,41 +128,41 @@ class FindCallerTool:
         finally:
             # 恢复原始目录
             os.chdir(original_dir)
-    
-    def _create_system_prompt(self, function_name: str, root_dir: str, 
+
+    def _create_system_prompt(self, function_name: str, root_dir: str,
                              file_extensions: List[str], exclude_dirs: List[str],
                              objective: str) -> str:
         """
         创建Agent的system prompt
-        
+
         Args:
             function_name: 函数名称
             root_dir: 代码库根目录
             file_extensions: 文件扩展名列表
             exclude_dirs: 排除目录列表
             objective: 分析目标
-            
+
         Returns:
             系统提示文本
         """
         file_ext_str = " ".join([f"*{ext}" for ext in file_extensions]) if file_extensions else ""
         exclude_str = " ".join([f"--glob '!{excl}'" for excl in exclude_dirs]) if exclude_dirs else ""
         objective_text = f"\n\n## 分析目标\n{objective}" if objective else ""
-        
+
         search_pattern = f"\\b{function_name}\\s*\\("
-        
+
         return f"""# 函数调用分析专家
 
 ## 任务描述
 查找所有调用 `{function_name}` 函数的代码位置，专注于分析目标所需的信息，生成有针对性的调用分析报告。{objective_text}
 
 ## 工具使用优先级
-1. **优先使用 execute_shell 执行 rg 命令**: 
+1. **优先使用 execute_shell 执行 rg 命令**:
    - `rg "\\b{function_name}\\s*\\(" --type py` 查找Python文件中的调用
    - `rg "\\b{function_name}\\s*\\(" --type js` 查找JavaScript文件中的调用
    - `rg -w "{function_name}" -A 2 -B 2` 查看调用上下文
 
-2. **辅以 read_code**: 
+2. **辅以 read_code**:
    - 找到调用位置后使用read_code阅读上下文
    - 读取关键调用者的完整实现
 
@@ -185,7 +185,7 @@ class FindCallerTool:
 ## 调用者查找工具指南
 
 ### execute_shell 搜索命令
-- **基本搜索**: 
+- **基本搜索**:
   - `rg "\\b{function_name}\\s*\\(" --type=文件类型`
   - 示例: `rg "\\b{function_name}\\s*\\(" --type py` 搜索Python文件中的调用
 
@@ -255,10 +255,10 @@ class FindCallerTool:
     def _create_summary_prompt(self, function_name: str) -> str:
         """
         创建Agent的summary prompt
-        
+
         Args:
             function_name: 函数名称
-            
+
         Returns:
             总结提示文本
         """

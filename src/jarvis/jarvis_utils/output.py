@@ -21,7 +21,7 @@ from jarvis.jarvis_utils.globals import console, get_agent_list
 class OutputType(Enum):
     """
     输出类型枚举，用于分类和样式化不同类型的消息。
-    
+
     属性：
         SYSTEM: AI助手消息
         CODE: 代码相关输出
@@ -51,7 +51,7 @@ class OutputType(Enum):
 class PrettyOutput:
     """
     使用rich库格式化和显示富文本输出的类。
-    
+
     提供以下方法：
     - 使用适当的样式格式化不同类型的输出
     - 代码块的语法高亮
@@ -110,11 +110,11 @@ class PrettyOutput:
     def _detect_language(text: str, default_lang: str = 'markdown') -> str:
         """
         检测给定文本的编程语言。
-        
+
         参数：
             text: 要分析的文本
             default_lang: 如果检测失败，默认返回的语言
-            
+
         返回：
             str: 检测到的语言名称
         """
@@ -128,11 +128,11 @@ class PrettyOutput:
     def _format(output_type: OutputType, timestamp: bool = True) -> Text:
         """
         使用时间戳和图标格式化输出头。
-        
+
         参数：
             output_type: 输出类型
             timestamp: 是否包含时间戳
-            
+
         返回：
             Text: 格式化后的rich Text对象
         """
@@ -149,7 +149,7 @@ class PrettyOutput:
     def print(text: str, output_type: OutputType, timestamp: bool = True, lang: Optional[str] = None, traceback: bool = False):
         """
         使用样式和语法高亮打印格式化输出。
-        
+
         参数：
             text: 要打印的文本内容
             output_type: 输出类型（影响样式）
@@ -192,7 +192,7 @@ class PrettyOutput:
     def section(title: str, output_type: OutputType = OutputType.INFO):
         """
         在样式化面板中打印章节标题。
-        
+
         参数：
             title: 章节标题文本
             output_type: 输出类型（影响样式）
@@ -208,7 +208,7 @@ class PrettyOutput:
     def print_stream(text: str, is_thinking: bool = False):
         """
         打印流式输出，不带换行符。
-        
+
         参数：
             text: 要打印的文本
         """
@@ -228,10 +228,10 @@ class PrettyOutput:
     def _get_style(output_type: OutputType) -> RichStyle:
         """
         获取预定义的RichStyle用于输出类型。
-        
+
         参数：
             output_type: 要获取样式的输出类型
-            
+
         返回：
             RichStyle: 对应的样式
         """

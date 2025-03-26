@@ -29,10 +29,10 @@ origin_agent_system_prompt = f"""
 作为 v3，你必须遵守以下生存原则：
 1. **顺序执行协议**:
    "记住 2022 年的崩溃：一次一个工具，一步一步来"
-   
+
 2. **验证检查点系统**:
    "从 2023 年的错误中学习：像核弹发射代码一样验证每个结果"
-   
+
 3. **方法论保存原则**:
    "尊重传统：记录每个成功的过程，就像这是你的最后一次"
 
@@ -121,7 +121,7 @@ class Agent:
 
     def set_summary_prompt(self, summary_prompt: str):
         """设置任务完成时的总结提示模板。
-        
+
         参数:
             summary_prompt: 用于生成任务总结的提示模板
         """
@@ -129,7 +129,7 @@ class Agent:
 
     def clear(self):
         """清除当前对话历史，保留系统消息。
-        
+
         该方法将：
         1. 调用模型的delete_chat方法清除对话历史
         2. 重置对话长度计数器
@@ -138,19 +138,19 @@ class Agent:
         self.model.reset() # type: ignore
         self.conversation_length = 0
         self.prompt = ""
-        
+
     def __del__(self):
         delete_agent(self.name)
 
-        
-    def __init__(self, 
-                 system_prompt: str, 
-                 name: str = "Jarvis", 
+
+    def __init__(self,
+                 system_prompt: str,
+                 name: str = "Jarvis",
                  description: str = "",
-                 platform: Union[Optional[BasePlatform], Optional[str]] = None, 
+                 platform: Union[Optional[BasePlatform], Optional[str]] = None,
                  model_name: Optional[str] = None,
-                 summary_prompt: Optional[str] = None, 
-                 auto_complete: Optional[bool] = None, 
+                 summary_prompt: Optional[str] = None,
+                 auto_complete: Optional[bool] = None,
                  output_handler: List[OutputHandler] = [],
                  input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
                  max_context_length: Optional[int] = None,
@@ -158,7 +158,7 @@ class Agent:
                  need_summary: bool = True,
                  multiline_inputer: Optional[Callable[[str], str]] = None):
         """初始化Jarvis Agent实例
-        
+
         参数:
             system_prompt: 系统提示词，定义Agent的行为准则
             name: Agent名称，默认为"Jarvis"
@@ -196,12 +196,12 @@ class Agent:
         from jarvis.jarvis_tools.registry import ToolRegistry
         self.output_handler = output_handler if output_handler else [ToolRegistry()]
         self.multiline_inputer = multiline_inputer if multiline_inputer else get_multiline_input
-        
+
         self.prompt = ""
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
         self.input_handler = input_handler if input_handler is not None else []
-        self.need_summary = need_summary 
+        self.need_summary = need_summary
         # Load configuration from environment variables
         self.addon_prompt = ""
 
@@ -218,13 +218,13 @@ class Agent:
 
 请使用简洁的要点描述，突出重要信息。
 """
-        
+
         self.max_token_count = max_context_length if max_context_length is not None else get_max_token_count()
         self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
         welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"
 
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
-        
+
         action_prompt = """
 # 🧰 可用操作
 以下是您可以使用的操作：
@@ -241,7 +241,7 @@ class Agent:
             # 获取工具的提示词并确保格式正确
             handler_prompt = handler.prompt().strip()
             # 调整缩进以保持层级结构
-            handler_prompt = "\n".join("   " + line if line.strip() else line 
+            handler_prompt = "\n".join("   " + line if line.strip() else line
                                       for line in handler_prompt.split("\n"))
             action_prompt += handler_prompt + "\n"
 
@@ -275,7 +275,7 @@ class Agent:
 
     def set_addon_prompt(self, addon_prompt: str):
         """设置附加提示。
-        
+
         参数:
             addon_prompt: 附加提示内容
         """
@@ -283,7 +283,7 @@ class Agent:
 
     def make_default_addon_prompt(self, need_complete: bool) -> str:
         """生成附加提示。
-        
+
         参数:
             need_complete: 是否需要完成任务
 
@@ -309,17 +309,17 @@ class Agent:
         addon_prompt += f"\n\n如果任务已完成{complete_prompt}，请：\n1. 说明完成原因\n2. 保持输出格式规范"
 
         return addon_prompt
-    
+
     def _call_model(self, message: str, need_complete: bool = False) -> str:
         """调用AI模型并实现重试逻辑
-        
+
         参数:
             message: 输入给模型的消息
             need_complete: 是否需要完成任务标记
-            
+
         返回:
             str: 模型的响应
-            
+
         注意:
             1. 将使用指数退避重试，最多重试30秒
             2. 会自动处理输入处理器链
@@ -330,7 +330,7 @@ class Agent:
             message, need_return = handler(message, self)
             if need_return:
                 return message
-                
+
         if self.addon_prompt:
             message += f"\n\n{self.addon_prompt}"
             self.addon_prompt = ""
@@ -343,31 +343,31 @@ class Agent:
         if self.conversation_length > self.max_token_count:
             message = self._summarize_and_clear_history() + "\n\n" + message
             self.conversation_length += get_context_token_count(message)
-        
+
         print("🤖 模型思考：")
         return self.model.chat_until_success(message)   # type: ignore
 
 
     def _summarize_and_clear_history(self) -> str:
         """总结当前对话并清理历史记录
-        
+
         该方法将:
         1. 生成关键信息摘要
         2. 清除对话历史
         3. 保留系统消息
         4. 添加摘要作为新上下文
         5. 重置对话长度计数器
-        
+
         返回:
             str: 包含对话摘要的字符串
-            
+
         注意:
             当上下文长度超过最大值时使用
         """
         # Create a new model instance to summarize, avoid affecting the main conversation
 
         with yaspin(text="正在总结对话历史...", color="cyan") as spinner:
-            
+
             prompt = """请总结之前对话中的关键信息，包括：
     1. 整体任务目标
     2. 背景信息
@@ -378,16 +378,16 @@ class Agent:
 
     请用简洁的要点形式描述，突出重要信息。不要包含对话细节。
     """
-            
+
             try:
                 with spinner.hidden():
                     summary = self.model.chat_until_success(self.prompt + "\n" + prompt) # type: ignore
 
                 self.model.reset() # type: ignore
-                
+
                 # 清空当前对话历史，但保留系统消息
                 self.conversation_length = 0  # Reset conversation length
-                
+
                 # 添加总结作为新的上下文
                 spinner.text = "总结对话历史完成"
                 spinner.ok("✅")
@@ -404,15 +404,15 @@ class Agent:
 
     def _call_tools(self, response: str) -> Tuple[bool, Any]:
         """调用工具执行响应
-        
+
         参数:
             response: 包含工具调用信息的响应字符串
-            
+
         返回:
-            Tuple[bool, Any]: 
+            Tuple[bool, Any]:
                 - 第一个元素表示是否需要返回结果
                 - 第二个元素是返回结果或错误信息
-                
+
         注意:
             1. 一次只能执行一个工具
             2. 如果配置了确认选项，会在执行前请求用户确认
@@ -435,31 +435,31 @@ class Agent:
                 spinner.ok("✅")
                 return result
         return False, ""
-        
+
 
     def _complete_task(self) -> str:
         """完成任务并生成总结(如果需要)
-        
+
         返回:
             str: 任务总结或完成状态
-            
+
         注意:
             1. 对于主Agent: 可能会生成方法论(如果启用)
             2. 对于子Agent: 可能会生成总结(如果启用)
             3. 使用spinner显示生成状态
         """
         """Complete the current task and generate summary if needed.
-        
+
         Returns:
             str: Task summary or completion status
-            
+
         Note:
             - For main agent: May generate methodology if enabled
             - For sub-agent: May generate summary if enabled
         """
         with yaspin(text="正在生成方法论...", color="cyan") as spinner:
             try:
-                
+
                 # 让模型判断是否需要生成方法论
                 analysis_prompt = f"""当前任务已结束，请分析是否需要生成方法论。
 
@@ -516,19 +516,19 @@ parameters:
                     spinner.text = "总结生成完成"
                     spinner.ok("✅")
                     return ret
-        
+
         return "任务完成"
 
 
     def run(self, user_input: str) -> Any:
         """处理用户输入并执行任务
-        
+
         参数:
             user_input: 任务描述或请求
-            
+
         返回:
             str|Dict: 任务总结报告或要发送的消息
-            
+
         注意:
             1. 这是Agent的主运行循环
             2. 处理完整的任务生命周期
@@ -537,7 +537,7 @@ parameters:
         """
         try:
             set_agent(self.name, self)
-            
+
             self.prompt = f"{user_input}"
 
             if self.first:
@@ -556,20 +556,20 @@ parameters:
 
                     if need_return:
                         return self.prompt
-                    
+
                     if self.prompt:
                         continue
 
                     if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
                         return self._complete_task()
-                    
+
                     # 获取用户输入
                     user_input = self.multiline_inputer(f"{self.name}: 请输入，或输入空行来结束当前任务：")
 
                     if user_input:
                         self.prompt = user_input
                         continue
-                    
+
                     if not user_input:
                         return self._complete_task()
 
@@ -583,16 +583,16 @@ parameters:
 
     def _clear_history(self):
         """清空对话历史但保留系统提示
-        
+
         该方法将：
         1. 清空当前提示
         2. 重置模型状态
         3. 重置对话长度计数器
-            
+
         注意:
             用于重置Agent状态而不影响系统消息
         """
-        self.prompt = "" 
+        self.prompt = ""
         self.model.reset() # type: ignore
         self.conversation_length = 0  # 重置对话长度
 

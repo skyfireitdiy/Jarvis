@@ -16,10 +16,10 @@ from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def find_git_root(start_dir="."):
     """
     切换到给定路径的Git根目录，如果不是Git仓库则初始化。
-    
+
     参数:
         start_dir (str): 起始查找目录，默认为当前目录。
-    
+
     返回:
         str: Git仓库根目录路径。如果目录不是Git仓库，则会初始化一个新的Git仓库。
     """
@@ -39,28 +39,28 @@ def has_uncommitted_changes():
     """检查Git仓库中是否有未提交的更改"""
     # 静默添加所有更改
     subprocess.run(["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
+
     # 检查工作目录更改
-    working_changes = subprocess.run(["git", "diff", "--exit-code"], 
-                                    stdout=subprocess.DEVNULL, 
+    working_changes = subprocess.run(["git", "diff", "--exit-code"],
+                                    stdout=subprocess.DEVNULL,
                                     stderr=subprocess.DEVNULL).returncode != 0
-    
+
     # 检查暂存区更改
-    staged_changes = subprocess.run(["git", "diff", "--cached", "--exit-code"], 
-                                   stdout=subprocess.DEVNULL, 
+    staged_changes = subprocess.run(["git", "diff", "--cached", "--exit-code"],
+                                   stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL).returncode != 0
-    
+
     # 静默重置更改
     subprocess.run(["git", "reset"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
+
     return working_changes or staged_changes
 def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]:
     """获取两个提交哈希值之间的提交列表
-    
+
     参数：
         start_hash: 起始提交哈希值（不包含）
         end_hash: 结束提交哈希值（包含）
-        
+
     返回：
         List[Tuple[str, str]]: (提交哈希值, 提交信息) 元组列表
     """
@@ -75,20 +75,20 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
         if result.returncode != 0:
             PrettyOutput.print(f"获取commit历史失败: {result.stderr}", OutputType.ERROR)
             return []
-            
+
         commits = []
         for line in result.stdout.splitlines():
             if '|' in line:
                 commit_hash, message = line.split('|', 1)
                 commits.append((commit_hash, message))
         return commits
-        
+
     except Exception as e:
         PrettyOutput.print(f"获取commit历史异常: {str(e)}", OutputType.ERROR)
         return []
 def get_latest_commit_hash() -> str:
     """获取当前Git仓库的最新提交哈希值
-    
+
     返回：
         str: 提交哈希值，如果不在Git仓库或发生错误则返回空字符串
     """
@@ -106,25 +106,25 @@ def get_latest_commit_hash() -> str:
         return ""
 def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
     """从Git差异中获取所有更改文件的修改行范围
-    
+
     返回：
         字典，将文件路径映射到包含修改部分的（起始行, 结束行）范围元组。
         行号从1开始。
     """
     # 获取所有文件的Git差异
     diff_output = os.popen("git show").read()
-    
+
     # 解析差异以获取修改的文件及其行范围
     result = {}
     current_file = None
-    
+
     for line in diff_output.splitlines():
         # 匹配类似"+++ b/path/to/file"的行
         file_match = re.match(r"^\+\+\+ b/(.*)", line)
         if file_match:
             current_file = file_match.group(1)
             continue
-            
+
         # 匹配类似"@@ -100,5 +100,7 @@"的行，其中+部分显示新行
         range_match = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
         if range_match and current_file:
@@ -132,5 +132,5 @@ def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
             line_count = int(range_match.group(2)) if range_match.group(2) else 1
             end_line = start_line + line_count - 1
             result[current_file] = (start_line, end_line)
-    
+
     return result

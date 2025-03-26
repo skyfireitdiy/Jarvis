@@ -42,67 +42,67 @@ class PlatformRegistry:
     @staticmethod
     def check_platform_implementation(platform_class: Type[BasePlatform]) -> bool:
         """Check if the platform class implements all necessary methods
-        
+
         Args:
             platform_class: The platform class to check
-            
+
         Returns:
             bool: Whether all necessary methods are implemented
         """
         missing_methods = []
-        
+
         for method_name, params in REQUIRED_METHODS:
             if not hasattr(platform_class, method_name):
                 missing_methods.append(method_name)
                 continue
-                
+
             method = getattr(platform_class, method_name)
             if not callable(method):
                 missing_methods.append(method_name)
                 continue
-                
+
             # 检查方法参数
             import inspect
             sig = inspect.signature(method)
             method_params = [p for p in sig.parameters if p != 'self']
             if len(method_params) != len(params):
                 missing_methods.append(f"{method_name}(parameter mismatch)")
-        
+
         if missing_methods:
             PrettyOutput.print(
-                f"平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}", 
+                f"平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}",
                 OutputType.WARNING
             )
             return False
-            
+
         return True
 
     @staticmethod
     def load_platform_from_dir(directory: str) -> Dict[str, Type[BasePlatform]]:
         """Load platforms from specified directory
-        
+
         Args:
             directory: Platform directory path
-            
+
         Returns:
             Dict[str, Type[BasePlatform]]: Platform name to platform class mapping
         """
         platforms = {}
-        
+
         # 确保目录存在
         if not os.path.exists(directory):
             PrettyOutput.print(f"平台目录不存在: {directory}", OutputType.WARNING)
             return platforms
-            
+
         # 获取目录的包名
         package_name = None
         if directory == os.path.dirname(__file__):
             package_name = "jarvis.jarvis_platform"
-            
+
         # 添加目录到Python路径
         if directory not in sys.path:
             sys.path.append(directory)
-        
+
         # 遍历目录下的所有.py文件
         for filename in os.listdir(directory):
             if filename.endswith('.py') and not filename.startswith('__'):
@@ -113,12 +113,12 @@ class PlatformRegistry:
                         module = importlib.import_module(f"{package_name}.{module_name}")
                     else:
                         module = importlib.import_module(module_name)
-                    
+
                     # 遍历模块中的所有类
                     for _, obj in inspect.getmembers(module):
                         # 检查是否是BasePlatform的子类，但不是BasePlatform本身
-                        if (inspect.isclass(obj) and 
-                            issubclass(obj, BasePlatform) and 
+                        if (inspect.isclass(obj) and
+                            issubclass(obj, BasePlatform) and
                             obj != BasePlatform and
                             hasattr(obj, 'platform_name')):
                             # 检查平台实现
@@ -128,7 +128,7 @@ class PlatformRegistry:
                             break
                 except Exception as e:
                     PrettyOutput.print(f"加载平台 {module_name} 失败: {str(e)}", OutputType.ERROR)
-        
+
         return platforms
 
 
@@ -136,9 +136,9 @@ class PlatformRegistry:
     def get_global_platform_registry():
         """Get global platform registry"""
         if PlatformRegistry.global_platform_registry is None:
-            PlatformRegistry.global_platform_registry = PlatformRegistry()  
+            PlatformRegistry.global_platform_registry = PlatformRegistry()
         return PlatformRegistry.global_platform_registry
-    
+
     def __init__(self):
         """Initialize platform registry"""
         self.platforms: Dict[str, Type[BasePlatform]] = {}
@@ -151,7 +151,7 @@ class PlatformRegistry:
         if platform_dir and os.path.exists(platform_dir):
             for platform_name, platform_class in PlatformRegistry.load_platform_from_dir(platform_dir).items():
                 self.register_platform(platform_name, platform_class)
-        
+
 
     def get_normal_platform(self) -> BasePlatform:
         platform_name = get_normal_platform_name()
@@ -159,7 +159,7 @@ class PlatformRegistry:
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name) # type: ignore
         return platform # type: ignore
-    
+
     def get_thinking_platform(self) -> BasePlatform:
         platform_name = get_thinking_platform_name()
         model_name = get_thinking_model_name()
@@ -169,26 +169,26 @@ class PlatformRegistry:
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]):
         """Register platform class
-        
+
         Args:
             name: Platform name
             model_class: Platform class
         """
         self.platforms[name] = platform_class
-            
+
     def create_platform(self, name: str) -> Optional[BasePlatform]:
         """Create platform instance
-        
+
         Args:
             name: Platform name
-            
+
         Returns:
             BasePlatform: Platform instance
         """
         if name not in self.platforms:
             PrettyOutput.print(f"未找到平台: {name}", OutputType.WARNING)
             return None
-            
+
         try:
 
             platform = self.platforms[name]()

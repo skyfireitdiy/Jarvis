@@ -10,12 +10,12 @@ from jarvis.jarvis_utils.utils import init_env
 
 class AskCodebaseTool:
     """用于智能代码库查询和分析的工具
-    
+
     适用场景：
     - 查询特定功能所在的文件位置（支持所有文件类型）
     - 了解单个功能点的实现原理（支持所有文件类型）
     - 查找特定API或接口的用法（支持所有文件类型）
-    
+
     不适用场景：
     - 跨越多文件的大范围分析
     - 复杂系统架构的全面评估
@@ -45,20 +45,20 @@ class AskCodebaseTool:
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Execute codebase analysis using an Agent with execute_shell and rag tools
-        
+
         Args:
             args: Dictionary containing:
                 - question: The question to answer, preferably about locating functionality
                   or understanding implementation details of a specific feature
                 - top_k: Optional number of files to analyze
                 - root_dir: Optional root directory of the codebase
-                
+
         Returns:
             Dict containing:
                 - success: Boolean indicating success
                 - stdout: Analysis result
                 - stderr: Error message if any
-                
+
         Note:
             This tool works best for focused questions about specific features or implementations.
             It is not designed for comprehensive multi-file analysis or complex architectural questions.
@@ -66,28 +66,28 @@ class AskCodebaseTool:
         try:
             question = args["question"]
             root_dir = args.get("root_dir", ".")
-            
+
             # Store current directory
             original_dir = os.getcwd()
-            
+
             try:
                 # Change to root_dir
                 os.chdir(root_dir)
-                
+
                 # Get git root directory
                 git_root = find_git_root() or os.getcwd()
-                
+
                 # Create system prompt for the Agent
                 system_prompt = self._create_system_prompt(question, git_root)
-                
+
                 # Create summary prompt for the Agent
                 summary_prompt = self._create_summary_prompt(question)
-                
+
                 # Create tools registry
                 from jarvis.jarvis_tools.registry import ToolRegistry
                 tool_registry = ToolRegistry()
                 tool_registry.use_tools(["execute_shell", "read_code", "rag"])
-                
+
                 # Create and run Agent
                 analyzer_agent = Agent(
                     system_prompt=system_prompt,
@@ -99,11 +99,11 @@ class AskCodebaseTool:
                     execute_tool_confirm=False,
                     auto_complete=self.auto_complete
                 )
-                
+
                 # Run agent and get result
                 task_input = f"回答关于代码库的问题: {question}"
                 result = analyzer_agent.run(task_input)
-                
+
                 return {
                     "success": True,
                     "stdout": result,
@@ -120,14 +120,14 @@ class AskCodebaseTool:
                 "stdout": "",
                 "stderr": error_msg
             }
-            
+
     def _create_system_prompt(self, question: str, git_root: str) -> str:
         """创建Agent的system prompt
-        
+
         Args:
             question: 用户问题
             git_root: Git仓库根目录
-            
+
         Returns:
             系统提示文本
         """
@@ -141,16 +141,16 @@ class AskCodebaseTool:
 - 代码库根目录: {git_root}
 
 ## 工具使用优先级
-1. **绝对优先使用 execute_shell**: 
+1. **绝对优先使用 execute_shell**:
    - 使用 fd 查找文件: `fd -t f -e py` 查找Python文件等
    - 使用 rg 搜索代码: `rg "pattern" --type py` 在Python文件中搜索等
    - 使用 loc 统计代码: `loc --include="*.py"` 统计Python代码量等
 
-2. **优先使用 read_code**: 
+2. **优先使用 read_code**:
    - 找到相关文件后优先使用read_code读取文件内容
    - 对大文件使用行范围参数读取指定区域
 
-3. **避免使用 rag**: 
+3. **避免使用 rag**:
    - 仅在fd、rg和read_code无法解决问题时作为最后手段
    - 使用rag前必须先尝试使用shell命令解决问题
 
@@ -206,10 +206,10 @@ class AskCodebaseTool:
 
     def _create_summary_prompt(self, question: str) -> str:
         """创建Agent的summary prompt
-        
+
         Args:
             question: 用户问题
-            
+
         Returns:
             总结提示文本
         """
@@ -257,7 +257,7 @@ class AskCodebaseTool:
 def main():
     """
     命令行入口点，允许将ask_codebase作为独立脚本运行
-    
+
     用法示例:
     ```
     python -m jarvis.jarvis_tools.ask_codebase "登录功能在哪个文件实现？" --root_dir /path/to/codebase
@@ -267,22 +267,22 @@ def main():
     import sys
 
     init_env()
-    
+
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description="智能代码库查询工具")
     parser.add_argument("question", help="关于代码库的问题")
     parser.add_argument("--root_dir", "-d", default=".", help="代码库根目录路径")
-    
+
     # 解析命令行参数
     args = parser.parse_args()
-    
+
     # 创建并执行工具
     tool = AskCodebaseTool(auto_complete=False)
     result = tool.execute({
         "question": args.question,
         "root_dir": args.root_dir
     })
-    
+
     # 输出结果
     if result["success"]:
         PrettyOutput.print(result["stdout"], OutputType.SUCCESS)

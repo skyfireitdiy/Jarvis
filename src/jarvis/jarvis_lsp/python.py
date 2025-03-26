@@ -4,17 +4,17 @@ from jarvis.jarvis_lsp.base import BaseLSP
 
 class PythonLSP(BaseLSP):
     """Python LSP implementation using jedi."""
-    
+
     language = "python"
-    
+
     def __init__(self):
         self.workspace_path = ""
         self.script_cache = {}
-    
+
     def initialize(self, workspace_path: str) -> bool:
         self.workspace_path = workspace_path
         return True
-    
+
     def _get_script(self, file_path: str):
         if file_path not in self.script_cache:
             try:
@@ -24,8 +24,8 @@ class PythonLSP(BaseLSP):
             except Exception:
                 return None
         return self.script_cache[file_path]
-    
-    
+
+
     def _location_to_dict(self, location) -> Dict[str, Any]:
         return {
             "uri": location.module_path,
@@ -34,7 +34,7 @@ class PythonLSP(BaseLSP):
                 "end": {"line": location.line - 1, "character": location.column + len(location.name)}
             }
         }
-    
+
     def get_diagnostics(self, file_path: str) -> List[Dict[str, Any]]:
         script = self._get_script(file_path)
         if not script:
@@ -52,6 +52,6 @@ class PythonLSP(BaseLSP):
             } for e in errors]
         except Exception:
             return []
-    
+
     def shutdown(self):
         self.script_cache.clear()

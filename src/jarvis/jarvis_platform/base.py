@@ -8,7 +8,7 @@ from jarvis.jarvis_utils.utils import ct, ot, get_context_token_count, while_suc
 
 class BasePlatform(ABC):
     """Base class for large language models"""
-    
+
     def __init__(self):
         """Initialize model"""
         self.suppress_output = True  # 添加输出控制标志
@@ -26,7 +26,7 @@ class BasePlatform(ABC):
         """Reset model"""
         clear_read_file_record()
         self.delete_chat()
-        
+
     @abstractmethod
     def chat(self, message: str) -> str:
         """Execute conversation"""
@@ -37,11 +37,11 @@ class BasePlatform(ABC):
             import time
             start_time = time.time()
             response = self.chat(message)
-            
+
             end_time = time.time()
             duration = end_time - start_time
             char_count = len(response)
-            
+
             # Calculate token count and tokens per second
             try:
                 token_count = get_context_token_count(response)
@@ -61,24 +61,24 @@ class BasePlatform(ABC):
             # Keep original think tag handling
             response = re.sub(ot("think")+r'.*?'+ct("think"), '', response, flags=re.DOTALL)
             return response
-                
+
         return while_true(lambda: while_success(lambda: _chat(), 5), 5)
-        
+
     @abstractmethod
     def name(self) -> str:
         """Model name"""
         raise NotImplementedError("name is not implemented")
-    
+
     @abstractmethod
     def delete_chat(self)->bool:
         """Delete chat"""
         raise NotImplementedError("delete_chat is not implemented")
-    
+
     @abstractmethod
     def set_system_message(self, message: str):
         """Set system message"""
         raise NotImplementedError("set_system_message is not implemented")
-    
+
     @abstractmethod
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""

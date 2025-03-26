@@ -9,7 +9,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class AI8Model(BasePlatform):
     """AI8 model implementation"""
-    
+
     platform_name = "ai8"
     BASE_URL = "https://ai8.rcouyi.com"
 
@@ -17,7 +17,7 @@ class AI8Model(BasePlatform):
         """获取模型列表"""
         self.get_available_models()
         return [(name,info['desc']) for name,info in self.models.items()]
-    
+
     def __init__(self):
         """Initialize model"""
         super().__init__()
@@ -28,7 +28,7 @@ class AI8Model(BasePlatform):
         self.token = os.getenv("AI8_API_KEY")
         if not self.token:
             PrettyOutput.print("未设置 AI8_API_KEY", OutputType.WARNING)
-            
+
         self.headers = {
             'Authorization': self.token,
             'Content-Type': 'application/json',
@@ -41,42 +41,42 @@ class AI8Model(BasePlatform):
             'Sec-Fetch-Mode': 'cors',
             'Sec-Fetch-Dest': 'empty',
         }
-        
+
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
         if self.model_name not in self.get_available_models():
             PrettyOutput.print(f"警告: 选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
 
-        
-        
+
+
 
     def set_model_name(self, model_name: str):
         """Set model name"""
 
         self.model_name = model_name
-            
+
     def create_conversation(self) -> bool:
         """Create a new conversation"""
         try:
-            
-            
+
+
             # 1. 创建会话
             response = requests.post(
                 f"{self.BASE_URL}/api/chat/session",
                 headers=self.headers,
                 json={}
             )
-            
+
             if response.status_code != 200:
                 PrettyOutput.print(f"创建会话失败: {response.status_code}", OutputType.WARNING)
                 return False
-            
+
             data = response.json()
             if data['code'] != 0:
                 PrettyOutput.print(f"创建会话失败: {data.get('msg', '未知错误')}", OutputType.WARNING)
                 return False
-            
+
             self.conversation = data['data']
-            
+
             # 2. 更新会话设置
             session_data = {
                 **self.conversation,
@@ -87,13 +87,13 @@ class AI8Model(BasePlatform):
                 "localPlugins": None,
                 "useAppId": 0
             }
-            
+
             response = requests.put(
                 f"{self.BASE_URL}/api/chat/session/{self.conversation['id']}",
                 headers=self.headers,
                 json=session_data
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
                 if data['code'] == 0:
@@ -105,45 +105,45 @@ class AI8Model(BasePlatform):
             else:
                 PrettyOutput.print(f"更新会话设置失败: {response.status_code}", OutputType.WARNING)
                 return False
-            
+
         except Exception as e:
             PrettyOutput.print(f"创建会话失败: {str(e)}", OutputType.ERROR)
             return False
-    
+
     def set_system_message(self, message: str):
         """Set system message"""
         self.system_message = message
-        
+
     def chat(self, message: str) -> str:
         """Execute conversation"""
         try:
-            
+
             # 确保有会话ID
             if not self.conversation:
                 if not self.create_conversation():
                     raise Exception("Failed to create conversation")
-                
 
-            
+
+
             payload = {
                 "text": message,
                 "sessionId": self.conversation['id'] if self.conversation else None,
                 "files": []
             }
-            
-            
+
+
             response = requests.post(
                 f"{self.BASE_URL}/api/chat/completions",
                 headers=self.headers,
                 json=payload,
                 stream=True
             )
-            
+
             if response.status_code != 200:
                 error_msg = f"Failed to chat: {response.status_code} {response.text}"
                 PrettyOutput.print(error_msg, OutputType.WARNING)
                 raise Exception(error_msg)
-            
+
             # 处理流式响应
             full_response = ""
             for line in response.iter_lines():
@@ -161,33 +161,33 @@ class AI8Model(BasePlatform):
 
                         except json.JSONDecodeError:
                             continue
-            
+
             if not self.suppress_output:
                 PrettyOutput.print_stream_end()
 
             return full_response
-            
+
         except Exception as e:
             PrettyOutput.print(f"对话异常: {str(e)}", OutputType.ERROR)
             raise e
-            
+
     def name(self) -> str:
         """Return model name"""
         return self.model_name
-        
-            
+
+
     def delete_chat(self) -> bool:
         """Delete current chat session"""
         try:
             if not self.conversation:
                 return True
-            
-            
+
+
             response = requests.delete(
                 f"{self.BASE_URL}/api/chat/session/{self.conversation['id']}",
                 headers=self.headers
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
                 if data['code'] == 0:
@@ -201,45 +201,45 @@ class AI8Model(BasePlatform):
                 error_msg = f"删除会话请求失败: {response.status_code}"
                 PrettyOutput.print(error_msg, OutputType.WARNING)
                 return False
-            
+
         except Exception as e:
             PrettyOutput.print(f"删除会话失败: {str(e)}", OutputType.ERROR)
             return False
-        
+
     def get_available_models(self) -> List[str]:
         """Get available model list
-        
+
         Returns:
             List[str]: Available model name list
         """
         try:
             if self.models:
                 return list(self.models.keys())
-            
+
             response = requests.get(
                 f"{self.BASE_URL}/api/chat/tmpl",
                 headers=self.headers
             )
-            
+
             if response.status_code != 200:
                 PrettyOutput.print(f"获取模型列表失败: {response.status_code}", OutputType.WARNING)
                 return []
-            
+
             data = response.json()
             if data['code'] != 0:
                 PrettyOutput.print(f"获取模型列表失败: {data.get('msg', '未知错误')}", OutputType.WARNING)
                 return []
-            
+
             # 保存模型信息
             self.models = {
-                model['value']: model 
+                model['value']: model
                 for model in data['data']['models']
             }
 
             for model in self.models.values():
                 # 添加标签
                 model_str = f"{model['label']}"
-                
+
                 # 添加特性标记
                 features = []
                 if model['attr'].get('multimodal'):
@@ -257,12 +257,12 @@ class AI8Model(BasePlatform):
                     model_str += f" - {model['attr']['note']}"
                 if features:
                     model_str += f" [{'|'.join(features)}]"
-                    
+
                 model['desc'] = model_str
-            
+
             return list(self.models.keys())
-            
+
         except Exception as e:
             PrettyOutput.print(f"获取模型列表失败: {str(e)}", OutputType.ERROR)
             return []
-        
+

@@ -8,7 +8,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class CreateCodeAgentTool:
     """用于管理代码开发工作流的工具"""
-    
+
     name = "create_code_agent"
     description = "技术代码实现和开发过程管理工具"
     parameters = {
@@ -25,16 +25,16 @@ class CreateCodeAgentTool:
             "default": "."
         }
     }
-    
-    
+
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
             requirement = args.get("requirement", "")
             root_dir = args.get("root_dir", ".")
-            
+
             # Store current directory
             original_dir = os.getcwd()
-            
+
             try:
                 # Change to root_dir
                 os.chdir(root_dir)
@@ -44,7 +44,7 @@ class CreateCodeAgentTool:
                         "stderr": "Requirement must be provided",
                         "stdout": ""
                     }
-                
+
                 # Step 1: Handle uncommitted changes
                 start_commit = None
                 if has_uncommitted_changes():
@@ -57,18 +57,18 @@ class CreateCodeAgentTool:
                             "stderr": "Failed to commit changes: " + result["stderr"],
                             "stdout": ""
                         }
-                
+
                 # Get current commit hash
                 start_commit = get_latest_commit_hash()
-                
+
                 # Step 2: Development
                 PrettyOutput.print("开始开发...", OutputType.INFO)
                 agent = CodeAgent()
                 agent.run(requirement)
-                
+
                 # Get new commit hash after development
                 end_commit = get_latest_commit_hash()
-                
+
                 # Step 3: Code Review
                 PrettyOutput.print("开始代码审查...", OutputType.INFO)
                 reviewer = CodeReviewTool()
@@ -78,17 +78,17 @@ class CreateCodeAgentTool:
                     "end_commit": end_commit,
                     "root_dir": root_dir
                 })
-                
+
                 if not review_result["success"]:
                     return {
                         "success": False,
                         "stderr": "Code review failed: " + review_result["stderr"],
                         "stdout": ""
                     }
-                
+
                 # Step 4: Generate Summary
                 summary = f"""开发总结:
-                
+
 开始提交: {start_commit}
 结束提交: {end_commit}
 
@@ -98,7 +98,7 @@ class CreateCodeAgentTool:
 代码审查结果:
 {extract_code_report(review_result["stdout"])}
 """
-                
+
                 return {
                     "success": True,
                     "stdout": summary,
@@ -107,7 +107,7 @@ class CreateCodeAgentTool:
             finally:
                 # Always restore original directory
                 os.chdir(original_dir)
-            
+
         except Exception as e:
             return {
                 "success": False,

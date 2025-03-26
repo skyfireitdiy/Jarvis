@@ -2,11 +2,11 @@ from typing import Dict, Any, Callable
 import json
 class Tool:
     """工具类，用于封装工具的基本信息和执行方法"""
-    
+
     def __init__(self, name: str, description: str, parameters: Dict, func: Callable):
         """
         初始化工具对象
-        
+
         参数:
             name (str): 工具名称
             description (str): 工具描述
@@ -27,10 +27,10 @@ class Tool:
     def execute(self, arguments: Dict) -> Dict[str, Any]:
         """
         执行工具函数
-        
+
         参数:
             arguments (Dict): 工具执行所需的参数
-            
+
         返回:
             Dict[str, Any]: 工具执行结果
         """

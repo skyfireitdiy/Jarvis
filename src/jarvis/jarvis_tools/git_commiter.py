@@ -37,14 +37,14 @@ class GitCommitTool:
     def _extract_commit_message(self, message):
         """Raw extraction preserving all characters"""
         r = re.search(
-            r"(?i)" + ot("COMMIT_MESSAGE") + r"\s*([\s\S]*?)\s*" + ct("COMMIT_MESSAGE"), 
+            r"(?i)" + ot("COMMIT_MESSAGE") + r"\s*([\s\S]*?)\s*" + ct("COMMIT_MESSAGE"),
             message
         )
         if r:
             # 直接返回原始内容，仅去除外围空白
             return shlex.quote(r.group(1).strip())
         return "<<FORMAT VIOLATION>> Invalid commit message structure"
-    
+
     def _get_last_commit_hash(self):
         process = subprocess.Popen(
             ["git", "log", "-1", "--pretty=%H"],
@@ -58,19 +58,19 @@ class GitCommitTool:
         """Execute automatic commit process with support for multi-line messages and special characters"""
         try:
             root_dir = args.get("root_dir", ".")
-            
+
             # Store current directory
             original_dir = os.getcwd()
-            
+
             try:
                 # Change to root_dir
                 os.chdir(root_dir)
-                
+
                 find_git_root()
                 if not has_uncommitted_changes():
                     PrettyOutput.print("没有未提交的更改", OutputType.SUCCESS)
                     return {"success": True, "stdout": "No changes to commit", "stderr": ""}
-                
+
                 with yaspin(text="正在初始化提交流程...", color="cyan") as spinner:
                     # 添加文件
                     spinner.text = "正在添加文件到提交..."
@@ -80,7 +80,7 @@ class GitCommitTool:
                         stderr=subprocess.DEVNULL
                     ).wait()
                     spinner.write("✅ 添加文件到提交")
-                    
+
                     # 获取差异
                     spinner.text = "正在获取代码差异..."
                     process = subprocess.Popen(
@@ -90,7 +90,7 @@ class GitCommitTool:
                     )
                     diff = process.communicate()[0].decode()
                     spinner.write("✅ 获取差异")
-                    
+
                     # 生成提交信息
                     spinner.text = "正在生成提交消息..."
                     prompt = f'''根据以下规则生成提交信息：
@@ -114,7 +114,7 @@ class GitCommitTool:
                     commit_message = platform.chat_until_success(prompt)
                     commit_message = self._extract_commit_message(commit_message)
                     spinner.write("✅ 生成提交消息")
-                    
+
                     # 执行提交
                     spinner.text = "正在准备提交..."
                     with tempfile.NamedTemporaryFile(mode='w', delete=True) as tmp_file:

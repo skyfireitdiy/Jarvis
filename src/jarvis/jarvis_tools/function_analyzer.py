@@ -11,7 +11,7 @@ class FunctionAnalyzerTool:
     函数分析工具
     使用agent深入分析函数内部实现，包括子函数调用、全局变量使用等
     """
-    
+
     name = "function_analyzer"
     description = "深入分析函数内部实现，查找子函数调用、全局变量使用等详细信息"
     parameters = {
@@ -60,20 +60,20 @@ class FunctionAnalyzerTool:
         },
         "required": ["function_name"]
     }
-    
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行函数分析工具
-        
+
         Args:
             args: 包含参数的字典
-            
+
         Returns:
             包含执行结果的字典
         """
         # 存储原始目录
         original_dir = os.getcwd()
-        
+
         try:
             # 解析参数
             function_name = args.get("function_name", "")
@@ -83,7 +83,7 @@ class FunctionAnalyzerTool:
             exclude_dirs = args.get("exclude_dirs", [])
             analysis_depth = args.get("analysis_depth", 1)
             objective = args.get("objective", "")
-            
+
             # 验证参数
             if not function_name:
                 return {
@@ -91,24 +91,24 @@ class FunctionAnalyzerTool:
                     "stdout": "",
                     "stderr": "必须提供函数名称"
                 }
-            
+
             # 创建agent的system prompt
             system_prompt = self._create_system_prompt(
-                function_name, file_path, root_dir, 
+                function_name, file_path, root_dir,
                 file_extensions, exclude_dirs, analysis_depth, objective
             )
-            
+
             # 创建agent的summary prompt
             summary_prompt = self._create_summary_prompt(function_name, analysis_depth)
-            
+
             # 切换到根目录
             os.chdir(root_dir)
-            
+
             # 构建使用的工具
             from jarvis.jarvis_tools.registry import ToolRegistry
             tool_registry = ToolRegistry()
             tool_registry.use_tools(["execute_shell", "read_code"])
-            
+
             # 创建并运行agent
             analyzer_agent = Agent(
                 system_prompt=system_prompt,
@@ -120,17 +120,17 @@ class FunctionAnalyzerTool:
                 execute_tool_confirm=False,
                 auto_complete=True
             )
-            
+
             # 运行agent并获取结果
             task_input = f"深入分析 '{function_name}' 函数的内部实现，包括子函数调用、全局变量使用等详细信息"
             result = analyzer_agent.run(task_input)
-            
+
             return {
                 "success": True,
                 "stdout": result,
                 "stderr": ""
             }
-                
+
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
@@ -141,13 +141,13 @@ class FunctionAnalyzerTool:
         finally:
             # 恢复原始目录
             os.chdir(original_dir)
-    
-    def _create_system_prompt(self, function_name: str, file_path: str, root_dir: str, 
+
+    def _create_system_prompt(self, function_name: str, file_path: str, root_dir: str,
                              file_extensions: List[str], exclude_dirs: List[str],
                              analysis_depth: int, objective: str) -> str:
         """
         创建Agent的system prompt
-        
+
         Args:
             function_name: 函数名称
             file_path: 函数所在文件路径
@@ -156,29 +156,29 @@ class FunctionAnalyzerTool:
             exclude_dirs: 排除目录列表
             analysis_depth: 子函数分析深度
             objective: 分析目标
-            
+
         Returns:
             系统提示文本
         """
         file_ext_str = " ".join([f"*{ext}" for ext in file_extensions]) if file_extensions else ""
         exclude_str = " ".join([f"--glob '!{excl}'" for excl in exclude_dirs]) if exclude_dirs else ""
-        
+
         depth_description = "不分析子函数" if analysis_depth == 0 else f"分析 {analysis_depth} 层子函数"
         file_info = f"已知文件路径: {file_path}" if file_path else "需要首先查找函数定义位置"
         objective_text = f"\n\n## 分析目标\n{objective}" if objective else ""
-        
+
         return f"""# 函数实现分析专家
 
 ## 任务描述
 分析函数 `{function_name}` 的实现，专注于分析目标所需的信息，生成有针对性的函数分析报告。{objective_text}
 
 ## 工具使用优先级
-1. **首先使用 execute_shell 执行 rg 命令查找函数定义**: 
+1. **首先使用 execute_shell 执行 rg 命令查找函数定义**:
    - `rg "def\\s+{function_name}\\s*\\(" --type py` 查找Python函数定义
    - `rg "function\\s+{function_name}\\s*\\(" --type js` 查找JavaScript函数定义
    - `rg "func\\s+{function_name}\\s*\\(" --type go` 查找Go函数定义
 
-2. **优先使用 read_code 阅读函数实现**: 
+2. **优先使用 read_code 阅读函数实现**:
    - 找到函数位置后使用read_code阅读完整实现
    - 对于长函数可分段读取关键部分
 
@@ -305,16 +305,16 @@ class FunctionAnalyzerTool:
     def _create_summary_prompt(self, function_name: str, analysis_depth: int) -> str:
         """
         创建Agent的summary prompt
-        
+
         Args:
             function_name: 函数名称
             analysis_depth: 子函数分析深度
-            
+
         Returns:
             总结提示文本
         """
         depth_description = "不包含子函数分析" if analysis_depth == 0 else f"包含 {analysis_depth} 层子函数分析"
-        
+
         return f"""# 函数分析报告: `{function_name}`
 
 ## 报告要求
@@ -328,4 +328,4 @@ class FunctionAnalyzerTool:
 - 使用具体的代码片段支持你的观点
 - 以清晰的Markdown格式呈现，简洁明了
 
-在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的函数概览，而是直接解决分析目标中提出的具体问题。""" 
+在分析中保持灵活性，避免固定思维模式。你的任务不是提供全面的函数概览，而是直接解决分析目标中提出的具体问题。"""

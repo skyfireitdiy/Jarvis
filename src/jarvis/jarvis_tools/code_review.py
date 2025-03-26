@@ -53,14 +53,14 @@ class CodeReviewTool:
         try:
             review_type = args.get("review_type", "current").strip()
             root_dir = args.get("root_dir", ".")
-            
+
             # Store current directory
             original_dir = os.getcwd()
-            
+
             try:
                 # Change to root_dir
                 os.chdir(root_dir)
-                
+
                 # Build git diff command based on review type
                 with yaspin(text="正在获取代码变更...", color="cyan") as spinner:
                     if review_type == "commit":
@@ -93,7 +93,7 @@ class CodeReviewTool:
                         diff_cmd = ReadCodeTool().execute({"files": [{"path": file_path}]})["stdout"]
                     else:  # current changes
                         diff_cmd = "git diff HEAD | cat -"
-                
+
                     # Execute git diff command
                     try:
                         diff_output = subprocess.check_output(diff_cmd, shell=True, text=True)
@@ -224,9 +224,9 @@ class CodeReviewTool:
 - **位置**: [起始行号-结束行号]
 - **分类**: [使用SCRIPPPS框架中相关类别]
 - **严重程度**: [P0/P1/P2/P3] - [简要说明判定理由]
-- **问题描述**: 
+- **问题描述**:
   [详细描述问题，包括技术原理和潜在影响]
-- **改进建议**: 
+- **改进建议**:
   ```
   [提供完整、可执行的代码示例，而非概念性建议]
   ```
@@ -259,14 +259,14 @@ class CodeReviewTool:
             finally:
                 # Always restore original directory
                 os.chdir(original_dir)
-                
+
         except Exception as e:
             return {
                 "success": False,
                 "stdout": {},
                 "stderr": f"Review failed: {str(e)}"
             }
-        
+
 
 def extract_code_report(result: str) -> str:
     sm = re.search(ot("REPORT")+r'\n(.*?)\n'+ct("REPORT"), result, re.DOTALL)
@@ -279,33 +279,33 @@ def main():
     import argparse
 
     init_env()
-    
+
     parser = argparse.ArgumentParser(description='Autonomous code review tool')
     subparsers = parser.add_subparsers(dest='type')
-    
+
     # Commit subcommand
     commit_parser = subparsers.add_parser('commit', help='Review specific commit')
     commit_parser.add_argument('commit', help='Commit SHA to review')
-    
+
     # Current subcommand
     current_parser = subparsers.add_parser('current', help='Review current changes')
-    
+
     # Range subcommand
     range_parser = subparsers.add_parser('range', help='Review commit range')
     range_parser.add_argument('start_commit', help='Start commit SHA')
     range_parser.add_argument('end_commit', help='End commit SHA')
-    
+
     # File subcommand
     file_parser = subparsers.add_parser('file', help='Review specific file')
     file_parser.add_argument('file', help='File path to review')
-    
+
     # Common arguments
     parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
-    
+
     # Set default subcommand to 'current'
     parser.set_defaults(type='current')
     args = parser.parse_args()
-    
+
     tool = CodeReviewTool()
     tool_args = {
         "review_type": args.type,
@@ -318,14 +318,14 @@ def main():
         tool_args["end_commit"] = args.end_commit
     elif args.type == 'file':
         tool_args["file_path"] = args.file
-    
+
     result = tool.execute(tool_args)
-    
+
     if result["success"]:
         PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
         report = extract_code_report(result["stdout"])
         PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")
-        
+
     else:
         PrettyOutput.print(result["stderr"], OutputType.WARNING)
 

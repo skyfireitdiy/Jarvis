@@ -32,12 +32,12 @@ class ReadCodeTool:
 
     def _handle_single_file(self, filepath: str, start_line: int = 1, end_line: int = -1) -> Dict[str, Any]:
         """处理单个文件的读取操作
-        
+
         Args:
             filepath (str): 文件路径
             start_line (int): 起始行号，默认为1
             end_line (int): 结束行号，默认为-1表示文件末尾
-            
+
         Returns:
             Dict[str, Any]: 包含成功状态、输出内容和错误信息的字典
         """
@@ -52,7 +52,7 @@ class ReadCodeTool:
                         "stdout": "",
                         "stderr": f"文件不存在: {abs_path}"
                     }
-                
+
                 # 文件大小限制检查（10MB）
                 if os.path.getsize(abs_path) > 10 * 1024 * 1024:
                     return {
@@ -60,21 +60,21 @@ class ReadCodeTool:
                         "stdout": "",
                         "stderr": "文件过大 (>10MB)"
                     }
-                
+
                 # 读取文件内容
                 with open(abs_path, 'r', encoding='utf-8', errors="ignore") as f:
                     lines = f.readlines()
-                
+
                 total_lines = len(lines)
-                
+
                 # 处理特殊值-1表示文件末尾
                 if end_line == -1:
                     end_line = total_lines
                 else:
                     end_line = max(1, min(end_line, total_lines)) if end_line >= 0 else total_lines + end_line + 1
-                
+
                 start_line = max(1, min(start_line, total_lines)) if start_line >= 0 else total_lines + start_line + 1
-                
+
                 if start_line > end_line:
                     spinner.fail("❌")
                     return {
@@ -82,14 +82,14 @@ class ReadCodeTool:
                         "stdout": "",
                         "stderr": f"无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})"
                     }
-                
+
                 # 添加行号并构建输出内容
                 selected_lines = lines[start_line-1:end_line]
                 numbered_content = "".join(
-                    [f"{i:4d}:{line}" 
+                    [f"{i:4d}:{line}"
                      for i, line in enumerate(selected_lines, start=start_line)]
                 )
-                
+
                 # 构建输出格式
                 output = (
                     f"\n🔍 文件: {abs_path}\n"
@@ -106,7 +106,7 @@ class ReadCodeTool:
                     "stdout": output,
                     "stderr": ""
                 }
-                
+
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {
@@ -117,10 +117,10 @@ class ReadCodeTool:
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """执行代码读取操作
-        
+
         Args:
             args (Dict): 包含文件列表的参数字典
-            
+
         Returns:
             Dict[str, Any]: 包含成功状态、输出内容和错误信息的字典
         """
@@ -131,32 +131,32 @@ class ReadCodeTool:
                     "stdout": "",
                     "stderr": "参数中必须包含文件列表"
                 }
-            
+
             all_outputs = []
             overall_success = True
-            
+
             for file_info in args["files"]:
                 if not isinstance(file_info, dict) or "path" not in file_info:
                     continue
-                
+
                 result = self._handle_single_file(
                     file_info["path"].strip(),
                     file_info.get("start_line", 1),
                     file_info.get("end_line", -1)
                 )
-                
+
                 if result["success"]:
                     all_outputs.append(result["stdout"])
                 else:
                     all_outputs.append(f"❌ {file_info['path']}: {result['stderr']}")
                     overall_success = False
-                
+
             return {
                 "success": overall_success,
                 "stdout": "\n".join(all_outputs),
                 "stderr": ""
             }
-            
+
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {

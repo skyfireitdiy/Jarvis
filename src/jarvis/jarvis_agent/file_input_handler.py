@@ -13,7 +13,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     prompt = user_input
     files = []
-    
+
     file_refs = re.findall(r"'([^']+)'", user_input)
     for ref in file_refs:
         # Handle file:start,end or file:start:end format
@@ -22,12 +22,12 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             # Initialize with default values
             start_line = 1  # 1-based
             end_line = -1
-            
+
             # Process line range if specified
             if ',' in line_range or ':' in line_range:
                 try:
                     raw_start, raw_end = map(int, re.split(r'[,:]', line_range))
-                    
+
                     # Handle special values and Python-style negative indices
                     try:
                         with open(file_path, 'r', encoding='utf-8', errors="ignore") as f:
@@ -41,24 +41,24 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                         end_line = total_lines
                     else:
                         start_line = raw_start if raw_start > 0 else total_lines + raw_start + 1
-                    
+
                     # Process end line
                     if raw_end == 0:  # 0表示整个文件（如果start也是0）
                         end_line = total_lines
                     else:
                         end_line = raw_end if raw_end > 0 else total_lines + raw_end + 1
-                    
+
                     # Auto-correct ranges
                     start_line = max(1, min(start_line, total_lines))
                     end_line = max(start_line, min(end_line, total_lines))
-                    
+
                     # Final validation
                     if start_line < 1 or end_line > total_lines or start_line > end_line:
                         raise ValueError
 
                 except:
                     continue
-            
+
             # Add file if it exists
             if os.path.isfile(file_path):
                 files.append({
@@ -74,7 +74,7 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                     "start_line": 1,  # 1-based
                     "end_line": -1
                 })
-        
+
     # Read and process files if any were found
     if files:
         with yaspin(text="正在读取文件...", color="cyan") as spinner:
@@ -83,6 +83,6 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 spinner.text = "文件读取完成"
                 spinner.ok("✅")
                 return result["stdout"] + "\n" + prompt, False
-    
+
     return prompt, False
 

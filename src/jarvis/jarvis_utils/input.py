@@ -19,10 +19,10 @@ from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def get_single_line_input(tip: str) -> str:
     """
     获取支持历史记录的单行输入。
-    
+
     参数：
         tip: 要显示的提示信息
-        
+
     返回：
         str: 用户的输入
     """
@@ -34,7 +34,7 @@ def get_single_line_input(tip: str) -> str:
 class FileCompleter(Completer):
     """
     带有模糊匹配的文件路径自定义补全器。
-    
+
     属性：
         path_completer: 基础路径补全器
         max_suggestions: 显示的最大建议数量
@@ -48,11 +48,11 @@ class FileCompleter(Completer):
     def get_completions(self, document: Document, complete_event) -> Completion: # type: ignore
         """
         生成带有模糊匹配的文件路径补全建议。
-        
+
         参数：
             document: 当前正在编辑的文档
             complete_event: 补全事件
-            
+
         生成：
             Completion: 建议的补全项
         """
@@ -99,8 +99,8 @@ class FileCompleter(Completer):
         all_files = []
         try:
             import subprocess
-            result = subprocess.run(['git', 'ls-files'], 
-                                 stdout=subprocess.PIPE, 
+            result = subprocess.run(['git', 'ls-files'],
+                                 stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
                                  text=True)
             if result.returncode == 0:
@@ -130,10 +130,10 @@ class FileCompleter(Completer):
 def get_multiline_input(tip: str) -> str:
     """
     获取带有增强补全和确认功能的多行输入。
-    
+
     参数：
         tip: 要显示的提示信息
-        
+
     返回：
         str: 用户的输入，如果取消则返回空字符串
     """

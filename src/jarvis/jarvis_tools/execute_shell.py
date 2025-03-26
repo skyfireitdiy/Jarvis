@@ -1,5 +1,5 @@
 # Shell command execution module
-# 
+#
 # Provides functionality to execute shell commands safely with:
 # - Command escaping
 # - Output capturing
@@ -12,7 +12,7 @@ from pathlib import Path
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class ShellTool:
     """Shell command execution tool
-    
+
     Attributes:
         name: Tool identifier used in API
         description: Tool description for API documentation
@@ -32,10 +32,10 @@ class ShellTool:
     }
     def _escape_command(self, cmd: str) -> str:
         """Escape special characters in command to prevent shell injection
-        
+
         Args:
             cmd: Raw command string
-            
+
         Returns:
             Escaped command string with single quotes properly handled
         """
@@ -44,21 +44,21 @@ class ShellTool:
         try:
             # Get and clean command input
             command = args["command"].strip()
-            
+
             # Generate temporary file name using process ID for uniqueness
             script_file = os.path.join(tempfile.gettempdir(), f"jarvis_shell_{os.getpid()}.sh")
             output_file = os.path.join(tempfile.gettempdir(), f"jarvis_shell_{os.getpid()}.log")
-            
+
             # Write command to script file
             with open(script_file, 'w', encoding='utf-8') as f:
                 f.write(f"#!/bin/bash\n{command}")
-            
+
             # Use script command to capture both stdout and stderr
             tee_command = f"script -q -c 'bash {script_file}' {output_file}"
-            
+
             # Execute command and capture return code
             os.system(tee_command)
-            
+
             # Read and process output file
             try:
                 with open(output_file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -74,14 +74,14 @@ class ShellTool:
                 # Clean up temporary files
                 Path(script_file).unlink(missing_ok=True)
                 Path(output_file).unlink(missing_ok=True)
-            
+
             # Return successful result
             return {
                 "success": True,
                 "stdout": output,
                 "stderr": "",
             }
-                
+
         except Exception as e:
             # Ensure temporary files are cleaned up even if error occurs
             if 'script_file' in locals():

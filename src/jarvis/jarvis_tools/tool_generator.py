@@ -11,7 +11,7 @@ from jarvis.jarvis_utils.utils import ct, ot
 
 class ToolGenerator:
     """工具生成器类，用于自动创建与Jarvis系统集成的新工具"""
-    
+
     name = "tool_generator"
     description = "使用LLM自动生成与系统集成的新工具"
     parameters = {
@@ -22,7 +22,7 @@ class ToolGenerator:
                 "description": "新工具的名称"
             },
             "description": {
-                "type": "string", 
+                "type": "string",
                 "description": "工具用途描述"
             },
             "input_spec": {
@@ -32,7 +32,7 @@ class ToolGenerator:
         },
         "required": ["tool_name", "description", "input_spec"]
     }
-    
+
     def execute(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行工具生成过程
@@ -43,19 +43,19 @@ class ToolGenerator:
         """
         # 获取代码生成平台实例
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        
+
         try:
             tool_name = arguments["tool_name"]
             description = arguments["description"]
             input_spec = arguments["input_spec"]
-            
+
             # 使用LLM生成工具实现代码
             with yaspin(text="正在生成工具...", color="cyan") as spinner:
                 prompt = self._create_prompt(tool_name, description, input_spec)
                 llm_response = model.chat_until_success(prompt)
                 spinner.text = "工具生成完成"
                 spinner.ok("✅")
-            
+
             # 从LLM响应中提取实现代码
             with yaspin(text="正在提取工具实现...", color="cyan") as spinner:
                 implementation = self._extract_code(llm_response)
@@ -67,7 +67,7 @@ class ToolGenerator:
                     }
                 spinner.text = "工具实现提取完成"
                 spinner.ok("✅")
-            
+
             # 验证生成的工具代码是否符合返回值格式要求
             with yaspin(text="正在验证工具返回值格式...", color="cyan") as spinner:
                 if not self._validate_return_value_format(implementation):
@@ -78,31 +78,31 @@ class ToolGenerator:
                     }
                 spinner.text = "工具返回值格式验证完成"
                 spinner.ok("✅")
-            
+
             # 保存生成的新工具
             with yaspin(text="正在保存工具...", color="cyan") as spinner:
                 tools_dir = Path.home() / ".jarvis" / "tools"
                 tools_dir.mkdir(parents=True, exist_ok=True)
                 tool_file = tools_dir / f"{tool_name}.py"
-                
+
                 with open(tool_file, "w", errors="ignore") as f:
                     f.write(implementation)
                 spinner.text = "工具保存完成"
                 spinner.ok("✅")
-            
+
             return {
                 "success": True,
                 "stdout": f"工具成功生成于: {tool_file}",
                 "stderr": ""
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
                 "stdout": "",
                 "stderr": f"工具生成失败: {str(e)}"
             }
-    
+
     def _create_prompt(self, tool_name: str, description: str, input_spec: str) -> str:
         """
         创建用于工具生成的LLM提示
@@ -134,10 +134,10 @@ class CustomTool:
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行工具功能
-        
+
         Args:
             args: 传递给工具的参数
-            
+
         Returns:
             {
                 "success": bool,
@@ -148,7 +148,7 @@ class CustomTool:
         try:
             # 在此实现工具逻辑
             # 使用LLM
-            # model = PlatformRegistry.get_global_platform_registry().get_normal_platform() 
+            # model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
             # result = model.chat_until_success(prompt)
 
             result = "工具执行结果"
@@ -189,7 +189,7 @@ class CustomTool:
 示例：
 {example_code}
 '''
-    
+
     def _extract_code(self, response: str) -> str:
         """
         从LLM响应中提取Python代码
@@ -202,7 +202,7 @@ class CustomTool:
         if sm:
             return sm.group(1)
         return ""
-    
+
     def _validate_return_value_format(self, code: str) -> bool:
         """
         验证execute方法的返回值格式是否正确
@@ -216,6 +216,6 @@ class CustomTool:
         if "def execute(self, args: Dict) -> Dict:" not in code and \
            "def execute(self, args: Dict) -> Dict[str, Any]:" not in code:
             return False
-        
+
         # 检查返回值中是否包含所有必需字段
         return all(field in code for field in required_fields)

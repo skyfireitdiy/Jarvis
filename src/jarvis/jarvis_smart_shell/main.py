@@ -33,10 +33,10 @@ def execute_command(command: str) -> None:
 
 def process_request(request: str) -> Optional[str]:
     """Process user request and return corresponding shell command
-    
+
     Args:
         request: User's natural language request
-        
+
     Returns:
         Optional[str]: Corresponding shell command, return None if processing fails
     """
@@ -46,7 +46,7 @@ def process_request(request: str) -> Optional[str]:
 
         shell = get_shell_name()
         current_path = os.getcwd()
-        
+
         # Set system prompt
         system_message = """
 # 🤖 Role Definition
@@ -96,18 +96,18 @@ Output: find . -name "*.py"
 
         prefix = f"Current path: {current_path}\n"
         prefix += f"Current shell: {shell}\n"
-        
+
         with yaspin(text="正在生成命令...", color="cyan") as spinner:
             result = model.chat_until_success(prefix + request)
             spinner.ok("✅ 命令生成成功")
-        
+
         # 提取命令
         if result and isinstance(result, str):
             command = result.strip()
             return command
-        
+
         return None
-        
+
     except Exception as e:
         PrettyOutput.print(f"处理请求失败: {str(e)}", OutputType.WARNING)
         return None
@@ -124,25 +124,25 @@ Example:
   %(prog)s "Compress all jpg images"
   %(prog)s "Find documents modified in the last week"
 """)
-    
+
     # 修改为可选参数，添加从stdin读取的支持
     parser.add_argument(
         "request",
         nargs='?',  # 设置为可选参数
         help="描述您想要执行的操作（用自然语言描述），如果未提供则从标准输入读取"
     )
-    
+
     # 解析参数
     args = parser.parse_args()
-    
+
     # 添加标准输入处理
     if not args.request:
         # 检查是否在交互式终端中运行
         args.request = get_multiline_input(tip="请输入您要执行的功能：")
-    
+
     # 处理请求
     command = process_request(args.request)
-    
+
     # 输出结果
     if command:
         execute_command(command)  # 显示并执行命令

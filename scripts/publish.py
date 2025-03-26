@@ -15,13 +15,13 @@ from typing import Tuple, List
 def get_current_version() -> Tuple[int, int, int]:
     """获取当前版本号"""
     init_file = Path("src/jarvis/__init__.py")
-    
+
     # 从__init__.py中读取版本号
     init_content = init_file.read_text()
     version_match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', init_content)
     if not version_match:
         raise ValueError("Version not found in __init__.py")
-    
+
     version_str = version_match.group(1)
     major, minor, patch = map(int, version_str.split('.'))
     return major, minor, patch
@@ -29,7 +29,7 @@ def get_current_version() -> Tuple[int, int, int]:
 def update_version(version_type: str) -> str:
     """更新版本号"""
     major, minor, patch = get_current_version()
-    
+
     if version_type == "major":
         major += 1
         minor = 0
@@ -41,9 +41,9 @@ def update_version(version_type: str) -> str:
         patch += 1
     else:
         raise ValueError("Invalid version type. Use 'major', 'minor', or 'patch'")
-    
+
     new_version = f"{major}.{minor}.{patch}"
-    
+
     # 更新文件中的版本号
     files_to_update = {
         "src/jarvis/__init__.py": (
@@ -59,13 +59,13 @@ def update_version(version_type: str) -> str:
             f'version = "{new_version}"'
         )
     }
-    
+
     for file_path, (pattern, replacement) in files_to_update.items():
         path = Path(file_path)
         content = path.read_text()
         new_content = re.sub(pattern, replacement, content)
         path.write_text(new_content)
-    
+
     return new_version
 
 def run_command(cmd: List[str], error_msg: str) -> None:
@@ -90,37 +90,37 @@ def main():
     if len(sys.argv) != 2 or sys.argv[1] not in ["major", "minor", "patch"]:
         print("Usage: python scripts/publish.py [major|minor|patch]")
         sys.exit(1)
-    
+
     version_type = sys.argv[1]
-    
+
     try:
         # 更新版本号
         new_version = update_version(version_type)
         print(f"Updated version to {new_version}")
-        
+
         # 删除所有的 __pycache__ 目录
         print("Removing __pycache__ directories...")
         remove_pycache_directories()
-        
+
         # 清理旧的构建文件
         print("Cleaning old build files...")
         for path in ["build", "dist", "*.egg-info"]:
             os.system(f"rm -rf {path}")
-        
+
         # 构建包
         print("Building package...")
         run_command(
             ["python", "-m", "build"],
             "Failed to build package"
         )
-        
+
         # 检查构建的包
         print("Checking package...")
         run_command(
             ["twine", "check", "dist/*"],
             "Package check failed"
         )
-        
+
         # 提交版本更新
         print("Committing version update...")
         run_command(
@@ -131,30 +131,30 @@ def main():
             ["git", "commit", "-m", f"Bump version to {new_version}"],
             "Failed to commit version update"
         )
-        
+
         # 创建标签
         print("Creating git tag...")
         run_command(
             ["git", "tag", f"v{new_version}"],
             "Failed to create tag"
         )
-        
+
         # 上传到PyPI
         print("Uploading to PyPI...")
         run_command(
             ["twine", "upload", "dist/*"],
             "Failed to upload to PyPI"
         )
-        
+
         # 推送到远程仓库
         print("Pushing to remote...")
         run_command(
             ["git", "push", "origin", "main", "--tags", "--force"],
             "Failed to push to remote"
         )
-        
+
         print(f"\nSuccessfully published version {new_version} to PyPI!")
-        
+
     except Exception as e:
         print(f"Error: {str(e)}")
         sys.exit(1)

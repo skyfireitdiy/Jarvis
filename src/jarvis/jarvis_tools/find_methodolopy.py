@@ -20,10 +20,10 @@ class FindMethodologyTool:
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """执行方法论查找操作
-        
+
         Args:
             args (Dict): 包含查询文本的参数字典
-            
+
         Returns:
             Dict[str, Any]: 包含成功状态、输出内容和错误信息的字典
         """
@@ -34,10 +34,10 @@ class FindMethodologyTool:
                     "stdout": "",
                     "stderr": "参数中必须包含查询文本"
                 }
-            
+
             with yaspin(text="搜索相关方法论...", color="cyan") as spinner:
                 methodology_prompt = load_methodology(args["query"])
-                
+
                 if methodology_prompt:
                     spinner.text = "找到相关方法论"
                     spinner.ok("✅")
@@ -55,7 +55,7 @@ class FindMethodologyTool:
                         "stdout": "未找到相关的方法论",
                         "stderr": ""
                     }
-                    
+
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {

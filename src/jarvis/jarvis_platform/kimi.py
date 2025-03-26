@@ -15,7 +15,7 @@ class KimiModel(BasePlatform):
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
         return [("kimi", "Based on the web Kimi, free interface")]
-    
+
     def __init__(self):
         """
         Initialize Kimi model
@@ -28,7 +28,7 @@ class KimiModel(BasePlatform):
                 "需要设置 KIMI_API_KEY 才能使用 Jarvis。请按照以下步骤操作：\n"
                 "1. 获取 Kimi API Key:\n"
                 "   • 访问 Kimi AI 平台: https://kimi.moonshot.cn\n"
-                "   • 登录您的账户\n" 
+                "   • 登录您的账户\n"
                 "   • 打开浏览器开发者工具 (F12 或右键 -> 检查)\n"
                 "   • 切换到网络标签\n"
                 "   • 发送任意消息\n"
@@ -84,9 +84,9 @@ class KimiModel(BasePlatform):
                 raise Exception("Failed to create chat session")
 
         url = f"https://kimi.moonshot.cn/api/chat/{self.chat_id}/completion/stream"
-        
-        
-        
+
+
+
         payload = {
             "messages": [{"role": "user", "content": message}],
             "use_search": True,
@@ -106,23 +106,23 @@ class KimiModel(BasePlatform):
         try:
             response = while_success(lambda: requests.post(url, headers=headers, json=payload, stream=True), sleep_time=5)
             full_response = ""
-            
+
             # 收集搜索和引用结果
             search_results = []
             ref_sources = []
-            
+
             for line in response.iter_lines():
                 if not line:
                     continue
-                    
+
                 line = line.decode('utf-8')
                 if not line.startswith("data: "):
                     continue
-                    
+
                 try:
                     data = json.loads(line[6:])
                     event = data.get("event")
-                    
+
                     if event == "cmpl":
                         # 处理补全文本
                         text = data.get("text", "")
@@ -130,7 +130,7 @@ class KimiModel(BasePlatform):
                             if not self.suppress_output:
                                 PrettyOutput.print_stream(text)
                             full_response += text
-                            
+
                     elif event == "search_plus":
                         # 收集搜索结果
                         msg = data.get("msg", {})
@@ -143,7 +143,7 @@ class KimiModel(BasePlatform):
                                 "type": msg.get("type", ""),
                                 "url": msg.get("url", "")
                             })
-                                
+
                     elif event == "ref_docs":
                         # 收集引用来源
                         ref_cards = data.get("ref_cards", [])
@@ -159,13 +159,13 @@ class KimiModel(BasePlatform):
                                 "rag_segments": card.get("rag_segments", []),
                                 "origin": card.get("origin", {})
                             })
-                                    
+
                 except json.JSONDecodeError:
                     continue
-                    
+
             if not self.suppress_output:
                 PrettyOutput.print_stream_end()
-            
+
 
             # 显示搜索结果摘要
             if search_results and not self.suppress_output:
@@ -180,7 +180,7 @@ class KimiModel(BasePlatform):
                     output.append(f"  链接: {result['url']}")
                     output.append("")
                 PrettyOutput.print("\n".join(output), OutputType.PROGRESS)
-                        
+
             # 显示引用来源
             if ref_sources and not self.suppress_output:
                 output = ["引用来源:"]
@@ -189,7 +189,7 @@ class KimiModel(BasePlatform):
                     output.append(f"  链接: {source['url']}")
                     if source['abstract']:
                         output.append(f"  摘要: {source['abstract']}")
-                    
+
                     # 显示相关段落
                     if source['rag_segments']:
                         output.append("  相关段落:")
@@ -197,18 +197,18 @@ class KimiModel(BasePlatform):
                             text = segment.get('text', '').replace('\n', ' ').strip()
                             if text:
                                 output.append(f"    - {text}")
-                    
+
                     # 显示原文引用
                     origin = source['origin']
                     if origin:
                         text = origin.get('text', '')
                         if text:
                             output.append(f"  原文: {text}")
-                    
+
                     output.append("")
 
                 PrettyOutput.print("\n".join(output), OutputType.PROGRESS)
-            
+
             return full_response
 
         except Exception as e:
@@ -218,13 +218,13 @@ class KimiModel(BasePlatform):
         """Delete current session"""
         if not self.chat_id:
             return True  # 如果没有会话ID，视为删除成功
-            
+
         url = f"https://kimi.moonshot.cn/api/chat/{self.chat_id}"
         headers = {
             'Authorization': self.auth_header,
             'Content-Type': 'application/json'
         }
-        
+
         try:
             response = while_success(lambda: requests.delete(url, headers=headers), sleep_time=5)
             if response.status_code == 200:

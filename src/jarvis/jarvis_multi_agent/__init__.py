@@ -35,16 +35,16 @@ class MultiAgent(OutputHandler):
 to: 智能体名称    # 目标智能体名称
 content: |
     # 消息主题
-    
+
     ## 背景信息
     [提供必要的上下文和背景]
-    
+
     ## 具体需求
     [明确表达期望完成的任务]
-    
+
     ## 相关资源
     [列出相关文档、数据或工具]
-    
+
     ## 期望结果
     [描述期望的输出格式和内容]
 
@@ -60,7 +60,7 @@ content: |
 to: 智能体名称    # 目标智能体名称
 content: |
     # 消息主题
-    
+
     ## 任务结果
     [任务完成结果，用于反馈]
 {ct("SEND_MESSAGE")}
@@ -81,15 +81,15 @@ content: |
         if len(send_messages) == 0:
             return False, ""
         return True, send_messages[0]
-        
+
     def name(self) -> str:
         return "SEND_MESSAGE"
-        
-    
+
+
     @staticmethod
     def _extract_send_msg(content: str) -> List[Dict]:
         """Extract send message from content.
-        
+
         Args:
             content: The content containing send message
         """
@@ -138,4 +138,4 @@ content: {msg['content']}
                 last_agent = self.agents[msg['to']].name
                 msg = self.agents[msg['to']].run(prompt)
         return ""
-    
+
