@@ -189,6 +189,7 @@ def apply_patch(output_str: str, agent: Any) -> str:
                     addon_prompt += "如果没有问题，请继续进行下一步修改\n"
                     addon_prompt += f"如果用户的需求已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
                     addon_prompt += "如果有任何信息不清楚，调用工具获取信息\n"
+                    addon_prompt += "每次响应必须且只能包含一个操作\n"
 
                     agent.set_addon_prompt(addon_prompt)
 
