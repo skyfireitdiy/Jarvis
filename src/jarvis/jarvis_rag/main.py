@@ -19,7 +19,6 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import  ct, get_file_md5, init_env, ot
 
 from jarvis.jarvis_rag.file_processors import TextFileProcessor, PDFProcessor, DocxProcessor, PPTProcessor, ExcelProcessor
-``
 """
 Jarvis RAG (Retrieval-Augmented Generation) Module
 
