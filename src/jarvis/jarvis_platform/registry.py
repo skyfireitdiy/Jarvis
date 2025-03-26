@@ -11,7 +11,6 @@ REQUIRED_METHODS = [
     ('chat', ['message']),           # 方法名和参数列表
     ('name', []),
     ('delete_chat', []),
-    ('reset', []),
     ('set_system_message', ['message']),
     ('set_model_name', ['model_name']),
     ('get_model_list', []),

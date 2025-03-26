@@ -228,7 +228,9 @@ class KimiModel(BasePlatform):
         try:
             response = while_success(lambda: requests.delete(url, headers=headers), sleep_time=5)
             if response.status_code == 200:
-                self.reset()
+                self.chat_id = ""
+                self.uploaded_files = []
+                self.first_chat = True  # 重置first_chat标记
                 return True
             else:
                 PrettyOutput.print(f"删除会话失败: HTTP {response.status_code}", OutputType.WARNING)
@@ -237,11 +239,6 @@ class KimiModel(BasePlatform):
             PrettyOutput.print(f"删除会话时发生错误: {str(e)}", OutputType.ERROR)
             return False
 
-    def reset(self):
-        """Reset chat"""
-        self.chat_id = ""
-        self.uploaded_files = []
-        self.first_chat = True  # 重置first_chat标记
 
     def name(self) -> str:
         """Model name"""

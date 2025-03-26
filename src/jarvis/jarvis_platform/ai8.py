@@ -176,9 +176,6 @@ class AI8Model(BasePlatform):
         """Return model name"""
         return self.model_name
         
-    def reset(self):
-        """Reset model state"""
-        self.conversation = None
             
     def delete_chat(self) -> bool:
         """Delete current chat session"""
@@ -204,7 +201,7 @@ class AI8Model(BasePlatform):
             if response.status_code == 200:
                 data = response.json()
                 if data['code'] == 0:
-                    self.reset()
+                    self.conversation = None
                     return True
                 else:
                     error_msg = f"删除会话失败: {data.get('msg', '未知错误')}"

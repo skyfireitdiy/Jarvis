@@ -6,7 +6,7 @@
 - 带有自定义主题的控制台配置
 - 环境初始化
 """
-from typing import Any, Set
+from typing import Any, Set, Dict
 import colorama
 import os
 from rich.console import Console
@@ -17,6 +17,7 @@ colorama.init()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # 全局代理管理
 global_agents: Set[str] = set()
+global_read_files: Dict[str, Set[str]] = {}
 current_agent_name: str = ""
 # 使用自定义主题配置rich控制台
 custom_theme = Theme({
@@ -80,3 +81,14 @@ def delete_agent(agent_name: str) -> None:
         global_agents.remove(agent_name)
         global current_agent_name
         current_agent_name = ""
+
+def add_read_file_record(file_path: str):
+    if current_agent_name not in global_read_files:
+        global_read_files[current_agent_name] = set()
+    global_read_files[current_agent_name].add(file_path)
+
+def has_read_file(file_path: str) -> bool:
+    return not os.path.exists(file_path) or (current_agent_name in global_read_files and file_path in global_read_files[current_agent_name])
+
+def clear_read_file_record():
+    global_read_files.pop(current_agent_name, None)

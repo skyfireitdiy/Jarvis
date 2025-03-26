@@ -195,11 +195,6 @@ class OyiModel(BasePlatform):
         """Return model name"""
         return self.model_name
         
-    def reset(self):
-        """Reset model state"""
-        self.messages = []
-        self.conversation = None
-        self.first_chat = True
             
     def delete_chat(self) -> bool:
         """Delete current chat session"""
@@ -225,7 +220,9 @@ class OyiModel(BasePlatform):
             if response.status_code == 200:
                 data = response.json()
                 if data['code'] == 200 and data['type'] == 'success':
-                    self.reset()
+                    self.messages = []
+                    self.conversation = None
+                    self.first_chat = True
                     return True
                 else:
                     error_msg = f"删除会话失败: {data.get('message', '未知错误')}"
@@ -235,6 +232,7 @@ class OyiModel(BasePlatform):
                 error_msg = f"删除会话请求失败: {response.status_code}"
                 PrettyOutput.print(error_msg, OutputType.WARNING)
                 return False
+            
             
         except Exception as e:
             PrettyOutput.print(f"删除会话失败: {str(e)}", OutputType.ERROR)

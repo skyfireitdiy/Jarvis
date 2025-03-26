@@ -79,7 +79,7 @@ def chat_with_model(platform_name: str, model_name: str):
             # Check if it is a clear session command
             if user_input.strip() == "/clear":
                 try:
-                    platform.delete_chat()
+                    platform.reset()
                     platform.set_model_name(model_name)  # Reinitialize session
                     PrettyOutput.print("会话已清除", OutputType.SUCCESS)
                 except Exception as e:
@@ -100,7 +100,7 @@ def chat_with_model(platform_name: str, model_name: str):
     finally:
         # Clean up resources
         try:
-            platform.delete_chat()
+            platform.reset()
         except:
             pass
 

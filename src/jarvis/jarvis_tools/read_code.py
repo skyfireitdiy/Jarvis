@@ -1,8 +1,10 @@
 from typing import Dict, Any
 import os
 
+from pkg_resources import add_activation_listener
 from yaspin import yaspin
 
+from jarvis.jarvis_utils.globals import add_read_file_record
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class ReadCodeTool:
@@ -41,6 +43,7 @@ class ReadCodeTool:
         """
         try:
             abs_path = os.path.abspath(filepath)
+            add_read_file_record(abs_path)
             with yaspin(text=f"正在读取文件: {abs_path}...", color="cyan") as spinner:
                 # 文件存在性检查
                 if not os.path.exists(abs_path):

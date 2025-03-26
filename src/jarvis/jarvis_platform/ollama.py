@@ -118,22 +118,20 @@ class OllamaPlatform(BasePlatform):
         return full_response
 
         
-    def reset(self):
-        """Reset model state"""
-        self.messages = []
-        if self.system_message:
-            self.messages.append({"role": "system", "content": self.system_message})
-            
     def name(self) -> str:
         """Return model name"""
         return self.model_name
             
     def delete_chat(self) -> bool:
         """Delete current chat session"""
-        self.reset()
+        self.messages = []
+        if self.system_message:
+            self.messages.append({"role": "system", "content": self.system_message})
         return True
         
     def set_system_message(self, message: str):
         """Set system message"""
         self.system_message = message
-        self.reset()  # 重置会话以应用新的系统消息 
+        self.messages = []
+        if self.system_message:
+            self.messages.append({"role": "system", "content": self.system_message})

@@ -3,6 +3,7 @@ import os
 
 from yaspin import yaspin
 
+from jarvis.jarvis_utils.globals import add_read_file_record
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -39,6 +40,7 @@ class FileOperationTool:
         """Handle operations for a single file"""
         try:
             abs_path = os.path.abspath(filepath)
+            add_read_file_record(abs_path)
             if operation == "read":
                 with yaspin(text=f"正在读取文件: {abs_path}...", color="cyan") as spinner:
                     if not os.path.exists(abs_path):

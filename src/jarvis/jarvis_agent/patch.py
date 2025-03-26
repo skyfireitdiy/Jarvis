@@ -11,6 +11,7 @@ from jarvis.jarvis_tools.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
+from jarvis.jarvis_utils.globals import has_read_file
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, get_file_line_count, user_confirm
@@ -131,6 +132,11 @@ def apply_patch(output_str: str) -> str:
         spinner.text = "开始获取当前提交hash..."
         start_hash = get_latest_commit_hash()
         spinner.write("✅ 当前提交hash获取完成")
+
+        not_read_file = [f for f in patches.keys() if not has_read_file(f)]
+        if not_read_file:
+            yaspin.write(f"❌ 以下文件未读取: {not_read_file}，应用补丁存在风险，将先读取文件后再生成补丁", color="red")
+            return f"以下文件未读取: {not_read_file}，应用补丁存在风险，请先读取文件后再生成补丁"
 
         # 按文件逐个处理
         for filepath, patch_content in patches.items():

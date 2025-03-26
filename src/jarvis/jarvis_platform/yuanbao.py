@@ -64,7 +64,6 @@ class YuanbaoPlatform(BasePlatform):
             self.model_name = model_name
         else:
             PrettyOutput.print(f"错误：不支持的模型: {model_name}", OutputType.ERROR)
-        self.reset()
 
     def _get_base_headers(self):
         """Get base headers for API requests"""
@@ -218,10 +217,6 @@ class YuanbaoPlatform(BasePlatform):
         except Exception as e:
             raise Exception(f"对话失败: {str(e)}")
 
-    def reset(self):
-        """Reset chat"""
-        self.conversation_id = ""
-        self.first_chat = True
 
     def delete_chat(self) -> bool:
         """Delete current session"""
@@ -248,7 +243,8 @@ class YuanbaoPlatform(BasePlatform):
             response = while_success(lambda: requests.post(url, headers=headers, json=payload), sleep_time=5)
             
             if response.status_code == 200:
-                self.reset()
+                self.conversation_id = ""
+                self.first_chat = True
                 return True
             else:
                 PrettyOutput.print(f"删除会话失败: HTTP {response.status_code}", OutputType.WARNING)

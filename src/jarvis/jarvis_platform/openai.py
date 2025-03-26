@@ -103,15 +103,11 @@ class OpenAIModel(BasePlatform):
         """Return model name"""
         return self.model_name
 
-    def reset(self):
-        """Reset model state"""
-        # Clear conversation history, only keep system message
+
+    def delete_chat(self)->bool:
+        """Delete conversation"""
         if self.system_message:
             self.messages = [{"role": "system", "content": self.system_message}]
         else:
             self.messages = []
-
-    def delete_chat(self)->bool:
-        """Delete conversation"""
-        self.reset()
         return True

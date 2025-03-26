@@ -135,7 +135,7 @@ class Agent:
         2. 重置对话长度计数器
         3. 清空当前提示
         """
-        self.model.delete_chat() # type: ignore
+        self.model.reset() # type: ignore
         self.conversation_length = 0
         self.prompt = ""
         
@@ -334,7 +334,7 @@ class Agent:
                 with spinner.hidden():
                     summary = self.model.chat_until_success(self.prompt + "\n" + prompt) # type: ignore
 
-                self.model.delete_chat() # type: ignore
+                self.model.reset() # type: ignore
                 
                 # 清空当前对话历史，但保留系统消息
                 self.conversation_length = 0  # Reset conversation length

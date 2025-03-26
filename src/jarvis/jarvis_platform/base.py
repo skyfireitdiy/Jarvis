@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import re
 from typing import Dict, List, Tuple
+from jarvis.jarvis_utils.globals import clear_read_file_record
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, get_context_token_count, while_success, while_true
 
@@ -20,6 +21,11 @@ class BasePlatform(ABC):
     def set_model_name(self, model_name: str):
         """Set model name"""
         raise NotImplementedError("set_model_name is not implemented")
+
+    def reset(self):
+        """Reset model"""
+        clear_read_file_record()
+        self.delete_chat()
         
     @abstractmethod
     def chat(self, message: str) -> str:
@@ -57,11 +63,6 @@ class BasePlatform(ABC):
             return response
                 
         return while_true(lambda: while_success(lambda: _chat(), 5), 5)
-
-    @abstractmethod
-    def reset(self):
-        """Reset model"""
-        raise NotImplementedError("reset is not implemented")
         
     @abstractmethod
     def name(self) -> str:
