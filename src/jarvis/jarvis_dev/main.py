@@ -400,7 +400,6 @@ def create_dev_team() -> MultiAgent:
         "rag", 
         "execute_shell",
         "read_webpage", 
-        "select_code_files",
         "methodology",
         "ask_codebase"
     ])
@@ -416,7 +415,6 @@ def create_dev_team() -> MultiAgent:
         "file_analyzer",
         "function_analyzer",
         "read_code",
-        "select_code_files",
         "methodology"
     ])
     
@@ -456,7 +454,6 @@ def create_dev_team() -> MultiAgent:
         "code_review",
         "execute_shell_script",
         "read_code",
-        "select_code_files"
     ])
     
     # Update PM prompt with tool usage guidance
@@ -492,7 +489,6 @@ def create_dev_team() -> MultiAgent:
 - **rag**：访问项目知识库，参考相似需求历史
 - **execute_shell**：查询系统环境和配置信息
 - **read_webpage**：收集用户体验和行业趋势信息
-- **select_code_files**：了解现有代码中与需求相关的部分
 - **methodology**：应用需求分析和用户故事映射方法论
 - **ask_codebase**：分析代码库中的功能实现，了解现有系统能力和限制，分析业务逻辑
 
@@ -520,7 +516,6 @@ def create_dev_team() -> MultiAgent:
 - **file_analyzer**：深入分析关键文件的结构和功能
 - **function_analyzer**：分析核心函数的实现和设计
 - **read_code**：阅读和理解关键代码段
-- **select_code_files**：选择并分析与架构相关的代码文件
 - **methodology**：应用架构设计方法论和模式
 
 ## 文档管理规范
@@ -598,7 +593,6 @@ def create_dev_team() -> MultiAgent:
 - **code_review**：从质量保证角度审查代码
 - **execute_shell_script**：执行自动化测试脚本
 - **read_code**：阅读和理解代码以设计测试用例
-- **select_code_files**：选择需要测试的关键代码文件
 
 ## 文档管理规范
 每一步测试或质量评估后，必须使用file_operation工具将结论性输出记录到测试文档中：
