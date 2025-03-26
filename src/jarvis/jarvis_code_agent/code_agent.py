@@ -184,6 +184,7 @@ class CodeAgent:
                            input_handler=[
                                shell_input_handler, file_input_handler, builtin_input_handler],
                            need_summary=need_summary)
+        self.agent.set_addon_prompt("请使用工具充分理解用户需求，然后根据需求一步步执行代码修改/开发")
 
     def _init_env(self):
         with yaspin(text="正在初始化环境...", color="cyan") as spinner:
@@ -262,20 +263,15 @@ def main():
     PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
 
     try:
-        try:
-            user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
-            if not user_input:
-                return 0
-            agent = CodeAgent(platform=args.platform,
-                              model=args.model, need_summary=False)
-            agent.run(user_input)
-
-        except Exception as e:
-            PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
+        user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
+        if not user_input:
+            return 0
+        agent = CodeAgent(platform=args.platform,
+                            model=args.model, need_summary=False)
+        agent.run(user_input)
 
     except Exception as e:
-        PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
-        return 1
+        PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
     return 0
 
