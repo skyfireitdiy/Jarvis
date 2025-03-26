@@ -126,6 +126,8 @@ class MethodologyTool:
                         "content": content
                     }, f, ensure_ascii=False, indent=2)
 
+                PrettyOutput.print(f"方法论已保存到 {file_path}", OutputType.INFO)
+
                 action = "Updated" if os.path.exists(file_path) else "Added"
                 return {
                     "success": True,
@@ -147,24 +149,3 @@ class MethodologyTool:
                 "stderr": f"Execution failed: {str(e)}"
             }
 
-    def get_methodology(self, problem_type: str) -> Optional[str]:
-        """获取特定问题类型的方法论
-
-        Args:
-            problem_type: 问题类型
-
-        Returns:
-            Optional[str]: 方法论内容，如果不存在则返回 None
-        """
-        file_path = self._get_methodology_file_path(problem_type)
-
-        if not os.path.exists(file_path):
-            return None
-
-        try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                methodology = json.load(f)
-                return methodology.get("content")
-        except Exception as e:
-            PrettyOutput.print(f"读取方法论失败: {str(e)}", OutputType.ERROR)
-            return None
