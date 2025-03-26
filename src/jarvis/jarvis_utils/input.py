@@ -81,6 +81,7 @@ class FileCompleter(Completer):
                 (ot("RAG"), '知识库检索'),
                 (ot("Summary"), '总结'),
                 (ot("Clear"), '清除历史'),
+                (ot("Methodology"), '查找相关方法论'),
             ]
             for name, desc in default_suggestions:
                 yield Completion(

@@ -68,6 +68,16 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             agent.clear()
             if not user_input.strip():
                 return "", True
+        elif tag == "Methodology":
+            user_input = user_input.replace(f"'<{tag}>'", "")
+            user_input += """
+请使用find_methodology工具查找相关方法论，可以使用的提问格式包括：
+1. 关于xxx的方法论有哪些？
+2. 如何解决xxx问题？
+3. xxx的最佳实践是什么？
+4. 处理xxx的标准流程是什么？
+5. 实现xxx的参考方案有哪些？
+"""
         # 移除对未知标记的警告输出
     
     return user_input, False
