@@ -490,7 +490,7 @@ class Agent:
 方法论格式：
 {ot("TOOL_CALL")}
 name: methodology
-parameters:
+arguments:
   operation: add/update
   problem_type: 方法论类型，例如：code_review, bug_fix 等
   content: |
