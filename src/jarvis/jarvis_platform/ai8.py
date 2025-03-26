@@ -33,6 +33,19 @@ class AI8Model(BasePlatform):
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
         if self.model_name not in self.get_available_models():
             PrettyOutput.print(f"警告: 选择的模型 {self.model_name} 不在可用列表中", OutputType.WARNING)
+
+        self.headers = {
+            'Authorization': self.token,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, text/plain, */*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'X-APP-VERSION': '2.3.0',
+            'Origin': self.BASE_URL,
+            'Referer': f'{self.BASE_URL}/chat?_userMenuKey=chat',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Dest': 'empty',
+        }
         
 
     def set_model_name(self, model_name: str):
@@ -43,24 +56,12 @@ class AI8Model(BasePlatform):
     def create_conversation(self) -> bool:
         """Create a new conversation"""
         try:
-            headers = {
-                'Authorization': self.token,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json, text/plain, */*',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'X-APP-VERSION': '2.3.0',
-                'Origin': self.BASE_URL,
-                'Referer': f'{self.BASE_URL}/chat?_userMenuKey=chat',
-                'Sec-Fetch-Site': 'same-origin',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Dest': 'empty',
-
-            }
+            
             
             # 1. 创建会话
             response = requests.post(
                 f"{self.BASE_URL}/api/chat/session",
-                headers=headers,
+                headers=self.headers,
                 json={}
             )
             
@@ -88,7 +89,7 @@ class AI8Model(BasePlatform):
             
             response = requests.put(
                 f"{self.BASE_URL}/api/chat/session/{self.conversation['id']}",
-                headers=headers,
+                headers=self.headers,
                 json=session_data
             )
             
@@ -121,15 +122,7 @@ class AI8Model(BasePlatform):
                 if not self.create_conversation():
                     raise Exception("Failed to create conversation")
                 
-            headers = {
-                'Authorization': self.token,
-                'Content-Type': 'application/json',
-                'Accept': 'text/event-stream',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'X-APP-VERSION': '2.2.2',
-                'Origin': self.BASE_URL,
-                'Referer': f'{self.BASE_URL}/chat?_userMenuKey=chat'
-            }
+
             
             payload = {
                 "text": message,
@@ -140,7 +133,7 @@ class AI8Model(BasePlatform):
             
             response = requests.post(
                 f"{self.BASE_URL}/api/chat/completions",
-                headers=headers,
+                headers=self.headers,
                 json=payload,
                 stream=True
             )
@@ -188,19 +181,10 @@ class AI8Model(BasePlatform):
             if not self.conversation:
                 return True
             
-            headers = {
-                'Authorization': self.token,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json, text/plain, */*',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'X-APP-VERSION': '2.2.2',
-                'Origin': self.BASE_URL,
-                'Referer': f'{self.BASE_URL}/chat?_userMenuKey=chat'
-            }
             
             response = requests.delete(
                 f"{self.BASE_URL}/api/chat/session/{self.conversation['id']}",
-                headers=headers
+                headers=self.headers
             )
             
             if response.status_code == 200:
@@ -231,18 +215,9 @@ class AI8Model(BasePlatform):
             if self.models:
                 return list(self.models.keys())
             
-            headers = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json, text/plain, */*',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'X-APP-VERSION': '2.2.2',
-                'Origin': self.BASE_URL,
-                'Referer': f'{self.BASE_URL}/chat?_userMenuKey=chat'
-            }
-            
             response = requests.get(
                 f"{self.BASE_URL}/api/chat/tmpl",
-                headers=headers
+                headers=self.headers
             )
             
             if response.status_code != 200:
