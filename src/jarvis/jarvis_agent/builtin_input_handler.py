@@ -40,24 +40,24 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 """
         elif tag == "Web":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            user_input += """
+            agent.set_addon_prompt("""
 请使用search_web工具进行网页搜索，可以使用的提问格式包括：
 1. xxx技术的最新发展是什么？
 2. xxx框架的官方文档在哪里？
 3. xxx库的GitHub仓库地址是什么？
 4. xxx问题的解决方案有哪些？
 5. xxx概念的详细解释是什么？
-"""
+""")
         elif tag == "RAG":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            user_input += """
+            agent.set_addon_prompt("""
 请使用rag工具进行知识库检索，可以使用的提问格式包括：
 1. 关于xxx的知识点有哪些？
 2. xxx的最佳实践是什么？
 3. xxx的实现方案有哪些？
 4. xxx的相关案例有哪些？
 5. xxx的技术细节是什么？
-"""
+""")
         elif tag == "Summary":
             user_input = user_input.replace(f"'<{tag}>'", "")
             agent._summarize_and_clear_history()
@@ -70,14 +70,14 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 return "", True
         elif tag == "Methodology":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            user_input += """
+            agent.set_addon_prompt("""
 请使用find_methodology工具查找相关方法论，可以使用的提问格式包括：
 1. 关于xxx的方法论有哪些？
 2. 如何解决xxx问题？
 3. xxx的最佳实践是什么？
 4. 处理xxx的标准流程是什么？
 5. 实现xxx的参考方案有哪些？
-"""
+""")
         # 移除对未知标记的警告输出
 
     return user_input, False
