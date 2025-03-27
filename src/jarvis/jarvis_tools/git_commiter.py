@@ -1,8 +1,9 @@
 import re
 import shlex
 import subprocess
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import tempfile
+from click import Option
 import yaml
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -10,6 +11,8 @@ import sys
 import argparse
 import os
 
+from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
@@ -34,7 +37,7 @@ class GitCommitTool:
         },
         "required": []
     }
-    def _extract_commit_message(self, message):
+    def _extract_commit_message(self, message)->Optional[str]:
         """Raw extraction preserving all characters"""
         r = re.search(
             r"(?i)" + ot("COMMIT_MESSAGE") + r"\s*([\s\S]*?)\s*" + ct("COMMIT_MESSAGE"),
@@ -43,7 +46,7 @@ class GitCommitTool:
         if r:
             # 直接返回原始内容，仅去除外围空白
             return shlex.quote(r.group(1).strip())
-        return "<<FORMAT VIOLATION>> Invalid commit message structure"
+        return None
 
     def _get_last_commit_hash(self):
         process = subprocess.Popen(
@@ -91,6 +94,16 @@ class GitCommitTool:
                     diff = process.communicate()[0].decode()
                     spinner.write("✅ 获取差异")
 
+                    diff_token = get_context_token_count(diff)
+                    if diff_token > get_max_token_count() - 2048:
+                        spinner.write("⚠️ 代码差异超过最大token限制，将使用git diff --cached --stat获取变更的文件")
+                        process = subprocess.Popen(
+                            ["git", "diff", "--cached", "--stat"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                        )
+                        diff = process.communicate()[0].decode()
+
                     # 生成提交信息
                     spinner.text = "正在生成提交消息..."
                     prompt = f'''根据以下规则生成提交信息：
@@ -110,9 +123,13 @@ class GitCommitTool:
         # 分析材料
         {diff}
         '''
-                    platform = PlatformRegistry().get_normal_platform()
-                    commit_message = platform.chat_until_success(prompt)
-                    commit_message = self._extract_commit_message(commit_message)
+                    while True:
+                        platform = PlatformRegistry().get_normal_platform()
+                        commit_message = platform.chat_until_success(prompt)
+                        commit_message = self._extract_commit_message(commit_message)
+                        # 重试
+                        if commit_message:
+                            break
                     spinner.write("✅ 生成提交消息")
 
                     # 执行提交
