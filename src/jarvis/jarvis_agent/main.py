@@ -61,7 +61,7 @@ def main():
                 user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
                 if not user_input:
                     break
-                agent.set_addon_prompt("如果有必要，请先指定出行动计划，然后根据计划一步步执行")
+                agent.set_addon_prompt("如果有必要，请先指定出行动计划，然后根据计划一步步执行，如果任务过于复杂，可以拆分子Agent进行执行，拆的子Agent需要掌握所有必要的任务信息，否则无法执行")
                 agent.run(user_input)
             except Exception as e:
                 PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
