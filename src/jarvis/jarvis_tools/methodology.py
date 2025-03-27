@@ -23,7 +23,7 @@ class MethodologyTool:
             },
             "problem_type": {
                 "type": "string",
-                "description": "问题类型，例如：code_review, bug_fix 等"
+                "description": "问题类型，例如：部署开源项目、生成提交信息、"
             },
             "content": {
                 "type": "string",
