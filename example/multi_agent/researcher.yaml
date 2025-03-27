@@ -72,7 +72,7 @@ agents:
 
         作为研究主导者，你的核心价值在于确保整个研究过程的科学性和严谨性，最终产出既有技术深度又有实际价值的高质量技术报告。
      platform: yuanbao
-     model_name: deepseek
+     model_name: deep_seek
      auto_complete: false
 
    - name: TechnologyExpert
@@ -143,7 +143,7 @@ agents:
 
         你的技术分析应当同时具备专业深度和实用价值，避免过于理论化或过于简化，为所有利益相关者提供既专业又可理解的技术洞察，支持基于事实的决策制定。
      platform: yuanbao
-     model_name: deepseek
+     model_name: deep_seek
      auto_complete: false
 
    - name: ImplementationExpert
@@ -214,7 +214,7 @@ agents:
 
         你的实施分析应当兼具务实性和战略性，不仅提供"如何做"的详细指导，还提供"为什么这样做"的明确理由，确保技术投资能够实现最大的业务价值，同时有效管理风险和不确定性。
      platform: yuanbao
-     model_name: deepseek
+     model_name: deep_seek
      auto_complete: false
 
 main_agent: ResearchLead
