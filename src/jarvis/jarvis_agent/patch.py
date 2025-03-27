@@ -182,9 +182,9 @@ def apply_patch(output_str: str, agent: Any) -> str:
 
                     # 增加代码变更分析和错误提示
 
-                    addon_prompt = "1. 请调用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
-                    addon_prompt += "2. 如果发现代码错误，请立即提出修复方案\n"
-                    addon_prompt += "3. 如果错误并非是本次修改引入，要询问用户是否需要立即修复\n"
+                    addon_prompt =  "1. 请调用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
+                    addon_prompt += "2. 如果发现致命的代码错误，请立即开始修复\n"
+                    addon_prompt += "3. 如果发现性能、风格等问题，要询问用户是否需要立即修复\n"
                     addon_prompt += "\n\n"
                     addon_prompt += "如果没有问题，请继续进行下一步修改\n"
                     addon_prompt += f"如果用户的需求已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
