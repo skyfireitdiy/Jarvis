@@ -1,7 +1,8 @@
 from typing import Dict, Any, Optional, List
 import os
 from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
-from typing import Dict, Any, Optional, List
+
+from jarvis.jarvis_platform.registry import PlatformRegistry
 
 class BrowserTool:
     name = "browser"
@@ -11,7 +12,7 @@ class BrowserTool:
         "properties": {
             "action": {
                 "type": "string",
-                "description": "要执行的浏览器操作，可选值: 'launch', 'goto', 'screenshot', 'content', 'click', 'type', 'close'"
+                "description": "要执行的浏览器操作，可选值: 'launch', 'goto', 'screenshot', 'extract', 'click', 'type', 'close'"
             },
             "url": {
                 "type": "string",
@@ -29,10 +30,9 @@ class BrowserTool:
                 "type": "string",
                 "description": "保存文件的路径（用于screenshot操作）"
             },
-            "browser_type": {
+            "query": {
                 "type": "string",
-                "description": "浏览器类型: 'chromium', 'firefox', 或 'webkit'",
-                "default": "chromium"
+                "description": "从页面内容中提取的信息描述（用于extract操作）"
             }
         },
         "required": ["action"]
@@ -71,7 +71,7 @@ class BrowserTool:
         action = args.get("action", "").strip().lower()
         
         # 验证操作类型
-        valid_actions = ['launch', 'goto', 'screenshot', 'content', 'click', 'type', 'close']
+        valid_actions = ['launch', 'goto', 'screenshot', 'extract', 'click', 'type', 'close']
         if action not in valid_actions:
             return {
                 "success": False,
@@ -80,23 +80,21 @@ class BrowserTool:
             }
             
         try:
-            # 根据操作类型执行相应的方法
-            if action == "launch":
-                return self._launch_browser(agent, args)
-            elif action == "close":
+            if agent.browser_data["browser"] is None or agent.browser_data["page"] is None:
+                if not self._launch_browser(agent):
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "启动浏览器失败"
+                    }
+            if action == "close":
                 return self._close_browser(agent)
-            elif agent.browser_data["browser"] is None or agent.browser_data["page"] is None:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "浏览器未启动。请先使用 'launch' 操作启动浏览器。"
-                }
             elif action == "goto":
                 return self._goto_url(agent, args)
             elif action == "screenshot":
                 return self._take_screenshot(agent, args)
-            elif action == "content":
-                return self._get_content(agent)
+            elif action == "extract":
+                return self._extract_information(agent, args)
             elif action == "click":
                 return self._click_element(agent, args)
             elif action == "type":
@@ -114,16 +112,8 @@ class BrowserTool:
                 "stderr": f"执行浏览器操作出错: {str(e)}"
             }
     
-    def _launch_browser(self, agent: Any, args: Dict[str, Any]) -> Dict[str, Any]:
-        """启动浏览器"""
-        if agent.browser_data["browser"] is not None:
-            return {
-                "success": True,
-                "stdout": "浏览器已经在运行",
-                "stderr": ""
-            }
-            
-        browser_type = args.get("browser_type", "chromium").lower()
+    def _launch_browser(self, agent: Any) -> bool:
+        browser_type = "chromium"
         headless = True
         
         # 固定视口大小为1920x1080
@@ -134,18 +124,7 @@ class BrowserTool:
             playwright = sync_playwright().start()
             agent.browser_data["playwright"] = playwright
             
-            if browser_type == "chromium":
-                browser = playwright.chromium.launch(headless=headless)
-            elif browser_type == "firefox":
-                browser = playwright.firefox.launch(headless=headless)
-            elif browser_type == "webkit":
-                browser = playwright.webkit.launch(headless=headless)
-            else:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"不支持的浏览器类型: {browser_type}。支持的类型: chromium, firefox, webkit"
-                }
+            browser = playwright.chromium.launch(headless=headless)
             
             # 创建具有固定1920x1080视口大小的上下文
             context = browser.new_context(
@@ -158,17 +137,9 @@ class BrowserTool:
             agent.browser_data["context"] = context
             agent.browser_data["page"] = page
             
-            return {
-                "success": True,
-                "stdout": f"成功启动 {browser_type} 浏览器，视口大小: 1920x1080",
-                "stderr": ""
-            }
+            return True
         except Exception as e:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"启动浏览器失败: {str(e)}"
-            }
+            return False
     
     def _close_browser(self, agent: Any) -> Dict[str, Any]:
         """关闭浏览器"""
@@ -253,20 +224,47 @@ class BrowserTool:
                 "stderr": f"截图失败: {str(e)}"
             }
     
-    def _get_content(self, agent: Any) -> Dict[str, Any]:
-        """获取页面内容"""
+    def _extract_information(self, agent: Any, args: Dict[str, Any]) -> Dict[str, Any]:
+        """从页面提取特定信息"""
+        query = args.get("query", "").strip()
+        if not query:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "未提供提取信息的查询"
+            }
+            
         try:
+            # 获取页面内容
             content = agent.browser_data["page"].content()
+            page_title = agent.browser_data["page"].title()
+            page_url = agent.browser_data["page"].url
+            
+            # 页面基本信息
+            context_info = f"页面标题: {page_title}\n页面URL: {page_url}\n\n"
+            
+            prompt = f"""
+            从以下网页内容中提取有关"{query}"的信息。
+            如果找不到相关信息，请回答"在页面中未找到关于'{query}'的信息"。
+            提取的信息应该简洁、准确，并直接回答查询，不要包含额外的解释。
+
+            网页内容:
+            {content}"""
+
+
+            model = PlatformRegistry().get_thinking_platform()
+            result = model.chat_until_success(prompt)
             return {
                 "success": True,
-                "stdout": content,
+                "stdout": result,
                 "stderr": ""
             }
+
         except Exception as e:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"获取页面内容失败: {str(e)}"
+                "stderr": f"提取信息失败: {str(e)}"
             }
     
     def _click_element(self, agent: Any, args: Dict[str, Any]) -> Dict[str, Any]:
