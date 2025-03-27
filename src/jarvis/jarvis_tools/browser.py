@@ -1,5 +1,9 @@
 from typing import Dict, Any, Optional, List
 import os
+import time
+import scipy as sp
+from yaspin import yaspin
+from yaspin.spinners import Spinners
 from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -81,24 +85,83 @@ class BrowserTool:
             
         try:
             if agent.browser_data["browser"] is None or agent.browser_data["page"] is None:
-                if not self._launch_browser(agent):
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "启动浏览器失败"
-                    }
+                with yaspin(Spinners.dots, text="正在启动浏览器...") as spinner:
+                    if not self._launch_browser(agent):
+                        spinner.text = "启动浏览器失败"
+                        spinner.fail("❌")
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": "启动浏览器失败"
+                        }
+                    spinner.text = "启动浏览器成功"
+                    spinner.ok("✅")
+                    
             if action == "close":
-                return self._close_browser(agent)
+                with yaspin(Spinners.dots, text="正在关闭浏览器...") as spinner:
+                    result = self._close_browser(agent)
+                    if result["success"]:
+                        spinner.text = "关闭浏览器成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = "关闭浏览器失败"
+                        spinner.fail("❌")
+                    return result
             elif action == "goto":
-                return self._goto_url(agent, args)
+                url = args.get("url", "").strip()
+                with yaspin(Spinners.dots, text=f"正在导航到 {url}...") as spinner:
+                    result = self._goto_url(agent, args)
+                    if result["success"]:
+                        spinner.text = f"导航到 {url} 成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = f"导航到 {url} 失败"
+                        spinner.fail("❌")
+                    return result
             elif action == "screenshot":
-                return self._take_screenshot(agent, args)
+                path = args.get("path", "screenshot.png").strip()
+                with yaspin(Spinners.dots, text=f"正在截取页面截图...") as spinner:
+                    result = self._take_screenshot(agent, args)
+                    if result["success"]:
+                        spinner.text = f"截取页面截图成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = f"截取页面截图失败"
+                        spinner.fail("❌")
+                    return result
             elif action == "extract":
-                return self._extract_information(agent, args)
+                query = args.get("query", "").strip()
+                with yaspin(Spinners.dots, text=f"正在提取信息: {query}...") as spinner:
+                    result = self._extract_information(agent, args)
+                    if result["success"]:
+                        spinner.text = f"提取信息成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = f"提取信息失败"
+                        spinner.fail("❌")
+                    return result
             elif action == "click":
-                return self._click_element(agent, args)
+                selector = args.get("selector", "").strip()
+                with yaspin(Spinners.dots, text=f"正在点击元素: {selector}...") as spinner:
+                    result = self._click_element(agent, args)
+                    if result["success"]:
+                        spinner.text = f"点击元素 {selector} 成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = f"点击元素 {selector} 失败"
+                        spinner.fail("❌")
+                    return result
             elif action == "type":
-                return self._type_text(agent, args)
+                selector = args.get("selector", "").strip()
+                with yaspin(Spinners.dots, text=f"正在输入文本到元素: {selector}...") as spinner:
+                    result = self._type_text(agent, args)
+                    if result["success"]:
+                        spinner.text = f"输入文本到元素 {selector} 成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = f"输入文本到元素 {selector} 失败"
+                        spinner.fail("❌")
+                    return result
             return {
                 "success": False,
                 "stdout": "",
@@ -251,12 +314,11 @@ class BrowserTool:
             网页内容:
             {content}"""
 
-
             model = PlatformRegistry().get_thinking_platform()
             result = model.chat_until_success(prompt)
             return {
                 "success": True,
-                "stdout": result,
+                "stdout": f"{context_info}提取结果: \n\n{result}",
                 "stderr": ""
             }
 
