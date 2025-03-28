@@ -1,12 +1,17 @@
+from multiprocessing import get_context
 from typing import Dict, Any, Optional, List
 import os
 import time
+from datetime import datetime
+from pathlib import Path
 import scipy as sp
 from yaspin import yaspin
 from yaspin.spinners import Spinners
 from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.embedding import get_context_token_count
 
 class BrowserTool:
     name = "browser"
@@ -96,6 +101,10 @@ class BrowserTool:
                         }
                     spinner.text = "启动浏览器成功"
                     spinner.ok("✅")
+            
+            # 在操作前先截图（对于非launch和close操作）
+            if action not in ['launch', 'close'] and agent.browser_data["page"] is not None:
+                self._auto_screenshot(agent, action)
                     
             if action == "close":
                 with yaspin(Spinners.dots, text="正在关闭浏览器...") as spinner:
@@ -175,6 +184,26 @@ class BrowserTool:
                 "stderr": f"执行浏览器操作出错: {str(e)}"
             }
     
+    def _auto_screenshot(self, agent: Any, action: str) -> None:
+        """在执行操作前自动截图"""
+        try:
+            # 获取agent名称，默认为"unknown"
+            agent_name = getattr(agent, "name", "unknown")
+            
+            # 创建截图保存目录
+            screenshot_dir = Path.home() / ".jarvis" / f"{agent_name}-browser"
+            screenshot_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 生成带时间戳的文件名
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            screenshot_path = screenshot_dir / f"{timestamp}-{action}.png"
+            
+            # 尝试截图
+            agent.browser_data["page"].screenshot(path=str(screenshot_path))
+        except Exception:
+            # 自动截图失败不应影响主要操作，所以捕获异常但不报错
+            pass
+    
     def _launch_browser(self, agent: Any) -> bool:
         browser_type = "chromium"
         headless = True
@@ -214,6 +243,10 @@ class BrowserTool:
             }
         
         try:
+            # 在关闭前截一张最终状态的截图
+            if agent.browser_data["page"] is not None:
+                self._auto_screenshot(agent, "final")
+                
             agent.browser_data["browser"].close()
             
             # 如果playwright存在，关闭它
@@ -313,6 +346,9 @@ class BrowserTool:
 
             网页内容:
             {content}"""
+
+            if get_context_token_count(prompt) > get_max_token_count() - 2048:
+                pass
 
             model = PlatformRegistry().get_thinking_platform()
             result = model.chat_until_success(prompt)
