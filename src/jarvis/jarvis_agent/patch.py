@@ -110,7 +110,7 @@ def _parse_patch(patch_str: str) -> Dict[str, str]:
             if not sm:
                 PrettyOutput.print("无效的补丁格式", OutputType.WARNING)
                 continue
-            filepath = sm.group(1).strip()
+            filepath = os.path.abspath(sm.group(1).strip())
             if filepath not in result:
                 result[filepath] = patch
             else:
@@ -134,7 +134,8 @@ def apply_patch(output_str: str, agent: Any) -> str:
 
         not_read_file = [f for f in patches.keys() if not has_read_file(f)]
         if not_read_file:
-            yaspin.write(f"❌ 以下文件未读取: {not_read_file}，应用补丁存在风险，将先读取文件后再生成补丁", color="red")
+            spinner.text=f"以下文件未读取: {not_read_file}，应用补丁存在风险，将先读取文件后再生成补丁"
+            spinner.fail("❌")
             return f"以下文件未读取: {not_read_file}，应用补丁存在风险，请先读取文件后再生成补丁"
 
         # 按文件逐个处理
