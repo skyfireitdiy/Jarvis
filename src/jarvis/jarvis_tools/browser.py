@@ -347,8 +347,27 @@ class BrowserTool:
             网页内容:
             {content}"""
 
+            # 检查token限制
             if get_context_token_count(prompt) > get_max_token_count() - 2048:
-                pass
+                # 尝试转换为markdown格式
+                from jarvis.jarvis_utils.utils import html_to_markdown
+                markdown_content = html_to_markdown(content, page_url)
+                markdown_prompt = f"""
+                从以下网页内容中提取有关"{query}"的信息。
+                如果找不到相关信息，请回答"在页面中未找到关于'{query}'的信息"。
+                提取的信息应该简洁、准确，并直接回答查询，不要包含额外的解释。
+
+                网页内容(已转换为Markdown):
+                {markdown_content}"""
+                
+                # 再次检查token限制
+                if get_context_token_count(markdown_prompt) > get_max_token_count() - 2048:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "网页内容过大，无法处理"
+                    }
+                prompt = markdown_prompt
 
             model = PlatformRegistry().get_thinking_platform()
             result = model.chat_until_success(prompt)
