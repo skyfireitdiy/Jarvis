@@ -1,0 +1,275 @@
+from typing import Dict, Any, Optional
+import os
+import time
+import pty
+import termios
+import fcntl
+import signal
+import select
+from datetime import datetime
+from pathlib import Path
+from yaspin import yaspin
+from yaspin.spinners import Spinners
+
+class TTYTool:
+    name = "tty"
+    description = "控制虚拟终端执行各种操作，如启动终端、输入命令、获取输出等。"
+    parameters = {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "description": "要执行的终端操作，可选值: 'launch', 'input', 'output', 'close'"
+            },
+            "command": {
+                "type": "string",
+                "description": "要执行的命令（用于input操作）"
+            },
+            "timeout": {
+                "type": "number",
+                "description": "等待输出的超时时间（秒，用于input操作）"
+            }
+        },
+        "required": ["action"]
+    }
+
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """执行终端操作
+
+        参数:
+            args: 包含操作参数的字典，包括agent属性
+
+        返回:
+            字典，包含以下内容：
+                - success: 布尔值，表示操作状态
+                - stdout: 成功消息或操作结果
+                - stderr: 错误消息或空字符串
+        """
+        # 获取agent对象
+        agent = args.get("agent")
+        if agent is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "未提供agent对象"
+            }
+            
+        # 确保agent有tty属性字典
+        if not hasattr(agent, "tty_data"):
+            agent.tty_data = {
+                "master_fd": None,
+                "pid": None,
+                "shell": os.environ.get("SHELL", "/bin/bash")
+            }
+            
+        action = args.get("action", "").strip().lower()
+        
+        # 验证操作类型
+        valid_actions = ['launch', 'input', 'output', 'close']
+        if action not in valid_actions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"不支持的操作: {action}。有效操作: {', '.join(valid_actions)}"
+            }
+            
+        try:
+            if action == "launch":
+                with yaspin(Spinners.dots, text="正在启动虚拟终端...") as spinner:
+                    result = self._launch_tty(agent)
+                    if result["success"]:
+                        spinner.text = "启动虚拟终端成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = "启动虚拟终端失败"
+                        spinner.fail("❌")
+                    return result
+            elif action == "input":
+                command = args.get("command", "").strip()
+                timeout = args.get("timeout", 5.0)  # 默认5秒超时
+                with yaspin(Spinners.dots, text=f"正在执行命令: {command}...") as spinner:
+                    result = self._input_command(agent, command, timeout)
+                    if result["success"]:
+                        spinner.text = f"执行命令 {command} 成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = f"执行命令 {command} 失败"
+                        spinner.fail("❌")
+                    return result
+            elif action == "output":
+                with yaspin(Spinners.dots, text="正在获取终端输出...") as spinner:
+                    result = self._get_output(agent)
+                    if result["success"]:
+                        spinner.text = "获取终端输出成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = "获取终端输出失败"
+                        spinner.fail("❌")
+                    return result
+            elif action == "close":
+                with yaspin(Spinners.dots, text="正在关闭虚拟终端...") as spinner:
+                    result = self._close_tty(agent)
+                    if result["success"]:
+                        spinner.text = "关闭虚拟终端成功"
+                        spinner.ok("✅")
+                    else:
+                        spinner.text = "关闭虚拟终端失败"
+                        spinner.fail("❌")
+                    return result
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "不支持的操作"
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"执行终端操作出错: {str(e)}"
+            }
+    
+    def _launch_tty(self, agent: Any) -> Dict[str, Any]:
+        """启动虚拟终端"""
+        try:
+            # 创建伪终端
+            pid, master_fd = pty.fork()
+            
+            if pid == 0:  # 子进程
+                # 执行shell
+                os.execvp(agent.tty_data["shell"], [agent.tty_data["shell"]])
+            else:  # 父进程
+                # 设置非阻塞模式
+                fcntl.fcntl(master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+                
+                # 保存终端状态
+                agent.tty_data["master_fd"] = master_fd
+                agent.tty_data["pid"] = pid
+                
+                return {
+                    "success": True,
+                    "stdout": "虚拟终端已启动",
+                    "stderr": ""
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"启动虚拟终端失败: {str(e)}"
+            }
+    
+    def _input_command(self, agent: Any, command: str, timeout: float) -> Dict[str, Any]:
+        """输入命令并等待输出"""
+        if agent.tty_data["master_fd"] is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "虚拟终端未启动"
+            }
+            
+        try:
+            # 添加换行符并发送命令
+            os.write(agent.tty_data["master_fd"], (command + "\n").encode())
+            
+            # 等待输出
+            output = ""
+            start_time = time.time()
+            
+            while time.time() - start_time < timeout:
+                try:
+                    # 使用select等待数据可读
+                    r, _, _ = select.select([agent.tty_data["master_fd"]], [], [], 0.1)
+                    if r:
+                        data = os.read(agent.tty_data["master_fd"], 1024)
+                        if data:
+                            output += data.decode()
+                except BlockingIOError:
+                    continue
+                    
+            return {
+                "success": True,
+                "stdout": output,
+                "stderr": ""
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"执行命令失败: {str(e)}"
+            }
+    
+    def _get_output(self, agent: Any) -> Dict[str, Any]:
+        """获取终端输出"""
+        if agent.tty_data["master_fd"] is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "虚拟终端未启动"
+            }
+            
+        try:
+            output = ""
+            # 使用select等待数据可读
+            r, _, _ = select.select([agent.tty_data["master_fd"]], [], [], 0.1)
+            if r:
+                while True:
+                    try:
+                        data = os.read(agent.tty_data["master_fd"], 1024)
+                        if data:
+                            output += data.decode()
+                        else:
+                            break
+                    except BlockingIOError:
+                        break
+                        
+            return {
+                "success": True,
+                "stdout": output,
+                "stderr": ""
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取输出失败: {str(e)}"
+            }
+    
+    def _close_tty(self, agent: Any) -> Dict[str, Any]:
+        """关闭虚拟终端"""
+        if agent.tty_data["master_fd"] is None:
+            return {
+                "success": True,
+                "stdout": "没有正在运行的虚拟终端",
+                "stderr": ""
+            }
+            
+        try:
+            # 关闭主文件描述符
+            os.close(agent.tty_data["master_fd"])
+            
+            # 终止子进程
+            if agent.tty_data["pid"]:
+                os.kill(agent.tty_data["pid"], signal.SIGTERM)
+                
+            # 清除终端数据
+            agent.tty_data = {
+                "master_fd": None,
+                "pid": None,
+                "shell": os.environ.get("SHELL", "/bin/bash")
+            }
+            
+            return {
+                "success": True,
+                "stdout": "虚拟终端已关闭",
+                "stderr": ""
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"关闭虚拟终端失败: {str(e)}"
+            }
