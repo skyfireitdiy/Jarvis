@@ -5,6 +5,7 @@ from urllib.parse import urlparse, urljoin
 import re
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import html_to_markdown
 
 class WebpageTool:
     name = "read_webpage"
@@ -79,7 +80,7 @@ class WebpageTool:
                     browser.close()
 
                 # Parse with BeautifulSoup and convert to markdown
-                markdown_content = self._html_to_markdown(html_content, url)
+                markdown_content = html_to_markdown(html_content, url)
 
                 # Build output in markdown format
                 output = [
