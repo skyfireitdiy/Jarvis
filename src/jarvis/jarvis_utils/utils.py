@@ -2,16 +2,17 @@ import os
 import time
 import hashlib
 from pathlib import Path
-from typing import Dict
+from typing import Union, List, Dict, Any, Callable, cast
 import psutil
 from bs4 import BeautifulSoup, Tag
+from bs4.element import NavigableString, PageElement
 from urllib.parse import urljoin
 import re
 from jarvis.jarvis_utils.config import get_max_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-def init_env():
+def init_env() -> None:
     """初始化环境变量从~/.jarvis/env文件
 
     功能：
@@ -38,7 +39,7 @@ def init_env():
                             continue
         except Exception as e:
             PrettyOutput.print(f"警告: 读取 {env_file} 失败: {e}", OutputType.WARNING)
-def while_success(func, sleep_time: float = 0.1):
+def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
     """循环执行函数直到成功
 
     参数：
@@ -55,7 +56,7 @@ def while_success(func, sleep_time: float = 0.1):
             PrettyOutput.print(f"执行失败: {str(e)}, 等待 {sleep_time}s...", OutputType.ERROR)
             time.sleep(sleep_time)
             continue
-def while_true(func, sleep_time: float = 0.1):
+def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> bool:
     """Loop execution function, until the function returns True"""
     while True:
         ret = func()
@@ -103,7 +104,7 @@ def get_file_line_count(filename: str) -> int:
         return 0
 
 
-def is_long_context(files: list) -> bool:
+def is_long_context(files: List[str]) -> bool:
     """检查文件列表是否属于长上下文
 
     判断标准：
@@ -157,106 +158,68 @@ def ct(tag_name: str) -> str:
     return f"</{tag_name}>"
 
 
-def create_soup_element(content):
-    """Safely create a BeautifulSoup element, ensuring it's treated as markup"""
+def create_soup_element(content: Union[str, Tag, List[Any]]) -> List[Union[Tag, str]]:
+    """Safely create a BeautifulSoup element, ensuring it's treated as markup
+    
+    Args:
+        content: Input content to convert to BeautifulSoup elements
+    Returns:
+        List of BeautifulSoup elements or strings
+    """
     if isinstance(content, str):
         # Create a wrapper tag to ensure proper parsing
         soup_div = BeautifulSoup(f"<div>{content}</div>", 'html.parser').div
         if soup_div is not None:
-            return soup_div.contents
-        # Return an empty list if the div is None
+            return [cast(Union[Tag, str], el) for el in soup_div.contents]
         return []
-    return content
+    elif isinstance(content, list):
+        return content
+    return [content]
 
 def html_to_markdown(html_content: str, base_url: str) -> str:
     """Convert HTML to Markdown format preserving the content structure"""
-    soup = BeautifulSoup(html_content, 'html.parser')
+    soup: BeautifulSoup = BeautifulSoup(html_content, 'html.parser')
+
+    def process_tag(tag: Tag) -> str:
+        """Helper function to process individual tags"""
+        if tag.name == 'a':
+            href = str(tag.get('href', ''))
+            text = tag.get_text().strip()
+            if text and href:
+                if href.startswith('/') and not href.startswith('//'):
+                    href = urljoin(base_url, href)
+                return f"[{text}]({href})"
+        elif tag.name == 'img':
+            src = str(tag.get('src', ''))
+            alt = str(tag.get('alt', 'Image')).strip()
+            if src.startswith('/') and not src.startswith('//'):
+                src = urljoin(base_url, src)
+            return f"![{alt}]({src})"
+        elif tag.name == 'pre':
+            return f"\n\n```\n{tag.get_text().strip()}\n```\n\n"
+        elif tag.name == 'code':
+            return f"`{tag.get_text().strip()}`"
+        elif tag.name == 'br':
+            return '\n'
+        return tag.get_text().strip()
 
     # Remove unwanted elements
     for element in soup(['script', 'style', 'meta', 'noscript', 'head']):
         element.decompose()
 
-    # Process headings
-    for level in range(1, 7):
-        for heading in soup.find_all(f'h{level}'):
-            text = heading.get_text().strip()
-            heading_md = "\n\n" + "#" * level + " " + text + "\n\n"
-            new_element = create_soup_element(heading_md)
-            heading.replace_with(*new_element)
-
-    # Process paragraphs
-    for p in soup.find_all('p'):
-        text = p.get_text().strip()
-        if text:
-            new_element = create_soup_element("\n\n" + text + "\n\n")
-            p.replace_with(*new_element)
-
-    # Process unordered lists
-    for ul in soup.find_all('ul'):
-        items = []
-        for li in ul.find_all('li', recursive=False):
-            items.append("* " + li.get_text().strip())
-        new_element = create_soup_element("\n\n" + "\n".join(items) + "\n\n")
-        ul.replace_with(*new_element)
-
-    # Process ordered lists
-    for ol in soup.find_all('ol'):
-        items = []
-        for i, li in enumerate(ol.find_all('li', recursive=False), 1):
-            items.append(str(i) + ". " + li.get_text().strip())
-        new_element = create_soup_element("\n\n" + "\n".join(items) + "\n\n")
-        ol.replace_with(*new_element)
-
-    # Process links (first pass)
-    for a in soup.find_all('a', href=True):
-        try:
-            href = a['href']
-            text = a.get_text().strip()
-            if text and href:
-                # Convert relative URLs to absolute
-                if href.startswith('/') and not href.startswith('//'):
-                    href = urljoin(base_url, href)
-                link_md = "[" + text + "](" + href + ")"
-                new_element = create_soup_element(link_md)
-                a.replace_with(*new_element)
-        except (KeyError, AttributeError):
-            continue
-
-    # Process images
-    for img in soup.find_all('img', src=True):
-        try:
-            src = img['src']
-            alt = img.get('alt', 'Image').strip()
-            # Convert relative URLs to absolute
-            if src.startswith('/') and not src.startswith('//'):
-                src = urljoin(base_url, src)
-            img_md = "![" + alt + "](" + src + ")"
-            new_element = create_soup_element(img_md)
-            img.replace_with(*new_element)
-        except (KeyError, AttributeError, UnboundLocalError):
-            continue
-
-    # Process code blocks
-    for pre in soup.find_all('pre'):
-        code = pre.get_text().strip()
-        pre_md = "\n\n```\n" + code + "\n```\n\n"
-        new_element = create_soup_element(pre_md)
-        pre.replace_with(*new_element)
-
-    # Process inline code
-    for code in soup.find_all('code'):
-        text = code.get_text().strip()
-        code_md = "`" + text + "`"
-        new_element = create_soup_element(code_md)
-        code.replace_with(*new_element)
-
-    # Process line breaks
-    for br in soup.find_all('br'):
-        new_element = create_soup_element('\n')
-        br.replace_with(*new_element)
+    # Process all supported tags
+    for tag_name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'a', 'img', 'pre', 'code', 'br']:
+        for tag in soup.find_all(tag_name):
+            if isinstance(tag, Tag):
+                processed = process_tag(tag)
+                if processed:
+                    # 直接创建新的Tag元素而不是使用字符串
+                    new_tag = soup.new_tag("div")
+                    new_tag.string = processed
+                    tag.replace_with(new_tag)
 
     # Get the full text
-    markdown_text = soup.get_text()
+    markdown_text = str(soup.get_text())
 
     # Clean up extra whitespace and line breaks
     markdown_text = re.sub(r'\n{3,}', '\n\n', markdown_text)
