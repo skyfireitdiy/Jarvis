@@ -1,18 +1,15 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import os
 import time
 import pty
-import termios
 import fcntl
 import signal
 import select
-from datetime import datetime
-from pathlib import Path
 from yaspin import yaspin
 from yaspin.spinners import Spinners
 
-class TTYTool:
-    name = "tty"
+class VirtualTTYTool:
+    name = "virtual_tty"
     description = "控制虚拟终端执行各种操作，如启动终端、输入命令、获取输出等。"
     parameters = {
         "type": "object",
