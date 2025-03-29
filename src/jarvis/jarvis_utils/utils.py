@@ -242,3 +242,182 @@ def html_to_markdown(html_content: str, base_url: str) -> str:
         markdown_text += "\n\n" + "\n".join(link_section)
 
     return markdown_text.strip()
+
+def extract_interactive_elements(html_content: str) -> List[Dict[str, Any]]:
+    """Extract all interactive elements from HTML content with their properties.
+    
+    Args:
+        html_content: HTML content to parse
+        
+    Returns:
+        List of dictionaries containing element properties:
+        - xpath: XPath of the element
+        - tag: HTML tag name
+        - text: Text content
+        - is_clickable: Whether element is clickable
+        - is_input: Whether element is an input field
+        - is_select: Whether element is a select dropdown
+    """
+    soup = BeautifulSoup(html_content, 'html.parser')
+    interactive_elements = []
+    
+    # Define interactive tags
+    clickable_tags = {'a', 'button', 'input', 'select', 'textarea'}
+    input_tags = {'input', 'textarea', 'select'}
+    
+    def get_xpath(element: Tag) -> str:
+        """Generate XPath for an element"""
+        components = []
+        current = element
+        
+        while current and current.name:
+            siblings = current.find_previous_siblings(current.name)
+            index = len(siblings) + 1
+            components.append(f"{current.name}[{index}]")
+            current = current.parent
+            
+        return "/".join(reversed(components))
+    
+    def process_element(element: Tag) -> None:
+        """Process a single element and add it to interactive_elements if it's interactive"""
+        tag_name = element.name.lower()
+        
+        # Skip non-interactive elements
+        if tag_name not in clickable_tags and not element.find_parent(clickable_tags):
+            return
+            
+        # Get element properties
+        element_info = {
+            'xpath': get_xpath(element),
+            'tag': tag_name,
+            'text': element.get_text().strip(),
+            'is_clickable': tag_name in clickable_tags or bool(element.find_parent('a')) or bool(element.find_parent('button')),
+            'is_input': tag_name in input_tags,
+            'is_select': tag_name == 'select'
+        }
+        
+        # Add additional properties for input elements
+        if element_info['is_input']:
+            element_info['input_type'] = element.get('type', 'text')
+            element_info['name'] = element.get('name', '')
+            element_info['value'] = element.get('value', '')
+            
+        # Add options for select elements
+        if element_info['is_select']:
+            element_info['options'] = [
+                {'value': opt.get('value', ''), 'text': opt.get_text().strip()}
+                for opt in element.find_all('option')
+                if isinstance(opt, Tag)
+            ]
+            
+        interactive_elements.append(element_info)
+    
+    # Process all elements
+    for element in soup.find_all():
+        if isinstance(element, Tag):
+            process_element(element)
+    
+    return interactive_elements
+
+def extract_display_elements(html_content: str) -> List[Dict[str, Any]]:
+    """Extract all display elements from HTML content with their properties.
+    
+    Args:
+        html_content: HTML content to parse
+        
+    Returns:
+        List of dictionaries containing element properties:
+        - xpath: XPath of the element
+        - tag: HTML tag name
+        - text: Text content
+        - heading_level: Heading level (1-6) if the element is a heading
+        - is_list: Whether the element is a list
+        - is_list_item: Whether the element is a list item
+        - is_table: Whether the element is a table
+        - is_table_cell: Whether the element is a table cell
+    """
+    soup = BeautifulSoup(html_content, 'html.parser')
+    display_elements = []
+    
+    # Define display tags
+    display_tags = {
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',  # Headings
+        'p', 'div', 'span',                   # Text containers
+        'ul', 'ol', 'li',                     # Lists
+        'table', 'tr', 'td', 'th',            # Tables
+        'article', 'section', 'main',         # Content sections
+        'header', 'footer', 'nav',            # Layout sections
+        'aside', 'figure', 'figcaption'       # Side content
+    }
+    
+    # Define interactive tags to exclude
+    interactive_tags = {'a', 'button', 'input', 'select', 'textarea', 'form'}
+    
+    def get_xpath(element: Tag) -> str:
+        """Generate XPath for an element"""
+        components = []
+        current = element
+        
+        while current and current.name:
+            siblings = current.find_previous_siblings(current.name)
+            index = len(siblings) + 1
+            components.append(f"{current.name}[{index}]")
+            current = current.parent
+            
+        return "/".join(reversed(components))
+    
+    def process_element(element: Tag) -> None:
+        """Process a single element and add it to display_elements if it's a display element"""
+        tag_name = element.name.lower()
+        
+        # Skip non-display elements and interactive elements
+        if tag_name not in display_tags or element.find_parent(interactive_tags):
+            return
+            
+        # Get text content
+        text = element.get_text().strip()
+        if not text:  # Skip empty elements
+            return
+            
+        # Get element properties
+        element_info = {
+            'xpath': get_xpath(element),
+            'tag': tag_name,
+            'text': text,
+            'heading_level': int(tag_name[1]) if tag_name.startswith('h') and len(tag_name) == 2 else None,
+            'is_list': tag_name in {'ul', 'ol'},
+            'is_list_item': tag_name == 'li',
+            'is_table': tag_name == 'table',
+            'is_table_cell': tag_name in {'td', 'th'}
+        }
+        
+        # Add list-specific properties
+        if element_info['is_list']:
+            element_info['list_items'] = [
+                {'text': li.get_text().strip()}
+                for li in element.find_all('li')
+                if isinstance(li, Tag)
+            ]
+            
+        # Add table-specific properties
+        if element_info['is_table']:
+            element_info['table_rows'] = [
+                {
+                    'cells': [
+                        {'text': cell.get_text().strip(), 'is_header': cell.name == 'th'}
+                        for cell in row.find_all(['td', 'th'])
+                        if isinstance(cell, Tag)
+                    ]
+                }
+                for row in element.find_all('tr')
+                if isinstance(row, Tag)
+            ]
+            
+        display_elements.append(element_info)
+    
+    # Process all elements
+    for element in soup.find_all():
+        if isinstance(element, Tag):
+            process_element(element)
+    
+    return display_elements
