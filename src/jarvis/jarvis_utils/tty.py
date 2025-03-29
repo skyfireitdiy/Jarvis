@@ -19,15 +19,15 @@ class TTYTool:
         "properties": {
             "action": {
                 "type": "string",
-                "description": "要执行的终端操作，可选值: 'launch', 'input', 'output', 'close'"
+                "description": "要执行的终端操作，可选值: 'launch', 'send_keys', 'output', 'close'"
             },
-            "command": {
+            "keys": {
                 "type": "string",
-                "description": "要执行的命令（用于input操作）"
+                "description": "要发送的按键序列（用于send_keys操作），例如：'ls\\n'表示输入ls后按回车"
             },
             "timeout": {
                 "type": "number",
-                "description": "等待输出的超时时间（秒，用于input操作）"
+                "description": "等待输出的超时时间（秒，用于send_keys操作）"
             }
         },
         "required": ["action"]
@@ -65,7 +65,7 @@ class TTYTool:
         action = args.get("action", "").strip().lower()
         
         # 验证操作类型
-        valid_actions = ['launch', 'input', 'output', 'close']
+        valid_actions = ['launch', 'send_keys', 'output', 'close']
         if action not in valid_actions:
             return {
                 "success": False,
@@ -84,16 +84,16 @@ class TTYTool:
                         spinner.text = "启动虚拟终端失败"
                         spinner.fail("❌")
                     return result
-            elif action == "input":
-                command = args.get("command", "").strip()
+            elif action == "send_keys":
+                keys = args.get("keys", "").strip()
                 timeout = args.get("timeout", 5.0)  # 默认5秒超时
-                with yaspin(Spinners.dots, text=f"正在执行命令: {command}...") as spinner:
-                    result = self._input_command(agent, command, timeout)
+                with yaspin(Spinners.dots, text=f"正在发送按键序列: {keys}...") as spinner:
+                    result = self._input_command(agent, keys, timeout)
                     if result["success"]:
-                        spinner.text = f"执行命令 {command} 成功"
+                        spinner.text = f"发送按键序列 {keys} 成功"
                         spinner.ok("✅")
                     else:
-                        spinner.text = f"执行命令 {command} 失败"
+                        spinner.text = f"发送按键序列 {keys} 失败"
                         spinner.fail("❌")
                     return result
             elif action == "output":
@@ -169,8 +169,8 @@ class TTYTool:
             }
             
         try:
-            # 添加换行符并发送命令
-            os.write(agent.tty_data["master_fd"], (command + "\n").encode())
+            # 直接发送按键序列，不添加换行符
+            os.write(agent.tty_data["master_fd"], command.encode())
             
             # 等待输出
             output = ""
