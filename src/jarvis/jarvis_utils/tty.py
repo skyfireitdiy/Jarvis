@@ -27,7 +27,7 @@ class TTYTool:
             },
             "timeout": {
                 "type": "number",
-                "description": "等待输出的超时时间（秒，用于send_keys操作）"
+                "description": "等待输出的超时时间（秒），用于send_keys和output操作"
             }
         },
         "required": ["action"]
@@ -97,8 +97,9 @@ class TTYTool:
                         spinner.fail("❌")
                     return result
             elif action == "output":
+                timeout = args.get("timeout", 5.0)  # 默认5秒超时
                 with yaspin(Spinners.dots, text="正在获取终端输出...") as spinner:
-                    result = self._get_output(agent)
+                    result = self._get_output(agent, timeout)
                     if result["success"]:
                         spinner.text = "获取终端输出成功"
                         spinner.ok("✅")
@@ -200,7 +201,7 @@ class TTYTool:
                 "stderr": f"执行命令失败: {str(e)}"
             }
     
-    def _get_output(self, agent: Any) -> Dict[str, Any]:
+    def _get_output(self, agent: Any, timeout: float = 5.0) -> Dict[str, Any]:
         """获取终端输出"""
         if agent.tty_data["master_fd"] is None:
             return {
@@ -211,18 +212,21 @@ class TTYTool:
             
         try:
             output = ""
-            # 使用select等待数据可读
-            r, _, _ = select.select([agent.tty_data["master_fd"]], [], [], 0.1)
-            if r:
-                while True:
-                    try:
-                        data = os.read(agent.tty_data["master_fd"], 1024)
-                        if data:
-                            output += data.decode()
-                        else:
+            start_time = time.time()
+            
+            while time.time() - start_time < timeout:
+                # 使用select等待数据可读
+                r, _, _ = select.select([agent.tty_data["master_fd"]], [], [], 0.1)
+                if r:
+                    while True:
+                        try:
+                            data = os.read(agent.tty_data["master_fd"], 1024)
+                            if data:
+                                output += data.decode()
+                            else:
+                                break
+                        except BlockingIOError:
                             break
-                    except BlockingIOError:
-                        break
                         
             return {
                 "success": True,
