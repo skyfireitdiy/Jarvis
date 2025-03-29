@@ -5,8 +5,6 @@ import pty
 import fcntl
 import signal
 import select
-from yaspin import yaspin
-from yaspin.spinners import Spinners
 
 class VirtualTTYTool:
     name = "virtual_tty"
@@ -20,7 +18,11 @@ class VirtualTTYTool:
             },
             "keys": {
                 "type": "string",
-                "description": "要发送的按键序列（用于send_keys操作），例如：'ls\\n'表示输入ls后按回车"
+                "description": "要发送的按键序列（用于send_keys操作）。"
+            },
+            "add_enter": {
+                "type": "boolean",
+                "description": "是否在按键序列末尾添加回车符（\\n），默认为false"
             },
             "timeout": {
                 "type": "number",
@@ -56,7 +58,7 @@ class VirtualTTYTool:
             agent.tty_data = {
                 "master_fd": None,
                 "pid": None,
-                "shell": os.environ.get("SHELL", "/bin/bash")
+                "shell": "/bin/bash"
             }
             
         action = args.get("action", "").strip().lower()
@@ -72,48 +74,41 @@ class VirtualTTYTool:
             
         try:
             if action == "launch":
-                with yaspin(Spinners.dots, text="正在启动虚拟终端...") as spinner:
-                    result = self._launch_tty(agent)
-                    if result["success"]:
-                        spinner.text = "启动虚拟终端成功"
-                        spinner.ok("✅")
-                    else:
-                        spinner.text = "启动虚拟终端失败"
-                        spinner.fail("❌")
-                    return result
+                print("🚀 正在启动虚拟终端...")
+                result = self._launch_tty(agent)
+                if result["success"]:
+                    print("✅ 启动虚拟终端成功")
+                else:
+                    print("❌ 启动虚拟终端失败")
+                return result
             elif action == "send_keys":
                 keys = args.get("keys", "").strip()
+                add_enter = args.get("add_enter", False)
                 timeout = args.get("timeout", 5.0)  # 默认5秒超时
-                with yaspin(Spinners.dots, text=f"正在发送按键序列: {keys}...") as spinner:
-                    result = self._input_command(agent, keys, timeout)
-                    if result["success"]:
-                        spinner.text = f"发送按键序列 {keys} 成功"
-                        spinner.ok("✅")
-                    else:
-                        spinner.text = f"发送按键序列 {keys} 失败"
-                        spinner.fail("❌")
-                    return result
+                print(f"⌨️ 正在发送按键序列: {keys}...")
+                result = self._input_command(agent, keys, timeout, add_enter)
+                if result["success"]:
+                    print(f"✅ 发送按键序列 {keys} 成功")
+                else:
+                    print(f"❌ 发送按键序列 {keys} 失败")
+                return result
             elif action == "output":
                 timeout = args.get("timeout", 5.0)  # 默认5秒超时
-                with yaspin(Spinners.dots, text="正在获取终端输出...") as spinner:
-                    result = self._get_output(agent, timeout)
-                    if result["success"]:
-                        spinner.text = "获取终端输出成功"
-                        spinner.ok("✅")
-                    else:
-                        spinner.text = "获取终端输出失败"
-                        spinner.fail("❌")
-                    return result
+                print("📥 正在获取终端输出...")
+                result = self._get_output(agent, timeout)
+                if result["success"]:
+                    print("✅ 获取终端输出成功")
+                else:
+                    print("❌ 获取终端输出失败")
+                return result
             elif action == "close":
-                with yaspin(Spinners.dots, text="正在关闭虚拟终端...") as spinner:
-                    result = self._close_tty(agent)
-                    if result["success"]:
-                        spinner.text = "关闭虚拟终端成功"
-                        spinner.ok("✅")
-                    else:
-                        spinner.text = "关闭虚拟终端失败"
-                        spinner.fail("❌")
-                    return result
+                print("🔒 正在关闭虚拟终端...")
+                result = self._close_tty(agent)
+                if result["success"]:
+                    print("✅ 关闭虚拟终端成功")
+                else:
+                    print("❌ 关闭虚拟终端失败")
+                return result
             return {
                 "success": False,
                 "stdout": "",
@@ -144,9 +139,25 @@ class VirtualTTYTool:
                 agent.tty_data["master_fd"] = master_fd
                 agent.tty_data["pid"] = pid
                 
+                # 读取初始输出
+                output = ""
+                start_time = time.time()
+                while time.time() - start_time < 2.0:  # 最多等待2秒
+                    try:
+                        r, _, _ = select.select([master_fd], [], [], 0.1)
+                        if r:
+                            data = os.read(master_fd, 1024)
+                            if data:
+                                output += data.decode()
+                    except BlockingIOError:
+                        continue
+                
+                if output:
+                    print(f"📤 {output}")
+                
                 return {
                     "success": True,
-                    "stdout": "虚拟终端已启动",
+                    "stdout": output,
                     "stderr": ""
                 }
                 
@@ -157,7 +168,7 @@ class VirtualTTYTool:
                 "stderr": f"启动虚拟终端失败: {str(e)}"
             }
     
-    def _input_command(self, agent: Any, command: str, timeout: float) -> Dict[str, Any]:
+    def _input_command(self, agent: Any, command: str, timeout: float, add_enter: bool = False) -> Dict[str, Any]:
         """输入命令并等待输出"""
         if agent.tty_data["master_fd"] is None:
             return {
@@ -167,7 +178,11 @@ class VirtualTTYTool:
             }
             
         try:
-            # 直接发送按键序列，不添加换行符
+            # 根据add_enter参数决定是否添加换行符
+            if add_enter:
+                command = command + "\n"
+                
+            # 发送按键序列
             os.write(agent.tty_data["master_fd"], command.encode())
             
             # 等待输出
@@ -184,7 +199,7 @@ class VirtualTTYTool:
                             output += data.decode()
                 except BlockingIOError:
                     continue
-                    
+            print(f"📤 {output}")
             return {
                 "success": True,
                 "stdout": output,
@@ -224,6 +239,7 @@ class VirtualTTYTool:
                                 break
                         except BlockingIOError:
                             break
+            print(f"📤 {output}")
                         
             return {
                 "success": True,
@@ -259,7 +275,7 @@ class VirtualTTYTool:
             agent.tty_data = {
                 "master_fd": None,
                 "pid": None,
-                "shell": os.environ.get("SHELL", "/bin/bash")
+                "shell": "/bin/bash"
             }
             
             return {
