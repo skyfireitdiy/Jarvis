@@ -15,7 +15,7 @@ class VirtualTTYTool:
         "properties": {
             "action": {
                 "type": "string",
-                "description": "要执行的终端操作，可选值: 'launch', 'send_keys', 'output', 'close'"
+                "description": "要执行的终端操作，可选值: 'launch', 'send_keys', 'output', 'close', 'get_screen'"
             },
             "keys": {
                 "type": "string",
@@ -65,7 +65,7 @@ class VirtualTTYTool:
         action = args.get("action", "").strip().lower()
         
         # 验证操作类型
-        valid_actions = ['launch', 'send_keys', 'output', 'close']
+        valid_actions = ['launch', 'send_keys', 'output', 'close', 'get_screen']
         if action not in valid_actions:
             return {
                 "success": False,
@@ -109,6 +109,14 @@ class VirtualTTYTool:
                     print("✅ 关闭虚拟终端成功")
                 else:
                     print("❌ 关闭虚拟终端失败")
+                return result
+            elif action == "get_screen":
+                print("🖥️ 正在获取终端屏幕内容...")
+                result = self._get_screen(agent)
+                if result["success"]:
+                    print("✅ 获取终端屏幕内容成功")
+                else:
+                    print("❌ 获取终端屏幕内容失败")
                 return result
             return {
                 "success": False,
@@ -290,4 +298,46 @@ class VirtualTTYTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"关闭虚拟终端失败: {str(e)}"
+            }
+
+    def _get_screen(self, agent: Any) -> Dict[str, Any]:
+        """获取当前终端屏幕内容"""
+        if agent.tty_data["master_fd"] is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "虚拟终端未启动"
+            }
+            
+        try:
+            # 发送控制序列获取屏幕内容
+            os.write(agent.tty_data["master_fd"], b"\x1b[2J\x1b[H\x1b[999;999H\x1b[6n")
+            
+            # 读取响应
+            output = ""
+            start_time = time.time()
+            while time.time() - start_time < 2.0:  # 最多等待2秒
+                try:
+                    r, _, _ = select.select([agent.tty_data["master_fd"]], [], [], 0.1)
+                    if r:
+                        data = os.read(agent.tty_data["master_fd"], 1024)
+                        if data:
+                            output += data.decode()
+                except BlockingIOError:
+                    continue
+            
+            # 清理控制字符
+            output = output.replace("\x1b[2J", "").replace("\x1b[H", "").replace("\x1b[999;999H", "").replace("\x1b[6n", "")
+            
+            return {
+                "success": True,
+                "stdout": output.strip(),
+                "stderr": ""
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取屏幕内容失败: {str(e)}"
             }
