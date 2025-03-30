@@ -1,11 +1,6 @@
-from typing import Dict, Any, List, Union, Sequence, cast
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-from bs4 import BeautifulSoup, Tag
-from bs4.element import NavigableString  # 正确导入NavigableString
-from urllib.parse import urlparse, urljoin
-import re
-
-from jarvis.jarvis_utils.config import get_browser_headless
+from typing import Dict, Any
+import os
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class WebpageTool:
@@ -23,79 +18,31 @@ class WebpageTool:
         "required": ["url"]
     }
 
+    @staticmethod
+    def check() -> bool:
+        return os.getenv("YUANBAO_COOKIES", "") != "" and os.getenv("YUANBAO_AGENT_ID", "") != ""
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Read webpage content using Playwright to handle JavaScript-rendered pages"""
+        """Read webpage content using Yuanbao model"""
         try:
             url = args["url"].strip()
+            
+            # Create Yuanbao model instance
+            model = PlatformRegistry().create_platform("yuanbao")
+            model.set_suppress_output(False)  # type: ignore
+            model.set_model_name("deep_seek")  # type: ignore
 
-            with sync_playwright() as p:
-                # Launch browser
-                browser = p.chromium.launch(
-                    headless=get_browser_headless(),
-                    args=['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
-                )
+            # Construct prompt for webpage reading
+            prompt = f"请帮我读取并总结这个网页的内容：{url}\n请以markdown格式输出，包含标题和主要内容。"
 
-                # Create a new page with appropriate settings
-                page = browser.new_page(
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                    viewport={'width': 1920, 'height': 1080}
-                )
+            # Get response from Yuanbao model
+            response = model.chat_until_success(prompt)  # type: ignore
 
-                # Set timeout to avoid long waits
-                page.set_default_timeout(30000)  # 30 seconds
-
-                try:
-                    # Navigate to URL and wait for page to load
-                    response = page.goto(url, wait_until="domcontentloaded")
-
-                    # Additional wait for network to be idle (with a timeout)
-                    try:
-                        page.wait_for_load_state("networkidle", timeout=10000)
-                    except PlaywrightTimeoutError:
-                        # Continue even if network doesn't become completely idle
-                        pass
-
-                    # Make sure we got a valid response
-                    if not response or response.status >= 400:
-                        raise Exception(f"Failed to load page: HTTP {response.status if response else 'No response'}")
-
-                    # Get page title safely
-                    title = "No title"
-                    try:
-                        title = page.title()
-                    except Exception:
-                        # Try to extract title from content if direct method fails
-                        try:
-                            title_element = page.query_selector("title")
-                            if title_element:
-                                title = title_element.text_content() or "No title"
-                        except Exception:
-                            pass
-
-                    # Get the HTML content after JavaScript execution
-                    html_content = page.content()
-
-                except Exception as e:
-                    raise Exception(f"Error navigating to page: {str(e)}")
-                finally:
-                    # Always close browser
-                    browser.close()
-
-                import html2text
-                markdown_content = html2text.html2text(html_content)
-
-                # Build output in markdown format
-                output = [
-                    f"# {title}",
-                    f"Url: {url}",
-                    markdown_content
-                ]
-
-                return {
-                    "success": True,
-                    "stdout": "\n".join(output),
-                    "stderr": ""
-                }
+            return {
+                "success": True,
+                "stdout": response,
+                "stderr": ""
+            }
 
         except Exception as e:
             PrettyOutput.print(f"读取网页失败: {str(e)}", OutputType.ERROR)
@@ -104,14 +51,3 @@ class WebpageTool:
                 "stdout": "",
                 "stderr": f"Failed to parse webpage: {str(e)}"
             }
-
-    def _create_soup_element(self, content: Union[str, Tag, NavigableString]) -> List[Union[Tag, NavigableString]]:
-        """Safely create a BeautifulSoup element, ensuring it's treated as markup"""
-        if isinstance(content, str):
-            # Create a wrapper tag to ensure proper parsing
-            soup_div = BeautifulSoup(f"<div>{content}</div>", 'html.parser').div
-            if soup_div is not None:
-                return [child for child in soup_div.contents if isinstance(child, (Tag, NavigableString))]
-            return []
-        elif isinstance(content, (Tag, NavigableString)):
-            return [content]
