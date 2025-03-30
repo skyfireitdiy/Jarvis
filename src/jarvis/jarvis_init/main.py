@@ -43,7 +43,7 @@ def install_playwright():
     """安装Playwright及其依赖。"""
     try:
         PrettyOutput.print("正在安装Playwright...", OutputType.INFO)
-        subprocess.run(["playwright", "install"], check=True)
+        subprocess.run(["playwright", "install", "chromium"], check=True)
         PrettyOutput.print("Playwright安装成功", OutputType.SUCCESS)
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(f"Playwright安装失败: {str(e)}", OutputType.ERROR)
