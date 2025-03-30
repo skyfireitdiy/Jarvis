@@ -15,6 +15,7 @@ from jarvis.jarvis_utils.utils import ct, ot, init_env
 class CodeReviewTool:
     name = "code_review"
     description = "自动代码审查工具，用于分析代码变更"
+    labels = ['code', 'analysis', 'review']
     parameters = {
         "type": "object",
         "properties": {

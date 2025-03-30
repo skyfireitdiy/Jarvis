@@ -6,6 +6,8 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class RAGTool:
     name = "rag"
     description = "基于文档目录进行问答，支持多种文档格式（txt、pdf、docx等）"
+    # 工具标签
+    labels = ['document', 'qa', 'analysis']
     parameters = {
         "type": "object",
         "properties": {

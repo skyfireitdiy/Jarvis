@@ -14,6 +14,7 @@ class ToolGenerator:
 
     name = "tool_generator"
     description = "使用LLM自动生成与系统集成的新工具"
+    labels = ['tool', 'generation', 'automation']
     parameters = {
         "type": "object",
         "properties": {

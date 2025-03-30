@@ -10,6 +10,7 @@ from jarvis.jarvis_utils.utils import html_to_markdown
 class WebpageTool:
     name = "read_webpage"
     description = "读取网页内容，提取标题、文本和超链接"
+    labels = ['web', 'scraping']
     parameters = {
         "type": "object",
         "properties": {

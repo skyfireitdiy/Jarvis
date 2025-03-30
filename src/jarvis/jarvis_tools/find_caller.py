@@ -14,6 +14,8 @@ class FindCallerTool:
 
     name = "find_caller"
     description = "查找所有调用指定函数的代码位置"
+    # 工具标签
+    labels = ['code', 'analysis', 'function']
     parameters = {
         "type": "object",
         "properties": {

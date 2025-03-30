@@ -1,6 +1,3 @@
-
-
-
 import os
 import statistics
 from typing import Any, Dict
@@ -10,6 +7,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 class SearchWebTool:
     name = "search_web"
     description = "搜索互联网上的信息"
+    labels = ['web', 'search', 'information']
     parameters = {
         "type": "object",
         "properties": {

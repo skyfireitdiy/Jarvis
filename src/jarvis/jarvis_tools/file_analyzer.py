@@ -15,6 +15,7 @@ class FileAnalyzerTool:
 
     name = "file_analyzer"
     description = "深入分析单个文件的结构、实现细节和代码质量"
+    labels = ['code', 'analysis', 'file']
     parameters = {
         "type": "object",
         "properties": {

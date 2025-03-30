@@ -4,6 +4,7 @@ import os
 class ChdirTool:
     name = "chdir"
     description = "更改当前工作目录"
+    labels = ['file', 'system', 'directory']
     parameters = {
         "type": "object",
         "properties": {

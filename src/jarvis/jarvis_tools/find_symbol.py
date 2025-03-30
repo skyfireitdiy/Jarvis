@@ -14,6 +14,8 @@ class SymbolTool:
 
     name = "find_symbol"
     description = "查找代码符号的引用、定义和声明位置"
+    # 工具标签
+    labels = ['code', 'analysis', 'symbol']
     parameters = {
         "type": "object",
         "properties": {

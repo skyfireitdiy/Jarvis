@@ -9,6 +9,8 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class PythonScriptTool:
     name = "execute_python_script"
     description = "执行Python脚本文件并返回结果"
+    # 工具标签
+    labels = ['python', 'execution', 'script']
     parameters = {
         "type": "object",
         "properties": {

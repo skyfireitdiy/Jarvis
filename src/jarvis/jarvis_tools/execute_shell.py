@@ -20,6 +20,7 @@ class ShellTool:
     """
     name = "execute_shell"
     description = "执行Shell命令并返回结果。与virtual_tty不同，此工具每次执行都是独立的命令，不会保持终端状态。适用于执行单个命令并获取结果的场景，如运行简单的系统命令。"
+    labels = ['system', 'shell']
     parameters = {
         "type": "object",
         "properties": {

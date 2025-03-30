@@ -21,6 +21,7 @@ from jarvis.jarvis_utils.utils import ct, ot, init_env
 class GitCommitTool:
     name = "git_commit_agent"
     description = "根据代码变更自动生成并执行Git提交"
+    labels = ['git', 'version_control']
     parameters = {
         "type": "object",
         "properties": {

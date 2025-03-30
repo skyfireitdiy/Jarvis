@@ -13,6 +13,7 @@ from jarvis.jarvis_utils.embedding import get_context_token_count
 class BrowserTool:
     name = "browser"
     description = "控制无头浏览器执行各种操作，如导航、截图和获取内容。（如果需要搜索信息，优先使用Bing搜索引擎）"
+    labels = ['web', 'automation']
     parameters = {
         "type": "object",
         "properties": {

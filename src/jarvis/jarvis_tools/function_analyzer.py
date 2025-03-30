@@ -14,6 +14,7 @@ class FunctionAnalyzerTool:
 
     name = "function_analyzer"
     description = "深入分析函数内部实现，查找子函数调用、全局变量使用等详细信息"
+    labels = ['code', 'analysis', 'function']
     parameters = {
         "type": "object",
         "properties": {

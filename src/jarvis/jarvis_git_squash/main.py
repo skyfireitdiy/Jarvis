@@ -10,6 +10,7 @@ from jarvis.jarvis_utils.utils import init_env, user_confirm
 class GitSquashTool:
     name = "git_squash_agent"
     description = "Squash commits interactively using a base commit hash"
+    labels = ['git', 'version_control', 'squash']
 
     def _confirm_squash(self) -> bool:
         """Prompt user for confirmation to squash commits"""

@@ -47,6 +47,7 @@ class Document:
 
 
 class RAGTool:
+    labels = ['document', 'search', 'qa']
     def __init__(self, root_dir: str):
         """Initialize RAG tool
 

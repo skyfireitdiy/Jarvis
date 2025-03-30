@@ -17,12 +17,14 @@ class Tool:
         self.description = description
         self.parameters = parameters
         self.func = func
+        self.labels = []  # 默认空标签列表
     def to_dict(self) -> Dict:
         """将工具对象转换为字典格式，主要用于序列化"""
         return {
             "name": self.name,
             "description": self.description,
-            "parameters": json.dumps(self.parameters, ensure_ascii=False)
+            "parameters": json.dumps(self.parameters, ensure_ascii=False),
+            "labels": self.labels
         }
     def execute(self, arguments: Dict) -> Dict[str, Any]:
         """

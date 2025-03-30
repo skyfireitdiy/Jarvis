@@ -9,6 +9,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class ShellScriptTool:
     name = "execute_shell_script"
     description = "执行Shell脚本文件并返回结果"
+    labels = ['shell', 'execution', 'script']
     parameters = {
         "type": "object",
         "properties": {

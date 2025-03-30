@@ -13,7 +13,8 @@ class ProjectAnalyzerTool:
     """
 
     name = "project_analyzer"
-    description = "分析项目结构、入口点、模块划分等信息，提供项目概览（支持所有文件类型）"
+    description = "分析项目结构和依赖关系"
+    labels = ['analysis', 'code']
     parameters = {
         "type": "object",
         "properties": {

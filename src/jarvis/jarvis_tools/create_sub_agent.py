@@ -10,6 +10,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class SubAgentTool:
     name = "create_sub_agent"
     description = "创建子代理以处理特定任务，子代理将生成任务总结报告"
+    labels = ['agent', 'automation', 'task']
     parameters = {
         "type": "object",
         "properties": {

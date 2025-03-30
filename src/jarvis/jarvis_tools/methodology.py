@@ -13,6 +13,7 @@ class MethodologyTool:
 
     name = "methodology"
     description = "管理问题解决方法论，支持添加、更新和删除操作"
+    labels = ['analysis', 'planning']
     parameters = {
         "type": "object",
         "properties": {
