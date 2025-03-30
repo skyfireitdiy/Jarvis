@@ -70,6 +70,7 @@ setup(
             "jarvis-ask-codebase=jarvis.jarvis_tools.ask_codebase:main",
             "jarvis-git-details=jarvis.jarvis_git_details.main:main",
             "jarvis-methodology=jarvis.jarvis_methodology.main:main",
+            "jarvis-init=jarvis.jarvis_init.main:main",
         ],
     },
     python_requires=">=3.8",
