@@ -499,3 +499,44 @@ def rerank_results(query: str, documents: List[str], initial_scores: Optional[Li
 
         # 发生错误时回退到初始分数
         return initial_scores if initial_scores else [0.5] * len(documents)
+
+def search_content(query: str, content: str, top_k: int = 5) -> List[str]:
+    """
+    搜索内容，将内容分块并计算嵌入向量，然后使用查询进行搜索。
+
+    参数：
+        query: 搜索查询
+        content: 要搜索的内容
+
+    返回：
+        List[str]: 按相关性排序的内容块列表
+    """
+    try:
+        # 加载嵌入模型
+        embedding_model = load_embedding_model()
+        
+        # 将内容分块
+        chunks = split_text_into_chunks(content)
+        if not chunks:
+            return []
+            
+        # 计算查询和内容块的嵌入向量
+        query_embedding = get_embedding(embedding_model, query)
+        chunk_embeddings = get_embedding_batch(embedding_model, "计算内容块嵌入", chunks)
+        
+        # 计算余弦相似度
+        similarities = []
+        for chunk_embedding in chunk_embeddings:
+            similarity = np.dot(query_embedding, chunk_embedding)
+            similarities.append(similarity)
+            
+        # 根据相似度排序
+        sorted_indices = np.argsort(similarities)[::-1]
+        sorted_chunks = [chunks[i] for i in sorted_indices]
+        
+        return sorted_chunks[:top_k]
+        
+    except Exception as e:
+        PrettyOutput.print(f"内容搜索失败: {str(e)}", OutputType.ERROR)
+        return []
+        
