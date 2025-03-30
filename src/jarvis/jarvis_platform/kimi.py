@@ -14,7 +14,10 @@ class KimiModel(BasePlatform):
 
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
-        return [("kimi", "Based on the web Kimi, free interface")]
+        return [
+            ("kimi", "基于网页的 Kimi，免费接口"),
+            ("k1", "基于网页的 Kimi，深度思考模型")
+            ]
 
     def __init__(self):
         """
@@ -47,6 +50,8 @@ class KimiModel(BasePlatform):
         self.chat_id = ""
         self.first_chat = True  # 添加标记，用于判断是否是第一次对话
         self.system_message = ""
+        self.model_name = "kimi"
+        self.web = os.getenv("KIMI_WEB", "false") == "true"
 
     def set_system_message(self, message: str):
         """Set system message"""
@@ -54,7 +59,7 @@ class KimiModel(BasePlatform):
 
     def set_model_name(self, model_name: str):
         """Set model name"""
-        pass
+        self.model_name = model_name
 
     def _create_chat(self) -> bool:
         """Create a new chat session"""
@@ -89,13 +94,14 @@ class KimiModel(BasePlatform):
 
         payload = {
             "messages": [{"role": "user", "content": message}],
-            "use_search": True,
+            "use_search": True if self.web else False,
             "extend": {"sidebar": True},
             "kimiplus_id": "kimi",
             "use_research": False,
             "use_math": False,
             "refs": [],
-            "refs_file": []
+            "refs_file": [],
+            "model": self.model_name,
         }
 
         headers = {
