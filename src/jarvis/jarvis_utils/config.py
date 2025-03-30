@@ -176,3 +176,12 @@ def get_rag_ignored_paths() -> list:
         pass
 
     return default_ignored
+
+def get_browser_headless() -> bool:
+    """
+    获取浏览器是否在无头模式下运行。
+
+    返回：
+        bool: 如果浏览器在无头模式下运行则返回True，否则返回False
+    """
+    return os.getenv('JARVIS_BROWSER_HEADLESS', 'true') == 'true'

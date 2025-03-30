@@ -7,7 +7,7 @@ from yaspin.spinners import Spinners
 from playwright.sync_api import sync_playwright
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.config import get_browser_headless, get_max_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 
 class BrowserTool:
@@ -350,7 +350,7 @@ class BrowserTool:
     
     def _launch_browser(self, agent: Any) -> bool:
         browser_type = "chromium"
-        headless = True
+        headless = get_browser_headless()
         
         # 固定视口大小为1920x1080
         viewport_width = 1920
@@ -431,14 +431,14 @@ class BrowserTool:
             agent.browser_data["page"].goto(url)
             return {
                 "success": True,
-                "stdout": f"成功导航到 {url}",
+                "stdout": f"已成功打开页面",
                 "stderr": ""
             }
         except Exception as e:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"导航到 {url} 失败: {str(e)}"
+                "stderr": f"打开页面失败: {str(e)}"
             }
     
     def _take_screenshot(self, agent: Any, args: Dict[str, Any]) -> Dict[str, Any]:

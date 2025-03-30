@@ -5,6 +5,7 @@ from bs4.element import NavigableString  # 正确导入NavigableString
 from urllib.parse import urlparse, urljoin
 import re
 
+from jarvis.jarvis_utils.config import get_browser_headless
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class WebpageTool:
@@ -30,7 +31,7 @@ class WebpageTool:
             with sync_playwright() as p:
                 # Launch browser
                 browser = p.chromium.launch(
-                    headless=True,
+                    headless=get_browser_headless(),
                     args=['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
                 )
 
