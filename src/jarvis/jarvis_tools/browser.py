@@ -518,8 +518,8 @@ class BrowserTool:
             # 检查token限制
             if get_context_token_count(prompt) > get_max_token_count() - 2048:
                 # 尝试转换为markdown格式
-                from jarvis.jarvis_utils.utils import html_to_markdown
-                markdown_content = html_to_markdown(content, page_url)
+                import html2text
+                markdown_content = html2text.html2text(content)
                 markdown_prompt = f"""
                 从以下网页内容中提取有关"{query}"的信息。
                 如果找不到相关信息，请回答"在页面中未找到关于'{query}'的信息"，并给出下一步推荐的操作。

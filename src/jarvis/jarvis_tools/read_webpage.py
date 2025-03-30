@@ -6,7 +6,6 @@ from urllib.parse import urlparse, urljoin
 import re
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import html_to_markdown
 
 class WebpageTool:
     name = "read_webpage"
@@ -81,8 +80,8 @@ class WebpageTool:
                     # Always close browser
                     browser.close()
 
-                # Parse with BeautifulSoup and convert to markdown
-                markdown_content = html_to_markdown(html_content, url)
+                import html2text
+                markdown_content = html2text.html2text(html_content)
 
                 # Build output in markdown format
                 output = [
@@ -115,55 +114,3 @@ class WebpageTool:
             return []
         elif isinstance(content, (Tag, NavigableString)):
             return [content]
-        return []
-
-    def _html_to_markdown(self, html_content: str, base_url: str) -> str:
-        """Convert HTML to Markdown format preserving the content structure"""
-        from bs4 import BeautifulSoup, Tag
-        from typing import List
-        import re
-        
-        soup = BeautifulSoup(html_content, 'html.parser')
-        
-        # 类型安全的元素处理函数
-        def process_element(element: Tag) -> None:
-            # 处理标题
-            if element.name and element.name.startswith('h') and len(element.name) == 2:
-                level = int(element.name[1])
-                text = str(element.get_text()).strip()
-                element.replace_with(soup.new_string(f"\n\n{'#' * level} {text}\n\n"))
-                return
-                
-            # 处理段落
-            if element.name == 'p':
-                text = str(element.get_text()).strip()
-                if text:
-                    element.replace_with(soup.new_string(f"\n\n{text}\n\n"))
-                return
-                
-            # 处理列表
-            if element.name in ('ul', 'ol'):
-                items: List[str] = []
-                for li in element.find_all('li', recursive=False):
-                    if isinstance(li, Tag):
-                        prefix = "* " if element.name == 'ul' else f"{len(items)+1}. "
-                        items.append(prefix + str(li.get_text()).strip())
-                element.replace_with(soup.new_string("\n\n" + "\n".join(items) + "\n\n"))
-                return
-                
-            # 递归处理子元素
-            for child in list(element.children):
-                if isinstance(child, Tag):
-                    process_element(child)
-        
-        # 处理整个文档
-        if len(soup.contents) > 0 and isinstance(soup.contents[0], Tag):
-            process_element(soup.contents[0])
-        
-        # 获取最终文本并清理格式
-        markdown_text = str(soup)
-        markdown_text = re.sub(r'<[^>]+>', '', markdown_text)  # 移除残留标签
-        markdown_text = re.sub(r'\n{3,}', '\n\n', markdown_text)
-        markdown_text = re.sub(r'\s{2,}', ' ', markdown_text)
-        
-        return markdown_text.strip()

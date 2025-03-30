@@ -49,6 +49,7 @@ setup(
         "uvicorn>=0.33.0",
         "python-pptx>=1.0.0",
         "pandas>=2.0.0",
+        "html2text>=2024.2.26",
     ],
     entry_points={
         "console_scripts": [
