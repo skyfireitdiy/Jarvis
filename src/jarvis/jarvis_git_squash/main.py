@@ -1,8 +1,7 @@
-import re
 import sys
 import argparse
-from typing import Dict, Any
-from jarvis.jarvis_tools.git_commiter import GitCommitTool
+from typing import Dict
+from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 import subprocess
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput

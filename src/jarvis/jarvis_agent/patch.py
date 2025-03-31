@@ -7,7 +7,7 @@ from yaspin import yaspin
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_tools.git_commiter import GitCommitTool
+from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash

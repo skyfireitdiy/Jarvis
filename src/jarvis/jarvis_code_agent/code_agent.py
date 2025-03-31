@@ -17,7 +17,7 @@ from jarvis.jarvis_agent.file_input_handler import file_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.patch import PatchOutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_tools.git_commiter import GitCommitTool
+from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.git_utils import (
     find_git_root,
