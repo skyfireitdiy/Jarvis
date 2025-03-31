@@ -28,6 +28,10 @@ class VirtualTTYTool:
             "timeout": {
                 "type": "number",
                 "description": "等待输出的超时时间（秒），用于send_keys和output操作"
+            },
+            "tty_id": {
+                "type": "string",
+                "description": "虚拟终端的唯一标识符，用于区分多个TTY会话。如果未提供，默认为'default'"
             }
         },
         "required": ["action"]
@@ -54,9 +58,16 @@ class VirtualTTYTool:
                 "stderr": "未提供agent对象"
             }
             
-        # 确保agent有tty属性字典
-        if not hasattr(agent, "tty_data"):
-            agent.tty_data = {
+        # 获取TTY ID，默认为"default"
+        tty_id = args.get("tty_id", "default")
+            
+        # 确保agent有tty_sessions字典
+        if not hasattr(agent, "tty_sessions"):
+            agent.tty_sessions = {}
+            
+        # 如果指定的tty_id不存在，为其创建一个新的tty_data
+        if tty_id not in agent.tty_sessions:
+            agent.tty_sessions[tty_id] = {
                 "master_fd": None,
                 "pid": None,
                 "shell": "/bin/bash"
@@ -65,7 +76,7 @@ class VirtualTTYTool:
         action = args.get("action", "").strip().lower()
         
         # 验证操作类型
-        valid_actions = ['launch', 'send_keys', 'output', 'close', 'get_screen']
+        valid_actions = ['launch', 'send_keys', 'output', 'close', 'get_screen', 'list']
         if action not in valid_actions:
             return {
                 "success": False,
@@ -75,48 +86,56 @@ class VirtualTTYTool:
             
         try:
             if action == "launch":
-                print("🚀 正在启动虚拟终端...")
-                result = self._launch_tty(agent)
+                print(f"🚀 正在启动虚拟终端 [{tty_id}]...")
+                result = self._launch_tty(agent, tty_id)
                 if result["success"]:
-                    print("✅ 启动虚拟终端成功")
+                    print(f"✅ 启动虚拟终端 [{tty_id}] 成功")
                 else:
-                    print("❌ 启动虚拟终端失败")
+                    print(f"❌ 启动虚拟终端 [{tty_id}] 失败")
                 return result
             elif action == "send_keys":
                 keys = args.get("keys", "").strip()
                 add_enter = args.get("add_enter", False)
                 timeout = args.get("timeout", 5.0)  # 默认5秒超时
-                print(f"⌨️ 正在发送按键序列: {keys}...")
-                result = self._input_command(agent, keys, timeout, add_enter)
+                print(f"⌨️ 正在向终端 [{tty_id}] 发送按键序列: {keys}...")
+                result = self._input_command(agent, tty_id, keys, timeout, add_enter)
                 if result["success"]:
-                    print(f"✅ 发送按键序列 {keys} 成功")
+                    print(f"✅ 发送按键序列到终端 [{tty_id}] 成功")
                 else:
-                    print(f"❌ 发送按键序列 {keys} 失败")
+                    print(f"❌ 发送按键序列到终端 [{tty_id}] 失败")
                 return result
             elif action == "output":
                 timeout = args.get("timeout", 5.0)  # 默认5秒超时
-                print("📥 正在获取终端输出...")
-                result = self._get_output(agent, timeout)
+                print(f"📥 正在获取终端 [{tty_id}] 输出...")
+                result = self._get_output(agent, tty_id, timeout)
                 if result["success"]:
-                    print("✅ 获取终端输出成功")
+                    print(f"✅ 获取终端 [{tty_id}] 输出成功")
                 else:
-                    print("❌ 获取终端输出失败")
+                    print(f"❌ 获取终端 [{tty_id}] 输出失败")
                 return result
             elif action == "close":
-                print("🔒 正在关闭虚拟终端...")
-                result = self._close_tty(agent)
+                print(f"🔒 正在关闭虚拟终端 [{tty_id}]...")
+                result = self._close_tty(agent, tty_id)
                 if result["success"]:
-                    print("✅ 关闭虚拟终端成功")
+                    print(f"✅ 关闭虚拟终端 [{tty_id}] 成功")
                 else:
-                    print("❌ 关闭虚拟终端失败")
+                    print(f"❌ 关闭虚拟终端 [{tty_id}] 失败")
                 return result
             elif action == "get_screen":
-                print("🖥️ 正在获取终端屏幕内容...")
-                result = self._get_screen(agent)
+                print(f"🖥️ 正在获取终端 [{tty_id}] 屏幕内容...")
+                result = self._get_screen(agent, tty_id)
                 if result["success"]:
-                    print("✅ 获取终端屏幕内容成功")
+                    print(f"✅ 获取终端 [{tty_id}] 屏幕内容成功")
                 else:
-                    print("❌ 获取终端屏幕内容失败")
+                    print(f"❌ 获取终端 [{tty_id}] 屏幕内容失败")
+                return result
+            elif action == "list":
+                print("📋 正在获取所有虚拟终端列表...")
+                result = self._list_ttys(agent)
+                if result["success"]:
+                    print("✅ 获取虚拟终端列表成功")
+                else:
+                    print("❌ 获取虚拟终端列表失败")
                 return result
             return {
                 "success": False,
@@ -131,22 +150,26 @@ class VirtualTTYTool:
                 "stderr": f"执行终端操作出错: {str(e)}"
             }
     
-    def _launch_tty(self, agent: Any) -> Dict[str, Any]:
+    def _launch_tty(self, agent: Any, tty_id: str) -> Dict[str, Any]:
         """启动虚拟终端"""
         try:
+            # 如果该ID的终端已经启动，先关闭它
+            if agent.tty_sessions[tty_id]["master_fd"] is not None:
+                self._close_tty(agent, tty_id)
+                
             # 创建伪终端
             pid, master_fd = pty.fork()
             
             if pid == 0:  # 子进程
                 # 执行shell
-                os.execvp(agent.tty_data["shell"], [agent.tty_data["shell"]])
+                os.execvp(agent.tty_sessions[tty_id]["shell"], [agent.tty_sessions[tty_id]["shell"]])
             else:  # 父进程
                 # 设置非阻塞模式
                 fcntl.fcntl(master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
                 
                 # 保存终端状态
-                agent.tty_data["master_fd"] = master_fd
-                agent.tty_data["pid"] = pid
+                agent.tty_sessions[tty_id]["master_fd"] = master_fd
+                agent.tty_sessions[tty_id]["pid"] = pid
                 
                 # 读取初始输出
                 output = ""
@@ -162,7 +185,7 @@ class VirtualTTYTool:
                         continue
                 
                 if output:
-                    print(f"📤 {output}")
+                    print(f"📤 终端 [{tty_id}]: {output}")
                 
                 return {
                     "success": True,
@@ -174,16 +197,16 @@ class VirtualTTYTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"启动虚拟终端失败: {str(e)}"
+                "stderr": f"启动虚拟终端 [{tty_id}] 失败: {str(e)}"
             }
     
-    def _input_command(self, agent: Any, command: str, timeout: float, add_enter: bool = False) -> Dict[str, Any]:
+    def _input_command(self, agent: Any, tty_id: str, command: str, timeout: float, add_enter: bool = False) -> Dict[str, Any]:
         """输入命令并等待输出"""
-        if agent.tty_data["master_fd"] is None:
+        if agent.tty_sessions[tty_id]["master_fd"] is None:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "虚拟终端未启动"
+                "stderr": f"虚拟终端 [{tty_id}] 未启动"
             }
             
         try:
@@ -192,7 +215,7 @@ class VirtualTTYTool:
                 command = command + "\n"
                 
             # 发送按键序列
-            os.write(agent.tty_data["master_fd"], command.encode())
+            os.write(agent.tty_sessions[tty_id]["master_fd"], command.encode())
             
             # 等待输出
             output = ""
@@ -201,14 +224,14 @@ class VirtualTTYTool:
             while time.time() - start_time < timeout:
                 try:
                     # 使用select等待数据可读
-                    r, _, _ = select.select([agent.tty_data["master_fd"]], [], [], 0.1)
+                    r, _, _ = select.select([agent.tty_sessions[tty_id]["master_fd"]], [], [], 0.1)
                     if r:
-                        data = os.read(agent.tty_data["master_fd"], 1024)
+                        data = os.read(agent.tty_sessions[tty_id]["master_fd"], 1024)
                         if data:
                             output += data.decode()
                 except BlockingIOError:
                     continue
-            print(f"📤 {output}")
+            print(f"📤 终端 [{tty_id}]: {output}")
             return {
                 "success": True,
                 "stdout": output,
@@ -219,16 +242,16 @@ class VirtualTTYTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"执行命令失败: {str(e)}"
+                "stderr": f"在终端 [{tty_id}] 执行命令失败: {str(e)}"
             }
     
-    def _get_output(self, agent: Any, timeout: float = 5.0) -> Dict[str, Any]:
+    def _get_output(self, agent: Any, tty_id: str, timeout: float = 5.0) -> Dict[str, Any]:
         """获取终端输出"""
-        if agent.tty_data["master_fd"] is None:
+        if agent.tty_sessions[tty_id]["master_fd"] is None:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "虚拟终端未启动"
+                "stderr": f"虚拟终端 [{tty_id}] 未启动"
             }
             
         try:
@@ -237,18 +260,18 @@ class VirtualTTYTool:
             
             while time.time() - start_time < timeout:
                 # 使用select等待数据可读
-                r, _, _ = select.select([agent.tty_data["master_fd"]], [], [], 0.1)
+                r, _, _ = select.select([agent.tty_sessions[tty_id]["master_fd"]], [], [], 0.1)
                 if r:
                     while True:
                         try:
-                            data = os.read(agent.tty_data["master_fd"], 1024)
+                            data = os.read(agent.tty_sessions[tty_id]["master_fd"], 1024)
                             if data:
                                 output += data.decode()
                             else:
                                 break
                         except BlockingIOError:
                             break
-            print(f"📤 {output}")
+            print(f"📤 终端 [{tty_id}]: {output}")
                         
             return {
                 "success": True,
@@ -260,28 +283,28 @@ class VirtualTTYTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"获取输出失败: {str(e)}"
+                "stderr": f"获取终端 [{tty_id}] 输出失败: {str(e)}"
             }
     
-    def _close_tty(self, agent: Any) -> Dict[str, Any]:
+    def _close_tty(self, agent: Any, tty_id: str) -> Dict[str, Any]:
         """关闭虚拟终端"""
-        if agent.tty_data["master_fd"] is None:
+        if agent.tty_sessions[tty_id]["master_fd"] is None:
             return {
                 "success": True,
-                "stdout": "没有正在运行的虚拟终端",
+                "stdout": f"没有正在运行的虚拟终端 [{tty_id}]",
                 "stderr": ""
             }
             
         try:
             # 关闭主文件描述符
-            os.close(agent.tty_data["master_fd"])
+            os.close(agent.tty_sessions[tty_id]["master_fd"])
             
             # 终止子进程
-            if agent.tty_data["pid"]:
-                os.kill(agent.tty_data["pid"], signal.SIGTERM)
+            if agent.tty_sessions[tty_id]["pid"]:
+                os.kill(agent.tty_sessions[tty_id]["pid"], signal.SIGTERM)
                 
-            # 清除终端数据
-            agent.tty_data = {
+            # 重置终端数据
+            agent.tty_sessions[tty_id] = {
                 "master_fd": None,
                 "pid": None,
                 "shell": "/bin/bash"
@@ -289,7 +312,7 @@ class VirtualTTYTool:
             
             return {
                 "success": True,
-                "stdout": "虚拟终端已关闭",
+                "stdout": f"虚拟终端 [{tty_id}] 已关闭",
                 "stderr": ""
             }
             
@@ -297,30 +320,30 @@ class VirtualTTYTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"关闭虚拟终端失败: {str(e)}"
+                "stderr": f"关闭虚拟终端 [{tty_id}] 失败: {str(e)}"
             }
 
-    def _get_screen(self, agent: Any) -> Dict[str, Any]:
+    def _get_screen(self, agent: Any, tty_id: str) -> Dict[str, Any]:
         """获取当前终端屏幕内容"""
-        if agent.tty_data["master_fd"] is None:
+        if agent.tty_sessions[tty_id]["master_fd"] is None:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "虚拟终端未启动"
+                "stderr": f"虚拟终端 [{tty_id}] 未启动"
             }
             
         try:
             # 发送控制序列获取屏幕内容
-            os.write(agent.tty_data["master_fd"], b"\x1b[2J\x1b[H\x1b[999;999H\x1b[6n")
+            os.write(agent.tty_sessions[tty_id]["master_fd"], b"\x1b[2J\x1b[H\x1b[999;999H\x1b[6n")
             
             # 读取响应
             output = ""
             start_time = time.time()
             while time.time() - start_time < 2.0:  # 最多等待2秒
                 try:
-                    r, _, _ = select.select([agent.tty_data["master_fd"]], [], [], 0.1)
+                    r, _, _ = select.select([agent.tty_sessions[tty_id]["master_fd"]], [], [], 0.1)
                     if r:
-                        data = os.read(agent.tty_data["master_fd"], 1024)
+                        data = os.read(agent.tty_sessions[tty_id]["master_fd"], 1024)
                         if data:
                             output += data.decode()
                 except BlockingIOError:
@@ -339,5 +362,38 @@ class VirtualTTYTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"获取屏幕内容失败: {str(e)}"
+                "stderr": f"获取终端 [{tty_id}] 屏幕内容失败: {str(e)}"
+            }
+            
+    def _list_ttys(self, agent: Any) -> Dict[str, Any]:
+        """列出所有虚拟终端"""
+        try:
+            active_ttys = []
+            
+            for tty_id, tty_data in agent.tty_sessions.items():
+                status = "活动" if tty_data["master_fd"] is not None else "关闭"
+                active_ttys.append({
+                    "id": tty_id,
+                    "status": status,
+                    "pid": tty_data["pid"] if tty_data["pid"] else None,
+                    "shell": tty_data["shell"]
+                })
+                
+            # 格式化输出
+            output = "虚拟终端列表:\n"
+            for tty in active_ttys:
+                output += f"ID: {tty['id']}, 状态: {tty['status']}, PID: {tty['pid']}, Shell: {tty['shell']}\n"
+                
+            return {
+                "success": True,
+                "stdout": output,
+                "stderr": "",
+                "tty_list": active_ttys  # 返回原始数据，方便程序处理
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取虚拟终端列表失败: {str(e)}"
             }
