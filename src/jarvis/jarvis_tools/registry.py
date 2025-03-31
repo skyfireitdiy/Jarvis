@@ -1,4 +1,5 @@
 import json
+from math import e
 from pathlib import Path
 import re
 import sys
@@ -23,6 +24,7 @@ tool_call_help = f"""
 
 # 📋 工具调用格式
 {ot("TOOL_CALL")}
+want: 想要通过命令获取到什么信息
 name: 工具名称
 arguments:
     param1: 值1
@@ -55,6 +57,7 @@ arguments:
 始终使用 | 语法表示字符串参数：
 
 {ot("TOOL_CALL")}
+want: 当前的git状态
 name: execute_script
 arguments:
     interpreter: bash
@@ -83,9 +86,7 @@ class ToolRegistry(OutputHandler):
         return "TOOL_CALL"
 
     def can_handle(self, response: str) -> bool:
-        if self._extract_tool_calls(response):
-            return True
-        return False
+        return ToolRegistry._has_tool_calls_block(response)
 
     def prompt(self) -> str:
         """加载工具"""
@@ -120,13 +121,9 @@ class ToolRegistry(OutputHandler):
         return ""
 
     def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
-        tool_calls = self._extract_tool_calls(response)
-        if len(tool_calls) > 1:
-            PrettyOutput.print(f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([tool_call['name'] for tool_call in tool_calls])}", OutputType.WARNING)
-            return False, f"调用失败：请一次只处理一个工具调用。"
-        if len(tool_calls) == 0:
-            return False, ""
-        tool_call = tool_calls[0]
+        tool_call, err_msg = self._extract_tool_calls(response)
+        if err_msg:
+            return False, err_msg
         return False, self.handle_tool_calls(tool_call, agent)
 
     def __init__(self):
@@ -240,8 +237,14 @@ class ToolRegistry(OutputHandler):
         except Exception as e:
             PrettyOutput.print(f"从 {Path(file_path).name} 加载工具失败: {str(e)}", OutputType.ERROR)
             return False
+        
     @staticmethod
-    def _extract_tool_calls(content: str) -> List[Dict]:
+    def _has_tool_calls_block(content: str) -> bool:
+        """从内容中提取工具调用块"""
+        return re.search(ot("TOOL_CALL")+r'(.*?)'+ct("TOOL_CALL"), content, re.DOTALL) is not None
+        
+    @staticmethod
+    def _extract_tool_calls(content: str) -> Tuple[Dict, str]:
         """从内容中提取工具调用。
 
         参数:
@@ -259,11 +262,19 @@ class ToolRegistry(OutputHandler):
         for item in data:
             try:
                 msg = yaml.safe_load(item)
-                if 'name' in msg and 'arguments' in msg:
+                if 'name' in msg and 'arguments' in msg and 'want' in msg:
                     ret.append(msg)
+                else:
+                    return {}, f"""工具调用格式错误，请检查工具调用格式。 
+                    
+                    {tool_call_help}""" 
             except Exception as e:
-                continue
-        return ret
+                return {}, f"""工具调用格式错误，请检查工具调用格式。 
+                
+                {tool_call_help}""" 
+        if len(ret) > 1:
+            return {}, "检测到多个工具调用，请一次只处理一个工具调用。"
+        return ret[0] if ret else {}, ""
 
     def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
         """注册新工具"""
@@ -292,65 +303,7 @@ class ToolRegistry(OutputHandler):
             args = tool_call["arguments"]
             args["agent"] = agent
 
-            tool_call_help = f"""
-# 🛠️ 工具使用系统
-您正在使用一个需要精确格式和严格规则的工具执行系统。
-
-# 📋 工具调用格式
-
-{ot("TOOL_CALL")}
-name: 工具名称
-arguments:
-    param1: 值1
-    param2: 值2
-{ct("TOOL_CALL")}
-
-# ❗ 关键规则
-1. 每次只使用一个工具
-   - 一次只执行一个工具
-   - 等待结果后再进行下一步
-
-2. 严格遵守格式
-   - 完全按照上述格式
-   - 使用正确的YAML缩进
-   - 包含所有必需参数
-
-3. 结果处理
-   - 等待执行结果
-   - 不要假设结果
-   - 不要创建虚假响应
-   - 不要想象对话
-
-4. 信息管理
-   - 如果信息不足，询问用户
-   - 跳过不必要的步骤
-   - 如果卡住，请求指导
-   - 不要在没有完整信息的情况下继续
-
-# 📝 字符串参数格式
-始终使用 | 语法表示字符串参数：
-
-{ot("TOOL_CALL")}
-name: execute_script
-arguments:
-    command: |
-        git status --porcelain
-{ct("TOOL_CALL")}
-
-# 💡 最佳实践
-- 准备好后立即开始执行
-- 无需请求许可即可开始
-- 使用正确的字符串格式
-- 监控进度并调整
-- 遇到困难时请求帮助
-
-# ⚠️ 常见错误
-- 同时调用多个工具
-- 字符串参数缺少 |
-- 假设工具结果
-- 创建虚构对话
-- 在没有所需信息的情况下继续
-"""
+            
 
             if isinstance(args, str):
                 try:
@@ -385,7 +338,7 @@ arguments:
                         max_count = self.max_token_count
                         if get_context_token_count(output) > max_count:
                             output_to_summarize = output[-max_count:]
-                            truncation_notice = f"\n(注意：由于输出过长，仅总结最后 {max_count} 个字符)"
+                            truncation_notice = f"\n(注意：由于输出过长，仅使用最后 {max_count} 个Token进行总结)"
                         else:
                             output_to_summarize = output
                             truncation_notice = ""
@@ -400,14 +353,13 @@ arguments:
 执行结果:
 {output_to_summarize}
 
-请提供总结:"""
+请从工具中提取出以下信息：{args["want"]}"""
 
                         summary = model.chat_until_success(prompt)
-                        output = f"""--- 原始输出过长，以下是总结 ---{truncation_notice}
+                        output = f"""--- 原始输出过长，以下是从原始输出提取出的信息 ---{truncation_notice}
 
 {summary}
-
---- 总结结束 ---"""
+"""
                         result["stdout"] = output
                     except Exception as e:
                         PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
