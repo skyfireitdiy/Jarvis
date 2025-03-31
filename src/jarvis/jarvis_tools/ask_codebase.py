@@ -45,7 +45,7 @@ class AskCodebaseTool:
         self.auto_complete = auto_complete
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute codebase analysis using an Agent with execute_shell and rag tools
+        """Execute codebase analysis using an Agent with execute_script and rag tools
 
         Args:
             args: Dictionary containing:
@@ -87,7 +87,7 @@ class AskCodebaseTool:
                 # Create tools registry
                 from jarvis.jarvis_tools.registry import ToolRegistry
                 tool_registry = ToolRegistry()
-                tool_registry.use_tools(["execute_shell", "read_code", "rag"])
+                tool_registry.use_tools(["execute_script", "read_code", "rag"])
 
                 # Create and run Agent
                 analyzer_agent = Agent(
@@ -142,7 +142,7 @@ class AskCodebaseTool:
 - 代码库根目录: {git_root}
 
 ## 工具使用优先级
-1. **绝对优先使用 execute_shell**:
+1. **绝对优先使用 execute_script**:
    - 使用 fd 查找文件: `fd -t f -e py` 查找Python文件等
    - 使用 rg 搜索代码: `rg "pattern" --type py` 在Python文件中搜索等
    - 使用 loc 统计代码: `loc"` 统计代码量

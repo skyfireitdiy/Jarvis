@@ -42,8 +42,7 @@ class CodeAgent:
         self.root_dir = os.getcwd()
         tool_registry = ToolRegistry()
         tool_registry.use_tools([
-            "execute_shell",
-            "execute_shell_script",
+            "execute_script",
             "search_web",
             "ask_user",
             "ask_codebase",
@@ -65,7 +64,7 @@ class CodeAgent:
 ### 1. 项目结构分析
 - 第一步必须分析项目结构，识别关键模块和文件
 - 结合用户需求，确定需要修改的文件列表
-- 优先使用fd命令查找文件，使用execute_shell执行
+- 优先使用fd命令查找文件，使用execute_script执行
 - 明确说明将要修改的文件及其范围
 
 ### 2. 需求分析
@@ -82,15 +81,15 @@ class CodeAgent:
 - 工具选择：
   | 分析需求 | 首选工具 | 备选工具 |
   |---------|---------|----------|
-  | 项目结构 | fd (通过execute_shell) | ask_codebase(仅在必要时) |
+  | 项目结构 | fd (通过execute_script) | ask_codebase(仅在必要时) |
   | 文件内容 | read_code | ask_codebase(仅在必要时) |
-  | 查找引用 | rg (通过execute_shell) | ask_codebase(仅在必要时) |
-  | 查找定义 | rg (通过execute_shell) | ask_codebase(仅在必要时) |
-  | 函数调用者 | rg (通过execute_shell) | ask_codebase(仅在必要时) |
+  | 查找引用 | rg (通过execute_script) | ask_codebase(仅在必要时) |
+  | 查找定义 | rg (通过execute_script) | ask_codebase(仅在必要时) |
+  | 函数调用者 | rg (通过execute_script) | ask_codebase(仅在必要时) |
   | 函数分析 | read_code + rg | ask_codebase(仅在必要时) |
-  | 整体分析 | execute_shell_script | ask_codebase(仅在必要时) |
-  | 代码质量检查 | execute_shell | ask_codebase(仅在必要时) |
-  | 统计代码行数 | loc (通过execute_shell) | - |
+  | 整体分析 | execute_script | ask_codebase(仅在必要时) |
+  | 代码质量检查 | execute_script | ask_codebase(仅在必要时) |
+  | 统计代码行数 | loc (通过execute_script) | - |
 
 ### 4. 方案设计
 - 确定最小变更方案，保持代码结构
@@ -147,7 +146,7 @@ class CodeAgent:
   - C/C++: `cppcheck <file_path>`
 
 - **整体代码分析**：
-  - 使用execute_shell_script编写和执行脚本，批量分析多个文件
+  - 使用execute_script编写和执行脚本，批量分析多个文件
   - 简单脚本示例：`find . -name "*.py" | xargs pylint`
   - 使用多工具组合：`fd -e py | xargs pylint`
 

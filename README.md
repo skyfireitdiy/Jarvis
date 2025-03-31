@@ -91,7 +91,7 @@ jarvis-ask-codebase --help
 |----------|------|
 | read_code | 支持行号和范围的代码文件读取 |
 | execute_shell | 执行系统命令并捕获输出 |
-| execute_shell_script | 执行shell脚本文件 |
+| execute_script | 执行脚本并返回结果，支持Shell命令、Shell脚本和Python脚本 |
 | ask_codebase | 智能代码库查询和分析，用于定位功能所在文件和理解单点实现，适合查询特定功能位置和实现原理 |
 | ask_user | 交互式用户输入收集 |
 | file_operation | 基础文件操作（读取/写入/存在性检查） |

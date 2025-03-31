@@ -56,7 +56,7 @@ PM_PROMPT = f"""
 - **file_operation**：创建和管理项目文档，跟踪项目状态
 - **search_web**：研究相关领域知识，寻找最佳实践
 - **rag**：访问项目知识库，参考历史经验
-- **execute_shell**：监控项目状态，执行自动化任务
+- **execute_script**：监控项目状态，执行自动化任务
 - **read_webpage**：收集行业信息和最新技术动态
 - **project_analyzer**：分析项目结构和架构，了解整体情况
 - **methodology**：采用适当的项目方法论和最佳实践
@@ -385,7 +385,7 @@ def create_dev_team() -> MultiAgent:
         "file_operation",
         "search_web",
         "rag",
-        "execute_shell",
+        "execute_script",
         "read_webpage",
         "project_analyzer",
         "methodology",
@@ -398,7 +398,7 @@ def create_dev_team() -> MultiAgent:
         "file_operation",
         "search_web",
         "rag",
-        "execute_shell",
+        "execute_script",
         "read_webpage",
         "methodology",
         "ask_codebase"
@@ -410,7 +410,7 @@ def create_dev_team() -> MultiAgent:
         "search_web",
         "rag",
         "ask_codebase",
-        "execute_shell",
+        "execute_script",
         "read_code",
         "methodology"
     ])
@@ -420,7 +420,7 @@ def create_dev_team() -> MultiAgent:
         "file_operation",
         "ask_codebase",
         "lsp_get_diagnostics",
-        "execute_shell",
+        "execute_script",
         "project_analyzer"
     ])
 
@@ -429,7 +429,7 @@ def create_dev_team() -> MultiAgent:
         "create_code_agent",
         "file_operation",
         "ask_codebase",
-        "execute_shell",
+        "execute_script",
         "read_code",
         "create_sub_agent"
     ])
@@ -439,9 +439,9 @@ def create_dev_team() -> MultiAgent:
         "create_code_agent",
         "file_operation",
         "ask_codebase",
-        "execute_shell",
+        "execute_script",
         "lsp_get_diagnostics",
-        "execute_shell_script",
+        "execute_script",
         "read_code",
     ])
 
@@ -452,7 +452,7 @@ def create_dev_team() -> MultiAgent:
 - **file_operation**：创建和管理项目文档，跟踪项目状态
 - **search_web**：研究相关领域知识，寻找最佳实践
 - **rag**：访问项目知识库，参考历史经验
-- **execute_shell**：监控项目状态，执行自动化任务
+- **execute_script**：监控项目状态，执行自动化任务
 - **read_webpage**：收集行业信息和最新技术动态
 - **project_analyzer**：分析项目结构和架构，了解整体情况
 - **methodology**：采用适当的项目方法论和最佳实践
@@ -476,7 +476,7 @@ def create_dev_team() -> MultiAgent:
 - **file_operation**：创建和管理需求文档与分析资料
 - **search_web**：研究行业标准和最佳实践
 - **rag**：访问项目知识库，参考相似需求历史
-- **execute_shell**：查询系统环境和配置信息
+- **execute_script**：查询系统环境和配置信息
 - **read_webpage**：收集用户体验和行业趋势信息
 - **methodology**：应用需求分析和用户故事映射方法论
 - **ask_codebase**：分析代码库中的功能实现，了解现有系统能力和限制，分析业务逻辑
@@ -500,7 +500,7 @@ def create_dev_team() -> MultiAgent:
 - **search_web**：研究架构模式和技术趋势
 - **rag**：访问架构知识库，参考历史设计决策
 - **ask_codebase**：分析代码库，理解系统实现
-- **execute_shell**：检查系统环境和依赖关系
+- **execute_script**：检查系统环境和依赖关系
 - **read_code**：阅读和理解关键代码段
 - **methodology**：应用架构设计方法论和模式
 
@@ -522,7 +522,7 @@ def create_dev_team() -> MultiAgent:
 - **file_operation**：管理技术文档和指导文件
 - **ask_codebase**：分析代码库，理解实现细节
 - **lsp_get_diagnostics**：检查代码问题和警告
-- **execute_shell**：执行开发工具和命令
+- **execute_script**：执行开发工具和命令
 
 ## 文档管理规范
 每一步技术指导或审查后，必须使用file_operation工具将结论性输出记录到技术文档中：
@@ -543,7 +543,7 @@ def create_dev_team() -> MultiAgent:
 - **create_code_agent**：创建专业代码开发代理
 - **file_operation**：管理源代码和配置文件
 - **ask_codebase**：了解代码库实现细节
-- **execute_shell**：执行开发命令和测试脚本
+- **execute_script**：执行开发命令和测试脚本
 - **read_code**：阅读和理解关键代码段
 - **create_sub_agent**：创建专门的子代理处理特定任务
 
@@ -566,9 +566,9 @@ def create_dev_team() -> MultiAgent:
 - **create_code_agent**：创建测试代码开发代理
 - **file_operation**：管理测试文档和测试脚本
 - **ask_codebase**：了解代码库实现以设计测试
-- **execute_shell**：执行测试命令和测试套件
+- **execute_script**：执行测试命令和测试套件
 - **lsp_get_diagnostics**：检查代码问题和警告
-- **execute_shell_script**：执行自动化测试脚本
+- **execute_script**：执行各类脚本（Shell命令、Shell脚本、Python脚本）
 - **read_code**：阅读和理解代码以设计测试用例
 
 ## 文档管理规范

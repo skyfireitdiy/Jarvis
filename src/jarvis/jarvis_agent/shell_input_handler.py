@@ -1,5 +1,3 @@
-
-
 from typing import Any, Tuple
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -17,8 +15,9 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         if user_confirm(f"是否要执行以上shell脚本？", default=True):
             from jarvis.jarvis_tools.registry import ToolRegistry
             output = ToolRegistry().handle_tool_calls({
-                "name": "execute_shell_script",
+                "name": "execute_script",
                 "arguments": {
+                    "interpreter": "bash",
                     "script_content": script
                 }
             }, agent)

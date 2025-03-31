@@ -55,9 +55,10 @@ arguments:
 始终使用 | 语法表示字符串参数：
 
 {ot("TOOL_CALL")}
-name: execute_shell
+name: execute_script
 arguments:
-    command: |
+    interpreter: bash
+    script_cotent: |
         git status --porcelain
 {ct("TOOL_CALL")}
 
@@ -330,7 +331,7 @@ arguments:
 始终使用 | 语法表示字符串参数：
 
 {ot("TOOL_CALL")}
-name: execute_shell
+name: execute_script
 arguments:
     command: |
         git status --porcelain
