@@ -185,7 +185,7 @@ class CodeAgent:
                            input_handler=[
                                shell_input_handler, file_input_handler, builtin_input_handler],
                            need_summary=need_summary)
-        self.agent.set_addon_prompt("请使用工具充分理解用户需求，然后根据需求一步步执行代码修改/开发")
+        self.agent.set_addon_prompt("请使用工具充分理解用户需求，然后根据需求一步步执行代码修改/开发，如果不清楚要修改那些文件，可以使用ask_codebase工具，以：xxxx功能在哪个文件中实现？类似句式提问")
 
     def get_root_dir(self) -> str:
         """获取项目根目录
