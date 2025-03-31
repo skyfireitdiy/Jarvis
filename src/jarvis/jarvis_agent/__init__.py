@@ -9,7 +9,7 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.config import is_auto_complete, is_execute_tool_confirm
+from jarvis.jarvis_utils.config import get_max_tool_call_count, is_auto_complete, is_execute_tool_confirm
 from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -204,6 +204,9 @@ class Agent:
         self.need_summary = need_summary
         # Load configuration from environment variables
         self.addon_prompt = ""
+
+        self.tool_call_count = 0
+        self.max_tool_call_count = get_max_tool_call_count()
 
 
         self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
@@ -461,12 +464,18 @@ class Agent:
             return False, f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}"
         if len(tool_list) == 0:
             return False, ""
+        if self.tool_call_count >= self.max_tool_call_count:
+            if user_confirm(f"工具调用次数超过限制，是否继续执行？", True):
+                self.tool_call_count = 0
+            else:
+                return False, ""
         if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
             with yaspin(text=f"正在执行{tool_list[0].name()}...", color="cyan") as spinner:
                 with spinner.hidden():
                     result = tool_list[0].handle(response, self)
                 spinner.text = f"{tool_list[0].name()}执行完成"
                 spinner.ok("✅")
+                self.tool_call_count += 1
                 return result
         return False, ""
 

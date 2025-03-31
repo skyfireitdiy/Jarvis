@@ -185,3 +185,12 @@ def get_browser_headless() -> bool:
         bool: 如果浏览器在无头模式下运行则返回True，否则返回False
     """
     return os.getenv('JARVIS_BROWSER_HEADLESS', 'true') == 'true'
+
+def get_max_tool_call_count() -> int:
+    """
+    获取最大工具调用次数。
+
+    返回：
+        int: 最大连续工具调用次数，默认为20
+    """
+    return int(os.getenv('JARVIS_MAX_TOOL_CALL_COUNT', '20'))
