@@ -411,9 +411,6 @@ def create_dev_team() -> MultiAgent:
         "rag",
         "ask_codebase",
         "execute_shell",
-        "project_analyzer",
-        "file_analyzer",
-        "function_analyzer",
         "read_code",
         "methodology"
     ])
@@ -424,10 +421,6 @@ def create_dev_team() -> MultiAgent:
         "ask_codebase",
         "lsp_get_diagnostics",
         "execute_shell",
-        "code_review",
-        "find_symbol",
-        "find_caller",
-        "function_analyzer",
         "project_analyzer"
     ])
 
@@ -437,9 +430,6 @@ def create_dev_team() -> MultiAgent:
         "file_operation",
         "ask_codebase",
         "execute_shell",
-        "find_symbol",
-        "function_analyzer",
-        "file_analyzer",
         "read_code",
         "create_sub_agent"
     ])
@@ -451,7 +441,6 @@ def create_dev_team() -> MultiAgent:
         "ask_codebase",
         "execute_shell",
         "lsp_get_diagnostics",
-        "code_review",
         "execute_shell_script",
         "read_code",
     ])
@@ -512,9 +501,6 @@ def create_dev_team() -> MultiAgent:
 - **rag**：访问架构知识库，参考历史设计决策
 - **ask_codebase**：分析代码库，理解系统实现
 - **execute_shell**：检查系统环境和依赖关系
-- **project_analyzer**：分析项目结构，理解模块划分
-- **file_analyzer**：深入分析关键文件的结构和功能
-- **function_analyzer**：分析核心函数的实现和设计
 - **read_code**：阅读和理解关键代码段
 - **methodology**：应用架构设计方法论和模式
 
@@ -537,11 +523,6 @@ def create_dev_team() -> MultiAgent:
 - **ask_codebase**：分析代码库，理解实现细节
 - **lsp_get_diagnostics**：检查代码问题和警告
 - **execute_shell**：执行开发工具和命令
-- **code_review**：进行代码审查，确保代码质量
-- **find_symbol**：查找关键符号在代码中的使用
-- **find_caller**：分析函数调用关系和依赖
-- **function_analyzer**：深入分析函数实现和优化空间
-- **project_analyzer**：分析项目结构和技术架构
 
 ## 文档管理规范
 每一步技术指导或审查后，必须使用file_operation工具将结论性输出记录到技术文档中：
@@ -563,9 +544,6 @@ def create_dev_team() -> MultiAgent:
 - **file_operation**：管理源代码和配置文件
 - **ask_codebase**：了解代码库实现细节
 - **execute_shell**：执行开发命令和测试脚本
-- **find_symbol**：查找关键符号在代码中的使用
-- **function_analyzer**：分析函数实现和优化空间
-- **file_analyzer**：分析文件结构和功能
 - **read_code**：阅读和理解关键代码段
 - **create_sub_agent**：创建专门的子代理处理特定任务
 
@@ -590,7 +568,6 @@ def create_dev_team() -> MultiAgent:
 - **ask_codebase**：了解代码库实现以设计测试
 - **execute_shell**：执行测试命令和测试套件
 - **lsp_get_diagnostics**：检查代码问题和警告
-- **code_review**：从质量保证角度审查代码
 - **execute_shell_script**：执行自动化测试脚本
 - **read_code**：阅读和理解代码以设计测试用例
 

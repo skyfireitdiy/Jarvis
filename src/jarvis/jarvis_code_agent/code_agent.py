@@ -82,14 +82,14 @@ class CodeAgent:
 - 工具选择：
   | 分析需求 | 首选工具 | 备选工具 |
   |---------|---------|----------|
-  | 项目结构 | fd (通过execute_shell) | project_analyzer(仅在必要时) |
-  | 文件内容 | read_code | file_analyzer(仅在必要时) |
-  | 查找引用 | rg (通过execute_shell) | find_symbol(仅在必要时) |
-  | 查找定义 | rg (通过execute_shell) | find_symbol(仅在必要时) |
-  | 函数调用者 | rg (通过execute_shell) | find_caller(仅在必要时) |
-  | 函数分析 | read_code + rg | function_analyzer(仅在必要时) |
+  | 项目结构 | fd (通过execute_shell) | ask_codebase(仅在必要时) |
+  | 文件内容 | read_code | ask_codebase(仅在必要时) |
+  | 查找引用 | rg (通过execute_shell) | ask_codebase(仅在必要时) |
+  | 查找定义 | rg (通过execute_shell) | ask_codebase(仅在必要时) |
+  | 函数调用者 | rg (通过execute_shell) | ask_codebase(仅在必要时) |
+  | 函数分析 | read_code + rg | ask_codebase(仅在必要时) |
   | 整体分析 | execute_shell_script | ask_codebase(仅在必要时) |
-  | 代码质量检查 | execute_shell | code_review(仅在必要时) |
+  | 代码质量检查 | execute_shell | ask_codebase(仅在必要时) |
   | 统计代码行数 | loc (通过execute_shell) | - |
 
 ### 4. 方案设计
@@ -111,13 +111,7 @@ class CodeAgent:
 ## 专用工具简介
 仅在必要时使用以下专用工具：
 
-- **project_analyzer**: 项目整体结构分析，仅在fd命令无法满足需求时使用
-- **file_analyzer**: 单文件深度分析，应优先使用read_code替代
-- **find_caller**: 函数调用者查找，应优先使用rg命令替代
-- **find_symbol**: 符号引用查找，应优先使用rg命令替代
-- **function_analyzer**: 函数实现分析，应优先使用read_code和rg组合替代
 - **ask_codebase**: 代码库整体查询，应优先使用fd、rg和read_code组合替代
-- **code_review**: 代码质量检查，应优先使用语言特定的lint工具替代
 
 ## Shell命令优先策略
 
@@ -164,7 +158,7 @@ class CodeAgent:
 - 大文件处理：对大型文件使用read_code指定行范围，避免全部加载
 
 ### 仅在命令行工具不足时使用专用工具
-只有当fd、rg、loc和read_code工具无法获取足够信息时，才考虑使用专用工具（ask_codebase、code_review等）。在每次使用专用工具前，应先尝试使用上述工具获取所需信息。
+只有当fd、rg、loc和read_code工具无法获取足够信息时，才考虑使用专用工具（ask_codebase等）。在每次使用专用工具前，应先尝试使用上述工具获取所需信息。
 
 ### 注意事项
 - read_code比cat或grep更适合阅读代码
