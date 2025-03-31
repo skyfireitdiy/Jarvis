@@ -56,7 +56,7 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
             PrettyOutput.print(f"执行失败: {str(e)}, 等待 {sleep_time}s...", OutputType.ERROR)
             time.sleep(sleep_time)
             continue
-def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> bool:
+def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
     """Loop execution function, until the function returns True"""
     while True:
         ret = func()
