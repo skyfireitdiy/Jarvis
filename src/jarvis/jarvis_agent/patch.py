@@ -42,7 +42,7 @@ class PatchOutputHandler(OutputHandler):
 {ot("PATCH")}
 File: [文件路径]
 Reason: [修改原因]
-[代码修改说明]
+[代码修改说明，不用输出完整的代码，仅输出修改的片段即可]
 {ct("PATCH")}
 ```
 
