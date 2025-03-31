@@ -411,7 +411,12 @@ arguments:
                     except Exception as e:
                         PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
                         output = f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
-            PrettyOutput.print(yaml.safe_dump(result, indent=4, sort_keys=False, allow_unicode=True), OutputType.TOOL, lang="yaml")
+            if result.get("stdout"):
+                PrettyOutput.section("标准输出", OutputType.TOOL)
+                print(result["stdout"])
+            if result.get("stderr"):
+                PrettyOutput.section("标准错误", OutputType.TOOL)
+                print(result["stderr"])
             return output
 
         except Exception as e:
