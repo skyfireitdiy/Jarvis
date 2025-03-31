@@ -535,6 +535,7 @@ class Agent:
 
 方法论格式：
 {ot("TOOL_CALL")}
+want: 添加/更新xxxx的方法论
 name: methodology
 arguments:
   operation: add/update
