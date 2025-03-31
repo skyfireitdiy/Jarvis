@@ -32,6 +32,9 @@ class AskUserTool:
         try:
             question = args["question"]
 
+            agent = args["agent"]
+            agent.reset_tool_call_count()
+
             # Display the question
             PrettyOutput.print(f"问题: {question}", OutputType.SYSTEM)
 

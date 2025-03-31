@@ -466,7 +466,7 @@ class Agent:
             return False, ""
         if self.tool_call_count >= self.max_tool_call_count:
             if user_confirm(f"工具调用次数超过限制，是否继续执行？", True):
-                self.tool_call_count = 0
+                self.reset_tool_call_count()
             else:
                 return False, ""
         if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
@@ -478,6 +478,9 @@ class Agent:
                 self.tool_call_count += 1
                 return result
         return False, ""
+    
+    def reset_tool_call_count(self):
+        self.tool_call_count = 0
 
 
     def _complete_task(self) -> str:
@@ -605,6 +608,8 @@ arguments:
 
                     if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
                         return self._complete_task()
+                    
+                    self.reset_tool_call_count()
 
                     # 获取用户输入
                     user_input = self.multiline_inputer(f"{self.name}: 请输入，或输入空行来结束当前任务：")
