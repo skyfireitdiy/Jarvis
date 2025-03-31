@@ -23,7 +23,7 @@ class AskCodebaseTool:
     """
 
     name = "ask_codebase"
-    description = "查询代码库中特定功能的位置和实现原理，适合定位功能所在文件和理解单点实现，不适合跨文件大范围分析"
+    description = "查询代码库中特定功能的位置和实现原理，适合定位功能所在文件和理解单点实现"
     labels = ['code', 'analysis', 'qa']
     parameters = {
         "type": "object",
