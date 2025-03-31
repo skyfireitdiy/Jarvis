@@ -136,7 +136,7 @@ class ToolRegistry(OutputHandler):
         self._load_builtin_tools()
         self._load_external_tools()
         # 确保max_token_count是整数
-        self.max_token_count = min(int(get_max_token_count() * 0.8), 8192)
+        self.max_token_count = get_max_token_count() - 2048
 
     def use_tools(self, name: List[str]):
         """使用指定工具"""
