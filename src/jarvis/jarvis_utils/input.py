@@ -174,7 +174,6 @@ def get_multiline_input(tip: str) -> str:
         text = session.prompt(
             prompt,
             style=style,
-            in_thread=True  # 使用线程模式而不是创建新的事件循环
         ).strip()
         return text
     except KeyboardInterrupt:

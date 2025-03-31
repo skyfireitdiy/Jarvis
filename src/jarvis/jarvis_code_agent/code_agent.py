@@ -48,12 +48,6 @@ class CodeAgent:
             "ask_user",
             "ask_codebase",
             "lsp_get_diagnostics",
-            "code_review",
-            "find_symbol",
-            "find_caller",
-            "function_analyzer",
-            "project_analyzer",
-            "file_analyzer",
             "read_code"
         ])
         code_system_prompt = """
