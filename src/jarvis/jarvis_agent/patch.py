@@ -25,7 +25,7 @@ class PatchOutputHandler(OutputHandler):
         return False, apply_patch(response, agent)
 
     def can_handle(self, response: str) -> bool:
-        if _parse_patch(response):
+        if _has_patch_block(response):
             return True
         return False
 
@@ -42,7 +42,7 @@ class PatchOutputHandler(OutputHandler):
 {ot("PATCH")}
 File: [文件路径]
 Reason: [修改原因]
-[上下文代码片段]
+[代码修改说明]
 {ct("PATCH")}
 ```
 
@@ -96,9 +96,14 @@ def add(a, b):
 - 每个文件的修改是独立的，不能出现“参照xxx文件的修改”这样的描述
 - 不要出现未实现的代码，如：TODO
 """
+    
+def _has_patch_block(patch_str: str) -> bool:
+    """判断是否存在补丁块"""
+    return re.search(ot("PATCH")+r'\n?(.*?)\n?' +
+                     ct("PATCH"), patch_str, re.DOTALL) is not None
 
 
-def _parse_patch(patch_str: str) -> Dict[str, str]:
+def _parse_patch(patch_str: str) -> Tuple[Dict[str, str], str]:
     """解析新的上下文补丁格式"""
     result = {}
     patches = re.findall(ot("PATCH")+r'\n?(.*?)\n?' +
@@ -108,24 +113,33 @@ def _parse_patch(patch_str: str) -> Dict[str, str]:
             first_line = patch.splitlines()[0]
             sm = re.match(r'^File:\s*(.+)$', first_line)
             if not sm:
-                PrettyOutput.print("无效的补丁格式", OutputType.WARNING)
-                continue
+                return ({}, f"""无效的补丁格式，正确格式应该为：
+{ot("PATCH")}
+File: [文件路径]
+Reason: [修改原因]
+[代码修改说明]
+{ct("PATCH")}""")
             filepath = os.path.abspath(sm.group(1).strip())
             if filepath not in result:
                 result[filepath] = patch
             else:
                 result[filepath] += "\n\n" + patch
-    return result
+    return result, ""
 
 
 def apply_patch(output_str: str, agent: Any) -> str:
     """Apply patches to files"""
     with yaspin(text="正在应用补丁...", color="cyan") as spinner:
         try:
-            patches = _parse_patch(output_str)
+            patches, error_msg = _parse_patch(output_str)
+            if error_msg:
+                spinner.text = "补丁格式错误"
+                spinner.fail("❌")
+                return error_msg
         except Exception as e:
-            PrettyOutput.print(f"解析补丁失败: {str(e)}", OutputType.ERROR)
-            return ""
+            spinner.text = "解析补丁失败"
+            spinner.fail("❌")
+            return f"解析补丁失败: {str(e)}"
 
         # 获取当前提交hash作为起始点
         spinner.text = "开始获取当前提交hash..."
