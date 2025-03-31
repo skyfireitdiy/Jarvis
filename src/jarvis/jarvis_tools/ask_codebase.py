@@ -87,7 +87,7 @@ class AskCodebaseTool:
                 # Create tools registry
                 from jarvis.jarvis_tools.registry import ToolRegistry
                 tool_registry = ToolRegistry()
-                tool_registry.use_tools(["execute_script", "read_code", "rag"])
+                tool_registry.use_tools(["execute_script", "read_code", "rag", "methodology"])
 
                 # Create and run Agent
                 analyzer_agent = Agent(

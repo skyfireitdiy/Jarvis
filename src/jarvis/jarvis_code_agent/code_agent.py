@@ -47,7 +47,8 @@ class CodeAgent:
             "ask_user",
             "ask_codebase",
             "lsp_get_diagnostics",
-            "read_code"
+            "read_code",
+            "methodology",
         ])
         code_system_prompt = """
 # 代码工程师指南

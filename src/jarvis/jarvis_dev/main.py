@@ -421,7 +421,8 @@ def create_dev_team() -> MultiAgent:
         "ask_codebase",
         "lsp_get_diagnostics",
         "execute_script",
-        "project_analyzer"
+        "project_analyzer",
+        "methodology",
     ])
 
     DEV_output_handler = ToolRegistry()
@@ -431,7 +432,8 @@ def create_dev_team() -> MultiAgent:
         "ask_codebase",
         "execute_script",
         "read_code",
-        "create_sub_agent"
+        "create_sub_agent",
+        "methodology",
     ])
 
     QA_output_handler = ToolRegistry()
@@ -443,6 +445,7 @@ def create_dev_team() -> MultiAgent:
         "lsp_get_diagnostics",
         "execute_script",
         "read_code",
+        "methodology",
     ])
 
     # Update PM prompt with tool usage guidance
