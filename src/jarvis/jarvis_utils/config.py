@@ -16,7 +16,7 @@ def get_max_token_count() -> int:
     返回:
         int: 模型能处理的最大token数量。
     """
-    return int(os.getenv('JARVIS_MAX_TOKEN_COUNT', '102400000'))  # 默认100M
+    return int(os.getenv('JARVIS_MAX_TOKEN_COUNT', '128000'))  # 默认100M
 
 def get_thread_count() -> int:
     """
