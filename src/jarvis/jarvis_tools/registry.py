@@ -311,7 +311,7 @@ class ToolRegistry(OutputHandler):
         output = "\n\n".join(output_parts)
         return "无输出和错误" if not output else output
 
-    def _summarize_segment(self, segment: str, name: str, args: Dict, segment_info: str, want: str) -> str:
+    def _summarize_segment(self, segment: str, name: str, args: Dict, segment_info: str, want: str, previous_summary: Optional[str] = None, is_final: bool = False) -> str:
         """总结输出片段
 
         Args:
@@ -319,6 +319,9 @@ class ToolRegistry(OutputHandler):
             name: 工具名称
             args: 工具参数
             segment_info: 片段信息，如"第1/3部分"
+            want: 用户需求
+            previous_summary: 之前的总结内容，可以为None
+            is_final: 是否为最后一个切片
 
         Returns:
             str: 片段总结
@@ -326,60 +329,63 @@ class ToolRegistry(OutputHandler):
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
         model.set_suppress_output(False)
         
-        segment_prompt = f"""请总结以下工具执行结果的{segment_info}，提取关键信息：
+        if previous_summary is None:
+            # 第一个切片
+            segment_prompt = f"""请总结以下工具执行结果的{segment_info}，提取关键信息：
 1. 保留所有重要的数值、路径、错误信息等
 2. 保持结果的准确性
 3. 用简洁的语言描述主要内容
 4. 如果有错误信息，确保包含在总结中
 
+注意：这仅是整个输出的第一部分，所以不要试图得出最终结论，只需要提取关键信息。
+
 工具名称: {name}
 执行结果片段:
 {segment}
 
-请判断是否达到以下目标：{want}
-如果目标是提取信息，请输出提取到的关键信息，如果目标为完成操作，请输出操作是否已完成，给出依据。
+请提取与以下需求相关的关键信息：{want}
 """
+        elif is_final:
+            # 最后一个切片
+            segment_prompt = f"""这是工具执行结果的最后一部分。请结合之前的总结和当前片段，给出完整的结论。
 
-        return model.chat_until_success(segment_prompt)
+之前的总结信息:
+{previous_summary}
 
-    def _merge_summaries(self, name: str, segment_summaries: List[str], segments_count: int, want: str) -> str:
-        """合并多个片段总结为最终总结
-
-        Args:
-            name: 工具名称
-            args: 工具参数
-            segment_summaries: 各片段的总结列表
-            segments_count: 片段总数
-
-        Returns:
-            str: 最终的总结
-        """
-        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        model.set_suppress_output(False)
-        
-        final_prompt = f"""我已经将一个长输出分成了{segments_count}个部分并进行了总结，现在请将这些总结整合成一个连贯的最终总结：
-1. 合并重复信息
-2. 保持关键细节和重要发现
-3. 确保总结的完整性和连贯性
-4. 优先保留与用户需求相关的信息
+当前片段 ({segment_info}):
+{segment}
 
 工具名称: {name}
 用户需求: {want}
 
-各部分总结:
+请基于所有信息，给出完整的结论，回答用户的需求。
 """
-        for i, summary in enumerate(segment_summaries):
-            final_prompt += f"\n--- 第{i+1}部分总结 ---\n{summary}\n"
+        else:
+            # 中间切片
+            segment_prompt = f"""请继续总结工具执行结果的{segment_info}。
 
-        return model.chat_until_success(final_prompt)
+之前的总结信息:
+{previous_summary}
+
+当前片段:
+{segment}
+
+工具名称: {name}
+
+请将之前的总结与当前片段中的新信息整合，提取关键信息，但不要得出最终结论，因为还有更多内容需要处理。
+关注与以下需求相关的信息：{want}
+"""
+
+        return model.chat_until_success(segment_prompt)
 
     def _process_long_output(self, output: str, name: str, args: Dict, want: str) -> str:
-        """处理过长的工具输出
+        """处理过长的工具输出，采用迭代方式处理切片
 
         Args:
             output: 原始输出
             name: 工具名称
             args: 工具参数
+            want: 用户需求
 
         Returns:
             str: 处理后的输出
@@ -393,11 +399,11 @@ class ToolRegistry(OutputHandler):
             if total_tokens > max_count:  # 如果输出超过窗口范围，进行切分处理
                 # 估计所需的片段数量
                 segments_count = (total_tokens // max_count) + (1 if total_tokens % max_count > 0 else 0)
-                PrettyOutput.print(f"输出将被分为{segments_count}个片段进行处理", OutputType.SYSTEM)
+                PrettyOutput.print(f"输出将被分为{segments_count}个片段进行迭代处理", OutputType.SYSTEM)
                 
-                # 切分输出并分别总结
-                segment_summaries = []
+                # 切分输出并迭代总结
                 segment_size = len(output) // segments_count
+                current_summary = None
                 
                 for i in range(segments_count):
                     start_idx = i * segment_size
@@ -405,19 +411,29 @@ class ToolRegistry(OutputHandler):
                     segment = output[start_idx:end_idx]
                     
                     segment_info = f"第{i+1}/{segments_count}部分"
-                    segment_summary = self._summarize_segment(segment, name, args, segment_info, want)
-                    segment_summaries.append(segment_summary)
+                    is_final = (i == segments_count - 1)
+                    
+                    PrettyOutput.print(f"处理{segment_info}...", OutputType.SYSTEM)
+                    
+                    # 将前一个总结结果传递给当前处理
+                    current_summary = self._summarize_segment(
+                        segment, 
+                        name, 
+                        args, 
+                        segment_info, 
+                        want, 
+                        previous_summary=current_summary,
+                        is_final=is_final
+                    )
                 
-                # 汇总所有片段的总结
-                summary = self._merge_summaries(name, segment_summaries, segments_count, want)
-                return f"""--- 原始输出过长 ({total_tokens} tokens)，已分{segments_count}个片段处理后汇总 ---
+                return f"""--- 原始输出过长 ({total_tokens} tokens)，已分{segments_count}个片段迭代处理 ---
 
-{summary}
+{current_summary}
 """
             else:
                 # 在窗口范围内，直接总结
                 segment_info = "完整内容"
-                summary = self._summarize_segment(output, name, args, segment_info, want)
+                summary = self._summarize_segment(output, name, args, segment_info, want, is_final=True)
                 return f"""--- 原始输出过长，以下是总结 ---
 
 {summary}
