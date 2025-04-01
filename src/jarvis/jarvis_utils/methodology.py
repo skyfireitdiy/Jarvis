@@ -144,17 +144,17 @@ def load_methodology(user_input: str) -> str:
             spinner.ok("✅")
         
         # 构建提示信息
-        prompt = """我已上传了一个包含多种方法论的文件。请根据用户的需求，从这些方法论中选择最相关的内容，
-并总结出适合解决用户问题的步骤。如果没有完全匹配的方法论，可以组合多个方法论或提供一般性建议。
+        prompt = """我已上传了一个包含多种方法论的文件。"""
+        platform.chat_until_success(prompt)
 
-用户需求: {user_input}
+        prompt = f"""
+        用户需求: {user_input}
 
-请提供:
-1. 最相关的方法论名称
-2. 解决用户问题的具体步骤
-3. 任何需要注意的事项
-"""
-        
+        请提供:
+        1. 最相关的方法论名称
+        2. 解决用户问题的具体步骤
+        3. 任何需要注意的事项
+        """
         return platform.chat_until_success(prompt)
     
     except Exception as e:
