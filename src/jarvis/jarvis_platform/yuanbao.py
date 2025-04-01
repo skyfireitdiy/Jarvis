@@ -2,6 +2,15 @@ from typing import Dict, List, Tuple
 import requests
 import json
 import os
+import mimetypes
+import hmac
+import hashlib
+import time
+import urllib.parse
+from pathlib import Path
+from PIL import Image
+from yaspin import yaspin
+from yaspin.spinners import Spinners
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
@@ -51,6 +60,7 @@ class YuanbaoPlatform(BasePlatform):
         self.system_message = ""  # 系统消息，用于初始化对话
         self.first_chat = True  # 标识是否为第一次对话
         self.model_name = "deep_seek_v3"  # 默认模型名称，使用下划线保持一致
+        self.multimedia = []
 
     def set_system_message(self, message: str):
         """Set system message"""
@@ -115,10 +125,262 @@ class YuanbaoPlatform(BasePlatform):
             return False
 
     def upload_files(self, file_list: List[str]) -> List[Dict]:
-        pass
+        """Upload files to Yuanbao platform
+        
+        Args:
+            file_list: List of file paths to upload
+            
+        Returns:
+            List of file metadata dictionaries for use in chat messages
+        """
+        if not self.cookies:
+            PrettyOutput.print("未设置YUANBAO_COOKIES，无法上传文件", OutputType.ERROR)
+            return []
+            
+        uploaded_files = []
+        
+        for file_path in file_list:
+            try:
+                file_name = os.path.basename(file_path)
+                
+                with yaspin(Spinners.dots, text=f"上传文件 {file_name}") as spinner:
+                    # 1. Prepare the file information
+                    spinner.text = f"准备文件信息: {file_name}"
+                    file_size = os.path.getsize(file_path)
+                    file_extension = os.path.splitext(file_path)[1].lower().lstrip('.')
+                    
+                    # Determine file_type using mimetypes
+                    mime_type, _ = mimetypes.guess_type(file_path)
+                    
+                    # Default to txt if mime_type couldn't be determined
+                    if not mime_type:
+                        file_type = "txt"
+                    # Image types
+                    elif mime_type.startswith('image/'):
+                        file_type = "img"
+                    # PDF type
+                    elif mime_type == 'application/pdf':
+                        file_type = "pdf"
+                    # Document types
+                    elif mime_type in ['application/msword', 
+                                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                     'application/rtf', 
+                                     'application/vnd.oasis.opendocument.text']:
+                        file_type = "doc"
+                    # Default to txt for all other types
+                    else:
+                        file_type = "txt"
+                    
+                    # 2. Generate upload information
+                    spinner.text = f"获取上传信息: {file_name}"
+                    upload_info = self._generate_upload_info(file_name)
+                    if not upload_info:
+                        spinner.fail(f"❌ 无法获取文件 {file_name} 的上传信息")
+                        continue
+                        
+                    # 3. Upload the file to COS
+                    spinner.text = f"上传文件到云存储: {file_name}"
+                    upload_success = self._upload_file_to_cos(file_path, upload_info)
+                    if not upload_success:
+                        spinner.fail(f"❌ 上传文件 {file_name} 失败")
+                        continue
+                        
+                    # 4. Create file metadata for chat
+                    spinner.text = f"生成文件元数据: {file_name}"
+                    file_metadata = {
+                        "type": file_type,
+                        "docType": file_extension if file_extension else file_type,
+                        "url": upload_info.get("resourceUrl", ""),
+                        "fileName": file_name,
+                        "size": file_size,
+                        "width": 0,
+                        "height": 0
+                    }
+                    
+                    # Get image dimensions if it's an image file
+                    if file_type == "img":
+                        try:
+                            with Image.open(file_path) as img:
+                                file_metadata["width"] = img.width
+                                file_metadata["height"] = img.height
+                        except Exception as e:
+                            spinner.write(f"⚠️ 无法获取图片 {file_name} 的尺寸: {str(e)}")
+                    
+                    uploaded_files.append(file_metadata)
+                    spinner.ok(f"✅ 文件 {file_name} 上传成功")
+                
+            except Exception as e:
+                PrettyOutput.print(f"上传文件 {file_path} 时出错: {str(e)}", OutputType.ERROR)
+        
+        self.multimedia = uploaded_files
+        return uploaded_files
+        
+    def _generate_upload_info(self, file_name: str) -> Dict:
+        """Generate upload information from Yuanbao API
+        
+        Args:
+            file_name: Name of the file to upload
+            
+        Returns:
+            Dictionary containing upload information or empty dict if failed
+        """
+        url = "https://yuanbao.tencent.com/api/resource/genUploadInfo"
+        
+        headers = self._get_base_headers()
+        
+        payload = {
+            "fileName": file_name,
+            "docFrom": "localDoc",
+            "docOpenId": ""
+        }
+        
+        try:
+            response = while_success(
+                lambda: requests.post(url, headers=headers, json=payload), 
+                sleep_time=5
+            )
+            
+            if response.status_code != 200:
+                PrettyOutput.print(f"获取上传信息失败，状态码: {response.status_code}", OutputType.ERROR)
+                if hasattr(response, 'text'):
+                    PrettyOutput.print(f"响应: {response.text}", OutputType.ERROR)
+                return {}
+                
+            upload_info = response.json()
+            return upload_info
+            
+        except Exception as e:
+            PrettyOutput.print(f"获取上传信息时出错: {str(e)}", OutputType.ERROR)
+            return {}
+            
+    def _upload_file_to_cos(self, file_path: str, upload_info: Dict) -> bool:
+        """Upload file to Tencent COS using the provided upload information
+        
+        Args:
+            file_path: Path to the file to upload
+            upload_info: Upload information from generate_upload_info
+            
+        Returns:
+            Boolean indicating success or failure
+        """
+        try:
+            # Extract required information from upload_info
+            bucket_url = f"https://{upload_info['bucketName']}.{upload_info.get('accelerateDomain', 'cos.accelerate.myqcloud.com')}"
+            object_path = upload_info.get('location', '')
+            url = f"{bucket_url}{object_path}"
+            
+            # Security credentials
+            tmp_secret_id = upload_info.get('encryptTmpSecretId', '')
+            tmp_secret_key = upload_info.get('encryptTmpSecretKey', '')
+            token = upload_info.get('encryptToken', '')
+            start_time = upload_info.get('startTime', int(time.time()))
+            expired_time = upload_info.get('expiredTime', start_time + 600)
+            key_time = f"{start_time};{expired_time}"
+            
+            # Read file content
+            with open(file_path, 'rb') as file:
+                file_content = file.read()
+                
+            # Prepare headers for PUT request
+            host = f"{upload_info['bucketName']}.{upload_info.get('accelerateDomain', 'cos.accelerate.myqcloud.com')}"
+            headers = {
+                'Host': host,
+                'Content-Length': str(len(file_content)),
+                'Content-Type': 'application/octet-stream',
+                'x-cos-security-token': token
+            }
+            
+            # Generate signature for COS request (per Tencent Cloud documentation)
+            signature = self._generate_cos_signature(
+                secret_key=tmp_secret_key,
+                method="PUT",
+                path=urllib.parse.quote(object_path),
+                params={},
+                headers={'host': host, 'content-length': headers['Content-Length']},
+                key_time=key_time
+            )
+            
+            # Add Authorization header with signature
+            headers['Authorization'] = (
+                f"q-sign-algorithm=sha1&q-ak={tmp_secret_id}&q-sign-time={key_time}&"
+                f"q-key-time={key_time}&q-header-list=content-length;host&"
+                f"q-url-param-list=&q-signature={signature}"
+            )
+            
+            # Upload the file
+            response = requests.put(url, headers=headers, data=file_content)
+            
+            if response.status_code not in [200, 204]:
+                PrettyOutput.print(f"文件上传到COS失败，状态码: {response.status_code}", OutputType.ERROR)
+                if hasattr(response, 'text'):
+                    PrettyOutput.print(f"响应: {response.text}", OutputType.ERROR)
+                return False
+                
+            return True
+            
+        except Exception as e:
+            PrettyOutput.print(f"上传文件到COS时出错: {str(e)}", OutputType.ERROR)
+            return False
+    
+    def _generate_cos_signature(self, secret_key: str, method: str, path: str, 
+                              params: Dict, headers: Dict, key_time: str) -> str:
+        """Generate COS signature according to Tencent Cloud COS documentation
+        
+        Args:
+            secret_key: Temporary secret key
+            method: HTTP method (GET, PUT, etc.)
+            path: Object path
+            params: URL parameters
+            headers: HTTP headers
+            key_time: Time range for signature
+            
+        Returns:
+            Signature string
+        """
+        try:
+            # 1. Generate SignKey
+            sign_key = hmac.new(
+                secret_key.encode('utf-8'),
+                key_time.encode('utf-8'),
+                hashlib.sha1
+            ).hexdigest()
+            
+            # 2. Format parameters and headers
+            formatted_params = '&'.join([f"{k.lower()}={urllib.parse.quote(str(v), safe='')}" 
+                               for k, v in sorted(params.items())])
+            
+            formatted_headers = '&'.join([f"{k.lower()}={urllib.parse.quote(str(v), safe='')}" 
+                                for k, v in sorted(headers.items())])
+            
+            # 3. Generate HttpString
+            http_string = f"{method.lower()}\n{path}\n{formatted_params}\n{formatted_headers}\n"
+            
+            # 4. Generate StringToSign
+            string_to_sign = f"sha1\n{key_time}\n{hashlib.sha1(http_string.encode('utf-8')).hexdigest()}\n"
+            
+            # 5. Generate Signature
+            signature = hmac.new(
+                sign_key.encode('utf-8'),
+                string_to_sign.encode('utf-8'),
+                hashlib.sha1
+            ).hexdigest()
+            
+            return signature
+            
+        except Exception as e:
+            PrettyOutput.print(f"生成签名时出错: {str(e)}", OutputType.ERROR)
+            raise e
 
     def chat(self, message: str) -> str:
-        """Send message and get response"""
+        """Send message and get response with optional file attachments
+        
+        Args:
+            message: Message text to send
+            file_list: Optional list of file paths to upload and attach
+            
+        Returns:
+            Response from the model
+        """
         if not self.conversation_id:
             if not self._create_conversation():
                 raise Exception("Failed to create conversation session")
@@ -141,7 +403,7 @@ class YuanbaoPlatform(BasePlatform):
                     "intentionStatus": True
                 }
             },
-            "multimedia": [],
+            "multimedia": self.multimedia,
             "agentId": self.agent_id,
             "supportHint": 1,
             "version": "v2",
@@ -149,9 +411,10 @@ class YuanbaoPlatform(BasePlatform):
             "chatModelId": self.model_name,
         }
 
+        self.multimedia = []
+
         if self.web:
             payload["supportFunctions"] = ["supportInternetSearch"]
-
 
         # 添加系统消息（如果是第一次对话）
         if self.first_chat and self.system_message:
@@ -219,7 +482,6 @@ class YuanbaoPlatform(BasePlatform):
 
         except Exception as e:
             raise Exception(f"对话失败: {str(e)}")
-
 
     def delete_chat(self) -> bool:
         """Delete current session"""

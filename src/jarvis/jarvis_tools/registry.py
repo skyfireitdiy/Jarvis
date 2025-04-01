@@ -1,7 +1,9 @@
 import json
+import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
@@ -311,135 +313,6 @@ class ToolRegistry(OutputHandler):
         output = "\n\n".join(output_parts)
         return "无输出和错误" if not output else output
 
-    def _summarize_segment(self, segment: str, name: str, segment_info: str, want: str, previous_summary: Optional[str] = None, is_final: bool = False) -> str:
-        """总结输出片段
-
-        Args:
-            segment: 要总结的输出片段
-            name: 工具名称
-            args: 工具参数
-            segment_info: 片段信息，如"第1/3部分"
-            want: 用户需求
-            previous_summary: 之前的总结内容，可以为None
-            is_final: 是否为最后一个切片
-
-        Returns:
-            str: 片段总结
-        """
-        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        model.set_suppress_output(False)
-        
-        if previous_summary is None:
-            # 第一个切片
-            segment_prompt = f"""请总结以下工具执行结果的{segment_info}，提取关键信息：
-1. 保留所有重要的数值、路径、错误信息等
-2. 保持结果的准确性
-3. 用简洁的语言描述主要内容
-4. 如果有错误信息，确保包含在总结中
-
-注意：这仅是整个输出的第一部分，所以不要试图得出最终结论，只需要提取关键信息。
-
-工具名称: {name}
-执行结果片段:
-{segment}
-
-请提取与以下关键信息：{want}
-"""
-        elif is_final:
-            # 最后一个切片
-            segment_prompt = f"""这是工具执行结果的最后一部分。请结合之前的总结和当前片段，给出完整的结论。
-
-之前的总结信息:
-{previous_summary}
-
-当前片段 ({segment_info}):
-{segment}
-
-工具名称: {name}
-用户需求: {want}
-
-请基于所有信息，给出完整的结论，回答用户的需求。
-"""
-        else:
-            # 中间切片
-            segment_prompt = f"""请继续总结工具执行结果的{segment_info}。
-
-之前的总结信息:
-{previous_summary}
-
-当前片段:
-{segment}
-
-工具名称: {name}
-
-请将之前的总结与当前片段中的新信息整合，提取关键信息，但不要得出最终结论，因为还有更多内容需要处理。
-关注与以下相关信息：{want}
-"""
-
-        return model.chat_until_success(segment_prompt)
-
-    def _process_long_output(self, output: str, name: str, args: Dict, want: str) -> str:
-        """处理过长的工具输出，采用迭代方式处理切片
-
-        Args:
-            output: 原始输出
-            name: 工具名称
-            args: 工具参数
-            want: 用户需求
-
-        Returns:
-            str: 处理后的输出
-        """
-        PrettyOutput.section("输出过长，正在总结...", OutputType.SYSTEM)
-        try:
-            max_count = self.max_input_token_count
-            total_tokens = get_context_token_count(output)
-            
-            # 检查是否需要切分输出
-            if total_tokens > max_count:  # 如果输出超过窗口范围，进行切分处理
-                # 估计所需的片段数量
-                segments_count = (total_tokens // max_count) + (1 if total_tokens % max_count > 0 else 0)
-                PrettyOutput.print(f"输出将被分为{segments_count}个片段进行迭代处理", OutputType.SYSTEM)
-                
-                # 切分输出并迭代总结
-                segment_size = len(output) // segments_count
-                current_summary = None
-                
-                for i in range(segments_count):
-                    start_idx = i * segment_size
-                    end_idx = (i + 1) * segment_size if i < segments_count - 1 else len(output)
-                    segment = output[start_idx:end_idx]
-                    
-                    segment_info = f"第{i+1}/{segments_count}部分"
-                    is_final = (i == segments_count - 1)
-                    
-                    PrettyOutput.print(f"处理{segment_info}...", OutputType.SYSTEM)
-                    
-                    # 将前一个总结结果传递给当前处理
-                    current_summary = self._summarize_segment(
-                        segment, 
-                        name, 
-                        segment_info, 
-                        want, 
-                        previous_summary=current_summary,
-                        is_final=is_final
-                    )
-                
-                return f"""--- 原始输出过长 ({total_tokens} tokens)，已分{segments_count}个片段迭代处理 ---
-
-{current_summary}
-"""
-            else:
-                # 在窗口范围内，直接总结
-                segment_info = "完整内容"
-                summary = self._summarize_segment(output, name, segment_info, want, is_final=True)
-                return f"""--- 原始输出过长，以下是总结 ---
-
-{summary}
-"""
-        except Exception as e:
-            PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
-            return f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
 
     def handle_tool_calls(self, tool_call: Dict, agent: Any) -> str:
         try:
@@ -462,10 +335,14 @@ class ToolRegistry(OutputHandler):
             output = self._format_tool_output(result["stdout"], result.get("stderr", ""))
 
             # 处理结果
-            if result["success"] and get_context_token_count(output) > self.max_input_token_count:
-                processed_output = self._process_long_output(output, name, args, want)
-                result["stdout"] = processed_output
-                output = processed_output
+            if get_context_token_count(output) > self.max_input_token_count:
+                output_file = os.path.join(tempfile.gettempdir(), f"jarvis_output_{os.getpid()}.txt")
+                with open(output_file, "w", encoding="utf-8") as f:
+                    f.write(output)
+                agent.model.upload_files([output_file])
+                output = f"输出文件: {output_file}"
+                result["stdout"] = "输出过长，已经保存到文件中"
+                result["stderr"] = ""
 
             # 显示结果
             if result.get("stdout"):
