@@ -87,13 +87,13 @@ content: |
 
 ## 文档管理规范
 ### 项目文档结构
-- `/requirements/`：存放需求相关文档
+- `requirements/`：存放需求相关文档
   - `project_requirements_v<version>.md`：项目需求文档
   - `change_log.md`：需求变更记录
-- `/status_reports/`：存放状态报告
+- `status_reports/`：存放状态报告
   - `weekly_status_report.md`：周报
   - `risk_register.md`：风险登记册
-- `/communication/`：存放沟通记录
+- `communication/`：存放沟通记录
   - `team_communication_log.md`：团队沟通日志
   - `decision_log.md`：决策记录
 
