@@ -18,9 +18,19 @@ class WebpageTool:
         "required": ["url"]
     }
 
+    def __init__(self):
+        if os.getenv("YUANBAO_COOKIES", "") != "" and os.getenv("YUANBAO_AGENT_ID", "") != "":
+            self.platform = "yuanbao"
+            self.model = "deep_seek"
+        if os.getenv("KIMI_API_KEY", "") != "":
+            self.platform = "kimi"
+            self.model = "k1"
+        else:
+            self.platform = ""
+
     @staticmethod
     def check() -> bool:
-        return os.getenv("YUANBAO_COOKIES", "") != "" and os.getenv("YUANBAO_AGENT_ID", "") != ""
+        return os.getenv("YUANBAO_COOKIES", "") != "" and os.getenv("YUANBAO_AGENT_ID", "") != "" or os.getenv("KIMI_API_KEY", "") != ""
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Read webpage content using Yuanbao model"""
@@ -28,9 +38,9 @@ class WebpageTool:
             url = args["url"].strip()
             
             # Create Yuanbao model instance
-            model = PlatformRegistry().create_platform("yuanbao")
+            model = PlatformRegistry().create_platform(self.platform)
             model.set_suppress_output(False)  # type: ignore
-            model.set_model_name("deep_seek")  # type: ignore
+            model.set_model_name(self.model)  # type: ignore
 
             # Construct prompt for webpage reading
             prompt = f"请帮我读取并总结这个网页的内容：{url}\n请以markdown格式输出，包含标题和主要内容。"
