@@ -11,7 +11,7 @@ import sys
 import argparse
 import os
 
-from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -96,7 +96,7 @@ class GitCommitTool:
                     spinner.write("✅ 获取差异")
 
                     diff_token = get_context_token_count(diff)
-                    if diff_token > get_max_token_count() - 2048:
+                    if diff_token > get_max_input_token_count() - 2048:
                         spinner.write("⚠️ 代码差异超过最大token限制，将使用git diff --cached --stat获取变更的文件")
                         process = subprocess.Popen(
                             ["git", "diff", "--cached", "--stat"],

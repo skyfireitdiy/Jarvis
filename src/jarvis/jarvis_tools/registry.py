@@ -1,5 +1,4 @@
 import json
-from math import e
 from pathlib import Path
 import re
 import sys
@@ -11,7 +10,7 @@ from yaspin import yaspin
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.base import Tool
-from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
@@ -132,8 +131,7 @@ class ToolRegistry(OutputHandler):
         # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
-        # 确保max_token_count是整数
-        self.max_token_count = get_max_token_count() - 2048
+        self.max_input_token_count = get_max_input_token_count() - 2048
 
     def use_tools(self, name: List[str]):
         """使用指定工具"""
@@ -386,7 +384,7 @@ class ToolRegistry(OutputHandler):
         """
         PrettyOutput.section("输出过长，正在总结...", OutputType.SYSTEM)
         try:
-            max_count = self.max_token_count
+            max_count = self.max_input_token_count
             total_tokens = get_context_token_count(output)
             
             # 检查是否需要切分输出
@@ -447,7 +445,7 @@ class ToolRegistry(OutputHandler):
             output = self._format_tool_output(result["stdout"], result.get("stderr", ""))
 
             # 处理结果
-            if result["success"] and get_context_token_count(output) > self.max_token_count:
+            if result["success"] and get_context_token_count(output) > self.max_input_token_count:
                 processed_output = self._process_long_output(output, name, args, want)
                 result["stdout"] = processed_output
                 output = processed_output

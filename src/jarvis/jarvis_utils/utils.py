@@ -3,12 +3,8 @@ import time
 import hashlib
 from pathlib import Path
 from typing import Union, List, Dict, Any, Callable, cast
-import psutil
 from bs4 import BeautifulSoup, Tag
-from bs4.element import NavigableString, PageElement
-from urllib.parse import urljoin
-import re
-from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
@@ -116,8 +112,8 @@ def is_long_context(files: List[str]) -> bool:
     返回：
     布尔值表示是否属于长上下文
     """
-    max_token_count = get_max_token_count()
-    threshold = max_token_count * 0.8
+    max_input_token_count = get_max_input_token_count()
+    threshold = max_input_token_count * 0.8
     total_tokens = 0
 
     for file_path in files:

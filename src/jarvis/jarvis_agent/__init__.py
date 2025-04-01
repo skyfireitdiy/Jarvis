@@ -9,7 +9,7 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.config import get_max_tool_call_count, is_auto_complete, is_execute_tool_confirm
+from jarvis.jarvis_utils.config import get_max_input_token_count, get_max_tool_call_count, is_auto_complete, is_execute_tool_confirm
 from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -153,7 +153,6 @@ class Agent:
                  auto_complete: Optional[bool] = None,
                  output_handler: List[OutputHandler] = [],
                  input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
-                 max_context_length: Optional[int] = None,
                  execute_tool_confirm: Optional[bool] = None,
                  need_summary: bool = True,
                  multiline_inputer: Optional[Callable[[str], str]] = None):
@@ -222,7 +221,7 @@ class Agent:
 请使用简洁的要点描述，突出重要信息。
 """
 
-        self.max_token_count = (max_context_length if max_context_length is not None else get_max_token_count()) - 2048
+        self.max_token_count =  get_max_token_count()
         self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
         welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"
 

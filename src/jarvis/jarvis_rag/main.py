@@ -10,10 +10,9 @@ from pathlib import Path
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import lzma  # 添加 lzma 导入
-from threading import Lock
 import hashlib
 
-from jarvis.jarvis_utils.config import get_max_paragraph_length, get_max_token_count, get_min_paragraph_length, get_rag_ignored_paths
+from jarvis.jarvis_utils.config import get_max_input_token_count, get_max_paragraph_length, get_min_paragraph_length, get_rag_ignored_paths
 from jarvis.jarvis_utils.embedding import get_context_token_count, get_embedding, get_embedding_batch, load_embedding_model, rerank_results
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import  ct, get_file_md5, init_env, ot
@@ -66,7 +65,7 @@ class RAGTool:
             self.min_paragraph_length = get_min_paragraph_length()  # Minimum paragraph length
             self.max_paragraph_length = get_max_paragraph_length()  # Maximum paragraph length
             self.context_window = 5  # Fixed context window size
-            self.max_token_count = int(get_max_token_count() * 0.8)
+            self.max_input_token_count = int(get_max_input_token_count() * 0.8)
             spinner.text = "配置初始化完成"
             spinner.ok("✅")
 
@@ -1300,7 +1299,7 @@ class RAGTool:
             footer_token_count = get_context_token_count(footer_prompt)
 
             # 每批可用的token数，减去一些安全余量
-            available_tokens_per_batch = self.max_token_count - base_token_count - footer_token_count - 1000
+            available_tokens_per_batch = self.max_input_token_count - base_token_count - footer_token_count - 1000
 
             # 确定是否需要分批处理
             with yaspin(text="计算文档上下文大小...", color="cyan") as spinner:
