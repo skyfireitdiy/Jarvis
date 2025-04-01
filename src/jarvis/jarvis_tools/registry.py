@@ -23,7 +23,7 @@ tool_call_help = f"""
 
 # 📋 工具调用格式
 {ot("TOOL_CALL")}
-want: 想要通过命令获取到什么信息/想要执行什么任务，以及想要获取到什么结果，下一步的计划是什么，以便于更好地提取信息
+want: 想要从执行结果中获取到的信息，如果工具输出内容过长，会根据此字段尝试提取有效信息
 name: 工具名称
 arguments:
     param1: 值1
@@ -311,7 +311,7 @@ class ToolRegistry(OutputHandler):
         output = "\n\n".join(output_parts)
         return "无输出和错误" if not output else output
 
-    def _summarize_segment(self, segment: str, name: str, args: Dict, segment_info: str, want: str, previous_summary: Optional[str] = None, is_final: bool = False) -> str:
+    def _summarize_segment(self, segment: str, name: str, segment_info: str, want: str, previous_summary: Optional[str] = None, is_final: bool = False) -> str:
         """总结输出片段
 
         Args:
@@ -343,7 +343,7 @@ class ToolRegistry(OutputHandler):
 执行结果片段:
 {segment}
 
-请提取与以下需求相关的关键信息：{want}
+请提取与以下关键信息：{want}
 """
         elif is_final:
             # 最后一个切片
@@ -419,7 +419,6 @@ class ToolRegistry(OutputHandler):
                     current_summary = self._summarize_segment(
                         segment, 
                         name, 
-                        args, 
                         segment_info, 
                         want, 
                         previous_summary=current_summary,
@@ -433,7 +432,7 @@ class ToolRegistry(OutputHandler):
             else:
                 # 在窗口范围内，直接总结
                 segment_info = "完整内容"
-                summary = self._summarize_segment(output, name, args, segment_info, want, is_final=True)
+                summary = self._summarize_segment(output, name, segment_info, want, is_final=True)
                 return f"""--- 原始输出过长，以下是总结 ---
 
 {summary}
