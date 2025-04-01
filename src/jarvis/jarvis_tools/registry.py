@@ -313,7 +313,7 @@ class ToolRegistry(OutputHandler):
         output = "\n\n".join(output_parts)
         return "无输出和错误" if not output else output
 
-    def _summarize_segment(self, segment: str, name: str, args: Dict, segment_info: str) -> str:
+    def _summarize_segment(self, segment: str, name: str, args: Dict, segment_info: str, want: str) -> str:
         """总结输出片段
 
         Args:
@@ -338,11 +338,11 @@ class ToolRegistry(OutputHandler):
 执行结果片段:
 {segment}
 
-请从工具中提取出与以下需求相关的信息：{args["want"]}"""
+请从工具中提取出与以下需求相关的信息：{want}"""
 
         return model.chat_until_success(segment_prompt)
 
-    def _merge_summaries(self, name: str, args: Dict, segment_summaries: List[str], segments_count: int) -> str:
+    def _merge_summaries(self, name: str, args: Dict, segment_summaries: List[str], segments_count: int, want: str) -> str:
         """合并多个片段总结为最终总结
 
         Args:
@@ -364,7 +364,7 @@ class ToolRegistry(OutputHandler):
 4. 优先保留与用户需求相关的信息
 
 工具名称: {name}
-用户需求: {args["want"]}
+用户需求: {want}
 
 各部分总结:
 """
@@ -373,7 +373,7 @@ class ToolRegistry(OutputHandler):
 
         return model.chat_until_success(final_prompt)
 
-    def _process_long_output(self, output: str, name: str, args: Dict) -> str:
+    def _process_long_output(self, output: str, name: str, args: Dict, want: str) -> str:
         """处理过长的工具输出
 
         Args:
@@ -405,11 +405,11 @@ class ToolRegistry(OutputHandler):
                     segment = output[start_idx:end_idx]
                     
                     segment_info = f"第{i+1}/{segments_count}部分"
-                    segment_summary = self._summarize_segment(segment, name, args, segment_info)
+                    segment_summary = self._summarize_segment(segment, name, args, segment_info, want)
                     segment_summaries.append(segment_summary)
                 
                 # 汇总所有片段的总结
-                summary = self._merge_summaries(name, args, segment_summaries, segments_count)
+                summary = self._merge_summaries(name, args, segment_summaries, segments_count, want)
                 return f"""--- 原始输出过长 ({total_tokens} tokens)，已分{segments_count}个片段处理后汇总 ---
 
 {summary}
@@ -417,7 +417,7 @@ class ToolRegistry(OutputHandler):
             else:
                 # 在窗口范围内，直接总结
                 segment_info = "完整内容"
-                summary = self._summarize_segment(output, name, args, segment_info)
+                summary = self._summarize_segment(output, name, args, segment_info, want)
                 return f"""--- 原始输出过长，以下是总结 ---
 
 {summary}
@@ -427,11 +427,10 @@ class ToolRegistry(OutputHandler):
             return f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
 
     def handle_tool_calls(self, tool_call: Dict, agent: Any) -> str:
-        """处理工具调用，只处理第一个工具"""
         try:
-            # 只处理第一个工具调用
             name = tool_call["name"]
             args = tool_call["arguments"]
+            want = tool_call["want"]
             args["agent"] = agent
 
             if isinstance(args, str):
@@ -449,7 +448,7 @@ class ToolRegistry(OutputHandler):
 
             # 处理结果
             if result["success"] and get_context_token_count(output) > self.max_token_count:
-                processed_output = self._process_long_output(output, name, args)
+                processed_output = self._process_long_output(output, name, args, want)
                 result["stdout"] = processed_output
                 output = processed_output
 
