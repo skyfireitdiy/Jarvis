@@ -339,9 +339,10 @@ class ToolRegistry(OutputHandler):
                 output_file = os.path.join(tempfile.gettempdir(), f"jarvis_output_{os.getpid()}.txt")
                 with open(output_file, "w", encoding="utf-8") as f:
                     f.write(output)
-                agent.model.upload_files([output_file])
-                output = f"输出文件: {output_file}"
-                result["stdout"] = "输出过长，已经保存到文件中"
+                model = PlatformRegistry().get_normal_platform()
+                model.upload_files([output_file])
+                prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
+                result["stdout"] = model.chat_until_success(prompt)
                 result["stderr"] = ""
 
             # 显示结果
