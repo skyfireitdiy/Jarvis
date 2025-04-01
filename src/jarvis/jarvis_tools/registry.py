@@ -295,6 +295,137 @@ class ToolRegistry(OutputHandler):
             return {"success": False, "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self.tools.keys())}", "stdout": ""}
         return tool.execute(arguments)
 
+    def _format_tool_output(self, stdout: str, stderr: str) -> str:
+        """格式化工具输出为可读字符串
+
+        Args:
+            stdout: 标准输出
+            stderr: 标准错误
+
+        Returns:
+            str: 格式化后的输出
+        """
+        output_parts = []
+        if stdout:
+            output_parts.append(f"输出:\n{stdout}")
+        if stderr:
+            output_parts.append(f"错误:\n{stderr}")
+        output = "\n\n".join(output_parts)
+        return "无输出和错误" if not output else output
+
+    def _summarize_segment(self, segment: str, name: str, args: Dict, segment_info: str) -> str:
+        """总结输出片段
+
+        Args:
+            segment: 要总结的输出片段
+            name: 工具名称
+            args: 工具参数
+            segment_info: 片段信息，如"第1/3部分"
+
+        Returns:
+            str: 片段总结
+        """
+        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        model.set_suppress_output(False)
+        
+        segment_prompt = f"""请总结以下工具执行结果的{segment_info}，提取关键信息：
+1. 保留所有重要的数值、路径、错误信息等
+2. 保持结果的准确性
+3. 用简洁的语言描述主要内容
+4. 如果有错误信息，确保包含在总结中
+
+工具名称: {name}
+执行结果片段:
+{segment}
+
+请从工具中提取出与以下需求相关的信息：{args["want"]}"""
+
+        return model.chat_until_success(segment_prompt)
+
+    def _merge_summaries(self, name: str, args: Dict, segment_summaries: List[str], segments_count: int) -> str:
+        """合并多个片段总结为最终总结
+
+        Args:
+            name: 工具名称
+            args: 工具参数
+            segment_summaries: 各片段的总结列表
+            segments_count: 片段总数
+
+        Returns:
+            str: 最终的总结
+        """
+        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        model.set_suppress_output(False)
+        
+        final_prompt = f"""我已经将一个长输出分成了{segments_count}个部分并进行了总结，现在请将这些总结整合成一个连贯的最终总结：
+1. 合并重复信息
+2. 保持关键细节和重要发现
+3. 确保总结的完整性和连贯性
+4. 优先保留与用户需求相关的信息
+
+工具名称: {name}
+用户需求: {args["want"]}
+
+各部分总结:
+"""
+        for i, summary in enumerate(segment_summaries):
+            final_prompt += f"\n--- 第{i+1}部分总结 ---\n{summary}\n"
+
+        return model.chat_until_success(final_prompt)
+
+    def _process_long_output(self, output: str, name: str, args: Dict) -> str:
+        """处理过长的工具输出
+
+        Args:
+            output: 原始输出
+            name: 工具名称
+            args: 工具参数
+
+        Returns:
+            str: 处理后的输出
+        """
+        PrettyOutput.section("输出过长，正在总结...", OutputType.SYSTEM)
+        try:
+            max_count = self.max_token_count
+            total_tokens = get_context_token_count(output)
+            
+            # 检查是否需要切分输出
+            if total_tokens > max_count:  # 如果输出超过窗口范围，进行切分处理
+                # 估计所需的片段数量
+                segments_count = (total_tokens // max_count) + (1 if total_tokens % max_count > 0 else 0)
+                PrettyOutput.print(f"输出将被分为{segments_count}个片段进行处理", OutputType.SYSTEM)
+                
+                # 切分输出并分别总结
+                segment_summaries = []
+                segment_size = len(output) // segments_count
+                
+                for i in range(segments_count):
+                    start_idx = i * segment_size
+                    end_idx = (i + 1) * segment_size if i < segments_count - 1 else len(output)
+                    segment = output[start_idx:end_idx]
+                    
+                    segment_info = f"第{i+1}/{segments_count}部分"
+                    segment_summary = self._summarize_segment(segment, name, args, segment_info)
+                    segment_summaries.append(segment_summary)
+                
+                # 汇总所有片段的总结
+                summary = self._merge_summaries(name, args, segment_summaries, segments_count)
+                return f"""--- 原始输出过长 ({total_tokens} tokens)，已分{segments_count}个片段处理后汇总 ---
+
+{summary}
+"""
+            else:
+                # 在窗口范围内，直接总结
+                segment_info = "完整内容"
+                summary = self._summarize_segment(output, name, args, segment_info)
+                return f"""--- 原始输出过长，以下是总结 ---
+
+{summary}
+"""
+        except Exception as e:
+            PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
+            return f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
+
     def handle_tool_calls(self, tool_call: Dict, agent: Any) -> str:
         """处理工具调用，只处理第一个工具"""
         try:
@@ -303,8 +434,6 @@ class ToolRegistry(OutputHandler):
             args = tool_call["arguments"]
             args["agent"] = agent
 
-            
-
             if isinstance(args, str):
                 try:
                     args = json.loads(args)
@@ -312,64 +441,26 @@ class ToolRegistry(OutputHandler):
                     PrettyOutput.print(f"工具参数格式无效: {name} {tool_call_help}", OutputType.ERROR)
                     return ""
 
-            # Execute tool call
+            # 执行工具调用
             result = self.execute_tool(name, args)
 
-            stdout = result["stdout"]
-            stderr = result.get("stderr", "")
-            output_parts = []
-            if stdout:
-                output_parts.append(f"输出:\n{stdout}")
-            if stderr:
-                output_parts.append(f"错误:\n{stderr}")
-            output = "\n\n".join(output_parts)
-            output = "无输出和错误" if not output else output
+            # 格式化输出
+            output = self._format_tool_output(result["stdout"], result.get("stderr", ""))
 
-            # Process the result
-            if result["success"]:
-                # If the output exceeds 4k characters, use a large model to summarize
-                if get_context_token_count(output) > self.max_token_count:
-                    PrettyOutput.section("输出过长，正在总结...", OutputType.SYSTEM)
-                    try:
+            # 处理结果
+            if result["success"] and get_context_token_count(output) > self.max_token_count:
+                processed_output = self._process_long_output(output, name, args)
+                result["stdout"] = processed_output
+                output = processed_output
 
-                        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-                        model.set_suppress_output(False)
-                        # If the output exceeds the maximum context length, only take the last part
-                        max_count = self.max_token_count
-                        if get_context_token_count(output) > max_count:
-                            output_to_summarize = output[-max_count:]
-                            truncation_notice = f"\n(注意：由于输出过长，仅使用最后 {max_count} 个Token进行总结)"
-                        else:
-                            output_to_summarize = output
-                            truncation_notice = ""
-
-                        prompt = f"""请总结以下工具的执行结果，提取关键信息和重要结果。注意：
-1. 保留所有重要的数值、路径、错误信息等
-2. 保持结果的准确性
-3. 用简洁的语言描述主要内容
-4. 如果有错误信息，确保包含在总结中
-
-工具名称: {name}
-执行结果:
-{output_to_summarize}
-
-请从工具中提取出以下信息：{args["want"]}"""
-
-                        summary = model.chat_until_success(prompt)
-                        output = f"""--- 原始输出过长，以下是从原始输出提取出的信息 ---{truncation_notice}
-
-{summary}
-"""
-                        result["stdout"] = output
-                    except Exception as e:
-                        PrettyOutput.print(f"总结失败: {str(e)}", OutputType.ERROR)
-                        output = f"输出过长 ({len(output)} 字符)，建议查看原始输出。\n前300字符预览:\n{output[:300]}..."
+            # 显示结果
             if result.get("stdout"):
                 PrettyOutput.section("标准输出", OutputType.TOOL)
                 print(result["stdout"])
             if result.get("stderr"):
                 PrettyOutput.section("标准错误", OutputType.TOOL)
                 print(result["stderr"])
+                
             return output
 
         except Exception as e:
