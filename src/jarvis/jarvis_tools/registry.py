@@ -23,7 +23,7 @@ tool_call_help = f"""
 
 # 📋 工具调用格式
 {ot("TOOL_CALL")}
-want: 想要通过命令获取到什么信息/想要执行什么任务
+want: 想要通过命令获取到什么信息/想要执行什么任务，以及想要获取到什么结果，下一步的计划是什么，以便于更好地提取信息
 name: 工具名称
 arguments:
     param1: 值1
@@ -56,7 +56,7 @@ arguments:
 始终使用 | 语法表示字符串参数：
 
 {ot("TOOL_CALL")}
-want: 当前的git状态
+want: 当前的git状态，期望获取xxx的提交记录
 name: execute_script
 arguments:
     interpreter: bash
@@ -373,7 +373,7 @@ class ToolRegistry(OutputHandler):
 工具名称: {name}
 
 请将之前的总结与当前片段中的新信息整合，提取关键信息，但不要得出最终结论，因为还有更多内容需要处理。
-关注与以下需求相关的信息：{want}
+关注与以下相关信息：{want}
 """
 
         return model.chat_until_success(segment_prompt)
