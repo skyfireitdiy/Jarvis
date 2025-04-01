@@ -144,7 +144,7 @@ def load_methodology(user_input: str) -> str:
             spinner.ok("✅")
         
         # 构建提示信息
-        prompt = """我已上传了一个包含多种方法论的文件。"""
+        prompt = """我已上传了一个包含多种方法论的文件，收到请回复“已接收到文件”"""
         platform.chat_until_success(prompt)
 
         prompt = f"""
