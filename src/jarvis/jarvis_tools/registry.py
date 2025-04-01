@@ -343,7 +343,9 @@ class ToolRegistry(OutputHandler):
                 model.set_suppress_output(False)
                 model.upload_files([output_file])
                 prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
-                result["stdout"] = model.chat_until_success(prompt)
+                result["stdout"] = f"""工具调用原始输出过长，以下是根据输出提出的信息：
+
+{model.chat_until_success(prompt)}"""
                 result["stderr"] = ""
 
             # 显示结果
