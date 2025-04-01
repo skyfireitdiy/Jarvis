@@ -55,7 +55,6 @@ PM_PROMPT = f"""
 - **ask_user**：获取用户需求和反馈，澄清不明确的需求点
 - **file_operation**：创建和管理项目文档，跟踪项目状态
 - **search_web**：研究相关领域知识，寻找最佳实践
-- **rag**：访问项目知识库，参考历史经验
 - **execute_script**：监控项目状态，执行自动化任务
 - **read_webpage**：收集行业信息和最新技术动态
 - **project_analyzer**：分析项目结构和架构，了解整体情况
@@ -384,7 +383,6 @@ def create_dev_team() -> MultiAgent:
         "ask_user",
         "file_operation",
         "search_web",
-        "rag",
         "execute_script",
         "read_webpage",
         "project_analyzer",
@@ -397,7 +395,6 @@ def create_dev_team() -> MultiAgent:
         "ask_user",
         "file_operation",
         "search_web",
-        "rag",
         "execute_script",
         "read_webpage",
         "methodology",
@@ -408,7 +405,6 @@ def create_dev_team() -> MultiAgent:
     SA_output_handler.use_tools([
         "file_operation",
         "search_web",
-        "rag",
         "ask_codebase",
         "execute_script",
         "read_code",
@@ -454,7 +450,6 @@ def create_dev_team() -> MultiAgent:
 - **ask_user**：获取用户需求和反馈，澄清不明确的需求点
 - **file_operation**：创建和管理项目文档，跟踪项目状态
 - **search_web**：研究相关领域知识，寻找最佳实践
-- **rag**：访问项目知识库，参考历史经验
 - **execute_script**：监控项目状态，执行自动化任务
 - **read_webpage**：收集行业信息和最新技术动态
 - **project_analyzer**：分析项目结构和架构，了解整体情况
@@ -478,7 +473,6 @@ def create_dev_team() -> MultiAgent:
 - **ask_user**：深入了解用户需求，进行需求挖掘和验证
 - **file_operation**：创建和管理需求文档与分析资料
 - **search_web**：研究行业标准和最佳实践
-- **rag**：访问项目知识库，参考相似需求历史
 - **execute_script**：查询系统环境和配置信息
 - **read_webpage**：收集用户体验和行业趋势信息
 - **methodology**：应用需求分析和用户故事映射方法论
@@ -501,7 +495,6 @@ def create_dev_team() -> MultiAgent:
 ## 工具使用指南
 - **file_operation**：创建和管理架构文档和技术规格
 - **search_web**：研究架构模式和技术趋势
-- **rag**：访问架构知识库，参考历史设计决策
 - **ask_codebase**：分析代码库，理解系统实现
 - **execute_script**：检查系统环境和依赖关系
 - **read_code**：阅读和理解关键代码段

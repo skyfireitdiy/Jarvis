@@ -48,16 +48,6 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 4. xxx问题的解决方案有哪些？
 5. xxx概念的详细解释是什么？
 """)
-        elif tag == "RAG":
-            user_input = user_input.replace(f"'<{tag}>'", "")
-            agent.set_addon_prompt("""
-请使用rag工具进行知识库检索，可以使用的提问格式包括：
-1. 关于xxx的知识点有哪些？
-2. xxx的最佳实践是什么？
-3. xxx的实现方案有哪些？
-4. xxx的相关案例有哪些？
-5. xxx的技术细节是什么？
-""")
         elif tag == "Summary":
             user_input = user_input.replace(f"'<{tag}>'", "")
             agent._summarize_and_clear_history()

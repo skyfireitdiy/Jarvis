@@ -164,7 +164,6 @@ def get_rag_ignored_paths() -> list:
         '*.png',
         '*.gif',
         '*.tiff',
-        '*.pdf',
         '*.zip',
         '*.tar',
         '*.tar.gz',

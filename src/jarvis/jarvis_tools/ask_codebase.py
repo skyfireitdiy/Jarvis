@@ -45,7 +45,7 @@ class AskCodebaseTool:
         self.auto_complete = auto_complete
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute codebase analysis using an Agent with execute_script and rag tools
+        """Execute codebase analysis using an Agent with execute_script
 
         Args:
             args: Dictionary containing:
@@ -87,7 +87,7 @@ class AskCodebaseTool:
                 # Create tools registry
                 from jarvis.jarvis_tools.registry import ToolRegistry
                 tool_registry = ToolRegistry()
-                tool_registry.use_tools(["execute_script", "read_code", "rag", "methodology"])
+                tool_registry.use_tools(["execute_script", "read_code", "methodology"])
 
                 # Create and run Agent
                 analyzer_agent = Agent(
@@ -150,10 +150,6 @@ class AskCodebaseTool:
 2. **优先使用 read_code**:
    - 找到相关文件后优先使用read_code读取文件内容
    - 对大文件使用行范围参数读取指定区域
-
-3. **避免使用 rag**:
-   - 仅在fd、rg和read_code无法解决问题时作为最后手段
-   - 使用rag前必须先尝试使用shell命令解决问题
 
 ## 分析策略
 1. 首先理解问题，确定需要查找的关键信息和代码组件
