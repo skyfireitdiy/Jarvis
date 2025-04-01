@@ -342,7 +342,7 @@ class ToolRegistry(OutputHandler):
 
         return model.chat_until_success(segment_prompt)
 
-    def _merge_summaries(self, name: str, args: Dict, segment_summaries: List[str], segments_count: int, want: str) -> str:
+    def _merge_summaries(self, name: str, segment_summaries: List[str], segments_count: int, want: str) -> str:
         """合并多个片段总结为最终总结
 
         Args:
@@ -409,7 +409,7 @@ class ToolRegistry(OutputHandler):
                     segment_summaries.append(segment_summary)
                 
                 # 汇总所有片段的总结
-                summary = self._merge_summaries(name, args, segment_summaries, segments_count, want)
+                summary = self._merge_summaries(name, segment_summaries, segments_count, want)
                 return f"""--- 原始输出过长 ({total_tokens} tokens)，已分{segments_count}个片段处理后汇总 ---
 
 {summary}
