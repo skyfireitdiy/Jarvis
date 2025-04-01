@@ -340,6 +340,7 @@ class ToolRegistry(OutputHandler):
                 with open(output_file, "w", encoding="utf-8") as f:
                     f.write(output)
                 model = PlatformRegistry().get_normal_platform()
+                model.set_suppress_output(False)
                 model.upload_files([output_file])
                 prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
                 result["stdout"] = model.chat_until_success(prompt)
