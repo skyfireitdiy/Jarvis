@@ -243,6 +243,7 @@ class KimiModel(BasePlatform):
         if self.uploaded_files:
             refs = [f["id"] for f in self.uploaded_files]
             refs_file = self.uploaded_files
+            self.uploaded_files = []
 
         if self.first_chat:
             message = self.system_message + "\n" + message
