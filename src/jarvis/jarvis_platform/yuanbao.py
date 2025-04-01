@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 import requests
 import json
 import os
@@ -113,6 +113,9 @@ class YuanbaoPlatform(BasePlatform):
         except Exception as e:
             PrettyOutput.print(f"错误：创建会话失败：{e}", OutputType.ERROR)
             return False
+
+    def upload_files(self, file_list: List[str]) -> List[Dict]:
+        pass
 
     def chat(self, message: str) -> str:
         """Send message and get response"""

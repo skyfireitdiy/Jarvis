@@ -31,6 +31,10 @@ class BasePlatform(ABC):
     def chat(self, message: str) -> str:
         """Execute conversation"""
         raise NotImplementedError("chat is not implemented")
+    
+    @abstractmethod
+    def upload_files(self, file_list: List[str]) -> List[Dict]:
+        raise NotImplementedError("upload_files is not implemented")
 
     def chat_until_success(self, message: str) -> str:
         def _chat():
