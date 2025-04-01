@@ -23,7 +23,7 @@ tool_call_help = f"""
 
 # 📋 工具调用格式
 {ot("TOOL_CALL")}
-want: 想要通过命令获取到什么信息
+want: 想要通过命令获取到什么信息/想要执行什么任务
 name: 工具名称
 arguments:
     param1: 值1
@@ -336,7 +336,9 @@ class ToolRegistry(OutputHandler):
 执行结果片段:
 {segment}
 
-请从工具中提取出与以下需求相关的信息：{want}"""
+请判断是否达到以下目标：{want}
+如果目标是提取信息，请输出提取到的关键信息，如果目标为完成操作，请输出操作是否已完成，给出依据。
+"""
 
         return model.chat_until_success(segment_prompt)
 
