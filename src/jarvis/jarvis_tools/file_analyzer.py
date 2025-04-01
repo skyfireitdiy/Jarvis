@@ -97,16 +97,17 @@ class FileAnalyzerTool:
                         "stdout": "",
                         "stderr": f"文件上传失败: {str(e)}"
                     }
+                
+            prompt = f"""我上传了文件，收到请回复“已接收到文件”"""
+            platform.chat_until_success(prompt)
             
             # 构建分析请求
             file_names = [os.path.basename(file) for file in valid_files]
-            analysis_request = f"""我已上传以下文件供你分析：
-{', '.join(file_names)}
-
+            analysis_request = f"""
 请根据以下提示分析这些文件：
 {prompt}
 
-请提供详细的分析结果，包括相关的代码片段和解释。"""
+请提供详细的分析结果和理由。"""
 
             # 发送请求并获取分析结果
             with yaspin(Spinners.dots, text="正在分析文件...") as spinner:

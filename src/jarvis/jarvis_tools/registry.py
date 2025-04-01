@@ -342,6 +342,7 @@ class ToolRegistry(OutputHandler):
                 model = PlatformRegistry().get_normal_platform()
                 model.set_suppress_output(False)
                 model.upload_files([output_file])
+                model.chat_until_success("我上传了一个工具执行输出的文件，收到请回复“已接收到文件”")
                 prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
                 result["stdout"] = f"""工具调用原始输出过长，以下是根据输出提出的信息：
 

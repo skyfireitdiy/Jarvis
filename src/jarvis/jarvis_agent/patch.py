@@ -307,24 +307,18 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
     """处理基于上下文的代码片段"""
     with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
         try:
-            with spinner.hidden():
-                old_file_content = FileOperationTool().execute(
-                    {"operation": "read", "files": [{"path": filepath}]})
-                if not old_file_content["success"]:
-                    spinner.write("❌ 文件读取失败")
-                    return False
+            model = PlatformRegistry().get_normal_platform()
+
+            model.upload_files([filepath])
+            model.chat_until_success("我上传了文件，收到请回复“已接收到文件”")
+
+            model.set_suppress_output(False)
 
             prompt = f"""
 # 代码合并专家指南
 
 ## 任务描述
 你是一位精确的代码审查与合并专家，需要将补丁内容与原始代码智能合并。
-
-## 输入资料
-### 原始代码
-```
-{old_file_content["stdout"]}
-```
 
 ### 补丁内容
 ```
@@ -349,8 +343,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
 [合并后的完整代码，包括所有空行和缩进]
 {ct("MERGED_CODE")}
 """
-            model = PlatformRegistry().get_normal_platform()
-            model.set_suppress_output(False)
+            
             count = 30
             start_line = -1
             end_line = -1
@@ -412,12 +405,8 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
             # 读取原始文件内容
-            old_file_content = FileOperationTool().execute(
-                {"operation": "read", "files": [{"path": filepath}]})
-            if not old_file_content["success"]:
-                spinner.text = "文件读取失败"
-                spinner.fail("❌")
-                return False
+            model.upload_files([filepath])
+            model.chat_until_success("我上传了文件，收到请回复“已接收到文件”")
 
             model.set_suppress_output(False)
 
@@ -426,12 +415,6 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 
 ## 任务描述
 你是一位精确的代码补丁生成专家，需要根据补丁描述生成精确的代码差异。
-
-## 输入资料
-### 原始代码
-```
-{old_file_content["stdout"]}
-```
 
 ### 补丁内容
 ```
