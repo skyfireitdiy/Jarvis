@@ -83,7 +83,7 @@ class MethodologyTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "Missing required parameters: operation and problem_type"
+                "stderr": "缺少必要参数: operation和problem_type"
             }
 
         try:
@@ -96,14 +96,14 @@ class MethodologyTool:
                     os.remove(file_path)
                     return {
                         "success": True,
-                        "stdout": f"Deleted methodology for problem type '{problem_type}'",
+                        "stdout": f"已删除问题类型'{problem_type}'对应的方法论",
                         "stderr": ""
                     }
                 else:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"Methodology for problem type '{problem_type}' not found"
+                        "stderr": f"未找到问题类型'{problem_type}'对应的方法论"
                     }
 
             elif operation in ["update", "add"]:
@@ -111,7 +111,7 @@ class MethodologyTool:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "Need to provide methodology content"
+                        "stderr": "需要提供方法论内容"
                     }
 
                 # 确保目录存在
@@ -129,10 +129,10 @@ class MethodologyTool:
 
                 PrettyOutput.print(f"方法论已保存到 {file_path}", OutputType.INFO)
 
-                action = "Updated" if os.path.exists(file_path) else "Added"
+                action = "更新" if os.path.exists(file_path) else "添加"
                 return {
                     "success": True,
-                    "stdout": f"{action} methodology for problem type '{problem_type}'",
+                    "stdout": f"{action}了问题类型'{problem_type}'对应的方法论",
                     "stderr": ""
                 }
 
@@ -140,13 +140,13 @@ class MethodologyTool:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"Unsupported operation type: {operation}"
+                    "stderr": f"不支持的操作类型: {operation}"
                 }
 
         except Exception as e:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Execution failed: {str(e)}"
+                "stderr": f"执行失败: {str(e)}"
             }
 
