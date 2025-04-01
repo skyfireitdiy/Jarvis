@@ -308,9 +308,9 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
     with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
         try:
             model = PlatformRegistry().get_normal_platform()
-
-            model.upload_files([filepath])
-            model.chat_until_success("我上传了文件，收到请回复“已接收到文件”")
+            with spinner.hidden():
+                model.upload_files([filepath])
+                model.chat_until_success("我上传了文件，收到请回复“已接收到文件”")
 
             model.set_suppress_output(False)
 
@@ -405,8 +405,9 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
             # 读取原始文件内容
-            model.upload_files([filepath])
-            model.chat_until_success("我上传了文件，收到请回复“已接收到文件”")
+            with spinner.hidden():  
+                model.upload_files([filepath])
+                model.chat_until_success("我上传了文件，收到请回复“已接收到文件”")
 
             model.set_suppress_output(False)
 
