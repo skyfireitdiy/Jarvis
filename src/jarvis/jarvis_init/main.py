@@ -1,8 +1,6 @@
 from typing import Any, Tuple
 import subprocess
 from jarvis.jarvis_utils.embedding import (
-    load_embedding_model,
-    load_rerank_model,
     get_context_token_count,
     load_tokenizer
 )
@@ -16,13 +14,6 @@ def init_models() -> Tuple[Any, Any, Any, Any]:
         Tuple[Any, Any, Any, Any]: (embedding_model, rerank_model, rerank_tokenizer, tokenizer)
     """
     try:
-        # 加载嵌入模型
-        PrettyOutput.print("正在加载嵌入模型...", OutputType.INFO)
-        embedding_model = load_embedding_model()
-        
-        # 加载重排序模型和分词器
-        PrettyOutput.print("正在加载重排序模型...", OutputType.INFO)
-        rerank_model, rerank_tokenizer = load_rerank_model()
         
         # 加载GPT2分词器
         PrettyOutput.print("正在加载GPT2分词器...", OutputType.INFO)

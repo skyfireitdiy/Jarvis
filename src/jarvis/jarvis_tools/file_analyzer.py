@@ -100,11 +100,12 @@ class FileAnalyzerTool:
                 
             prompt = f"""我上传了文件，收到请回复“已接收到文件”"""
             platform.chat_until_success(prompt)
+
+            platform.set_suppress_output(False)
             
             # 构建分析请求
-            file_names = [os.path.basename(file) for file in valid_files]
             analysis_request = f"""
-请根据以下提示分析这些文件：
+请根据以下提示分析这些文件。
 {prompt}
 
 请提供详细的分析结果和理由。"""

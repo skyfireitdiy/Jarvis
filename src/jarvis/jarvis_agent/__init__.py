@@ -9,7 +9,7 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.config import get_max_input_token_count, get_max_tool_call_count, is_auto_complete, is_execute_tool_confirm
+from jarvis.jarvis_utils.config import get_max_tool_call_count, is_auto_complete, is_execute_tool_confirm
 from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -587,7 +587,7 @@ arguments:
             self.prompt = f"{user_input}"
 
             if self.first:
-                self.prompt = f"{user_input}\n\n{load_methodology(user_input)}"
+                self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(user_input)}"
                 self.first = False
 
             while True:
