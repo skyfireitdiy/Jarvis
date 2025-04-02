@@ -19,7 +19,7 @@ class SearchWebTool:
         if os.getenv("YUANBAO_COOKIES", "") != "" and os.getenv("YUANBAO_AGENT_ID", "") != "":
             self.platform = "yuanbao"
             self.model = "deep_seek"
-        if os.getenv("KIMI_API_KEY", "") != "":
+        elif os.getenv("KIMI_API_KEY", "") != "":
             self.platform = "kimi"
             self.model = "k1"
         else:
