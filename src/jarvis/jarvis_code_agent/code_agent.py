@@ -49,6 +49,10 @@ class CodeAgent:
             "lsp_get_diagnostics",
             "read_code",
             "methodology",
+            "chdir",
+            "create_code_agent",
+            "find_methodology",
+            "virtual_tty",
         ])
         code_system_prompt = """
 # 代码工程师指南
@@ -167,6 +171,7 @@ class CodeAgent:
 - loc比wc -l提供更多代码统计信息，应优先使用
 - 针对不同编程语言选择对应的代码质量检查工具
 - 不要留下未实现的代码
+- 对于非常复杂的需求，可以使用create_code_agent工具，但是要提供完整的上下文信息
 """
         # Dynamically add ask_codebase based on task complexity if really needed
         # 处理platform参数
