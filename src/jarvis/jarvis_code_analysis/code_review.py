@@ -12,6 +12,7 @@ from jarvis.jarvis_agent import Agent
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
+from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
 
 class CodeReviewTool:
     name = "code_review"
@@ -50,211 +51,6 @@ class CodeReviewTool:
         },
         "required": []
     }
-
-    # Language-specific checklists
-    C_CPP_CHECKLIST = """
-## C/C++ 代码审查检查清单
-
-### 内存管理
-- [ ] 每个 `malloc`/`new` 是否有对应的 `free`/`delete`
-- [ ] 是否存在内存泄漏
-- [ ] 是否有缓冲区溢出风险
-- [ ] 指针使用前是否检查 NULL
-- [ ] 是否正确使用智能指针 (C++)
-
-### 并发安全
-- [ ] 是否正确加锁/解锁
-- [ ] 是否有潜在的死锁风险
-- [ ] 是否有竞态条件
-- [ ] 原子操作是否正确使用
-
-### 资源管理
-- [ ] 文件句柄是否正确关闭
-- [ ] 是否存在资源泄漏
-
-### 错误处理
-- [ ] 错误码是否被检查和处理
-- [ ] 异常是否被正确捕获和处理 (C++)
-- [ ] 是否有未处理的边界情况
-
-### 安全性
-- [ ] 是否存在整数溢出风险
-- [ ] 是否存在格式化字符串漏洞
-- [ ] 是否存在类型转换问题
-
-### 性能
-- [ ] 是否有不必要的拷贝
-- [ ] 循环和递归是否有正确的终止条件
-- [ ] 数据结构选择是否合适
-
-### 代码质量
-- [ ] 是否遵循命名规范
-- [ ] 函数参数是否过多
-- [ ] 函数是否过长/过于复杂
-- [ ] 注释是否充分且有意义
-- [ ] 是否有魔法数字/硬编码
-
-### 编译器警告
-- [ ] 是否有未解决的编译器警告
-- [ ] 是否启用了合适的警告级别
-"""
-
-    GO_CHECKLIST = """
-## Go 代码审查检查清单
-
-### 错误处理
-- [ ] 是否正确检查和处理错误
-- [ ] 是否遵循 Go 的错误处理惯例 (errors.Is, errors.As)
-- [ ] 错误是否有足够的上下文信息
-
-### 并发
-- [ ] goroutine 是否会正常终止
-- [ ] 是否存在竞态条件
-- [ ] channel 使用是否正确
-- [ ] 是否正确使用 sync 包
-- [ ] 是否使用了上下文 (context) 进行超时控制
-
-### 资源管理
-- [ ] defer 是否正确使用
-- [ ] 资源是否被正确关闭
-- [ ] 是否有潜在的资源泄漏
-
-### 性能
-- [ ] 是否避免不必要的内存分配
-- [ ] 切片和映射的容量是否合理
-- [ ] 是否使用了高效的 IO 操作
-- [ ] 大型结构体是否使用指针传递
-
-### 代码风格与最佳实践
-- [ ] 是否遵循官方 Go 代码风格
-- [ ] 命名是否遵循 Go 的约定
-- [ ] 是否避免了不必要的代码重复
-- [ ] 是否正确使用接口
-- [ ] 是否过度使用全局变量
-- [ ] 包的设计是否合理
-
-### 测试
-- [ ] 是否有足够的单元测试
-- [ ] 测试覆盖率是否合理
-- [ ] 表格驱动测试是否得当
-
-### 安全
-- [ ] SQL 注入风险
-- [ ] 命令注入风险
-- [ ] 敏感信息是否安全存储
-
-### 文档
-- [ ] 导出的函数/类型是否有文档注释
-- [ ] 复杂逻辑是否有注释说明
-"""
-
-    PYTHON_CHECKLIST = """
-## Python 代码审查检查清单
-
-### 代码风格
-- [ ] 是否遵循 PEP 8 规范
-- [ ] 命名是否符合 Python 约定
-- [ ] 是否有适当的空格和缩进
-- [ ] 是否避免了过长的行
-
-### 类型安全
-- [ ] 是否使用类型注解 (Python 3.6+)
-- [ ] 是否处理了可能的类型不匹配
-- [ ] 复杂参数是否有类型说明
-
-### 异常处理
-- [ ] 是否捕获和处理了异常
-- [ ] 是否使用了合适的异常类型
-- [ ] 是否避免了过于宽泛的 except 子句
-- [ ] 自定义异常是否合理
-
-### 性能
-- [ ] 是否避免了低效的循环和操作
-- [ ] 列表推导式和生成器的使用是否合理
-- [ ] 是否优化了 I/O 操作
-- [ ] 是否合理使用了缓存
-
-### 安全
-- [ ] 是否存在 SQL 注入风险
-- [ ] 是否存在命令注入风险
-- [ ] 密码和密钥是否安全存储
-- [ ] 是否正确验证用户输入
-
-### 依赖管理
-- [ ] 是否明确指定了依赖版本
-- [ ] 是否考虑了版本兼容性
-- [ ] 是否最小化了依赖的数量
-
-### 测试
-- [ ] 是否有单元测试
-- [ ] 测试覆盖率是否合理
-- [ ] 是否处理了边界情况
-
-### 文档
-- [ ] 函数和类是否有文档字符串
-- [ ] 复杂逻辑是否有注释说明
-- [ ] README 是否完整
-
-### 设计
-- [ ] 是否遵循 SOLID 原则
-- [ ] 是否避免了过度工程
-- [ ] 是否实现了适当的抽象
-"""
-
-    RUST_CHECKLIST = """
-## Rust 代码审查检查清单
-
-### 内存安全
-- [ ] 是否避免了不安全代码块 (unsafe)
-- [ ] 如有 unsafe 代码，是否有充分的注释和证明
-- [ ] 生命周期参数是否正确标注
-- [ ] 引用是否遵循借用规则
-
-### 错误处理
-- [ ] 是否正确使用 Result 和 Option 类型
-- [ ] 错误传播操作符 (?) 是否合理使用
-- [ ] 错误类型是否合适
-- [ ] 是否有自定义错误类型
-
-### 并发安全
-- [ ] 可变状态是否受到 Mutex/RwLock 保护
-- [ ] 是否避免了死锁风险
-- [ ] Send/Sync trait 实现是否安全
-- [ ] 是否正确使用原子类型
-
-### 性能
-- [ ] 是否避免了不必要的克隆
-- [ ] 是否合理使用了引用而非所有权转移
-- [ ] 数据结构选择是否高效
-- [ ] 是否合理使用了迭代器
-
-### 代码风格
-- [ ] 是否遵循 Rust 官方风格指南
-- [ ] 命名是否符合 Rust 约定
-- [ ] 代码是否通过 clippy 静态分析
-- [ ] 是否避免了过度使用宏
-
-### API 设计
-- [ ] 公共 API 是否有文档注释
-- [ ] 类型和函数是否遵循最小权限原则
-- [ ] trait 边界是否合理
-- [ ] 泛型参数使用是否合适
-
-### 依赖管理
-- [ ] 是否有明确的版本约束
-- [ ] 是否最小化了依赖数量
-- [ ] 是否避免了有安全问题的依赖
-
-### 测试
-- [ ] 是否有单元测试
-- [ ] 是否测试了错误路径
-- [ ] 是否使用了属性测试 (property testing)
-- [ ] 文档示例是否可执行
-
-### 资源管理
-- [ ] 资源是否通过 Drop trait 正确释放
-- [ ] 是否避免了资源泄漏
-"""
 
     def _detect_languages_from_files(self, file_paths: List[str]) -> List[str]:
         """
@@ -368,7 +164,7 @@ class CodeReviewTool:
             'rust': 'rust',
             'java': 'java',
             'javascript': 'javascript',
-            'typescript': 'javascript',  # TypeScript -> JavaScript group
+            'typescript': 'typescript',
             'php': 'php',
             'ruby': 'ruby',
             'swift': 'swift',
@@ -376,14 +172,14 @@ class CodeReviewTool:
             'csharp': 'csharp',
             'sql': 'sql',
             'shell': 'shell',
-            'html': 'web',
-            'css': 'web',
+            'html': 'html',
+            'css': 'css',
             'xml': 'xml',
             'json': 'json',
             'yaml': 'yaml',
             'markdown': 'docs',
-            'docker': 'devops',
-            'terraform': 'devops',
+            'docker': 'docker',
+            'terraform': 'terraform',
             'makefile': 'devops'
         }
         
@@ -392,23 +188,18 @@ class CodeReviewTool:
             primary_lang = language_mapping.get(lang)
             if primary_lang:
                 # Only keep languages we have checklists for
-                if primary_lang in ['c_cpp', 'go', 'python', 'rust']:
+                if primary_lang in ['c_cpp', 'go', 'python', 'rust', 'java', 'javascript', 'typescript', 
+                                   'csharp', 'swift', 'php', 'shell', 'sql', 'ruby', 'kotlin', 
+                                   'html', 'css', 'xml', 'json', 'yaml', 'docker', 'terraform',
+                                   'docs', 'markdown', 'devops', 'makefile']:
                     primary_languages.add(primary_lang)
         
         return list(primary_languages)
     
     def _get_language_checklist(self, language: str) -> str:
         """Get the checklist for a specific language."""
-        if language == 'c_cpp':
-            return self.C_CPP_CHECKLIST
-        elif language == 'go':
-            return self.GO_CHECKLIST
-        elif language == 'python':
-            return self.PYTHON_CHECKLIST
-        elif language == 'rust':
-            return self.RUST_CHECKLIST
-        else:
-            return ""
+        checklist = get_language_checklist(language)
+        return checklist if checklist else ""
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
