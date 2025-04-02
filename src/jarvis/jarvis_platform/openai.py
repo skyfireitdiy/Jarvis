@@ -43,8 +43,8 @@ class OpenAIModel(BasePlatform):
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
 
-    def upload_files(self, file_list: List[str]) -> List[Dict]:
-        pass
+    def upload_files(self, file_list: List[str]) -> bool:
+        return False
 
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""

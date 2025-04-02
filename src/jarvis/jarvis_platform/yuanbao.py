@@ -124,7 +124,7 @@ class YuanbaoPlatform(BasePlatform):
             PrettyOutput.print(f"错误：创建会话失败：{e}", OutputType.ERROR)
             return False
 
-    def upload_files(self, file_list: List[str]) -> List[Dict]:
+    def upload_files(self, file_list: List[str]) -> bool:
         """Upload files to Yuanbao platform
         
         Args:
@@ -135,15 +135,15 @@ class YuanbaoPlatform(BasePlatform):
         """
         if not self.cookies:
             PrettyOutput.print("未设置YUANBAO_COOKIES，无法上传文件", OutputType.ERROR)
-            return []
+            return False
             
         uploaded_files = []
         
         for file_path in file_list:
-            try:
-                file_name = os.path.basename(file_path)
+            file_name = os.path.basename(file_path)
+            with yaspin(Spinners.dots, text=f"上传文件 {file_name}") as spinner:
+                try:
                 
-                with yaspin(Spinners.dots, text=f"上传文件 {file_name}") as spinner:
                     # 1. Prepare the file information
                     spinner.text = f"准备文件信息: {file_name}"
                     file_size = os.path.getsize(file_path)
@@ -157,7 +157,7 @@ class YuanbaoPlatform(BasePlatform):
                         file_type = "txt"
                     # Image types
                     elif mime_type.startswith('image/'):
-                        file_type = "img"
+                        file_type = "image"
                     # PDF type
                     elif mime_type == 'application/pdf':
                         file_type = "pdf"
@@ -175,15 +175,17 @@ class YuanbaoPlatform(BasePlatform):
                     spinner.text = f"获取上传信息: {file_name}"
                     upload_info = self._generate_upload_info(file_name)
                     if not upload_info:
-                        spinner.fail(f"❌ 无法获取文件 {file_name} 的上传信息")
-                        continue
+                        spinner.text = f"无法获取文件 {file_name} 的上传信息"
+                        spinner.fail("❌")
+                        return False
                         
                     # 3. Upload the file to COS
                     spinner.text = f"上传文件到云存储: {file_name}"
                     upload_success = self._upload_file_to_cos(file_path, upload_info)
                     if not upload_success:
-                        spinner.fail(f"❌ 上传文件 {file_name} 失败")
-                        continue
+                        spinner.text = f"上传文件 {file_name} 失败"
+                        spinner.fail("❌")
+                        return False
                         
                     # 4. Create file metadata for chat
                     spinner.text = f"生成文件元数据: {file_name}"
@@ -207,13 +209,16 @@ class YuanbaoPlatform(BasePlatform):
                             spinner.write(f"⚠️ 无法获取图片 {file_name} 的尺寸: {str(e)}")
                     
                     uploaded_files.append(file_metadata)
-                    spinner.ok(f"✅ 文件 {file_name} 上传成功")
+                    spinner.text = f"文件 {file_name} 上传成功"
+                    spinner.ok("✅")
                 
-            except Exception as e:
-                PrettyOutput.print(f"上传文件 {file_path} 时出错: {str(e)}", OutputType.ERROR)
+                except Exception as e:
+                    spinner.text = f"上传文件 {file_path} 时出错: {str(e)}"
+                    spinner.fail("❌")
+                    return False
         
         self.multimedia = uploaded_files
-        return uploaded_files
+        return True
         
     def _generate_upload_info(self, file_name: str) -> Dict:
         """Generate upload information from Yuanbao API

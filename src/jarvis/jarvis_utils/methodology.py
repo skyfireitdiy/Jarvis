@@ -133,8 +133,8 @@ def load_methodology(user_input: str) -> str:
         with yaspin(text="上传方法论文件到大模型...", color="yellow") as spinner:
             with spinner.hidden():
             # 上传文件
-                uploaded_files = platform.upload_files([temp_file_path])
-                if not uploaded_files:
+                upload_result = platform.upload_files([temp_file_path])
+                if not upload_result:
                     spinner.text = "上传方法论文件失败"
                     spinner.fail("❌")
                     return ""

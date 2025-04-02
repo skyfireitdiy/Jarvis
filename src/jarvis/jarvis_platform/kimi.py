@@ -171,25 +171,27 @@ class KimiModel(BasePlatform):
             time.sleep(1)
         
         return False
-    def upload_files(self, file_list: List[str]) -> List[Dict]:
+    def upload_files(self, file_list: List[str]) -> bool:
         """Upload file list and return file information"""
         if not file_list:
-            return []
+            return True
 
         from yaspin import yaspin
         
         if not self.chat_id:
             with yaspin(text="创建聊天会话...", color="yellow") as spinner:
                 if not self._create_chat():
+                    yaspin.text = "创建聊天会话失败"
                     spinner.fail("❌")
-                    raise Exception("Failed to create chat session")
+                    return False
+                spinner.text = "创建聊天会话成功"
                 spinner.ok("✅")
 
         uploaded_files = []
         for index, file_path in enumerate(file_list, 1):
-            try:
-                file_name = os.path.basename(file_path)
-                with yaspin(text=f"处理文件 [{index}/{len(file_list)}]: {file_name}", color="yellow") as spinner:
+            file_name = os.path.basename(file_path)
+            with yaspin(text=f"处理文件 [{index}/{len(file_list)}]: {file_name}", color="yellow") as spinner:
+                try:
                     mime_type, _ = mimetypes.guess_type(file_path)
                     action = "image" if mime_type and mime_type.startswith('image/') else "file"
                     
@@ -212,22 +214,25 @@ class KimiModel(BasePlatform):
                                 spinner.text = f"文件处理完成: {file_name}"
                                 spinner.ok("✅")
                             else:
-                                spinner.text = f"文件解析失败: {file_name}"
-                                spinner.fail("❌")
+                                spinner.text = f"❌文件解析失败: {file_name}"
+                                spinner.fail("")
+                                return False
                         else:
                             uploaded_files.append(file_info)
-                            spinner.text = f"图片处理完成: {file_name}"
-                            spinner.ok("✅")
+                            spinner.write( f"✅图片处理完成: {file_name}")
                     else:
                         spinner.text = f"文件上传失败: {file_name}"
                         spinner.fail("❌")
+                        return False
                     
-            except Exception as e:
-                PrettyOutput.print(f"✗ 处理文件出错 {file_path}: {str(e)}", OutputType.ERROR)
-                continue
+                except Exception as e:
+                    spinner.text = f"处理文件出错 {file_path}: {str(e)}"
+                    spinner.fail("❌")
+                    return False
         
         self.uploaded_files = uploaded_files
-        return uploaded_files
+        self.chat_until_success("我上传了文件，收到请回复“收到”")
+        return True
 
 
     def chat(self, message: str) -> str:

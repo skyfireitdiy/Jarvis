@@ -79,8 +79,8 @@ class FileAnalyzerTool:
             # 上传文件
             with yaspin(Spinners.dots, text="正在上传文件...") as spinner:
                 try:
-                    uploaded_files = platform.upload_files(valid_files)
-                    if not uploaded_files:
+                    upload_result = platform.upload_files(valid_files)
+                    if not upload_result:
                         spinner.text = "文件上传失败"
                         spinner.fail("❌")
                         return {
