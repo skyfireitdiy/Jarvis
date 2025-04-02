@@ -150,6 +150,7 @@ class GitCommitTool:
         3. 主题行不超过72个字符，不以句号结尾，使用祈使语气
         4. 如有详细描述，使用空行分隔主题和详细描述
         5. 详细描述部分应解释"是什么"和"为什么"，而非"如何"
+        6. 仅输出提交信息，不要输出其他内容
         '''
 
                         # 获取模型并尝试上传文件
@@ -188,14 +189,12 @@ class GitCommitTool:
                         
                         # 尝试生成提交信息
                         spinner.text = "正在生成提交消息..."
-                        platform.set_suppress_output(False)
-                        with spinner.hidden():
-                            while True:
-                                commit_message = platform.chat_until_success(prompt)
-                                commit_message = self._extract_commit_message(commit_message)
-                                # 如果成功提取，就跳出循环
-                                if commit_message:
-                                    break
+                        while True:
+                            commit_message = platform.chat_until_success(prompt)
+                            commit_message = self._extract_commit_message(commit_message)
+                            # 如果成功提取，就跳出循环
+                            if commit_message:
+                                break
                         spinner.write("✅ 生成提交消息")
 
                         # 执行提交
