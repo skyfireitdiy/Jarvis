@@ -117,20 +117,6 @@ class GitCommitTool:
                         temp_diff_file.flush()
                         temp_diff_file.close()
                         spinner.write(f"✅ 差异内容已写入临时文件")
-
-                        # 检查差异内容大小
-                        diff_token = get_context_token_count(diff)
-                        diff_summary = diff
-                        if diff_token > get_max_input_token_count() - 2048:
-                            spinner.write(f"⚠️ 代码差异超过最大token限制 ({diff_token} tokens)")
-                            process = subprocess.Popen(
-                                ["git", "diff", "--cached", "--stat"],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE
-                            )
-                            diff_summary = process.communicate()[0].decode()
-                            spinner.write("✅ 已获取代码差异摘要")
-
                         # 生成提交信息
                         spinner.text = "正在生成提交消息..."
                         
@@ -184,7 +170,7 @@ class GitCommitTool:
                             # 直接在提示中包含差异内容
                             prompt = base_prompt + f'''
         # 分析材料
-        {diff_summary}
+        {diff}
         '''
                         
                         # 尝试生成提交信息
