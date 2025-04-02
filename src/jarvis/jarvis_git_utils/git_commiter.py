@@ -87,69 +87,141 @@ class GitCommitTool:
 
                     # 获取差异
                     spinner.text = "正在获取代码差异..."
+                    # 获取文件列表
+                    files_cmd = ["git", "diff", "--cached", "--name-only"]
+                    process = subprocess.Popen(
+                        files_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    files_output = process.communicate()[0].decode()
+                    files = [f.strip() for f in files_output.split("\n") if f.strip()]
+                    file_count = len(files)
+                    
+                    # 获取完整差异
                     process = subprocess.Popen(
                         ["git", "diff", "--cached", "--exit-code"],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE
                     )
                     diff = process.communicate()[0].decode()
-                    spinner.write("✅ 获取差异")
+                    spinner.write(f"✅ 获取差异 ({file_count} 个文件)")
 
-                    diff_token = get_context_token_count(diff)
-                    if diff_token > get_max_input_token_count() - 2048:
-                        spinner.write("⚠️ 代码差异超过最大token限制，将使用git diff --cached --stat获取变更的文件")
-                        process = subprocess.Popen(
-                            ["git", "diff", "--cached", "--stat"],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE
-                        )
-                        diff = process.communicate()[0].decode()
+                    # 写入差异文件
+                    temp_diff_file = None
+                    try:
+                        # 创建临时文件并写入差异内容
+                        temp_diff_file = tempfile.NamedTemporaryFile(mode='w', suffix='.diff', delete=False)
+                        temp_diff_file_path = temp_diff_file.name
+                        temp_diff_file.write(diff)
+                        temp_diff_file.flush()
+                        temp_diff_file.close()
+                        spinner.write(f"✅ 差异内容已写入临时文件")
 
-                    # 生成提交信息
-                    spinner.text = "正在生成提交消息..."
-                    prompt = f'''根据以下规则生成提交信息：
-                    提交信息应使用{args.get('lang', '中文')}书写
+                        # 检查差异内容大小
+                        diff_token = get_context_token_count(diff)
+                        diff_summary = diff
+                        if diff_token > get_max_input_token_count() - 2048:
+                            spinner.write(f"⚠️ 代码差异超过最大token限制 ({diff_token} tokens)")
+                            process = subprocess.Popen(
+                                ["git", "diff", "--cached", "--stat"],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE
+                            )
+                            diff_summary = process.communicate()[0].decode()
+                            spinner.write("✅ 已获取代码差异摘要")
+
+                        # 生成提交信息
+                        spinner.text = "正在生成提交消息..."
+                        
+                        # 准备提示信息
+                        base_prompt = f'''根据代码差异生成提交信息：
+                        提交信息应使用{args.get('lang', '中文')}书写
         # 必需结构
         必须使用以下格式：
         {ot("COMMIT_MESSAGE")}
         <类型>(<范围>): <主题>
-        使用祈使语气描述变更内容
+        
+        [可选] 详细描述变更内容和原因
         {ct("COMMIT_MESSAGE")}
         # 格式规则
-        1. 类型: fix, feat, docs, style, refactor, test, chore
-        2. 范围表示模块 (例如: auth, database)
-        3. 主题行 <= 72个字符，不以句号结尾
-        4. 正文使用现在时态解释每个变更的内容和原因
-        5. 不要遗漏任何变更
-        # 分析材料
-        {diff}
+        1. 类型: fix(修复bug), feat(新功能), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
+        2. 范围表示变更的模块或组件 (例如: auth, database, ui)
+        3. 主题行不超过72个字符，不以句号结尾，使用祈使语气
+        4. 如有详细描述，使用空行分隔主题和详细描述
+        5. 详细描述部分应解释"是什么"和"为什么"，而非"如何"
         '''
-                    while True:
+
+                        # 获取模型并尝试上传文件
                         platform = PlatformRegistry().get_normal_platform()
-                        commit_message = platform.chat_until_success(prompt)
-                        commit_message = self._extract_commit_message(commit_message)
-                        # 重试
-                        if commit_message:
-                            break
-                    spinner.write("✅ 生成提交消息")
+                        upload_success = False
+                        
+                        if hasattr(platform, 'upload_files') and os.path.exists(temp_diff_file_path):
+                            spinner.text = "正在上传代码差异文件..."
+                            try:
+                                with spinner.hidden():
+                                    upload_success = platform.upload_files([temp_diff_file_path])
+                                if upload_success:
+                                    spinner.write("✅ 成功上传代码差异文件")
+                                else:
+                                    spinner.write("⚠️ 上传代码差异文件失败，将回退到直接提供差异内容")
+                            except Exception as e:
+                                spinner.write(f"⚠️ 上传文件时出错: {str(e)}")
+                                upload_success = False
+                        
+                        # 根据上传状态准备完整的提示
+                        if upload_success:
+                            # 使用上传的文件
+                            prompt = base_prompt + f'''
+        # 变更概述
+        - 变更文件数量: {file_count} 个文件
+        - 已上传包含完整代码差异的文件
+        
+        请详细分析已上传的代码差异文件，生成符合上述格式的提交信息。
+        '''
+                        else:
+                            # 直接在提示中包含差异内容
+                            prompt = base_prompt + f'''
+        # 分析材料
+        {diff_summary}
+        '''
+                        
+                        # 尝试生成提交信息
+                        spinner.text = "正在生成提交消息..."
+                        platform.set_suppress_output(False)
+                        with spinner.hidden():
+                            while True:
+                                commit_message = platform.chat_until_success(prompt)
+                                commit_message = self._extract_commit_message(commit_message)
+                                # 如果成功提取，就跳出循环
+                                if commit_message:
+                                    break
+                        spinner.write("✅ 生成提交消息")
 
-                    # 执行提交
-                    spinner.text = "正在准备提交..."
-                    with tempfile.NamedTemporaryFile(mode='w', delete=True) as tmp_file:
-                        tmp_file.write(commit_message)
-                        tmp_file.flush()
-                        spinner.text = "正在执行提交..."
-                        commit_cmd = ["git", "commit", "-F", tmp_file.name]
-                        subprocess.Popen(
-                            commit_cmd,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL
-                        ).wait()
-                        spinner.write("✅ 提交")
+                        # 执行提交
+                        spinner.text = "正在准备提交..."
+                        with tempfile.NamedTemporaryFile(mode='w', delete=True) as tmp_file:
+                            tmp_file.write(commit_message)
+                            tmp_file.flush()
+                            spinner.text = "正在执行提交..."
+                            commit_cmd = ["git", "commit", "-F", tmp_file.name]
+                            subprocess.Popen(
+                                commit_cmd,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL
+                            ).wait()
+                            spinner.write("✅ 提交")
 
-                    commit_hash = self._get_last_commit_hash()
-                    spinner.text = "完成提交"
-                    spinner.ok("✅")
+                        commit_hash = self._get_last_commit_hash()
+                        spinner.text = "完成提交"
+                        spinner.ok("✅")
+                    finally:
+                        # 清理临时差异文件
+                        if temp_diff_file is not None and os.path.exists(temp_diff_file_path):
+                            try:
+                                os.unlink(temp_diff_file_path)
+                            except Exception as e:
+                                spinner.write(f"⚠️ 无法删除临时文件: {str(e)}")
 
                 PrettyOutput.print(f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS)
 
