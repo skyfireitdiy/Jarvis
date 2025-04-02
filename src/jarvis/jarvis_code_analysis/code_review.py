@@ -104,6 +104,27 @@ class CodeReviewTool:
                                 "stdout": {},
                                 "stderr": "No changes to review"
                             }
+                        
+                        # Add review type and related information to the diff output
+                        review_info = f"""
+----- 代码审查信息 -----
+审查类型: {review_type}"""
+                        
+                        # Add specific information based on review type
+                        if review_type == "commit":
+                            review_info += f"\n提交SHA: {args['commit_sha']}"
+                        elif review_type == "range":
+                            review_info += f"\n起始提交: {args['start_commit']}\n结束提交: {args['end_commit']}"
+                        elif review_type == "file":
+                            review_info += f"\n文件路径: {args['file_path']}"
+                        else:  # current changes
+                            review_info += "\n当前未提交修改"
+                        
+                        review_info += "\n------------------------\n\n"
+                        
+                        # Combine review info with diff output
+                        diff_output = review_info + diff_output
+                        
                         PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")
                     except subprocess.CalledProcessError as e:
                         return {
