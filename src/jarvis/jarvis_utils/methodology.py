@@ -142,6 +142,7 @@ def load_methodology(user_input: str) -> str:
             spinner.text = "上传方法论文件成功"
             spinner.ok("✅")
         
+        platform.set_suppress_output(False)
         # 构建提示信息
         prompt = f"""根据用户需求: {user_input}
 
