@@ -19,7 +19,7 @@ class FindMethodologyTool:
         "required": ["query"]
     }
 
-    def execute(self, args: Dict) -> Dict[str, Any]:
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行方法论查找操作
 
         Args:
