@@ -127,7 +127,7 @@ def load_methodology(user_input: str) -> str:
             spinner.ok("✅")
 
         # 获取当前平台
-        platform = PlatformRegistry().get_normal_platform()
+        platform = PlatformRegistry().get_thinking_platform()
         
         # 上传文件到大模型
         with yaspin(text="上传方法论文件到大模型...", color="yellow") as spinner:
@@ -143,18 +143,21 @@ def load_methodology(user_input: str) -> str:
             spinner.ok("✅")
         
         # 构建提示信息
-        prompt = """我已上传了一个包含多种方法论的文件，收到请回复“已接收到文件”"""
-        platform.chat_until_success(prompt)
-        platform.set_suppress_output(False)
-        prompt = f"""
-        用户需求: {user_input}
+        prompt = f"""根据用户需求: {user_input}
 
-        请总结:
-        1. 解决用户问题的具体步骤
-        2. 任何需要注意的事项
+请按以下格式回复：
 
-        如果没有找到可参考的方法论，请直接为当前需求制定执行计划。
-        """
+### 方法论步骤
+1. [步骤1描述]
+2. [步骤2描述]
+
+如果没有匹配的方法论，请提供执行计划并注明：
+(未参考任何现有方法论)
+
+### 执行计划
+1. [步骤1描述] 
+2. [步骤2描述]
+"""
         return platform.chat_until_success(prompt)
     
     except Exception as e:
