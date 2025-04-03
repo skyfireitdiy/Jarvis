@@ -336,7 +336,6 @@ class ToolRegistry(OutputHandler):
             output = self._format_tool_output(result["stdout"], result.get("stderr", ""))
 
             # 处理结果
-            upload_result = False
             if get_context_token_count(output) > self.max_input_token_count:
                 tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
                 output_file = tmp_file.name
@@ -344,8 +343,7 @@ class ToolRegistry(OutputHandler):
                 tmp_file.close()
                 model = PlatformRegistry().get_normal_platform()
                 model.set_suppress_output(False)
-                if model.upload_files([output_file]):
-                    upload_result = True
+                model.upload_files([output_file]) # TODO 处理错误
                 prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
                 return f"""工具调用原始输出过长，以下是根据输出提出的信息：
 
