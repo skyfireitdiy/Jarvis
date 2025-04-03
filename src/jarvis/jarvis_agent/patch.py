@@ -513,6 +513,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                         success = False
                         break
                 if not success:
+                    revert_file(filepath)
                     continue
 
                 # 写入修改后的内容
