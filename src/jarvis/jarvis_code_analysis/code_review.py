@@ -344,14 +344,7 @@ class CodeReviewTool:
                     # Add language-specific checklists
                     if detected_languages:
                         review_info += "\n\n----- 检测到的编程语言 -----"
-                        language_names = {
-                            'c_cpp': 'C/C++',
-                            'go': 'Go',
-                            'python': 'Python',
-                            'rust': 'Rust'
-                        }
-                        detected_lang_names = [language_names.get(lang, lang) for lang in detected_languages]
-                        review_info += f"\n检测到的语言: {', '.join(detected_lang_names)}"
+                        review_info += f"\n检测到的语言: {', '.join(detected_languages)}"
                         
                         review_info += "\n\n----- 语言特定审查清单 -----"
                         for lang in detected_languages:
