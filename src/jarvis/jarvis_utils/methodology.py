@@ -121,7 +121,7 @@ def load_methodology(user_input: str) -> str:
             spinner.ok("✅")
 
         # 获取当前平台
-        platform = PlatformRegistry().get_thinking_platform()
+        platform = PlatformRegistry().get_normal_platform()
         
         upload_result = False
         if get_context_token_count(user_input) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE:
