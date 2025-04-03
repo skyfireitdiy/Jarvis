@@ -151,6 +151,7 @@ def load_methodology(user_input: str) -> str:
 2. [步骤2描述]
 
 如果没有匹配的方法论，请输出：没有历史方法论可参考
+除以上要求外，不要输出任何内容
 """
         if not upload_result:
             prompt += f"""
