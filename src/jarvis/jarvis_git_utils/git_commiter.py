@@ -143,7 +143,7 @@ class GitCommitTool:
                         platform = PlatformRegistry().get_normal_platform()
                         upload_success = False
                         
-                        if hasattr(platform, 'upload_files') and os.path.exists(temp_diff_file_path):
+                        if get_context_token_count(diff) > get_max_input_token_count() - 2048 and hasattr(platform, 'upload_files') and os.path.exists(temp_diff_file_path):
                             spinner.text = "正在上传代码差异文件..."
                             try:
                                 with spinner.hidden():
