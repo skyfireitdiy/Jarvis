@@ -2,7 +2,6 @@ from typing import Dict, List, Tuple
 import requests
 import json
 import os
-import mimetypes
 import hmac
 import hashlib
 import time
@@ -160,18 +159,18 @@ class YuanbaoPlatform(BasePlatform):
                     elif file_extension == 'pdf':
                         file_type = "pdf"
                     # Spreadsheet types
-                    elif file_extension in ['xls', 'xlsx', 'csv']:
+                    elif file_extension in ['xls', 'xlsx']:
                         file_type = "excel"
                     # Presentation types 
                     elif file_extension in ['ppt', 'pptx']:
                         file_type = "ppt"
                     # Document types
-                    elif file_extension in ['doc', 'docx', 'txt', 'text', 'md']:
+                    elif file_extension in ['doc', 'docx']:
                         file_type = "doc"
                     # Code file types
                     elif file_extension in ['bat', 'c', 'cpp', 'cs', 'css', 'go', 'h', 'hpp', 'ini',
                          'java', 'js', 'json', 'log', 'lua', 'php', 'pl', 'py', 'rb', 
-                         'sh', 'sql', 'swift', 'tex', 'toml', 'vue', 'yaml', 'yml']:
+                         'sh', 'sql', 'swift', 'tex', 'toml', 'vue', 'yaml', 'yml', 'rs']:
                         file_type = "code"
                     
                     # 2. Generate upload information
