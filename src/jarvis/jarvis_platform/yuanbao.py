@@ -221,7 +221,6 @@ class YuanbaoPlatform(BasePlatform):
                     return False
         
         self.multimedia = uploaded_files
-        self.chat_until_success('我上传了文件，收到请回复"收到"')
         return True
         
     def _generate_upload_info(self, file_name: str) -> Dict:

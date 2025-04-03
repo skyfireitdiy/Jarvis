@@ -231,7 +231,6 @@ class KimiModel(BasePlatform):
                     return False
         
         self.uploaded_files = uploaded_files
-        self.chat_until_success("我上传了文件，收到请回复“收到”")
         return True
 
 
