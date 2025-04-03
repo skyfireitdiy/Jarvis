@@ -17,7 +17,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
 
 class YuanbaoPlatform(BasePlatform):
-    """Hunyuan model implementation"""
+    """Hunyuan模型实现"""
 
     platform_name = "yuanbao"
 
@@ -64,7 +64,7 @@ class YuanbaoPlatform(BasePlatform):
         self.multimedia = []
 
     def set_system_message(self, message: str):
-        """Set system message"""
+        """设置系统消息"""
         self.system_message = message
 
     def set_model_name(self, model_name: str):
@@ -77,7 +77,7 @@ class YuanbaoPlatform(BasePlatform):
             PrettyOutput.print(f"错误：不支持的模型: {model_name}", OutputType.ERROR)
 
     def _get_base_headers(self):
-        """Get base headers for API requests"""
+        """获取API请求的基础头部信息"""
         return {
             'Host': 'yuanbao.tencent.com',
             'X-Language': 'zh-CN',
@@ -102,7 +102,7 @@ class YuanbaoPlatform(BasePlatform):
         }
 
     def _create_conversation(self) -> bool:
-        """Create a new conversation session"""
+        """创建一个新的对话会话"""
         url = "https://yuanbao.tencent.com/api/user/agent/conversation/create"
 
         headers = self._get_base_headers()
@@ -126,13 +126,13 @@ class YuanbaoPlatform(BasePlatform):
             return False
 
     def upload_files(self, file_list: List[str]) -> bool:
-        """Upload files to Yuanbao platform
+        """上传文件到元宝平台
         
-        Args:
-            file_list: List of file paths to upload
+        参数:
+            file_list: 要上传的文件路径列表
             
-        Returns:
-            List of file metadata dictionaries for use in chat messages
+        返回:
+            用于聊天消息的文件元数据字典列表
         """
         if not self.cookies:
             PrettyOutput.print("未设置YUANBAO_COOKIES，无法上传文件", OutputType.ERROR)
@@ -224,13 +224,13 @@ class YuanbaoPlatform(BasePlatform):
         return True
         
     def _generate_upload_info(self, file_name: str) -> Dict:
-        """Generate upload information from Yuanbao API
+        """从元宝API生成上传信息
         
-        Args:
-            file_name: Name of the file to upload
+        参数:
+            file_name: 要上传的文件名
             
-        Returns:
-            Dictionary containing upload information or empty dict if failed
+        返回:
+            包含上传信息的字典，如果失败则返回空字典
         """
         url = "https://yuanbao.tencent.com/api/resource/genUploadInfo"
         
@@ -262,14 +262,14 @@ class YuanbaoPlatform(BasePlatform):
             return {}
             
     def _upload_file_to_cos(self, file_path: str, upload_info: Dict, spinner: Yaspin) -> bool:
-        """Upload file to Tencent COS using the provided upload information
+        """使用提供的上传信息将文件上传到腾讯COS
         
-        Args:
-            file_path: Path to the file to upload
-            upload_info: Upload information from generate_upload_info
+        参数:
+            file_path: 要上传的文件路径
+            upload_info: 从generate_upload_info获取的上传信息
             
-        Returns:
-            Boolean indicating success or failure
+        返回:
+            布尔值表示成功或失败
         """
         try:
             # Extract required information from upload_info
@@ -334,18 +334,18 @@ class YuanbaoPlatform(BasePlatform):
     
     def _generate_cos_signature(self, secret_key: str, method: str, path: str, 
                               params: Dict, headers: Dict, key_time: str) -> str:
-        """Generate COS signature according to Tencent Cloud COS documentation
+        """根据腾讯云COS文档生成COS签名
         
-        Args:
-            secret_key: Temporary secret key
-            method: HTTP method (GET, PUT, etc.)
-            path: Object path
-            params: URL parameters
-            headers: HTTP headers
-            key_time: Time range for signature
+        参数:
+            secret_key: 临时密钥
+            method: HTTP方法(GET, PUT等)
+            path: 对象路径
+            params: URL参数
+            headers: HTTP头部
+            key_time: 签名时间范围
             
-        Returns:
-            Signature string
+        返回:
+            签名字符串
         """
         try:
             # 1. Generate SignKey
@@ -382,14 +382,14 @@ class YuanbaoPlatform(BasePlatform):
             raise e
 
     def chat(self, message: str) -> str:
-        """Send message and get response with optional file attachments
+        """发送消息并获取响应，可选文件附件
         
-        Args:
-            message: Message text to send
-            file_list: Optional list of file paths to upload and attach
+        参数:
+            message: 要发送的消息文本
+            file_list: 可选的上传和附加文件路径列表
             
-        Returns:
-            Response from the model
+        返回:
+            模型的响应
         """
         if not self.conversation_id:
             if not self._create_conversation():
@@ -494,7 +494,7 @@ class YuanbaoPlatform(BasePlatform):
             raise Exception(f"对话失败: {str(e)}")
 
     def delete_chat(self) -> bool:
-        """Delete current session"""
+        """删除当前会话"""
         if not self.conversation_id:
             return True  # 如果没有会话ID，视为删除成功
 
@@ -531,5 +531,5 @@ class YuanbaoPlatform(BasePlatform):
             return False
 
     def name(self) -> str:
-        """Model name"""
+        """模型名称"""
         return self.model_name
