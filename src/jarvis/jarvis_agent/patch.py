@@ -9,7 +9,8 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
-from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import get_max_input_token_count, is_confirm_before_apply_patch
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
 from jarvis.jarvis_utils.globals import add_read_file_record, has_read_file
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -308,8 +309,11 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
     with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
         try:
             model = PlatformRegistry().get_normal_platform()
+            upload_success = False
+            file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
             with spinner.hidden():
-                model.upload_files([filepath])
+                if get_context_token_count(file_content) > get_max_input_token_count() - 2048 and model.upload_files([filepath]):
+                    upload_success = True
 
             model.set_suppress_output(False)
 
@@ -342,7 +346,12 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
 [合并后的完整代码，包括所有空行和缩进]
 {ct("MERGED_CODE")}
 """
-            
+            if not upload_success:
+                prompt += f"""
+# 原始代码
+{file_content}
+"""
+
             count = 30
             start_line = -1
             end_line = -1
@@ -403,9 +412,13 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
     """处理大型代码文件的补丁操作，使用差异化补丁格式"""
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
+            file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
+            upload_success = False
             # 读取原始文件内容
             with spinner.hidden():  
-                model.upload_files([filepath])
+                if get_context_token_count(file_content) > get_max_input_token_count() - 2048 and model.upload_files([filepath]):
+                    upload_success = True
+
 
             model.set_suppress_output(False)
 
@@ -454,6 +467,12 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 <<<<<< REPLACE
 {ct("DIFF")}
 """
+            if not upload_success:
+                prompt += f"""
+# 原始代码
+{file_content}
+"""
+
             # 获取补丁内容
             with spinner.hidden():
                 response = model.chat_until_success(prompt)

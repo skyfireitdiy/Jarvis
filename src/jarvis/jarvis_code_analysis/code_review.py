@@ -4,12 +4,15 @@ import os
 import re
 import tempfile
 
+from httpx import get
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_agent import Agent
 
+from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
 from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
@@ -535,20 +538,18 @@ class CodeReviewTool:
                     temp_file.write(diff_output)
                 
                 try:
+                    upload_success = False
                     # Upload the file to the agent's model
                     with yaspin(text="正在上传代码差异文件...", color="cyan") as spinner:
-                        if agent.model and hasattr(agent.model, 'upload_files'):
+                        if get_context_token_count(diff_output) > get_max_input_token_count() - 2048 and agent.model and hasattr(agent.model, 'upload_files'):
                             upload_success = agent.model.upload_files([temp_file_path])
                             if upload_success:
                                 spinner.ok("✅")
                                 PrettyOutput.print(f"已成功上传代码差异文件", OutputType.SUCCESS)
+                                upload_success = True
                             else:
-                                spinner.fail("❌")
-                                PrettyOutput.print(f"上传代码差异文件失败", OutputType.WARNING)
                                 upload_success = False
                         else:
-                            spinner.fail("❌")
-                            PrettyOutput.print(f"当前模型不支持文件上传", OutputType.WARNING)
                             upload_success = False
                     
                     # Prepare the prompt based on upload status

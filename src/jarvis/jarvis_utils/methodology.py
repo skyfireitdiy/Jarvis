@@ -11,6 +11,10 @@ import json
 import hashlib
 import tempfile
 from typing import Dict, List, Optional
+
+from httpx import get
+from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_platform.registry import PlatformRegistry
 
@@ -115,29 +119,23 @@ def load_methodology(user_input: str) -> str:
                 return ""
             spinner.text = f"加载方法论文件完成 (共 {len(methodologies)} 个)"
             spinner.ok("✅")
-        
-        # 创建临时文件
-        with yaspin(text="创建方法论临时文件...", color="yellow") as spinner:
-            temp_file_path = _create_methodology_temp_file(methodologies)
-            if not temp_file_path:
-                spinner.text = "创建方法论临时文件失败"
-                spinner.fail("❌")
-                return ""
-            spinner.text = f"创建方法论临时文件完成: {temp_file_path}"
-            spinner.ok("✅")
 
         # 获取当前平台
         platform = PlatformRegistry().get_thinking_platform()
         
-        # 上传文件到大模型
-        with yaspin(text="上传方法论文件到大模型...", color="yellow") as spinner:
-            with spinner.hidden():
-            # 上传文件
-                upload_result = platform.upload_files([temp_file_path])
-                if not upload_result:
-                    spinner.text = "上传方法论文件失败"
+        upload_result = False
+        if get_context_token_count(user_input) > get_max_input_token_count() - 2048:
+            # 创建临时文件
+            with yaspin(text="创建方法论临时文件...", color="yellow") as spinner:
+                temp_file_path = _create_methodology_temp_file(methodologies)
+                if not temp_file_path:
+                    spinner.text = "创建方法论临时文件失败"
                     spinner.fail("❌")
                     return ""
+                spinner.text = f"创建方法论临时文件完成: {temp_file_path}"
+                spinner.ok("✅")
+            if platform.upload_files([temp_file_path]):
+                upload_result = True
             
             spinner.text = "上传方法论文件成功"
             spinner.ok("✅")
@@ -152,13 +150,14 @@ def load_methodology(user_input: str) -> str:
 1. [步骤1描述]
 2. [步骤2描述]
 
-如果没有匹配的方法论，请提供执行计划并注明：
-(未参考任何现有方法论)
-
-### 执行计划
-1. [步骤1描述] 
-2. [步骤2描述]
+如果没有匹配的方法论，请输出：没有历史方法论可参考
 """
+        if not upload_result:
+            prompt += f"""
+# 方法论内容
+"""
+            for problem_type, content in methodologies.items():
+                prompt += f"## {problem_type}\n\n{content}\n\n---\n\n"
         return platform.chat_until_success(prompt)
     
     except Exception as e:
