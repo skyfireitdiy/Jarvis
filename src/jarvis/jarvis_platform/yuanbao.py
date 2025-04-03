@@ -150,27 +150,29 @@ class YuanbaoPlatform(BasePlatform):
                     file_size = os.path.getsize(file_path)
                     file_extension = os.path.splitext(file_path)[1].lower().lstrip('.')
                     
-                    # Determine file_type using mimetypes
-                    mime_type, _ = mimetypes.guess_type(file_path)
+                    # Determine file_type using file extension
+                    file_type = "txt"  # Default type
                     
-                    # Default to txt if mime_type couldn't be determined
-                    if not mime_type:
-                        file_type = "txt"
                     # Image types
-                    elif mime_type.startswith('image/'):
+                    if file_extension in ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif']:
                         file_type = "image"
                     # PDF type
-                    elif mime_type == 'application/pdf':
+                    elif file_extension == 'pdf':
                         file_type = "pdf"
+                    # Spreadsheet types
+                    elif file_extension in ['xls', 'xlsx', 'csv']:
+                        file_type = "excel"
+                    # Presentation types 
+                    elif file_extension in ['ppt', 'pptx']:
+                        file_type = "ppt"
                     # Document types
-                    elif mime_type in ['application/msword', 
-                                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                                     'application/rtf', 
-                                     'application/vnd.oasis.opendocument.text']:
+                    elif file_extension in ['doc', 'docx', 'txt', 'text', 'md']:
                         file_type = "doc"
-                    # Default to txt for all other types
-                    else:
-                        file_type = "txt"
+                    # Code file types
+                    elif file_extension in ['bat', 'c', 'cpp', 'cs', 'css', 'go', 'h', 'hpp', 'ini',
+                         'java', 'js', 'json', 'log', 'lua', 'php', 'pl', 'py', 'rb', 
+                         'sh', 'sql', 'swift', 'tex', 'toml', 'vue', 'yaml', 'yml']:
+                        file_type = "code"
                     
                     # 2. Generate upload information
                     spinner.text = f"获取上传信息: {file_name}"
@@ -201,7 +203,7 @@ class YuanbaoPlatform(BasePlatform):
                     }
                     
                     # Get image dimensions if it's an image file
-                    if file_type == "img":
+                    if file_type == "image":
                         try:
                             with Image.open(file_path) as img:
                                 file_metadata["width"] = img.width
@@ -219,7 +221,7 @@ class YuanbaoPlatform(BasePlatform):
                     return False
         
         self.multimedia = uploaded_files
-        self.chat_until_success("我上传了文件，收到请回复“收到”")
+        self.chat_until_success('我上传了文件，收到请回复"收到"')
         return True
         
     def _generate_upload_info(self, file_name: str) -> Dict:

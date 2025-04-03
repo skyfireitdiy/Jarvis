@@ -472,7 +472,6 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 # 原始代码
 {file_content}
 """
-            
             for _ in range(3):
                 # 获取补丁内容
                 with spinner.hidden():
@@ -489,7 +488,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                 # 应用所有差异化补丁
                 modified_content = file_content
                 patch_count = 0
-
+                success = True
                 for match in diff_blocks:
                     search_text = match.group(1).strip()
                     replace_text = match.group(2).strip()
@@ -501,6 +500,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                             spinner.text = f"补丁 #{patch_count} 应用失败：找到多个匹配的代码段"
                             prompt = f"补丁 #{patch_count} 应用失败：找到多个匹配的代码段"
                             spinner.fail("❌")
+                            success = False
                             break
                         # 应用替换
                         modified_content = modified_content.replace(
@@ -510,8 +510,9 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                         spinner.text = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
                         prompt = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
                         spinner.fail("❌")
+                        success = False
                         break
-                else:
+                if not success:
                     continue
 
                 # 写入修改后的内容
