@@ -472,50 +472,56 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 # 原始代码
 {file_content}
 """
+            
+            for _ in range(3):
+                # 获取补丁内容
+                with spinner.hidden():
+                    response = model.chat_until_success(prompt)
 
-            # 获取补丁内容
-            with spinner.hidden():
-                response = model.chat_until_success(prompt)
+                # 解析差异化补丁
+                diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
+                                        response, re.DOTALL)
 
-            # 解析差异化补丁
-            diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
-                                      response, re.DOTALL)
+                # 读取原始文件内容
+                with open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
+                    file_content = f.read()
 
-            # 读取原始文件内容
-            with open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
-                file_content = f.read()
+                # 应用所有差异化补丁
+                modified_content = file_content
+                patch_count = 0
 
-            # 应用所有差异化补丁
-            modified_content = file_content
-            patch_count = 0
-
-            for match in diff_blocks:
-                search_text = match.group(1).strip()
-                replace_text = match.group(2).strip()
-                patch_count += 1
-                # 检查搜索文本是否存在于文件中
-                if search_text in modified_content:
-                    # 如果有多处，报错
-                    if modified_content.count(search_text) > 1:
-                        spinner.text = f"补丁 #{patch_count} 应用失败：找到多个匹配的代码段"
+                for match in diff_blocks:
+                    search_text = match.group(1).strip()
+                    replace_text = match.group(2).strip()
+                    patch_count += 1
+                    # 检查搜索文本是否存在于文件中
+                    if search_text in modified_content:
+                        # 如果有多处，报错
+                        if modified_content.count(search_text) > 1:
+                            spinner.text = f"补丁 #{patch_count} 应用失败：找到多个匹配的代码段"
+                            prompt = f"补丁 #{patch_count} 应用失败：找到多个匹配的代码段"
+                            spinner.fail("❌")
+                            break
+                        # 应用替换
+                        modified_content = modified_content.replace(
+                            search_text, replace_text)
+                        spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
+                    else:
+                        spinner.text = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
+                        prompt = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
                         spinner.fail("❌")
-                        return False
-                    # 应用替换
-                    modified_content = modified_content.replace(
-                        search_text, replace_text)
-                    spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
+                        break
                 else:
-                    spinner.text = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
-                    spinner.fail("❌")
-                    return False
+                    continue
 
-            # 写入修改后的内容
-            with open(filepath, 'w', encoding='utf-8', errors="ignore") as f:
-                f.write(modified_content)
+                # 写入修改后的内容
+                with open(filepath, 'w', encoding='utf-8', errors="ignore") as f:
+                    f.write(modified_content)
 
-            spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
-            spinner.ok("✅")
-            return True
+                spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
+                spinner.ok("✅")
+                return True
+            return False
 
         except Exception as e:
             spinner.text = f"文件修改失败: {str(e)}"
