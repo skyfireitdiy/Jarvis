@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import yaml
 from yaspin import yaspin
 
+from distutils.command import upload
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.base import Tool
@@ -335,13 +336,16 @@ class ToolRegistry(OutputHandler):
             output = self._format_tool_output(result["stdout"], result.get("stderr", ""))
 
             # 处理结果
+            upload_result = False
             if get_context_token_count(output) > self.max_input_token_count:
-                output_file = os.path.join(tempfile.gettempdir(), f"jarvis_output_{os.getpid()}.txt")
-                with open(output_file, "w", encoding="utf-8") as f:
-                    f.write(output)
+                tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
+                output_file = tmp_file.name
+                tmp_file.write(output)
+                tmp_file.close()
                 model = PlatformRegistry().get_normal_platform()
                 model.set_suppress_output(False)
-                model.upload_files([output_file])
+                if model.upload_files([output_file]):
+                    upload_result = True
                 prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
                 return f"""工具调用原始输出过长，以下是根据输出提出的信息：
 
