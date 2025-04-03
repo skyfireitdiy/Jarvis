@@ -1,3 +1,3 @@
 """Jarvis AI Assistant"""
 
-__version__ = "0.1.143"
+__version__ = "0.1.144"
