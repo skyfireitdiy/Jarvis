@@ -447,13 +447,13 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 - 每个{ot("DIFF")}块必须包含SEARCH部分和REPLACE部分
 - SEARCH部分是需要查找的原始代码
 - REPLACE部分是替换后的新代码
-- 确保SEARCH部分能在原文件中唯一匹配
+- 确保SEARCH部分能在原文件中**唯一匹配**
 - 如果修改较大，可以使用多个{ot("DIFF")}块
 
 ## 输出模板
 {ot("DIFF")}
 >>>>>> SEARCH
-[需要查找的原始代码，包含足够上下文]
+[需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
 ======
 [替换后的新代码]
 <<<<<< REPLACE
@@ -461,7 +461,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 
 {ot("DIFF")}
 >>>>>> SEARCH
-[另一处需要查找的原始代码]
+[另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
 ======
 [另一处替换后的新代码]
 <<<<<< REPLACE
