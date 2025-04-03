@@ -342,7 +342,7 @@ class ToolRegistry(OutputHandler):
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp_file:
                     output_file = tmp_file.name
                     tmp_file.write(output)
-                subprocess.run(['sed', r's/\x1B\[[0-9;]*[mKH]//g', output_file, '-i'])
+                    tmp_file.flush()
                 model = PlatformRegistry().get_normal_platform()
                 model.set_suppress_output(False)
                 model.upload_files([output_file]) # TODO 处理错误
