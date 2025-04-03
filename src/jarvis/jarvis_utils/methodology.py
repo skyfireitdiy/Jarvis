@@ -13,7 +13,7 @@ import tempfile
 from typing import Dict, List, Optional
 
 from httpx import get
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -124,7 +124,7 @@ def load_methodology(user_input: str) -> str:
         platform = PlatformRegistry().get_thinking_platform()
         
         upload_result = False
-        if get_context_token_count(user_input) > get_max_input_token_count() - 2048:
+        if get_context_token_count(user_input) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE:
             # 创建临时文件
             with yaspin(text="创建方法论临时文件...", color="yellow") as spinner:
                 temp_file_path = _create_methodology_temp_file(methodologies)

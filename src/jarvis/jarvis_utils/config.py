@@ -9,6 +9,10 @@ import os
 - 执行配置
 - 文本处理配置
 """
+
+# 输出窗口预留大小
+INPUT_WINDOW_REVERSE_SIZE = 2048
+
 def get_max_token_count() -> int:
     """
     获取模型允许的最大token数量。

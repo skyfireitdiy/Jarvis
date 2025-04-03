@@ -12,7 +12,7 @@ from yaspin import yaspin
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.base import Tool
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
@@ -133,7 +133,7 @@ class ToolRegistry(OutputHandler):
         # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
-        self.max_input_token_count = get_max_input_token_count() - 2048
+        self.max_input_token_count = get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
 
     def use_tools(self, name: List[str]):
         """使用指定工具"""

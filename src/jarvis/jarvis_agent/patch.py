@@ -9,7 +9,7 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
-from jarvis.jarvis_utils.config import get_max_input_token_count, is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count, is_confirm_before_apply_patch
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
 from jarvis.jarvis_utils.globals import add_read_file_record, has_read_file
@@ -312,7 +312,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             upload_success = False
             file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
             with spinner.hidden():
-                if get_context_token_count(file_content) > get_max_input_token_count() - 2048 and model.upload_files([filepath]):
+                if get_context_token_count(file_content) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE and model.upload_files([filepath]):
                     upload_success = True
 
             model.set_suppress_output(False)
@@ -416,7 +416,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
             upload_success = False
             # 读取原始文件内容
             with spinner.hidden():  
-                if get_context_token_count(file_content) > get_max_input_token_count() - 2048 and model.upload_files([filepath]):
+                if get_context_token_count(file_content) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE and model.upload_files([filepath]):
                     upload_success = True
 
 

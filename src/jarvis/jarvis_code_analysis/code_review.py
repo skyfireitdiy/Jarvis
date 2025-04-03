@@ -11,7 +11,7 @@ from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_agent import Agent
 
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
@@ -541,7 +541,7 @@ class CodeReviewTool:
                     upload_success = False
                     # Upload the file to the agent's model
                     with yaspin(text="正在上传代码差异文件...", color="cyan") as spinner:
-                        if get_context_token_count(diff_output) > get_max_input_token_count() - 2048 and agent.model and hasattr(agent.model, 'upload_files'):
+                        if get_context_token_count(diff_output) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE and agent.model and hasattr(agent.model, 'upload_files'):
                             upload_success = agent.model.upload_files([temp_file_path])
                             if upload_success:
                                 spinner.ok("✅")
