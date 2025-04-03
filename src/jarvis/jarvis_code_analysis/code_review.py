@@ -529,6 +529,8 @@ class CodeReviewTool:
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.diff', delete=False) as temp_file:
                     temp_file_path = temp_file.name
                     temp_file.write(diff_output)
+
+                subprocess.run(['sed', r's/\x1B\[[0-9;]*[mKH]//g', temp_file_path, '-i'])
                 
                 try:
                     upload_success = False

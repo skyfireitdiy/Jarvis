@@ -9,6 +9,7 @@
 import os
 import json
 import hashlib
+import subprocess
 import tempfile
 from typing import Dict, List, Optional
 
@@ -134,6 +135,7 @@ def load_methodology(user_input: str) -> str:
                     return ""
                 spinner.text = f"创建方法论临时文件完成: {temp_file_path}"
                 spinner.ok("✅")
+            subprocess.run(['sed', r's/\x1B\[[0-9;]*[mKH]//g', temp_file_path, '-i'])
             if platform.upload_files([temp_file_path]):
                 upload_result = True
             

@@ -110,13 +110,6 @@ class GitCommitTool:
                     # 写入差异文件
                     temp_diff_file = None
                     try:
-                        # 创建临时文件并写入差异内容
-                        temp_diff_file = tempfile.NamedTemporaryFile(mode='w', suffix='.diff', delete=False)
-                        temp_diff_file_path = temp_diff_file.name
-                        temp_diff_file.write(diff)
-                        temp_diff_file.flush()
-                        temp_diff_file.close()
-                        spinner.write(f"✅ 差异内容已写入临时文件")
                         # 生成提交信息
                         spinner.text = "正在生成提交消息..."
                         
@@ -143,10 +136,16 @@ class GitCommitTool:
                         platform = PlatformRegistry().get_normal_platform()
                         upload_success = False
                         
-                        if get_context_token_count(diff) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE and hasattr(platform, 'upload_files') and os.path.exists(temp_diff_file_path):
+                        if get_context_token_count(diff) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE and hasattr(platform, 'upload_files'):
                             spinner.text = "正在上传代码差异文件..."
                             try:
                                 with spinner.hidden():
+                                    # 创建临时文件并写入差异内容
+                                    with tempfile.NamedTemporaryFile(mode='w', suffix='.diff', delete=False) as temp_diff_file: 
+                                        temp_diff_file_path = temp_diff_file.name
+                                        temp_diff_file.write(diff)
+                                        spinner.write(f"✅ 差异内容已写入临时文件")
+                                    subprocess.run(['sed', r's/\x1B\[[0-9;]*[mKH]//g', temp_diff_file_path, '-i'])
                                     upload_success = platform.upload_files([temp_diff_file_path])
                                 if upload_success:
                                     spinner.write("✅ 成功上传代码差异文件")

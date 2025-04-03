@@ -112,7 +112,8 @@ class FileAnalyzerTool:
 
             # 发送请求并获取分析结果
             with yaspin(Spinners.dots, text="正在分析文件...") as spinner:
-                analysis_result = platform.chat_until_success(analysis_request)
+                with spinner.hidden():
+                    analysis_result = platform.chat_until_success(analysis_request)
                 spinner.text = "分析完成"
                 spinner.ok("✅")
             

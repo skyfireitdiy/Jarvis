@@ -2,10 +2,12 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import tempfile
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from matplotlib.pyplot import subplot
 import yaml
 from yaspin import yaspin
 
@@ -337,10 +339,10 @@ class ToolRegistry(OutputHandler):
 
             # 处理结果
             if get_context_token_count(output) > self.max_input_token_count:
-                tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-                output_file = tmp_file.name
-                tmp_file.write(output)
-                tmp_file.close()
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp_file:
+                    output_file = tmp_file.name
+                    tmp_file.write(output)
+                subprocess.run(['sed', r's/\x1B\[[0-9;]*[mKH]//g', output_file, '-i'])
                 model = PlatformRegistry().get_normal_platform()
                 model.set_suppress_output(False)
                 model.upload_files([output_file]) # TODO 处理错误
