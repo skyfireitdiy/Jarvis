@@ -107,6 +107,7 @@ class GitCommitTool:
                     diff = process.communicate()[0].decode()
                     spinner.write(f"✅ 获取差异 ({file_count} 个文件)")
                     try:
+                        temp_diff_file = None
                         # 生成提交信息
                         spinner.text = "正在生成提交消息..."
                         
