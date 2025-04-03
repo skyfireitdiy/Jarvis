@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image
 from yaspin import yaspin
 from yaspin.spinners import Spinners
+from yaspin.api import Yaspin
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
@@ -181,7 +182,7 @@ class YuanbaoPlatform(BasePlatform):
                         
                     # 3. Upload the file to COS
                     spinner.text = f"上传文件到云存储: {file_name}"
-                    upload_success = self._upload_file_to_cos(file_path, upload_info)
+                    upload_success = self._upload_file_to_cos(file_path, upload_info, spinner)
                     if not upload_success:
                         spinner.text = f"上传文件 {file_name} 失败"
                         spinner.fail("❌")
@@ -259,7 +260,7 @@ class YuanbaoPlatform(BasePlatform):
             PrettyOutput.print(f"获取上传信息时出错: {str(e)}", OutputType.ERROR)
             return {}
             
-    def _upload_file_to_cos(self, file_path: str, upload_info: Dict) -> bool:
+    def _upload_file_to_cos(self, file_path: str, upload_info: Dict, spinner: Yaspin) -> bool:
         """Upload file to Tencent COS using the provided upload information
         
         Args:
@@ -286,6 +287,8 @@ class YuanbaoPlatform(BasePlatform):
             # Read file content
             with open(file_path, 'rb') as file:
                 file_content = file.read()
+
+            spinner.write(f"ℹ️ 上传文件大小: {len(file_content)}")
                 
             # Prepare headers for PUT request
             host = f"{upload_info['bucketName']}.{upload_info.get('accelerateDomain', 'cos.accelerate.myqcloud.com')}"
