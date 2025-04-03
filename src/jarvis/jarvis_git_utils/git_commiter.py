@@ -213,12 +213,13 @@ class GitCommitTool:
                         "commit_message": commit_message
                     }),
                     "stderr": ""
-                    }
+                }
             finally:
                 # Always restore original directory
                 os.chdir(original_dir)
 
         except Exception as e:
+            PrettyOutput.print(f"提交失败: {str(e)}", OutputType.ERROR)
             return {
                 "success": False,
                 "stdout": "",
