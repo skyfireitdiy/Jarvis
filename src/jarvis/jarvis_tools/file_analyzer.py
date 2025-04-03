@@ -79,7 +79,8 @@ class FileAnalyzerTool:
             # 上传文件
             with yaspin(Spinners.dots, text="正在上传文件...") as spinner:
                 try:
-                    upload_result = platform.upload_files(valid_files)
+                    with spinner.hidden():
+                        upload_result = platform.upload_files(valid_files)
                     if not upload_result:
                         spinner.text = "文件上传失败"
                         spinner.fail("❌")
@@ -88,6 +89,7 @@ class FileAnalyzerTool:
                             "stdout": "",
                             "stderr": "文件上传失败"
                         }
+                    spinner.text = "文件上传成功"
                     spinner.ok("✅")
                 except Exception as e:
                     spinner.text = "文件上传失败"
@@ -97,9 +99,6 @@ class FileAnalyzerTool:
                         "stdout": "",
                         "stderr": f"文件上传失败: {str(e)}"
                     }
-                
-            prompt = f"""我上传了文件，收到请回复“已接收到文件”"""
-            platform.chat_until_success(prompt)
 
             platform.set_suppress_output(False)
             
