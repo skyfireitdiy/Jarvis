@@ -16,6 +16,7 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_tools.registry import ToolRegistry
             output = ToolRegistry().handle_tool_calls({
                 "name": "execute_script",
+                "want": "提取命令执行结果关键信息",
                 "arguments": {
                     "interpreter": "bash",
                     "script_content": script
