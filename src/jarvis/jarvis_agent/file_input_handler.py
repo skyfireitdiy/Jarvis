@@ -7,6 +7,8 @@ from typing import Any, Tuple
 from yaspin import yaspin
 
 from jarvis.jarvis_tools.file_operation import FileOperationTool
+from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -78,11 +80,16 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     # Read and process files if any were found
     if files:
         with yaspin(text="正在读取文件...", color="cyan") as spinner:
+            old_prompt = prompt
             result = FileOperationTool().execute({"operation":"read","files": files})
             if result["success"]:
                 spinner.text = "文件读取完成"
                 spinner.ok("✅")
-                return result["stdout"] + "\n" + prompt, False
+                prompt = result["stdout"] + "\n" + prompt
+                if get_context_token_count(prompt) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE:
+                    with spinner.hidden():
+                        agent.model.upload_files([f["path"] for f in files])
+                    return old_prompt, False
 
     return prompt, False
 
