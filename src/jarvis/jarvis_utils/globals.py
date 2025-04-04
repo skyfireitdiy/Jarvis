@@ -17,7 +17,7 @@ colorama.init()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # 全局代理管理
 global_agents: Set[str] = set()
-global_read_files: Dict[str, Set[str]] = {}
+global_read_files: Dict[str, Dict[str, int]] = {}
 current_agent_name: str = ""
 # 使用自定义主题配置rich控制台
 custom_theme = Theme({
@@ -84,11 +84,28 @@ def delete_agent(agent_name: str) -> None:
 
 def add_read_file_record(file_path: str):
     if current_agent_name not in global_read_files:
-        global_read_files[current_agent_name] = set()
-    global_read_files[current_agent_name].add(file_path)
+        global_read_files[current_agent_name] = {}
+    global_read_files[current_agent_name][file_path] = 10  # 初始计数设为10
 
 def has_read_file(file_path: str) -> bool:
-    return not os.path.exists(file_path) or (current_agent_name in global_read_files and file_path in global_read_files[current_agent_name])
+    return not os.path.exists(file_path) or (
+        current_agent_name in global_read_files 
+        and file_path in global_read_files[current_agent_name]
+    )
 
 def clear_read_file_record():
     global_read_files.pop(current_agent_name, None)
+
+def decrease_read_file_counts():
+    """减少当前agent的所有文件读取计数，删除计数为0的记录"""
+    if current_agent_name in global_read_files:
+        to_delete = []
+        for file_path, count in global_read_files[current_agent_name].items():
+            count -= 1
+            if count <= 0:
+                to_delete.append(file_path)
+            else:
+                global_read_files[current_agent_name][file_path] = count
+        
+        for file_path in to_delete:
+            global_read_files[current_agent_name].pop(file_path, None)

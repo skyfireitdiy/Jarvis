@@ -341,6 +341,10 @@ class Agent:
         else:
             message += f"\n\n{self.make_default_addon_prompt(need_complete)}"
 
+        # 在真正调用模型对话前减少文件读取计数
+        from jarvis.jarvis_utils.globals import decrease_read_file_counts
+        decrease_read_file_counts()
+
         # 累加对话长度
         self.conversation_length += get_context_token_count(message)
 
