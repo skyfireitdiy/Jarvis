@@ -7,9 +7,10 @@ import os
 import sys
 import subprocess
 import argparse
-from typing import Optional
+from typing import Optional, List, Tuple
 
-from yaspin import yaspin
+# 忽略yaspin的类型检查
+from yaspin import yaspin  # type: ignore
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
@@ -40,7 +41,7 @@ class CodeAgent:
                 model: Optional[str] = None,
                 need_summary: bool = True):
         self.root_dir = os.getcwd()
-        tool_registry = ToolRegistry()
+        tool_registry = ToolRegistry()  # type: ignore
         tool_registry.use_tools([
             "execute_script",
             "search_web",
@@ -175,22 +176,30 @@ class CodeAgent:
 """
         # Dynamically add ask_codebase based on task complexity if really needed
         # 处理platform参数
-        platform_instance = (PlatformRegistry().create_platform(platform)
-                             if platform
-                             else PlatformRegistry().get_normal_platform())
+        platform_instance = (PlatformRegistry().create_platform(platform)  # type: ignore
+            if platform
+            else PlatformRegistry().get_normal_platform())  # type: ignore
         if model:
             platform_instance.set_model_name(model)  # type: ignore
 
-        self.agent = Agent(system_prompt=code_system_prompt,
-                           name="CodeAgent",
-                           auto_complete=False,
-                           output_handler=[tool_registry,
-                                           PatchOutputHandler()],
-                           platform=platform_instance,
-                           input_handler=[
-                               shell_input_handler, file_input_handler, builtin_input_handler],
-                           need_summary=need_summary)
-        self.agent.set_addon_prompt("请使用工具充分理解用户需求，然后根据需求一步步执行代码修改/开发，如果不清楚要修改那些文件，可以使用ask_codebase工具，以：xxxx功能在哪个文件中实现？类似句式提问")
+        self.agent = Agent(
+            system_prompt=code_system_prompt,
+            name="CodeAgent",
+            auto_complete=False,
+            output_handler=[tool_registry, PatchOutputHandler()],
+            platform=platform_instance,
+            input_handler=[
+                shell_input_handler,
+                file_input_handler,
+                builtin_input_handler
+            ],
+            need_summary=need_summary
+        )
+        self.agent.set_addon_prompt(
+            "请使用工具充分理解用户需求，然后根据需求一步步执行代码修改/开发，"
+            "如果不清楚要修改那些文件，可以使用ask_codebase工具，"
+            "以：xxxx功能在哪个文件中实现？类似句式提问"
+        )
 
     def get_root_dir(self) -> str:
         """获取项目根目录
@@ -200,7 +209,8 @@ class CodeAgent:
         """
         return self.root_dir
 
-    def _init_env(self):
+    def _init_env(self) -> None:
+        """初始化环境"""
         with yaspin(text="正在初始化环境...", color="cyan") as spinner:
             curr_dir = os.getcwd()
             git_dir = find_git_root(curr_dir)
@@ -212,7 +222,7 @@ class CodeAgent:
             spinner.text = "环境初始化完成"
             spinner.ok("✅")
 
-    def _handle_uncommitted_changes(self):
+    def _handle_uncommitted_changes(self) -> None:
         """处理未提交的修改"""
         if has_uncommitted_changes():
             PrettyOutput.print("检测到未提交的修改，是否要提交？", OutputType.WARNING)
@@ -220,38 +230,56 @@ class CodeAgent:
                 git_commiter = GitCommitTool()
                 git_commiter.execute({})
 
-    def _show_commit_history(self, start_commit, end_commit):
-        """显示提交历史"""
+    def _show_commit_history(
+        self,
+        start_commit: Optional[str],
+        end_commit: Optional[str]
+    ) -> List[Tuple[str, str]]:
+        """Show commit history between two commits.
+
+        Args:
+            start_commit: The starting commit hash
+            end_commit: The ending commit hash
+
+        Returns:
+            List of tuples containing (commit_hash, commit_message)
+        """
         if start_commit and end_commit:
             commits = get_commits_between(start_commit, end_commit)
         else:
             commits = []
 
         if commits:
-            commit_messages = "检测到以下提交记录:\n" + \
+            commit_messages = (
+                "检测到以下提交记录:\n" +
                 "\n".join(
-                    [f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits])
+                    f"- {commit_hash[:7]}: {message}"
+                    for commit_hash, message in commits
+                )
+            )
             PrettyOutput.print(commit_messages, OutputType.INFO)
         return commits
 
-    def _handle_commit_confirmation(self, commits, start_commit):
+    def _handle_commit_confirmation(
+        self, 
+        commits: List[Tuple[str, str]], 
+        start_commit: Optional[str]
+    ) -> None:
         """处理提交确认和可能的重置"""
         if commits and user_confirm("是否接受以上提交记录？", True):
             if len(commits) > 1 and user_confirm(
                 "是否要合并为一个更清晰的提交记录？", True
             ):
-                # Reset to start commit
                 subprocess.run(
-                    ["git", "reset", "--mixed", start_commit],
+                    ["git", "reset", "--mixed", str(start_commit)],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     check=True
                 )
-                # Create new commit
                 git_commiter = GitCommitTool()
                 git_commiter.execute({})
         elif start_commit:
-            os.system(f"git reset --hard {start_commit}")
+            os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
             PrettyOutput.print("已重置到初始提交", OutputType.INFO)
 
     def run(self, user_input: str) -> Optional[str]:
@@ -283,7 +311,7 @@ class CodeAgent:
             return f"Error during execution: {str(e)}"
 
 
-def main():
+def main() -> None:
     """Jarvis主入口点。"""
     init_env()
 
