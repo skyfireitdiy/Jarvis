@@ -495,9 +495,8 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                     if search_text in modified_content:
                         # 如果有多处，报错
                         if modified_content.count(search_text) > 1:
-                            spinner.text = f"补丁 #{patch_count} 应用失败：找到多个匹配的代码段"
                             prompt = f"补丁 #{patch_count} 应用失败：找到多个匹配的代码段"
-                            spinner.fail("❌")
+                            spinner.write(f"❌ 补丁 #{patch_count} 应用失败：找到多个匹配的代码段")
                             success = False
                             break
                         # 应用替换
@@ -505,9 +504,8 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                             search_text, replace_text)
                         spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
                     else:
-                        spinner.text = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
+                        spinner.write(f"❌ 补丁 #{patch_count} 应用失败：无法找到匹配的代码段")
                         prompt = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
-                        spinner.fail("❌")
                         success = False
                         break
                 if not success:
@@ -521,6 +519,8 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                 spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
                 spinner.ok("✅")
                 return True
+            spinner.text = f"文件 {filepath} 修改失败"
+            spinner.fail("❌")
             return False
 
         except Exception as e:
