@@ -315,7 +315,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
                 if get_context_token_count(file_content) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE and model.upload_files([filepath]):
                     upload_success = True
 
-            model.set_suppress_output(False)
+            model.set_suppress_output(True)
 
             prompt = f"""
 # 代码合并专家指南
@@ -359,8 +359,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             finished = False
             while count > 0:
                 count -= 1
-                with spinner.hidden():
-                    response = model.chat_until_success(prompt).splitlines()
+                response = model.chat_until_success(prompt).splitlines()
                 try:
                     start_line = response.index(ot("MERGED_CODE")) + 1
                     try:
@@ -420,7 +419,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                     upload_success = True
 
 
-            model.set_suppress_output(False)
+            model.set_suppress_output(True)
 
             prompt = f"""
 # 代码补丁生成专家指南
@@ -474,8 +473,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 """
             for _ in range(3):
                 # 获取补丁内容
-                with spinner.hidden():
-                    response = model.chat_until_success(prompt)
+                response = model.chat_until_success(prompt)
 
                 # 解析差异化补丁
                 diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
