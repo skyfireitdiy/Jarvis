@@ -9,7 +9,6 @@ class LSPGetDiagnosticsTool:
     # 工具描述
     description = "Get diagnostic information (errors, warnings) from code files"
     # 工具标签
-    labels = ['code', 'analysis', 'lsp']
     # 工具参数定义
     parameters = {
         "file_path": "Path to the file to analyze",

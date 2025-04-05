@@ -13,7 +13,6 @@ class ScriptTool:
     """
     name = "execute_script"
     description = "执行脚本并返回结果，支持任意解释器。注意：由于模型上下文长度限制，请避免在脚本中输出大量信息，应该使用rg过滤输出"
-    labels = ['system', 'shell', 'python', 'execution', 'script']
     parameters = {
         "type": "object",
         "properties": {

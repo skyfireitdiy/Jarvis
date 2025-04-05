@@ -7,7 +7,6 @@ from jarvis.jarvis_utils.methodology import load_methodology
 class FindMethodologyTool:
     name = "find_methodology"
     description = "方法论查找工具，用于在执行过程中查看历史方法论辅助决策"
-    labels = ['methodology', 'search', 'analysis']
     parameters = {
         "type": "object",
         "properties": {

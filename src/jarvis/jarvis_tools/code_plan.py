@@ -35,7 +35,6 @@ class CodePlanTool:
 
     name = "code_plan"
     description = "理解需求并制定详细的代码修改计划，在修改前获取用户确认"
-    labels = ['code', 'planning', 'development']
     parameters = {
         "type": "object",
         "properties": {

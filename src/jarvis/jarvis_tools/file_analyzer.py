@@ -9,7 +9,6 @@ from yaspin.spinners import Spinners
 class FileAnalyzerTool:
     name = "file_analyzer"
     description = """分析文件内容并提取关键信息。支持的文件：文本文件、word文档、pdf文件、图片"""
-    labels = ['file', 'analysis', 'code']
     parameters = {
         "type": "object",
         "properties": {

@@ -11,7 +11,6 @@ class CreateCodeAgentTool:
 
     name = "create_code_agent"
     description = "代码开发工具，当需要修改代码时使用，如果只是简单文件修改，使用文件操作或者脚本即可"
-    labels = ['code', 'development', 'automation']
     parameters = {
         "requirement": """代码实现的技术规范，必须包含以下完整信息：
 1. 项目代码目录 - 项目根目录的绝对路径

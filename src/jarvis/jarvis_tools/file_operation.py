@@ -17,7 +17,6 @@ from jarvis.jarvis_utils.file_processors import (
 class FileOperationTool:
     name = "file_operation"
     description = "文件批量操作工具，可批量读写多个文件，支持文本、PDF、Word、Excel、PPT等格式，适用于需要同时处理多个文件的场景（读取配置文件、保存生成内容等）"
-    labels = ['file', 'io', 'batch']
     parameters = {
         "type": "object",
         "properties": {
