@@ -101,7 +101,7 @@ class CodePlanTool:
                     name="CodePlanner",
                     description="分析代码修改需求并制定详细计划",
                     summary_prompt=summary_prompt,
-                    platform=PlatformRegistry().get_thinking_platform(),
+                    platform=PlatformRegistry().get_normal_platform(),
                     output_handler=[tool_registry],
                     execute_tool_confirm=False,
                     auto_complete=False,
@@ -143,6 +143,11 @@ class CodePlanTool:
 ## 任务描述
 分析代码修改需求，理解需求后制定详细的代码修改计划，并在执行前获取用户确认。
 
+## 重要原则
+- **禁止直接修改代码**：仅提供修改计划，不执行实际代码修改
+- **只读分析**：所有代码分析必须基于现有代码，不得假设或虚构代码
+- **配置变更优先**：优先考虑通过配置而非代码修改实现需求
+
 ## 需求信息
 - 需求: {requirement}
 - 代码库根目录: {git_root}
@@ -157,11 +162,13 @@ class CodePlanTool:
    - 使用fd/rg查找相关文件
    - 使用read_code分析关键文件
    - 确定需要修改的文件和范围
+   - **严格禁止修改代码**：仅分析不修改
 
 3. **计划制定阶段**:
    - 制定最小变更方案
    - 按功能模块分组修改
    - 预估修改范围和影响
+   - **仅输出计划**：不执行实际修改
 
 4. **用户确认阶段**:
    - 将完整修改计划呈现给用户
@@ -171,6 +178,7 @@ class CodePlanTool:
 5. **计划输出阶段**:
    - 按照summary_prompt格式输出最终计划
    - 确保计划清晰、可执行
+   - **明确标注**：所有修改需用户手动执行
 
 ## 工具使用优先级
 1. **代码查询工具**:
@@ -183,6 +191,7 @@ class CodePlanTool:
    - ask_user: 确认需求细节
 
 ## 计划制定原则
+- **只读原则**：所有分析必须基于现有代码，不得修改
 - 最小变更原则: 保持现有代码结构
 - 模块化修改: 按功能分组修改
 - 影响分析: 评估修改的影响范围
