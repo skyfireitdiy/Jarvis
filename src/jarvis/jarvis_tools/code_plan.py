@@ -52,9 +52,6 @@ class CodePlanTool:
         "required": ["requirement"]
     }
 
-    def __init__(self, auto_complete: bool = True):
-        self.auto_complete = auto_complete
-
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行代码规划流程
 
@@ -108,7 +105,7 @@ class CodePlanTool:
                     platform=PlatformRegistry().get_thinking_platform(),
                     output_handler=[tool_registry],
                     execute_tool_confirm=False,
-                    auto_complete=self.auto_complete
+                    auto_complete=True,
                 )
 
                 # 运行agent并获取结果
@@ -246,7 +243,7 @@ def main():
     args = parser.parse_args()
 
     # 创建并执行工具
-    tool = CodePlanTool(auto_complete=False)
+    tool = CodePlanTool()
     result = tool.execute({
         "requirement": args.requirement,
         "root_dir": args.root_dir
