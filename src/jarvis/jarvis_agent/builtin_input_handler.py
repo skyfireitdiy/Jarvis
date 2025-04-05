@@ -1,5 +1,6 @@
 import re
 from typing import Any, Tuple
+from jarvis.jarvis_utils.utils import ot, ct
 
 
 
@@ -30,8 +31,17 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 
         if tag == "CodeBase":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            user_input += """
-请使用ask_codebase工具查询代码库，可以使用的提问格式包括：
+            user_input += f"""
+请使用ask_codebase工具查询代码库，必须严格遵守以下工具调用格式：
+
+{ot("TOOL_CALL")}
+want: 想要从执行结果中获取到的信息
+name: ask_codebase
+arguments:
+    question: "与xxx功能相关的文件有哪些？"
+{ct("TOOL_CALL")}
+
+可以使用的提问格式包括：
 1. 与xxx功能相关的文件有哪些？
 2. 要实现xxx，应该要修改哪些文件？
 3. xxx功能是怎么实现的？
@@ -40,8 +50,17 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 """
         elif tag == "Web":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            agent.set_addon_prompt("""
-请使用search_web工具进行网页搜索，可以使用的提问格式包括：
+            agent.set_addon_prompt(f"""
+请使用search_web工具进行网页搜索，必须严格遵守以下工具调用格式：
+
+{ot("TOOL_CALL")}
+want: 想要从执行结果中获取到的信息
+name: search_web
+arguments:
+    query: "xxx技术的最新发展是什么？"
+{ct("TOOL_CALL")}
+
+可以使用的提问格式包括：
 1. xxx技术的最新发展是什么？
 2. xxx框架的官方文档在哪里？
 3. xxx库的GitHub仓库地址是什么？
@@ -60,8 +79,17 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 return "", True
         elif tag == "Methodology":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            agent.set_addon_prompt("""
-请使用find_methodology工具查找相关方法论，可以使用的提问格式包括：
+            agent.set_addon_prompt(f"""
+请使用find_methodology工具查找相关方法论，必须严格遵守以下工具调用格式：
+
+{ot("TOOL_CALL")}
+want: 想要从执行结果中获取到的信息
+name: find_methodology
+arguments:
+    query: "关于xxx的方法论有哪些？"
+{ct("TOOL_CALL")}
+
+可以使用的提问格式包括：
 1. 关于xxx的方法论有哪些？
 2. 如何解决xxx问题？
 3. xxx的最佳实践是什么？
@@ -70,8 +98,17 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 """)
         elif tag == "Plan":
             user_input = user_input.replace(f"'<{tag}>'", "")
-            agent.set_addon_prompt("""
-请使用code_plan工具生成代码修改计划，请提供详细的需求描述：
+            agent.set_addon_prompt(f"""
+请使用code_plan工具生成代码修改计划，必须严格遵守以下工具调用格式：
+
+{ot("TOOL_CALL")}
+want: 想要从执行结果中获取到的信息
+name: code_plan
+arguments:
+    requirement: "需要实现用户登录功能，包括用户名密码验证和JWT生成"
+{ct("TOOL_CALL")}
+
+请提供详细的需求描述：
 
 示例：
 1. 需要实现用户登录功能，包括用户名密码验证和JWT生成
