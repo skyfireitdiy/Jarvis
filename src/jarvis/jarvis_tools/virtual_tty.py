@@ -14,23 +14,24 @@ class VirtualTTYTool:
         "properties": {
             "action": {
                 "type": "string",
-                "description": "要执行的终端操作，可选值: 'launch', 'send_keys', 'output', 'close', 'get_screen'"
+                "description": "要执行的终端操作类型",
+                "enum": ["launch", "send_keys", "output", "close", "get_screen", "list"]
             },
             "keys": {
                 "type": "string",
-                "description": "要发送的按键序列（用于send_keys操作）。"
+                "description": "要发送的按键序列（仅支持单行输入，当action为send_keys时有效）"
             },
             "add_enter": {
                 "type": "boolean",
-                "description": "是否在按键序列末尾添加回车符（\\n），默认为false"
+                "description": "是否在单行命令末尾自动添加回车符（仅当action为send_keys时有效，默认为false）"
             },
             "timeout": {
                 "type": "number",
-                "description": "等待输出的超时时间（秒），用于send_keys和output操作"
+                "description": "等待输出的超时时间（秒，仅当action为send_keys或output时有效，默认为5.0）"
             },
             "tty_id": {
                 "type": "string",
-                "description": "虚拟终端的唯一标识符，用于区分多个TTY会话。如果未提供，默认为'default'"
+                "description": "虚拟终端的唯一标识符（默认为'default'）"
             }
         },
         "required": ["action"]
@@ -200,7 +201,12 @@ class VirtualTTYTool:
             }
     
     def _input_command(self, agent: Any, tty_id: str, command: str, timeout: float, add_enter: bool = False) -> Dict[str, Any]:
-        """输入命令并等待输出"""
+        """输入单行命令并等待输出
+        
+        参数:
+            command: 要输入的单行命令
+            add_enter: 是否在命令末尾添加回车符
+        """
         if agent.tty_sessions[tty_id]["master_fd"] is None:
             return {
                 "success": False,
@@ -208,8 +214,16 @@ class VirtualTTYTool:
                 "stderr": f"虚拟终端 [{tty_id}] 未启动"
             }
             
+        # 严格检查并拒绝多行输入
+        if "\n" in command:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "错误：禁止多行输入"
+            }
+            
         try:
-            # 根据add_enter参数决定是否添加换行符
+            # 根据add_enter参数决定是否添加回车符
             if add_enter:
                 command = command + "\n"
                 
