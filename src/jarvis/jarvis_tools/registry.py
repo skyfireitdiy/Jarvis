@@ -6,7 +6,6 @@ import tempfile
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
-from yaspin import yaspin
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -445,8 +444,7 @@ def main():
             return 1
 
         # 执行工具
-        with yaspin(text=f"正在执行工具 {tool_name}...").dots12:
-            result = registry.execute_tool(tool_name, tool_args)
+        result = registry.execute_tool(tool_name, tool_args)
 
         # 显示结果
         if result["success"]:
