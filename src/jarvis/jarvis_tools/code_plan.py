@@ -227,35 +227,4 @@ class CodePlanTool:
 使用清晰的Markdown格式，重点突出修改计划和验证方案。"""
 
 
-def main():
-    """命令行入口点"""
-    import argparse
-    import sys
 
-    init_env()
-
-    # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description="代码修改规划工具")
-    parser.add_argument("requirement", help="代码修改需求描述")
-    parser.add_argument("--root_dir", "-d", default=".", help="代码库根目录路径")
-
-    # 解析命令行参数
-    args = parser.parse_args()
-
-    # 创建并执行工具
-    tool = CodePlanTool()
-    result = tool.execute({
-        "requirement": args.requirement,
-        "root_dir": args.root_dir
-    })
-
-    # 输出结果
-    if result["success"]:
-        PrettyOutput.print(result["stdout"], OutputType.SUCCESS)
-    else:
-        PrettyOutput.print(result["stderr"], OutputType.WARNING)
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
