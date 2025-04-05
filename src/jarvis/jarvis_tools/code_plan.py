@@ -77,7 +77,7 @@ class CodePlanTool:
                 os.chdir(root_dir)
 
                 # 获取git根目录
-                git_root = find_git_root() or os.getcwd()
+                git_root: str = find_git_root() or os.getcwd()
 
                 # 创建系统提示
                 system_prompt = self._create_system_prompt(requirement, git_root)
@@ -86,7 +86,7 @@ class CodePlanTool:
                 summary_prompt = self._create_summary_prompt(requirement)
 
                 # 创建工具注册表
-                tool_registry = ToolRegistry()
+                tool_registry: ToolRegistry = ToolRegistry()
                 tool_registry.use_tools([
                     "execute_script", 
                     "read_code", 
@@ -96,12 +96,13 @@ class CodePlanTool:
                 ])
 
                 # 创建并运行Agent
+                platform_registry: PlatformRegistry = PlatformRegistry()
                 planner_agent = Agent(
                     system_prompt=system_prompt,
                     name="CodePlanner",
                     description="分析代码修改需求并制定详细计划",
                     summary_prompt=summary_prompt,
-                    platform=PlatformRegistry().get_normal_platform(),
+                    platform=platform_registry.get_normal_platform(),
                     output_handler=[tool_registry],
                     execute_tool_confirm=False,
                     auto_complete=False,

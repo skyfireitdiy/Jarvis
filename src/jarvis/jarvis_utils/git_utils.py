@@ -13,7 +13,7 @@ import re
 import subprocess
 from typing import List, Tuple, Dict
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-def find_git_root(start_dir="."):
+def find_git_root(start_dir: str = ".") -> str:
     """
     切换到给定路径的Git根目录，如果不是Git仓库则初始化。
 
@@ -35,8 +35,12 @@ def find_git_root(start_dir="."):
         git_root = os.path.abspath(".")
     os.chdir(git_root)
     return git_root
-def has_uncommitted_changes():
-    """检查Git仓库中是否有未提交的更改"""
+def has_uncommitted_changes() -> bool:
+    """检查Git仓库中是否有未提交的更改
+    
+    返回:
+        bool: 如果有未提交的更改返回True，否则返回False
+    """
     # 静默添加所有更改
     subprocess.run(["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 

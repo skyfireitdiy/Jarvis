@@ -21,8 +21,8 @@ REQUIRED_METHODS = [
 class PlatformRegistry:
     """Platform registry"""
 
-    global_platform_name = "yuanbao"
-    global_platform_registry = None
+    global_platform_name: str = "yuanbao"
+    global_platform_registry: Optional['PlatformRegistry'] = None
 
     @staticmethod
     def get_platform_dir() -> str:
@@ -134,13 +134,13 @@ class PlatformRegistry:
 
 
     @staticmethod
-    def get_global_platform_registry():
+    def get_global_platform_registry() -> 'PlatformRegistry':
         """Get global platform registry"""
         if PlatformRegistry.global_platform_registry is None:
             PlatformRegistry.global_platform_registry = PlatformRegistry()
         return PlatformRegistry.global_platform_registry
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize platform registry"""
         self.platforms: Dict[str, Type[BasePlatform]] = {}
         # 从用户平台目录加载额外平台
@@ -168,7 +168,7 @@ class PlatformRegistry:
         platform.set_model_name(model_name) # type: ignore
         return platform # type: ignore
 
-    def register_platform(self, name: str, platform_class: Type[BasePlatform]):
+    def register_platform(self, name: str, platform_class: Type[BasePlatform]) -> None:
         """Register platform class
 
         Args:
@@ -178,6 +178,7 @@ class PlatformRegistry:
         self.platforms[name] = platform_class
 
     def create_platform(self, name: str) -> Optional[BasePlatform]:
+        """Create platform instance"""
         """Create platform instance
 
         Args:

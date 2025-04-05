@@ -125,7 +125,7 @@ class ToolRegistry(OutputHandler):
             return False, err_msg
         return False, self.handle_tool_calls(tool_call, agent)
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化工具注册表"""
         self.tools: Dict[str, Tool] = {}
         # 加载内置工具和外部工具
@@ -133,18 +133,26 @@ class ToolRegistry(OutputHandler):
         self._load_external_tools()
         self.max_input_token_count = get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
 
-    def use_tools(self, name: List[str]):
-        """使用指定工具"""
+    def use_tools(self, name: List[str]) -> None:
+        """使用指定工具
+        
+        参数:
+            name: 要使用的工具名称列表
+        """
         missing_tools = [tool_name for tool_name in name if tool_name not in self.tools]
         if missing_tools:
             PrettyOutput.print(f"工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}", OutputType.WARNING)
         self.tools = {tool_name: self.tools[tool_name] for tool_name in name}
 
-    def dont_use_tools(self, names: List[str]):
-        """从注册表中移除指定工具"""
+    def dont_use_tools(self, names: List[str]) -> None:
+        """从注册表中移除指定工具
+        
+        参数:
+            names: 要移除的工具名称列表
+        """
         self.tools = {name: tool for name, tool in self.tools.items() if name not in names}
 
-    def _load_builtin_tools(self):
+    def _load_builtin_tools(self) -> None:
         """从内置工具目录加载工具"""
         tools_dir = Path(__file__).parent
 
@@ -156,7 +164,7 @@ class ToolRegistry(OutputHandler):
 
             self.register_tool_by_file(str(file_path))
 
-    def _load_external_tools(self):
+    def _load_external_tools(self) -> None:
         """从~/.jarvis/tools加载外部工具"""
         external_tools_dir = Path.home() / '.jarvis/tools'
         if not external_tools_dir.exists():
@@ -170,7 +178,7 @@ class ToolRegistry(OutputHandler):
 
             self.register_tool_by_file(str(file_path))
 
-    def register_tool_by_file(self, file_path: str):
+    def register_tool_by_file(self, file_path: str) -> bool:
         """从指定文件加载并注册工具
 
         参数:
@@ -242,7 +250,7 @@ class ToolRegistry(OutputHandler):
         return re.search(ot("TOOL_CALL")+r'(.*?)'+ct("TOOL_CALL"), content, re.DOTALL) is not None
         
     @staticmethod
-    def _extract_tool_calls(content: str) -> Tuple[Dict, str]:
+    def _extract_tool_calls(content: str) -> Tuple[Dict[str, Dict[str, Any]], str]:
         """从内容中提取工具调用。
 
         参数:
@@ -274,20 +282,46 @@ class ToolRegistry(OutputHandler):
             return {}, "检测到多个工具调用，请一次只处理一个工具调用。"
         return ret[0] if ret else {}, ""
 
-    def register_tool(self, name: str, description: str, parameters: Dict, func: Callable):
-        """注册新工具"""
+    def register_tool(self, name: str, description: str, parameters: Dict[str, Dict[str, Any]], func: Callable[..., Dict[str, Any]]) -> None:
+        """注册新工具
+        
+        参数:
+            name: 工具名称
+            description: 工具描述
+            parameters: 工具参数定义
+            func: 工具执行函数
+        """
         self.tools[name] = Tool(name, description, parameters, func)
 
     def get_tool(self, name: str) -> Optional[Tool]:
-        """获取工具"""
+        """获取工具
+        
+        参数:
+            name: 工具名称
+            
+        返回:
+            Optional[Tool]: 找到的工具实例，如果不存在则返回None
+        """
         return self.tools.get(name)
 
-    def get_all_tools(self) -> List[Dict]:
-        """获取所有工具（Ollama格式定义）"""
+    def get_all_tools(self) -> List[Dict[str, Any]]:
+        """获取所有工具（Ollama格式定义）
+        
+        返回:
+            List[Dict[str, Any]]: 包含所有工具信息的列表
+        """
         return [tool.to_dict() for tool in self.tools.values()]
 
-    def execute_tool(self, name: str, arguments: Dict) -> Dict[str, Any]:
-        """执行指定工具"""
+    def execute_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """执行指定工具
+        
+        参数:
+            name: 工具名称
+            arguments: 工具参数
+            
+        返回:
+            Dict[str, Any]: 包含执行结果的字典，包含success、stdout和stderr字段
+        """
         tool = self.get_tool(name)
         if tool is None:
             return {"success": False, "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self.tools.keys())}", "stdout": ""}
@@ -312,10 +346,10 @@ class ToolRegistry(OutputHandler):
         return "无输出和错误" if not output else output
 
 
-    def handle_tool_calls(self, tool_call: Dict, agent: Any) -> str:
+    def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
         try:
-            name = tool_call["name"]
-            args = tool_call["arguments"]
+            name = tool_call["name"]  # 确保name是str类型
+            args = tool_call["arguments"]  # args已经是Dict[str, Any]
             want = tool_call["want"]
             args["agent"] = agent
 
@@ -327,7 +361,7 @@ class ToolRegistry(OutputHandler):
                     return ""
 
             # 执行工具调用
-            result = self.execute_tool(name, args)
+            result = self.execute_tool(name, args)  # 修正参数传递
 
             # 格式化输出
             output = self._format_tool_output(result["stdout"], result.get("stderr", ""))
@@ -338,13 +372,14 @@ class ToolRegistry(OutputHandler):
                     output_file = tmp_file.name
                     tmp_file.write(output)
                     tmp_file.flush()
-                model = PlatformRegistry().get_normal_platform()
-                model.set_suppress_output(False)
-                model.upload_files([output_file]) # TODO 处理错误
+                platform: Any = PlatformRegistry().get_normal_platform()
+                if platform:
+                    platform.set_suppress_output(False)
+                    platform.upload_files([output_file]) # TODO 处理错误
                 prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
                 return f"""工具调用原始输出过长，以下是根据输出提出的信息：
 
-{model.chat_until_success(prompt)}"""
+{platform.chat_until_success(prompt)}"""
                 
             return output
 
@@ -353,7 +388,7 @@ class ToolRegistry(OutputHandler):
             return f"工具调用失败: {str(e)}"
 
 
-def main():
+def main() -> int:
     """命令行工具入口，提供工具列表查看和工具调用功能"""
     import argparse
     import json
@@ -404,9 +439,9 @@ def main():
 
     elif args.command == 'call':
         tool_name = args.tool_name
-        tool = registry.get_tool(tool_name)
+        tool_obj = registry.get_tool(tool_name)
 
-        if not tool:
+        if not tool_obj:
             PrettyOutput.print(f"错误: 工具 '{tool_name}' 不存在", OutputType.ERROR)
             available_tools = ", ".join([t["name"] for t in registry.get_all_tools()])
             print(f"可用工具: {available_tools}")
@@ -430,13 +465,13 @@ def main():
                 return 1
 
         # 检查必需参数
-        required_params = tool.parameters.get('required', [])
+        required_params = tool_obj.parameters.get('required', [])
         missing_params = [p for p in required_params if p not in tool_args]
 
         if missing_params:
             PrettyOutput.print(f"错误: 缺少必需参数: {', '.join(missing_params)}", OutputType.ERROR)
             print("\n参数说明:")
-            params = tool.parameters.get('properties', {})
+            params = tool_obj.parameters.get('properties', {})
             for param_name in required_params:
                 param_info = params.get(param_name, {})
                 desc = param_info.get('description', '无描述')
