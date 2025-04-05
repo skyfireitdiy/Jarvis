@@ -105,7 +105,7 @@ class CodePlanTool:
                     platform=PlatformRegistry().get_thinking_platform(),
                     output_handler=[tool_registry],
                     execute_tool_confirm=False,
-                    auto_complete=True,
+                    auto_complete=False,
                 )
 
                 # 运行agent并获取结果
