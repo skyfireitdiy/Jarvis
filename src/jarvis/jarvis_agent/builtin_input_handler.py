@@ -106,12 +106,6 @@ want: 想要从执行结果中获取到的信息
 name: code_plan
 arguments:
     requirement: "需要实现用户登录功能，包括用户名密码验证和JWT生成"
-    context: {{
-        "current_session": "当前会话状态摘要",
-        "user_history": "用户历史请求摘要",
-        "system_state": "系统当前状态",
-        "related_files": "已确定的相关文件列表"
-    }}
 {ct("TOOL_CALL")}
 
 请提供详细的需求描述和完整上下文信息：
