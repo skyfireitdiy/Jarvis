@@ -81,6 +81,7 @@ class FileCompleter(Completer):
                 (ot("Summary"), '总结'),
                 (ot("Clear"), '清除历史'),
                 (ot("Methodology"), '查找相关方法论'),
+                (ot("Plan"), '生成代码修改计划'),
             ]
             for name, desc in default_suggestions:
                 yield Completion(

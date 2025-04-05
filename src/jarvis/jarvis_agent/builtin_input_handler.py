@@ -68,6 +68,25 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 4. 处理xxx的标准流程是什么？
 5. 实现xxx的参考方案有哪些？
 """)
+        elif tag == "Plan":
+            user_input = user_input.replace(f"'<{tag}>'", "")
+            agent.set_addon_prompt("""
+请使用code_plan工具生成代码修改计划，请提供详细的需求描述：
+
+示例：
+1. 需要实现用户登录功能，包括用户名密码验证和JWT生成
+2. 重构订单处理模块以提高性能
+3. 优化数据库查询性能，减少响应时间
+4. 添加支付网关集成功能
+5. 修改用户权限管理系统
+
+code_plan工具将：
+1. 分析项目结构确定相关文件
+2. 理解需求后制定详细修改步骤
+3. 按功能模块分组修改内容
+4. 评估修改影响范围
+5. 生成可执行的开发计划
+""")
         # 移除对未知标记的警告输出
 
     return user_input, False
