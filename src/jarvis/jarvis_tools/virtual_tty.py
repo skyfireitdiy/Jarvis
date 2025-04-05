@@ -23,7 +23,7 @@ class VirtualTTYTool:
             },
             "add_enter": {
                 "type": "boolean",
-                "description": "是否在单行命令末尾自动添加回车符（仅当action为send_keys时有效，默认为false）"
+                "description": "是否在单行命令末尾自动添加回车符（仅当action为send_keys时有效，默认为true）"
             },
             "timeout": {
                 "type": "number",
@@ -95,7 +95,7 @@ class VirtualTTYTool:
                 return result
             elif action == "send_keys":
                 keys = args.get("keys", "").strip()
-                add_enter = args.get("add_enter", False)
+                add_enter = args.get("add_enter", True)
                 timeout = args.get("timeout", 5.0)  # 默认5秒超时
                 print(f"⌨️ 正在向终端 [{tty_id}] 发送按键序列: {keys}...")
                 result = self._input_command(agent, tty_id, keys, timeout, add_enter)
@@ -200,7 +200,7 @@ class VirtualTTYTool:
                 "stderr": f"启动虚拟终端 [{tty_id}] 失败: {str(e)}"
             }
     
-    def _input_command(self, agent: Any, tty_id: str, command: str, timeout: float, add_enter: bool = False) -> Dict[str, Any]:
+    def _input_command(self, agent: Any, tty_id: str, command: str, timeout: float, add_enter: bool = True) -> Dict[str, Any]:
         """输入单行命令并等待输出
         
         参数:
