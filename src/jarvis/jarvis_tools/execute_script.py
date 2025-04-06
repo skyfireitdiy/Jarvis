@@ -12,7 +12,10 @@ class ScriptTool:
     Executes scripts with any interpreter with a unified interface.
     """
     name = "execute_script"
-    description = "执行脚本并返回结果，支持任意解释器。注意：由于模型上下文长度限制，请避免在脚本中输出大量信息，应该使用rg过滤输出"
+    description = "执行脚本并返回结果，支持任意解释器。" \
+        + "注意：由于模型上下文长度限制，请避免在脚本中输出大量信息，应该使用rg过滤输出。" \
+        + "与virtual_tty不同，此工具会创建一个临时的脚本文件，并使用脚本命令执行脚本，不具备交互式操作的能力，" \
+        + "适用于需要执行脚本并获取结果的场景。不适合需要交互式操作的场景（如：ssh连接、sftp传输、gdb/dlv调试等）。"
     parameters = {
         "type": "object",
         "properties": {

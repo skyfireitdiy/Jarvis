@@ -8,7 +8,9 @@ import select
 
 class VirtualTTYTool:
     name = "virtual_tty"
-    description = "控制虚拟终端执行各种操作，如启动终端、输入命令、获取输出等。与execute_script不同，此工具会创建一个持久的虚拟终端会话，可以连续执行多个命令，并保持终端状态。适用于需要交互式操作的场景，如运行需要用户输入的交互式程序。"
+    description = "控制虚拟终端执行各种操作，如启动终端、输入命令、获取输出等。" \
+         + "与execute_script不同，此工具会创建一个持久的虚拟终端会话，可以连续执行多个命令，并保持终端状态。" \
+         + "适用于需要交互式操作的场景，如运行需要用户输入的交互式程序（如：ssh连接、sftp传输、gdb/dlv调试等）。"
     parameters = {
         "type": "object",
         "properties": {
