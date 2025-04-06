@@ -88,6 +88,13 @@ class VirtualTTYTool:
             
         try:
             if action == "launch":
+                if args.get("keys", "") != "":
+                    print(f"🚫 启动虚拟终端时，不能同时指定keys参数")
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "启动虚拟终端时，不能同时指定keys参数"
+                    }
                 print(f"🚀 正在启动虚拟终端 [{tty_id}]...")
                 result = self._launch_tty(agent, tty_id)
                 if result["success"]:
