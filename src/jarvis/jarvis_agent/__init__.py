@@ -542,7 +542,7 @@ want: 添加/更新xxxx的方法论
 name: methodology
 arguments:
   operation: add/update
-  problem_type: 方法论类型，例如：code_review, bug_fix 等
+  problem_type: 方法论类型，不要过于细节，也不要过于泛化
   content: |
     方法论内容
 {ct("TOOL_CALL")}
