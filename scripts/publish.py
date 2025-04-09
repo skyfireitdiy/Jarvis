@@ -86,6 +86,10 @@ def remove_pycache_directories():
                 print(f"Removing {pycache_dir}")
                 os.system(f"rm -rf {pycache_dir}")
 
+    # 新增清理.mypy_cache目录
+    print("Removing .mypy_cache directories...")
+    os.system("find . -name '.mypy_cache' | xargs -r rm -rvf")
+
 def build_docker_image(version: str) -> None:
     """构建Docker镜像并添加标签"""
     print("Building Docker image...")
