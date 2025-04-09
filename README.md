@@ -21,17 +21,46 @@
 ## 🚀 快速开始 <a id="quick-start"></a>
 ### 安装
 ```bash
-pip install jarvis-ai-assistant # 安装jarvis-ai-assistant
-playwright install # 安装playwright
+git clone https://github.com/skyfireitdiy/Jarvis
+cd Jarvis
+pip3 install -e .
 ```
 
 ### 最小化配置
+
+#### 腾讯元宝
 ```bash
-JARVIS_PLATFORM=openai # 设置AI平台
-JARVIS_MODEL=deepseek-chat # 设置AI模型
-OPENAI_API_KEY=your_openai_api_key # 设置OpenAI API密钥
-OPENAI_API_BASE=https://api.deepseek.com/v1 # 设置OpenAI API基础URL
+JARVIS_PLATFORM=yuanbao
+JARVIS_MODEL=deep_seek_v3
+JARVIS_THINKING_PLATFORM=yuanbao
+JARVIS_THINKING_MODEL=deep_seek
+
+YUANBAO_COOKIES=<元宝cookies>
+YUANBAO_AGENT_ID=<元宝AgentID>
 ```
+
+元宝cookies以及AgentID获取方式：
+
+![元宝cookies以及AgentID获取方式](docs/images/yuanbao.png)
+
+浏览器地址栏中那部分是AgentID。
+
+
+#### Kimi
+```bash
+JARVIS_PLATFORM=kimi
+JARVIS_MODEL=kimi
+JARVIS_THINKING_PLATFORM=kimi
+JARVIS_THINKING_MODEL=k1
+
+KIMI_API_KEY=<Kimi API KEY>
+```
+
+Kimi API Key获取方式：
+
+![Kimi API Key获取方式](docs/images/kimi.png)
+
+删除Bearer前缀，剩下的内容就是Kimi API Key。
 
 以上配置编写到`~/.jarvis/env`文件中。
 
@@ -39,29 +68,48 @@ OPENAI_API_BASE=https://api.deepseek.com/v1 # 设置OpenAI API基础URL
 ```bash
 # 使用通用代理
 jarvis
+
 # 使用代码代理
 jarvis-code-agent
 # 或者 jca
-# 使用codebase的功能
-jarvis-codebase --help
-# 使用rag的功能
-jarvis-rag --help
+
 # 使用智能shell的功能
 jarvis-smart-shell --help
 # 或者 jss
+
 # 使用平台管理的功能
 jarvis-platform-manager --help
+
+# 使用代码审查的功能
+jarvis-code-review --help
+
 # 使用自动化git commit的功能
 jarvis-git-commit --help
 # 或者 jgc
-# 使用代码审查的功能
-jarvis-code-review --help
+
 # 使用dev功能（开发中）
 jarvis-dev --help
+
 # 使用git squash的功能
 jarvis-git-squash --help
+
+# 使用多代理的功能
+jarvis-multi-agent --help
+
+# 使用agent的功能
+jarvis-agent --help
+
+# 使用工具的功能
+jarvis-tool --help
+
 # 使用代码库查询功能
 jarvis-ask-codebase --help
+
+# 使用git details的功能
+jarvis-git-details --help
+
+# 使用方法论的功能
+jarvis-methodology --help
 ```
 
 ---
@@ -70,41 +118,43 @@ jarvis-ask-codebase --help
 ### 环境变量配置
 | 分类 | 变量名称 | 默认值 | 说明 |
 |------|----------|--------|------|
-| 核心配置 | `JARVIS_MAX_TOKEN_COUNT` | 131072 | 上下文窗口的最大token数量 |
+| 核心配置 | `JARVIS_MAX_TOKEN_COUNT` | 102400000 | 上下文窗口的最大token数量 |
+| 核心配置 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
 | 核心配置 | `JARVIS_THREAD_COUNT` | 1 | 并行处理的线程数量 |
-| 核心配置 | `JARVIS_AUTO_COMPLETE` | false | 是否启用自动补全功能 |
+| 核心配置 | `JARVIS_AUTO_COMPLETE` | false | 是否启用自动补全功能 
+| 核心配置 | `JARVIS_SHELL_NAME` | bash | 系统shell名称 |
+| 核心配置 | `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
+| 核心配置 | `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
+| 核心配置 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 思考任务使用的平台 |
+| 核心配置 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 思考任务使用的模型 |
 | 核心配置 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | 核心配置 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
-| 模型配置 | `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
-| 模型配置 | `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
-| 模型配置 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 思考任务使用的平台 |
-| 模型配置 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 思考任务使用的模型 |
-| 方法论配置 | `JARVIS_USE_METHODOLOGY` | true | 是否启用方法论系统 |
-| 方法论配置 | `JARVIS_RECORD_METHODOLOGY` | true | 是否记录方法论 |
-| 方法论配置 | `JARVIS_NEED_SUMMARY` | true | 是否自动生成摘要 |
-| 文本处理 | `JARVIS_MIN_PARAGRAPH_LENGTH` | 50 | 文本处理的最小段落长度 |
-| 文本处理 | `JARVIS_MAX_PARAGRAPH_LENGTH` | 12800 | 文本处理的最大段落长度 |
+| 核心配置 | `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
+
+
 ---
 ## 🛠️ 工具说明 <a id="tools"></a>
 ### 内置工具
 | 工具名称 | 描述 |
 |----------|------|
-| read_code | 支持行号和范围的代码文件读取 |
-| execute_shell | 执行系统命令并捕获输出 |
-| execute_script | 执行脚本并返回结果，支持Shell命令、Shell脚本和Python脚本 |
 | ask_codebase | 智能代码库查询和分析，用于定位功能所在文件和理解单点实现，适合查询特定功能位置和实现原理 |
 | ask_user | 交互式用户输入收集 |
-| file_operation | 基础文件操作（读取/写入/存在性检查） |
-| git_commiter | 自动化git提交处理 |
-| code_review | 多维度的自动代码审查 |
+| chdir | 更改当前工作目录 |
+| code_plan | 理解需求并制定详细的代码修改计划，在修改前获取用户确认 |
+| create_code_agent | 代码开发工具，当需要修改代码时使用，如果只是简单文件修改，使用文件操作或者脚本即可 |
+| create_sub_agent | 创建子代理以处理特定任务，子代理将生成任务总结报告 |
+| execute_script | 执行脚本并返回结果，支持任意解释器。 |
+| file_analyzer | 分析文件内容并提取关键信息。支持的文件：文本文件、word文档、pdf文件、图片 |
+| file_operation | 文件批量操作工具，可批量读写多个文件，支持文本、PDF、Word、Excel、PPT等格式，适用于需要同时处理多个文件的场景（读取配置文件、保存生成内容等） |
+| find_methodology | 方法论查找工具，用于在执行过程中查看历史方法论辅助决策 |
+| lsp_get_diagnostics | 获取代码诊断信息（错误、警告） |
+| methodology | 经验管理工具，支持添加、更新和删除操作 |
+| read_code | 代码阅读与分析工具，用于读取源代码文件并添加行号，针对代码文件优化，提供更好的格式化输出和行号显示，适用于代码分析、审查和理解代码实现的场景 |
+| read_webpage | 读取网页内容，提取标题、文本和超链接 |
 | search_web | 使用bing进行网络搜索 |
-| read_webpage | 读取网页内容 |
-| chdir | 更改工作目录 |
-| create_code_agent | 创建新的代码代理 |
-| create_sub_agent | 创建子代理 |
-| lsp_validate_edit | 验证代码编辑 |
-| rag | 文档检索和问答 |
-| select_code_files | 选择代码文件 |
+| virtual_tty | 控制虚拟终端执行各种操作，如启动终端、输入命令、获取输出等。 |
+
+
 ### 工具位置
 - 内置工具：`src/jarvis/tools/`
 - 用户工具：`~/.jarvis/tools/`
@@ -176,8 +226,8 @@ class CustomPlatform(BasePlatform):
         # 执行对话
         pass
 
-    def reset(self):
-        # 重置平台
+    def upload_files(self, file_list: List[str]) -> bool:
+        # 上传文件
         pass
 
     def delete_chat(self):
