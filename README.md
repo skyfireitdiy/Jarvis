@@ -8,6 +8,7 @@
 
 *您的智能开发和系统交互助手*
 
+[视频介绍](#video-introduction) •
 [快速开始](#quick-start) •
 [配置说明](#configuration) •
 [工具说明](#tools) •
@@ -17,6 +18,10 @@
 </div>
 
 ---
+
+## 📺 视频介绍<a id="video-introduction"></a>
+
+<iframe src="//player.bilibili.com/player.html?isOutside=true&aid=114306578382907&bvid=BV1x2dAYeEpM&cid=29314583629&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
 
 ## 🚀 快速开始 <a id="quick-start"></a>
 ### 安装
