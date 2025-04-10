@@ -238,7 +238,8 @@ def revert_file(filepath: str):
         # 检查文件是否在版本控制中
         result = subprocess.run(
             ['git', 'ls-files', '--error-unmatch', filepath],
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            text=False  # 禁用自动文本解码
         )
         if result.returncode == 0:
             subprocess.run(['git', 'checkout', 'HEAD',
@@ -248,7 +249,8 @@ def revert_file(filepath: str):
                 os.remove(filepath)
         subprocess.run(['git', 'clean', '-f', '--', filepath], check=True)
     except subprocess.CalledProcessError as e:
-        PrettyOutput.print(f"恢复文件失败: {str(e)}", OutputType.ERROR)
+        error_msg = e.stderr.decode('utf-8', errors='replace') if e.stderr else str(e)
+        PrettyOutput.print(f"恢复文件失败: {error_msg}", OutputType.ERROR)
 # 修改后的恢复函数
 
 
@@ -267,10 +269,15 @@ def get_diff() -> str:
         result = subprocess.run(
             ['git', 'diff', '--cached'],
             capture_output=True,
-            text=True,
+            text=False,  # 禁用自动文本解码
             check=True
         )
-        ret = result.stdout
+        # 尝试UTF-8解码，失败时使用回退策略
+        try:
+            ret = result.stdout.decode('utf-8')
+        except UnicodeDecodeError:
+            # 尝试宽松解码，替换无效字符
+            ret = result.stdout.decode('utf-8', errors='replace')
         subprocess.run(['git', "reset", "--mixed", "HEAD"], check=True)
         return ret
     except subprocess.CalledProcessError as e:

@@ -74,14 +74,16 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
             ['git', 'log', f'{start_hash}..{end_hash}', '--pretty=format:%H|%s'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=False  # 禁用自动文本解码
         )
         if result.returncode != 0:
-            PrettyOutput.print(f"获取commit历史失败: {result.stderr}", OutputType.ERROR)
+            error_msg = result.stderr.decode('utf-8', errors='replace')
+            PrettyOutput.print(f"获取commit历史失败: {error_msg}", OutputType.ERROR)
             return []
 
+        output = result.stdout.decode('utf-8', errors='replace')
         commits = []
-        for line in result.stdout.splitlines():
+        for line in output.splitlines():
             if '|' in line:
                 commit_hash, message = line.split('|', 1)
                 commits.append((commit_hash, message))
@@ -101,10 +103,10 @@ def get_latest_commit_hash() -> str:
             ['git', 'rev-parse', 'HEAD'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=False  # 禁用自动文本解码
         )
         if result.returncode == 0:
-            return result.stdout.strip()
+            return result.stdout.decode('utf-8', errors='replace').strip()
         return ""
     except Exception:
         return ""
