@@ -1,5 +1,4 @@
 import os
-import statistics
 from typing import Any, Dict
 from jarvis.jarvis_platform.registry import PlatformRegistry
 

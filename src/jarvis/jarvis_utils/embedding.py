@@ -1,12 +1,8 @@
 import os
-import numpy as np
-import torch
-from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from typing import List, Any, Optional, Tuple
+from transformers import AutoTokenizer
+from typing import List
 import functools
 
-from yaspin.api import Yaspin
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 
 # 全局缓存，避免重复加载模型

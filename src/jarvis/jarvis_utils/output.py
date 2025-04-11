@@ -11,7 +11,6 @@ from enum import Enum
 from datetime import datetime
 from typing import Optional
 from rich.panel import Panel
-from rich.box import HEAVY
 from rich.text import Text
 from rich.syntax import Syntax
 from rich.style import Style as RichStyle

@@ -3,7 +3,6 @@ import shlex
 import subprocess
 from typing import Dict, Any, Optional
 import tempfile
-from click import Option
 import yaml
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry

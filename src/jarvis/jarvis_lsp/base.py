@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional, Tuple, Any, Union
+from typing import List, Dict, Any, Union
 
 class BaseLSP(ABC):
     """Base class for Language Server Protocol integration.

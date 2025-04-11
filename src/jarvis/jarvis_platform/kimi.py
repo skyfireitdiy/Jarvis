@@ -7,7 +7,6 @@ import time
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
-from yaspin import yaspin
 
 class KimiModel(BasePlatform):
     """Kimi model implementation"""

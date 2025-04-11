@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 import os
 
 from jarvis.jarvis_platform.registry import PlatformRegistry

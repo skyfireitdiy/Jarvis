@@ -4,7 +4,6 @@ import os
 import re
 import tempfile
 
-from httpx import get
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
