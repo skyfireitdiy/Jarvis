@@ -174,18 +174,19 @@ class PrettyOutput:
         lang = lang if lang is not None else PrettyOutput._detect_language(text, default_lang='markdown')
         header = PrettyOutput._format(output_type, timestamp)
         content = Syntax(text, lang, theme="monokai", word_wrap=True)
-        panel = Panel(
-            content,
-            style=styles[output_type],
-            border_style=styles[output_type],
-            title=header,
-            title_align="left",
-            padding=(0, 0),
-            highlight=True,
-            # box=HEAVY,
-        )
+        # panel = Panel(
+        #     content,
+        #     style=styles[output_type],
+        #     border_style=styles[output_type],
+        #     title=header,
+        #     title_align="left",
+        #     padding=(0, 0),
+        #     highlight=True,
+        #     # box=HEAVY,
+        # )
         console.print()
-        console.print(panel)
+        console.print(header)
+        console.print(content)
         if traceback or output_type == OutputType.ERROR:
             console.print_exception()
     @staticmethod

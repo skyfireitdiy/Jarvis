@@ -19,7 +19,7 @@ def init_env() -> None:
     jarvis_dir = Path.home() / ".jarvis"
     env_file = jarvis_dir / "env"
 
-    # Check if ~/.jarvis directory exists
+    # 检查~/.jarvis目录是否存在
     if not jarvis_dir.exists():
         jarvis_dir.mkdir(parents=True)
     if env_file.exists():
@@ -53,7 +53,7 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
             time.sleep(sleep_time)
             continue
 def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
-    """Loop execution function, until the function returns True"""
+    """循环执行函数直到返回True"""
     while True:
         ret = func()
         if ret:
@@ -62,37 +62,37 @@ def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
         time.sleep(sleep_time)
     return ret
 def get_file_md5(filepath: str)->str:
-    """Calculate the MD5 hash of a file's content.
+    """计算文件内容的MD5哈希值
 
-    Args:
-        filepath: Path to the file to hash
+    参数:
+        filepath: 要计算哈希的文件路径
 
-    Returns:
-        str: MD5 hash of the file's content
+    返回:
+        str: 文件内容的MD5哈希值
     """
     return hashlib.md5(open(filepath, "rb").read(100*1024*1024)).hexdigest()
 def user_confirm(tip: str, default: bool = True) -> bool:
-    """Prompt the user for confirmation with a yes/no question.
+    """提示用户确认是/否问题
 
-    Args:
-        tip: The message to show to the user
-        default: The default response if user hits enter
+    参数:
+        tip: 显示给用户的消息
+        default: 用户直接回车时的默认响应
 
-    Returns:
-        bool: True if user confirmed, False otherwise
+    返回:
+        bool: 用户确认返回True，否则返回False
     """
     suffix = "[Y/n]" if default else "[y/N]"
     ret = get_single_line_input(f"{tip} {suffix}: ")
     return default if ret == "" else ret.lower() == "y"
 
 def get_file_line_count(filename: str) -> int:
-    """Count the number of lines in a file.
+    """计算文件中的行数
 
-    Args:
-        filename: Path to the file to count lines for
+    参数:
+        filename: 要计算行数的文件路径
 
-    Returns:
-        int: Number of lines in the file, 0 if file cannot be read
+    返回:
+        int: 文件中的行数，如果文件无法读取则返回0
     """
     try:
         return len(open(filename, "r", encoding="utf-8", errors="ignore").readlines())
@@ -173,19 +173,19 @@ def create_soup_element(content: Union[str, Tag, List[Any]]) -> List[Union[Tag, 
     return [content]
 
 def extract_interactive_elements(html_content: str) -> List[Dict[str, Any]]:
-    """Extract all interactive elements from HTML content with their properties.
+    """从HTML内容中提取所有交互元素及其属性
     
-    Args:
-        html_content: HTML content to parse
+    参数:
+        html_content: 要解析的HTML内容
         
-    Returns:
-        List of dictionaries containing element properties:
-        - xpath: XPath of the element
-        - tag: HTML tag name
-        - text: Text content
-        - is_clickable: Whether element is clickable
-        - is_input: Whether element is an input field
-        - is_select: Whether element is a select dropdown
+    返回:
+        包含元素属性的字典列表:
+        - xpath: 元素的XPath
+        - tag: HTML标签名
+        - text: 文本内容
+        - is_clickable: 元素是否可点击
+        - is_input: 元素是否是输入字段
+        - is_select: 元素是否是下拉选择框
     """
     soup = BeautifulSoup(html_content, 'html.parser')
     interactive_elements = []
@@ -249,21 +249,21 @@ def extract_interactive_elements(html_content: str) -> List[Dict[str, Any]]:
     return interactive_elements
 
 def extract_display_elements(html_content: str) -> List[Dict[str, Any]]:
-    """Extract all display elements from HTML content with their properties.
+    """从HTML内容中提取所有显示元素及其属性
     
-    Args:
-        html_content: HTML content to parse
+    参数:
+        html_content: 要解析的HTML内容
         
-    Returns:
-        List of dictionaries containing element properties:
-        - xpath: XPath of the element
-        - tag: HTML tag name
-        - text: Text content
-        - heading_level: Heading level (1-6) if the element is a heading
-        - is_list: Whether the element is a list
-        - is_list_item: Whether the element is a list item
-        - is_table: Whether the element is a table
-        - is_table_cell: Whether the element is a table cell
+    返回:
+        包含元素属性的字典列表:
+        - xpath: 元素的XPath
+        - tag: HTML标签名
+        - text: 文本内容
+        - heading_level: 如果是标题元素则返回标题级别(1-6)
+        - is_list: 元素是否是列表
+        - is_list_item: 元素是否是列表项
+        - is_table: 元素是否是表格
+        - is_table_cell: 元素是否是表格单元格
     """
     soup = BeautifulSoup(html_content, 'html.parser')
     display_elements = []
