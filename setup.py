@@ -14,11 +14,8 @@ setup(
     include_package_data=True,
     install_requires=[
         "requests>=2.25.1",
-        "pyyaml>=5.1",
         "colorama>=0.4.6",
         "prompt_toolkit>=3.0.0",
-        "openai>=1.20.0",
-        "bs4>=0.0.1",
         "PyMuPDF>=1.21.0",
         "yaspin>=2.4.0",
         "pygments>=2.15.0",
