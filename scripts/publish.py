@@ -90,20 +90,6 @@ def remove_pycache_directories():
     print("Removing .mypy_cache directories...")
     os.system("find . -name '.mypy_cache' | xargs -r rm -rvf")
 
-def build_docker_image(version: str) -> None:
-    """构建Docker镜像并添加标签"""
-    print("Building Docker image...")
-    # 构建Docker镜像
-    run_command(
-        ["docker", "build", "-t", f"jarvis-ai-assistant:{version}", "-f", "docker/Dockerfile", "."],
-        "Failed to build Docker image"
-    )
-    # 添加latest标签
-    run_command(
-        ["docker", "tag", f"jarvis-ai-assistant:{version}", "jarvis-ai-assistant:latest"],
-        "Failed to tag Docker image"
-    )
-    print("Docker image built successfully")
 
 def main():
     if len(sys.argv) != 2 or sys.argv[1] not in ["major", "minor", "patch"]:
@@ -172,10 +158,6 @@ def main():
             "Failed to push to remote"
         )
 
-        # 构建Docker镜像
-        build_docker_image(new_version)
-
-        print(f"\nSuccessfully published version {new_version} to PyPI and built Docker image!")
 
     except Exception as e:
         print(f"Error: {str(e)}")
