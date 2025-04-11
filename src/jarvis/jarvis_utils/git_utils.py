@@ -96,18 +96,27 @@ def get_latest_commit_hash() -> str:
     """获取当前Git仓库的最新提交哈希值
 
     返回：
-        str: 提交哈希值，如果不在Git仓库或发生错误则返回空字符串
+        str: 提交哈希值，如果不在Git仓库、空仓库或发生错误则返回空字符串
     """
     try:
+        # 首先检查是否存在HEAD引用
+        head_check = subprocess.run(
+            ['git', 'rev-parse', '--verify', 'HEAD'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=False
+        )
+        if head_check.returncode != 0:
+            return ""  # 空仓库或无效HEAD
+
+        # 获取HEAD的完整哈希值
         result = subprocess.run(
             ['git', 'rev-parse', 'HEAD'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=False  # 禁用自动文本解码
+            text=False
         )
-        if result.returncode == 0:
-            return result.stdout.decode('utf-8', errors='replace').strip()
-        return ""
+        return result.stdout.decode('utf-8', errors='replace').strip() if result.returncode == 0 else ""
     except Exception:
         return ""
 def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:

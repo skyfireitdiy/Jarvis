@@ -255,33 +255,61 @@ def revert_file(filepath: str):
 
 
 def revert_change():
+    """恢复所有未提交的修改到HEAD状态"""
     import subprocess
-    subprocess.run(['git', 'reset', '--hard', 'HEAD'], check=True)
-    subprocess.run(['git', 'clean', '-fd'], check=True)
+    try:
+        # 检查是否为空仓库
+        head_check = subprocess.run(
+            ['git', 'rev-parse', '--verify', 'HEAD'],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE
+        )
+        if head_check.returncode == 0:
+            subprocess.run(['git', 'reset', '--hard', 'HEAD'], check=True)
+        subprocess.run(['git', 'clean', '-fd'], check=True)
+    except subprocess.CalledProcessError as e:
+        return f"恢复更改失败: {str(e)}"
 # 修改后的获取差异函数
 
 
 def get_diff() -> str:
     """使用git获取暂存区差异"""
     import subprocess
+    
+    # 初始化状态
+    need_reset = False
+    
     try:
+        # 暂存所有修改
         subprocess.run(['git', 'add', '.'], check=True)
+        need_reset = True
+        
+        # 获取差异
         result = subprocess.run(
             ['git', 'diff', '--cached'],
             capture_output=True,
-            text=False,  # 禁用自动文本解码
+            text=False,
             check=True
         )
-        # 尝试UTF-8解码，失败时使用回退策略
+        
+        # 解码输出
         try:
             ret = result.stdout.decode('utf-8')
         except UnicodeDecodeError:
-            # 尝试宽松解码，替换无效字符
             ret = result.stdout.decode('utf-8', errors='replace')
-        subprocess.run(['git', "reset", "--mixed", "HEAD"], check=True)
+        
+        # 重置暂存区
+        subprocess.run(['git', "reset", "--mixed"], check=False)
         return ret
+        
     except subprocess.CalledProcessError as e:
+        if need_reset:
+            subprocess.run(['git', "reset", "--mixed"], check=False)
         return f"获取差异失败: {str(e)}"
+    except Exception as e:
+        if need_reset:
+            subprocess.run(['git', "reset", "--mixed"], check=False)
+        return f"发生意外错误: {str(e)}"
 
 
 def handle_commit_workflow() -> bool:
