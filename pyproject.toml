@@ -27,18 +27,14 @@ dependencies = [
     "colorama>=0.4.6",
     "prompt_toolkit>=3.0.0",
     "openai>=1.20.0",
-    "numpy>=1.19.5",
-    "sentence-transformers>=2.2.2",
     "bs4>=0.0.1",
     "PyMuPDF>=1.21.0",
     "yaspin>=2.4.0",
-    "rich>=13.3.1",
     "pygments>=2.15.0",
     "fuzzywuzzy>=0.18.0",
     "jedi>=0.17.2",
     "fastapi>=0.115.4",
     "uvicorn>=0.33.0",
-    "python-pptx>=1.0.0",
     "pandas>=2.0.0",
 ]
 requires-python = ">=3.8"
