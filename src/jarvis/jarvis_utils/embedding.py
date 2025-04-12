@@ -4,9 +4,9 @@ from typing import List
 import functools
 
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.config import get_data_dir
 
 # 全局缓存，避免重复加载模型
-_global_models = {}
 _global_tokenizers = {}
 
 def get_context_token_count(text: str) -> int:
@@ -155,7 +155,7 @@ def load_tokenizer() -> AutoTokenizer:
         AutoTokenizer: 加载的分词器
     """
     model_name = "gpt2"
-    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+    cache_dir = os.path.join(get_data_dir(), "huggingface", "hub")
 
     # 检查全局缓存
     if model_name in _global_tokenizers:
