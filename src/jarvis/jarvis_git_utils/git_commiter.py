@@ -171,10 +171,8 @@ class GitCommitTool:
                         
                         # 尝试生成提交信息
                         spinner.text = "正在生成提交消息..."
-                        platform.set_suppress_output(False)
                         while True:
-                            with spinner.hidden():
-                                commit_message = platform.chat_until_success(prompt)
+                            commit_message = platform.chat_until_success(prompt)
                             commit_message = self._extract_commit_message(commit_message)
                             # 如果成功提取，就跳出循环
                             if commit_message:
