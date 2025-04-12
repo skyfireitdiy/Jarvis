@@ -4,6 +4,7 @@ import sys
 
 from typing import Dict  # 仅保留实际使用的类型导入
 
+from jarvis.jarvis_utils.config import get_data_dir
 from prompt_toolkit import prompt
 import yaml
 from yaspin import yaspin
@@ -25,13 +26,14 @@ def _load_tasks() -> Dict[str, str]:
     """Load tasks from .jarvis files in user home and current directory."""
     tasks: Dict[str, str] = {}
 
-    # Check .jarvis/pre-command in user directory
-    user_jarvis = os.path.expanduser("~/.jarvis/pre-command")
-    if os.path.exists(user_jarvis):
-        spinner_text = f"从{user_jarvis}加载预定义任务..."
+    # Check pre-command in data directory
+    data_dir = get_data_dir()
+    pre_command_path = os.path.join(data_dir, "pre-command")
+    if os.path.exists(pre_command_path):
+        spinner_text = f"从{pre_command_path}加载预定义任务..."
         with yaspin(text=spinner_text, color="cyan") as spinner:
             try:
-                with open(user_jarvis, "r", encoding="utf-8", errors="ignore") as f:
+                with open(pre_command_path, "r", encoding="utf-8", errors="ignore") as f:
                     user_tasks = yaml.safe_load(f)
                 if isinstance(user_tasks, dict):
                     for name, desc in user_tasks.items():

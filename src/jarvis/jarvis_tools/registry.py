@@ -10,7 +10,7 @@ import yaml
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.base import Tool
-from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count
+from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
@@ -165,8 +165,8 @@ class ToolRegistry(OutputHandler):
             self.register_tool_by_file(str(file_path))
 
     def _load_external_tools(self) -> None:
-        """从~/.jarvis/tools加载外部工具"""
-        external_tools_dir = Path.home() / '.jarvis/tools'
+        """从jarvis_data/tools加载外部工具"""
+        external_tools_dir = Path(get_data_dir()) / 'tools'
         if not external_tools_dir.exists():
             return
 

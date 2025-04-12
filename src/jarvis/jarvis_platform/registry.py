@@ -4,7 +4,7 @@ import os
 import sys
 from typing import Dict, Type, Optional, List
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import get_normal_model_name, get_normal_platform_name, get_thinking_model_name, get_thinking_platform_name
+from jarvis.jarvis_utils.config import get_normal_model_name, get_normal_platform_name, get_thinking_model_name, get_thinking_platform_name, get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 REQUIRED_METHODS = [
@@ -26,15 +26,13 @@ class PlatformRegistry:
 
     @staticmethod
     def get_platform_dir() -> str:
-        user_platform_dir = os.path.expanduser("~/.jarvis/models")
+        user_platform_dir = os.path.join(get_data_dir(), "models")
         if not os.path.exists(user_platform_dir):
             try:
                 os.makedirs(user_platform_dir)
                 # 创建 __init__.py 使其成为 Python 包
                 with open(os.path.join(user_platform_dir, "__init__.py"), "w", errors="ignore") as f:
                     pass
-
-                pass
             except Exception as e:
                 PrettyOutput.print(f"创建平台目录失败: {str(e)}", OutputType.ERROR)
                 return ""

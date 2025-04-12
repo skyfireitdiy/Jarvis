@@ -3,6 +3,7 @@ import json
 import hashlib
 from typing import Dict, Any
 
+from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -35,7 +36,7 @@ class MethodologyTool:
 
     def __init__(self):
         """初始化经验管理工具"""
-        self.methodology_dir = os.path.expanduser("~/.jarvis/methodologies")
+        self.methodology_dir = os.path.join(get_data_dir(), "methodologies")
         self._ensure_dir_exists()
 
     def _ensure_dir_exists(self):

@@ -6,6 +6,7 @@ import sys
 from typing import Dict, Type, Optional, List
 from jarvis.jarvis_lsp.base import BaseLSP
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.config import get_data_dir
 
 REQUIRED_METHODS = [
     ('initialize', ['workspace_path']),
@@ -21,7 +22,7 @@ class LSPRegistry:
     @staticmethod
     def get_lsp_dir() -> str:
         """Get LSP implementation directory."""
-        user_lsp_dir = os.path.expanduser("~/.jarvis/lsp")
+        user_lsp_dir = os.path.join(get_data_dir(), "lsp")
         if not os.path.exists(user_lsp_dir):
             try:
                 os.makedirs(user_lsp_dir)

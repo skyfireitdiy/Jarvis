@@ -11,7 +11,7 @@ import json
 import tempfile
 from typing import Dict, Optional
 
-from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count
+from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -23,7 +23,7 @@ def _get_methodology_directory() -> str:
     返回：
         str: 方法论目录的路径
     """
-    methodology_dir = os.path.expanduser("~/.jarvis/methodologies")
+    methodology_dir = os.path.join(get_data_dir(), "methodologies")
     if not os.path.exists(methodology_dir):
         try:
             os.makedirs(methodology_dir, exist_ok=True)

@@ -14,6 +14,7 @@ from yaspin.api import Yaspin
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
+from jarvis.jarvis_utils.config import get_data_dir
 
 class YuanbaoPlatform(BasePlatform):
     """Hunyuan模型实现"""
@@ -46,9 +47,9 @@ class YuanbaoPlatform(BasePlatform):
                 "   • 发送任意消息\n"
                 "   • 在请求中找到 X-Uskey 和 T-UserID 头部值\n"
                 "2. 设置环境变量:\n"
-                "   • 方法 1: 创建或编辑 ~/.jarvis/env 文件:\n"
-                "   echo 'YUANBAO_COOKIES=your_cookies_here' >> ~/.jarvis/env\n"
-                "   echo 'YUANBAO_AGENT_ID=your_agent_id_here' >> ~/.jarvis/env\n"
+                "   • 方法 1: 创建或编辑配置文件:\n"
+                f"   echo 'YUANBAO_COOKIES=your_cookies_here' >> {get_data_dir()}/env\n"
+                f"   echo 'YUANBAO_AGENT_ID=your_agent_id_here' >> {get_data_dir()}/env\n"
                 "   • 方法 2: 直接设置环境变量:\n"
                 "   export YUANBAO_COOKIES=your_cookies_here\n"
                 "   export YUANBAO_AGENT_ID=your_agent_id_here\n"

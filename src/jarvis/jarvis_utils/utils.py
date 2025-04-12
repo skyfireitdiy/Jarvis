@@ -3,22 +3,22 @@ import time
 import hashlib
 from pathlib import Path
 from typing import List, Any, Callable
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import get_max_input_token_count, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 def init_env() -> None:
-    """初始化环境变量从~/.jarvis/env文件
+    """初始化环境变量从jarvis_data/env文件
 
     功能：
-    1. 创建不存在的.jarvis目录
+    1. 创建不存在的jarvis_data目录
     2. 加载环境变量到os.environ
     3. 处理文件读取异常
     """
-    jarvis_dir = Path.home() / ".jarvis"
+    jarvis_dir = Path(get_data_dir())
     env_file = jarvis_dir / "env"
 
-    # 检查~/.jarvis目录是否存在
+    # 检查jarvis_data目录是否存在
     if not jarvis_dir.exists():
         jarvis_dir.mkdir(parents=True)
     if env_file.exists():

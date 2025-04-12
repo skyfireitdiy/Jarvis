@@ -118,3 +118,17 @@ def get_max_tool_call_count() -> int:
         int: 最大连续工具调用次数，默认为20
     """
     return int(os.getenv('JARVIS_MAX_TOOL_CALL_COUNT', '20'))
+
+
+def get_data_dir() -> str:
+    """
+    获取Jarvis数据存储目录路径。
+    
+    返回:
+        str: 数据目录路径，优先从JARVIS_DATA_PATH环境变量获取，
+             如果未设置或为空，则使用~/.jarvis作为默认值
+    """
+    data_path = os.getenv('JARVIS_DATA_PATH', '').strip()
+    if not data_path:
+        return os.path.expanduser('~/.jarvis')
+    return data_path

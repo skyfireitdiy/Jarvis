@@ -7,6 +7,7 @@ import time
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
+from jarvis.jarvis_utils.config import get_data_dir
 
 class KimiModel(BasePlatform):
     """Kimi model implementation"""
@@ -39,8 +40,8 @@ class KimiModel(BasePlatform):
                 "   • 在请求中找到 Authorization 头\n"
                 "   • 复制 token 值（去掉 'Bearer ' 前缀）\n"
                 "2. 设置环境变量:\n"
-                "   • 方法 1: 创建或编辑 ~/.jarvis/env 文件:\n"
-                "   echo 'KIMI_API_KEY=your_key_here' > ~/.jarvis/env\n"
+                "   • 方法 1: 创建或编辑配置文件:\n"
+                f"   echo 'KIMI_API_KEY=your_key_here' > {get_data_dir()}/env\n"
                 "   • 方法 2: 直接设置环境变量:\n"
                 "   export KIMI_API_KEY=your_key_here\n"
                 "设置后，重新运行 Jarvis。"
