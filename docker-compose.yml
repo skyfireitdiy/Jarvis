@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  jarvis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jarvis:${VERSION:-latest}
+    container_name: jarvis
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: ["jarvis"]
+
+  jarvis_builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jarvis:${VERSION:-latest}
+    container_name: jarvis_builder
+    command: ["bash"]
