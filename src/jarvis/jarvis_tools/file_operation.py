@@ -8,8 +8,7 @@ from jarvis.jarvis_utils.globals import add_read_file_record
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 # 导入文件处理器
 from jarvis.jarvis_utils.file_processors import (
-    TextFileProcessor, PDFProcessor, DocxProcessor, 
-    PPTProcessor, ExcelProcessor
+    TextFileProcessor
 )
 
 
@@ -44,10 +43,6 @@ class FileOperationTool:
     def _get_file_processor(self, file_path: str):
         """获取适合处理指定文件的处理器"""
         processors = [
-            PDFProcessor,    # PDF文件处理器
-            DocxProcessor,   # Word文档处理器
-            PPTProcessor,    # PowerPoint演示文稿处理器
-            ExcelProcessor,  # Excel表格处理器
             TextFileProcessor  # 文本文件处理器(放在最后作为兜底)
         ]
         
@@ -126,25 +121,11 @@ class FileOperationTool:
                                 "stderr": f"读取文本文件失败: {str(e)}"
                             }
                     else:
-                        # 使用专用处理器来提取非文本文件的内容
-                        try:
-                            spinner.text = f"使用 {processor.__name__} 提取 {abs_path} 的内容..."
-                            content = processor.extract_text(abs_path)
-                            # 获取文件类型友好名称
-                            file_type_names = {
-                                PDFProcessor: "PDF文档",
-                                DocxProcessor: "Word文档",
-                                PPTProcessor: "PowerPoint演示文稿",
-                                ExcelProcessor: "Excel表格"
-                            }
-                            file_type = file_type_names.get(processor, file_extension)
-                            file_info = f"\n文件: {abs_path} ({file_type})"
-                        except Exception as e:
-                            return {
-                                "success": False,
-                                "stdout": "",
-                                "stderr": f"提取 {file_extension} 文件内容失败: {str(e)}"
-                            }
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": f"不支持的文件类型: {file_extension}"
+                        }
                     
                     # 构建输出信息
                     output = f"{file_info}\n{content}" + "\n\n"
