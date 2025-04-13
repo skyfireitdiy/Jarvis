@@ -4,12 +4,12 @@ FROM python:3.8.20
 RUN pip config set global.index-url https://pypi.mirrors.ustc.edu.cn/simple/
 
 # 创建工作目录
-WORKDIR /jarvis
+WORKDIR /app
 
-# 拷贝项目文件
-COPY setup.py .
-COPY src/ ./src/
-COPY scripts/ ./scripts/
+# 拷贝项目文件到/jarvis目录
+COPY setup.py /jarvis/
+COPY src/ /jarvis/src/
+COPY scripts/ /jarvis/scripts/
 
 # 安装项目依赖
-RUN pip install -e .
+RUN pip install -e /jarvis
