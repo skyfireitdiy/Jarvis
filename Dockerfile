@@ -12,7 +12,6 @@ WORKDIR /app
 COPY setup.py /jarvis/
 COPY README.md /jarvis/
 COPY src/ /jarvis/src/
-COPY scripts/ /jarvis/scripts/
 
 # 安装项目依赖
 RUN pip install -e /jarvis --default-timeout=100 --retries 5
