@@ -156,8 +156,8 @@ jarvis-methodology --help
 | lsp_get_diagnostics | 获取代码诊断信息（错误、警告） |
 | methodology | 经验管理工具，支持添加、更新和删除操作 |
 | read_code | 代码阅读与分析工具，用于读取源代码文件并添加行号，针对代码文件优化，提供更好的格式化输出和行号显示，适用于代码分析、审查和理解代码实现的场景 |
-| read_webpage | 读取网页内容，提取标题、文本和超链接 |
-| search_web | 使用bing进行网络搜索 |
+| read_webpage | 读取网页内容并分析 |
+| search_web | 使用互联网搜索 |
 | virtual_tty | 控制虚拟终端执行各种操作，如启动终端、输入命令、获取输出等。 |
 
 
