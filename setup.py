@@ -26,6 +26,7 @@ setup(
         "transformers==4.46.3",
         "torch==2.4.1",
         "python-Levenshtein==0.25.1",
+        "sseclient==0.0.27",
     ],
     entry_points={
         "console_scripts": [

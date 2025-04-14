@@ -14,6 +14,7 @@ from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
+from jarvis.jarvis_mcp.local_mcp_client import LocalMcpClient
 
 
 
@@ -131,6 +132,7 @@ class ToolRegistry(OutputHandler):
         # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
+        self._load_mcp_tools()
         self.max_input_token_count = get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
 
     def use_tools(self, name: List[str]) -> None:
@@ -151,6 +153,16 @@ class ToolRegistry(OutputHandler):
             names: 要移除的工具名称列表
         """
         self.tools = {name: tool for name, tool in self.tools.items() if name not in names}
+
+    def _load_mcp_tools(self) -> None:
+        """从jarvis_data/tools/mcp加载工具"""
+        mcp_tools_dir = Path(get_data_dir()) / 'mcp'
+        if not mcp_tools_dir.exists():
+            return
+
+        # 遍历目录中的所有.yaml文件
+        for file_path in mcp_tools_dir.glob("*.yaml"):
+            self.register_mcp_tool_by_file(str(file_path))
 
     def _load_builtin_tools(self) -> None:
         """从内置工具目录加载工具"""
@@ -178,6 +190,89 @@ class ToolRegistry(OutputHandler):
 
             self.register_tool_by_file(str(file_path))
 
+    def register_mcp_tool_by_file(self, file_path: str) -> bool:
+        """从指定文件加载并注册工具
+        
+        参数:
+            file_path: 工具文件的路径
+
+        返回:
+            bool: 工具是否加载成功
+        """
+        try:
+            config = yaml.safe_load(open(file_path, 'r', encoding='utf-8'))
+            if 'type' not in config:
+                PrettyOutput.print(f"文件 {file_path} 缺少type字段", OutputType.WARNING)
+                return False
+            if config['type'] == 'local':
+                if 'command' not in config:
+                    PrettyOutput.print(f"文件 {file_path} 缺少command字段", OutputType.WARNING)
+                    return False
+                
+                # 创建本地MCP客户端
+                mcp_client = LocalMcpClient(config)
+                
+                # 获取工具信息
+                tools = mcp_client.get_tool_list()
+                if not tools:
+                    PrettyOutput.print(f"从 {file_path} 获取工具列表失败", OutputType.WARNING)
+                    return False
+                
+                # 注册每个工具
+                for tool in tools:
+                    def create_local_execute_func(tool_name: str, client: LocalMcpClient):
+                        def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
+                            return client.execute(tool_name, arguments)
+                        return execute
+                    
+                    # 注册工具
+                    self.register_tool(
+                        name=tool['name'],
+                        description=tool['description'],
+                        parameters=tool['parameters'],
+                        func=create_local_execute_func(tool['name'], mcp_client)
+                    )
+                
+                return True
+                
+            elif config['type'] == 'remote':
+                if 'base_url' not in config:
+                    PrettyOutput.print(f"文件 {file_path} 缺少base_url字段", OutputType.WARNING)
+                    return False
+                
+                # 创建远程MCP客户端
+                from jarvis.jarvis_mcp.remote_mcp_client import RemoteMcpClient
+                mcp_client = RemoteMcpClient(config)
+                
+                # 获取工具信息
+                tools = mcp_client.get_tool_list()
+                if not tools:
+                    PrettyOutput.print(f"从 {file_path} 获取工具列表失败", OutputType.WARNING)
+                    return False
+                
+                # 注册每个工具
+                for tool in tools:
+                    def create_remote_execute_func(tool_name: str, client: RemoteMcpClient):
+                        def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
+                            return client.execute(tool_name, arguments)
+                        return execute
+                    
+                    # 注册工具
+                    self.register_tool(
+                        name=tool['name'],
+                        description=tool['description'],
+                        parameters=tool['parameters'],
+                        func=create_remote_execute_func(tool['name'], mcp_client)
+                    )
+                
+                return True
+            else:
+                PrettyOutput.print(f"文件 {file_path} 类型错误: {config['type']}", OutputType.WARNING)
+                return False
+        except Exception as e:
+            PrettyOutput.print(f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING)
+            return False
+        
     def register_tool_by_file(self, file_path: str) -> bool:
         """从指定文件加载并注册工具
 
