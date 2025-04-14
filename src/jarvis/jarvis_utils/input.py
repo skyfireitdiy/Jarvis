@@ -158,8 +158,14 @@ def get_multiline_input(tip: str) -> str:
         'prompt': 'ansicyan',
     })
     try:
+        from prompt_toolkit.history import FileHistory
+        from jarvis.jarvis_utils.config import get_data_dir
+        import os
+        # 获取数据目录路径
+        history_dir = get_data_dir()
+        # 初始化带历史记录的会话
         session = PromptSession(
-            history=None,
+            history=FileHistory(os.path.join(history_dir, 'multiline_input_history')),
             completer=FileCompleter(),
             key_bindings=bindings,
             complete_while_typing=True,
