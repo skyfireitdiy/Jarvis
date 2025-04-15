@@ -69,6 +69,9 @@ class LocalMcpClient(McpClient):
                 raise RuntimeError(f"初始化失败: {response.get('error', 'Unknown error')}")
 
             result = response['result']
+            
+            # 发送initialized通知 - 使用正确的方法名格式
+            self._send_notification('notifications/initialized', {})
 
         except Exception as e:
             PrettyOutput.print(f"MCP初始化失败: {str(e)}", OutputType.ERROR)
@@ -95,18 +98,42 @@ class LocalMcpClient(McpClient):
                 'params': params,
                 'id': 1
             }
-            print("req:", request)
             # 发送请求
             self.process.stdin.write(json.dumps(request) + '\n')  # type: ignore
             self.process.stdin.flush()  # type: ignore
 
             # 读取响应
             response = self.process.stdout.readline()  # type: ignore
-            print(response)
             return json.loads(response)
 
         except Exception as e:
             PrettyOutput.print(f"发送请求失败: {str(e)}", OutputType.ERROR)
+            raise
+
+    def _send_notification(self, method: str, params: Dict[str, Any]) -> None:
+        """发送通知到MCP进程（不需要响应）
+        
+        参数:
+            method: 通知方法
+            params: 通知参数
+        """
+        if not self.process:
+            raise RuntimeError('MCP process not started')
+
+        try:
+            # 构建通知
+            notification = {
+                'jsonrpc': '2.0',
+                'method': method,
+                'params': params
+            }
+            print("notification:", notification)
+            # 发送通知
+            self.process.stdin.write(json.dumps(notification) + '\n')  # type: ignore
+            self.process.stdin.flush()  # type: ignore
+
+        except Exception as e:
+            PrettyOutput.print(f"发送通知失败: {str(e)}", OutputType.ERROR)
             raise
 
     def get_tool_list(self) -> List[Dict[str, Any]]:
@@ -120,8 +147,9 @@ class LocalMcpClient(McpClient):
         """
         try:
             response = self._send_request('tools/list', {})
-            if 'result' in response:
-                tools = response['result']
+            if 'result' in response and 'tools' in response['result']:
+                # 注意这里: 响应结构是 response['result']['tools']
+                tools = response['result']['tools']
                 # 将MCP协议字段转换为内部格式
                 formatted_tools = []
                 for tool in tools:
@@ -138,7 +166,15 @@ class LocalMcpClient(McpClient):
                     })
                 return formatted_tools
             else:
-                PrettyOutput.print(f"获取工具列表失败: {response.get('error', 'Unknown error')}", OutputType.ERROR)
+                error_msg = "获取工具列表失败"
+                if 'error' in response:
+                    error_msg += f": {response['error']}"
+                elif 'result' in response:
+                    error_msg += f": 响应格式不正确 - {response['result']}"
+                else:
+                    error_msg += ": 未知错误"
+                    
+                PrettyOutput.print(error_msg, OutputType.ERROR)
                 return []
         except Exception as e:
             PrettyOutput.print(f"获取工具列表失败: {str(e)}", OutputType.ERROR)
@@ -196,8 +232,8 @@ class LocalMcpClient(McpClient):
         """清理资源"""
         if self.process:
             try:
-                # 发送退出通知
-                self._send_request('exit', {})
+                # 发送退出通知 - 使用通知而非请求
+                self._send_notification('notifications/exit', {})
                 # 等待进程结束
                 self.process.wait(timeout=1)
             except:
