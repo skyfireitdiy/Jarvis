@@ -126,7 +126,7 @@ jarvis-methodology --help
 |------|----------|--------|------|
 | 核心配置 | `JARVIS_MAX_TOKEN_COUNT` | 102400000 | 上下文窗口的最大token数量 |
 | 核心配置 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
-| 核心配置 | `JARVIS_AUTO_COMPLETE` | false | 是否启用自动补全功能 
+| 核心配置 | `JARVIS_AUTO_COMPLETE` | false | 是否启用自动完成功能（任务判定完成的时候会自动终止） |
 | 核心配置 | `JARVIS_SHELL_NAME` | bash | 系统shell名称 |
 | 核心配置 | `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
 | 核心配置 | `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
@@ -166,7 +166,7 @@ jarvis-methodology --help
 ---
 ## 🛠️ 扩展开发 <a id="extensions"></a>
 ### 添加新工具
-在 `~/.jarvis/tools/》 中创建新的 Python 文件：
+在 `~/.jarvis/tools/` 中创建新的 Python 文件：
 ```python
 from typing import Dict, Any
 from jarvis.utils import OutputType, PrettyOutput
@@ -215,7 +215,7 @@ class CustomTool:
 
 
 ### 添加新大模型平台
-在 `~/.jarvis/platforms/》 中创建新的 Python 文件：
+在 `~/.jarvis/platforms/` 中创建新的 Python 文件：
 ```python
 from jarvis.jarvis_platform.base import BasePlatform
 class CustomPlatform(BasePlatform):
