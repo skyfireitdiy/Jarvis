@@ -69,8 +69,6 @@ class LocalMcpClient(McpClient):
                 raise RuntimeError(f"初始化失败: {response.get('error', 'Unknown error')}")
 
             result = response['result']
-            if result.get('protocolVersion') != self.protocol_version:
-                raise RuntimeError(f"协议版本不匹配: 服务器返回 {result.get('protocolVersion')}, 期望 {self.protocol_version}")
 
         except Exception as e:
             PrettyOutput.print(f"MCP初始化失败: {str(e)}", OutputType.ERROR)
@@ -97,13 +95,14 @@ class LocalMcpClient(McpClient):
                 'params': params,
                 'id': 1
             }
-
+            print("req:", request)
             # 发送请求
             self.process.stdin.write(json.dumps(request) + '\n')  # type: ignore
             self.process.stdin.flush()  # type: ignore
 
             # 读取响应
             response = self.process.stdout.readline()  # type: ignore
+            print(response)
             return json.loads(response)
 
         except Exception as e:

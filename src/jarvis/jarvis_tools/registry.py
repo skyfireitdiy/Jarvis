@@ -15,6 +15,7 @@ from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
 from jarvis.jarvis_mcp.local_mcp_client import LocalMcpClient
+from jarvis.jarvis_mcp.remote_mcp_client import RemoteMcpClient
 
 
 
@@ -241,7 +242,6 @@ class ToolRegistry(OutputHandler):
                     return False
                 
                 # 创建远程MCP客户端
-                from jarvis.jarvis_mcp.remote_mcp_client import RemoteMcpClient
                 mcp_client = RemoteMcpClient(config)
                 
                 # 获取工具信息

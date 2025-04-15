@@ -6,7 +6,6 @@ import hmac
 import hashlib
 import time
 import urllib.parse
-from pathlib import Path
 from PIL import Image
 from yaspin import yaspin
 from yaspin.spinners import Spinners

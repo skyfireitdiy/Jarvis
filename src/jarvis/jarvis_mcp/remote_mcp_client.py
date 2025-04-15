@@ -60,8 +60,6 @@ class RemoteMcpClient(McpClient):
                 raise RuntimeError(f"初始化失败: {response.get('error', 'Unknown error')}")
 
             result = response['result']
-            if result.get('protocolVersion') != "2025-03-26":
-                raise RuntimeError(f"协议版本不匹配: 服务器返回 {result.get('protocolVersion')}, 期望 2025-03-26")
 
             # 建立SSE连接
             sse_url = urljoin(self.base_url, 'events')
