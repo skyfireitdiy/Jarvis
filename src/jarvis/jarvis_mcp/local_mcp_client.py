@@ -127,7 +127,6 @@ class LocalMcpClient(McpClient):
                 'method': method,
                 'params': params
             }
-            print("notification:", notification)
             # 发送通知
             self.process.stdin.write(json.dumps(notification) + '\n')  # type: ignore
             self.process.stdin.flush()  # type: ignore
