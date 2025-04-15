@@ -99,8 +99,6 @@ class LocalMcpClient(McpClient):
                 'id': 1
             }
 
-            print("request:", request)
-
             # 发送请求
             self.process.stdin.write(json.dumps(request) + '\n')  # type: ignore
             self.process.stdin.flush()  # type: ignore
