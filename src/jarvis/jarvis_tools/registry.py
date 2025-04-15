@@ -223,7 +223,12 @@ class ToolRegistry(OutputHandler):
                 for tool in tools:
                     def create_local_execute_func(tool_name: str, client: LocalMcpClient):
                         def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
-                            return client.execute(tool_name, arguments)
+                            args = arguments.copy()
+                            args.pop('agent', None)
+                            args.pop('want', None)
+                            ret = client.execute(tool_name, args)
+                            PrettyOutput.print(f"MCP {tool_name} 执行结果:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
+                            return ret
                         return execute
                     
                     # 注册工具
@@ -254,7 +259,12 @@ class ToolRegistry(OutputHandler):
                 for tool in tools:
                     def create_remote_execute_func(tool_name: str, client: RemoteMcpClient):
                         def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
-                            return client.execute(tool_name, arguments)
+                            args = arguments.copy()
+                            args.pop('agent', None)
+                            args.pop('want', None)
+                            ret = client.execute(tool_name, args)
+                            PrettyOutput.print(f"MCP {tool_name} 执行结果:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
+                            return ret
                         return execute
                     
                     # 注册工具
