@@ -31,14 +31,6 @@ def get_max_input_token_count() -> int:
     """
     return int(os.getenv('JARVIS_MAX_INPUT_TOKEN_COUNT', '32000'))
 
-def get_thread_count() -> int:
-    """
-    获取用于并行处理的线程数。
-
-    返回：
-        int: 线程数，默认为1
-    """
-    return int(os.getenv('JARVIS_THREAD_COUNT', '1'))
 
 def is_auto_complete() -> bool:
     """

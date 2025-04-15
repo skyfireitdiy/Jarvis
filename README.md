@@ -126,13 +126,12 @@ jarvis-methodology --help
 |------|----------|--------|------|
 | 核心配置 | `JARVIS_MAX_TOKEN_COUNT` | 102400000 | 上下文窗口的最大token数量 |
 | 核心配置 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
-| 核心配置 | `JARVIS_THREAD_COUNT` | 1 | 并行处理的线程数量 |
 | 核心配置 | `JARVIS_AUTO_COMPLETE` | false | 是否启用自动补全功能 
 | 核心配置 | `JARVIS_SHELL_NAME` | bash | 系统shell名称 |
 | 核心配置 | `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
 | 核心配置 | `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
-| 核心配置 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 思考任务使用的平台 |
-| 核心配置 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 思考任务使用的模型 |
+| 核心配置 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 推理任务使用的平台 |
+| 核心配置 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 |
 | 核心配置 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | 核心配置 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
 | 核心配置 | `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
@@ -147,14 +146,14 @@ jarvis-methodology --help
 | ask_user | 交互式用户输入收集 |
 | chdir | 更改当前工作目录 |
 | code_plan | 理解需求并制定详细的代码修改计划，在修改前获取用户确认 |
-| create_code_agent | 代码开发工具，当需要修改代码时使用，如果只是简单文件修改，使用文件操作或者脚本即可 |
+| create_code_agent | 代码开发工具，当需要修改代码时使用 |
 | create_sub_agent | 创建子代理以处理特定任务，子代理将生成任务总结报告 |
 | execute_script | 执行脚本并返回结果，支持任意解释器。 |
 | file_analyzer | 分析文件内容并提取关键信息。支持的文件：文本文件、word文档、pdf文件、图片 |
-| file_operation | 文件批量操作工具，可批量读写多个文件，支持文本、PDF、Word、Excel、PPT等格式，适用于需要同时处理多个文件的场景（读取配置文件、保存生成内容等） |
+| file_operation | 文件批量操作工具，可批量读写多个文件，支持文本文件，适用于需要同时处理多个文件的场景（读取配置文件、保存生成内容等） |
 | find_methodology | 方法论查找工具，用于在执行过程中查看历史方法论辅助决策 |
 | lsp_get_diagnostics | 获取代码诊断信息（错误、警告） |
-| methodology | 经验管理工具，支持添加、更新和删除操作 |
+| methodology | 方法论管理工具，支持添加、更新和删除操作 |
 | read_code | 代码阅读与分析工具，用于读取源代码文件并添加行号，针对代码文件优化，提供更好的格式化输出和行号显示，适用于代码分析、审查和理解代码实现的场景 |
 | read_webpage | 读取网页内容并分析 |
 | search_web | 使用互联网搜索 |
