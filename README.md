@@ -214,23 +214,23 @@ class CustomTool:
 ```
 
 
-### 添加MCP工具
-MCP(模型上下文协议)允许通过本地或远程服务集成外部工具。在`~/.jarvis/tools/mcp/`中创建YAML配置文件：
+### 添加MCP
+MCP(模型上下文协议)。在`~/.jarvis/tools/mcp/`中创建YAML配置文件：
 
-#### 本地MCP工具配置（`stdio`模式）
+#### 本地MCP配置（`stdio`模式）
 ```yaml
 type: local
-name: 工具组名称
+name: MCP名称
 command: 可执行命令
 args: [参数列表]  # 可选
 env:  # 可选环境变量
   KEY: VALUE
 ```
 
-#### 远程MCP工具配置（`sse`模式）
+#### 远程MCP配置（`sse`模式）
 ```yaml
 type: remote
-name: 工具组名称
+name: MCP名称
 base_url: http://example.com/api
 auth_token: 认证令牌  # 可选
 headers:  # 可选HTTP头

@@ -177,6 +177,13 @@ class GitCommitTool:
                             # 如果成功提取，就跳出循环
                             if commit_message:
                                 break
+                            prompt = f"""格式错误，请按照以下格式重新生成提交信息：
+                            {ot("COMMIT_MESSAGE")}
+        <类型>(<范围>): <主题>
+        
+        [可选] 详细描述变更内容和原因
+        {ct("COMMIT_MESSAGE")}
+                            """
                         spinner.write("✅ 生成提交消息")
 
                         # 执行提交
