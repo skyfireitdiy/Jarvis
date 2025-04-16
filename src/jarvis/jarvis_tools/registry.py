@@ -205,6 +205,8 @@ class ToolRegistry(OutputHandler):
             if 'type' not in config:
                 PrettyOutput.print(f"文件 {file_path} 缺少type字段", OutputType.WARNING)
                 return False
+            name = config.get('name', Path(file_path).stem)
+            
             if config['type'] == 'local':
                 if 'command' not in config:
                     PrettyOutput.print(f"文件 {file_path} 缺少command字段", OutputType.WARNING)
@@ -233,7 +235,7 @@ class ToolRegistry(OutputHandler):
                     
                     # 注册工具
                     self.register_tool(
-                        name=tool['name'],
+                        name=f"{name}_{tool['name']}",
                         description=tool['description'],
                         parameters=tool['parameters'],
                         func=create_local_execute_func(tool['name'], mcp_client)
@@ -263,13 +265,13 @@ class ToolRegistry(OutputHandler):
                             args.pop('agent', None)
                             args.pop('want', None)
                             ret = client.execute(tool_name, args)
-                            PrettyOutput.print(f"MCP {tool_name} 执行结果:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
+                            PrettyOutput.print(f"MCP {name} {tool_name} 执行结果:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
                             return ret
                         return execute
                     
                     # 注册工具
                     self.register_tool(
-                        name=tool['name'],
+                        name=f"{name}_{tool['name']}",
                         description=tool['description'],
                         parameters=tool['parameters'],
                         func=create_remote_execute_func(tool['name'], mcp_client)
