@@ -214,6 +214,41 @@ class CustomTool:
 ```
 
 
+### 添加MCP工具
+MCP(Microservice Control Protocol)允许通过本地或远程服务集成外部工具。在`~/.jarvis/tools/mcp/`中创建YAML配置文件：
+
+#### 本地MCP工具配置
+```yaml
+type: local
+name: 工具组名称
+command: 可执行命令
+args: [参数列表]  # 可选
+env:  # 可选环境变量
+  KEY: VALUE
+```
+
+#### 远程MCP工具配置
+```yaml
+type: remote
+name: 工具组名称
+base_url: http://example.com/api
+auth_token: 认证令牌  # 可选
+headers:  # 可选HTTP头
+  X-Custom-Header: value
+```
+
+MCP服务需要实现以下JSON-RPC接口：
+- `tools/list` - 获取工具列表
+- `tools/call` - 调用工具
+- `notifications/initialized` - 初始化通知
+- `notifications/exit` - 退出通知
+
+工具定义应包含:
+- `name` - 工具名称
+- `description` - 工具描述
+- `inputSchema` - 输入参数Schema
+
+
 ### 添加新大模型平台
 在 `~/.jarvis/platforms/` 中创建新的 Python 文件：
 ```python
