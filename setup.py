@@ -27,6 +27,7 @@ setup(
         "torch==2.4.1",
         "python-Levenshtein==0.25.1",
         "sseclient==0.0.27",
+        "pillow==10.2.1",
     ],
     entry_points={
         "console_scripts": [

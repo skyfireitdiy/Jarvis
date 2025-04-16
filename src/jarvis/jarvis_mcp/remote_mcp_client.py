@@ -37,8 +37,9 @@ class RemoteMcpClient(McpClient):
         extra_headers = config.get('headers', {})
         self.session.headers.update(extra_headers)
         
-        # 初始化SSE连接
-        self.sse_client = None
+        # 建立SSE连接
+        sse_url = urljoin(self.base_url, 'sse')
+        self.sse_client = sseclient.SSEClient(sse_url)
         self._initialize()
 
     def _initialize(self) -> None:
@@ -64,10 +65,7 @@ class RemoteMcpClient(McpClient):
             # 发送initialized通知 - 使用正确的方法名格式
             self._send_notification('notifications/initialized', {})
 
-            # 建立SSE连接
-            sse_url = urljoin(self.base_url, 'events')
             response = self.session.get(sse_url, stream=True)
-            self.sse_client = sseclient.SSEClient(response)
 
         except Exception as e:
             PrettyOutput.print(f"MCP初始化失败: {str(e)}", OutputType.ERROR)
