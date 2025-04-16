@@ -93,7 +93,7 @@ class RemoteMcpClient(McpClient):
 
             # 发送请求
             response = self.session.post(
-                urljoin(self.base_url, 'rpc'),
+                urljoin(self.base_url, 'sse'),
                 json=request
             )
             response.raise_for_status()
@@ -120,7 +120,7 @@ class RemoteMcpClient(McpClient):
 
             # 发送通知
             response = self.session.post(
-                urljoin(self.base_url, 'rpc'),
+                urljoin(self.base_url, 'sse'),
                 json=notification
             )
             response.raise_for_status()
