@@ -1,6 +1,5 @@
 from typing import Any, Dict, List
 import requests
-import sseclient
 from urllib.parse import urljoin
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from . import McpClient
@@ -37,9 +36,8 @@ class RemoteMcpClient(McpClient):
         extra_headers = config.get('headers', {})
         self.session.headers.update(extra_headers)
         
-        # 建立SSE连接
-        sse_url = urljoin(self.base_url, 'sse')
-        self.sse_client = sseclient.SSEClient(sse_url)
+        # SSE相关属性
+        self.sse_stream = None
         self._initialize()
 
     def _initialize(self) -> None:
@@ -62,10 +60,13 @@ class RemoteMcpClient(McpClient):
 
             result = response['result']
             
-            # 发送initialized通知 - 使用正确的方法名格式
+            # 发送initialized通知
             self._send_notification('notifications/initialized', {})
 
-            response = self.session.get(sse_url, stream=True)
+            # 建立SSE连接
+            sse_url = urljoin(self.base_url, 'sse')
+            self.sse_stream = self.session.get(sse_url, stream=True)
+            self.sse_stream.raise_for_status()
 
         except Exception as e:
             PrettyOutput.print(f"MCP初始化失败: {str(e)}", OutputType.ERROR)
@@ -307,7 +308,7 @@ class RemoteMcpClient(McpClient):
 
     def __del__(self):
         """清理资源"""
-        if self.sse_client and hasattr(self.sse_client, 'resp'):
-            self.sse_client.resp.close()
+        if self.sse_stream:
+            self.sse_stream.close()
         if self.session:
             self.session.close()
