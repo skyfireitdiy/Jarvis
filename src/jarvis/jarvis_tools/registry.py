@@ -254,116 +254,67 @@ class ToolRegistry(OutputHandler):
                 if 'command' not in config:
                     PrettyOutput.print(f"文件 {file_path} 缺少command字段", OutputType.WARNING)
                     return False
-                
-                # 创建本地MCP客户端
-                mcp_client = LocalMcpClient(config)
-                
-                # 获取工具信息
-                tools = mcp_client.get_tool_list()
-                if not tools:
-                    PrettyOutput.print(f"从 {file_path} 获取工具列表失败", OutputType.WARNING)
-                    return False
-                
-                # 注册每个工具
-                for tool in tools:
-                    
-                    # 注册工具
-                    self.register_tool(
-                        name=f"{name}.{tool['name']}",
-                        description=tool['description'],
-                        parameters=tool['parameters'],
-                        func=create_mcp_execute_func(tool['name'], mcp_client)
-                    )
-                
-
-                # 注册资源列表工具
-                self.register_tool(
-                    name=f"{name}.resource.get_resource_list",
-                    description=f"获取{name}MCP服务器上的资源列表",
-                    parameters={
-                        'type': 'object',
-                        'properties': {},
-                        'required': []
-                    },
-                    func=create_resource_list_func(mcp_client)
-                )
-
-                # 注册获取资源工具
-                self.register_tool(
-                    name=f"{name}.resource.get_resource",
-                    description=f"获取{name}MCP服务器上的指定资源",
-                    parameters={
-                        'type': 'object',
-                        'properties': {
-                            'uri': {
-                                'type': 'string',
-                                'description': '资源的URI标识符'
-                            }
-                        },
-                        'required': ['uri']
-                    },
-                    func=create_resource_get_func(mcp_client)
-                )
-                
-                return True
-                
             elif config['type'] == 'remote':
                 if 'base_url' not in config:
                     PrettyOutput.print(f"文件 {file_path} 缺少base_url字段", OutputType.WARNING)
-                    return False
-                
-                # 创建远程MCP客户端
-                mcp_client = RemoteMcpClient(config)
-                
-                # 获取工具信息
-                tools = mcp_client.get_tool_list()
-                if not tools:
-                    PrettyOutput.print(f"从 {file_path} 获取工具列表失败", OutputType.WARNING)
-                    return False
-                
-                # 注册每个工具
-                for tool in tools:
-                    
-                    
-                    # 注册工具
-                    self.register_tool(
-                        name=f"{name}.{tool['name']}",
-                        description=tool['description'],
-                        parameters=tool['parameters'],
-                        func=create_mcp_execute_func(tool['name'], mcp_client)
-                    )
-
-                # 注册资源列表工具
-                self.register_tool(
-                    name=f"{name}.resource.get_resource_list",
-                    description=f"获取{name}MCP服务器上的资源列表",
-                    parameters={
-                        'properties': {},
-                        'required': []
-                    },
-                    func=create_resource_list_func(mcp_client)
-                )
-
-                # 注册获取资源工具
-                self.register_tool(
-                    name=f"{name}.resource.get_resource",
-                    description=f"获取{name}MCP服务器上的指定资源",
-                    parameters={
-                        'properties': {
-                            'uri': {
-                                'type': 'string',
-                                'description': '资源的URI标识符'
-                            }
-                        },
-                        'required': ['uri']
-                    },
-                    func=create_resource_get_func(mcp_client)
-                )
-                
-                return True
+                    return False    
             else:
                 PrettyOutput.print(f"文件 {file_path} 类型错误: {config['type']}", OutputType.WARNING)
                 return False
+                
+            # 创建MCP客户端
+            mcp_client: McpClient = LocalMcpClient(config) if config['type'] == 'local' else RemoteMcpClient(config)
+            
+            # 获取工具信息
+            tools = mcp_client.get_tool_list()
+            if not tools:
+                PrettyOutput.print(f"从 {file_path} 获取工具列表失败", OutputType.WARNING)
+                return False
+            
+            # 注册每个工具
+            for tool in tools:
+                
+                # 注册工具
+                self.register_tool(
+                    name=f"{name}.tool_call.{tool['name']}",
+                    description=tool['description'],
+                    parameters=tool['parameters'],
+                    func=create_mcp_execute_func(tool['name'], mcp_client)
+                )
+            
+
+            # 注册资源列表工具
+            self.register_tool(
+                name=f"{name}.resource.get_resource_list",
+                description=f"获取{name}MCP服务器上的资源列表",
+                parameters={
+                    'type': 'object',
+                    'properties': {},
+                    'required': []
+                },
+                func=create_resource_list_func(mcp_client)
+            )
+
+            # 注册获取资源工具
+            self.register_tool(
+                name=f"{name}.resource.get_resource",
+                description=f"获取{name}MCP服务器上的指定资源",
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'uri': {
+                            'type': 'string',
+                            'description': '资源的URI标识符'
+                        }
+                    },
+                    'required': ['uri']
+                },
+                func=create_resource_get_func(mcp_client)
+            )
+            
+            return True
+                
+
         except Exception as e:
             PrettyOutput.print(f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING)
             return False
