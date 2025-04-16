@@ -228,6 +228,91 @@ class LocalMcpClient(McpClient):
                 'stderr': str(e)
             }
 
+    def get_resource_list(self) -> List[Dict[str, Any]]:
+        """获取资源列表
+        
+        返回:
+            List[Dict[str, Any]]: 资源列表，每个资源包含以下字段：
+                - uri: str - 资源的唯一标识符
+                - name: str - 资源的名称
+                - description: str - 资源的描述（可选）
+                - mimeType: str - 资源的MIME类型（可选）
+        """
+        try:
+            response = self._send_request('resources/list', {})
+            if 'result' in response and 'resources' in response['result']:
+                return response['result']['resources']
+            else:
+                error_msg = "获取资源列表失败"
+                if 'error' in response:
+                    error_msg += f": {response['error']}"
+                else:
+                    error_msg += ": 未知错误"
+                PrettyOutput.print(error_msg, OutputType.ERROR)
+                return []
+        except Exception as e:
+            PrettyOutput.print(f"获取资源列表失败: {str(e)}", OutputType.ERROR)
+            return []
+
+    def get_resource(self, uri: str) -> Dict[str, Any]:
+        """获取指定资源的内容
+        
+        参数:
+            uri: str - 资源的URI标识符
+            
+        返回:
+            Dict[str, Any]: 执行结果，包含以下字段：
+                - success: bool - 是否执行成功
+                - stdout: str - 资源内容（文本或base64编码的二进制内容）
+                - stderr: str - 错误信息
+        """
+        try:
+            response = self._send_request('resources/read', {
+                'uri': uri
+            })
+            if 'result' in response and 'contents' in response['result']:
+                contents = response['result']['contents']
+                if contents:
+                    content = contents[0]  # 获取第一个资源内容
+                    # 根据资源类型返回内容
+                    if 'text' in content:
+                        return {
+                            'success': True,
+                            'stdout': content['text'],
+                            'stderr': ''
+                        }
+                    elif 'blob' in content:
+                        return {
+                            'success': True,
+                            'stdout': content['blob'],
+                            'stderr': ''
+                        }
+                return {
+                    'success': False,
+                    'stdout': '',
+                    'stderr': '资源内容为空'
+                }
+            else:
+                error_msg = "获取资源内容失败"
+                if 'error' in response:
+                    error_msg += f": {response['error']}"
+                else:
+                    error_msg += ": 未知错误"
+                PrettyOutput.print(error_msg, OutputType.ERROR)
+                return {
+                    'success': False,
+                    'stdout': '',
+                    'stderr': error_msg
+                }
+        except Exception as e:
+            error_msg = f"获取资源内容失败: {str(e)}"
+            PrettyOutput.print(error_msg, OutputType.ERROR)
+            return {
+                'success': False,
+                'stdout': '',
+                'stderr': error_msg
+            }
+
     def __del__(self):
         """清理资源"""
         if self.process:

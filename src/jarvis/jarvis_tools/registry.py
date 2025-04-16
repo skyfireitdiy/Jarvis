@@ -16,6 +16,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
 from jarvis.jarvis_mcp.local_mcp_client import LocalMcpClient
 from jarvis.jarvis_mcp.remote_mcp_client import RemoteMcpClient
+from jarvis.jarvis_mcp import McpClient
 
 
 
@@ -206,6 +207,48 @@ class ToolRegistry(OutputHandler):
                 PrettyOutput.print(f"文件 {file_path} 缺少type字段", OutputType.WARNING)
                 return False
             name = config.get('name', Path(file_path).stem)
+
+
+            # 注册资源工具
+            def create_resource_list_func(client: McpClient):
+                def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
+                    args = arguments.copy()
+                    args.pop('agent', None)
+                    args.pop('want', None)
+                    ret = client.get_resource_list()
+                    PrettyOutput.print(f"MCP {name} 资源列表:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
+                    return {
+                        'success': True,
+                        'stdout': yaml.safe_dump(ret),
+                        'stderr': ''
+                    }
+                return execute
+
+            def create_resource_get_func(client: McpClient):
+                def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
+                    args = arguments.copy()
+                    args.pop('agent', None)
+                    args.pop('want', None)
+                    if 'uri' not in args:
+                        return {
+                            'success': False,
+                            'stdout': '',
+                            'stderr': '缺少必需的uri参数'
+                        }
+                    ret = client.get_resource(args['uri'])
+                    PrettyOutput.print(f"MCP {name} 获取资源:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
+                    return ret
+                return execute
+            
+            def create_mcp_execute_func(tool_name: str, client: McpClient):
+                def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
+                    args = arguments.copy()
+                    args.pop('agent', None)
+                    args.pop('want', None)
+                    ret = client.execute(tool_name, args)
+                    PrettyOutput.print(f"MCP {name} {tool_name} 执行结果:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
+                    return ret
+                return execute
             
             if config['type'] == 'local':
                 if 'command' not in config:
@@ -223,23 +266,44 @@ class ToolRegistry(OutputHandler):
                 
                 # 注册每个工具
                 for tool in tools:
-                    def create_local_execute_func(tool_name: str, client: LocalMcpClient):
-                        def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
-                            args = arguments.copy()
-                            args.pop('agent', None)
-                            args.pop('want', None)
-                            ret = client.execute(tool_name, args)
-                            PrettyOutput.print(f"MCP {tool_name} 执行结果:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
-                            return ret
-                        return execute
                     
                     # 注册工具
                     self.register_tool(
                         name=f"{name}.{tool['name']}",
                         description=tool['description'],
                         parameters=tool['parameters'],
-                        func=create_local_execute_func(tool['name'], mcp_client)
+                        func=create_mcp_execute_func(tool['name'], mcp_client)
                     )
+                
+
+                # 注册资源列表工具
+                self.register_tool(
+                    name=f"{name}.resource.get_resource_list",
+                    description=f"获取{name}MCP服务器上的资源列表",
+                    parameters={
+                        'type': 'object',
+                        'properties': {},
+                        'required': []
+                    },
+                    func=create_resource_list_func(mcp_client)
+                )
+
+                # 注册获取资源工具
+                self.register_tool(
+                    name=f"{name}.resource.get_resource",
+                    description=f"获取{name}MCP服务器上的指定资源",
+                    parameters={
+                        'type': 'object',
+                        'properties': {
+                            'uri': {
+                                'type': 'string',
+                                'description': '资源的URI标识符'
+                            }
+                        },
+                        'required': ['uri']
+                    },
+                    func=create_resource_get_func(mcp_client)
+                )
                 
                 return True
                 
@@ -259,23 +323,42 @@ class ToolRegistry(OutputHandler):
                 
                 # 注册每个工具
                 for tool in tools:
-                    def create_remote_execute_func(tool_name: str, client: RemoteMcpClient):
-                        def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
-                            args = arguments.copy()
-                            args.pop('agent', None)
-                            args.pop('want', None)
-                            ret = client.execute(tool_name, args)
-                            PrettyOutput.print(f"MCP {name} {tool_name} 执行结果:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
-                            return ret
-                        return execute
+                    
                     
                     # 注册工具
                     self.register_tool(
                         name=f"{name}.{tool['name']}",
                         description=tool['description'],
                         parameters=tool['parameters'],
-                        func=create_remote_execute_func(tool['name'], mcp_client)
+                        func=create_mcp_execute_func(tool['name'], mcp_client)
                     )
+
+                # 注册资源列表工具
+                self.register_tool(
+                    name=f"{name}.resource.get_resource_list",
+                    description=f"获取{name}MCP服务器上的资源列表",
+                    parameters={
+                        'properties': {},
+                        'required': []
+                    },
+                    func=create_resource_list_func(mcp_client)
+                )
+
+                # 注册获取资源工具
+                self.register_tool(
+                    name=f"{name}.resource.get_resource",
+                    description=f"获取{name}MCP服务器上的指定资源",
+                    parameters={
+                        'properties': {
+                            'uri': {
+                                'type': 'string',
+                                'description': '资源的URI标识符'
+                            }
+                        },
+                        'required': ['uri']
+                    },
+                    func=create_resource_get_func(mcp_client)
+                )
                 
                 return True
             else:
@@ -389,7 +472,7 @@ class ToolRegistry(OutputHandler):
             return {}, "检测到多个工具调用，请一次只处理一个工具调用。"
         return ret[0] if ret else {}, ""
 
-    def register_tool(self, name: str, description: str, parameters: Dict[str, Dict[str, Any]], func: Callable[..., Dict[str, Any]]) -> None:
+    def register_tool(self, name: str, description: str, parameters: Any, func: Callable[..., Dict[str, Any]]) -> None:
         """注册新工具
         
         参数:

@@ -33,4 +33,33 @@ class McpClient(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_resource_list(self) -> List[Dict[str, Any]]:
+        """获取资源列表
+        
+        返回:
+            List[Dict[str, Any]]: 资源列表，每个资源包含以下字段：
+                - uri: str - 资源的唯一标识符
+                - name: str - 资源的名称
+                - description: str - 资源的描述（可选）
+                - mimeType: str - 资源的MIME类型（可选）
+        """
+        pass
+
+    @abstractmethod
+    def get_resource(self, uri: str) -> Dict[str, Any]:
+        """获取指定资源的内容
+        
+        参数:
+            uri: str - 资源的URI标识符
+            
+        返回:
+            Dict[str, Any]: 资源内容，包含以下字段：
+                - uri: str - 资源的URI
+                - mimeType: str - 资源的MIME类型（可选）
+                - text: str - 文本内容（如果是文本资源）
+                - blob: str - 二进制内容（如果是二进制资源，base64编码）
+        """
+        pass
+
 
