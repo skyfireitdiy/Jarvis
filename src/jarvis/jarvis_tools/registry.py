@@ -235,7 +235,7 @@ class ToolRegistry(OutputHandler):
                     
                     # 注册工具
                     self.register_tool(
-                        name=f"{name}_{tool['name']}",
+                        name=f"{name}.{tool['name']}",
                         description=tool['description'],
                         parameters=tool['parameters'],
                         func=create_local_execute_func(tool['name'], mcp_client)
@@ -271,7 +271,7 @@ class ToolRegistry(OutputHandler):
                     
                     # 注册工具
                     self.register_tool(
-                        name=f"{name}_{tool['name']}",
+                        name=f"{name}.{tool['name']}",
                         description=tool['description'],
                         parameters=tool['parameters'],
                         func=create_remote_execute_func(tool['name'], mcp_client)
