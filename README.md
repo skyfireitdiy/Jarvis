@@ -237,17 +237,6 @@ headers:  # 可选HTTP头
   X-Custom-Header: value
 ```
 
-MCP服务需要实现以下JSON-RPC接口：
-- `tools/list` - 获取工具列表
-- `tools/call` - 调用工具
-- `notifications/initialized` - 初始化通知
-- `notifications/exit` - 退出通知
-
-工具定义应包含:
-- `name` - 工具名称
-- `description` - 工具描述
-- `inputSchema` - 输入参数Schema
-
 
 ### 添加新大模型平台
 在 `~/.jarvis/platforms/` 中创建新的 Python 文件：
