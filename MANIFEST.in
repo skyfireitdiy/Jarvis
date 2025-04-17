@@ -3,3 +3,4 @@ include LICENSE
 include pyproject.toml
 recursive-include src/jarvis * 
 exclude __pycache__
+exclude .venv
