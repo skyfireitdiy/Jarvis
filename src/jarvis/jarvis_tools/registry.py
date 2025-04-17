@@ -577,12 +577,7 @@ def main() -> int:
                 print(f"   描述: {tool['description']}")
                 if args.detailed:
                     print(f"   参数:")
-                    params = tool['parameters'].get('properties', {})
-                    required = tool['parameters'].get('required', [])
-                    for param_name, param_info in params.items():
-                        req_mark = "*" if param_name in required else ""
-                        desc = param_info.get('description', '无描述')
-                        print(f"     - {param_name}{req_mark}: {desc}")
+                    print(tool['parameters'])
 
     elif args.command == 'call':
         tool_name = args.tool_name
