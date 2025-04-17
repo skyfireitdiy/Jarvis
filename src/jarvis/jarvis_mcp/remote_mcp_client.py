@@ -1,6 +1,10 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Iterator, Callable
 import requests
-from urllib.parse import urljoin
+import json
+import threading
+import time
+import uuid
+from urllib.parse import urljoin, urlencode, parse_qs
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from . import McpClient
 
@@ -37,12 +41,37 @@ class RemoteMcpClient(McpClient):
         self.session.headers.update(extra_headers)
         
         # SSE相关属性
-        self.sse_stream = None
+        self.sse_response = None
+        self.sse_thread = None
+        self.messages_endpoint = None
+        self.session_id = None      # 从SSE连接获取的会话ID
+        self.pending_requests = {}  # 存储等待响应的请求 {id: Event}
+        self.request_results = {}   # 存储请求结果 {id: result}
+        self.notification_handlers = {}
+        self.event_lock = threading.Lock()
+        self.request_id_counter = 0
+        
+        # 初始化连接
         self._initialize()
 
     def _initialize(self) -> None:
         """初始化MCP连接"""
         try:
+            # 启动SSE连接
+            self._start_sse_connection()
+            
+            # 等待获取消息端点和会话ID
+            start_time = time.time()
+            while (not self.messages_endpoint or not self.session_id) and time.time() - start_time < 5:
+                time.sleep(0.1)
+                
+            if not self.messages_endpoint:
+                self.messages_endpoint = "/messages"  # 默认端点
+                PrettyOutput.print(f"未获取到消息端点，使用默认值: {self.messages_endpoint}", OutputType.WARNING)
+                
+            if not self.session_id:
+                PrettyOutput.print("未获取到会话ID", OutputType.WARNING)
+            
             # 发送初始化请求
             response = self._send_request('initialize', {
                 'processId': None,  # 远程客户端不需要进程ID
@@ -58,19 +87,152 @@ class RemoteMcpClient(McpClient):
             if 'result' not in response:
                 raise RuntimeError(f"初始化失败: {response.get('error', 'Unknown error')}")
 
-            result = response['result']
-            
             # 发送initialized通知
             self._send_notification('notifications/initialized', {})
-
-            # 建立SSE连接
-            sse_url = urljoin(self.base_url, 'sse')
-            self.sse_stream = self.session.get(sse_url, stream=True)
-            self.sse_stream.raise_for_status()
 
         except Exception as e:
             PrettyOutput.print(f"MCP初始化失败: {str(e)}", OutputType.ERROR)
             raise
+
+    def _start_sse_connection(self) -> None:
+        """建立SSE连接并启动处理线程"""
+        try:
+            # 设置SSE请求头
+            sse_headers = dict(self.session.headers)
+            sse_headers.update({
+                'Accept': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+            })
+            
+            # 建立SSE连接
+            sse_url = urljoin(self.base_url, 'sse')
+            self.sse_response = self.session.get(
+                sse_url, 
+                stream=True, 
+                headers=sse_headers,
+                timeout=30
+            )
+            self.sse_response.raise_for_status()
+            
+            # 启动事件处理线程
+            self.sse_thread = threading.Thread(target=self._process_sse_events, daemon=True)
+            self.sse_thread.start()
+            
+        except Exception as e:
+            PrettyOutput.print(f"SSE连接失败: {str(e)}", OutputType.ERROR)
+            raise
+    
+    def _process_sse_events(self) -> None:
+        """处理SSE事件流"""
+        if not self.sse_response:
+            return
+            
+        buffer = ""
+        for line in self.sse_response.iter_lines(decode_unicode=True):
+            if line:
+                if line.startswith("data:"):
+                    data = line[5:].strip()
+                    # 检查是否包含消息端点信息
+                    if data.startswith('/'):
+                        # 这是消息端点信息，例如 "/messages/?session_id=xyz"
+                        try:
+                            # 提取消息端点路径和会话ID
+                            url_parts = data.split('?')
+                            self.messages_endpoint = url_parts[0]
+                            
+                            # 如果有查询参数，尝试提取session_id
+                            if len(url_parts) > 1:
+                                query_string = url_parts[1]
+                                query_params = parse_qs(query_string)
+                                if 'session_id' in query_params:
+                                    self.session_id = query_params['session_id'][0]
+                        except Exception as e:
+                            PrettyOutput.print(f"解析消息端点或会话ID失败: {e}", OutputType.WARNING)
+                    else:
+                        buffer += data
+                elif line.startswith(":"):  # 忽略注释行
+                    continue
+                elif line.startswith("event:"):  # 事件类型
+                    continue  # 我们不使用事件类型
+                elif line.startswith("id:"):  # 事件ID
+                    continue  # 我们不使用事件ID
+                elif line.startswith("retry:"):  # 重连时间
+                    continue  # 我们自己管理重连
+            else:  # 空行表示事件结束
+                if buffer:
+                    try:
+                        self._handle_sse_event(buffer)
+                    except Exception as e:
+                        PrettyOutput.print(f"处理SSE事件出错: {e}", OutputType.ERROR)
+                    buffer = ""
+        
+        PrettyOutput.print("SSE连接已关闭", OutputType.WARNING)
+
+    def _handle_sse_event(self, data: str) -> None:
+        """处理单个SSE事件数据"""
+        try:
+            event_data = json.loads(data)
+            
+            # 检查是请求响应还是通知
+            if 'id' in event_data:
+                # 这是一个请求的响应
+                req_id = event_data['id']
+                with self.event_lock:
+                    self.request_results[req_id] = event_data
+                    if req_id in self.pending_requests:
+                        # 通知等待线程响应已到达
+                        self.pending_requests[req_id].set()
+            elif 'method' in event_data:
+                # 这是一个通知
+                method = event_data.get('method', '')
+                params = event_data.get('params', {})
+                
+                # 调用已注册的处理器
+                if method in self.notification_handlers:
+                    for handler in self.notification_handlers[method]:
+                        try:
+                            handler(params)
+                        except Exception as e:
+                            PrettyOutput.print(
+                                f"处理通知时出错 ({method}): {e}", 
+                                OutputType.ERROR
+                            )
+        except json.JSONDecodeError:
+            PrettyOutput.print(f"无法解析SSE事件: {data}", OutputType.WARNING)
+        except Exception as e:
+            PrettyOutput.print(f"处理SSE事件时出错: {e}", OutputType.ERROR)
+
+    def register_notification_handler(self, method: str, handler: Callable) -> None:
+        """注册通知处理器
+        
+        参数:
+            method: 通知方法名
+            handler: 处理通知的回调函数，接收params参数
+        """
+        with self.event_lock:
+            if method not in self.notification_handlers:
+                self.notification_handlers[method] = []
+            self.notification_handlers[method].append(handler)
+
+    def unregister_notification_handler(self, method: str, handler: Callable) -> None:
+        """注销通知处理器
+        
+        参数:
+            method: 通知方法名
+            handler: 要注销的处理器函数
+        """
+        with self.event_lock:
+            if method in self.notification_handlers:
+                if handler in self.notification_handlers[method]:
+                    self.notification_handlers[method].remove(handler)
+                if not self.notification_handlers[method]:
+                    del self.notification_handlers[method]
+
+    def _get_next_request_id(self) -> str:
+        """获取下一个请求ID"""
+        with self.event_lock:
+            self.request_id_counter += 1
+            return str(self.request_id_counter)
 
     def _send_request(self, method: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """发送请求到MCP服务器
@@ -82,24 +244,88 @@ class RemoteMcpClient(McpClient):
         返回:
             Dict[str, Any]: 响应结果
         """
+        # 生成唯一请求ID
+        req_id = self._get_next_request_id()
+        
+        # 创建事件标志，用于等待响应
+        event = threading.Event()
+        
+        with self.event_lock:
+            self.pending_requests[req_id] = event
+        
         try:
             # 构建请求
             request = {
                 'jsonrpc': '2.0',
                 'method': method,
                 'params': params,
-                'id': 1
+                'id': req_id
             }
 
-            # 发送请求
-            response = self.session.post(
-                urljoin(self.base_url, 'sse'),
-                json=request
-            )
-            response.raise_for_status()
-            return response.json()
+            # 尝试不同的请求发送方式
+            if self.session_id:
+                # 方法1: 使用查询参数中的session_id
+                query_params = {'session_id': self.session_id}
+                messages_url = urljoin(self.base_url, self.messages_endpoint)
+                
+                # 尝试直接使用原始URL（不追加查询参数）
+                try:
+                    post_response = self.session.post(
+                        messages_url,
+                        json=request
+                    )
+                    post_response.raise_for_status()
+                except requests.HTTPError:
+                    # 如果失败，尝试添加会话ID到查询参数
+                    messages_url_with_session = f"{messages_url}?{urlencode(query_params)}"
+                    post_response = self.session.post(
+                        messages_url_with_session,
+                        json=request
+                    )
+                    post_response.raise_for_status()
+            else:
+                # 方法2: 不使用session_id
+                if not self.messages_endpoint:
+                    self.messages_endpoint = "/messages"
+                
+                messages_url = urljoin(self.base_url, self.messages_endpoint)
+                
+                # 尝试直接使用messages端点而不带任何查询参数
+                try:
+                    # 尝试1: 标准JSON-RPC格式
+                    post_response = self.session.post(
+                        messages_url,
+                        json=request
+                    )
+                    post_response.raise_for_status()
+                except requests.HTTPError:
+                    # 尝试2: JSON字符串作为请求参数
+                    post_response = self.session.post(
+                        messages_url,
+                        params={'request': json.dumps(request)}
+                    )
+                    post_response.raise_for_status()
+            
+            # 等待SSE通道返回响应（最多30秒）
+            if not event.wait(timeout=30):
+                raise TimeoutError(f"等待响应超时: {method}")
+            
+            # 获取响应结果
+            with self.event_lock:
+                result = self.request_results.pop(req_id, None)
+                self.pending_requests.pop(req_id, None)
+            
+            if result is None:
+                raise RuntimeError(f"未收到响应: {method}")
+                
+            return result
 
         except Exception as e:
+            # 清理请求状态
+            with self.event_lock:
+                self.pending_requests.pop(req_id, None)
+                self.request_results.pop(req_id, None)
+                
             PrettyOutput.print(f"发送请求失败: {str(e)}", OutputType.ERROR)
             raise
 
@@ -118,12 +344,49 @@ class RemoteMcpClient(McpClient):
                 'params': params
             }
 
-            # 发送通知
-            response = self.session.post(
-                urljoin(self.base_url, 'sse'),
-                json=notification
-            )
-            response.raise_for_status()
+            # 尝试不同的请求发送方式，与_send_request保持一致
+            if self.session_id:
+                # 方法1: 使用查询参数中的session_id
+                query_params = {'session_id': self.session_id}
+                messages_url = urljoin(self.base_url, self.messages_endpoint or '/messages')
+                
+                # 尝试直接使用原始URL（不追加查询参数）
+                try:
+                    post_response = self.session.post(
+                        messages_url,
+                        json=notification
+                    )
+                    post_response.raise_for_status()
+                except requests.HTTPError:
+                    # 如果失败，尝试添加会话ID到查询参数
+                    messages_url_with_session = f"{messages_url}?{urlencode(query_params)}"
+                    post_response = self.session.post(
+                        messages_url_with_session,
+                        json=notification
+                    )
+                    post_response.raise_for_status()
+            else:
+                # 方法2: 不使用session_id
+                if not self.messages_endpoint:
+                    self.messages_endpoint = "/messages"
+                
+                messages_url = urljoin(self.base_url, self.messages_endpoint)
+                
+                # 尝试直接使用messages端点而不带任何查询参数
+                try:
+                    # 尝试1: 标准JSON-RPC格式
+                    post_response = self.session.post(
+                        messages_url,
+                        json=notification
+                    )
+                    post_response.raise_for_status()
+                except requests.HTTPError:
+                    # 尝试2: JSON字符串作为请求参数
+                    post_response = self.session.post(
+                        messages_url,
+                        params={'request': json.dumps(notification)}
+                    )
+                    post_response.raise_for_status()
 
         except Exception as e:
             PrettyOutput.print(f"发送通知失败: {str(e)}", OutputType.ERROR)
@@ -308,7 +571,20 @@ class RemoteMcpClient(McpClient):
 
     def __del__(self):
         """清理资源"""
-        if self.sse_stream:
-            self.sse_stream.close()
+        # 清理请求状态
+        with self.event_lock:
+            for event in self.pending_requests.values():
+                event.set()  # 释放所有等待的请求
+            self.pending_requests.clear()
+            self.request_results.clear()
+            
+        # 关闭SSE响应
+        if self.sse_response:
+            try:
+                self.sse_response.close()
+            except:
+                pass
+                
+        # 关闭HTTP会话
         if self.session:
             self.session.close()
