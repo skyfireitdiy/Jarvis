@@ -139,7 +139,7 @@ class ToolRegistry(OutputHandler):
 
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
-        
+
         参数:
             name: 要使用的工具名称列表
         """
@@ -150,7 +150,7 @@ class ToolRegistry(OutputHandler):
 
     def dont_use_tools(self, names: List[str]) -> None:
         """从注册表中移除指定工具
-        
+
         参数:
             names: 要移除的工具名称列表
         """
@@ -194,7 +194,7 @@ class ToolRegistry(OutputHandler):
 
     def register_mcp_tool_by_file(self, file_path: str) -> bool:
         """从指定文件加载并注册工具
-        
+
         参数:
             file_path: 工具文件的路径
 
@@ -206,6 +206,12 @@ class ToolRegistry(OutputHandler):
             if 'type' not in config:
                 PrettyOutput.print(f"文件 {file_path} 缺少type字段", OutputType.WARNING)
                 return False
+
+            # 检查enable标志
+            if not config.get('enable', True):
+                PrettyOutput.print(f"文件 {file_path} 已禁用(enable=false)，跳过注册", OutputType.INFO)
+                return False
+
             name = config.get('name', Path(file_path).stem)
 
 
@@ -239,7 +245,7 @@ class ToolRegistry(OutputHandler):
                     PrettyOutput.print(f"MCP {name} 获取资源:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
                     return ret
                 return execute
-            
+
             def create_mcp_execute_func(tool_name: str, client: McpClient):
                 def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     args = arguments.copy()
@@ -249,7 +255,7 @@ class ToolRegistry(OutputHandler):
                     PrettyOutput.print(f"MCP {name} {tool_name} 执行结果:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
                     return ret
                 return execute
-            
+
             if config['type'] == 'local':
                 if 'command' not in config:
                     PrettyOutput.print(f"文件 {file_path} 缺少command字段", OutputType.WARNING)
@@ -257,23 +263,23 @@ class ToolRegistry(OutputHandler):
             elif config['type'] == 'remote':
                 if 'base_url' not in config:
                     PrettyOutput.print(f"文件 {file_path} 缺少base_url字段", OutputType.WARNING)
-                    return False    
+                    return False
             else:
                 PrettyOutput.print(f"文件 {file_path} 类型错误: {config['type']}", OutputType.WARNING)
                 return False
-                
+
             # 创建MCP客户端
             mcp_client: McpClient = LocalMcpClient(config) if config['type'] == 'local' else RemoteMcpClient(config)
-            
+
             # 获取工具信息
             tools = mcp_client.get_tool_list()
             if not tools:
                 PrettyOutput.print(f"从 {file_path} 获取工具列表失败", OutputType.WARNING)
                 return False
-            
+
             # 注册每个工具
             for tool in tools:
-                
+
                 # 注册工具
                 self.register_tool(
                     name=f"{name}.tool_call.{tool['name']}",
@@ -281,7 +287,7 @@ class ToolRegistry(OutputHandler):
                     parameters=tool['parameters'],
                     func=create_mcp_execute_func(tool['name'], mcp_client)
                 )
-            
+
 
             # 注册资源列表工具
             self.register_tool(
@@ -311,14 +317,14 @@ class ToolRegistry(OutputHandler):
                 },
                 func=create_resource_get_func(mcp_client)
             )
-            
+
             return True
-                
+
 
         except Exception as e:
             PrettyOutput.print(f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING)
             return False
-        
+
     def register_tool_by_file(self, file_path: str) -> bool:
         """从指定文件加载并注册工具
 
@@ -384,12 +390,12 @@ class ToolRegistry(OutputHandler):
         except Exception as e:
             PrettyOutput.print(f"从 {Path(file_path).name} 加载工具失败: {str(e)}", OutputType.ERROR)
             return False
-        
+
     @staticmethod
     def _has_tool_calls_block(content: str) -> bool:
         """从内容中提取工具调用块"""
         return re.search(ot("TOOL_CALL")+r'(.*?)'+ct("TOOL_CALL"), content, re.DOTALL) is not None
-        
+
     @staticmethod
     def _extract_tool_calls(content: str) -> Tuple[Dict[str, Dict[str, Any]], str]:
         """从内容中提取工具调用。
@@ -412,20 +418,20 @@ class ToolRegistry(OutputHandler):
                 if 'name' in msg and 'arguments' in msg and 'want' in msg:
                     ret.append(msg)
                 else:
-                    return {}, f"""工具调用格式错误，请检查工具调用格式。 
-                    
-                    {tool_call_help}""" 
+                    return {}, f"""工具调用格式错误，请检查工具调用格式。
+
+                    {tool_call_help}"""
             except Exception as e:
-                return {}, f"""工具调用格式错误，请检查工具调用格式。 
-                
-                {tool_call_help}""" 
+                return {}, f"""工具调用格式错误，请检查工具调用格式。
+
+                {tool_call_help}"""
         if len(ret) > 1:
             return {}, "检测到多个工具调用，请一次只处理一个工具调用。"
         return ret[0] if ret else {}, ""
 
     def register_tool(self, name: str, description: str, parameters: Any, func: Callable[..., Dict[str, Any]]) -> None:
         """注册新工具
-        
+
         参数:
             name: 工具名称
             description: 工具描述
@@ -436,10 +442,10 @@ class ToolRegistry(OutputHandler):
 
     def get_tool(self, name: str) -> Optional[Tool]:
         """获取工具
-        
+
         参数:
             name: 工具名称
-            
+
         返回:
             Optional[Tool]: 找到的工具实例，如果不存在则返回None
         """
@@ -447,7 +453,7 @@ class ToolRegistry(OutputHandler):
 
     def get_all_tools(self) -> List[Dict[str, Any]]:
         """获取所有工具（Ollama格式定义）
-        
+
         返回:
             List[Dict[str, Any]]: 包含所有工具信息的列表
         """
@@ -455,11 +461,11 @@ class ToolRegistry(OutputHandler):
 
     def execute_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """执行指定工具
-        
+
         参数:
             name: 工具名称
             arguments: 工具参数
-            
+
         返回:
             Dict[str, Any]: 包含执行结果的字典，包含success、stdout和stderr字段
         """
@@ -521,7 +527,7 @@ class ToolRegistry(OutputHandler):
                 return f"""工具调用原始输出过长，以下是根据输出提出的信息：
 
 {platform.chat_until_success(prompt)}"""
-                
+
             return output
 
         except Exception as e:
