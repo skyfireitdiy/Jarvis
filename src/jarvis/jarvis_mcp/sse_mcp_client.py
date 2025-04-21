@@ -9,7 +9,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from . import McpClient
 
 
-class RemoteMcpClient(McpClient):
+class SSEMcpClient(McpClient):
     """远程MCP客户端实现
     
     参数:

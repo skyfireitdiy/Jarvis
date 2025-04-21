@@ -6,7 +6,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from . import McpClient
 
 
-class LocalMcpClient(McpClient):
+class StdioMcpClient(McpClient):
     """本地MCP客户端实现
     
     参数:

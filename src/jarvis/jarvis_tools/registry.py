@@ -14,8 +14,8 @@ from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
-from jarvis.jarvis_mcp.local_mcp_client import LocalMcpClient
-from jarvis.jarvis_mcp.remote_mcp_client import RemoteMcpClient
+from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
+from jarvis.jarvis_mcp.remote_mcp_client import SSEMcpClient
 from jarvis.jarvis_mcp import McpClient
 
 
@@ -256,11 +256,11 @@ class ToolRegistry(OutputHandler):
                     return ret
                 return execute
 
-            if config['type'] == 'local':
+            if config['type'] == 'stdio':
                 if 'command' not in config:
                     PrettyOutput.print(f"文件 {file_path} 缺少command字段", OutputType.WARNING)
                     return False
-            elif config['type'] == 'remote':
+            elif config['type'] == 'sse':
                 if 'base_url' not in config:
                     PrettyOutput.print(f"文件 {file_path} 缺少base_url字段", OutputType.WARNING)
                     return False
@@ -269,7 +269,7 @@ class ToolRegistry(OutputHandler):
                 return False
 
             # 创建MCP客户端
-            mcp_client: McpClient = LocalMcpClient(config) if config['type'] == 'local' else RemoteMcpClient(config)
+            mcp_client: McpClient = StdioMcpClient(config) if config['type'] == 'stdio' else SSEMcpClient(config)
 
             # 获取工具信息
             tools = mcp_client.get_tool_list()
