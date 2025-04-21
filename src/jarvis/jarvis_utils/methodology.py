@@ -141,7 +141,7 @@ def load_methodology(user_input: str) -> str:
         
         platform.set_suppress_output(False)
         # 构建提示信息
-        prompt = f"""根据用户需求: {user_input}
+        prompt = f"""根据用户需求和已有的方法论内容，总结出与该任务/需求相关的方法论: {user_input}
 
 请按以下格式回复：
 ### 与该任务/需求相关的方法论
