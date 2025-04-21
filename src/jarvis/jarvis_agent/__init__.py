@@ -592,7 +592,10 @@ arguments:
             self.prompt = f"{user_input}"
 
             if self.first:
-                self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(user_input)}"
+                msg = user_input
+                for handler in self.input_handler:
+                    msg, _ = handler(msg, self)
+                self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg)}"
                 self.first = False
 
             while True:
