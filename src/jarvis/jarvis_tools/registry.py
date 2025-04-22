@@ -10,14 +10,17 @@ import yaml
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.base import Tool
-from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count, get_data_dir
+from jarvis.jarvis_utils.config import (
+    INPUT_WINDOW_REVERSE_SIZE,
+    get_max_input_token_count,
+    get_data_dir,
+)
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import ct, ot, init_env
 from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
-from jarvis.jarvis_mcp.remote_mcp_client import SSEMcpClient
+from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
 from jarvis.jarvis_mcp import McpClient
-
 
 
 tool_call_help = f"""
@@ -82,6 +85,7 @@ arguments:
 - 在没有所需信息的情况下继续
 """
 
+
 class ToolRegistry(OutputHandler):
 
     def name(self) -> str:
@@ -103,19 +107,22 @@ class ToolRegistry(OutputHandler):
 
                     # 生成格式化的YAML参数
                     yaml_params = yaml.dump(
-                        tool['parameters'],
+                        tool["parameters"],
                         allow_unicode=True,
                         indent=4,
                         sort_keys=False,
-                        width=120  # 增加行宽限制
+                        width=120,  # 增加行宽限制
                     )
 
                     # 添加缩进并移除尾部空格
-                    for line in yaml_params.split('\n'):
+                    for line in yaml_params.split("\n"):
                         tools_prompt += f"    {line.rstrip()}\n"
 
                 except yaml.YAMLError as e:
-                    PrettyOutput.print(f"工具 {tool['name']} 参数序列化失败: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"工具 {tool['name']} 参数序列化失败: {str(e)}",
+                        OutputType.ERROR,
+                    )
                     continue
 
             tools_prompt += tool_call_help.rstrip()  # 移除帮助文本尾部空格
@@ -135,7 +142,9 @@ class ToolRegistry(OutputHandler):
         self._load_builtin_tools()
         self._load_external_tools()
         self._load_mcp_tools()
-        self.max_input_token_count = get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
+        self.max_input_token_count = (
+            get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
+        )
 
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
@@ -145,7 +154,10 @@ class ToolRegistry(OutputHandler):
         """
         missing_tools = [tool_name for tool_name in name if tool_name not in self.tools]
         if missing_tools:
-            PrettyOutput.print(f"工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}", OutputType.WARNING)
+            PrettyOutput.print(
+                f"工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}",
+                OutputType.WARNING,
+            )
         self.tools = {tool_name: self.tools[tool_name] for tool_name in name}
 
     def dont_use_tools(self, names: List[str]) -> None:
@@ -154,11 +166,13 @@ class ToolRegistry(OutputHandler):
         参数:
             names: 要移除的工具名称列表
         """
-        self.tools = {name: tool for name, tool in self.tools.items() if name not in names}
+        self.tools = {
+            name: tool for name, tool in self.tools.items() if name not in names
+        }
 
     def _load_mcp_tools(self) -> None:
         """从jarvis_data/tools/mcp加载工具"""
-        mcp_tools_dir = Path(get_data_dir()) / 'mcp'
+        mcp_tools_dir = Path(get_data_dir()) / "mcp"
         if not mcp_tools_dir.exists():
             return
 
@@ -180,7 +194,7 @@ class ToolRegistry(OutputHandler):
 
     def _load_external_tools(self) -> None:
         """从jarvis_data/tools加载外部工具"""
-        external_tools_dir = Path(get_data_dir()) / 'tools'
+        external_tools_dir = Path(get_data_dir()) / "tools"
         if not external_tools_dir.exists():
             return
 
@@ -202,79 +216,102 @@ class ToolRegistry(OutputHandler):
             bool: 工具是否加载成功
         """
         try:
-            config = yaml.safe_load(open(file_path, 'r', encoding='utf-8'))
-            if 'type' not in config:
+            config = yaml.safe_load(open(file_path, "r", encoding="utf-8"))
+            if "type" not in config:
                 PrettyOutput.print(f"文件 {file_path} 缺少type字段", OutputType.WARNING)
                 return False
 
             # 检查enable标志
-            if not config.get('enable', True):
-                PrettyOutput.print(f"文件 {file_path} 已禁用(enable=false)，跳过注册", OutputType.INFO)
+            if not config.get("enable", True):
+                PrettyOutput.print(
+                    f"文件 {file_path} 已禁用(enable=false)，跳过注册", OutputType.INFO
+                )
                 return False
 
-            name = config.get('name', Path(file_path).stem)
-
+            name = config.get("name", Path(file_path).stem)
 
             # 注册资源工具
             def create_resource_list_func(client: McpClient):
                 def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     args = arguments.copy()
-                    args.pop('agent', None)
-                    args.pop('want', None)
+                    args.pop("agent", None)
+                    args.pop("want", None)
                     ret = client.get_resource_list()
-                    PrettyOutput.print(f"MCP {name} 资源列表:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
+                    PrettyOutput.print(
+                        f"MCP {name} 资源列表:\n{yaml.safe_dump(ret)}", OutputType.TOOL
+                    )
                     return {
-                        'success': True,
-                        'stdout': yaml.safe_dump(ret),
-                        'stderr': ''
+                        "success": True,
+                        "stdout": yaml.safe_dump(ret),
+                        "stderr": "",
                     }
+
                 return execute
 
             def create_resource_get_func(client: McpClient):
                 def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     args = arguments.copy()
-                    args.pop('agent', None)
-                    args.pop('want', None)
-                    if 'uri' not in args:
+                    args.pop("agent", None)
+                    args.pop("want", None)
+                    if "uri" not in args:
                         return {
-                            'success': False,
-                            'stdout': '',
-                            'stderr': '缺少必需的uri参数'
+                            "success": False,
+                            "stdout": "",
+                            "stderr": "缺少必需的uri参数",
                         }
-                    ret = client.get_resource(args['uri'])
-                    PrettyOutput.print(f"MCP {name} 获取资源:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
+                    ret = client.get_resource(args["uri"])
+                    PrettyOutput.print(
+                        f"MCP {name} 获取资源:\n{yaml.safe_dump(ret)}", OutputType.TOOL
+                    )
                     return ret
+
                 return execute
 
             def create_mcp_execute_func(tool_name: str, client: McpClient):
                 def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     args = arguments.copy()
-                    args.pop('agent', None)
-                    args.pop('want', None)
+                    args.pop("agent", None)
+                    args.pop("want", None)
                     ret = client.execute(tool_name, args)
-                    PrettyOutput.print(f"MCP {name} {tool_name} 执行结果:\n{yaml.safe_dump(ret)}", OutputType.TOOL)
+                    PrettyOutput.print(
+                        f"MCP {name} {tool_name} 执行结果:\n{yaml.safe_dump(ret)}",
+                        OutputType.TOOL,
+                    )
                     return ret
+
                 return execute
 
-            if config['type'] == 'stdio':
-                if 'command' not in config:
-                    PrettyOutput.print(f"文件 {file_path} 缺少command字段", OutputType.WARNING)
+            if config["type"] == "stdio":
+                if "command" not in config:
+                    PrettyOutput.print(
+                        f"文件 {file_path} 缺少command字段", OutputType.WARNING
+                    )
                     return False
-            elif config['type'] == 'sse':
-                if 'base_url' not in config:
-                    PrettyOutput.print(f"文件 {file_path} 缺少base_url字段", OutputType.WARNING)
+            elif config["type"] == "sse":
+                if "base_url" not in config:
+                    PrettyOutput.print(
+                        f"文件 {file_path} 缺少base_url字段", OutputType.WARNING
+                    )
                     return False
             else:
-                PrettyOutput.print(f"文件 {file_path} 类型错误: {config['type']}", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"文件 {file_path} 类型错误: {config['type']}", OutputType.WARNING
+                )
                 return False
 
             # 创建MCP客户端
-            mcp_client: McpClient = StdioMcpClient(config) if config['type'] == 'stdio' else SSEMcpClient(config)
+            mcp_client: McpClient = (
+                StdioMcpClient(config)
+                if config["type"] == "stdio"
+                else SSEMcpClient(config)
+            )
 
             # 获取工具信息
             tools = mcp_client.get_tool_list()
             if not tools:
-                PrettyOutput.print(f"从 {file_path} 获取工具列表失败", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"从 {file_path} 获取工具列表失败", OutputType.WARNING
+                )
                 return False
 
             # 注册每个工具
@@ -283,22 +320,17 @@ class ToolRegistry(OutputHandler):
                 # 注册工具
                 self.register_tool(
                     name=f"{name}.tool_call.{tool['name']}",
-                    description=tool['description'],
-                    parameters=tool['parameters'],
-                    func=create_mcp_execute_func(tool['name'], mcp_client)
+                    description=tool["description"],
+                    parameters=tool["parameters"],
+                    func=create_mcp_execute_func(tool["name"], mcp_client),
                 )
-
 
             # 注册资源列表工具
             self.register_tool(
                 name=f"{name}.resource.get_resource_list",
                 description=f"获取{name}MCP服务器上的资源列表",
-                parameters={
-                    'type': 'object',
-                    'properties': {},
-                    'required': []
-                },
-                func=create_resource_list_func(mcp_client)
+                parameters={"type": "object", "properties": {}, "required": []},
+                func=create_resource_list_func(mcp_client),
             )
 
             # 注册获取资源工具
@@ -306,23 +338,21 @@ class ToolRegistry(OutputHandler):
                 name=f"{name}.resource.get_resource",
                 description=f"获取{name}MCP服务器上的指定资源",
                 parameters={
-                    'type': 'object',
-                    'properties': {
-                        'uri': {
-                            'type': 'string',
-                            'description': '资源的URI标识符'
-                        }
+                    "type": "object",
+                    "properties": {
+                        "uri": {"type": "string", "description": "资源的URI标识符"}
                     },
-                    'required': ['uri']
+                    "required": ["uri"],
                 },
-                func=create_resource_get_func(mcp_client)
+                func=create_resource_get_func(mcp_client),
             )
 
             return True
 
-
         except Exception as e:
-            PrettyOutput.print(f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING)
+            PrettyOutput.print(
+                f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING
+            )
             return False
 
     def register_tool_by_file(self, file_path: str) -> bool:
@@ -354,12 +384,14 @@ class ToolRegistry(OutputHandler):
                 for item_name in dir(module):
                     item = getattr(module, item_name)
                     # 检查是否是类并具有必要属性
-                    if (isinstance(item, type) and
-                        hasattr(item, 'name') and
-                        hasattr(item, 'description') and
-                        hasattr(item, 'parameters') and
-                        hasattr(item, 'execute') and
-                        item.name == module_name):
+                    if (
+                        isinstance(item, type)
+                        and hasattr(item, "name")
+                        and hasattr(item, "description")
+                        and hasattr(item, "parameters")
+                        and hasattr(item, "execute")
+                        and item.name == module_name
+                    ):
 
                         if hasattr(item, "check"):
                             if not item.check():
@@ -373,7 +405,7 @@ class ToolRegistry(OutputHandler):
                             name=tool_instance.name,
                             description=tool_instance.description,
                             parameters=tool_instance.parameters,
-                            func=tool_instance.execute
+                            func=tool_instance.execute,
                         )
                         tool_found = True
                         break
@@ -388,13 +420,18 @@ class ToolRegistry(OutputHandler):
                 sys.path.remove(parent_dir)
 
         except Exception as e:
-            PrettyOutput.print(f"从 {Path(file_path).name} 加载工具失败: {str(e)}", OutputType.ERROR)
+            PrettyOutput.print(
+                f"从 {Path(file_path).name} 加载工具失败: {str(e)}", OutputType.ERROR
+            )
             return False
 
     @staticmethod
     def _has_tool_calls_block(content: str) -> bool:
         """从内容中提取工具调用块"""
-        return re.search(ot("TOOL_CALL")+r'(.*?)'+ct("TOOL_CALL"), content, re.DOTALL) is not None
+        return (
+            re.search(ot("TOOL_CALL") + r"(.*?)" + ct("TOOL_CALL"), content, re.DOTALL)
+            is not None
+        )
 
     @staticmethod
     def _extract_tool_calls(content: str) -> Tuple[Dict[str, Dict[str, Any]], str]:
@@ -410,26 +447,40 @@ class ToolRegistry(OutputHandler):
             Exception: 如果工具调用缺少必要字段
         """
         # 将内容拆分为行
-        data = re.findall(ot("TOOL_CALL")+r'(.*?)'+ct("TOOL_CALL"), content, re.DOTALL)
+        data = re.findall(
+            ot("TOOL_CALL") + r"(.*?)" + ct("TOOL_CALL"), content, re.DOTALL
+        )
         ret = []
         for item in data:
             try:
                 msg = yaml.safe_load(item)
-                if 'name' in msg and 'arguments' in msg and 'want' in msg:
+                if "name" in msg and "arguments" in msg and "want" in msg:
                     ret.append(msg)
                 else:
-                    return {}, f"""工具调用格式错误，请检查工具调用格式。
+                    return (
+                        {},
+                        f"""工具调用格式错误，请检查工具调用格式。
 
-                    {tool_call_help}"""
+                    {tool_call_help}""",
+                    )
             except Exception as e:
-                return {}, f"""工具调用格式错误，请检查工具调用格式。
+                return (
+                    {},
+                    f"""工具调用格式错误，请检查工具调用格式。
 
-                {tool_call_help}"""
+                {tool_call_help}""",
+                )
         if len(ret) > 1:
             return {}, "检测到多个工具调用，请一次只处理一个工具调用。"
         return ret[0] if ret else {}, ""
 
-    def register_tool(self, name: str, description: str, parameters: Any, func: Callable[..., Dict[str, Any]]) -> None:
+    def register_tool(
+        self,
+        name: str,
+        description: str,
+        parameters: Any,
+        func: Callable[..., Dict[str, Any]],
+    ) -> None:
         """注册新工具
 
         参数:
@@ -471,7 +522,11 @@ class ToolRegistry(OutputHandler):
         """
         tool = self.get_tool(name)
         if tool is None:
-            return {"success": False, "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self.tools.keys())}", "stdout": ""}
+            return {
+                "success": False,
+                "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self.tools.keys())}",
+                "stdout": "",
+            }
         return tool.execute(arguments)
 
     def _format_tool_output(self, stdout: str, stderr: str) -> str:
@@ -492,7 +547,6 @@ class ToolRegistry(OutputHandler):
         output = "\n\n".join(output_parts)
         return "无输出和错误" if not output else output
 
-
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
         try:
             name = tool_call["name"]  # 确保name是str类型
@@ -504,25 +558,31 @@ class ToolRegistry(OutputHandler):
                 try:
                     args = json.loads(args)
                 except json.JSONDecodeError:
-                    PrettyOutput.print(f"工具参数格式无效: {name} {tool_call_help}", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"工具参数格式无效: {name} {tool_call_help}", OutputType.ERROR
+                    )
                     return ""
 
             # 执行工具调用
             result = self.execute_tool(name, args)  # 修正参数传递
 
             # 格式化输出
-            output = self._format_tool_output(result["stdout"], result.get("stderr", ""))
+            output = self._format_tool_output(
+                result["stdout"], result.get("stderr", "")
+            )
 
             # 处理结果
             if get_context_token_count(output) > self.max_input_token_count:
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp_file:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".txt", delete=False
+                ) as tmp_file:
                     output_file = tmp_file.name
                     tmp_file.write(output)
                     tmp_file.flush()
                 platform: Any = PlatformRegistry().get_normal_platform()
                 if platform:
                     platform.set_suppress_output(False)
-                    platform.upload_files([output_file]) # TODO 处理错误
+                    platform.upload_files([output_file])  # TODO 处理错误
                 prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
                 return f"""工具调用原始输出过长，以下是根据输出提出的信息：
 
@@ -542,33 +602,37 @@ def main() -> int:
 
     init_env()
 
-    parser = argparse.ArgumentParser(description='Jarvis 工具系统命令行界面')
-    subparsers = parser.add_subparsers(dest='command', help='命令')
+    parser = argparse.ArgumentParser(description="Jarvis 工具系统命令行界面")
+    subparsers = parser.add_subparsers(dest="command", help="命令")
 
     # 列出工具子命令
-    list_parser = subparsers.add_parser('list', help='列出所有可用工具')
-    list_parser.add_argument('--json', action='store_true', help='以JSON格式输出')
-    list_parser.add_argument('--detailed', action='store_true', help='显示详细信息')
+    list_parser = subparsers.add_parser("list", help="列出所有可用工具")
+    list_parser.add_argument("--json", action="store_true", help="以JSON格式输出")
+    list_parser.add_argument("--detailed", action="store_true", help="显示详细信息")
 
     # 调用工具子命令
-    call_parser = subparsers.add_parser('call', help='调用指定工具')
-    call_parser.add_argument('tool_name', help='要调用的工具名称')
-    call_parser.add_argument('--args', type=str, help='工具参数 (JSON格式)')
-    call_parser.add_argument('--args-file', type=str, help='从文件加载工具参数 (JSON格式)')
+    call_parser = subparsers.add_parser("call", help="调用指定工具")
+    call_parser.add_argument("tool_name", help="要调用的工具名称")
+    call_parser.add_argument("--args", type=str, help="工具参数 (JSON格式)")
+    call_parser.add_argument(
+        "--args-file", type=str, help="从文件加载工具参数 (JSON格式)"
+    )
 
     args = parser.parse_args()
 
     # 初始化工具注册表
     registry = ToolRegistry()
 
-    if args.command == 'list':
+    if args.command == "list":
         tools = registry.get_all_tools()
 
         if args.json:
             if args.detailed:
                 print(json.dumps(tools, indent=2, ensure_ascii=False))
             else:
-                simple_tools = [{"name": t["name"], "description": t["description"]} for t in tools]
+                simple_tools = [
+                    {"name": t["name"], "description": t["description"]} for t in tools
+                ]
                 print(json.dumps(simple_tools, indent=2, ensure_ascii=False))
         else:
             PrettyOutput.section("可用工具列表", OutputType.SYSTEM)
@@ -577,9 +641,9 @@ def main() -> int:
                 print(f"   描述: {tool['description']}")
                 if args.detailed:
                     print(f"   参数:")
-                    print(tool['parameters'])
+                    print(tool["parameters"])
 
-    elif args.command == 'call':
+    elif args.command == "call":
         tool_name = args.tool_name
         tool_obj = registry.get_tool(tool_name)
 
@@ -600,23 +664,27 @@ def main() -> int:
 
         elif args.args_file:
             try:
-                with open(args.args_file, 'r', encoding='utf-8') as f:
+                with open(args.args_file, "r", encoding="utf-8") as f:
                     tool_args = json.load(f)
             except (json.JSONDecodeError, FileNotFoundError) as e:
-                PrettyOutput.print(f"错误: 无法从文件加载参数: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(
+                    f"错误: 无法从文件加载参数: {str(e)}", OutputType.ERROR
+                )
                 return 1
 
         # 检查必需参数
-        required_params = tool_obj.parameters.get('required', [])
+        required_params = tool_obj.parameters.get("required", [])
         missing_params = [p for p in required_params if p not in tool_args]
 
         if missing_params:
-            PrettyOutput.print(f"错误: 缺少必需参数: {', '.join(missing_params)}", OutputType.ERROR)
+            PrettyOutput.print(
+                f"错误: 缺少必需参数: {', '.join(missing_params)}", OutputType.ERROR
+            )
             print("\n参数说明:")
-            params = tool_obj.parameters.get('properties', {})
+            params = tool_obj.parameters.get("properties", {})
             for param_name in required_params:
                 param_info = params.get(param_name, {})
-                desc = param_info.get('description', '无描述')
+                desc = param_info.get("description", "无描述")
                 print(f"  - {param_name}: {desc}")
             return 1
 
