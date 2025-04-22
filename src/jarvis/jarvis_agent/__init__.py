@@ -2,7 +2,7 @@ import datetime
 import platform
 from typing import Any, Callable, List, Optional, Tuple, Union
 
-from yaspin import yaspin
+from yaspin import yaspin # type: ignore
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_agent.patch import PatchOutputHandler
