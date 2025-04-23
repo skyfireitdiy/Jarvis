@@ -78,6 +78,9 @@ class KimiModel(BasePlatform):
         }
         try:
             response = while_success(lambda: requests.request("POST", url, headers=headers, data=payload), sleep_time=5)
+            if response.status_code != 200:
+                PrettyOutput.print(f"错误：创建会话失败：{response.json()}", OutputType.ERROR)
+                return False
             self.chat_id = response.json()["id"]
             return True
         except Exception as e:
