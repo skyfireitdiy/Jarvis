@@ -87,8 +87,6 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 spinner.ok("✅")
                 prompt = result["stdout"] + "\n" + prompt
                 if get_context_token_count(prompt) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE:
-                    with spinner.hidden():
-                        agent.model.upload_files([f["path"] for f in files])
                     return old_prompt, False
 
     return prompt, False
