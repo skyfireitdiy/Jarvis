@@ -141,7 +141,15 @@ def load_methodology(user_input: str) -> str:
         
         platform.set_suppress_output(False)
         # 构建提示信息
-        prompt = f"""根据用户需求和已有的方法论内容，总结出与该任务/需求相关的方法论: {user_input}
+        prompt = f"""以下是所有可用的方法论内容：
+
+"""
+        if not upload_result:
+            for problem_type, content in methodologies.items():
+                prompt += f"## {problem_type}\n\n{content}\n\n---\n\n"
+        
+        prompt += f"""
+请根据以上方法论内容，总结出与以下用户需求相关的方法论: {user_input}
 
 请按以下格式回复：
 ### 与该任务/需求相关的方法论
@@ -153,12 +161,6 @@ def load_methodology(user_input: str) -> str:
 如果没有匹配的方法论，请输出：没有历史方法论可参考
 除以上要求外，不要输出任何内容
 """
-        if not upload_result:
-            prompt += f"""
-# 方法论内容
-"""
-            for problem_type, content in methodologies.items():
-                prompt += f"## {problem_type}\n\n{content}\n\n---\n\n"
         return platform.chat_until_success(prompt)
     
     except Exception as e:
