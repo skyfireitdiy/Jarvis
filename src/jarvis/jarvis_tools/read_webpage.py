@@ -12,6 +12,11 @@ class WebpageTool:
             "url": {
                 "type": "string",
                 "description": "要读取的网页URL"
+            },
+            "want": {
+                "type": "string",
+                "description": "具体想要从网页获取的信息或回答的问题",
+                "default": "请总结这个网页的主要内容"
             }
         },
         "required": ["url"]
@@ -35,14 +40,20 @@ class WebpageTool:
         """Read webpage content using Yuanbao model"""
         try:
             url = args["url"].strip()
+            want = args.get("want", "请总结这个网页的主要内容")
             
             # Create Yuanbao model instance
             model = PlatformRegistry().create_platform(self.platform)
             model.set_suppress_output(False)  # type: ignore
             model.set_model_name(self.model)  # type: ignore
 
-            # Construct prompt for webpage reading
-            prompt = f"请帮我读取并总结这个网页的内容：{url}\n请以markdown格式输出，包含标题和主要内容。"
+            # Construct prompt based on want parameter
+            prompt = f"""请帮我处理这个网页：{url}
+用户的具体需求是：{want}
+请按照以下要求输出结果：
+1. 使用Markdown格式
+2. 包含网页标题
+3. 根据用户需求提供准确、完整的信息"""
 
             # Get response from Yuanbao model
             response = model.chat_until_success(prompt)  # type: ignore
