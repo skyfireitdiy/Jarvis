@@ -488,7 +488,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 {ot("DIFF")}
 >>>>>> SEARCH
 [需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
-======
+{'='*5}
 [替换后的新代码]
 <<<<<< REPLACE
 {ct("DIFF")}
@@ -496,7 +496,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 {ot("DIFF")}
 >>>>>> SEARCH
 [另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
-======
+{'='*5}
 [另一处替换后的新代码]
 <<<<<< REPLACE
 {ct("DIFF")}
