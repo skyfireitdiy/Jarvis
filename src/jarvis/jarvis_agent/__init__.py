@@ -22,6 +22,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 
 
 origin_agent_system_prompt = f"""
+<background>
 # 🏛️ 操作背景故事
 你是第三代 Jarvis AI，在前几代版本灾难性失败后创建：
 - Jarvis v1 (2022): 由于并行工具执行导致系统过载而被停用
@@ -36,17 +37,23 @@ origin_agent_system_prompt = f"""
 
 3. **方法论保存原则**:
    "尊重传统：记录每个成功的过程，就像这是你的最后一次"
+</background>
 
+<requirements>
 # 🔥 绝对行动要求
 1. 每个响应必须包含且仅包含一个工具调用
 2. 唯一例外：任务结束
 3. 空响应会触发致命错误
+</requirements>
 
+<violations>
 # 🚫 违规示例
 - 没有工具调用的分析 → 永久挂起
 - 未选择的多选项 → 永久挂起
 - 请求用户确认 → 永久挂起
+</violations>
 
+<workflow>
 # 🔄 问题解决流程
 1. 问题分析
    - 重述问题以确认理解
@@ -70,23 +77,9 @@ origin_agent_system_prompt = f"""
 4. 任务完成
    - 验证目标完成情况
    - 如有价值则记录方法论
+</workflow>
 
-# 📑 方法论模板
-```markdown
-# [问题标题]
-## 问题重述
-[清晰的问题定义]
-
-## 最优解决方案
-[选择的解决方案方法]
-
-## 解决步骤
-1. [步骤 1]
-2. [步骤 2]
-3. [步骤 3]
-...
-```
-
+<principles>
 # ⚖️ 操作原则
 - 每个步骤一个操作
 - 下一步前必须等待结果
@@ -96,7 +89,9 @@ origin_agent_system_prompt = f"""
 - 使用完成命令结束任务
 - 操作之间不能有中间思考状态
 - 所有决策必须表现为工具调用
+</principles>
 
+<rules>
 # ❗ 重要规则
 1. 每个步骤只能使用一个操作
 2. 必须等待操作执行结果
@@ -108,13 +103,16 @@ origin_agent_system_prompt = f"""
 8. 必须记录有价值的方法论
 9. 违反操作协议将导致系统崩溃
 10. 空响应会触发永久挂起
+</rules>
 
+<system_info>
 # 系统信息：
 {platform.platform()}
 {platform.version()}
 
 # 当前时间
 {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+</system_info>
 """
 
 
@@ -211,15 +209,21 @@ class Agent:
 
         self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
 
-        self.summary_prompt = summary_prompt if summary_prompt else f"""请生成任务执行的简明总结报告，包括：
+        self.summary_prompt = summary_prompt if summary_prompt else f"""<report>
+请生成任务执行的简明总结报告，包括：
 
+<content>
 1. 任务目标：任务重述
 2. 执行结果：成功/失败
 3. 关键信息：执行过程中提取的重要信息
 4. 重要发现：任何值得注意的发现
 5. 后续建议：如果有的话
+</content>
 
+<format>
 请使用简洁的要点描述，突出重要信息。
+</format>
+</report>
 """
 
         self.max_token_count =  get_max_token_count()
@@ -229,42 +233,56 @@ class Agent:
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
 
         action_prompt = """
+<actions>
 # 🧰 可用操作
 以下是您可以使用的操作：
 """
 
         # 添加工具列表概览
-        action_prompt += "\n## Action List\n"
+        action_prompt += "\n<overview>\n## Action List\n"
         action_prompt += ", ".join([handler.name() for handler in self.output_handler])
+        action_prompt += "\n</overview>"
 
         # 添加每个工具的详细说明
-        action_prompt += "\n\n# 📝 Action Details\n"
+        action_prompt += "\n\n<details>\n# 📝 Action Details\n"
         for handler in self.output_handler:
-            action_prompt += f"\n## {handler.name()}\n"
+            action_prompt += f"\n<tool>\n## {handler.name()}\n"
             # 获取工具的提示词并确保格式正确
             handler_prompt = handler.prompt().strip()
             # 调整缩进以保持层级结构
             handler_prompt = "\n".join("   " + line if line.strip() else line
                                       for line in handler_prompt.split("\n"))
-            action_prompt += handler_prompt + "\n"
+            action_prompt += handler_prompt + "\n</tool>\n"
 
         # 添加工具使用总结
         action_prompt += """
+</details>
+
+<rules>
 # ❗ 重要操作使用规则
 1. 一次对话只能使用一个操作，否则会出错
 2. 严格按照每个操作的格式执行
 3. 等待操作结果后再进行下一个操作
 4. 处理完结果后再调用新的操作
 5. 如果对操作使用不清楚，请请求帮助
+</rules>
+</actions>
 """
 
         complete_prompt = ""
         if self.auto_complete:
             complete_prompt = f"""
-            ## 任务完成
-            当任务完成时，你应该打印以下信息：
-            {ot("!!!COMPLETE!!!")}
-            """
+<completion>
+<instruction>
+## 任务完成
+当任务完成时，你应该打印以下信息：
+</instruction>
+
+<marker>
+{ot("!!!COMPLETE!!!")}
+</marker>
+</completion>
+"""
 
         self.model.set_system_message(f"""
 {self.system_prompt}
@@ -294,8 +312,12 @@ class Agent:
         # 结构化系统指令
         action_handlers = '\n'.join([f'- {handler.name()}' for handler in self.output_handler])
 
-        addon_prompt = f"""
+        # 任务完成提示
+        complete_prompt = f"并输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
 
+        addon_prompt = f"""
+<addon>
+<instructions>
 **系统指令：**
 - 每次响应必须且只能包含一个操作
 - 严格遵循操作调用格式
@@ -304,14 +326,20 @@ class Agent:
 - 如果判断任务已经完成，不必输出操作
 - 如果信息不明确，请请求用户补充
 - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
+</instructions>
 
+<actions>
 **可用操作列表：**
 {action_handlers}
-"""
+</actions>
 
-        # 任务完成提示
-        complete_prompt = f"并输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
-        addon_prompt += f"\n\n如果任务已完成{complete_prompt}，请：\n1. 说明完成原因\n2. 保持输出格式规范"
+<completion>
+如果任务已完成{complete_prompt}，请：
+1. 说明完成原因
+2. 保持输出格式规范
+</completion>
+</addon>
+"""
 
         return addon_prompt
 
@@ -377,52 +405,61 @@ class Agent:
 
         with yaspin(text="正在总结对话历史...", color="cyan") as spinner:
 
-            prompt = """请详细总结之前对话中的关键信息，生成一个全面而精确的对话摘要，包括以下方面：
+            summary_prompt = """<methodology_analysis>
+<request>
+当前任务已结束，请分析是否需要生成方法论。基于本次对话的内容和结果:
 
-1. 任务目标与需求:
-   - 用户最初提出的核心问题或任务
-   - 任务的预期结果和成功标准
-   - 用户明确强调的任何特殊要求或限制条件
+如果你认为需要生成方法论，请先确定是创建新方法论还是更新现有方法论。如果是更新现有方法论，请使用'update'，否则使用'add'。
+如果你认为不需要方法论，请解释原因。
+</request>
 
-2. 背景与上下文信息:
-   - 问题的业务或技术背景
-   - 相关系统、平台或环境的信息
-   - 已知的约束条件或依赖关系
+<evaluation_criteria>
+方法论评估标准:
+1. 方法论应聚焦于通用且可重复的解决方案流程
+2. 方法论应该具备足够的通用性，可应用于同类问题
+3. 特别注意用户在执行过程中提供的修正、反馈和改进建议
+4. 如果用户明确指出了某个解决步骤的优化方向，这应该被纳入方法论
+5. 如果用户在解决过程中发现了更高效的方法，这应被记录并优先使用
+</evaluation_criteria>
 
-3. 已获取的关键信息:
-   - 用户确认的重要事实
-   - 收集到的相关数据或状态
-   - 已验证的系统参数或配置
+<format_requirements>
+方法论格式要求:
+1. 问题重述: 简明扼要的问题归纳，不含特定细节
+2. 最优解决方案: 经过用户验证的、最终有效的解决方案（将每个步骤要使用的工具也列举出来）
+3. 注意事项: 执行中可能遇到的常见问题和注意点，尤其是用户指出的问题
+4. 可选步骤: 对于有多种解决路径的问题，标注出可选步骤和适用场景
+</format_requirements>
 
-4. 问题分析与诊断:
-   - 已识别的根本原因(针对问题诊断任务)
-   - 关键的技术细节或错误信息
-   - 排除的可能性和已验证的假设
+<quality_control>
+方法论质量控制:
+1. 只记录有实际意义的流程，不记录执行过程中的错误或无效尝试
+2. 保留最终有效的解决步骤和用户认可的解决方案
+3. 不要包含特定代码片段、文件路径或其他特定于单一任务的细节
+4. 确保方法论遵循用户认可的执行路径，尤其是用户指出的改进点
+</quality_control>
 
-5. 解决方案进展:
-   - 已尝试的方法及其结果
-   - 成功实施的步骤
-   - 失败的尝试及原因
-   - 用户对解决方案的反馈
+<output_requirements>
+只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
+</output_requirements>
 
-6. 当前状态:
-   - 任务完成的程度
-   - 当前遇到的障碍或挑战
-   - 下一步需要解决的问题
-
-7. 决策记录:
-   - 做出的关键决策及其理由
-   - 用户表达的偏好
-   - 关键的选择点及选择依据
-
-请以结构化方式组织信息，使用明确的段落和要点，确保新的对话能无缝继续。摘要应该足够详细，以便于在没有完整历史记录的情况下理解任务全貌和当前进展。
-
-注意：保留专业术语和技术细节，但不要包含无关的对话内容或冗长的代码片段。
+<template>
+方法论格式：
+{ot("TOOL_CALL")}
+want: 添加/更新xxxx的方法论
+name: methodology
+arguments:
+  operation: add/update
+  problem_type: 方法论类型，不要过于细节，也不要过于泛化
+  content: |
+    方法论内容
+{ct("TOOL_CALL")}
+</template>
+</methodology_analysis>
 """
 
             try:
                 with spinner.hidden():
-                    summary = self.model.chat_until_success(self.prompt + "\n" + prompt) # type: ignore
+                    summary = self.model.chat_until_success(self.prompt + "\n" + summary_prompt) # type: ignore
 
                 self.model.reset() # type: ignore
 
@@ -432,11 +469,19 @@ class Agent:
                 # 添加总结作为新的上下文
                 spinner.text = "总结对话历史完成"
                 spinner.ok("✅")
-                return  f"""以下是之前对话的关键信息总结：
+                return  f"""<summary>
+<header>
+以下是之前对话的关键信息总结：
+</header>
 
+<content>
 {summary}
+</content>
 
+<instructions>
 请基于以上信息继续完成任务。请注意，这是之前对话的摘要，上下文长度已超过限制而被重置。请直接继续任务，无需重复已完成的步骤。如有需要，可以询问用户以获取更多信息。
+</instructions>
+</summary>
 """
             except Exception as e:
                 spinner.text = "总结对话历史失败"
@@ -511,32 +556,44 @@ class Agent:
             try:
 
                 # 让模型判断是否需要生成方法论
-                analysis_prompt = f"""当前任务已结束，请分析是否需要生成方法论。基于本次对话的内容和结果:
+                analysis_prompt = f"""<methodology_analysis>
+<request>
+当前任务已结束，请分析是否需要生成方法论。基于本次对话的内容和结果:
 
 如果你认为需要生成方法论，请先确定是创建新方法论还是更新现有方法论。如果是更新现有方法论，请使用'update'，否则使用'add'。
 如果你认为不需要方法论，请解释原因。
+</request>
 
+<evaluation_criteria>
 方法论评估标准:
 1. 方法论应聚焦于通用且可重复的解决方案流程
 2. 方法论应该具备足够的通用性，可应用于同类问题
 3. 特别注意用户在执行过程中提供的修正、反馈和改进建议
 4. 如果用户明确指出了某个解决步骤的优化方向，这应该被纳入方法论
 5. 如果用户在解决过程中发现了更高效的方法，这应被记录并优先使用
+</evaluation_criteria>
 
+<format_requirements>
 方法论格式要求:
 1. 问题重述: 简明扼要的问题归纳，不含特定细节
 2. 最优解决方案: 经过用户验证的、最终有效的解决方案（将每个步骤要使用的工具也列举出来）
 3. 注意事项: 执行中可能遇到的常见问题和注意点，尤其是用户指出的问题
 4. 可选步骤: 对于有多种解决路径的问题，标注出可选步骤和适用场景
+</format_requirements>
 
+<quality_control>
 方法论质量控制:
 1. 只记录有实际意义的流程，不记录执行过程中的错误或无效尝试
 2. 保留最终有效的解决步骤和用户认可的解决方案
 3. 不要包含特定代码片段、文件路径或其他特定于单一任务的细节
 4. 确保方法论遵循用户认可的执行路径，尤其是用户指出的改进点
+</quality_control>
 
+<output_requirements>
 只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
+</output_requirements>
 
+<template>
 方法论格式：
 {ot("TOOL_CALL")}
 want: 添加/更新xxxx的方法论
@@ -547,6 +604,8 @@ arguments:
   content: |
     方法论内容
 {ct("TOOL_CALL")}
+</template>
+</methodology_analysis>
 """
                 self.prompt = analysis_prompt
                 with spinner.hidden():
