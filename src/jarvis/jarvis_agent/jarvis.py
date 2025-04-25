@@ -11,6 +11,7 @@ from yaspin import yaspin
 from jarvis.jarvis_agent import (
      PrettyOutput, OutputType,
      get_multiline_input,
+     user_confirm,
      Agent,
      origin_agent_system_prompt
 )
@@ -89,7 +90,14 @@ def _select_task(tasks: Dict[str, str]) -> str:
             if choice == 0:
                 return ""
             if 1 <= choice <= len(task_names):
-                return tasks[task_names[choice - 1]]
+                selected_task = tasks[task_names[choice - 1]]
+                # 询问是否需要补充信息
+                need_additional = user_confirm("需要为此任务添加补充信息吗？", default=False)
+                if need_additional:
+                    additional_input = get_multiline_input("请输入补充信息（输入空行结束）：")
+                    if additional_input:
+                        selected_task = f"{selected_task}\n\n补充信息:\n{additional_input}"
+                return selected_task
             PrettyOutput.print("无效的选择。请选择列表中的一个号码。", OutputType.WARNING)
 
         except (KeyboardInterrupt, EOFError):
