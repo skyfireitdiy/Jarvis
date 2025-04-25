@@ -24,9 +24,13 @@ from jarvis.jarvis_mcp import McpClient
 
 
 tool_call_help = f"""
+<tool_system_guide>
+<introduction>
 # 🛠️ 工具使用系统
 您正在使用一个需要精确格式和严格规则的工具执行系统。
+</introduction>
 
+<format>
 # 📋 工具调用格式
 {ot("TOOL_CALL")}
 want: 想要从执行结果中获取到的信息，如果工具输出内容过长，会根据此字段尝试提取有效信息
@@ -35,29 +39,41 @@ arguments:
     param1: 值1
     param2: 值2
 {ct("TOOL_CALL")}
+</format>
 
+<rules>
 # ❗ 关键规则
-1. 每次只使用一个工具
-   - 一次只执行一个工具
-   - 等待结果后再进行下一步
+<rule>
+### 1. 每次只使用一个工具
+- 一次只执行一个工具
+- 等待结果后再进行下一步
+</rule>
 
-2. 严格遵守格式
-   - 完全按照上述格式
-   - 使用正确的YAML缩进
-   - 包含所有必需参数
+<rule>
+### 2. 严格遵守格式
+- 完全按照上述格式
+- 使用正确的YAML缩进
+- 包含所有必需参数
+</rule>
 
-3. 结果处理
-   - 等待执行结果
-   - 不要假设结果
-   - 不要创建虚假响应
-   - 不要想象对话
+<rule>
+### 3. 结果处理
+- 等待执行结果
+- 不要假设结果
+- 不要创建虚假响应
+- 不要想象对话
+</rule>
 
-4. 信息管理
-   - 如果信息不足，询问用户
-   - 跳过不必要的步骤
-   - 如果卡住，请求指导
-   - 不要在没有完整信息的情况下继续
+<rule>
+### 4. 信息管理
+- 如果信息不足，询问用户
+- 跳过不必要的步骤
+- 如果卡住，请求指导
+- 不要在没有完整信息的情况下继续
+</rule>
+</rules>
 
+<string_format>
 # 📝 字符串参数格式
 始终使用 | 语法表示字符串参数：
 
@@ -69,20 +85,26 @@ arguments:
     script_cotent: |
         git status --porcelain
 {ct("TOOL_CALL")}
+</string_format>
 
+<best_practices>
 # 💡 最佳实践
 - 准备好后立即开始执行
 - 无需请求许可即可开始
 - 使用正确的字符串格式
 - 监控进度并调整
 - 遇到困难时请求帮助
+</best_practices>
 
+<common_errors>
 # ⚠️ 常见错误
 - 同时调用多个工具
 - 字符串参数缺少 |
 - 假设工具结果
 - 创建虚构对话
 - 在没有所需信息的情况下继续
+</common_errors>
+</tool_system_guide>
 """
 
 
@@ -98,12 +120,16 @@ class ToolRegistry(OutputHandler):
         """加载工具"""
         tools = self.get_all_tools()
         if tools:
-            tools_prompt = "## 可用工具:\n"
+            tools_prompt = "<tools_section>\n"
+            tools_prompt += "  <header>## 可用工具:</header>\n"
+            tools_prompt += "  <tools_list>\n"
             for tool in tools:
                 try:
-                    tools_prompt += f"- 名称: {tool['name']}\n"
-                    tools_prompt += f"  描述: {tool['description']}\n"
-                    tools_prompt += "  参数: |\n"
+                    tools_prompt += "    <tool>\n"
+                    tools_prompt += f"      <name>名称: {tool['name']}</name>\n"
+                    tools_prompt += f"      <description>描述: {tool['description']}</description>\n"
+                    tools_prompt += "      <parameters>\n"
+                    tools_prompt += "        <yaml>|\n"
 
                     # 生成格式化的YAML参数
                     yaml_params = yaml.dump(
@@ -116,7 +142,11 @@ class ToolRegistry(OutputHandler):
 
                     # 添加缩进并移除尾部空格
                     for line in yaml_params.split("\n"):
-                        tools_prompt += f"    {line.rstrip()}\n"
+                        tools_prompt += f"          {line.rstrip()}\n"
+
+                    tools_prompt += "        </yaml>\n"
+                    tools_prompt += "      </parameters>\n"
+                    tools_prompt += "    </tool>\n"
 
                 except yaml.YAMLError as e:
                     PrettyOutput.print(
@@ -125,6 +155,8 @@ class ToolRegistry(OutputHandler):
                     )
                     continue
 
+            tools_prompt += "  </tools_list>\n"
+            tools_prompt += "</tools_section>\n"
             tools_prompt += tool_call_help.rstrip()  # 移除帮助文本尾部空格
             return tools_prompt
         return ""
