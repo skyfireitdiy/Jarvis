@@ -29,7 +29,7 @@ def get_max_input_token_count() -> int:
     返回:
         int: 模型能处理的最大输入token数量。
     """
-    return int(os.getenv('JARVIS_MAX_INPUT_TOKEN_COUNT', '64000'))
+    return int(os.getenv('JARVIS_MAX_INPUT_TOKEN_COUNT', '32000'))
 
 
 def is_auto_complete() -> bool:
