@@ -92,8 +92,12 @@ def chat_with_model(platform_name: str, model_name: str):
                 try:
                     file_path = user_input.strip()[8:].strip()
                     if not file_path:
-                        PrettyOutput.print("请指定要上传的文件路径，例如: /upload /path/to/file", OutputType.WARNING)
+                        PrettyOutput.print("请指定要上传的文件路径，例如: /upload /path/to/file 或 /upload \"/path/with spaces/file\"", OutputType.WARNING)
                         continue
+                    
+                    # Remove quotes if present
+                    if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
+                        file_path = file_path[1:-1]
                     
                     PrettyOutput.print(f"正在上传文件: {file_path}", OutputType.INFO)
                     if platform.upload_files([file_path]):
