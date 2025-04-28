@@ -1,14 +1,9 @@
 import os
 import yaml
-"""
-配置管理模块
+"""配置管理模块。
+
 该模块提供了获取Jarvis系统各种配置设置的函数。
 所有配置都从环境变量中读取，带有回退默认值。
-该模块组织为以下几个类别：
-- 系统配置
-- 模型配置
-- 执行配置
-- 文本处理配置
 """
 
 # 输出窗口预留大小
@@ -28,8 +23,8 @@ def get_replace_map() -> dict:
     if not os.path.exists(replace_map_path):
         return {}
     
-    with open(replace_map_path, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f) or {}
+    with open(replace_map_path, 'r', encoding='utf-8') as file:
+        return yaml.safe_load(file) or {}
 
 def get_max_token_count() -> int:
     """
