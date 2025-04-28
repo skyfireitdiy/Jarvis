@@ -1,12 +1,14 @@
 """内置替换映射表模块。
 
 该模块定义了Jarvis系统内置的默认替换映射表。
+格式: {"标记名": {"template": "替换模板", "description": "描述信息"}}
 """
 
 from .tag import ot, ct
 
 BUILTIN_REPLACE_MAP = {
-    "CodeBase": f"""
+    "CodeBase": {
+        "template": f"""
 请使用ask_codebase工具查询代码库，必须严格遵守以下工具调用格式：
 
 {ot("TOOL_CALL")}
@@ -23,7 +25,10 @@ arguments:
 4. xxx模块的入口函数是什么？
 5. xxx功能的测试用例在哪里？
 """,
-    "Web": f"""
+        "description": "查询代码库"
+    },
+    "Web": {
+        "template": f"""
 请使用search_web工具进行网页搜索，必须严格遵守以下工具调用格式：
 
 {ot("TOOL_CALL")}
@@ -40,7 +45,10 @@ arguments:
 4. xxx问题的解决方案有哪些？
 5. xxx概念的详细解释是什么？
 """,
-    "Methodology": f"""
+        "description": "网页搜索"
+    },
+    "Methodology": {
+        "template": f"""
 请使用find_methodology工具查找相关方法论，必须严格遵守以下工具调用格式：
 
 {ot("TOOL_CALL")}
@@ -57,7 +65,10 @@ arguments:
 4. 处理xxx的标准流程是什么？
 5. 实现xxx的参考方案有哪些？
 """,
-    "Plan": f"""
+        "description": "查找相关方法论"
+    },
+    "Plan": {
+        "template": f"""
 请使用code_plan工具生成代码修改计划，必须严格遵守以下工具调用格式：
 
 {ot("TOOL_CALL")}
@@ -88,5 +99,7 @@ code_plan工具将：
 3. 按功能模块分组修改内容
 4. 评估修改影响范围
 5. 生成可执行的开发计划
-"""
+""",
+        "description": "生成代码修改计划"
+    }
 }
