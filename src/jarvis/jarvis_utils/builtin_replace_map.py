@@ -117,5 +117,17 @@ code_plan工具将：
         "template": f"""
 请使用find_methodology工具查找相关方法论：
 """
+    },
+    "Dev": {
+        "append": False,
+        "template": f"""
+请调用create_code_agent开发以下需求：
+"""
+    },
+    "Fix": {
+        "append": False,
+        "template": f"""
+请修复以下问题：
+"""
     }
 }
