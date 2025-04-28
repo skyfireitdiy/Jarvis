@@ -9,9 +9,11 @@ from jarvis.jarvis_utils.config import get_shell_name
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.utils import init_env
 
-def print_command(command: str) -> None:
+def execute_command(command: str, should_run: bool) -> None:
     """Print command without execution"""
     print(command)
+    if should_run:
+        os.system(command)
 
 
 def install_fish_completion() -> int:
@@ -25,7 +27,7 @@ def install_fish_completion() -> int:
         return 0
         
     # 使用fish命令检查函数是否已加载
-    check_cmd = 'type -q fish_command_not_found | grep fish_command_not_found && echo "defined" || echo "undefined"'
+    check_cmd = 'functions --names | grep fish_command_not_found > /dev/null && echo "defined" || echo "undefined"'
     result = os.popen(f'fish -c \'{check_cmd}\'').read().strip()
     
     if result == "defined":
@@ -171,18 +173,20 @@ Example:
     # 处理install命令
     if args.install:
         return install_fish_completion()
+    
+    should_run = False
 
     # 添加标准输入处理
     if not args.request:
         # 检查是否在交互式终端中运行
         args.request = get_multiline_input(tip="请输入您要执行的功能：")
-
+        should_run = True
     # 处理请求
     command = process_request(args.request)
 
     # 输出结果
     if command:
-        print_command(command)  # 显示并执行命令
+        execute_command(command, should_run)  # 显示并执行命令
         return 0
     else:
         return 1
