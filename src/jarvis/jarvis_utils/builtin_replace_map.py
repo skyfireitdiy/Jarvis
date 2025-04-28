@@ -111,5 +111,11 @@ code_plan工具将：
         "template": f"""
 请使用工具在当前目录下查找与以下功能相关的文件：
 """
+    },
+    "FindMethodology": {
+        "append": False,
+        "template": f"""
+请使用find_methodology工具查找相关方法论：
+"""
     }
 }
