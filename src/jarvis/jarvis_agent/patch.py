@@ -153,6 +153,13 @@ def apply_patch(output_str: str, agent: Any) -> str:
             spinner.fail("❌")
             return f"以下文件未读取: {not_read_file}，应用补丁存在风险，请先读取文件后再生成补丁"
 
+        # 检查是否有文件在Git仓库外
+        in_git_repo = True
+        for filepath in patches.keys():
+            if not _is_file_in_git_repo(filepath):
+                in_git_repo = False
+                break
+
         # 按文件逐个处理
         for filepath, patch_content in patches.items():
             try:
@@ -177,46 +184,50 @@ def apply_patch(output_str: str, agent: Any) -> str:
                 spinner.write(f"✅ 文件 {filepath} 回滚完成")
 
         final_ret = ""
-        diff = get_diff()
-        if diff:
-            PrettyOutput.print(diff, OutputType.CODE, lang="diff")
-            with spinner.hidden():
-                commited = handle_commit_workflow()
-            if commited:
-                # 获取提交信息
-                end_hash = get_latest_commit_hash()
-                commits = get_commits_between(start_hash, end_hash)
+        if in_git_repo:
+            diff = get_diff()
+            if diff:
+                PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+                with spinner.hidden():
+                    commited = handle_commit_workflow()
+                if commited:
+                    # 获取提交信息
+                    end_hash = get_latest_commit_hash()
+                    commits = get_commits_between(start_hash, end_hash)
 
-                # 添加提交信息到final_ret
-                if commits:
-                    final_ret += "✅ 补丁已应用\n"
-                    final_ret += "# 提交信息:\n"
-                    for commit_hash, commit_message in commits:
-                        final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
+                    # 添加提交信息到final_ret
+                    if commits:
+                        final_ret += "✅ 补丁已应用\n"
+                        final_ret += "# 提交信息:\n"
+                        for commit_hash, commit_message in commits:
+                            final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
 
-                    final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
+                        final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
 
-                    # 增加代码变更分析和错误提示
+                        # 增加代码变更分析和错误提示
+                        addon_prompt =  "1. 请调用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
+                        addon_prompt += "2. 如果发现致命的代码错误，请立即开始修复\n"
+                        addon_prompt += "3. 如果发现性能、风格等问题，要询问用户是否需要立即修复\n"
+                        addon_prompt += "\n\n"
+                        addon_prompt += "如果没有问题，请继续进行下一步修改\n"
+                        addon_prompt += f"如果用户的需求已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
+                        addon_prompt += "如果有任何信息不清楚，调用工具获取信息\n"
+                        addon_prompt += "每次响应必须且只能包含一个操作\n"
 
-                    addon_prompt =  "1. 请调用静态检查工具（如有）检查以上变更是否引入了潜在错误\n"
-                    addon_prompt += "2. 如果发现致命的代码错误，请立即开始修复\n"
-                    addon_prompt += "3. 如果发现性能、风格等问题，要询问用户是否需要立即修复\n"
-                    addon_prompt += "\n\n"
-                    addon_prompt += "如果没有问题，请继续进行下一步修改\n"
-                    addon_prompt += f"如果用户的需求已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
-                    addon_prompt += "如果有任何信息不清楚，调用工具获取信息\n"
-                    addon_prompt += "每次响应必须且只能包含一个操作\n"
+                        agent.set_addon_prompt(addon_prompt)
 
-                    agent.set_addon_prompt(addon_prompt)
-
+                    else:
+                        final_ret += "✅ 补丁已应用（没有新的提交）"
                 else:
-                    final_ret += "✅ 补丁已应用（没有新的提交）"
+                    final_ret += "❌ 补丁应用被拒绝\n"
+                    final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
             else:
-                final_ret += "❌ 补丁应用被拒绝\n"
-                final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
+                commited = False
+                final_ret += "❌ 没有要提交的更改\n"
         else:
-            commited = False
-            final_ret += "❌ 没有要提交的更改\n"
+            # 对于Git仓库外的文件，直接返回成功
+            final_ret += "✅ 补丁已应用（文件不在Git仓库中）"
+            commited = True
         # 用户确认最终结果
         with spinner.hidden():
             if commited:
@@ -230,6 +241,22 @@ def apply_patch(output_str: str, agent: Any) -> str:
             agent.set_addon_prompt(custom_reply)
             return final_ret
 
+
+def _is_file_in_git_repo(filepath: str) -> bool:
+    """检查文件是否在当前Git仓库中"""
+    import subprocess
+    try:
+        # 获取Git仓库根目录
+        repo_root = subprocess.run(
+            ['git', 'rev-parse', '--show-toplevel'],
+            capture_output=True,
+            text=True
+        ).stdout.strip()
+        
+        # 检查文件路径是否在仓库根目录下
+        return os.path.abspath(filepath).startswith(os.path.abspath(repo_root))
+    except:
+        return False
 
 def revert_file(filepath: str):
     """增强版git恢复，处理新文件"""
