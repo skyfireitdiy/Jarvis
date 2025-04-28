@@ -2,7 +2,6 @@ from typing import Dict, Any
 import os
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
-from jarvis.jarvis_code_analysis.code_review import CodeReviewTool, extract_code_report
 from jarvis.jarvis_utils.git_utils import get_latest_commit_hash, has_uncommitted_changes
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
@@ -69,23 +68,6 @@ class CreateCodeAgentTool:
                 # Get new commit hash after development
                 end_commit = get_latest_commit_hash()
 
-                # Step 3: Code Review
-                PrettyOutput.print("开始代码审查...", OutputType.INFO)
-                reviewer = CodeReviewTool()
-                review_result = reviewer.execute({
-                    "review_type": "range",
-                    "start_commit": start_commit,
-                    "end_commit": end_commit,
-                    "root_dir": root_dir
-                })
-
-                if not review_result["success"]:
-                    return {
-                        "success": False,
-                        "stderr": "Code review failed: " + review_result["stderr"],
-                        "stdout": ""
-                    }
-
                 # Step 4: Generate Summary
                 summary = f"""开发总结:
 
@@ -95,8 +77,6 @@ class CreateCodeAgentTool:
 需求:
 {requirement}
 
-代码审查结果:
-{extract_code_report(review_result["stdout"])}
 """
 
                 return {
