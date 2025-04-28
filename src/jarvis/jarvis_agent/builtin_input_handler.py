@@ -35,15 +35,13 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             # 先执行标记替换
             user_input = user_input.replace(f"'<{tag}>'", replace_map[tag])
             
-            # 特殊处理逻辑（通过映射表值类型判断）
-            if isinstance(replace_map[tag], dict) and replace_map[tag].get("_special_action"):
-                action = replace_map[tag]["_special_action"]
-                if action == "summarize":
-                    agent._summarize_and_clear_history()
-                elif action == "clear":
-                    agent.clear()
-                
-                if not user_input.strip():
-                    return "", True
+            # 特殊处理逻辑（独立判断）
+            if tag == "Summary":
+                agent._summarize_and_clear_history()
+            elif tag == "Clear":
+                agent.clear()
+            
+            if (tag == "Summary" or tag == "Clear") and not user_input.strip():
+                return "", True
 
     return user_input, False
