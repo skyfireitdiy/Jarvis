@@ -36,7 +36,8 @@ class FindMethodologyTool:
                 }
 
             with yaspin(text="搜索相关方法论...", color="cyan") as spinner:
-                methodology_prompt = load_methodology(args["query"])
+                with spinner.hidden():
+                    methodology_prompt = load_methodology(args["query"])
 
                 if methodology_prompt:
                     spinner.text = "找到相关方法论"

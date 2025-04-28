@@ -105,5 +105,11 @@ code_plan工具将：
 5. 生成可执行的开发计划
 """,
         "description": "生成代码修改计划"
+    },
+    "FindRelatedFiles": {
+        "append": False,
+        "template": f"""
+请使用工具在当前目录下查找与以下功能相关的文件：
+"""
     }
 }
