@@ -354,6 +354,8 @@ def main() -> None:
                       help='Target platform name', default=None)
     parser.add_argument('-m', '--model', type=str,
                       help='Model name to use', default=None)
+    parser.add_argument('-r', '--requirement', type=str,
+                      help='Requirement to process', default=None)
     args = parser.parse_args()
 
     curr_dir = os.getcwd()
@@ -361,7 +363,10 @@ def main() -> None:
     PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
 
     try:
-        user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
+        if args.requirement:
+            user_input = args.requirement
+        else:
+            user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
         if not user_input:
             sys.exit(0)
         agent = CodeAgent(platform=args.platform,
