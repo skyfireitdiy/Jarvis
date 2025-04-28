@@ -8,7 +8,7 @@ BUILTIN_REPLACE_MAP = {
     # 格式: {"原始文本": "替换文本"}
     "example": "demo",
     "sample": "template",
-    "CodeBase": """
+    "CodeBase": f"""
 请使用ask_codebase工具查询代码库，必须严格遵守以下工具调用格式：
 
 {ot("TOOL_CALL")}
@@ -25,7 +25,7 @@ arguments:
 4. xxx模块的入口函数是什么？
 5. xxx功能的测试用例在哪里？
 """,
-    "Web": """
+    "Web": f"""
 请使用search_web工具进行网页搜索，必须严格遵守以下工具调用格式：
 
 {ot("TOOL_CALL")}
@@ -42,7 +42,7 @@ arguments:
 4. xxx问题的解决方案有哪些？
 5. xxx概念的详细解释是什么？
 """,
-    "Methodology": """
+    "Methodology": f"""
 请使用find_methodology工具查找相关方法论，必须严格遵守以下工具调用格式：
 
 {ot("TOOL_CALL")}
@@ -59,7 +59,7 @@ arguments:
 4. 处理xxx的标准流程是什么？
 5. 实现xxx的参考方案有哪些？
 """,
-    "Plan": """
+    "Plan": f"""
 请使用code_plan工具生成代码修改计划，必须严格遵守以下工具调用格式：
 
 {ot("TOOL_CALL")}
