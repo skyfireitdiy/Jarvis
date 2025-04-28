@@ -15,7 +15,7 @@ from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.config import get_max_token_count
-from jarvis.jarvis_utils.utils import ct, ot
+from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import user_confirm
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
