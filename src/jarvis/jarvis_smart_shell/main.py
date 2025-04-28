@@ -2,7 +2,6 @@
 import argparse
 import os
 import sys
-import readline
 from typing import Optional
 
 from yaspin import yaspin
