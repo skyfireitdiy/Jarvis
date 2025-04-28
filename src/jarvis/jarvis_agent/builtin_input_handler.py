@@ -1,7 +1,7 @@
 import re
 from typing import Any, Tuple
 from jarvis.jarvis_utils.utils import ot, ct
-from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
+from jarvis.jarvis_utils.config import get_replace_map
 
 
 
@@ -22,6 +22,8 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     if not special_tags:
         return user_input, False
 
+    # 获取替换映射表
+    replace_map = get_replace_map()
     # 使用集合去重
     processed_tags = set()
     # 处理每个标记
@@ -30,7 +32,7 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             continue
         processed_tags.add(tag)
 
-        if tag in BUILTIN_REPLACE_MAP:
+        if tag in replace_map:
             if tag in ["Summary", "Clear"]:
                 # 特殊处理需要立即返回的标记
                 user_input = user_input.replace(f"'<{tag}>'", "")
@@ -44,9 +46,9 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 # 使用预定义的模板
                 user_input = user_input.replace(f"'<{tag}>'", "")
                 if tag in ["Web", "Methodology", "Plan"]:
-                    agent.set_addon_prompt(BUILTIN_REPLACE_MAP[tag])
+                    agent.set_addon_prompt(replace_map[tag])
                 else:
-                    user_input += BUILTIN_REPLACE_MAP[tag]
+                    user_input += replace_map[tag]
         # 移除对未知标记的警告输出
 
     return user_input, False
