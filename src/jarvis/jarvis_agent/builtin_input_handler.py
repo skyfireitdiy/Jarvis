@@ -32,18 +32,8 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         processed_tags.add(tag)
 
         if tag in replace_map:
-            if tag in ["Summary", "Clear"]:
-                # 特殊处理需要立即返回的标记
-                user_input = user_input.replace(f"'<{tag}>'", "")
-                if tag == "Summary":
-                    agent._summarize_and_clear_history()
-                elif tag == "Clear":
-                    agent.clear()
-                if not user_input.strip():
-                    return "", True
-            else:
-                # 直接替换标记为映射内容
-                user_input = user_input.replace(f"'<{tag}>'", replace_map[tag])
+            # 统一直接替换标记为映射内容
+            user_input = user_input.replace(f"'<{tag}>'", replace_map[tag])
         # 移除对未知标记的警告输出
 
     return user_input, False
