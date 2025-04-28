@@ -168,6 +168,14 @@ Jarvis支持使用特殊标记`'<tag>'`来触发命令替换功能，其中`tag`
 |------|------|
 | `'Summary'` | 总结当前会话并清空历史记录 |
 | `'Clear'` | 清空当前会话 |
+| `'CodeBase'` | 查询代码库 |
+| `'Web'` | 网页搜索 |
+| `'Methodology'` | 查找相关方法论 |
+| `'Plan'` | 生成代码修改计划 |
+| `'FindRelatedFiles'` | 查找相关文件 |
+| `'FindMethodology'` | 查找方法论 |
+| `'Dev'` | 调用create_code_agent开发需求 |
+| `'Fix'` | 修复问题 |
 
 #### 自定义替换
 可以通过在`~/.jarvis/replace_map.yaml`文件中添加自定义替换规则：
