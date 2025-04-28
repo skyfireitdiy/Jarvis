@@ -61,7 +61,7 @@ def chat_with_model(platform_name: str, model_name: str):
         platform.set_model_name(model_name)
         platform.set_suppress_output(False)
         PrettyOutput.print(f"连接到 {platform_name} 平台 {model_name} 模型", OutputType.SUCCESS)
-        PrettyOutput.print("可用命令: /bye - 退出聊天, /clear - 清除会话, /upload - 上传文件", OutputType.INFO)
+        PrettyOutput.print("可用命令: /bye - 退出聊天, /clear - 清除会话, /upload - 上传文件, /shell - 执行shell命令", OutputType.INFO)
 
         # Start conversation loop
         while True:
@@ -106,6 +106,25 @@ def chat_with_model(platform_name: str, model_name: str):
                         PrettyOutput.print("文件上传失败", OutputType.ERROR)
                 except Exception as e:
                     PrettyOutput.print(f"上传文件失败: {str(e)}", OutputType.ERROR)
+                continue
+
+            # Check if it is a shell command
+            if user_input.strip().startswith("/shell"):
+                try:
+                    command = user_input.strip()[6:].strip()
+                    if not command:
+                        PrettyOutput.print("请指定要执行的shell命令，例如: /shell ls -l", OutputType.WARNING)
+                        continue
+                    
+                    PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
+                    import subprocess
+                    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                    if result.returncode == 0:
+                        PrettyOutput.print(f"命令执行成功:\n{result.stdout}", OutputType.SUCCESS)
+                    else:
+                        PrettyOutput.print(f"命令执行失败({result.returncode}):\n{result.stderr}", OutputType.ERROR)
+                except Exception as e:
+                    PrettyOutput.print(f"执行命令失败: {str(e)}", OutputType.ERROR)
                 continue
 
             try:
