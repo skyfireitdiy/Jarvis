@@ -61,6 +61,7 @@ def chat_with_model(platform_name: str, model_name: str):
         platform.set_model_name(model_name)
         platform.set_suppress_output(False)
         PrettyOutput.print(f"连接到 {platform_name} 平台 {model_name} 模型", OutputType.SUCCESS)
+        PrettyOutput.print("可用命令: /bye - 退出聊天, /clear - 清除会话, /upload - 上传文件", OutputType.INFO)
 
         # Start conversation loop
         while True:
@@ -84,6 +85,23 @@ def chat_with_model(platform_name: str, model_name: str):
                     PrettyOutput.print("会话已清除", OutputType.SUCCESS)
                 except Exception as e:
                     PrettyOutput.print(f"清除会话失败: {str(e)}", OutputType.ERROR)
+                continue
+
+            # Check if it is an upload command
+            if user_input.strip().startswith("/upload"):
+                try:
+                    file_path = user_input.strip()[8:].strip()
+                    if not file_path:
+                        PrettyOutput.print("请指定要上传的文件路径，例如: /upload /path/to/file", OutputType.WARNING)
+                        continue
+                    
+                    PrettyOutput.print(f"正在上传文件: {file_path}", OutputType.INFO)
+                    if platform.upload_files([file_path]):
+                        PrettyOutput.print("文件上传成功", OutputType.SUCCESS)
+                    else:
+                        PrettyOutput.print("文件上传失败", OutputType.ERROR)
+                except Exception as e:
+                    PrettyOutput.print(f"上传文件失败: {str(e)}", OutputType.ERROR)
                 continue
 
             try:
