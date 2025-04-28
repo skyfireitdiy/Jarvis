@@ -1,5 +1,6 @@
 import os
 import yaml
+from functools import lru_cache
 """配置管理模块。
 
 该模块提供了获取Jarvis系统各种配置设置的函数。
@@ -9,6 +10,7 @@ import yaml
 # 输出窗口预留大小
 INPUT_WINDOW_REVERSE_SIZE = 2048
 
+@lru_cache(maxsize=None)
 def get_replace_map() -> dict:
     """
     获取替换映射表。
