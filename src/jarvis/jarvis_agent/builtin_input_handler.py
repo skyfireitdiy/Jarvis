@@ -36,6 +36,6 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 
         # 处理普通替换标记
         if tag in replace_map:
-            user_input = user_input.replace(f"'<{tag}>'", replace_map[tag])
+            user_input = user_input.replace(f"'<{tag}>'", replace_map[tag]["template"])
 
     return user_input, False

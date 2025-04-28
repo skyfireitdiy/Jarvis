@@ -135,13 +135,9 @@ class FileCompleter(Completer):
     
     def _get_description(self, tag: str) -> str:
         """获取标记的描述信息"""
-        descriptions = {
-            "CodeBase": "查询代码库",
-            "Web": "网页搜索", 
-            "Methodology": "查找相关方法论",
-            "Plan": "生成代码修改计划"
-        }
-        return descriptions.get(tag, tag)
+        if tag in self.replace_map:
+            return self.replace_map[tag].get("description", tag)
+        return tag
 def get_multiline_input(tip: str) -> str:
     """
     获取带有增强补全和确认功能的多行输入。
