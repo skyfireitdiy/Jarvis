@@ -1,6 +1,6 @@
 import os
-import yaml
 from functools import lru_cache
+import yaml
 """配置管理模块。
 
 该模块提供了获取Jarvis系统各种配置设置的函数。
