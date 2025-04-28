@@ -122,19 +122,19 @@ jarvis-methodology --help
 
 ## ⚙️ 配置说明 <a id="configuration"></a>
 ### 环境变量配置
-| 分类 | 变量名称 | 默认值 | 说明 |
-|------|----------|--------|------|
-| 核心配置 | `JARVIS_MAX_TOKEN_COUNT` | 102400000 | 上下文窗口的最大token数量 |
-| 核心配置 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
-| 核心配置 | `JARVIS_AUTO_COMPLETE` | false | 是否启用自动完成功能（任务判定完成的时候会自动终止） |
-| 核心配置 | `JARVIS_SHELL_NAME` | bash | 系统shell名称 |
-| 核心配置 | `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
-| 核心配置 | `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
-| 核心配置 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 推理任务使用的平台 |
-| 核心配置 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 |
-| 核心配置 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
-| 核心配置 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
-| 核心配置 | `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
+| 变量名称 | 默认值 | 说明 |
+|----------|--------|------|
+| `JARVIS_MAX_TOKEN_COUNT` | 102400000 | 上下文窗口的最大token数量 |
+| `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
+| `JARVIS_AUTO_COMPLETE` | false | 是否启用自动完成功能（任务判定完成的时候会自动终止） |
+| `JARVIS_SHELL_NAME` | bash | 系统shell名称 |
+| `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
+| `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
+| `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 推理任务使用的平台 |
+| `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 |
+| `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
+| `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
+| `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
 
 
 ---
