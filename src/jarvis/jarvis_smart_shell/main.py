@@ -13,22 +13,9 @@ from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
-def execute_command(command: str) -> None:
-    """Show command and allow user to edit, then execute, Ctrl+C to cancel"""
-    try:
-        print("生成的命令 (可以编辑, 按回车执行, Ctrl+C 取消):")
-        # Pre-fill input line
-        readline.set_startup_hook(lambda: readline.insert_text(command))
-        try:
-            edited_command = input("> ")
-            if edited_command.strip():  # Ensure command is not empty
-                os.system(edited_command)
-        except KeyboardInterrupt:
-            PrettyOutput.print("执行取消", OutputType.INFO)
-        finally:
-            readline.set_startup_hook()  # Clear pre-filled
-    except Exception as e:
-        PrettyOutput.print(f"执行命令失败: {str(e)}", OutputType.WARNING)
+def print_command(command: str) -> None:
+    """Print command without execution"""
+    print(command)
 
 
 def process_request(request: str) -> Optional[str]:
@@ -145,7 +132,7 @@ Example:
 
     # 输出结果
     if command:
-        execute_command(command)  # 显示并执行命令
+        print_command(command)  # 显示并执行命令
         return 0
     else:
         return 1
