@@ -17,6 +17,7 @@ from fuzzywuzzy import process
 from colorama import Fore, Style as ColoramaStyle
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.config import get_replace_map
 def get_single_line_input(tip: str) -> str:
     """
     获取支持历史记录的单行输入。
@@ -46,6 +47,7 @@ class FileCompleter(Completer):
         self.path_completer = PathCompleter()
         self.max_suggestions = 10
         self.min_score = 10
+        self.replace_map = get_replace_map()
     def get_completions(self, document: Document, complete_event) -> Completion: # type: ignore
         """
         生成带有模糊匹配的文件路径补全建议。
@@ -74,15 +76,18 @@ class FileCompleter(Completer):
             return
         # 添加默认建议
         if not text_after_at.strip():
-            # 默认建议列表
+            # 从replace_map获取建议列表
             default_suggestions = [
-                (ot("CodeBase"), '查询代码库'),
-                (ot("Web"), '网页搜索'),
+                (ot(tag), desc) for tag, desc in [
+                    (tag, self._get_description(tag)) 
+                    for tag in self.replace_map.keys()
+                ]
+            ]
+            # 添加特殊标记
+            default_suggestions.extend([
                 (ot("Summary"), '总结'),
                 (ot("Clear"), '清除历史'),
-                (ot("Methodology"), '查找相关方法论'),
-                (ot("Plan"), '生成代码修改计划'),
-            ]
+            ])
             for name, desc in default_suggestions:
                 yield Completion(
                     text=f"'{name}'",
@@ -127,6 +132,16 @@ class FileCompleter(Completer):
                     display=display_text,
                     display_meta="File"
                 ) # type: ignore
+    
+    def _get_description(self, tag: str) -> str:
+        """获取标记的描述信息"""
+        descriptions = {
+            "CodeBase": "查询代码库",
+            "Web": "网页搜索", 
+            "Methodology": "查找相关方法论",
+            "Plan": "生成代码修改计划"
+        }
+        return descriptions.get(tag, tag)
 def get_multiline_input(tip: str) -> str:
     """
     获取带有增强补全和确认功能的多行输入。
