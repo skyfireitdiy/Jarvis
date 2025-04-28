@@ -4,12 +4,9 @@ import os
 import sys
 from typing import Optional
 
-from yaspin import yaspin
-
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_shell_name
 from jarvis.jarvis_utils.input import get_multiline_input
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
 def print_command(command: str) -> None:
@@ -83,9 +80,7 @@ Output: find . -name "*.py"
         prefix = f"Current path: {current_path}\n"
         prefix += f"Current shell: {shell}\n"
 
-        with yaspin(text="正在生成命令...", color="cyan") as spinner:
-            result = model.chat_until_success(prefix + request)
-            spinner.ok("✅ 命令生成成功")
+        result = model.chat_until_success(prefix + request)
 
         # 提取命令
         if result and isinstance(result, str):
@@ -94,8 +89,7 @@ Output: find . -name "*.py"
 
         return None
 
-    except Exception as e:
-        PrettyOutput.print(f"处理请求失败: {str(e)}", OutputType.WARNING)
+    except Exception:
         return None
 
 def main():
