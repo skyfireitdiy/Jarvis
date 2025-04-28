@@ -31,17 +31,18 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             continue
         processed_tags.add(tag)
 
+        # 优先处理特殊标记
+        if tag == "Summary":
+            user_input = user_input.replace(f"'<{tag}>'", "")
+            agent._summarize_and_clear_history()
+            return "", True
+        elif tag == "Clear":
+            user_input = user_input.replace(f"'<{tag}>'", "")
+            agent.clear()
+            return "", True
+
+        # 处理普通替换标记
         if tag in replace_map:
-            # 先执行标记替换
             user_input = user_input.replace(f"'<{tag}>'", replace_map[tag])
-            
-            # 特殊处理逻辑（独立判断）
-            if tag == "Summary":
-                agent._summarize_and_clear_history()
-            elif tag == "Clear":
-                agent.clear()
-            
-            if (tag == "Summary" or tag == "Clear") and not user_input.strip():
-                return "", True
 
     return user_input, False
