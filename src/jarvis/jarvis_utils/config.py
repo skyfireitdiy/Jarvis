@@ -49,7 +49,8 @@ def get_shell_name() -> str:
     返回：
         str: Shell名称（例如bash, zsh），默认为bash
     """
-    return os.getenv('SHELL', 'bash')
+    shell_path = os.getenv('SHELL', '/bin/bash')
+    return os.path.basename(shell_path)
 def get_normal_platform_name() -> str:
     """
     获取正常操作的平台名称。
