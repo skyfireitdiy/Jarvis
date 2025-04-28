@@ -16,6 +16,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from fuzzywuzzy import process
 from colorama import Fore, Style as ColoramaStyle
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.tag import ot
 def get_single_line_input(tip: str) -> str:
     """
     获取支持历史记录的单行输入。
@@ -74,7 +75,6 @@ class FileCompleter(Completer):
         # 添加默认建议
         if not text_after_at.strip():
             # 默认建议列表
-            from jarvis.jarvis_utils.utils import ot
             default_suggestions = [
                 (ot("CodeBase"), '查询代码库'),
                 (ot("Web"), '网页搜索'),

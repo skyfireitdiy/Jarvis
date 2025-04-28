@@ -3,7 +3,7 @@
 该模块定义了Jarvis系统内置的默认替换映射表。
 """
 
-from .utils import ot, ct
+from .tag import ot, ct
 
 BUILTIN_REPLACE_MAP = {
     "CodeBase": f"""

@@ -14,7 +14,8 @@ from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import ct, ot, init_env
+from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.tag import ot, ct
 
 
 class GitCommitTool:

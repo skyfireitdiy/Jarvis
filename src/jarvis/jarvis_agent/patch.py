@@ -15,7 +15,8 @@ from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit
 from jarvis.jarvis_utils.globals import add_read_file_record, has_read_file
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import ct, ot, get_file_line_count, user_confirm
+from jarvis.jarvis_utils.utils import get_file_line_count, user_confirm
+from jarvis.jarvis_utils.tag import ot, ct
 
 
 class PatchOutputHandler(OutputHandler):

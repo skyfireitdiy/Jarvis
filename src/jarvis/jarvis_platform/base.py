@@ -3,7 +3,8 @@ import re
 from typing import List, Tuple
 from jarvis.jarvis_utils.globals import clear_read_file_record
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import ct, ot, get_context_token_count, while_success, while_true
+from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
+from jarvis.jarvis_utils.tag import ot, ct
 
 
 class BasePlatform(ABC):

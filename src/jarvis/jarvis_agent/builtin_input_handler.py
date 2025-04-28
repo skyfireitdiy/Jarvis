@@ -23,21 +23,14 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 
     # 获取替换映射表
     replace_map = get_replace_map()
-    # 使用集合去重
-    processed_tags = set()
     # 处理每个标记
     for tag in special_tags:
-        if tag in processed_tags:
-            continue
-        processed_tags.add(tag)
 
         # 优先处理特殊标记
         if tag == "Summary":
-            user_input = user_input.replace(f"'<{tag}>'", "")
             agent._summarize_and_clear_history()
             return "", True
         elif tag == "Clear":
-            user_input = user_input.replace(f"'<{tag}>'", "")
             agent.clear()
             return "", True
 

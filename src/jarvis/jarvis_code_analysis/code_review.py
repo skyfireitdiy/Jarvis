@@ -13,7 +13,8 @@ from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import ct, ot, init_env
+from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
 
 class CodeReviewTool:
