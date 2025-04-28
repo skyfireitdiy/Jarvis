@@ -103,6 +103,7 @@ Example:
   %(prog)s "Find all Python files in the current directory"
   %(prog)s "Compress all jpg images"
   %(prog)s "Find documents modified in the last week"
+  %(prog)s install
 """)
 
     # 修改为可选参数，添加从stdin读取的支持
@@ -111,9 +112,36 @@ Example:
         nargs='?',  # 设置为可选参数
         help="描述您想要执行的操作（用自然语言描述），如果未提供则从标准输入读取"
     )
+    
+    # 添加install子命令
+    parser.add_argument(
+        "--install",
+        action="store_true",
+        help="安装fish shell的命令补全功能"
+    )
 
     # 解析参数
     args = parser.parse_args()
+
+    # 处理install命令
+    if args.install:
+        if get_shell_name() == "fish":
+            fish_func_dir = os.path.expanduser("~/.config/fish/functions/")
+            os.makedirs(fish_func_dir, exist_ok=True)
+            with open(os.path.join(fish_func_dir, "jarvis-smart-shell.fish"), "w") as f:
+                f.write("""function fish_command_not_found
+    commandline -r (jss $argv)
+end
+
+function __fish_command_not_found_handler --on-event fish_command_not_found
+    fish_command_not_found $argv
+end
+""")
+            print("Fish shell命令补全功能已安装")
+            return 0
+        else:
+            print("当前不是fish shell，无需安装")
+            return 0
 
     # 添加标准输入处理
     if not args.request:
