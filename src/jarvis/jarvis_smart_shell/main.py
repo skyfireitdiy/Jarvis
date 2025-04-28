@@ -25,7 +25,7 @@ def install_fish_completion() -> int:
         return 0
         
     # 使用fish命令检查函数是否已加载
-    check_cmd = 'type -q fish_command_not_found && echo "defined" || echo "undefined"'
+    check_cmd = 'type -q fish_command_not_found | grep fish_command_not_found && echo "defined" || echo "undefined"'
     result = os.popen(f'fish -c \'{check_cmd}\'').read().strip()
     
     if result == "defined":
