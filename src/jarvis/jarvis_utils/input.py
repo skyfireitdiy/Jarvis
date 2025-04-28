@@ -74,32 +74,35 @@ class FileCompleter(Completer):
         text_after_at = text[current_at_pos + 1:cursor_pos]
         if ' ' in text_after_at:
             return
-        # 添加默认建议
-        if not text_after_at.strip():
-            # 从replace_map获取建议列表
-            default_suggestions = [
-                (ot(tag), desc) for tag, desc in [
-                    (tag, self._get_description(tag)) 
-                    for tag in self.replace_map.keys()
-                ]
-            ]
-            # 添加特殊标记
-            default_suggestions.extend([
-                (ot("Summary"), '总结'),
-                (ot("Clear"), '清除历史'),
-            ])
-            for name, desc in default_suggestions:
-                yield Completion(
-                    text=f"'{name}'",
-                    start_position=-1,
-                    display=name,
-                    display_meta=desc
-                ) # type: ignore
-            return
+        
+
+            
         # 获取当前@之后的文本
         file_path = text_after_at.strip()
         # 计算替换长度
         replace_length = len(text_after_at) + 1
+
+        # 从replace_map获取建议列表
+        default_suggestions = [
+            (ot(tag), desc) for tag, desc in [
+                (tag, self._get_description(tag)) 
+                for tag in self.replace_map.keys()
+            ]
+        ]
+        # 添加特殊标记
+        default_suggestions.extend([
+            (ot("Summary"), '总结'),
+            (ot("Clear"), '清除历史'),
+        ])
+        for name, desc in default_suggestions:
+            yield Completion(
+                text=f"'{name}'",
+                start_position=-replace_length,
+                display=name,
+                display_meta=desc
+            ) # type: ignore
+
+
         # 使用git ls-files获取所有可能的文件
         all_files = []
         try:
