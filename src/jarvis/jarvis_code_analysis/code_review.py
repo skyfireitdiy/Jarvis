@@ -559,7 +559,7 @@ class CodeReviewTool:
 {ct("REPORT")}""",
                     output_handler=[tool_registry],
                     platform=PlatformRegistry().get_thinking_platform(),
-                    auto_complete=True
+                    auto_complete=False
                 )
                 
                 # Determine if we need to split the diff due to size
