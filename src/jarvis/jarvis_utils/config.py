@@ -23,7 +23,7 @@ def get_replace_map() -> dict:
     if not os.path.exists(replace_map_path):
         return {}
     
-    with open(replace_map_path, 'r', encoding='utf-8') as file:
+    with open(replace_map_path, 'r', encoding='utf-8', errors='ignore') as file:
         return yaml.safe_load(file) or {}
 
 def get_max_token_count() -> int:
