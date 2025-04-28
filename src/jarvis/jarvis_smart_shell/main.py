@@ -14,6 +14,51 @@ def print_command(command: str) -> None:
     print(command)
 
 
+def install_fish_completion() -> int:
+    """Install fish shell command completion if not already installed
+    
+    Returns:
+        int: 0 if success, 1 if failed
+    """
+    if get_shell_name() != "fish":
+        print("当前不是fish shell，无需安装")
+        return 0
+        
+    # 使用fish命令检查函数是否已加载
+    check_cmd = 'type -q fish_command_not_found && echo "defined" || echo "undefined"'
+    result = os.popen(f'fish -c \'{check_cmd}\'').read().strip()
+    
+    if result == "defined":
+        print("fish_command_not_found函数已加载，无需安装")
+        return 0
+        
+    config_file = os.path.expanduser("~/.config/fish/config.fish")
+    
+    # 检查文件内容是否已定义但未加载
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as config:
+            if "function fish_command_not_found" in config.read():
+                print("fish_command_not_found函数已定义但未加载，请执行: source ~/.config/fish/config.fish")
+                return 0
+                
+    # 创建config.fish文件如果不存在
+    os.makedirs(os.path.dirname(config_file), exist_ok=True)
+    
+    # 追加函数定义到config.fish
+    with open(config_file, 'a') as config:
+        config.write("""
+function fish_command_not_found
+    commandline -r (jss $argv)
+end
+
+function __fish_command_not_found_handler --on-event fish_command_not_found
+    fish_command_not_found $argv
+end
+""")
+    print("Fish shell命令补全功能已安装到config.fish，请执行: source ~/.config/fish/config.fish")
+    return 0
+
+
 def process_request(request: str) -> Optional[str]:
     """Process user request and return corresponding shell command
 
@@ -125,23 +170,7 @@ Example:
 
     # 处理install命令
     if args.install:
-        if get_shell_name() == "fish":
-            fish_func_dir = os.path.expanduser("~/.config/fish/functions/")
-            os.makedirs(fish_func_dir, exist_ok=True)
-            with open(os.path.join(fish_func_dir, "jarvis-smart-shell.fish"), "w") as f:
-                f.write("""function fish_command_not_found
-    commandline -r (jss $argv)
-end
-
-function __fish_command_not_found_handler --on-event fish_command_not_found
-    fish_command_not_found $argv
-end
-""")
-            print("Fish shell命令补全功能已安装")
-            return 0
-        else:
-            print("当前不是fish shell，无需安装")
-            return 0
+        return install_fish_completion()
 
     # 添加标准输入处理
     if not args.request:
