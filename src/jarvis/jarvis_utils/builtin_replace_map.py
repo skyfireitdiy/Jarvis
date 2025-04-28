@@ -8,6 +8,7 @@ from .tag import ot, ct
 
 BUILTIN_REPLACE_MAP = {
     "CodeBase": {
+        "append": True,
         "template": f"""
 请使用ask_codebase工具查询代码库，必须严格遵守以下工具调用格式：
 
@@ -28,6 +29,7 @@ arguments:
         "description": "查询代码库"
     },
     "Web": {
+        "append": True,
         "template": f"""
 请使用search_web工具进行网页搜索，必须严格遵守以下工具调用格式：
 
@@ -48,6 +50,7 @@ arguments:
         "description": "网页搜索"
     },
     "Methodology": {
+        "append": True,
         "template": f"""
 请使用find_methodology工具查找相关方法论，必须严格遵守以下工具调用格式：
 
@@ -68,6 +71,7 @@ arguments:
         "description": "查找相关方法论"
     },
     "Plan": {
+        "append": True,
         "template": f"""
 请使用code_plan工具生成代码修改计划，必须严格遵守以下工具调用格式：
 

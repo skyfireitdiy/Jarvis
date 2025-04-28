@@ -33,9 +33,19 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         elif tag == "Clear":
             agent.clear()
             return "", True
+        
+        processed_tag = set()
+        add_on_prompt = ""
 
         # 处理普通替换标记
         if tag in replace_map:
-            user_input = user_input.replace(f"'<{tag}>'", replace_map[tag]["template"])
+            processed_tag.add(tag)
+            if "append" in replace_map[tag] and replace_map[tag]["append"] and tag not in processed_tag:
+                user_input = user_input.replace(f"'<{tag}>'", "")
+                add_on_prompt += replace_map[tag]["template"] + "\n"
+            else:
+                user_input = user_input.replace(f"'<{tag}>'", replace_map[tag]["template"])
+
+        agent.set_addon_prompt(add_on_prompt)
 
     return user_input, False
