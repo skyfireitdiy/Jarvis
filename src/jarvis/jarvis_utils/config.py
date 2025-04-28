@@ -1,4 +1,5 @@
 import os
+import yaml
 """
 配置管理模块
 该模块提供了获取Jarvis系统各种配置设置的函数。
@@ -12,6 +13,23 @@ import os
 
 # 输出窗口预留大小
 INPUT_WINDOW_REVERSE_SIZE = 2048
+
+def get_replace_map() -> dict:
+    """
+    获取替换映射表。
+    
+    从数据目录下的replace_map.yaml文件中读取替换映射表，
+    如果文件不存在则返回空字典。
+    
+    返回:
+        dict: 替换映射表字典
+    """
+    replace_map_path = os.path.join(get_data_dir(), 'replace_map.yaml')
+    if not os.path.exists(replace_map_path):
+        return {}
+    
+    with open(replace_map_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f) or {}
 
 def get_max_token_count() -> int:
     """
