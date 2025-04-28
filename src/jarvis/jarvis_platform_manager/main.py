@@ -118,11 +118,11 @@ def chat_with_model(platform_name: str, model_name: str):
                         continue
                     
                     PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
-                    result = subprocess.run(command, shell=True, check=False, capture_output=True, text=True)
-                    if result.returncode == 0:
-                        PrettyOutput.print(f"命令执行成功:\n{result.stdout}", OutputType.SUCCESS)
+                    return_code = os.system(command)
+                    if return_code == 0:
+                        PrettyOutput.print("命令执行完成", OutputType.SUCCESS)
                     else:
-                        PrettyOutput.print(f"命令执行失败({result.returncode}):\n{result.stderr}", OutputType.ERROR)
+                        PrettyOutput.print(f"命令执行失败(返回码: {return_code})", OutputType.ERROR)
                 except Exception as ex:
                     PrettyOutput.print(f"执行命令失败: {str(ex)}", OutputType.ERROR)
                 continue
