@@ -1,6 +1,5 @@
 import re
 from typing import Any, Tuple
-from jarvis.jarvis_utils.utils import ot, ct
 from jarvis.jarvis_utils.config import get_replace_map
 
 
@@ -43,12 +42,9 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 if not user_input.strip():
                     return "", True
             else:
-                # 使用预定义的模板
+                # 统一使用预定义的模板
                 user_input = user_input.replace(f"'<{tag}>'", "")
-                if tag in ["Web", "Methodology", "Plan"]:
-                    agent.set_addon_prompt(replace_map[tag])
-                else:
-                    user_input += replace_map[tag]
+                user_input += replace_map[tag]
         # 移除对未知标记的警告输出
 
     return user_input, False
