@@ -6,10 +6,6 @@
 from .utils import ot, ct
 
 BUILTIN_REPLACE_MAP = {
-    # 内置默认替换规则
-    # 格式: {"原始文本": "替换文本"}
-    "example": "demo",
-    "sample": "template",
     "CodeBase": f"""
 请使用ask_codebase工具查询代码库，必须严格遵守以下工具调用格式：
 
