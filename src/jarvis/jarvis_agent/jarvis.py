@@ -114,6 +114,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
     parser.add_argument('-p', '--platform', type=str, help='Platform to use')
     parser.add_argument('-m', '--model', type=str, help='Model to use')
+    parser.add_argument('-t', '--task', type=str, help='Directly input task content from command line')
     args = parser.parse_args()
 
     try:
@@ -125,6 +126,11 @@ def main() -> None:
             output_handler=[ToolRegistry(), PatchOutputHandler()],
             need_summary=False
         )
+
+        # 优先处理命令行直接传入的任务
+        if args.task:
+            agent.run(args.task)
+            sys.exit(0)
 
         tasks = _load_tasks()
         if tasks and (selected_task := _select_task(tasks)):
