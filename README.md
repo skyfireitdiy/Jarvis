@@ -15,6 +15,7 @@
 [扩展开发](#extensions) •
 [贡献指南](#contributing) •
 [许可证](#license) •
+[Wiki文档](https://deepwiki.com/skyfireitdiy/Jarvis)
 </div>
 
 ---
