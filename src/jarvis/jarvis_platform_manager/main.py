@@ -1,3 +1,4 @@
+import subprocess
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import asyncio
 from fastapi import FastAPI, HTTPException
@@ -117,14 +118,13 @@ def chat_with_model(platform_name: str, model_name: str):
                         continue
                     
                     PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
-                    import subprocess
-                    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                    result = subprocess.run(command, shell=True, check=False, capture_output=True, text=True)
                     if result.returncode == 0:
                         PrettyOutput.print(f"命令执行成功:\n{result.stdout}", OutputType.SUCCESS)
                     else:
                         PrettyOutput.print(f"命令执行失败({result.returncode}):\n{result.stderr}", OutputType.ERROR)
-                except Exception as e:
-                    PrettyOutput.print(f"执行命令失败: {str(e)}", OutputType.ERROR)
+                except Exception as ex:
+                    PrettyOutput.print(f"执行命令失败: {str(ex)}", OutputType.ERROR)
                 continue
 
             try:
