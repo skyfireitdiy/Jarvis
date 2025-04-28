@@ -616,9 +616,8 @@ class CodeReviewTool:
                         complete_prompt = user_prompt + "\n\n代码差异内容:\n```diff\n" + diff_output + "\n```"
                     
                     # Run the agent with the prompt
-                    with yaspin(text="正在分析代码变更...", color="cyan") as spinner:
-                        result = agent.run(complete_prompt)
-                        spinner.ok("✅")
+                    
+                    result = agent.run(complete_prompt)                    
                 finally:
                     # Clean up the temporary file
                     if os.path.exists(temp_file_path):
