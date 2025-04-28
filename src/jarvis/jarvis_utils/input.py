@@ -136,7 +136,7 @@ class FileCompleter(Completer):
     def _get_description(self, tag: str) -> str:
         """获取标记的描述信息"""
         if tag in self.replace_map:
-            return self.replace_map[tag].get("description", tag)
+            return self.replace_map[tag].get("description", tag) + "(Append)" if "append" in self.replace_map[tag] and self.replace_map[tag]["append"] else "(Replace)"
         return tag
 def get_multiline_input(tip: str) -> str:
     """
