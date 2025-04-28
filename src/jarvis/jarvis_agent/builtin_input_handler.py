@@ -42,9 +42,8 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 if not user_input.strip():
                     return "", True
             else:
-                # 统一使用预定义的模板
-                user_input = user_input.replace(f"'<{tag}>'", "")
-                user_input += replace_map[tag]
+                # 直接替换标记为映射内容
+                user_input = user_input.replace(f"'<{tag}>'", replace_map[tag])
         # 移除对未知标记的警告输出
 
     return user_input, False
