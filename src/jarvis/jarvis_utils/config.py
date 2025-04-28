@@ -1,6 +1,7 @@
 import os
 from functools import lru_cache
 import yaml
+from .builtin_replace_map import BUILTIN_REPLACE_MAP
 """配置管理模块。
 
 该模块提供了获取Jarvis系统各种配置设置的函数。
@@ -16,17 +17,18 @@ def get_replace_map() -> dict:
     获取替换映射表。
     
     从数据目录下的replace_map.yaml文件中读取替换映射表，
-    如果文件不存在则返回空字典。
+    如果文件不存在则返回内置替换映射表。
     
     返回:
-        dict: 替换映射表字典
+        dict: 合并后的替换映射表字典(内置+文件中的映射表)
     """
     replace_map_path = os.path.join(get_data_dir(), 'replace_map.yaml')
     if not os.path.exists(replace_map_path):
-        return {}
+        return BUILTIN_REPLACE_MAP.copy()
     
     with open(replace_map_path, 'r', encoding='utf-8', errors='ignore') as file:
-        return yaml.safe_load(file) or {}
+        file_map = yaml.safe_load(file) or {}
+        return {**BUILTIN_REPLACE_MAP, **file_map}
 
 def get_max_token_count() -> int:
     """
