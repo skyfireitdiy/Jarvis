@@ -136,6 +136,7 @@ jarvis-methodology --help
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
 | `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
+| `JARVIS_CODE_EMBEDDING_MODEL_SIZE` | small | 代码嵌入模型大小，可选值：small、large |
 
 
 ---

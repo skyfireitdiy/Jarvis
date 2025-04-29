@@ -29,6 +29,11 @@ setup(
         "sseclient==0.0.27",
         "pillow==10.2.0",
     ],
+    extras_require={
+        "dev": ["pytest", "black", "isort", "mypy", "build", "twine"],
+        "gpu": ["flash_attn==2.5.6", "faiss-gpu==1.7.0"],
+        "cpu": ["faiss-cpu==1.7.0"],
+    },
     entry_points={
         "console_scripts": [
             "jarvis=jarvis.jarvis_agent.jarvis:main",

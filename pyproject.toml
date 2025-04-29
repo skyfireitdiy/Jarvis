@@ -45,7 +45,9 @@ dependencies = [
 requires-python = ">=3.8"
 
 [project.optional-dependencies]
-dev = ["pytest", "black", "isort", "mypy"]
+dev = ["pytest", "black", "isort", "mypy", "build", "twine"]
+gpu = ["flash_attn==2.5.6", "faiss-gpu==1.7.0"]
+cpu = ["faiss-cpu==1.7.0"]
 
 [project.urls]
 Homepage = "https://github.com/skyfireitdiy/Jarvis"
