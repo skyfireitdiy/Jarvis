@@ -31,8 +31,9 @@ setup(
     ],
     extras_require={
         "dev": ["pytest", "black", "isort", "mypy", "build", "twine"],
-        "gpu": ["flash_attn==2.5.6", "faiss-gpu==1.7.0"],
-        "cpu": ["faiss-cpu==1.7.0"],
+        "gpu_flash_attn": ["ninja==1.11.1.4" ,"flash_attn==2.5.6"],
+        "gpu": ["faiss-gpu==1.7.2", "numpy<2"],
+        "cpu": ["faiss-cpu==1.7.2"],
     },
     entry_points={
         "console_scripts": [

@@ -815,7 +815,7 @@ class CodeVectorDB:
                     flat_index = self.index
                 
                 # 获取存储的向量
-                xb = faiss.vector_to_array(flat_index.xb).reshape(flat_index.ntotal, flat_index.d)
+                xb = faiss.vector_to_array(flat_index.xb).reshape(flat_index.ntotal, flat_index.d) # type: ignore
                 
                 # 确保ID在范围内
                 if vector_id < xb.shape[0]:

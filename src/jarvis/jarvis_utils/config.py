@@ -150,7 +150,7 @@ def get_code_embeding_model_name() -> str:
     返回：
         str: 代码嵌入模型名称，默认为'Qodo/Qodo-Embed-1-7B'
     """
-    return 'Qodo/Qodo-Embed-1-1.5B' if os.getenv('JARVIS_CODE_EMBEDDING_MODEL_SIZE', 'small') == 'large' else 'Qodo/Qodo-Embed-1-7B'
+    return 'Qodo/Qodo-Embed-1-7B' if os.getenv('JARVIS_CODE_EMBEDDING_MODEL_SIZE', 'large') == 'large' else 'Qodo/Qodo-Embed-1-1.5B'
 
 def get_code_embeding_model_dimension() -> int:
     """
@@ -159,4 +159,4 @@ def get_code_embeding_model_dimension() -> int:
     返回：
         int: 代码嵌入模型维度，默认为3584
     """
-    return 3584 if os.getenv('JARVIS_CODE_EMBEDDING_MODEL_SIZE', 'small') == 'large' else 1536
+    return 3584 if os.getenv('JARVIS_CODE_EMBEDDING_MODEL_SIZE', 'large') == 'large' else 1536

@@ -14,4 +14,4 @@ tags
 logs
 patches*
 .venv
-
+build
