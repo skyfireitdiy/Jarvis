@@ -16,6 +16,7 @@ import functools
 import torch
 from pathlib import Path
 import time
+import subprocess
 
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.config import get_code_embeding_model_dimension, get_code_embeding_model_name, get_data_dir
@@ -599,6 +600,63 @@ class CodeVectorDB:
             PrettyOutput.print(f"检测文件类型时出错 {file_path}: {str(e)}", OutputType.WARNING)
             return False
     
+    def _is_file_git_tracked(self, file_path: str) -> bool:
+        """
+        检查文件是否被Git追踪。
+
+        Args:
+            file_path: 文件路径
+
+        Returns:
+            bool: 如果文件被Git追踪返回True，否则返回False
+        """
+        try:
+            # 使用git ls-files检查文件是否被追踪
+            result = subprocess.run(
+                ['git', 'ls-files', '--error-unmatch', file_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False  # 不要在命令失败时抛出异常
+            )
+            # 返回码为0表示文件被Git追踪
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def _is_in_git_repo(self, directory: str) -> bool:
+        """
+        检查目录是否在Git仓库中。
+
+        Args:
+            directory: 目录路径
+
+        Returns:
+            bool: 如果目录在Git仓库中返回True，否则返回False
+        """
+        try:
+            # 获取当前工作目录
+            original_dir = os.getcwd()
+            
+            try:
+                # 切换到目标目录
+                os.chdir(directory)
+                
+                # 检查是否在Git仓库中
+                result = subprocess.run(
+                    ['git', 'rev-parse', '--is-inside-work-tree'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False  # 不要在命令失败时抛出异常
+                )
+                
+                # 输出为"true"表示在Git仓库中
+                return result.returncode == 0 and result.stdout.strip() == b'true'
+            finally:
+                # 切回原始目录
+                os.chdir(original_dir)
+        except Exception:
+            return False
+
     def add_directory(self, directory_path: str, include_hidden: bool = False, 
                     recursive: bool = True, model_name: str = get_code_embeding_model_name()) -> Dict[str, List[int]]:
         """
@@ -616,10 +674,16 @@ class CodeVectorDB:
         if not os.path.isdir(directory_path):
             raise ValueError(f"{directory_path} 不是有效的目录")
         
+        # 检查是否在Git仓库中
+        is_git_directory = self._is_in_git_repo(directory_path)
+        if is_git_directory:
+            PrettyOutput.print(f"检测到Git仓库，将只处理Git追踪的文件", OutputType.INFO)
+        
         # 收集所有文件
         files_to_process = []
         skipped_binary_files = 0
         skipped_hidden_files = 0
+        skipped_non_git_files = 0
         
         def should_process_file(file_path: str) -> bool:
             """判断是否应该处理该文件"""
@@ -628,6 +692,12 @@ class CodeVectorDB:
             if not include_hidden and file_name.startswith('.'):
                 nonlocal skipped_hidden_files
                 skipped_hidden_files += 1
+                return False
+                
+            # 如果在Git仓库中，检查文件是否被Git追踪
+            if is_git_directory and not self._is_file_git_tracked(file_path):
+                nonlocal skipped_non_git_files
+                skipped_non_git_files += 1
                 return False
                 
             # 检查是否文本文件
@@ -660,6 +730,8 @@ class CodeVectorDB:
             PrettyOutput.print(f"跳过了 {skipped_binary_files} 个二进制文件", OutputType.INFO)
         if skipped_hidden_files > 0:
             PrettyOutput.print(f"跳过了 {skipped_hidden_files} 个隐藏文件", OutputType.INFO)
+        if skipped_non_git_files > 0:
+            PrettyOutput.print(f"跳过了 {skipped_non_git_files} 个非Git追踪文件", OutputType.INFO)
         
         # 处理文件
         results = {}
