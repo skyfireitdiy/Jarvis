@@ -33,6 +33,8 @@ try:
 except ImportError:
     PrettyOutput.print("flash-attn库未安装或无法加载，将使用标准注意力机制", OutputType.DEBUG)
 
+# 设置PyTorch内存管理
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True,max_split_size_mb:128'
 
 class CodeEmbedding:
     """Class for generating embeddings for code files using Qodo-Embed-1-7B model."""
@@ -59,10 +61,21 @@ class CodeEmbedding:
         # 加载分词器和模型
         self.tokenizer, self.model = load_model_and_tokenizer(model_name, self.device)
         
-        # 设置模型的最大上下文窗口大小 - 稍微减小以保证安全
-        self.max_tokens = 32758  # 32768 - 10 for safety margin
+        # 设置模型的最大上下文窗口大小 - 减小以节省内存
+        self.max_tokens = 8192  # 减小上下文窗口大小
         # 嵌入向量维度
         self.embedding_dim = dimension
+        
+        # 启用梯度检查点以节省内存
+        if hasattr(self.model, 'gradient_checkpointing_enable'):
+            self.model.gradient_checkpointing_enable()
+        
+        # 设置模型为评估模式
+        self.model.eval()
+        
+        # 如果使用CUDA，清理缓存
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
     
     def _last_token_pool(self, last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
         """
@@ -199,80 +212,79 @@ class CodeEmbedding:
         if len(code_chunks) > 1 and self.device == "cpu":
             PrettyOutput.print(f"警告: 在CPU上处理{len(code_chunks)}个代码块，这可能会很慢", OutputType.WARNING)
         
-        for i, chunk in enumerate(code_chunks):
-            try:
-                # Log chunk info
-                chunk_tokens = len(self.tokenizer.encode(chunk, add_special_tokens=True))
-                PrettyOutput.print(f"处理代码块 {i+1}/{len(code_chunks)}, token数: {chunk_tokens}", OutputType.DEBUG)
-                
-                if chunk_tokens > self.max_tokens:
-                    PrettyOutput.print(f"警告: 代码块 {i+1} token数 ({chunk_tokens}) 超过最大限制 ({self.max_tokens})", 
-                                    OutputType.WARNING)
-                
-                # Use a very safe max_length to avoid any possibility of exceeding the limit
-                safe_max_length = self.max_tokens - 10  # Extra safe margin
-                
-                # Tokenize the chunk - ensure truncation is enforced
-                inputs = self.tokenizer(chunk, return_tensors="pt", truncation=True, 
-                                       max_length=safe_max_length)
-                
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-                
-                # Generate embeddings
-                with torch.no_grad():
+        # 使用torch.no_grad()上下文管理器
+        with torch.no_grad():
+            for i, chunk in enumerate(code_chunks):
+                try:
+                    # 清理GPU缓存
+                    if self.device == "cuda":
+                        torch.cuda.empty_cache()
+                    
+                    # Tokenize the chunk
+                    inputs = self.tokenizer(chunk, return_tensors="pt", truncation=True, max_length=self.max_tokens)
+                    inputs = {k: v.to(self.device) for k, v in inputs.items()}
+                    
+                    # Generate embeddings
                     outputs = self.model(**inputs)
-                
-                # Extract embeddings
-                attention_mask_tensor = cast(Tensor, inputs['attention_mask'])
-                embedding = self._last_token_pool(outputs.last_hidden_state, attention_mask_tensor)
-                
-                # Normalize if required
-                if normalize:
-                    embedding = F.normalize(embedding, p=2, dim=1)
-                
-                # Move to CPU
-                embeddings.append(embedding.cpu())
-                
-                # 如果有多个块，显示进度
-                if len(code_chunks) > 1 and (i+1) % 5 == 0:
-                    PrettyOutput.print(f"已处理 {i+1}/{len(code_chunks)} 个代码块", OutputType.INFO)
-                
-            except RuntimeError as e:
-                if "CUDA out of memory" in str(e):
-                    PrettyOutput.print(f"CUDA内存不足，尝试在CPU上处理此块", OutputType.WARNING)
-                    # 尝试在CPU上处理
-                    try:
-                        # 将模型临时移到CPU
-                        original_device = next(self.model.parameters()).device
-                        # 转换模型到CPU
-                        model_cpu = cast(PreTrainedModel, self.model.cpu())
+                    
+                    # Extract embeddings
+                    attention_mask_tensor = cast(Tensor, inputs['attention_mask'])
+                    embedding = self._last_token_pool(outputs.last_hidden_state, attention_mask_tensor)
+                    
+                    # Normalize if required
+                    if normalize:
+                        embedding = F.normalize(embedding, p=2, dim=1)
+                    
+                    # Move to CPU and detach
+                    embedding = embedding.cpu().detach()
+                    embeddings.append(embedding)
+                    
+                    # 清理GPU缓存
+                    if self.device == "cuda":
+                        torch.cuda.empty_cache()
+                    
+                    # 显示进度
+                    if (i + 1) % 5 == 0 or (i + 1) == len(code_chunks):
+                        PrettyOutput.print(f"已处理 {i + 1}/{len(code_chunks)} 个代码块", OutputType.INFO)
                         
-                        # Use the same very safe max_length
-                        inputs = self.tokenizer(chunk, return_tensors="pt", truncation=True, 
-                                             max_length=safe_max_length)
-                        
-                        with torch.no_grad():
-                            outputs = model_cpu(**inputs)
-                        
-                        attention_mask_tensor = cast(Tensor, inputs['attention_mask'])
-                        embedding = self._last_token_pool(outputs.last_hidden_state, attention_mask_tensor)
-                        
-                        if normalize:
-                            embedding = F.normalize(embedding, p=2, dim=1)
-                        
-                        embeddings.append(embedding)
-                        
-                        # 将模型移回原来的设备
-                        self.model = cast(PreTrainedModel, model_cpu.to(original_device))
-                    except Exception as cpu_e:
-                        PrettyOutput.print(f"在CPU上处理也失败: {str(cpu_e)}", OutputType.ERROR)
+                except RuntimeError as e:
+                    if "CUDA out of memory" in str(e):
+                        PrettyOutput.print(f"CUDA内存不足，尝试在CPU上处理此块", OutputType.WARNING)
+                        # 尝试在CPU上处理
+                        try:
+                            # 将模型临时移到CPU
+                            original_device = next(self.model.parameters()).device
+                            self.model = cast(PreTrainedModel, self.model.cpu())
+                            
+                            # 重新处理输入
+                            inputs = {k: v.cpu() for k, v in inputs.items()}
+                            outputs = self.model(**inputs)
+                            
+                            # 提取嵌入
+                            attention_mask_tensor = cast(Tensor, inputs['attention_mask'])
+                            embedding = self._last_token_pool(outputs.last_hidden_state, attention_mask_tensor)
+                            
+                            if normalize:
+                                embedding = F.normalize(embedding, p=2, dim=1)
+                            
+                            embeddings.append(embedding.cpu().detach())
+                            
+                            # 将模型移回原来的设备
+                            self.model = cast(PreTrainedModel, self.model.to(original_device))
+                            
+                            # 清理GPU缓存
+                            if self.device == "cuda":
+                                torch.cuda.empty_cache()
+                                
+                        except Exception as cpu_e:
+                            PrettyOutput.print(f"在CPU上处理也失败: {str(cpu_e)}", OutputType.ERROR)
+                            raise
+                    else:
+                        PrettyOutput.print(f"处理代码块时出错: {str(e)}", OutputType.ERROR)
                         raise
-                else:
+                except Exception as e:
                     PrettyOutput.print(f"处理代码块时出错: {str(e)}", OutputType.ERROR)
                     raise
-            except Exception as e:
-                PrettyOutput.print(f"处理代码块时出错: {str(e)}", OutputType.ERROR)
-                raise
         
         return embeddings
     
@@ -403,7 +415,7 @@ def embed_file(file_path: str, model_name: str, dimension: int,  normalize: bool
     Returns:
         List[torch.Tensor]: 文件代码块的嵌入向量列表
     """
-    embedder = CodeEmbedding(model_name=model_name, dimension=dimension)
+    embedder = CodeEmbedding(model_name, dimension)
     return embedder.embed_file(file_path, normalize)
 
 
@@ -417,7 +429,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     file_path = sys.argv[1]
-    embeddings = embed_file(file_path, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension())
+    embeddings = embed_file(file_path, get_code_embeding_model_name(), get_code_embeding_model_dimension())
     
     print(f"为 {file_path} 生成了 {len(embeddings)} 个嵌入向量")
     for i, embedding in enumerate(embeddings):

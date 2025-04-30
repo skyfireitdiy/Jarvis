@@ -410,7 +410,7 @@ class CodeVectorDB:
             else:
                 # 没有缓存，生成文件的嵌入向量
                 PrettyOutput.print(f"生成文件的嵌入向量: {file_path}", OutputType.INFO)
-                embeddings = embed_file(file_path, model_name=model_name, dimension=dimension)
+                embeddings = embed_file(file_path, model_name, dimension)
                 
                 # 缓存嵌入向量
                 self.embedding_cache.put(file_path, model_name, embeddings)
@@ -516,7 +516,7 @@ class CodeVectorDB:
             List[Dict[str, Any]]: List of results with metadata and scores
         """
         # 创建临时CodeEmbedding实例
-        embedder = CodeEmbedding(model_name=model_name, dimension=dimension)
+        embedder = CodeEmbedding(model_name, dimension)
         
         # 生成查询文本的嵌入向量
         query_embeddings = embedder.embed_code(query_text)
@@ -541,7 +541,7 @@ class CodeVectorDB:
             List[Dict[str, Any]]: List of results with metadata and scores
         """
         # 生成文件的嵌入向量
-        query_embeddings = embed_file(file_path, model_name=model_name, dimension=dimension)
+        query_embeddings = embed_file(file_path, model_name, dimension)
         
         # 使用第一个嵌入向量进行搜索
         if query_embeddings:
@@ -769,7 +769,7 @@ class CodeVectorDB:
                 
                 # 处理文件
                 PrettyOutput.print(f"处理文件 ({i+1}/{len(files_to_process)}): {file_path}", OutputType.INFO)
-                ids = self.add_file(file_path, model_name=model_name, dimension=dimension)
+                ids = self.add_file(file_path, model_name, dimension)
                 results[file_path] = ids
                 
             except Exception as e:
@@ -978,20 +978,20 @@ if __name__ == "__main__":
         if args.command == "add":
             path = os.path.abspath(args.path)
             if os.path.isfile(path):
-                ids = db.add_file(path, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension())
+                ids = db.add_file(path, get_code_embeding_model_name(), get_code_embeding_model_dimension())
                 db.save()
                 print(f"已将文件 {path} 添加到数据库，ID: {ids}")
             elif os.path.isdir(path):
-                results = db.add_directory(path, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension(), include_hidden=args.include_hidden, recursive=args.recursive)
+                results = db.add_directory(path, get_code_embeding_model_name(), get_code_embeding_model_dimension(), include_hidden=args.include_hidden, recursive=args.recursive)
                 print(f"已将目录 {path} 中的 {len(results)} 个文件添加到数据库")
             else:
                 print(f"路径 {path} 无效")
                 
         elif args.command == "search":
             if args.is_file and os.path.isfile(args.query):
-                results = db.search_by_file(args.query, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension(), top_k=args.top_k)
+                results = db.search_by_file(args.query, get_code_embeding_model_name(), get_code_embeding_model_dimension(), top_k=args.top_k)
             else:
-                results = db.search_by_text(args.query, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension(), top_k=args.top_k)
+                results = db.search_by_text(args.query, get_code_embeding_model_name(), get_code_embeding_model_dimension(), top_k=args.top_k)
                 
             print(f"找到 {len(results)} 个结果:")
             for i, result in enumerate(results):

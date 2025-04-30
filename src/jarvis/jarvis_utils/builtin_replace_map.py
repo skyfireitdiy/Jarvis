@@ -4,7 +4,7 @@
 格式: {"标记名": {"template": "替换模板", "description": "描述信息"}}
 """
 
-from .tag import ot, ct
+from jarvis.jarvis_utils.tag import ot, ct
 
 BUILTIN_REPLACE_MAP = {
     "CodeBase": {

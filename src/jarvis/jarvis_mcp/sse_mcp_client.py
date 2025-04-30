@@ -1,12 +1,11 @@
-from typing import Any, Dict, List, Optional, Iterator, Callable
+from typing import Any, Dict, List, Callable
 import requests
 import json
 import threading
 import time
-import uuid
 from urllib.parse import urljoin, urlencode, parse_qs
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from . import McpClient
+from jarvis.jarvis_mcp import McpClient
 
 
 class SSEMcpClient(McpClient):

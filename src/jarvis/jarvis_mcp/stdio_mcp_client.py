@@ -3,7 +3,7 @@ import subprocess
 import os
 import json
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from . import McpClient
+from jarvis.jarvis_mcp import McpClient
 
 
 class StdioMcpClient(McpClient):
