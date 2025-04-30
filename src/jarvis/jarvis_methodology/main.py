@@ -113,6 +113,94 @@ def extract_methodology(input_file):
 5. 确保YAML缩进正确
 6. 内容字段使用|保留多行格式
 """
+
+def extract_methodology_from_url(url):
+    """从URL提取方法论"""
+    try:
+        # 获取平台实例
+        platform = PlatformRegistry().get_normal_platform()
+        
+        # 构建提取提示
+        prompt = f"""请从以下URL内容中提取方法论：
+        
+{url}
+
+请按以下格式返回结果：
+<methodologies>
+- problem_type: [问题类型1]
+  content: |
+    [多行方法论内容1]
+- problem_type: [问题类型2]
+  content: |
+    [多行方法论内容2]
+</methodologies>
+
+要求：
+1. 方法论应聚焦于通用且可重复的解决方案流程
+2. 方法论应该具备足够的通用性，可应用于同类问题
+3. 方法论内容应包含：
+   - 问题重述: 简明扼要的问题归纳
+   - 最优解决方案: 经过验证的解决方案
+   - 注意事项: 执行中可能遇到的问题
+   - 可选步骤: 多种解决路径和适用场景
+4. 在<methodologies>标签中直接使用YAML列表
+5. 确保YAML缩进正确
+6. 内容字段使用|保留多行格式
+"""
+        # 调用大模型平台提取方法论
+        with yaspin(text="正在从URL提取方法论...", color="yellow") as spinner:
+            response = platform.chat_until_success(prompt)
+            
+            # 提取YAML部分
+            methodologies_start = response.find('<methodologies>') + len('<methodologies>')
+            methodologies_end = response.find('</methodologies>')
+            if methodologies_start == -1 or methodologies_end == -1:
+                spinner.text = "响应格式无效"
+                spinner.fail("❌")
+                PrettyOutput.print("大模型未返回有效的<methodologies>格式", OutputType.ERROR)
+                return
+                
+            yaml_content = response[methodologies_start:methodologies_end].strip()
+            
+            try:
+                data = yaml.safe_load(yaml_content)
+                extracted_methodologies = {
+                    item['problem_type']: item['content']
+                    for item in data
+                }
+            except (yaml.YAMLError, KeyError, TypeError) as e:
+                spinner.text = "YAML解析失败"
+                spinner.fail("❌")
+                PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
+                return
+
+            if not extracted_methodologies:
+                spinner.text = "未提取到有效方法论"
+                spinner.fail("❌")
+                return
+            spinner.ok("✅")
+
+        # 加载现有方法论
+        existing_methodologies = _load_all_methodologies()
+
+        # 合并方法论（新数据会覆盖旧数据）
+        merged_data = {**existing_methodologies, **extracted_methodologies}
+
+        # 保存合并后的方法论
+        methodology_dir = _get_methodology_directory()
+        for problem_type, content in merged_data.items():
+            safe_filename = hashlib.md5(problem_type.encode('utf-8')).hexdigest()
+            file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "problem_type": problem_type,
+                    "content": content
+                }, f, ensure_ascii=False, indent=2)
+
+        PrettyOutput.print(f"成功从URL提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）", OutputType.SUCCESS)
+    except Exception as e:
+        PrettyOutput.print(f"从URL提取失败: {str(e)}", OutputType.ERROR)
         # 调用大模型平台提取方法论
         with yaspin(text="正在提取方法论...", color="yellow") as spinner:
             response = platform.chat_until_success(prompt)
@@ -188,6 +276,10 @@ def main():
     extract_parser = subparsers.add_parser("extract", help="从文本文件中提取方法论")
     extract_parser.add_argument("input_file", type=str, help="要提取方法论的文本文件路径")
 
+    # extract-url命令
+    extract_url_parser = subparsers.add_parser("extract-url", help="从URL提取方法论")
+    extract_url_parser.add_argument("url", type=str, help="要提取方法论的URL")
+
     args = parser.parse_args()
 
     if args.command == "import":
@@ -198,6 +290,8 @@ def main():
         list_methodologies()
     elif args.command == "extract":
         extract_methodology(args.input_file)
+    elif args.command == "extract-url":
+        extract_methodology_from_url(args.url)
 
 if __name__ == "__main__":
     main()
