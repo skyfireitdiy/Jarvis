@@ -616,16 +616,14 @@ class ToolRegistry(OutputHandler):
                 if platform:
                     platform.set_suppress_output(False)
                     try:
-                        platform.upload_files([output_file])
-                    except Exception as e:
-                        # 上传失败时截取输出的前30行和后30行
-                        with open(output_file, 'r') as f:
-                            lines = f.readlines()
-                            if len(lines) > 60:
+                        if not platform.upload_files([output_file]):
+                            # 上传失败时直接使用已有output变量
+                            if len(output.splitlines()) > 60:
+                                lines = output.splitlines()
                                 truncated = lines[:30] + ['\n...内容太长，已截取前后30行...\n'] + lines[-30:]
-                                output = ''.join(truncated)
-                            else:
-                                output = ''.join(lines)
+                                output = '\n'.join(truncated)
+                            return f"文件上传失败\n\n{output}"
+                    except Exception as e:
                         return f"文件上传失败: {str(e)}\n\n{output}"
                 prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
                 return f"""工具调用原始输出过长，以下是根据输出提出的信息：
