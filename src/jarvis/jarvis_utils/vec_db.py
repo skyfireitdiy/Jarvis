@@ -21,6 +21,7 @@ import subprocess
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.config import get_code_embeding_model_dimension, get_code_embeding_model_name, get_data_dir
 from jarvis.jarvis_utils.code_embeding import embed_file, CodeEmbedding
+from jarvis.jarvis_utils.utils import init_env
 
 # 检查是否可以使用faiss
 _HAS_FAISS = False
@@ -232,7 +233,7 @@ def get_embedding_cache() -> EmbeddingCache:
 class CodeVectorDB:
     """A vector database for code embeddings using FAISS."""
     
-    def __init__(self, db_path: Optional[str] = None, dimension: int = get_code_embeding_model_dimension()):
+    def __init__(self, dimension: int, db_path: Optional[str] = None):
         """
         Initialize the vector database.
         
@@ -386,7 +387,7 @@ class CodeVectorDB:
         
         return ids
     
-    def add_file(self, file_path: str, model_name: str = get_code_embeding_model_name()) -> List[int]:
+    def add_file(self, file_path: str, model_name: str, dimension: int) -> List[int]:
         """
         Add a file to the database by generating its embeddings.
         
@@ -409,7 +410,7 @@ class CodeVectorDB:
             else:
                 # 没有缓存，生成文件的嵌入向量
                 PrettyOutput.print(f"生成文件的嵌入向量: {file_path}", OutputType.INFO)
-                embeddings = embed_file(file_path, normalize=True, model_name=model_name)
+                embeddings = embed_file(file_path, model_name=model_name, dimension=dimension)
                 
                 # 缓存嵌入向量
                 self.embedding_cache.put(file_path, model_name, embeddings)
@@ -502,7 +503,7 @@ class CodeVectorDB:
         
         return results
     
-    def search_by_text(self, query_text: str, top_k: int = 5, model_name: str = get_code_embeding_model_name()) -> List[Dict[str, Any]]:
+    def search_by_text(self, query_text: str, model_name: str, dimension: int, top_k: int = 5) -> List[Dict[str, Any]]:
         """
         Search the database using a text query.
         
@@ -515,7 +516,7 @@ class CodeVectorDB:
             List[Dict[str, Any]]: List of results with metadata and scores
         """
         # 创建临时CodeEmbedding实例
-        embedder = CodeEmbedding(model_name=model_name)
+        embedder = CodeEmbedding(model_name=model_name, dimension=dimension)
         
         # 生成查询文本的嵌入向量
         query_embeddings = embedder.embed_code(query_text)
@@ -527,7 +528,7 @@ class CodeVectorDB:
             PrettyOutput.print("无法为查询文本生成嵌入向量", OutputType.ERROR)
             return []
     
-    def search_by_file(self, file_path: str, top_k: int = 5, model_name: str = get_code_embeding_model_name()) -> List[Dict[str, Any]]:
+    def search_by_file(self, file_path: str, model_name: str, dimension: int, top_k: int = 5) -> List[Dict[str, Any]]:
         """
         Search the database using a file as query.
         
@@ -540,7 +541,7 @@ class CodeVectorDB:
             List[Dict[str, Any]]: List of results with metadata and scores
         """
         # 生成文件的嵌入向量
-        query_embeddings = embed_file(file_path, normalize=True, model_name=model_name)
+        query_embeddings = embed_file(file_path, model_name=model_name, dimension=dimension)
         
         # 使用第一个嵌入向量进行搜索
         if query_embeddings:
@@ -657,8 +658,8 @@ class CodeVectorDB:
         except Exception:
             return False
 
-    def add_directory(self, directory_path: str, include_hidden: bool = False, 
-                    recursive: bool = True, model_name: str = get_code_embeding_model_name()) -> Dict[str, List[int]]:
+    def add_directory(self, directory_path: str,  model_name: str, dimension: int, include_hidden: bool = False, 
+                    recursive: bool = True,) -> Dict[str, List[int]]:
         """
         Add all text files in a directory to the database.
         
@@ -768,7 +769,7 @@ class CodeVectorDB:
                 
                 # 处理文件
                 PrettyOutput.print(f"处理文件 ({i+1}/{len(files_to_process)}): {file_path}", OutputType.INFO)
-                ids = self.add_file(file_path, model_name=model_name)
+                ids = self.add_file(file_path, model_name=model_name, dimension=dimension)
                 results[file_path] = ids
                 
             except Exception as e:
@@ -932,7 +933,7 @@ def get_default_db() -> CodeVectorDB:
     global _default_db
     if _default_db is None:
         try:
-            _default_db = CodeVectorDB()
+            _default_db = CodeVectorDB(get_code_embeding_model_dimension())
         except ImportError:
             PrettyOutput.print("无法创建向量数据库: FAISS库未安装。请运行 pip install faiss-cpu", OutputType.ERROR)
             raise
@@ -941,6 +942,8 @@ def get_default_db() -> CodeVectorDB:
 
 if __name__ == "__main__":
     import argparse
+
+    init_env()
     
     parser = argparse.ArgumentParser(description="代码向量数据库工具")
     subparsers = parser.add_subparsers(dest="command", help="命令")
@@ -975,20 +978,20 @@ if __name__ == "__main__":
         if args.command == "add":
             path = os.path.abspath(args.path)
             if os.path.isfile(path):
-                ids = db.add_file(path)
+                ids = db.add_file(path, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension())
                 db.save()
                 print(f"已将文件 {path} 添加到数据库，ID: {ids}")
             elif os.path.isdir(path):
-                results = db.add_directory(path, args.include_hidden, args.recursive)
+                results = db.add_directory(path, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension(), include_hidden=args.include_hidden, recursive=args.recursive)
                 print(f"已将目录 {path} 中的 {len(results)} 个文件添加到数据库")
             else:
                 print(f"路径 {path} 无效")
                 
         elif args.command == "search":
             if args.is_file and os.path.isfile(args.query):
-                results = db.search_by_file(args.query, args.top_k)
+                results = db.search_by_file(args.query, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension(), top_k=args.top_k)
             else:
-                results = db.search_by_text(args.query, args.top_k)
+                results = db.search_by_text(args.query, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension(), top_k=args.top_k)
                 
             print(f"找到 {len(results)} 个结果:")
             for i, result in enumerate(results):

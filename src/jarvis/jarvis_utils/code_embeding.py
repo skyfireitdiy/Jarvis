@@ -10,11 +10,12 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 import functools
-from typing import List, Union, Optional, Dict, Tuple, Any, cast
+from typing import List, Union, Optional, Dict, Tuple, cast
 from transformers import AutoTokenizer, AutoModel, PreTrainedTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.config import get_code_embeding_model_dimension, get_code_embeding_model_name, get_data_dir
+from jarvis.jarvis_utils.utils import init_env
 
 # 全局缓存，避免重复加载模型和分词器
 _global_tokenizers: Dict[str, Union[PreTrainedTokenizer, PreTrainedTokenizerFast]] = {}
@@ -36,7 +37,7 @@ except ImportError:
 class CodeEmbedding:
     """Class for generating embeddings for code files using Qodo-Embed-1-7B model."""
     
-    def __init__(self, model_name: str = get_code_embeding_model_name(), device: Optional[str] = None):
+    def __init__(self, model_name: str, dimension: int, device: Optional[str] = None):
         """
         Initialize the CodeEmbedding class.
         
@@ -61,7 +62,7 @@ class CodeEmbedding:
         # 模型支持的最大输入token数
         self.max_tokens = 32000
         # 嵌入向量维度
-        self.embedding_dim = get_code_embeding_model_dimension()
+        self.embedding_dim = dimension
     
     def _last_token_pool(self, last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
         """
@@ -311,31 +312,34 @@ def load_model_and_tokenizer(model_name: str, device: str = "cuda") -> Tuple[Uni
     return tokenizer, model
 
 
-def embed_file(file_path: str, normalize: bool = True, model_name: str = get_code_embeding_model_name()) -> List[torch.Tensor]:
+def embed_file(file_path: str, model_name: str, dimension: int,  normalize: bool = True) -> List[torch.Tensor]:
     """
     生成给定文件的代码嵌入向量，使用Qodo-Embed-1-7B模型。
     
     Args:
         file_path: 文件路径
         normalize: 是否对嵌入向量进行归一化，默认为True
-        model_name: 使用的模型名称，默认为"Qodo/Qodo-Embed-1-7B"
+        model_name: 使用的模型名称
+        dimension: 嵌入向量的维度
         
     Returns:
         List[torch.Tensor]: 文件代码块的嵌入向量列表
     """
-    embedder = CodeEmbedding(model_name=model_name)
+    embedder = CodeEmbedding(model_name=model_name, dimension=dimension)
     return embedder.embed_file(file_path, normalize)
 
 
 if __name__ == "__main__":
     import sys
+
+    init_env()
     
     if len(sys.argv) < 2:
-        print("使用方法: python code_embeding.py <文件路径>")
+        print("使用方法: python code_embeding.py <文件路径> <模型名称> <维度>")
         sys.exit(1)
     
     file_path = sys.argv[1]
-    embeddings = embed_file(file_path)
+    embeddings = embed_file(file_path, model_name=get_code_embeding_model_name(), dimension=get_code_embeding_model_dimension())
     
     print(f"为 {file_path} 生成了 {len(embeddings)} 个嵌入向量")
     for i, embedding in enumerate(embeddings):
