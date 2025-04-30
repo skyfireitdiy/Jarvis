@@ -30,10 +30,7 @@ setup(
         "pillow==10.2.0",
     ],
     extras_require={
-        "dev": ["pytest", "black", "isort", "mypy", "build", "twine"],
-        "gpu_flash_attn": ["ninja==1.11.1.4" ,"flash_attn==2.5.6"],
-        "gpu": ["faiss-gpu==1.7.2", "numpy<2"],
-        "cpu": ["faiss-cpu==1.7.2"],
+        "dev": ["pytest", "black", "isort", "mypy", "build", "twine"]
     },
     entry_points={
         "console_scripts": [
