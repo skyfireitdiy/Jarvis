@@ -59,8 +59,8 @@ class CodeEmbedding:
         # 加载分词器和模型
         self.tokenizer, self.model = load_model_and_tokenizer(model_name, self.device)
         
-        # 模型支持的最大输入token数
-        self.max_tokens = 32000
+        # 设置模型的最大上下文窗口大小 - 稍微减小以保证安全
+        self.max_tokens = 32758  # 32768 - 10 for safety margin
         # 嵌入向量维度
         self.embedding_dim = dimension
     
@@ -94,26 +94,79 @@ class CodeEmbedding:
         Returns:
             A list of text chunks.
         """
-        # Tokenize the entire text
-        tokens = self.tokenizer.encode(text, add_special_tokens=False)
+        # For very long texts, we need to avoid tokenizing the entire text at once
+        # First, split by newline to process in manageable segments
+        lines = text.split('\n')
         
-        # If the text fits within the token limit, return it as is
-        if len(tokens) <= self.max_tokens:
-            return [text]
+        # Initialize variables
+        chunks = []
+        current_chunk = ""
+        current_chunk_tokens = 0
+        # Allow a buffer of 3 tokens for safety (2 for special tokens + 1 for safety margin)
+        max_chunk_tokens = self.max_tokens - 3  
         
-        # Split the tokens into chunks
-        chunk_size = self.max_tokens - overlap
-        token_chunks = []
+        for line in lines:
+            # Tokenize this line to get its token count
+            line_tokens = len(self.tokenizer.encode(line, add_special_tokens=False))
+            
+            # If adding this line would exceed the token limit, save the current chunk and start a new one
+            if current_chunk_tokens + line_tokens > max_chunk_tokens:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = line
+                current_chunk_tokens = line_tokens
+            else:
+                # Add the line to the current chunk
+                if current_chunk:
+                    current_chunk += '\n' + line
+                else:
+                    current_chunk = line
+                current_chunk_tokens += line_tokens
         
-        for i in range(0, len(tokens), chunk_size):
-            # Make sure we don't exceed the token limit
-            end_idx = min(i + self.max_tokens, len(tokens))
-            token_chunks.append(tokens[i:end_idx])
+        # Add the last chunk if there is one
+        if current_chunk:
+            chunks.append(current_chunk)
         
-        # Convert token chunks back to text
-        text_chunks = [self.tokenizer.decode(chunk, skip_special_tokens=True) for chunk in token_chunks]
+        # If no chunks were created (e.g., empty input), return an empty list
+        if not chunks:
+            return []
+            
+        # Add some overlap between chunks if needed and possible
+        if overlap > 0 and len(chunks) > 1:
+            overlapped_chunks = [chunks[0]]
+            
+            for i in range(1, len(chunks)):
+                prev_chunk = chunks[i-1]
+                curr_chunk = chunks[i]
+                
+                # Get the last few tokens from the previous chunk to create overlap
+                # This is a simple approach - for more advanced overlap, you might
+                # want to ensure semantic boundaries are preserved
+                prev_lines = prev_chunk.split('\n')
+                overlap_text = ""
+                
+                # Add lines from the end of previous chunk until we reach desired overlap
+                j = len(prev_lines) - 1
+                overlap_token_count = 0
+                
+                while j >= 0 and overlap_token_count < overlap:
+                    line_tokens = len(self.tokenizer.encode(prev_lines[j], add_special_tokens=False))
+                    if overlap_token_count + line_tokens <= overlap:
+                        overlap_text = prev_lines[j] + ('\n' + overlap_text if overlap_text else '')
+                        overlap_token_count += line_tokens
+                    else:
+                        break
+                    j -= 1
+                
+                # Prepend overlap text to current chunk if we have any
+                if overlap_text:
+                    overlapped_chunks.append(overlap_text + '\n' + curr_chunk)
+                else:
+                    overlapped_chunks.append(curr_chunk)
+                    
+            return overlapped_chunks
         
-        return text_chunks
+        return chunks
     
     def embed_code(self, code: str, normalize: bool = True) -> List[torch.Tensor]:
         """
@@ -130,22 +183,46 @@ class CodeEmbedding:
         code_chunks = self._split_text_into_chunks(code)
         embeddings = []
         
+        # For large files, estimate total tokens instead of counting exactly
+        if len(code) > 100000:  # If file is larger than ~100KB
+            # Estimate based on a small sample
+            sample_size = min(10000, len(code))
+            sample = code[:sample_size]
+            sample_tokens = len(self.tokenizer.encode(sample, add_special_tokens=False))
+            estimated_tokens = int(sample_tokens * (len(code) / sample_size))
+            PrettyOutput.print(f"源文件预估token数: ~{estimated_tokens}, 划分为 {len(code_chunks)} 个代码块", OutputType.INFO)
+        else:
+            total_tokens = len(self.tokenizer.encode(code, add_special_tokens=False, truncation=False))
+            PrettyOutput.print(f"源文件总token数: {total_tokens}, 划分为 {len(code_chunks)} 个代码块", OutputType.INFO)
+        
         # 如果处理较大文本且在CPU上运行，提供警告
         if len(code_chunks) > 1 and self.device == "cpu":
             PrettyOutput.print(f"警告: 在CPU上处理{len(code_chunks)}个代码块，这可能会很慢", OutputType.WARNING)
         
         for i, chunk in enumerate(code_chunks):
             try:
-                # Tokenize the chunk
+                # Log chunk info
+                chunk_tokens = len(self.tokenizer.encode(chunk, add_special_tokens=True))
+                PrettyOutput.print(f"处理代码块 {i+1}/{len(code_chunks)}, token数: {chunk_tokens}", OutputType.DEBUG)
+                
+                if chunk_tokens > self.max_tokens:
+                    PrettyOutput.print(f"警告: 代码块 {i+1} token数 ({chunk_tokens}) 超过最大限制 ({self.max_tokens})", 
+                                    OutputType.WARNING)
+                
+                # Use a very safe max_length to avoid any possibility of exceeding the limit
+                safe_max_length = self.max_tokens - 10  # Extra safe margin
+                
+                # Tokenize the chunk - ensure truncation is enforced
                 inputs = self.tokenizer(chunk, return_tensors="pt", truncation=True, 
-                                       max_length=self.max_tokens)
+                                       max_length=safe_max_length)
+                
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
                 
                 # Generate embeddings
                 with torch.no_grad():
                     outputs = self.model(**inputs)
                 
-                # Extract embeddings - 确保attention_mask是Tensor类型
+                # Extract embeddings
                 attention_mask_tensor = cast(Tensor, inputs['attention_mask'])
                 embedding = self._last_token_pool(outputs.last_hidden_state, attention_mask_tensor)
                 
@@ -170,8 +247,9 @@ class CodeEmbedding:
                         # 转换模型到CPU
                         model_cpu = cast(PreTrainedModel, self.model.cpu())
                         
+                        # Use the same very safe max_length
                         inputs = self.tokenizer(chunk, return_tensors="pt", truncation=True, 
-                                             max_length=self.max_tokens)
+                                             max_length=safe_max_length)
                         
                         with torch.no_grad():
                             outputs = model_cpu(**inputs)
