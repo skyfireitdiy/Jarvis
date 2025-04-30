@@ -50,19 +50,7 @@ def install_fish_completion() -> int:
     with open(config_file, 'a') as config:
         config.write("""
 function fish_command_not_found
-    echo "请选择操作:"
-    echo "1. 修复错误命令"
-    echo "2. 生成新命令" 
-    echo "3. 取消"
-    read -P "> " choice
-    switch "$choice"
-        case "1"
-            commandline -r (jss fix (commandline -b))
-        case "2"
-            commandline -r (jss request (commandline -b))
-        case "*"
-            commandline -f repaint
-    end
+    commandline -r (jss request "$argv")
 end
 
 function __fish_command_not_found_handler --on-event fish_command_not_found
@@ -72,41 +60,6 @@ end
     print("Fish shell命令补全功能已安装到config.fish，请执行: source ~/.config/fish/config.fish")
     return 0
 
-
-def fix_command(wrong_command: str) -> Optional[str]:
-    """Fix wrong shell command and return the correct one
-    
-    Args:
-        wrong_command: The wrong command to be fixed
-        
-    Returns:
-        Optional[str]: The fixed command, or None if fixing fails
-    """
-    try:
-        model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
-        
-        system_message = """
-# 角色
-修复错误的shell命令
-
-# 规则
-1. 只输出修复后的命令
-2. 不要解释或标记
-3. 单行输出
-4. 保持原命令意图
-5. 确保修复后的命令语法正确
-"""
-        model.set_system_message(system_message)
-        
-        result = model.chat_until_success(f"Fix this wrong command: {wrong_command}")
-        
-        if result and isinstance(result, str):
-            return result.strip()
-            
-        return None
-        
-    except Exception:
-        return None
 
 def process_request(request: str) -> Optional[str]:
     """Process user request and return corresponding shell command
@@ -166,7 +119,6 @@ def main():
 Example:
   %(prog)s request "Find all Python files in the current directory"
   %(prog)s install
-  %(prog)s fix "find . -name *.py"
 """)
 
     # 创建子命令解析器
@@ -182,13 +134,7 @@ Example:
 
     # install子命令
     install_parser = subparsers.add_parser('install', help='安装fish shell的命令补全功能')
-    
-    # fix子命令
-    fix_parser = subparsers.add_parser('fix', help='修复错误的shell命令')
-    fix_parser.add_argument(
-        "wrong_command",
-        help="需要修复的错误shell命令"
-    )
+
 
     # 解析参数
     args = parser.parse_args()
@@ -198,13 +144,7 @@ Example:
     # 处理install命令
     if args.command == "install":
         return install_fish_completion()
-    # 处理fix命令
-    elif args.command == "fix":
-        fixed_command = fix_command(args.wrong_command)
-        if fixed_command:
-            execute_command(fixed_command, False)
-            return 0
-        return 1
+
     
     # 处理request命令
     if not args.request:
