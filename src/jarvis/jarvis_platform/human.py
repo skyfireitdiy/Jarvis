@@ -20,6 +20,7 @@ class HumanPlatform(BasePlatform):
         self.conversation_id = ""  # 会话ID，用于标识当前对话
         self.model_name = "human"  # 默认模型名称
         self.system_message = ""  # 系统消息，用于初始化对话
+        self.first_message = True
 
     def set_system_message(self, message: str):
         """设置系统消息"""
@@ -40,8 +41,9 @@ class HumanPlatform(BasePlatform):
         else:
             session_info = f"(会话ID: {self.conversation_id})"
 
-        if self.system_message:
+        if self.system_message and self.first_message:
             prompt = f"{self.system_message}\n\n{message} {session_info}\n\n请回复:"
+            self.first_message = False
         else:
             prompt = f"{message} {session_info}\n\n请回复:"
         
@@ -56,6 +58,7 @@ class HumanPlatform(BasePlatform):
     def delete_chat(self) -> bool:
         """删除当前会话"""
         self.conversation_id = ""
+        self.first_message = True
         return True
 
     def name(self) -> str:
