@@ -151,41 +151,40 @@ def extract_methodology_from_url(url):
         with yaspin(text="正在从URL提取方法论...", color="yellow") as spinner:
             try:
                 response = platform.chat_until_success(prompt)
-                
-                # 提取YAML部分
-                methodologies_start = response.find('<methodologies>') + len('<methodologies>')
-                methodologies_end = response.find('</methodologies>')
-                if methodologies_start == -1 or methodologies_end == -1:
-                    spinner.text = "响应格式无效"
-                    spinner.fail("❌")
-                    PrettyOutput.print("大模型未返回有效的<methodologies>格式", OutputType.ERROR)
-                    return
-                    
-                yaml_content = response[methodologies_start:methodologies_end].strip()
-                
-                try:
-                    data = yaml.safe_load(yaml_content)
-                    extracted_methodologies = {
-                        item['problem_type']: item['content']
-                        for item in data
-                    }
-                except (yaml.YAMLError, KeyError, TypeError) as e:
-                    spinner.text = "YAML解析失败"
-                    spinner.fail("❌")
-                    PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
-                    return
-
-                if not extracted_methodologies:
-                    spinner.text = "未提取到有效方法论"
-                    spinner.fail("❌")
-                    return
-                spinner.ok("✅")
-
             except Exception as e:
                 spinner.text = "提取失败"
                 spinner.fail("❌")
                 PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
                 return
+
+            # 提取YAML部分
+            methodologies_start = response.find('<methodologies>') + len('<methodologies>')
+            methodologies_end = response.find('</methodologies>')
+            if methodologies_start == -1 or methodologies_end == -1:
+                spinner.text = "响应格式无效"
+                spinner.fail("❌")
+                PrettyOutput.print("大模型未返回有效的<methodologies>格式", OutputType.ERROR)
+                return
+                
+            yaml_content = response[methodologies_start:methodologies_end].strip()
+            
+            try:
+                data = yaml.safe_load(yaml_content)
+                extracted_methodologies = {
+                    item['problem_type']: item['content']
+                    for item in data
+                }
+            except (yaml.YAMLError, KeyError, TypeError) as e:
+                spinner.text = "YAML解析失败"
+                spinner.fail("❌")
+                PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
+                return
+
+            if not extracted_methodologies:
+                spinner.text = "未提取到有效方法论"
+                spinner.fail("❌")
+                return
+            spinner.ok("✅")
 
         # 加载现有方法论
         existing_methodologies = _load_all_methodologies()
@@ -210,8 +209,14 @@ def extract_methodology_from_url(url):
         PrettyOutput.print(f"从URL提取失败: {str(e)}", OutputType.ERROR)
         # 调用大模型平台提取方法论
         with yaspin(text="正在提取方法论...", color="yellow") as spinner:
-            response = platform.chat_until_success(prompt)
-            
+            try:
+                response = platform.chat_until_success(prompt)
+            except Exception as e:
+                spinner.text = "提取失败"
+                spinner.fail("❌")
+                PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
+                return
+
             # 提取YAML部分
             methodologies_start = response.find('<methodologies>') + len('<methodologies>')
             methodologies_end = response.find('</methodologies>')
