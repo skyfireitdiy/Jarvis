@@ -13,6 +13,7 @@ class BasePlatform(ABC):
     def __init__(self):
         """Initialize model"""
         self.suppress_output = True  # 添加输出控制标志
+        self.web = False  # 添加web属性，默认false
 
     def __del__(self):
         """Destroy model"""
@@ -92,3 +93,7 @@ class BasePlatform(ABC):
     def set_suppress_output(self, suppress: bool):
         """Set whether to suppress output"""
         self.suppress_output = suppress
+
+    def set_web(self, web: bool):
+        """Set web flag"""
+        self.web = web

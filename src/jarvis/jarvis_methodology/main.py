@@ -180,6 +180,8 @@ def extract_methodology_from_url(url):
     try:
         # 获取平台实例
         platform = PlatformRegistry().get_normal_platform()
+
+        platform.web = True
         
         # 构建提取提示
         prompt = f"""请从以下URL内容中提取方法论：

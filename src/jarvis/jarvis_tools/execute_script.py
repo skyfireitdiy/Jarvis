@@ -23,11 +23,6 @@ class ScriptTool:
                 "type": "string",
                 "description": "脚本解释器: 如bash, python3, expect, perl, ruby等任意解释器。如需直接执行shell命令, 可使用bash作为解释器"
             },
-            "script_type": {
-                "type": "string",
-                "enum": ["shell_command", "shell_script", "python_script"],
-                "description": "已废弃，请使用interpreter参数。脚本类型: shell_command (Shell命令), shell_script (Shell脚本), python_script (Python脚本)"
-            },
             "script_content": {
                 "type": "string",
                 "description": "要执行的脚本内容"
@@ -142,23 +137,8 @@ class ScriptTool:
                     "stderr": "Missing or empty script_content parameter"
                 }
             
-            # Get interpreter, with fallback to script_type for backward compatibility
-            interpreter = args.get("interpreter")
-            script_type = args.get("script_type")
-            
-            # Handle backward compatibility
-            if interpreter is None and script_type is not None:
-                if script_type == "shell_command":
-                    # For direct shell commands, use bash -c
-                    return self._execute_script_with_interpreter("bash -c", script_content)
-                elif script_type == "shell_script":
-                    interpreter = "bash"
-                elif script_type == "python_script":
-                    interpreter = "python"
-            
-            # Default to bash if nothing specified
-            if interpreter is None:
-                interpreter = "bash"
+            # Get interpreter, default to bash if not specified
+            interpreter = args.get("interpreter", "bash")
                 
             # Execute the script with the specified interpreter
             return self._execute_script_with_interpreter(interpreter, script_content)

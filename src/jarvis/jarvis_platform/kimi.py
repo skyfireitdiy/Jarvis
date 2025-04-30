@@ -54,7 +54,6 @@ class KimiModel(BasePlatform):
         self.first_chat = True  # 添加标记，用于判断是否是第一次对话
         self.system_message = ""
         self.model_name = "kimi"
-        self.web = os.getenv("KIMI_WEB", "false") == "true"
 
     def set_system_message(self, message: str):
         """Set system message"""
