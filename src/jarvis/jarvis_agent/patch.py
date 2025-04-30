@@ -148,7 +148,12 @@ def apply_patch(output_str: str, agent: Any) -> str:
         start_hash = get_latest_commit_hash()
         spinner.write("✅ 当前提交hash获取完成")
 
-        not_read_file = [f for f in patches.keys() if not has_read_file(f)]
+        not_read_file = [
+            f for f in patches.keys() 
+            if not has_read_file(f) 
+            and os.path.exists(f) 
+            and os.path.getsize(f) > 0
+        ]
         if not_read_file:
             spinner.text=f"以下文件未读取: {not_read_file}，应用补丁存在风险，将先读取文件后再生成补丁"
             spinner.fail("❌")
