@@ -160,31 +160,32 @@ def extract_methodology_from_url(url):
                     spinner.fail("❌")
                     PrettyOutput.print("大模型未返回有效的<methodologies>格式", OutputType.ERROR)
                     return
+                    
+                yaml_content = response[methodologies_start:methodologies_end].strip()
+                
+                try:
+                    data = yaml.safe_load(yaml_content)
+                    extracted_methodologies = {
+                        item['problem_type']: item['content']
+                        for item in data
+                    }
+                except (yaml.YAMLError, KeyError, TypeError) as e:
+                    spinner.text = "YAML解析失败"
+                    spinner.fail("❌")
+                    PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
+                    return
+
+                if not extracted_methodologies:
+                    spinner.text = "未提取到有效方法论"
+                    spinner.fail("❌")
+                    return
+                spinner.ok("✅")
+
             except Exception as e:
                 spinner.text = "提取失败"
                 spinner.fail("❌")
                 PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
                 return
-                
-            yaml_content = response[methodologies_start:methodologies_end].strip()
-            
-            try:
-                data = yaml.safe_load(yaml_content)
-                extracted_methodologies = {
-                    item['problem_type']: item['content']
-                    for item in data
-                }
-            except (yaml.YAMLError, KeyError, TypeError) as e:
-                spinner.text = "YAML解析失败"
-                spinner.fail("❌")
-                PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
-                return
-
-            if not extracted_methodologies:
-                spinner.text = "未提取到有效方法论"
-                spinner.fail("❌")
-                return
-            spinner.ok("✅")
 
         # 加载现有方法论
         existing_methodologies = _load_all_methodologies()
