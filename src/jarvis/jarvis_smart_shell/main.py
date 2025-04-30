@@ -57,9 +57,9 @@ function fish_command_not_found
     read -P "> " choice
     switch "$choice"
         case "1"
-            commandline -r "jss fix (commandline -b)"
+            commandline -r (jss fix (commandline -b))
         case "2"
-            commandline -r "jss request (commandline -b)"
+            commandline -r (jss request (commandline -b))
         case "*"
             commandline -f repaint
     end
