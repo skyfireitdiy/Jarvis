@@ -580,6 +580,20 @@ class ToolRegistry(OutputHandler):
         output = "\n\n".join(output_parts)
         return "无输出和错误" if not output else output
 
+    def _truncate_output(self, output: str) -> str:
+        """截断过长的输出内容
+        
+        参数:
+            output: 要截断的输出内容
+            
+        返回:
+            截断后的内容，如果内容不超过60行则返回原内容
+        """
+        if len(output.splitlines()) > 60:
+            lines = output.splitlines()
+            return '\n'.join(lines[:30] + ['\n...内容太长，已截取前后30行...\n'] + lines[-30:])
+        return output
+
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
         try:
             name = tool_call["name"]  # 确保name是str类型
@@ -617,16 +631,9 @@ class ToolRegistry(OutputHandler):
                     platform.set_suppress_output(False)
                     try:
                         if not platform.upload_files([output_file]):
-                            # 上传失败时仅返回截断后的内容
-                            if len(output.splitlines()) > 60:
-                                lines = output.splitlines()
-                                output = '\n'.join(lines[:30] + ['\n...内容太长，已截取前后30行...\n'] + lines[-30:])
-                            return output
+                            return self._truncate_output(output)
                     except Exception:
-                        if len(output.splitlines()) > 60:
-                            lines = output.splitlines()
-                            output = '\n'.join(lines[:30] + ['\n...内容太长，已截取前后30行...\n'] + lines[-30:])
-                        return output
+                        return self._truncate_output(output)
                 prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
                 return f"""工具调用原始输出过长，以下是根据输出提出的信息：
 
