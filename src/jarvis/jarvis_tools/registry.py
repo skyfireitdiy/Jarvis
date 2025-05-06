@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
@@ -610,26 +611,45 @@ class ToolRegistry(OutputHandler):
                 result["stdout"], result.get("stderr", "")
             )
 
-            # 处理结果
-            if is_context_overflow(output):
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".txt", delete=False
-                ) as tmp_file:
+            # 检查内容是否过大
+            is_large_content = is_context_overflow(output)
+            
+            if is_large_content:
+                # 创建临时文件
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp_file:
                     output_file = tmp_file.name
                     tmp_file.write(output)
                     tmp_file.flush()
-                platform: Any = PlatformRegistry().get_normal_platform()
-                if platform:
-                    platform.set_suppress_output(False)
-                    try:
-                        if not platform.upload_files([output_file]):
-                            return self._truncate_output(output)
-                    except Exception:
-                        return self._truncate_output(output)
-                prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
-                return f"""工具调用原始输出过长，以下是根据输出提出的信息：
+                
+                try:
+                    # 获取平台实例
+                    platform = PlatformRegistry().get_normal_platform()
+                    if platform and hasattr(platform, 'upload_files'):
+                        platform.set_suppress_output(False)
+                        # 尝试上传文件
+                        upload_success = platform.upload_files([output_file])
+                        
+                        if upload_success:
+                            # 使用上传的文件生成摘要
+                            prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
+                            return f"""工具调用原始输出过长，以下是根据输出提出的信息：
 
 {platform.chat_until_success(prompt)}"""
+                        elif hasattr(platform, 'chat_big_content'):
+                            # 如果上传失败但支持大内容处理，使用chat_big_content
+                            prompt = f"以下内容为工具执行结果，请阅读内容，并根据内容提取出以下信息：{want}\n\n{output}"
+                            return f"""工具调用原始输出过长，以下是根据输出提出的信息：
+
+{platform.chat_big_content(output, prompt)}"""
+                    
+                    # 如果都不支持，返回截断的输出
+                    return self._truncate_output(output)
+                finally:
+                    # 清理临时文件
+                    try:
+                        os.unlink(output_file)
+                    except Exception:
+                        pass
 
             return output
 

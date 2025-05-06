@@ -121,34 +121,20 @@ def load_methodology(user_input: str) -> str:
 
         # 获取当前平台
         platform = PlatformRegistry().get_normal_platform()
-        
-        upload_result = False
-        if is_context_overflow(user_input):
-            # 创建临时文件
-            with yaspin(text="创建方法论临时文件...", color="yellow") as spinner:
-                temp_file_path = _create_methodology_temp_file(methodologies)
-                if not temp_file_path:
-                    spinner.text = "创建方法论临时文件失败"
-                    spinner.fail("❌")
-                    return ""
-                spinner.text = f"创建方法论临时文件完成: {temp_file_path}"
-                spinner.ok("✅")
-            if platform.upload_files([temp_file_path]):
-                upload_result = True
-            
-            spinner.text = "上传方法论文件成功"
-            spinner.ok("✅")
-        
-        platform.set_suppress_output(False)
-        # 构建提示信息
-        prompt = f"""以下是所有可用的方法论内容：
+        if not platform:
+            return ""
+
+        # 构建基础提示信息
+        base_prompt = f"""以下是所有可用的方法论内容：
 
 """
-        if not upload_result:
-            for problem_type, content in methodologies.items():
-                prompt += f"## {problem_type}\n\n{content}\n\n---\n\n"
+        # 构建完整内容
+        full_content = base_prompt
+        for problem_type, content in methodologies.items():
+            full_content += f"## {problem_type}\n\n{content}\n\n---\n\n"
         
-        prompt += f"""
+        # 添加用户输入和输出要求
+        full_content += f"""
 请根据以上方法论内容，总结出与以下用户需求相关的方法论: {user_input}
 
 请按以下格式回复：
@@ -161,21 +147,70 @@ def load_methodology(user_input: str) -> str:
 如果没有匹配的方法论，请输出：没有历史方法论可参考
 除以上要求外，不要输出任何内容
 """
-        return platform.chat_until_success(prompt)
+
+        # 检查内容是否过大
+        is_large_content = is_context_overflow(full_content)
+        temp_file_path = None
+        
+        try:
+            if is_large_content:
+                # 创建临时文件
+                with yaspin(text="创建方法论临时文件...", color="yellow") as spinner:
+                    temp_file_path = _create_methodology_temp_file(methodologies)
+                    if not temp_file_path:
+                        spinner.text = "创建方法论临时文件失败"
+                        spinner.fail("❌")
+                        return ""
+                    spinner.text = f"创建方法论临时文件完成: {temp_file_path}"
+                    spinner.ok("✅")
+
+                # 尝试上传文件
+                if hasattr(platform, 'upload_files'):
+                    platform.set_suppress_output(False)
+                    upload_success = platform.upload_files([temp_file_path])
+                    
+                    if upload_success:
+                        # 使用上传的文件生成摘要
+                        return platform.chat_until_success(base_prompt + f"""
+请根据已上传的方法论文件内容，总结出与以下用户需求相关的方法论: {user_input}
+
+请按以下格式回复：
+### 与该任务/需求相关的方法论
+1. [方法论名字]
+2. [方法论名字]
+### 根据以上方法论，总结出方法论内容
+[总结的方法论内容]
+
+如果没有匹配的方法论，请输出：没有历史方法论可参考
+除以上要求外，不要输出任何内容
+""")
+                    elif hasattr(platform, 'chat_big_content'):
+                        # 如果上传失败但支持大内容处理，使用chat_big_content
+                        return platform.chat_big_content(full_content, base_prompt + f"""
+请根据以上方法论内容，总结出与以下用户需求相关的方法论: {user_input}
+
+请按以下格式回复：
+### 与该任务/需求相关的方法论
+1. [方法论名字]
+2. [方法论名字]
+### 根据以上方法论，总结出方法论内容
+[总结的方法论内容]
+
+如果没有匹配的方法论，请输出：没有历史方法论可参考
+除以上要求外，不要输出任何内容
+""")
+            
+            # 如果内容不大或上传失败，直接使用chat_until_success
+            return platform.chat_until_success(full_content)
+        
+        finally:
+            # 清理临时文件
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.remove(temp_file_path)
+                except Exception:
+                    pass
     
     except Exception as e:
         PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
-        # 清理临时文件
-        if 'temp_file_path' in locals() and temp_file_path and os.path.exists(temp_file_path):
-            try:
-                os.remove(temp_file_path)
-            except:
-                pass
         return ""
-    finally:
-        # 确保清理临时文件
-        if 'temp_file_path' in locals() and temp_file_path and os.path.exists(temp_file_path):
-            try:
-                os.remove(temp_file_path)
-            except:
-                pass
