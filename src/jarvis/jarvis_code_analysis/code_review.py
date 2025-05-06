@@ -586,16 +586,19 @@ class CodeReviewTool:
                 
                 try:
                     upload_success = False
+                    # Check if content is too large
+                    is_large_content = is_context_overflow(diff_output)
+                    
                     # Upload the file to the agent's model
                     with yaspin(text="正在上传代码差异文件...", color="cyan") as spinner:
-                        if is_context_overflow(diff_output) and agent.model and hasattr(agent.model, 'upload_files'):
+                        if is_large_content and agent.model and hasattr(agent.model, 'upload_files'):
                             upload_success = agent.model.upload_files([temp_file_path])
                             if upload_success:
                                 spinner.ok("✅")
                                 PrettyOutput.print(f"已成功上传代码差异文件", OutputType.SUCCESS)
-                                upload_success = True
                             else:
-                                upload_success = False
+                                spinner.fail("❌")
+                                PrettyOutput.print(f"上传代码差异文件失败，将使用分块处理", OutputType.WARNING)
                         else:
                             upload_success = False
                     
@@ -610,13 +613,17 @@ class CodeReviewTool:
 - 检测到的编程语言: {', '.join(detected_languages) if detected_languages else '未检测到特定语言'}
 
 请基于上传的代码差异文件进行全面审查，并生成详细的代码审查报告。"""
+                        # Run the agent with the prompt
+                        result = agent.run(complete_prompt)
                     else:
-                        # If upload failed, include the diff directly in the prompt
-                        complete_prompt = user_prompt + "\n\n代码差异内容:\n```diff\n" + diff_output + "\n```"
-                    
-                    # Run the agent with the prompt
-                    
-                    result = agent.run(complete_prompt)                    
+                        # If upload failed or not needed, handle based on context size
+                        if is_large_content and agent.model and hasattr(agent.model, 'chat_big_content'):
+                            # Use chat_big_content for large content when upload fails
+                            result = agent.model.chat_big_content(diff_output, user_prompt)
+                        else:
+                            # Include the diff directly in the prompt for smaller content
+                            complete_prompt = user_prompt + "\n\n代码差异内容:\n```diff\n" + diff_output + "\n```"
+                            result = agent.run(complete_prompt)
                 finally:
                     # Clean up the temporary file
                     if os.path.exists(temp_file_path):
