@@ -178,7 +178,7 @@ class KimiModel(BasePlatform):
         if not file_list:
             return True
 
-        from yaspin import yaspin
+        from yaspin import yaspin # type: ignore
         
         if not self.chat_id:
             with yaspin(text="创建聊天会话...", color="yellow") as spinner:

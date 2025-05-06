@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import re
 from typing import List, Tuple
+from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.globals import clear_read_file_record
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
@@ -37,38 +39,49 @@ class BasePlatform(ABC):
     @abstractmethod
     def upload_files(self, file_list: List[str]) -> bool:
         raise NotImplementedError("upload_files is not implemented")
+    
+    def chat_big_content(self, content: str, prompt: str) -> str:
+        prefix_prompt = f"""
+        我将分多次提供大量的上下文内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”。
+        """
+        while_true(lambda: while_success(lambda: self._chat(prefix_prompt), 5), 5)
+        split_content = split_text_into_chunks(content, get_max_input_token_count() - 1024)
+        for chunk in split_content:
+            while_true(lambda: while_success(lambda: self._chat(f"<part_content>{chunk}</part_content>"), 5), 5)
+        return while_true(lambda: while_success(lambda: self._chat(f"内容已经全部提供完毕\n\n{prompt}"), 5), 5)
 
+    
+    def _chat(self, message: str):
+        import time
+        start_time = time.time()
+        response = self.chat(message)
+
+        end_time = time.time()
+        duration = end_time - start_time
+        char_count = len(response)
+
+        # Calculate token count and tokens per second
+        try:
+            token_count = get_context_token_count(response)
+            tokens_per_second = token_count / duration if duration > 0 else 0
+        except Exception as e:
+            PrettyOutput.print(f"Tokenization failed: {str(e)}", OutputType.WARNING)
+            token_count = 0
+            tokens_per_second = 0
+
+        # Print statistics
+        if not self.suppress_output:
+            PrettyOutput.print(
+                f"对话完成 - 耗时: {duration:.2f}秒, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}",
+                OutputType.INFO,
+            )
+
+        # Keep original think tag handling
+        response = re.sub(ot("think")+r'.*?'+ct("think"), '', response, flags=re.DOTALL)
+        return response
+    
     def chat_until_success(self, message: str) -> str:
-        def _chat():
-            import time
-            start_time = time.time()
-            response = self.chat(message)
-
-            end_time = time.time()
-            duration = end_time - start_time
-            char_count = len(response)
-
-            # Calculate token count and tokens per second
-            try:
-                token_count = get_context_token_count(response)
-                tokens_per_second = token_count / duration if duration > 0 else 0
-            except Exception as e:
-                PrettyOutput.print(f"Tokenization failed: {str(e)}", OutputType.WARNING)
-                token_count = 0
-                tokens_per_second = 0
-
-            # Print statistics
-            if not self.suppress_output:
-                PrettyOutput.print(
-                    f"对话完成 - 耗时: {duration:.2f}秒, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}",
-                    OutputType.INFO,
-                )
-
-            # Keep original think tag handling
-            response = re.sub(ot("think")+r'.*?'+ct("think"), '', response, flags=re.DOTALL)
-            return response
-
-        return while_true(lambda: while_success(lambda: _chat(), 5), 5)
+        return while_true(lambda: while_success(lambda: self._chat(message), 5), 5)
 
     @abstractmethod
     def name(self) -> str:
