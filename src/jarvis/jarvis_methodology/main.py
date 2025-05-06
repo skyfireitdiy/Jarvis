@@ -18,7 +18,7 @@ from jarvis.jarvis_utils.methodology import (
 )
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-from yaspin import yaspin
+from yaspin import yaspin # type: ignore
 
 def import_methodology(input_file):
     """导入方法论文件（合并策略）"""

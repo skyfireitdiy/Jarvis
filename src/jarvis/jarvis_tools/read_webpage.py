@@ -31,7 +31,7 @@ class WebpageTool:
             
             # Create Yuanbao model instance
             model = PlatformRegistry().get_normal_platform()
-            model.web = True
+            model.set_web(True)
             model.set_suppress_output(False)  # type: ignore
 
             # Construct prompt based on want parameter

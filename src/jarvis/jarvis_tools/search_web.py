@@ -16,7 +16,7 @@ class SearchWebTool:
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]: # type: ignore
         query = args.get("query")
         model = PlatformRegistry().get_normal_platform()
-        model.web = True
+        model.set_web(True)
         model.set_suppress_output(False) # type: ignore
         return {
             "stdout": model.chat_until_success(query), # type: ignore
