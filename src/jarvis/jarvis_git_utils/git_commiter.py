@@ -10,11 +10,9 @@ import sys
 import argparse
 import os
 
-from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count
-from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 from jarvis.jarvis_utils.tag import ot, ct
 
 
@@ -134,7 +132,7 @@ class GitCommitTool:
                         platform = PlatformRegistry().get_normal_platform()
                         upload_success = False
                         
-                        if get_context_token_count(diff) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE and hasattr(platform, 'upload_files'):
+                        if is_context_overflow(diff) and hasattr(platform, 'upload_files'):
                             spinner.text = "正在上传代码差异文件..."
                             try:
                                 with spinner.hidden():

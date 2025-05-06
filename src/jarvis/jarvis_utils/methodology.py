@@ -11,10 +11,10 @@ import json
 import tempfile
 from typing import Dict, Optional
 
-from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count, get_data_dir
-from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.utils import is_context_overflow
 
 def _get_methodology_directory() -> str:
     """
@@ -123,7 +123,7 @@ def load_methodology(user_input: str) -> str:
         platform = PlatformRegistry().get_normal_platform()
         
         upload_result = False
-        if get_context_token_count(user_input) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE:
+        if is_context_overflow(user_input):
             # 创建临时文件
             with yaspin(text="创建方法论临时文件...", color="yellow") as spinner:
                 temp_file_path = _create_methodology_temp_file(methodologies)

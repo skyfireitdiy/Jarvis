@@ -7,9 +7,8 @@ from typing import Any, Tuple
 from yaspin import yaspin
 
 from jarvis.jarvis_tools.file_operation import FileOperationTool
-from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count
-from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import is_context_overflow
 
 
 def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
@@ -86,7 +85,7 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 spinner.text = "文件读取完成"
                 spinner.ok("✅")
                 prompt = result["stdout"] + "\n" + prompt
-                if get_context_token_count(prompt) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE:
+                if is_context_overflow(prompt):
                     return old_prompt, False
 
     return prompt, False

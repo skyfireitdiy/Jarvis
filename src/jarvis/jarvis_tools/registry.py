@@ -10,14 +10,9 @@ import yaml
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.base import Tool
-from jarvis.jarvis_utils.config import (
-    INPUT_WINDOW_REVERSE_SIZE,
-    get_max_input_token_count,
-    get_data_dir,
-)
-from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
@@ -175,9 +170,6 @@ class ToolRegistry(OutputHandler):
         self._load_builtin_tools()
         self._load_external_tools()
         self._load_mcp_tools()
-        self.max_input_token_count = (
-            get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
-        )
 
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
@@ -619,7 +611,7 @@ class ToolRegistry(OutputHandler):
             )
 
             # 处理结果
-            if get_context_token_count(output) > self.max_input_token_count:
+            if is_context_overflow(output):
                 with tempfile.NamedTemporaryFile(
                     mode="w", suffix=".txt", delete=False
                 ) as tmp_file:
