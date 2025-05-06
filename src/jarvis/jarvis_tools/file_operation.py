@@ -2,7 +2,7 @@ from typing import Dict, Any
 import os
 from pathlib import Path
 
-from yaspin import yaspin
+from yaspin import yaspin # type: ignore
 
 from jarvis.jarvis_utils.globals import add_read_file_record
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
