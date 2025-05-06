@@ -11,7 +11,7 @@ import hashlib
 import os
 import json
 import argparse
-import yaml
+import yaml # type: ignore
 from jarvis.jarvis_utils.methodology import (
     _get_methodology_directory,
     _load_all_methodologies
