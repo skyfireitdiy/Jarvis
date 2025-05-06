@@ -1,5 +1,5 @@
 from typing import Dict, List, Tuple
-import requests
+import requests # type: ignore
 import json
 import os
 import mimetypes
