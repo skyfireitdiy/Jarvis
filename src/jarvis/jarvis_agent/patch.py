@@ -2,7 +2,7 @@ import re
 from typing import Dict, Any, Tuple
 import os
 
-from yaspin import yaspin
+from yaspin import yaspin # type: ignore
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.base import BasePlatform
@@ -376,11 +376,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
     with yaspin(text=f"正在修改文件 {filepath}...", color="cyan") as spinner:
         try:
             model = PlatformRegistry().get_normal_platform()
-            upload_success = False
             file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
-            with spinner.hidden():
-                if get_context_token_count(file_content) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE and model.upload_files([filepath]):
-                    upload_success = True
 
             model.set_suppress_output(True)
 
@@ -412,9 +408,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
 {ot("MERGED_CODE")}
 [合并后的完整代码，包括所有空行和缩进]
 {ct("MERGED_CODE")}
-"""
-            if not upload_success:
-                prompt += f"""
+
 # 原始代码
 {file_content}
 """
