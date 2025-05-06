@@ -467,16 +467,20 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             spinner.fail("❌")
             return False
 
+def _is_context_overflow(file_content: str) -> bool:
+    """判断文件内容是否超出上下文限制"""
+    return get_context_token_count(file_content) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
 
 def handle_large_code_operation(filepath: str, patch_content: str, model: BasePlatform) -> bool:
     """处理大型代码文件的补丁操作，使用差异化补丁格式"""
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
             file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
+            need_upload_file = _is_context_overflow(file_content)
             upload_success = False
             # 读取原始文件内容
             with spinner.hidden():  
-                if get_context_token_count(file_content) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE and model.upload_files([filepath]):
+                if need_upload_file and model.upload_files([filepath]):
                     upload_success = True
 
 
@@ -527,11 +531,14 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 <<<<<< REPLACE
 {ct("DIFF")}
 """
-            if not upload_success:
+            if not need_upload_file:
                 prompt += f"""
 # 原始代码
 {file_content}
 """
+            elif not upload_success:
+                pass
+
             for _ in range(3):
                 # 获取补丁内容
                 response = model.chat_until_success(prompt)
