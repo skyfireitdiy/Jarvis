@@ -105,7 +105,7 @@ class GitCommitTool:
                     diff = process.communicate()[0].decode()
                     spinner.write(f"✅ 获取差异 ({file_count} 个文件)")
                     try:
-                        temp_diff_file = None
+                        temp_diff_file_path = None
                         # 生成提交信息
                         spinner.text = "正在生成提交消息..."
                         
@@ -132,7 +132,10 @@ class GitCommitTool:
                         platform = PlatformRegistry().get_normal_platform()
                         upload_success = False
                         
-                        if is_context_overflow(diff) and hasattr(platform, 'upload_files'):
+                        # Check if content is too large
+                        is_large_content = is_context_overflow(diff)
+                        
+                        if is_large_content and hasattr(platform, 'upload_files'):
                             spinner.text = "正在上传代码差异文件..."
                             try:
                                 with spinner.hidden():
@@ -146,7 +149,7 @@ class GitCommitTool:
                                 if upload_success:
                                     spinner.write("✅ 成功上传代码差异文件")
                                 else:
-                                    spinner.write("⚠️ 上传代码差异文件失败，将回退到直接提供差异内容")
+                                    spinner.write("⚠️ 上传代码差异文件失败，将使用分块处理")
                             except Exception as e:
                                 spinner.write(f"⚠️ 上传文件时出错: {str(e)}")
                                 upload_success = False
@@ -162,16 +165,23 @@ class GitCommitTool:
         请详细分析已上传的代码差异文件，生成符合上述格式的提交信息。
         '''
                         else:
-                            # 直接在提示中包含差异内容
-                            prompt = base_prompt + f'''
+                            # 如果上传失败但内容较大，使用chat_big_content
+                            if is_large_content and hasattr(platform, 'chat_big_content'):
+                                spinner.text = "正在使用分块处理生成提交信息..."
+                                commit_message = platform.chat_big_content(diff, base_prompt)
+                            else:
+                                # 直接在提示中包含差异内容
+                                prompt = base_prompt + f'''
         # 分析材料
         {diff}
         '''
+                                commit_message = platform.chat_until_success(prompt)
                         
                         # 尝试生成提交信息
                         spinner.text = "正在生成提交消息..."
                         while True:
-                            commit_message = platform.chat_until_success(prompt)
+                            if not upload_success and not is_large_content:
+                                commit_message = platform.chat_until_success(prompt)
                             commit_message = self._extract_commit_message(commit_message)
                             # 如果成功提取，就跳出循环
                             if commit_message:
@@ -204,7 +214,7 @@ class GitCommitTool:
                         spinner.ok("✅")
                     finally:
                         # 清理临时差异文件
-                        if temp_diff_file is not None and os.path.exists(temp_diff_file_path):
+                        if temp_diff_file_path is not None and os.path.exists(temp_diff_file_path):
                             try:
                                 os.unlink(temp_diff_file_path)
                             except Exception as e:
