@@ -1,3 +1,4 @@
+from ast import main
 import re
 from typing import Dict, Any, Tuple
 import os
@@ -486,7 +487,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 
             model.set_suppress_output(True)
 
-            prompt = f"""
+            main_prompt = f"""
 # 代码补丁生成专家指南
 
 ## 任务描述
@@ -531,17 +532,20 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 <<<<<< REPLACE
 {ct("DIFF")}
 """
-            if not need_upload_file:
-                prompt += f"""
-# 原始代码
-{file_content}
-"""
-            elif not upload_success:
-                pass
-
+            
             for _ in range(3):
-                # 获取补丁内容
-                response = model.chat_until_success(prompt)
+                file_prompt = ""
+                if not need_upload_file:
+                    file_prompt = f"""
+    # 原始代码
+    {file_content}
+    """
+                    response = model.chat_until_success(main_prompt + file_prompt)
+                else:
+                    if upload_success:
+                        response = model.chat_until_success(main_prompt)
+                    else:
+                        response = model.chat_big_content(file_content, main_prompt)
 
                 # 解析差异化补丁
                 diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),

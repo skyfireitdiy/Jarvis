@@ -44,11 +44,11 @@ class BasePlatform(ABC):
         prefix_prompt = f"""
         我将分多次提供大量的上下文内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”。
         """
-        while_true(lambda: while_success(lambda: self._chat(prefix_prompt), 5), 5)
+        self.chat_until_success(prefix_prompt)
         split_content = split_text_into_chunks(content, get_max_input_token_count() - 1024)
         for chunk in split_content:
-            while_true(lambda: while_success(lambda: self._chat(f"<part_content>{chunk}</part_content>"), 5), 5)
-        return while_true(lambda: while_success(lambda: self._chat(f"内容已经全部提供完毕\n\n{prompt}"), 5), 5)
+            self.chat_until_success(f"<part_content>{chunk}</part_content>")
+        return self.chat_until_success(f"内容已经全部提供完毕\n\n{prompt}")
 
     
     def _chat(self, message: str):
