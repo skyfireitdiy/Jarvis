@@ -101,7 +101,7 @@ def load_methodology(user_input: str) -> str:
     返回：
         str: 相关的方法论提示，如果未找到方法论则返回空字符串
     """
-    from yaspin import yaspin
+    from yaspin import yaspin # type: ignore
 
     # 获取方法论目录
     methodology_dir = _get_methodology_directory()

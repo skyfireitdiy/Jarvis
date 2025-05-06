@@ -1,4 +1,3 @@
-from ast import main
 import re
 from typing import Dict, Any, Tuple
 import os

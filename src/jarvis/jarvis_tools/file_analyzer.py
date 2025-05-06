@@ -3,8 +3,8 @@ import os
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from yaspin import yaspin
-from yaspin.spinners import Spinners
+from yaspin import yaspin # type: ignore
+from yaspin.spinners import Spinners # type: ignore
 
 class FileAnalyzerTool:
     name = "file_analyzer"
