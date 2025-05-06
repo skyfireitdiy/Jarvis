@@ -9,13 +9,12 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.file_operation import FileOperationTool
-from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count, is_confirm_before_apply_patch
-from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import get_commits_between, get_latest_commit_hash
 from jarvis.jarvis_utils.globals import add_read_file_record, has_read_file
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import get_file_line_count, user_confirm
+from jarvis.jarvis_utils.utils import is_context_overflow, get_file_line_count, user_confirm
 from jarvis.jarvis_utils.tag import ot, ct
 
 
@@ -467,16 +466,14 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             spinner.fail("❌")
             return False
 
-def _is_context_overflow(file_content: str) -> bool:
-    """判断文件内容是否超出上下文限制"""
-    return get_context_token_count(file_content) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
+
 
 def handle_large_code_operation(filepath: str, patch_content: str, model: BasePlatform) -> bool:
     """处理大型代码文件的补丁操作，使用差异化补丁格式"""
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
             file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
-            need_upload_file = _is_context_overflow(file_content)
+            need_upload_file = is_context_overflow(file_content)
             upload_success = False
             # 读取原始文件内容
             with spinner.hidden():  

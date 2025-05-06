@@ -3,7 +3,7 @@ import time
 import hashlib
 from pathlib import Path
 from typing import List, Any, Callable
-from jarvis.jarvis_utils.config import get_max_input_token_count, get_data_dir
+from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
@@ -130,3 +130,6 @@ def is_long_context(files: List[str]) -> bool:
     return total_tokens > threshold
 
 
+def is_context_overflow(file_content: str) -> bool:
+    """判断文件内容是否超出上下文限制"""
+    return get_context_token_count(file_content) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
