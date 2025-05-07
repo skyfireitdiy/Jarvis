@@ -399,7 +399,7 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             model = PlatformRegistry().get_normal_platform()
             file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
 
-            model.set_suppress_output(True)
+            model.set_suppress_output(False)
 
             prompt = f"""
 # 代码合并专家指南
@@ -441,7 +441,8 @@ def handle_small_code_operation(filepath: str, patch_content: str) -> bool:
             finished = False
             while count > 0:
                 count -= 1
-                response = model.chat_until_success(prompt).splitlines()
+                with spinner.hidden():
+                    response = model.chat_until_success(prompt).splitlines()
                 try:
                     start_line = response.index(ot("MERGED_CODE")) + 1
                     try:
@@ -503,7 +504,7 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                     upload_success = True
 
 
-            model.set_suppress_output(True)
+            model.set_suppress_output(False)
 
             main_prompt = f"""
 # 代码补丁生成专家指南
@@ -558,12 +559,15 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
     # 原始代码
     {file_content}
     """
-                    response = model.chat_until_success(main_prompt + file_prompt)
+                    with spinner.hidden():
+                        response = model.chat_until_success(main_prompt + file_prompt)
                 else:
                     if upload_success:
-                        response = model.chat_until_success(main_prompt)
+                        with spinner.hidden():
+                            response = model.chat_until_success(main_prompt)
                     else:
-                        response = model.chat_big_content(file_content, main_prompt)
+                        with spinner.hidden():
+                            response = model.chat_big_content(file_content, main_prompt)
 
                 # 解析差异化补丁
                 diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
@@ -585,7 +589,6 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                     if search_text in modified_content:
                         # 如果有多处，报错
                         if modified_content.count(search_text) > 1:
-                            prompt = f"补丁 #{patch_count} 应用失败：找到多个匹配的代码段"
                             spinner.write(f"❌ 补丁 #{patch_count} 应用失败：找到多个匹配的代码段")
                             success = False
                             break
@@ -595,7 +598,6 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                         spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
                     else:
                         spinner.write(f"❌ 补丁 #{patch_count} 应用失败：无法找到匹配的代码段")
-                        prompt = f"补丁 #{patch_count} 应用失败：无法找到匹配的代码段"
                         success = False
                         break
                 if not success:
