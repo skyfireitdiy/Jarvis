@@ -82,30 +82,20 @@ class FileCompleter(Completer):
         # 计算替换长度
         replace_length = len(text_after_at) + 1
 
-        # 从replace_map获取建议列表
-        default_suggestions = [
-            (ot(tag), desc) for tag, desc in [
-                (tag, self._get_description(tag)) 
-                for tag in self.replace_map.keys()
-                if not file_path or process.extractOne(file_path, [tag])[1] > self.min_score
-            ]
-        ]
-        # 添加特殊标记
-        default_suggestions.extend([
+        # 获取所有可能的补全项
+        all_completions = []
+        
+        # 1. 添加特殊标记
+        all_completions.extend([
+            (ot(tag), self._get_description(tag))
+            for tag in self.replace_map.keys()
+        ])
+        all_completions.extend([
             (ot("Summary"), '总结'),
             (ot("Clear"), '清除历史'),
         ])
-        for name, desc in default_suggestions:
-            yield Completion(
-                text=f"'{name}'",
-                start_position=-replace_length,
-                display=name,
-                display_meta=desc
-            ) # type: ignore
-
-
-        # 使用git ls-files获取所有可能的文件
-        all_files = []
+        
+        # 2. 添加文件列表
         try:
             import subprocess
             result = subprocess.run(['git', 'ls-files'],
@@ -113,28 +103,40 @@ class FileCompleter(Completer):
                                  stderr=subprocess.PIPE,
                                  text=True)
             if result.returncode == 0:
-                all_files = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+                all_completions.extend([
+                    (path, "File") 
+                    for path in result.stdout.splitlines() 
+                    if path.strip()
+                ])
         except Exception:
             pass
-        # 生成补全建议
-        if not file_path:
-            scored_files = [(path, 100) for path in all_files[:self.max_suggestions]]
-        else:
-            scored_files_data = process.extract(file_path, all_files, limit=self.max_suggestions)
-            scored_files = [(m[0], m[1]) for m in scored_files_data]
-            scored_files.sort(key=lambda x: x[1], reverse=True)
-            scored_files = scored_files[:self.max_suggestions]
-        # 生成补全项
-        for path, score in scored_files:
-            if not file_path or score > self.min_score:
-                display_text = path
-                if file_path and score < 100:
-                    display_text = f"{path} ({score}%)"
+            
+        # 统一过滤和排序
+        if file_path:
+            # 使用模糊匹配过滤
+            scored_items = process.extract(file_path, [item[0] for item in all_completions], limit=self.max_suggestions)
+            scored_items = [(item[0], item[1]) for item in scored_items if item[1] > self.min_score]
+            # 创建映射以便查找描述
+            completion_map = {item[0]: item[1] for item in all_completions}
+            # 生成补全项
+            for text, score in scored_items:
+                display_text = text
+                if score < 100:
+                    display_text = f"{text} ({score}%)"
                 yield Completion(
-                    text=f"'{path}'",
+                    text=f"'{text}'",
                     start_position=-replace_length,
                     display=display_text,
-                    display_meta="File"
+                    display_meta=completion_map.get(text, "")
+                ) # type: ignore
+        else:
+            # 没有输入时返回前max_suggestions个建议
+            for text, desc in all_completions[:self.max_suggestions]:
+                yield Completion(
+                    text=f"'{text}'",
+                    start_position=-replace_length,
+                    display=text,
+                    display_meta=desc
                 ) # type: ignore
     
     def _get_description(self, tag: str) -> str:
