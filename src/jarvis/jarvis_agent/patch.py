@@ -210,12 +210,8 @@ def apply_patch(output_str: str, agent: Any) -> str:
                         final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
 
                         # 修改后的提示逻辑
-                        addon_prompt =  "1. 请确认补丁是否已正确应用\n"
-                        addon_prompt += "2. 检查修改后的代码是否符合预期\n"
-                        addon_prompt += "3. 如果确认无误，请继续进行下一步修改\n"
-                        addon_prompt += "4. 如果发现问题，请立即开始修复\n"
-                        addon_prompt += f"如果用户的需求已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
-                        addon_prompt += "如果有任何信息不清楚，调用工具获取信息\n"
+                        addon_prompt = f"如果用户的需求未完成，请继续生成补丁，如果已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
+                        addon_prompt += "如果有任何信息不明确，调用工具获取信息\n"
                         addon_prompt += "每次响应必须且只能包含一个操作\n"
 
                         agent.set_addon_prompt(addon_prompt)
