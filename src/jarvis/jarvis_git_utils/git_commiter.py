@@ -164,6 +164,7 @@ class GitCommitTool:
         
         请详细分析已上传的代码差异文件，生成符合上述格式的提交信息。
         '''
+                            commit_message = platform.chat_until_success(prompt)
                         else:
                             # 如果上传失败但内容较大，使用chat_big_content
                             if is_large_content and hasattr(platform, 'chat_big_content'):
@@ -180,11 +181,13 @@ class GitCommitTool:
                         # 尝试生成提交信息
                         spinner.text = "正在生成提交消息..."
                         while True:
-                            if not upload_success and not is_large_content:
+                            # 只在特定情况下重新获取commit_message
+                            if not upload_success and not is_large_content and not commit_message:
                                 commit_message = platform.chat_until_success(prompt)
-                            commit_message = self._extract_commit_message(commit_message)
+                            extracted_message = self._extract_commit_message(commit_message)
                             # 如果成功提取，就跳出循环
-                            if commit_message:
+                            if extracted_message:
+                                commit_message = extracted_message
                                 break
                             prompt = f"""格式错误，请按照以下格式重新生成提交信息：
                             {ot("COMMIT_MESSAGE")}
@@ -193,6 +196,7 @@ class GitCommitTool:
         [可选] 详细描述变更内容和原因
         {ct("COMMIT_MESSAGE")}
                             """
+                            commit_message = platform.chat_until_success(prompt)
                         spinner.write("✅ 生成提交消息")
 
                         # 执行提交
