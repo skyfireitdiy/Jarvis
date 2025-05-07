@@ -87,6 +87,7 @@ class FileCompleter(Completer):
             (ot(tag), desc) for tag, desc in [
                 (tag, self._get_description(tag)) 
                 for tag in self.replace_map.keys()
+                if not file_path or process.extractOne(file_path, [tag])[1] > self.min_score
             ]
         ]
         # 添加特殊标记
