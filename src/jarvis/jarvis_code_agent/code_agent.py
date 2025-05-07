@@ -261,8 +261,25 @@ class CodeAgent:
         if has_uncommitted_changes():
             PrettyOutput.print("检测到未提交的修改，是否要提交？", OutputType.WARNING)
             if user_confirm("是否要提交？", True):
-                git_commiter = GitCommitTool()
-                git_commiter.execute({})
+                import subprocess
+                try:
+                    # 获取当前提交次数
+                    commit_count = len(subprocess.run(
+                        ['git', 'rev-list', '--count', 'HEAD'],
+                        capture_output=True,
+                        text=True
+                    ).stdout.strip())
+                    
+                    # 暂存所有修改
+                    subprocess.run(['git', 'add', '.'], check=True)
+                    
+                    # 提交变更
+                    subprocess.run(
+                        ['git', 'commit', '-m', f'CheckPoint #{commit_count + 1}'], 
+                        check=True
+                    )
+                except subprocess.CalledProcessError as e:
+                    PrettyOutput.print(f"提交失败: {str(e)}", OutputType.ERROR)
 
     def _show_commit_history(
         self,
@@ -301,17 +318,14 @@ class CodeAgent:
     ) -> None:
         """处理提交确认和可能的重置"""
         if commits and user_confirm("是否接受以上提交记录？", True):
-            if len(commits) > 1 and user_confirm(
-                "是否要合并为一个更清晰的提交记录？", True
-            ):
-                subprocess.run(
-                    ["git", "reset", "--mixed", str(start_commit)],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    check=True
-                )
-                git_commiter = GitCommitTool()
-                git_commiter.execute({})
+            subprocess.run(
+                ["git", "reset", "--mixed", str(start_commit)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True
+            )
+            git_commiter = GitCommitTool()
+            git_commiter.execute({})
         elif start_commit:
             os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
             PrettyOutput.print("已重置到初始提交", OutputType.INFO)

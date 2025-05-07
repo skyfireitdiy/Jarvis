@@ -347,14 +347,32 @@ def handle_commit_workflow() -> bool:
     """Handle the git commit workflow and return the commit details.
 
     Returns:
-        tuple[bool, str, str]: (continue_execution, commit_id, commit_message)
+        bool: 提交是否成功
     """
     if is_confirm_before_apply_patch() and not user_confirm("是否要提交代码？", default=True):
         revert_change()
         return False
-    git_commiter = GitCommitTool()
-    commit_result = git_commiter.execute({})
-    return commit_result["success"]
+    
+    import subprocess
+    try:
+        # 获取当前提交次数
+        commit_count = len(subprocess.run(
+            ['git', 'rev-list', '--count', 'HEAD'],
+            capture_output=True,
+            text=True
+        ).stdout.strip())
+        
+        # 暂存所有修改
+        subprocess.run(['git', 'add', '.'], check=True)
+        
+        # 提交变更
+        subprocess.run(
+            ['git', 'commit', '-m', f'CheckPoint #{commit_count + 1}'], 
+            check=True
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        return False
 
 
 def handle_code_operation(filepath: str, patch_content: str) -> bool:
