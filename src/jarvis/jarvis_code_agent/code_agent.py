@@ -7,7 +7,7 @@ import os
 import sys
 import subprocess
 import argparse
-from typing import Optional, List, Tuple
+from typing import Any, Dict, Optional, List, Tuple
 
 # 忽略yaspin的类型检查
 from yaspin import yaspin  # type: ignore
@@ -243,6 +243,83 @@ class CodeAgent:
         """
         return self.root_dir
 
+    def get_loc_stats(self) -> str:
+        """使用loc命令获取当前目录的代码统计信息
+        
+        返回:
+            str: loc命令输出的原始字符串，失败时返回空字符串
+        """
+        try:
+            result = subprocess.run(
+                ['loc'],
+                cwd=self.root_dir,
+                capture_output=True,
+                text=True
+            )
+            return result.stdout if result.returncode == 0 else ""
+        except FileNotFoundError:
+            return ""
+
+    def get_recent_commits_with_files(self) -> List[Dict[str, Any]]:
+        """获取最近5次提交的commit信息和文件清单
+        
+        返回:
+            List[Dict[str, Any]]: 包含commit信息和文件清单的字典列表，格式为:
+                [
+                    {
+                        'hash': 提交hash,
+                        'message': 提交信息,
+                        'author': 作者,
+                        'date': 提交日期,
+                        'files': [修改的文件列表] (最多50个文件)
+                    },
+                    ...
+                ]
+                失败时返回空列表
+        """
+        try:
+            # 获取最近5次提交的基本信息
+            result = subprocess.run(
+                ['git', 'log', '-5', '--pretty=format:%H%n%s%n%an%n%ad'],
+                cwd=self.root_dir,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                return []
+
+            # 解析提交信息
+            commits = []
+            lines = result.stdout.splitlines()
+            for i in range(0, len(lines), 4):
+                if i + 3 >= len(lines):
+                    break
+                commit = {
+                    'hash': lines[i],
+                    'message': lines[i+1],
+                    'author': lines[i+2],
+                    'date': lines[i+3],
+                    'files': []
+                }
+                commits.append(commit)
+
+            # 获取每个提交的文件修改清单
+            for commit in commits:
+                files_result = subprocess.run(
+                    ['git', 'show', '--name-only', '--pretty=format:', commit['hash']],
+                    cwd=self.root_dir,
+                    capture_output=True,
+                    text=True
+                )
+                if files_result.returncode == 0:
+                    files = list(set(filter(None, files_result.stdout.splitlines())))
+                    commit['files'] = files[:50]  # 限制最多50个文件
+
+            return commits
+
+        except subprocess.CalledProcessError:
+            return []
+
     def _init_env(self) -> None:
         """初始化环境"""
         with yaspin(text="正在初始化环境...", color="cyan") as spinner:
@@ -263,12 +340,16 @@ class CodeAgent:
             if user_confirm("是否要提交？", True):
                 import subprocess
                 try:
-                    # 获取当前提交次数
-                    commit_count = len(subprocess.run(
+                    # 获取当前分支的提交总数
+                    commit_count = subprocess.run(
                         ['git', 'rev-list', '--count', 'HEAD'],
                         capture_output=True,
                         text=True
-                    ).stdout.strip())
+                    )
+                    if commit_count.returncode != 0:
+                        return
+                        
+                    commit_count = int(commit_count.stdout.strip())
                     
                     # 暂存所有修改
                     subprocess.run(['git', 'add', '.'], check=True)
@@ -343,8 +424,24 @@ class CodeAgent:
             self._init_env()
             start_commit = get_latest_commit_hash()
 
+            # 获取项目统计信息并附加到用户输入
+            loc_stats = self.get_loc_stats()
+            commits_info = self.get_recent_commits_with_files()
+            
+            project_info = []
+            if loc_stats:
+                project_info.append(f"代码统计:\n{loc_stats}")
+            if commits_info:
+                commits_str = "\n".join(
+                    f"提交 {i+1}: {commit['hash'][:7]} - {commit['message']} ({len(commit['files'])}个文件)"
+                    for i, commit in enumerate(commits_info)
+                )
+                project_info.append(f"最近提交:\n{commits_str}")
+            
+            enhanced_input = f"{user_input}\n\n项目概况:\n" + "\n\n".join(project_info) if project_info else user_input
+
             try:
-                self.agent.run(user_input)
+                self.agent.run(enhanced_input)
             except RuntimeError as e:
                 PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
                 return str(e)

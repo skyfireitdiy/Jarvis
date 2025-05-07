@@ -355,12 +355,16 @@ def handle_commit_workflow() -> bool:
     
     import subprocess
     try:
-        # 获取当前提交次数
-        commit_count = len(subprocess.run(
+        # 获取当前分支的提交总数
+        commit_count = subprocess.run(
             ['git', 'rev-list', '--count', 'HEAD'],
             capture_output=True,
             text=True
-        ).stdout.strip())
+        )
+        if commit_count.returncode != 0:
+            return False
+            
+        commit_count = int(commit_count.stdout.strip())
         
         # 暂存所有修改
         subprocess.run(['git', 'add', '.'], check=True)
