@@ -94,7 +94,7 @@ def _select_task(tasks: Dict[str, str]) -> str:
                 # 询问是否需要补充信息
                 need_additional = user_confirm("需要为此任务添加补充信息吗？", default=False)
                 if need_additional:
-                    additional_input = get_multiline_input("请输入补充信息（输入空行结束）：")
+                    additional_input = get_multiline_input("请输入补充信息：")
                     if additional_input:
                         selected_task = f"{selected_task}\n\n补充信息:\n{additional_input}"
                 return selected_task
