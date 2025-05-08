@@ -51,6 +51,7 @@ class CodeAgent:
             "methodology",
             "chdir",
             "find_methodology",
+            "edit_file",
         ])
         code_system_prompt = """
 <code_engineer_guide>
