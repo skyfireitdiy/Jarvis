@@ -16,7 +16,6 @@ from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.file_input_handler import file_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
-from jarvis.jarvis_agent.patch import PatchOutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -220,7 +219,7 @@ class CodeAgent:
             system_prompt=code_system_prompt,
             name="CodeAgent",
             auto_complete=False,
-            output_handler=[tool_registry, PatchOutputHandler()],
+            output_handler=[tool_registry],
             platform=platform_instance,
             input_handler=[
                 shell_input_handler,

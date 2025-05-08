@@ -5,7 +5,6 @@ from typing import Any, Callable, List, Optional, Tuple, Union
 from yaspin import yaspin # type: ignore
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
-from jarvis.jarvis_agent.patch import PatchOutputHandler
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
@@ -180,7 +179,7 @@ class Agent:
         self.model.set_suppress_output(False)
 
         from jarvis.jarvis_tools.registry import ToolRegistry
-        self.output_handler = output_handler if output_handler else [ToolRegistry(), PatchOutputHandler()]
+        self.output_handler = output_handler if output_handler else [ToolRegistry()]
         self.multiline_inputer = multiline_inputer if multiline_inputer else get_multiline_input
 
         self.prompt = ""

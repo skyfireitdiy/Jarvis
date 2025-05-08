@@ -1,6 +1,9 @@
+from pydoc import describe
 import re
 from typing import Dict, Any, Tuple
 import os
+
+from networkx import descendants
 
 from yaspin import yaspin # type: ignore
 
@@ -18,34 +21,14 @@ from jarvis.jarvis_utils.utils import is_context_overflow, get_file_line_count, 
 from jarvis.jarvis_utils.tag import ot, ct
 
 
-class PatchOutputHandler(OutputHandler):
-    def name(self) -> str:
-        return "PATCH"
+class PatchOutputHandler:
 
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
-        return False, apply_patch(response, agent)
-
-    def can_handle(self, response: str) -> bool:
-        if _has_patch_block(response):
-            return True
-        return False
-
-    def prompt(self) -> str:
-        return f"""
+    name = "patch"
+    description = """代码补丁工具，用于生成和应用代码补丁
 # 代码补丁规范
 
 ## 重要提示
 我可以看到完整的代码，所以不需要生成完整的代码，只需要提供修改的代码片段即可。请尽量精简补丁内容，只包含必要的上下文和修改部分。特别注意：不要提供完整文件内容，只提供需要修改的部分！
-
-## 补丁格式定义
-使用{ot("PATCH")}块来精确指定代码更改：
-```
-{ot("PATCH")}
-File: [文件路径]
-Reason: [修改原因]
-[代码修改说明，不用输出完整的代码，仅输出修改的片段即可]
-{ct("PATCH")}
-```
 
 ## 核心原则
 1. **精准修改**：只显示需要修改的代码部分，不需要展示整个文件内容
@@ -71,22 +54,6 @@ Reason: [修改原因]
    - 如果原代码行尾没有空格，补丁也不应添加行尾空格
    - 如果原代码使用特定的行尾注释风格，补丁也应保持该风格
 
-## 补丁示例
-```
-{ot("PATCH")}
-File: src/utils/math.py
-Reason: 修复除零错误，增加参数验证以提高函数健壮性
-def safe_divide(a, b):
-    # 添加参数验证
-    if b == 0:
-        raise ValueError("除数不能为零")
-    return a / b
-# 现有代码 ...
-def add(a, b):
-    return a + b
-{ct("PATCH")}
-```
-
 ## 最佳实践
 - 每个补丁专注于单一职责的修改
 - 避免包含过多无关代码
@@ -96,77 +63,46 @@ def add(a, b):
 - 绝不提供完整文件内容，除非是新建文件
 - 每个文件的修改是独立的，不能出现“参照xxx文件的修改”这样的描述
 - 不要出现未实现的代码，如：TODO
-"""
-    
-def _has_patch_block(patch_str: str) -> bool:
-    """判断是否存在补丁块"""
-    return re.search(ot("PATCH")+r'\n?(.*?)\n?' +
-                     ct("PATCH"), patch_str, re.DOTALL) is not None
+    """
+    parameters = {
+        "type": "object",
+        "properties": {
+            "file": {"type": "string", "description": "文件路径"},
+            "reason": {"type": "string", "description": "修改原因"},
+            "content": {"type": "string", "description": "补丁内容"}
+        }
+    }
 
 
-def _parse_patch(patch_str: str) -> Tuple[Dict[str, str], str]:
-    """解析新的上下文补丁格式"""
-    result = {}
-    patches = re.findall(ot("PATCH")+r'\n?(.*?)\n?' +
-                         ct("PATCH"), patch_str, re.DOTALL)
-    if patches:
-        for patch in patches:
-            first_line = patch.splitlines()[0]
-            sm = re.match(r'^File:\s*(.+)$', first_line)
-            if not sm:
-                return ({}, f"""无效的补丁格式，正确格式应该为：
-{ot("PATCH")}
-File: [文件路径]
-Reason: [修改原因]
-[代码修改说明，不用输出完整的代码，仅输出修改的片段即可]
-{ct("PATCH")}""")
-            filepath = os.path.abspath(sm.group(1).strip())
-            if filepath not in result:
-                result[filepath] = patch
-            else:
-                result[filepath] += "\n\n" + patch
-    return result, ""
 
+    def execute(self, args: Dict) -> Dict[str, Any]:
+        """Apply patches to files"""
 
-def apply_patch(output_str: str, agent: Any) -> str:
-    """Apply patches to files"""
-    with yaspin(text="正在应用补丁...", color="cyan") as spinner:
-        try:
-            patches, error_msg = _parse_patch(output_str)
-            if error_msg:
-                spinner.text = "补丁格式错误"
+        from jarvis.jarvis_agent import Agent
+        filepath = args["file"]
+        patch_content = args["content"]
+        agent: Agent = args["agent"]
+
+        with yaspin(text="正在应用补丁...", color="cyan") as spinner:
+
+            # 获取当前提交hash作为起始点
+            spinner.text = "开始获取当前提交hash..."
+            start_hash = get_latest_commit_hash()
+            spinner.write("✅ 当前提交hash获取完成")
+
+            not_read_file = not has_read_file(filepath) and os.path.exists(filepath) and os.path.getsize(filepath) > 0
+            if not_read_file:
+                spinner.text=f"以下文件未读取: {filepath}，应用补丁存在风险，将先读取文件后再生成补丁"
                 spinner.fail("❌")
-                return error_msg
-        except Exception as e:
-            spinner.text = "解析补丁失败"
-            spinner.fail("❌")
-            return f"解析补丁失败: {str(e)}"
+                return {
+                    "success": False,
+                    "stdout": f"以下文件未读取: {filepath}，应用补丁存在风险，请先读取文件后再生成补丁",
+                    "stderr": ""
+                }
 
-        # 获取当前提交hash作为起始点
-        spinner.text = "开始获取当前提交hash..."
-        start_hash = get_latest_commit_hash()
-        spinner.write("✅ 当前提交hash获取完成")
+            # 检查是否有文件在Git仓库外
+            in_git_repo = _is_file_in_git_repo(filepath)
 
-        not_read_file = [
-            f for f in patches.keys() 
-            if not has_read_file(f) 
-            and os.path.exists(f) 
-            and os.path.getsize(f) > 0
-        ]
-        if not_read_file:
-            spinner.text=f"以下文件未读取: {not_read_file}，应用补丁存在风险，将先读取文件后再生成补丁"
-            spinner.fail("❌")
-            return f"以下文件未读取: {not_read_file}，应用补丁存在风险，请先读取文件后再生成补丁"
-
-        # 检查是否有文件在Git仓库外
-        in_git_repo = True
-        for filepath in patches.keys():
-            if not _is_file_in_git_repo(filepath):
-                in_git_repo = False
-                break
-
-        # 按文件逐个处理
-        for filepath, patch_content in patches.items():
             try:
                 spinner.text = f"正在处理文件: {filepath}"
                 if not os.path.exists(filepath):
@@ -188,59 +124,74 @@ def apply_patch(output_str: str, agent: Any) -> str:
                 revert_file(filepath)  # 回滚单个文件
                 spinner.write(f"✅ 文件 {filepath} 回滚完成")
 
-        final_ret = ""
-        if in_git_repo:
-            diff = get_diff()
-            if diff:
-                PrettyOutput.print(diff, OutputType.CODE, lang="diff")
-                with spinner.hidden():
-                    commited = handle_commit_workflow()
-                if commited:
-                    # 获取提交信息
-                    end_hash = get_latest_commit_hash()
-                    commits = get_commits_between(start_hash, end_hash)
+            final_ret = ""
+            if in_git_repo:
+                diff = get_diff()
+                if diff:
+                    PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+                    with spinner.hidden():
+                        commited = handle_commit_workflow()
+                    if commited:
+                        # 获取提交信息
+                        end_hash = get_latest_commit_hash()
+                        commits = get_commits_between(start_hash, end_hash)
 
-                    # 添加提交信息到final_ret
-                    if commits:
-                        final_ret += "✅ 补丁已应用\n"
-                        final_ret += "# 提交信息:\n"
-                        for commit_hash, commit_message in commits:
-                            final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
+                        # 添加提交信息到final_ret
+                        if commits:
+                            final_ret += "✅ 补丁已应用\n"
+                            final_ret += "# 提交信息:\n"
+                            for commit_hash, commit_message in commits:
+                                final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
 
-                        final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
+                            final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
 
-                        # 修改后的提示逻辑
-                        addon_prompt = f"如果用户的需求未完成，请继续生成补丁，如果已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
-                        addon_prompt += "如果有任何信息不明确，调用工具获取信息\n"
-                        addon_prompt += "每次响应必须且只能包含一个操作\n"
+                            # 修改后的提示逻辑
+                            addon_prompt = f"如果用户的需求未完成，请继续生成补丁，如果已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
+                            addon_prompt += "如果有任何信息不明确，调用工具获取信息\n"
+                            addon_prompt += "每次响应必须且只能包含一个操作\n"
 
-                        agent.set_addon_prompt(addon_prompt)
+                            agent.set_addon_prompt(addon_prompt)
 
+                        else:
+                            final_ret += "✅ 补丁已应用（没有新的提交）"
                     else:
-                        final_ret += "✅ 补丁已应用（没有新的提交）"
+                        final_ret += "❌ 补丁应用被拒绝\n"
+                        final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
                 else:
-                    final_ret += "❌ 补丁应用被拒绝\n"
-                    final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
+                    commited = False
+                    final_ret += "❌ 没有要提交的更改\n"
             else:
-                commited = False
-                final_ret += "❌ 没有要提交的更改\n"
-        else:
-            # 对于Git仓库外的文件，直接返回成功
-            final_ret += "✅ 补丁已应用（文件不在Git仓库中）"
-            commited = True
-        # 用户确认最终结果
-        with spinner.hidden():
-            if commited:
-                return final_ret
-            PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
-            if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
-                return final_ret
-            custom_reply = get_multiline_input("请输入自定义回复")
-            if not custom_reply.strip():  # 如果自定义回复为空，返回空字符串
-                return ""
-            agent.set_addon_prompt(custom_reply)
-            return final_ret
-
+                # 对于Git仓库外的文件，直接返回成功
+                final_ret += "✅ 补丁已应用（文件不在Git仓库中）"
+                commited = True
+            # 用户确认最终结果
+            with spinner.hidden():
+                if commited:
+                    return {
+                        "success": True,
+                        "stdout": final_ret,
+                        "stderr": ""
+                    }
+                PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
+                if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
+                    return {
+                        "success": True,
+                        "stdout": final_ret,
+                        "stderr": ""
+                    }
+                custom_reply = get_multiline_input("请输入自定义回复")
+                if not custom_reply.strip():  # 如果自定义回复为空，返回空字符串
+                    return {
+                        "success": True,
+                        "stdout": final_ret,
+                        "stderr": ""
+                    }
+                agent.set_addon_prompt(custom_reply)
+                return {
+                    "success": True,
+                    "stdout": final_ret,
+                    "stderr": ""
+                }
 
 def _is_file_in_git_repo(filepath: str) -> bool:
     """检查文件是否在当前Git仓库中"""
