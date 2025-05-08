@@ -3,7 +3,8 @@ from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import ct, ot, init_env
+from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.utils import init_env
 
 # 定义每个角色的系统提示
 PM_PROMPT = f"""
