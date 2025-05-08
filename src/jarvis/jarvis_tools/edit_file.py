@@ -63,6 +63,7 @@ class PatchOutputHandler:
 - 绝不提供完整文件内容，除非是新建文件
 - 每个文件的修改是独立的，不能出现“参照xxx文件的修改”这样的描述
 - 不要出现未实现的代码，如：TODO
+- 如果要修改的内容较多，请分多次修改
     """
     parameters = {
         "type": "object",
