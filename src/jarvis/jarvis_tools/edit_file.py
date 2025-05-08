@@ -23,9 +23,9 @@ from jarvis.jarvis_utils.tag import ot, ct
 
 class PatchOutputHandler:
 
-    name = "patch"
-    description = """代码补丁工具，用于生成和应用代码补丁
-# 代码补丁规范
+    name = "edit_file"
+    description = """代码编辑工具，用于编辑文件
+# 代码编辑规范
 
 ## 重要提示
 我可以看到完整的代码，所以不需要生成完整的代码，只需要提供修改的代码片段即可。请尽量精简补丁内容，只包含必要的上下文和修改部分。特别注意：不要提供完整文件内容，只提供需要修改的部分！
@@ -146,7 +146,7 @@ class PatchOutputHandler:
                             final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
 
                             # 修改后的提示逻辑
-                            addon_prompt = f"如果用户的需求未完成，请继续生成补丁，如果已经完成，请终止，不要输出新的 {ot('PATCH')}，不要实现任何超出用户需求外的内容\n"
+                            addon_prompt = f"如果用户的需求未完成，请继续生成补丁，如果已经完成，请终止，不要输出新的PATCH，不要实现任何超出用户需求外的内容\n"
                             addon_prompt += "如果有任何信息不明确，调用工具获取信息\n"
                             addon_prompt += "每次响应必须且只能包含一个操作\n"
 
@@ -483,19 +483,19 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
 
 ## 输出模板
 {ot("DIFF")}
->>>>>> SEARCH
+{">" * 5} SEARCH
 [需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
 {'='*5}
 [替换后的新代码]
-<<<<<< REPLACE
+{"<" * 5} REPLACE
 {ct("DIFF")}
 
 {ot("DIFF")}
->>>>>> SEARCH
+{">" * 5} SEARCH
 [另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
 {'='*5}
 [另一处替换后的新代码]
-<<<<<< REPLACE
+{"<" * 5} REPLACE
 {ct("DIFF")}
 """
             
