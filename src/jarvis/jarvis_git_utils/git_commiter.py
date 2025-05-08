@@ -153,9 +153,10 @@ class GitCommitTool:
                             except Exception as e:
                                 spinner.write(f"⚠️ 上传文件时出错: {str(e)}")
                                 upload_success = False
-                        
                         # 根据上传状态准备完整的提示
                         if upload_success:
+                            # 尝试生成提交信息
+                            spinner.text = "正在生成提交消息..."
                             # 使用上传的文件
                             prompt = base_prompt + f'''
         # 变更概述
@@ -178,8 +179,6 @@ class GitCommitTool:
         '''
                                 commit_message = platform.chat_until_success(prompt)
                         
-                        # 尝试生成提交信息
-                        spinner.text = "正在生成提交消息..."
                         while True:
                             # 只在特定情况下重新获取commit_message
                             if not upload_success and not is_large_content and not commit_message:
