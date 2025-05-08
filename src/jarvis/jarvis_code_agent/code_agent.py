@@ -201,7 +201,6 @@ class CodeAgent:
 - loc比wc -l提供更多代码统计信息，应优先使用
 - 针对不同编程语言选择对应的代码质量检查工具
 - 不要留下未实现的代码
-- 对于非常复杂的需求，可以使用create_code_agent工具，但是要提供完整的上下文信息
 </notes>
 </code_engineer_guide>
 """
