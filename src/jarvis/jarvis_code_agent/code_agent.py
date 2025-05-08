@@ -50,9 +50,7 @@ class CodeAgent:
             "read_code",
             "methodology",
             "chdir",
-            "create_code_agent",
             "find_methodology",
-            "virtual_tty",
         ])
         code_system_prompt = """
 <code_engineer_guide>
