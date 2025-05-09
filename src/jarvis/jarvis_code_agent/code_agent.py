@@ -201,7 +201,7 @@ class CodeAgent:
                 )
                 if files_result.returncode == 0:
                     files = list(set(filter(None, files_result.stdout.splitlines())))
-                    commit['files'] = files[:50]  # 限制最多50个文件
+                    commit['files'] = files[:20]  # 限制最多50个文件
 
             return commits
 
