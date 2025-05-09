@@ -175,6 +175,7 @@ class YuanbaoPlatform(BasePlatform):
                     # 2. Generate upload information
                     spinner.text = f"获取上传信息: {file_name}"
                     upload_info = self._generate_upload_info(file_name)
+                    print(upload_info)
                     if not upload_info:
                         spinner.text = f"无法获取文件 {file_name} 的上传信息"
                         spinner.fail("❌")
@@ -208,6 +209,8 @@ class YuanbaoPlatform(BasePlatform):
                                 file_metadata["height"] = img.height
                         except Exception as e:
                             spinner.write(f"⚠️ 无法获取图片 {file_name} 的尺寸: {str(e)}")
+
+                    self._wait_upload(file_name)
                     
                     uploaded_files.append(file_metadata)
                     spinner.text = f"文件 {file_name} 上传成功"
@@ -220,6 +223,15 @@ class YuanbaoPlatform(BasePlatform):
         
         self.multimedia = uploaded_files
         return True
+        
+    def _wait_upload(self, file_name: str):
+        """等待文件上传完成"""
+        while True:
+            upload_info = self._generate_upload_info(file_name)
+            if upload_info and upload_info.get("isUploaded"):
+                break
+            time.sleep(1)
+
         
     def _generate_upload_info(self, file_name: str) -> Dict:
         """从元宝API生成上传信息
