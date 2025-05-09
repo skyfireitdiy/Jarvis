@@ -159,7 +159,7 @@ class CodeAgent:
                         'message': 提交信息,
                         'author': 作者,
                         'date': 提交日期,
-                        'files': [修改的文件列表] (最多50个文件)
+                        'files': [修改的文件列表] (最多20个文件)
                     },
                     ...
                 ]
@@ -201,7 +201,7 @@ class CodeAgent:
                 )
                 if files_result.returncode == 0:
                     files = list(set(filter(None, files_result.stdout.splitlines())))
-                    commit['files'] = files[:20]  # 限制最多50个文件
+                    commit['files'] = files[:20]  # 限制最多20个文件
 
             return commits
 
@@ -209,7 +209,10 @@ class CodeAgent:
             return []
 
     def _init_env(self) -> None:
-        """初始化环境"""
+        """初始化环境，包括：
+        1. 查找git根目录
+        2. 检查并处理未提交的修改
+        """
         with yaspin(text="正在初始化环境...", color="cyan") as spinner:
             curr_dir = os.getcwd()
             git_dir = find_git_root(curr_dir)
@@ -222,7 +225,10 @@ class CodeAgent:
             spinner.ok("✅")
 
     def _handle_uncommitted_changes(self) -> None:
-        """处理未提交的修改"""
+        """处理未提交的修改，包括：
+        1. 提示用户确认是否提交
+        2. 如果确认，则暂存并提交所有修改
+        """
         if has_uncommitted_changes():
             PrettyOutput.print("检测到未提交的修改，是否要提交？", OutputType.WARNING)
             if user_confirm("是否要提交？", True):
@@ -255,14 +261,14 @@ class CodeAgent:
         start_commit: Optional[str],
         end_commit: Optional[str]
     ) -> List[Tuple[str, str]]:
-        """Show commit history between two commits.
+        """显示两个提交之间的提交历史
 
-        Args:
-            start_commit: The starting commit hash
-            end_commit: The ending commit hash
+        参数:
+            start_commit: 起始提交hash
+            end_commit: 结束提交hash
 
-        Returns:
-            List of tuples containing (commit_hash, commit_message)
+        返回:
+            包含(commit_hash, commit_message)的元组列表
         """
         if start_commit and end_commit:
             commits = get_commits_between(start_commit, end_commit)
