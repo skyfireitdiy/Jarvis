@@ -175,7 +175,6 @@ class YuanbaoPlatform(BasePlatform):
                     # 2. Generate upload information
                     spinner.text = f"获取上传信息: {file_name}"
                     upload_info = self._generate_upload_info(file_name)
-                    print(upload_info)
                     if not upload_info:
                         spinner.text = f"无法获取文件 {file_name} 的上传信息"
                         spinner.fail("❌")
@@ -228,6 +227,7 @@ class YuanbaoPlatform(BasePlatform):
         """等待文件上传完成"""
         while True:
             upload_info = self._generate_upload_info(file_name)
+            print(upload_info)
             if upload_info and upload_info.get("isUploaded"):
                 break
             time.sleep(1)
