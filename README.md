@@ -8,6 +8,7 @@
 
 *您的智能开发和系统交互助手*
 
+[核心特色](#core-features) •
 [视频介绍](#video-introduction) •
 [快速开始](#quick-start) •
 [配置说明](#configuration) •
@@ -19,6 +20,15 @@
 </div>
 
 ---
+
+## 🌟 核心特色 <a id="core-features"></a>
+
+- 🆓 零成本接入：无缝集成元宝、Kimi等优质模型，无需支付API费用，同时保留强大的文件处理、搜索和推理能力
+- 🛠️ 工具驱动：内置丰富工具集，涵盖脚本执行、代码开发、网页搜索、终端操作等核心功能
+- 👥 人机协作：支持实时交互，用户可随时介入指导，确保AI行为符合预期
+- 🔌 高度可扩展：支持自定义工具和平台，轻松集成MCP协议
+- 📈 智能进化：内置方法论系统，持续学习优化，越用越智能
+
 
 ## 📺 视频介绍<a id="video-introduction"></a>
 
@@ -136,7 +146,6 @@ jarvis-methodology --help
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
 | `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
-| `JARVIS_CODE_EMBEDDING_MODEL_SIZE` | small | 代码嵌入模型大小，可选值：small、large |
 
 
 ---
