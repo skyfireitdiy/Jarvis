@@ -1,22 +1,22 @@
 from importlib.metadata import files
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
 class FileSearchReplaceTool:
     name = "file_search_replace"
-    description = """代码编辑工具，用于编辑文件
+    description = """代码编辑工具，用于编辑单个文件
 
 # 代码编辑规范
 
 ## 重要提示
-此工具可以查看和修改完整代码，只需提供要修改的代码片段即可。应尽量精简内容，只包含必要的上下文和修改部分。特别注意：不要提供完整文件内容，只提供需要修改的部分！
+此工具可以查看和修改单个文件的代码，只需提供要修改的代码片段即可。应尽量精简内容，只包含必要的上下文和修改部分。特别注意：不要提供完整文件内容，只提供需要修改的部分！
 
 ## 基本使用
-1. 指定需要修改的一个或多个文件路径
-2. 为每个文件提供一组或多组"搜索文本"和"替换文本"对
-3. 搜索文本需在目标文件中有且仅有一次精确匹配
+1. 指定需要修改的文件路径
+2. 提供一组或多组"搜索文本"和"替换文本"对
+3. 每个搜索文本需在目标文件中有且仅有一次精确匹配
 4. 创建新文件时，使用空字符串("")作为搜索文本，替换文本作为完整文件内容
-5. 所有编辑要么全部成功，要么全部失败并回滚
+5. 所有修改要么全部成功，要么全部失败并回滚
 
 ## 核心原则
 1. **精准修改**：只提供需要修改的代码部分，不需要展示整个文件内容
@@ -44,36 +44,36 @@ class FileSearchReplaceTool:
 ## 最佳实践
 1. 每个修改应专注于单一职责，避免包含过多无关代码
 2. 设计唯一的搜索文本，避免多处匹配的风险
-3. 分多个小步骤执行复杂修改，而非一次性大量更改
-4. 创建新文件时提供完整、格式良好的内容
-5. 不要出现未实现的代码，如：TODO
+3. 创建新文件时提供完整、格式良好的内容
+4. 不要出现未实现的代码，如：TODO
 """
     parameters = {
         "type": "object",
         "properties": {
-            "files_config": {
-                "type": "object",
-                "description": "文件编辑配置，键为文件路径，值为搜索替换对列表",
-                "additionalProperties": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "search": {
-                                "type": "string",
-                                "description": "需要被替换的文本，必须在文件中唯一匹配，新文件用空字符串"
-                            },
-                            "replace": {
-                                "type": "string", 
-                                "description": "替换的目标文本，需保持与原代码相同的缩进和格式风格"
-                            }
+            "file": {
+                "type": "string",
+                "description": "需要修改的文件路径"
+            },
+            "changes": {
+                "type": "array",
+                "description": "一组或多组搜索替换对",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "search": {
+                            "type": "string",
+                            "description": "需要被替换的文本，必须在文件中唯一匹配，新文件用空字符串"
                         },
-                        "required": ["search", "replace"]
-                    }
+                        "replace": {
+                            "type": "string", 
+                            "description": "替换的目标文本，需保持与原代码相同的缩进和格式风格"
+                        }
+                    },
+                    "required": ["search", "replace"]
                 }
             }
         },
-        "required": ["files_config"]
+        "required": ["file", "changes"]
     }
 
     def __init__(self):
@@ -82,30 +82,22 @@ class FileSearchReplaceTool:
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """
-        执行文件搜索替换操作，每个搜索块只允许有且只有一次匹配，否则失败
-        任意一个文件处理失败，则整个操作就失败，并停止处理后续文件
+        执行文件搜索替换操作，每个搜索文本只允许有且只有一次匹配，否则失败
         特殊支持不存在的文件和空文件处理
 
         参数:
-            files_config (dict): 文件搜索替换配置，格式如下：
-            {
-                "文件1": [
-                    {
-                        "search": "搜索块1",
-                        "replace": "替换块1"
-                    },
-                    {
-                        "search": "搜索块2",
-                        "replace": "替换块2"
-                    }
-                ],
-                "文件2": [
-                    {
-                        "search": "搜索块1",
-                        "replace": "替换块1"
-                    }
-                ]
-            }
+            file (str): 文件路径
+            changes (list): 一组或多组搜索替换对，格式如下：
+            [
+                {
+                    "search": "搜索文本1",
+                    "replace": "替换文本1"
+                },
+                {
+                    "search": "搜索文本2",
+                    "replace": "替换文本2"
+                }
+            ]
 
         返回:
             dict: 包含执行结果的字典
@@ -122,50 +114,48 @@ class FileSearchReplaceTool:
         stderr_messages = []
         success = True
         
-        # 创建已处理文件列表，用于失败时回滚
-        processed_files = []
-
-        files_config = args["files_config"]
+        file_path = args["file"]
+        changes = args["changes"]
+        
+        # 创建已处理文件变量，用于失败时回滚
+        original_content = None
+        processed = False
 
         try:
-            for file_path, replacements in files_config.items():
-                file_exists = os.path.exists(file_path)
-                content = ""
-                original_content = ""
+            file_exists = os.path.exists(file_path)
+            content = ""
+            
+            try:
+                # 如果文件存在，则读取内容
+                if file_exists:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        original_content = content
                 
-                try:
-                    # 如果文件存在，则读取内容
-                    if file_exists:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            original_content = content
+                # 创建一个临时内容副本进行操作
+                temp_content = content
+                replaced_count = 0
+                
+                # 处理所有搜索替换对
+                for change in changes:
+                    search_text = change["search"]
+                    replace_text = change["replace"]
                     
-                    file_success = True
-                    file_replaced_count = 0
-                    
-                    # 创建一个临时内容副本进行操作
-                    temp_content = content
-                    
-                    # 执行所有替换操作
-                    for replacement in replacements:
-                        search_text = replacement["search"]
-                        replace_text = replacement["replace"]
-                        
-                        # 特殊处理不存在的文件或空文件
-                        if not file_exists or content == "":
-                            if search_text == "":
-                                # 对于不存在的文件或空文件，如果搜索文本为空，则直接使用替换文本作为内容
-                                temp_content = replace_text
-                                file_replaced_count += 1
-                                continue
-                            else:
-                                stderr_message = f"文件 {file_path} {'不存在' if not file_exists else '为空'}，但搜索文本非空: '{search_text}'"
-                                stderr_messages.append(stderr_message)
-                                PrettyOutput.print(stderr_message, OutputType.ERROR)
-                                file_success = False
-                                success = False
-                                break
-                        
+                    # 特殊处理不存在的文件或空文件
+                    if not file_exists or content == "":
+                        if search_text == "":
+                            # 对于不存在的文件或空文件，如果搜索文本为空，则直接使用替换文本作为内容
+                            temp_content = replace_text
+                            replaced_count += 1
+                            # 只允许有一个空字符串搜索
+                            break
+                        else:
+                            stderr_message = f"文件 {file_path} {'不存在' if not file_exists else '为空'}，但搜索文本非空: '{search_text}'"
+                            stderr_messages.append(stderr_message)
+                            PrettyOutput.print(stderr_message, OutputType.ERROR)
+                            success = False
+                            break
+                    else:
                         # 正常文件处理 - 检查匹配次数
                         match_count = temp_content.count(search_text)
                         
@@ -173,78 +163,68 @@ class FileSearchReplaceTool:
                             stderr_message = f"文件 {file_path} 中未找到匹配文本: '{search_text}'"
                             stderr_messages.append(stderr_message)
                             PrettyOutput.print(stderr_message, OutputType.ERROR)
-                            file_success = False
                             success = False
                             break
                         elif match_count > 1:
-                            stderr_message = f"文件 {file_path} 中匹配到多个 ({match_count}) '{search_text}'，每个搜索块只允许一次匹配"
+                            stderr_message = f"文件 {file_path} 中匹配到多个 ({match_count}) '{search_text}'，搜索文本只允许一次匹配"
                             stderr_messages.append(stderr_message)
                             PrettyOutput.print(stderr_message, OutputType.ERROR)
-                            file_success = False
                             success = False
                             break
                         else:
                             # 只有一个匹配，执行替换
                             temp_content = temp_content.replace(search_text, replace_text, 1)
-                            file_replaced_count += 1
+                            replaced_count += 1
 
-                    # 只有当所有替换操作都成功时，才写回文件
-                    if file_success and (temp_content != original_content or not file_exists):
-                        # 确保目录存在
-                        os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
-                        
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            f.write(temp_content)
-                        
-                        if file_exists:
-                            processed_files.append((file_path, original_content))
-                        else:
-                            processed_files.append((file_path, None))  # 标记为新创建的文件
-                        
-                        action = "创建并写入" if not file_exists else "成功替换"
-                        stdout_message = f"文件 {file_path} {action} {file_replaced_count} 处"
-                        stdout_messages.append(stdout_message)
-                        PrettyOutput.print(stdout_message, OutputType.SUCCESS)
-                    elif not file_success:
-                        # 如果当前文件处理失败，停止处理后续文件
-                        break
-                    else:
-                        stdout_message = f"文件 {file_path} 没有找到需要替换的内容"
-                        stdout_messages.append(stdout_message)
-                        PrettyOutput.print(stdout_message, OutputType.INFO)
+                # 只有当所有替换操作都成功时，才写回文件
+                if success and (temp_content != original_content or not file_exists):
+                    # 确保目录存在
+                    os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
                     
-                except Exception as e:
-                    stderr_message = f"处理文件 {file_path} 时出错: {str(e)}"
-                    stderr_messages.append(stderr_message)
-                    PrettyOutput.print(stderr_message, OutputType.ERROR)
-                    success = False
-                    break  # 任意文件失败，停止处理
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(temp_content)
+                    
+                    processed = True
+                    
+                    action = "创建并写入" if not file_exists else "成功替换"
+                    stdout_message = f"文件 {file_path} {action} {replaced_count} 处"
+                    stdout_messages.append(stdout_message)
+                    PrettyOutput.print(stdout_message, OutputType.SUCCESS)
+                elif success:
+                    stdout_message = f"文件 {file_path} 没有找到需要替换的内容"
+                    stdout_messages.append(stdout_message)
+                    PrettyOutput.print(stdout_message, OutputType.INFO)
+                
+            except Exception as e:
+                stderr_message = f"处理文件 {file_path} 时出错: {str(e)}"
+                stderr_messages.append(stderr_message)
+                PrettyOutput.print(stderr_message, OutputType.ERROR)
+                success = False
 
             # 如果操作失败，回滚已修改的文件
-            if not success and processed_files:
-                rollback_message = "操作失败，正在回滚已修改的文件..."
+            if not success and processed:
+                rollback_message = "操作失败，正在回滚修改..."
                 stderr_messages.append(rollback_message)
                 PrettyOutput.print(rollback_message, OutputType.WARNING)
                 
-                for file_path, original_content in processed_files:
-                    try:
-                        if original_content is None:
-                            # 如果是新创建的文件，则删除
-                            if os.path.exists(file_path):
-                                os.remove(file_path)
-                            rollback_file_message = f"已删除新创建的文件: {file_path}"
-                        else:
-                            # 如果是修改的文件，则恢复原内容
-                            with open(file_path, 'w', encoding='utf-8') as f:
-                                f.write(original_content)
-                            rollback_file_message = f"已回滚文件: {file_path}"
-                            
-                        stderr_messages.append(rollback_file_message)
-                        PrettyOutput.print(rollback_file_message, OutputType.INFO)
-                    except Exception as e:
-                        rollback_error = f"回滚文件 {file_path} 失败: {str(e)}"
-                        stderr_messages.append(rollback_error)
-                        PrettyOutput.print(rollback_error, OutputType.ERROR)
+                try:
+                    if original_content is None:
+                        # 如果是新创建的文件，则删除
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                        rollback_file_message = f"已删除新创建的文件: {file_path}"
+                    else:
+                        # 如果是修改的文件，则恢复原内容
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            f.write(original_content)
+                        rollback_file_message = f"已回滚文件: {file_path}"
+                        
+                    stderr_messages.append(rollback_file_message)
+                    PrettyOutput.print(rollback_file_message, OutputType.INFO)
+                except Exception as e:
+                    rollback_error = f"回滚文件 {file_path} 失败: {str(e)}"
+                    stderr_messages.append(rollback_error)
+                    PrettyOutput.print(rollback_error, OutputType.ERROR)
 
             return {
                 "success": success,
@@ -257,25 +237,24 @@ class FileSearchReplaceTool:
             PrettyOutput.print(error_msg, OutputType.ERROR)
             
             # 如果有已修改的文件，尝试回滚
-            if processed_files:
-                rollback_message = "操作失败，正在回滚已修改的文件..."
+            if processed:
+                rollback_message = "操作失败，正在回滚修改..."
                 stderr_messages.append(rollback_message)
                 PrettyOutput.print(rollback_message, OutputType.WARNING)
                 
-                for file_path, original_content in processed_files:
-                    try:
-                        if original_content is None:
-                            # 如果是新创建的文件，则删除
-                            if os.path.exists(file_path):
-                                os.remove(file_path)
-                            stderr_messages.append(f"已删除新创建的文件: {file_path}")
-                        else:
-                            # 如果是修改的文件，则恢复原内容
-                            with open(file_path, 'w', encoding='utf-8') as f:
-                                f.write(original_content)
-                            stderr_messages.append(f"已回滚文件: {file_path}")
-                    except:
-                        stderr_messages.append(f"回滚文件失败: {file_path}")
+                try:
+                    if original_content is None:
+                        # 如果是新创建的文件，则删除
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                        stderr_messages.append(f"已删除新创建的文件: {file_path}")
+                    else:
+                        # 如果是修改的文件，则恢复原内容
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            f.write(original_content)
+                        stderr_messages.append(f"已回滚文件: {file_path}")
+                except:
+                    stderr_messages.append(f"回滚文件失败: {file_path}")
             
             return {
                 "success": False,
