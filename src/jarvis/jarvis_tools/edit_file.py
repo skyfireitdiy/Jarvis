@@ -77,7 +77,26 @@ class PatchOutputHandler:
 
 
     def execute(self, args: Dict) -> Dict[str, Any]:
-        """Apply patches to files"""
+        """应用补丁到文件
+        
+        参数:
+            args (Dict): 包含以下键的字典:
+                - file (str): 要修改的文件路径
+                - content (str): 补丁内容
+                - agent (Agent): Jarvis代理实例
+                
+        返回值:
+            Dict[str, Any]: 包含以下键的字典:
+                - success (bool): 操作是否成功
+                - stdout (str): 成功时的输出信息
+                - stderr (str): 错误时的错误信息
+                
+        异常:
+            可能抛出各种异常，包括:
+            - 文件操作异常
+            - Git操作异常
+            - 其他运行时异常
+        """
 
         from jarvis.jarvis_agent import Agent
         filepath = args["file"]
