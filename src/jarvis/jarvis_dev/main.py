@@ -997,6 +997,7 @@ def create_dev_team() -> MultiAgent:
         "methodology",
         "ask_codebase",
         "edit_file",
+        "rewrite_file",
     ])
 
     BA_output_handler = ToolRegistry()
@@ -1009,6 +1010,7 @@ def create_dev_team() -> MultiAgent:
         "methodology",
         "ask_codebase",
         "edit_file",
+        "rewrite_file",
     ])
 
     SA_output_handler = ToolRegistry()
@@ -1020,6 +1022,7 @@ def create_dev_team() -> MultiAgent:
         "read_code",
         "methodology",
         "edit_file",
+        "rewrite_file",
     ])
 
     TL_output_handler = ToolRegistry()
@@ -1030,6 +1033,7 @@ def create_dev_team() -> MultiAgent:
         "execute_script",
         "methodology",
         "edit_file",
+        "rewrite_file",
     ])
 
     DEV_output_handler = ToolRegistry()
@@ -1042,6 +1046,7 @@ def create_dev_team() -> MultiAgent:
         "create_sub_agent",
         "methodology",
         "edit_file",
+        "rewrite_file",
     ])
 
     QA_output_handler = ToolRegistry()
@@ -1055,6 +1060,7 @@ def create_dev_team() -> MultiAgent:
         "read_code",
         "methodology",
         "edit_file",
+        "rewrite_file",
     ])
 
     # Update PM prompt with tool usage guidance

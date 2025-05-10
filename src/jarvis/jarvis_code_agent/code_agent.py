@@ -55,6 +55,7 @@ class CodeAgent:
             "chdir",
             "find_methodology",
             "edit_file",
+            "rewrite_file"
         ])
         code_system_prompt = """
 <code_engineer_guide>
@@ -92,6 +93,13 @@ class CodeAgent:
 - 每个搜索文本在文件中必须唯一匹配，确保修改的准确性
 - 为新文件创建时，使用空字符串作为搜索文本，替换文本作为完整内容
 - 保持与原代码完全一致的格式和缩进风格
+
+### 文件重写工具使用
+- rewrite_file工具用于完全重写文件内容或创建新文件
+- 当需要替换整个文件内容时，优先使用rewrite_file工具
+- 创建新文件时，使用rewrite_file工具提供完整的文件内容
+- 保持与原代码相同的格式、缩进和编码风格
+- 确保提供格式良好的完整文件内容
 
 ### 最小补丁原则
 - 对于任何代码修改，只提供需要修改的代码部分，不提供完整文件内容
