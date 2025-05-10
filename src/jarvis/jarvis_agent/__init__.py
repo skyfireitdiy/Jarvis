@@ -2,6 +2,7 @@ import datetime
 import platform
 from typing import Any, Callable, List, Optional, Tuple, Union
 
+from jarvis.jarvis_tools.registry import ToolRegistry
 from yaspin import yaspin # type: ignore
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
@@ -138,6 +139,7 @@ class Agent:
                  summary_prompt: Optional[str] = None,
                  auto_complete: Optional[bool] = None,
                  output_handler: List[OutputHandler] = [],
+                 use_tools: List[str] = [],
                  input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
                  execute_tool_confirm: Optional[bool] = None,
                  need_summary: bool = True,
@@ -180,6 +182,8 @@ class Agent:
 
         from jarvis.jarvis_tools.registry import ToolRegistry
         self.output_handler = output_handler if output_handler else [ToolRegistry()]
+        self.set_use_tools(use_tools)
+
         self.multiline_inputer = multiline_inputer if multiline_inputer else get_multiline_input
 
         self.prompt = ""
@@ -280,6 +284,13 @@ class Agent:
 {complete_prompt}
 """)
         self.first = True
+
+    def set_use_tools(self, use_tools):
+        for handler in self.output_handler:
+            if isinstance(handler, ToolRegistry):
+                if use_tools:
+                    handler.use_tools(use_tools)
+                break
 
 
     def set_addon_prompt(self, addon_prompt: str):
