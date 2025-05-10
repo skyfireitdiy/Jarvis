@@ -13,8 +13,7 @@
 - 完善的错误处理和回滚机制
 - 严格的格式保持要求
 """
-from importlib.metadata import files
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 
 class FileSearchReplaceTool:
