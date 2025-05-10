@@ -54,7 +54,7 @@ class CodeAgent:
             "methodology",
             "chdir",
             "find_methodology",
-            "edit_file",
+            "file_search_replace",
         ])
         code_system_prompt = """
 <code_engineer_guide>
@@ -86,8 +86,15 @@ class CodeAgent:
 - 仅在命令行工具不足时使用专用工具
 
 ## 代码编辑规范
+### 代码修改工具选择
+- 对于所有代码修改任务，优先使用file_search_replace工具
+- file_search_replace通过搜索和替换实现精确的代码编辑，是首选的代码修改方式
+- 每个搜索文本在文件中必须唯一匹配，确保修改的准确性
+- 为新文件创建时，使用空字符串作为搜索文本，替换文本作为完整内容
+- 保持与原代码完全一致的格式和缩进风格
+
 ### 最小补丁原则
-- 使用edit_file工具时，只提供需要修改的代码部分，不提供完整文件内容
+- 对于任何代码修改，只提供需要修改的代码部分，不提供完整文件内容
 - 严格保持原始代码的缩进、空行和格式风格
 - 提供最小必要的上下文，确保修改位置精确
 - 每个修改必须包含清晰的修改理由
@@ -123,7 +130,10 @@ class CodeAgent:
         self.agent.set_addon_prompt(
             "请使用工具充分理解用户需求，然后根据需求一步步执行代码修改/开发，"
             "如果不清楚要修改那些文件，可以使用ask_codebase工具，"
-            "以：xxxx功能在哪个文件中实现？类似句式提问"
+            "以：xxxx功能在哪个文件中实现？类似句式提问。"
+            "所有代码修改任务都应优先使用file_search_replace工具，而非edit_file工具。"
+            "file_search_replace工具通过精确的搜索和替换实现代码编辑，"
+            "搜索文本需在目标文件中有且仅有一次精确匹配，确保修改的准确性。"
         )
 
         self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
