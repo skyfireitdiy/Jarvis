@@ -10,7 +10,6 @@ import argparse
 from typing import Any, Dict, Optional, List, Tuple
 
 # 忽略yaspin的类型检查
-from jarvis.jarvis_tools.edit_file import get_diff, handle_commit_workflow
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from yaspin import yaspin  # type: ignore
 
@@ -24,7 +23,9 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.git_utils import (
     find_git_root,
     get_commits_between,
+    get_diff,
     get_latest_commit_hash,
+    handle_commit_workflow,
     has_uncommitted_changes
 )
 from jarvis.jarvis_utils.input import get_multiline_input

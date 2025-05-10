@@ -12,7 +12,9 @@ import os
 import re
 import subprocess
 from typing import List, Tuple, Dict
+from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.utils import user_confirm
 def find_git_root(start_dir: str = ".") -> str:
     """
     切换到给定路径的Git根目录，如果不是Git仓库则初始化。
@@ -92,6 +94,130 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
     except Exception as e:
         PrettyOutput.print(f"获取commit历史异常: {str(e)}", OutputType.ERROR)
         return []
+    
+
+# 修改后的获取差异函数
+
+
+def get_diff() -> str:
+    """使用git获取暂存区差异"""
+    import subprocess
+    
+    # 初始化状态
+    need_reset = False
+    
+    try:
+        # 暂存所有修改
+        subprocess.run(['git', 'add', '.'], check=True)
+        need_reset = True
+        
+        # 获取差异
+        result = subprocess.run(
+            ['git', 'diff', '--cached'],
+            capture_output=True,
+            text=False,
+            check=True
+        )
+        
+        # 解码输出
+        try:
+            ret = result.stdout.decode('utf-8')
+        except UnicodeDecodeError:
+            ret = result.stdout.decode('utf-8', errors='replace')
+        
+        # 重置暂存区
+        subprocess.run(['git', "reset", "--mixed"], check=False)
+        return ret
+        
+    except subprocess.CalledProcessError as e:
+        if need_reset:
+            subprocess.run(['git', "reset", "--mixed"], check=False)
+        return f"获取差异失败: {str(e)}"
+    except Exception as e:
+        if need_reset:
+            subprocess.run(['git', "reset", "--mixed"], check=False)
+        return f"发生意外错误: {str(e)}"
+
+
+
+
+
+def revert_file(filepath: str):
+    """增强版git恢复，处理新文件"""
+    import subprocess
+    try:
+        # 检查文件是否在版本控制中
+        result = subprocess.run(
+            ['git', 'ls-files', '--error-unmatch', filepath],
+            stderr=subprocess.PIPE,
+            text=False  # 禁用自动文本解码
+        )
+        if result.returncode == 0:
+            subprocess.run(['git', 'checkout', 'HEAD',
+                           '--', filepath], check=True)
+        else:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        subprocess.run(['git', 'clean', '-f', '--', filepath], check=True)
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.decode('utf-8', errors='replace') if e.stderr else str(e)
+        PrettyOutput.print(f"恢复文件失败: {error_msg}", OutputType.ERROR)
+# 修改后的恢复函数
+
+
+def revert_change():
+    """恢复所有未提交的修改到HEAD状态"""
+    import subprocess
+    try:
+        # 检查是否为空仓库
+        head_check = subprocess.run(
+            ['git', 'rev-parse', '--verify', 'HEAD'],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE
+        )
+        if head_check.returncode == 0:
+            subprocess.run(['git', 'reset', '--hard', 'HEAD'], check=True)
+        subprocess.run(['git', 'clean', '-fd'], check=True)
+    except subprocess.CalledProcessError as e:
+        return f"恢复更改失败: {str(e)}"
+
+
+def handle_commit_workflow() -> bool:
+    """Handle the git commit workflow and return the commit details.
+
+    Returns:
+        bool: 提交是否成功
+    """
+    if is_confirm_before_apply_patch() and not user_confirm("是否要提交代码？", default=True):
+        revert_change()
+        return False
+    
+    import subprocess
+    try:
+        # 获取当前分支的提交总数
+        commit_count = subprocess.run(
+            ['git', 'rev-list', '--count', 'HEAD'],
+            capture_output=True,
+            text=True
+        )
+        if commit_count.returncode != 0:
+            return False
+            
+        commit_count = int(commit_count.stdout.strip())
+        
+        # 暂存所有修改
+        subprocess.run(['git', 'add', '.'], check=True)
+        
+        # 提交变更
+        subprocess.run(
+            ['git', 'commit', '-m', f'CheckPoint #{commit_count + 1}'], 
+            check=True
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        return False
+
+
 def get_latest_commit_hash() -> str:
     """获取当前Git仓库的最新提交哈希值
 
@@ -149,3 +275,21 @@ def get_modified_line_ranges() -> Dict[str, Tuple[int, int]]:
             result[current_file] = (start_line, end_line)
 
     return result
+
+
+
+def is_file_in_git_repo(filepath: str) -> bool:
+    """检查文件是否在当前Git仓库中"""
+    import subprocess
+    try:
+        # 获取Git仓库根目录
+        repo_root = subprocess.run(
+            ['git', 'rev-parse', '--show-toplevel'],
+            capture_output=True,
+            text=True
+        ).stdout.strip()
+        
+        # 检查文件路径是否在仓库根目录下
+        return os.path.abspath(filepath).startswith(os.path.abspath(repo_root))
+    except:
+        return False
