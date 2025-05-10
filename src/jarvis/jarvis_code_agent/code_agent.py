@@ -125,6 +125,8 @@ class CodeAgent:
             "以：xxxx功能在哪个文件中实现？类似句式提问"
         )
 
+        self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
+
     def get_root_dir(self) -> str:
         """获取项目根目录
 
