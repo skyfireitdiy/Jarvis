@@ -1,3 +1,7 @@
+from importlib.metadata import files
+from typing import Any, Dict
+
+
 class FileSearchReplaceTool:
     name = "file_search_replace"
     description = """代码编辑工具，用于编辑文件
@@ -76,7 +80,7 @@ class FileSearchReplaceTool:
         """初始化文件搜索替换工具"""
         pass
 
-    def execute(self, files_config):
+    def execute(self, args: Dict) -> Dict[str, Any]:
         """
         执行文件搜索替换操作，每个搜索块只允许有且只有一次匹配，否则失败
         任意一个文件处理失败，则整个操作就失败，并停止处理后续文件
@@ -120,6 +124,8 @@ class FileSearchReplaceTool:
         
         # 创建已处理文件列表，用于失败时回滚
         processed_files = []
+
+        files_config = args["files_config"]
 
         try:
             for file_path, replacements in files_config.items():
