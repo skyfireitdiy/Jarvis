@@ -192,6 +192,7 @@ class Agent:
 
         self.tool_call_count = 0
         self.max_tool_call_count = get_max_tool_call_count()
+        self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
 
 
         self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
@@ -288,6 +289,14 @@ class Agent:
             addon_prompt: 附加提示内容
         """
         self.addon_prompt = addon_prompt
+
+    def set_after_tool_call_cb(self, cb: Callable[[Agent], None]): # type: ignore
+        """设置工具调用后回调函数。
+
+        参数:
+            cb: 回调函数
+        """
+        self.after_tool_call_cb = cb
 
     def make_default_addon_prompt(self, need_complete: bool) -> str:
         """生成附加提示。
@@ -656,6 +665,9 @@ arguments:
 
                     if need_return:
                         return self.prompt
+
+                    if self.after_tool_call_cb:
+                        self.after_tool_call_cb(self)
 
                     if self.prompt:
                         continue
