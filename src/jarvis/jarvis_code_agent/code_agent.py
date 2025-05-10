@@ -134,6 +134,22 @@ class CodeAgent:
             "所有代码修改任务都应优先使用file_search_replace工具，而非edit_file工具。"
             "file_search_replace工具通过精确的搜索和替换实现代码编辑，"
             "搜索文本需在目标文件中有且仅有一次精确匹配，确保修改的准确性。"
+            "使用file_search_replace工具时，需要按照以下格式提供参数：\n"
+            "```\n"
+            "files_config: {\n"
+            '  "文件路径1": [\n'
+            '    {"search": "要搜索的文本1", "replace": "要替换的文本1"},\n'
+            '    {"search": "要搜索的文本2", "replace": "要替换的文本2"}\n'
+            "  ],\n"
+            '  "文件路径2": [\n'
+            '    {"search": "要搜索的文本", "replace": "要替换的文本"}\n'
+            "  ]\n"
+            "}\n"
+            "```\n"
+            "对于新文件，使用空字符串作为搜索文本：\n"
+            "```\n"
+            'files_config: {"新文件路径": [{"search": "", "replace": "完整的文件内容"}]}\n'
+            "```"
         )
 
         self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
