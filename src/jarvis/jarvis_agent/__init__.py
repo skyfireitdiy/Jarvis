@@ -290,7 +290,7 @@ class Agent:
         """
         self.addon_prompt = addon_prompt
 
-    def set_after_tool_call_cb(self, cb: Callable[[Agent], None]): # type: ignore
+    def set_after_tool_call_cb(self, cb: Callable[[Any], None]): # type: ignore
         """设置工具调用后回调函数。
 
         参数:
