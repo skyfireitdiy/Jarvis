@@ -10,6 +10,8 @@ import argparse
 from typing import Any, Dict, Optional, List, Tuple
 
 # 忽略yaspin的类型检查
+from jarvis.jarvis_tools.edit_file import get_diff, handle_commit_workflow
+from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from yaspin import yaspin  # type: ignore
 
 from jarvis.jarvis_agent import Agent
@@ -348,6 +350,57 @@ class CodeAgent:
 
         except RuntimeError as e:
             return f"Error during execution: {str(e)}"
+        
+    def after_tool_call_cb(self, agent: Agent) -> None:
+        """工具调用后回调函数。"""
+        final_ret = ""
+        diff = get_diff()
+        if diff:
+            start_hash = get_latest_commit_hash()
+            PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+            commited = handle_commit_workflow()
+            if commited:
+                # 获取提交信息
+                end_hash = get_latest_commit_hash()
+                commits = get_commits_between(start_hash, end_hash)
+
+                # 添加提交信息到final_ret
+                if commits:
+                    final_ret += "✅ 补丁已应用\n"
+                    final_ret += "# 提交信息:\n"
+                    for commit_hash, commit_message in commits:
+                        final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
+
+                    final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
+
+                    # 修改后的提示逻辑
+                    addon_prompt = f"如果用户的需求未完成，请继续生成补丁，如果已经完成，请终止，不要输出新的PATCH，不要实现任何超出用户需求外的内容\n"
+                    addon_prompt += "如果有任何信息不明确，调用工具获取信息\n"
+                    addon_prompt += "每次响应必须且只能包含一个操作\n"
+
+                    agent.set_addon_prompt(addon_prompt)
+
+                else:
+                    final_ret += "✅ 补丁已应用（没有新的提交）"
+            else:
+                final_ret += "❌ 补丁应用被拒绝\n"
+                final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
+        else:
+            commited = False
+            final_ret += "❌ 没有要提交的更改\n"
+        # 用户确认最终结果
+        if commited:
+            agent.prompt += final_ret
+            return
+        PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
+        if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
+            agent.prompt += final_ret
+            return
+        custom_reply = get_multiline_input("请输入自定义回复")
+        if not custom_reply.strip():  # 如果自定义回复为空，返回空字符串
+            agent.prompt += final_ret
+        agent.set_addon_prompt(custom_reply)
+        agent.prompt += final_ret
 
 
 def main() -> None:

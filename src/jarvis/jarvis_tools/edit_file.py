@@ -85,10 +85,6 @@ class PatchOutputHandler:
         agent: Agent = args["agent"]
 
         with yaspin(text="正在应用补丁...", color="cyan") as spinner:
-
-            # 获取当前提交hash作为起始点
-            spinner.text = "开始获取当前提交hash..."
-            start_hash = get_latest_commit_hash()
             spinner.write("✅ 当前提交hash获取完成")
 
             not_read_file = not has_read_file(filepath) and os.path.exists(filepath) and os.path.getsize(filepath) > 0
@@ -124,75 +120,11 @@ class PatchOutputHandler:
                 spinner.text = f"文件 {filepath} 处理失败: {str(e)}, 回滚文件"
                 revert_file(filepath)  # 回滚单个文件
                 spinner.write(f"✅ 文件 {filepath} 回滚完成")
-
-            final_ret = ""
-            if in_git_repo:
-                diff = get_diff()
-                if diff:
-                    PrettyOutput.print(diff, OutputType.CODE, lang="diff")
-                    with spinner.hidden():
-                        commited = handle_commit_workflow()
-                    if commited:
-                        # 获取提交信息
-                        end_hash = get_latest_commit_hash()
-                        commits = get_commits_between(start_hash, end_hash)
-
-                        # 添加提交信息到final_ret
-                        if commits:
-                            final_ret += "✅ 补丁已应用\n"
-                            final_ret += "# 提交信息:\n"
-                            for commit_hash, commit_message in commits:
-                                final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
-
-                            final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
-
-                            # 修改后的提示逻辑
-                            addon_prompt = f"如果用户的需求未完成，请继续生成补丁，如果已经完成，请终止，不要输出新的PATCH，不要实现任何超出用户需求外的内容\n"
-                            addon_prompt += "如果有任何信息不明确，调用工具获取信息\n"
-                            addon_prompt += "每次响应必须且只能包含一个操作\n"
-
-                            agent.set_addon_prompt(addon_prompt)
-
-                        else:
-                            final_ret += "✅ 补丁已应用（没有新的提交）"
-                    else:
-                        final_ret += "❌ 补丁应用被拒绝\n"
-                        final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
-                else:
-                    commited = False
-                    final_ret += "❌ 没有要提交的更改\n"
-            else:
-                # 对于Git仓库外的文件，直接返回成功
-                final_ret += "✅ 补丁已应用（文件不在Git仓库中）"
-                commited = True
-            # 用户确认最终结果
-            with spinner.hidden():
-                if commited:
-                    return {
-                        "success": True,
-                        "stdout": final_ret,
-                        "stderr": ""
-                    }
-                PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
-                if not is_confirm_before_apply_patch() or user_confirm("是否使用此回复？", default=True):
-                    return {
-                        "success": True,
-                        "stdout": final_ret,
-                        "stderr": ""
-                    }
-                custom_reply = get_multiline_input("请输入自定义回复")
-                if not custom_reply.strip():  # 如果自定义回复为空，返回空字符串
-                    return {
-                        "success": True,
-                        "stdout": final_ret,
-                        "stderr": ""
-                    }
-                agent.set_addon_prompt(custom_reply)
-                return {
-                    "success": True,
-                    "stdout": final_ret,
-                    "stderr": ""
-                }
+        return {
+            "success": True,
+            "stdout": f"文件 {filepath} 处理完成",
+            "stderr": ""
+        }
 
 def _is_file_in_git_repo(filepath: str) -> bool:
     """检查文件是否在当前Git仓库中"""
