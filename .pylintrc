@@ -1,0 +1,7 @@
+[MASTER]
+ignore=.venv
+jobs=1
+
+[MESSAGES CONTROL]
+disable=all
+enable=E,F
