@@ -166,7 +166,7 @@ class FileSearchReplaceTool:
                         else:
                             stderr_message = f"文件 {file_path} {'不存在' if not file_exists else '为空'}，但搜索文本非空: '{search_text}'"
                             stderr_messages.append(stderr_message)
-                            PrettyOutput.print(stderr_message, OutputType.ERROR)
+                            PrettyOutput.print(stderr_message, OutputType.WARNING)
                             success = False
                             break
                     else:
@@ -176,13 +176,13 @@ class FileSearchReplaceTool:
                         if match_count == 0:
                             stderr_message = f"文件 {file_path} 中未找到匹配文本: '{search_text}'"
                             stderr_messages.append(stderr_message)
-                            PrettyOutput.print(stderr_message, OutputType.ERROR)
+                            PrettyOutput.print(stderr_message, OutputType.WARNING)
                             success = False
                             break
                         elif match_count > 1:
                             stderr_message = f"文件 {file_path} 中匹配到多个 ({match_count}) '{search_text}'，搜索文本只允许一次匹配"
                             stderr_messages.append(stderr_message)
-                            PrettyOutput.print(stderr_message, OutputType.ERROR)
+                            PrettyOutput.print(stderr_message, OutputType.WARNING)
                             success = False
                             break
                         else:
@@ -212,7 +212,7 @@ class FileSearchReplaceTool:
             except Exception as e:
                 stderr_message = f"处理文件 {file_path} 时出错: {str(e)}"
                 stderr_messages.append(stderr_message)
-                PrettyOutput.print(stderr_message, OutputType.ERROR)
+                PrettyOutput.print(stderr_message, OutputType.WARNING)
                 success = False
 
             # 如果操作失败，回滚已修改的文件
@@ -238,7 +238,7 @@ class FileSearchReplaceTool:
                 except Exception as e:
                     rollback_error = f"回滚文件 {file_path} 失败: {str(e)}"
                     stderr_messages.append(rollback_error)
-                    PrettyOutput.print(rollback_error, OutputType.ERROR)
+                    PrettyOutput.print(rollback_error, OutputType.WARNING)
 
             return {
                 "success": success,
@@ -248,7 +248,7 @@ class FileSearchReplaceTool:
             
         except Exception as e:
             error_msg = f"文件搜索替换操作失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            PrettyOutput.print(error_msg, OutputType.WARNING)
             
             # 如果有已修改的文件，尝试回滚
             if processed:

@@ -118,7 +118,7 @@ class FileRewriteTool:
             except Exception as e:
                 stderr_message = f"处理文件 {file_path} 时出错: {str(e)}"
                 stderr_messages.append(stderr_message)
-                PrettyOutput.print(stderr_message, OutputType.ERROR)
+                PrettyOutput.print(stderr_message, OutputType.WARNING)
                 success = False
 
             # 如果操作失败，回滚已修改的文件
@@ -144,7 +144,7 @@ class FileRewriteTool:
                 except Exception as e:
                     rollback_error = f"回滚文件 {file_path} 失败: {str(e)}"
                     stderr_messages.append(rollback_error)
-                    PrettyOutput.print(rollback_error, OutputType.ERROR)
+                    PrettyOutput.print(rollback_error, OutputType.WARNING)
 
             return {
                 "success": success,
@@ -154,7 +154,7 @@ class FileRewriteTool:
             
         except Exception as e:
             error_msg = f"文件重写操作失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            PrettyOutput.print(error_msg, OutputType.WARNING)
             
             # 如果有已修改的文件，尝试回滚
             if processed:
