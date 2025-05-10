@@ -8,7 +8,7 @@ default = true
 
 [project]
 name = "jarvis-ai-assistant"
-version = "0.1.163"
+version = "0.1.164"
 description = "Jarvis: An AI assistant that uses tools to interact with the system"
 readme = "README.md"
 authors = [{ name = "skyfire", email = "skyfireitdiy@hotmail.com" }]
