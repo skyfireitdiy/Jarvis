@@ -180,7 +180,6 @@ class FileSearchReplaceTool:
                         else:
                             stderr_message = f"文件 {file_path} {'不存在' if not file_exists else '为空'}，但搜索文本非空: '{search_text}'"
                             stderr_messages.append(stderr_message)
-                            PrettyOutput.print(stderr_message, OutputType.WARNING)
                             success = False
                             break
                     else:
@@ -190,13 +189,11 @@ class FileSearchReplaceTool:
                         if match_count == 0:
                             stderr_message = f"文件 {file_path} 中未找到匹配文本: '{search_text}'"
                             stderr_messages.append(stderr_message)
-                            PrettyOutput.print(stderr_message, OutputType.WARNING)
                             success = False
                             break
                         elif match_count > 1:
                             stderr_message = f"文件 {file_path} 中匹配到多个 ({match_count}) '{search_text}'，搜索文本只允许一次匹配"
                             stderr_messages.append(stderr_message)
-                            PrettyOutput.print(stderr_message, OutputType.WARNING)
                             success = False
                             break
                         else:
@@ -233,35 +230,10 @@ class FileSearchReplaceTool:
                 PrettyOutput.print(stderr_message, OutputType.WARNING)
                 success = False
 
-            # 如果操作失败，回滚已修改的文件
-            if not success and processed:
-                rollback_message = "操作失败，正在回滚修改..."
-                stderr_messages.append(rollback_message)
-                PrettyOutput.print(rollback_message, OutputType.WARNING)
-                
-                try:
-                    if original_content is None:
-                        # 如果是新创建的文件，则删除
-                        if os.path.exists(file_path):
-                            os.remove(file_path)
-                        rollback_file_message = f"已删除新创建的文件: {file_path}"
-                    else:
-                        # 如果是修改的文件，则恢复原内容
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            f.write(original_content)
-                        rollback_file_message = f"已回滚文件: {file_path}"
-                        
-                    stderr_messages.append(rollback_file_message)
-                    PrettyOutput.print(rollback_file_message, OutputType.INFO)
-                except Exception as e:
-                    rollback_error = f"回滚文件 {file_path} 失败: {str(e)}"
-                    stderr_messages.append(rollback_error)
-                    PrettyOutput.print(rollback_error, OutputType.WARNING)
-
             return {
                 "success": success,
-                "stdout": "\n".join(stdout_messages),
-                "stderr": "\n".join(stderr_messages)
+                "stdout": "\n".join(stdout_messages) if success else "",
+                "stderr": "\n".join(stderr_messages) if not success else ""
             }
             
         except Exception as e:
