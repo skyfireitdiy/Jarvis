@@ -163,8 +163,7 @@ class FileSearchReplaceTool:
                 
                 # 创建一个临时内容副本进行操作
                 temp_content = content
-                replaced_count = 0
-                
+
                 # 处理所有搜索替换对
                 for change in changes:
                     search_text = change["search"]
@@ -175,7 +174,6 @@ class FileSearchReplaceTool:
                         if search_text == "":
                             # 对于不存在的文件或空文件，如果搜索文本为空，则直接使用替换文本作为内容
                             temp_content = replace_text
-                            replaced_count += 1
                             # 只允许有一个空字符串搜索
                             break
                         else:
@@ -200,7 +198,6 @@ class FileSearchReplaceTool:
                         else:
                             # 只有一个匹配，执行替换
                             temp_content = temp_content.replace(search_text, replace_text, 1)
-                            replaced_count += 1
 
                 if not success:
                     success, temp_content = handle_code_patch(file_path, yaml.safe_dump(changes))
@@ -215,8 +212,8 @@ class FileSearchReplaceTool:
                     
                     processed = True
                     
-                    action = "创建并写入" if not file_exists else "成功替换"
-                    stdout_message = f"文件 {file_path} {action} {replaced_count} 处"
+                    action = "创建并写入" if not file_exists else "成功修改"
+                    stdout_message = f"文件 {file_path} {action} 完成"
                     stdout_messages.append(stdout_message)
                     PrettyOutput.print(stdout_message, OutputType.SUCCESS)
                 elif success:
