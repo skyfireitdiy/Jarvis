@@ -161,45 +161,13 @@ class FileSearchReplaceTool:
                         content = f.read()
                         original_content = content
                 
-                # 创建一个临时内容副本进行操作
-                temp_content = content
-
-                # 处理所有搜索替换对
-                for change in changes:
-                    search_text = change["search"]
-                    replace_text = change["replace"]
-                    
-                    # 特殊处理不存在的文件或空文件
-                    if not file_exists or content == "":
-                        if search_text == "":
-                            # 对于不存在的文件或空文件，如果搜索文本为空，则直接使用替换文本作为内容
-                            temp_content = replace_text
-                            break
-                        else:
-                            stderr_message = f"文件 {file_path} {'不存在' if not file_exists else '为空'}，但搜索文本非空: '{search_text}'"
-                            stderr_messages.append(stderr_message)
-                            success = False
-                            break
-                    else:
-                        # 正常文件处理 - 检查匹配次数
-                        match_count = temp_content.count(search_text)
-                        
-                        if match_count == 0:
-                            stderr_message = f"文件 {file_path} 中未找到匹配文本: '{search_text}'"
-                            stderr_messages.append(stderr_message)
-                            success = False
-                            break
-                        elif match_count > 1:
-                            stderr_message = f"文件 {file_path} 中匹配到多个 ({match_count}) '{search_text}'，搜索文本只允许一次匹配"
-                            stderr_messages.append(stderr_message)
-                            success = False
-                            break
-                        else:
-                            # 只有一个匹配，执行替换
-                            temp_content = temp_content.replace(search_text, replace_text, 1)
+                # 使用fast_edit处理直接替换逻辑
+                success, temp_content, fast_stdout, fast_stderr = fast_edit(file_path, changes, content, file_exists)
+                stdout_messages.extend(fast_stdout)
+                stderr_messages.extend(fast_stderr)
 
                 if not success:
-                    success, temp_content = handle_code_patch(file_path, yaml.safe_dump(changes))
+                    success, temp_content = slow_edit(file_path, yaml.safe_dump(changes))
 
                 # 只有当所有替换操作都成功时，才写回文件
                 if success and (temp_content != original_content or not file_exists):
@@ -265,8 +233,50 @@ class FileSearchReplaceTool:
             
 
 
-def handle_code_patch(filepath: str, patch_content: str) -> Tuple[bool, str]:
-    """处理大型代码文件的补丁操作，使用差异化补丁格式"""
+def fast_edit(file_path: str, changes: list, content: str, file_exists: bool) -> Tuple[bool, str, list, list]:
+    """直接替换编辑逻辑"""
+    temp_content = content
+    stdout_messages = []
+    stderr_messages = []
+    success = True
+    
+    # 处理所有搜索替换对
+    for change in changes:
+        search_text = change["search"]
+        replace_text = change["replace"]
+        
+        # 特殊处理不存在的文件或空文件
+        if not file_exists or content == "":
+            if search_text == "":
+                # 对于不存在的文件或空文件，如果搜索文本为空，则直接使用替换文本作为内容
+                temp_content = replace_text
+                break
+            else:
+                stderr_message = f"文件 {file_path} {'不存在' if not file_exists else '为空'}，但搜索文本非空: '{search_text}'"
+                stderr_messages.append(stderr_message)
+                success = False
+                break
+        else:
+            # 正常文件处理 - 检查匹配次数
+            match_count = temp_content.count(search_text)
+            
+            if match_count == 0:
+                stderr_message = f"文件 {file_path} 中未找到匹配文本: '{search_text}'"
+                stderr_messages.append(stderr_message)
+                success = False
+                break
+            elif match_count > 1:
+                stderr_message = f"文件 {file_path} 中匹配到多个 ({match_count}) '{search_text}'，搜索文本只允许一次匹配"
+                stderr_messages.append(stderr_message)
+                success = False
+                break
+            else:
+                # 只有一个匹配，执行替换
+                temp_content = temp_content.replace(search_text, replace_text, 1)
+    
+    return success, temp_content, stdout_messages, stderr_messages
+
+def slow_edit(filepath: str, patch_content: str) -> Tuple[bool, str]:
     model = PlatformRegistry().get_normal_platform()
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
