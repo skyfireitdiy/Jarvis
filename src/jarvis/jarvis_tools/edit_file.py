@@ -13,7 +13,17 @@
 - 完善的错误处理和回滚机制
 - 严格的格式保持要求
 """
-from typing import Any, Dict
+import re
+from typing import Any, Dict, Tuple
+
+import yaml
+from yaspin import yaspin
+
+from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_tools.file_operation import FileOperationTool
+from jarvis.jarvis_utils.git_utils import revert_file
+from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.utils import is_context_overflow
 
 
 class FileSearchReplaceTool:
@@ -74,6 +84,10 @@ class FileSearchReplaceTool:
                 "items": {
                     "type": "object",
                     "properties": {
+                        "reason": {
+                            "type": "string",
+                            "description": "修改的原因"
+                        },
                         "search": {
                             "type": "string",
                             "description": "需要被替换的文本，必须在文件中唯一匹配，新文件用空字符串"
@@ -190,6 +204,10 @@ class FileSearchReplaceTool:
                             temp_content = temp_content.replace(search_text, replace_text, 1)
                             replaced_count += 1
 
+                if not success:
+                    PrettyOutput.print("快速编辑失败，尝试使用代码补丁编辑", OutputType.INFO)
+                    success, temp_content = handle_code_patch(file_path, yaml.safe_dump(changes))
+
                 # 只有当所有替换操作都成功时，才写回文件
                 if success and (temp_content != original_content or not file_exists):
                     # 确保目录存在
@@ -279,8 +297,9 @@ class FileSearchReplaceTool:
             
 
 
-def handle_large_code_operation(filepath: str, patch_content: str, model: BasePlatform) -> bool:
+def handle_code_patch(filepath: str, patch_content: str) -> Tuple[bool, str]:
     """处理大型代码文件的补丁操作，使用差异化补丁格式"""
+    model = PlatformRegistry().get_normal_platform()
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
             file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
@@ -392,18 +411,15 @@ def handle_large_code_operation(filepath: str, patch_content: str, model: BasePl
                     revert_file(filepath)
                     continue
 
-                # 写入修改后的内容
-                with open(filepath, 'w', encoding='utf-8', errors="ignore") as f:
-                    f.write(modified_content)
 
                 spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
                 spinner.ok("✅")
-                return True
+                return True, modified_content
             spinner.text = f"文件 {filepath} 修改失败"
             spinner.fail("❌")
-            return False
+            return False, ""
 
         except Exception as e:
             spinner.text = f"文件修改失败: {str(e)}"
             spinner.fail("❌")
-            return False
+            return False, ""
