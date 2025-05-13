@@ -34,19 +34,27 @@ class FileSearchReplaceTool:
 # 代码编辑规范
 
 ## 重要提示
-此工具可以查看和修改单个文件的代码，只需提供要修改的代码片段即可。应尽量精简内容，只包含必要的上下文和修改部分。特别注意：不要提供完整文件内容，只提供需要修改的部分！
+此工具可以查看和修改单个文件的代码，只需提供要修改的代码片段即可。应尽量精简内容，只包含必要的上下文和修改部分。特别注意：不要提供完整文件内容，只提供需要修改的部分及其上下文！
 
 ## 基本使用
 1. 指定需要修改的文件路径
 2. 提供一组或多组"reason"和"patch"对
+3. 每个patch必须包含修改后的代码和1-2行上下文用于精确定位
 
 ## 核心原则
-1. **精准修改**：只提供需要修改的代码部分，不需要展示整个文件内容
+1. **精准修改**：只提供需要修改的代码部分及其上下文，不需要展示整个文件内容
 2. **最小补丁原则**：始终生成最小范围的补丁，只包含必要的上下文和实际修改
+3. **上下文定位**：确保提供的上下文能唯一标识修改位置
 
 ## 最佳实践
 1. 每个修改应专注于单一职责，避免包含过多无关代码
 2. 不要出现未实现的代码，如：TODO
+3. 示例格式：
+  ```
+  # 原有上下文行
+  if condition:  # 修改这行
+      return new_value
+  ```
 """
     parameters = {
         "type": "object",
@@ -57,7 +65,7 @@ class FileSearchReplaceTool:
             },
             "changes": {
                 "type": "array",
-                "description": "一组或多组修改",
+                "description": "一组或多组修改，每个修改必须包含1-2行上下文用于精确定位",
                 "items": {
                     "type": "object",
                     "properties": {
@@ -67,7 +75,7 @@ class FileSearchReplaceTool:
                         },
                         "patch": {
                             "type": "string",
-                            "description": "修改后的代码，只需要传入修改后的代码片段，不需要传入原代码和不需要修改的代码"
+                            "description": "修改后的代码片段，必须包含1-2行上下文代码用于精确定位修改位置，不需要传入完整文件内容"
                         }
                     },
                     "required": ["reason", "patch"]
@@ -201,6 +209,27 @@ class FileSearchReplaceTool:
 
 
 def slow_edit(filepath: str, patch_content: str) -> Tuple[bool, str]:
+    """执行精确的文件编辑操作，使用AI模型生成差异补丁并应用。
+
+    功能概述:
+    1. 使用AI模型分析补丁内容并生成精确的代码差异
+    2. 应用生成的差异补丁到目标文件
+    3. 提供重试机制确保操作可靠性
+
+    参数:
+        filepath: 要编辑的文件路径
+        patch_content: YAML格式的补丁内容，包含修改原因和代码片段
+
+    返回值:
+        Tuple[bool, str]: 
+            - 第一个元素表示操作是否成功
+            - 第二个元素是修改后的文件内容(成功时)或错误信息(失败时)
+
+    异常处理:
+    1. 捕获并处理文件操作异常
+    2. 失败时自动回滚文件修改
+    3. 提供详细的执行状态输出
+    """
     model = PlatformRegistry().get_normal_platform()
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
