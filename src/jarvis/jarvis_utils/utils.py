@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from doctest import script_from_examples
 import os
 import time
 import hashlib
@@ -20,13 +21,15 @@ def init_env() -> None:
     jarvis_dir = Path(get_data_dir())
     env_file = jarvis_dir / "env"
 
+    script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
+    hf_archive = script_dir / "jarvis_data" / "huggingface.tar.gz"
+
     # 检查jarvis_data目录是否存在
     if not jarvis_dir.exists():
         jarvis_dir.mkdir(parents=True)
 
     # 检查并解压huggingface模型
     hf_dir = jarvis_dir / "huggingface" / "hub"
-    hf_archive = jarvis_dir / "huggingface.tar.gz"
     if not hf_dir.exists() and hf_archive.exists():
         try:
             PrettyOutput.print("正在解压HuggingFace模型...", OutputType.INFO)
