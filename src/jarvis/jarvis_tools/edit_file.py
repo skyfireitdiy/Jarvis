@@ -82,31 +82,31 @@ class FileSearchReplaceTool:
         pass
 
     def execute(self, args: Dict) -> Dict[str, Any]:
-        """Execute file editing operation with error handling and rollback mechanism.
+        """执行文件编辑操作，包含错误处理和回滚机制。
 
-        Main features:
-        1. Handle file creation or modification
-        2. Atomic operation: all changes succeed or rollback completely
-        3. Maintain file state before/after modification for rollback
-        4. Provide detailed execution status output
+        主要功能:
+        1. 处理文件创建或修改
+        2. 原子操作：所有修改要么全部成功，要么全部回滚
+        3. 保存修改前后的文件状态以便回滚
+        4. 提供详细的执行状态输出
 
-        Args:
-            args: Dict containing:
-                - file: Path to file to modify
-                - changes: List of changes, each containing:
-                    - reason: Description of change
-                    - patch: Modified code snippet
+        参数:
+            args: 包含以下键的字典:
+                - file: 要修改的文件路径
+                - changes: 修改列表，每个修改包含:
+                    - reason: 修改原因描述
+                    - patch: 修改后的代码片段
 
-        Returns:
-            Dict[str, Any] containing:
-                - success: Whether operation succeeded
-                - stdout: Output message on success
-                - stderr: Error message on failure
+        返回:
+            Dict[str, Any] 包含:
+                - success: 操作是否成功
+                - stdout: 成功时的输出消息
+                - stderr: 失败时的错误消息
 
-        Exception handling:
-        1. File operations exceptions are caught and logged
-        2. Failed modifications attempt to rollback to original state
-        3. Newly created files are deleted on failure
+        异常处理:
+        1. 捕获并记录文件操作异常
+        2. 失败的修改尝试回滚到原始状态
+        3. 新创建的文件在失败时会被删除
         """
         import os
         from jarvis.jarvis_utils.output import PrettyOutput, OutputType
