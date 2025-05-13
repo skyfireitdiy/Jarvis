@@ -203,7 +203,6 @@ class FileSearchReplaceTool:
                             replaced_count += 1
 
                 if not success:
-                    PrettyOutput.print("快速编辑失败，尝试使用代码补丁编辑", OutputType.INFO)
                     success, temp_content = handle_code_patch(file_path, yaml.safe_dump(changes))
 
                 # 只有当所有替换操作都成功时，才写回文件
