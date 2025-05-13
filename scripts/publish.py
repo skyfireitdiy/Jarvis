@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 自动更新版本号并发布到PyPI的脚本
 使用方法：
