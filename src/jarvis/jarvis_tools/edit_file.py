@@ -174,7 +174,6 @@ class FileSearchReplaceTool:
                         if search_text == "":
                             # 对于不存在的文件或空文件，如果搜索文本为空，则直接使用替换文本作为内容
                             temp_content = replace_text
-                            # 只允许有一个空字符串搜索
                             break
                         else:
                             stderr_message = f"文件 {file_path} {'不存在' if not file_exists else '为空'}，但搜索文本非空: '{search_text}'"
