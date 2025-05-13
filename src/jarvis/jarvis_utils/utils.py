@@ -2,6 +2,7 @@
 import os
 import time
 import hashlib
+import tarfile
 from pathlib import Path
 from typing import List, Any, Callable
 from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count, get_data_dir
@@ -22,6 +23,19 @@ def init_env() -> None:
     # 检查jarvis_data目录是否存在
     if not jarvis_dir.exists():
         jarvis_dir.mkdir(parents=True)
+
+    # 检查并解压huggingface模型
+    hf_dir = jarvis_dir / "huggingface" / "hub"
+    hf_archive = jarvis_dir / "huggingface.tar.gz"
+    if not hf_dir.exists() and hf_archive.exists():
+        try:
+            PrettyOutput.print("正在解压HuggingFace模型...", OutputType.INFO)
+            with tarfile.open(hf_archive, "r:gz") as tar:
+                tar.extractall(path=jarvis_dir)
+            PrettyOutput.print("HuggingFace模型解压完成", OutputType.SUCCESS)
+        except Exception as e:
+            PrettyOutput.print(f"解压HuggingFace模型失败: {e}", OutputType.ERROR)
+
     if env_file.exists():
         try:
             with open(env_file, "r", encoding="utf-8", errors="ignore") as f:
