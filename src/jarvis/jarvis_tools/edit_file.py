@@ -277,3 +277,133 @@ class FileSearchReplaceTool:
             }
 
             
+
+
+def handle_large_code_operation(filepath: str, patch_content: str, model: BasePlatform) -> bool:
+    """处理大型代码文件的补丁操作，使用差异化补丁格式"""
+    with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
+        try:
+            file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
+            need_upload_file = is_context_overflow(file_content)
+            upload_success = False
+            # 读取原始文件内容
+            with spinner.hidden():  
+                if need_upload_file and model.upload_files([filepath]):
+                    upload_success = True
+
+
+            model.set_suppress_output(False)
+
+            main_prompt = f"""
+# 代码补丁生成专家指南
+
+## 任务描述
+你是一位精确的代码补丁生成专家，需要根据补丁描述生成精确的代码差异。
+
+### 补丁内容
+```
+{patch_content}
+```
+
+## 补丁生成要求
+1. **精确性**：严格按照补丁的意图修改代码
+2. **格式一致性**：严格保持原始代码的格式风格
+   - 缩进方式（空格或制表符）必须与原代码保持一致
+   - 空行数量和位置必须与原代码风格匹配
+   - 行尾空格处理必须与原代码一致
+3. **最小化修改**：只修改必要的代码部分，保持其他部分不变
+4. **上下文完整性**：提供足够的上下文，确保补丁能准确应用
+
+## 输出格式规范
+- 使用{ot("DIFF")}块包围每个需要修改的代码段
+- 每个{ot("DIFF")}块必须包含SEARCH部分和REPLACE部分
+- SEARCH部分是需要查找的原始代码
+- REPLACE部分是替换后的新代码
+- 确保SEARCH部分能在原文件中**唯一匹配**
+- 如果修改较大，可以使用多个{ot("DIFF")}块
+
+## 输出模板
+{ot("DIFF")}
+{">" * 5} SEARCH
+[需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
+{'='*5}
+[替换后的新代码]
+{"<" * 5} REPLACE
+{ct("DIFF")}
+
+{ot("DIFF")}
+{">" * 5} SEARCH
+[另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
+{'='*5}
+[另一处替换后的新代码]
+{"<" * 5} REPLACE
+{ct("DIFF")}
+"""
+            
+            for _ in range(3):
+                file_prompt = ""
+                if not need_upload_file:
+                    file_prompt = f"""
+    # 原始代码
+    {file_content}
+    """
+                    with spinner.hidden():
+                        response = model.chat_until_success(main_prompt + file_prompt)
+                else:
+                    if upload_success:
+                        with spinner.hidden():
+                            response = model.chat_until_success(main_prompt)
+                    else:
+                        with spinner.hidden():
+                            response = model.chat_big_content(file_content, main_prompt)
+
+                # 解析差异化补丁
+                diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
+                                        response, re.DOTALL)
+
+                # 读取原始文件内容
+                with open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
+                    file_content = f.read()
+
+                # 应用所有差异化补丁
+                modified_content = file_content
+                patch_count = 0
+                success = True
+                for match in diff_blocks:
+                    search_text = match.group(1).strip()
+                    replace_text = match.group(2).strip()
+                    patch_count += 1
+                    # 检查搜索文本是否存在于文件中
+                    if search_text in modified_content:
+                        # 如果有多处，报错
+                        if modified_content.count(search_text) > 1:
+                            spinner.write(f"❌ 补丁 #{patch_count} 应用失败：找到多个匹配的代码段")
+                            success = False
+                            break
+                        # 应用替换
+                        modified_content = modified_content.replace(
+                            search_text, replace_text)
+                        spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
+                    else:
+                        spinner.write(f"❌ 补丁 #{patch_count} 应用失败：无法找到匹配的代码段")
+                        success = False
+                        break
+                if not success:
+                    revert_file(filepath)
+                    continue
+
+                # 写入修改后的内容
+                with open(filepath, 'w', encoding='utf-8', errors="ignore") as f:
+                    f.write(modified_content)
+
+                spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
+                spinner.ok("✅")
+                return True
+            spinner.text = f"文件 {filepath} 修改失败"
+            spinner.fail("❌")
+            return False
+
+        except Exception as e:
+            spinner.text = f"文件修改失败: {str(e)}"
+            spinner.fail("❌")
+            return False

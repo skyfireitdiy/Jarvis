@@ -32,6 +32,16 @@ class GitCommitTool:
                 "type": "string",
                 "description": "Git仓库的根目录路径（可选）",
                 "default": "."
+            },
+            "prefix": {
+                "type": "string",
+                "description": "提交信息前缀（可选）",
+                "default": ""
+            },
+            "suffix": {
+                "type": "string",
+                "description": "提交信息后缀（可选）",
+                "default": ""
             }
         },
         "required": []
@@ -60,6 +70,8 @@ class GitCommitTool:
         """Execute automatic commit process with support for multi-line messages and special characters"""
         try:
             root_dir = args.get("root_dir", ".")
+            prefix = args.get("prefix", "")
+            suffix = args.get("suffix", "")
 
             # Store current directory
             original_dir = os.getcwd()
@@ -112,21 +124,21 @@ class GitCommitTool:
                         # 准备提示信息
                         base_prompt = f'''根据代码差异生成提交信息：
                         提交信息应使用{args.get('lang', '中文')}书写
-        # 必需结构
-        必须使用以下格式：
-        {ot("COMMIT_MESSAGE")}
-        <类型>(<范围>): <主题>
-        
-        [可选] 详细描述变更内容和原因
-        {ct("COMMIT_MESSAGE")}
-        # 格式规则
-        1. 类型: fix(修复bug), feat(新功能), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
-        2. 范围表示变更的模块或组件 (例如: auth, database, ui)
-        3. 主题行不超过72个字符，不以句号结尾，使用祈使语气
-        4. 如有详细描述，使用空行分隔主题和详细描述
-        5. 详细描述部分应解释"是什么"和"为什么"，而非"如何"
-        6. 仅输出提交信息，不要输出其他内容
-        '''
+    # 必需结构
+    必须使用以下格式：
+    {ot("COMMIT_MESSAGE")}
+    <类型>(<范围>): <主题>
+    
+    [可选] 详细描述变更内容和原因
+    {ct("COMMIT_MESSAGE")}
+    # 格式规则
+    1. 类型: fix(修复bug), feat(新功能), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
+    2. 范围表示变更的模块或组件 (例如: auth, database, ui)
+    3. 主题行不超过72个字符，不以句号结尾，使用祈使语气
+    4. 如有详细描述，使用空行分隔主题和详细描述
+    5. 详细描述部分应解释"是什么"和"为什么"，而非"如何"
+    6. 仅输出提交信息，不要输出其他内容
+    '''
 
                         # 获取模型并尝试上传文件
                         platform = PlatformRegistry().get_normal_platform()
@@ -159,12 +171,12 @@ class GitCommitTool:
                             spinner.text = "正在生成提交消息..."
                             # 使用上传的文件
                             prompt = base_prompt + f'''
-        # 变更概述
-        - 变更文件数量: {file_count} 个文件
-        - 已上传包含完整代码差异的文件
-        
-        请详细分析已上传的代码差异文件，生成符合上述格式的提交信息。
-        '''
+    # 变更概述
+    - 变更文件数量: {file_count} 个文件
+    - 已上传包含完整代码差异的文件
+    
+    请详细分析已上传的代码差异文件，生成符合上述格式的提交信息。
+    '''
                             commit_message = platform.chat_until_success(prompt)
                         else:
                             # 如果上传失败但内容较大，使用chat_big_content
@@ -174,9 +186,9 @@ class GitCommitTool:
                             else:
                                 # 直接在提示中包含差异内容
                                 prompt = base_prompt + f'''
-        # 分析材料
-        {diff}
-        '''
+    # 分析材料
+    {diff}
+    '''
                                 commit_message = platform.chat_until_success(prompt)
                         
                         while True:
@@ -187,13 +199,18 @@ class GitCommitTool:
                             # 如果成功提取，就跳出循环
                             if extracted_message:
                                 commit_message = extracted_message
+                                # 应用prefix和suffix
+                                if prefix:
+                                    commit_message = f"{prefix} {commit_message}"
+                                if suffix:
+                                    commit_message = f"{commit_message}\n{suffix}"
                                 break
                             prompt = f"""格式错误，请按照以下格式重新生成提交信息：
                             {ot("COMMIT_MESSAGE")}
-        <类型>(<范围>): <主题>
-        
-        [可选] 详细描述变更内容和原因
-        {ct("COMMIT_MESSAGE")}
+    <类型>(<范围>): <主题>
+    
+    [可选] 详细描述变更内容和原因
+    {ct("COMMIT_MESSAGE")}
                             """
                             commit_message = platform.chat_until_success(prompt)
                         spinner.write("✅ 生成提交消息")
@@ -250,9 +267,16 @@ def main():
     parser = argparse.ArgumentParser(description='Git commit tool')
     parser.add_argument('--lang', type=str, default='Chinese', help='Language for commit messages')
     parser.add_argument('--root-dir', type=str, default='.', help='Root directory of the Git repository')
+    parser.add_argument('--prefix', type=str, default='', help='Prefix to prepend to commit message (separated by space)')
+    parser.add_argument('--suffix', type=str, default='', help='Suffix to append to commit message (separated by newline)')
     args = parser.parse_args()
     tool = GitCommitTool()
-    tool.execute({"lang": args.lang if hasattr(args, 'lang') else 'Chinese', "root_dir": args.root_dir})
+    tool.execute({
+        "lang": args.lang if hasattr(args, 'lang') else 'Chinese',
+        "root_dir": args.root_dir,
+        "prefix": args.prefix if hasattr(args, 'prefix') else '',
+        "suffix": args.suffix if hasattr(args, 'suffix') else ''
+    })
 
 if __name__ == "__main__":
     sys.exit(main())
