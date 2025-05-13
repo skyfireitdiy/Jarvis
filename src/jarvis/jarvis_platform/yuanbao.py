@@ -44,7 +44,7 @@ class YuanbaoPlatform(BasePlatform):
                 "   • 打开浏览器开发者工具 (F12 或右键 -> 检查)\n"
                 "   • 切换到网络标签\n"
                 "   • 发送任意消息\n"
-                "   • 查看请求中的 Cookie 和 X-AgentID 值（具体位置见README.md中截图）\n"
+                "   • 查看请求中的 Cookie 和 AgentID 值（具体位置见README.md中截图）\n"
                 "2. 设置环境变量:\n"
                 "   • 方法 1: 创建或编辑配置文件:\n"
                 f"   echo 'YUANBAO_COOKIES=your_cookies_here' >> {get_data_dir()}/env\n"
