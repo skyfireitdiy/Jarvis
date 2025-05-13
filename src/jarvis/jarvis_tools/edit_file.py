@@ -38,39 +38,15 @@ class FileSearchReplaceTool:
 
 ## 基本使用
 1. 指定需要修改的文件路径
-2. 提供一组或多组"搜索文本"和"替换文本"对
-3. 每个搜索文本需在目标文件中有且仅有一次精确匹配
-4. 创建新文件时，使用空字符串("")作为搜索文本，替换文本作为完整文件内容
-5. 所有修改要么全部成功，要么全部失败并回滚
+2. 提供一组或多组"reason"和"patch"对
 
 ## 核心原则
 1. **精准修改**：只提供需要修改的代码部分，不需要展示整个文件内容
 2. **最小补丁原则**：始终生成最小范围的补丁，只包含必要的上下文和实际修改
-3. **格式严格保持**：
-   - 严格保持原始代码的缩进方式（空格或制表符）
-   - 保持原始代码的空行数量和位置
-   - 保持原始代码的行尾空格处理方式
-   - 不改变原始代码的换行风格
-4. **新旧区分**：
-   - 对于新文件：提供完整的代码内容
-   - 对于现有文件：只提供修改部分，不要提供整个文件
-
-## 格式兼容性要求
-1. **缩进一致性**：
-   - 如果原代码使用4个空格缩进，替换文本也必须使用4个空格缩进
-   - 如果原代码使用制表符缩进，替换文本也必须使用制表符
-2. **空行保留**：
-   - 如果原代码在函数之间有两个空行，替换文本也必须保留这两个空行
-   - 如果原代码在类方法之间有一个空行，替换文本也必须保留这一个空行
-3. **行尾处理**：
-   - 不要改变原代码的行尾空格或换行符风格
-   - 保持原有的换行符类型(CR、LF或CRLF)
 
 ## 最佳实践
 1. 每个修改应专注于单一职责，避免包含过多无关代码
-2. 设计唯一的搜索文本，避免多处匹配的风险
-3. 创建新文件时提供完整、格式良好的内容
-4. 不要出现未实现的代码，如：TODO
+2. 不要出现未实现的代码，如：TODO
 """
     parameters = {
         "type": "object",
@@ -81,7 +57,7 @@ class FileSearchReplaceTool:
             },
             "changes": {
                 "type": "array",
-                "description": "一组或多组搜索替换对",
+                "description": "一组或多组修改",
                 "items": {
                     "type": "object",
                     "properties": {
@@ -89,16 +65,12 @@ class FileSearchReplaceTool:
                             "type": "string",
                             "description": "修改的原因"
                         },
-                        "search": {
+                        "patch": {
                             "type": "string",
-                            "description": "需要被替换的文本，必须在文件中唯一匹配，新文件用空字符串"
-                        },
-                        "replace": {
-                            "type": "string", 
-                            "description": "替换的目标文本，需保持与原代码相同的缩进和格式风格"
+                            "description": "修改后的代码，只需要传入修改后的代码片段，不需要传入原代码和不需要修改的代码"
                         }
                     },
-                    "required": ["search", "replace"]
+                    "required": ["reason", "patch"]
                 }
             }
         },
@@ -110,32 +82,6 @@ class FileSearchReplaceTool:
         pass
 
     def execute(self, args: Dict) -> Dict[str, Any]:
-        """
-        执行文件搜索替换操作，每个搜索文本只允许有且只有一次匹配，否则失败
-        特殊支持不存在的文件和空文件处理
-
-        参数:
-            file (str): 文件路径
-            changes (list): 一组或多组搜索替换对，格式如下：
-            [
-                {
-                    "search": "搜索文本1",
-                    "replace": "替换文本1"
-                },
-                {
-                    "search": "搜索文本2",
-                    "replace": "替换文本2"
-                }
-            ]
-
-        返回:
-            dict: 包含执行结果的字典
-            {
-                "success": bool,  # 是否成功完成所有替换
-                "stdout": str,    # 标准输出信息
-                "stderr": str     # 错误信息
-            }
-        """
         import os
         from jarvis.jarvis_utils.output import PrettyOutput, OutputType
         
@@ -161,13 +107,7 @@ class FileSearchReplaceTool:
                         content = f.read()
                         original_content = content
                 
-                # 使用fast_edit处理直接替换逻辑
-                success, temp_content, fast_stdout, fast_stderr = fast_edit(file_path, changes, content, file_exists)
-                stdout_messages.extend(fast_stdout)
-                stderr_messages.extend(fast_stderr)
-
-                if not success:
-                    success, temp_content = slow_edit(file_path, yaml.safe_dump(changes))
+                success, temp_content = slow_edit(file_path, yaml.safe_dump(changes))
 
                 # 只有当所有替换操作都成功时，才写回文件
                 if success and (temp_content != original_content or not file_exists):
@@ -187,6 +127,9 @@ class FileSearchReplaceTool:
                     stdout_message = f"文件 {file_path} 没有找到需要替换的内容"
                     stdout_messages.append(stdout_message)
                     PrettyOutput.print(stdout_message, OutputType.INFO)
+                else:
+                    stdout_message = f"文件 {file_path} 修改失败"
+                    stdout_messages.append(stdout_message)
                 
             except Exception as e:
                 stderr_message = f"处理文件 {file_path} 时出错: {str(e)}"
@@ -230,51 +173,6 @@ class FileSearchReplaceTool:
                 "stderr": error_msg + "\n" + "\n".join(stderr_messages)
             }
 
-            
-
-
-def fast_edit(file_path: str, changes: list, content: str, file_exists: bool) -> Tuple[bool, str, list, list]:
-    """直接替换编辑逻辑"""
-    temp_content = content
-    stdout_messages = []
-    stderr_messages = []
-    success = True
-    
-    # 处理所有搜索替换对
-    for change in changes:
-        search_text = change["search"]
-        replace_text = change["replace"]
-        
-        # 特殊处理不存在的文件或空文件
-        if not file_exists or content == "":
-            if search_text == "":
-                # 对于不存在的文件或空文件，如果搜索文本为空，则直接使用替换文本作为内容
-                temp_content = replace_text
-                break
-            else:
-                stderr_message = f"文件 {file_path} {'不存在' if not file_exists else '为空'}，但搜索文本非空: '{search_text}'"
-                stderr_messages.append(stderr_message)
-                success = False
-                break
-        else:
-            # 正常文件处理 - 检查匹配次数
-            match_count = temp_content.count(search_text)
-            
-            if match_count == 0:
-                stderr_message = f"文件 {file_path} 中未找到匹配文本: '{search_text}'"
-                stderr_messages.append(stderr_message)
-                success = False
-                break
-            elif match_count > 1:
-                stderr_message = f"文件 {file_path} 中匹配到多个 ({match_count}) '{search_text}'，搜索文本只允许一次匹配"
-                stderr_messages.append(stderr_message)
-                success = False
-                break
-            else:
-                # 只有一个匹配，执行替换
-                temp_content = temp_content.replace(search_text, replace_text, 1)
-    
-    return success, temp_content, stdout_messages, stderr_messages
 
 def slow_edit(filepath: str, patch_content: str) -> Tuple[bool, str]:
     model = PlatformRegistry().get_normal_platform()
