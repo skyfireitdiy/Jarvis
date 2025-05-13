@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Jarvis代码代理模块。
 
 该模块提供CodeAgent类，用于处理代码修改任务。

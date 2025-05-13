@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Rust language-specific code review checklist.
 """

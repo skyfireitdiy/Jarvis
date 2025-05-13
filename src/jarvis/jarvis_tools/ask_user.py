@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # 导入所需的类型注解模块
 from typing import Dict, Any
 

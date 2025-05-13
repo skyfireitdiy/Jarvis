@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import datetime
 import platform
 from typing import Any, Callable, List, Optional, Tuple, Union

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Infrastructure as Code (Docker, Terraform) specific code review checklist.
 """

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Swift language-specific code review checklist.
 """

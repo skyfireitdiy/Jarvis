@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_tools.registry import ToolRegistry

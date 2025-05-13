@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 C# language-specific code review checklist.
 """

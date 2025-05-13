@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import re
 from typing import Any, Tuple
 from jarvis.jarvis_utils.config import get_replace_map

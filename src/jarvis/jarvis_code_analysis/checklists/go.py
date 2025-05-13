@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Go language-specific code review checklist.
 """

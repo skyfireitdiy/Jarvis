@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Shell/Bash language-specific code review checklist.
 """

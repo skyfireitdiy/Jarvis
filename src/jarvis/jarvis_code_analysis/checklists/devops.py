@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 DevOps (Makefile, CI/CD) specific code review checklist.
 """

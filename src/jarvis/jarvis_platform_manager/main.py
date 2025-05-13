@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from jarvis.jarvis_platform.registry import PlatformRegistry
 import asyncio

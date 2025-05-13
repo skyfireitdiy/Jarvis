@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Documentation (Markdown, reStructuredText) specific code review checklist.
 """

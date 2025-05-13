@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from typing import Dict, Any
 import os
 from jarvis.jarvis_code_agent.code_agent import CodeAgent

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Python language-specific code review checklist.
 """

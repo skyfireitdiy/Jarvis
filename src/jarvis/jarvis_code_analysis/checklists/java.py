@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Java language-specific code review checklist.
 """

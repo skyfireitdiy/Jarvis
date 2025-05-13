@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 HTML/CSS specific code review checklist.
 """

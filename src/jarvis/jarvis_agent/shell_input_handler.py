@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from typing import Any, Tuple
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput

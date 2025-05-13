@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Git Commit分析工具模块
 
 该模块提供了一个GitCommitAnalyzer类，用于获取和分析指定Git commit的详细信息，

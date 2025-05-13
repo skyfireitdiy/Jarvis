@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from transformers import AutoTokenizer
 from typing import List

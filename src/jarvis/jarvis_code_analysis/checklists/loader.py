@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Utility module for loading language-specific code review checklists.
 """

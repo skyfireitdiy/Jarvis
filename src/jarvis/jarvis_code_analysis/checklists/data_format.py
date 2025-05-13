@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Data format (XML, JSON, YAML) specific code review checklist.
 """

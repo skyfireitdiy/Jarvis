@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 def ot(tag_name: str) -> str:
     """生成HTML标签开始标记
 

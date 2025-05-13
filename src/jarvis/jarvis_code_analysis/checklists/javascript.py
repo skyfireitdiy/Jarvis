@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 JavaScript/TypeScript language-specific code review checklist.
 """

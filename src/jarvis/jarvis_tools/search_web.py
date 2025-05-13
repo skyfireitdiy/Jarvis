@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from typing import Any, Dict
 from jarvis.jarvis_platform.registry import PlatformRegistry

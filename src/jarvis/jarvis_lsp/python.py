@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from typing import List, Dict, Any
 import jedi
 from jarvis.jarvis_lsp.base import BaseLSP

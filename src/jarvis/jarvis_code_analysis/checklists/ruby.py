@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Ruby-specific code review checklist.
 """

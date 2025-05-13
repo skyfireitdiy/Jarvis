@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 PHP language-specific code review checklist.
 """

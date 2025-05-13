@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from typing import Dict, Any
 from jarvis.jarvis_lsp.registry import LSPRegistry
