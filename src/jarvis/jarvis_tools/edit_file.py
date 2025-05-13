@@ -141,7 +141,7 @@ class FileSearchReplaceTool:
                         content = f.read()
                         original_content = content
                 
-                success, temp_content = slow_edit(file_path, yaml.safe_dump(changes))
+                success, temp_content = patch_apply(file_path, yaml.safe_dump(changes))
 
                 # 只有当所有替换操作都成功时，才写回文件
                 if success and (temp_content != original_content or not file_exists):
@@ -208,7 +208,7 @@ class FileSearchReplaceTool:
             }
 
 
-def slow_edit(filepath: str, patch_content: str) -> Tuple[bool, str]:
+def patch_apply(filepath: str, patch_content: str) -> Tuple[bool, str]:
     """执行精确的文件编辑操作，使用AI模型生成差异补丁并应用。
 
     功能概述:
