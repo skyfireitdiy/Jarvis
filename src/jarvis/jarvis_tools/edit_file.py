@@ -311,7 +311,7 @@ def handle_code_patch(filepath: str, patch_content: str) -> Tuple[bool, str]:
                     upload_success = True
 
 
-            model.set_suppress_output(False)
+            model.set_suppress_output(True)
 
             main_prompt = f"""
 # 代码补丁生成专家指南
@@ -366,15 +366,13 @@ def handle_code_patch(filepath: str, patch_content: str) -> Tuple[bool, str]:
     # 原始代码
     {file_content}
     """
-                    with spinner.hidden():
-                        response = model.chat_until_success(main_prompt + file_prompt)
+                    
+                    response = model.chat_until_success(main_prompt + file_prompt)
                 else:
                     if upload_success:
-                        with spinner.hidden():
-                            response = model.chat_until_success(main_prompt)
+                        response = model.chat_until_success(main_prompt)
                     else:
-                        with spinner.hidden():
-                            response = model.chat_big_content(file_content, main_prompt)
+                        response = model.chat_big_content(file_content, main_prompt)
 
                 # 解析差异化补丁
                 diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
