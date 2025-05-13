@@ -82,6 +82,32 @@ class FileSearchReplaceTool:
         pass
 
     def execute(self, args: Dict) -> Dict[str, Any]:
+        """Execute file editing operation with error handling and rollback mechanism.
+
+        Main features:
+        1. Handle file creation or modification
+        2. Atomic operation: all changes succeed or rollback completely
+        3. Maintain file state before/after modification for rollback
+        4. Provide detailed execution status output
+
+        Args:
+            args: Dict containing:
+                - file: Path to file to modify
+                - changes: List of changes, each containing:
+                    - reason: Description of change
+                    - patch: Modified code snippet
+
+        Returns:
+            Dict[str, Any] containing:
+                - success: Whether operation succeeded
+                - stdout: Output message on success
+                - stderr: Error message on failure
+
+        Exception handling:
+        1. File operations exceptions are caught and logged
+        2. Failed modifications attempt to rollback to original state
+        3. Newly created files are deleted on failure
+        """
         import os
         from jarvis.jarvis_utils.output import PrettyOutput, OutputType
         
@@ -202,10 +228,7 @@ def slow_edit(filepath: str, patch_content: str) -> Tuple[bool, str]:
 
 ## 补丁生成要求
 1. **精确性**：严格按照补丁的意图修改代码
-2. **格式一致性**：严格保持原始代码的格式风格
-   - 缩进方式（空格或制表符）必须与原代码保持一致
-   - 空行数量和位置必须与原代码风格匹配
-   - 行尾空格处理必须与原代码一致
+2. **格式一致性**：严格保持原始代码的格式风格，如果补丁中缩进或者空行与原代码不一致，则需要修正补丁中的缩进或者空行
 3. **最小化修改**：只修改必要的代码部分，保持其他部分不变
 4. **上下文完整性**：提供足够的上下文，确保补丁能准确应用
 
