@@ -66,7 +66,7 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
         try:
             return func()
         except Exception as e:
-            PrettyOutput.print(f"执行失败: {str(e)}, 等待 {sleep_time}s...", OutputType.ERROR)
+            PrettyOutput.print(f"执行失败: {str(e)}, 等待 {sleep_time}s...", OutputType.WARNING)
             time.sleep(sleep_time)
             continue
 def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
