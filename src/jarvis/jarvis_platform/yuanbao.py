@@ -213,6 +213,7 @@ class YuanbaoPlatform(BasePlatform):
                     uploaded_files.append(file_metadata)
                     spinner.text = f"文件 {file_name} 上传成功"
                     spinner.ok("✅")
+                    time.sleep(3) # 上传成功后等待3秒
                 
                 except Exception as e:
                     spinner.text = f"上传文件 {file_path} 时出错: {str(e)}"
