@@ -8,7 +8,6 @@ import tempfile
 from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
-from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_agent import Agent
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -488,7 +487,7 @@ class CodeReviewTool:
 
 我将分析上传的代码差异文件，进行全面的代码审查。
 </code_review_guide>"""
-
+                from jarvis.jarvis_tools.registry import ToolRegistry
                 tool_registry = ToolRegistry()
                 tool_registry.dont_use_tools(["code_review"])
                 agent = Agent(

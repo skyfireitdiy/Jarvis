@@ -44,9 +44,12 @@ class BasePlatform(ABC):
         我将分多次提供大量的上下文内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”。
         """
         self.chat_until_success(prefix_prompt)
-        split_content = split_text_into_chunks(content, get_max_input_token_count() - 1024)
+        split_content = split_text_into_chunks(content, get_max_input_token_count() - 1024, get_max_input_token_count() - 2048)
+        submit_count = 0
         for chunk in split_content:
-            self.chat_until_success(f"<part_content>{chunk}</part_content>")
+            submit_count += 1
+            PrettyOutput.print(f"已提交{submit_count}次（总{len(split_content)}次）", OutputType.INFO)
+            self.chat_until_success(f"<part_content>{chunk}</part_content>请返回已收到")
         return self.chat_until_success(f"内容已经全部提供完毕\n\n{prompt}")
 
     
