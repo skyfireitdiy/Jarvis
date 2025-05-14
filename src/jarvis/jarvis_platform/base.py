@@ -40,6 +40,10 @@ class BasePlatform(ABC):
         raise NotImplementedError("upload_files is not implemented")
     
     def chat_big_content(self, content: str, prompt: str) -> str:
+        # 检查content大小不超过10MB
+        if len(content.encode('utf-8')) > 10 * 1024 * 1024:
+            return "Error: Content size exceeds 10MB limit"
+        
         prefix_prompt = f"""
         我将分多次提供大量的上下文内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”。
         """
