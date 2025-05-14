@@ -25,11 +25,6 @@ def init_env() -> None:
     script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
     hf_archive = script_dir / "jarvis_data" / "huggingface.tar.gz"
 
-    # 检查是否是git仓库并更新
-    from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
-
-    check_and_update_git_repo(str(script_dir))
-
     # 检查jarvis_data目录是否存在
     if not jarvis_dir.exists():
         jarvis_dir.mkdir(parents=True)
@@ -58,6 +53,13 @@ def init_env() -> None:
                             continue
         except Exception as e:
             PrettyOutput.print(f"警告: 读取 {env_file} 失败: {e}", OutputType.WARNING)
+
+        # 检查是否是git仓库并更新
+    from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
+
+    check_and_update_git_repo(str(script_dir))
+
+    
 def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
     """循环执行函数直到成功
 

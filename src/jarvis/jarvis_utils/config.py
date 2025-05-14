@@ -143,3 +143,12 @@ def get_data_dir() -> str:
     if not data_path:
         return os.path.expanduser('~/.jarvis')
     return data_path
+
+def get_auto_update() -> bool:
+    """
+    获取是否自动更新git仓库。
+
+    返回：
+        bool: 如果需要自动更新则返回True，默认为True
+    """
+    return os.getenv('JARVIS_AUTO_UPDATE', 'true') == 'true'
