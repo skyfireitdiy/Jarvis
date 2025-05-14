@@ -10,7 +10,7 @@
 import os
 import json
 import tempfile
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
@@ -92,7 +92,7 @@ def _create_methodology_temp_file(methodologies: Dict[str, str]) -> Optional[str
         PrettyOutput.print(f"创建方法论临时文件失败: {str(e)}", OutputType.ERROR)
         return None
 
-def load_methodology(user_input: str) -> str:
+def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> str:
     """
     加载方法论并上传到大模型。
 
@@ -103,6 +103,9 @@ def load_methodology(user_input: str) -> str:
         str: 相关的方法论提示，如果未找到方法论则返回空字符串
     """
     from yaspin import yaspin # type: ignore
+    from jarvis.jarvis_tools.registry import ToolRegistry
+
+    prompt = tool_registery.prompt() if tool_registery else ""
 
     # 获取方法论目录
     methodology_dir = _get_methodology_directory()
@@ -133,10 +136,13 @@ def load_methodology(user_input: str) -> str:
         full_content = base_prompt
         for problem_type, content in methodologies.items():
             full_content += f"## {problem_type}\n\n{content}\n\n---\n\n"
+
+        full_content += f"以下是所有可用的工具内容：\n\n"
+        full_content += prompt
         
         # 添加用户输入和输出要求
         full_content += f"""
-请根据以上方法论内容，规划/总结出以下用户需求的执行步骤: {user_input}
+请根据以上方法论和可调用的工具内容，规划/总结出以下用户需求的执行步骤: {user_input}
 
 请按以下格式回复：
 ### 与该任务/需求相关的方法论
@@ -175,7 +181,7 @@ def load_methodology(user_input: str) -> str:
                     if upload_success:
                         # 使用上传的文件生成摘要
                         return platform.chat_until_success(base_prompt + f"""
-请根据已上传的方法论文件内容，规划/总结出以下用户需求的执行步骤: {user_input}
+请根据已上传的方法论和可调用的工具文件内容，规划/总结出以下用户需求的执行步骤: {user_input}
 
 请按以下格式回复：
 ### 与该任务/需求相关的方法论
@@ -192,7 +198,7 @@ def load_methodology(user_input: str) -> str:
                     elif hasattr(platform, 'chat_big_content'):
                         # 如果上传失败但支持大内容处理，使用chat_big_content
                         return platform.chat_big_content(full_content, base_prompt + f"""
-请根据以上方法论内容，规划/总结出以下用户需求的执行步骤: {user_input}
+请根据以上方法论和可调用的工具文件内容，规划/总结出以下用户需求的执行步骤: {user_input}
 
 请按以下格式回复：
 ### 与该任务/需求相关的方法论

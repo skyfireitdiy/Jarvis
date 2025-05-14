@@ -35,10 +35,14 @@ class FindMethodologyTool:
                     "stdout": "",
                     "stderr": "参数中必须包含查询文本"
                 }
+            
+            agent = args.get("agent", None)
+
+            tool_registry = agent.get_tool_registry() if agent else None
 
             with yaspin(text="搜索相关方法论...", color="cyan") as spinner:
                 with spinner.hidden():
-                    methodology_prompt = load_methodology(args["query"])
+                    methodology_prompt = load_methodology(args["query"], tool_registry)
 
                 if methodology_prompt:
                     spinner.text = "找到相关方法论"
