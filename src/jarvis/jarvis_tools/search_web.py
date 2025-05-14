@@ -24,3 +24,7 @@ class SearchWebTool:
             "stderr": "",
             "success": True,
         }
+
+    def check(self) -> bool:
+        """检查当前平台是否支持web功能"""
+        return PlatformRegistry().get_normal_platform().support_web()

@@ -534,3 +534,7 @@ class YuanbaoPlatform(BasePlatform):
     def name(self) -> str:
         """模型名称"""
         return self.model_name
+        
+    def support_web(self) -> bool:
+        """Yuanbao平台支持web功能"""
+        return True
