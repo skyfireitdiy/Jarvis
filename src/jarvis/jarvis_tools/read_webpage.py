@@ -60,6 +60,7 @@ class WebpageTool:
                 "stderr": f"Failed to parse webpage: {str(e)}"
             }
 
-    def check(self) -> bool:
+    @staticmethod
+    def check() -> bool:
         """检查当前平台是否支持web功能"""
         return PlatformRegistry().get_normal_platform().support_web()
