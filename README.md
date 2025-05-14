@@ -142,7 +142,7 @@ OPENAI_API_BASE=https://api.openai.com/v1  # 可选，默认为官方API地址
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
 | `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
-| `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis |
+| `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis（仅在以git仓库方式安装时有效） |
 
 所有配置编写到`~/.jarvis/env`文件中即可生效。
 
