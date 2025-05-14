@@ -181,10 +181,12 @@ class generate_new_tool:
             # 注册新工具到当前的工具注册表
             success_message = f"工具 '{tool_name}' 已成功生成在 {tool_file_path}"
             
-            if agent and hasattr(agent, "tool_registry"):
-                # 尝试加载并注册新工具
-                if agent.tool_registry.register_tool_by_file(str(tool_file_path)):
-                    success_message += f"\n已成功注册到当前会话的工具注册表中"
+            if agent:
+                tool_registry = agent.get_tool_registry()
+                if tool_registry:
+                    # 尝试加载并注册新工具
+                    if tool_registry.register_tool_by_file(str(tool_file_path)):
+                        success_message += f"\n已成功注册到当前会话的工具注册表中"
                 else:
                     success_message += f"\n注册到当前会话失败，可能需要重新启动Jarvis"
             

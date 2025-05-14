@@ -310,6 +310,17 @@ class Agent:
         """
         self.after_tool_call_cb = cb
 
+    def get_tool_registry(self) -> Optional[ToolRegistry]:
+        """获取工具注册器。
+
+        返回:
+            ToolRegistry: 工具注册器实例
+        """
+        for handler in self.output_handler:
+            if isinstance(handler, ToolRegistry):
+                return handler
+        return None
+
     def make_default_addon_prompt(self, need_complete: bool) -> str:
         """生成附加提示。
 
