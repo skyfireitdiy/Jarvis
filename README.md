@@ -87,7 +87,26 @@ Kimi API Key获取方式：
 
 删除Bearer前缀，剩下的内容就是Kimi API Key。
 
+
+#### OpenAI
+```bash
+JARVIS_PLATFORM=openai
+JARVIS_MODEL=gpt-4o  # 默认模型，可选gpt-4-turbo, gpt-3.5-turbo等
+JARVIS_THINKING_PLATFORM=openai
+JARVIS_THINKING_MODEL=gpt-4o
+
+OPENAI_API_KEY=<OpenAI API Key>
+OPENAI_API_BASE=https://api.openai.com/v1  # 可选，默认为官方API地址
+OPENAI_MODEL_NAME=gpt-4o  # 可选，覆盖JARVIS_MODEL设置
+```
+
+配置说明：
+1. `OPENAI_API_KEY`: 必填。
+2. `OPENAI_API_BASE`: 可选，用于自定义API端点
+
 以上配置编写到`~/.jarvis/env`文件中。
+
+支持的模型可通过`jarvis-platform-manager --list-models`查看完整列表。
 
 ### 基本使用
 ```bash
