@@ -42,9 +42,13 @@
 
 ### 安装
 ```bash
+# 从源码安装（推荐）
 git clone https://github.com/skyfireitdiy/Jarvis
 cd Jarvis
 pip3 install -e .
+
+# 或者从PyPI安装（可能更新不及时）
+pip3 install jarvis-ai-assistant
 ```
 
 ### 最小化配置
