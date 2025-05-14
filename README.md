@@ -97,7 +97,6 @@ JARVIS_THINKING_MODEL=gpt-4o
 
 OPENAI_API_KEY=<OpenAI API Key>
 OPENAI_API_BASE=https://api.openai.com/v1  # 可选，默认为官方API地址
-OPENAI_MODEL_NAME=gpt-4o  # 可选，覆盖JARVIS_MODEL设置
 ```
 
 配置说明：
