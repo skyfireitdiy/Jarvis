@@ -17,6 +17,8 @@ def execute_command(command: str, should_run: bool) -> None:
         os.system(command)
 
 
+
+
 def install_fish_completion() -> int:
     """Install fish shell command completion with interactive choice
     
@@ -110,7 +112,7 @@ def process_request(request: str) -> Optional[str]:
     except Exception:
         return None
 
-def main():
+def main() -> int:
     # 创建参数解析器
     init_env()
     parser = argparse.ArgumentParser(
@@ -135,6 +137,12 @@ Example:
 
     # install子命令
     install_parser = subparsers.add_parser('install', help='安装fish shell的命令补全功能')
+    install_parser.add_argument(
+        "--shell",
+        choices=["fish"],
+        default="fish",
+        help="指定shell类型(仅支持fish)"
+    )
 
 
     # 解析参数
@@ -144,9 +152,11 @@ Example:
 
     # 处理install命令
     if args.command == "install":
+        if args.shell != "fish":
+            print(f"错误: 不支持的shell类型: {args.shell}, 仅支持fish")
+            return 1
         return install_fish_completion()
 
-    
     # 处理request命令
     if not args.request:
         # 检查是否在交互式终端中运行
