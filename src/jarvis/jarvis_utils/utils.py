@@ -17,12 +17,18 @@ def init_env() -> None:
     1. 创建不存在的jarvis_data目录
     2. 加载环境变量到os.environ
     3. 处理文件读取异常
+    4. 检查git仓库状态并在落后时更新
     """
     jarvis_dir = Path(get_data_dir())
     env_file = jarvis_dir / "env"
 
     script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
     hf_archive = script_dir / "jarvis_data" / "huggingface.tar.gz"
+
+    # 检查是否是git仓库并更新
+    from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
+
+    check_and_update_git_repo(str(script_dir))
 
     # 检查jarvis_data目录是否存在
     if not jarvis_dir.exists():

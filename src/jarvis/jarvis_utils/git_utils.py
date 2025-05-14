@@ -294,3 +294,38 @@ def is_file_in_git_repo(filepath: str) -> bool:
         return os.path.abspath(filepath).startswith(os.path.abspath(repo_root))
     except:
         return False
+
+
+def check_and_update_git_repo(repo_path: str) -> bool:
+    """检查并更新git仓库
+
+    参数:
+        repo_path: 仓库路径
+
+    返回:
+        bool: 是否执行了更新
+    """
+    git_root = find_git_root(repo_path)
+    if git_root is None:
+        return False
+
+    try:
+        # 检查是否有未提交的修改
+        if has_uncommitted_changes():
+            PrettyOutput.print("检测到未提交的修改，跳过自动更新", OutputType.WARNING)
+            return False
+
+        # 获取远程更新
+        subprocess.run(["git", "fetch"], cwd=git_root, check=True)
+        # 检查本地是否落后
+        result = subprocess.run(["git", "rev-list", "--count", "HEAD..origin/main"], 
+                              cwd=git_root, capture_output=True, text=True)
+        if result.returncode == 0 and int(result.stdout.strip()) > 0:
+            PrettyOutput.print("检测到新版本，正在更新Jarvis...", OutputType.INFO)
+            subprocess.run(["git", "pull"], cwd=git_root, check=True)
+            PrettyOutput.print("Jarvis已更新到最新版本", OutputType.SUCCESS)
+            return True
+        return False
+    except Exception as e:
+        PrettyOutput.print(f"Git仓库更新检查失败: {e}", OutputType.WARNING)
+        return False
