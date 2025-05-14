@@ -339,3 +339,5 @@ class CustomPlatform(BasePlatform):
 <div align="center">
 由 Jarvis 团队用 ❤️ 制作
 </div>
+
+![Jarvis技术支持群](docs/images/wechat.png)
