@@ -109,52 +109,22 @@ OPENAI_MODEL_NAME=gpt-4o  # 可选，覆盖JARVIS_MODEL设置
 支持的模型可通过`jarvis-platform-manager --list-models`查看完整列表。
 
 ### 基本使用
-```bash
-# 使用通用代理
-jarvis
-
-# 使用代码代理
-jarvis-code-agent
-# 或者 jca
-
-# 使用智能shell的功能
-jarvis-smart-shell --help
-# 或者 jss
-
-# 使用平台管理的功能
-jarvis-platform-manager --help
-
-# 使用代码审查的功能
-jarvis-code-review --help
-
-# 使用自动化git commit的功能
-jarvis-git-commit --help
-# 或者 jgc
-
-# 使用dev功能（开发中）
-jarvis-dev --help
-
-# 使用git squash的功能
-jarvis-git-squash --help
-
-# 使用多代理的功能
-jarvis-multi-agent --help
-
-# 使用agent的功能
-jarvis-agent --help
-
-# 使用工具的功能
-jarvis-tool --help
-
-# 使用代码库查询功能
-jarvis-ask-codebase --help
-
-# 使用git details的功能
-jarvis-git-details --help
-
-# 使用方法论的功能
-jarvis-methodology --help
-```
+| 命令 | 快捷方式 | 功能描述 |
+|------|----------|----------|
+| `jarvis` | - | 使用通用代理 |
+| `jarvis-code-agent` | `jca` | 使用代码代理 |
+| `jarvis-smart-shell` | `jss` | 使用智能shell功能 |
+| `jarvis-platform-manager` | - | 使用平台管理功能 |
+| `jarvis-code-review` | - | 使用代码审查功能 |
+| `jarvis-git-commit` | `jgc` | 使用自动化git commit功能 |
+| `jarvis-dev` | - | 使用dev功能（开发中） |
+| `jarvis-git-squash` | - | 使用git squash功能 |
+| `jarvis-multi-agent` | - | 使用多代理功能 |
+| `jarvis-agent` | - | 使用agent功能 |
+| `jarvis-tool` | - | 使用工具功能 |
+| `jarvis-ask-codebase` | `jac` | 使用代码库查询功能 |
+| `jarvis-git-details` | - | 使用git details功能 |
+| `jarvis-methodology` | - | 使用方法论功能 |
 
 ---
 
