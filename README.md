@@ -36,6 +36,10 @@
 
 
 ## 🚀 快速开始 <a id="quick-start"></a>
+### 系统要求
+- 目前只能在Linux系统下使用（很多工具依赖Linux系统）
+- Windows没有测试过，但Windows 10以上的用户可以在WSL上使用此工具
+
 ### 安装
 ```bash
 git clone https://github.com/skyfireitdiy/Jarvis
