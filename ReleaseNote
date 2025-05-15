@@ -1,6 +1,6 @@
-v0.1.167
+v0.1.168
 - Auto commit before version release
-- chore(release): 准备发布v0.1.167版本
+- chore(release): 准备发布v0.1.168版本
 - docs(发布流程): 完善版本发布流程说明并添加ReleaseNote文件
 - fix(git_details): 修复提取分析报告时未返回原始结果的问题
 - feat(git-analyzer): 支持分析commit范围并重构分析逻辑
