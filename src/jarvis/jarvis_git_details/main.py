@@ -226,7 +226,7 @@ def extract_analysis_report(result: str) -> str:
     search_match = re.search(ot("REPORT")+r'\n(.*?)\n'+ct("REPORT"), result, re.DOTALL)
     if search_match:
         return search_match.group(1)
-    return ""
+    return result
 
 
 def main():
