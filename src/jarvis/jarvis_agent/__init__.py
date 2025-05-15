@@ -356,7 +356,7 @@ class Agent:
 如果任务已完成，请：
 1. 说明完成原因
 2. 保持输出格式规范
-{ot('!!!COMPLETE!!!')}
+{complete_prompt}
 </completion>
 </addon>
 """
