@@ -5,10 +5,38 @@
 发布版本: |
   1. 检测是否有未提交的代码，如果有，使用"jgc"命令提交
   2. 使用命令获取最新的tag（版本号）
-  3. 执行git命令，获取从最新的tag到HEAD的所有提交信息，并根据该信息生成简短的release_note
-  4. 将生成的信息写入ReleaseNote文件的最顶部，格式如下：
-    v{version}
-    {release_note}
+  3. 执行git命令，获取从最新的tag到HEAD的所有提交信息，并根据该信息生成简短的release_note，格式如下：
+    ```markdown
+    ### Release Note - v{new_version}  
+
+    #### **新功能 (Features)**  
+    - {new_features1}
+    - {new_features2}
+    - ...
+
+    #### **修复 (Fixes)**  
+    - {fix1}
+    - {fix2}
+    - ...
+
+    #### **优化与重构 (Refactors & Improvements)**  
+    - {refactor1}
+    - {refactor2}
+    - ...
+
+    #### **文档更新 (Documentation)**  
+    - {doc1}
+    - {doc2}
+    - ...
+
+    #### **其他 (Miscellaneous)**  
+    - {misc1}
+    - {misc2}
+    - ...
+
+    本次更新主要...
+    ```
+  4. 将生成的信息写入ReleaseNote文件的最顶部
   5. 执行python3 ./scripts/publish.py patch 进行版本发布
 安装当前版本: 执行 python3 -m pip install -e . 安装当前python包
 代码走查: 使用git工具，查看当前代码库修改的内容，进行code-review，如果有问题，给出修改意见
