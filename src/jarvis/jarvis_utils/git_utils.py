@@ -305,6 +305,7 @@ def check_and_update_git_repo(repo_path: str) -> bool:
     返回:
         bool: 是否执行了更新
     """
+    curr_dir = os.path.abspath(os.getcwd())
     git_root = find_git_root(repo_path)
     if git_root is None:
         return False
@@ -330,3 +331,5 @@ def check_and_update_git_repo(repo_path: str) -> bool:
     except Exception as e:
         PrettyOutput.print(f"Git仓库更新检查失败: {e}", OutputType.WARNING)
         return False
+    finally:
+        os.chdir(curr_dir)
