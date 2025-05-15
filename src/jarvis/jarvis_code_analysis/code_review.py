@@ -553,8 +553,9 @@ class CodeReviewTool:
 如果检测到了特定编程语言，请参考语言特定的审查清单进行评估，并在报告中包含相关分析。
 </notes>
 
+输出格式：
 {ot("REPORT")}
-[在此处插入完整的审查报告]
+[在此处插入完整MARKDOWN格式的审查报告]
 {ct("REPORT")}""",
                     output_handler=[tool_registry],
                     platform=PlatformRegistry().get_thinking_platform(),
@@ -653,7 +654,7 @@ def extract_code_report(result: str) -> str:
     sm = re.search(ot("REPORT")+r'\n(.*?)\n'+ct("REPORT"), result, re.DOTALL)
     if sm:
         return sm.group(1)
-    return ""
+    return result
 
 def main():
     """CLI entry point"""
