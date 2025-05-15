@@ -332,7 +332,7 @@ class Agent:
         action_handlers = '\n'.join([f'- {handler.name()}' for handler in self.output_handler])
 
         # 任务完成提示
-        complete_prompt = f"并输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
+        complete_prompt = f"3. 输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
 
         addon_prompt = f"""
 <addon>
@@ -353,9 +353,10 @@ class Agent:
 </actions>
 
 <completion>
-如果任务已完成{complete_prompt}，请：
+如果任务已完成，请：
 1. 说明完成原因
 2. 保持输出格式规范
+{ot('!!!COMPLETE!!!')}
 </completion>
 </addon>
 """
