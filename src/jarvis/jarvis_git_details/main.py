@@ -31,41 +31,140 @@ class GitCommitAnalyzer:
         """执行commit分析
 
         Args:
-            args: 包含commit_sha和root_dir的参数字典
+            args: 包含commit_sha/commit_range和root_dir的参数字典
+                commit_sha: 单个commit的SHA
+                commit_range: 两个commit的SHA范围，格式为"commit1..commit2"
+                root_dir: 代码库根目录
 
         Returns:
-            包含分析结果的字典，包括：
-            - success: 操作是否成功
-            - stdout: 包含commit_info和diff_content的结果
-            - stderr: 错误信息（如果操作失败）
+            包含分析结果的字典
         """
         try:
-            commit_sha = args["commit_sha"]
+            commit_sha = args.get("commit_sha")
+            commit_range = args.get("commit_range")
             root_dir = args.get("root_dir", ".")
 
-            # Store current directory
-            original_dir = os.getcwd()
+            if commit_range:
+                return self.analyze_commit_range(commit_range, root_dir)
+            elif commit_sha:
+                return self.analyze_single_commit(commit_sha, root_dir)
+            else:
+                raise ValueError("Either commit_sha or commit_range must be provided")
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": {},
+                "stderr": f"Failed to analyze commit: {str(e)}"
+            }
 
-            try:
-                # Change to root_dir
-                os.chdir(root_dir)
+    def analyze_single_commit(self, commit_sha: str, root_dir: str) -> Dict[str, Any]:
+        """分析单个commit
 
-                # 获取commit详细信息
-                commit_info = subprocess.check_output(
-                    f"git show {commit_sha} --pretty=fuller",
-                    shell=True,
-                    text=True
-                )
+        Args:
+            commit_sha: commit的SHA
+            root_dir: 代码库根目录
 
-                # 获取commit修改内容
-                diff_content = subprocess.check_output(
-                    f"git show {commit_sha} --patch",
-                    shell=True,
-                    text=True
-                )
+        Returns:
+            包含分析结果的字典
+        """
+        original_dir = os.getcwd()
+        try:
+            os.chdir(root_dir)
 
-                # 分析commit的功能、原因和逻辑
-                system_prompt = """你是一位资深代码分析专家，拥有多年代码审查和重构经验。你需要对Git commit进行深入分析，包括：
+            # 获取commit详细信息
+            commit_info = subprocess.check_output(
+                f"git show {commit_sha} --pretty=fuller",
+                shell=True,
+                text=True
+            )
+
+            # 获取commit修改内容
+            diff_content = subprocess.check_output(
+                f"git show {commit_sha} --patch",
+                shell=True,
+                text=True
+            )
+
+            # 分析commit的功能、原因和逻辑
+            analysis_result = self._analyze_diff_content(diff_content)
+
+            return {
+                "success": True,
+                "stdout": {
+                    "commit_info": commit_info,
+                    "diff_content": diff_content,
+                    "analysis_result": analysis_result
+                },
+                "stderr": ""
+            }
+        except subprocess.CalledProcessError as error:
+            return {
+                "success": False,
+                "stdout": {},
+                "stderr": f"Failed to analyze commit: {str(error)}"
+            }
+        finally:
+            os.chdir(original_dir)
+
+    def analyze_commit_range(self, commit_range: str, root_dir: str) -> Dict[str, Any]:
+        """分析两个commit之间的代码变更
+
+        Args:
+            commit_range: 两个commit的SHA范围，格式为"commit1..commit2"
+            root_dir: 代码库根目录
+
+        Returns:
+            包含分析结果的字典
+        """
+        original_dir = os.getcwd()
+        try:
+            os.chdir(root_dir)
+
+            # 获取commit范围差异
+            diff_content = subprocess.check_output(
+                f"git diff {commit_range} --patch",
+                shell=True,
+                text=True
+            )
+
+            # 获取commit范围信息
+            commit_info = subprocess.check_output(
+                f"git log {commit_range} --pretty=fuller",
+                shell=True,
+                text=True
+            )
+
+            # 使用相同的分析方法处理差异内容
+            analysis_result = self._analyze_diff_content(diff_content)
+
+            return {
+                "success": True,
+                "stdout": {
+                    "commit_info": commit_info,
+                    "diff_content": diff_content,
+                    "analysis_result": analysis_result
+                },
+                "stderr": ""
+            }
+        except subprocess.CalledProcessError as error:
+            return {
+                "success": False,
+                "stdout": {},
+                "stderr": f"Failed to analyze commit range: {str(error)}"
+            }
+        finally:
+            os.chdir(original_dir)
+
+    def _analyze_diff_content(self, diff_content: str) -> str:
+        """分析diff内容并生成报告
+
+        Args:
+            diff_content: git diff或git show的输出内容
+
+        Returns:
+            分析结果字符串
+        """
+        system_prompt = """你是一位资深代码分析专家，拥有多年代码审查和重构经验。你需要对Git commit进行深入分析，包括：
 1. 修改的功能：明确说明本次commit实现或修改了哪些功能
 2. 修改的原因：分析为什么要进行这些修改（如修复bug、优化性能、添加新功能等）
 3. 修改的逻辑：详细说明代码修改的具体实现逻辑和思路
@@ -80,11 +179,11 @@ class GitCommitAnalyzer:
 - 保持结构清晰，便于理解
 - 重点关注关键修改和潜在风险"""
 
-                tool_registry = ToolRegistry()
-                agent = Agent(
-                    system_prompt=system_prompt,
-                    name="Commit Analysis Agent",
-                    summary_prompt=f"""请生成一份详细的commit分析报告，包含以下内容：
+        tool_registry = ToolRegistry()
+        agent = Agent(
+            system_prompt=system_prompt,
+            name="Commit Analysis Agent",
+            summary_prompt=f"""请生成一份详细的commit分析报告，包含以下内容：
 {ot("REPORT")}
 # 功能分析
 [说明本次commit实现或修改了哪些功能]
@@ -107,31 +206,12 @@ class GitCommitAnalyzer:
 # 最佳实践
 [检查代码是否符合行业最佳实践和项目规范]
 {ct("REPORT")}""",
-                    output_handler=[tool_registry],
-                    platform=PlatformRegistry().get_thinking_platform(),
-                    auto_complete=True
-                )
+            output_handler=[tool_registry],
+            platform=PlatformRegistry().get_thinking_platform(),
+            auto_complete=True
+        )
 
-                analysis_result = agent.run(diff_content)
-
-                return {
-                    "success": True,
-                    "stdout": {
-                        "commit_info": commit_info,
-                        "diff_content": diff_content,
-                        "analysis_result": analysis_result
-                    },
-                    "stderr": ""
-                }
-            finally:
-                # Always restore original directory
-                os.chdir(original_dir)
-        except subprocess.CalledProcessError as error:
-            return {
-                "success": False,
-                "stdout": {},
-                "stderr": f"Failed to analyze commit: {str(error)}"
-            }
+        return agent.run(diff_content)
 
 
 def extract_analysis_report(result: str) -> str:
@@ -156,16 +236,24 @@ def main():
     init_env()
 
     parser = argparse.ArgumentParser(description='Git Commit Analyzer')
-    parser.add_argument('commit', help='Commit SHA to analyze')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('commit', nargs='?', help='Commit SHA to analyze')
+    group.add_argument('--range', type=str, help='Commit range to analyze (commit1..commit2)')
     parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
 
     args = parser.parse_args()
 
     analyzer = GitCommitAnalyzer()
-    result = analyzer.execute({
-        "commit_sha": args.commit,
-        "root_dir": args.root_dir
-    })
+    if args.range:
+        result = analyzer.execute({
+            "commit_range": args.range,
+            "root_dir": args.root_dir
+        })
+    else:
+        result = analyzer.execute({
+            "commit_sha": args.commit,
+            "root_dir": args.root_dir
+        })
 
     if result["success"]:
         PrettyOutput.section("Commit Information:", OutputType.SUCCESS)
