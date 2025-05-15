@@ -1,0 +1,19 @@
+v0.1.167
+- feat(git-analyzer): 支持分析commit范围并重构分析逻辑
+- feat(config): 添加JARVIS_AUTO_UPDATE配置项
+- feat(platform): 为平台添加web功能支持检查
+- feat(git_utils): 添加Git仓库自动检查更新功能
+- feat(base): 添加对大内容大小的检查
+- feat(install): 为install命令添加shell类型参数支持
+- fix(git_details): 修复提取分析报告时未返回原始结果的问题
+- fix(jarvis_agent): 修正任务完成提示变量名错误
+- fix(jarvis_agent): 修正任务完成提示格式和内容
+- fix(git_utils): 修复git仓库更新后未恢复工作目录的问题
+- refactor(web_tools): 将check方法改为静态方法
+- refactor(workflow): 简化代码提交流程并优化大文件处理
+- docs(发布流程): 完善版本发布流程说明并添加ReleaseNote文件
+- docs(code_review): 更新代码审查报告输出格式说明
+- docs(README): 补充JARVIS_AUTO_UPDATE配置项的说明
+- docs(README): 移除已弃用的OPENAI_MODEL_NAME配置项
+- docs(README): 添加技术支持群二维码图片
+- docs(wechat): 添加微信二维码图片
