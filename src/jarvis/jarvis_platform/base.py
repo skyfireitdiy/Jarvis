@@ -48,7 +48,6 @@ class BasePlatform(ABC):
         start_time = time.time()
 
         input_token_count = get_context_token_count(message)
-
         if is_context_overflow(message):
             PrettyOutput.print("错误：输入内容超过最大限制", OutputType.WARNING)
             return "错误：输入内容超过最大限制"
@@ -56,10 +55,12 @@ class BasePlatform(ABC):
         if input_token_count > get_max_input_token_count():
             current_suppress_output = self.suppress_output
             self.set_suppress_output(True)
-            inputs = split_text_into_chunks(message, get_max_input_token_count() - 1024, get_max_input_token_count() - 2048)
+            max_chunk_size = get_max_input_token_count() - 1024  # 留出一些余量
+            min_chunk_size = max_chunk_size // 2  # 最小块大小设为最大块大小的一半
+            inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
             with yaspin(text="正在提交长上下文...", color="cyan") as spinner:
                 prefix_prompt = f"""
-                我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”，明白请输出“开始接收输入”。
+                我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
                 """
                 while_true(lambda: while_success(lambda: self.chat(prefix_prompt), 5), 5)
                 submit_count = 0

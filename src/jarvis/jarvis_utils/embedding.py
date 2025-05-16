@@ -20,131 +20,84 @@ def get_context_token_count(text: str) -> int:
         int: 文本中的token数量
     """
     try:
-        # 使用擅长处理通用文本的快速分词器
         tokenizer = load_tokenizer()
-        chunks = split_text_into_chunks(text, 512)
-        return sum([len(tokenizer.encode(chunk)) for chunk in chunks]) # type: ignore
-
+        # 分批处理长文本，确保不超过模型最大长度
+        total_tokens = 0
+        chunk_size = 100  # 每次处理100个字符，避免超过模型最大长度（考虑到中文字符可能被编码成多个token）
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i:i + chunk_size]
+            tokens = tokenizer.encode(chunk)  # type: ignore
+            total_tokens += len(tokens)
+        return total_tokens
     except Exception as e:
         PrettyOutput.print(f"计算token失败: {str(e)}", OutputType.WARNING)
-        # 回退到基于字符的粗略估计
         return len(text) // 4  # 每个token大约4个字符的粗略估计
 
 def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 50) -> List[str]:
-    """将文本分割成块，严格按句子边界切割，优化RAG检索效果。
+    """将文本分割成块，基于token数量进行切割。
 
     参数：
         text: 要分割的输入文本
-        max_length: 每个块的最大长度
-        min_length: 每个块的最小长度（除了最后一块可能较短）
+        max_length: 每个块的最大token数量
+        min_length: 每个块的最小token数量（除了最后一块可能较短）
 
     返回：
-        List[str]: 文本块列表，每个块严格按句子边界切割，长度不超过max_length且不小于min_length
+        List[str]: 文本块列表，每个块的token数量不超过max_length且不小于min_length
     """
     if not text:
         return []
 
-    # 如果文本长度小于最大长度，直接返回整个文本
-    if len(text) <= max_length:
-        return [text]
+    try:
+        tokenizer = load_tokenizer()
+        
+        def get_token_count(chunk: str) -> int:
+            """安全地计算文本的token数量，通过分批处理避免超出模型最大长度"""
+            total_tokens = 0
+            chunk_size = 100  # 每次处理100个字符
+            for i in range(0, len(chunk), chunk_size):
+                sub_chunk = chunk[i:i + chunk_size]
+                tokens = tokenizer.encode(sub_chunk)  # type: ignore
+                total_tokens += len(tokens)
+            return total_tokens
 
-    # 预处理：规范化文本，移除多余空白字符
-    text = ' '.join(text.split())
-
-    # 中英文标点符号集合，优化RAG召回的句子边界
-    primary_punctuation = {'.', '!', '?', '\n', '。', '！', '？'}  # 主要句末标点
-    secondary_punctuation = {'；', '：', '…', ';', ':'}  # 次级分隔符
-    tertiary_punctuation = {',', '，', '、', ')', '）', ']', '】', '}', '》', '"', "'"}  # 最低优先级
-
-    chunks = []
-    start = 0
-
-    while start < len(text):
-        # 初始化结束位置为最大可能长度
-        end = min(start + max_length, len(text))
-
-        # 只有当不是最后一块且结束位置等于最大长度时，才尝试寻找句子边界
-        if end < len(text) and end == start + max_length:
-            # 优先查找段落边界，这对RAG特别重要
-            paragraph_boundary = text.rfind('\n\n', start, end)
-            if paragraph_boundary > start and paragraph_boundary < end - min_length:  # 确保不会切得太短
-                end = paragraph_boundary + 2
+        chunks = []
+        current_chunk = ""
+        current_tokens = 0
+        
+        # 按较大的块处理文本，避免破坏token边界
+        chunk_size = 50  # 每次处理50个字符
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i:i + chunk_size]
+            chunk_tokens = get_token_count(chunk)
+            
+            # 如果当前块加上新块会超过最大长度，且当前块已经达到最小长度，则保存当前块
+            if current_tokens + chunk_tokens > max_length and current_tokens >= min_length:
+                chunks.append(current_chunk)
+                current_chunk = chunk
+                current_tokens = chunk_tokens
             else:
-                # 寻找句子边界，从end-1位置开始
-                found_boundary = False
-                best_boundary = -1
+                current_chunk += chunk
+                current_tokens += chunk_tokens
 
-                # 扩大搜索范围以找到更好的语义边界
-                search_range = min(120, end - start - min_length)  # 扩大搜索范围，但确保新块不小于min_length
-
-                # 先尝试找主要标点（句号等）
-                for i in range(end-1, max(start, end-search_range), -1):
-                    if text[i] in primary_punctuation:
-                        best_boundary = i
-                        found_boundary = True
-                        break
-
-                # 如果没找到主要标点，再找次要标点（分号、冒号等）
-                if not found_boundary:
-                    for i in range(end-1, max(start, end-search_range), -1):
-                        if text[i] in secondary_punctuation:
-                            best_boundary = i
-                            found_boundary = True
-                            break
-
-                # 最后考虑逗号和其他可能的边界
-                if not found_boundary:
-                    for i in range(end-1, max(start, end-search_range), -1):
-                        if text[i] in tertiary_punctuation:
-                            best_boundary = i
-                            found_boundary = True
-                            break
-
-                # 如果找到了合适的边界且不会导致太短的块，使用它
-                if found_boundary and (best_boundary - start) >= min_length:
-                    end = best_boundary + 1
-
-        # 添加当前块，并确保删除开头和结尾的空白字符
-        chunk = text[start:end].strip()
-        if chunk and len(chunk) >= min_length:  # 只添加符合最小长度的非空块
-            chunks.append(chunk)
-        elif chunk and not chunks:  # 如果是第一个块且小于最小长度，也添加它
-            chunks.append(chunk)
-        elif chunk:  # 如果块太小，尝试与前一个块合并
-            if chunks:
-                if len(chunks[-1]) + len(chunk) <= max_length * 1.1:  # 允许略微超过最大长度
-                    chunks[-1] = chunks[-1] + " " + chunk
+        # 处理最后一个块
+        if current_chunk:
+            if current_tokens >= min_length:
+                chunks.append(current_chunk)
+            elif chunks:  # 如果最后一个块太短，尝试与前面的块合并
+                last_chunk = chunks[-1]
+                combined = last_chunk + current_chunk
+                combined_tokens = get_token_count(combined)
+                if combined_tokens <= max_length:
+                    chunks[-1] = combined
                 else:
-                    # 如果合并会导致太长，添加这个小块（特殊情况）
-                    chunks.append(chunk)
+                    chunks.append(current_chunk)
 
-        # 计算下一块的开始位置，直接使用当前块的结束位置作为下一块的开始，不再有重叠窗口
-        next_start = end  # 直接使用当前块的结束位置作为下一块的开始，不再有重叠窗口
+        return chunks
 
-        # 确保总是有前进，避免无限循环
-        if next_start <= start:
-            next_start = start + max(1, min_length // 2)
-
-        start = next_start
-
-    # 最后检查是否有太短的块，尝试合并相邻的短块
-    if len(chunks) > 1:
-        merged_chunks = []
-        i = 0
-        while i < len(chunks):
-            current = chunks[i]
-            # 如果当前块太短且不是最后一个块，尝试与下一个合并
-            if len(current) < min_length and i < len(chunks) - 1:
-                next_chunk = chunks[i + 1]
-                if len(current) + len(next_chunk) <= max_length * 1.1:
-                    merged_chunks.append(current + " " + next_chunk)
-                    i += 2  # 跳过下一个块
-                    continue
-            merged_chunks.append(current)
-            i += 1
-        chunks = merged_chunks
-
-    return chunks
+    except Exception as e:
+        PrettyOutput.print(f"文本分割失败: {str(e)}", OutputType.WARNING)
+        # 发生错误时回退到简单的字符分割
+        return [text[i:i + max_length] for i in range(0, len(text), max_length)]
 
 
 @functools.lru_cache(maxsize=1)
