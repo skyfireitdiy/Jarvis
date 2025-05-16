@@ -6,7 +6,26 @@ from jarvis.jarvis_utils.utils import init_env
 
 
 def main() -> int:
-    """命令行工具入口，提供工具列表查看和工具调用功能"""
+    """
+    命令行工具入口，提供工具列表查看和工具调用功能
+    
+    功能:
+        1. 列出所有可用工具 (list命令)
+        2. 调用指定工具 (call命令)
+    
+    参数:
+        通过命令行参数传递，包括:
+        - list: 列出工具
+            --json: 以JSON格式输出
+            --detailed: 显示详细信息
+        - call: 调用工具
+            tool_name: 工具名称
+            --args: 工具参数(JSON格式)
+            --args-file: 从文件加载工具参数
+    
+    返回值:
+        int: 0表示成功，非0表示错误
+    """
     import argparse
     import json
 
@@ -34,24 +53,24 @@ def main() -> int:
     registry = ToolRegistry()
 
     if args.command == "list":
-        tools = registry.get_all_tools()
+        tools = registry.get_all_tools()  # 从注册表获取所有工具信息
 
         if args.json:
             if args.detailed:
-                print(json.dumps(tools, indent=2, ensure_ascii=False))
+                print(json.dumps(tools, indent=2, ensure_ascii=False))  # 输出完整JSON格式
             else:
                 simple_tools = [
                     {"name": t["name"], "description": t["description"]} for t in tools
-                ]
+                ]  # 简化工具信息
                 print(json.dumps(simple_tools, indent=2, ensure_ascii=False))
         else:
-            PrettyOutput.section("可用工具列表", OutputType.SYSTEM)
+            PrettyOutput.section("可用工具列表", OutputType.SYSTEM)  # 使用美化输出
             for tool in tools:
                 print(f"\n✅ {tool['name']}")
                 print(f"   描述: {tool['description']}")
                 if args.detailed:
                     print(f"   参数:")
-                    print(tool["parameters"])
+                    print(tool["parameters"])  # 显示详细参数信息
 
     elif args.command == "call":
         tool_name = args.tool_name
@@ -63,11 +82,11 @@ def main() -> int:
             print(f"可用工具: {available_tools}")
             return 1
 
-        # 获取参数
+        # 获取参数: 支持从命令行直接传入或从文件加载
         tool_args = {}
         if args.args:
             try:
-                tool_args = json.loads(args.args)
+                tool_args = json.loads(args.args)  # 解析JSON格式参数
             except json.JSONDecodeError:
                 PrettyOutput.print("错误: 参数必须是有效的JSON格式", OutputType.ERROR)
                 return 1
@@ -75,14 +94,14 @@ def main() -> int:
         elif args.args_file:
             try:
                 with open(args.args_file, "r", encoding="utf-8") as f:
-                    tool_args = json.load(f)
+                    tool_args = json.load(f)  # 从文件加载JSON参数
             except (json.JSONDecodeError, FileNotFoundError) as e:
                 PrettyOutput.print(
                     f"错误: 无法从文件加载参数: {str(e)}", OutputType.ERROR
                 )
                 return 1
 
-        # 检查必需参数
+        # 检查必需参数是否完整
         required_params = tool_obj.parameters.get("required", [])
         missing_params = [p for p in required_params if p not in tool_args]
 
@@ -98,10 +117,10 @@ def main() -> int:
                 print(f"  - {param_name}: {desc}")
             return 1
 
-        # 执行工具
+        # 执行工具并处理结果
         result = registry.execute_tool(tool_name, tool_args)
 
-        # 显示结果
+        # 显示执行结果
         if result["success"]:
             PrettyOutput.section(f"工具 {tool_name} 执行成功", OutputType.SUCCESS)
         else:
