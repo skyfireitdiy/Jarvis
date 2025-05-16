@@ -13,6 +13,20 @@ from jarvis.jarvis_utils.utils import is_context_overflow
 
 
 def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
+    """Process user input containing file references and read file contents.
+    
+    Args:
+        user_input: Input string that may contain file references in format:
+            - 'file_path' (whole file)
+            - 'file_path:start_line,end_line' (line range)
+            - 'file_path:start_line:end_line' (alternative range format)
+        agent: Agent object for further processing (currently unused)
+        
+    Returns:
+        Tuple[str, bool]: 
+            - Processed prompt string with file contents prepended
+            - Boolean indicating if context overflow occurred
+    """
     prompt = user_input
     files = []
 
@@ -37,7 +51,7 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                     except FileNotFoundError:
                         PrettyOutput.print(f"文件不存在: {file_path}", OutputType.WARNING)
                         continue
-                    # Process start line
+                    # Process start line (0 means whole file, negative means from end)
                     if raw_start == 0:  # 0表示整个文件
                         start_line = 1
                         end_line = total_lines
@@ -85,6 +99,7 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             if result["success"]:
                 spinner.text = "文件读取完成"
                 spinner.ok("✅")
+                # Prepend file contents to prompt and check for overflow
                 prompt = result["stdout"] + "\n" + prompt
                 if is_context_overflow(prompt):
                     return old_prompt, False
