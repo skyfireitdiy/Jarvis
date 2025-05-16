@@ -559,32 +559,28 @@ arguments:
             2. 对于子Agent: 可能会生成总结(如果启用)
             3. 使用spinner显示生成状态
         """
-        """Complete the current task and generate summary if needed.
-
-        Returns:
-            str: Task summary or completion status
-
-        Note:
-            - For main agent: May generate methodology if enabled
-            - For sub-agent: May generate summary if enabled
-        """
-        with yaspin(text="正在生成方法论...", color="cyan") as spinner:
+        with yaspin(text="正在分析任务...", color="cyan") as spinner:
             try:
-
                 # 让模型判断是否需要生成方法论
                 analysis_prompt = f"""<task_analysis>
 <request>
 当前任务已结束，请分析该任务的解决方案：
 
-1. 首先评估当前任务是否可以通过编写工具来自动化解决
-2. 如果可以通过工具解决，请设计并提供工具代码
-3. 如果无法通过编写通用工具完成，评估是否可以总结为通用方法论
-4. 如果以上都不可行，给出详细理由
+1. 首先检查现有工具或方法论是否已经可以完成该任务，如果可以，直接说明即可，无需生成新内容
+2. 如果现有工具/方法论不足，评估当前任务是否可以通过编写新工具来自动化解决
+3. 如果可以通过工具解决，请设计并提供工具代码
+4. 如果无法通过编写通用工具完成，评估是否可以总结为通用方法论
+5. 如果以上都不可行，给出详细理由
 
-请根据分析结果采取相应行动：创建工具、生成方法论或说明原因。
+请根据分析结果采取相应行动：说明现有工具/方法论、创建新工具、生成新方法论或说明原因。
 </request>
 
 <evaluation_criteria>
+现有资源评估:
+1. 现有工具 - 检查系统中是否已有可以完成该任务的工具
+2. 现有方法论 - 检查是否已有适用于该任务的方法论
+3. 组合使用 - 评估现有工具和方法论组合使用是否可以解决问题
+
 工具评估标准:
 1. 通用性 - 该工具是否可以解决一类问题，而不仅仅是当前特定问题
 2. 自动化 - 该工具是否可以减少人工干预，提高效率
@@ -607,6 +603,46 @@ arguments:
 5. 工具描述应详细说明用途、适用场景和使用示例
 6. 参数定义应遵循JSON Schema格式
 7. 不要包含特定任务的细节，保持通用性
+
+工具设计关键点:
+1. **使用PrettyOutput打印执行过程**：强烈建议在工具中使用PrettyOutput显示执行过程，
+   这样用户可以了解工具在做什么，提升用户体验。示例：
+   ```python
+   from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+   
+   # 执行中打印信息
+   PrettyOutput.print("正在处理数据...", OutputType.INFO)
+   # 成功信息
+   PrettyOutput.print("操作成功完成", OutputType.SUCCESS)
+   # 警告信息
+   PrettyOutput.print("发现潜在问题", OutputType.WARNING)
+   # 错误信息
+   PrettyOutput.print("操作失败", OutputType.ERROR)
+   ```
+   
+2. **结构化返回结果**：工具应该始终返回结构化的结果字典，包含以下字段：
+   - success: 布尔值，表示操作是否成功
+   - stdout: 字符串，包含工具的主要输出内容
+   - stderr: 字符串，包含错误信息（如果有）
+
+3. **异常处理**：工具应该妥善处理可能发生的异常，并在失败时清理已创建的资源
+   ```python
+   try:
+       # 执行逻辑
+       return {{
+           "success": True,
+           "stdout": "成功结果",
+           "stderr": ""
+       }}
+   except Exception as e:
+       PrettyOutput.print(f"操作失败: {{str(e)}}", OutputType.ERROR)
+       # 清理资源（如果有创建）
+       return {{
+           "success": False,
+           "stdout": "",
+           "stderr": f"操作失败: {{str(e)}}"
+       }}
+   ```
 </tool_requirements>
 
 <methodology_requirements>
@@ -618,9 +654,14 @@ arguments:
 </methodology_requirements>
 
 <output_requirements>
-根据分析结果，输出以下两种格式之一：
+根据分析结果，输出以下三种情况之一：
 
-1. 工具创建（如果适合通过工具解决）:
+1. 如果现有工具/方法论可以解决，直接输出说明：
+已有工具/方法论可以解决该问题，无需创建新内容。
+可用的工具/方法论：[列出工具名称或方法论名称]
+使用方法：[简要说明如何使用]
+
+2. 工具创建（如果需要创建新工具）:
 {ot("TOOL_CALL")}
 want: 创建新工具来解决XXX问题
 name: generate_new_tool
@@ -629,11 +670,13 @@ arguments:
   tool_code: |
     # -*- coding: utf-8 -*-
     from typing import Dict, Any
+    from jarvis.jarvis_utils.output import PrettyOutput, OutputType
     
     class 工具名称:
         name = "工具名称"
-        description = \"\"\"
-        工具描述，包含用途、使用场景等
+        description = "Tool for text transformation"
+                Tool description
+        适用场景：1. 格式化文本; 2. 处理标题; 3. 标准化输出
         \"\"\"
         
         parameters = {{
@@ -649,15 +692,29 @@ arguments:
             return True
         
         def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-            # 实现逻辑
-            return {{
-                "success": True,
-                "stdout": "结果输出",
-                "stderr": ""
-            }}
+            try:
+                # 使用PrettyOutput显示执行过程
+                PrettyOutput.print("开始执行操作...", OutputType.INFO)
+                
+                # 实现逻辑
+                # ...
+                
+        PrettyOutput.print("操作已完成", OutputType.SUCCESS)
+        return {{
+            "success": True,
+            "stdout": "结果输出",
+            "stderr": ""
+        }}
+    except Exception as e:
+        PrettyOutput.print(f"操作失败: {{str(e)}}", OutputType.ERROR)
+        return {{
+            "success": False,
+            "stdout": "",
+            "stderr": f"操作失败: {{str(e)}}"
+        }}
 {ct("TOOL_CALL")}
 
-2. 方法论创建（如果适合生成方法论）:
+3. 方法论创建（如果需要创建新方法论）:
 {ot("TOOL_CALL")}
 want: 添加/更新xxxx的方法论
 name: methodology
@@ -668,10 +725,94 @@ arguments:
     方法论内容
 {ct("TOOL_CALL")}
 
-如果任务既不适合创建工具也不适合生成方法论，则直接输出原因分析，不要使用工具调用格式。
+如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>
-</task_analysis>
-"""
+
+<tool_example>
+以下是一个完整的工具示例，供参考：
+
+```python
+# -*- coding: utf-8 -*-
+from typing import Dict, Any
+from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+
+class text_transformer:
+    name = "text_transformer"
+    description = "Tool for text transformation"
+    Tool description for text transformation
+    适用场景：1. 格式化文本; 2. 处理标题; 3. 标准化输出
+    \"\"\"
+    
+    parameters = {{
+        "type": "object",
+        "properties": {{
+            "text": {{
+                "type": "string",
+                "description": "需要转换格式的文本"
+            }},
+            "transform_type": {{
+                "type": "string",
+                "description": "转换类型，可选值为 upper（大写）、lower（小写）或 title（首字母大写）",
+                "enum": ["upper", "lower", "title"]
+            }}
+        }},
+        "required": ["text", "transform_type"]
+    }}
+    
+    @staticmethod
+    def check() -> bool:
+        return True
+    
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            text = args["text"]
+            transform_type = args["transform_type"]
+            
+            # 使用PrettyOutput显示执行过程
+            PrettyOutput.print(f"正在将文本转换为 {{transform_type}} 格式...", OutputType.INFO)
+            
+            if transform_type == "upper":
+                result = text.upper()
+                PrettyOutput.print("文本已转换为大写", OutputType.SUCCESS)
+            elif transform_type == "lower":
+                result = text.lower()
+                PrettyOutput.print("文本已转换为小写", OutputType.SUCCESS)
+            elif transform_type == "title":
+                result = text.title()
+                PrettyOutput.print("文本已转换为首字母大写", OutputType.SUCCESS)
+            else:
+                PrettyOutput.print(f"不支持的转换类型: {{transform_type}}", OutputType.ERROR)
+                return {{
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"不支持的转换类型: {{transform_type}}"
+                }}
+            
+            return {{
+                "success": True,
+                "stdout": result,
+                "stderr": ""
+            }}
+            
+        except Exception as e:
+            PrettyOutput.print(f"转换失败: {{str(e)}}", OutputType.ERROR)
+            return {{
+                "success": False,
+                "stdout": "",
+                "stderr": f"转换失败: {{str(e)}}"
+            }}
+```
+
+使用方法：
+```
+name: text_transformer
+arguments:
+    text: hello world
+    transform_type: upper
+```
+</tool_example>
+</task_analysis>"""
+
                 self.prompt = analysis_prompt
                 with spinner.hidden():
                     response = self.model.chat_until_success(self.prompt) # type: ignore

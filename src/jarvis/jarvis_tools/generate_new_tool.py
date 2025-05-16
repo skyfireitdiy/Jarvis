@@ -12,85 +12,6 @@ class generate_new_tool:
     生成并注册新的Jarvis工具。该工具会在用户数据目录下创建新的工具文件，
     并自动注册到当前的工具注册表中。适用场景：1. 需要创建新的自定义工具；
     2. 扩展Jarvis功能；3. 自动化重复性操作；4. 封装特定领域的功能。
-    
-    使用示例：
-    
-    ```
-    # 创建一个将文本转换为大写/小写的工具
-    name: generate_new_tool
-    arguments:
-        tool_name: text_transformer
-        tool_code: |
-            # -*- coding: utf-8 -*-
-            from typing import Dict, Any
-            
-            class text_transformer:
-                name = "text_transformer"
-                description = \"\"\"
-                文本转换工具，可以将输入的文本转换为大写、小写或首字母大写格式。
-                适用场景：1. 格式化文本; 2. 处理标题; 3. 标准化输出
-                \"\"\"
-                
-                parameters = {
-                    "type": "object",
-                    "properties": {
-                        "text": {
-                            "type": "string",
-                            "description": "需要转换格式的文本"
-                        },
-                        "transform_type": {
-                            "type": "string",
-                            "description": "转换类型，可选值为 upper（大写）、lower（小写）或 title（首字母大写）",
-                            "enum": ["upper", "lower", "title"]
-                        }
-                    },
-                    "required": ["text", "transform_type"]
-                }
-                
-                @staticmethod
-                def check() -> bool:
-                    return True
-                
-                def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-                    try:
-                        text = args["text"]
-                        transform_type = args["transform_type"]
-                        
-                        if transform_type == "upper":
-                            result = text.upper()
-                        elif transform_type == "lower":
-                            result = text.lower()
-                        elif transform_type == "title":
-                            result = text.title()
-                        else:
-                            return {
-                                "success": False,
-                                "stdout": "",
-                                "stderr": f"不支持的转换类型: {transform_type}"
-                            }
-                        
-                        return {
-                            "success": True,
-                            "stdout": result,
-                            "stderr": ""
-                        }
-                        
-                    except Exception as e:
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": f"转换失败: {str(e)}"
-                        }
-    ```
-    
-    创建完成后可以立即使用：
-    
-    ```
-    name: text_transformer
-    arguments:
-        text: hello world
-        transform_type: upper
-    ```
     """
     
     parameters = {
@@ -136,6 +57,7 @@ class generate_new_tool:
         返回:
             Dict: 包含生成结果的字典
         """
+        tool_file_path = None
         try:
             # 从参数中获取工具信息
             tool_name = args["tool_name"]
@@ -181,15 +103,30 @@ class generate_new_tool:
             # 注册新工具到当前的工具注册表
             success_message = f"工具 '{tool_name}' 已成功生成在 {tool_file_path}"
             
+            registration_successful = False
             if agent:
                 tool_registry = agent.get_tool_registry()
                 if tool_registry:
                     # 尝试加载并注册新工具
+                    PrettyOutput.print(f"正在注册工具 '{tool_name}'...", OutputType.INFO)
                     if tool_registry.register_tool_by_file(str(tool_file_path)):
                         success_message += f"\n已成功注册到当前会话的工具注册表中"
+                        registration_successful = True
+                    else:
+                        # 注册失败，删除已创建的文件
+                        PrettyOutput.print(f"注册工具 '{tool_name}' 失败，正在删除文件...", OutputType.WARNING)
+                        if tool_file_path.exists():
+                            tool_file_path.unlink()
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": f"工具文件已生成，但注册失败。文件已被删除。"
+                        }
                 else:
+                    PrettyOutput.print("未找到工具注册表，无法自动注册工具", OutputType.WARNING)
                     success_message += f"\n注册到当前会话失败，可能需要重新启动Jarvis"
             
+            PrettyOutput.print(f"工具 '{tool_name}' 创建" + ("并注册" if registration_successful else "") + "成功！", OutputType.SUCCESS)
             return {
                 "success": True,
                 "stdout": success_message,
@@ -197,11 +134,23 @@ class generate_new_tool:
             }
             
         except Exception as e:
-            # 如果发生异常，返回失败响应，包含错误信息
+            # 如果发生异常，删除已创建的文件并返回失败响应
+            error_msg = f"生成工具失败: {str(e)}"
+            PrettyOutput.print(error_msg, OutputType.ERROR)
+            
+            # 删除已创建的文件
+            if tool_file_path and tool_file_path.exists():
+                try:
+                    PrettyOutput.print(f"正在删除已创建的文件 {tool_file_path}...", OutputType.INFO)
+                    tool_file_path.unlink()
+                    PrettyOutput.print(f"文件已删除", OutputType.SUCCESS)
+                except Exception as delete_error:
+                    PrettyOutput.print(f"删除文件失败: {str(delete_error)}", OutputType.ERROR)
+            
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"生成工具失败: {str(e)}"
+                "stderr": error_msg
             }
     
     def _validate_and_process_code(self, tool_name: str, tool_code: str) -> Tuple[str, str]:
