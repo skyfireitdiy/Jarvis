@@ -6,7 +6,7 @@ import hashlib
 import tarfile
 from pathlib import Path
 from typing import List, Any, Callable
-from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_input_token_count, get_data_dir
+from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_big_content_size, get_max_input_token_count, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
@@ -125,37 +125,7 @@ def get_file_line_count(filename: str) -> int:
         return 0
 
 
-def is_long_context(files: List[str]) -> bool:
-    """检查文件列表是否属于长上下文
 
-    判断标准：
-    当总token数超过最大上下文长度的80%时视为长上下文
-
-    参数：
-    files -- 要检查的文件路径列表
-
-    返回：
-    布尔值表示是否属于长上下文
-    """
-    max_input_token_count = get_max_input_token_count()
-    threshold = max_input_token_count * 0.8
-    total_tokens = 0
-
-    for file_path in files:
-        try:
-            with open(file_path, 'r', encoding='utf-8', errors="ignore") as f:
-                content = f.read()
-                total_tokens += get_context_token_count(content)
-
-                if total_tokens > threshold:
-                    return True
-        except Exception as e:
-            PrettyOutput.print(f"读取文件 {file_path} 失败: {e}", OutputType.WARNING)
-            continue
-
-    return total_tokens > threshold
-
-
-def is_context_overflow(file_content: str) -> bool:
+def is_context_overflow(content: str) -> bool:
     """判断文件内容是否超出上下文限制"""
-    return get_context_token_count(file_content) > get_max_input_token_count() - INPUT_WINDOW_REVERSE_SIZE
+    return get_context_token_count(content) > get_max_big_content_size() 

@@ -152,3 +152,12 @@ def get_auto_update() -> bool:
         bool: 如果需要自动更新则返回True，默认为True
     """
     return os.getenv('JARVIS_AUTO_UPDATE', 'true') == 'true'
+
+def get_max_big_content_size() -> int:
+    """
+    获取最大大内容大小。
+
+    返回：
+        int: 最大大内容大小，默认为10MB
+    """
+    return int(os.getenv('JARVIS_MAX_BIG_CONTENT_SIZE', '10485760'))

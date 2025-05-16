@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
 from abc import ABC, abstractmethod
 import re
+from sys import prefix
 from typing import List, Tuple
-from jarvis.jarvis_utils.config import get_max_input_token_count
+
+from httpx import get
+from networkx import prefix_tree
+from torch import le
+from jarvis.jarvis_utils.config import get_max_big_content_size, get_max_input_token_count
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
@@ -41,7 +46,7 @@ class BasePlatform(ABC):
     
     def chat_big_content(self, content: str, prompt: str) -> str:
         # 检查content大小不超过10MB
-        if len(content.encode('utf-8')) > 10 * 1024 * 1024:
+        if len(content.encode('utf-8')) > get_max_big_content_size():
             return "Error: Content size exceeds 10MB limit"
         
         prefix_prompt = f"""
@@ -60,7 +65,26 @@ class BasePlatform(ABC):
     def _chat(self, message: str):
         import time
         start_time = time.time()
-        response = self.chat(message)
+
+        input_token_count = get_context_token_count(message)
+
+        if input_token_count > get_max_input_token_count():
+            return "Error: Content size exceeds 10MB limit"
+
+        if input_token_count > get_max_input_token_count():
+            inputs = split_text_into_chunks(message, get_max_input_token_count() - 1024, get_max_input_token_count() - 2048)
+            prefix_prompt = f"""
+            我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”。
+            """
+            self.chat_until_success(prefix_prompt)
+            submit_count = 0
+            for input in inputs:
+                submit_count += 1
+                PrettyOutput.print(f"已提交{submit_count}次（总{len(inputs)}次）", OutputType.INFO)
+                self.chat_until_success(f"<part_content>{input}</part_content>请返回已收到")
+            return self.chat_until_success("内容已经全部提供完毕，请开始回答")
+        else:
+            response = self.chat(message)
 
         end_time = time.time()
         duration = end_time - start_time
@@ -78,7 +102,7 @@ class BasePlatform(ABC):
         # Print statistics
         if not self.suppress_output:
             PrettyOutput.print(
-                f"对话完成 - 耗时: {duration:.2f}秒, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}",
+                f"对话完成 - 耗时: {duration:.2f}秒, 输入字符数: {len(message)}, 输入Token数量: {input_token_count}, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}",
                 OutputType.INFO,
             )
 
