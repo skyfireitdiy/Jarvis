@@ -1,4 +1,4 @@
-### Release Note - v0.1.169 2025-05-16
+### Release Note - v0.1.171 2025-05-16
 
 #### **新功能 (Features)**  
 - 添加生成ReleaseNote的自动化流程
