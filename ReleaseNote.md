@@ -1,3 +1,13 @@
+### Release Note - v0.1.174 2025-05-16
+
+#### **修复 (Fixes)**  
+- 调整JARVIS_MAX_BIG_CONTENT_SIZE默认值从64000到96000
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 优化长文本处理逻辑和token计算方式
+
+本次更新主要优化了文本处理逻辑和token计算方式。
+
 ### Release Note - v0.1.173 2025-05-16
 
 #### **修复 (Fixes)**  
