@@ -23,6 +23,7 @@ from yaspin import yaspin
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.file_operation import FileOperationTool
 from jarvis.jarvis_utils.git_utils import revert_file
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow
 
@@ -230,6 +231,11 @@ def patch_apply(filepath: str, patch_content: str) -> Tuple[bool, str]:
     2. 失败时自动回滚文件修改
     3. 提供详细的执行状态输出
     """
+    import os
+    work_dir = os.path.abspath(os.curdir)
+    filepath = os.path.abspath(filepath)
+    if not filepath.startswith(work_dir):
+        PrettyOutput.print(f"文件 {filepath} 不在工作目录 {work_dir} 下，不会进行版本控制管理", OutputType.WARNING)
     model = PlatformRegistry().get_normal_platform()
     with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
         try:
