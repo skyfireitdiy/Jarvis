@@ -2,6 +2,41 @@
   1. 调用"jgc"提交代码
   2. 执行"git pull -r" 更新远程分支
   3. 执行"git push" 提交到远程仓库
+生成ReleaseNote: |
+  1. 检测是否有未提交的代码，如果有，使用"jgc"命令提交（jgc命令无参数）
+  2. 使用命令获取最新的tag（版本号）
+  3. 使用date命令获取当前时间
+  4. 执行git命令，获取从最新的tag到HEAD的所有提交信息，并根据该信息生成简短的release_note，格式如下：
+    ```markdown
+    ### Release Note - v{new_version} {current_date}
+
+    #### **新功能 (Features)**  
+    - {new_features1}
+    - {new_features2}
+    - ...
+
+    #### **修复 (Fixes)**  
+    - {fix1}
+    - {fix2}
+    - ...
+
+    #### **优化与重构 (Refactors & Improvements)**  
+    - {refactor1}
+    - {refactor2}
+    - ...
+
+    #### **文档更新 (Documentation)**  
+    - {doc1}
+    - {doc2}
+    - ...
+
+    #### **其他 (Miscellaneous)**  
+    - {misc1}
+    - {misc2}
+    - ...
+
+    本次更新主要...
+    ```
 发布版本: |
   1. 检测是否有未提交的代码，如果有，使用"jgc"命令提交（jgc命令无参数）
   2. 使用命令获取最新的tag（版本号）
