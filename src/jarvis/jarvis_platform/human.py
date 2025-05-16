@@ -65,3 +65,6 @@ class HumanPlatform(BasePlatform):
     def name(self) -> str:
         """平台名称"""
         return self.model_name
+
+    def support_web(self) -> bool:
+        return False
