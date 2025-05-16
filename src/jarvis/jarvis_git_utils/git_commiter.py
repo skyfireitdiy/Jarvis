@@ -180,6 +180,12 @@ class GitCommitTool:
     '''
                             commit_message = platform.chat_until_success(prompt)
                         else:
+                                if is_large_content:
+                                    return {
+                                        "success": False,
+                                        "stdout": "",
+                                        "stderr": "错误：上传代码差异文件失败"
+                                    }
                                 # 直接在提示中包含差异内容
                                 prompt = base_prompt + f'''
     # 分析材料

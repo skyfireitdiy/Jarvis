@@ -591,8 +591,8 @@ class CodeReviewTool:
                     is_large_content = is_context_overflow(diff_output)
                     
                     # Upload the file to the agent's model
-                    with yaspin(text="正在上传代码差异文件...", color="cyan") as spinner:
-                        if is_large_content and agent.model and hasattr(agent.model, 'upload_files'):
+                    if is_large_content and agent.model and hasattr(agent.model, 'upload_files'):
+                        with yaspin(text="正在上传代码差异文件...", color="cyan") as spinner:
                             upload_success = agent.model.upload_files([temp_file_path])
                             if upload_success:
                                 spinner.ok("✅")
@@ -600,8 +600,8 @@ class CodeReviewTool:
                             else:
                                 spinner.fail("❌")
                                 PrettyOutput.print(f"上传代码差异文件失败，将使用分块处理", OutputType.WARNING)
-                        else:
-                            upload_success = False
+                    else:
+                        upload_success = False
                     
                     # Prepare the prompt based on upload status
                     if upload_success:
@@ -617,6 +617,12 @@ class CodeReviewTool:
                         # Run the agent with the prompt
                         result = agent.run(complete_prompt)
                     else:
+                        if is_large_content:
+                            return {
+                                "success": False,
+                                "stdout": "",
+                                "stderr": "错误：上传代码差异文件失败"
+                            }
                         # Include the diff directly in the prompt for smaller content
                         complete_prompt = user_prompt + "\n\n代码差异内容:\n```diff\n" + diff_output + "\n```"
                         result = agent.run(complete_prompt)
