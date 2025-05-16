@@ -263,7 +263,7 @@ MCP(模型上下文协议)。在`~/.jarvis/tools/mcp/`中创建YAML配置文件�
 
 #### 本地MCP配置（`stdio`模式）
 ```yaml
-type: local
+type: stdio
 name: MCP名称
 command: 可执行命令
 args: [参数列表]  # 可选
@@ -273,7 +273,7 @@ env:  # 可选环境变量
 
 #### 远程MCP配置（`sse`模式）
 ```yaml
-type: remote
+type: sse
 name: MCP名称
 base_url: http://example.com/api
 auth_token: 认证令牌  # 可选

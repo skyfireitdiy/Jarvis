@@ -115,3 +115,6 @@ class OpenAIModel(BasePlatform):
         else:
             self.messages = []
         return True
+
+    def support_web(self) -> bool:
+        return False

@@ -133,4 +133,4 @@ class BasePlatform(ABC):
     @abstractmethod
     def support_web(self) -> bool:
         """Check if platform supports web functionality"""
-        raise NotImplementedError("support_web is not implemented")
+        return False
