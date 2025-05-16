@@ -1,35 +1,32 @@
-### Release Note - v0.1.168  
+### Release Note - v0.1.169 2025-05-16
 
 #### **新功能 (Features)**  
-- **Git 分析器**: 支持分析 commit 范围并重构分析逻辑 (`git-analyzer`)  
-- **配置项**: 新增 `JARVIS_AUTO_UPDATE` 配置项，支持 Git 仓库自动检查更新 (`config`, `git_utils`)  
-- **平台支持**: 为平台添加 Web 功能支持检查 (`platform`)  
-- **安装命令**: 为 `install` 命令添加 shell 类型参数支持 (`install`)  
-- **大文件处理**: 优化大文件处理逻辑，并添加对大内容大小的检查 (`base`, `workflow`)  
+- 添加生成ReleaseNote的自动化流程
+- 添加长上下文交互时的进度显示
+- 新增JARVIS_MAX_BIG_CONTENT_SIZE配置参数
+- 改进任务分析流程和工作生成机制
+- 重构任务分析提示模板以支持工作生成和版本控制
+- 为agent添加基本优先级显示
+- 改进release_note生成格式和内容结构  
 
 #### **修复 (Fixes)**  
-- **Git 工具**:  
-  - 修复提取分析报告时未返回原始结果的问题 (`git_details`)  
-  - 修复 Git 仓库更新后未恢复工作目录的问题 (`git_utils`)  
-- **Jarvis Agent**:  
-  - 修正任务完成提示的变量名错误 (`jarvis_agent`)  
-  - 修正任务完成提示的格式和内容 (`jarvis_agent`)  
+- 修正ReleaseNote.md文件写入方式为追加导致重复问题
+- 修改默认最大内容大小从10MB改为1MB
+- 修复上下文丢失时的空响应处理
+- 修复自定义回复循环和显示格式问题
+- 修复大文件上下文丢失时的错误处理逻辑  
 
 #### **优化与重构 (Refactors & Improvements)**  
-- **代码提交流程**: 简化提交流程并优化大文件处理 (`workflow`)  
-- **Web 工具**: 将 `check` 方法改为静态方法 (`web_tools`)  
+- 优化上下文长度过滤编辑逻辑
+- 简化对话配置和结果显示模板
+- 移除chat_big_content策略并统一为大内容处理编辑逻辑  
 
 #### **文档更新 (Documentation)**  
-- **发布流程**: 完善版本发布流程说明并新增 `ReleaseNote` 文件 (`发布流程`)  
-- **代码审查报告**: 更新输出格式说明 (`code_review`)  
-- **README**:  
-  - 补充 `JARVIS_AUTO_UPDATE` 配置项说明  
-  - 移除已弃用的 `OPENAI_MODEL_NAME` 配置项  
-  - 新增技术支持群二维码图片  
-- **微信支持**: 添加微信二维码图片 (`wechat`)  
+- 更新release_note生成编辑和重命名文件
+- 更新pre-command文档中jgc命令的说明
+- 重构发布说明格式和补充细节更新内容  
 
 #### **其他 (Miscellaneous)**  
-- 自动提交版本发布前的变更 (`Auto commit before version release`)  
-- 版本发布准备 (`chore(release)`)  
+- 在发布说明中添加当前日期和预期发布时间
 
-本次更新主要围绕 **Git 分析优化、配置项增强、Bug 修复及文档完善**，提升稳定性和用户体验。
+本次更新主要改进了发布流程自动化，优化了任务分析机制，并修复了多个关键问题。
