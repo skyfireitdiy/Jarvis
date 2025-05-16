@@ -49,6 +49,8 @@ class BasePlatform(ABC):
 
         input_token_count = get_context_token_count(message)
 
+        print(f"input_token_count: {input_token_count}")
+
         if is_context_overflow(message):
             PrettyOutput.print("错误：输入内容超过最大限制", OutputType.WARNING)
             return "错误：输入内容超过最大限制"
