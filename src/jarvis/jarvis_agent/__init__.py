@@ -505,6 +505,8 @@ class Agent:
                 self.reset_tool_call_count()
             else:
                 return False, ""
+        if self.execute_tool_confirm:
+            self.reset_tool_call_count()
         if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
             with yaspin(text=f"正在执行{tool_list[0].name()}...", color="cyan") as spinner:
                 with spinner.hidden():
@@ -834,6 +836,7 @@ arguments:
                 self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
                 self.first = False
 
+            self.conversation_length = get_context_token_count(self.prompt)
             while True:
                 try:
                     # 如果对话历史长度超过限制，在提示中添加提醒
