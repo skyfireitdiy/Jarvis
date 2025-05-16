@@ -572,45 +572,92 @@ arguments:
             try:
 
                 # 让模型判断是否需要生成方法论
-                analysis_prompt = f"""<methodology_analysis>
+                analysis_prompt = f"""<task_analysis>
 <request>
-当前任务已结束，请分析是否需要生成方法论。基于本次对话的内容和结果:
+当前任务已结束，请分析该任务的解决方案：
 
-如果你认为需要生成方法论，请先确定是创建新方法论还是更新现有方法论。如果是更新现有方法论，请使用'update'，否则使用'add'。
-如果你认为不需要方法论，请解释原因。
+1. 首先评估当前任务是否可以通过编写工具来自动化解决
+2. 如果可以通过工具解决，请设计并提供工具代码
+3. 如果无法通过编写通用工具完成，评估是否可以总结为通用方法论
+4. 如果以上都不可行，给出详细理由
+
+请根据分析结果采取相应行动：创建工具、生成方法论或说明原因。
 </request>
 
 <evaluation_criteria>
+工具评估标准:
+1. 通用性 - 该工具是否可以解决一类问题，而不仅仅是当前特定问题
+2. 自动化 - 该工具是否可以减少人工干预，提高效率
+3. 可靠性 - 该工具是否可以在不同场景下稳定工作
+4. 简单性 - 该工具是否易于使用，参数设计是否合理
+
 方法论评估标准:
 1. 方法论应聚焦于通用且可重复的解决方案流程
 2. 方法论应该具备足够的通用性，可应用于同类问题
 3. 特别注意用户在执行过程中提供的修正、反馈和改进建议
 4. 如果用户明确指出了某个解决步骤的优化方向，这应该被纳入方法论
-5. 如果用户在解决过程中发现了更高效的方法，这应被记录并优先使用
 </evaluation_criteria>
 
-<format_requirements>
+<tool_requirements>
+工具代码要求:
+1. 工具类名应与工具名称保持一致
+2. 必须包含name、description、parameters属性
+3. 必须实现execute方法处理输入参数
+4. 可选实现check方法验证环境
+5. 工具描述应详细说明用途、适用场景和使用示例
+6. 参数定义应遵循JSON Schema格式
+7. 不要包含特定任务的细节，保持通用性
+</tool_requirements>
+
+<methodology_requirements>
 方法论格式要求:
 1. 问题重述: 简明扼要的问题归纳，不含特定细节
 2. 最优解决方案: 经过用户验证的、最终有效的解决方案（将每个步骤要使用的工具也列举出来）
 3. 注意事项: 执行中可能遇到的常见问题和注意点，尤其是用户指出的问题
 4. 可选步骤: 对于有多种解决路径的问题，标注出可选步骤和适用场景
-</format_requirements>
-
-<quality_control>
-方法论质量控制:
-1. 只记录有实际意义的流程，不记录执行过程中的错误或无效尝试
-2. 保留最终有效的解决步骤和用户认可的解决方案
-3. 不要包含特定代码片段、文件路径或其他特定于单一任务的细节
-4. 确保方法论遵循用户认可的执行路径，尤其是用户指出的改进点
-</quality_control>
+</methodology_requirements>
 
 <output_requirements>
-只输出方法论工具调用指令，或不生成方法论的解释。不要输出其他内容。
-</output_requirements>
+根据分析结果，输出以下两种格式之一：
 
-<template>
-方法论格式：
+1. 工具创建（如果适合通过工具解决）:
+{ot("TOOL_CALL")}
+want: 创建新工具来解决XXX问题
+name: generate_new_tool
+arguments:
+  tool_name: 工具名称
+  tool_code: |
+    # -*- coding: utf-8 -*-
+    from typing import Dict, Any
+    
+    class 工具名称:
+        name = "工具名称"
+        description = \"\"\"
+        工具描述，包含用途、使用场景等
+        \"\"\"
+        
+        parameters = {{
+            "type": "object",
+            "properties": {{
+                # 参数定义
+            }},
+            "required": []
+        }}
+        
+        @staticmethod
+        def check() -> bool:
+            return True
+        
+        def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+            # 实现逻辑
+            return {{
+                "success": True,
+                "stdout": "结果输出",
+                "stderr": ""
+            }}
+{ct("TOOL_CALL")}
+
+2. 方法论创建（如果适合生成方法论）:
 {ot("TOOL_CALL")}
 want: 添加/更新xxxx的方法论
 name: methodology
@@ -620,8 +667,10 @@ arguments:
   content: |
     方法论内容
 {ct("TOOL_CALL")}
-</template>
-</methodology_analysis>
+
+如果任务既不适合创建工具也不适合生成方法论，则直接输出原因分析，不要使用工具调用格式。
+</output_requirements>
+</task_analysis>
 """
                 self.prompt = analysis_prompt
                 with spinner.hidden():
@@ -629,10 +678,10 @@ arguments:
 
                 with spinner.hidden():
                     self._call_tools(response)
-                spinner.text = "方法论生成完成"
+                spinner.text = "分析完成"
                 spinner.ok("✅")
             except Exception as e:
-                spinner.text = "方法论生成失败"
+                spinner.text = "分析失败"
                 spinner.fail("❌")
         if self.need_summary:
             with yaspin(text="正在生成总结...", color="cyan") as spinner:
