@@ -300,7 +300,7 @@ def patch_apply(filepath: str, patch_content: str) -> Tuple[bool, str]:
                     if upload_success:
                         response = model.chat_until_success(main_prompt)
                     else:
-                        response = model.chat_big_content(file_content, main_prompt)
+                        return False, ""
 
                 # 解析差异化补丁
                 diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
