@@ -7,6 +7,7 @@ from typing import List, Tuple
 from httpx import get
 from networkx import prefix_tree
 from torch import le
+from yaspin import yaspin
 from jarvis.jarvis_utils.config import get_max_big_content_size, get_max_input_token_count
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -57,17 +58,24 @@ class BasePlatform(ABC):
             return "错误：输入内容超过最大限制"
 
         if input_token_count > get_max_input_token_count():
+            current_suppress_output = self.suppress_output
+            self.set_suppress_output(True)
             inputs = split_text_into_chunks(message, get_max_input_token_count() - 1024, get_max_input_token_count() - 2048)
-            prefix_prompt = f"""
-            我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”，明白请输出“开始接收输入”。
-            """
-            while_true(lambda: while_success(lambda: self.chat(prefix_prompt), 5), 5)
-            submit_count = 0
-            for input in inputs:
-                submit_count += 1
-                PrettyOutput.print(f"提交{submit_count}/{len(inputs)}次", OutputType.INFO)
-                while_true(lambda: while_success(lambda: self.chat(f"<part_content>{input}</part_content>请返回已收到"), 5), 5)
+            with yaspin(text="正在提交长上下文...", color="cyan") as spinner:
+                prefix_prompt = f"""
+                我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”，明白请输出“开始接收输入”。
+                """
+                while_true(lambda: while_success(lambda: self.chat(prefix_prompt), 5), 5)
+                submit_count = 0
+                for input in inputs:
+                    submit_count += 1
+                    spinner.text = f"正在提交第{submit_count}部分（共{len(inputs)}部分）"
+                    while_true(lambda: while_success(lambda: self.chat(f"<part_content>{input}</part_content>请返回已收到"), 5), 5)
+                spinner.text = "提交完成"
+                spinner.ok("✅")
+            self.set_suppress_output(current_suppress_output)
             response = while_true(lambda: while_success(lambda: self.chat("内容已经全部提供完毕，请继续"), 5), 5)
+            
         else:
             response = self.chat(message)
 
