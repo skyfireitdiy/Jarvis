@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import datetime
 import platform
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union, Protocol
 
-from jarvis.jarvis_tools.registry import ToolRegistry
 from yaspin import yaspin # type: ignore
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
@@ -105,6 +104,13 @@ origin_agent_system_prompt = f"""
 """
 
 
+class OutputHandlerProtocol(Protocol):
+    def name(self) -> str: ...
+    def can_handle(self, response: str) -> bool: ...
+    def prompt(self) -> str: ...
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
+
+
 class Agent:
 
     def set_summary_prompt(self, summary_prompt: str):
@@ -139,7 +145,7 @@ class Agent:
                  model_name: Optional[str] = None,
                  summary_prompt: Optional[str] = None,
                  auto_complete: Optional[bool] = None,
-                 output_handler: List[OutputHandler] = [],
+                 output_handler: List[OutputHandlerProtocol] = [],
                  use_tools: List[str] = [],
                  input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
                  execute_tool_confirm: Optional[bool] = None,
@@ -287,6 +293,8 @@ class Agent:
         self.first = True
 
     def set_use_tools(self, use_tools):
+        """设置要使用的工具列表"""
+        from jarvis.jarvis_tools.registry import ToolRegistry
         for handler in self.output_handler:
             if isinstance(handler, ToolRegistry):
                 if use_tools:
@@ -310,12 +318,9 @@ class Agent:
         """
         self.after_tool_call_cb = cb
 
-    def get_tool_registry(self) -> Optional[ToolRegistry]:
-        """获取工具注册器。
-
-        返回:
-            ToolRegistry: 工具注册器实例
-        """
+    def get_tool_registry(self) -> Optional[Any]:
+        """获取工具注册表实例"""
+        from jarvis.jarvis_tools.registry import ToolRegistry
         for handler in self.output_handler:
             if isinstance(handler, ToolRegistry):
                 return handler

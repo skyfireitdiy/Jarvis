@@ -52,7 +52,7 @@ setup(
             "jarvis-git-squash=jarvis.jarvis_git_squash.main:main",
             "jarvis-multi-agent=jarvis.jarvis_multi_agent.main:main",
             "jarvis-agent=jarvis.jarvis_agent.main:main",
-            "jarvis-tool=jarvis.jarvis_tools.registry:main",
+            "jarvis-tool=jarvis.jarvis_tools.cli.main:main",
             "jarvis-ask-codebase=jarvis.jarvis_tools.ask_codebase:main",
             "jac=jarvis.jarvis_tools.ask_codebase:main",
             "jarvis-git-details=jarvis.jarvis_git_details.main:main",
