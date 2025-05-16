@@ -31,7 +31,7 @@ def get_context_token_count(text: str) -> int:
         return len(text) // 4  # 每个token大约4个字符的粗略估计
 
 def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 50) -> List[str]:
-    """将文本分割成带重叠窗口的块，优化RAG检索效果。
+    """将文本分割成块，严格按句子边界切割，优化RAG检索效果。
 
     参数：
         text: 要分割的输入文本
@@ -39,7 +39,7 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
         min_length: 每个块的最小长度（除了最后一块可能较短）
 
     返回：
-        List[str]: 文本块列表，每个块的长度尽可能接近但不超过max_length
+        List[str]: 文本块列表，每个块严格按句子边界切割，长度不超过max_length且不小于min_length
     """
     if not text:
         return []
@@ -118,8 +118,8 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
                     # 如果合并会导致太长，添加这个小块（特殊情况）
                     chunks.append(chunk)
 
-        # 计算下一块的开始位置，调整重叠窗口大小以提高RAG检索质量
-        next_start = end - int(max_length * 0.2)  # 20%的重叠窗口大小
+        # 计算下一块的开始位置，直接使用当前块的结束位置作为下一块的开始，不再有重叠窗口
+        next_start = end  # 直接使用当前块的结束位置作为下一块的开始，不再有重叠窗口
 
         # 确保总是有前进，避免无限循环
         if next_start <= start:
