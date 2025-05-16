@@ -850,7 +850,7 @@ arguments:
                     if self.after_tool_call_cb:
                         self.after_tool_call_cb(self)
 
-                    if self.prompt:
+                    if self.prompt or self.addon_prompt:
                         continue
 
                     if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
