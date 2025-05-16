@@ -48,18 +48,6 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
         return []
 
     try:
-        tokenizer = load_tokenizer()
-        
-        def get_token_count(chunk: str) -> int:
-            """安全地计算文本的token数量，通过分批处理避免超出模型最大长度"""
-            total_tokens = 0
-            chunk_size = 100  # 每次处理100个字符
-            for i in range(0, len(chunk), chunk_size):
-                sub_chunk = chunk[i:i + chunk_size]
-                tokens = tokenizer.encode(sub_chunk)  # type: ignore
-                total_tokens += len(tokens)
-            return total_tokens
-
         chunks = []
         current_chunk = ""
         current_tokens = 0
@@ -68,7 +56,7 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
         chunk_size = 50  # 每次处理50个字符
         for i in range(0, len(text), chunk_size):
             chunk = text[i:i + chunk_size]
-            chunk_tokens = get_token_count(chunk)
+            chunk_tokens = get_context_token_count(chunk)
             
             # 如果当前块加上新块会超过最大长度，且当前块已经达到最小长度，则保存当前块
             if current_tokens + chunk_tokens > max_length and current_tokens >= min_length:
@@ -86,7 +74,7 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
             elif chunks:  # 如果最后一个块太短，尝试与前面的块合并
                 last_chunk = chunks[-1]
                 combined = last_chunk + current_chunk
-                combined_tokens = get_token_count(combined)
+                combined_tokens = get_context_token_count(combined)
                 if combined_tokens <= max_length:
                     chunks[-1] = combined
                 else:
