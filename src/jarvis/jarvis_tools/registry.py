@@ -636,12 +636,8 @@ class ToolRegistry(OutputHandler):
                             return f"""工具调用原始输出过长，以下是根据输出提出的信息：
 
 {platform.chat_until_success(prompt)}"""
-                        elif hasattr(platform, 'chat_big_content'):
-                            # 如果上传失败但支持大内容处理，使用chat_big_content
-                            prompt = f"以下内容为工具执行结果，请阅读内容，并根据内容提取出以下信息：{want}\n\n{output}"
-                            return f"""工具调用原始输出过长，以下是根据输出提出的信息：
-
-{platform.chat_big_content(output, prompt)}"""
+                        else:
+                            return self._truncate_output(output)
                     
                     # 如果都不支持，返回截断的输出
                     return self._truncate_output(output)

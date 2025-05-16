@@ -125,6 +125,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
         # 获取当前平台
         platform = PlatformRegistry().get_normal_platform()
+        platform.set_suppress_output(False)
         if not platform:
             return ""
 
@@ -175,7 +176,6 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
                 # 尝试上传文件
                 if hasattr(platform, 'upload_files'):
-                    platform.set_suppress_output(False)
                     upload_success = platform.upload_files([temp_file_path])
                     
                     if upload_success:
@@ -195,24 +195,8 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 如果没有匹配的方法论，请输出：没有历史方法论可参考
 除以上要求外，不要输出任何内容
 """)
-                    elif hasattr(platform, 'chat_big_content'):
-                        # 如果上传失败但支持大内容处理，使用chat_big_content
-                        return platform.chat_big_content(full_content, base_prompt + f"""
-请根据以上方法论和可调用的工具文件内容，规划/总结出以下用户需求的执行步骤: {user_input}
-
-请按以下格式回复：
-### 与该任务/需求相关的方法论
-1. [方法论名字]
-2. [方法论名字]
-### 根据以上方法论，规划/总结出执行步骤
-1. [步骤1]
-2. [步骤2]
-3. [步骤3]
-
-如果没有匹配的方法论，请输出：没有历史方法论可参考
-除以上要求外，不要输出任何内容
-""")
-            
+                    else:
+                        return "没有历史方法论可参考"
             # 如果内容不大或上传失败，直接使用chat_until_success
             return platform.chat_until_success(full_content)
         

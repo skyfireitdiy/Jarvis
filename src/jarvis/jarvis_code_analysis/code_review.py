@@ -617,14 +617,9 @@ class CodeReviewTool:
                         # Run the agent with the prompt
                         result = agent.run(complete_prompt)
                     else:
-                        # If upload failed or not needed, handle based on context size
-                        if is_large_content and agent.model and hasattr(agent.model, 'chat_big_content'):
-                            # Use chat_big_content for large content when upload fails
-                            result = agent.model.chat_big_content(diff_output, user_prompt)
-                        else:
-                            # Include the diff directly in the prompt for smaller content
-                            complete_prompt = user_prompt + "\n\n代码差异内容:\n```diff\n" + diff_output + "\n```"
-                            result = agent.run(complete_prompt)
+                        # Include the diff directly in the prompt for smaller content
+                        complete_prompt = user_prompt + "\n\n代码差异内容:\n```diff\n" + diff_output + "\n```"
+                        result = agent.run(complete_prompt)
                 finally:
                     # Clean up the temporary file
                     if os.path.exists(temp_file_path):

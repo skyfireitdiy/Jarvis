@@ -180,11 +180,6 @@ class GitCommitTool:
     '''
                             commit_message = platform.chat_until_success(prompt)
                         else:
-                            # 如果上传失败但内容较大，使用chat_big_content
-                            if is_large_content and hasattr(platform, 'chat_big_content'):
-                                spinner.text = "正在使用分块处理生成提交信息..."
-                                commit_message = platform.chat_big_content(diff, base_prompt)
-                            else:
                                 # 直接在提示中包含差异内容
                                 prompt = base_prompt + f'''
     # 分析材料

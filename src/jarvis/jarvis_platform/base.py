@@ -43,23 +43,7 @@ class BasePlatform(ABC):
     @abstractmethod
     def upload_files(self, file_list: List[str]) -> bool:
         raise NotImplementedError("upload_files is not implemented")
-    
-    def chat_big_content(self, content: str, prompt: str) -> str:
-        # 检查content大小不超过10MB
-        if len(content.encode('utf-8')) > get_max_big_content_size():
-            return "Error: Content size exceeds 10MB limit"
-        
-        prefix_prompt = f"""
-        我将分多次提供大量的上下文内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”。
-        """
-        self.chat_until_success(prefix_prompt)
-        split_content = split_text_into_chunks(content, get_max_input_token_count() - 1024, get_max_input_token_count() - 2048)
-        submit_count = 0
-        for chunk in split_content:
-            submit_count += 1
-            PrettyOutput.print(f"已提交{submit_count}次（总{len(split_content)}次）", OutputType.INFO)
-            self.chat_until_success(f"<part_content>{chunk}</part_content>请返回已收到")
-        return self.chat_until_success(f"内容已经全部提供完毕\n\n{prompt}")
+
 
     
     def _chat(self, message: str):
@@ -68,21 +52,22 @@ class BasePlatform(ABC):
 
         input_token_count = get_context_token_count(message)
 
-        if input_token_count > get_max_input_token_count():
-            return "Error: Content size exceeds 10MB limit"
+        if input_token_count > get_max_big_content_size():
+            PrettyOutput.print("错误：输入内容超过最大限制", OutputType.WARNING)
+            return "错误：输入内容超过最大限制"
 
         if input_token_count > get_max_input_token_count():
             inputs = split_text_into_chunks(message, get_max_input_token_count() - 1024, get_max_input_token_count() - 2048)
             prefix_prompt = f"""
-            我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”。
+            我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出“已收到”，明白请输出“开始接收输入”。
             """
-            self.chat_until_success(prefix_prompt)
+            while_true(lambda: while_success(lambda: self.chat(prefix_prompt), 5), 5)
             submit_count = 0
             for input in inputs:
                 submit_count += 1
-                PrettyOutput.print(f"已提交{submit_count}次（总{len(inputs)}次）", OutputType.INFO)
-                self.chat_until_success(f"<part_content>{input}</part_content>请返回已收到")
-            return self.chat_until_success("内容已经全部提供完毕，请开始回答")
+                PrettyOutput.print(f"提交{submit_count}/{len(inputs)}次", OutputType.INFO)
+                while_true(lambda: while_success(lambda: self.chat(f"<part_content>{input}</part_content>请返回已收到"), 5), 5)
+            response = while_true(lambda: while_success(lambda: self.chat("内容已经全部提供完毕，请继续"), 5), 5)
         else:
             response = self.chat(message)
 
