@@ -127,6 +127,8 @@ def main() -> None:
             need_summary=False
         )
 
+        agent.set_addon_prompt(agent.make_default_addon_prompt(False) + "\n如果使用脚本可以完成任务，优先execute_script工具")
+
         # 优先处理命令行直接传入的任务
         if args.task:
             agent.run(args.task)
