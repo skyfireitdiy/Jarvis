@@ -37,7 +37,6 @@
 
     本次更新主要...
     ```
-  5. 执行python3 ./scripts/publish.py patch 进行版本发布
 安装当前版本: 执行 python3 -m pip install -e . 安装当前python包
 代码走查: 使用git工具，查看当前代码库修改的内容，进行code-review，如果有问题，给出修改意见
 生成diff: 生成remote到HEAD的diff文件
