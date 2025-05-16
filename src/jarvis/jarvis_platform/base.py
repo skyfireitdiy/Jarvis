@@ -1,17 +1,13 @@
 # -*- coding: utf-8 -*-
 from abc import ABC, abstractmethod
 import re
-from sys import prefix
 from typing import List, Tuple
 
-from httpx import get
-from networkx import prefix_tree
-from torch import le
 from yaspin import yaspin
-from jarvis.jarvis_utils.config import get_max_big_content_size, get_max_input_token_count
+from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
+from jarvis.jarvis_utils.utils import get_context_token_count, is_context_overflow, while_success, while_true
 from jarvis.jarvis_utils.tag import ot, ct
 
 
@@ -53,7 +49,7 @@ class BasePlatform(ABC):
 
         input_token_count = get_context_token_count(message)
 
-        if input_token_count > get_max_big_content_size():
+        if is_context_overflow(message):
             PrettyOutput.print("错误：输入内容超过最大限制", OutputType.WARNING)
             return "错误：输入内容超过最大限制"
 

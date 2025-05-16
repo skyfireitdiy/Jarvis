@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-from doctest import script_from_examples
 import os
 import time
 import hashlib
 import tarfile
 from pathlib import Path
-from typing import List, Any, Callable
-from jarvis.jarvis_utils.config import INPUT_WINDOW_REVERSE_SIZE, get_max_big_content_size, get_max_input_token_count, get_data_dir
+from typing import Any, Callable
+from jarvis.jarvis_utils.config import get_max_big_content_size, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
