@@ -91,22 +91,26 @@ class OpenAIModel(BasePlatform):
             # 使用Rich的Live组件来实时展示更新
             if not self.suppress_output:
                 text_content = Text()
-                panel = Panel(text_content, 
-                              title=f"[bold blue]{self.model_name}[/bold blue]", 
-                              subtitle="生成中...", 
-                              border_style="cyan", 
-                              box=box.ROUNDED)
+                panel = Panel(
+                    text_content, 
+                    title=f"[bold cyan]{self.model_name}[/bold cyan]", 
+                    subtitle="[dim]思考中...[/dim]", 
+                    border_style="bright_blue",
+                    box=box.ROUNDED,
+                    padding=(1, 2)
+                )
                 
                 with Live(panel, refresh_per_second=3, transient=False) as live:
                     for chunk in response:
                         if chunk.choices and chunk.choices[0].delta.content:
                             text = chunk.choices[0].delta.content
                             full_response += text
-                            text_content.append(text)
+                            text_content.append(text, style="bright_white")
+                            panel.subtitle = "[yellow]正在回答...[/yellow]"
                             live.update(panel)
                     
                     # 显示对话完成状态
-                    panel.subtitle = "[bold green]对话完成[/bold green]"
+                    panel.subtitle = "[bold green]✓ 对话完成[/bold green]"
                     live.update(panel)
             else:
                 # 如果禁止输出，则静默处理

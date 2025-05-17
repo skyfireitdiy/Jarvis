@@ -401,8 +401,6 @@ class Agent:
         if self.conversation_length > self.max_token_count:
             message = self._summarize_and_clear_history() + "\n\n" + message
             self.conversation_length += get_context_token_count(message)
-
-        print("🤖 模型思考：")
         return self.model.chat_until_success(message)   # type: ignore
 
 

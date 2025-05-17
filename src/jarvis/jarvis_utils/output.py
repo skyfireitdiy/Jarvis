@@ -18,6 +18,7 @@ from rich.style import Style as RichStyle
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
 from jarvis.jarvis_utils.globals import console, get_agent_list
+# from rich.box import HEAVY
 class OutputType(Enum):
     """
     输出类型枚举，用于分类和样式化不同类型的消息。
@@ -158,18 +159,18 @@ class PrettyOutput:
             traceback: 是否显示错误的回溯信息
         """
         styles = {
-            OutputType.SYSTEM: RichStyle(color="bright_cyan", bgcolor="#1a1a1a", frame=True, meta={"icon": "🤖"}),
-            OutputType.CODE: RichStyle(color="green", bgcolor="#1a1a1a", frame=True, meta={"icon": "📝"}),
-            OutputType.RESULT: RichStyle(color="bright_blue", bgcolor="#1a1a1a", frame=True, meta={"icon": "✨"}),
-            OutputType.ERROR: RichStyle(color="red", frame=True, bgcolor="dark_red", meta={"icon": "❌"}),
-            OutputType.INFO: RichStyle(color="gold1", frame=True, bgcolor="grey11", meta={"icon": "ℹ️"}),
-            OutputType.PLANNING: RichStyle(color="purple", bold=True, frame=True, meta={"icon": "📋"}),
-            OutputType.PROGRESS: RichStyle(color="white", encircle=True, frame=True, meta={"icon": "⏳"}),
-            OutputType.SUCCESS: RichStyle(color="bright_green", bold=True, strike=False, meta={"icon": "✅"}),
-            OutputType.WARNING: RichStyle(color="yellow", bold=True, blink2=True, bgcolor="dark_orange", meta={"icon": "⚠️"}),
-            OutputType.DEBUG: RichStyle(color="grey58", dim=True, conceal=True, meta={"icon": "🔍"}),
-            OutputType.USER: RichStyle(color="spring_green2", frame=True, meta={"icon": "👤"}),
-            OutputType.TOOL: RichStyle(color="dark_sea_green4", bgcolor="grey19", frame=True, meta={"icon": "🔧"}),
+            OutputType.SYSTEM: RichStyle(color="bright_cyan", bgcolor="#1e2b3c", frame=True, meta={"icon": "🤖"}),
+            OutputType.CODE: RichStyle(color="green", bgcolor="#1c2b1c", frame=True, meta={"icon": "📝"}),
+            OutputType.RESULT: RichStyle(color="bright_blue", bgcolor="#1c1c2b", frame=True, meta={"icon": "✨"}),
+            OutputType.ERROR: RichStyle(color="red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}),
+            OutputType.INFO: RichStyle(color="gold1", frame=True, bgcolor="#2b2b1c", meta={"icon": "ℹ️"}),
+            OutputType.PLANNING: RichStyle(color="purple", bold=True, frame=True, bgcolor="#2b1c2b", meta={"icon": "📋"}),
+            OutputType.PROGRESS: RichStyle(color="white", encircle=True, frame=True, bgcolor="#1c1c1c", meta={"icon": "⏳"}),
+            OutputType.SUCCESS: RichStyle(color="bright_green", bold=True, strike=False, bgcolor="#1c2b1c", meta={"icon": "✅"}),
+            OutputType.WARNING: RichStyle(color="yellow", bold=True, blink2=True, bgcolor="#2b2b1c", meta={"icon": "⚠️"}),
+            OutputType.DEBUG: RichStyle(color="grey58", dim=True, conceal=True, bgcolor="#1c1c1c", meta={"icon": "🔍"}),
+            OutputType.USER: RichStyle(color="spring_green2", frame=True, bgcolor="#1c2b2b", meta={"icon": "👤"}),
+            OutputType.TOOL: RichStyle(color="dark_sea_green4", bgcolor="#1c2b2b", frame=True, meta={"icon": "🔧"}),
         }
         lang = lang if lang is not None else PrettyOutput._detect_language(text, default_lang='markdown')
         header = PrettyOutput._format(output_type, timestamp)
@@ -186,7 +187,7 @@ class PrettyOutput:
         )
         console.print()
         console.print(panel)
-        if traceback or output_type == OutputType.ERROR:
+        if traceback:
             console.print_exception()
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):

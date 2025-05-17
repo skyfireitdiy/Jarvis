@@ -459,8 +459,14 @@ class YuanbaoPlatform(BasePlatform):
             # 使用Rich的Live组件来实时展示更新
             if not self.suppress_output:
                 text_content = Text()
-                panel = Panel(text_content, title=f"[bold blue]{self.model_name}[/bold blue]", 
-                          subtitle="思考中...", border_style="blue", box=box.ROUNDED)
+                panel = Panel(
+                    text_content, 
+                    title=f"[bold cyan]{self.model_name}[/bold cyan]", 
+                    subtitle="[dim]思考中...[/dim]", 
+                    border_style="bright_blue",
+                    box=box.ROUNDED,
+                    padding=(1, 2)
+                )
                 with Live(panel, refresh_per_second=3, transient=False) as live:
                     # 处理SSE流响应
                     for line in response.iter_lines():
@@ -481,8 +487,9 @@ class YuanbaoPlatform(BasePlatform):
                                     msg = data.get("msg", "")
                                     if msg:
                                         full_response += msg
-                                        text_content.append(msg)
-                                        panel.subtitle = "正在回答..."
+                                        # 使用更丰富的文字样式
+                                        text_content.append(msg, style="bright_white")
+                                        panel.subtitle = "[yellow]正在回答...[/yellow]"
                                         live.update(panel)
 
                                 # 处理思考中的消息
@@ -490,7 +497,7 @@ class YuanbaoPlatform(BasePlatform):
                                     think_content = data.get("content", "")
                                     if think_content:
                                         thinking_content = think_content
-                                        panel.subtitle = f"思考中: {thinking_content}"
+                                        panel.subtitle = f"[dim]思考中: {thinking_content}[/dim]"
                                         live.update(panel)
 
                             except json.JSONDecodeError:
@@ -501,7 +508,7 @@ class YuanbaoPlatform(BasePlatform):
                             break
                     
                     # 显示对话完成状态
-                    panel.subtitle = "[bold green]对话完成[/bold green]"
+                    panel.subtitle = "[bold green]✓ 对话完成[/bold green]"
                     live.update(panel)
             else:
                 # 如果禁止输出，则静默处理

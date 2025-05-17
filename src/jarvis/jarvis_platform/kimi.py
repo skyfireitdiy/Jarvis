@@ -288,11 +288,14 @@ class KimiModel(BasePlatform):
             # 使用Rich的Live组件来实时展示更新
             if not self.suppress_output:
                 text_content = Text()
-                panel = Panel(text_content, 
-                            title=f"[bold magenta]{self.model_name}[/bold magenta]", 
-                            subtitle="思考中...", 
-                            border_style="magenta", 
-                            box=box.ROUNDED)
+                panel = Panel(
+                    text_content, 
+                    title=f"[bold cyan]{self.model_name}[/bold cyan]", 
+                    subtitle="[dim]思考中...[/dim]", 
+                    border_style="bright_blue",
+                    box=box.ROUNDED,
+                    padding=(1, 2)
+                )
                 
                 with Live(panel, refresh_per_second=3, transient=False) as live:
                     for line in response.iter_lines():
@@ -312,8 +315,8 @@ class KimiModel(BasePlatform):
                                 text = data.get("text", "")
                                 if text:
                                     full_response += text
-                                    text_content.append(text)
-                                    panel.subtitle = "生成中..."
+                                    text_content.append(text, style="bright_white")
+                                    panel.subtitle = "[yellow]正在回答...[/yellow]"
                                     live.update(panel)
 
                             elif event == "search_plus":
@@ -328,7 +331,7 @@ class KimiModel(BasePlatform):
                                         "type": msg.get("type", ""),
                                         "url": msg.get("url", "")
                                     })
-                                    panel.subtitle = f"搜索中: 找到 {len(search_results)} 个结果"
+                                    panel.subtitle = f"[dim]搜索中: 找到 {len(search_results)} 个结果[/dim]"
                                     live.update(panel)
 
                             elif event == "ref_docs":
@@ -346,14 +349,14 @@ class KimiModel(BasePlatform):
                                         "rag_segments": card.get("rag_segments", []),
                                         "origin": card.get("origin", {})
                                     })
-                                    panel.subtitle = f"分析引用: 找到 {len(ref_sources)} 个来源"
+                                    panel.subtitle = f"[dim]分析引用: 找到 {len(ref_sources)} 个来源[/dim]"
                                     live.update(panel)
 
                         except json.JSONDecodeError:
                             continue
                     
                     # 显示对话完成状态
-                    panel.subtitle = "[bold green]回答完成[/bold green]"
+                    panel.subtitle = "[bold green]✓ 对话完成[/bold green]"
                     live.update(panel)
             else:
                 # 如果禁止输出，则静默处理
