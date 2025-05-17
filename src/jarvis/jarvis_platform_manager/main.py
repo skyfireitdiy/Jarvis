@@ -51,6 +51,7 @@ def list_platforms():
 def chat_with_model(platform_name: str, model_name: str):
     """Chat with specified platform and model"""
     registry = PlatformRegistry.get_global_platform_registry()
+    conversation_history = []  # 存储对话记录
 
     # Create platform instance
     platform = registry.create_platform(platform_name)
@@ -63,12 +64,13 @@ def chat_with_model(platform_name: str, model_name: str):
         platform.set_model_name(model_name)
         platform.set_suppress_output(False)
         PrettyOutput.print(f"连接到 {platform_name} 平台 {model_name} 模型", OutputType.SUCCESS)
-        PrettyOutput.print("可用命令: /bye - 退出聊天, /clear - 清除会话, /upload - 上传文件, /shell - 执行shell命令", OutputType.INFO)
+        PrettyOutput.print("可用命令: /bye - 退出聊天, /clear - 清除会话, /upload - 上传文件, /shell - 执行shell命令, /save - 保存当前对话, /saveall - 保存所有对话", OutputType.INFO)
 
         # Start conversation loop
         while True:
             # Get user input
             user_input = get_multiline_input("")
+            conversation_history.append({"role": "user", "content": user_input})  # 记录用户输入
 
             # Check if input is cancelled
             if user_input.strip() == "/bye":
@@ -84,6 +86,7 @@ def chat_with_model(platform_name: str, model_name: str):
                 try:
                     platform.reset()
                     platform.set_model_name(model_name)  # Reinitialize session
+                    conversation_history = []  # 重置对话记录
                     PrettyOutput.print("会话已清除", OutputType.SUCCESS)
                 except Exception as e:
                     PrettyOutput.print(f"清除会话失败: {str(e)}", OutputType.ERROR)
@@ -110,6 +113,52 @@ def chat_with_model(platform_name: str, model_name: str):
                     PrettyOutput.print(f"上传文件失败: {str(e)}", OutputType.ERROR)
                 continue
 
+            # Check if it is a save command
+            if user_input.strip().startswith("/save"):
+                try:
+                    file_path = user_input.strip()[5:].strip()
+                    if not file_path:
+                        PrettyOutput.print("请指定保存文件名，例如: /save last_message.txt", OutputType.WARNING)
+                        continue
+                    
+                    # Remove quotes if present
+                    if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
+                        file_path = file_path[1:-1]
+                    
+                    # Write last message content to file
+                    if conversation_history:
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            last_entry = conversation_history[-1]
+                            f.write(f"{last_entry['content']}\n")
+                        PrettyOutput.print(f"最后一条消息内容已保存到 {file_path}", OutputType.SUCCESS)
+                    else:
+                        PrettyOutput.print("没有可保存的消息", OutputType.WARNING)
+                except Exception as e:
+                    PrettyOutput.print(f"保存消息失败: {str(e)}", OutputType.ERROR)
+                continue
+
+            # Check if it is a saveall command
+            if user_input.strip().startswith("/saveall"):
+                try:
+                    file_path = user_input.strip()[8:].strip()
+                    if not file_path:
+                        PrettyOutput.print("请指定保存文件名，例如: /saveall all_conversations.txt", OutputType.WARNING)
+                        continue
+                    
+                    # Remove quotes if present
+                    if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
+                        file_path = file_path[1:-1]
+                    
+                    # Write full conversation history to file
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        for entry in conversation_history:
+                            f.write(f"{entry['role']}: {entry['content']}\n\n")
+                    
+                    PrettyOutput.print(f"所有对话已保存到 {file_path}", OutputType.SUCCESS)
+                except Exception as e:
+                    PrettyOutput.print(f"保存所有对话失败: {str(e)}", OutputType.ERROR)
+                continue
+
             # Check if it is a shell command
             if user_input.strip().startswith("/shell"):
                 try:
@@ -133,6 +182,8 @@ def chat_with_model(platform_name: str, model_name: str):
                 response = platform.chat_until_success(user_input)
                 if not response:
                     PrettyOutput.print("没有有效的回复", OutputType.WARNING)
+                else:
+                    conversation_history.append({"role": "assistant", "content": response})  # 记录模型回复
 
             except Exception as e:
                 PrettyOutput.print(f"聊天失败: {str(e)}", OutputType.ERROR)
