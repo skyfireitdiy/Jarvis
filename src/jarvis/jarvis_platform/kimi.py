@@ -294,7 +294,7 @@ class KimiModel(BasePlatform):
                             border_style="magenta", 
                             box=box.ROUNDED)
                 
-                with Live(panel, refresh_per_second=10, transient=False) as live:
+                with Live(panel, refresh_per_second=3, transient=False) as live:
                     for line in response.iter_lines():
                         if not line:
                             continue

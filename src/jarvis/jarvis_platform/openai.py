@@ -97,7 +97,7 @@ class OpenAIModel(BasePlatform):
                               border_style="cyan", 
                               box=box.ROUNDED)
                 
-                with Live(panel, refresh_per_second=10, transient=False) as live:
+                with Live(panel, refresh_per_second=3, transient=False) as live:
                     for chunk in response:
                         if chunk.choices and chunk.choices[0].delta.content:
                             text = chunk.choices[0].delta.content

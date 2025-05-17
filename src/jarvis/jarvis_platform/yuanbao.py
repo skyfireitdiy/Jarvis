@@ -461,7 +461,7 @@ class YuanbaoPlatform(BasePlatform):
                 text_content = Text()
                 panel = Panel(text_content, title=f"[bold blue]{self.model_name}[/bold blue]", 
                           subtitle="思考中...", border_style="blue", box=box.ROUNDED)
-                with Live(panel, refresh_per_second=10, transient=False) as live:
+                with Live(panel, refresh_per_second=3, transient=False) as live:
                     # 处理SSE流响应
                     for line in response.iter_lines():
                         if not line:
