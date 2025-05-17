@@ -12,6 +12,7 @@ import json
 import tempfile
 from typing import Any, Dict, Optional
 
+from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -91,6 +92,42 @@ def _create_methodology_temp_file(methodologies: Dict[str, str]) -> Optional[str
     except Exception as e:
         PrettyOutput.print(f"创建方法论临时文件失败: {str(e)}", OutputType.ERROR)
         return None
+
+def upload_methodology(platform: BasePlatform) -> bool:
+    """
+    上传方法论文件到指定平台
+    
+    参数：
+        platform: 平台实例，需实现upload_files方法
+    
+    返回：
+        bool: 上传是否成功
+    """
+    methodology_dir = _get_methodology_directory()
+    if not os.path.exists(methodology_dir):
+        PrettyOutput.print("方法论文档不存在", OutputType.WARNING)
+        return False
+    
+    methodologies = _load_all_methodologies()
+    if not methodologies:
+        PrettyOutput.print("没有可用的方法论文档", OutputType.WARNING)
+        return False
+    
+    temp_file_path = _create_methodology_temp_file(methodologies)
+    if not temp_file_path:
+        return False
+    
+    try:
+        if hasattr(platform, 'upload_files'):
+            return platform.upload_files([temp_file_path])
+        return False
+    finally:
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+            except Exception:
+                pass
+
 
 def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> str:
     """
