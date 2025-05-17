@@ -11,6 +11,10 @@ from PIL import Image
 from yaspin import yaspin
 from yaspin.spinners import Spinners
 from yaspin.api import Yaspin
+from rich.live import Live
+from rich.text import Text
+from rich.panel import Panel
+from rich import box
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
@@ -387,7 +391,6 @@ class YuanbaoPlatform(BasePlatform):
         
         参数:
             message: 要发送的消息文本
-            file_list: 可选的上传和附加文件路径列表
             
         返回:
             模型的响应
@@ -425,7 +428,9 @@ class YuanbaoPlatform(BasePlatform):
         self.multimedia = []
 
         if self.web:
-            payload["supportFunctions"] = ["supportInternetSearch"]
+            payload["supportFunctions"] = ["openInternetSearch"]
+        else:
+            payload["supportFunctions"] = ["autoInternetSearch"]
 
         # 添加系统消息（如果是第一次对话）
         if self.first_chat and self.system_message:
@@ -449,45 +454,82 @@ class YuanbaoPlatform(BasePlatform):
 
             full_response = ""
             is_text_block = False
+            thinking_content = ""
 
-            # 处理SSE流响应
-            for line in response.iter_lines():
-                if not line:
-                    continue
+            # 使用Rich的Live组件来实时展示更新
+            if not self.suppress_output:
+                text_content = Text()
+                panel = Panel(text_content, title=f"[bold blue]{self.model_name}[/bold blue]", 
+                          subtitle="思考中...", border_style="blue", box=box.ROUNDED)
+                with Live(panel, refresh_per_second=10, transient=False) as live:
+                    # 处理SSE流响应
+                    for line in response.iter_lines():
+                        if not line:
+                            continue
 
-                line_str = line.decode('utf-8')
+                        line_str = line.decode('utf-8')
 
-                # SSE格式的行通常以"data: "开头
-                if line_str.startswith("data: "):
-                    try:
-                        data_str = line_str[6:]  # 移除"data: "前缀
-                        data = json.loads(data_str)
+                        # SSE格式的行通常以"data: "开头
+                        if line_str.startswith("data: "):
+                            try:
+                                data_str = line_str[6:]  # 移除"data: "前缀
+                                data = json.loads(data_str)
 
-                        # 处理文本类型的消息
-                        if data.get("type") == "text":
-                            is_text_block = True
-                            msg = data.get("msg", "")
-                            if msg:
-                                if not self.suppress_output:
-                                    PrettyOutput.print_stream(msg)
-                                full_response += msg
+                                # 处理文本类型的消息
+                                if data.get("type") == "text":
+                                    is_text_block = True
+                                    msg = data.get("msg", "")
+                                    if msg:
+                                        full_response += msg
+                                        text_content.append(msg)
+                                        panel.subtitle = "正在回答..."
+                                        live.update(panel)
 
-                        # 处理思考中的消息（可选展示）
-                        elif data.get("type") == "think" and not self.suppress_output:
-                            think_content = data.get("content", "")
-                            # 可以选择性地显示思考过程，但不加入最终响应
-                            PrettyOutput.print_stream(f"{think_content}", is_thinking=True)
+                                # 处理思考中的消息
+                                elif data.get("type") == "think":
+                                    think_content = data.get("content", "")
+                                    if think_content:
+                                        thinking_content = think_content
+                                        panel.subtitle = f"思考中: {thinking_content}"
+                                        live.update(panel)
+
+                            except json.JSONDecodeError:
+                                pass
+
+                        # 检测结束标志
+                        elif line_str == "data: [DONE]":
+                            break
+                    
+                    # 显示对话完成状态
+                    panel.subtitle = "[bold green]对话完成[/bold green]"
+                    live.update(panel)
+            else:
+                # 如果禁止输出，则静默处理
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+
+                    line_str = line.decode('utf-8')
+
+                    # SSE格式的行通常以"data: "开头
+                    if line_str.startswith("data: "):
+                        try:
+                            data_str = line_str[6:]  # 移除"data: "前缀
+                            data = json.loads(data_str)
+
+                            # 处理文本类型的消息
+                            if data.get("type") == "text":
+                                is_text_block = True
+                                msg = data.get("msg", "")
+                                if msg:
+                                    full_response += msg
+
+                        except json.JSONDecodeError:
                             pass
 
-                    except json.JSONDecodeError:
-                        pass
-
-                # 检测结束标志
-                elif line_str == "data: [DONE]":
-                    break
-
-            if not self.suppress_output:
-                PrettyOutput.print_stream_end()
+                    # 检测结束标志
+                    elif line_str == "data: [DONE]":
+                        break
 
             return full_response
 
