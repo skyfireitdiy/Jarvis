@@ -33,8 +33,8 @@ tool_call_help = f"""
 want: 想要从执行结果中获取到的信息，如果工具输出内容过长，会根据此字段尝试提取有效信息
 name: 工具名称
 arguments:
-    param1: 值1
-    param2: 值2
+  param1: 值1
+  param2: 值2
 {ct("TOOL_CALL")}
 </format>
 
@@ -49,7 +49,7 @@ arguments:
 <rule>
 ### 2. 严格遵守格式
 - 完全按照上述格式
-- 使用正确的YAML缩进
+- 使用正确的YAML格式，2个空格作为缩进
 - 包含所有必需参数
 </rule>
 
@@ -72,15 +72,15 @@ arguments:
 
 <string_format>
 # 📝 字符串参数格式
-始终使用 | 语法表示字符串参数：
+始终使用 |2 语法表示字符串参数，防止多行字符串行首空格引起歧义：
 
 {ot("TOOL_CALL")}
 want: 当前的git状态，期望获取xxx的提交记录
 name: execute_script
 arguments:
-    interpreter: bash
-    script_cotent: |
-        git status --porcelain
+  interpreter: bash
+  script_cotent: |2
+    git status --porcelain
 {ct("TOOL_CALL")}
 </string_format>
 
@@ -96,7 +96,7 @@ arguments:
 <common_errors>
 # ⚠️ 常见错误
 - 同时调用多个工具
-- 字符串参数缺少 |
+- 字符串参数缺少 |2
 - 假设工具结果
 - 创建虚构对话
 - 在没有所需信息的情况下继续

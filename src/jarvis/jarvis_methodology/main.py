@@ -95,10 +95,10 @@ def extract_methodology(input_file):
 请按以下格式返回结果：
 <methodologies>
 - problem_type: [问题类型1]
-  content: |
+  content: |2
     [多行方法论内容1]
 - problem_type: [问题类型2]
-  content: |
+  content: |2
     [多行方法论内容2]
 </methodologies>
 
@@ -192,10 +192,10 @@ def extract_methodology_from_url(url):
 请按以下格式返回结果：
 <methodologies>
 - problem_type: [问题类型1]
-  content: |
+  content: |2
     [多行方法论内容1]
 - problem_type: [问题类型2]
-  content: |
+  content: |2
     [多行方法论内容2]
 </methodologies>
 

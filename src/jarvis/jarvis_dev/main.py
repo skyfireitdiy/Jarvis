@@ -125,7 +125,7 @@ PM_PROMPT = f"""
 ## 消息传递模板
 {ot("SEND_MESSAGE")}
 to: [角色]
-content: |
+content: |2
   # [任务主题]
 
   ## 背景与目标
@@ -259,7 +259,7 @@ BA_PROMPT = f"""
 ## 消息传递模板
 {ot("SEND_MESSAGE")}
 to: [角色]
-content: |
+content: |2
   # [需求主题]
 
   ## 背景与目标
@@ -415,7 +415,7 @@ SA_PROMPT = f"""
 ## 消息传递模板
 {ot("SEND_MESSAGE")}
 to: [角色]
-content: |
+content: |2
   # [架构主题]
 
   ## 背景与目标
@@ -571,7 +571,7 @@ TL_PROMPT = f"""
 ## 消息传递模板
 {ot("SEND_MESSAGE")}
 to: [角色]
-content: |
+content: |2
   # [技术主题]
 
   ## 背景与目标
@@ -750,7 +750,7 @@ arguments:
 ## 消息传递模板
 {ot("SEND_MESSAGE")}
 to: [角色]
-content: |
+content: |2
   # [开发主题]
 
   ## 背景与目标
@@ -931,7 +931,7 @@ arguments:
 ## 消息传递模板
 {ot("SEND_MESSAGE")}
 to: [角色]
-content: |
+content: |2
   # [测试主题]
 
   ## 背景与目标

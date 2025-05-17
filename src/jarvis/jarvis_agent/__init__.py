@@ -645,7 +645,7 @@ want: 创建新工具来解决XXX问题
 name: generate_new_tool
 arguments:
   tool_name: 工具名称
-  tool_code: |
+  tool_code: |2
     # -*- coding: utf-8 -*-
     from typing import Dict, Any
     from jarvis.jarvis_utils.output import PrettyOutput, OutputType
@@ -699,7 +699,7 @@ name: methodology
 arguments:
   operation: add/update
   problem_type: 方法论类型，不要过于细节，也不要过于泛化
-  content: |
+  content: |2
     方法论内容
 {ct("TOOL_CALL")}
 
