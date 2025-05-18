@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, List, Tuple
+from typing import Dict, Generator, List, Tuple
 import requests # type: ignore
 import json
 import os
@@ -241,7 +241,7 @@ class KimiModel(BasePlatform):
         return True
 
 
-    def chat(self, message: str) -> str:
+    def chat(self, message: str) -> Generator[str, None, None]:
         """Send message and get response"""
         if not self.chat_id:
             if not self._create_chat():
@@ -279,179 +279,29 @@ class KimiModel(BasePlatform):
 
         try:
             response = while_success(lambda: requests.post(url, headers=headers, json=payload, stream=True), sleep_time=5)
-            full_response = ""
+            # 如果禁止输出，则静默处理
+            for line in response.iter_lines():
+                if not line:
+                    continue
 
-            # 收集搜索和引用结果
-            search_results = []
-            ref_sources = []
+                line = line.decode('utf-8')
+                if not line.startswith("data: "):
+                    continue
 
-            # 使用Rich的Live组件来实时展示更新
-            if not self.suppress_output:
-                text_content = Text()
-                panel = Panel(
-                    text_content, 
-                    title=f"[bold cyan]{self.model_name}[/bold cyan]", 
-                    subtitle="[dim]思考中...[/dim]", 
-                    border_style="bright_blue",
-                    box=box.ROUNDED
-                )
-                
-                with Live(panel, refresh_per_second=3, transient=False) as live:
-                    for line in response.iter_lines():
-                        if not line:
-                            continue
+                try:
+                    data = json.loads(line[6:])
+                    event = data.get("event")
 
-                        line = line.decode('utf-8')
-                        if not line.startswith("data: "):
-                            continue
-
-                        try:
-                            data = json.loads(line[6:])
-                            event = data.get("event")
-
-                            if event == "cmpl":
-                                # 处理补全文本
-                                text = data.get("text", "")
-                                if text:
-                                    full_response += text
-                                    text_content.append(text, style="bright_white")
-                                    panel.subtitle = "[yellow]正在回答...[/yellow]"
-                                    live.update(panel)
-
-                            elif event == "search_plus":
-                                # 收集搜索结果
-                                msg = data.get("msg", {})
-                                if msg.get("type") == "get_res":
-                                    search_results.append({
-                                        "date": msg.get("date", ""),
-                                        "site_name": msg.get("site_name", ""),
-                                        "snippet": msg.get("snippet", ""),
-                                        "title": msg.get("title", ""),
-                                        "type": msg.get("type", ""),
-                                        "url": msg.get("url", "")
-                                    })
-                                    panel.subtitle = f"[dim]搜索中: 找到 {len(search_results)} 个结果[/dim]"
-                                    live.update(panel)
-
-                            elif event == "ref_docs":
-                                # 收集引用来源
-                                ref_cards = data.get("ref_cards", [])
-                                for card in ref_cards:
-                                    ref_sources.append({
-                                        "idx_s": card.get("idx_s", ""),
-                                        "idx_z": card.get("idx_z", ""),
-                                        "ref_id": card.get("ref_id", ""),
-                                        "url": card.get("url", ""),
-                                        "title": card.get("title", ""),
-                                        "abstract": card.get("abstract", ""),
-                                        "source": card.get("source_label", ""),
-                                        "rag_segments": card.get("rag_segments", []),
-                                        "origin": card.get("origin", {})
-                                    })
-                                    panel.subtitle = f"[dim]分析引用: 找到 {len(ref_sources)} 个来源[/dim]"
-                                    live.update(panel)
-
-                        except json.JSONDecodeError:
-                            continue
-                    
-                    # 显示对话完成状态
-                    panel.subtitle = "[bold green]✓ 对话完成[/bold green]"
-                    live.update(panel)
-            else:
-                # 如果禁止输出，则静默处理
-                for line in response.iter_lines():
-                    if not line:
-                        continue
-
-                    line = line.decode('utf-8')
-                    if not line.startswith("data: "):
-                        continue
-
-                    try:
-                        data = json.loads(line[6:])
-                        event = data.get("event")
-
-                        if event == "cmpl":
-                            # 处理补全文本
-                            text = data.get("text", "")
-                            if text:
-                                full_response += text
-
-                        elif event == "search_plus":
-                            # 收集搜索结果
-                            msg = data.get("msg", {})
-                            if msg.get("type") == "get_res":
-                                search_results.append({
-                                    "date": msg.get("date", ""),
-                                    "site_name": msg.get("site_name", ""),
-                                    "snippet": msg.get("snippet", ""),
-                                    "title": msg.get("title", ""),
-                                    "type": msg.get("type", ""),
-                                    "url": msg.get("url", "")
-                                })
-
-                        elif event == "ref_docs":
-                            # 收集引用来源
-                            ref_cards = data.get("ref_cards", [])
-                            for card in ref_cards:
-                                ref_sources.append({
-                                    "idx_s": card.get("idx_s", ""),
-                                    "idx_z": card.get("idx_z", ""),
-                                    "ref_id": card.get("ref_id", ""),
-                                    "url": card.get("url", ""),
-                                    "title": card.get("title", ""),
-                                    "abstract": card.get("abstract", ""),
-                                    "source": card.get("source_label", ""),
-                                    "rag_segments": card.get("rag_segments", []),
-                                    "origin": card.get("origin", {})
-                                })
-
-                    except json.JSONDecodeError:
-                        continue
-
-            # 显示搜索结果摘要
-            if search_results and not self.suppress_output:
-                output = ["搜索结果:"]
-                for result in search_results:
-                    output.append(f"- {result['title']}")
-                    if result['date']:
-                        output.append(f"  日期: {result['date']}")
-                    output.append(f"  来源: {result['site_name']}")
-                    if result['snippet']:
-                        output.append(f"  摘要: {result['snippet']}")
-                    output.append(f"  链接: {result['url']}")
-                    output.append("")
-                PrettyOutput.print("\n".join(output), OutputType.PROGRESS)
-
-            # 显示引用来源
-            if ref_sources and not self.suppress_output:
-                output = ["引用来源:"]
-                for source in ref_sources:
-                    output.append(f"- [{source['ref_id']}] {source['title']} ({source['source']})")
-                    output.append(f"  链接: {source['url']}")
-                    if source['abstract']:
-                        output.append(f"  摘要: {source['abstract']}")
-
-                    # 显示相关段落
-                    if source['rag_segments']:
-                        output.append("  相关段落:")
-                        for segment in source['rag_segments']:
-                            text = segment.get('text', '').replace('\n', ' ').strip()
-                            if text:
-                                output.append(f"    - {text}")
-
-                    # 显示原文引用
-                    origin = source['origin']
-                    if origin:
-                        text = origin.get('text', '')
+                    if event == "cmpl":
+                        # 处理补全文本
+                        text = data.get("text", "")
                         if text:
-                            output.append(f"  原文: {text}")
+                            yield text
+                except json.JSONDecodeError:
+                    continue
 
-                    output.append("")
 
-                PrettyOutput.print("\n".join(output), OutputType.PROGRESS)
-
-            return full_response
+            return None
 
         except Exception as e:
             raise Exception(f"Chat failed: {str(e)}")

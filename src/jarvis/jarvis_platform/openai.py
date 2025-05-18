@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, List, Tuple
+from typing import Dict, Generator, List, Tuple
 import os
 from openai import OpenAI
 from rich.live import Live
@@ -73,7 +73,7 @@ class OpenAIModel(BasePlatform):
         self.system_message = message
         self.messages.append({"role": "system", "content": self.system_message})
 
-    def chat(self, message: str) -> str:
+    def chat(self, message: str) -> Generator[str, None, None]:
         """Execute conversation"""
         try:
 
@@ -87,41 +87,16 @@ class OpenAIModel(BasePlatform):
             ) # type: ignore
 
             full_response = ""
-
-            # 使用Rich的Live组件来实时展示更新
-            if not self.suppress_output:
-                text_content = Text()
-                panel = Panel(
-                    text_content, 
-                    title=f"[bold cyan]{self.model_name}[/bold cyan]", 
-                    subtitle="[dim]思考中...[/dim]", 
-                    border_style="bright_blue",
-                    box=box.ROUNDED
-                )
-                
-                with Live(panel, refresh_per_second=3, transient=False) as live:
-                    for chunk in response:
-                        if chunk.choices and chunk.choices[0].delta.content:
-                            text = chunk.choices[0].delta.content
-                            full_response += text
-                            text_content.append(text, style="bright_white")
-                            panel.subtitle = "[yellow]正在回答...[/yellow]"
-                            live.update(panel)
-                    
-                    # 显示对话完成状态
-                    panel.subtitle = "[bold green]✓ 对话完成[/bold green]"
-                    live.update(panel)
-            else:
-                # 如果禁止输出，则静默处理
-                for chunk in response:
-                    if chunk.choices and chunk.choices[0].delta.content:
-                        text = chunk.choices[0].delta.content
-                        full_response += text
+            for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    text = chunk.choices[0].delta.content
+                    full_response += text
+                    yield text
 
             # Add assistant reply to history
             self.messages.append({"role": "assistant", "content": full_response})
 
-            return full_response
+            return None
 
         except Exception as e:
             PrettyOutput.print(f"对话失败：{str(e)}", OutputType.ERROR)

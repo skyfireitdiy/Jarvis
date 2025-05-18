@@ -467,7 +467,6 @@ class YuanbaoPlatform(BasePlatform):
 
                         # 处理文本类型的消息
                         if data.get("type") == "text":
-                            is_text_block = True
                             msg = data.get("msg", "")
                             if msg:
                                 yield msg

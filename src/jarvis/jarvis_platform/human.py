@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, List, Tuple
+from typing import Generator, List, Tuple
 import random
 import string
 from jarvis.jarvis_platform.base import BasePlatform
@@ -34,7 +34,7 @@ class HumanPlatform(BasePlatform):
         else:
             PrettyOutput.print(f"错误：不支持的模型: {model_name}", OutputType.ERROR)
 
-    def chat(self, message: str) -> str:
+    def chat(self, message: str) -> Generator[str, None, None]:
         """发送消息并获取人类响应"""
         if not self.conversation_id:
             self.conversation_id = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
@@ -49,7 +49,8 @@ class HumanPlatform(BasePlatform):
             prompt = f"{message} {session_info}\n\n请回复:"
         
         response = get_multiline_input(prompt)
-        return response
+        yield response
+        return None
 
     def upload_files(self, file_list: List[str]) -> bool:
         """文件上传功能，人类平台不需要实际处理"""
