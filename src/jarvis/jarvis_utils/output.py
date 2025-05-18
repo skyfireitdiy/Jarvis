@@ -166,7 +166,7 @@ class PrettyOutput:
             OutputType.PLANNING: dict(  bgcolor="#2b1c2b"),
             OutputType.PROGRESS: dict(  bgcolor="#1c1c1c"),
             OutputType.SUCCESS: dict( bgcolor="#1c2b1c"),
-            OutputType.WARNING: dict( bgcolor="#2b2b1c", meta={"icon": "⚠️"}),
+            OutputType.WARNING: dict( bgcolor="#2b2b1c"),
             OutputType.DEBUG: dict(  bgcolor="#1c1c1c"),
             OutputType.USER: dict( bgcolor="#1c2b2b"),
             OutputType.TOOL: dict( bgcolor="#1c2b2b"),
