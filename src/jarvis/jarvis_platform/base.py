@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
 from abc import ABC, abstractmethod
 import re
-from typing import List, Tuple
+from typing import Generator, List, Tuple
 
 from yaspin import yaspin
+
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import get_context_token_count, is_context_overflow, while_success, while_true
 from jarvis.jarvis_utils.tag import ot, ct
-
+from rich.live import Live
+from rich.text import Text
+from rich.panel import Panel
+from rich import box
 
 class BasePlatform(ABC):
     """Base class for large language models"""
@@ -33,7 +37,7 @@ class BasePlatform(ABC):
         self.delete_chat()
 
     @abstractmethod
-    def chat(self, message: str) -> str:
+    def chat(self, message: str) -> Generator[str, None, None]:
         """Execute conversation"""
         raise NotImplementedError("chat is not implemented")
     
@@ -53,8 +57,6 @@ class BasePlatform(ABC):
             return "错误：输入内容超过最大限制"
 
         if input_token_count > get_max_input_token_count():
-            current_suppress_output = self.suppress_output
-            self.set_suppress_output(True)
             max_chunk_size = get_max_input_token_count() - 1024  # 留出一些余量
             min_chunk_size = max_chunk_size // 2  # 最小块大小设为最大块大小的一半
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
@@ -70,32 +72,42 @@ class BasePlatform(ABC):
                     while_true(lambda: while_success(lambda: self.chat(f"<part_content>{input}</part_content>请返回已收到"), 5), 5)
                 spinner.text = "提交完成"
                 spinner.ok("✅")
-            self.set_suppress_output(current_suppress_output)
-            response = while_true(lambda: while_success(lambda: self.chat("内容已经全部提供完毕，请继续"), 5), 5)
-            
+            response = while_true(lambda: while_success(lambda: self._chat("内容已经全部提供完毕，请继续"), 5), 5)
         else:
-            response = self.chat(message)
+            response = ""
 
-        end_time = time.time()
-        duration = end_time - start_time
-        char_count = len(response)
-
-        # Calculate token count and tokens per second
-        try:
-            token_count = get_context_token_count(response)
-            tokens_per_second = token_count / duration if duration > 0 else 0
-        except Exception as e:
-            PrettyOutput.print(f"Tokenization failed: {str(e)}", OutputType.WARNING)
-            token_count = 0
-            tokens_per_second = 0
-
-        # Print statistics
-        if not self.suppress_output:
-            PrettyOutput.section(
-                f"对话完成 - 耗时: {duration:.2f}秒, 输入字符数: {len(message)}, 输入Token数量: {input_token_count}, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}",
-                OutputType.INFO,
+            text_content = Text()
+            panel = Panel(
+                text_content, 
+                title=f"[bold cyan]{self.name()}[/bold cyan]", 
+                subtitle="[dim]思考中...[/dim]", 
+                border_style="bright_blue",
+                box=box.ROUNDED
             )
 
+            if not self.suppress_output:
+                with Live(panel, refresh_per_second=3, transient=False) as live:
+                    for s in self.chat(message):
+                        response += s
+                        text_content.append(s, style="bright_white")
+                        panel.subtitle = "[yellow]正在回答...[/yellow]"
+                        live.update(panel)
+                    end_time = time.time()
+                    duration = end_time - start_time
+                    char_count = len(response)
+                    # Calculate token count and tokens per second
+                    try:
+                        token_count = get_context_token_count(response)
+                        tokens_per_second = token_count / duration if duration > 0 else 0
+                    except Exception as e:
+                        PrettyOutput.print(f"Tokenization failed: {str(e)}", OutputType.WARNING)
+                        token_count = 0
+                        tokens_per_second = 0
+                    panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒, 输入字符数: {len(message)}, 输入Token数量: {input_token_count}, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}[/bold green]"
+                    live.update(panel)
+            else:
+                for s in self.chat(message):
+                    response += s
         # Keep original think tag handling
         response = re.sub(ot("think")+r'.*?'+ct("think"), '', response, flags=re.DOTALL)
         return response

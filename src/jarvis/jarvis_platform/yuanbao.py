@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, List, Tuple
+from typing import Dict, Generator, List, Tuple
 import requests
 import json
 import os
@@ -386,7 +386,7 @@ class YuanbaoPlatform(BasePlatform):
             PrettyOutput.print(f"生成签名时出错: {str(e)}", OutputType.ERROR)
             raise e
 
-    def chat(self, message: str) -> str:
+    def chat(self, message: str) -> Generator[str, None, None]:
         """发送消息并获取响应，可选文件附件
         
         参数:
@@ -452,92 +452,39 @@ class YuanbaoPlatform(BasePlatform):
                     error_msg += f", 响应: {response.text}"
                 raise Exception(error_msg)
 
-            full_response = ""
-            is_text_block = False
-            thinking_content = ""
+            # 处理SSE流响应
+            for line in response.iter_lines():
+                if not line:
+                    continue
 
-            # 使用Rich的Live组件来实时展示更新
-            if not self.suppress_output:
-                text_content = Text()
-                panel = Panel(
-                    text_content, 
-                    title=f"[bold cyan]{self.model_name}[/bold cyan]", 
-                    subtitle="[dim]思考中...[/dim]", 
-                    border_style="bright_blue",
-                    box=box.ROUNDED
-                )
-                with Live(panel, refresh_per_second=3, transient=False) as live:
-                    # 处理SSE流响应
-                    for line in response.iter_lines():
-                        if not line:
-                            continue
+                line_str = line.decode('utf-8')
 
-                        line_str = line.decode('utf-8')
+                # SSE格式的行通常以"data: "开头
+                if line_str.startswith("data: "):
+                    try:
+                        data_str = line_str[6:]  # 移除"data: "前缀
+                        data = json.loads(data_str)
 
-                        # SSE格式的行通常以"data: "开头
-                        if line_str.startswith("data: "):
-                            try:
-                                data_str = line_str[6:]  # 移除"data: "前缀
-                                data = json.loads(data_str)
+                        # 处理文本类型的消息
+                        if data.get("type") == "text":
+                            is_text_block = True
+                            msg = data.get("msg", "")
+                            if msg:
+                                yield msg
 
-                                # 处理文本类型的消息
-                                if data.get("type") == "text":
-                                    is_text_block = True
-                                    msg = data.get("msg", "")
-                                    if msg:
-                                        full_response += msg
-                                        # 使用更丰富的文字样式
-                                        text_content.append(msg, style="bright_white")
-                                        panel.subtitle = "[yellow]正在回答...[/yellow]"
-                                        live.update(panel)
+                        # 处理思考中的消息
+                        elif data.get("type") == "think":
+                            think_content = data.get("content", "")
+                            if think_content:
+                                yield think_content
 
-                                # 处理思考中的消息
-                                elif data.get("type") == "think":
-                                    think_content = data.get("content", "")
-                                    if think_content:
-                                        thinking_content = think_content
-                                        panel.subtitle = f"[dim]思考中: {thinking_content}[/dim]"
-                                        live.update(panel)
+                    except json.JSONDecodeError:
+                        pass
 
-                            except json.JSONDecodeError:
-                                pass
-
-                        # 检测结束标志
-                        elif line_str == "data: [DONE]":
-                            break
-                    
-                    # 显示对话完成状态
-                    panel.subtitle = "[bold green]✓ 对话完成[/bold green]"
-                    live.update(panel)
-            else:
-                # 如果禁止输出，则静默处理
-                for line in response.iter_lines():
-                    if not line:
-                        continue
-
-                    line_str = line.decode('utf-8')
-
-                    # SSE格式的行通常以"data: "开头
-                    if line_str.startswith("data: "):
-                        try:
-                            data_str = line_str[6:]  # 移除"data: "前缀
-                            data = json.loads(data_str)
-
-                            # 处理文本类型的消息
-                            if data.get("type") == "text":
-                                is_text_block = True
-                                msg = data.get("msg", "")
-                                if msg:
-                                    full_response += msg
-
-                        except json.JSONDecodeError:
-                            pass
-
-                    # 检测结束标志
-                    elif line_str == "data: [DONE]":
-                        break
-
-            return full_response
+                # 检测结束标志
+                elif line_str == "data: [DONE]":
+                    return None
+            return None
 
         except Exception as e:
             raise Exception(f"对话失败: {str(e)}")
