@@ -253,19 +253,25 @@ def main():
     ```
     python -m jarvis.jarvis_tools.ask_codebase "登录功能在哪个文件实现？" --root_dir /path/to/codebase
     ```
+    如果没有提供问题参数，则会进入交互式多行输入模式
     """
     import argparse
     import sys
+    from jarvis.jarvis_utils.input import get_multiline_input
 
     init_env()
 
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description="智能代码库查询工具")
-    parser.add_argument("question", help="关于代码库的问题")
+    parser.add_argument("question", nargs="?", help="关于代码库的问题")
     parser.add_argument("--root_dir", "-d", default=".", help="代码库根目录路径")
 
     # 解析命令行参数
     args = parser.parse_args()
+
+    # 如果没有提供问题参数，使用多行输入
+    if not args.question:
+        args.question = get_multiline_input("请输入关于代码库的问题:")
 
     # 创建并执行工具
     tool = AskCodebaseTool(auto_complete=False)
