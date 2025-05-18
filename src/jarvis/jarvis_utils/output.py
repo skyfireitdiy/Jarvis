@@ -215,11 +215,13 @@ class PrettyOutput:
             title: 章节标题文本
             output_type: 输出类型（影响样式）
         """
+        text = Text(title, style=output_type.value, justify="center")
         panel = Panel(
-            Text(title, style=output_type.value, justify="center"),
+            text,
             border_style=output_type.value
         )
-        console.print()
-        console.print(panel)
-        console.print()
+        if get_pretty_output():
+            console.print(panel)
+        else:
+            console.print(text)
     
