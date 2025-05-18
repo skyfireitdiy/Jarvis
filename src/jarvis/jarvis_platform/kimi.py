@@ -293,8 +293,7 @@ class KimiModel(BasePlatform):
                     title=f"[bold cyan]{self.model_name}[/bold cyan]", 
                     subtitle="[dim]思考中...[/dim]", 
                     border_style="bright_blue",
-                    box=box.ROUNDED,
-                    padding=(1, 2)
+                    box=box.ROUNDED
                 )
                 
                 with Live(panel, refresh_per_second=3, transient=False) as live:

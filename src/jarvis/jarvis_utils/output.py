@@ -126,7 +126,7 @@ class PrettyOutput:
         except (ClassNotFound, Exception):
             return default_lang
     @staticmethod
-    def _format(output_type: OutputType, timestamp: bool = True) -> Text:
+    def _format(output_type: OutputType, timestamp: bool = True) -> str:
         """
         使用时间戳和图标格式化输出头。
 
@@ -137,14 +137,13 @@ class PrettyOutput:
         返回：
             Text: 格式化后的rich Text对象
         """
-        formatted = Text()
+        icon = PrettyOutput._ICONS.get(output_type, "")
+        formatted = f"{icon} "
         if timestamp:
-            formatted.append(f"[{datetime.now().strftime('%H:%M:%S')}][{output_type.value}]", style=output_type.value)
+            formatted+=f"[{datetime.now().strftime('%H:%M:%S')}][{output_type.value}]"
         agent_info = get_agent_list()
         if agent_info:
-            formatted.append(f"[{agent_info}]", style="blue")
-        icon = PrettyOutput._ICONS.get(output_type, "")
-        formatted.append(f" {icon} ", style=output_type.value)
+            formatted+=f"[{agent_info}]"
         return formatted
     @staticmethod
     def print(text: str, output_type: OutputType, timestamp: bool = True, lang: Optional[str] = None, traceback: bool = False):
@@ -159,6 +158,21 @@ class PrettyOutput:
             traceback: 是否显示错误的回溯信息
         """
         styles = {
+            OutputType.SYSTEM: dict( bgcolor="#1e2b3c"),
+            OutputType.CODE: dict( bgcolor="#1c2b1c"),
+            OutputType.RESULT: dict( bgcolor="#1c1c2b"),
+            OutputType.ERROR: dict( bgcolor="#2b1c1c"),
+            OutputType.INFO: dict( bgcolor="#2b2b1c", meta={"icon": "ℹ️"}),
+            OutputType.PLANNING: dict(  bgcolor="#2b1c2b"),
+            OutputType.PROGRESS: dict(  bgcolor="#1c1c1c"),
+            OutputType.SUCCESS: dict( bgcolor="#1c2b1c"),
+            OutputType.WARNING: dict( bgcolor="#2b2b1c", meta={"icon": "⚠️"}),
+            OutputType.DEBUG: dict(  bgcolor="#1c1c1c"),
+            OutputType.USER: dict( bgcolor="#1c2b2b"),
+            OutputType.TOOL: dict( bgcolor="#1c2b2b"),
+        }
+
+        header_styles = {
             OutputType.SYSTEM: RichStyle(color="bright_cyan", bgcolor="#1e2b3c", frame=True, meta={"icon": "🤖"}),
             OutputType.CODE: RichStyle(color="green", bgcolor="#1c2b1c", frame=True, meta={"icon": "📝"}),
             OutputType.RESULT: RichStyle(color="bright_blue", bgcolor="#1c1c2b", frame=True, meta={"icon": "✨"}),
@@ -172,20 +186,18 @@ class PrettyOutput:
             OutputType.USER: RichStyle(color="spring_green2", frame=True, bgcolor="#1c2b2b", meta={"icon": "👤"}),
             OutputType.TOOL: RichStyle(color="dark_sea_green4", bgcolor="#1c2b2b", frame=True, meta={"icon": "🔧"}),
         }
+
         lang = lang if lang is not None else PrettyOutput._detect_language(text, default_lang='markdown')
-        header = PrettyOutput._format(output_type, timestamp)
-        content = Syntax(text, lang, theme="monokai", word_wrap=True)
+        header = Text(PrettyOutput._format(output_type, timestamp), style=header_styles[output_type])
+        content = Syntax(text, lang, theme="monokai", word_wrap=True, background_color=styles[output_type]["bgcolor"])
         panel = Panel(
             content,
-            style=styles[output_type],
-            border_style=styles[output_type],
+            border_style=header_styles[output_type],
             title=header,
             title_align="left",
             padding=(0, 0),
             highlight=True,
-            # box=HEAVY,
         )
-        console.print()
         console.print(panel)
         if traceback:
             console.print_exception()
@@ -206,15 +218,3 @@ class PrettyOutput:
         console.print(panel)
         console.print()
     
-    @staticmethod
-    def _get_style(output_type: OutputType) -> RichStyle:
-        """
-        获取预定义的RichStyle用于输出类型。
-
-        参数：
-            output_type: 要获取样式的输出类型
-
-        返回：
-            RichStyle: 对应的样式
-        """
-        return console.get_style(output_type.value)

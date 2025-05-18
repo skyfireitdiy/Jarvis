@@ -91,7 +91,7 @@ class BasePlatform(ABC):
 
         # Print statistics
         if not self.suppress_output:
-            PrettyOutput.print(
+            PrettyOutput.section(
                 f"对话完成 - 耗时: {duration:.2f}秒, 输入字符数: {len(message)}, 输入Token数量: {input_token_count}, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}",
                 OutputType.INFO,
             )
