@@ -189,7 +189,7 @@ class PrettyOutput:
 
         lang = lang if lang is not None else PrettyOutput._detect_language(text, default_lang='markdown')
         header = Text(PrettyOutput._format(output_type, timestamp), style=header_styles[output_type])
-        content = Syntax(text, lang, theme="monokai", word_wrap=True, background_color=styles[output_type]["bgcolor"])
+        content = Syntax(text, lang, theme="dracula", word_wrap=True, background_color=styles[output_type]["bgcolor"])
         panel = Panel(
             content,
             border_style=header_styles[output_type],
