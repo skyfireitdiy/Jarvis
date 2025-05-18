@@ -169,4 +169,4 @@ def get_pretty_output() -> bool:
     返回：
         bool: 如果启用PrettyOutput则返回True，默认为True
     """
-    return os.getenv('JARVIS_PRETTY_OUTPUT', 'true') == 'true'
+    return os.getenv('JARVIS_PRETTY_OUTPUT', 'false') == 'true'
