@@ -161,3 +161,12 @@ def get_max_big_content_size() -> int:
         int: 最大大内容大小，默认为1MB
     """
     return int(os.getenv('JARVIS_MAX_BIG_CONTENT_SIZE', '96000'))
+
+def get_pretty_output() -> bool:
+    """
+    获取是否启用PrettyOutput。
+
+    返回：
+        bool: 如果启用PrettyOutput则返回True，默认为True
+    """
+    return os.getenv('JARVIS_PRETTY_OUTPUT', 'true') == 'true'

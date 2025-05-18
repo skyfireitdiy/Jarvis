@@ -5,7 +5,7 @@ from typing import Generator, List, Tuple
 
 from yaspin import yaspin
 
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import get_max_input_token_count, get_pretty_output
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import get_context_token_count, is_context_overflow, while_success, while_true
@@ -86,25 +86,31 @@ class BasePlatform(ABC):
             )
 
             if not self.suppress_output:
-                with Live(panel, refresh_per_second=3, transient=False) as live:
-                    for s in self.chat(message):
-                        response += s
-                        text_content.append(s, style="bright_white")
-                        panel.subtitle = "[yellow]正在回答...[/yellow]"
+                if get_pretty_output():
+                    with Live(panel, refresh_per_second=10, transient=False) as live:
+                        for s in self.chat(message):
+                            response += s
+                            text_content.append(s, style="bright_white")
+                            panel.subtitle = "[yellow]正在回答...[/yellow]"
+                            live.update(panel)
+                        end_time = time.time()
+                        duration = end_time - start_time
+                        char_count = len(response)
+                        # Calculate token count and tokens per second
+                        try:
+                            token_count = get_context_token_count(response)
+                            tokens_per_second = token_count / duration if duration > 0 else 0
+                        except Exception as e:
+                            PrettyOutput.print(f"Tokenization failed: {str(e)}", OutputType.WARNING)
+                            token_count = 0
+                            tokens_per_second = 0
+                        panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒, 输入字符数: {len(message)}, 输入Token数量: {input_token_count}, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}[/bold green]"
                         live.update(panel)
-                    end_time = time.time()
-                    duration = end_time - start_time
-                    char_count = len(response)
-                    # Calculate token count and tokens per second
-                    try:
-                        token_count = get_context_token_count(response)
-                        tokens_per_second = token_count / duration if duration > 0 else 0
-                    except Exception as e:
-                        PrettyOutput.print(f"Tokenization failed: {str(e)}", OutputType.WARNING)
-                        token_count = 0
-                        tokens_per_second = 0
-                    panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒, 输入字符数: {len(message)}, 输入Token数量: {input_token_count}, 输出字符数: {char_count}, 输出Token数量: {token_count}, 每秒Token数量: {tokens_per_second:.2f}[/bold green]"
-                    live.update(panel)
+                else:
+                    for s in self.chat(message):
+                        print(s, end="", flush=True)
+                        response += s
+                    print()
             else:
                 for s in self.chat(message):
                     response += s

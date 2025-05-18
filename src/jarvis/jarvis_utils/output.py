@@ -17,6 +17,7 @@ from rich.syntax import Syntax
 from rich.style import Style as RichStyle
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
+from jarvis.jarvis_utils.config import get_pretty_output
 from jarvis.jarvis_utils.globals import console, get_agent_list
 # from rich.box import HEAVY
 class OutputType(Enum):
@@ -198,7 +199,11 @@ class PrettyOutput:
             padding=(0, 0),
             highlight=True,
         )
-        console.print(panel)
+        if get_pretty_output():
+            console.print(panel)
+        else:
+            console.print(header)
+            console.print(content)
         if traceback:
             console.print_exception()
     @staticmethod
