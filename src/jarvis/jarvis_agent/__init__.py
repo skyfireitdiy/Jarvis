@@ -749,19 +749,18 @@ arguments:
             self.prompt = f"{user_input}"
 
             if self.first:
-                msg = user_input
-                for handler in self.input_handler:
-                    msg, _ = handler(msg, self)
                 
                 # 先尝试上传方法轮
                 platform = self.model if hasattr(self.model, 'upload_files') else None
                 if platform and upload_methodology(platform):
-                    methodology_prompt = f"{user_input}\n\n方法论已上传到平台，请参考平台上的方法论内容"
+                    self.prompt = f"{user_input}\n\n方法论已上传到平台，请参考平台上的方法论内容"
                 else:
+                    msg = user_input
+                    for handler in self.input_handler:
+                        msg, _ = handler(msg, self)
                     # 上传失败则回退到本地加载
-                    methodology_prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+                    self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
                 
-                self.prompt = methodology_prompt
                 self.first = False
 
             self.conversation_length = get_context_token_count(self.prompt)
