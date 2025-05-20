@@ -2,10 +2,6 @@
 from typing import Dict, Generator, List, Tuple
 import os
 from openai import OpenAI
-from rich.live import Live
-from rich.text import Text
-from rich.panel import Panel
-from rich import box
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
