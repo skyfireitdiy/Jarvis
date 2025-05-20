@@ -18,7 +18,6 @@ from jarvis.jarvis_agent import (
 )
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.utils import init_env
-from jarvis.jarvis_agent.file_input_handler import file_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 
@@ -122,7 +121,10 @@ def main() -> None:
             system_prompt=origin_agent_system_prompt,
             platform=args.platform,
             model_name=args.model,
-            input_handler=[file_input_handler, shell_input_handler, builtin_input_handler],
+            input_handler=[
+                shell_input_handler, 
+                builtin_input_handler
+            ],
             output_handler=[ToolRegistry()],
             need_summary=False
         )

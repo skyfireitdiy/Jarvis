@@ -16,7 +16,6 @@ from yaspin import yaspin  # type: ignore
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
-from jarvis.jarvis_agent.file_input_handler import file_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
@@ -109,7 +108,6 @@ class CodeAgent:
             platform=platform_instance,
             input_handler=[
                 shell_input_handler,
-                file_input_handler,
                 builtin_input_handler
             ],
             need_summary=need_summary
