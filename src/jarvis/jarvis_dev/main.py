@@ -1257,7 +1257,7 @@ def create_dev_team() -> MultiAgent:
 def main():
     """Main entry point for the development team simulation."""
 
-    init_env()
+    init_env("欢迎使用 Jarvis-Dev，您的开发团队已准备就绪！")
 
     # Create the development team
     dev_team = create_dev_team()

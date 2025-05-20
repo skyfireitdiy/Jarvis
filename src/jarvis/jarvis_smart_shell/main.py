@@ -114,7 +114,7 @@ def process_request(request: str) -> Optional[str]:
 
 def main() -> int:
     # 创建参数解析器
-    init_env()
+    init_env("欢迎使用 Jarvis-SmartShell，您的智能shell助手已准备就绪！")
     parser = argparse.ArgumentParser(
         description="将自然语言要求转换为shell命令",
         formatter_class=argparse.RawDescriptionHelpFormatter,

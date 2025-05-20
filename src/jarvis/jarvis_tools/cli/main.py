@@ -29,7 +29,7 @@ def main() -> int:
     import argparse
     import json
 
-    init_env()
+    init_env("欢迎使用 Jarvis-Tools，您的工具系统已准备就绪！")
 
     parser = argparse.ArgumentParser(description="Jarvis 工具系统命令行界面")
     subparsers = parser.add_subparsers(dest="command", help="命令")

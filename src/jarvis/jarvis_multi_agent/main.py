@@ -10,7 +10,7 @@ def main():
     Returns:
         最终处理结果
     """
-    init_env()
+    init_env("欢迎使用 Jarvis-MultiAgent，您的多智能体系统已准备就绪！")
     import argparse
     parser = argparse.ArgumentParser(description="多智能体系统启动器")
     parser.add_argument("--config", "-c", required=True, help="YAML配置文件路径")

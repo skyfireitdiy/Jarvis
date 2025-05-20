@@ -3,7 +3,7 @@ import argparse
 import os
 import sys
 
-from typing import Dict  # 仅保留实际使用的类型导入
+from typing import Dict, List, Tuple  # 增加必要的类型导入
 
 from jarvis.jarvis_utils.config import get_data_dir
 from prompt_toolkit import prompt
@@ -105,11 +105,10 @@ def _select_task(tasks: Dict[str, str]) -> str:
             PrettyOutput.print(f"选择任务失败: {str(val_err)}", OutputType.ERROR)
 
 
-
-
 def main() -> None:
-    """Jarvis main entry point"""
-    init_env()
+
+    
+    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！")
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
     parser.add_argument('-p', '--platform', type=str, help='Platform to use')
     parser.add_argument('-m', '--model', type=str, help='Model to use')

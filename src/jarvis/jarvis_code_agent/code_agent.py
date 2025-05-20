@@ -31,7 +31,7 @@ from jarvis.jarvis_utils.git_utils import (
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env, user_confirm
-
+from jarvis import __version__
 
 class CodeAgent:
     """Jarvis系统的代码修改代理。
@@ -403,7 +403,7 @@ class CodeAgent:
 
 def main() -> None:
     """Jarvis主入口点。"""
-    init_env()
+    init_env("欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！")
 
     parser = argparse.ArgumentParser(description='Jarvis Code Agent')
     parser.add_argument('-p', '--platform', type=str,

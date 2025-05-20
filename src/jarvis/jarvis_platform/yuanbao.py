@@ -294,7 +294,7 @@ class YuanbaoPlatform(BasePlatform):
             with open(file_path, 'rb') as file:
                 file_content = file.read()
 
-            spinner.write(f"ℹ️ 上传文件大小: {len(file_content)}")
+            spinner.write(f"ℹ️  上传文件大小: {len(file_content)}")
                 
             # Prepare headers for PUT request
             host = f"{upload_info['bucketName']}.{upload_info.get('accelerateDomain', 'cos.accelerate.myqcloud.com')}"

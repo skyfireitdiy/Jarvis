@@ -46,7 +46,7 @@ class GitSquashTool:
             PrettyOutput.print(f"压缩提交失败: {str(e)}", OutputType.WARNING)
 
 def main():
-    init_env()
+    init_env("欢迎使用 Jarvis-GitSquash，您的Git压缩助手已准备就绪！")
     parser = argparse.ArgumentParser(description='Git squash tool')
     parser.add_argument('commit_hash', type=str, help='Base commit hash to squash from')
     parser.add_argument('--lang', type=str, default='Chinese', help='Language for commit messages')

@@ -661,7 +661,7 @@ def main():
     """CLI entry point"""
     import argparse
 
-    init_env()
+    init_env("欢迎使用 Jarvis-CodeReview，您的代码审查助手已准备就绪！")
 
     parser = argparse.ArgumentParser(description='Autonomous code review tool')
     subparsers = parser.add_subparsers(dest='type')

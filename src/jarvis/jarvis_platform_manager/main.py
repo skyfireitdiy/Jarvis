@@ -606,7 +606,7 @@ def main():
     """Main function"""
     import argparse
 
-    init_env()
+    init_env("欢迎使用 Jarvis-PlatformManager，您的平台管理助手已准备就绪！")
 
     parser = argparse.ArgumentParser(description='Jarvis AI 平台')
     subparsers = parser.add_subparsers(dest='command', help='可用子命令')

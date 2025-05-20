@@ -5,11 +5,13 @@ import hashlib
 import tarfile
 from pathlib import Path
 from typing import Any, Callable
+
+from jarvis import __version__
 from jarvis.jarvis_utils.config import get_max_big_content_size, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-def init_env() -> None:
+def init_env(tool_name: str) -> None:
     """初始化环境变量从jarvis_data/env文件
 
     功能：
@@ -18,6 +20,21 @@ def init_env() -> None:
     3. 处理文件读取异常
     4. 检查git仓库状态并在落后时更新
     """
+
+    jarvis_ascii_art = f"""
+   ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
+   ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝
+   ██║███████║██████╔╝██║   ██║██║███████╗
+██╗██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║
+╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║
+ ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝
+ {tool_name}
+ 
+ https://github.com/skyfireitdiy/Jarvis
+ v{__version__}
+"""
+    PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
+
     jarvis_dir = Path(get_data_dir())
     env_file = jarvis_dir / "env"
 

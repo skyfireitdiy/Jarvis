@@ -10,7 +10,7 @@
 """
 from enum import Enum
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 from rich.panel import Panel
 from rich.text import Text
 from rich.syntax import Syntax
@@ -19,7 +19,7 @@ from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
 from jarvis.jarvis_utils.config import get_pretty_output
 from jarvis.jarvis_utils.globals import console, get_agent_list
-# from rich.box import HEAVY
+from rich.box import SIMPLE
 class OutputType(Enum):
     """
     输出类型枚举，用于分类和样式化不同类型的消息。
@@ -202,8 +202,11 @@ class PrettyOutput:
         if get_pretty_output():
             console.print(panel)
         else:
-            console.print(header)
-            console.print(content)
+            if len(text.splitlines()) > 1:
+                console.print(header)
+                console.print(content)
+            else:
+                console.print(header, content)
         if traceback:
             console.print_exception()
     @staticmethod
@@ -225,3 +228,29 @@ class PrettyOutput:
         else:
             console.print(text)
     
+    @staticmethod
+    def print_gradient_text(text: str, start_color: Tuple[int, int, int], end_color: Tuple[int, int, int]) -> None:
+        """打印带有渐变色彩的文本。
+        
+        Args:
+            text: 要打印的文本
+            start_color: 起始RGB颜色元组 (r, g, b)
+            end_color: 结束RGB颜色元组 (r, g, b)
+        """
+        lines = text.strip('\n').split('\n')
+        total_lines = len(lines)
+        colored_lines = []
+        for i, line in enumerate(lines):
+            # 计算当前行的渐变颜色
+            r = int(start_color[0] + (end_color[0] - start_color[0]) * i / (total_lines - 1))
+            g = int(start_color[1] + (end_color[1] - start_color[1]) * i / (total_lines - 1))
+            b = int(start_color[2] + (end_color[2] - start_color[2]) * i / (total_lines - 1))
+            
+            # 使用ANSI转义序列设置颜色
+            colored_lines.append(f"\033[38;2;{r};{g};{b}m{line}\033[0m")
+        colored_text = Text('\n'.join(colored_lines), style=OutputType.TOOL.value, justify="center")
+        panel = Panel(
+            colored_text,
+            box=SIMPLE
+        )
+        console.print(panel)

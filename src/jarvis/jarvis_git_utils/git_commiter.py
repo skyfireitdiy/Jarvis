@@ -265,7 +265,7 @@ class GitCommitTool:
             }
 
 def main():
-    init_env()
+    init_env("欢迎使用 Jarvis-GitCommitTool，您的Git提交助手已准备就绪！")
     parser = argparse.ArgumentParser(description='Git commit tool')
     parser.add_argument('--lang', type=str, default='Chinese', help='Language for commit messages')
     parser.add_argument('--root-dir', type=str, default='.', help='Root directory of the Git repository')

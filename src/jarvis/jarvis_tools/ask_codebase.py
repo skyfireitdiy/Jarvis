@@ -259,7 +259,7 @@ def main():
     import sys
     from jarvis.jarvis_utils.input import get_multiline_input
 
-    init_env()
+    init_env("欢迎使用 Jarvis-AskCodebase，您的智能代码库查询工具已准备就绪！")
 
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description="智能代码库查询工具")

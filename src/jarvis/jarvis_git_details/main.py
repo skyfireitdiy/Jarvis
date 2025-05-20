@@ -233,7 +233,7 @@ def main():
     """主函数，用于命令行接口"""
     import argparse
 
-    init_env()
+    init_env("欢迎使用 Jarvis-GitCommitAnalyzer，您的Git Commit分析助手已准备就绪！")
 
     parser = argparse.ArgumentParser(description='Git Commit Analyzer')
     group = parser.add_mutually_exclusive_group(required=True)

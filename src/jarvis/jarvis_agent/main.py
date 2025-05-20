@@ -32,7 +32,7 @@ def load_config(config_path: str) -> dict:
 def main():
     """Main entry point for Jarvis agent"""
     # Initialize environment
-    init_env()
+    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！")
 
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
