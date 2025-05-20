@@ -69,16 +69,7 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
 
         # 处理最后一个块
         if current_chunk:
-            if current_tokens >= min_length:
-                chunks.append(current_chunk)
-            elif chunks:  # 如果最后一个块太短，尝试与前面的块合并
-                last_chunk = chunks[-1]
-                combined = last_chunk + current_chunk
-                combined_tokens = get_context_token_count(combined)
-                if combined_tokens <= max_length:
-                    chunks[-1] = combined
-                else:
-                    chunks.append(current_chunk)
+            chunks.append(current_chunk)  # 直接添加最后一个块，无论长度如何
 
         return chunks
 
