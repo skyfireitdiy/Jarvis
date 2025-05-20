@@ -1,3 +1,26 @@
+### Release Note - v0.1.176 2025-05-19
+
+#### **新功能 (Features)**
+- 无
+
+#### **修复 (Fixes)**
+- 修正pre-command文件中git diff命令的格式说明
+- 更新JARVIS_MAX_BIG_CONTENT_SIZE配置值
+- 添加JARVIS_PRETTY_OUTPUT配置选项
+
+#### **优化与重构 (Refactors & Improvements)**
+- 优化文件输入处理逻辑
+- 重构平台聊天输出处理
+- 改进文本分块处理逻辑
+
+#### **文档更新 (Documentation)**
+- 更新README.md中的配置说明
+
+#### **其他 (Miscellaneous)**
+- 删除未使用的file_input_handler模块
+
+本次更新主要优化了代码结构和配置选项，移除了不使用的模块，并改进了文本处理逻辑。
+
 ### Release Note - v0.1.175 2025-05-17
 
 #### **新功能 (Features)**
