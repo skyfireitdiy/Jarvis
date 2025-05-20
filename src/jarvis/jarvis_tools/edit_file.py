@@ -406,7 +406,6 @@ def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> T
         if search_text in modified_content:
             # 如果有多处，报错
             if modified_content.count(search_text) > 1:
-                spinner.write(f"❌ 补丁 #{patch_count} 应用失败：找到多个匹配的代码段")
                 success = False
                 break
             # 应用替换
@@ -414,7 +413,6 @@ def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> T
                 search_text, replace_text)
             spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
         else:
-            spinner.write(f"❌ 补丁 #{patch_count} 应用失败：无法找到匹配的代码段")
             success = False
             break
     if not success:

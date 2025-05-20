@@ -45,10 +45,27 @@ class OpenAIModel(BasePlatform):
         self.system_message = ""
 
     def upload_files(self, file_list: List[str]) -> bool:
+        """
+        上传文件到OpenAI平台
+        
+        参数:
+            file_list: 需要上传的文件路径列表
+            
+        返回:
+            bool: 上传是否成功 (当前实现始终返回False)
+        """
         return False
 
     def get_model_list(self) -> List[Tuple[str, str]]:
-        """Get model list"""
+        """
+        获取可用的OpenAI模型列表
+        
+        返回:
+            List[Tuple[str, str]]: 模型ID和名称的元组列表
+            
+        异常:
+            当API调用失败时会打印错误信息并返回空列表
+        """
         try:
             models = self.client.models.list()
             model_list = []
@@ -60,17 +77,41 @@ class OpenAIModel(BasePlatform):
             return []
 
     def set_model_name(self, model_name: str):
-        """Set model name"""
+        """
+        设置当前使用的模型名称
+        
+        参数:
+            model_name: 要设置的模型名称
+        """
 
         self.model_name = model_name
 
     def set_system_message(self, message: str):
-        """Set system message"""
+        """
+        设置系统消息(角色设定)
+        
+        参数:
+            message: 系统消息内容
+            
+        说明:
+            设置后会立即添加到消息历史中
+        """
         self.system_message = message
         self.messages.append({"role": "system", "content": self.system_message})
 
     def chat(self, message: str) -> Generator[str, None, None]:
-        """Execute conversation"""
+        """
+        执行对话并返回生成器
+        
+        参数:
+            message: 用户输入的消息内容
+            
+        返回:
+            Generator[str, None, None]: 生成器，逐块返回AI响应内容
+            
+        异常:
+            当API调用失败时会抛出异常并打印错误信息
+        """
         try:
 
             # Add user message to history
@@ -99,12 +140,25 @@ class OpenAIModel(BasePlatform):
             raise Exception(f"Chat failed: {str(e)}")
 
     def name(self) -> str:
-        """Return model name"""
+        """
+        获取当前使用的模型名称
+        
+        返回:
+            str: 当前配置的模型名称
+        """
         return self.model_name
 
 
     def delete_chat(self)->bool:
-        """Delete conversation"""
+        """
+        删除当前对话历史
+        
+        返回:
+            bool: 操作是否成功
+            
+        说明:
+            如果设置了系统消息，会保留系统消息
+        """
         if self.system_message:
             self.messages = [{"role": "system", "content": self.system_message}]
         else:
@@ -112,4 +166,10 @@ class OpenAIModel(BasePlatform):
         return True
 
     def support_web(self) -> bool:
+        """
+        检查是否支持网页访问功能
+        
+        返回:
+            bool: 当前是否支持网页访问 (OpenAI平台始终返回False)
+        """
         return False
