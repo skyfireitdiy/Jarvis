@@ -337,33 +337,20 @@ class Agent:
         action_handlers = '\n'.join([f'- {handler.name()}' for handler in self.output_handler])
 
         # 任务完成提示
-        complete_prompt = f"3. 输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
+        complete_prompt = f"- 输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
 
         addon_prompt = f"""
-<addon>
-<instructions>
-**系统指令：**
-- 每次响应必须且只能包含一个操作
-- 严格遵循操作调用格式
-- 必须包含参数和说明
-- 操作结束需等待结果
-- 如果判断任务已经完成，不必输出操作
+请判断是否已经完成任务，如果已经完成：
+- 说明完成原因
+{complete_prompt}
+如果没有完成，请进行下一步操作：
+- 仅包含一个操作
 - 如果信息不明确，请请求用户补充
 - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
-</instructions>
-
-<actions>
-**可用操作列表：**
+- 操作列表：
 {action_handlers}
-</actions>
 
-<completion>
-如果任务已完成，请：
-1. 说明完成原因
-2. 保持输出格式规范
-{complete_prompt}
-</completion>
-</addon>
+请继续。
 """
 
         return addon_prompt
