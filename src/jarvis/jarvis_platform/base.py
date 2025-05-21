@@ -66,10 +66,13 @@ class BasePlatform(ABC):
                 """
                 while_true(lambda: while_success(lambda: self.chat(prefix_prompt), 5), 5)
                 submit_count = 0
+                length = 0
                 for input in inputs:
                     submit_count += 1
-                    spinner.text = f"正在提交第{submit_count}部分（共{len(inputs)}部分）"
+                    length += len(input)
+                    spinner.text = f"正在提交第{submit_count}部分（共{len(inputs)}部分({length}/{len(message)})）"
                     while_true(lambda: while_success(lambda: self.chat(f"<part_content>{input}</part_content>请返回已收到"), 5), 5)
+                    spinner.write(f"提交第{submit_count}部分完成，当前进度：{length}/{len(message)}")
                 spinner.text = "提交完成"
                 spinner.ok("✅")
             response = while_true(lambda: while_success(lambda: self._chat("内容已经全部提供完毕，请继续"), 5), 5)
