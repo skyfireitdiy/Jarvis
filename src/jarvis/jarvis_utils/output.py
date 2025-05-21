@@ -139,7 +139,7 @@ class PrettyOutput:
             Text: 格式化后的rich Text对象
         """
         icon = PrettyOutput._ICONS.get(output_type, "")
-        formatted = f"{icon} "
+        formatted = f"{icon}  "
         if timestamp:
             formatted+=f"[{datetime.now().strftime('%H:%M:%S')}][{output_type.value}]"
         agent_info = get_agent_list()
