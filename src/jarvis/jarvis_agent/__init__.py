@@ -340,15 +340,17 @@ class Agent:
         complete_prompt = f"- 输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
 
         addon_prompt = f"""
-请判断是否已经完成任务，如果已经完成：
-- 说明完成原因，不需要再有新的操作
-{complete_prompt}
-如果没有完成，请进行下一步操作：
-- 仅包含一个操作
-- 如果信息不明确，请请求用户补充
-- 如果执行过程中连续失败5次，请使用ask_user询问用户操作
-- 操作列表：
-{action_handlers}
+[系统提示开始]
+    请判断是否已经完成任务，如果已经完成：
+    - 说明完成原因，不需要再有新的操作
+    {complete_prompt}
+    如果没有完成，请进行下一步操作：
+    - 仅包含一个操作
+    - 如果信息不明确，请请求用户补充
+    - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
+    - 操作列表：
+    {action_handlers}
+[系统提示结束]
 
 请继续。
 """
