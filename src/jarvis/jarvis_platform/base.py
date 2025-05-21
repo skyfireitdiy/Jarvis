@@ -58,7 +58,7 @@ class BasePlatform(ABC):
 
         if input_token_count > get_max_input_token_count():
             max_chunk_size = get_max_input_token_count() - 1024  # 留出一些余量
-            min_chunk_size = max_chunk_size // 2  # 最小块大小设为最大块大小的一半
+            min_chunk_size = get_max_input_token_count() - 2048
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
             with yaspin(text="正在提交长上下文...", color="cyan") as spinner:
                 prefix_prompt = f"""
