@@ -47,6 +47,10 @@ def main() -> int:
         "--args-file", type=str, help="从文件加载工具参数 (JSON格式)"
     )
 
+    # 统计子命令
+    stat_parser = subparsers.add_parser("stat", help="显示工具调用统计信息")
+    stat_parser.add_argument("--json", action="store_true", help="以JSON格式输出")
+
     args = parser.parse_args()
 
     # 初始化工具注册表
@@ -71,6 +75,29 @@ def main() -> int:
                 if args.detailed:
                     print(f"   参数:")
                     print(tool["parameters"])  # 显示详细参数信息
+
+    elif args.command == "stat":
+        from tabulate import tabulate
+        stats = registry._get_tool_stats()
+        tools = registry.get_all_tools()
+        
+        # 构建统计表格数据
+        table_data = []
+        for tool in tools:
+            name = tool["name"]
+            count = stats.get(name, 0)
+            table_data.append([name, count])
+        
+        # 按调用次数降序排序
+        table_data.sort(key=lambda x: x[1], reverse=True)
+        
+        if args.json:
+            print(json.dumps(dict(table_data), indent=2))
+        else:
+            PrettyOutput.section("工具调用统计", OutputType.SYSTEM)
+            print(tabulate(table_data, headers=["工具名称", "调用次数"], tablefmt="grid"))
+            
+        return 0
 
     elif args.command == "call":
         tool_name = args.tool_name

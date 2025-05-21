@@ -202,7 +202,7 @@ class PrettyOutput:
         if get_pretty_output():
             console.print(panel)
         else:
-            if len(text.splitlines()) > 1:
+            if len(text.strip().splitlines()) > 1:
                 console.print(header)
                 console.print(content)
             else:

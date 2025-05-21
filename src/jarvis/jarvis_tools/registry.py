@@ -178,6 +178,32 @@ class ToolRegistry(OutputHandlerProtocol):
         self._load_external_tools()
         self._load_mcp_tools()
 
+    def _get_tool_stats(self) -> Dict[str, int]:
+        """从数据目录获取工具调用统计"""
+        stats_file = Path(get_data_dir()) / "tool_stat.yaml"
+        if stats_file.exists():
+            try:
+                with open(stats_file, "r", encoding="utf-8") as f:
+                    return yaml.safe_load(f) or {}
+            except Exception as e:
+                PrettyOutput.print(
+                    f"加载工具调用统计失败: {str(e)}", OutputType.WARNING
+                )
+        return {}
+
+    def _update_tool_stats(self, name: str) -> None:
+        """更新工具调用统计"""
+        stats = self._get_tool_stats()
+        stats[name] = stats.get(name, 0) + 1
+        stats_file = Path(get_data_dir()) / "tool_stat.yaml"
+        try:
+            with open(stats_file, "w", encoding="utf-8") as f:
+                yaml.safe_dump(stats, f)
+        except Exception as e:
+            PrettyOutput.print(
+                f"保存工具调用统计失败: {str(e)}", OutputType.WARNING
+            )
+
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
 
@@ -559,6 +585,10 @@ class ToolRegistry(OutputHandlerProtocol):
                 "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self.tools.keys())}",
                 "stdout": "",
             }
+        
+        # 更新工具调用统计
+        self._update_tool_stats(name)
+        
         return tool.execute(arguments)
 
     def _format_tool_output(self, stdout: str, stderr: str) -> str:
