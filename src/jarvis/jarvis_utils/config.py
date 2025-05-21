@@ -158,9 +158,9 @@ def get_max_big_content_size() -> int:
     获取最大大内容大小。
 
     返回：
-        int: 最大大内容大小，默认为1MB
+        int: 最大大内容大小
     """
-    return int(os.getenv('JARVIS_MAX_BIG_CONTENT_SIZE', '96000'))
+    return int(os.getenv('JARVIS_MAX_BIG_CONTENT_SIZE', '1024000'))
 
 def get_pretty_output() -> bool:
     """
