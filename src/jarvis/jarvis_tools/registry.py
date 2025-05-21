@@ -216,7 +216,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 f"工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}",
                 OutputType.WARNING,
             )
-        self.tools = {tool_name: self.tools[tool_name] for tool_name in name}
+        self.tools = {tool_name: self.tools[tool_name] for tool_name in name if tool_name in self.tools}
 
     def dont_use_tools(self, names: List[str]) -> None:
         """从注册表中移除指定工具
