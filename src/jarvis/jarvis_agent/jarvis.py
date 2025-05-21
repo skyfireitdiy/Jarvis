@@ -90,6 +90,7 @@ def _select_task(tasks: Dict[str, str]) -> str:
                 return ""
             if 1 <= choice <= len(task_names):
                 selected_task = tasks[task_names[choice - 1]]
+                PrettyOutput.print(f"将要执行任务:\n {selected_task}", OutputType.INFO)
                 # 询问是否需要补充信息
                 need_additional = user_confirm("需要为此任务添加补充信息吗？", default=False)
                 if need_additional:
@@ -137,7 +138,7 @@ def main() -> None:
 
         tasks = _load_tasks()
         if tasks and (selected_task := _select_task(tasks)):
-            PrettyOutput.print(f"执行任务: {selected_task}", OutputType.INFO)
+            PrettyOutput.print(f"开始执行任务: \n{selected_task}", OutputType.INFO)
             agent.run(selected_task)
             sys.exit(0)
 
