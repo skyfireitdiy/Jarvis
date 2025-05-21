@@ -168,6 +168,7 @@ class Agent:
             execute_tool_confirm: 执行工具前是否需要确认
             need_summary: 是否需要生成总结
             multiline_inputer: 多行输入处理器
+            use_methodology: 是否使用方法论
         """
         self.name = make_agent_name(name)
         self.description = description
@@ -271,27 +272,10 @@ class Agent:
 </actions>
 """
 
-        complete_prompt = ""
-        if self.auto_complete:
-            complete_prompt = f"""
-<completion>
-<instruction>
-## 任务完成
-当任务完成时，你应该打印以下信息：
-</instruction>
-
-<marker>
-{ot("!!!COMPLETE!!!")}
-</marker>
-</completion>
-"""
-
         self.model.set_system_message(f"""
 {self.system_prompt}
 
 {action_prompt}
-
-{complete_prompt}
 """)
         self.first = True
 
@@ -345,7 +329,7 @@ class Agent:
         addon_prompt = f"""
 [系统提示开始]
     请判断是否已经完成任务，如果已经完成：
-    - 说明完成原因，不需要再有新的操作
+    - 直接输出完成原因，不需要再有新的操作，不要输出{ot("TOOL_CALL")}标签
     {complete_prompt}
     如果没有完成，请进行下一步操作：
     - 仅包含一个操作
