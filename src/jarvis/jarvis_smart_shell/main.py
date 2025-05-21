@@ -5,6 +5,8 @@ import os
 import sys
 from typing import Optional
 
+from sympy import false
+
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_shell_name
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -113,8 +115,8 @@ def process_request(request: str) -> Optional[str]:
         return None
 
 def main() -> int:
-    # 创建参数解析器
-    init_env("欢迎使用 Jarvis-SmartShell，您的智能shell助手已准备就绪！")
+    # 创建参数解析器s
+    init_env("")
     parser = argparse.ArgumentParser(
         description="将自然语言要求转换为shell命令",
         formatter_class=argparse.RawDescriptionHelpFormatter,

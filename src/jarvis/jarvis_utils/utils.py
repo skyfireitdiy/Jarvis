@@ -11,7 +11,7 @@ from jarvis.jarvis_utils.config import get_max_big_content_size, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-def init_env(tool_name: str) -> None:
+def init_env(welcome_str: str) -> None:
     """初始化环境变量从jarvis_data/env文件
 
     功能：
@@ -28,12 +28,13 @@ def init_env(tool_name: str) -> None:
 ██╗██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║
 ╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║
  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝
- {tool_name}
- 
+ {welcome_str}
+
  https://github.com/skyfireitdiy/Jarvis
  v{__version__}
 """
-    PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
+    if welcome_str:
+        PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
 
     jarvis_dir = Path(get_data_dir())
     env_file = jarvis_dir / "env"
