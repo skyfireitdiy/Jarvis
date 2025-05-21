@@ -33,6 +33,7 @@ setup(
         "sseclient==0.0.27",
         "pillow==10.2.0",
         "openai==1.78.1",
+        "tabulate==0.9.0",
     ],
     extras_require={
         "dev": ["pytest", "black", "isort", "mypy", "build", "twine"]
