@@ -14,11 +14,13 @@
 - 完善的错误处理和回滚机制
 - 严格的格式保持要求
 """
+from typing import List
 import re
 from typing import Any, Dict, Tuple
 
 import yaml
 from yaspin import yaspin
+from yaspin.core import Yaspin
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.file_operation import FileOperationTool
@@ -32,30 +34,27 @@ class FileSearchReplaceTool:
     name = "edit_file"
     description = """代码编辑工具，用于编辑单个文件
 
-# 代码编辑规范
+# 代码补丁生成指南
 
 ## 重要提示
 此工具可以查看和修改单个文件的代码，只需提供要修改的代码片段即可。应尽量精简内容，只包含必要的上下文和修改部分。特别注意：不要提供完整文件内容，只提供需要修改的部分及其上下文！
 
 ## 基本使用
 1. 指定需要修改的文件路径
-2. 提供一组或多组"reason"和"patch"对
-3. 每个patch必须包含修改后的代码和1-2行上下文用于精确定位
+2. 提供一组或多组修改，每个修改包含"reason"、"search"和"replace"
+3. 每个修改中，"search"必须包含足够的上下文确保能在文件中**唯一匹配**
 
 ## 核心原则
 1. **精准修改**：只提供需要修改的代码部分及其上下文，不需要展示整个文件内容
 2. **最小补丁原则**：始终生成最小范围的补丁，只包含必要的上下文和实际修改
-3. **上下文定位**：确保提供的上下文能唯一标识修改位置
+3. **上下文完整性**：确保提供的上下文能唯一标识修改位置，避免匹配到多处
 
-## 最佳实践
-1. 每个修改应专注于单一职责，避免包含过多无关代码
-2. 不要出现未实现的代码，如：TODO
-3. 示例格式：
-  ```
-  # 原有上下文行
-  if condition:  # 修改这行
-      return new_value
-  ```
+## 输出格式规范
+- 每个修改必须包含SEARCH部分和REPLACE部分
+- SEARCH部分是需要查找的原始代码，必须能在原文件中**唯一匹配**
+- REPLACE部分是替换后的新代码
+- 如果修改较大，可以使用多个修改块
+
 """
     parameters = {
         "type": "object",
@@ -74,12 +73,15 @@ class FileSearchReplaceTool:
                             "type": "string",
                             "description": "修改的原因"
                         },
-                        "patch": {
+                        "search": {
                             "type": "string",
-                            "description": "修改后的代码片段，必须包含1-2行上下文代码用于精确定位修改位置，不需要传入完整文件内容"
+                            "description": "需要查找的原始代码"
+                        },
+                        "replace": {
+                            "type": "string",
+                            "description": "替换后的新代码"
                         }
                     },
-                    "required": ["reason", "patch"]
                 }
             }
         },
@@ -141,8 +143,10 @@ class FileSearchReplaceTool:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
                         original_content = content
-                
-                success, temp_content = patch_apply(file_path, yaml.safe_dump(changes))
+                with yaspin(text=f"正在处理文件 {file_path}...", color="cyan") as spinner:
+                    success, temp_content = fast_edit(file_path, changes, spinner)
+                    if not success:
+                        success, temp_content = slow_edit(file_path, yaml.safe_dump(changes), spinner)
 
                 # 只有当所有替换操作都成功时，才写回文件
                 if success and (temp_content != original_content or not file_exists):
@@ -207,9 +211,10 @@ class FileSearchReplaceTool:
                 "stdout": "",
                 "stderr": error_msg + "\n" + "\n".join(stderr_messages)
             }
+        
 
 
-def patch_apply(filepath: str, patch_content: str) -> Tuple[bool, str]:
+def slow_edit(filepath: str, patch_content: str, spinner: Yaspin) -> Tuple[bool, str]:
     """执行精确的文件编辑操作，使用AI模型生成差异补丁并应用。
 
     功能概述:
@@ -237,20 +242,19 @@ def patch_apply(filepath: str, patch_content: str) -> Tuple[bool, str]:
     if not filepath.startswith(work_dir):
         PrettyOutput.print(f"文件 {filepath} 不在工作目录 {work_dir} 下，不会进行版本控制管理", OutputType.WARNING)
     model = PlatformRegistry().get_normal_platform()
-    with yaspin(text=f"正在处理文件 {filepath}...", color="cyan") as spinner:
-        try:
-            file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
-            need_upload_file = is_context_overflow(file_content)
-            upload_success = False
-            # 读取原始文件内容
-            with spinner.hidden():  
-                if need_upload_file and model.upload_files([filepath]):
-                    upload_success = True
+    try:
+        file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
+        need_upload_file = is_context_overflow(file_content)
+        upload_success = False
+        # 读取原始文件内容
+        with spinner.hidden():  
+            if need_upload_file and model.upload_files([filepath]):
+                upload_success = True
 
 
-            model.set_suppress_output(True)
+        model.set_suppress_output(True)
 
-            main_prompt = f"""
+        main_prompt = f"""
 # 代码补丁生成专家指南
 
 ## 任务描述
@@ -292,66 +296,79 @@ def patch_apply(filepath: str, patch_content: str) -> Tuple[bool, str]:
 {"<" * 5} REPLACE
 {ct("DIFF")}
 """
-            
-            for _ in range(3):
-                file_prompt = ""
-                if not need_upload_file:
-                    file_prompt = f"""
-    # 原始代码
-    {file_content}
-    """
-                    
-                    response = model.chat_until_success(main_prompt + file_prompt)
+        
+        for _ in range(3):
+            file_prompt = ""
+            if not need_upload_file:
+                file_prompt = f"""
+# 原始代码
+{file_content}
+"""
+                
+                response = model.chat_until_success(main_prompt + file_prompt)
+            else:
+                if upload_success:
+                    response = model.chat_until_success(main_prompt)
                 else:
-                    if upload_success:
-                        response = model.chat_until_success(main_prompt)
-                    else:
-                        return False, ""
+                    return False, ""
 
-                # 解析差异化补丁
-                diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
-                                        response, re.DOTALL)
+            # 解析差异化补丁
+            diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
+                                    response, re.DOTALL)
 
-                # 读取原始文件内容
-                with open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
-                    file_content = f.read()
+            patches = []
+            for match in diff_blocks:
+                patches.append({
+                    "search": match.group(1).strip(),
+                    "replace": match.group(2).strip()
+                })
 
-                # 应用所有差异化补丁
-                modified_content = file_content
-                patch_count = 0
-                success = True
-                for match in diff_blocks:
-                    search_text = match.group(1).strip()
-                    replace_text = match.group(2).strip()
-                    patch_count += 1
-                    # 检查搜索文本是否存在于文件中
-                    if search_text in modified_content:
-                        # 如果有多处，报错
-                        if modified_content.count(search_text) > 1:
-                            spinner.write(f"❌ 补丁 #{patch_count} 应用失败：找到多个匹配的代码段")
-                            success = False
-                            break
-                        # 应用替换
-                        modified_content = modified_content.replace(
-                            search_text, replace_text)
-                        spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
-                    else:
-                        spinner.write(f"❌ 补丁 #{patch_count} 应用失败：无法找到匹配的代码段")
-                        success = False
-                        break
-                if not success:
-                    revert_file(filepath)
-                    continue
-
-
-                spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
-                spinner.ok("✅")
+            success, modified_content = fast_edit(filepath, patches, spinner)
+            if success:
                 return True, modified_content
-            spinner.text = f"文件 {filepath} 修改失败"
-            spinner.fail("❌")
-            return False, ""
+        spinner.text = f"文件 {filepath} 修改失败"
+        spinner.fail("❌")
+        return False, ""
 
-        except Exception as e:
-            spinner.text = f"文件修改失败: {str(e)}"
-            spinner.fail("❌")
-            return False, ""
+    except Exception as e:
+        spinner.text = f"文件修改失败: {str(e)}"
+        spinner.fail("❌")
+        return False, ""
+
+
+def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> Tuple[bool, str]:
+    # 读取原始文件内容
+    with open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
+        file_content = f.read()
+
+    # 应用所有差异化补丁
+    modified_content = file_content
+    patch_count = 0
+    success = True
+    for patch in patches:
+        search_text = patch["search"]
+        replace_text = patch["replace"]
+        patch_count += 1
+        # 检查搜索文本是否存在于文件中
+        if search_text in modified_content:
+            # 如果有多处，报错
+            if modified_content.count(search_text) > 1:
+                spinner.write(f"❌ 补丁 #{patch_count} 应用失败：找到多个匹配的代码段")
+                success = False
+                break
+            # 应用替换
+            modified_content = modified_content.replace(
+                search_text, replace_text)
+            spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
+        else:
+            spinner.write(f"❌ 补丁 #{patch_count} 应用失败：无法找到匹配的代码段")
+            success = False
+            break
+    if not success:
+        revert_file(filepath)
+        return False, ""
+
+
+    spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
+    spinner.ok("✅")
+    return True, modified_content
