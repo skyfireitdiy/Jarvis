@@ -216,25 +216,37 @@ class FileSearchReplaceTool:
 
 def slow_edit(filepath: str, patch_content: str, spinner: Yaspin) -> Tuple[bool, str]:
     """执行精确的文件编辑操作，使用AI模型生成差异补丁并应用。
-
-    功能概述:
+    
+    核心功能:
     1. 使用AI模型分析补丁内容并生成精确的代码差异
     2. 应用生成的差异补丁到目标文件
-    3. 提供重试机制确保操作可靠性
-
+    3. 提供3次重试机制确保操作可靠性
+    4. 支持大文件处理(自动上传到模型平台)
+    5. 严格的格式一致性检查
+    
     参数:
-        filepath: 要编辑的文件路径
-        patch_content: YAML格式的补丁内容，包含修改原因和代码片段
-
+        filepath: 要编辑的文件路径(绝对或相对路径)
+        patch_content: YAML格式的补丁内容，包含:
+            - reason: 修改原因描述
+            - search: 需要查找的原始代码(必须包含足够上下文)
+            - replace: 替换后的新代码
+        spinner: Yaspin实例，用于显示处理状态
+    
     返回值:
         Tuple[bool, str]: 
-            - 第一个元素表示操作是否成功
-            - 第二个元素是修改后的文件内容(成功时)或错误信息(失败时)
-
+            - 第一个元素表示操作是否成功(True/False)
+            - 第二个元素是修改后的文件内容(成功时)或空字符串(失败时)
+    
     异常处理:
-    1. 捕获并处理文件操作异常
-    2. 失败时自动回滚文件修改
-    3. 提供详细的执行状态输出
+    1. 文件不存在或权限不足时会捕获异常并返回失败
+    2. 模型生成补丁失败时会自动重试最多3次
+    3. 补丁应用失败时会自动回滚文件修改
+    
+    实现细节:
+    1. 检查文件是否在工作目录下(影响版本控制)
+    2. 根据文件大小决定是否上传到模型平台
+    3. 使用精确的DIFF格式解析模型生成的补丁
+    4. 确保补丁应用前进行唯一性匹配检查
     """
     import os
     work_dir = os.path.abspath(os.curdir)
@@ -337,6 +349,37 @@ def slow_edit(filepath: str, patch_content: str, spinner: Yaspin) -> Tuple[bool,
 
 
 def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> Tuple[bool, str]:
+    """快速应用预先生成的补丁到目标文件。
+    
+    核心功能:
+    1. 直接应用已生成的代码补丁
+    2. 执行严格的唯一匹配检查
+    3. 提供详细的补丁应用状态反馈
+    4. 失败时自动回滚文件修改
+    
+    参数:
+        filepath: 要编辑的文件路径(绝对或相对路径)
+        patches: 补丁列表，每个补丁包含:
+            - search: 需要查找的原始代码
+            - replace: 替换后的新代码
+        spinner: Yaspin实例，用于显示处理状态
+    
+    返回值:
+        Tuple[bool, str]: 
+            - 第一个元素表示操作是否成功(True/False)
+            - 第二个元素是修改后的文件内容(成功时)或空字符串(失败时)
+    
+    异常处理:
+    1. 文件不存在或权限不足时会捕获异常并返回失败
+    2. 补丁不匹配或有多处匹配时会返回失败
+    3. 失败时会自动回滚文件修改
+    
+    实现细节:
+    1. 读取文件内容到内存
+    2. 依次应用每个补丁，检查唯一匹配性
+    3. 记录每个补丁的应用状态
+    4. 所有补丁成功应用后才写入文件
+    """
     # 读取原始文件内容
     with open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
         file_content = f.read()
