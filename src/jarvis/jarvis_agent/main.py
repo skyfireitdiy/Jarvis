@@ -9,13 +9,13 @@ from jarvis.jarvis_utils.utils import init_env
 
 
 def load_config(config_path: str) -> dict:
-    """Load configuration from YAML file
+    """从YAML文件加载配置
 
-    Args:
-        config_path: Path to the YAML configuration file
+    参数:
+        config_path: YAML配置文件的路径
 
-    Returns:
-        dict: Configuration dictionary
+    返回:
+        dict: 配置字典
     """
     if not os.path.exists(config_path):
         PrettyOutput.print(f"配置文件 {config_path} 不存在，使用默认配置", OutputType.WARNING)
