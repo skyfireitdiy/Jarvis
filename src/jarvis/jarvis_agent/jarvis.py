@@ -39,10 +39,10 @@ def _load_tasks() -> Dict[str, str]:
                     for name, desc in user_tasks.items():
                         if desc:
                             tasks[str(name)] = str(desc)
-                spinner.text = "预定义任务加载完成"
+                spinner.text = f"预定义任务加载完成{pre_command_path}"
                 spinner.ok("✅")
             except (yaml.YAMLError, OSError):
-                spinner.text = "预定义任务加载失败"
+                spinner.text = f"预定义任务加载失败{pre_command_path}"
                 spinner.fail("❌")
 
     # Check .jarvis/pre-command in current directory
@@ -58,10 +58,10 @@ def _load_tasks() -> Dict[str, str]:
                     for name, desc in local_tasks.items():
                         if desc:
                             tasks[str(name)] = str(desc)
-                spinner.text = "预定义任务加载完成"
+                spinner.text = f"预定义任务加载完成{pre_command_path}"
                 spinner.ok("✅")
             except (yaml.YAMLError, OSError):
-                spinner.text = "预定义任务加载失败"
+                spinner.text = f"预定义任务加载失败{pre_command_path}"
                 spinner.fail("❌")
 
     return tasks
