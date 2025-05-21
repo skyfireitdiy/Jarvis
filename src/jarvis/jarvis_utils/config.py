@@ -170,3 +170,12 @@ def get_pretty_output() -> bool:
         bool: 如果启用PrettyOutput则返回True，默认为True
     """
     return os.getenv('JARVIS_PRETTY_OUTPUT', 'false') == 'true'
+
+def is_use_methodology() -> bool:
+    """
+    获取是否启用方法论。
+
+    返回：
+        bool: 如果启用方法论则返回True，默认为True
+    """
+    return os.getenv('JARVIS_USE_METHODOLOGY', 'true') == 'true'
