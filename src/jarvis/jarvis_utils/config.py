@@ -38,7 +38,7 @@ def get_max_token_count() -> int:
     返回:
         int: 模型能处理的最大token数量。
     """
-    return int(os.getenv('JARVIS_MAX_TOKEN_COUNT', '102400000'))
+    return int(os.getenv('JARVIS_MAX_TOKEN_COUNT', '960000'))
 
 def get_max_input_token_count() -> int:
     """

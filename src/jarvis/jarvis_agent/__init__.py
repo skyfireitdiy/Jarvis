@@ -492,7 +492,7 @@ class Agent:
             return False, f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}"
         if len(tool_list) == 0:
             return False, ""
-        if self.tool_call_count >= self.max_tool_call_count:
+        if self.max_tool_call_count > 0 and self.tool_call_count >= self.max_tool_call_count:
             if user_confirm(f"工具调用次数超过限制，是否继续执行？", True):
                 self.reset_tool_call_count()
             else:

@@ -131,7 +131,7 @@ OPENAI_API_BASE=https://api.openai.com/v1  # 可选，默认为官方API地址
 ### 环境变量配置
 | 变量名称 | 默认值 | 说明 |
 |----------|--------|------|
-| `JARVIS_MAX_TOKEN_COUNT` | 102400000 | 上下文窗口的最大token数量 |
+| `JARVIS_MAX_TOKEN_COUNT` | 960000 | 上下文窗口的最大token数量 |
 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
 | `JARVIS_AUTO_COMPLETE` | false | 是否启用自动完成功能（任务判定完成的时候会自动终止） |
 | `JARVIS_SHELL_NAME` | bash | 系统shell名称 |
@@ -141,7 +141,7 @@ OPENAI_API_BASE=https://api.openai.com/v1  # 可选，默认为官方API地址
 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 |
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
-| `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
+| `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数，如果是0表示无限制 |
 | `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis（仅在以git仓库方式安装时有效） |
 | `JARVIS_MAX_BIG_CONTENT_SIZE` | 96000 | 最大大内容大小 |
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
