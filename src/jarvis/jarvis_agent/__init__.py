@@ -385,6 +385,8 @@ class Agent:
         # 累加对话长度
         self.conversation_length += get_context_token_count(message)
 
+        print(message)
+
         if self.conversation_length > self.max_token_count:
             message = self._summarize_and_clear_history() + "\n\n" + message
             self.conversation_length += get_context_token_count(message)
