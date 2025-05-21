@@ -98,8 +98,6 @@ class ReadCodeTool:
                 spinner.text = f"文件读取完成: {abs_path}"
                 spinner.ok("✅")
 
-                PrettyOutput.print(output, OutputType.SUCCESS)
-
                 return {
                     "success": True,
                     "stdout": output,
