@@ -283,6 +283,7 @@ command: 可执行命令
 args: [参数列表]  # 可选
 env:  # 可选环境变量
   KEY: VALUE
+enable: true  # 可选，默认为true，表示是否启用该MCP
 ```
 
 #### 远程MCP配置（`sse`模式）
@@ -293,6 +294,7 @@ base_url: http://example.com/api
 auth_token: 认证令牌  # 可选
 headers:  # 可选HTTP头
   X-Custom-Header: value
+enable: true  # 可选，默认为true，表示是否启用该MCP
 ```
 
 #### 流式MCP配置（`streamable`模式）
@@ -305,6 +307,7 @@ headers:  # 可选HTTP头
   Content-Type: application/json  # 自动添加
   Accept: application/json  # 自动添加
   X-Custom-Header: value  # 自定义头
+enable: true  # 可选，默认为true，表示是否启用该MCP
 ```
 
 
