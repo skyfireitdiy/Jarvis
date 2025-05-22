@@ -98,6 +98,36 @@
       "type": "boolean",
       "description": "Whether to print prompts",
       "default": false
+    },
+    "KIMI_API_KEY": {
+      "type": "string",
+      "description": "API key for Kimi platform authentication",
+      "default": ""
+    },
+    "OPENAI_API_KEY": {
+      "type": "string",
+      "description": "API key for OpenAI platform authentication",
+      "default": ""
+    },
+    "OPENAI_API_BASE": {
+      "type": "string",
+      "description": "Base URL for OpenAI API, defaults to https://api.openai.com/v1",
+      "default": "https://api.openai.com/v1"
+    },
+    "OPENAI_MODEL_NAME": {
+      "type": "string",
+      "description": "Default model name for OpenAI platform",
+      "default": "gpt-4o"
+    },
+    "YUANBAO_COOKIES": {
+      "type": "string",
+      "description": "Authentication cookies for Yuanbao platform",
+      "default": ""
+    },
+    "YUANBAO_AGENT_ID": {
+      "type": "string",
+      "description": "Agent ID for Yuanbao platform authentication",
+      "default": ""
     }
   },
   "additionalProperties": false

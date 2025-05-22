@@ -6,10 +6,6 @@ import time
 from typing import Dict, Generator, List, Tuple
 
 import requests  # type: ignore
-from rich import box
-from rich.live import Live
-from rich.panel import Panel
-from rich.text import Text
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import get_data_dir
