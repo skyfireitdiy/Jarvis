@@ -95,46 +95,9 @@ def init_env(welcome_str: str) -> None:
             except yaml.YAMLError:
                 pass
             
-            # 如果不是YAML格式，按旧格式处理
-            current_key = None
-            current_value = []
-            env_data = {}
-            with open(env_file, "r", encoding="utf-8", errors="ignore") as f:
-                for line in f:
-                    line = line.rstrip()
-                    if not line or line.startswith(("#", ";")):
-                        continue
-                    if "=" in line and not line.startswith((" ", "\t")):
-                        # 处理之前收集的多行值
-                        if current_key is not None:
-                            env_data[current_key] = "\n".join(current_value).strip().strip("'").strip('"')
-                            current_value = []
-                        # 解析新的键值对
-                        key, value = line.split("=", 1)
-                        current_key = key.strip()
-                        current_value.append(value.strip())
-                    elif current_key is not None:
-                        # 多行值的后续行
-                        current_value.append(line.strip())
-            # 处理最后一个键值对
-            if current_key is not None:
-                env_data[current_key] = "\n".join(current_value).strip().strip("'").strip('"')
-            
-            # 更新环境变量
-            os.environ.update(env_data)
-            
-            # 如果是旧格式，转换为YAML并备份
-            backup_file = env_file.with_name(f"env.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
-            env_file.rename(backup_file)
-            schema_path = Path(os.path.relpath(
-                Path(__file__).parent.parent / "jarvis_data" / "env_schema.json",
-                start=jarvis_dir
-            ))
-            with open(env_file, "w", encoding="utf-8") as f:
-                f.write(f"# yaml-language-server: $schema={schema_path}\n")
-                yaml.dump(env_data, f, default_flow_style=False, allow_unicode=True)
-            
-            PrettyOutput.print(f"检测到旧格式配置文件，已自动转换为YAML格式并备份到 {backup_file}", OutputType.INFO)
+            # 如果不是YAML格式，直接报错
+            PrettyOutput.print(f"错误: 配置文件 {env_file} 必须是有效的YAML格式", OutputType.ERROR)
+            raise ValueError("仅支持YAML格式的配置文件")
             
         except Exception as e:
             PrettyOutput.print(f"警告: 读取 {env_file} 失败: {e}", OutputType.WARNING)
