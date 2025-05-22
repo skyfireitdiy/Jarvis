@@ -16,7 +16,7 @@ setup(
     package_data={
         "jarvis": [
             "jarvis_data/huggingface.tar.gz",
-            "jarvis_data/env_schema.json"
+            "jarvis_data/config_schema.json"
         ],
     },
     install_requires=[

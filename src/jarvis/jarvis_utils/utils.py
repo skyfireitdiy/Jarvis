@@ -44,16 +44,16 @@ def init_env(welcome_str: str) -> None:
         PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
 
     jarvis_dir = Path(get_data_dir())
-    env_file = jarvis_dir / "env"
+    config_file = jarvis_dir / "config.yaml"
 
     # 如果env文件不存在，创建并写入schema声明
-    if not env_file.exists():
+    if not config_file.exists():
         # 计算从env文件到env_schema.json的相对路径
         schema_path = Path(os.path.relpath(
-            Path(__file__).parent.parent / "jarvis_data" / "env_schema.json",
+            Path(__file__).parent.parent / "jarvis_data" / "config_schema.json",
             start=jarvis_dir
         ))
-        with open(env_file, "w", encoding="utf-8") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             f.write(f"# yaml-language-server: $schema={schema_path}\n")
 
     script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
@@ -74,21 +74,21 @@ def init_env(welcome_str: str) -> None:
         except Exception as e:
             PrettyOutput.print(f"解压HuggingFace模型失败: {e}", OutputType.ERROR)
 
-    if env_file.exists():
+    if config_file.exists():
         try:
             # 仅读取配置文件内容但不设置环境变量
             try:
-                with open(env_file, "r", encoding="utf-8") as f:
+                with open(config_file, "r", encoding="utf-8") as f:
                     content = f.read()
                     env_data = yaml.safe_load(content) or {}
                     if isinstance(env_data, dict):
                         # 检查是否已有schema声明，没有则添加
                         if "# yaml-language-server: $schema=" not in content:
                             schema_path = Path(os.path.relpath(
-                                Path(__file__).parent.parent / "jarvis_data" / "env_schema.json",
+                                Path(__file__).parent.parent / "jarvis_data" / "config_schema.json",
                                 start=jarvis_dir
                             ))
-                            with open(env_file, "w", encoding="utf-8") as f:
+                            with open(config_file, "w", encoding="utf-8") as f:
                                 f.write(f"# yaml-language-server: $schema={schema_path}\n")
                                 f.write(content)
                         os.environ.update({str(k): str(v) for k, v in env_data.items() if v is not None})
@@ -105,7 +105,7 @@ def init_env(welcome_str: str) -> None:
             current_key = None
             current_value = []
             env_data = {}
-            with open(env_file, "r", encoding="utf-8", errors="ignore") as f:
+            with open(config_file, "r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     line = line.rstrip()
                     if not line or line.startswith(("#", ";")):
@@ -133,20 +133,20 @@ def init_env(welcome_str: str) -> None:
                 os.environ.update({str(k): str(v) for k, v in env_data["ENV"].items() if v is not None})
             
             # 如果是旧格式，转换为YAML并备份
-            backup_file = env_file.with_name(f"env.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
-            env_file.rename(backup_file)
+            backup_file = config_file.with_name(f"env.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
+            config_file.rename(backup_file)
             schema_path = Path(os.path.relpath(
-                Path(__file__).parent.parent / "jarvis_data" / "env_schema.json",
+                Path(__file__).parent.parent / "jarvis_data" / "config_schema.json",
                 start=jarvis_dir
             ))
-            with open(env_file, "w", encoding="utf-8") as f:
+            with open(config_file, "w", encoding="utf-8") as f:
                 f.write(f"# yaml-language-server: $schema={schema_path}\n")
                 yaml.dump(env_data, f, default_flow_style=False, allow_unicode=True)
             
             PrettyOutput.print(f"检测到旧格式配置文件，已自动转换为YAML格式并备份到 {backup_file}", OutputType.INFO)
             
         except Exception as e:
-            PrettyOutput.print(f"警告: 读取 {env_file} 失败: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"警告: 读取 {config_file} 失败: {e}", OutputType.WARNING)
 
         # 检查是否是git仓库并更新
     from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
