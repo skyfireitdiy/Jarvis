@@ -14,6 +14,7 @@ import os
 from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
+from jarvis.jarvis_utils.config import get_git_commit_prompt
 from jarvis.jarvis_utils.tag import ot, ct
 
 
@@ -24,11 +25,6 @@ class GitCommitTool:
     parameters = {
         "type": "object",
         "properties": {
-            "lang": {
-                "type": "string",
-                "description": "提交信息的语言",
-                "default": "Chinese"
-            },
             "root_dir": {
                 "type": "string",
                 "description": "Git仓库的根目录路径（可选）",
@@ -123,8 +119,9 @@ class GitCommitTool:
                         spinner.text = "正在生成提交消息..."
                         
                         # 准备提示信息
-                        base_prompt = f'''根据代码差异生成提交信息：
-                        提交信息应使用{args.get('lang', '中文')}书写
+                        custom_prompt = get_git_commit_prompt()
+                        base_prompt = custom_prompt if custom_prompt else f'''根据代码差异生成提交信息：
+                        提交信息应使用中文书写
     # 必需结构
     必须使用以下格式：
     {ot("COMMIT_MESSAGE")}
@@ -267,14 +264,12 @@ class GitCommitTool:
 def main():
     init_env("欢迎使用 Jarvis-GitCommitTool，您的Git提交助手已准备就绪！")
     parser = argparse.ArgumentParser(description='Git commit tool')
-    parser.add_argument('--lang', type=str, default='Chinese', help='Language for commit messages')
     parser.add_argument('--root-dir', type=str, default='.', help='Root directory of the Git repository')
     parser.add_argument('--prefix', type=str, default='', help='Prefix to prepend to commit message (separated by space)')
     parser.add_argument('--suffix', type=str, default='', help='Suffix to append to commit message (separated by newline)')
     args = parser.parse_args()
     tool = GitCommitTool()
     tool.execute({
-        "lang": args.lang if hasattr(args, 'lang') else 'Chinese',
         "root_dir": args.root_dir,
         "prefix": args.prefix if hasattr(args, 'prefix') else '',
         "suffix": args.suffix if hasattr(args, 'suffix') else ''

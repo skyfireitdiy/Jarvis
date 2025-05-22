@@ -9,6 +9,15 @@ from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
 所有配置都从环境变量中读取，带有回退默认值。
 """
 
+def get_git_commit_prompt() -> str:
+    """
+    获取Git提交提示模板
+    
+    返回:
+        str: Git提交信息生成提示模板，如果未配置则返回空字符串
+    """
+    return os.getenv("JARVIS_GIT_COMMIT_PROMPT", "")
+
 # 输出窗口预留大小
 INPUT_WINDOW_REVERSE_SIZE = 2048
 

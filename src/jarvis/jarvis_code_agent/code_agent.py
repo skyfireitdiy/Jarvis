@@ -49,7 +49,6 @@ class CodeAgent:
             "search_web",
             "ask_user",
             "ask_codebase",
-            "lsp_get_diagnostics",
             "read_code",
             "methodology",
             "chdir",

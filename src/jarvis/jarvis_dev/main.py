@@ -562,7 +562,6 @@ TL_PROMPT = f"""
 ## 工具使用指南
 - **file_operation**：管理技术文档和指导文件
 - **ask_codebase**：分析代码库，理解实现细节
-- **lsp_get_diagnostics**：检查代码问题和警告
 - **execute_script**：执行开发工具和命令
 - **methodology**：应用开发方法论和最佳实践
 </tools>
@@ -900,7 +899,6 @@ QA_PROMPT = f"""
 - **file_operation**：管理测试文档和测试脚本
 - **ask_codebase**：了解代码库实现以设计测试
 - **execute_script**：执行测试命令和测试套件
-- **lsp_get_diagnostics**：检查代码问题和警告
 - **read_code**：阅读和理解代码以设计测试用例
 - **methodology**：应用测试方法论和最佳实践
 </tools>
@@ -1030,7 +1028,6 @@ def create_dev_team() -> MultiAgent:
     TL_output_handler.use_tools([
         "file_operation",
         "ask_codebase",
-        "lsp_get_diagnostics",
         "execute_script",
         "methodology",
         "edit_file",
@@ -1055,8 +1052,6 @@ def create_dev_team() -> MultiAgent:
         "create_code_agent",
         "file_operation",
         "ask_codebase",
-        "execute_script",
-        "lsp_get_diagnostics",
         "execute_script",
         "read_code",
         "methodology",
@@ -1135,7 +1130,6 @@ def create_dev_team() -> MultiAgent:
 ## 工具使用指南
 - **file_operation**：管理技术文档和指导文件
 - **ask_codebase**：分析代码库，理解实现细节
-- **lsp_get_diagnostics**：检查代码问题和警告
 - **execute_script**：执行开发工具和命令
 
 ## 文档管理规范
@@ -1181,7 +1175,6 @@ def create_dev_team() -> MultiAgent:
 - **file_operation**：管理测试文档和测试脚本
 - **ask_codebase**：了解代码库实现以设计测试
 - **execute_script**：执行测试命令和测试套件
-- **lsp_get_diagnostics**：检查代码问题和警告
 - **execute_script**：执行各类脚本（Shell命令、Shell脚本、Python脚本）
 - **read_code**：阅读和理解代码以设计测试用例
 
