@@ -295,6 +295,18 @@ headers:  # 可选HTTP头
   X-Custom-Header: value
 ```
 
+#### 流式MCP配置（`streamable`模式）
+```yaml
+type: streamable
+name: MCP名称
+base_url: http://example.com/api  # 必填
+auth_token: 认证令牌  # 可选
+headers:  # 可选HTTP头
+  Content-Type: application/json  # 自动添加
+  Accept: application/json  # 自动添加
+  X-Custom-Header: value  # 自定义头
+```
+
 
 ### 添加新大模型平台
 在 `~/.jarvis/platforms/` 中创建新的 Python 文件：
