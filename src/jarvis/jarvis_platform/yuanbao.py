@@ -39,25 +39,6 @@ class YuanbaoPlatform(BasePlatform):
         self.agent_id = os.getenv("YUANBAO_AGENT_ID")  # 代理ID
 
         if not self.cookies:
-            message = (
-                "需要设置 YUANBAO_COOKIES 和 YUANBAO_AGENT_ID 才能使用 Jarvis 的元宝功能。请按照以下步骤操作：\n"
-                "1. 获取元宝 API 参数:\n"
-                "   • 访问元宝平台: https://yuanbao.tencent.com\n"
-                "   • 登录您的账户\n"
-                "   • 打开浏览器开发者工具 (F12 或右键 -> 检查)\n"
-                "   • 切换到网络标签\n"
-                "   • 发送任意消息\n"
-                "   • 查看请求中的 Cookie 和 AgentID 值（具体位置见README.md中截图）\n"
-                "2. 设置环境变量:\n"
-                "   • 方法 1: 创建或编辑配置文件:\n"
-                f"   echo 'YUANBAO_COOKIES=your_cookies_here' >> {get_data_dir()}/env\n"
-                f"   echo 'YUANBAO_AGENT_ID=your_agent_id_here' >> {get_data_dir()}/env\n"
-                "   • 方法 2: 直接设置环境变量:\n"
-                "   export YUANBAO_COOKIES=your_cookies_here\n"
-                "   export YUANBAO_AGENT_ID=your_agent_id_here\n"
-                "设置后，重新运行 Jarvis。"
-            )
-            PrettyOutput.print(message, OutputType.INFO)
             PrettyOutput.print("YUANBAO_COOKIES 未设置", OutputType.WARNING)
 
         self.system_message = ""  # 系统消息，用于初始化对话

@@ -33,24 +33,6 @@ class KimiModel(BasePlatform):
         self.chat_id = ""
         self.api_key = os.getenv("KIMI_API_KEY")
         if not self.api_key:
-            message = (
-                "需要设置 KIMI_API_KEY 才能使用 Jarvis。请按照以下步骤操作：\n"
-                "1. 获取 Kimi API Key:\n"
-                "   • 访问 Kimi AI 平台: https://kimi.moonshot.cn\n"
-                "   • 登录您的账户\n"
-                "   • 打开浏览器开发者工具 (F12 或右键 -> 检查)\n"
-                "   • 切换到网络标签\n"
-                "   • 发送任意消息\n"
-                "   • 在请求中找到 Authorization 头\n"
-                "   • 复制 token 值（去掉 'Bearer ' 前缀）\n"
-                "2. 设置环境变量:\n"
-                "   • 方法 1: 创建或编辑配置文件:\n"
-                f"   echo 'KIMI_API_KEY=your_key_here' > {get_data_dir()}/env\n"
-                "   • 方法 2: 直接设置环境变量:\n"
-                "   export KIMI_API_KEY=your_key_here\n"
-                "设置后，重新运行 Jarvis。"
-            )
-            PrettyOutput.print(message, OutputType.INFO)
             PrettyOutput.print("KIMI_API_KEY 未设置", OutputType.WARNING)
         self.auth_header = f"Bearer {self.api_key}"
         self.uploaded_files = []  # 存储已上传文件的信息
