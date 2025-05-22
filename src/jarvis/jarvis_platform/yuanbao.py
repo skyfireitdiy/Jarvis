@@ -9,10 +9,6 @@ from typing import Dict, Generator, List, Tuple
 
 import requests
 from PIL import Image
-from rich import box
-from rich.live import Live
-from rich.panel import Panel
-from rich.text import Text
 from yaspin import yaspin
 from yaspin.api import Yaspin
 from yaspin.spinners import Spinners
