@@ -1,3 +1,37 @@
+### Release Note - v0.1.179 2025-05-22
+
+#### **新功能 (Features)**  
+- 添加可流式传输的HTTP MCP客户端实现(StreamableMcpClient)
+- 新增lint工具支持并集成到代码修改提示中
+- 添加命令使用统计功能
+- 添加YAML格式配置文件支持
+- 添加任务分析功能支持
+
+#### **修复 (Fixes)**  
+- 修改环境变量默认值：JARVIS_USE_METHODOLOGY和JARVIS_USE_ANALYSIS从'true'改为'false'
+- 移除不再使用的lsp_get_diagnostics工具
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 优化代码结构和导入顺序
+- 优化lint工具匹配逻辑并统一文件名大小写处理
+- 优化git差异获取功能以包含新增文件
+- 优化操作列表的显示格式
+- 优化系统提示格式和内容
+- 优化提交信息生成提示模板结构
+
+#### **文档更新 (Documentation)**  
+- 统一函数文档字符串格式
+- 更新README导航链接格式
+- 更新配置格式并添加文件路径说明
+
+#### **其他 (Miscellaneous)**  
+- 删除空文件aaaa
+- 移除不再需要的依赖项(jedi和sseclient)
+- 添加tabulate依赖项
+
+本次更新主要增强了配置管理、代码质量检查和统计功能，同时进行了多项代码优化和重构。特别值得注意的是配置系统的改进，包括YAML格式支持和环境变量默认值的调整。
+
+
 ### Release Note - v0.1.178 2025-05-21
 
 #### **新功能 (Features)**  
