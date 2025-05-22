@@ -75,7 +75,7 @@ def init_env(welcome_str: str) -> None:
 
     if env_file.exists():
         try:
-            # 首先尝试作为YAML文件读取
+            # 仅读取配置文件内容但不设置环境变量
             try:
                 with open(env_file, "r", encoding="utf-8") as f:
                     content = f.read()
@@ -194,7 +194,7 @@ def _update_cmd_stats(cmd_name: str) -> None:
     stats_file = Path(get_data_dir()) / "cmd_stat.yaml"
     try:
         with open(stats_file, "w", encoding="utf-8") as f:
-            yaml.safe_dump(stats, f)
+            yaml.safe_dump(stats, f, allow_unicode=True)
     except Exception as e:
         PrettyOutput.print(
             f"保存命令调用统计失败: {str(e)}", OutputType.WARNING

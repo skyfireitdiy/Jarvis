@@ -252,7 +252,7 @@ class GitCommitTool:
                     "stdout": yaml.safe_dump({
                         "commit_hash": commit_hash,
                         "commit_message": commit_message
-                    }),
+                    }, allow_unicode=True),
                     "stderr": ""
                 }
             finally:

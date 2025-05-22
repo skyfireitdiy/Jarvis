@@ -198,7 +198,7 @@ class ToolRegistry(OutputHandlerProtocol):
         stats_file = Path(get_data_dir()) / "tool_stat.yaml"
         try:
             with open(stats_file, "w", encoding="utf-8") as f:
-                yaml.safe_dump(stats, f)
+                yaml.safe_dump(stats, f, allow_unicode=True)
         except Exception as e:
             PrettyOutput.print(
                 f"保存工具调用统计失败: {str(e)}", OutputType.WARNING
@@ -296,11 +296,11 @@ class ToolRegistry(OutputHandlerProtocol):
                     args.pop("want", None)
                     ret = client.get_resource_list()
                     PrettyOutput.print(
-                        f"MCP {name} 资源列表:\n{yaml.safe_dump(ret)}", OutputType.TOOL
+                        f"MCP {name} 资源列表:\n{yaml.safe_dump(ret, allow_unicode=True)}", OutputType.TOOL
                     )
                     return {
                         "success": True,
-                        "stdout": yaml.safe_dump(ret),
+                        "stdout": yaml.safe_dump(ret, allow_unicode=True),
                         "stderr": "",
                     }
 
@@ -319,7 +319,7 @@ class ToolRegistry(OutputHandlerProtocol):
                         }
                     ret = client.get_resource(args["uri"])
                     PrettyOutput.print(
-                        f"MCP {name} 获取资源:\n{yaml.safe_dump(ret)}", OutputType.TOOL
+                        f"MCP {name} 获取资源:\n{yaml.safe_dump(ret, allow_unicode=True)}", OutputType.TOOL
                     )
                     return ret
 
@@ -332,7 +332,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     args.pop("want", None)
                     ret = client.execute(tool_name, args)
                     PrettyOutput.print(
-                        f"MCP {name} {tool_name} 执行结果:\n{yaml.safe_dump(ret)}",
+                        f"MCP {name} {tool_name} 执行结果:\n{yaml.safe_dump(ret, allow_unicode=True)}",
                         OutputType.TOOL,
                     )
                     return ret

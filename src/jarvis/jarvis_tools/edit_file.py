@@ -156,7 +156,7 @@ class FileSearchReplaceTool:
                 with yaspin(text=f"正在处理文件 {file_path}...", color="cyan") as spinner:
                     success, temp_content = fast_edit(file_path, changes, spinner)
                     if not success:
-                        success, temp_content = slow_edit(file_path, yaml.safe_dump(changes), spinner)
+                        success, temp_content = slow_edit(file_path, yaml.safe_dump(changes, allow_unicode=True), spinner)
 
                 # 只有当所有替换操作都成功时，才写回文件
                 if success and (temp_content != original_content or not file_exists):
@@ -284,7 +284,7 @@ def slow_edit(filepath: str, patch_content: str, spinner: Yaspin) -> Tuple[bool,
 
 ### 补丁内容
 ```
-{yaml.safe_dump(patch_content)}
+{patch_content}
 ```
 
 ## 补丁生成要求
