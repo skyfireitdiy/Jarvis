@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Jarvis Environment Variables Schema",
+  "description": "Schema for Jarvis system environment variables configuration",
+  "type": "object",
+  "properties": {
+    "JARVIS_GIT_COMMIT_PROMPT": {
+      "type": "string",
+      "description": "Git commit message generation prompt template",
+      "default": ""
+    },
+    "JARVIS_MAX_TOKEN_COUNT": {
+      "type": "integer",
+      "description": "Maximum token count the model can handle",
+      "default": 960000
+    },
+    "JARVIS_MAX_INPUT_TOKEN_COUNT": {
+      "type": "integer",
+      "description": "Maximum input token count the model can handle",
+      "default": 32000
+    },
+    "JARVIS_AUTO_COMPLETE": {
+      "type": "boolean",
+      "description": "Whether to enable auto-completion feature",
+      "default": false
+    },
+    "SHELL": {
+      "type": "string",
+      "description": "System shell name (e.g. bash, zsh)",
+      "default": "/bin/bash"
+    },
+    "JARVIS_PLATFORM": {
+      "type": "string",
+      "description": "Normal operation platform name",
+      "default": "yuanbao"
+    },
+    "JARVIS_MODEL": {
+      "type": "string",
+      "description": "Normal operation model name",
+      "default": "deep_seek_v3"
+    },
+    "JARVIS_THINKING_PLATFORM": {
+      "type": "string",
+      "description": "Thinking operation platform name",
+      "default": "yuanbao"
+    },
+    "JARVIS_THINKING_MODEL": {
+      "type": "string",
+      "description": "Thinking operation model name",
+      "default": "deep_seek"
+    },
+    "JARVIS_EXECUTE_TOOL_CONFIRM": {
+      "type": "boolean",
+      "description": "Whether to require confirmation before executing tools",
+      "default": false
+    },
+    "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
+      "type": "boolean",
+      "description": "Whether to require confirmation before applying patches",
+      "default": true
+    },
+    "JARVIS_MAX_TOOL_CALL_COUNT": {
+      "type": "integer",
+      "description": "Maximum consecutive tool call count",
+      "default": 20
+    },
+    "JARVIS_DATA_PATH": {
+      "type": "string",
+      "description": "Path to Jarvis data storage directory",
+      "default": "~/.jarvis"
+    },
+    "JARVIS_AUTO_UPDATE": {
+      "type": "boolean",
+      "description": "Whether to auto-update git repositories",
+      "default": true
+    },
+    "JARVIS_MAX_BIG_CONTENT_SIZE": {
+      "type": "integer",
+      "description": "Maximum big content size",
+      "default": 1024000
+    },
+    "JARVIS_PRETTY_OUTPUT": {
+      "type": "boolean",
+      "description": "Whether to enable PrettyOutput",
+      "default": false
+    },
+    "JARVIS_USE_METHODOLOGY": {
+      "type": "boolean",
+      "description": "Whether to enable methodology",
+      "default": false
+    },
+    "JARVIS_USE_ANALYSIS": {
+      "type": "boolean",
+      "description": "Whether to enable task analysis",
+      "default": false
+    },
+    "JARVIS_PRINT_PROMPT": {
+      "type": "boolean",
+      "description": "Whether to print prompts",
+      "default": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -45,6 +45,16 @@ def init_env(welcome_str: str) -> None:
     jarvis_dir = Path(get_data_dir())
     env_file = jarvis_dir / "env"
 
+    # 如果env文件不存在，创建并写入schema声明
+    if not env_file.exists():
+        # 计算从env文件到env_schema.json的相对路径
+        schema_path = Path(os.path.relpath(
+            Path(__file__).parent.parent / "jarvis_data" / "env_schema.json",
+            start=jarvis_dir
+        ))
+        with open(env_file, "w", encoding="utf-8") as f:
+            f.write(f"# yaml-language-server: $schema={schema_path}\n")
+
     script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
     hf_archive = script_dir / "jarvis_data" / "huggingface.tar.gz"
 
@@ -68,8 +78,18 @@ def init_env(welcome_str: str) -> None:
             # 首先尝试作为YAML文件读取
             try:
                 with open(env_file, "r", encoding="utf-8") as f:
-                    env_data = yaml.safe_load(f) or {}
+                    content = f.read()
+                    env_data = yaml.safe_load(content) or {}
                     if isinstance(env_data, dict):
+                        # 检查是否已有schema声明，没有则添加
+                        if "# yaml-language-server: $schema=" not in content:
+                            schema_path = Path(os.path.relpath(
+                                Path(__file__).parent.parent / "jarvis_data" / "env_schema.json",
+                                start=jarvis_dir
+                            ))
+                            with open(env_file, "w", encoding="utf-8") as f:
+                                f.write(f"# yaml-language-server: $schema={schema_path}\n")
+                                f.write(content)
                         os.environ.update({str(k): str(v) for k, v in env_data.items() if v is not None})
                         return
             except yaml.YAMLError:
@@ -106,7 +126,12 @@ def init_env(welcome_str: str) -> None:
             # 如果是旧格式，转换为YAML并备份
             backup_file = env_file.with_name(f"env.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
             env_file.rename(backup_file)
+            schema_path = Path(os.path.relpath(
+                Path(__file__).parent.parent / "jarvis_data" / "env_schema.json",
+                start=jarvis_dir
+            ))
             with open(env_file, "w", encoding="utf-8") as f:
+                f.write(f"# yaml-language-server: $schema={schema_path}\n")
                 yaml.dump(env_data, f, default_flow_style=False, allow_unicode=True)
             
             PrettyOutput.print(f"检测到旧格式配置文件，已自动转换为YAML格式并备份到 {backup_file}", OutputType.INFO)

@@ -14,7 +14,10 @@ setup(
     package_dir={"": "src"},
     include_package_data=True,
     package_data={
-        "jarvis": ["jarvis_data/huggingface.tar.gz"],
+        "jarvis": [
+            "jarvis_data/huggingface.tar.gz",
+            "jarvis_data/env_schema.json"
+        ],
     },
     install_requires=[
         "requests==2.32.3",
