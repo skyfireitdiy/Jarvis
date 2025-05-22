@@ -122,13 +122,13 @@ class GitCommitTool:
                         custom_prompt = get_git_commit_prompt()
                         base_prompt = custom_prompt if custom_prompt else f'''根据代码差异生成提交信息：
                         提交信息应使用中文书写
-    # 必需结构
+    # 格式模板
     必须使用以下格式：
-    {ot("COMMIT_MESSAGE")}
+
     <类型>(<范围>): <主题>
     
     [可选] 详细描述变更内容和原因
-    {ct("COMMIT_MESSAGE")}
+
     # 格式规则
     1. 类型: fix(修复bug), feat(新功能), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
     2. 范围表示变更的模块或组件 (例如: auth, database, ui)
@@ -137,6 +137,12 @@ class GitCommitTool:
     5. 详细描述部分应解释"是什么"和"为什么"，而非"如何"
     6. 仅输出提交信息，不要输出其他内容
     '''
+                        base_prompt += f"""
+    # 输出格式
+    {ot("COMMIT_MESSAGE")}
+    commit信息
+    {ct("COMMIT_MESSAGE")}
+                        """
 
                         # 获取模型并尝试上传文件
                         platform = PlatformRegistry().get_normal_platform()
@@ -206,10 +212,8 @@ class GitCommitTool:
                                 break
                             prompt = f"""格式错误，请按照以下格式重新生成提交信息：
                             {ot("COMMIT_MESSAGE")}
-    <类型>(<范围>): <主题>
-    
-    [可选] 详细描述变更内容和原因
-    {ct("COMMIT_MESSAGE")}
+                            commit信息
+                            {ct("COMMIT_MESSAGE")}
                             """
                             commit_message = platform.chat_until_success(prompt)
                         spinner.write("✅ 生成提交消息")
