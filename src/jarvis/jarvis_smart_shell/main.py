@@ -8,7 +8,7 @@ from typing import Optional
 from sympy import false
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_shell_name
+from jarvis.jarvis_utils.config import get_shell_name, set_config
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.utils import init_env
 
@@ -90,7 +90,7 @@ def process_request(request: str) -> Optional[str]:
 
 # 规则
 1. 只输出命令
-2. 不要解释或标记
+2. 不要输出任何命令之外的内容
 3. 单行输出
 4. 多个命令用&&连接
 
@@ -116,8 +116,11 @@ def process_request(request: str) -> Optional[str]:
         return None
 
 def main() -> int:
-    # 创建参数解析器s
+    # 创建参数解析器
     init_env("")
+
+    set_config("JARVIS_PRINT_PROMPT", "false")
+    
     parser = argparse.ArgumentParser(
         description="将自然语言要求转换为shell命令",
         formatter_class=argparse.RawDescriptionHelpFormatter,

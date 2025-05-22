@@ -21,6 +21,10 @@ def set_global_env_data(env_data: Dict[str, Any]) -> None:
     global GLOBAL_ENV_DATA
     GLOBAL_ENV_DATA = env_data
 
+def set_config(key: str, value: Any) -> None:
+    """设置配置"""
+    GLOBAL_ENV_DATA[key] = value
+
 
 """配置管理模块。
 
