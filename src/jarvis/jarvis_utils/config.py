@@ -187,7 +187,7 @@ def is_use_methodology() -> bool:
     返回：
         bool: 如果启用方法论则返回True，默认为True
     """
-    return os.getenv('JARVIS_USE_METHODOLOGY', 'true') == 'true'
+    return os.getenv('JARVIS_USE_METHODOLOGY', 'false') == 'true'
 
 def is_use_analysis() -> bool:
     """
@@ -196,4 +196,4 @@ def is_use_analysis() -> bool:
     返回：
         bool: 如果启用任务分析则返回True，默认为True
     """
-    return os.getenv('JARVIS_USE_ANALYSIS', 'true') == 'true'
+    return os.getenv('JARVIS_USE_ANALYSIS', 'false') == 'true'
