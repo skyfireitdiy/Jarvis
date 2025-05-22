@@ -45,7 +45,7 @@ pip3 install jarvis-ai-assistant
 
 ### 最小化配置
 
-将以下配置写入到`~/.jarvis/env`文件中。
+将以下配置写入到`~/.jarvis/config.yaml`文件中。
 
 #### 腾讯元宝
 ```yaml
@@ -53,9 +53,9 @@ JARVIS_PLATFORM: yuanbao
 JARVIS_MODEL: deep_seek_v3
 JARVIS_THINKING_PLATFORM: yuanbao
 JARVIS_THINKING_MODEL: deep_seek
-
-YUANBAO_COOKIES: <元宝cookies>
-YUANBAO_AGENT_ID: <元宝AgentID>
+ENV:
+  YUANBAO_COOKIES: <元宝cookies>
+  YUANBAO_AGENT_ID: <元宝AgentID>
 ```
 
 元宝cookies以及AgentID获取方式：
@@ -72,7 +72,8 @@ JARVIS_MODEL: kimi
 JARVIS_THINKING_PLATFORM: kimi
 JARVIS_THINKING_MODEL: k1
 
-KIMI_API_KEY: <Kimi API KEY>
+ENV:
+  KIMI_API_KEY: <Kimi API KEY>
 ```
 
 Kimi API Key获取方式：
@@ -97,7 +98,7 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 1. `OPENAI_API_KEY`: 必填。
 2. `OPENAI_API_BASE`: 可选，用于自定义API端点
 
-以上配置编写到`~/.jarvis/env`文件中。
+以上配置编写到`~/.jarvis/config.yaml`文件中。
 
 支持的模型可通过`jarvis-platform-manager --list-models`查看完整列表。
 
@@ -122,27 +123,10 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 ---
 
 ## ⚙️ 配置说明 <a id="configuration"></a>
-### 配置文件格式
-配置文件支持两种格式：
-1. **YAML格式（推荐）**：
-   ```yaml
-   JARVIS_PLATFORM: yuanbao
-   JARVIS_MODEL: deep_seek_v3
-   YUANBAO_COOKIES: "your_cookies_here"
-   ```
-
-2. **传统键值对格式**：
-   ```
-   JARVIS_PLATFORM=yuanbao
-   JARVIS_MODEL=deep_seek_v3
-   YUANBAO_COOKIES=your_cookies_here
-   ```
-
-系统会自动检测格式并处理。当检测到传统格式时，会自动转换为YAML格式并备份原文件。
-
-### 环境变量配置
+### 配置项
 | 变量名称 | 默认值 | 说明 |
 |----------|--------|------|
+| `ENV` | {} | 环境变量配置，用于设置系统环境变量 |
 | `JARVIS_MAX_TOKEN_COUNT` | 960000 | 上下文窗口的最大token数量 |
 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
 | `JARVIS_AUTO_COMPLETE` | false | 是否启用自动完成功能（任务判定完成的时候会自动终止） |
@@ -159,9 +143,19 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
 | `JARVIS_GIT_COMMIT_PROMPT` | "" | 自定义git提交信息生成提示模板 |
 | `JARVIS_PRINT_PROMPT` | false | 是否打印提示 |
+| `JARVIS_USE_METHODOLOGY` | false | 是否启用方法论功能 |
+| `JARVIS_USE_ANALYSIS` | false | 是否启用任务分析功能 |
+| `JARVIS_DATA_PATH` | ~/.jarvis | Jarvis数据存储目录路径 |
 
-所有配置编写到`~/.jarvis/env`文件中即可生效。
+所有配置编写到`~/.jarvis/config.yaml`文件中即可生效。
 
+### 配置文件格式
+配置文件仅支持YAML格式：
+```yaml
+JARVIS_PLATFORM: yuanbao
+JARVIS_MODEL: deep_seek_v3
+YUANBAO_COOKIES: "your_cookies_here"
+```
 
 ---
 ## 🛠️ 工具说明 <a id="tools"></a>
