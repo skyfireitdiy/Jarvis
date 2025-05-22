@@ -128,6 +128,24 @@ OPENAI_API_BASE=https://api.openai.com/v1  # 可选，默认为官方API地址
 ---
 
 ## ⚙️ 配置说明 <a id="configuration"></a>
+### 配置文件格式
+配置文件支持两种格式：
+1. **YAML格式（推荐）**：
+   ```yaml
+   JARVIS_PLATFORM: yuanbao
+   JARVIS_MODEL: deep_seek_v3
+   YUANBAO_COOKIES: "your_cookies_here"
+   ```
+
+2. **传统键值对格式**：
+   ```
+   JARVIS_PLATFORM=yuanbao
+   JARVIS_MODEL=deep_seek_v3
+   YUANBAO_COOKIES=your_cookies_here
+   ```
+
+系统会自动检测格式并处理。当检测到传统格式时，会自动转换为YAML格式并备份原文件。
+
 ### 环境变量配置
 | 变量名称 | 默认值 | 说明 |
 |----------|--------|------|
@@ -145,6 +163,7 @@ OPENAI_API_BASE=https://api.openai.com/v1  # 可选，默认为官方API地址
 | `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis（仅在以git仓库方式安装时有效） |
 | `JARVIS_MAX_BIG_CONTENT_SIZE` | 1024000 | 最大大内容大小 |
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
+| `JARVIS_GIT_COMMIT_PROMPT` | "" | 自定义git提交信息生成提示模板 |
 
 所有配置编写到`~/.jarvis/env`文件中即可生效。
 
