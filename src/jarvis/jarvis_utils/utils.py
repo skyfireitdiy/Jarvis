@@ -45,6 +45,11 @@ def init_env(welcome_str: str) -> None:
 
     jarvis_dir = Path(get_data_dir())
     config_file = jarvis_dir / "config.yaml"
+    old_config_file = jarvis_dir / "env"
+
+    # 检查jarvis_data目录是否存在
+    if not jarvis_dir.exists():
+        jarvis_dir.mkdir(parents=True)
 
     # 如果env文件不存在，创建并写入schema声明
     if not config_file.exists():
@@ -59,9 +64,6 @@ def init_env(welcome_str: str) -> None:
     script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
     hf_archive = script_dir / "jarvis_data" / "huggingface.tar.gz"
 
-    # 检查jarvis_data目录是否存在
-    if not jarvis_dir.exists():
-        jarvis_dir.mkdir(parents=True)
 
     # 检查并解压huggingface模型
     hf_dir = jarvis_dir / "huggingface" / "hub"
@@ -74,79 +76,68 @@ def init_env(welcome_str: str) -> None:
         except Exception as e:
             PrettyOutput.print(f"解压HuggingFace模型失败: {e}", OutputType.ERROR)
 
-    if config_file.exists():
-        try:
-            # 仅读取配置文件内容但不设置环境变量
-            try:
-                with open(config_file, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    env_data = yaml.safe_load(content) or {}
-                    if isinstance(env_data, dict):
-                        # 检查是否已有schema声明，没有则添加
-                        if "# yaml-language-server: $schema=" not in content:
-                            schema_path = Path(os.path.relpath(
-                                Path(__file__).parent.parent / "jarvis_data" / "config_schema.json",
-                                start=jarvis_dir
-                            ))
-                            with open(config_file, "w", encoding="utf-8") as f:
-                                f.write(f"# yaml-language-server: $schema={schema_path}\n")
-                                f.write(content)
-                        os.environ.update({str(k): str(v) for k, v in env_data.items() if v is not None})
-                    # 保存到全局变量
-                    set_global_env_data(env_data)
-                    # 如果配置中有ENV键值对，则设置环境变量
-                    if "ENV" in env_data and isinstance(env_data["ENV"], dict):
-                        os.environ.update({str(k): str(v) for k, v in env_data["ENV"].items() if v is not None})
-                    return
-            except yaml.YAMLError:
-                pass
-            
-            # 如果不是YAML格式，按旧格式处理
-            current_key = None
-            current_value = []
-            env_data = {}
-            with open(config_file, "r", encoding="utf-8", errors="ignore") as f:
-                for line in f:
-                    line = line.rstrip()
-                    if not line or line.startswith(("#", ";")):
-                        continue
-                    if "=" in line and not line.startswith((" ", "\t")):
-                        # 处理之前收集的多行值
-                        if current_key is not None:
-                            env_data[current_key] = "\n".join(current_value).strip().strip("'").strip('"')
-                            current_value = []
-                        # 解析新的键值对
-                        key, value = line.split("=", 1)
-                        current_key = key.strip()
-                        current_value.append(value.strip())
-                    elif current_key is not None:
-                        # 多行值的后续行
-                        current_value.append(line.strip())
+    
+    config_data = {}
+    if old_config_file.exists():# 旧的配置文件存在
+        current_key = None
+        current_value = []
+        with open(config_file, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.rstrip()
+                if not line or line.startswith(("#", ";")):
+                    continue
+                if "=" in line and not line.startswith((" ", "\t")):
+                    # 处理之前收集的多行值
+                    if current_key is not None:
+                        config_data[current_key] = "\n".join(current_value).strip().strip("'").strip('"')
+                        current_value = []
+                    # 解析新的键值对
+                    key, value = line.split("=", 1)
+                    current_key = key.strip()
+                    current_value.append(value.strip())
+                elif current_key is not None:
+                    # 多行值的后续行
+                    current_value.append(line.strip())
             # 处理最后一个键值对
             if current_key is not None:
-                env_data[current_key] = "\n".join(current_value).strip().strip("'").strip('"')
-            
-            # 更新环境变量
-            os.environ.update(env_data)
+                config_data[current_key] = "\n".join(current_value).strip().strip("'").strip('"')
+
+        # 如果是旧格式，转换为YAML并备份
+        backup_file = old_config_file.with_name(f"env.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
+        old_config_file.rename(backup_file)
+        schema_path = Path(os.path.relpath(
+            Path(__file__).parent.parent / "jarvis_data" / "config_schema.json",
+            start=jarvis_dir
+        ))
+        with open(config_file, "w", encoding="utf-8") as f:
+            f.write(f"# yaml-language-server: $schema={schema_path}\n")
+            yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
+        PrettyOutput.print(f"检测到旧格式配置文件，已自动转换为YAML格式并备份到 {backup_file}", OutputType.INFO)
+
+    # 读取新的配置
+    try:
+        with open(config_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            config_data = yaml.safe_load(content) or {}
+            if isinstance(config_data, dict):
+                # 检查是否已有schema声明，没有则添加
+                if "# yaml-language-server: $schema=" not in content:
+                    schema_path = Path(os.path.relpath(
+                        Path(__file__).parent.parent / "jarvis_data" / "config_schema.json",
+                        start=jarvis_dir
+                    ))
+                    with open(config_file, "w", encoding="utf-8") as f:
+                        f.write(f"# yaml-language-server: $schema={schema_path}\n")
+                        f.write(content)
+            # 保存到全局变量
+            set_global_env_data(config_data)
             # 如果配置中有ENV键值对，则设置环境变量
-            if "ENV" in env_data and isinstance(env_data["ENV"], dict):
-                os.environ.update({str(k): str(v) for k, v in env_data["ENV"].items() if v is not None})
-            
-            # 如果是旧格式，转换为YAML并备份
-            backup_file = config_file.with_name(f"env.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
-            config_file.rename(backup_file)
-            schema_path = Path(os.path.relpath(
-                Path(__file__).parent.parent / "jarvis_data" / "config_schema.json",
-                start=jarvis_dir
-            ))
-            with open(config_file, "w", encoding="utf-8") as f:
-                f.write(f"# yaml-language-server: $schema={schema_path}\n")
-                yaml.dump(env_data, f, default_flow_style=False, allow_unicode=True)
-            
-            PrettyOutput.print(f"检测到旧格式配置文件，已自动转换为YAML格式并备份到 {backup_file}", OutputType.INFO)
-            
-        except Exception as e:
-            PrettyOutput.print(f"警告: 读取 {config_file} 失败: {e}", OutputType.WARNING)
+            if "ENV" in config_data and isinstance(config_data["ENV"], dict):
+                os.environ.update({str(k): str(v) for k, v in config_data["ENV"].items() if v is not None})
+            return
+    except yaml.YAMLError:
+        pass
+        
 
         # 检查是否是git仓库并更新
     from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
