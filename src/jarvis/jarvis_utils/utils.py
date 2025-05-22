@@ -10,10 +10,11 @@ from typing import Any, Callable, Dict
 import yaml
 
 from jarvis import __version__
-from jarvis.jarvis_utils.config import get_data_dir, get_max_big_content_size
+from jarvis.jarvis_utils.config import get_data_dir, get_max_big_content_size, set_global_env_data
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 
 
 def init_env(welcome_str: str) -> None:
@@ -91,7 +92,12 @@ def init_env(welcome_str: str) -> None:
                                 f.write(f"# yaml-language-server: $schema={schema_path}\n")
                                 f.write(content)
                         os.environ.update({str(k): str(v) for k, v in env_data.items() if v is not None})
-                        return
+                    # 保存到全局变量
+                    set_global_env_data(env_data)
+                    # 如果配置中有ENV键值对，则设置环境变量
+                    if "ENV" in env_data and isinstance(env_data["ENV"], dict):
+                        os.environ.update({str(k): str(v) for k, v in env_data["ENV"].items() if v is not None})
+                    return
             except yaml.YAMLError:
                 pass
             
@@ -122,6 +128,9 @@ def init_env(welcome_str: str) -> None:
             
             # 更新环境变量
             os.environ.update(env_data)
+            # 如果配置中有ENV键值对，则设置环境变量
+            if "ENV" in env_data and isinstance(env_data["ENV"], dict):
+                os.environ.update({str(k): str(v) for k, v in env_data["ENV"].items() if v is not None})
             
             # 如果是旧格式，转换为YAML并备份
             backup_file = env_file.with_name(f"env.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")

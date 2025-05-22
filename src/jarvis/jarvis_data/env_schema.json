@@ -4,6 +4,14 @@
   "description": "Schema for Jarvis system environment variables configuration",
   "type": "object",
   "properties": {
+    "ENV": {
+      "type": "object",
+      "description": "Additional environment variables to set",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
     "JARVIS_GIT_COMMIT_PROMPT": {
       "type": "string",
       "description": "Git commit message generation prompt template",

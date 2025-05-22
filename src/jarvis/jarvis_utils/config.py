@@ -2,9 +2,25 @@
 import os
 from functools import lru_cache
 
+from typing import Any, Dict
+
+
 import yaml
 
+
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
+
+
+# 全局环境变量存储
+
+GLOBAL_ENV_DATA: Dict[str, Any] = {}
+
+
+def set_global_env_data(env_data: Dict[str, Any]) -> None:
+    """设置全局环境变量数据"""
+    global GLOBAL_ENV_DATA
+    GLOBAL_ENV_DATA = env_data
+
 
 """配置管理模块。
 
@@ -19,7 +35,7 @@ def get_git_commit_prompt() -> str:
     返回:
         str: Git提交信息生成提示模板，如果未配置则返回空字符串
     """
-    return os.getenv("JARVIS_GIT_COMMIT_PROMPT", "")
+    return GLOBAL_ENV_DATA.get("JARVIS_GIT_COMMIT_PROMPT", "")
 
 # 输出窗口预留大小
 INPUT_WINDOW_REVERSE_SIZE = 2048
@@ -50,7 +66,7 @@ def get_max_token_count() -> int:
     返回:
         int: 模型能处理的最大token数量。
     """
-    return int(os.getenv('JARVIS_MAX_TOKEN_COUNT', '960000'))
+    return int(GLOBAL_ENV_DATA.get('JARVIS_MAX_TOKEN_COUNT', '960000'))
 
 def get_max_input_token_count() -> int:
     """
@@ -59,7 +75,7 @@ def get_max_input_token_count() -> int:
     返回:
         int: 模型能处理的最大输入token数量。
     """
-    return int(os.getenv('JARVIS_MAX_INPUT_TOKEN_COUNT', '32000'))
+    return int(GLOBAL_ENV_DATA.get('JARVIS_MAX_INPUT_TOKEN_COUNT', '32000'))
 
 
 def is_auto_complete() -> bool:
@@ -69,7 +85,7 @@ def is_auto_complete() -> bool:
     返回：
         bool: 如果启用了自动补全则返回True，默认为False
     """
-    return os.getenv('JARVIS_AUTO_COMPLETE', 'false') == 'true'
+    return GLOBAL_ENV_DATA.get('JARVIS_AUTO_COMPLETE', 'false') == 'true'
 
 
 def get_shell_name() -> str:
@@ -79,7 +95,7 @@ def get_shell_name() -> str:
     返回：
         str: Shell名称（例如bash, zsh），默认为bash
     """
-    shell_path = os.getenv('SHELL', '/bin/bash')
+    shell_path = GLOBAL_ENV_DATA.get('SHELL', '/bin/bash')
     return os.path.basename(shell_path)
 def get_normal_platform_name() -> str:
     """
@@ -88,7 +104,7 @@ def get_normal_platform_name() -> str:
     返回：
         str: 平台名称，默认为'yuanbao'
     """
-    return os.getenv('JARVIS_PLATFORM', 'yuanbao')
+    return GLOBAL_ENV_DATA.get('JARVIS_PLATFORM', 'yuanbao')
 def get_normal_model_name() -> str:
     """
     获取正常操作的模型名称。
@@ -96,7 +112,7 @@ def get_normal_model_name() -> str:
     返回：
         str: 模型名称，默认为'deep_seek'
     """
-    return os.getenv('JARVIS_MODEL', 'deep_seek_v3')
+    return GLOBAL_ENV_DATA.get('JARVIS_MODEL', 'deep_seek_v3')
 
 
 def get_thinking_platform_name() -> str:
@@ -106,7 +122,7 @@ def get_thinking_platform_name() -> str:
     返回：
         str: 平台名称，默认为'yuanbao'
     """
-    return os.getenv('JARVIS_THINKING_PLATFORM', os.getenv('JARVIS_PLATFORM', 'yuanbao'))
+    return GLOBAL_ENV_DATA.get('JARVIS_THINKING_PLATFORM', GLOBAL_ENV_DATA.get('JARVIS_PLATFORM', 'yuanbao'))
 def get_thinking_model_name() -> str:
     """
     获取思考操作的模型名称。
@@ -114,7 +130,7 @@ def get_thinking_model_name() -> str:
     返回：
         str: 模型名称，默认为'deep_seek'
     """
-    return os.getenv('JARVIS_THINKING_MODEL', os.getenv('JARVIS_MODEL', 'deep_seek'))
+    return GLOBAL_ENV_DATA.get('JARVIS_THINKING_MODEL', GLOBAL_ENV_DATA.get('JARVIS_MODEL', 'deep_seek'))
 
 def is_execute_tool_confirm() -> bool:
     """
@@ -123,7 +139,7 @@ def is_execute_tool_confirm() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return os.getenv('JARVIS_EXECUTE_TOOL_CONFIRM', 'false') == 'true'
+    return GLOBAL_ENV_DATA.get('JARVIS_EXECUTE_TOOL_CONFIRM', 'false') == 'true'
 def is_confirm_before_apply_patch() -> bool:
     """
     检查应用补丁前是否需要确认。
@@ -131,7 +147,7 @@ def is_confirm_before_apply_patch() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return os.getenv('JARVIS_CONFIRM_BEFORE_APPLY_PATCH', 'true') == 'true'
+    return GLOBAL_ENV_DATA.get('JARVIS_CONFIRM_BEFORE_APPLY_PATCH', 'true') == 'true'
 
 def get_max_tool_call_count() -> int:
     """
@@ -140,7 +156,7 @@ def get_max_tool_call_count() -> int:
     返回：
         int: 最大连续工具调用次数，默认为20
     """
-    return int(os.getenv('JARVIS_MAX_TOOL_CALL_COUNT', '20'))
+    return int(GLOBAL_ENV_DATA.get('JARVIS_MAX_TOOL_CALL_COUNT', '20'))
 
 
 def get_data_dir() -> str:
@@ -151,7 +167,7 @@ def get_data_dir() -> str:
         str: 数据目录路径，优先从JARVIS_DATA_PATH环境变量获取，
              如果未设置或为空，则使用~/.jarvis作为默认值
     """
-    data_path = os.getenv('JARVIS_DATA_PATH', '').strip()
+    data_path = GLOBAL_ENV_DATA.get('JARVIS_DATA_PATH', '').strip()
     if not data_path:
         return os.path.expanduser('~/.jarvis')
     return data_path
@@ -163,7 +179,7 @@ def get_auto_update() -> bool:
     返回：
         bool: 如果需要自动更新则返回True，默认为True
     """
-    return os.getenv('JARVIS_AUTO_UPDATE', 'true') == 'true'
+    return GLOBAL_ENV_DATA.get('JARVIS_AUTO_UPDATE', 'true') == 'true'
 
 def get_max_big_content_size() -> int:
     """
@@ -172,7 +188,7 @@ def get_max_big_content_size() -> int:
     返回：
         int: 最大大内容大小
     """
-    return int(os.getenv('JARVIS_MAX_BIG_CONTENT_SIZE', '1024000'))
+    return int(GLOBAL_ENV_DATA.get('JARVIS_MAX_BIG_CONTENT_SIZE', '1024000'))
 
 def get_pretty_output() -> bool:
     """
@@ -181,7 +197,7 @@ def get_pretty_output() -> bool:
     返回：
         bool: 如果启用PrettyOutput则返回True，默认为True
     """
-    return os.getenv('JARVIS_PRETTY_OUTPUT', 'false') == 'true'
+    return GLOBAL_ENV_DATA.get('JARVIS_PRETTY_OUTPUT', 'false') == 'true'
 
 def is_use_methodology() -> bool:
     """
@@ -190,7 +206,7 @@ def is_use_methodology() -> bool:
     返回：
         bool: 如果启用方法论则返回True，默认为True
     """
-    return os.getenv('JARVIS_USE_METHODOLOGY', 'false') == 'true'
+    return GLOBAL_ENV_DATA.get('JARVIS_USE_METHODOLOGY', 'false') == 'true'
 
 def is_use_analysis() -> bool:
     """
@@ -199,7 +215,7 @@ def is_use_analysis() -> bool:
     返回：
         bool: 如果启用任务分析则返回True，默认为True
     """
-    return os.getenv('JARVIS_USE_ANALYSIS', 'false') == 'true'
+    return GLOBAL_ENV_DATA.get('JARVIS_USE_ANALYSIS', 'false') == 'true'
 
 def is_print_prompt() -> bool:
     """
@@ -208,4 +224,4 @@ def is_print_prompt() -> bool:
     返回：
         bool: 如果打印提示则返回True，默认为True
     """
-    return os.getenv('JARVIS_PRINT_PROMPT', 'false') == 'true'
+    return GLOBAL_ENV_DATA.get('JARVIS_PRINT_PROMPT', 'false') == 'true'
