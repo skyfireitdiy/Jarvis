@@ -183,7 +183,7 @@ def get_auto_update() -> bool:
     返回：
         bool: 如果需要自动更新则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get('JARVIS_AUTO_UPDATE', 'true') == 'true'
+    return GLOBAL_CONFIG_DATA.get('JARVIS_AUTO_UPDATE', 'false') == 'true'
 
 def get_max_big_content_size() -> int:
     """
