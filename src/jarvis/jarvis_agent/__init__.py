@@ -10,7 +10,7 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.config import get_max_tool_call_count, is_auto_complete, is_execute_tool_confirm, is_use_methodology
+from jarvis.jarvis_utils.config import get_max_tool_call_count, is_auto_complete, is_execute_tool_confirm, is_use_analysis, is_use_methodology
 from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
 from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -151,7 +151,8 @@ class Agent:
                  execute_tool_confirm: Optional[bool] = None,
                  need_summary: bool = True,
                  multiline_inputer: Optional[Callable[[str], str]] = None,
-                 use_methodology: Optional[bool] = None):
+                 use_methodology: Optional[bool] = None,
+                 use_analysis: Optional[bool] = None):
         """初始化Jarvis Agent实例
 
         参数:
@@ -169,6 +170,7 @@ class Agent:
             need_summary: 是否需要生成总结
             multiline_inputer: 多行输入处理器
             use_methodology: 是否使用方法论
+            use_analysis: 是否使用任务分析
         """
         self.name = make_agent_name(name)
         self.description = description
@@ -196,7 +198,7 @@ class Agent:
         self.multiline_inputer = multiline_inputer if multiline_inputer else get_multiline_input
 
         self.use_methodology = use_methodology if use_methodology is not None else is_use_methodology()
-
+        self.use_analysis = use_analysis if use_analysis is not None else is_use_analysis()
         self.prompt = ""
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
@@ -511,7 +513,7 @@ class Agent:
             2. 对于子Agent: 可能会生成总结(如果启用)
             3. 使用spinner显示生成状态
         """
-        if self.use_methodology:
+        if self.use_analysis:
             self._analysis_task()
         if self.need_summary:
             with yaspin(text="正在生成总结...", color="cyan") as spinner:
