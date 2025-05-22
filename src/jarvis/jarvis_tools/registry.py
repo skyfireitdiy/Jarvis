@@ -12,6 +12,7 @@ import yaml
 from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
 from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
+from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_data_dir
@@ -350,6 +351,12 @@ class ToolRegistry(OutputHandlerProtocol):
                         f"文件 {file_path} 缺少base_url字段", OutputType.WARNING
                     )
                     return False
+            elif config["type"] == "streamable":
+                if "base_url" not in config:
+                    PrettyOutput.print(
+                        f"文件 {file_path} 缺少base_url字段", OutputType.WARNING
+                    )
+                    return False
             else:
                 PrettyOutput.print(
                     f"文件 {file_path} 类型错误: {config['type']}", OutputType.WARNING
@@ -357,11 +364,14 @@ class ToolRegistry(OutputHandlerProtocol):
                 return False
 
             # 创建MCP客户端
-            mcp_client: McpClient = (
-                StdioMcpClient(config)
-                if config["type"] == "stdio"
-                else SSEMcpClient(config)
-            )
+            if config["type"] == "stdio":
+                mcp_client: McpClient = StdioMcpClient(config)
+            elif config["type"] == "sse":
+                mcp_client: McpClient = SSEMcpClient(config)
+            elif config["type"] == "streamable":
+                mcp_client: McpClient = StreamableMcpClient(config)
+            else:
+                raise ValueError(f"不支持的MCP客户端类型: {config['type']}")
 
             # 获取工具信息
             tools = mcp_client.get_tool_list()
