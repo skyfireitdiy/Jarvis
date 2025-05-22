@@ -154,7 +154,8 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 ```yaml
 JARVIS_PLATFORM: yuanbao
 JARVIS_MODEL: deep_seek_v3
-YUANBAO_COOKIES: "your_cookies_here"
+ENV:
+  YUANBAO_COOKIES: "your_cookies_here"
 ```
 
 ---
