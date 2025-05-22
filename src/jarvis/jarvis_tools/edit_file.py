@@ -284,7 +284,7 @@ def slow_edit(filepath: str, patch_content: str, spinner: Yaspin) -> Tuple[bool,
 
 ### 补丁内容
 ```
-{patch_content}
+{yaml.safe_dump(patch_content)}
 ```
 
 ## 补丁生成要求

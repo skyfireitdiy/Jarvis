@@ -10,19 +10,20 @@
       "default": ""
     },
     "JARVIS_MAX_TOKEN_COUNT": {
-      "type": "integer",
+      "type": "string",
       "description": "Maximum token count the model can handle",
-      "default": 960000
+      "default": "960000"
     },
     "JARVIS_MAX_INPUT_TOKEN_COUNT": {
-      "type": "integer",
+      "type": "string",
       "description": "Maximum input token count the model can handle",
-      "default": 32000
+      "default": "32000"
     },
     "JARVIS_AUTO_COMPLETE": {
-      "type": "boolean",
+      "type": "string",
       "description": "Whether to enable auto-completion feature",
-      "default": false
+      "default": "false",
+      "enum": ["true", "false"]
     },
     "SHELL": {
       "type": "string",
@@ -50,19 +51,21 @@
       "default": "deep_seek"
     },
     "JARVIS_EXECUTE_TOOL_CONFIRM": {
-      "type": "boolean",
+      "type": "string",
       "description": "Whether to require confirmation before executing tools",
-      "default": false
+      "default": "false",
+      "enum": ["true", "false"]
     },
     "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
-      "type": "boolean",
+      "type": "string",
       "description": "Whether to require confirmation before applying patches",
-      "default": true
+      "default": "true",
+      "enum": ["true", "false"]
     },
     "JARVIS_MAX_TOOL_CALL_COUNT": {
-      "type": "integer",
+      "type": "string",
       "description": "Maximum consecutive tool call count",
-      "default": 20
+      "default": "20"
     },
     "JARVIS_DATA_PATH": {
       "type": "string",
@@ -70,34 +73,39 @@
       "default": "~/.jarvis"
     },
     "JARVIS_AUTO_UPDATE": {
-      "type": "boolean",
+      "type": "string",
       "description": "Whether to auto-update git repositories",
-      "default": true
+      "default": "true",
+      "enum": ["true", "false"]
     },
     "JARVIS_MAX_BIG_CONTENT_SIZE": {
-      "type": "integer",
+      "type": "string",
       "description": "Maximum big content size",
-      "default": 1024000
+      "default": "1024000"
     },
     "JARVIS_PRETTY_OUTPUT": {
-      "type": "boolean",
+      "type": "string",
       "description": "Whether to enable PrettyOutput",
-      "default": false
+      "default": "false",
+      "enum": ["true", "false"]
     },
     "JARVIS_USE_METHODOLOGY": {
-      "type": "boolean",
+      "type": "string",
       "description": "Whether to enable methodology",
-      "default": false
+      "default": "false",
+      "enum": ["true", "false"]
     },
     "JARVIS_USE_ANALYSIS": {
-      "type": "boolean",
+      "type": "string",
       "description": "Whether to enable task analysis",
-      "default": false
+      "default": "false",
+      "enum": ["true", "false"]
     },
     "JARVIS_PRINT_PROMPT": {
-      "type": "boolean",
+      "type": "string",
       "description": "Whether to print prompts",
-      "default": false
+      "default": "false",
+      "enum": ["true", "false"]
     },
     "KIMI_API_KEY": {
       "type": "string",
