@@ -45,7 +45,6 @@ def init_env(welcome_str: str) -> None:
 
     jarvis_dir = Path(get_data_dir())
     config_file = jarvis_dir / "config.yaml"
-    old_config_file = jarvis_dir / "env"
 
     # 检查jarvis_data目录是否存在
     if not jarvis_dir.exists():
