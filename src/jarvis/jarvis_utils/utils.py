@@ -78,6 +78,18 @@ def init_env(welcome_str: str) -> None:
     check_and_update_git_repo(str(script_dir))
 
 def _read_config_file(jarvis_dir, config_file):
+    """读取并解析YAML格式的配置文件
+    
+    功能：
+    1. 读取配置文件内容
+    2. 检查并添加schema声明(如果缺失)
+    3. 将配置数据保存到全局变量
+    4. 设置环境变量(如果配置中有ENV字段)
+    
+    参数:
+        jarvis_dir: Jarvis数据目录路径
+        config_file: 配置文件路径
+    """
     with open(config_file, "r", encoding="utf-8") as f:
         content = f.read()
         config_data = yaml.safe_load(content) or {}
@@ -98,6 +110,18 @@ def _read_config_file(jarvis_dir, config_file):
             os.environ.update({str(k): str(v) for k, v in config_data["ENV"].items() if v is not None})
 
 def _read_old_config_file(config_file):
+    """读取并解析旧格式的env配置文件
+    
+    功能：
+    1. 解析键值对格式的旧配置文件
+    2. 支持多行值的处理
+    3. 自动去除值的引号和空格
+    4. 将配置数据保存到全局变量
+    5. 设置环境变量并显示迁移警告
+    
+    参数:
+        config_file: 旧格式配置文件路径
+    """
     config_data = {}
     current_key = None
     current_value = []
@@ -144,7 +168,19 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
             time.sleep(sleep_time)
             continue
 def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
-    """循环执行函数直到返回True"""
+    """循环执行函数直到返回True
+    
+    参数:
+        func: 要执行的函数，必须返回布尔值
+        sleep_time: 每次失败后的等待时间(秒)
+        
+    返回:
+        函数最终返回的True值
+        
+    注意:
+        与while_success不同，此函数只检查返回是否为True，
+        不捕获异常，异常会直接抛出
+    """
     while True:
         ret = func()
         if ret:
