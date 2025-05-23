@@ -3,25 +3,28 @@ import os
 import time
 import hashlib
 import tarfile
-import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Dict
+import yaml
 
 from jarvis import __version__
 from jarvis.jarvis_utils.config import get_max_big_content_size, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-def init_env(welcome_str: str) -> None:
-    """初始化环境变量从jarvis_data/env文件
 
+
+def init_env(welcome_str: str) -> None:
+    '''初始化环境变量从jarvis_data/env文件
     功能：
     1. 创建不存在的jarvis_data目录
     2. 加载环境变量到os.environ
     3. 处理文件读取异常
     4. 检查git仓库状态并在落后时更新
-    """
+    5. 统计当前命令使用次数
+    '''
+    count_cmd_usage()
 
     jarvis_ascii_art = f"""
    ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
@@ -181,6 +184,39 @@ def get_file_line_count(filename: str) -> int:
         return 0
 
 
+
+def _get_cmd_stats() -> Dict[str, int]:
+    """从数据目录获取命令调用统计"""
+    stats_file = Path(get_data_dir()) / "cmd_stat.yaml"
+    if stats_file.exists():
+        try:
+            with open(stats_file, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+        except Exception as e:
+            PrettyOutput.print(
+                f"加载命令调用统计失败: {str(e)}", OutputType.WARNING
+            )
+    return {}
+
+def _update_cmd_stats(cmd_name: str) -> None:
+    """更新命令调用统计"""
+    stats = _get_cmd_stats()
+    stats[cmd_name] = stats.get(cmd_name, 0) + 1
+    stats_file = Path(get_data_dir()) / "cmd_stat.yaml"
+    try:
+        with open(stats_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(stats, f)
+    except Exception as e:
+        PrettyOutput.print(
+            f"保存命令调用统计失败: {str(e)}", OutputType.WARNING
+        )
+
+def count_cmd_usage() -> None:
+    """统计当前命令的使用次数"""
+    import sys
+    if len(sys.argv) > 1:
+        cmd_name = sys.argv[1]
+        _update_cmd_stats(cmd_name)
 
 def is_context_overflow(content: str) -> bool:
     """判断文件内容是否超出上下文限制"""
