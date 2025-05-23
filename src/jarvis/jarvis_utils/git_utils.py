@@ -101,42 +101,27 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
 
 
 def get_diff() -> str:
-    """使用git获取暂存区差异"""
-    import subprocess
+    """使用git获取工作区差异
     
-    # 初始化状态
-    need_reset = False
-    
+    返回:
+        str: 差异内容或错误信息
+    """
     try:
-        # 暂存所有修改
-        subprocess.run(['git', 'add', '.'], check=True)
-        need_reset = True
-        
-        # 获取差异
         result = subprocess.run(
-            ['git', 'diff', '--cached'],
+            ['git', 'diff', 'HEAD'],
             capture_output=True,
             text=False,
             check=True
         )
         
-        # 解码输出
         try:
-            ret = result.stdout.decode('utf-8')
+            return result.stdout.decode('utf-8')
         except UnicodeDecodeError:
-            ret = result.stdout.decode('utf-8', errors='replace')
-        
-        # 重置暂存区
-        subprocess.run(['git', "reset", "--mixed"], check=False)
-        return ret
-        
+            return result.stdout.decode('utf-8', errors='replace')
+            
     except subprocess.CalledProcessError as e:
-        if need_reset:
-            subprocess.run(['git', "reset", "--mixed"], check=False)
         return f"获取差异失败: {str(e)}"
     except Exception as e:
-        if need_reset:
-            subprocess.run(['git', "reset", "--mixed"], check=False)
         return f"发生意外错误: {str(e)}"
 
 
@@ -333,3 +318,30 @@ def check_and_update_git_repo(repo_path: str) -> bool:
         return False
     finally:
         os.chdir(curr_dir)
+
+
+def get_diff_file_list() -> List[str]:
+    """获取HEAD到当前变更的文件列表
+    
+    返回:
+        List[str]: 修改的文件路径列表
+    """
+    try:
+        result = subprocess.run(
+            ['git', 'diff', '--name-only', 'HEAD'],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            PrettyOutput.print(f"获取差异文件列表失败: {result.stderr}", OutputType.ERROR)
+            return []
+        
+        return [f for f in result.stdout.splitlines() if f]
+        
+    except subprocess.CalledProcessError as e:
+        PrettyOutput.print(f"获取差异文件列表失败: {str(e)}", OutputType.ERROR)
+        return []
+    except Exception as e:
+        PrettyOutput.print(f"获取差异文件列表异常: {str(e)}", OutputType.ERROR)
+        return []

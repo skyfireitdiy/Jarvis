@@ -24,6 +24,7 @@ from jarvis.jarvis_utils.git_utils import (
     find_git_root,
     get_commits_between,
     get_diff,
+    get_diff_file_list,
     get_latest_commit_hash,
     handle_commit_workflow,
     has_uncommitted_changes
@@ -372,12 +373,17 @@ class CodeAgent:
 
                     final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
 
+                    # 获取修改的文件列表
+                    modified_files = get_diff_file_list()
+                    
                     # 修改后的提示逻辑
                     addon_prompt = """
-1. 请使用静态检查工具检查修改的代码（如果有），如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
-2. 在引入的警告和错误都被修复的前提下，如果用户的需求未完成，请继续修改代码，如果已经完成，请终止，不要实现任何超出用户需求外的内容
-3. 如果有任何信息不明确，调用工具获取信息
-4. 每次响应必须且只能包含一个操作
+1. 请对以下修改的文件进行静态扫描:
+""" + "\n".join(f"   - {file}" for file in modified_files) + """
+2. 如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
+3. 在引入的警告和错误都被修复的前提下，如果用户的需求未完成，请继续修改代码，如果已经完成，请终止，不要实现任何超出用户需求外的内容
+4. 如果有任何信息不明确，调用工具获取信息
+5. 每次响应必须且只能包含一个操作
                     """
 
                     agent.set_addon_prompt(addon_prompt)
