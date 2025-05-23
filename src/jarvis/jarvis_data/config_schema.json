@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Jarvis Environment Variables Schema",
-  "description": "Schema for Jarvis system configuration",
+  "title": "Jarvis环境变量配置模式",
+  "description": "Jarvis系统配置模式",
   "type": "object",
   "properties": {
     "JARVIS_MCP": {
@@ -100,7 +100,7 @@
     },
     "ENV": {
       "type": "object",
-      "description": "Additional environment variables to set",
+      "description": "需要设置的额外环境变量",
       "additionalProperties": {
         "type": "string"
       },
@@ -108,22 +108,22 @@
     },
     "JARVIS_GIT_COMMIT_PROMPT": {
       "type": "string",
-      "description": "Git commit message generation prompt template",
+      "description": "Git提交信息生成提示模板",
       "default": ""
     },
     "JARVIS_MAX_TOKEN_COUNT": {
       "type": "string",
-      "description": "Maximum token count the model can handle",
+      "description": "模型能处理的最大token数量",
       "default": "960000"
     },
     "JARVIS_MAX_INPUT_TOKEN_COUNT": {
       "type": "string",
-      "description": "Maximum input token count the model can handle",
+      "description": "模型能处理的最大输入token数量",
       "default": "32000"
     },
     "JARVIS_AUTO_COMPLETE": {
       "type": "string",
-      "description": "Whether to enable auto-completion feature",
+      "description": "是否启用自动补全功能",
       "default": "false",
       "enum": [
         "true",
@@ -132,32 +132,32 @@
     },
     "SHELL": {
       "type": "string",
-      "description": "System shell name (e.g. bash, zsh)",
+      "description": "系统shell名称(如: bash, zsh)",
       "default": "/bin/bash"
     },
     "JARVIS_PLATFORM": {
       "type": "string",
-      "description": "Normal operation platform name",
+      "description": "常规操作平台名称",
       "default": "yuanbao"
     },
     "JARVIS_MODEL": {
       "type": "string",
-      "description": "Normal operation model name",
+      "description": "常规操作模型名称",
       "default": "deep_seek_v3"
     },
     "JARVIS_THINKING_PLATFORM": {
       "type": "string",
-      "description": "Thinking operation platform name",
+      "description": "思考操作平台名称",
       "default": "yuanbao"
     },
     "JARVIS_THINKING_MODEL": {
       "type": "string",
-      "description": "Thinking operation model name",
+      "description": "思考操作模型名称",
       "default": "deep_seek"
     },
     "JARVIS_EXECUTE_TOOL_CONFIRM": {
       "type": "string",
-      "description": "Whether to require confirmation before executing tools",
+      "description": "执行工具前是否需要确认",
       "default": "false",
       "enum": [
         "true",
@@ -166,7 +166,7 @@
     },
     "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
       "type": "string",
-      "description": "Whether to require confirmation before applying patches",
+      "description": "应用补丁前是否需要确认",
       "default": "true",
       "enum": [
         "true",
@@ -175,17 +175,17 @@
     },
     "JARVIS_MAX_TOOL_CALL_COUNT": {
       "type": "string",
-      "description": "Maximum consecutive tool call count",
+      "description": "最大连续工具调用次数",
       "default": "20"
     },
     "JARVIS_DATA_PATH": {
       "type": "string",
-      "description": "Path to Jarvis data storage directory",
+      "description": "Jarvis数据存储目录路径",
       "default": "~/.jarvis"
     },
     "JARVIS_AUTO_UPDATE": {
       "type": "string",
-      "description": "Whether to auto-update git repositories",
+      "description": "是否自动更新git仓库",
       "default": "true",
       "enum": [
         "true",
@@ -194,12 +194,12 @@
     },
     "JARVIS_MAX_BIG_CONTENT_SIZE": {
       "type": "string",
-      "description": "Maximum big content size",
+      "description": "最大大内容尺寸",
       "default": "1024000"
     },
     "JARVIS_PRETTY_OUTPUT": {
       "type": "string",
-      "description": "Whether to enable PrettyOutput",
+      "description": "是否启用美化输出",
       "default": "false",
       "enum": [
         "true",
@@ -208,7 +208,7 @@
     },
     "JARVIS_USE_METHODOLOGY": {
       "type": "string",
-      "description": "Whether to enable methodology",
+      "description": "是否启用方法论",
       "default": "false",
       "enum": [
         "true",
@@ -217,7 +217,7 @@
     },
     "JARVIS_USE_ANALYSIS": {
       "type": "string",
-      "description": "Whether to enable task analysis",
+      "description": "是否启用任务分析",
       "default": "false",
       "enum": [
         "true",
@@ -226,7 +226,7 @@
     },
     "JARVIS_PRINT_PROMPT": {
       "type": "string",
-      "description": "Whether to print prompts",
+      "description": "是否打印提示",
       "default": "false",
       "enum": [
         "true",
@@ -235,7 +235,7 @@
     },
     "JARVIS_REPLACE_MAP": {
       "type": "object",
-      "description": "Custom replacement map configuration",
+      "description": "自定义替换映射表配置",
       "additionalProperties": {
         "type": "object",
         "properties": {
