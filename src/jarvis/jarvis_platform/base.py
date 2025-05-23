@@ -5,7 +5,7 @@ from typing import Generator, List, Tuple
 
 from yaspin import yaspin
 
-from jarvis.jarvis_utils.config import get_max_input_token_count, get_pretty_output
+from jarvis.jarvis_utils.config import get_max_input_token_count, get_pretty_output, is_print_prompt
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import get_context_token_count, is_context_overflow, while_success, while_true
@@ -122,6 +122,8 @@ class BasePlatform(ABC):
         return response
     
     def chat_until_success(self, message: str) -> str:
+        if is_print_prompt():
+            PrettyOutput.print(f"{message}", OutputType.USER)
         return while_true(lambda: while_success(lambda: self._chat(message), 5), 5)
 
     @abstractmethod

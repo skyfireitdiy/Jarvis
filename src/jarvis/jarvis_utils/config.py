@@ -197,3 +197,12 @@ def is_use_analysis() -> bool:
         bool: 如果启用任务分析则返回True，默认为True
     """
     return os.getenv('JARVIS_USE_ANALYSIS', 'false') == 'true'
+
+def is_print_prompt() -> bool:
+    """
+    获取是否打印提示。
+
+    返回：
+        bool: 如果打印提示则返回True，默认为True
+    """
+    return os.getenv('JARVIS_PRINT_PROMPT', 'false') == 'true'

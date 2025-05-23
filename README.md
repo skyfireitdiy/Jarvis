@@ -158,6 +158,7 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 | `JARVIS_MAX_BIG_CONTENT_SIZE` | 1024000 | 最大大内容大小 |
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
 | `JARVIS_GIT_COMMIT_PROMPT` | "" | 自定义git提交信息生成提示模板 |
+| `JARVIS_PRINT_PROMPT` | false | 是否打印提示 |
 
 所有配置编写到`~/.jarvis/env`文件中即可生效。
 
