@@ -356,6 +356,8 @@ class CodeAgent:
         final_ret = ""
         diff = get_diff()
         if diff:
+            # 获取修改的文件列表
+            modified_files = get_diff_file_list()
             start_hash = get_latest_commit_hash()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             commited = handle_commit_workflow()
@@ -373,9 +375,6 @@ class CodeAgent:
 
                     final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
 
-                    # 获取修改的文件列表
-                    modified_files = get_diff_file_list()
-                    
                     # 修改后的提示逻辑
                     addon_prompt = """
 1. 请对以下修改的文件进行静态扫描:
