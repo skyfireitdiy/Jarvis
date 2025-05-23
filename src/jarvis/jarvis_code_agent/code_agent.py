@@ -11,6 +11,7 @@ import argparse
 from typing import Any, Dict, Optional, List, Tuple
 
 # 忽略yaspin的类型检查
+from jarvis.jarvis_code_agent.lint import get_lint_tools
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from yaspin import yaspin  # type: ignore
 
@@ -376,13 +377,22 @@ class CodeAgent:
                     final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
 
                     # 修改后的提示逻辑
+                    lint_tools_info = "\n".join(
+                        f"   - {file}: 使用 {'、'.join(get_lint_tools(os.path.splitext(file)[1] or os.path.basename(file)))}"
+                        for file in modified_files 
+                        if get_lint_tools(os.path.splitext(file)[1] or os.path.basename(file))
+                    )
                     addon_prompt = """
 1. 请对以下修改的文件进行静态扫描:
-""" + "\n".join(f"   - {file}" for file in modified_files) + """
-2. 如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
-3. 在引入的警告和错误都被修复的前提下，如果用户的需求未完成，请继续修改代码，如果已经完成，请终止，不要实现任何超出用户需求外的内容
-4. 如果有任何信息不明确，调用工具获取信息
-5. 每次响应必须且只能包含一个操作
+""" + "\n".join(f"   - {file}" for file in modified_files) + (
+                        f"""
+2. 建议使用以下lint工具进行检查:
+{lint_tools_info}""" if lint_tools_info else ""
+                    ) + """
+3. 如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
+4. 在引入的警告和错误都被修复的前提下，如果用户的需求未完成，请继续修改代码，如果已经完成，请终止，不要实现任何超出用户需求外的内容
+5. 如果有任何信息不明确，调用工具获取信息
+6. 每次响应必须且只能包含一个操作
                     """
 
                     agent.set_addon_prompt(addon_prompt)
