@@ -8,17 +8,21 @@
 - 带有模糊匹配的文件路径补全
 - 用于输入控制的自定义键绑定
 """
+from colorama import Fore
+from colorama import Style as ColoramaStyle
+from fuzzywuzzy import process
 from prompt_toolkit import PromptSession
-from prompt_toolkit.styles import Style as PromptStyle
-from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.completion import Completer, Completion, PathCompleter
 from prompt_toolkit.document import Document
+from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.key_binding import KeyBindings
-from fuzzywuzzy import process
-from colorama import Fore, Style as ColoramaStyle
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-from jarvis.jarvis_utils.tag import ot
+from prompt_toolkit.styles import Style as PromptStyle
+
 from jarvis.jarvis_utils.config import get_replace_map
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.tag import ot
+
+
 def get_single_line_input(tip: str) -> str:
     """
     获取支持历史记录的单行输入。
@@ -176,9 +180,12 @@ def get_multiline_input(tip: str) -> str:
         'prompt': 'ansicyan',
     })
     try:
-        from prompt_toolkit.history import FileHistory
-        from jarvis.jarvis_utils.config import get_data_dir
         import os
+
+        from prompt_toolkit.history import FileHistory
+
+        from jarvis.jarvis_utils.config import get_data_dir
+
         # 获取数据目录路径
         history_dir = get_data_dir()
         # 初始化带历史记录的会话

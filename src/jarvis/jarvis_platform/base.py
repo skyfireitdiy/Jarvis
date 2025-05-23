@@ -1,19 +1,23 @@
 # -*- coding: utf-8 -*-
-from abc import ABC, abstractmethod
 import re
+from abc import ABC, abstractmethod
 from typing import Generator, List, Tuple
 
+from rich import box
+from rich.live import Live
+from rich.panel import Panel
+from rich.text import Text
 from yaspin import yaspin
 
-from jarvis.jarvis_utils.config import get_max_input_token_count, get_pretty_output, is_print_prompt
+from jarvis.jarvis_utils.config import (get_max_input_token_count,
+                                        get_pretty_output, is_print_prompt)
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import get_context_token_count, is_context_overflow, while_success, while_true
-from jarvis.jarvis_utils.tag import ot, ct
-from rich.live import Live
-from rich.text import Text
-from rich.panel import Panel
-from rich import box
+from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.utils import (get_context_token_count,
+                                       is_context_overflow, while_success,
+                                       while_true)
+
 
 class BasePlatform(ABC):
     """Base class for large language models"""

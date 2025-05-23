@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import re
 from typing import Any, Tuple
-from jarvis.jarvis_utils.config import get_replace_map
 
+from jarvis.jarvis_utils.config import get_replace_map
 
 
 def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:

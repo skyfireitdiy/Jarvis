@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
+import argparse
+import os
 import re
 import shlex
 import subprocess
-from typing import Dict, Any, Optional
+import sys
 import tempfile
+from typing import Any, Dict, Optional
+
 import yaml
 from yaspin import yaspin
-from jarvis.jarvis_platform.registry import PlatformRegistry
-import sys
-import argparse
-import os
 
-from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env, is_context_overflow
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_git_commit_prompt
-from jarvis.jarvis_utils.tag import ot, ct
+from jarvis.jarvis_utils.git_utils import (find_git_root,
+                                           has_uncommitted_changes)
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 
 
 class GitCommitTool:

@@ -7,16 +7,17 @@
 - 生成方法论临时文件
 - 上传方法论文件到大模型
 """
-import os
 import json
+import os
 import tempfile
 from typing import Any, Dict, Optional
 
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import is_context_overflow
+
 
 def _get_methodology_directory() -> str:
     """
@@ -139,7 +140,8 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
     返回：
         str: 相关的方法论提示，如果未找到方法论则返回空字符串
     """
-    from yaspin import yaspin # type: ignore
+    from yaspin import yaspin  # type: ignore
+
     from jarvis.jarvis_tools.registry import ToolRegistry
 
     prompt = tool_registery.prompt() if tool_registery else ""

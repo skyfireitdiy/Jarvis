@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 import argparse
-import yaml
 import os
+
+import yaml
+
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.input import get_multiline_input
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
 

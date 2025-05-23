@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-from typing import Generator, List, Tuple
 import random
 import string
+from typing import Generator, List, Tuple
+
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 
 class HumanPlatform(BasePlatform):
     """人类交互平台实现，模拟大模型但实际上与人交互"""

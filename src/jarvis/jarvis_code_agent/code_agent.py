@@ -4,36 +4,33 @@
 该模块提供CodeAgent类，用于处理代码修改任务。
 """
 
-import os
-import sys
-import subprocess
 import argparse
-from typing import Any, Dict, Optional, List, Tuple
+import os
+import subprocess
+import sys
+from typing import Any, Dict, List, Optional, Tuple
 
-# 忽略yaspin的类型检查
-from jarvis.jarvis_code_agent.lint import get_lint_tools
-from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from yaspin import yaspin  # type: ignore
 
+from jarvis import __version__
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
-from jarvis.jarvis_platform.registry import PlatformRegistry
+# 忽略yaspin的类型检查
+from jarvis.jarvis_code_agent.lint import get_lint_tools
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils.git_utils import (
-    find_git_root,
-    get_commits_between,
-    get_diff,
-    get_diff_file_list,
-    get_latest_commit_hash,
-    handle_commit_workflow,
-    has_uncommitted_changes
-)
+from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
+from jarvis.jarvis_utils.git_utils import (find_git_root, get_commits_between,
+                                           get_diff, get_diff_file_list,
+                                           get_latest_commit_hash,
+                                           handle_commit_workflow,
+                                           has_uncommitted_changes)
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env, user_confirm
-from jarvis import __version__
+
 
 class CodeAgent:
     """Jarvis系统的代码修改代理。

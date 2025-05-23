@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Generator, List, Tuple
 import os
+from typing import Dict, Generator, List, Tuple
+
 from openai import OpenAI
+
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 
 class OpenAIModel(BasePlatform):
     platform_name = "openai"

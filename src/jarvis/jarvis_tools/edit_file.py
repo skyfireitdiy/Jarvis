@@ -17,9 +17,8 @@
 - 支持大文件处理(自动上传到模型平台)
 - 提供3次重试机制确保操作可靠性
 """
-from typing import List
 import re
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import yaml
 from yaspin import yaspin
@@ -130,7 +129,8 @@ class FileSearchReplaceTool:
         4. 保持原始代码的格式风格
         """
         import os
-        from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+
+        from jarvis.jarvis_utils.output import OutputType, PrettyOutput
         
         stdout_messages = []
         stderr_messages = []

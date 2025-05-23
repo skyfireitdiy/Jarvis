@@ -6,8 +6,9 @@ Lint工具配置模块
 """
 
 import os
-import yaml
 from typing import Dict, List
+
+import yaml
 
 from jarvis.jarvis_utils.config import get_data_dir
 

@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Any
 import os
 from pathlib import Path
+from typing import Any, Dict
 
-from yaspin import yaspin # type: ignore
+from yaspin import yaspin  # type: ignore
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 # 导入文件处理器
-from jarvis.jarvis_utils.file_processors import (
-    TextFileProcessor
-)
-
+from jarvis.jarvis_utils.file_processors import TextFileProcessor
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class FileOperationTool:

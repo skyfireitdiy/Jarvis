@@ -1,18 +1,21 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Generator, List, Tuple
-import requests # type: ignore
 import json
-import os
 import mimetypes
+import os
 import time
-from rich.live import Live
-from rich.text import Text
-from rich.panel import Panel
+from typing import Dict, Generator, List, Tuple
+
+import requests  # type: ignore
 from rich import box
+from rich.live import Live
+from rich.panel import Panel
+from rich.text import Text
+
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
-from jarvis.jarvis_utils.config import get_data_dir
+
 
 class KimiModel(BasePlatform):
     """Kimi model implementation"""
@@ -183,7 +186,7 @@ class KimiModel(BasePlatform):
         if not file_list:
             return True
 
-        from yaspin import yaspin # type: ignore
+        from yaspin import yaspin  # type: ignore
         
         if not self.chat_id:
             with yaspin(text="创建聊天会话...", color="yellow") as spinner:

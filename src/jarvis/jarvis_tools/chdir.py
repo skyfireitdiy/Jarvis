@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Any
 import os
+from typing import Any, Dict
+
 
 class ChdirTool:
     name = "chdir"

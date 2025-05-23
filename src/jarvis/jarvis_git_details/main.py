@@ -8,7 +8,7 @@
 import os
 import re
 import subprocess
-from typing import Dict, Any
+from typing import Any, Dict
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry

@@ -7,11 +7,13 @@
 - 带有自定义主题的控制台配置
 - 环境初始化
 """
-from typing import Any, Set, Dict
-import colorama
 import os
+from typing import Any, Dict, Set
+
+import colorama
 from rich.console import Console
 from rich.theme import Theme
+
 # 初始化colorama以支持跨平台的彩色文本
 colorama.init()
 # 禁用tokenizers并行以避免多进程问题

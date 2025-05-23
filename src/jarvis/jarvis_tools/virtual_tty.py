@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Any
-import os
-import time
-import pty
 import fcntl
-import signal
+import os
+import pty
 import select
+import signal
+import time
+from typing import Any, Dict
+
 
 class VirtualTTYTool:
     name = "virtual_tty"

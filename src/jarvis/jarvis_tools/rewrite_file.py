@@ -80,7 +80,8 @@ class FileRewriteTool:
             }
         """
         import os
-        from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+
+        from jarvis.jarvis_utils.output import OutputType, PrettyOutput
         
         stdout_messages = []
         stderr_messages = []

@@ -8,14 +8,9 @@ import yaml
 from prompt_toolkit import prompt
 from yaspin import yaspin
 
-from jarvis.jarvis_agent import (
-    Agent,
-    OutputType,
-    PrettyOutput,
-    get_multiline_input,
-    origin_agent_system_prompt,
-    user_confirm
-)
+from jarvis.jarvis_agent import (Agent, OutputType, PrettyOutput,
+                                 get_multiline_input,
+                                 origin_agent_system_prompt, user_confirm)
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_tools.registry import ToolRegistry

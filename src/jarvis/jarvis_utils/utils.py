@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
-import os
-import time
 import hashlib
+import os
 import tarfile
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict
+
 import yaml
 
 from jarvis import __version__
-from jarvis.jarvis_utils.config import get_max_big_content_size, get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, get_max_big_content_size
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 def init_env(welcome_str: str) -> None:

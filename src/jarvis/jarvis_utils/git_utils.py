@@ -12,10 +12,14 @@ Git工具模块
 import os
 import re
 import subprocess
-from typing import List, Tuple, Dict
-from jarvis.jarvis_utils.config import get_auto_update, is_confirm_before_apply_patch
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from typing import Dict, List, Tuple
+
+from jarvis.jarvis_utils.config import (get_auto_update,
+                                        is_confirm_before_apply_patch)
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import user_confirm
+
+
 def find_git_root(start_dir: str = ".") -> str:
     """
     切换到给定路径的Git根目录，如果不是Git仓库则初始化。

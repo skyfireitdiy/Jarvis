@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import unicodedata
 
+
 class FileProcessor:
     """Base class for file processor"""
     @staticmethod

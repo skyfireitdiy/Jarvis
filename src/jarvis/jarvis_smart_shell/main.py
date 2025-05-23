@@ -12,6 +12,7 @@ from jarvis.jarvis_utils.config import get_shell_name
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.utils import init_env
 
+
 def execute_command(command: str, should_run: bool) -> None:
     """Print command without execution"""
     print(command)

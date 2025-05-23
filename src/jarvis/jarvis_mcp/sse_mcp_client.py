@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-from typing import Any, Dict, List, Callable
-import requests
 import json
 import threading
 import time
-from urllib.parse import urljoin, urlencode, parse_qs
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from typing import Any, Callable, Dict, List
+from urllib.parse import parse_qs, urlencode, urljoin
+
+import requests
+
 from jarvis.jarvis_mcp import McpClient
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class SSEMcpClient(McpClient):

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
 from functools import lru_cache
+
 import yaml
+
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
+
 """配置管理模块。
 
 该模块提供了获取Jarvis系统各种配置设置的函数。

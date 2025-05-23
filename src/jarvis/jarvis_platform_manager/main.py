@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
-import os
-from jarvis.jarvis_platform.registry import PlatformRegistry
 import asyncio
+import os
+from typing import Any, Dict, List, Optional
+
+import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-import uvicorn
-from fastapi.middleware.cors import CORSMiddleware
 
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
+
 
 def list_platforms():
     """List all supported platforms and models"""
@@ -248,10 +250,10 @@ class ChatCompletionResponse(BaseModel):
 
 def service_command(args):
     """Process service subcommand - start OpenAI-compatible API server"""
-    import time
-    import uuid
     import json
     import os
+    import time
+    import uuid
     from datetime import datetime
 
     host = args.host
@@ -451,11 +453,11 @@ def service_command(args):
 
     async def stream_chat_response(platform, message, model_name):
         """Stream chat response in OpenAI-compatible format"""
-        import time
         import json
+        import os
+        import time
         import uuid
         from datetime import datetime
-        import os
 
         completion_id = f"chatcmpl-{str(uuid.uuid4())}"
         created_time = int(time.time())

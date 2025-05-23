@@ -8,18 +8,19 @@
 - 列出所有方法论
 """
 
-import hashlib
-import os
-import json
 import argparse
-import yaml # type: ignore
-from jarvis.jarvis_utils.methodology import (
-    _get_methodology_directory,
-    _load_all_methodologies
-)
+import hashlib
+import json
+import os
+
+import yaml  # type: ignore
+from yaspin import yaspin  # type: ignore
+
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-from yaspin import yaspin # type: ignore
+from jarvis.jarvis_utils.methodology import (_get_methodology_directory,
+                                             _load_all_methodologies)
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 
 def import_methodology(input_file):
     """导入方法论文件（合并策略）"""

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 # 导入所需的类型注解模块
-from typing import Dict, Any
+from typing import Any, Dict
 
 # 导入多行输入工具和输出工具
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 
 # 定义AskUserTool类，用于向用户提问
 class AskUserTool:

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_multi_agent import MultiAgent
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput

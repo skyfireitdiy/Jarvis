@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-import sys
 import argparse
-from typing import Dict
-from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 import subprocess
+import sys
+from typing import Dict
 
+from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env, user_confirm
+
+
 class GitSquashTool:
     name = "git_squash_agent"
     description = "Squash commits interactively using a base commit hash"

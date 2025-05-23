@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-import os
-from transformers import AutoTokenizer
-from typing import List
 import functools
+import os
+from typing import List
 
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from transformers import AutoTokenizer
+
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 # 全局缓存，避免重复加载模型
 _global_tokenizers = {}

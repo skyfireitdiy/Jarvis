@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Any
+from typing import Any, Dict
+
 from yaspin import yaspin
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.methodology import load_methodology
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 
 class FindMethodologyTool:
     name = "find_methodology"

@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Any
 import os
+from typing import Any, Dict
+
+from yaspin import yaspin  # type: ignore
+from yaspin.spinners import Spinners  # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from yaspin import yaspin # type: ignore
-from yaspin.spinners import Spinners # type: ignore
+
 
 class FileAnalyzerTool:
     name = "file_analyzer"

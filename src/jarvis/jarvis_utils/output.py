@@ -8,18 +8,22 @@
 - 多种编程语言的语法高亮支持
 - 结构化输出的面板显示
 """
-from enum import Enum
 from datetime import datetime
+from enum import Enum
 from typing import Optional, Tuple
-from rich.panel import Panel
-from rich.text import Text
-from rich.syntax import Syntax
-from rich.style import Style as RichStyle
+
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
+from rich.box import SIMPLE
+from rich.panel import Panel
+from rich.style import Style as RichStyle
+from rich.syntax import Syntax
+from rich.text import Text
+
 from jarvis.jarvis_utils.config import get_pretty_output
 from jarvis.jarvis_utils.globals import console, get_agent_list
-from rich.box import SIMPLE
+
+
 class OutputType(Enum):
     """
     输出类型枚举，用于分类和样式化不同类型的消息。

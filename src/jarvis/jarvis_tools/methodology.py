@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-import os
-import json
 import hashlib
-from typing import Dict, Any
+import json
+import os
+from typing import Any, Dict
 
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-
 
 
 class MethodologyTool:

@@ -1,24 +1,27 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Generator, List, Tuple
-import requests
+import hashlib
+import hmac
 import json
 import os
-import hmac
-import hashlib
 import time
 import urllib.parse
+from typing import Dict, Generator, List, Tuple
+
+import requests
 from PIL import Image
-from yaspin import yaspin
-from yaspin.spinners import Spinners
-from yaspin.api import Yaspin
-from rich.live import Live
-from rich.text import Text
-from rich.panel import Panel
 from rich import box
+from rich.live import Live
+from rich.panel import Panel
+from rich.text import Text
+from yaspin import yaspin
+from yaspin.api import Yaspin
+from yaspin.spinners import Spinners
+
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
-from jarvis.jarvis_utils.config import get_data_dir
+
 
 class YuanbaoPlatform(BasePlatform):
     """Hunyuan模型实现"""

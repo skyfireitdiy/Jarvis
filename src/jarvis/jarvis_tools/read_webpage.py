@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Any
 import os
+from typing import Any, Dict
+
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 
 class WebpageTool:
     name = "read_webpage"

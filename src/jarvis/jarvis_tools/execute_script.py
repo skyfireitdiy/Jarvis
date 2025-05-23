@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Any
 import os
 import tempfile
 from pathlib import Path
+from typing import Any, Dict
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
