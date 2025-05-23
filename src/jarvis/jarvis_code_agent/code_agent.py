@@ -378,9 +378,9 @@ class CodeAgent:
 
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
-                        f"   - {file}: 使用 {'、'.join(get_lint_tools(os.path.splitext(file)[1] or os.path.basename(file)))}"
+                        f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
                         for file in modified_files 
-                        if get_lint_tools(os.path.splitext(file)[1] or os.path.basename(file))
+                        if get_lint_tools(file)
                     )
                     addon_prompt = """
 1. 请对以下修改的文件进行静态扫描:

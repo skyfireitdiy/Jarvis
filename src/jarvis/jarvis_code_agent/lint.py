@@ -114,13 +114,13 @@ LINT_TOOLS = {
     '.adoc': ['asciidoctor-lint'],
     
     # Docker/Terraform/Makefile等无后缀文件
-    'Makefile': ['checkmake'],
-    'Dockerfile': ['hadolint'],
+    'makefile': ['checkmake'],
+    'dockerfile': ['hadolint'],
     'docker-compose.yml': ['hadolint'],
     'docker-compose.yaml': ['hadolint'],
-    'Jenkinsfile': ['jenkinsfile-linter'],
-    'BUILD': ['buildifier'],
-    'WORKSPACE': ['buildifier'],
+    'jenkinsfile': ['jenkinsfile-linter'],
+    'build': ['buildifier'],
+    'workspace': ['buildifier'],
     '.bashrc': ['shellcheck'],
     '.bash_profile': ['shellcheck'],
     '.zshrc': ['shellcheck'],
@@ -128,6 +128,8 @@ LINT_TOOLS = {
     '.editorconfig': ['editorconfig-checker'],
     '.eslintrc': ['eslint'],
     '.prettierrc': ['prettier'],
+    'cmakelists.txt': ['cmake-format'],
+    '.cmake': ['cmake-format'],
 }
 
 def load_lint_tools_config() -> Dict[str, List[str]]:
@@ -143,7 +145,7 @@ def load_lint_tools_config() -> Dict[str, List[str]]:
 # 合并默认配置和yaml配置
 LINT_TOOLS.update(load_lint_tools_config())
 
-def get_lint_tools(file_extension_or_name: str) -> List[str]:
+def get_lint_tools(filename: str) -> List[str]:
     """
     根据文件扩展名或文件名获取对应的lint工具列表
     
@@ -153,4 +155,9 @@ def get_lint_tools(file_extension_or_name: str) -> List[str]:
     Returns:
         对应的lint工具列表，如果找不到则返回空列表
     """
-    return LINT_TOOLS.get(file_extension_or_name.lower(), [])
+    filename = os.path.basename(filename)
+    lint_tools = LINT_TOOLS.get(filename.lower(), [])
+    if lint_tools:
+        return lint_tools
+    ext = os.path.splitext(filename)[1]
+    return LINT_TOOLS.get(ext.lower(), [])
