@@ -229,14 +229,36 @@ class ToolRegistry(OutputHandlerProtocol):
         }
 
     def _load_mcp_tools(self) -> None:
-        """从jarvis_data/tools/mcp加载工具"""
+        """加载MCP工具，优先从配置获取，其次从目录扫描"""
+        from jarvis.jarvis_utils.config import get_mcp_config
+        
+        # 优先从配置获取MCP工具配置
+        mcp_configs = get_mcp_config()
+        if mcp_configs:
+            for config in mcp_configs:
+                self.register_mcp_tool_by_config(config)
+            return
+
+        # 如果配置中没有，则扫描目录
         mcp_tools_dir = Path(get_data_dir()) / "mcp"
         if not mcp_tools_dir.exists():
             return
 
+        # 添加警告信息
+        PrettyOutput.print(
+            "警告: 从文件目录加载MCP工具的方式将在未来版本中废弃，请尽快迁移到JARVIS_MCP配置方式",
+            OutputType.WARNING
+        )
+
         # 遍历目录中的所有.yaml文件
         for file_path in mcp_tools_dir.glob("*.yaml"):
-            self.register_mcp_tool_by_file(str(file_path))
+            try:
+                config = yaml.safe_load(open(file_path, "r", encoding="utf-8"))
+                self.register_mcp_tool_by_config(config)
+            except Exception as e:
+                PrettyOutput.print(
+                    f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING
+                )
 
     def _load_builtin_tools(self) -> None:
         """从内置工具目录加载工具"""
@@ -264,29 +286,26 @@ class ToolRegistry(OutputHandlerProtocol):
 
             self.register_tool_by_file(str(file_path))
 
-    def register_mcp_tool_by_file(self, file_path: str) -> bool:
-        """从指定文件加载并注册工具
+    def register_mcp_tool_by_config(self, config: Dict[str, Any]) -> bool:
+        """从配置字典加载并注册工具
 
         参数:
-            file_path: 工具文件的路径
+            config: MCP工具配置字典
 
         返回:
             bool: 工具是否加载成功
         """
         try:
-            config = yaml.safe_load(open(file_path, "r", encoding="utf-8"))
             if "type" not in config:
-                PrettyOutput.print(f"文件 {file_path} 缺少type字段", OutputType.WARNING)
+                PrettyOutput.print("配置缺少type字段", OutputType.WARNING)
                 return False
 
             # 检查enable标志
             if not config.get("enable", True):
-                PrettyOutput.print(
-                    f"文件 {file_path} 已禁用(enable=false)，跳过注册", OutputType.INFO
-                )
+                PrettyOutput.print("MCP配置已禁用(enable=false)，跳过注册", OutputType.INFO)
                 return False
 
-            name = config.get("name", Path(file_path).stem)
+            name = config.get("name", "mcp")
 
             # 注册资源工具
             def create_resource_list_func(client: McpClient):
@@ -341,26 +360,18 @@ class ToolRegistry(OutputHandlerProtocol):
 
             if config["type"] == "stdio":
                 if "command" not in config:
-                    PrettyOutput.print(
-                        f"文件 {file_path} 缺少command字段", OutputType.WARNING
-                    )
+                    PrettyOutput.print("配置缺少command字段", OutputType.WARNING)
                     return False
             elif config["type"] == "sse":
                 if "base_url" not in config:
-                    PrettyOutput.print(
-                        f"文件 {file_path} 缺少base_url字段", OutputType.WARNING
-                    )
+                    PrettyOutput.print("配置缺少base_url字段", OutputType.WARNING)
                     return False
             elif config["type"] == "streamable":
                 if "base_url" not in config:
-                    PrettyOutput.print(
-                        f"文件 {file_path} 缺少base_url字段", OutputType.WARNING
-                    )
+                    PrettyOutput.print("配置缺少base_url字段", OutputType.WARNING)
                     return False
             else:
-                PrettyOutput.print(
-                    f"文件 {file_path} 类型错误: {config['type']}", OutputType.WARNING
-                )
+                PrettyOutput.print(f"不支持的MCP客户端类型: {config['type']}", OutputType.WARNING)
                 return False
 
             # 创建MCP客户端
@@ -376,14 +387,11 @@ class ToolRegistry(OutputHandlerProtocol):
             # 获取工具信息
             tools = mcp_client.get_tool_list()
             if not tools:
-                PrettyOutput.print(
-                    f"从 {file_path} 获取工具列表失败", OutputType.WARNING
-                )
+                PrettyOutput.print("从配置获取工具列表失败", OutputType.WARNING)
                 return False
 
             # 注册每个工具
             for tool in tools:
-
                 # 注册工具
                 self.register_tool(
                     name=f"{name}.tool_call.{tool['name']}",
@@ -417,9 +425,7 @@ class ToolRegistry(OutputHandlerProtocol):
             return True
 
         except Exception as e:
-            PrettyOutput.print(
-                f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING
-            )
+            PrettyOutput.print(f"MCP配置加载失败: {str(e)}", OutputType.WARNING)
             return False
 
     def register_tool_by_file(self, file_path: str) -> bool:

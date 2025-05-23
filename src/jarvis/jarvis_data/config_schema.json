@@ -4,6 +4,89 @@
   "description": "Schema for Jarvis system environment variables configuration",
   "type": "object",
   "properties": {
+    "JARVIS_MCP": {
+      "type": "array",
+      "description": "MCP工具配置列表",
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["type", "base_url"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["sse", "streamable"],
+                "description": "MCP客户端类型"
+              },
+              "base_url": {
+                "type": "string",
+                "format": "uri",
+                "description": "MCP服务器基础URL"
+              },
+              "auth_token": {
+                "type": "string",
+                "description": "认证令牌(可选)"
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "额外的HTTP头(可选)"
+              },
+              "name": {
+                "type": "string",
+                "description": "工具名称(可选)"
+              },
+              "enable": {
+                "type": "boolean",
+                "default": true,
+                "description": "是否启用该工具(可选)"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["type", "command"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["stdio"],
+                "description": "MCP客户端类型"
+              },
+              "command": {
+                "type": "string",
+                "description": "要执行的命令"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "命令参数列表(可选)"
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "环境变量(可选)"
+              },
+              "name": {
+                "type": "string",
+                "description": "工具名称(可选)"
+              },
+              "enable": {
+                "type": "boolean",
+                "default": true,
+                "description": "是否启用该工具(可选)"
+              }
+            }
+          }
+        ]
+      }
+    },
     "ENV": {
       "type": "object",
       "description": "Additional environment variables to set",

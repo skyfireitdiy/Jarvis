@@ -2,7 +2,7 @@
 import os
 from functools import lru_cache
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
 import yaml
@@ -229,3 +229,13 @@ def is_print_prompt() -> bool:
         bool: 如果打印提示则返回True，默认为True
     """
     return GLOBAL_CONFIG_DATA.get('JARVIS_PRINT_PROMPT', 'false') == 'true'
+
+
+def get_mcp_config() -> List[Dict[str, Any]]:
+    """
+    获取MCP配置列表。
+
+    返回:
+        List[Dict[str, Any]]: MCP配置项列表，如果未配置则返回空列表
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_MCP", [])
