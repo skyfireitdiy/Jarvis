@@ -68,7 +68,7 @@ def init_env(welcome_str: str) -> None:
     if not config_file.exists():
         old_config_file = jarvis_dir / "env"
         if old_config_file.exists():# 旧的配置文件存在
-            _read_old_config_file(config_file)
+            _read_old_config_file(old_config_file)
     else:
         _read_config_file(jarvis_dir, config_file)        
 
