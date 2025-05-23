@@ -1,25 +1,32 @@
 # -*- coding: utf-8 -*-
+# 标准库导入
 import datetime
 import platform
-from typing import Any, Callable, List, Optional, Tuple, Union, Protocol
+from typing import Any, Callable, List, Optional, Protocol, Tuple, Union
 
-from yaspin import yaspin # type: ignore
+# 第三方库导入
+from yaspin import yaspin  # type: ignore
 
-from jarvis.jarvis_agent.output_handler import OutputHandler
+# 本地库导入
+# jarvis_agent 相关
+# jarvis_platform 相关
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+# jarvis_utils 相关
+from jarvis.jarvis_utils.config import (get_max_token_count,
+                                        get_max_tool_call_count,
+                                        is_auto_complete,
+                                        is_execute_tool_confirm,
+                                        is_use_analysis, is_use_methodology)
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.config import get_max_tool_call_count, is_auto_complete, is_execute_tool_confirm, is_use_analysis, is_use_methodology
-from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
-from jarvis.jarvis_utils.globals import make_agent_name, set_agent, delete_agent
+from jarvis.jarvis_utils.globals import (delete_agent, make_agent_name,
+                                         set_agent)
 from jarvis.jarvis_utils.input import get_multiline_input
-from jarvis.jarvis_utils.config import get_max_token_count
+from jarvis.jarvis_utils.methodology import (load_methodology,
+                                             upload_methodology)
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import user_confirm
-
-from jarvis.jarvis_platform.registry import PlatformRegistry
-
 
 origin_agent_system_prompt = f"""
 <role>
@@ -105,14 +112,20 @@ origin_agent_system_prompt = f"""
 
 
 class OutputHandlerProtocol(Protocol):
-    def name(self) -> str: ...
-    def can_handle(self, response: str) -> bool: ...
-    def prompt(self) -> str: ...
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
+    def name(self) -> str:
+        ...
+
+    def can_handle(self, response: str) -> bool:
+        ...
+
+    def prompt(self) -> str:
+        ...
+
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
+        ...
 
 
 class Agent:
-
     def set_summary_prompt(self, summary_prompt: str):
         """设置任务完成时的总结提示模板。
 
@@ -129,30 +142,31 @@ class Agent:
         2. 重置对话长度计数器
         3. 清空当前提示
         """
-        self.model.reset() # type: ignore
+        self.model.reset()  # type: ignore
         self.conversation_length = 0
         self.prompt = ""
 
     def __del__(self):
         delete_agent(self.name)
 
-
-    def __init__(self,
-                 system_prompt: str,
-                 name: str = "Jarvis",
-                 description: str = "",
-                 platform: Union[Optional[BasePlatform], Optional[str]] = None,
-                 model_name: Optional[str] = None,
-                 summary_prompt: Optional[str] = None,
-                 auto_complete: Optional[bool] = None,
-                 output_handler: List[OutputHandlerProtocol] = [],
-                 use_tools: List[str] = [],
-                 input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
-                 execute_tool_confirm: Optional[bool] = None,
-                 need_summary: bool = True,
-                 multiline_inputer: Optional[Callable[[str], str]] = None,
-                 use_methodology: Optional[bool] = None,
-                 use_analysis: Optional[bool] = None):
+    def __init__(
+        self,
+        system_prompt: str,
+        name: str = "Jarvis",
+        description: str = "",
+        platform: Union[Optional[BasePlatform], Optional[str]] = None,
+        model_name: Optional[str] = None,
+        summary_prompt: Optional[str] = None,
+        auto_complete: Optional[bool] = None,
+        output_handler: List[OutputHandlerProtocol] = [],
+        use_tools: List[str] = [],
+        input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
+        execute_tool_confirm: Optional[bool] = None,
+        need_summary: bool = True,
+        multiline_inputer: Optional[Callable[[str], str]] = None,
+        use_methodology: Optional[bool] = None,
+        use_analysis: Optional[bool] = None,
+    ):
         """初始化Jarvis Agent实例
 
         参数:
@@ -184,7 +198,9 @@ class Agent:
             else:
                 self.model = platform
         else:
-            self.model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+            self.model = (
+                PlatformRegistry.get_global_platform_registry().get_normal_platform()
+            )
 
         if model_name is not None:
             self.model.set_model_name(model_name)
@@ -192,13 +208,20 @@ class Agent:
         self.model.set_suppress_output(False)
 
         from jarvis.jarvis_tools.registry import ToolRegistry
+
         self.output_handler = output_handler if output_handler else [ToolRegistry()]
         self.set_use_tools(use_tools)
 
-        self.multiline_inputer = multiline_inputer if multiline_inputer else get_multiline_input
+        self.multiline_inputer = (
+            multiline_inputer if multiline_inputer else get_multiline_input
+        )
 
-        self.use_methodology = use_methodology if use_methodology is not None else is_use_methodology()
-        self.use_analysis = use_analysis if use_analysis is not None else is_use_analysis()
+        self.use_methodology = (
+            use_methodology if use_methodology is not None else is_use_methodology()
+        )
+        self.use_analysis = (
+            use_analysis if use_analysis is not None else is_use_analysis()
+        )
         self.prompt = ""
         self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
@@ -211,10 +234,16 @@ class Agent:
         self.max_tool_call_count = get_max_tool_call_count()
         self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
 
+        self.execute_tool_confirm = (
+            execute_tool_confirm
+            if execute_tool_confirm is not None
+            else is_execute_tool_confirm()
+        )
 
-        self.execute_tool_confirm = execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm()
-
-        self.summary_prompt = summary_prompt if summary_prompt else f"""<report>
+        self.summary_prompt = (
+            summary_prompt
+            if summary_prompt
+            else f"""<report>
 请生成任务执行的简明总结报告，包括：
 
 <content>
@@ -230,9 +259,12 @@ class Agent:
 </format>
 </report>
 """
+        )
 
-        self.max_token_count =  get_max_token_count()
-        self.auto_complete = auto_complete if auto_complete is not None else is_auto_complete()
+        self.max_token_count = get_max_token_count()
+        self.auto_complete = (
+            auto_complete if auto_complete is not None else is_auto_complete()
+        )
         welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"
 
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
@@ -245,7 +277,9 @@ class Agent:
 
         # 添加工具列表概览
         action_prompt += "\n<overview>\n## Action List\n"
-        action_prompt += "[" + ", ".join([handler.name() for handler in self.output_handler]) + "]"
+        action_prompt += (
+            "[" + ", ".join([handler.name() for handler in self.output_handler]) + "]"
+        )
         action_prompt += "\n</overview>"
 
         # 添加每个工具的详细说明
@@ -255,8 +289,10 @@ class Agent:
             # 获取工具的提示词并确保格式正确
             handler_prompt = handler.prompt().strip()
             # 调整缩进以保持层级结构
-            handler_prompt = "\n".join("   " + line if line.strip() else line
-                                      for line in handler_prompt.split("\n"))
+            handler_prompt = "\n".join(
+                "   " + line if line.strip() else line
+                for line in handler_prompt.split("\n")
+            )
             action_prompt += handler_prompt + "\n</tool>\n"
 
         # 添加工具使用总结
@@ -274,22 +310,24 @@ class Agent:
 </actions>
 """
 
-        self.model.set_system_message(f"""
+        self.model.set_system_message(
+            f"""
 {self.system_prompt}
 
 {action_prompt}
-""")
+"""
+        )
         self.first = True
 
     def set_use_tools(self, use_tools):
         """设置要使用的工具列表"""
         from jarvis.jarvis_tools.registry import ToolRegistry
+
         for handler in self.output_handler:
             if isinstance(handler, ToolRegistry):
                 if use_tools:
                     handler.use_tools(use_tools)
                 break
-
 
     def set_addon_prompt(self, addon_prompt: str):
         """设置附加提示。
@@ -299,7 +337,7 @@ class Agent:
         """
         self.addon_prompt = addon_prompt
 
-    def set_after_tool_call_cb(self, cb: Callable[[Any], None]): # type: ignore
+    def set_after_tool_call_cb(self, cb: Callable[[Any], None]):  # type: ignore
         """设置工具调用后回调函数。
 
         参数:
@@ -310,6 +348,7 @@ class Agent:
     def get_tool_registry(self) -> Optional[Any]:
         """获取工具注册表实例"""
         from jarvis.jarvis_tools.registry import ToolRegistry
+
         for handler in self.output_handler:
             if isinstance(handler, ToolRegistry):
                 return handler
@@ -326,7 +365,11 @@ class Agent:
         action_handlers = ", ".join([handler.name() for handler in self.output_handler])
 
         # 任务完成提示
-        complete_prompt = f"- 输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
+        complete_prompt = (
+            f"- 输出{ot('!!!COMPLETE!!!')}"
+            if need_complete and self.auto_complete
+            else ""
+        )
 
         addon_prompt = f"""
 [系统提示开始]
@@ -378,8 +421,7 @@ class Agent:
         if self.conversation_length > self.max_token_count:
             message = self._summarize_and_clear_history() + "\n\n" + message
             self.conversation_length += get_context_token_count(message)
-        return self.model.chat_until_success(message)   # type: ignore
-
+        return self.model.chat_until_success(message)  # type: ignore
 
     def _summarize_and_clear_history(self) -> str:
         """总结当前对话并清理历史记录
@@ -400,7 +442,6 @@ class Agent:
         # Create a new model instance to summarize, avoid affecting the main conversation
 
         with yaspin(text="正在总结对话历史...", color="cyan") as spinner:
-
             summary_prompt = """
 <summary_request>
 <objective>
@@ -426,9 +467,9 @@ class Agent:
 
             try:
                 with spinner.hidden():
-                    summary = self.model.chat_until_success(self.prompt + "\n" + summary_prompt) # type: ignore
+                    summary = self.model.chat_until_success(self.prompt + "\n" + summary_prompt)  # type: ignore
 
-                self.model.reset() # type: ignore
+                self.model.reset()  # type: ignore
 
                 # 清空当前对话历史，但保留系统消息
                 self.conversation_length = 0  # Reset conversation length
@@ -436,7 +477,7 @@ class Agent:
                 # 添加总结作为新的上下文
                 spinner.text = "总结对话历史完成"
                 spinner.ok("✅")
-                return  f"""<summary>
+                return f"""<summary>
 <header>
 以下是之前对话的关键信息总结：
 </header>
@@ -476,18 +517,29 @@ class Agent:
             if handler.can_handle(response):
                 tool_list.append(handler)
         if len(tool_list) > 1:
-            PrettyOutput.print(f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}", OutputType.WARNING)
-            return False, f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}"
+            PrettyOutput.print(
+                f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}",
+                OutputType.WARNING,
+            )
+            return (
+                False,
+                f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}",
+            )
         if len(tool_list) == 0:
             return False, ""
-        if self.max_tool_call_count > 0 and self.tool_call_count >= self.max_tool_call_count:
+        if (
+            self.max_tool_call_count > 0
+            and self.tool_call_count >= self.max_tool_call_count
+        ):
             if user_confirm(f"工具调用次数超过限制，是否继续执行？", True):
                 self.reset_tool_call_count()
             else:
                 return False, ""
         if self.execute_tool_confirm:
             self.reset_tool_call_count()
-        if not self.execute_tool_confirm or user_confirm(f"需要执行{tool_list[0].name()}确认执行？", True):
+        if not self.execute_tool_confirm or user_confirm(
+            f"需要执行{tool_list[0].name()}确认执行？", True
+        ):
             with yaspin(text=f"正在执行{tool_list[0].name()}...", color="cyan") as spinner:
                 with spinner.hidden():
                     result = tool_list[0].handle(response, self)
@@ -496,10 +548,9 @@ class Agent:
                 self.tool_call_count += 1
                 return result
         return False, ""
-    
+
     def reset_tool_call_count(self):
         self.tool_call_count = 0
-
 
     def _complete_task(self) -> str:
         """完成任务并生成总结(如果需要)
@@ -518,7 +569,7 @@ class Agent:
             with yaspin(text="正在生成总结...", color="cyan") as spinner:
                 self.prompt = self.summary_prompt
                 with spinner.hidden():
-                    ret = self.model.chat_until_success(self.prompt) # type: ignore
+                    ret = self.model.chat_until_success(self.prompt)  # type: ignore
                     spinner.text = "总结生成完成"
                     spinner.ok("✅")
                     return ret
@@ -677,7 +728,7 @@ arguments:
 
                 self.prompt = analysis_prompt
                 with spinner.hidden():
-                    response = self.model.chat_until_success(self.prompt) # type: ignore
+                    response = self.model.chat_until_success(self.prompt)  # type: ignore
 
                 with spinner.hidden():
                     self._call_tools(response)
@@ -686,7 +737,6 @@ arguments:
             except Exception as e:
                 spinner.text = "分析失败"
                 spinner.fail("❌")
-
 
     def run(self, user_input: str) -> Any:
         """处理用户输入并执行任务
@@ -709,9 +759,8 @@ arguments:
             self.prompt = f"{user_input}"
 
             if self.first and self.use_methodology:
-                
                 # 先尝试上传方法轮
-                platform = self.model if hasattr(self.model, 'upload_files') else None
+                platform = self.model if hasattr(self.model, "upload_files") else None
                 if platform and upload_methodology(platform):
                     self.prompt = f"{user_input}\n\n方法论已上传到平台，请参考平台上的方法论内容"
                 else:
@@ -720,7 +769,7 @@ arguments:
                         msg, _ = handler(msg, self)
                     # 上传失败则回退到本地加载
                     self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
-                
+
                 self.first = False
 
             self.conversation_length = get_context_token_count(self.prompt)
@@ -730,7 +779,9 @@ arguments:
 
                     current_response = self._call_model(self.prompt, True)
                     self.prompt = ""
-                    self.conversation_length += get_context_token_count(current_response)
+                    self.conversation_length += get_context_token_count(
+                        current_response
+                    )
 
                     need_return, self.prompt = self._call_tools(current_response)
 
@@ -745,11 +796,13 @@ arguments:
 
                     if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
                         return self._complete_task()
-                    
+
                     self.reset_tool_call_count()
 
                     # 获取用户输入
-                    user_input = self.multiline_inputer(f"{self.name}: 请输入，或输入空行来结束当前任务：")
+                    user_input = self.multiline_inputer(
+                        f"{self.name}: 请输入，或输入空行来结束当前任务："
+                    )
 
                     if user_input:
                         self.prompt = user_input
@@ -778,8 +831,5 @@ arguments:
             用于重置Agent状态而不影响系统消息
         """
         self.prompt = ""
-        self.model.reset() # type: ignore
+        self.model.reset()  # type: ignore
         self.conversation_length = 0  # 重置对话长度
-
-
-
