@@ -53,15 +53,17 @@ pip3 install jarvis-ai-assistant
 
 ### 最小化配置
 
-#### 腾讯元宝
-```bash
-JARVIS_PLATFORM=yuanbao
-JARVIS_MODEL=deep_seek_v3
-JARVIS_THINKING_PLATFORM=yuanbao
-JARVIS_THINKING_MODEL=deep_seek
+将以下配置写入到`~/.jarvis/env`文件中。
 
-YUANBAO_COOKIES=<元宝cookies>
-YUANBAO_AGENT_ID=<元宝AgentID>
+#### 腾讯元宝
+```yaml
+JARVIS_PLATFORM: yuanbao
+JARVIS_MODEL: deep_seek_v3
+JARVIS_THINKING_PLATFORM: yuanbao
+JARVIS_THINKING_MODEL: deep_seek
+
+YUANBAO_COOKIES: <元宝cookies>
+YUANBAO_AGENT_ID: <元宝AgentID>
 ```
 
 元宝cookies以及AgentID获取方式：
@@ -72,13 +74,13 @@ YUANBAO_AGENT_ID=<元宝AgentID>
 
 
 #### Kimi
-```bash
-JARVIS_PLATFORM=kimi
-JARVIS_MODEL=kimi
-JARVIS_THINKING_PLATFORM=kimi
-JARVIS_THINKING_MODEL=k1
+```yaml
+JARVIS_PLATFORM: kimi
+JARVIS_MODEL: kimi
+JARVIS_THINKING_PLATFORM: kimi
+JARVIS_THINKING_MODEL: k1
 
-KIMI_API_KEY=<Kimi API KEY>
+KIMI_API_KEY: <Kimi API KEY>
 ```
 
 Kimi API Key获取方式：
@@ -89,14 +91,14 @@ Kimi API Key获取方式：
 
 
 #### OpenAI
-```bash
-JARVIS_PLATFORM=openai
-JARVIS_MODEL=gpt-4o  # 默认模型，可选gpt-4-turbo, gpt-3.5-turbo等
-JARVIS_THINKING_PLATFORM=openai
-JARVIS_THINKING_MODEL=gpt-4o
+```yaml
+JARVIS_PLATFORM: openai
+JARVIS_MODEL: gpt-4o  # 默认模型，可选gpt-4-turbo, gpt-3.5-turbo等
+JARVIS_THINKING_PLATFORM: openai
+JARVIS_THINKING_MODEL: gpt-4o
 
-OPENAI_API_KEY=<OpenAI API Key>
-OPENAI_API_BASE=https://api.openai.com/v1  # 可选，默认为官方API地址
+OPENAI_API_KEY: <OpenAI API Key>
+OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 ```
 
 配置说明：
