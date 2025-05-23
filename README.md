@@ -8,15 +8,7 @@
 
 *您的智能开发和系统交互助手*
 
-[核心特色](#core-features) •
-[视频介绍](#video-introduction) •
-[快速开始](#quick-start) •
-[配置说明](#configuration) •
-[工具说明](#tools) •
-[扩展开发](#extensions) •
-[贡献指南](#contributing) •
-[许可证](#license) •
-[Wiki文档](https://deepwiki.com/skyfireitdiy/Jarvis)
+[核心特色](#core-features) • [视频介绍](#video-introduction) • [快速开始](#quick-start) • [配置说明](#configuration) • [工具说明](#tools) • [扩展开发](#extensions) • [贡献指南](#contributing) • [许可证](#license) • [Wiki文档](https://deepwiki.com/skyfireitdiy/Jarvis)
 </div>
 
 ---
