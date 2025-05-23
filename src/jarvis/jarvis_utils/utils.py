@@ -3,7 +3,6 @@ import hashlib
 import os
 import tarfile
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict
 
@@ -201,9 +200,7 @@ def _update_cmd_stats(cmd_name: str) -> None:
 def count_cmd_usage() -> None:
     """统计当前命令的使用次数"""
     import sys
-    if len(sys.argv) > 1:
-        cmd_name = sys.argv[1]
-        _update_cmd_stats(cmd_name)
+    _update_cmd_stats(sys.argv[0])
 
 def is_context_overflow(content: str) -> bool:
     """判断文件内容是否超出上下文限制"""
