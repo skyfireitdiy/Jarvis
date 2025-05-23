@@ -245,7 +245,7 @@ class Agent:
 
         # 添加工具列表概览
         action_prompt += "\n<overview>\n## Action List\n"
-        action_prompt += ", ".join([handler.name() for handler in self.output_handler])
+        action_prompt += "[" + ", ".join([handler.name() for handler in self.output_handler]) + "]"
         action_prompt += "\n</overview>"
 
         # 添加每个工具的详细说明
@@ -323,7 +323,7 @@ class Agent:
 
         """
         # 结构化系统指令
-        action_handlers = '\n'.join([f'- {handler.name()}' for handler in self.output_handler])
+        action_handlers = ", ".join([handler.name() for handler in self.output_handler])
 
         # 任务完成提示
         complete_prompt = f"- 输出{ot('!!!COMPLETE!!!')}" if need_complete and self.auto_complete else ""
@@ -337,8 +337,7 @@ class Agent:
     - 仅包含一个操作
     - 如果信息不明确，请请求用户补充
     - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
-    - 操作列表：
-    {action_handlers}
+    - 操作列表：{action_handlers}
 [系统提示结束]
 
 请继续。
