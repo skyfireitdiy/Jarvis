@@ -16,14 +16,14 @@ from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 
 
 def init_env(welcome_str: str) -> None:
-    '''初始化环境变量从jarvis_data/env文件
+    """初始化环境变量从jarvis_data/env文件
     功能：
     1. 创建不存在的jarvis_data目录
     2. 加载环境变量到os.environ
     3. 处理文件读取异常
     4. 检查git仓库状态并在落后时更新
     5. 统计当前命令使用次数
-    '''
+    """
     count_cmd_usage()
 
     jarvis_ascii_art = f"""
