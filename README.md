@@ -268,42 +268,36 @@ class CustomTool:
 
 
 ### 添加MCP
-MCP(模型上下文协议)。在`~/.jarvis/tools/mcp/`中创建YAML配置文件：
+MCP(模型上下文协议)支持两种配置方式：
 
-#### 本地MCP配置（`stdio`模式）
+#### 1. 通过配置文件配置（推荐）
+在`~/.jarvis/config.yaml`中添加`JARVIS_MCP`配置项：
 ```yaml
-type: stdio
+JARVIS_MCP:
+  - type: stdio  # 或 sse/streamable
+    name: MCP名称
+    command: 可执行命令  # stdio模式必填
+    base_url: http://example.com/api  # sse/streamable模式必填
+    args: [参数列表]  # 可选
+    env:  # 可选环境变量
+      KEY: VALUE
+    enable: true  # 可选，默认为true
+```
+
+#### 2. 通过文件配置（将在未来版本中废弃）
+在`~/.jarvis/tools/mcp/`中创建YAML配置文件：
+```yaml
+type: stdio  # 或 sse/streamable
 name: MCP名称
-command: 可执行命令
+command: 可执行命令  # stdio模式必填
+base_url: http://example.com/api  # sse/streamable模式必填
 args: [参数列表]  # 可选
 env:  # 可选环境变量
   KEY: VALUE
-enable: true  # 可选，默认为true，表示是否启用该MCP
+enable: true  # 可选，默认为true
 ```
 
-#### 远程MCP配置（`sse`模式）
-```yaml
-type: sse
-name: MCP名称
-base_url: http://example.com/api
-auth_token: 认证令牌  # 可选
-headers:  # 可选HTTP头
-  X-Custom-Header: value
-enable: true  # 可选，默认为true，表示是否启用该MCP
-```
-
-#### 流式MCP配置（`streamable`模式）
-```yaml
-type: streamable
-name: MCP名称
-base_url: http://example.com/api  # 必填
-auth_token: 认证令牌  # 可选
-headers:  # 可选HTTP头
-  Content-Type: application/json  # 自动添加
-  Accept: application/json  # 自动添加
-  X-Custom-Header: value  # 自定义头
-enable: true  # 可选，默认为true，表示是否启用该MCP
-```
+注意：文件配置方式将在未来版本中移除，请尽快迁移到环境变量配置方式。
 
 
 ### 添加新大模型平台

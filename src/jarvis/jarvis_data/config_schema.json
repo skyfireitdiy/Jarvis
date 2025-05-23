@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Jarvis Environment Variables Schema",
-  "description": "Schema for Jarvis system environment variables configuration",
+  "description": "Schema for Jarvis system configuration",
   "type": "object",
   "properties": {
     "JARVIS_MCP": {
@@ -12,11 +12,17 @@
         "oneOf": [
           {
             "type": "object",
-            "required": ["type", "base_url"],
+            "required": [
+              "type",
+              "base_url"
+            ],
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["sse", "streamable"],
+                "enum": [
+                  "sse",
+                  "streamable"
+                ],
                 "description": "MCP客户端类型"
               },
               "base_url": {
@@ -48,11 +54,16 @@
           },
           {
             "type": "object",
-            "required": ["type", "command"],
+            "required": [
+              "type",
+              "command"
+            ],
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["stdio"],
+                "enum": [
+                  "stdio"
+                ],
                 "description": "MCP客户端类型"
               },
               "command": {
