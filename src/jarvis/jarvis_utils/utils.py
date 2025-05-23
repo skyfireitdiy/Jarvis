@@ -94,6 +94,7 @@ def init_env(welcome_str: str) -> None:
                     config_data[current_key] = "\n".join(current_value).strip().strip("'").strip('"')
                 os.environ.update({str(k): str(v) for k, v in config_data.items() if v is not None})
                 set_global_env_data(config_data)
+            PrettyOutput.print(f"检测到旧格式配置文件，旧格式以后将不再支持，请尽快迁移到新格式", OutputType.WARNING)
     else:
         # 读取新的配置
         try:
