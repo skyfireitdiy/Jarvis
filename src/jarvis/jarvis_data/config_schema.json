@@ -31,7 +31,10 @@
       "type": "string",
       "description": "Whether to enable auto-completion feature",
       "default": "false",
-      "enum": ["true", "false"]
+      "enum": [
+        "true",
+        "false"
+      ]
     },
     "SHELL": {
       "type": "string",
@@ -62,13 +65,19 @@
       "type": "string",
       "description": "Whether to require confirmation before executing tools",
       "default": "false",
-      "enum": ["true", "false"]
+      "enum": [
+        "true",
+        "false"
+      ]
     },
     "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
       "type": "string",
       "description": "Whether to require confirmation before applying patches",
       "default": "true",
-      "enum": ["true", "false"]
+      "enum": [
+        "true",
+        "false"
+      ]
     },
     "JARVIS_MAX_TOOL_CALL_COUNT": {
       "type": "string",
@@ -84,7 +93,10 @@
       "type": "string",
       "description": "Whether to auto-update git repositories",
       "default": "true",
-      "enum": ["true", "false"]
+      "enum": [
+        "true",
+        "false"
+      ]
     },
     "JARVIS_MAX_BIG_CONTENT_SIZE": {
       "type": "string",
@@ -95,55 +107,37 @@
       "type": "string",
       "description": "Whether to enable PrettyOutput",
       "default": "false",
-      "enum": ["true", "false"]
+      "enum": [
+        "true",
+        "false"
+      ]
     },
     "JARVIS_USE_METHODOLOGY": {
       "type": "string",
       "description": "Whether to enable methodology",
       "default": "false",
-      "enum": ["true", "false"]
+      "enum": [
+        "true",
+        "false"
+      ]
     },
     "JARVIS_USE_ANALYSIS": {
       "type": "string",
       "description": "Whether to enable task analysis",
       "default": "false",
-      "enum": ["true", "false"]
+      "enum": [
+        "true",
+        "false"
+      ]
     },
     "JARVIS_PRINT_PROMPT": {
       "type": "string",
       "description": "Whether to print prompts",
       "default": "false",
-      "enum": ["true", "false"]
-    },
-    "KIMI_API_KEY": {
-      "type": "string",
-      "description": "API key for Kimi platform authentication",
-      "default": ""
-    },
-    "OPENAI_API_KEY": {
-      "type": "string",
-      "description": "API key for OpenAI platform authentication",
-      "default": ""
-    },
-    "OPENAI_API_BASE": {
-      "type": "string",
-      "description": "Base URL for OpenAI API, defaults to https://api.openai.com/v1",
-      "default": "https://api.openai.com/v1"
-    },
-    "OPENAI_MODEL_NAME": {
-      "type": "string",
-      "description": "Default model name for OpenAI platform",
-      "default": "gpt-4o"
-    },
-    "YUANBAO_COOKIES": {
-      "type": "string",
-      "description": "Authentication cookies for Yuanbao platform",
-      "default": ""
-    },
-    "YUANBAO_AGENT_ID": {
-      "type": "string",
-      "description": "Agent ID for Yuanbao platform authentication",
-      "default": ""
+      "enum": [
+        "true",
+        "false"
+      ]
     }
   },
   "additionalProperties": false
