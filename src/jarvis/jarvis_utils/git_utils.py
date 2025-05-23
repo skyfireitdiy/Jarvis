@@ -101,18 +101,25 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
 
 
 def get_diff() -> str:
-    """使用git获取工作区差异
+    """使用git获取工作区差异，包括修改和新增的文件内容
     
     返回:
         str: 差异内容或错误信息
     """
     try:
+        # 暂存新增文件
+        subprocess.run(['git', 'add', '-N', '.'], check=True)
+        
+        # 获取所有差异（包括新增文件）
         result = subprocess.run(
             ['git', 'diff', 'HEAD'],
             capture_output=True,
             text=False,
             check=True
         )
+        
+        # 重置暂存区
+        subprocess.run(['git', 'reset'], check=True)
         
         try:
             return result.stdout.decode('utf-8')
@@ -321,17 +328,24 @@ def check_and_update_git_repo(repo_path: str) -> bool:
 
 
 def get_diff_file_list() -> List[str]:
-    """获取HEAD到当前变更的文件列表
+    """获取HEAD到当前变更的文件列表，包括修改和新增的文件
     
     返回:
-        List[str]: 修改的文件路径列表
+        List[str]: 修改和新增的文件路径列表
     """
     try:
+        # 暂存新增文件
+        subprocess.run(['git', 'add', '-N', '.'], check=True)
+        
+        # 获取所有差异文件（包括新增文件）
         result = subprocess.run(
             ['git', 'diff', '--name-only', 'HEAD'],
             capture_output=True,
             text=True
         )
+        
+        # 重置暂存区
+        subprocess.run(['git', 'reset'], check=True)
         
         if result.returncode != 0:
             PrettyOutput.print(f"获取差异文件列表失败: {result.stderr}", OutputType.ERROR)
