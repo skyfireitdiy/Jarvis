@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import hashlib
 import os
+import subprocess
 import tarfile
 import time
 from pathlib import Path
@@ -262,3 +263,19 @@ def count_cmd_usage() -> None:
 def is_context_overflow(content: str) -> bool:
     """判断文件内容是否超出上下文限制"""
     return get_context_token_count(content) > get_max_big_content_size() 
+
+def get_loc_stats() -> str:
+    """使用loc命令获取当前目录的代码统计信息
+    
+    返回:
+        str: loc命令输出的原始字符串，失败时返回空字符串
+    """
+    try:
+        result = subprocess.run(
+            ['loc'],
+            capture_output=True,
+            text=True
+        )
+        return result.stdout if result.returncode == 0 else ""
+    except FileNotFoundError:
+        return ""

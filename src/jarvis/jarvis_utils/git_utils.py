@@ -12,7 +12,7 @@ Git工具模块
 import os
 import re
 import subprocess
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from jarvis.jarvis_utils.config import (get_auto_update,
                                         is_confirm_before_apply_patch)
@@ -375,4 +375,64 @@ def get_diff_file_list() -> List[str]:
         return []
     except Exception as e:
         PrettyOutput.print(f"获取差异文件列表异常: {str(e)}", OutputType.ERROR)
+        return []
+
+
+
+def get_recent_commits_with_files() -> List[Dict[str, Any]]:
+    """获取最近5次提交的commit信息和文件清单
+    
+    返回:
+        List[Dict[str, Any]]: 包含commit信息和文件清单的字典列表，格式为:
+            [
+                {
+                    'hash': 提交hash,
+                    'message': 提交信息,
+                    'author': 作者,
+                    'date': 提交日期,
+                    'files': [修改的文件列表] (最多20个文件)
+                },
+                ...
+            ]
+            失败时返回空列表
+    """
+    try:
+        # 获取最近5次提交的基本信息
+        result = subprocess.run(
+            ['git', 'log', '-5', '--pretty=format:%H%n%s%n%an%n%ad'],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            return []
+
+        # 解析提交信息
+        commits = []
+        lines = result.stdout.splitlines()
+        for i in range(0, len(lines), 4):
+            if i + 3 >= len(lines):
+                break
+            commit = {
+                'hash': lines[i],
+                'message': lines[i+1],
+                'author': lines[i+2],
+                'date': lines[i+3],
+                'files': []
+            }
+            commits.append(commit)
+
+        # 获取每个提交的文件修改清单
+        for commit in commits:
+            files_result = subprocess.run(
+                ['git', 'show', '--name-only', '--pretty=format:', commit['hash']],
+                capture_output=True,
+                text=True
+            )
+            if files_result.returncode == 0:
+                files = list(set(filter(None, files_result.stdout.splitlines())))
+                commit['files'] = files[:20]  # 限制最多20个文件
+
+        return commits
+
+    except subprocess.CalledProcessError:
         return []

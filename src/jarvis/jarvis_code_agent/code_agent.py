@@ -8,7 +8,7 @@ import argparse
 import os
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from yaspin import yaspin  # type: ignore
 
@@ -24,12 +24,12 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import (find_git_root, get_commits_between,
                                            get_diff, get_diff_file_list,
-                                           get_latest_commit_hash,
+                                           get_latest_commit_hash, get_recent_commits_with_files,
                                            handle_commit_workflow,
                                            has_uncommitted_changes)
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env, user_confirm
+from jarvis.jarvis_utils.utils import get_loc_stats, init_env, user_confirm
 
 
 class CodeAgent:
@@ -129,82 +129,8 @@ class CodeAgent:
         """
         return self.root_dir
 
-    def get_loc_stats(self) -> str:
-        """使用loc命令获取当前目录的代码统计信息
-        
-        返回:
-            str: loc命令输出的原始字符串，失败时返回空字符串
-        """
-        try:
-            result = subprocess.run(
-                ['loc'],
-                cwd=self.root_dir,
-                capture_output=True,
-                text=True
-            )
-            return result.stdout if result.returncode == 0 else ""
-        except FileNotFoundError:
-            return ""
 
-    def get_recent_commits_with_files(self) -> List[Dict[str, Any]]:
-        """获取最近5次提交的commit信息和文件清单
-        
-        返回:
-            List[Dict[str, Any]]: 包含commit信息和文件清单的字典列表，格式为:
-                [
-                    {
-                        'hash': 提交hash,
-                        'message': 提交信息,
-                        'author': 作者,
-                        'date': 提交日期,
-                        'files': [修改的文件列表] (最多20个文件)
-                    },
-                    ...
-                ]
-                失败时返回空列表
-        """
-        try:
-            # 获取最近5次提交的基本信息
-            result = subprocess.run(
-                ['git', 'log', '-5', '--pretty=format:%H%n%s%n%an%n%ad'],
-                cwd=self.root_dir,
-                capture_output=True,
-                text=True
-            )
-            if result.returncode != 0:
-                return []
 
-            # 解析提交信息
-            commits = []
-            lines = result.stdout.splitlines()
-            for i in range(0, len(lines), 4):
-                if i + 3 >= len(lines):
-                    break
-                commit = {
-                    'hash': lines[i],
-                    'message': lines[i+1],
-                    'author': lines[i+2],
-                    'date': lines[i+3],
-                    'files': []
-                }
-                commits.append(commit)
-
-            # 获取每个提交的文件修改清单
-            for commit in commits:
-                files_result = subprocess.run(
-                    ['git', 'show', '--name-only', '--pretty=format:', commit['hash']],
-                    cwd=self.root_dir,
-                    capture_output=True,
-                    text=True
-                )
-                if files_result.returncode == 0:
-                    files = list(set(filter(None, files_result.stdout.splitlines())))
-                    commit['files'] = files[:20]  # 限制最多20个文件
-
-            return commits
-
-        except subprocess.CalledProcessError:
-            return []
 
     def _init_env(self) -> None:
         """初始化环境，包括：
@@ -317,8 +243,8 @@ class CodeAgent:
             start_commit = get_latest_commit_hash()
 
             # 获取项目统计信息并附加到用户输入
-            loc_stats = self.get_loc_stats()
-            commits_info = self.get_recent_commits_with_files()
+            loc_stats = get_loc_stats()
+            commits_info = get_recent_commits_with_files()
             
             project_info = []
             if loc_stats:
