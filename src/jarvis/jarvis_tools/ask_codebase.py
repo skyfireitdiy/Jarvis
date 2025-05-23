@@ -4,9 +4,9 @@ from typing import Any, Dict
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.git_utils import find_git_root
+from jarvis.jarvis_utils.git_utils import find_git_root, get_recent_commits_with_files
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import get_loc_stats, init_env
 
 
 class AskCodebaseTool:
@@ -104,7 +104,28 @@ class AskCodebaseTool:
 
                 # Run agent and get result
                 task_input = f"回答关于代码库的问题: {question}"
-                result = analyzer_agent.run(task_input)
+
+
+                # 获取项目统计信息并附加到用户输入
+                loc_stats = get_loc_stats()
+                commits_info = get_recent_commits_with_files()
+                
+                project_info = []
+                if loc_stats:
+                    project_info.append(f"代码统计:\n{loc_stats}")
+                if commits_info:
+                    commits_str = "\n".join(
+                        f"提交 {i+1}: {commit['hash'][:7]} - {commit['message']} ({len(commit['files'])}个文件)\n" +
+                        "\n".join(f"    - {file}" for file in commit['files'][:5]) + 
+                        ("\n    ..." if len(commit['files']) > 5 else "")
+                        for i, commit in enumerate(commits_info)
+                    )
+                    project_info.append(f"最近提交:\n{commits_str}")
+                
+                enhanced_input = f"项目概况:\n" + "\n\n".join(project_info) + "\n\n" + task_input if project_info else task_input
+
+
+                result = analyzer_agent.run(enhanced_input)
 
                 return {
                     "success": True,
