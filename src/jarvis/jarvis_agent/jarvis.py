@@ -2,24 +2,25 @@
 import argparse
 import os
 import sys
+from typing import Dict
 
-from typing import Dict, List, Tuple  # 增加必要的类型导入
-
-from jarvis.jarvis_utils.config import get_data_dir
-from prompt_toolkit import prompt
 import yaml
+from prompt_toolkit import prompt
 from yaspin import yaspin
+
 from jarvis.jarvis_agent import (
-     PrettyOutput, OutputType,
-     get_multiline_input,
-     user_confirm,
-     Agent,
-     origin_agent_system_prompt
+    Agent,
+    OutputType,
+    PrettyOutput,
+    get_multiline_input,
+    origin_agent_system_prompt,
+    user_confirm
 )
-from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils.utils import init_env
-from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
+from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.utils import init_env
 
 
 def _load_tasks() -> Dict[str, str]:
