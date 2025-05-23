@@ -139,7 +139,7 @@ def get_diff() -> str:
 
 
 
-def revert_file(filepath: str):
+def revert_file(filepath: str) -> None:
     """增强版git恢复，处理新文件"""
     import subprocess
     try:
@@ -162,7 +162,7 @@ def revert_file(filepath: str):
 # 修改后的恢复函数
 
 
-def revert_change():
+def revert_change() -> None:
     """恢复所有未提交的修改到HEAD状态"""
     import subprocess
     try:
@@ -176,7 +176,7 @@ def revert_change():
             subprocess.run(['git', 'reset', '--hard', 'HEAD'], check=True)
         subprocess.run(['git', 'clean', '-fd'], check=True)
     except subprocess.CalledProcessError as e:
-        return f"恢复更改失败: {str(e)}"
+        PrettyOutput.print(f"恢复更改失败: {str(e)}", OutputType.ERROR)
 
 
 def handle_commit_workflow() -> bool:
@@ -192,15 +192,15 @@ def handle_commit_workflow() -> bool:
     import subprocess
     try:
         # 获取当前分支的提交总数
-        commit_count = subprocess.run(
+        commit_result = subprocess.run(
             ['git', 'rev-list', '--count', 'HEAD'],
             capture_output=True,
             text=True
         )
-        if commit_count.returncode != 0:
+        if commit_result.returncode != 0:
             return False
             
-        commit_count = int(commit_count.stdout.strip())
+        commit_count = int(commit_result.stdout.strip())
         
         # 暂存所有修改
         subprocess.run(['git', 'add', '.'], check=True)
@@ -313,15 +313,28 @@ def check_and_update_git_repo(repo_path: str) -> bool:
         if has_uncommitted_changes():
             return False
 
-        # 获取远程更新
-        subprocess.run(["git", "fetch"], cwd=git_root, check=True)
-        # 检查本地是否落后
-        result = subprocess.run(["git", "rev-list", "--count", "HEAD..origin/main"], 
-                              cwd=git_root, capture_output=True, text=True)
-        if result.returncode == 0 and int(result.stdout.strip()) > 0:
-            PrettyOutput.print("检测到新版本，正在更新Jarvis...", OutputType.INFO)
-            subprocess.run(["git", "pull"], cwd=git_root, check=True)
-            PrettyOutput.print("Jarvis已更新到最新版本", OutputType.SUCCESS)
+        # 获取远程tag更新
+        subprocess.run(["git", "fetch", "--tags"], cwd=git_root, check=True)
+        # 获取最新本地tag
+        local_tag_result = subprocess.run(["git", "describe", "--tags", "--abbrev=0"],
+                                cwd=git_root, capture_output=True, text=True)
+        # 获取最新远程tag
+        remote_tag_result = subprocess.run(
+            ["git", "ls-remote", "--tags", "--refs", "origin"],
+            cwd=git_root, capture_output=True, text=True
+        )
+        if remote_tag_result.returncode == 0:
+            # 提取最新的tag名称
+            tags = [ref.split("/")[-1] for ref in remote_tag_result.stdout.splitlines()]
+            tags = sorted(tags, key=lambda x: [int(i) if i.isdigit() else i for i in re.split(r'([0-9]+)', x)])
+            remote_tag = tags[-1] if tags else ""
+            remote_tag_result.stdout = remote_tag
+
+        if (local_tag_result.returncode == 0 and remote_tag_result.returncode == 0 and
+            local_tag_result.stdout.strip() != remote_tag_result.stdout.strip()):
+            PrettyOutput.print(f"检测到新版本tag {remote_tag_result.stdout.strip()}，正在更新Jarvis...", OutputType.INFO)
+            subprocess.run(["git", "checkout", remote_tag_result.stdout.strip()], cwd=git_root, check=True)
+            PrettyOutput.print(f"Jarvis已更新到tag {remote_tag_result.stdout.strip()}", OutputType.SUCCESS)
             return True
         return False
     except Exception as e:
