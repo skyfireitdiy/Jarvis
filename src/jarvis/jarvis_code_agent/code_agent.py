@@ -326,7 +326,9 @@ class CodeAgent:
                 project_info.append(f"代码统计:\n{loc_stats}")
             if commits_info:
                 commits_str = "\n".join(
-                    f"提交 {i+1}: {commit['hash'][:7]} - {commit['message']} ({len(commit['files'])}个文件)"
+                    f"提交 {i+1}: {commit['hash'][:7]} - {commit['message']} ({len(commit['files'])}个文件)\n" +
+                    "\n".join(f"    - {file}" for file in commit['files'][:5]) + 
+                    ("\n    ..." if len(commit['files']) > 5 else "")
                     for i, commit in enumerate(commits_info)
                 )
                 project_info.append(f"最近提交:\n{commits_str}")
