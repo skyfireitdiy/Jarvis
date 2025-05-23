@@ -200,9 +200,9 @@ Jarvis支持使用特殊标记`'<tag>'`来触发命令替换功能，其中`tag`
 | `'Fix'` | 修复问题 |
 
 #### 自定义替换
-可以通过以下两种方式配置自定义替换规则：
+可以通过以下方式配置自定义替换规则：
 
-1. **环境变量配置(推荐)**:
+**配置文件**:
 在`~/.jarvis/config.yaml`中添加`JARVIS_REPLACE_MAP`配置项：
 ```yaml
 JARVIS_REPLACE_MAP:
@@ -212,21 +212,6 @@ JARVIS_REPLACE_MAP:
     append: false  # 可选，true表示追加到输入末尾，false表示直接替换
 ```
 
-2. **文件配置(将被弃用)**:
-在`~/.jarvis/replace_map.yaml`文件中添加自定义替换规则：
-```yaml
-tag_name:
-  template: "替换后的内容"
-  description: "标记描述"
-  append: false  # 可选，true表示追加到输入末尾，false表示直接替换
-```
-注意：文件配置方式将在未来版本中移除，请尽快迁移到环境变量配置方式。
-```yaml
-tag_name:
-  template: "替换后的内容"
-  description: "标记描述"
-  append: false  # 可选，true表示追加到输入末尾，false表示直接替换
-```
 
 
 #### 文件路径补全
@@ -288,9 +273,9 @@ class CustomTool:
 
 
 ### 添加MCP
-MCP(模型上下文协议)支持两种配置方式：
+MCP(模型上下文协议)支持以下配置方式：
 
-#### 1. 通过配置文件配置（推荐）
+#### 配置文件
 在`~/.jarvis/config.yaml`中添加`JARVIS_MCP`配置项：
 ```yaml
 JARVIS_MCP:
@@ -304,20 +289,6 @@ JARVIS_MCP:
     enable: true  # 可选，默认为true
 ```
 
-#### 2. 通过文件配置（将在未来版本中废弃）
-在`~/.jarvis/tools/mcp/`中创建YAML配置文件：
-```yaml
-type: stdio  # 或 sse/streamable
-name: MCP名称
-command: 可执行命令  # stdio模式必填
-base_url: http://example.com/api  # sse/streamable模式必填
-args: [参数列表]  # 可选
-env:  # 可选环境变量
-  KEY: VALUE
-enable: true  # 可选，默认为true
-```
-
-注意：文件配置方式将在未来版本中移除，请尽快迁移到环境变量配置方式。
 
 
 ### 添加新大模型平台
