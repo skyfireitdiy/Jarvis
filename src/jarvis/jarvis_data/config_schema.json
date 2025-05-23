@@ -232,6 +232,28 @@
         "true",
         "false"
       ]
+    },
+    "JARVIS_REPLACE_MAP": {
+      "type": "object",
+      "description": "Custom replacement map configuration",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "append": {
+            "type": "boolean",
+            "description": "Whether to append to existing template"
+          },
+          "template": {
+            "type": "string",
+            "description": "Replacement template content"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the replacement"
+          }
+        },
+        "required": ["template"]
+      }
     }
   },
   "additionalProperties": false

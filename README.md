@@ -200,7 +200,27 @@ Jarvis支持使用特殊标记`'<tag>'`来触发命令替换功能，其中`tag`
 | `'Fix'` | 修复问题 |
 
 #### 自定义替换
-可以通过在`~/.jarvis/replace_map.yaml`文件中添加自定义替换规则：
+可以通过以下两种方式配置自定义替换规则：
+
+1. **环境变量配置(推荐)**:
+在`~/.jarvis/config.yaml`中添加`JARVIS_REPLACE_MAP`配置项：
+```yaml
+JARVIS_REPLACE_MAP:
+  tag_name:
+    template: "替换后的内容"
+    description: "标记描述"
+    append: false  # 可选，true表示追加到输入末尾，false表示直接替换
+```
+
+2. **文件配置(将被弃用)**:
+在`~/.jarvis/replace_map.yaml`文件中添加自定义替换规则：
+```yaml
+tag_name:
+  template: "替换后的内容"
+  description: "标记描述"
+  append: false  # 可选，true表示追加到输入末尾，false表示直接替换
+```
+注意：文件配置方式将在未来版本中移除，请尽快迁移到环境变量配置方式。
 ```yaml
 tag_name:
   template: "替换后的内容"

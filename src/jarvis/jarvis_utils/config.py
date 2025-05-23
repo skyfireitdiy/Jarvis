@@ -49,15 +49,26 @@ def get_replace_map() -> dict:
     """
     获取替换映射表。
     
-    从数据目录下的replace_map.yaml文件中读取替换映射表，
+    优先使用GLOBAL_CONFIG_DATA['JARVIS_REPLACE_MAP']的配置，
+    如果没有则从数据目录下的replace_map.yaml文件中读取替换映射表，
     如果文件不存在则返回内置替换映射表。
     
     返回:
         dict: 合并后的替换映射表字典(内置+文件中的映射表)
     """
+    if 'JARVIS_REPLACE_MAP' in GLOBAL_CONFIG_DATA:
+        return {**BUILTIN_REPLACE_MAP, **GLOBAL_CONFIG_DATA['JARVIS_REPLACE_MAP']}
+        
     replace_map_path = os.path.join(get_data_dir(), 'replace_map.yaml')
     if not os.path.exists(replace_map_path):
         return BUILTIN_REPLACE_MAP.copy()
+    
+    from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+    PrettyOutput.print(
+        "警告：使用replace_map.yaml进行配置的方式已被弃用，将在未来版本中移除。"
+        "请迁移到使用GLOBAL_CONFIG_DATA中的JARVIS_REPLACE_MAP配置。",
+        output_type=OutputType.WARNING
+    )
     
     with open(replace_map_path, 'r', encoding='utf-8', errors='ignore') as file:
         file_map = yaml.safe_load(file) or {}
