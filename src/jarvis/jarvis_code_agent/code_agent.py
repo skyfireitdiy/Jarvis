@@ -315,13 +315,10 @@ class CodeAgent:
                     )
                     if lint_tools_info:
                         addon_prompt = f"""
-1. 请对以下修改的文件进行静态扫描:
-""" + "\n".join(f"   - {file}" for file in modified_files) + (
-                            f"""
-2. 建议使用以下lint工具进行检查:
-{lint_tools_info}""" if lint_tools_info else ""
-                    ) + """
-3. 如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
+请对以下修改的文件进行静态扫描:
+{"\n".join(f"   - {file}" for file in modified_files)}
+{f"建议使用以下lint工具进行检查:\n{lint_tools_info}" if lint_tools_info else ""}
+如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
                     """
                         agent.set_addon_prompt(addon_prompt)
                 else:
