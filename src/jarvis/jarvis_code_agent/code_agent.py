@@ -47,7 +47,6 @@ class CodeAgent:
             "execute_script",
             "search_web",
             "ask_user",
-            "ask_codebase",
             "read_code",
             "methodology",
             "chdir",
@@ -90,7 +89,6 @@ class CodeAgent:
 - 对于简单的修改，可以使用execute_script工具执行shell命令完成
 </code_engineer_guide>
 """
-        # Dynamically add ask_codebase based on task complexity if really needed
         # 处理platform参数
         platform_instance = (PlatformRegistry().create_platform(platform)  # type: ignore
             if platform
@@ -112,7 +110,6 @@ class CodeAgent:
         )
         self.agent.set_addon_prompt(
             "请使用工具充分理解用户需求，然后根据需求一步步执行代码修改/开发，"
-            "如果不清楚要修改那些文件，可以使用ask_codebase工具，"
             "以：xxxx功能在哪个文件中实现？类似句式提问。"
             "所有代码修改任务都应优先使用edit_file工具，而非edit_file工具。"
             "edit_file工具通过精确的搜索和替换实现代码编辑，"

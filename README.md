@@ -143,8 +143,8 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
 | `JARVIS_GIT_COMMIT_PROMPT` | "" | 自定义git提交信息生成提示模板 |
 | `JARVIS_PRINT_PROMPT` | false | 是否打印提示 |
-| `JARVIS_USE_METHODOLOGY` | false | 是否启用方法论功能 |
-| `JARVIS_USE_ANALYSIS` | false | 是否启用任务分析功能 |
+| `JARVIS_USE_METHODOLOGY` | true | 是否启用方法论功能 |
+| `JARVIS_USE_ANALYSIS` | true | 是否启用任务分析功能 |
 | `JARVIS_DATA_PATH` | ~/.jarvis | Jarvis数据存储目录路径 |
 
 所有配置编写到`~/.jarvis/config.yaml`文件中即可生效。
@@ -163,7 +163,6 @@ ENV:
 ### 内置工具
 | 工具名称 | 描述 |
 |----------|------|
-| ask_codebase | 智能代码库查询和分析，用于定位功能所在文件和理解单点实现，适合查询特定功能位置和实现原理 |
 | ask_user | 交互式用户输入收集 |
 | chdir | 更改当前工作目录 |
 | rewrite_file | 文件重写工具，用于完全重写或创建文件，提供完整的文件内容替换 |

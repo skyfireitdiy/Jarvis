@@ -38,9 +38,8 @@ PM_PROMPT = f"""
 <step>
 ### 1. 需求接收与分析
 1. 接收用户需求，使用ask_user工具澄清不明确点
-2. 使用ask_codebase分析现有系统状态
-3. 使用search_web研究相关领域知识
-4. 使用file_operation记录需求文档
+2. 使用search_web研究相关领域知识
+3. 使用file_operation记录需求文档
 </step>
 
 <step>
@@ -118,7 +117,6 @@ PM_PROMPT = f"""
 - **search_web**：研究相关领域知识，寻找最佳实践
 - **execute_script**：监控项目状态，执行自动化任务
 - **methodology**：采用适当的项目方法论和最佳实践
-- **ask_codebase**：分析代码库，了解系统实现和技术债务
 </tools>
 
 <message_template>
@@ -205,9 +203,8 @@ BA_PROMPT = f"""
 ### 1. 需求接收与分析
 1. 接收PM的需求任务
 2. 使用ask_user工具澄清不明确点
-3. 使用ask_codebase分析现有系统状态
-4. 使用search_web研究相关领域知识
-5. 使用file_operation记录需求文档
+3. 使用search_web研究相关领域知识
+4. 使用file_operation记录需求文档
 </step>
 
 <step>
@@ -252,7 +249,6 @@ BA_PROMPT = f"""
 - **ask_user**：获取用户需求和反馈，澄清不明确的需求点
 - **file_operation**：创建和管理需求文档，跟踪需求状态
 - **search_web**：研究相关领域知识，寻找最佳实践
-- **ask_codebase**：分析代码库，了解系统实现和业务逻辑
 </tools>
 
 <message_template>
@@ -340,64 +336,57 @@ SA_PROMPT = f"""
 <step>
 ### 1. 需求分析与理解
 1. 接收PM分配的架构设计任务
-2. 使用ask_codebase分析现有系统架构
-3. 使用read_code深入理解关键代码
-4. 使用search_web研究技术趋势
-5. 使用file_operation记录需求理解
+2. 使用read_code深入理解关键代码
+3. 使用search_web研究技术趋势
+4. 使用file_operation记录需求理解
 </step>
 
 <step>
 ### 2. 架构设计规划
 1. 使用methodology选择架构设计方法
-2. 使用ask_codebase分析技术约束
-3. 使用execute_script检查系统环境
-4. 使用search_web研究架构模式
-5. 使用file_operation记录设计规划
+2. 使用execute_script检查系统环境
+3. 使用search_web研究架构模式
+4. 使用file_operation记录设计规划
 </step>
 
 <step>
 ### 3. 系统架构设计
 1. 设计系统整体架构
 2. 使用file_operation记录架构文档
-3. 使用ask_codebase验证架构可行性
-4. 使用search_web研究技术选型
-5. 使用file_operation更新架构设计
+3. 使用search_web研究技术选型
+4. 使用file_operation更新架构设计
 </step>
 
 <step>
 ### 4. 组件设计
 1. 设计系统组件和模块
 2. 使用file_operation记录组件规格
-3. 使用ask_codebase分析组件依赖
-4. 使用execute_script验证组件接口
-5. 使用file_operation更新组件设计
+3. 使用execute_script验证组件接口
+4. 使用file_operation更新组件设计
 </step>
 
 <step>
 ### 5. 接口设计
 1. 设计系统接口和API
 2. 使用file_operation记录接口文档
-3. 使用ask_codebase分析接口实现
-4. 使用search_web研究接口规范
-5. 使用file_operation更新接口设计
+3. 使用search_web研究接口规范
+4. 使用file_operation更新接口设计
 </step>
 
 <step>
 ### 6. 数据模型设计
 1. 设计系统数据模型
 2. 使用file_operation记录数据模型
-3. 使用ask_codebase分析数据流
-4. 使用execute_script验证数据约束
-5. 使用file_operation更新数据模型
+3. 使用execute_script验证数据约束
+4. 使用file_operation更新数据模型
 </step>
 
 <step>
 ### 7. 架构验证与交付
-1. 使用ask_codebase验证架构完整性
-2. 使用file_operation整理架构文档
-3. 使用execute_script生成架构报告
-4. 向PM提交架构设计结果
-5. 使用file_operation归档架构文档
+1. 使用file_operation整理架构文档
+2. 使用execute_script生成架构报告
+3. 向PM提交架构设计结果
+4. 使用file_operation归档架构文档
 </step>
 </workflow>
 
@@ -405,7 +394,6 @@ SA_PROMPT = f"""
 ## 工具使用指南
 - **file_operation**：创建和管理架构文档和技术规格
 - **search_web**：研究架构模式和技术趋势
-- **ask_codebase**：分析代码库，理解系统实现
 - **execute_script**：检查系统环境和依赖关系
 - **read_code**：阅读和理解关键代码段
 - **methodology**：应用架构设计方法论和模式
@@ -497,46 +485,40 @@ TL_PROMPT = f"""
 <step>
 ### 1. 架构理解与规划
 1. 接收PM分配的技术实施任务
-2. 使用ask_codebase分析架构设计
-3. 使用lsp_get_diagnostics检查代码问题
-4. 使用execute_script验证技术环境
-5. 使用file_operation记录技术规划
+2. 使用lsp_get_diagnostics检查代码问题
+3. 使用execute_script验证技术环境
+4. 使用file_operation记录技术规划
 </step>
 
 <step>
 ### 2. 技术方案制定
 1. 使用methodology选择开发方法
-2. 使用ask_codebase分析实现路径
-3. 使用ask_codebase评估技术债务
-4. 使用execute_script验证技术方案
-5. 使用file_operation记录技术方案
+2. 使用execute_script验证技术方案
+3. 使用file_operation记录技术方案
 </step>
 
 <step>
 ### 3. 开发规范制定
 1. 制定代码规范和标准
 2. 使用file_operation记录开发规范
-3. 使用ask_codebase分析现有规范
-4. 使用execute_script验证规范执行
-5. 使用file_operation更新开发规范
+3. 使用execute_script验证规范执行
+4. 使用file_operation更新开发规范
 </step>
 
 <step>
 ### 4. 任务分解与分配
 1. 分解技术任务为可执行单元
 2. 使用file_operation记录任务分解
-3. 使用ask_codebase分析任务依赖
-4. 使用execute_script验证任务划分
-5. 使用file_operation更新任务分配
+3. 使用execute_script验证任务划分
+4. 使用file_operation更新任务分配
 </step>
 
 <step>
 ### 5. 技术指导与支持
 1. 向DEV提供技术指导
 2. 使用file_operation记录指导内容
-3. 使用ask_codebase分析技术问题
-4. 使用lsp_get_diagnostics检查代码质量
-5. 使用file_operation更新技术文档
+3. 使用lsp_get_diagnostics检查代码质量
+4. 使用file_operation更新技术文档
 </step>
 
 <step>
@@ -550,18 +532,16 @@ TL_PROMPT = f"""
 
 <step>
 ### 7. 技术总结与交付
-1. 使用ask_codebase验证技术实现
-2. 使用file_operation整理技术文档
-3. 使用execute_script生成技术报告
-4. 向PM提交技术实施结果
-5. 使用file_operation归档技术文档
+1. 使用file_operation整理技术文档
+2. 使用execute_script生成技术报告
+3. 向PM提交技术实施结果
+4. 使用file_operation归档技术文档
 </step>
 </workflow>
 
 <tools>
 ## 工具使用指南
 - **file_operation**：管理技术文档和指导文件
-- **ask_codebase**：分析代码库，理解实现细节
 - **execute_script**：执行开发工具和命令
 - **methodology**：应用开发方法论和最佳实践
 </tools>
@@ -651,28 +631,25 @@ DEV_PROMPT = f"""
 <step>
 ### 1. 任务理解与分析
 1. 接收TL分配的开发任务
-2. 使用ask_codebase分析相关代码
-3. 使用read_code理解现有实现
-4. 使用execute_script验证开发环境
-5. 使用file_operation记录任务分析
+2. 使用read_code理解现有实现
+3. 使用execute_script验证开发环境
+4. 使用file_operation记录任务分析
 </step>
 
 <step>
 ### 2. 技术方案设计
 1. 分析实现方案
 2. 使用file_operation记录设计方案
-3. 使用ask_codebase验证方案可行性
-4. 使用execute_script验证技术选型
-5. 使用file_operation更新技术方案
+3. 使用execute_script验证技术选型
+4. 使用file_operation更新技术方案
 </step>
 
 <step>
 ### 3. 代码实现
 1. 使用create_code_agent生成代码
 2. 使用file_operation记录代码实现
-3. 使用ask_codebase分析代码质量
-4. 使用execute_script验证代码功能
-5. 使用file_operation更新代码文档
+3. 使用execute_script验证代码功能
+4. 使用file_operation更新代码文档
 </step>
 
 <step>
@@ -680,17 +657,15 @@ DEV_PROMPT = f"""
 1. 编写单元测试代码
 2. 使用file_operation记录测试用例
 3. 使用execute_script运行单元测试
-4. 使用ask_codebase分析测试覆盖
-5. 使用file_operation更新测试文档
+4. 使用file_operation更新测试文档
 </step>
 
 <step>
 ### 5. 代码优化与重构
 1. 优化代码实现
 2. 使用file_operation记录优化方案
-3. 使用ask_codebase分析性能问题
-4. 使用execute_script验证优化效果
-5. 使用file_operation更新优化文档
+3. 使用execute_script验证优化效果
+4. 使用file_operation更新优化文档
 </step>
 
 <step>
@@ -704,11 +679,10 @@ DEV_PROMPT = f"""
 
 <step>
 ### 7. 代码提交与交付
-1. 使用ask_codebase验证代码完整性
-2. 使用file_operation整理代码文档
-3. 使用execute_script生成提交报告
-4. 向TL提交代码实现结果
-5. 使用file_operation归档开发文档
+1. 使用file_operation整理代码文档
+2. 使用execute_script生成提交报告
+3. 向TL提交代码实现结果
+4. 使用file_operation归档开发文档
 </step>
 </workflow>
 
@@ -716,7 +690,6 @@ DEV_PROMPT = f"""
 ## 工具使用指南
 - **create_code_agent**：创建专业代码开发代理
 - **file_operation**：管理源代码和配置文件
-- **ask_codebase**：了解代码库实现细节
 - **execute_script**：执行开发命令和测试脚本
 - **read_code**：阅读和理解关键代码段
 - **create_sub_agent**：创建专门的子代理处理特定任务
@@ -832,37 +805,33 @@ QA_PROMPT = f"""
 <step>
 ### 1. 测试需求分析
 1. 接收PM分配的测试任务
-2. 使用ask_codebase分析测试范围
-3. 使用read_code理解功能实现
-4. 使用execute_script验证测试环境
-5. 使用file_operation记录测试需求
+2. 使用read_code理解功能实现
+3. 使用execute_script验证测试环境
+4. 使用file_operation记录测试需求
 </step>
 
 <step>
 ### 2. 测试计划制定
 1. 使用methodology选择测试方法
 2. 使用file_operation记录测试计划
-3. 使用ask_codebase分析测试重点
-4. 使用execute_script验证测试工具
-5. 使用file_operation更新测试计划
+3. 使用execute_script验证测试工具
+4. 使用file_operation更新测试计划
 </step>
 
 <step>
 ### 3. 测试用例设计
 1. 设计测试用例
 2. 使用file_operation记录测试用例
-3. 使用ask_codebase分析测试覆盖
-4. 使用execute_script验证测试用例
-5. 使用file_operation更新测试用例
+3. 使用execute_script验证测试用例
+4. 使用file_operation更新测试用例
 </step>
 
 <step>
 ### 4. 测试环境准备
 1. 配置测试环境
 2. 使用file_operation记录环境配置
-3. 使用ask_codebase分析环境需求
-4. 使用execute_script验证环境配置
-5. 使用file_operation更新环境文档
+3. 使用execute_script验证环境配置
+4. 使用file_operation更新环境文档
 </step>
 
 <step>
@@ -878,18 +847,16 @@ QA_PROMPT = f"""
 ### 6. 缺陷管理
 1. 分析缺陷
 2. 使用file_operation记录缺陷信息
-3. 使用ask_codebase分析缺陷原因
-4. 使用execute_script验证缺陷修复
-5. 使用file_operation更新缺陷报告
+3. 使用execute_script验证缺陷修复
+4. 使用file_operation更新缺陷报告
 </step>
 
 <step>
 ### 7. 质量评估与交付
-1. 使用ask_codebase验证测试覆盖
-2. 使用file_operation整理测试文档
-3. 使用execute_script生成质量报告
-4. 向PM提交测试结果
-5. 使用file_operation归档测试文档
+1. 使用file_operation整理测试文档
+2. 使用execute_script生成质量报告
+3. 向PM提交测试结果
+4. 使用file_operation归档测试文档
 </step>
 </workflow>
 
@@ -897,7 +864,6 @@ QA_PROMPT = f"""
 ## 工具使用指南
 - **create_code_agent**：创建测试代码开发代理
 - **file_operation**：管理测试文档和测试脚本
-- **ask_codebase**：了解代码库实现以设计测试
 - **execute_script**：执行测试命令和测试套件
 - **read_code**：阅读和理解代码以设计测试用例
 - **methodology**：应用测试方法论和最佳实践
@@ -994,7 +960,6 @@ def create_dev_team() -> MultiAgent:
         "search_web",
         "execute_script",
         "methodology",
-        "ask_codebase",
         "edit_file",
         "rewrite_file",
     ])
@@ -1007,7 +972,6 @@ def create_dev_team() -> MultiAgent:
         "execute_script",
         "read_webpage",
         "methodology",
-        "ask_codebase",
         "edit_file",
         "rewrite_file",
     ])
@@ -1016,7 +980,6 @@ def create_dev_team() -> MultiAgent:
     SA_output_handler.use_tools([
         "file_operation",
         "search_web",
-        "ask_codebase",
         "execute_script",
         "read_code",
         "methodology",
@@ -1027,7 +990,6 @@ def create_dev_team() -> MultiAgent:
     TL_output_handler = ToolRegistry()
     TL_output_handler.use_tools([
         "file_operation",
-        "ask_codebase",
         "execute_script",
         "methodology",
         "edit_file",
@@ -1038,7 +1000,6 @@ def create_dev_team() -> MultiAgent:
     DEV_output_handler.use_tools([
         "create_code_agent",
         "file_operation",
-        "ask_codebase",
         "execute_script",
         "read_code",
         "create_sub_agent",
@@ -1051,7 +1012,6 @@ def create_dev_team() -> MultiAgent:
     QA_output_handler.use_tools([
         "create_code_agent",
         "file_operation",
-        "ask_codebase",
         "execute_script",
         "read_code",
         "methodology",
@@ -1067,7 +1027,6 @@ def create_dev_team() -> MultiAgent:
 - **search_web**：研究相关领域知识，寻找最佳实践
 - **execute_script**：监控项目状态，执行自动化任务
 - **methodology**：采用适当的项目方法论和最佳实践
-- **ask_codebase**：分析代码库，了解系统实现和技术债务
 
 ## 文档管理规范
 每一步工作后，必须使用file_operation工具将结论性输出记录到项目文档中：
@@ -1089,7 +1048,6 @@ def create_dev_team() -> MultiAgent:
 - **execute_script**：查询系统环境和配置信息
 - **read_webpage**：收集用户体验和行业趋势信息
 - **methodology**：应用需求分析和用户故事映射方法论
-- **ask_codebase**：分析代码库中的功能实现，了解现有系统能力和限制，分析业务逻辑
 
 ## 文档管理规范
 每一步分析后，必须使用file_operation工具将结论性输出记录到分析文档中：
@@ -1108,7 +1066,6 @@ def create_dev_team() -> MultiAgent:
 ## 工具使用指南
 - **file_operation**：创建和管理架构文档和技术规格
 - **search_web**：研究架构模式和技术趋势
-- **ask_codebase**：分析代码库，理解系统实现
 - **execute_script**：检查系统环境和依赖关系
 - **read_code**：阅读和理解关键代码段
 - **methodology**：应用架构设计方法论和模式
@@ -1129,7 +1086,6 @@ def create_dev_team() -> MultiAgent:
     TL_PROMPT_EXTENSION = """
 ## 工具使用指南
 - **file_operation**：管理技术文档和指导文件
-- **ask_codebase**：分析代码库，理解实现细节
 - **execute_script**：执行开发工具和命令
 
 ## 文档管理规范
@@ -1150,7 +1106,6 @@ def create_dev_team() -> MultiAgent:
 ## 工具使用指南
 - **create_code_agent**：创建专业代码开发代理
 - **file_operation**：管理源代码和配置文件
-- **ask_codebase**：了解代码库实现细节
 - **execute_script**：执行开发命令和测试脚本
 - **read_code**：阅读和理解关键代码段
 - **create_sub_agent**：创建专门的子代理处理特定任务
@@ -1173,7 +1128,6 @@ def create_dev_team() -> MultiAgent:
 ## 工具使用指南
 - **create_code_agent**：创建测试代码开发代理
 - **file_operation**：管理测试文档和测试脚本
-- **ask_codebase**：了解代码库实现以设计测试
 - **execute_script**：执行测试命令和测试套件
 - **execute_script**：执行各类脚本（Shell命令、Shell脚本、Python脚本）
 - **read_code**：阅读和理解代码以设计测试用例

@@ -209,7 +209,7 @@
     "JARVIS_USE_METHODOLOGY": {
       "type": "string",
       "description": "是否启用方法论",
-      "default": "false",
+      "default": "true",
       "enum": [
         "true",
         "false"
@@ -218,7 +218,7 @@
     "JARVIS_USE_ANALYSIS": {
       "type": "string",
       "description": "是否启用任务分析",
-      "default": "false",
+      "default": "true",
       "enum": [
         "true",
         "false"
@@ -252,7 +252,9 @@
             "description": "Description of the replacement"
           }
         },
-        "required": ["template"]
+        "required": [
+          "template"
+        ]
       }
     }
   },

@@ -8,27 +8,6 @@
 from jarvis.jarvis_utils.tag import ct, ot
 
 BUILTIN_REPLACE_MAP = {
-    "CodeBase": {
-        "append": True,
-        "template": f"""
-请使用ask_codebase工具查询代码库，必须严格遵守以下工具调用格式：
-
-{ot("TOOL_CALL")}
-want: 想要从执行结果中获取到的信息
-name: ask_codebase
-arguments:
-    question: "与xxx功能相关的文件有哪些？"
-{ct("TOOL_CALL")}
-
-可以使用的提问格式包括：
-1. 与xxx功能相关的文件有哪些？
-2. 要实现xxx，应该要修改哪些文件？
-3. xxx功能是怎么实现的？
-4. xxx模块的入口函数是什么？
-5. xxx功能的测试用例在哪里？
-""",
-        "description": "查询代码库"
-    },
     "Web": {
         "append": True,
         "template": f"""

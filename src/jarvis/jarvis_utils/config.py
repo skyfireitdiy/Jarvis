@@ -100,7 +100,7 @@ def is_auto_complete() -> bool:
     返回：
         bool: 如果启用了自动补全则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get('JARVIS_AUTO_COMPLETE', 'false') == 'true'
+    return GLOBAL_CONFIG_DATA.get('JARVIS_AUTO_COMPLETE', False) == True
 
 
 def get_shell_name() -> str:
@@ -154,7 +154,7 @@ def is_execute_tool_confirm() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get('JARVIS_EXECUTE_TOOL_CONFIRM', 'false') == 'true'
+    return GLOBAL_CONFIG_DATA.get('JARVIS_EXECUTE_TOOL_CONFIRM', False) == True
 def is_confirm_before_apply_patch() -> bool:
     """
     检查应用补丁前是否需要确认。
@@ -162,7 +162,7 @@ def is_confirm_before_apply_patch() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get('JARVIS_CONFIRM_BEFORE_APPLY_PATCH', 'true') == 'true'
+    return GLOBAL_CONFIG_DATA.get('JARVIS_CONFIRM_BEFORE_APPLY_PATCH', True) == True
 
 def get_max_tool_call_count() -> int:
     """
@@ -194,7 +194,7 @@ def get_auto_update() -> bool:
     返回：
         bool: 如果需要自动更新则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get('JARVIS_AUTO_UPDATE', 'true') == 'true'
+    return GLOBAL_CONFIG_DATA.get('JARVIS_AUTO_UPDATE', True) == True
 
 def get_max_big_content_size() -> int:
     """
@@ -212,7 +212,7 @@ def get_pretty_output() -> bool:
     返回：
         bool: 如果启用PrettyOutput则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get('JARVIS_PRETTY_OUTPUT', 'false') == 'true'
+    return GLOBAL_CONFIG_DATA.get('JARVIS_PRETTY_OUTPUT', False) == True
 
 def is_use_methodology() -> bool:
     """
@@ -221,7 +221,7 @@ def is_use_methodology() -> bool:
     返回：
         bool: 如果启用方法论则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get('JARVIS_USE_METHODOLOGY', 'false') == 'true'
+    return GLOBAL_CONFIG_DATA.get('JARVIS_USE_METHODOLOGY', True) == True
 
 def is_use_analysis() -> bool:
     """
@@ -230,7 +230,7 @@ def is_use_analysis() -> bool:
     返回：
         bool: 如果启用任务分析则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get('JARVIS_USE_ANALYSIS', 'false') == 'true'
+    return GLOBAL_CONFIG_DATA.get('JARVIS_USE_ANALYSIS', True) == True
 
 def is_print_prompt() -> bool:
     """
@@ -239,7 +239,7 @@ def is_print_prompt() -> bool:
     返回：
         bool: 如果打印提示则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get('JARVIS_PRINT_PROMPT', 'false') == 'true'
+    return GLOBAL_CONFIG_DATA.get('JARVIS_PRINT_PROMPT', False) == True
 
 
 def get_mcp_config() -> List[Dict[str, Any]]:

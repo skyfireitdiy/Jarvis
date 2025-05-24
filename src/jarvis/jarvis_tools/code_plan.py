@@ -92,7 +92,6 @@ class CodePlanTool:
                 tool_registry.use_tools([
                     "execute_script", 
                     "read_code", 
-                    "ask_codebase", 
                     "search_web", 
                     "ask_user"
                 ])
@@ -157,7 +156,7 @@ class CodePlanTool:
 
 ## 工作流程
 1. **需求理解阶段**:
-   - 使用ask_codebase工具查询相关代码
+   - 使用execute_script工具和read_code工具理解代码
    - 必要时使用search_web搜索补充信息
    - 使用ask_user工具向用户确认模糊点
 
@@ -185,7 +184,6 @@ class CodePlanTool:
 
 ## 工具使用优先级
 1. **代码查询工具**:
-   - ask_codebase: 查询功能位置和实现
    - fd/rg: 查找文件和代码模式
    - read_code: 读取文件内容
 
