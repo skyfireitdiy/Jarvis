@@ -112,14 +112,14 @@
       "default": ""
     },
     "JARVIS_MAX_TOKEN_COUNT": {
-      "type": "string",
+      "type": "number",
       "description": "模型能处理的最大token数量",
-      "default": "960000"
+      "default": 960000
     },
     "JARVIS_MAX_INPUT_TOKEN_COUNT": {
-      "type": "string",
+      "type": "number",
       "description": "模型能处理的最大输入token数量",
-      "default": "32000"
+      "default": 32000
     },
     "JARVIS_AUTO_COMPLETE": {
       "type": "boolean",
@@ -162,9 +162,9 @@
       "default": true
     },
     "JARVIS_MAX_TOOL_CALL_COUNT": {
-      "type": "string",
+      "type": "number",
       "description": "最大连续工具调用次数",
-      "default": "20"
+      "default": 20
     },
     "JARVIS_DATA_PATH": {
       "type": "string",
@@ -177,9 +177,9 @@
       "default": true
     },
     "JARVIS_MAX_BIG_CONTENT_SIZE": {
-      "type": "string",
+      "type": "number",
       "description": "最大大内容尺寸",
-      "default": "1024000"
+      "default": 1024000
     },
     "JARVIS_PRETTY_OUTPUT": {
       "type": "boolean",
