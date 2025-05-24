@@ -114,15 +114,6 @@ class CodeAgent:
             ],
             need_summary=need_summary
         )
-        self.agent.set_addon_prompt(
-            "请严格遵循以下规范进行代码修改任务：\n"
-            "1. 每次响应仅执行一步操作，先分析再修改，避免一步多改。\n"
-            "2. 充分利用工具理解用户需求和现有代码，禁止凭空假设。\n"
-            "3. 如果不清楚要修改的文件，必须先分析并找出需要修改的文件，明确目标后再进行编辑。\n"
-            "4. 代码编辑任务优先使用 edit_file 工具，确保搜索文本在目标文件中有且仅有一次精确匹配，保证修改的准确性和安全性。\n"
-            "5. 如需大范围重写，才可使用 rewrite_file 工具。\n"
-            "6. 如遇信息不明，优先调用工具补充分析，不要主观臆断。"
-        )
 
         self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
 
@@ -262,8 +253,20 @@ class CodeAgent:
                     for i, commit in enumerate(commits_info)
                 )
                 project_info.append(f"最近提交:\n{commits_str}")
-            
-            enhanced_input = f"{user_input}\n\n项目概况:\n" + "\n\n".join(project_info) if project_info else user_input
+
+            first_tip = """请严格遵循以下规范进行代码修改任务：
+            1. 每次响应仅执行一步操作，先分析再修改，避免一步多改。
+            2. 充分利用工具理解用户需求和现有代码，禁止凭空假设。
+            3. 如果不清楚要修改的文件，必须先分析并找出需要修改的文件，明确目标后再进行编辑。
+            4. 代码编辑任务优先使用 edit_file 工具，确保搜索文本在目标文件中有且仅有一次精确匹配，保证修改的准确性和安全性。
+            5. 如需大范围重写，才可使用 rewrite_file 工具。
+            6. 如遇信息不明，优先调用工具补充分析，不要主观臆断。
+            """
+
+            if project_info:
+                enhanced_input = f"项目概况:\n" + "\n\n".join(project_info) + "\n\n" + first_tip + "\n\n" + user_input
+            else:
+                enhanced_input = first_tip + "\n\n" + user_input
 
             try:
                 self.agent.run(enhanced_input)
