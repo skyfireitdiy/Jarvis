@@ -14,7 +14,6 @@ from yaspin.api import Yaspin
 from yaspin.spinners import Spinners
 
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
 

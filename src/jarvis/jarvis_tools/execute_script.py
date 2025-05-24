@@ -61,6 +61,30 @@ class ScriptTool:
         "g++": "cpp",
     }
 
+    def get_display_output(self, file_path: str) -> str:
+        """消除控制字符，得到用户实际看到的文本，去除script命令首尾行"""
+        import re
+        # 读取文件内容并尝试多种编码
+        with open(file_path, 'rb') as f:
+            data = f.read()
+
+        import pyte
+        screen = pyte.Screen(300, 100000)
+        stream = pyte.ByteStream(screen)
+        stream.feed(data)
+        
+        # 清理每行右侧空格，并过滤空行
+        cleaned = []
+        cleaned = []
+        for y in range(screen.lines):
+            line = screen.buffer[y]
+            stripped = "".join(
+                char.data for char in line.values()
+            ).rstrip()
+            if stripped:
+                cleaned.append(stripped)
+        return "\n".join(cleaned[1:-1])
+
     def _execute_script_with_interpreter(self, interpreter: str, script_content: str) -> Dict[str, Any]:
         """Execute a script with the specified interpreter
         
@@ -90,13 +114,8 @@ class ScriptTool:
                 
                 # Read and process output file
                 try:
-                    with open(output_file, 'r', encoding='utf-8', errors='ignore') as f:
-                        output = f.read()
-                        # Remove header and footer added by script command (if any)
-                        if output:
-                            lines = output.splitlines()
-                            if len(lines) > 2:
-                                output = "\n".join(lines[1:-1])
+                    # 消除控制字符，得到用户实际看到的文本
+                    output = self.get_display_output(output_file)
                 except Exception as e:
                     output = f"读取输出文件失败: {str(e)}"
                     
@@ -151,3 +170,7 @@ class ScriptTool:
                 "stdout": "",
                 "stderr": str(e)
             } 
+        
+if __name__ == "__main__":
+    script_tool = ScriptTool()
+    print(script_tool.get_display_output("/home/wangmaobin/code/Jarvis/a.txt"))
