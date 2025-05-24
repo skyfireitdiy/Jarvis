@@ -29,27 +29,6 @@ arguments:
 """,
         "description": "网页搜索"
     },
-    "Methodology": {
-        "append": True,
-        "template": f"""
-请使用find_methodology工具查找相关方法论，必须严格遵守以下工具调用格式：
-
-{ot("TOOL_CALL")}
-want: 想要从执行结果中获取到的信息
-name: find_methodology
-arguments:
-    query: "关于xxx的方法论有哪些？"
-{ct("TOOL_CALL")}
-
-可以使用的提问格式包括：
-1. 关于xxx的方法论有哪些？
-2. 如何解决xxx问题？
-3. xxx的最佳实践是什么？
-4. 处理xxx的标准流程是什么？
-5. 实现xxx的参考方案有哪些？
-""",
-        "description": "查找相关方法论"
-    },
     "Plan": {
         "append": True,
         "template": f"""
@@ -90,12 +69,6 @@ code_plan工具将：
         "append": False,
         "template": f"""
 请使用工具在当前目录下查找与以下功能相关的文件：
-"""
-    },
-    "FindMethodology": {
-        "append": False,
-        "template": f"""
-请使用find_methodology工具查找相关方法论：
 """
     },
     "Dev": {

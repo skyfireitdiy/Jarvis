@@ -50,7 +50,6 @@ class CodeAgent:
             "read_code",
             "methodology",
             "chdir",
-            "find_methodology",
             "edit_file",
             "rewrite_file"
         ])
