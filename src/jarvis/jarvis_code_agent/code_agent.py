@@ -264,9 +264,10 @@ class CodeAgent:
             """
 
             if project_info:
-                enhanced_input = f"项目概况:\n" + "\n\n".join(project_info) + "\n\n" + first_tip + "\n\n" + user_input
+                enhanced_input = f"项目概况:\n" + "\n\n".join(project_info) + "\n\n" + first_tip + "\n\n任务描述：\
+                    n" + user_input
             else:
-                enhanced_input = first_tip + "\n\n" + user_input
+                enhanced_input = first_tip + "\n\n任务描述：\n" + user_input
 
             try:
                 self.agent.run(enhanced_input)
