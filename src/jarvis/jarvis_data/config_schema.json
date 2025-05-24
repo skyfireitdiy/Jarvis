@@ -122,13 +122,9 @@
       "default": "32000"
     },
     "JARVIS_AUTO_COMPLETE": {
-      "type": "string",
+      "type": "boolean",
       "description": "是否启用自动补全功能",
-      "default": "false",
-      "enum": [
-        "true",
-        "false"
-      ]
+      "default": false
     },
     "SHELL": {
       "type": "string",
@@ -156,22 +152,14 @@
       "default": "deep_seek"
     },
     "JARVIS_EXECUTE_TOOL_CONFIRM": {
-      "type": "string",
+      "type": "boolean",
       "description": "执行工具前是否需要确认",
-      "default": "false",
-      "enum": [
-        "true",
-        "false"
-      ]
+      "default": false
     },
     "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
-      "type": "string",
+      "type": "boolean",
       "description": "应用补丁前是否需要确认",
-      "default": "true",
-      "enum": [
-        "true",
-        "false"
-      ]
+      "default": true
     },
     "JARVIS_MAX_TOOL_CALL_COUNT": {
       "type": "string",
@@ -184,13 +172,9 @@
       "default": "~/.jarvis"
     },
     "JARVIS_AUTO_UPDATE": {
-      "type": "string",
+      "type": "boolean",
       "description": "是否自动更新git仓库",
-      "default": "true",
-      "enum": [
-        "true",
-        "false"
-      ]
+      "default": true
     },
     "JARVIS_MAX_BIG_CONTENT_SIZE": {
       "type": "string",
@@ -198,40 +182,24 @@
       "default": "1024000"
     },
     "JARVIS_PRETTY_OUTPUT": {
-      "type": "string",
+      "type": "boolean",
       "description": "是否启用美化输出",
-      "default": "false",
-      "enum": [
-        "true",
-        "false"
-      ]
+      "default": false
     },
     "JARVIS_USE_METHODOLOGY": {
-      "type": "string",
+      "type": "boolean",
       "description": "是否启用方法论",
-      "default": "true",
-      "enum": [
-        "true",
-        "false"
-      ]
+      "default": true
     },
     "JARVIS_USE_ANALYSIS": {
-      "type": "string",
+      "type": "boolean",
       "description": "是否启用任务分析",
-      "default": "true",
-      "enum": [
-        "true",
-        "false"
-      ]
+      "default": true
     },
     "JARVIS_PRINT_PROMPT": {
-      "type": "string",
+      "type": "boolean",
       "description": "是否打印提示",
-      "default": "false",
-      "enum": [
-        "true",
-        "false"
-      ]
+      "default": false
     },
     "JARVIS_REPLACE_MAP": {
       "type": "object",
