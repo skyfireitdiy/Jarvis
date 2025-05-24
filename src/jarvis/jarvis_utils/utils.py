@@ -134,7 +134,13 @@ def _read_old_config_file(config_file):
             if "=" in line and not line.startswith((" ", "\t")):
                         # 处理之前收集的多行值
                 if current_key is not None:
-                    config_data[current_key] = "\n".join(current_value).strip().strip("'").strip('"')
+                    value = "\n".join(current_value).strip().strip("'").strip('"')
+                    # 将字符串"true"/"false"转换为bool类型
+                    if value.lower() == "true":
+                        value = True
+                    elif value.lower() == "false":
+                        value = False
+                    config_data[current_key] = value
                     current_value = []
                         # 解析新的键值对
                 key, value = line.split("=", 1)
@@ -145,7 +151,13 @@ def _read_old_config_file(config_file):
                 current_value.append(line.strip())
                 # 处理最后一个键值对
         if current_key is not None:
-            config_data[current_key] = "\n".join(current_value).strip().strip("'").strip('"')
+            value = "\n".join(current_value).strip().strip("'").strip('"')
+            # 将字符串"true"/"false"转换为bool类型
+            if value.lower() == "true":
+                value = True
+            elif value.lower() == "false":
+                value = False
+            config_data[current_key] = value
         os.environ.update({str(k): str(v) for k, v in config_data.items() if v is not None})
         set_global_env_data(config_data)
     PrettyOutput.print(f"检测到旧格式配置文件，旧格式以后将不再支持，请尽快迁移到新格式", OutputType.WARNING)
