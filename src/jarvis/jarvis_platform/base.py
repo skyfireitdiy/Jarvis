@@ -126,9 +126,11 @@ class BasePlatform(ABC):
         return response
     
     def chat_until_success(self, message: str) -> str:
-        if is_print_prompt():
+        """Chat with model until successful response"""
+        if not self.suppress_output and is_print_prompt():
             PrettyOutput.print(f"{message}", OutputType.USER)
-        return while_true(lambda: while_success(lambda: self._chat(message), 5), 5)
+        result: str = while_true(lambda: while_success(lambda: self._chat(message), 5), 5)
+        return result
 
     @abstractmethod
     def name(self) -> str:
