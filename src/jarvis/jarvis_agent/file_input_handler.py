@@ -102,9 +102,9 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 # Prepend file contents to prompt and check for overflow
                 prompt = f"""{prompt} 
 
-[文件上下文开始]
+<file_context>
 {result["stdout"]}
-[文件上下文结束]"""
+</file_context>"""
                 if is_context_overflow(prompt):
                     return old_prompt, False
 

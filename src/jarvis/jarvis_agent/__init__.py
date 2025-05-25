@@ -372,7 +372,7 @@ class Agent:
         )
 
         addon_prompt = f"""
-[系统提示开始]
+<system_prompt>
     请判断是否已经完成任务，如果已经完成：
     - 直接输出完成原因，不需要再有新的操作，不要输出{ot("TOOL_CALL")}标签
     {complete_prompt}
@@ -381,7 +381,7 @@ class Agent:
     - 如果信息不明确，请请求用户补充
     - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
     - 操作列表：{action_handlers}
-[系统提示结束]
+</system_prompt>
 
 请继续。
 """
