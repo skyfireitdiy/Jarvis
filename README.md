@@ -83,6 +83,35 @@ Kimi API Key获取方式：
 删除Bearer前缀，剩下的内容就是Kimi API Key。
 
 
+#### 通义千问
+```yaml
+JARVIS_PLATFORM: tongyi
+JARVIS_MODEL: Normal  # 可选模型：Normal, Thinking, Deep-Research, Code-Chat
+JARVIS_THINKING_PLATFORM: tongyi
+JARVIS_THINKING_MODEL: Thinking
+
+ENV:
+  TONGYI_COOKIES: <通义千问cookies>
+```
+
+通义千问cookies获取方式：
+
+![通义千问cookies获取方式](docs/images/tongyi.png)
+
+1. 登录[通义千问](https://www.tongyi.com/qianwen)
+2. 打开浏览器开发者工具（F12）
+3. 在Network标签页中找到任意请求
+4. 在请求头中找到Cookie字段，复制其值
+
+配置说明：
+1. `TONGYI_COOKIES`: 必填，用于身份验证
+2. 支持的模型：
+   - `Normal`: 标准对话模型
+   - `Thinking`: 深度思考模型
+   - `Deep-Research`: 深度研究模型
+   - `Code-Chat`: 代码对话模型
+
+
 #### OpenAI
 ```yaml
 JARVIS_PLATFORM: openai
