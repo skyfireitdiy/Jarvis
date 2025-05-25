@@ -315,7 +315,7 @@ class KimiModel(BasePlatform):
 
     def name(self) -> str:
         """Model name"""
-        return "kimi"
+        return self.model_name
 
     def support_web(self) -> bool:
         """Kimi平台支持web功能"""
