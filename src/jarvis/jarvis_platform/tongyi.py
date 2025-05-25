@@ -25,6 +25,8 @@ class TongyiPlatform(BasePlatform):
         self.msg_id = ""
         self.model_name = ""
         self.uploaded_file_info = []
+        self.system_message = ""  # System message for initialization
+        self.first_chat = True  # Flag for first chat
 
 
     def _get_base_headers(self):
@@ -80,6 +82,21 @@ class TongyiPlatform(BasePlatform):
                 "deepResearch": False
             }
         }]
+
+        # Add system message if it's first chat
+        if self.first_chat and self.system_message:
+            contents.insert(0, {
+                "content": self.system_message,
+                "contentType": "text",
+                "role": "system",
+                "ext": {
+                    "searchType": "",
+                    "pptGenerate": False,
+                    "deepThink": False,
+                    "deepResearch": False
+                }
+            })
+            self.first_chat = False
 
         # Add uploaded files to contents if available and clear after use
         if self.uploaded_file_info:
@@ -393,6 +410,7 @@ class TongyiPlatform(BasePlatform):
             self.request_id = ""
             self.session_id = ""
             self.msg_id = ""
+            self.first_chat = True  # Reset first_chat flag
             return True
         except Exception as e:
             PrettyOutput.print(f"Error deleting chat: {str(e)}", OutputType.ERROR)
