@@ -88,18 +88,9 @@ class generate_new_tool:
                     "stderr": f"工具 '{tool_name}' 已经存在于 {tool_file_path}"
                 }
             
-            # 验证并处理工具代码
-            processed_code, error_msg = self._validate_and_process_code(tool_name, tool_code)
-            if error_msg:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": error_msg
-                }
-            
             # 写入工具文件
             with open(tool_file_path, "w", encoding="utf-8") as f:
-                f.write(processed_code)
+                f.write(tool_code)
             
             # 注册新工具到当前的工具注册表
             success_message = f"工具 '{tool_name}' 已成功生成在 {tool_file_path}"
@@ -153,86 +144,3 @@ class generate_new_tool:
                 "stdout": "",
                 "stderr": error_msg
             }
-    
-    def _validate_and_process_code(self, tool_name: str, tool_code: str) -> Tuple[str, str]:
-        """
-        验证并处理工具代码
-        
-        参数:
-            tool_name: 工具名称
-            tool_code: 工具代码
-            
-        返回:
-            Tuple[str, str]: (处理后的代码, 错误信息)
-        """
-        # 检查工具代码中是否包含类定义
-        if f"class {tool_name}" not in tool_code:
-            # 尝试找到任何类定义
-            class_match = re.search(r"class\s+(\w+)", tool_code)
-            if class_match:
-                old_class_name = class_match.group(1)
-                # 替换类名为工具名
-                tool_code = tool_code.replace(f"class {old_class_name}", f"class {tool_name}")
-                tool_code = tool_code.replace(f'name = "{old_class_name}"', f'name = "{tool_name}"')
-            else:
-                # 没有找到类定义，返回错误
-                return "", f"工具代码中缺少类定义 'class {tool_name}'"
-        
-        # 检查工具代码中是否包含必要的属性和方法
-        missing_components = []
-        
-        if f'name = "{tool_name}"' not in tool_code and f"name = '{tool_name}'" not in tool_code:
-            # 尝试查找任何name属性并修复
-            name_match = re.search(r'name\s*=\s*["\'](\w+)["\']', tool_code)
-            if name_match:
-                old_name = name_match.group(1)
-                tool_code = re.sub(r'name\s*=\s*["\'](\w+)["\']', f'name = "{tool_name}"', tool_code)
-            else:
-                missing_components.append(f"name = \"{tool_name}\"")
-        
-        if "description = " not in tool_code:
-            missing_components.append("description 属性")
-        
-        if "parameters = " not in tool_code:
-            missing_components.append("parameters 属性")
-        
-        if "def execute(self, args:" not in tool_code:
-            missing_components.append("execute 方法")
-        
-        if "def check(" not in tool_code:
-            # 添加默认的check方法
-            class_match = re.search(r"class\s+(\w+).*?:", tool_code, re.DOTALL)
-            if class_match:
-                indent = "    "  # 默认缩进
-                # 找到类定义后的第一个属性
-                first_attr_match = re.search(r"class\s+(\w+).*?:(.*?)(\w+\s*=)", tool_code, re.DOTALL)
-                if first_attr_match:
-                    # 获取属性前的缩进
-                    attr_indent = re.search(r"\n([ \t]*)\w+\s*=", first_attr_match.group(2))
-                    if attr_indent:
-                        indent = attr_indent.group(1)
-                
-                check_method = f"\n{indent}@staticmethod\n{indent}def check() -> bool:\n{indent}    \"\"\"检查工具是否可用\"\"\"\n{indent}    return True\n"
-                
-                # 在类定义后插入check方法
-                pattern = r"(class\s+(\w+).*?:.*?)(\n\s*\w+\s*=|\n\s*@|\n\s*def)"
-                replacement = r"\1" + check_method + r"\3"
-                tool_code = re.sub(pattern, replacement, tool_code, 1, re.DOTALL)
-        
-        # 如果缺少必要组件，返回错误信息
-        if missing_components:
-            return "", f"工具代码中缺少以下必要组件: {', '.join(missing_components)}"
-        
-        # 确保代码有正确的Python文件头部
-        if not tool_code.startswith("# -*- coding:") and not tool_code.startswith("# coding="):
-            tool_code = "# -*- coding: utf-8 -*-\n" + tool_code
-        
-        # 确保导入了必要的模块
-        if "from typing import Dict, Any" not in tool_code:
-            imports_pos = tool_code.find("\n\n")
-            if imports_pos > 0:
-                tool_code = tool_code[:imports_pos] + "\nfrom typing import Dict, Any" + tool_code[imports_pos:]
-            else:
-                tool_code = "from typing import Dict, Any\n\n" + tool_code
-        
-        return tool_code, ""
