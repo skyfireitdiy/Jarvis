@@ -2,7 +2,7 @@
 # 标准库导入
 import datetime
 import platform
-from typing import Any, Callable, List, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
 # 第三方库导入
 from yaspin import yaspin  # type: ignore
@@ -205,6 +205,8 @@ class Agent:
         if model_name is not None:
             self.model.set_model_name(model_name)
 
+        self.user_data: Dict[str, Any] = {}
+
         self.model.set_suppress_output(False)
 
         from jarvis.jarvis_tools.registry import ToolRegistry
@@ -318,6 +320,14 @@ class Agent:
 """
         )
         self.first = True
+
+    def set_user_data(self, key: str, value: Any):
+        """设置用户数据"""
+        self.user_data[key] = value
+
+    def get_user_data(self, key: str) -> Optional[Any]:
+        """获取用户数据"""
+        return self.user_data.get(key, None)
 
     def set_use_tools(self, use_tools):
         """设置要使用的工具列表"""

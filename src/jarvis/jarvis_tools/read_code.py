@@ -31,7 +31,7 @@ class ReadCodeTool:
         "required": ["files"]
     }
 
-    def _handle_single_file(self, filepath: str, start_line: int = 1, end_line: int = -1) -> Dict[str, Any]:
+    def _handle_single_file(self, filepath: str, start_line: int = 1, end_line: int = -1, agent: Any = None) -> Dict[str, Any]:
         """处理单个文件的读取操作
 
         Args:
@@ -99,6 +99,14 @@ class ReadCodeTool:
                 spinner.text = f"文件读取完成: {abs_path}"
                 spinner.ok("✅")
 
+                if agent:
+                    files = agent.get_user_data("files")
+                    if files:
+                        files.append(abs_path)
+                    else:
+                        files = [abs_path]
+                    agent.set_user_data("files", files)
+
                 return {
                     "success": True,
                     "stdout": output,
@@ -123,6 +131,7 @@ class ReadCodeTool:
             Dict[str, Any]: 包含成功状态、输出内容和错误信息的字典
         """
         try:
+            agent = args.get("agent", None)
             if "files" not in args or not isinstance(args["files"], list):
                 return {
                     "success": False,
@@ -140,7 +149,8 @@ class ReadCodeTool:
                 result = self._handle_single_file(
                     file_info["path"].strip(),
                     file_info.get("start_line", 1),
-                    file_info.get("end_line", -1)
+                    file_info.get("end_line", -1),
+                    agent
                 )
 
                 if result["success"]:

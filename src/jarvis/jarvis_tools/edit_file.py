@@ -138,6 +138,7 @@ class FileSearchReplaceTool:
         
         file_path = args["file"]
         changes = args["changes"]
+        agent = args.get("agent", None)
         
         # 创建已处理文件变量，用于失败时回滚
         original_content = None
@@ -153,6 +154,17 @@ class FileSearchReplaceTool:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
                         original_content = content
+
+                if file_exists and agent:
+                    files = agent.get_user_data("files")
+                    if not files or files.get(file_path, None) is None:
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": f"请先读取文件 {file_path} 的内容后再编辑"
+                        }
+
+
                 with yaspin(text=f"正在处理文件 {file_path}...", color="cyan") as spinner:
                     success, temp_content = fast_edit(file_path, changes, spinner)
                     if not success:

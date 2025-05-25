@@ -50,7 +50,7 @@ class FileOperationTool:
         return None  # 如果没有合适的处理器，返回None
     
     def _handle_single_file(self, operation: str, filepath: str, content: str = "",
-                          start_line: int = 1, end_line: int = -1) -> Dict[str, Any]:
+                          start_line: int = 1, end_line: int = -1, agent: Any = None) -> Dict[str, Any]:
         """Handle operations for a single file"""
         try:
             abs_path = os.path.abspath(filepath)
@@ -128,6 +128,15 @@ class FileOperationTool:
                     
                     spinner.text = f"文件读取完成: {abs_path}"
                     spinner.ok("✅")
+
+                    if agent:
+                        files = agent.get_user_data("files")
+                        if files:
+                            files.append(abs_path)
+                        else:
+                            files = [abs_path]
+                        agent.set_user_data("files", files)
+                        
                     return {
                         "success": True,
                         "stdout": output,
@@ -173,7 +182,7 @@ class FileOperationTool:
         """
         try:
             operation = args["operation"].strip()
-
+            agent = args.get("agent", None)
             if "files" not in args or not isinstance(args["files"], list):
                 return {
                     "success": False,
@@ -194,7 +203,8 @@ class FileOperationTool:
                     file_info["path"].strip(),
                     content,
                     file_info.get("start_line", 1),
-                    file_info.get("end_line", -1)
+                    file_info.get("end_line", -1),
+                    agent
                 )
 
                 if result["success"]:
