@@ -1,3 +1,24 @@
+### Release Note - v0.1.182 2025-05-25
+
+#### **新功能 (Features)**  
+- 新增文件输入处理功能 (file_input_handler.py)
+- 新增用户数据存储功能 (__init__.py)
+- 新增文件内容读取时的用户数据跟踪功能 (file_operation.py, read_code.py)
+
+#### **修复 (Fixes)**  
+- 修正git diff命令参数错误 (pre-command)
+- 修复文件操作工具中的边界条件问题 (file_operation.py)
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 优化编辑工具的核心逻辑 (edit_file.py)
+- 改进代码阅读工具的输出格式 (read_code.py)
+- 重构系统提示标签格式 (__init__.py)
+
+#### **文档更新 (Documentation)**  
+- 更新jarvis_agent模块的初始化文档 (__init__.py)
+
+本次更新主要增强了文件处理能力和用户数据管理功能，同时优化了核心工具的性能和稳定性。新增的文件输入处理功能可以智能识别文件引用并自动读取内容，用户数据存储功能为工具间数据共享提供了便利。
+
 ### Release Note - v0.1.181 2025-05-24
 
 #### **主要变更**
