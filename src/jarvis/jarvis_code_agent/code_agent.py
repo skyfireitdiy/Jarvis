@@ -15,6 +15,7 @@ from yaspin import yaspin  # type: ignore
 from jarvis import __version__
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.file_input_handler import file_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 # 忽略yaspin的类型检查
 from jarvis.jarvis_code_agent.lint import get_lint_tools
@@ -108,6 +109,7 @@ class CodeAgent:
             output_handler=[tool_registry],
             platform=platform_instance,
             input_handler=[
+                file_input_handler,
                 shell_input_handler,
                 builtin_input_handler
             ],
