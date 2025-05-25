@@ -1,3 +1,24 @@
+### Release Note - v0.1.183 2025-05-26
+
+#### **新功能 (Features)**  
+- 新增通义千问平台支持，包含四种模型类型：Normal, Thinking, Deep-Research, Code-Chat
+- 添加通义千问cookies获取指南和配置说明文档
+- 新增通义千问平台实现文件(src/jarvis/jarvis_platform/tongyi.py)
+
+#### **修复 (Fixes)**  
+- 修复Yuanbao平台中思考模式消息处理逻辑
+- 修复Kimi平台模型名称返回问题
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 优化平台注册表中不再需要的set_suppress_output方法
+- 统一各平台思考模式消息处理格式
+
+#### **文档更新 (Documentation)**  
+- 更新README.md添加通义千问平台配置说明
+- 添加通义千问cookies获取图示(docs/images/tongyi.png)
+
+本次更新主要新增了对通义千问平台的支持，提供了完整的平台实现和配置文档，并优化了现有平台的消息处理逻辑。
+
 ### Release Note - v0.1.182 2025-05-25
 
 #### **新功能 (Features)**  
