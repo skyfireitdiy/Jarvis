@@ -430,6 +430,8 @@ class YuanbaoPlatform(BasePlatform):
                 if hasattr(response, 'text'):
                     error_msg += f", 响应: {response.text}"
                 raise Exception(error_msg)
+            
+            in_thinking = False
 
             # 处理SSE流响应
             for line in response.iter_lines():
@@ -446,12 +448,18 @@ class YuanbaoPlatform(BasePlatform):
 
                         # 处理文本类型的消息
                         if data.get("type") == "text":
+                            if in_thinking:
+                                yield "</think>\n"
+                                in_thinking = False
                             msg = data.get("msg", "")
                             if msg:
                                 yield msg
 
                         # 处理思考中的消息
                         elif data.get("type") == "think":
+                            if not in_thinking:
+                                yield "<think>\n"
+                                in_thinking = True
                             think_content = data.get("content", "")
                             if think_content:
                                 yield think_content

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import os
-from typing import Generator, List, Tuple
+from typing import Any, Dict, Generator, List, Tuple
 import uuid
 
 import requests
@@ -21,10 +21,10 @@ class TongyiPlatform(BasePlatform):
         super().__init__()
         self.session_id = ""
         self.cookies = os.getenv("TONGYI_COOKIES", "")
-        self.x_xsrf_token = os.getenv("TONGYI_X_XSRF_TOKEN", "")
         self.request_id = ""
         self.msg_id = ""
         self.model_name = ""
+        self.uploaded_file_info = []
 
 
     def _get_base_headers(self):
@@ -33,11 +33,10 @@ class TongyiPlatform(BasePlatform):
             "Connection": "keep-alive",
             "X-Platform": "pc_tongyi",
             "sec-ch-ua-platform": "Windows",
-            "X-XSRF-TOKEN": self.x_xsrf_token,
             "sec-ch-ua": '"Chromium";v="136", "Microsoft Edge";v="136", "Not.A/Brand";v="99"',
             "sec-ch-ua-mobile": "?0",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
-            "accept": "text/event-stream",
+            "accept": "application/json, text/plain, */*",
             "DNT": "1",
             "Content-Type": "application/json",
             "Origin": "https://www.tongyi.com",
@@ -66,7 +65,38 @@ class TongyiPlatform(BasePlatform):
             self._generate_request_id()
         url = "https://api.tongyi.com/dialog/conversation"
         headers = self._get_base_headers()
+
+        headers["accept"] = "text/event-stream"
         
+        # Prepare contents array with message
+        contents = [{
+            "content": message,
+            "contentType": "text",
+            "role": "user",
+            "ext": {
+                "searchType": "",
+                "pptGenerate": False,
+                "deepThink": False,
+                "deepResearch": False
+            }
+        }]
+
+        # Add uploaded files to contents if available and clear after use
+        if self.uploaded_file_info:
+            for file_info in self.uploaded_file_info:
+                contents.append({
+                    "role": "user",
+                    "contentType": "file",
+                    "content": file_info["url"],
+                    "ext": {
+                        "fileSize": file_info.get("fileSize", 0),
+                        "batchId": file_info.get("batchId", ""),
+                        "docId": file_info.get("docId", "")
+                    }
+                })
+            # Clear uploaded file info after using it
+            self.uploaded_file_info = []
+
         payload = {
             "model": "",
             "action": "next",
@@ -80,32 +110,25 @@ class TongyiPlatform(BasePlatform):
                 "agentId": "",
                 "searchType": "",
                 "pptGenerate": False,
-                "bizScene": "",
+                "bizScene": "code_chat" if self.model_name == "Code-Chat" else "",
                 "bizSceneInfo": {},
                 "specifiedModel": "",
-                "deepThink": False,
-                "deepResearch": False
+                "deepThink": True if self.model_name == "Thinking" else False,
+                "deepResearch": False,
+                "fileUploadBatchId": self.uploaded_file_info[0]["batchId"] if self.uploaded_file_info else ""
             },
-            "contents": [
-                {
-                    "content": message,
-                    "contentType": "text",
-                    "role": "user",
-                    "ext": {
-                        "searchType": "",
-                        "pptGenerate": False,
-                        "deepThink": False,
-                        "deepResearch": False
-                    }
-                }
-            ]
+            "contents": contents
         }
 
         try:
             response = while_success(lambda: requests.post(url, headers=headers, json=payload, stream=True), sleep_time=5)
             if response.status_code != 200:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
-
+            msg_id = ""
+            session_id = ""
+            thinking_content = ""
+            text_content = ""
+            in_thinking = False
             for line in response.iter_lines():
                 if not line:
                     continue
@@ -117,27 +140,227 @@ class TongyiPlatform(BasePlatform):
                     data = json.loads(line_str[6:])
                     # 记录消息ID和会话ID
                     if "msgId" in data:
-                        self.msg_id = data["msgId"]
+                        msg_id = data["msgId"]
                     if "sessionId" in data:
-                        self.session_id = data["sessionId"]
-                        
+                        session_id = data["sessionId"]
+                    
                     if "contents" in data and len(data["contents"]) > 0:
-                        content = data["contents"][0]
-                        if content.get("contentType") == "text" and content.get("content"):
-                            yield content["content"]
+                        for content in data["contents"]:
+                            if content.get("contentType") == "think":
+                                if not in_thinking:
+                                    yield "<think>\n\n"
+                                    in_thinking = True
+                                if content.get("incremental"):
+                                    tmp_content = json.loads(content.get("content"))["content"]
+                                    thinking_content += tmp_content
+                                    yield tmp_content
+                                else:
+                                    tmp_content = json.loads(content.get("content"))["content"]
+                                    if len(thinking_content) < len(tmp_content):
+                                        yield tmp_content[len(thinking_content):]
+                                        thinking_content = tmp_content
+                                    else:
+                                        # thinking_content = "aaa</thi"
+                                        # tmp_content = "aaa"
+                                        # 应该yield nk>
+                                        # print("\n")
+                                        # print(len(thinking_content))
+                                        # print(len(tmp_content))
+                                        # print("--------------------------------")
+                                        # print(thinking_content)
+                                        # print("--------------------------------")
+                                        # print(tmp_content)
+                                        # print("--------------------------------")
+                                        yield "\r\n</think>\n"[len(thinking_content)-len(tmp_content):]
+                                        thinking_content = tmp_content
+                                    in_thinking = False
+                            elif content.get("contentType") == "text":
+                                if in_thinking:
+                                    continue
+                                if content.get("incremental"):
+                                    tmp_content = content.get("content")
+                                    text_content += tmp_content
+                                    yield tmp_content
+                                else:
+                                    tmp_content = content.get("content")
+                                    if len(text_content) < len(tmp_content):
+                                        yield tmp_content[len(text_content):]
+                                        text_content = tmp_content
+
+
                 except json.JSONDecodeError:
                     continue
+
+            self.msg_id = msg_id
+            self.session_id = session_id
 
             return None
 
         except Exception as e:
             raise Exception(f"Chat failed: {str(e)}")
             
+    def _get_upload_token(self) -> Dict[str, Any]:
+        """Get upload token from Tongyi API
+        
+        Returns:
+            Dict[str, Any]: Upload token information including accessId, bucketName, etc.
+        """
+        url = "https://api.tongyi.com/dialog/uploadToken"
+        headers = self._get_base_headers()
+        payload = {}
+
+        try:
+            response = while_success(lambda: requests.post(url, headers=headers, json=payload), sleep_time=5)
+            if response.status_code != 200:
+                raise Exception(f"HTTP {response.status_code}: {response.text}")
+                
+            result = response.json()
+            if not result.get("success"):
+                raise Exception(f"Failed to get upload token: {result.get('errorMsg')}")
+                
+            return result.get("data", {})
+            
+        except Exception as e:
+            raise Exception(f"Failed to get upload token: {str(e)}")
             
 
     def upload_files(self, file_list: List[str]) -> bool:
+        """Upload files to Tongyi platform and get download links
         
-        return False
+        Args:
+            file_list: List of file paths to upload
+            
+        Returns:
+            List[Dict[str, str]]: List of dictionaries containing file info and download URLs
+        """
+        try:
+            upload_token = self._get_upload_token()
+            uploaded_files = []
+            
+            for file_path in file_list:
+                if not os.path.exists(file_path):
+                    PrettyOutput.print(f"File not found: {file_path}", OutputType.ERROR)
+                    return False
+                    
+                # Get file name and content type
+                file_name = os.path.basename(file_path)
+                content_type = self._get_content_type(file_path)
+                
+                # Prepare form data
+                form_data = {
+                    'OSSAccessKeyId': upload_token['accessId'],
+                    'policy': upload_token['policy'],
+                    'signature': upload_token['signature'],
+                    'key': f"{upload_token['dir']}{file_name}",
+                    'dir': upload_token['dir'],
+                    'success_action_status': '200'
+                }
+                
+                # Prepare files
+                files = {
+                    'file': (file_name, open(file_path, 'rb'), content_type)
+                }
+                
+                # Upload file
+                response = requests.post(
+                    upload_token['host'],
+                    data=form_data,
+                    files=files
+                )
+                
+                if response.status_code != 200:
+                    PrettyOutput.print(f"Failed to upload {file_name}: HTTP {response.status_code}", OutputType.ERROR)
+                    return False
+                    
+                uploaded_files.append({
+                    'fileKey': file_name,
+                    'fileType': 'file',
+                    'dir': upload_token['dir']
+                })
+            
+            # Get download links for uploaded files
+            url = "https://api.tongyi.com/dialog/downloadLink/batch"
+            headers = self._get_base_headers()
+            payload = {
+                "fileKeys": [f['fileKey'] for f in uploaded_files],
+                "fileType": "file",
+                "dir": upload_token['dir']
+            }
+            
+            response = requests.post(url, headers=headers, json=payload)
+            if response.status_code != 200:
+                PrettyOutput.print(f"Failed to get download links: HTTP {response.status_code}", OutputType.ERROR)
+                return False
+                
+            result = response.json()
+            if not result.get("success"):
+                PrettyOutput.print(f"Failed to get download links: {result.get('errorMsg')}", OutputType.ERROR)
+                return False
+                
+            # Add files to chat
+            self.uploaded_file_info = result.get("data", {}).get("results", [])
+            for file_info in self.uploaded_file_info:
+                add_url = "https://api.tongyi.com/assistant/api/chat/file/add"
+                add_payload = {
+                    "workSource": "chat",
+                    "terminal": "web",
+                    "workCode": "0",
+                    "channel": "home",
+                    "workType": "file",
+                    "module": "uploadhistory",
+                    "workName": file_info["fileKey"],
+                    "workId": file_info["docId"],
+                    "workResourcePath": file_info["url"],
+                    "sessionId": "",
+                    "batchId": str(uuid.uuid4()).replace('-', '')[:32],  # Generate random batchId
+                    "fileSize": os.path.getsize(file_path)
+                }
+                
+                add_response = requests.post(add_url, headers=headers, json=add_payload)
+                if add_response.status_code != 200:
+                    PrettyOutput.print(f"Failed to add file to chat: HTTP {add_response.status_code}", OutputType.ERROR)
+                    continue
+                    
+                add_result = add_response.json()
+                if not add_result.get("success"):
+                    PrettyOutput.print(f"Failed to add file to chat: {add_result.get('errorMsg')}", OutputType.ERROR)
+                    continue
+                    
+                file_info.update(add_result.get("data", {}))
+                
+            return True
+            
+        except Exception as e:
+            PrettyOutput.print(f"Error uploading files: {str(e)}", OutputType.ERROR)
+            return False
+            
+    def _get_content_type(self, file_path: str) -> str:
+        """Get content type for file
+        
+        Args:
+            file_path: Path to file
+            
+        Returns:
+            str: Content type
+        """
+        ext = os.path.splitext(file_path)[1].lower()
+        content_types = {
+            '.txt': 'text/plain',
+            '.md': 'text/markdown',
+            '.doc': 'application/msword',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.xls': 'application/vnd.ms-excel',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            '.pdf': 'application/pdf',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.mp4': 'video/mp4',
+            '.mp3': 'audio/mpeg',
+            '.wav': 'audio/wav'
+        }
+        return content_types.get(ext, 'application/octet-stream')
 
     def name(self) -> str:
         """Get platform name
@@ -190,9 +413,10 @@ class TongyiPlatform(BasePlatform):
             List[Tuple[str, str]]: List of (model_id, model_name) tuples
         """
         return [
-            ("qwen-turbo", "Qwen-Turbo"),
-            ("qwen-plus", "Qwen-Plus"),
-            ("qwen-max", "Qwen-Max"),
+            ("Normal", "Normal"),
+            ("Thinking", "Thinking"),
+            ("Deep-Research", "Deep-Research"),
+            ("Code-Chat", "Code-Chat"),
         ]
 
     def support_web(self) -> bool:
