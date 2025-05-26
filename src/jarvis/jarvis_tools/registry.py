@@ -100,6 +100,7 @@ arguments:
 - 假设工具结果
 - 创建虚构对话
 - 在没有所需信息的情况下继续
+- yaml 格式错误
 </common_errors>
 </tool_system_guide>
 """
@@ -532,7 +533,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 else:
                     return (
                         {},
-                        f"""工具调用格式错误，请检查工具调用格式。
+                        f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments、want字段）。
 
                     {tool_call_help}""",
                     )
@@ -540,6 +541,8 @@ class ToolRegistry(OutputHandlerProtocol):
                 return (
                     {},
                     f"""工具调用格式错误，请检查工具调用格式。
+
+                    {e}
 
                 {tool_call_help}""",
                 )
