@@ -15,7 +15,7 @@
 
 ## 🌟 核心特色 <a id="core-features"></a>
 
-- 🆓 零成本接入：无缝集成元宝、Kimi等优质模型，无需支付API费用，同时保留强大的文件处理、搜索和推理能力
+- 🆓 零成本接入：无缝集成腾讯元宝(推荐首选)、Kimi等优质模型，无需支付API费用，同时保留强大的文件处理、搜索和推理能力
 - 🛠️ 工具驱动：内置丰富工具集，涵盖脚本执行、代码开发、网页搜索、终端操作等核心功能
 - 👥 人机协作：支持实时交互，用户可随时介入指导，确保AI行为符合预期
 - 🔌 高度可扩展：支持自定义工具和平台，轻松集成MCP协议
@@ -47,9 +47,9 @@ pip3 install jarvis-ai-assistant
 
 将以下配置写入到`~/.jarvis/config.yaml`文件中。
 
-#### 腾讯元宝
+#### 腾讯元宝 (推荐首选)
 ```yaml
-JARVIS_PLATFORM: yuanbao
+JARVIS_PLATFORM: yuanbao  # 推荐使用腾讯元宝平台，适配性最佳
 JARVIS_MODEL: deep_seek_v3
 JARVIS_THINKING_PLATFORM: yuanbao
 JARVIS_THINKING_MODEL: deep_seek
