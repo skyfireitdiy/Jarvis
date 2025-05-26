@@ -371,7 +371,6 @@ class TongyiPlatform(BasePlatform):
                         spinner.text = f"上传文件 {file_name} 时出错: {str(e)}"
                         spinner.fail("❌")
                         return False
-                        
             return True
             
         except Exception as e:
