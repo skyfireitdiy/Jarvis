@@ -17,6 +17,9 @@ from jarvis.jarvis_utils.utils import while_success
 class TongyiPlatform(BasePlatform):
     """Tongyi platform implementation"""
 
+    # Supported image formats
+    IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff"}
+
     platform_name = "tongyi"
 
     def __init__(self):
@@ -108,10 +111,14 @@ class TongyiPlatform(BasePlatform):
         # Add uploaded files to contents if available and clear after use
         if self.uploaded_file_info:
             for file_info in self.uploaded_file_info:
+                # Determine content type based on fileKey extension
+                file_ext = os.path.splitext(file_info["fileKey"])[1].lower()
+                is_image = file_ext in self.IMAGE_EXTENSIONS
+                
                 contents.append(
                     {
                         "role": "user",
-                        "contentType": "file",
+                        "contentType": "image" if is_image else "file",
                         "content": file_info["url"],
                         "ext": {
                             "fileSize": file_info.get("fileSize", 0),
@@ -317,10 +324,14 @@ class TongyiPlatform(BasePlatform):
                             spinner.fail("❌")
                             return False
 
+                        # Determine file type based on extension
+                        file_ext = os.path.splitext(file_path)[1].lower()
+                        is_image = file_ext in self.IMAGE_EXTENSIONS
+                        
                         uploaded_files.append(
                             {
                                 "fileKey": file_name,
-                                "fileType": "file",
+                                "fileType": "image" if is_image else "file",
                                 "dir": upload_token["dir"],
                             }
                         )
@@ -332,7 +343,7 @@ class TongyiPlatform(BasePlatform):
                         headers = self._get_base_headers()
                         payload = {
                             "fileKeys": [f["fileKey"] for f in uploaded_files],
-                            "fileType": "file",
+                            "fileType": "image" if any(f["fileType"] == "image" for f in uploaded_files) else "file",
                             "dir": upload_token["dir"],
                         }
 
@@ -428,6 +439,13 @@ class TongyiPlatform(BasePlatform):
             ".pdf": "application/pdf",
             ".epub": "application/epub+zip",
             ".mobi": "application/x-mobipocket-ebook",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".bmp": "image/bmp",
+            ".tiff": "image/tiff",
         }
         return content_types.get(ext, "application/octet-stream")
 
