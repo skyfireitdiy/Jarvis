@@ -95,7 +95,7 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     if files:
         with yaspin(text="正在读取文件...", color="cyan") as spinner:
             old_prompt = prompt
-            result = FileOperationTool().execute({"operation":"read","files": files})
+            result = FileOperationTool().execute({"operation":"read","files": files, "agent": agent})
             if result["success"]:
                 spinner.text = "文件读取完成"
                 spinner.ok("✅")
