@@ -33,19 +33,21 @@ def load_config(config_path: str) -> dict:
 
 def main():
     """Main entry point for Jarvis agent"""
-    # Initialize environment
-    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！")
-
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
-    parser.add_argument('-c', '--config', type=str, required=True,
-                        help='Path to the YAML configuration file')
+    parser.add_argument('-f', '--config', type=str, required=True,
+                        help='Path to agent config file')
+    parser.add_argument('-c', '--agent_definition', type=str,
+                        help='Path to agent definition file')
     parser.add_argument('-t', '--task', type=str,
                         help='Initial task to execute')
     args = parser.parse_args()
 
+    # Initialize environment
+    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config)
+
     # Load configuration
-    config = load_config(args.config)
+    config = load_config(args.agent_definition) if args.agent_definition else {}
 
     # Create and run agent
     try:

@@ -105,12 +105,13 @@ def _select_task(tasks: Dict[str, str]) -> str:
 def main() -> None:
 
     
-    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！")
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
     parser.add_argument('-p', '--platform', type=str, help='Platform to use')
     parser.add_argument('-m', '--model', type=str, help='Model to use')
     parser.add_argument('-t', '--task', type=str, help='Directly input task content from command line')
+    parser.add_argument('-f', '--config', type=str, help='Path to custom config file')
     args = parser.parse_args()
+    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config)
 
     try:
         agent = Agent(
