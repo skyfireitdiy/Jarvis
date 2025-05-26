@@ -157,7 +157,7 @@ class FileSearchReplaceTool:
 
                 if file_exists and agent:
                     files = agent.get_user_data("files")
-                    if not files or files.get(file_path, None) is None:
+                    if not files or file_path not in files:
                         return {
                             "success": False,
                             "stdout": "",
