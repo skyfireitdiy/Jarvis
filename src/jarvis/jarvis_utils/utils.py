@@ -5,7 +5,7 @@ import subprocess
 import tarfile
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 import yaml
 
@@ -17,7 +17,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 
-def init_env(welcome_str: str) -> None:
+def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     """初始化环境变量从jarvis_data/env文件
     功能：
     1. 创建不存在的jarvis_data目录
@@ -25,6 +25,10 @@ def init_env(welcome_str: str) -> None:
     3. 处理文件读取异常
     4. 检查git仓库状态并在落后时更新
     5. 统计当前命令使用次数
+
+    参数:
+        welcome_str: 欢迎信息字符串
+        config_file: 配置文件路径，默认为None(使用~/.jarvis/config.yaml)
     """
     count_cmd_usage()
 
@@ -43,35 +47,32 @@ def init_env(welcome_str: str) -> None:
     if welcome_str:
         PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
 
-    jarvis_dir = Path(get_data_dir())
-    config_file = jarvis_dir / "config.yaml"
+    config_file_path = Path(config_file) if config_file is not None else Path(os.path.expanduser("~/.jarvis/config.yaml"))
 
-    # 检查jarvis_data目录是否存在
-    if not jarvis_dir.exists():
-        jarvis_dir.mkdir(parents=True)
+    # 加载配置文件
+    if not config_file_path.exists():
+        old_config_file = config_file_path.parent / "env"
+        if old_config_file.exists():# 旧的配置文件存在
+            _read_old_config_file(old_config_file)
+    else:
+        _read_config_file(config_file_path.parent, config_file_path)
 
+    # 现在获取最终的数据目录(可能被配置文件修改)
+    data_dir = Path(get_data_dir())
     script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
     hf_archive = script_dir / "jarvis_data" / "huggingface.tar.gz"
 
 
     # 检查并解压huggingface模型
-    hf_dir = jarvis_dir / "huggingface" / "hub"
+    hf_dir = data_dir / "huggingface" / "hub"
     if not hf_dir.exists() and hf_archive.exists():
         try:
             PrettyOutput.print("正在解压HuggingFace模型...", OutputType.INFO)
             with tarfile.open(hf_archive, "r:gz") as tar:
-                tar.extractall(path=jarvis_dir)
+                tar.extractall(path=data_dir)
             PrettyOutput.print("HuggingFace模型解压完成", OutputType.SUCCESS)
         except Exception as e:
-            PrettyOutput.print(f"解压HuggingFace模型失败: {e}", OutputType.ERROR)
-
-
-    if not config_file.exists():
-        old_config_file = jarvis_dir / "env"
-        if old_config_file.exists():# 旧的配置文件存在
-            _read_old_config_file(old_config_file)
-    else:
-        _read_config_file(jarvis_dir, config_file)        
+            PrettyOutput.print(f"解压HuggingFace模型失败: {e}", OutputType.ERROR)   
 
         # 检查是否是git仓库并更新
     from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
