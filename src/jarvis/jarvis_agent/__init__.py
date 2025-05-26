@@ -4,6 +4,8 @@ import datetime
 import platform
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
+from jarvis.jarvis_platform.base import BasePlatform
+
 # 第三方库导入
 from yaspin import yaspin  # type: ignore
 
@@ -166,7 +168,9 @@ class Agent:
         multiline_inputer: Optional[Callable[[str], str]] = None,
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
+        files: List[str] = [],
     ):
+        self.files = files
         """初始化Jarvis Agent实例
 
         参数:
@@ -218,8 +222,9 @@ class Agent:
             multiline_inputer if multiline_inputer else get_multiline_input
         )
 
+        # 如果有上传文件，自动禁用方法论
         self.use_methodology = (
-            use_methodology if use_methodology is not None else is_use_methodology()
+            False if files else (use_methodology if use_methodology is not None else is_use_methodology())
         )
         self.use_analysis = (
             use_analysis if use_analysis is not None else is_use_analysis()
@@ -768,17 +773,23 @@ arguments:
 
             self.prompt = f"{user_input}"
 
-            if self.first and self.use_methodology:
-                # 先尝试上传方法轮
-                platform = self.model if hasattr(self.model, "upload_files") else None
-                if platform and upload_methodology(platform):
-                    self.prompt = f"{user_input}\n\n方法论已上传到平台，请参考平台上的方法论内容"
-                else:
-                    msg = user_input
-                    for handler in self.input_handler:
-                        msg, _ = handler(msg, self)
-                    # 上传失败则回退到本地加载
-                    self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+            if self.first:
+                # 如果有上传文件，先上传文件
+                if self.files and isinstance(self.model, BasePlatform) and hasattr(self.model, "upload_files"):
+                    self.model.upload_files(self.files)
+                    self.prompt = f"{user_input}\n\n已上传{len(self.files)}个文件到平台"
+                
+                # 如果启用方法论且没有上传文件，上传方法论
+                elif self.use_methodology:
+                    platform = self.model if hasattr(self.model, "upload_files") else None
+                    if platform and upload_methodology(platform):
+                        self.prompt = f"{user_input}\n\n方法论已上传到平台，请参考平台上的方法论内容"
+                    else:
+                        msg = user_input
+                        for handler in self.input_handler:
+                            msg, _ = handler(msg, self)
+                        # 上传失败则回退到本地加载
+                        self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
 
                 self.first = False
 
