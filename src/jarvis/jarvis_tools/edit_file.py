@@ -169,6 +169,21 @@ class FileSearchReplaceTool:
                     success, temp_content = fast_edit(file_path, changes, spinner)
                     if not success:
                         success, temp_content = slow_edit(file_path, yaml.safe_dump(changes, allow_unicode=True), spinner)
+                        if not success:
+                            spinner.text = f"文件 {file_path} 处理失败"
+                            spinner.fail("❌")
+                            return {
+                                "success": False,
+                                "stdout": "",
+                                "stderr": temp_content
+                            }
+                        else:
+                            spinner.text = f"文件 {file_path} 内容生成完成"
+                            spinner.ok("✅")
+                    else:
+                        spinner.text = f"文件 {file_path} 内容生成完成"
+                        spinner.ok("✅")
+
 
                 # 只有当所有替换操作都成功时，才写回文件
                 if success and (temp_content != original_content or not file_exists):
@@ -184,13 +199,6 @@ class FileSearchReplaceTool:
                     stdout_message = f"文件 {file_path} {action} 完成"
                     stdout_messages.append(stdout_message)
                     PrettyOutput.print(stdout_message, OutputType.SUCCESS)
-                elif success:
-                    stdout_message = f"文件 {file_path} 没有找到需要替换的内容"
-                    stdout_messages.append(stdout_message)
-                    PrettyOutput.print(stdout_message, OutputType.INFO)
-                else:
-                    stdout_message = f"文件 {file_path} 修改失败"
-                    stdout_messages.append(stdout_message)
                 
             except Exception as e:
                 stderr_message = f"处理文件 {file_path} 时出错: {str(e)}"
@@ -344,7 +352,7 @@ def slow_edit(filepath: str, patch_content: str, spinner: Yaspin) -> Tuple[bool,
                 if upload_success:
                     response = model.chat_until_success(main_prompt)
                 else:
-                    return False, ""
+                    return False, "文件上传失败"
 
             # 解析差异化补丁
             diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
@@ -357,17 +365,17 @@ def slow_edit(filepath: str, patch_content: str, spinner: Yaspin) -> Tuple[bool,
                     "replace": match.group(2).strip()
                 })
 
-            success, modified_content = fast_edit(filepath, patches, spinner)
+            success, modified_content_or_err = fast_edit(filepath, patches, spinner)
             if success:
-                return True, modified_content
+                return True, modified_content_or_err
         spinner.text = f"文件 {filepath} 修改失败"
         spinner.fail("❌")
-        return False, ""
+        return False, f"文件修改失败: {modified_content_or_err}"
 
     except Exception as e:
         spinner.text = f"文件修改失败: {str(e)}"
         spinner.fail("❌")
-        return False, ""
+        return False, f"文件修改失败: {str(e)}"
 
 
 def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> Tuple[bool, str]:
@@ -410,6 +418,7 @@ def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> T
     modified_content = file_content
     patch_count = 0
     success = True
+    err_msg = ""
     for patch in patches:
         search_text = patch["search"]
         replace_text = patch["replace"]
@@ -419,6 +428,7 @@ def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> T
             # 如果有多处，报错
             if modified_content.count(search_text) > 1:
                 success = False
+                err_msg = f"搜索文本 {search_text} 在文件中存在多处，请检查补丁内容"
                 break
             # 应用替换
             modified_content = modified_content.replace(
@@ -426,10 +436,11 @@ def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> T
             spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
         else:
             success = False
+            err_msg = f"搜索文本 {search_text} 在文件中不存在，请检查补丁内容"
             break
     if not success:
         revert_file(filepath)
-        return False, ""
+        return False, err_msg
 
 
     spinner.text = f"文件 {filepath} 修改完成，应用了 {patch_count} 个补丁"
