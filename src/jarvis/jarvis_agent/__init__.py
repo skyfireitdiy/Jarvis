@@ -771,6 +771,9 @@ arguments:
         try:
             set_agent(self.name, self)
 
+            for handler in self.input_handler:
+                user_input, _ = handler(user_input, self)
+
             self.prompt = f"{user_input}"
 
             if self.first:
@@ -785,19 +788,14 @@ arguments:
                     if platform and upload_methodology(platform):
                         self.prompt = f"{user_input}\n\n方法论已上传到平台，请参考平台上的方法论内容"
                     else:
-                        msg = user_input
-                        for handler in self.input_handler:
-                            msg, _ = handler(msg, self)
                         # 上传失败则回退到本地加载
-                        self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+                        self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(user_input, self.get_tool_registry())}"
 
                 self.first = False
 
             self.conversation_length = get_context_token_count(self.prompt)
             while True:
                 try:
-                    # 如果对话历史长度超过限制，在提示中添加提醒
-
                     current_response = self._call_model(self.prompt, True)
                     self.prompt = ""
                     self.conversation_length += get_context_token_count(
