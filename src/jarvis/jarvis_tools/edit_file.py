@@ -136,7 +136,7 @@ class FileSearchReplaceTool:
         stderr_messages = []
         success = True
         
-        file_path = args["file"]
+        file_path = os.path.abspath(args["file"])
         changes = args["changes"]
         agent = args.get("agent", None)
         
