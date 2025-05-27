@@ -1,3 +1,13 @@
+### Release Note - v0.1.187 2025-05-27
+
+#### **修复 (Fixes)**  
+- 修复了config参数从必选改为可选(main.py)
+- 修复了对话长度计算逻辑(__init__.py)
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 优化了模型响应处理流程(__init__.py)
+- 改进了文件上传后的提示信息(__init__.py)
+
 ### Release Note - v0.1.186 2025-05-27
 
 #### **新功能 (Features)**  
