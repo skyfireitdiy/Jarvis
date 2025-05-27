@@ -35,7 +35,7 @@ def main():
     """Main entry point for Jarvis agent"""
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Jarvis AI assistant')
-    parser.add_argument('-f', '--config', type=str, required=True,
+    parser.add_argument('-f', '--config', type=str, required=False,
                         help='Path to agent config file')
     parser.add_argument('-c', '--agent_definition', type=str,
                         help='Path to agent definition file')
