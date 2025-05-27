@@ -436,7 +436,9 @@ class Agent:
         if self.conversation_length > self.max_token_count:
             message = self._summarize_and_clear_history() + "\n\n" + message
             self.conversation_length += get_context_token_count(message)
-        return self.model.chat_until_success(message)  # type: ignore
+        response = self.model.chat_until_success(message)  # type: ignore
+        self.conversation_length += get_context_token_count(response)
+        return response
 
     def _summarize_and_clear_history(self) -> str:
         """总结当前对话并清理历史记录
@@ -793,14 +795,10 @@ arguments:
 
                 self.first = False
 
-            self.conversation_length = get_context_token_count(self.prompt)
             while True:
                 try:
                     current_response = self._call_model(self.prompt, True)
                     self.prompt = ""
-                    self.conversation_length += get_context_token_count(
-                        current_response
-                    )
 
                     need_return, self.prompt = self._call_tools(current_response)
 
