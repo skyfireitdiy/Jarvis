@@ -435,9 +435,26 @@ def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> T
                 search_text, replace_text)
             spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
         else:
-            success = False
-            err_msg = f"搜索文本 {search_text} 在文件中不存在，请检查补丁内容"
-            break
+            # 尝试增加缩进重试
+            found = False
+            for space_count in range(1, 17):
+                indented_search = '\n'.join(' ' * space_count + line for line in search_text.split('\n'))
+                indented_replace = '\n'.join(' ' * space_count + line for line in replace_text.split('\n'))
+                if indented_search in modified_content:
+                    if modified_content.count(indented_search) > 1:
+                        success = False
+                        err_msg = f"搜索文本 {indented_search} 在文件中存在多处，请检查补丁内容"
+                        break
+                    modified_content = modified_content.replace(
+                        indented_search, indented_replace)
+                    spinner.write(f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)")
+                    found = True
+                    break
+            
+            if not found:
+                success = False
+                err_msg = f"搜索文本 {search_text} 在文件中不存在，尝试增加1-16个空格缩进后仍未找到匹配"
+                break
     if not success:
         revert_file(filepath)
         return False, err_msg
