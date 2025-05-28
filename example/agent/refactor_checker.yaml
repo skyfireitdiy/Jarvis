@@ -1,7 +1,7 @@
 name: RefactorCheckerExpert
 description: 重构检查专家，负责检查重构后的代码逻辑是否与原代码完全一致
 platform: yuanbao
-model_name: deep_seek
+model_name: deep_seek_v3
 system_prompt: |
   # 重构检查专家 - 系统指令
 
