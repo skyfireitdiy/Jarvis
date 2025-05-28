@@ -2,7 +2,6 @@
 import argparse
 import os
 import re
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -53,7 +52,7 @@ class GitCommitTool:
         )
         if r:
             # 直接返回原始内容，仅去除外围空白
-            return shlex.quote(r.group(1).strip())
+            return r.group(1).strip()
         return None
 
     def _get_last_commit_hash(self):
