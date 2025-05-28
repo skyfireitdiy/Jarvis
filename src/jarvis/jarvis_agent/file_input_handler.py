@@ -30,7 +30,7 @@ def file_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     prompt = user_input
     files = []
 
-    file_refs = re.findall(r"'([^']+)'", user_input)
+    file_refs = re.findall(r"'([^'\n]+)'", user_input)
     for ref in file_refs:
         # 处理 file:start,end 或 file:start:end 格式
         if ':' in ref:
