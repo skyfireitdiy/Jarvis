@@ -18,7 +18,7 @@ from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import init_env, is_context_overflow
+from jarvis.jarvis_utils.utils import is_context_overflow
 
 tool_call_help = f"""
 <tool_system_guide>
