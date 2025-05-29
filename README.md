@@ -145,7 +145,6 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 | `jarvis-multi-agent` | - | 使用多代理功能 |
 | `jarvis-agent` | - | 使用agent功能 |
 | `jarvis-tool` | - | 使用工具功能 |
-| `jarvis-ask-codebase` | `jac` | 使用代码库查询功能 |
 | `jarvis-git-details` | - | 使用git details功能 |
 | `jarvis-methodology` | - | 使用方法论功能 |
 
