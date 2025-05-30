@@ -105,6 +105,10 @@ def chat_with_model(platform_name: str, model_name: str):
                     # Remove quotes if present
                     if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
                         file_path = file_path[1:-1]
+
+                    if not platform.support_upload_files():
+                        PrettyOutput.print("平台不支持上传文件", OutputType.ERROR)
+                        continue
                     
                     PrettyOutput.print(f"正在上传文件: {file_path}", OutputType.INFO)
                     if platform.upload_files([file_path]):
