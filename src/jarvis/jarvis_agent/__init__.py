@@ -790,18 +790,15 @@ arguments:
                     # 如果有上传文件，先上传文件
                     if (
                         self.files
-                        and isinstance(self.model, BasePlatform)
-                        and hasattr(self.model, "upload_files")
+                        and self.model
+                        and self.model.support_upload_files()
                     ):
                         self.model.upload_files(self.files)
                         self.prompt = f"{user_input}"
 
                     # 如果启用方法论且没有上传文件，上传方法论
                     elif self.use_methodology:
-                        platform = (
-                            self.model if hasattr(self.model, "upload_files") else None
-                        )
-                        if platform and upload_methodology(platform):
+                        if self.model and upload_methodology(self.model):
                             self.prompt = f"{user_input}"
                         else:
                             # 上传失败则回退到本地加载
