@@ -60,9 +60,6 @@ class BasePlatform(ABC):
         start_time = time.time()
 
         input_token_count = get_context_token_count(message)
-        if is_context_overflow(message):
-            PrettyOutput.print("错误：输入内容超过最大限制", OutputType.WARNING)
-            return "错误：输入内容超过最大限制"
 
         if input_token_count > get_max_input_token_count():
             max_chunk_size = get_max_input_token_count() - 1024  # 留出一些余量

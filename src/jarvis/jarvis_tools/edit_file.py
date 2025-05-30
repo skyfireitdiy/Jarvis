@@ -286,11 +286,11 @@ def slow_edit(filepath: str, patch_content: str, spinner: Yaspin) -> Tuple[bool,
     model = PlatformRegistry().get_normal_platform()
     try:
         file_content = FileOperationTool().execute({"operation":"read", "files":[{"path":filepath}]})["stdout"]
-        need_upload_file = is_context_overflow(file_content)
+        is_large_context = is_context_overflow(file_content)
         upload_success = False
         # 读取原始文件内容
         with spinner.hidden():  
-            if need_upload_file and model.upload_files([filepath]):
+            if is_large_context and model.support_upload_files() and model.upload_files([filepath]):
                 upload_success = True
 
 
@@ -340,19 +340,21 @@ def slow_edit(filepath: str, patch_content: str, spinner: Yaspin) -> Tuple[bool,
 """
         
         for _ in range(3):
-            file_prompt = ""
-            if not need_upload_file:
+            if is_large_context:
+                if upload_success:
+                    response = model.chat_until_success(main_prompt)
+                else:
+                    file_prompt = f"""
+# 原始代码
+{file_content}
+"""
+                    response = model.chat_until_success(main_prompt + file_prompt)
+            else:
                 file_prompt = f"""
 # 原始代码
 {file_content}
 """
-                
                 response = model.chat_until_success(main_prompt + file_prompt)
-            else:
-                if upload_success:
-                    response = model.chat_until_success(main_prompt)
-                else:
-                    return False, "文件上传失败"
 
             # 解析差异化补丁
             diff_blocks = re.finditer(ot("DIFF")+r'\s*>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'+ct("DIFF"),
