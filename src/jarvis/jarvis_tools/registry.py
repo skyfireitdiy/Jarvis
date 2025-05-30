@@ -678,22 +678,19 @@ class ToolRegistry(OutputHandlerProtocol):
                 try:
                     # 获取平台实例
                     platform = PlatformRegistry().get_normal_platform()
-                    if platform and hasattr(platform, 'upload_files'):
-                        platform.set_suppress_output(False)
-                        # 尝试上传文件
-                        upload_success = platform.upload_files([output_file])
-                        
-                        if upload_success:
-                            # 使用上传的文件生成摘要
-                            prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
-                            return f"""工具调用原始输出过长，以下是根据输出提出的信息：
+                    
+                    platform.set_suppress_output(False)
+                    # 尝试上传文件
+                    upload_success = platform.upload_files([output_file])
+                    
+                    if upload_success:
+                        # 使用上传的文件生成摘要
+                        prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
+                        return f"""工具调用原始输出过长，以下是根据输出提出的信息：
 
 {platform.chat_until_success(prompt)}"""
-                        else:
-                            return self._truncate_output(output)
-                    
-                    # 如果都不支持，返回截断的输出
-                    return self._truncate_output(output)
+                    else:
+                        return self._truncate_output(output)
                 finally:
                     # 清理临时文件
                     try:

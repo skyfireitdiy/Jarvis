@@ -152,7 +152,7 @@ class GitCommitTool:
                         # Check if content is too large
                         is_large_content = is_context_overflow(diff)
                         
-                        if is_large_content and hasattr(platform, 'upload_files'):
+                        if is_large_content:
                             spinner.text = "正在上传代码差异文件..."
                             try:
                                 with spinner.hidden():

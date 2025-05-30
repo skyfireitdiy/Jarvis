@@ -593,7 +593,7 @@ class CodeReviewTool:
                     is_large_content = is_context_overflow(diff_output)
                     
                     # Upload the file to the agent's model
-                    if is_large_content and agent.model and hasattr(agent.model, 'upload_files'):
+                    if is_large_content and agent.model:
                         with yaspin(text="正在上传代码差异文件...", color="cyan") as spinner:
                             upload_success = agent.model.upload_files([temp_file_path])
                             if upload_success:

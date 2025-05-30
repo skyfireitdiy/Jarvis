@@ -119,9 +119,8 @@ def upload_methodology(platform: BasePlatform) -> bool:
         return False
     
     try:
-        if hasattr(platform, 'upload_files'):
-            return platform.upload_files([temp_file_path])
-        return False
+        return platform.upload_files([temp_file_path])
+        
     finally:
         if temp_file_path and os.path.exists(temp_file_path):
             try:
@@ -214,12 +213,11 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
                     spinner.ok("✅")
 
                 # 尝试上传文件
-                if hasattr(platform, 'upload_files'):
-                    upload_success = platform.upload_files([temp_file_path])
-                    
-                    if upload_success:
-                        # 使用上传的文件生成摘要
-                        return platform.chat_until_success(base_prompt + f"""
+                upload_success = platform.upload_files([temp_file_path])
+                
+                if upload_success:
+                    # 使用上传的文件生成摘要
+                    return platform.chat_until_success(base_prompt + f"""
 请根据已上传的方法论和可调用的工具文件内容，规划/总结出以下用户需求的执行步骤: {user_input}
 
 请按以下格式回复：
@@ -234,8 +232,8 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 如果没有匹配的方法论，请输出：没有历史方法论可参考
 除以上要求外，不要输出任何内容
 """)
-                    else:
-                        return "没有历史方法论可参考"
+                else:
+                    return "没有历史方法论可参考"
             # 如果内容不大或上传失败，直接使用chat_until_success
             return platform.chat_until_success(full_content)
         
