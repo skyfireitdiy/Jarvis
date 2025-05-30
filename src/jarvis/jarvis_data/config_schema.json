@@ -179,7 +179,7 @@
     "JARVIS_MAX_BIG_CONTENT_SIZE": {
       "type": "number",
       "description": "最大大内容尺寸",
-      "default": 1024000
+      "default": 160000
     },
     "JARVIS_PRETTY_OUTPUT": {
       "type": "boolean",

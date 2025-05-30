@@ -203,7 +203,7 @@ def get_max_big_content_size() -> int:
     返回：
         int: 最大大内容大小
     """
-    return int(GLOBAL_CONFIG_DATA.get('JARVIS_MAX_BIG_CONTENT_SIZE', '1024000'))
+    return int(GLOBAL_CONFIG_DATA.get('JARVIS_MAX_BIG_CONTENT_SIZE', '160000'))
 
 def get_pretty_output() -> bool:
     """

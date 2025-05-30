@@ -168,7 +168,7 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
 | `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数，如果是0表示无限制 |
 | `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis（仅在以git仓库方式安装时有效） |
-| `JARVIS_MAX_BIG_CONTENT_SIZE` | 1024000 | 最大大内容大小 |
+| `JARVIS_MAX_BIG_CONTENT_SIZE` | 160000 | 最大大内容大小 |
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
 | `JARVIS_GIT_COMMIT_PROMPT` | "" | 自定义git提交信息生成提示模板 |
 | `JARVIS_PRINT_PROMPT` | false | 是否打印提示 |
