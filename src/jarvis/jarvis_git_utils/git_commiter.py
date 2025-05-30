@@ -77,6 +77,7 @@ class GitCommitTool:
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute automatic commit process with support for multi-line messages and special characters"""
         try:
+            original_dir = os.getcwd()
             root_dir = args.get("root_dir", ".")
             prefix = args.get("prefix", "")
             suffix = args.get("suffix", "")
