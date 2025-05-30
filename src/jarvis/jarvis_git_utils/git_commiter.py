@@ -153,6 +153,14 @@ class GitCommitTool:
                         is_large_content = is_context_overflow(diff)
                         
                         if is_large_content:
+                            if not platform.support_upload_files():
+                                spinner.text = "差异文件太大，无法处理"
+                                spinner.fail("❌")
+                                return {
+                                    "success": False,
+                                    "stdout": "",
+                                    "stderr": "错误：差异文件太大，无法处理"
+                                }
                             spinner.text = "正在上传代码差异文件..."
                             with spinner.hidden():
                                 # 创建临时文件并写入差异内容

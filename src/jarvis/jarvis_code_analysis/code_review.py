@@ -593,24 +593,25 @@ class CodeReviewTool:
                     
                     # Upload the file to the agent's model
                     if is_large_content:
-                        if agent.model and agent.model.support_upload_files():
-                            with yaspin(text="正在上传代码差异文件...", color="cyan") as spinner:
-                                upload_success = agent.model.upload_files([temp_file_path])
-                                if upload_success:
-                                    spinner.ok("✅")
-                                    PrettyOutput.print(f"已成功上传代码差异文件", OutputType.SUCCESS)
-                                else:
-                                    return {
-                                        "success": False,
-                                        "stdout": "",
-                                        "stderr": "上传代码差异文件失败"
-                                    }
-                        else:
+                        if not agent.model or not agent.model.support_upload_files():
                             return {
                                 "success": False,
                                 "stdout": "",
                                 "stderr": "代码差异太大，无法处理"
                             }
+                        
+                        with yaspin(text="正在上传代码差异文件...", color="cyan") as spinner:
+                            upload_success = agent.model.upload_files([temp_file_path])
+                            if upload_success:
+                                spinner.ok("✅")
+                                PrettyOutput.print(f"已成功上传代码差异文件", OutputType.SUCCESS)
+                            else:
+                                return {
+                                    "success": False,
+                                    "stdout": "",
+                                    "stderr": "上传代码差异文件失败"
+                                }
+                        
                     
                     # Prepare the prompt based on upload status
                     if is_large_content:
