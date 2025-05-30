@@ -685,6 +685,8 @@ class ToolRegistry(OutputHandlerProtocol):
                         agent_instance.clear_history()
                         upload_success = agent_instance.model.upload_files([output_file])
                         if upload_success:
+                            # 删除args的agent键
+                            args.pop("agent", None)
                             prompt = f"""
 以下是之前对话的关键信息总结：
 
