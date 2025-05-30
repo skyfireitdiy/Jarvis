@@ -4,8 +4,6 @@ import datetime
 import platform
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
-from jarvis.jarvis_platform.base import BasePlatform
-
 # 第三方库导入
 from yaspin import yaspin  # type: ignore
 
@@ -224,7 +222,11 @@ class Agent:
 
         # 如果有上传文件，自动禁用方法论
         self.use_methodology = (
-            False if files else (use_methodology if use_methodology is not None else is_use_methodology())
+            False
+            if files
+            else (
+                use_methodology if use_methodology is not None else is_use_methodology()
+            )
         )
         self.use_analysis = (
             use_analysis if use_analysis is not None else is_use_analysis()
@@ -440,24 +442,15 @@ class Agent:
         self.conversation_length += get_context_token_count(response)
         return response
 
-    def _summarize_and_clear_history(self) -> str:
-        """总结当前对话并清理历史记录
-
-        该方法将:
-        1. 生成关键信息摘要
-        2. 清除对话历史
-        3. 保留系统消息
-        4. 添加摘要作为新上下文
-        5. 重置对话长度计数器
+    def _generate_summary(self) -> str:
+        """生成对话历史摘要
 
         返回:
             str: 包含对话摘要的字符串
 
         注意:
-            当上下文长度超过最大值时使用
+            仅生成摘要，不修改对话状态
         """
-        # Create a new model instance to summarize, avoid affecting the main conversation
-
         with yaspin(text="正在总结对话历史...", color="cyan") as spinner:
             summary_prompt = """
 <summary_request>
@@ -482,19 +475,41 @@ class Agent:
 </summary_request>
 """
 
-            try:
-                with spinner.hidden():
-                    summary = self.model.chat_until_success(self.prompt + "\n" + summary_prompt)  # type: ignore
+        try:
+            with spinner.hidden():
+                summary = self.model.chat_until_success(self.prompt + "\n" + summary_prompt)  # type: ignore
+            spinner.text = "总结对话历史完成"
+            spinner.ok("✅")
+            return summary
+        except Exception as e:
+            spinner.text = "总结对话历史失败"
+            spinner.fail("❌")
+            return ""
 
-                self.model.reset()  # type: ignore
+    def _summarize_and_clear_history(self) -> str:
+        """总结当前对话并清理历史记录
 
-                # 清空当前对话历史，但保留系统消息
-                self.conversation_length = 0  # Reset conversation length
+        该方法将:
+        1. 调用_generate_summary生成摘要
+        2. 清除对话历史
+        3. 保留系统消息
+        4. 添加摘要作为新上下文
+        5. 重置对话长度计数器
 
-                # 添加总结作为新的上下文
-                spinner.text = "总结对话历史完成"
-                spinner.ok("✅")
-                return f"""<summary>
+        返回:
+            str: 包含对话摘要的字符串
+
+        注意:
+            当上下文长度超过最大值时使用
+        """
+        summary = self._generate_summary()
+        self.model.reset()  # type: ignore
+        self.conversation_length = 0  # Reset conversation length
+
+        if not summary:
+            return ""
+
+        return f"""<summary>
 <header>
 以下是之前对话的关键信息总结：
 </header>
@@ -508,10 +523,6 @@ class Agent:
 </instructions>
 </summary>
 """
-            except Exception as e:
-                spinner.text = "总结对话历史失败"
-                spinner.fail("❌")
-                return ""
 
     def _call_tools(self, response: str) -> Tuple[bool, Any]:
         """调用工具执行响应
@@ -777,13 +788,19 @@ arguments:
 
             if self.first:
                 # 如果有上传文件，先上传文件
-                if self.files and isinstance(self.model, BasePlatform) and hasattr(self.model, "upload_files"):
+                if (
+                    self.files
+                    and isinstance(self.model, BasePlatform)
+                    and hasattr(self.model, "upload_files")
+                ):
                     self.model.upload_files(self.files)
                     self.prompt = f"{user_input}"
-                
+
                 # 如果启用方法论且没有上传文件，上传方法论
                 elif self.use_methodology:
-                    platform = self.model if hasattr(self.model, "upload_files") else None
+                    platform = (
+                        self.model if hasattr(self.model, "upload_files") else None
+                    )
                     if platform and upload_methodology(platform):
                         self.prompt = f"{user_input}"
                     else:
