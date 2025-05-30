@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
 
+from numpy import place
 import yaml
 
 from jarvis.jarvis_mcp import McpClient
@@ -648,6 +649,9 @@ class ToolRegistry(OutputHandlerProtocol):
             want = tool_call["want"]
             args["agent"] = agent
 
+            from jarvis.jarvis_agent import Agent
+            agent_instance: Agent = agent 
+
             if isinstance(args, str):
                 try:
                     args = json.loads(args)
@@ -676,21 +680,26 @@ class ToolRegistry(OutputHandlerProtocol):
                     tmp_file.flush()
                 
                 try:
-                    # 获取平台实例
-                    platform = PlatformRegistry().get_normal_platform()
-                    
-                    platform.set_suppress_output(False)
-                    # 尝试上传文件
-                    upload_success = platform.upload_files([output_file])
-                    
-                    if upload_success:
-                        # 使用上传的文件生成摘要
-                        prompt = f"该文件为工具执行结果，请阅读文件内容，并根据文件提取出以下信息：{want}"
-                        return f"""工具调用原始输出过长，以下是根据输出提出的信息：
+                    if agent_instance.model and agent_instance.model.support_upload_files():
+                        summary = agent_instance._generate_summary()
+                        agent_instance.clear_history()
+                        upload_success = agent_instance.model.upload_files([output_file])
+                        if upload_success:
+                            prompt = f"""
+以下是之前对话的关键信息总结：
 
-{platform.chat_until_success(prompt)}"""
-                    else:
-                        return self._truncate_output(output)
+<content>
+{summary}
+</content>
+
+上传的文件是以下工具执行结果：
+{yaml.safe_dump({"name":name, "arguments":args, "want":want})}
+
+请根据以上信息，继续完成任务。
+"""
+                            return prompt
+                    # 使用上传的文件生成摘要
+                    return self._truncate_output(output)
                 finally:
                     # 清理临时文件
                     try:

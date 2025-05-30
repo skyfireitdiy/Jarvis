@@ -508,19 +508,14 @@ class Agent:
         if not summary:
             return ""
 
-        return f"""<summary>
-<header>
+        return f"""
 以下是之前对话的关键信息总结：
-</header>
 
 <content>
 {summary}
 </content>
 
-<instructions>
 请基于以上信息继续完成任务。请注意，这是之前对话的摘要，上下文长度已超过限制而被重置。请直接继续任务，无需重复已完成的步骤。如有需要，可以询问用户以获取更多信息。
-</instructions>
-</summary>
 """
 
     def _call_tools(self, response: str) -> Tuple[bool, Any]:
