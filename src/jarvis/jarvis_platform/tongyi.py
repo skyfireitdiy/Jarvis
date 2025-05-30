@@ -67,6 +67,10 @@ class TongyiPlatform(BasePlatform):
     def _generate_request_id(self):
         self.request_id = str(uuid.uuid4()).replace("-", "")
 
+    def support_upload_files(self) -> bool:
+        """Check if platform supports upload files"""
+        return True
+
     def chat(self, message: str) -> Generator[str, None, None]:
         if not self.request_id:
             self._generate_request_id()

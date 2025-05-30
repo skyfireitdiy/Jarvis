@@ -90,6 +90,10 @@ class KimiModel(BasePlatform):
         
         response = while_success(lambda: requests.post(url, headers=headers, data=payload), sleep_time=5)
         return response.json()
+    
+    def support_upload_files(self) -> bool:
+        """Check if platform supports upload files"""
+        return True
 
     def _upload_file(self, file_path: str, presigned_url: str) -> bool:
         """Upload file to presigned URL"""

@@ -107,6 +107,10 @@ class YuanbaoPlatform(BasePlatform):
             PrettyOutput.print(f"错误：创建会话失败：{e}", OutputType.ERROR)
             return False
 
+    def support_upload_files(self) -> bool:
+        """Check if platform supports upload files"""
+        return True
+
     def upload_files(self, file_list: List[str]) -> bool:
         """上传文件到元宝平台
         

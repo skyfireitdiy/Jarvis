@@ -49,6 +49,10 @@ class BasePlatform(ABC):
     def upload_files(self, file_list: List[str]) -> bool:
         raise NotImplementedError("upload_files is not implemented")
 
+    @abstractmethod
+    def support_upload_files(self) -> bool:
+        """Check if platform supports upload files"""
+        return False
 
     
     def _chat(self, message: str):
