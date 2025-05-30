@@ -154,24 +154,26 @@ class GitCommitTool:
                         
                         if is_large_content:
                             spinner.text = "正在上传代码差异文件..."
-                            try:
-                                with spinner.hidden():
-                                    # 创建临时文件并写入差异内容
-                                    with tempfile.NamedTemporaryFile(mode='w', suffix='.diff', delete=False) as temp_diff_file: 
-                                        temp_diff_file_path = temp_diff_file.name
-                                        temp_diff_file.write(diff)
-                                        temp_diff_file.flush()
-                                        spinner.write(f"✅ 差异内容已写入临时文件")
-                                    upload_success = platform.upload_files([temp_diff_file_path])
-                                if upload_success:
-                                    spinner.write("✅ 成功上传代码差异文件")
-                                else:
-                                    spinner.write("⚠️ 上传代码差异文件失败，将使用分块处理")
-                            except Exception as e:
-                                spinner.write(f"⚠️ 上传文件时出错: {str(e)}")
-                                upload_success = False
+                            with spinner.hidden():
+                                # 创建临时文件并写入差异内容
+                                with tempfile.NamedTemporaryFile(mode='w', suffix='.diff', delete=False) as temp_diff_file: 
+                                    temp_diff_file_path = temp_diff_file.name
+                                    temp_diff_file.write(diff)
+                                    temp_diff_file.flush()
+                                    spinner.write(f"✅ 差异内容已写入临时文件")
+                                upload_success = platform.upload_files([temp_diff_file_path])
+                            if upload_success:
+                                spinner.write("✅ 成功上传代码差异文件")
+                            else:
+                                spinner.text = "上传代码差异文件失败"
+                                spinner.fail("❌")
+                                return {
+                                    "success": False,
+                                    "stdout": "",
+                                    "stderr": "错误：上传代码差异文件失败"
+                                }
                         # 根据上传状态准备完整的提示
-                        if upload_success:
+                        if is_large_content:
                             # 尝试生成提交信息
                             spinner.text = "正在生成提交消息..."
                             # 使用上传的文件
@@ -184,13 +186,6 @@ class GitCommitTool:
     '''
                             commit_message = platform.chat_until_success(prompt)
                         else:
-                                if is_large_content:
-                                    return {
-                                        "success": False,
-                                        "stdout": "",
-                                        "stderr": "错误：上传代码差异文件失败"
-                                    }
-                                # 直接在提示中包含差异内容
                                 prompt = base_prompt + f'''
     # 分析材料
     {diff}
