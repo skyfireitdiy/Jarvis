@@ -681,7 +681,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 
                 try:
                     if agent_instance.model and agent_instance.model.support_upload_files():
-                        summary = agent_instance._generate_summary()
+                        summary = agent_instance.generate_summary()
                         agent_instance.clear_history()
                         upload_success = agent_instance.model.upload_files([output_file])
                         if upload_success:

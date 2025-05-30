@@ -442,7 +442,7 @@ class Agent:
         self.conversation_length += get_context_token_count(response)
         return response
 
-    def _generate_summary(self) -> str:
+    def generate_summary(self) -> str:
         """生成对话历史摘要
 
         返回:
@@ -502,7 +502,7 @@ class Agent:
         注意:
             当上下文长度超过最大值时使用
         """
-        summary = self._generate_summary()
+        summary = self.generate_summary()
         self.clear_history()  # type: ignore
 
         if not summary:
