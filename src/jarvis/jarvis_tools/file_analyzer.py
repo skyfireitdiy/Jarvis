@@ -30,6 +30,10 @@ class FileAnalyzerTool:
         "required": ["file_paths", "prompt"]
     }
 
+    @staticmethod
+    def check() -> bool:
+        return PlatformRegistry().get_thinking_platform().support_upload_files()
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行文件分析操作
 
@@ -62,8 +66,7 @@ class FileAnalyzerTool:
                 }
 
             # 创建thinking平台实例
-            platform_registry = PlatformRegistry.get_global_platform_registry()
-            platform = platform_registry.get_thinking_platform()
+            platform = PlatformRegistry().get_thinking_platform()
             
             if not platform:
                 return {
