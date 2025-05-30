@@ -503,8 +503,7 @@ class Agent:
             当上下文长度超过最大值时使用
         """
         summary = self._generate_summary()
-        self.model.reset()  # type: ignore
-        self.conversation_length = 0  # Reset conversation length
+        self.clear_history()  # type: ignore
 
         if not summary:
             return ""
@@ -786,33 +785,32 @@ arguments:
 
             self.prompt = f"{user_input}"
 
-            if self.first:
-                # 如果有上传文件，先上传文件
-                if (
-                    self.files
-                    and isinstance(self.model, BasePlatform)
-                    and hasattr(self.model, "upload_files")
-                ):
-                    self.model.upload_files(self.files)
-                    self.prompt = f"{user_input}"
-
-                # 如果启用方法论且没有上传文件，上传方法论
-                elif self.use_methodology:
-                    platform = (
-                        self.model if hasattr(self.model, "upload_files") else None
-                    )
-                    if platform and upload_methodology(platform):
-                        self.prompt = f"{user_input}"
-                    else:
-                        # 上传失败则回退到本地加载
-                        msg = user_input
-                        for handler in self.input_handler:
-                            msg, _ = handler(msg, self)
-                        self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
-
-                self.first = False
-
             while True:
+                if self.first:
+                    # 如果有上传文件，先上传文件
+                    if (
+                        self.files
+                        and isinstance(self.model, BasePlatform)
+                        and hasattr(self.model, "upload_files")
+                    ):
+                        self.model.upload_files(self.files)
+                        self.prompt = f"{user_input}"
+
+                    # 如果启用方法论且没有上传文件，上传方法论
+                    elif self.use_methodology:
+                        platform = (
+                            self.model if hasattr(self.model, "upload_files") else None
+                        )
+                        if platform and upload_methodology(platform):
+                            self.prompt = f"{user_input}"
+                        else:
+                            # 上传失败则回退到本地加载
+                            msg = user_input
+                            for handler in self.input_handler:
+                                msg, _ = handler(msg, self)
+                            self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+
+                    self.first = False
                 try:
                     current_response = self._call_model(self.prompt, True)
                     self.prompt = ""
@@ -853,7 +851,7 @@ arguments:
             PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
             return f"Task failed: {str(e)}"
 
-    def _clear_history(self):
+    def clear_history(self):
         """清空对话历史但保留系统提示
 
         该方法将：
