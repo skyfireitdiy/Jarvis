@@ -780,10 +780,10 @@ arguments:
             3. 包含错误处理和恢复逻辑
             4. 自动加载相关方法论(如果是首次运行)
         """
+
+        self.prompt = f"{user_input}"
         try:
             set_agent(self.name, self)
-
-            self.prompt = f"{user_input}"
 
             while True:
                 if self.first:
@@ -794,18 +794,15 @@ arguments:
                         and self.model.support_upload_files()
                     ):
                         self.model.upload_files(self.files)
-                        self.prompt = f"{user_input}"
 
                     # 如果启用方法论且没有上传文件，上传方法论
                     elif self.use_methodology:
-                        if self.model and upload_methodology(self.model):
-                            self.prompt = f"{user_input}"
-                        else:
+                        if not self.model or not upload_methodology(self.model):
                             # 上传失败则回退到本地加载
-                            msg = user_input
+                            msg = self.prompt
                             for handler in self.input_handler:
                                 msg, _ = handler(msg, self)
-                            self.prompt = f"{user_input}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+                            self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
 
                     self.first = False
                 try:
