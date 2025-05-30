@@ -43,6 +43,18 @@ pip3 install -e .
 pip3 install jarvis-ai-assistant
 ```
 
+### 预定义任务(pre-command)
+
+您可以创建预定义任务文件来快速执行常用命令：
+
+1. 在`~/.jarvis/pre-command`或当前目录的`.jarvis/pre-command`文件中定义任务
+2. 使用YAML格式定义任务，例如：
+```yaml
+build: "构建项目并运行测试"
+deploy: "部署应用到生产环境"
+```
+3. 运行`jarvis`命令时会自动加载这些任务并提示选择执行
+
 ### 最小化配置
 
 将以下配置写入到`~/.jarvis/config.yaml`文件中。
