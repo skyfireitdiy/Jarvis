@@ -142,11 +142,19 @@ class generate_new_tool:
                 # 从代码中提取import语句
                 for line in tool_code.split("\n"):
                     if line.strip().startswith("import "):
+                        # 处理 import a.b.c 形式
                         pkg = line.split()[1].split(".")[0]
                         required_packages.add(pkg)
                     elif line.strip().startswith("from "):
-                        pkg = line.split()[1].split()[0]
-                        required_packages.add(pkg)
+                        # 处理 from a.b.c import d 形式
+                        parts = line.split()
+                        if (
+                            len(parts) >= 4
+                            and parts[0] == "from"
+                            and parts[2] == "import"
+                        ):
+                            pkg = parts[1].split(".")[0]
+                            required_packages.add(pkg)
 
                 # 检查并安装缺失的包
                 for pkg in required_packages:
