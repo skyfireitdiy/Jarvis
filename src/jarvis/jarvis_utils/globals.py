@@ -21,6 +21,10 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # 全局代理管理
 global_agents: Set[str] = set()
 current_agent_name: str = ""
+# 表示与大模型交互的深度(>0表示正在交互)
+g_in_chat: int = 0
+# 表示是否接收到中断信号
+g_interrupt: bool = False
 # 使用自定义主题配置rich控制台
 custom_theme = Theme({
     "INFO": "yellow",
@@ -83,3 +87,44 @@ def delete_agent(agent_name: str) -> None:
         global_agents.remove(agent_name)
         global current_agent_name
         current_agent_name = ""
+
+def set_in_chat(status: bool) -> None:
+    """
+    设置与大模型交互的状态。
+
+    参数:
+        status: True表示增加交互深度，False表示减少
+    """
+    global g_in_chat
+    if status:
+        g_in_chat += 1
+    else:
+        g_in_chat = max(0, g_in_chat - 1)
+
+def get_in_chat() -> bool:
+    """
+    获取当前是否正在与大模型交互的状态。
+
+    返回:
+        bool: 当前交互状态(>0表示正在交互)
+    """
+    return g_in_chat > 0
+
+def set_interrupt(status: bool) -> None:
+    """
+    设置中断信号状态。
+
+    参数:
+        status: 中断状态
+    """
+    global g_interrupt
+    g_interrupt = status
+
+def get_interrupt() -> bool:
+    """
+    获取当前中断信号状态。
+
+    返回:
+        bool: 当前中断状态
+    """
+    return g_interrupt

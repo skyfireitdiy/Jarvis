@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import hashlib
 import os
+import signal
 import subprocess
 import tarfile
 import time
@@ -14,6 +15,7 @@ from jarvis.jarvis_utils.config import get_data_dir, get_max_big_content_size, s
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.globals import get_in_chat, set_interrupt
 
 
 
@@ -25,11 +27,25 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     3. 处理文件读取异常
     4. 检查git仓库状态并在落后时更新
     5. 统计当前命令使用次数
+    6. 注册SIGINT信号处理函数
 
     参数:
         welcome_str: 欢迎信息字符串
         config_file: 配置文件路径，默认为None(使用~/.jarvis/config.yaml)
     """
+    # 保存原始信号处理函数
+    original_sigint = signal.getsignal(signal.SIGINT)
+    
+    def sigint_handler(signum, frame):
+        if get_in_chat():
+            PrettyOutput.print("接收到SIGINT信号，正在设置中断标志...", OutputType.INFO)
+            set_interrupt(True)
+        else:
+            PrettyOutput.print("接收到SIGINT信号，正在优雅退出...", OutputType.INFO)
+            if original_sigint and callable(original_sigint):
+                original_sigint(signum, frame)
+    
+    signal.signal(signal.SIGINT, sigint_handler)
     count_cmd_usage()
 
     jarvis_ascii_art = f"""
