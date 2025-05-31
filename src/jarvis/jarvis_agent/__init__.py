@@ -395,6 +395,8 @@ class Agent:
         if self.addon_prompt:
             message += f"\n\n{self.addon_prompt}"
             self.addon_prompt = ""
+        else:
+            message += f"\n\n{self.make_default_addon_prompt(need_complete)}"
 
         # 累加对话长度
         self.conversation_length += get_context_token_count(message)
@@ -724,6 +726,43 @@ arguments:
                 spinner.text = "分析失败"
                 spinner.fail("❌")
 
+    
+    def make_default_addon_prompt(self, need_complete: bool) -> str:
+        """生成附加提示。
+
+        参数:
+            need_complete: 是否需要完成任务
+
+        """
+        return ""
+        # 结构化系统指令
+        action_handlers = ", ".join([handler.name() for handler in self.output_handler])
+
+        # 任务完成提示
+        complete_prompt = (
+            f"- 输出{ot('!!!COMPLETE!!!')}"
+            if need_complete and self.auto_complete
+            else ""
+        )
+
+        addon_prompt = f"""
+<system_prompt>
+    请判断是否已经完成任务，如果已经完成：
+    - 直接输出完成原因，不需要再有新的操作，不要输出{ot("TOOL_CALL")}标签
+    {complete_prompt}
+    如果没有完成，请进行下一步操作：
+    - 仅包含一个操作
+    - 如果信息不明确，请请求用户补充
+    - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
+    - 操作列表：{action_handlers}
+</system_prompt>
+
+请继续。
+"""
+
+        return addon_prompt
+
+
     def run(self, user_input: str) -> Any:
         """处理用户输入并执行任务
 
@@ -779,7 +818,7 @@ arguments:
                             f"模型交互期间被中断，请输入用户干预信息："
                         )
                         if user_input:
-                            self.prompt += f"{user_input}"
+                            self.prompt += f"\n\n{user_input}"
                             continue
 
                     if self.after_tool_call_cb:

@@ -109,7 +109,6 @@ class CodeAgent:
             output_handler=[tool_registry],
             platform=platform_instance,
             input_handler=[
-                file_input_handler,
                 shell_input_handler,
                 builtin_input_handler
             ],
@@ -289,8 +288,6 @@ class CodeAgent:
         final_ret = ""
         diff = get_diff()
         if diff:
-            # 获取修改的文件列表
-            modified_files = get_diff_file_list()
             start_hash = get_latest_commit_hash()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             commited = handle_commit_workflow()
@@ -301,8 +298,8 @@ class CodeAgent:
 
                 # 添加提交信息到final_ret
                 if commits:
-                    final_ret += "代码已修改完成\n"
-
+                    final_ret += f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
+                    modified_files = get_diff_file_list()
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
                         f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
@@ -320,9 +317,9 @@ class CodeAgent:
                     """
                         agent.set_addon_prompt(addon_prompt)
                 else:
-                    final_ret += "修改没有生效"
+                    final_ret += "\n\n修改没有生效\n"
             else:
-                final_ret += "修改被拒绝\n"
+                final_ret += "\n修改被拒绝\n"
                 final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
         else:
             return

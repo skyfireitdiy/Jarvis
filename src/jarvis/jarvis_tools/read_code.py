@@ -66,6 +66,15 @@ class ReadCodeTool:
                     lines = f.readlines()
 
                 total_lines = len(lines)
+                
+                # 处理空文件情况
+                if total_lines == 0:
+                    spinner.ok("✅")
+                    return {
+                        "success": True,
+                        "stdout": f"\n🔍 文件: {abs_path}\n📄 文件为空 (0行)\n",
+                        "stderr": ""
+                    }
 
                 # 处理特殊值-1表示文件末尾
                 if end_line == -1:

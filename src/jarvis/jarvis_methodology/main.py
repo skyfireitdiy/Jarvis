@@ -47,9 +47,9 @@ def import_methodology(input_file):
                     "content": content
                 }, f, ensure_ascii=False, indent=2)
 
-        print(f"成功导入 {len(import_data)} 个方法论（总计 {len(merged_data)} 个）")
+        PrettyOutput.print(f"成功导入 {len(import_data)} 个方法论（总计 {len(merged_data)} 个）", OutputType.SUCCESS)
     except (json.JSONDecodeError, OSError) as e:
-        print(f"导入失败: {str(e)}")
+        PrettyOutput.print(f"导入失败: {str(e)}", OutputType.ERROR)
 
 def export_methodology(output_file):
     """导出当前方法论到单个文件"""
@@ -59,9 +59,9 @@ def export_methodology(output_file):
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(methodologies, f, ensure_ascii=False, indent=2)
 
-        print(f"成功导出 {len(methodologies)} 个方法论到 {output_file}")
+        PrettyOutput.print(f"成功导出 {len(methodologies)} 个方法论到 {output_file}", OutputType.SUCCESS)
     except (OSError, TypeError) as e:
-        print(f"导出失败: {str(e)}")
+        PrettyOutput.print(f"导出失败: {str(e)}", OutputType.ERROR)
 
 def list_methodologies():
     """列出所有方法论"""
@@ -69,14 +69,14 @@ def list_methodologies():
         methodologies = _load_all_methodologies()
 
         if not methodologies:
-            print("没有找到方法论")
+            PrettyOutput.print("没有找到方法论", OutputType.INFO)
             return
 
-        print("可用方法论:")
+        PrettyOutput.print("可用方法论:", OutputType.INFO)
         for i, (problem_type, _) in enumerate(methodologies.items(), 1):
-            print(f"{i}. {problem_type}")
+            PrettyOutput.print(f"{i}. {problem_type}", OutputType.INFO)
     except (OSError, json.JSONDecodeError) as e:
-        print(f"列出方法论失败: {str(e)}")
+        PrettyOutput.print(f"列出方法论失败: {str(e)}", OutputType.ERROR)
 
 def extract_methodology(input_file):
     """从文本文件中提取方法论"""

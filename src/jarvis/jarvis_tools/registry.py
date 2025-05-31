@@ -622,9 +622,9 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         output_parts = []
         if stdout:
-            output_parts.append(f"<output>\n{stdout}\n</output>")
+            output_parts.append(f"输出:\n{stdout}\n")
         if stderr:
-            output_parts.append(f"<error>\n{stderr}\n</error>")
+            output_parts.append(f"\n\n\n错误:\n{stderr}\n")
         output = "\n\n".join(output_parts)
         return "<无输出和错误>" if not output else output
 
