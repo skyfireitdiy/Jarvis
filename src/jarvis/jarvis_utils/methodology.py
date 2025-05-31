@@ -162,7 +162,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
             spinner.ok("✅")
 
         # 获取当前平台
-        platform = PlatformRegistry().get_normal_platform()
+        platform = PlatformRegistry().get_thinking_platform()
         platform.set_suppress_output(False)
         if not platform:
             return ""

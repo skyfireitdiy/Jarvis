@@ -86,7 +86,7 @@ def extract_methodology(input_file):
             text_content = f.read()
 
         # 获取平台实例
-        platform = PlatformRegistry().get_normal_platform()
+        platform = PlatformRegistry().get_thinking_platform()
         
         # 构建提取提示
         prompt = f"""请从以下文本中提取方法论：
@@ -181,7 +181,7 @@ def extract_methodology_from_url(url):
     """从URL提取方法论"""
     try:
         # 获取平台实例
-        platform = PlatformRegistry().get_normal_platform()
+        platform = PlatformRegistry().get_thinking_platform()
 
         platform.web = True
         

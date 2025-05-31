@@ -103,7 +103,7 @@ class CodePlanTool:
                     name="CodePlanner",
                     description="分析代码修改需求并制定详细计划",
                     summary_prompt=summary_prompt,
-                    platform=platform_registry.get_normal_platform(),
+                    platform=platform_registry.get_thinking_platform(),
                     output_handler=[tool_registry],
                     execute_tool_confirm=False,
                     auto_complete=False,

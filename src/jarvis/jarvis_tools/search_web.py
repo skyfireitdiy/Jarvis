@@ -17,7 +17,7 @@ class SearchWebTool:
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]: # type: ignore
         query = args.get("query")
-        model = PlatformRegistry().get_normal_platform()
+        model = PlatformRegistry().get_thinking_platform()
         model.set_web(True)
         model.set_suppress_output(False) # type: ignore
         return {
@@ -29,4 +29,4 @@ class SearchWebTool:
     @staticmethod
     def check() -> bool:
         """检查当前平台是否支持web功能"""
-        return PlatformRegistry().get_normal_platform().support_web()
+        return PlatformRegistry().get_thinking_platform().support_web()

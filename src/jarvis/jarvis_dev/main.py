@@ -1160,42 +1160,42 @@ def create_dev_team() -> MultiAgent:
             description="Project Manager - Coordinates team and manages project delivery",
             system_prompt=PM_PROMPT_WITH_TOOLS,
             output_handler=[PM_output_handler],
-            platform=PlatformRegistry().get_normal_platform(),
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="BA",
             description="Business Analyst - Analyzes and documents requirements",
             system_prompt=BA_PROMPT_WITH_TOOLS,
             output_handler=[BA_output_handler],
-            platform=PlatformRegistry().get_normal_platform(),
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="SA",
             description="Solution Architect - Designs technical solutions",
             system_prompt=SA_PROMPT_WITH_TOOLS,
             output_handler=[SA_output_handler],
-            platform=PlatformRegistry().get_normal_platform(),
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="TL",
             description="Technical Lead - Leads development team and ensures technical quality",
             system_prompt=TL_PROMPT_WITH_TOOLS,
             output_handler=[TL_output_handler],
-            platform=PlatformRegistry().get_normal_platform(),
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="DEV",
             description="Developer - Implements features and writes code",
             system_prompt=DEV_PROMPT_WITH_TOOLS,
             output_handler=[DEV_output_handler],
-            platform=PlatformRegistry().get_normal_platform(),
+            platform=PlatformRegistry().get_thinking_platform(),
         ),
         dict(
             name="QA",
             description="Quality Assurance - Ensures product quality through testing",
             system_prompt=QA_PROMPT_WITH_TOOLS,
             output_handler=[QA_output_handler],
-            platform=PlatformRegistry().get_normal_platform(),
+            platform=PlatformRegistry().get_thinking_platform(),
         )
     ]
 
