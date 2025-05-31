@@ -772,17 +772,18 @@ arguments:
 
                     if need_return:
                         return self.prompt
-
-                    if self.after_tool_call_cb:
-                        self.after_tool_call_cb(self)
-
+                    
                     if get_interrupt():
                         set_interrupt(False)
                         user_input = self.multiline_inputer(
                             f"模型交互期间被中断，请输入用户干预信息："
                         )
                         if user_input:
-                            self.prompt += f"\n\n用户干预信息：{user_input}"
+                            self.prompt += f"{user_input}"
+                            continue
+
+                    if self.after_tool_call_cb:
+                        self.after_tool_call_cb(self)
 
                     if self.prompt or self.addon_prompt:
                         continue

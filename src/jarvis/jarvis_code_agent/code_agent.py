@@ -301,12 +301,7 @@ class CodeAgent:
 
                 # 添加提交信息到final_ret
                 if commits:
-                    final_ret += "✅ 补丁已应用\n"
-                    final_ret += "# 提交信息:\n"
-                    for commit_hash, commit_message in commits:
-                        final_ret += f"- {commit_hash[:7]}: {commit_message}\n"
-
-                    final_ret += f"# 应用补丁:\n```diff\n{diff}\n```"
+                    final_ret += "代码已修改完成\n"
 
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
@@ -325,9 +320,9 @@ class CodeAgent:
                     """
                         agent.set_addon_prompt(addon_prompt)
                 else:
-                    final_ret += "✅ 补丁已应用（没有新的提交）"
+                    final_ret += "修改没有生效"
             else:
-                final_ret += "❌ 补丁应用被拒绝\n"
+                final_ret += "修改被拒绝\n"
                 final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
         else:
             return
