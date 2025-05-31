@@ -378,6 +378,7 @@ class Agent:
             need_complete: 是否需要完成任务
 
         """
+        return ""
         # 结构化系统指令
         action_handlers = ", ".join([handler.name() for handler in self.output_handler])
 
