@@ -98,7 +98,7 @@ class CodeAgent:
         # 处理platform参数
         platform_instance = (PlatformRegistry().create_platform(platform)  # type: ignore
             if platform
-            else PlatformRegistry().get_thinking_platform())  # type: ignore
+            else PlatformRegistry().get_normal_platform())  # type: ignore
         if model:
             platform_instance.set_model_name(model)  # type: ignore
 

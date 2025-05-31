@@ -33,7 +33,7 @@ class WebpageTool:
             want = args.get("want", "请总结这个网页的主要内容")
             
             # Create Yuanbao model instance
-            model = PlatformRegistry().get_thinking_platform()
+            model = PlatformRegistry().get_normal_platform()
             model.set_web(True)
             model.set_suppress_output(False)  # type: ignore
 
@@ -65,4 +65,4 @@ class WebpageTool:
     @staticmethod
     def check() -> bool:
         """检查当前平台是否支持web功能"""
-        return PlatformRegistry().get_thinking_platform().support_web()
+        return PlatformRegistry().get_normal_platform().support_web()
