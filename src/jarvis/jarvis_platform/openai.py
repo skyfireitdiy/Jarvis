@@ -161,3 +161,12 @@ class OpenAIModel(BasePlatform):
             bool: 当前是否支持网页访问 (OpenAI平台始终返回False)
         """
         return False
+    
+    def support_upload_files(self) -> bool:
+        """
+        检查是否支持上传文件功能
+        
+        返回:
+            bool: 当前是否支持上传文件 (OpenAI平台始终返回False)
+        """
+        return False
