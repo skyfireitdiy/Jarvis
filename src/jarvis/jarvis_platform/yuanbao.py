@@ -386,6 +386,12 @@ class YuanbaoPlatform(BasePlatform):
 
         headers = self._get_base_headers()
 
+        chat_model_ext_info = {
+            "modelId": self.model_name,
+            "subModelId": "",
+            "supportFunctions": ["openInternetSearch"] if self.web else ["autoInternetSearch"],
+        }
+
         # 准备消息内容
         payload = {
             "model": "gpt_175B_0404",
@@ -404,16 +410,13 @@ class YuanbaoPlatform(BasePlatform):
             "agentId": self.agent_id,
             "supportHint": 1,
             "version": "v2",
-            "supportFunctions": [],
+            "supportFunctions": chat_model_ext_info["supportFunctions"],
             "chatModelId": self.model_name,
+            "chatModelExtInfo": json.dumps(chat_model_ext_info),
         }
 
         self.multimedia = []
 
-        if self.web:
-            payload["supportFunctions"] = ["openInternetSearch"]
-        else:
-            payload["supportFunctions"] = ["autoInternetSearch"]
 
         # 添加系统消息（如果是第一次对话）
         if self.first_chat and self.system_message:
