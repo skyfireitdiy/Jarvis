@@ -160,6 +160,54 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 | `jarvis-git-details` | - | 使用git details功能 |
 | `jarvis-methodology` | - | 使用方法论功能 |
 
+## 🏗️ 平台管理功能
+
+`jarvis-platform-manager` 提供以下子命令来管理AI平台和模型：
+
+### 1. 列出支持的平台和模型
+```bash
+jarvis-platform-manager info
+```
+显示所有支持的AI平台及其可用模型列表。
+
+### 2. 与指定平台和模型聊天
+```bash
+jarvis-platform-manager chat -p <平台名称> -m <模型名称>
+```
+启动交互式聊天会话，支持以下命令：
+- `/bye` - 退出聊天
+- `/clear` - 清除当前会话
+- `/upload <文件路径>` - 上传文件到当前会话
+- `/shell <命令>` - 执行shell命令
+- `/save <文件名>` - 保存最后一条消息
+- `/saveall <文件名>` - 保存完整对话历史
+
+### 3. 启动OpenAI兼容的API服务
+```bash
+jarvis-platform-manager service --host <IP地址> --port <端口号> -p <平台名称> -m <模型名称>
+```
+启动一个兼容OpenAI API的服务，可用于其他应用程序集成。
+
+### 4. 加载角色配置文件
+```bash
+jarvis-platform-manager role -c <配置文件路径>
+```
+从YAML配置文件加载预定义角色进行对话。配置文件格式示例：
+```yaml
+roles:
+  - name: "代码助手"
+    description: "专注于代码分析和生成的AI助手"
+    platform: "yuanbao"
+    model: "deep_seek_v3"
+    system_prompt: "你是一个专业的代码助手，专注于分析和生成高质量的代码"
+  - name: "文档撰写"
+    description: "帮助撰写技术文档的AI助手"
+    platform: "kimi"
+    model: "k1"
+    system_prompt: "你是一个技术文档撰写专家，擅长将复杂技术概念转化为清晰易懂的文字"
+```
+
+
 ---
 
 ## ⚙️ 配置说明 <a id="configuration"></a>
