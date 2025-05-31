@@ -98,7 +98,7 @@ def process_request(request: str) -> Optional[str]:
 输入: "查找Python文件"
 输出: find . -name "*.py"
 """
-        model.set_system_message(system_message)
+        model.set_system_prompt(system_message)
 
         prefix = f"Current path: {current_path}\n"
         prefix += f"Current shell: {shell}\n"

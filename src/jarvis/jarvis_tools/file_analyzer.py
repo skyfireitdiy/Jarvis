@@ -79,7 +79,7 @@ class FileAnalyzerTool:
             system_message = """你是一个文件分析助手。你的任务是分析提供的文件内容，并根据用户的提示提取关键信息。
 请保持客观，只关注文件中实际存在的内容。如果无法确定某些信息，请明确指出。
 请以结构化的方式组织你的回答，使用标题、列表和代码块等格式来提高可读性。"""
-            platform.set_system_message(system_message)
+            platform.set_system_prompt(system_message)
             
             # 上传文件
             with yaspin(Spinners.dots, text="正在上传文件...") as spinner:

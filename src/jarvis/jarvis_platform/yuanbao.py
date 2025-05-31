@@ -45,7 +45,7 @@ class YuanbaoPlatform(BasePlatform):
         self.model_name = "deep_seek_v3"  # 默认模型名称，使用下划线保持一致
         self.multimedia = []
 
-    def set_system_message(self, message: str):
+    def set_system_prompt(self, message: str):
         """设置系统消息"""
         self.system_message = message
 

@@ -48,7 +48,10 @@ def list_platforms():
                 PrettyOutput.print("  • 没有可用的模型信息", OutputType.WARNING)
 
         except Exception as e:
-            PrettyOutput.print(f"获取 {platform_name} 的模型列表失败: {str(e)}", OutputType.WARNING)
+            PrettyOutput.print(
+                f"获取 {platform_name} 的模型列表失败: {str(e)}", OutputType.WARNING
+            )
+
 
 def chat_with_model(platform_name: str, model_name: str):
     """Chat with specified platform and model"""
@@ -65,14 +68,21 @@ def chat_with_model(platform_name: str, model_name: str):
         # Set model
         platform.set_model_name(model_name)
         platform.set_suppress_output(False)
-        PrettyOutput.print(f"连接到 {platform_name} 平台 {model_name} 模型", OutputType.SUCCESS)
-        PrettyOutput.print("可用命令: /bye - 退出聊天, /clear - 清除会话, /upload - 上传文件, /shell - 执行shell命令, /save - 保存当前对话, /saveall - 保存所有对话", OutputType.INFO)
+        PrettyOutput.print(
+            f"连接到 {platform_name} 平台 {model_name} 模型", OutputType.SUCCESS
+        )
+        PrettyOutput.print(
+            "可用命令: /bye - 退出聊天, /clear - 清除会话, /upload - 上传文件, /shell - 执行shell命令, /save - 保存当前对话, /saveall - 保存所有对话",
+            OutputType.INFO,
+        )
 
         # Start conversation loop
         while True:
             # Get user input
             user_input = get_multiline_input("")
-            conversation_history.append({"role": "user", "content": user_input})  # 记录用户输入
+            conversation_history.append(
+                {"role": "user", "content": user_input}
+            )  # 记录用户输入
 
             # Check if input is cancelled
             if user_input.strip() == "/bye":
@@ -99,17 +109,22 @@ def chat_with_model(platform_name: str, model_name: str):
                 try:
                     file_path = user_input.strip()[8:].strip()
                     if not file_path:
-                        PrettyOutput.print("请指定要上传的文件路径，例如: /upload /path/to/file 或 /upload \"/path/with spaces/file\"", OutputType.WARNING)
+                        PrettyOutput.print(
+                            '请指定要上传的文件路径，例如: /upload /path/to/file 或 /upload "/path/with spaces/file"',
+                            OutputType.WARNING,
+                        )
                         continue
-                    
+
                     # Remove quotes if present
-                    if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
+                    if (file_path.startswith('"') and file_path.endswith('"')) or (
+                        file_path.startswith("'") and file_path.endswith("'")
+                    ):
                         file_path = file_path[1:-1]
 
                     if not platform.support_upload_files():
                         PrettyOutput.print("平台不支持上传文件", OutputType.ERROR)
                         continue
-                    
+
                     PrettyOutput.print(f"正在上传文件: {file_path}", OutputType.INFO)
                     if platform.upload_files([file_path]):
                         PrettyOutput.print("文件上传成功", OutputType.SUCCESS)
@@ -124,19 +139,26 @@ def chat_with_model(platform_name: str, model_name: str):
                 try:
                     file_path = user_input.strip()[5:].strip()
                     if not file_path:
-                        PrettyOutput.print("请指定保存文件名，例如: /save last_message.txt", OutputType.WARNING)
+                        PrettyOutput.print(
+                            "请指定保存文件名，例如: /save last_message.txt",
+                            OutputType.WARNING,
+                        )
                         continue
-                    
+
                     # Remove quotes if present
-                    if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
+                    if (file_path.startswith('"') and file_path.endswith('"')) or (
+                        file_path.startswith("'") and file_path.endswith("'")
+                    ):
                         file_path = file_path[1:-1]
-                    
+
                     # Write last message content to file
                     if conversation_history:
-                        with open(file_path, 'w', encoding='utf-8') as f:
+                        with open(file_path, "w", encoding="utf-8") as f:
                             last_entry = conversation_history[-1]
                             f.write(f"{last_entry['content']}\n")
-                        PrettyOutput.print(f"最后一条消息内容已保存到 {file_path}", OutputType.SUCCESS)
+                        PrettyOutput.print(
+                            f"最后一条消息内容已保存到 {file_path}", OutputType.SUCCESS
+                        )
                     else:
                         PrettyOutput.print("没有可保存的消息", OutputType.WARNING)
                 except Exception as e:
@@ -148,19 +170,26 @@ def chat_with_model(platform_name: str, model_name: str):
                 try:
                     file_path = user_input.strip()[8:].strip()
                     if not file_path:
-                        PrettyOutput.print("请指定保存文件名，例如: /saveall all_conversations.txt", OutputType.WARNING)
+                        PrettyOutput.print(
+                            "请指定保存文件名，例如: /saveall all_conversations.txt",
+                            OutputType.WARNING,
+                        )
                         continue
-                    
+
                     # Remove quotes if present
-                    if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
+                    if (file_path.startswith('"') and file_path.endswith('"')) or (
+                        file_path.startswith("'") and file_path.endswith("'")
+                    ):
                         file_path = file_path[1:-1]
-                    
+
                     # Write full conversation history to file
-                    with open(file_path, 'w', encoding='utf-8') as f:
+                    with open(file_path, "w", encoding="utf-8") as f:
                         for entry in conversation_history:
                             f.write(f"{entry['role']}: {entry['content']}\n\n")
-                    
-                    PrettyOutput.print(f"所有对话已保存到 {file_path}", OutputType.SUCCESS)
+
+                    PrettyOutput.print(
+                        f"所有对话已保存到 {file_path}", OutputType.SUCCESS
+                    )
                 except Exception as e:
                     PrettyOutput.print(f"保存所有对话失败: {str(e)}", OutputType.ERROR)
                 continue
@@ -170,15 +199,20 @@ def chat_with_model(platform_name: str, model_name: str):
                 try:
                     command = user_input.strip()[6:].strip()
                     if not command:
-                        PrettyOutput.print("请指定要执行的shell命令，例如: /shell ls -l", OutputType.WARNING)
+                        PrettyOutput.print(
+                            "请指定要执行的shell命令，例如: /shell ls -l",
+                            OutputType.WARNING,
+                        )
                         continue
-                    
+
                     PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
                     return_code = os.system(command)
                     if return_code == 0:
                         PrettyOutput.print("命令执行完成", OutputType.SUCCESS)
                     else:
-                        PrettyOutput.print(f"命令执行失败(返回码: {return_code})", OutputType.ERROR)
+                        PrettyOutput.print(
+                            f"命令执行失败(返回码: {return_code})", OutputType.ERROR
+                        )
                 except Exception as ex:
                     PrettyOutput.print(f"执行命令失败: {str(ex)}", OutputType.ERROR)
                 continue
@@ -189,7 +223,9 @@ def chat_with_model(platform_name: str, model_name: str):
                 if not response:
                     PrettyOutput.print("没有有效的回复", OutputType.WARNING)
                 else:
-                    conversation_history.append({"role": "assistant", "content": response})  # 记录模型回复
+                    conversation_history.append(
+                        {"role": "assistant", "content": response}
+                    )  # 记录模型回复
 
             except Exception as e:
                 PrettyOutput.print(f"聊天失败: {str(e)}", OutputType.ERROR)
@@ -203,12 +239,17 @@ def chat_with_model(platform_name: str, model_name: str):
         except:
             pass
 
+
 # Helper function for platform and model validation
 def validate_platform_model(args):
     if not args.platform or not args.model:
-        PrettyOutput.print("请指定平台和模型。使用 'jarvis info' 查看可用平台和模型。", OutputType.WARNING)
+        PrettyOutput.print(
+            "请指定平台和模型。使用 'jarvis info' 查看可用平台和模型。",
+            OutputType.WARNING,
+        )
         return False
     return True
+
 
 def chat_command(args):
     """Process chat subcommand"""
@@ -216,14 +257,17 @@ def chat_command(args):
         return
     chat_with_model(args.platform, args.model)
 
+
 def info_command(args):
     """Process info subcommand"""
     list_platforms()
+
 
 # New models for OpenAI-compatible API
 class ChatMessage(BaseModel):
     role: str
     content: str
+
 
 class ChatCompletionRequest(BaseModel):
     model: str
@@ -232,10 +276,12 @@ class ChatCompletionRequest(BaseModel):
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
 
+
 class ChatCompletionChoice(BaseModel):
     index: int
     message: ChatMessage
     finish_reason: str = "stop"
+
 
 class ChatCompletionChunk(BaseModel):
     id: str
@@ -244,13 +290,87 @@ class ChatCompletionChunk(BaseModel):
     model: str
     choices: List[Dict[str, Any]]
 
+
 class ChatCompletionResponse(BaseModel):
     id: str
     object: str = "chat.completion"
     created: int
     model: str
     choices: List[ChatCompletionChoice]
-    usage: Dict[str, int] = Field(default_factory=lambda: {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+    usage: Dict[str, int] = Field(
+        default_factory=lambda: {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
+    )
+
+
+def load_role_config(config_path: str) -> dict:
+    """从YAML文件加载角色配置
+
+    参数:
+        config_path: YAML配置文件的路径
+
+    返回:
+        dict: 角色配置字典
+    """
+    import yaml
+
+    if not os.path.exists(config_path):
+        PrettyOutput.print(f"角色配置文件 {config_path} 不存在", OutputType.ERROR)
+        return {}
+
+    with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
+        try:
+            config = yaml.safe_load(f)
+            return config if config else {}
+        except yaml.YAMLError as e:
+            PrettyOutput.print(f"角色配置文件解析失败: {str(e)}", OutputType.ERROR)
+            return {}
+
+
+def role_command(args):
+    """Process role subcommand - load role config and start chat"""
+    config = load_role_config(args.config)
+    if not config or "roles" not in config:
+        PrettyOutput.print("无效的角色配置文件", OutputType.ERROR)
+        return
+
+    # 显示可选角色列表
+    PrettyOutput.section("可用角色", OutputType.SUCCESS)
+    for i, role in enumerate(config["roles"], 1):
+        PrettyOutput.print(
+            f"{i}. {role['name']} - {role.get('description', '')}", OutputType.INFO
+        )
+
+    # 让用户选择角色
+    try:
+        choice = int(get_multiline_input("请选择角色(输入编号): "))
+        selected_role = config["roles"][choice - 1]
+    except (ValueError, IndexError):
+        PrettyOutput.print("无效的选择", OutputType.ERROR)
+        return
+
+    # 初始化平台和模型
+    platform_name = selected_role["platform"]
+    model_name = selected_role["model"]
+    system_prompt = selected_role.get("system_prompt", "")
+
+    registry = PlatformRegistry.get_global_platform_registry()
+    platform = registry.create_platform(platform_name)
+    if not platform:
+        PrettyOutput.print(f"创建平台 {platform_name} 失败", OutputType.WARNING)
+        return
+
+    platform.set_model_name(model_name)
+    if system_prompt:
+        platform.set_system_prompt(system_prompt)
+
+    # 开始对话
+    PrettyOutput.print(f"已选择角色: {selected_role['name']}", OutputType.SUCCESS)
+    chat_with_model(platform_name, model_name)
+
 
 def service_command(args):
     """Process service subcommand - start OpenAI-compatible API server"""
@@ -282,11 +402,16 @@ def service_command(args):
 
     registry = PlatformRegistry.get_global_platform_registry()
 
-    PrettyOutput.print(f"Starting Jarvis API server on {host}:{port}", OutputType.SUCCESS)
+    PrettyOutput.print(
+        f"Starting Jarvis API server on {host}:{port}", OutputType.SUCCESS
+    )
     PrettyOutput.print("This server provides an OpenAI-compatible API", OutputType.INFO)
 
     if default_platform and default_model:
-        PrettyOutput.print(f"Default platform: {default_platform}, model: {default_model}", OutputType.INFO)
+        PrettyOutput.print(
+            f"Default platform: {default_platform}, model: {default_model}",
+            OutputType.INFO,
+        )
 
     PrettyOutput.print("Available platforms:", OutputType.INFO)
 
@@ -306,7 +431,9 @@ def service_command(args):
         if key not in platform_instances:
             platform = registry.create_platform(platform_name)
             if not platform:
-                raise HTTPException(status_code=400, detail=f"Platform {platform_name} not found")
+                raise HTTPException(
+                    status_code=400, detail=f"Platform {platform_name} not found"
+                )
 
             platform.set_model_name(model_name)
             platform_instances[key] = platform
@@ -316,7 +443,9 @@ def service_command(args):
     def log_conversation(conversation_id, messages, model, response=None):
         """Log conversation to file in plain text format."""
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        log_file = os.path.join(logs_dir, f"conversation_{conversation_id}_{timestamp}.txt")
+        log_file = os.path.join(
+            logs_dir, f"conversation_{conversation_id}_{timestamp}.txt"
+        )
 
         with open(log_file, "w", encoding="utf-8", errors="ignore") as f:
             f.write(f"Conversation ID: {conversation_id}\n")
@@ -344,12 +473,14 @@ def service_command(args):
                     if models:
                         for model_name, _ in models:
                             full_name = f"{default_platform}/{model_name}"
-                            model_list.append({
-                                "id": full_name,
-                                "object": "model",
-                                "created": int(time.time()),
-                                "owned_by": default_platform
-                            })
+                            model_list.append(
+                                {
+                                    "id": full_name,
+                                    "object": "model",
+                                    "created": int(time.time()),
+                                    "owned_by": default_platform,
+                                }
+                            )
             except Exception as e:
                 print(f"Error getting models for {default_platform}: {str(e)}")
 
@@ -396,19 +527,21 @@ def service_command(args):
         # Store messages in chat history
         chat_histories[conversation_id] = {
             "model": model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages]
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
 
         # Log the conversation
-        log_conversation(conversation_id,
-                         [{"role": m.role, "content": m.content} for m in messages],
-                         model)
+        log_conversation(
+            conversation_id,
+            [{"role": m.role, "content": m.content} for m in messages],
+            model,
+        )
 
         if stream:
             # Return streaming response
             return StreamingResponse(
                 stream_chat_response(platform, message_text, model),
-                media_type="text/event-stream"
+                media_type="text/event-stream",
             )
         else:
             # Get chat response
@@ -420,16 +553,17 @@ def service_command(args):
 
                 # Update chat history with response
                 if conversation_id in chat_histories:
-                    chat_histories[conversation_id]["messages"].append({
-                        "role": "assistant",
-                        "content": response_text
-                    })
+                    chat_histories[conversation_id]["messages"].append(
+                        {"role": "assistant", "content": response_text}
+                    )
 
                 # Log the conversation with response
-                log_conversation(conversation_id,
-                                 chat_histories[conversation_id]["messages"],
-                                 model,
-                                 response_text)
+                log_conversation(
+                    conversation_id,
+                    chat_histories[conversation_id]["messages"],
+                    model,
+                    response_text,
+                )
 
                 return {
                     "id": completion_id,
@@ -439,18 +573,16 @@ def service_command(args):
                     "choices": [
                         {
                             "index": 0,
-                            "message": {
-                                "role": "assistant",
-                                "content": response_text
-                            },
-                            "finish_reason": "stop"
+                            "message": {"role": "assistant", "content": response_text},
+                            "finish_reason": "stop",
                         }
                     ],
                     "usage": {
                         "prompt_tokens": len(message_text) // 4,  # Rough estimate
                         "completion_tokens": len(response_text) // 4,  # Rough estimate
-                        "total_tokens": (len(message_text) + len(response_text)) // 4  # Rough estimate
-                    }
+                        "total_tokens": (len(message_text) + len(response_text))
+                        // 4,  # Rough estimate
+                    },
                 }
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
@@ -473,15 +605,13 @@ def service_command(args):
 
         # 修改第一个yield语句的格式
         initial_data = {
-            'id': completion_id,
-            'object': 'chat.completion.chunk',
-            'created': created_time,
-            'model': model_name,
-            'choices': [{
-                'index': 0,
-                'delta': {'role': 'assistant'},
-                'finish_reason': None
-            }]
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": created_time,
+            "model": model_name,
+            "choices": [
+                {"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}
+            ],
         }
         res = json.dumps(initial_data)
         yield f"data: {res}\n\n"
@@ -498,20 +628,22 @@ def service_command(args):
                 # 分成小块以获得更好的流式体验
                 chunk_size = 4  # 每个块的字符数
                 for i in range(0, len(response), chunk_size):
-                    chunk = response[i:i+chunk_size]
+                    chunk = response[i : i + chunk_size]
                     full_response += chunk
 
                     # 创建并发送块
                     chunk_data = {
-                        'id': completion_id,
-                        'object': 'chat.completion.chunk',
-                        'created': created_time,
-                        'model': model_name,
-                        'choices': [{
-                            'index': 0,
-                            'delta': {'content': chunk},
-                            'finish_reason': None
-                        }]
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": created_time,
+                        "model": model_name,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {"content": chunk},
+                                "finish_reason": None,
+                            }
+                        ],
                     }
 
                     yield f"data: {json.dumps(chunk_data)}\n\n"
@@ -521,30 +653,28 @@ def service_command(args):
             else:
                 # 如果没有输出，发送一个空内容块
                 chunk_data = {
-                    'id': completion_id,
-                    'object': 'chat.completion.chunk',
-                    'created': created_time,
-                    'model': model_name,
-                    'choices': [{
-                        'index': 0,
-                        'delta': {'content': "No response from model."},
-                        'finish_reason': None
-                    }]
+                    "id": completion_id,
+                    "object": "chat.completion.chunk",
+                    "created": created_time,
+                    "model": model_name,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {"content": "No response from model."},
+                            "finish_reason": None,
+                        }
+                    ],
                 }
                 yield f"data: {json.dumps(chunk_data)}\n\n"
                 full_response = "No response from model."
 
             # 修改最终yield语句的格式
             final_data = {
-                'id': completion_id,
-                'object': 'chat.completion.chunk',
-                'created': created_time,
-                'model': model_name,
-                'choices': [{
-                    'index': 0,
-                    'delta': {},
-                    'finish_reason': 'stop'
-                }]
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": created_time,
+                "model": model_name,
+                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
             }
             yield f"data: {json.dumps(final_data)}\n\n"
 
@@ -553,51 +683,61 @@ def service_command(args):
 
             # 记录对话到文件
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            log_file = os.path.join(logs_dir, f"stream_conversation_{conversation_id}_{timestamp}.json")
+            log_file = os.path.join(
+                logs_dir, f"stream_conversation_{conversation_id}_{timestamp}.json"
+            )
 
             log_data = {
                 "conversation_id": conversation_id,
                 "timestamp": timestamp,
                 "model": model_name,
                 "message": message,
-                "response": full_response
+                "response": full_response,
             }
 
             with open(log_file, "w", encoding="utf-8", errors="ignore") as f:
                 json.dump(log_data, f, ensure_ascii=False, indent=2)
 
-            PrettyOutput.print(f"Stream conversation logged to {log_file}", OutputType.INFO)
+            PrettyOutput.print(
+                f"Stream conversation logged to {log_file}", OutputType.INFO
+            )
 
         except Exception as e:
             # 发送错误消息
             error_msg = f"Error: {str(e)}"
             print(f"Streaming error: {error_msg}")
 
-            res = json.dumps({
-                'id': completion_id,
-                'object': 'chat.completion.chunk',
-                'created': created_time,
-                'model': model_name,
-                'choices': [{
-                    'index': 0,
-                    'delta': {'content': error_msg},
-                    'finish_reason': 'stop'
-                }]
-            })
+            res = json.dumps(
+                {
+                    "id": completion_id,
+                    "object": "chat.completion.chunk",
+                    "created": created_time,
+                    "model": model_name,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {"content": error_msg},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                }
+            )
             yield f"data: {res}\n\n"
             yield f"data: {json.dumps({'error': {'message': error_msg, 'type': 'server_error'}})}\n\n"
             yield "data: [DONE]\n\n"
 
             # 记录错误到文件
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            log_file = os.path.join(logs_dir, f"stream_error_{conversation_id}_{timestamp}.json")
+            log_file = os.path.join(
+                logs_dir, f"stream_error_{conversation_id}_{timestamp}.json"
+            )
 
             log_data = {
                 "conversation_id": conversation_id,
                 "timestamp": timestamp,
                 "model": model_name,
                 "message": message,
-                "error": error_msg
+                "error": error_msg,
             }
 
             with open(log_file, "w", encoding="utf-8", errors="ignore") as f:
@@ -608,40 +748,56 @@ def service_command(args):
     # Run the server
     uvicorn.run(app, host=host, port=port)
 
+
 def main():
     """Main function"""
     import argparse
 
     init_env("欢迎使用 Jarvis-PlatformManager，您的平台管理助手已准备就绪！")
 
-    parser = argparse.ArgumentParser(description='Jarvis AI 平台')
-    subparsers = parser.add_subparsers(dest='command', help='可用子命令')
+    parser = argparse.ArgumentParser(description="Jarvis AI 平台")
+    subparsers = parser.add_subparsers(dest="command", help="可用子命令")
 
     # info subcommand
-    info_parser = subparsers.add_parser('info', help='显示支持的平台和模型信息')
+    info_parser = subparsers.add_parser("info", help="显示支持的平台和模型信息")
 
     # chat subcommand
-    chat_parser = subparsers.add_parser('chat', help='与指定平台和模型聊天')
-    chat_parser.add_argument('--platform', '-p', help='指定要使用的平台')
-    chat_parser.add_argument('--model', '-m', help='指定要使用的模型')
+    chat_parser = subparsers.add_parser("chat", help="与指定平台和模型聊天")
+    chat_parser.add_argument("--platform", "-p", help="指定要使用的平台")
+    chat_parser.add_argument("--model", "-m", help="指定要使用的模型")
 
     # service subcommand
-    service_parser = subparsers.add_parser('service', help='启动OpenAI兼容的API服务')
-    service_parser.add_argument('--host', default='127.0.0.1', help='服务主机地址 (默认: 127.0.0.1)')
-    service_parser.add_argument('--port', type=int, default=8000, help='服务端口 (默认: 8000)')
-    service_parser.add_argument('--platform', '-p', help='指定默认平台，当客户端未指定平台时使用')
-    service_parser.add_argument('--model', '-m', help='指定默认模型，当客户端未指定模型时使用')
+    service_parser = subparsers.add_parser("service", help="启动OpenAI兼容的API服务")
+    service_parser.add_argument(
+        "--host", default="127.0.0.1", help="服务主机地址 (默认: 127.0.0.1)"
+    )
+    service_parser.add_argument(
+        "--port", type=int, default=8000, help="服务端口 (默认: 8000)"
+    )
+    service_parser.add_argument(
+        "--platform", "-p", help="指定默认平台，当客户端未指定平台时使用"
+    )
+    service_parser.add_argument(
+        "--model", "-m", help="指定默认模型，当客户端未指定平台时使用"
+    )
+
+    # role subcommand
+    role_parser = subparsers.add_parser("role", help="加载角色配置文件并开始对话")
+    role_parser.add_argument(
+        "--config", "-c", required=True, help="角色配置文件路径(YAML格式)"
+    )
 
     args = parser.parse_args()
 
-    if args.command == 'info':
+    if args.command == "info":
         info_command(args)
-    elif args.command == 'chat':
+    elif args.command == "chat":
         chat_command(args)
-    elif args.command == 'service':
+    elif args.command == "service":
         service_command(args)
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()

@@ -319,7 +319,7 @@ class Agent:
 </actions>
 """
 
-        self.model.set_system_message(
+        self.model.set_system_prompt(
             f"""
 {self.system_prompt}
 

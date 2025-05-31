@@ -493,7 +493,7 @@ class TongyiPlatform(BasePlatform):
             PrettyOutput.print(f"Error deleting chat: {str(e)}", OutputType.ERROR)
             return False
 
-    def set_system_message(self, message: str):
+    def set_system_prompt(self, message: str):
         """Set system message
 
         Args:

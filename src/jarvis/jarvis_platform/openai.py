@@ -74,7 +74,7 @@ class OpenAIModel(BasePlatform):
 
         self.model_name = model_name
 
-    def set_system_message(self, message: str):
+    def set_system_prompt(self, message: str):
         """
         设置系统消息(角色设定)
         

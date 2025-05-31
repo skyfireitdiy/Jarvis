@@ -25,7 +25,7 @@ class HumanPlatform(BasePlatform):
         self.system_message = ""  # 系统消息，用于初始化对话
         self.first_message = True
 
-    def set_system_message(self, message: str):
+    def set_system_prompt(self, message: str):
         """设置系统消息"""
         self.system_message = message
 

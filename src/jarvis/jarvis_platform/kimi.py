@@ -41,7 +41,7 @@ class KimiModel(BasePlatform):
         self.system_message = ""
         self.model_name = "kimi"
 
-    def set_system_message(self, message: str):
+    def set_system_prompt(self, message: str):
         """Set system message"""
         self.system_message = message
 

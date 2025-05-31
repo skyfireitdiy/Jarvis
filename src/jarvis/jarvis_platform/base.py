@@ -144,9 +144,9 @@ class BasePlatform(ABC):
         raise NotImplementedError("delete_chat is not implemented")
 
     @abstractmethod
-    def set_system_message(self, message: str):
+    def set_system_prompt(self, message: str):
         """Set system message"""
-        raise NotImplementedError("set_system_message is not implemented")
+        raise NotImplementedError("set_system_prompt is not implemented")
 
     @abstractmethod
     def get_model_list(self) -> List[Tuple[str, str]]:

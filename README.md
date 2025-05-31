@@ -358,7 +358,7 @@ class CustomPlatform(BasePlatform):
         # 设置模型名称
         pass
 
-    def set_system_message(self, message: str):
+    def set_system_prompt(self, message: str):
         # 设置系统消息
         pass
 
