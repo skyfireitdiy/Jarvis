@@ -15,7 +15,6 @@ from yaspin import yaspin  # type: ignore
 from jarvis import __version__
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
-from jarvis.jarvis_agent.file_input_handler import file_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 # 忽略yaspin的类型检查
 from jarvis.jarvis_code_agent.lint import get_lint_tools
@@ -116,17 +115,6 @@ class CodeAgent:
         )
 
         self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
-
-    def get_root_dir(self) -> str:
-        """获取项目根目录
-
-        返回:
-            str: 项目根目录路径
-        """
-        return self.root_dir
-
-
-
 
     def _init_env(self) -> None:
         """初始化环境，包括：

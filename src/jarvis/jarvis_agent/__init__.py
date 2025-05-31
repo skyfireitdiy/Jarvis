@@ -126,14 +126,6 @@ class OutputHandlerProtocol(Protocol):
 
 
 class Agent:
-    def set_summary_prompt(self, summary_prompt: str):
-        """设置任务完成时的总结提示模板。
-
-        参数:
-            summary_prompt: 用于生成任务总结的提示模板
-        """
-        self.summary_prompt = summary_prompt
-
     def clear(self):
         """清除当前对话历史，保留系统消息。
 
