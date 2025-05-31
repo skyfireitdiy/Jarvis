@@ -784,7 +784,7 @@ def main():
     # role subcommand
     role_parser = subparsers.add_parser("role", help="加载角色配置文件并开始对话")
     role_parser.add_argument(
-        "--config", "-c", required=True, help="角色配置文件路径(YAML格式)"
+        "--config", "-c", default="~/.jarvis/roles.yaml", help="角色配置文件路径(YAML格式，默认: ~/.jarvis/roles.yaml)"
     )
 
     args = parser.parse_args()
@@ -795,6 +795,8 @@ def main():
         chat_command(args)
     elif args.command == "service":
         service_command(args)
+    elif args.command == "role":
+        role_command(args)
     else:
         parser.print_help()
 
