@@ -15,7 +15,7 @@ from jarvis.jarvis_utils.config import get_data_dir, get_max_big_content_size, s
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.globals import get_in_chat, set_interrupt
+from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrupt
 
 
 
@@ -39,6 +39,8 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     def sigint_handler(signum, frame):
         if get_in_chat():
             set_interrupt(True)
+            if get_interrupt() > 5 and original_sigint and callable(original_sigint):
+                original_sigint(signum, frame)
         else:
             if original_sigint and callable(original_sigint):
                 original_sigint(signum, frame)

@@ -24,23 +24,27 @@ current_agent_name: str = ""
 # 表示与大模型交互的深度(>0表示正在交互)
 g_in_chat: int = 0
 # 表示是否接收到中断信号
-g_interrupt: bool = False
+g_interrupt: int = 0
 # 使用自定义主题配置rich控制台
-custom_theme = Theme({
-    "INFO": "yellow",
-    "WARNING": "yellow",
-    "ERROR": "red",
-    "SUCCESS": "green",
-    "SYSTEM": "cyan",
-    "CODE": "green",
-    "RESULT": "blue",
-    "PLANNING": "magenta",
-    "PROGRESS": "white",
-    "DEBUG": "blue",
-    "USER": "green",
-    "TOOL": "yellow",
-})
+custom_theme = Theme(
+    {
+        "INFO": "yellow",
+        "WARNING": "yellow",
+        "ERROR": "red",
+        "SUCCESS": "green",
+        "SYSTEM": "cyan",
+        "CODE": "green",
+        "RESULT": "blue",
+        "PLANNING": "magenta",
+        "PROGRESS": "white",
+        "DEBUG": "blue",
+        "USER": "green",
+        "TOOL": "yellow",
+    }
+)
 console = Console(theme=custom_theme)
+
+
 def make_agent_name(agent_name: str) -> str:
     """
     通过附加后缀生成唯一的代理名称（如果必要）。
@@ -57,6 +61,8 @@ def make_agent_name(agent_name: str) -> str:
             i += 1
         return f"{agent_name}_{i}"
     return agent_name
+
+
 def set_agent(agent_name: str, agent: Any) -> None:
     """
     设置当前代理并将其添加到全局代理集合中。
@@ -68,6 +74,8 @@ def set_agent(agent_name: str, agent: Any) -> None:
     global_agents.add(agent_name)
     global current_agent_name
     current_agent_name = agent_name
+
+
 def get_agent_list() -> str:
     """
     获取表示当前代理状态的格式化字符串。
@@ -75,7 +83,13 @@ def get_agent_list() -> str:
     返回：
         str: 包含代理数量和当前代理名称的格式化字符串
     """
-    return "[" + str(len(global_agents)) + "]" + current_agent_name if global_agents else ""
+    return (
+        "[" + str(len(global_agents)) + "]" + current_agent_name
+        if global_agents
+        else ""
+    )
+
+
 def delete_agent(agent_name: str) -> None:
     """
     从全局代理集合中删除一个代理。
@@ -87,6 +101,7 @@ def delete_agent(agent_name: str) -> None:
         global_agents.remove(agent_name)
         global current_agent_name
         current_agent_name = ""
+
 
 def set_in_chat(status: bool) -> None:
     """
@@ -101,6 +116,7 @@ def set_in_chat(status: bool) -> None:
     else:
         g_in_chat = max(0, g_in_chat - 1)
 
+
 def get_in_chat() -> bool:
     """
     获取当前是否正在与大模型交互的状态。
@@ -110,6 +126,7 @@ def get_in_chat() -> bool:
     """
     return g_in_chat > 0
 
+
 def set_interrupt(status: bool) -> None:
     """
     设置中断信号状态。
@@ -118,13 +135,17 @@ def set_interrupt(status: bool) -> None:
         status: 中断状态
     """
     global g_interrupt
-    g_interrupt = status
+    if status:
+        g_interrupt += 1
+    else:
+        g_interrupt = 0
 
-def get_interrupt() -> bool:
+
+def get_interrupt() -> int:
     """
     获取当前中断信号状态。
 
     返回:
-        bool: 当前中断状态
+        int: 当前中断计数
     """
     return g_interrupt
