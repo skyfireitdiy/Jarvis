@@ -135,8 +135,6 @@ class generate_new_tool:
 
             # 检查并安装缺失的依赖
             try:
-                import re
-
                 required_packages = set()
 
                 # 从代码中提取import语句
