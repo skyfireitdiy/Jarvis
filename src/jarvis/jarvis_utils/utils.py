@@ -38,10 +38,8 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     
     def sigint_handler(signum, frame):
         if get_in_chat():
-            PrettyOutput.print("接收到SIGINT信号，正在设置中断标志...", OutputType.INFO)
             set_interrupt(True)
         else:
-            PrettyOutput.print("接收到SIGINT信号，正在优雅退出...", OutputType.INFO)
             if original_sigint and callable(original_sigint):
                 original_sigint(signum, frame)
     
