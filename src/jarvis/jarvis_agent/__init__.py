@@ -19,8 +19,8 @@ from jarvis.jarvis_utils.config import (get_max_token_count,
                                         is_execute_tool_confirm,
                                         is_use_analysis, is_use_methodology)
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import (delete_agent, make_agent_name,
-                                         set_agent)
+from jarvis.jarvis_utils.globals import (delete_agent, get_interrupt, make_agent_name,
+                                         set_agent, set_interrupt)
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.methodology import (load_methodology,
                                              upload_methodology)
@@ -811,6 +811,14 @@ arguments:
 
                     if self.after_tool_call_cb:
                         self.after_tool_call_cb(self)
+
+                    if get_interrupt():
+                        set_interrupt(False)
+                        user_input = self.multiline_inputer(
+                            f"模型交互期间被中断，请输入用户干预信息："
+                        )
+                        if user_input:
+                            self.prompt += f"\n\n用户干预信息：{user_input}"
 
                     if self.prompt or self.addon_prompt:
                         continue
