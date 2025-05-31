@@ -440,8 +440,9 @@ def fast_edit(filepath: str, patches: List[Dict[str,str]], spinner: Yaspin) -> T
             # 尝试增加缩进重试
             found = False
             for space_count in range(1, 17):
-                indented_search = '\n'.join(' ' * space_count + line for line in search_text.split('\n'))
-                indented_replace = '\n'.join(' ' * space_count + line for line in replace_text.split('\n'))
+                # 跳过空行不增加空格
+                indented_search = '\n'.join(' ' * space_count + line if line.strip() else line for line in search_text.split('\n'))
+                indented_replace = '\n'.join(' ' * space_count + line if line.strip() else line for line in replace_text.split('\n'))
                 if indented_search in modified_content:
                     if modified_content.count(indented_search) > 1:
                         success = False
