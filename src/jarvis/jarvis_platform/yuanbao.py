@@ -412,8 +412,10 @@ class YuanbaoPlatform(BasePlatform):
             "version": "v2",
             "supportFunctions": chat_model_ext_info["supportFunctions"],
             "chatModelId": self.model_name,
-            "chatModelExtInfo": json.dumps(chat_model_ext_info),
         }
+
+        if self.first_chat:
+            payload["chatModelExtInfo"] = json.dumps(chat_model_ext_info),
 
         self.multimedia = []
 
