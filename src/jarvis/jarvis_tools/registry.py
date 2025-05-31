@@ -622,11 +622,11 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         output_parts = []
         if stdout:
-            output_parts.append(f"输出:\n{stdout}")
+            output_parts.append(f"<output>\n{stdout}\n</output>")
         if stderr:
-            output_parts.append(f"错误:\n{stderr}")
+            output_parts.append(f"<error>\n{stderr}\n</error>")
         output = "\n\n".join(output_parts)
-        return "无输出和错误" if not output else output
+        return "<无输出和错误>" if not output else output
 
     def _truncate_output(self, output: str) -> str:
         """截断过长的输出内容
