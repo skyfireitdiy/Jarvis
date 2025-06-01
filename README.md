@@ -469,6 +469,55 @@ class CustomPlatform(BasePlatform):
 ```
 
 
+## 💾 Git提交功能 (jarvis-git-commit)
+
+`jarvis-git-commit` 是Jarvis的自动化git提交工具，主要功能包括：
+
+### 1. 核心功能
+- 自动分析git变更
+- 生成符合规范的提交信息
+- 支持交互式确认提交
+- 批量处理多个提交
+
+### 2. 使用方式
+```bash
+# 基本用法
+jarvis-git-commit
+
+# 或使用快捷命令
+jgc
+
+# 带参数使用
+jarvis-git-commit -m "自定义提交信息"
+```
+
+### 3. 命令行参数
+| 参数 | 描述 |
+|------|------|
+| `-m/--message` | 指定自定义提交信息 |
+| `-a/--all` | 自动添加所有变更文件 |
+| `-n/--no-verify` | 跳过git hooks验证 |
+| `-f/--force` | 强制提交，即使有冲突 |
+
+### 4. 工作流程
+1. 检查当前git状态
+2. 分析变更内容
+3. 生成或确认提交信息
+4. 执行提交操作
+5. 显示提交结果
+
+### 5. 示例
+```bash
+# 使用默认方式提交
+jgc
+
+# 指定提交信息
+jgc -m "修复内存泄漏问题"
+
+# 自动添加所有变更并提交
+jgc -a
+```
+
 ## 🤝 贡献指南 <a id="contributing"></a>
 1. Fork 仓库
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
