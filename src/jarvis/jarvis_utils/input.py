@@ -12,7 +12,12 @@ from colorama import Fore
 from colorama import Style as ColoramaStyle
 from fuzzywuzzy import process
 from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import Completer, Completion, PathCompleter, CompleteEvent
+from prompt_toolkit.completion import (
+    Completer,
+    Completion,
+    PathCompleter,
+    CompleteEvent,
+)
 from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.key_binding import KeyBindings
