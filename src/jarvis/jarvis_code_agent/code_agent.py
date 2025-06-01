@@ -278,6 +278,7 @@ class CodeAgent:
         if diff:
             start_hash = get_latest_commit_hash()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+            modified_files = get_diff_file_list()
             commited = handle_commit_workflow()
             if commited:
                 # 获取提交信息
@@ -287,7 +288,6 @@ class CodeAgent:
                 # 添加提交信息到final_ret
                 if commits:
                     final_ret += f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
-                    modified_files = get_diff_file_list()
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
                         f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
