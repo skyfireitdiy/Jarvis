@@ -17,10 +17,8 @@ import yaml  # type: ignore
 from yaspin import yaspin  # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.methodology import (
-    _get_methodology_directory,
-    _load_all_methodologies,
-)
+from jarvis.jarvis_utils.methodology import (_get_methodology_directory,
+                                             _load_all_methodologies)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 

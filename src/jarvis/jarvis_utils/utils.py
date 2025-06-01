@@ -11,15 +11,13 @@ from typing import Any, Callable, Dict, Optional
 import yaml
 
 from jarvis import __version__
-from jarvis.jarvis_utils.config import (
-    get_data_dir,
-    get_max_big_content_size,
-    set_global_env_data,
-)
+from jarvis.jarvis_utils.config import (get_data_dir, get_max_big_content_size,
+                                        set_global_env_data)
 from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.globals import (get_in_chat, get_interrupt,
+                                         set_interrupt)
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrupt
 
 g_config_file = None
 

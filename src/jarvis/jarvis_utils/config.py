@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
 from functools import lru_cache
-
 from typing import Any, Dict, List
-
 
 import yaml
 
-
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
-
 
 # 全局环境变量存储
 
@@ -67,7 +63,7 @@ def get_replace_map() -> dict:
     if not os.path.exists(replace_map_path):
         return BUILTIN_REPLACE_MAP.copy()
 
-    from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+    from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
     PrettyOutput.print(
         "警告：使用replace_map.yaml进行配置的方式已被弃用，将在未来版本中移除。"

@@ -6,13 +6,10 @@ import sys
 from typing import Dict, List, Optional, Type
 
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import (
-    get_data_dir,
-    get_normal_model_name,
-    get_normal_platform_name,
-    get_thinking_model_name,
-    get_thinking_platform_name,
-)
+from jarvis.jarvis_utils.config import (get_data_dir, get_normal_model_name,
+                                        get_normal_platform_name,
+                                        get_thinking_model_name,
+                                        get_thinking_platform_name)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 REQUIRED_METHODS = [

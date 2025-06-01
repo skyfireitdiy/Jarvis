@@ -5,7 +5,6 @@ import os
 import sys
 from typing import Optional
 
-
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_shell_name, set_config
 from jarvis.jarvis_utils.input import get_multiline_input

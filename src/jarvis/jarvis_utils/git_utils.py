@@ -14,7 +14,8 @@ import re
 import subprocess
 from typing import Any, Dict, List, Tuple
 
-from jarvis.jarvis_utils.config import get_auto_update, is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import (get_auto_update,
+                                        is_confirm_before_apply_patch)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import user_confirm
 

@@ -12,26 +12,19 @@ from yaspin import yaspin  # type: ignore
 # jarvis_platform 相关
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
-
 # jarvis_utils 相关
-from jarvis.jarvis_utils.config import (
-    get_max_token_count,
-    get_max_tool_call_count,
-    is_auto_complete,
-    is_execute_tool_confirm,
-    is_use_analysis,
-    is_use_methodology,
-)
+from jarvis.jarvis_utils.config import (get_max_token_count,
+                                        get_max_tool_call_count,
+                                        is_auto_complete,
+                                        is_execute_tool_confirm,
+                                        is_use_analysis, is_use_methodology)
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import (
-    delete_agent,
-    get_interrupt,
-    make_agent_name,
-    set_agent,
-    set_interrupt,
-)
+from jarvis.jarvis_utils.globals import (delete_agent, get_interrupt,
+                                         make_agent_name, set_agent,
+                                         set_interrupt)
 from jarvis.jarvis_utils.input import get_multiline_input
-from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
+from jarvis.jarvis_utils.methodology import (load_methodology,
+                                             upload_methodology)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import user_confirm

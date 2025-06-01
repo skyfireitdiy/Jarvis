@@ -10,30 +10,26 @@ import subprocess
 import sys
 from typing import List, Optional, Tuple
 
+from yaspin import yaspin  # type: ignore
+
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
-
 # 忽略yaspin的类型检查
 from jarvis.jarvis_code_agent.lint import get_lint_tools
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
-from jarvis.jarvis_utils.git_utils import (
-    find_git_root,
-    get_commits_between,
-    get_diff,
-    get_diff_file_list,
-    get_latest_commit_hash,
-    get_recent_commits_with_files,
-    handle_commit_workflow,
-    has_uncommitted_changes,
-)
+from jarvis.jarvis_utils.git_utils import (find_git_root, get_commits_between,
+                                           get_diff, get_diff_file_list,
+                                           get_latest_commit_hash,
+                                           get_recent_commits_with_files,
+                                           handle_commit_workflow,
+                                           has_uncommitted_changes)
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import get_loc_stats, init_env, user_confirm
-from yaspin import yaspin  # type: ignore
 
 
 class CodeAgent:

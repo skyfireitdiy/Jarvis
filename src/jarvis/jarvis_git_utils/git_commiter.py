@@ -12,7 +12,8 @@ from yaspin import yaspin
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_git_commit_prompt
-from jarvis.jarvis_utils.git_utils import find_git_root, has_uncommitted_changes
+from jarvis.jarvis_utils.git_utils import (find_git_root,
+                                           has_uncommitted_changes)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow

@@ -8,7 +8,8 @@ from typing import Any, Dict, List
 from yaspin import yaspin
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
+from jarvis.jarvis_code_analysis.checklists.loader import \
+    get_language_checklist
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
