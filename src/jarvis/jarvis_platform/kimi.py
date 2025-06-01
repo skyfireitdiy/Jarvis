@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Kimi 平台实现模块
+# 提供与 Moonshot AI 的 Kimi 大模型交互功能
 import json
 import mimetypes
 import os
@@ -13,7 +15,12 @@ from jarvis.jarvis_utils.utils import while_success
 
 
 class KimiModel(BasePlatform):
-    """Kimi model implementation"""
+    """Kimi 大模型平台实现类
+    封装了与 Kimi 大模型交互的所有功能，包括：
+    - 会话管理
+    - 文件上传
+    - 消息收发
+    """
 
     platform_name = "kimi"
 
@@ -29,16 +36,16 @@ class KimiModel(BasePlatform):
         Initialize Kimi model
         """
         super().__init__()
-        self.chat_id = ""
-        self.api_key = os.getenv("KIMI_API_KEY")
+        self.chat_id = ""  # 当前会话ID
+        self.api_key = os.getenv("KIMI_API_KEY")  # 从环境变量获取API密钥
         if not self.api_key:
             PrettyOutput.print("KIMI_API_KEY 未设置", OutputType.WARNING)
-        self.auth_header = f"Bearer {self.api_key}"
+        self.auth_header = f"Bearer {self.api_key}"  # 认证头信息
         self.uploaded_files = []  # 存储已上传文件的信息
-        self.chat_id = ""
-        self.first_chat = True  # 添加标记，用于判断是否是第一次对话
-        self.system_message = ""
-        self.model_name = "kimi"
+        self.chat_id = ""  # 当前会话ID
+        self.first_chat = True  # 标记是否是第一次对话
+        self.system_message = ""  # 系统提示消息
+        self.model_name = "kimi"  # 默认模型名称
 
     def set_system_prompt(self, message: str):
         """Set system message"""
@@ -246,7 +253,12 @@ class KimiModel(BasePlatform):
         return True
 
     def chat(self, message: str) -> Generator[str, None, None]:
-        """Send message and get response"""
+        """发送消息并获取响应流
+        参数:
+            message: 要发送的消息内容
+        返回:
+            生成器，逐块返回模型响应
+        """
         if not self.chat_id:
             if not self._create_chat():
                 raise Exception("Failed to create chat session")

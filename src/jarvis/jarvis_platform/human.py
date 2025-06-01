@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+
+# 人类交互平台实现模块
+
+# 提供与真实人类交互的模拟接口
+
 import random
 import string
 from typing import Generator, List, Tuple
@@ -72,7 +77,9 @@ class HumanPlatform(BasePlatform):
         return self.model_name
 
     def support_web(self) -> bool:
+        """是否支持网页浏览功能"""
         return False
 
     def support_upload_files(self) -> bool:
+        """是否支持文件上传功能"""
         return False
