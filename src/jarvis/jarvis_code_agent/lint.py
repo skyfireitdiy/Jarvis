@@ -15,18 +15,18 @@ from jarvis.jarvis_utils.config import get_data_dir
 # 默认的lint工具配置
 LINT_TOOLS = {
     # C/C++
-    '.c': ['cppcheck', 'clang-tidy'],
-    '.cpp': ['cppcheck', 'clang-tidy'],
-    '.cc': ['cppcheck', 'clang-tidy'],
-    '.cxx': ['cppcheck', 'clang-tidy'],
-    '.h': ['cppcheck', 'clang-tidy'],
-    '.hpp': ['cppcheck', 'clang-tidy'],
-    '.hxx': ['cppcheck', 'clang-tidy'],
-    '.inl': ['cppcheck', 'clang-tidy'],
-    '.ipp': ['cppcheck', 'clang-tidy'],
+    '.c': ['clang-tidy'],
+    '.cpp': ['clang-tidy'],
+    '.cc': ['clang-tidy'],
+    '.cxx': ['clang-tidy'],
+    '.h': ['clang-tidy'],
+    '.hpp': ['clang-tidy'],
+    '.hxx': ['clang-tidy'],
+    '.inl': ['clang-tidy'],
+    '.ipp': ['clang-tidy'],
     
     # Go
-    '.go': ['golint', 'go vet'],
+    '.go': ['go vet'],
     
     # Python
     '.py': ['black', 'pylint', 'mypy', 'isort'],
@@ -40,9 +40,9 @@ LINT_TOOLS = {
     '.rlib': ['cargo clippy', 'rustfmt'],
     
     # Java
-    '.java': ['checkstyle', 'pmd'],
-    '.class': ['checkstyle', 'pmd'],
-    '.jar': ['checkstyle', 'pmd'],
+    '.java': ['pmd'],
+    '.class': ['pmd'],
+    '.jar': ['pmd'],
     
     # JavaScript/TypeScript
     '.js': ['eslint'],
@@ -55,11 +55,11 @@ LINT_TOOLS = {
     '.mts': ['eslint', 'tsc'],
     
     # PHP
-    '.php': ['phpcs', 'phpstan'],
-    '.phtml': ['phpcs', 'phpstan'],
-    '.php5': ['phpcs', 'phpstan'],
-    '.php7': ['phpcs', 'phpstan'],
-    '.phps': ['phpcs', 'phpstan'],
+    '.php': ['phpstan'],
+    '.phtml': ['phpstan'],
+    '.php5': ['phpstan'],
+    '.php7': ['phpstan'],
+    '.phps': ['phpstan'],
     
     # Ruby
     '.rb': ['rubocop'],
@@ -74,8 +74,8 @@ LINT_TOOLS = {
     '.kts': ['ktlint'],
     
     # C#
-    '.cs': ['dotnet-format', 'roslynator'],
-    '.csx': ['dotnet-format', 'roslynator'],
+    '.cs': ['roslynator'],
+    '.csx': ['roslynator'],
     
     # SQL
     '.sql': ['sqlfluff'],
