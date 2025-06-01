@@ -12,7 +12,7 @@ from colorama import Fore
 from colorama import Style as ColoramaStyle
 from fuzzywuzzy import process
 from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import Completer, Completion, PathCompleter
+from prompt_toolkit.completion import Completer, Completion, PathCompleter, CompleteEvent
 from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.key_binding import KeyBindings
@@ -59,7 +59,7 @@ class FileCompleter(Completer):
         self.min_score = 10
         self.replace_map = get_replace_map()
 
-    def get_completions(self, document: Document) -> Completion:  # type: ignore
+    def get_completions(self, document: Document, _: CompleteEvent) -> Completion:  # type: ignore
         """
         生成带有模糊匹配的文件路径补全建议。
 
