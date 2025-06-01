@@ -73,3 +73,6 @@ class HumanPlatform(BasePlatform):
 
     def support_web(self) -> bool:
         return False
+
+    def support_upload_files(self) -> bool:
+        return False

@@ -287,7 +287,7 @@ class PrettyOutput:
                 console.print(content)
             else:
                 console.print(header, content)
-        if traceback:
+        if traceback or output_type == OutputType.ERROR:
             console.print_exception()
 
     @staticmethod
