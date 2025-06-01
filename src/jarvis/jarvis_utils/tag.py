@@ -10,6 +10,7 @@ def ot(tag_name: str) -> str:
     """
     return f"<{tag_name}>"
 
+
 def ct(tag_name: str) -> str:
     """生成HTML标签结束标记
 

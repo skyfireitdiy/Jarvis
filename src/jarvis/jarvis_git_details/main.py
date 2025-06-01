@@ -54,7 +54,7 @@ class GitCommitAnalyzer:
             return {
                 "success": False,
                 "stdout": {},
-                "stderr": f"Failed to analyze commit: {str(e)}"
+                "stderr": f"Failed to analyze commit: {str(e)}",
             }
 
     def analyze_single_commit(self, commit_sha: str, root_dir: str) -> Dict[str, Any]:
@@ -73,16 +73,12 @@ class GitCommitAnalyzer:
 
             # 获取commit详细信息
             commit_info = subprocess.check_output(
-                f"git show {commit_sha} --pretty=fuller",
-                shell=True,
-                text=True
+                f"git show {commit_sha} --pretty=fuller", shell=True, text=True
             )
 
             # 获取commit修改内容
             diff_content = subprocess.check_output(
-                f"git show {commit_sha} --patch",
-                shell=True,
-                text=True
+                f"git show {commit_sha} --patch", shell=True, text=True
             )
 
             # 分析commit的功能、原因和逻辑
@@ -93,15 +89,15 @@ class GitCommitAnalyzer:
                 "stdout": {
                     "commit_info": commit_info,
                     "diff_content": diff_content,
-                    "analysis_result": analysis_result
+                    "analysis_result": analysis_result,
                 },
-                "stderr": ""
+                "stderr": "",
             }
         except subprocess.CalledProcessError as error:
             return {
                 "success": False,
                 "stdout": {},
-                "stderr": f"Failed to analyze commit: {str(error)}"
+                "stderr": f"Failed to analyze commit: {str(error)}",
             }
         finally:
             os.chdir(original_dir)
@@ -122,16 +118,12 @@ class GitCommitAnalyzer:
 
             # 获取commit范围差异
             diff_content = subprocess.check_output(
-                f"git diff {commit_range} --patch",
-                shell=True,
-                text=True
+                f"git diff {commit_range} --patch", shell=True, text=True
             )
 
             # 获取commit范围信息
             commit_info = subprocess.check_output(
-                f"git log {commit_range} --pretty=fuller",
-                shell=True,
-                text=True
+                f"git log {commit_range} --pretty=fuller", shell=True, text=True
             )
 
             # 使用相同的分析方法处理差异内容
@@ -142,15 +134,15 @@ class GitCommitAnalyzer:
                 "stdout": {
                     "commit_info": commit_info,
                     "diff_content": diff_content,
-                    "analysis_result": analysis_result
+                    "analysis_result": analysis_result,
                 },
-                "stderr": ""
+                "stderr": "",
             }
         except subprocess.CalledProcessError as error:
             return {
                 "success": False,
                 "stdout": {},
-                "stderr": f"Failed to analyze commit range: {str(error)}"
+                "stderr": f"Failed to analyze commit range: {str(error)}",
             }
         finally:
             os.chdir(original_dir)
@@ -208,7 +200,7 @@ class GitCommitAnalyzer:
 {ct("REPORT")}""",
             output_handler=[tool_registry],
             platform=PlatformRegistry().get_normal_platform(),
-            auto_complete=True
+            auto_complete=True,
         )
 
         return agent.run(diff_content)
@@ -223,7 +215,9 @@ def extract_analysis_report(result: str) -> str:
     Returns:
         提取的报告内容，如果未找到REPORT标签则返回空字符串
     """
-    search_match = re.search(ot("REPORT")+r'\n(.*?)\n'+ct("REPORT"), result, re.DOTALL)
+    search_match = re.search(
+        ot("REPORT") + r"\n(.*?)\n" + ct("REPORT"), result, re.DOTALL
+    )
     if search_match:
         return search_match.group(1)
     return result
@@ -235,25 +229,27 @@ def main():
 
     init_env("欢迎使用 Jarvis-GitCommitAnalyzer，您的Git Commit分析助手已准备就绪！")
 
-    parser = argparse.ArgumentParser(description='Git Commit Analyzer')
+    parser = argparse.ArgumentParser(description="Git Commit Analyzer")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('commit', nargs='?', help='Commit SHA to analyze')
-    group.add_argument('--range', type=str, help='Commit range to analyze (commit1..commit2)')
-    parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
+    group.add_argument("commit", nargs="?", help="Commit SHA to analyze")
+    group.add_argument(
+        "--range", type=str, help="Commit range to analyze (commit1..commit2)"
+    )
+    parser.add_argument(
+        "--root-dir", type=str, help="Root directory of the codebase", default="."
+    )
 
     args = parser.parse_args()
 
     analyzer = GitCommitAnalyzer()
     if args.range:
-        result = analyzer.execute({
-            "commit_range": args.range,
-            "root_dir": args.root_dir
-        })
+        result = analyzer.execute(
+            {"commit_range": args.range, "root_dir": args.root_dir}
+        )
     else:
-        result = analyzer.execute({
-            "commit_sha": args.commit,
-            "root_dir": args.root_dir
-        })
+        result = analyzer.execute(
+            {"commit_sha": args.commit, "root_dir": args.root_dir}
+        )
 
     if result["success"]:
         PrettyOutput.section("Commit Information:", OutputType.SUCCESS)

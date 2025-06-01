@@ -1,4 +1,3 @@
-
 import sys
 
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -9,11 +8,11 @@ from jarvis.jarvis_utils.utils import init_env
 def main() -> int:
     """
     命令行工具入口，提供工具列表查看和工具调用功能
-    
+
     功能:
         1. 列出所有可用工具 (list命令)
         2. 调用指定工具 (call命令)
-    
+
     参数:
         通过命令行参数传递，包括:
         - list: 列出工具
@@ -23,7 +22,7 @@ def main() -> int:
             tool_name: 工具名称
             --args: 工具参数(JSON格式)
             --args-file: 从文件加载工具参数
-    
+
     返回值:
         int: 0表示成功，非0表示错误
     """
@@ -62,7 +61,9 @@ def main() -> int:
 
         if args.json:
             if args.detailed:
-                print(json.dumps(tools, indent=2, ensure_ascii=False))  # 输出完整JSON格式
+                print(
+                    json.dumps(tools, indent=2, ensure_ascii=False)
+                )  # 输出完整JSON格式
             else:
                 simple_tools = [
                     {"name": t["name"], "description": t["description"]} for t in tools
@@ -79,25 +80,28 @@ def main() -> int:
 
     elif args.command == "stat":
         from tabulate import tabulate
+
         stats = registry._get_tool_stats()
         tools = registry.get_all_tools()
-        
+
         # 构建统计表格数据
         table_data = []
         for tool in tools:
             name = tool["name"]
             count = stats.get(name, 0)
             table_data.append([name, count])
-        
+
         # 按调用次数降序排序
         table_data.sort(key=lambda x: x[1], reverse=True)
-        
+
         if args.json:
             print(json.dumps(dict(table_data), indent=2))
         else:
             PrettyOutput.section("工具调用统计", OutputType.SYSTEM)
-            print(tabulate(table_data, headers=["工具名称", "调用次数"], tablefmt="grid"))
-            
+            print(
+                tabulate(table_data, headers=["工具名称", "调用次数"], tablefmt="grid")
+            )
+
         return 0
 
     elif args.command == "call":

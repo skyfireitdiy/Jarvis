@@ -11,26 +11,22 @@ class WebpageTool:
     parameters = {
         "type": "object",
         "properties": {
-            "url": {
-                "type": "string",
-                "description": "要读取的网页URL"
-            },
+            "url": {"type": "string", "description": "要读取的网页URL"},
             "want": {
                 "type": "string",
                 "description": "具体想要从网页获取的信息或回答的问题",
-                "default": "请总结这个网页的主要内容"
-            }
+                "default": "请总结这个网页的主要内容",
+            },
         },
-        "required": ["url"]
+        "required": ["url"],
     }
-
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Read webpage content using Yuanbao model"""
         try:
             url = args["url"].strip()
             want = args.get("want", "请总结这个网页的主要内容")
-            
+
             # Create Yuanbao model instance
             model = PlatformRegistry().get_normal_platform()
             model.set_web(True)
@@ -47,18 +43,14 @@ class WebpageTool:
             # Get response from Yuanbao model
             response = model.chat_until_success(prompt)  # type: ignore
 
-            return {
-                "success": True,
-                "stdout": response,
-                "stderr": ""
-            }
+            return {"success": True, "stdout": response, "stderr": ""}
 
         except Exception as e:
             PrettyOutput.print(f"读取网页失败: {str(e)}", OutputType.ERROR)
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Failed to parse webpage: {str(e)}"
+                "stderr": f"Failed to parse webpage: {str(e)}",
             }
 
     @staticmethod

@@ -22,23 +22,19 @@ class OpenAIModel(BasePlatform):
             PrettyOutput.print("OPENAI_API_KEY 未设置", OutputType.WARNING)
 
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
-        self.model_name =  os.getenv("JARVIS_MODEL") or "gpt-4o"
+        self.model_name = os.getenv("JARVIS_MODEL") or "gpt-4o"
 
-
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
+        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
 
     def upload_files(self, file_list: List[str]) -> bool:
         """
         上传文件到OpenAI平台
-        
+
         参数:
             file_list: 需要上传的文件路径列表
-            
+
         返回:
             bool: 上传是否成功 (当前实现始终返回False)
         """
@@ -47,10 +43,10 @@ class OpenAIModel(BasePlatform):
     def get_model_list(self) -> List[Tuple[str, str]]:
         """
         获取可用的OpenAI模型列表
-        
+
         返回:
             List[Tuple[str, str]]: 模型ID和名称的元组列表
-            
+
         异常:
             当API调用失败时会打印错误信息并返回空列表
         """
@@ -67,7 +63,7 @@ class OpenAIModel(BasePlatform):
     def set_model_name(self, model_name: str):
         """
         设置当前使用的模型名称
-        
+
         参数:
             model_name: 要设置的模型名称
         """
@@ -77,10 +73,10 @@ class OpenAIModel(BasePlatform):
     def set_system_prompt(self, message: str):
         """
         设置系统消息(角色设定)
-        
+
         参数:
             message: 系统消息内容
-            
+
         说明:
             设置后会立即添加到消息历史中
         """
@@ -90,13 +86,13 @@ class OpenAIModel(BasePlatform):
     def chat(self, message: str) -> Generator[str, None, None]:
         """
         执行对话并返回生成器
-        
+
         参数:
             message: 用户输入的消息内容
-            
+
         返回:
             Generator[str, None, None]: 生成器，逐块返回AI响应内容
-            
+
         异常:
             当API调用失败时会抛出异常并打印错误信息
         """
@@ -107,9 +103,9 @@ class OpenAIModel(BasePlatform):
 
             response = self.client.chat.completions.create(
                 model=self.model_name,  # Use the configured model name
-                messages=self.messages, # type: ignore
-                stream=True
-            ) # type: ignore
+                messages=self.messages,  # type: ignore
+                stream=True,
+            )  # type: ignore
 
             full_response = ""
             for chunk in response:
@@ -130,20 +126,19 @@ class OpenAIModel(BasePlatform):
     def name(self) -> str:
         """
         获取当前使用的模型名称
-        
+
         返回:
             str: 当前配置的模型名称
         """
         return self.model_name
 
-
-    def delete_chat(self)->bool:
+    def delete_chat(self) -> bool:
         """
         删除当前对话历史
-        
+
         返回:
             bool: 操作是否成功
-            
+
         说明:
             如果设置了系统消息，会保留系统消息
         """
@@ -156,16 +151,16 @@ class OpenAIModel(BasePlatform):
     def support_web(self) -> bool:
         """
         检查是否支持网页访问功能
-        
+
         返回:
             bool: 当前是否支持网页访问 (OpenAI平台始终返回False)
         """
         return False
-    
+
     def support_upload_files(self) -> bool:
         """
         检查是否支持上传文件功能
-        
+
         返回:
             bool: 当前是否支持上传文件 (OpenAI平台始终返回False)
         """

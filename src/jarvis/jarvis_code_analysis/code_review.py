@@ -8,8 +8,7 @@ from typing import Any, Dict, List
 from yaspin import yaspin
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_code_analysis.checklists.loader import \
-    get_language_checklist
+from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -20,7 +19,7 @@ from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 class CodeReviewTool:
     name = "code_review"
     description = "自动代码审查工具，用于分析代码变更"
-    labels = ['code', 'analysis', 'review']
+    labels = ["code", "analysis", "review"]
     parameters = {
         "type": "object",
         "properties": {
@@ -28,31 +27,31 @@ class CodeReviewTool:
                 "type": "string",
                 "description": "审查类型：'commit' 审查特定提交，'current' 审查当前变更，'range' 审查提交范围，'file' 审查特定文件",
                 "enum": ["commit", "current", "range", "file"],
-                "default": "current"
+                "default": "current",
             },
             "commit_sha": {
                 "type": "string",
-                "description": "要分析的提交SHA（review_type='commit'时必填）"
+                "description": "要分析的提交SHA（review_type='commit'时必填）",
             },
             "start_commit": {
                 "type": "string",
-                "description": "起始提交SHA（review_type='range'时必填）"
+                "description": "起始提交SHA（review_type='range'时必填）",
             },
             "end_commit": {
                 "type": "string",
-                "description": "结束提交SHA（review_type='range'时必填）"
+                "description": "结束提交SHA（review_type='range'时必填）",
             },
             "file_path": {
                 "type": "string",
-                "description": "要审查的文件路径（review_type='file'时必填）"
+                "description": "要审查的文件路径（review_type='file'时必填）",
             },
             "root_dir": {
                 "type": "string",
                 "description": "代码库根目录路径（可选）",
-                "default": "."
-            }
+                "default": ".",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     def _detect_languages_from_files(self, file_paths: List[str]) -> List[str]:
@@ -62,143 +61,203 @@ class CodeReviewTool:
         """
         if not file_paths:
             return []
-        
+
         # Extension-based language detection
         languages = set()
         for file_path in file_paths:
             file_path = file_path.lower()
             _, ext = os.path.splitext(file_path)
-            
+
             # Get base name for special files without extensions
             base_name = os.path.basename(file_path)
-            
+
             # C/C++
-            if ext in ['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx', '.inl', '.ipp']:
-                languages.add('c_cpp')
-            
+            if ext in [
+                ".c",
+                ".cpp",
+                ".cc",
+                ".cxx",
+                ".h",
+                ".hpp",
+                ".hxx",
+                ".inl",
+                ".ipp",
+            ]:
+                languages.add("c_cpp")
+
             # Go
-            elif ext in ['.go']:
-                languages.add('go')
-            
+            elif ext in [".go"]:
+                languages.add("go")
+
             # Python
-            elif ext in ['.py', '.pyw', '.pyi', '.pyx', '.pxd'] or base_name in ['requirements.txt', 'setup.py', 'pyproject.toml']:
-                languages.add('python')
-            
+            elif ext in [".py", ".pyw", ".pyi", ".pyx", ".pxd"] or base_name in [
+                "requirements.txt",
+                "setup.py",
+                "pyproject.toml",
+            ]:
+                languages.add("python")
+
             # Rust
-            elif ext in ['.rs', '.rlib'] or base_name in ['Cargo.toml', 'Cargo.lock']:
-                languages.add('rust')
-            
+            elif ext in [".rs", ".rlib"] or base_name in ["Cargo.toml", "Cargo.lock"]:
+                languages.add("rust")
+
             # Java
-            elif ext in ['.java', '.class', '.jar'] or base_name in ['pom.xml', 'build.gradle']:
-                languages.add('java')
-            
+            elif ext in [".java", ".class", ".jar"] or base_name in [
+                "pom.xml",
+                "build.gradle",
+            ]:
+                languages.add("java")
+
             # JavaScript
-            elif ext in ['.js', '.mjs', '.cjs', '.jsx']:
-                languages.add('javascript')
-            
+            elif ext in [".js", ".mjs", ".cjs", ".jsx"]:
+                languages.add("javascript")
+
             # TypeScript
-            elif ext in ['.ts', '.tsx', '.cts', '.mts']:
-                languages.add('typescript')
-            
+            elif ext in [".ts", ".tsx", ".cts", ".mts"]:
+                languages.add("typescript")
+
             # PHP
-            elif ext in ['.php', '.phtml', '.php5', '.php7', '.phps']:
-                languages.add('php')
-            
+            elif ext in [".php", ".phtml", ".php5", ".php7", ".phps"]:
+                languages.add("php")
+
             # Ruby
-            elif ext in ['.rb', '.rake', '.gemspec'] or base_name in ['Gemfile', 'Rakefile']:
-                languages.add('ruby')
-            
+            elif ext in [".rb", ".rake", ".gemspec"] or base_name in [
+                "Gemfile",
+                "Rakefile",
+            ]:
+                languages.add("ruby")
+
             # Swift
-            elif ext in ['.swift']:
-                languages.add('swift')
-            
+            elif ext in [".swift"]:
+                languages.add("swift")
+
             # Kotlin
-            elif ext in ['.kt', '.kts']:
-                languages.add('kotlin')
-            
+            elif ext in [".kt", ".kts"]:
+                languages.add("kotlin")
+
             # C#
-            elif ext in ['.cs', '.csx']:
-                languages.add('csharp')
-            
+            elif ext in [".cs", ".csx"]:
+                languages.add("csharp")
+
             # SQL
-            elif ext in ['.sql']:
-                languages.add('sql')
-            
+            elif ext in [".sql"]:
+                languages.add("sql")
+
             # Shell/Bash
-            elif ext in ['.sh', '.bash'] or base_name.startswith('.bash') or base_name.startswith('.zsh'):
-                languages.add('shell')
-            
+            elif (
+                ext in [".sh", ".bash"]
+                or base_name.startswith(".bash")
+                or base_name.startswith(".zsh")
+            ):
+                languages.add("shell")
+
             # HTML/CSS
-            elif ext in ['.html', '.htm', '.xhtml']:
-                languages.add('html')
-            elif ext in ['.css', '.scss', '.sass', '.less']:
-                languages.add('css')
-            
+            elif ext in [".html", ".htm", ".xhtml"]:
+                languages.add("html")
+            elif ext in [".css", ".scss", ".sass", ".less"]:
+                languages.add("css")
+
             # XML/JSON/YAML (config files)
-            elif ext in ['.xml', '.xsd', '.dtd', '.tld', '.jsp', '.jspx', '.tag', '.tagx']:
-                languages.add('xml')
-            elif ext in ['.json', '.jsonl', '.json5']:
-                languages.add('json')
-            elif ext in ['.yaml', '.yml']:
-                languages.add('yaml')
-            
+            elif ext in [
+                ".xml",
+                ".xsd",
+                ".dtd",
+                ".tld",
+                ".jsp",
+                ".jspx",
+                ".tag",
+                ".tagx",
+            ]:
+                languages.add("xml")
+            elif ext in [".json", ".jsonl", ".json5"]:
+                languages.add("json")
+            elif ext in [".yaml", ".yml"]:
+                languages.add("yaml")
+
             # Markdown/Documentation
-            elif ext in ['.md', '.markdown', '.rst', '.adoc']:
-                languages.add('markdown')
-            
+            elif ext in [".md", ".markdown", ".rst", ".adoc"]:
+                languages.add("markdown")
+
             # Docker
-            elif ext in ['.dockerfile'] or base_name in ['Dockerfile', 'docker-compose.yml', 'docker-compose.yaml']:
-                languages.add('docker')
-            
+            elif ext in [".dockerfile"] or base_name in [
+                "Dockerfile",
+                "docker-compose.yml",
+                "docker-compose.yaml",
+            ]:
+                languages.add("docker")
+
             # Terraform
-            elif ext in ['.tf', '.tfvars']:
-                languages.add('terraform')
-            
+            elif ext in [".tf", ".tfvars"]:
+                languages.add("terraform")
+
             # Makefile
-            elif ext in ['.mk'] or base_name == 'Makefile':
-                languages.add('makefile')
-        
+            elif ext in [".mk"] or base_name == "Makefile":
+                languages.add("makefile")
+
         # Map to our primary language groups for checklist purposes
         primary_languages = set()
         language_mapping = {
-            'c_cpp': 'c_cpp',
-            'go': 'go',
-            'python': 'python',
-            'rust': 'rust',
-            'java': 'java',
-            'javascript': 'javascript',
-            'typescript': 'typescript',
-            'php': 'php',
-            'ruby': 'ruby',
-            'swift': 'swift',
-            'kotlin': 'kotlin',
-            'csharp': 'csharp',
-            'sql': 'sql',
-            'shell': 'shell',
-            'html': 'html',
-            'css': 'css',
-            'xml': 'xml',
-            'json': 'json',
-            'yaml': 'yaml',
-            'markdown': 'docs',
-            'docker': 'docker',
-            'terraform': 'terraform',
-            'makefile': 'devops'
+            "c_cpp": "c_cpp",
+            "go": "go",
+            "python": "python",
+            "rust": "rust",
+            "java": "java",
+            "javascript": "javascript",
+            "typescript": "typescript",
+            "php": "php",
+            "ruby": "ruby",
+            "swift": "swift",
+            "kotlin": "kotlin",
+            "csharp": "csharp",
+            "sql": "sql",
+            "shell": "shell",
+            "html": "html",
+            "css": "css",
+            "xml": "xml",
+            "json": "json",
+            "yaml": "yaml",
+            "markdown": "docs",
+            "docker": "docker",
+            "terraform": "terraform",
+            "makefile": "devops",
         }
-        
+
         # Map detected languages to primary language groups
         for lang in languages:
             primary_lang = language_mapping.get(lang)
             if primary_lang:
                 # Only keep languages we have checklists for
-                if primary_lang in ['c_cpp', 'go', 'python', 'rust', 'java', 'javascript', 'typescript', 
-                                   'csharp', 'swift', 'php', 'shell', 'sql', 'ruby', 'kotlin', 
-                                   'html', 'css', 'xml', 'json', 'yaml', 'docker', 'terraform',
-                                   'docs', 'markdown', 'devops', 'makefile']:
+                if primary_lang in [
+                    "c_cpp",
+                    "go",
+                    "python",
+                    "rust",
+                    "java",
+                    "javascript",
+                    "typescript",
+                    "csharp",
+                    "swift",
+                    "php",
+                    "shell",
+                    "sql",
+                    "ruby",
+                    "kotlin",
+                    "html",
+                    "css",
+                    "xml",
+                    "json",
+                    "yaml",
+                    "docker",
+                    "terraform",
+                    "docs",
+                    "markdown",
+                    "devops",
+                    "makefile",
+                ]:
                     primary_languages.add(primary_lang)
-        
+
         return list(primary_languages)
-    
+
     def _get_language_checklist(self, language: str) -> str:
         """Get the checklist for a specific language."""
         checklist = get_language_checklist(language)
@@ -227,104 +286,124 @@ class CodeReviewTool:
                             return {
                                 "success": False,
                                 "stdout": {},
-                                "stderr": "commit_sha is required for commit review type"
+                                "stderr": "commit_sha is required for commit review type",
                             }
                         commit_sha = args["commit_sha"].strip()
                         diff_cmd = f"git show {commit_sha} | cat -"
-                        
+
                         # Execute git command and get diff output
-                        diff_output = subprocess.check_output(diff_cmd, shell=True, text=True)
+                        diff_output = subprocess.check_output(
+                            diff_cmd, shell=True, text=True
+                        )
                         if not diff_output:
                             return {
                                 "success": False,
                                 "stdout": {},
-                                "stderr": "No changes to review"
+                                "stderr": "No changes to review",
                             }
-                        
+
                         # Extract changed files using git command
                         files_cmd = f"git show --name-only --pretty=format: {commit_sha} | grep -v '^$'"
                         try:
-                            files_output = subprocess.check_output(files_cmd, shell=True, text=True)
-                            file_paths = [f.strip() for f in files_output.split("\n") if f.strip()]
+                            files_output = subprocess.check_output(
+                                files_cmd, shell=True, text=True
+                            )
+                            file_paths = [
+                                f.strip() for f in files_output.split("\n") if f.strip()
+                            ]
                         except subprocess.CalledProcessError:
                             # Fallback to regex extraction if git command fails
                             file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
                             files = re.findall(file_pattern, diff_output)
                             file_paths = [match[0] for match in files]
-                        
+
                     elif review_type == "range":
                         if "start_commit" not in args or "end_commit" not in args:
                             return {
                                 "success": False,
                                 "stdout": {},
-                                "stderr": "start_commit and end_commit are required for range review type"
+                                "stderr": "start_commit and end_commit are required for range review type",
                             }
                         start_commit = args["start_commit"].strip()
                         end_commit = args["end_commit"].strip()
                         diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
-                        
+
                         # Execute git command and get diff output
-                        diff_output = subprocess.check_output(diff_cmd, shell=True, text=True)
+                        diff_output = subprocess.check_output(
+                            diff_cmd, shell=True, text=True
+                        )
                         if not diff_output:
                             return {
                                 "success": False,
                                 "stdout": {},
-                                "stderr": "No changes to review"
+                                "stderr": "No changes to review",
                             }
-                        
+
                         # Extract changed files using git command
                         files_cmd = f"git diff --name-only {start_commit}..{end_commit}"
                         try:
-                            files_output = subprocess.check_output(files_cmd, shell=True, text=True)
-                            file_paths = [f.strip() for f in files_output.split("\n") if f.strip()]
+                            files_output = subprocess.check_output(
+                                files_cmd, shell=True, text=True
+                            )
+                            file_paths = [
+                                f.strip() for f in files_output.split("\n") if f.strip()
+                            ]
                         except subprocess.CalledProcessError:
                             # Fallback to regex extraction if git command fails
                             file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
                             files = re.findall(file_pattern, diff_output)
                             file_paths = [match[0] for match in files]
-                        
+
                     elif review_type == "file":
                         if "file_path" not in args:
                             return {
                                 "success": False,
                                 "stdout": {},
-                                "stderr": "file_path is required for file review type"
+                                "stderr": "file_path is required for file review type",
                             }
                         file_path = args["file_path"].strip()
                         file_paths = [file_path]
-                        diff_output = ReadCodeTool().execute({"files": [{"path": file_path}]})["stdout"]
-                        
+                        diff_output = ReadCodeTool().execute(
+                            {"files": [{"path": file_path}]}
+                        )["stdout"]
+
                     else:  # current changes
                         diff_cmd = "git diff HEAD | cat -"
-                        
+
                         # Execute git command and get diff output
-                        diff_output = subprocess.check_output(diff_cmd, shell=True, text=True)
+                        diff_output = subprocess.check_output(
+                            diff_cmd, shell=True, text=True
+                        )
                         if not diff_output:
                             return {
                                 "success": False,
                                 "stdout": {},
-                                "stderr": "No changes to review"
+                                "stderr": "No changes to review",
                             }
-                        
+
                         # Extract changed files using git command
                         files_cmd = "git diff --name-only HEAD"
                         try:
-                            files_output = subprocess.check_output(files_cmd, shell=True, text=True)
-                            file_paths = [f.strip() for f in files_output.split("\n") if f.strip()]
+                            files_output = subprocess.check_output(
+                                files_cmd, shell=True, text=True
+                            )
+                            file_paths = [
+                                f.strip() for f in files_output.split("\n") if f.strip()
+                            ]
                         except subprocess.CalledProcessError:
                             # Fallback to regex extraction if git command fails
                             file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
                             files = re.findall(file_pattern, diff_output)
                             file_paths = [match[0] for match in files]
-                    
+
                     # Detect languages from the file paths
                     detected_languages = self._detect_languages_from_files(file_paths)
-                    
+
                     # Add review type and related information to the diff output
                     review_info = f"""
 ----- 代码审查信息 -----
 审查类型: {review_type}"""
-                    
+
                     # Add specific information based on review type
                     if review_type == "commit":
                         review_info += f"\n提交SHA: {args['commit_sha']}"
@@ -334,29 +413,31 @@ class CodeReviewTool:
                         review_info += f"\n文件路径: {args['file_path']}"
                     else:  # current changes
                         review_info += "\n当前未提交修改"
-                    
+
                     # Add file list
                     if file_paths:
                         review_info += "\n\n----- 变更文件列表 -----"
                         for i, path in enumerate(file_paths, 1):
                             review_info += f"\n{i}. {path}"
-                    
+
                     # Add language-specific checklists
                     if detected_languages:
                         review_info += "\n\n----- 检测到的编程语言 -----"
-                        review_info += f"\n检测到的语言: {', '.join(detected_languages)}"
-                        
+                        review_info += (
+                            f"\n检测到的语言: {', '.join(detected_languages)}"
+                        )
+
                         review_info += "\n\n----- 语言特定审查清单 -----"
                         for lang in detected_languages:
                             checklist = self._get_language_checklist(lang)
                             if checklist:
                                 review_info += f"\n{checklist}"
-                    
+
                     review_info += "\n------------------------\n\n"
-                    
+
                     # Combine review info with diff output
                     diff_output = review_info + diff_output
-                    
+
                     PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")
                     spinner.text = "代码变更获取完成"
                     spinner.ok("✅")
@@ -490,6 +571,7 @@ class CodeReviewTool:
 我将分析上传的代码差异文件，进行全面的代码审查。
 </code_review_guide>"""
                 from jarvis.jarvis_tools.registry import ToolRegistry
+
                 tool_registry = ToolRegistry()
                 tool_registry.dont_use_tools(["code_review"])
                 agent = Agent(
@@ -561,16 +643,22 @@ class CodeReviewTool:
 {ct("REPORT")}""",
                     output_handler=[tool_registry],
                     platform=PlatformRegistry().get_thinking_platform(),
-                    auto_complete=False
+                    auto_complete=False,
                 )
-                
+
                 # Determine if we need to split the diff due to size
                 max_diff_size = 100 * 1024 * 1024  # Limit to 100MB
-                
+
                 if len(diff_output) > max_diff_size:
-                    PrettyOutput.print(f"代码差异内容总大小超过限制 ({len(diff_output)} > {max_diff_size} 字节)，将截断内容", OutputType.WARNING)
-                    diff_output = diff_output[:max_diff_size] + "\n\n[diff content truncated due to size limitations...]"
-                
+                    PrettyOutput.print(
+                        f"代码差异内容总大小超过限制 ({len(diff_output)} > {max_diff_size} 字节)，将截断内容",
+                        OutputType.WARNING,
+                    )
+                    diff_output = (
+                        diff_output[:max_diff_size]
+                        + "\n\n[diff content truncated due to size limitations...]"
+                    )
+
                 # Prepare the user prompt for code review
                 user_prompt = f"""请对以下代码变更进行全面审查。
 
@@ -580,43 +668,50 @@ class CodeReviewTool:
 - 检测到的编程语言: {', '.join(detected_languages) if detected_languages else '未检测到特定语言'}
 
 请根据SCRIPPPS框架和语言特定的审查清单进行分析，提供详细的代码审查报告。"""
-                
+
                 # Write the full diff output to a temporary file for uploading
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.diff', delete=False) as temp_file:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".diff", delete=False
+                ) as temp_file:
                     temp_file_path = temp_file.name
                     temp_file.write(diff_output)
                     temp_file.flush()
-                
+
                 try:
                     # Check if content is too large
                     is_large_content = is_context_overflow(diff_output)
-                    
+
                     # Upload the file to the agent's model
                     if is_large_content:
                         if not agent.model or not agent.model.support_upload_files():
                             return {
                                 "success": False,
                                 "stdout": "",
-                                "stderr": "代码差异太大，无法处理"
+                                "stderr": "代码差异太大，无法处理",
                             }
-                        
-                        with yaspin(text="正在上传代码差异文件...", color="cyan") as spinner:
+
+                        with yaspin(
+                            text="正在上传代码差异文件...", color="cyan"
+                        ) as spinner:
                             upload_success = agent.model.upload_files([temp_file_path])
                             if upload_success:
                                 spinner.ok("✅")
-                                PrettyOutput.print(f"已成功上传代码差异文件", OutputType.SUCCESS)
+                                PrettyOutput.print(
+                                    f"已成功上传代码差异文件", OutputType.SUCCESS
+                                )
                             else:
                                 return {
                                     "success": False,
                                     "stdout": "",
-                                    "stderr": "上传代码差异文件失败"
+                                    "stderr": "上传代码差异文件失败",
                                 }
-                        
-                    
+
                     # Prepare the prompt based on upload status
                     if is_large_content:
                         # When file is uploaded, reference it in the prompt
-                        complete_prompt = user_prompt + f"""
+                        complete_prompt = (
+                            user_prompt
+                            + f"""
 
 我已上传了一个包含代码差异的文件。该文件包含:
 - 审查类型: {review_type}
@@ -624,10 +719,16 @@ class CodeReviewTool:
 - 检测到的编程语言: {', '.join(detected_languages) if detected_languages else '未检测到特定语言'}
 
 请基于上传的代码差异文件进行全面审查，并生成详细的代码审查报告。"""
+                        )
                         # Run the agent with the prompt
                         result = agent.run(complete_prompt)
                     else:
-                        complete_prompt = user_prompt + "\n\n代码差异内容:\n```diff\n" + diff_output + "\n```"
+                        complete_prompt = (
+                            user_prompt
+                            + "\n\n代码差异内容:\n```diff\n"
+                            + diff_output
+                            + "\n```"
+                        )
                         result = agent.run(complete_prompt)
                 finally:
                     # Clean up the temporary file
@@ -635,13 +736,12 @@ class CodeReviewTool:
                         try:
                             os.unlink(temp_file_path)
                         except Exception:
-                            PrettyOutput.print(f"临时文件 {temp_file_path} 未能删除", OutputType.WARNING)
-                
-                return {
-                    "success": True,
-                    "stdout": result,
-                    "stderr": ""
-                }
+                            PrettyOutput.print(
+                                f"临时文件 {temp_file_path} 未能删除",
+                                OutputType.WARNING,
+                            )
+
+                return {"success": True, "stdout": result, "stderr": ""}
             finally:
                 # Always restore original directory
                 os.chdir(original_dir)
@@ -650,15 +750,16 @@ class CodeReviewTool:
             return {
                 "success": False,
                 "stdout": {},
-                "stderr": f"Review failed: {str(e)}"
+                "stderr": f"Review failed: {str(e)}",
             }
 
 
 def extract_code_report(result: str) -> str:
-    sm = re.search(ot("REPORT")+r'\n(.*?)\n'+ct("REPORT"), result, re.DOTALL)
+    sm = re.search(ot("REPORT") + r"\n(.*?)\n" + ct("REPORT"), result, re.DOTALL)
     if sm:
         return sm.group(1)
     return result
+
 
 def main():
     """CLI entry point"""
@@ -666,43 +767,42 @@ def main():
 
     init_env("欢迎使用 Jarvis-CodeReview，您的代码审查助手已准备就绪！")
 
-    parser = argparse.ArgumentParser(description='Autonomous code review tool')
-    subparsers = parser.add_subparsers(dest='type')
+    parser = argparse.ArgumentParser(description="Autonomous code review tool")
+    subparsers = parser.add_subparsers(dest="type")
 
     # Commit subcommand
-    commit_parser = subparsers.add_parser('commit', help='Review specific commit')
-    commit_parser.add_argument('commit', help='Commit SHA to review')
+    commit_parser = subparsers.add_parser("commit", help="Review specific commit")
+    commit_parser.add_argument("commit", help="Commit SHA to review")
 
     # Current subcommand
-    subparsers.add_parser('current', help='Review current changes')
+    subparsers.add_parser("current", help="Review current changes")
 
     # Range subcommand
-    range_parser = subparsers.add_parser('range', help='Review commit range')
-    range_parser.add_argument('start_commit', help='Start commit SHA')
-    range_parser.add_argument('end_commit', help='End commit SHA')
+    range_parser = subparsers.add_parser("range", help="Review commit range")
+    range_parser.add_argument("start_commit", help="Start commit SHA")
+    range_parser.add_argument("end_commit", help="End commit SHA")
 
     # File subcommand
-    file_parser = subparsers.add_parser('file', help='Review specific file')
-    file_parser.add_argument('file', help='File path to review')
+    file_parser = subparsers.add_parser("file", help="Review specific file")
+    file_parser.add_argument("file", help="File path to review")
 
     # Common arguments
-    parser.add_argument('--root-dir', type=str, help='Root directory of the codebase', default=".")
+    parser.add_argument(
+        "--root-dir", type=str, help="Root directory of the codebase", default="."
+    )
 
     # Set default subcommand to 'current'
-    parser.set_defaults(type='current')
+    parser.set_defaults(type="current")
     args = parser.parse_args()
 
     tool = CodeReviewTool()
-    tool_args = {
-        "review_type": args.type,
-        "root_dir": args.root_dir
-    }
-    if args.type == 'commit':
+    tool_args = {"review_type": args.type, "root_dir": args.root_dir}
+    if args.type == "commit":
         tool_args["commit_sha"] = args.commit
-    elif args.type == 'range':
+    elif args.type == "range":
         tool_args["start_commit"] = args.start_commit
         tool_args["end_commit"] = args.end_commit
-    elif args.type == 'file':
+    elif args.type == "file":
         tool_args["file_path"] = args.file
 
     result = tool.execute(tool_args)
@@ -714,6 +814,7 @@ def main():
 
     else:
         PrettyOutput.print(result["stderr"], OutputType.WARNING)
+
 
 if __name__ == "__main__":
     main()

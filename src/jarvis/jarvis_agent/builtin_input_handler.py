@@ -17,6 +17,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         Tuple[str, bool]: 处理后的输入和是否需要进一步处理
     """
     from jarvis.jarvis_agent import Agent
+
     agent: Agent = agent_
     # 查找特殊标记
     special_tags = re.findall(r"'<([^>]+)>'", user_input)
@@ -38,25 +39,35 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "ToolUsage":
             from jarvis.jarvis_tools.registry import ToolRegistry
-            tool_registry_  = agent.get_tool_registry()
-            tool_registry : ToolRegistry = tool_registry_ if tool_registry_ else ToolRegistry()
+
+            tool_registry_ = agent.get_tool_registry()
+            tool_registry: ToolRegistry = (
+                tool_registry_ if tool_registry_ else ToolRegistry()
+            )
             agent.set_addon_prompt(tool_registry.prompt())
         elif tag == "ReloadConfig":
             from jarvis.jarvis_utils.utils import load_config
+
             load_config()
             return "", True
-        
+
         processed_tag = set()
         add_on_prompt = ""
 
         # 处理普通替换标记
         if tag in replace_map:
             processed_tag.add(tag)
-            if "append" in replace_map[tag] and replace_map[tag]["append"] and tag not in processed_tag:
+            if (
+                "append" in replace_map[tag]
+                and replace_map[tag]["append"]
+                and tag not in processed_tag
+            ):
                 user_input = user_input.replace(f"'<{tag}>'", "")
                 add_on_prompt += replace_map[tag]["template"] + "\n"
             else:
-                user_input = user_input.replace(f"'<{tag}>'", replace_map[tag]["template"])
+                user_input = user_input.replace(
+                    f"'<{tag}>'", replace_map[tag]["template"]
+                )
 
         agent.set_addon_prompt(add_on_prompt)
 

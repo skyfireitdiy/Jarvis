@@ -950,74 +950,87 @@ content: |2
 </quality_assurance_guide>
 """
 
+
 def create_dev_team() -> MultiAgent:
     """Create a development team with multiple agents."""
 
     PM_output_handler = ToolRegistry()
-    PM_output_handler.use_tools([
-        "ask_user",
-        "file_operation",
-        "search_web",
-        "execute_script",
-        "methodology",
-        "edit_file",
-        "rewrite_file",
-    ])
+    PM_output_handler.use_tools(
+        [
+            "ask_user",
+            "file_operation",
+            "search_web",
+            "execute_script",
+            "methodology",
+            "edit_file",
+            "rewrite_file",
+        ]
+    )
 
     BA_output_handler = ToolRegistry()
-    BA_output_handler.use_tools([
-        "ask_user",
-        "file_operation",
-        "search_web",
-        "execute_script",
-        "read_webpage",
-        "methodology",
-        "edit_file",
-        "rewrite_file",
-    ])
+    BA_output_handler.use_tools(
+        [
+            "ask_user",
+            "file_operation",
+            "search_web",
+            "execute_script",
+            "read_webpage",
+            "methodology",
+            "edit_file",
+            "rewrite_file",
+        ]
+    )
 
     SA_output_handler = ToolRegistry()
-    SA_output_handler.use_tools([
-        "file_operation",
-        "search_web",
-        "execute_script",
-        "read_code",
-        "methodology",
-        "edit_file",
-        "rewrite_file",
-    ])
+    SA_output_handler.use_tools(
+        [
+            "file_operation",
+            "search_web",
+            "execute_script",
+            "read_code",
+            "methodology",
+            "edit_file",
+            "rewrite_file",
+        ]
+    )
 
     TL_output_handler = ToolRegistry()
-    TL_output_handler.use_tools([
-        "file_operation",
-        "execute_script",
-        "methodology",
-        "edit_file",
-        "rewrite_file",
-    ])
+    TL_output_handler.use_tools(
+        [
+            "file_operation",
+            "execute_script",
+            "methodology",
+            "edit_file",
+            "rewrite_file",
+        ]
+    )
 
     DEV_output_handler = ToolRegistry()
-    DEV_output_handler.use_tools([
-        "create_code_agent",
-        "file_operation",
-        "execute_script",
-        "read_code",
-        "create_sub_agent",
-        "methodology",
-        "edit_file",
-        "rewrite_file",
-    ])
+    DEV_output_handler.use_tools(
+        [
+            "create_code_agent",
+            "file_operation",
+            "execute_script",
+            "read_code",
+            "create_sub_agent",
+            "methodology",
+            "edit_file",
+            "rewrite_file",
+        ]
+    )
 
     QA_output_handler = ToolRegistry()
-    QA_output_handler.use_tools([
-        "create_code_agent",
-        "file_operation",
-        "execute_script",
-        "read_code",
-        "methodology",
-        "edit_file",
-        "rewrite_file",
-    ])
+    QA_output_handler.use_tools(
+        [
+            "create_code_agent",
+            "file_operation",
+            "execute_script",
+            "read_code",
+            "methodology",
+            "edit_file",
+            "rewrite_file",
+        ]
+    )
 
     # Update PM prompt with tool usage guidance
     PM_PROMPT_EXTENSION = """
@@ -1196,10 +1209,11 @@ def create_dev_team() -> MultiAgent:
             system_prompt=QA_PROMPT_WITH_TOOLS,
             output_handler=[QA_output_handler],
             platform=PlatformRegistry().get_normal_platform(),
-        )
+        ),
     ]
 
     return MultiAgent(configs, "PM")
+
 
 def main():
     """Main entry point for the development team simulation."""
@@ -1212,7 +1226,9 @@ def main():
     # Start interaction loop
     while True:
         try:
-            user_input = get_multiline_input("\nEnter your request (or press Enter to exit): ")
+            user_input = get_multiline_input(
+                "\nEnter your request (or press Enter to exit): "
+            )
             if not user_input:
                 break
 
@@ -1225,6 +1241,7 @@ def main():
         except Exception as e:
             PrettyOutput.print(f"Error: {str(e)}", output_type=OutputType.SYSTEM)
             continue
+
 
 if __name__ == "__main__":
     main()

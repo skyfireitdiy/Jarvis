@@ -34,6 +34,7 @@ def _get_methodology_directory() -> str:
             PrettyOutput.print(f"创建方法论目录失败: {str(e)}", OutputType.ERROR)
     return methodology_dir
 
+
 def _load_all_methodologies() -> Dict[str, str]:
     """
     加载所有方法论文件
@@ -48,6 +49,7 @@ def _load_all_methodologies() -> Dict[str, str]:
         return all_methodologies
 
     import glob
+
     for filepath in glob.glob(os.path.join(methodology_dir, "*.json")):
         try:
             with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
@@ -58,9 +60,12 @@ def _load_all_methodologies() -> Dict[str, str]:
                     all_methodologies[problem_type] = content
         except Exception as e:
             filename = os.path.basename(filepath)
-            PrettyOutput.print(f"加载方法论文件 {filename} 失败: {str(e)}", OutputType.WARNING)
+            PrettyOutput.print(
+                f"加载方法论文件 {filename} 失败: {str(e)}", OutputType.WARNING
+            )
 
     return all_methodologies
+
 
 def _create_methodology_temp_file(methodologies: Dict[str, str]) -> Optional[str]:
     """
@@ -74,33 +79,34 @@ def _create_methodology_temp_file(methodologies: Dict[str, str]) -> Optional[str
     """
     if not methodologies:
         return None
-    
+
     try:
         # 创建临时文件
-        fd, temp_path = tempfile.mkstemp(suffix='.md', prefix='methodologies_')
+        fd, temp_path = tempfile.mkstemp(suffix=".md", prefix="methodologies_")
         os.close(fd)
-        
+
         # 写入方法论内容
-        with open(temp_path, 'w', encoding='utf-8') as f:
+        with open(temp_path, "w", encoding="utf-8") as f:
             f.write("# 方法论集合\n\n")
             for problem_type, content in methodologies.items():
                 f.write(f"## {problem_type}\n\n")
                 f.write(f"{content}\n\n")
                 f.write("---\n\n")
             f.flush()
-        
+
         return temp_path
     except Exception as e:
         PrettyOutput.print(f"创建方法论临时文件失败: {str(e)}", OutputType.ERROR)
         return None
 
+
 def upload_methodology(platform: BasePlatform) -> bool:
     """
     上传方法论文件到指定平台
-    
+
     参数：
         platform: 平台实例，需实现upload_files方法
-    
+
     返回：
         bool: 上传是否成功
     """
@@ -108,19 +114,19 @@ def upload_methodology(platform: BasePlatform) -> bool:
     if not os.path.exists(methodology_dir):
         PrettyOutput.print("方法论文档不存在", OutputType.WARNING)
         return False
-    
+
     methodologies = _load_all_methodologies()
     if not methodologies:
         PrettyOutput.print("没有可用的方法论文档", OutputType.WARNING)
         return False
-    
+
     temp_file_path = _create_methodology_temp_file(methodologies)
     if not temp_file_path:
         return False
-    
+
     try:
         return platform.upload_files([temp_file_path])
-        
+
     finally:
         if temp_file_path and os.path.exists(temp_file_path):
             try:
@@ -176,7 +182,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
         full_content += f"以下是所有可用的工具内容：\n\n"
         full_content += prompt
-        
+
         # 添加用户输入和输出要求
         full_content += f"""
 请根据以上方法论和可调用的工具内容，规划/总结出以下用户需求的执行步骤: {user_input}
@@ -197,7 +203,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
         # 检查内容是否过大
         is_large_content = is_context_overflow(full_content)
         temp_file_path = None
-        
+
         try:
             if is_large_content:
                 # 创建临时文件
@@ -212,10 +218,12 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
                 # 尝试上传文件
                 upload_success = platform.upload_files([temp_file_path])
-                
+
                 if upload_success:
                     # 使用上传的文件生成摘要
-                    return platform.chat_until_success(base_prompt + f"""
+                    return platform.chat_until_success(
+                        base_prompt
+                        + f"""
 请根据已上传的方法论和可调用的工具文件内容，规划/总结出以下用户需求的执行步骤: {user_input}
 
 请按以下格式回复：
@@ -229,12 +237,13 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
 如果没有匹配的方法论，请输出：没有历史方法论可参考
 除以上要求外，不要输出任何内容
-""")
+"""
+                    )
                 else:
                     return "没有历史方法论可参考"
             # 如果内容不大或上传失败，直接使用chat_until_success
             return platform.chat_until_success(full_content)
-        
+
         finally:
             # 清理临时文件
             if temp_file_path and os.path.exists(temp_file_path):
@@ -242,7 +251,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
                     os.remove(temp_file_path)
                 except Exception:
                     pass
-    
+
     except Exception as e:
         PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
         return ""

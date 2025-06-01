@@ -111,6 +111,7 @@ class OutputHandlerProtocol(Protocol):
     def prompt(self) -> str: ...
     def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
 
+
 class ToolRegistry(OutputHandlerProtocol):
 
     def name(self) -> str:
@@ -200,9 +201,7 @@ class ToolRegistry(OutputHandlerProtocol):
             with open(stats_file, "w", encoding="utf-8") as f:
                 yaml.safe_dump(stats, f, allow_unicode=True)
         except Exception as e:
-            PrettyOutput.print(
-                f"保存工具调用统计失败: {str(e)}", OutputType.WARNING
-            )
+            PrettyOutput.print(f"保存工具调用统计失败: {str(e)}", OutputType.WARNING)
 
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
@@ -216,7 +215,11 @@ class ToolRegistry(OutputHandlerProtocol):
                 f"工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}",
                 OutputType.WARNING,
             )
-        self.tools = {tool_name: self.tools[tool_name] for tool_name in name if tool_name in self.tools}
+        self.tools = {
+            tool_name: self.tools[tool_name]
+            for tool_name in name
+            if tool_name in self.tools
+        }
 
     def dont_use_tools(self, names: List[str]) -> None:
         """从注册表中移除指定工具
@@ -231,7 +234,7 @@ class ToolRegistry(OutputHandlerProtocol):
     def _load_mcp_tools(self) -> None:
         """加载MCP工具，优先从配置获取，其次从目录扫描"""
         from jarvis.jarvis_utils.config import get_mcp_config
-        
+
         # 优先从配置获取MCP工具配置
         mcp_configs = get_mcp_config()
         if mcp_configs:
@@ -247,7 +250,7 @@ class ToolRegistry(OutputHandlerProtocol):
         # 添加警告信息
         PrettyOutput.print(
             "警告: 从文件目录加载MCP工具的方式将在未来版本中废弃，请尽快迁移到JARVIS_MCP配置方式",
-            OutputType.WARNING
+            OutputType.WARNING,
         )
 
         # 遍历目录中的所有.yaml文件
@@ -297,12 +300,17 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         try:
             if "type" not in config:
-                PrettyOutput.print(f"配置{config.get('name', '')}缺少type字段", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"配置{config.get('name', '')}缺少type字段", OutputType.WARNING
+                )
                 return False
 
             # 检查enable标志
             if not config.get("enable", True):
-                PrettyOutput.print(f"MCP配置{config.get('name', '')}已禁用(enable=false)，跳过注册", OutputType.INFO)
+                PrettyOutput.print(
+                    f"MCP配置{config.get('name', '')}已禁用(enable=false)，跳过注册",
+                    OutputType.INFO,
+                )
                 return False
 
             name = config.get("name", "mcp")
@@ -315,7 +323,8 @@ class ToolRegistry(OutputHandlerProtocol):
                     args.pop("want", None)
                     ret = client.get_resource_list()
                     PrettyOutput.print(
-                        f"MCP {name} 资源列表:\n{yaml.safe_dump(ret, allow_unicode=True)}", OutputType.TOOL
+                        f"MCP {name} 资源列表:\n{yaml.safe_dump(ret, allow_unicode=True)}",
+                        OutputType.TOOL,
                     )
                     return {
                         "success": True,
@@ -338,7 +347,8 @@ class ToolRegistry(OutputHandlerProtocol):
                         }
                     ret = client.get_resource(args["uri"])
                     PrettyOutput.print(
-                        f"MCP {name} 获取资源:\n{yaml.safe_dump(ret, allow_unicode=True)}", OutputType.TOOL
+                        f"MCP {name} 获取资源:\n{yaml.safe_dump(ret, allow_unicode=True)}",
+                        OutputType.TOOL,
                     )
                     return ret
 
@@ -360,18 +370,29 @@ class ToolRegistry(OutputHandlerProtocol):
 
             if config["type"] == "stdio":
                 if "command" not in config:
-                    PrettyOutput.print(f"配置{config.get('name', '')}缺少command字段", OutputType.WARNING)
+                    PrettyOutput.print(
+                        f"配置{config.get('name', '')}缺少command字段",
+                        OutputType.WARNING,
+                    )
                     return False
             elif config["type"] == "sse":
                 if "base_url" not in config:
-                    PrettyOutput.print(f"配置{config.get('name', '')}缺少base_url字段", OutputType.WARNING)
+                    PrettyOutput.print(
+                        f"配置{config.get('name', '')}缺少base_url字段",
+                        OutputType.WARNING,
+                    )
                     return False
             elif config["type"] == "streamable":
                 if "base_url" not in config:
-                    PrettyOutput.print(f"配置{config.get('name', '')}缺少base_url字段", OutputType.WARNING)
+                    PrettyOutput.print(
+                        f"配置{config.get('name', '')}缺少base_url字段",
+                        OutputType.WARNING,
+                    )
                     return False
             else:
-                PrettyOutput.print(f"不支持的MCP客户端类型: {config['type']}", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"不支持的MCP客户端类型: {config['type']}", OutputType.WARNING
+                )
                 return False
 
             # 创建MCP客户端
@@ -387,7 +408,10 @@ class ToolRegistry(OutputHandlerProtocol):
             # 获取工具信息
             tools = mcp_client.get_tool_list()
             if not tools:
-                PrettyOutput.print(f"从配置{config.get('name', '')}获取工具列表失败", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"从配置{config.get('name', '')}获取工具列表失败",
+                    OutputType.WARNING,
+                )
                 return False
 
             # 注册每个工具
@@ -425,7 +449,9 @@ class ToolRegistry(OutputHandlerProtocol):
             return True
 
         except Exception as e:
-            PrettyOutput.print(f"MCP配置{config.get('name', '')}加载失败: {str(e)}", OutputType.WARNING)
+            PrettyOutput.print(
+                f"MCP配置{config.get('name', '')}加载失败: {str(e)}", OutputType.WARNING
+            )
             return False
 
     def register_tool_by_file(self, file_path: str) -> bool:
@@ -602,10 +628,10 @@ class ToolRegistry(OutputHandlerProtocol):
                 "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self.tools.keys())}",
                 "stdout": "",
             }
-        
+
         # 更新工具调用统计
         self._update_tool_stats(name)
-        
+
         return tool.execute(arguments)
 
     def _format_tool_output(self, stdout: str, stderr: str) -> str:
@@ -628,16 +654,18 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def _truncate_output(self, output: str) -> str:
         """截断过长的输出内容
-        
+
         参数:
             output: 要截断的输出内容
-            
+
         返回:
             截断后的内容，如果内容不超过60行则返回原内容
         """
         if len(output.splitlines()) > 60:
             lines = output.splitlines()
-            return '\n'.join(lines[:30] + ['\n...内容太长，已截取前后30行...\n'] + lines[-30:])
+            return "\n".join(
+                lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:]
+            )
         return output
 
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
@@ -648,7 +676,8 @@ class ToolRegistry(OutputHandlerProtocol):
             args["agent"] = agent
 
             from jarvis.jarvis_agent import Agent
-            agent_instance: Agent = agent 
+
+            agent_instance: Agent = agent
 
             if isinstance(args, str):
                 try:
@@ -669,19 +698,26 @@ class ToolRegistry(OutputHandlerProtocol):
 
             # 检查内容是否过大
             is_large_content = is_context_overflow(output)
-            
+
             if is_large_content:
                 # 创建临时文件
-                with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp_file:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".txt", delete=False
+                ) as tmp_file:
                     output_file = tmp_file.name
                     tmp_file.write(output)
                     tmp_file.flush()
-                
+
                 try:
-                    if agent_instance.model and agent_instance.model.support_upload_files():
+                    if (
+                        agent_instance.model
+                        and agent_instance.model.support_upload_files()
+                    ):
                         summary = agent_instance.generate_summary()
                         agent_instance.clear_history()
-                        upload_success = agent_instance.model.upload_files([output_file])
+                        upload_success = agent_instance.model.upload_files(
+                            [output_file]
+                        )
                         if upload_success:
                             # 删除args的agent键
                             args.pop("agent", None)
@@ -712,4 +748,3 @@ class ToolRegistry(OutputHandlerProtocol):
         except Exception as e:
             PrettyOutput.print(f"工具执行失败：{str(e)}", OutputType.ERROR)
             return f"工具调用失败: {str(e)}"
-

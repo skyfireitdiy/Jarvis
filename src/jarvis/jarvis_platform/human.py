@@ -39,7 +39,9 @@ class HumanPlatform(BasePlatform):
     def chat(self, message: str) -> Generator[str, None, None]:
         """发送消息并获取人类响应"""
         if not self.conversation_id:
-            self.conversation_id = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+            self.conversation_id = "".join(
+                random.choices(string.ascii_letters + string.digits, k=8)
+            )
             session_info = f"(会话ID: {self.conversation_id})"
         else:
             session_info = f"(会话ID: {self.conversation_id})"
@@ -49,7 +51,7 @@ class HumanPlatform(BasePlatform):
             self.first_message = False
         else:
             prompt = f"{message} {session_info}\n\n请回复:"
-        
+
         response = get_multiline_input(prompt)
         yield response
         return None

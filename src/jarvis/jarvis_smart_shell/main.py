@@ -19,41 +19,42 @@ def execute_command(command: str, should_run: bool) -> None:
         os.system(command)
 
 
-
-
 def install_fish_completion() -> int:
     """Install fish shell command completion with interactive choice
-    
+
     Returns:
         int: 0 if success, 1 if failed
     """
     if get_shell_name() != "fish":
         print("当前不是fish shell，无需安装")
         return 0
-        
+
     # 使用fish命令检查函数是否已加载
     check_cmd = 'functions --names | grep fish_command_not_found > /dev/null && echo "defined" || echo "undefined"'
-    result = os.popen(f'fish -c \'{check_cmd}\'').read().strip()
-    
+    result = os.popen(f"fish -c '{check_cmd}'").read().strip()
+
     if result == "defined":
         print("fish_command_not_found函数已加载，无需安装")
         return 0
-        
+
     config_file = os.path.expanduser("~/.config/fish/config.fish")
-    
+
     # 检查文件内容是否已定义但未加载
     if os.path.exists(config_file):
-        with open(config_file, 'r') as config:
+        with open(config_file, "r") as config:
             if "function fish_command_not_found" in config.read():
-                print("fish_command_not_found函数已定义但未加载，请执行: source ~/.config/fish/config.fish")
+                print(
+                    "fish_command_not_found函数已定义但未加载，请执行: source ~/.config/fish/config.fish"
+                )
                 return 0
-                
+
     # 创建config.fish文件如果不存在
     os.makedirs(os.path.dirname(config_file), exist_ok=True)
-    
+
     # 追加函数定义到config.fish
-    with open(config_file, 'a') as config:
-        config.write("""
+    with open(config_file, "a") as config:
+        config.write(
+            """
 function fish_command_not_found
     commandline -r (jss request "$argv")
 end
@@ -61,8 +62,11 @@ end
 function __fish_command_not_found_handler --on-event fish_command_not_found
     fish_command_not_found "$argv"
 end
-""")
-    print("Fish shell命令补全功能已安装到config.fish，请执行: source ~/.config/fish/config.fish")
+"""
+        )
+    print(
+        "Fish shell命令补全功能已安装到config.fish，请执行: source ~/.config/fish/config.fish"
+    )
     return 0
 
 
@@ -114,12 +118,13 @@ def process_request(request: str) -> Optional[str]:
     except Exception:
         return None
 
+
 def main() -> int:
     # 创建参数解析器
     init_env("")
 
     set_config("JARVIS_PRINT_PROMPT", "false")
-    
+
     parser = argparse.ArgumentParser(
         description="将自然语言要求转换为shell命令",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -127,28 +132,29 @@ def main() -> int:
 Example:
   %(prog)s request "Find all Python files in the current directory"
   %(prog)s install
-""")
+""",
+    )
 
     # 创建子命令解析器
-    subparsers = parser.add_subparsers(dest='command', required=True)
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
     # request子命令
-    request_parser = subparsers.add_parser('request', help='描述您想要执行的操作（用自然语言描述）')
+    request_parser = subparsers.add_parser(
+        "request", help="描述您想要执行的操作（用自然语言描述）"
+    )
     request_parser.add_argument(
         "request",
-        nargs='?',  # 设置为可选参数
-        help="描述您想要执行的操作（用自然语言描述），如果未提供则从标准输入读取"
+        nargs="?",  # 设置为可选参数
+        help="描述您想要执行的操作（用自然语言描述），如果未提供则从标准输入读取",
     )
 
     # install子命令
-    install_parser = subparsers.add_parser('install', help='安装fish shell的命令补全功能')
-    install_parser.add_argument(
-        "--shell",
-        choices=["fish"],
-        default="fish",
-        help="指定shell类型(仅支持fish)"
+    install_parser = subparsers.add_parser(
+        "install", help="安装fish shell的命令补全功能"
     )
-
+    install_parser.add_argument(
+        "--shell", choices=["fish"], default="fish", help="指定shell类型(仅支持fish)"
+    )
 
     # 解析参数
     args = parser.parse_args()
@@ -176,6 +182,7 @@ Example:
         return 0
     else:
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

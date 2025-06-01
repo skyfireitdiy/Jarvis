@@ -21,17 +21,19 @@ class ReadCodeTool:
                     "properties": {
                         "path": {"type": "string"},
                         "start_line": {"type": "number", "default": 1},
-                        "end_line": {"type": "number", "default": -1}
+                        "end_line": {"type": "number", "default": -1},
                     },
-                    "required": ["path"]
+                    "required": ["path"],
                 },
-                "description": "要读取的文件列表"
+                "description": "要读取的文件列表",
             }
         },
-        "required": ["files"]
+        "required": ["files"],
     }
 
-    def _handle_single_file(self, filepath: str, start_line: int = 1, end_line: int = -1, agent: Any = None) -> Dict[str, Any]:
+    def _handle_single_file(
+        self, filepath: str, start_line: int = 1, end_line: int = -1, agent: Any = None
+    ) -> Dict[str, Any]:
         """处理单个文件的读取操作
 
         Args:
@@ -50,7 +52,7 @@ class ReadCodeTool:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"文件不存在: {abs_path}"
+                        "stderr": f"文件不存在: {abs_path}",
                     }
 
                 # 文件大小限制检查（10MB）
@@ -58,45 +60,55 @@ class ReadCodeTool:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "文件过大 (>10MB)"
+                        "stderr": "文件过大 (>10MB)",
                     }
 
                 # 读取文件内容
-                with open(abs_path, 'r', encoding='utf-8', errors="ignore") as f:
+                with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
 
                 total_lines = len(lines)
-                
+
                 # 处理空文件情况
                 if total_lines == 0:
                     spinner.ok("✅")
                     return {
                         "success": True,
                         "stdout": f"\n🔍 文件: {abs_path}\n📄 文件为空 (0行)\n",
-                        "stderr": ""
+                        "stderr": "",
                     }
 
                 # 处理特殊值-1表示文件末尾
                 if end_line == -1:
                     end_line = total_lines
                 else:
-                    end_line = max(1, min(end_line, total_lines)) if end_line >= 0 else total_lines + end_line + 1
+                    end_line = (
+                        max(1, min(end_line, total_lines))
+                        if end_line >= 0
+                        else total_lines + end_line + 1
+                    )
 
-                start_line = max(1, min(start_line, total_lines)) if start_line >= 0 else total_lines + start_line + 1
+                start_line = (
+                    max(1, min(start_line, total_lines))
+                    if start_line >= 0
+                    else total_lines + start_line + 1
+                )
 
                 if start_line > end_line:
                     spinner.fail("❌")
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})"
+                        "stderr": f"无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})",
                     }
 
                 # 添加行号并构建输出内容
-                selected_lines = lines[start_line-1:end_line]
+                selected_lines = lines[start_line - 1 : end_line]
                 numbered_content = "".join(
-                    [f"{i:4d}:{line}"
-                     for i, line in enumerate(selected_lines, start=start_line)]
+                    [
+                        f"{i:4d}:{line}"
+                        for i, line in enumerate(selected_lines, start=start_line)
+                    ]
                 )
 
                 # 构建输出格式
@@ -116,19 +128,11 @@ class ReadCodeTool:
                         files = [abs_path]
                     agent.set_user_data("files", files)
 
-                return {
-                    "success": True,
-                    "stdout": output,
-                    "stderr": ""
-                }
+                return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"文件读取失败: {str(e)}"
-            }
+            return {"success": False, "stdout": "", "stderr": f"文件读取失败: {str(e)}"}
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """执行代码读取操作
@@ -145,7 +149,7 @@ class ReadCodeTool:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "参数中必须包含文件列表"
+                    "stderr": "参数中必须包含文件列表",
                 }
 
             all_outputs = []
@@ -159,7 +163,7 @@ class ReadCodeTool:
                     file_info["path"].strip(),
                     file_info.get("start_line", 1),
                     file_info.get("end_line", -1),
-                    agent
+                    agent,
                 )
 
                 if result["success"]:
@@ -171,13 +175,9 @@ class ReadCodeTool:
             return {
                 "success": overall_success,
                 "stdout": "\n".join(all_outputs),
-                "stderr": ""
+                "stderr": "",
             }
 
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"代码读取失败: {str(e)}"
-            }
+            return {"success": False, "stdout": "", "stderr": f"代码读取失败: {str(e)}"}

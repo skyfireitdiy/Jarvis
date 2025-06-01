@@ -4,8 +4,10 @@ from typing import Any, Dict
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
-from jarvis.jarvis_utils.git_utils import (get_latest_commit_hash,
-                                           has_uncommitted_changes)
+from jarvis.jarvis_utils.git_utils import (
+    get_latest_commit_hash,
+    has_uncommitted_changes,
+)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -25,10 +27,9 @@ class CreateCodeAgentTool:
         "root_dir": {
             "type": "string",
             "description": "代码库根目录路径（可选）",
-            "default": "."
-        }
+            "default": ".",
+        },
     }
-
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -45,7 +46,7 @@ class CreateCodeAgentTool:
                     return {
                         "success": False,
                         "stderr": "Requirement must be provided",
-                        "stdout": ""
+                        "stdout": "",
                     }
 
                 # Step 1: Handle uncommitted changes
@@ -58,7 +59,7 @@ class CreateCodeAgentTool:
                         return {
                             "success": False,
                             "stderr": "Failed to commit changes: " + result["stderr"],
-                            "stdout": ""
+                            "stdout": "",
                         }
 
                 # Get current commit hash
@@ -83,11 +84,7 @@ class CreateCodeAgentTool:
 
 """
 
-                return {
-                    "success": True,
-                    "stdout": summary,
-                    "stderr": ""
-                }
+                return {"success": True, "stdout": summary, "stderr": ""}
             finally:
                 # Always restore original directory
                 os.chdir(original_dir)
@@ -96,5 +93,5 @@ class CreateCodeAgentTool:
             return {
                 "success": False,
                 "stderr": f"Development workflow failed: {str(e)}",
-                "stdout": ""
+                "stdout": "",
             }

@@ -12,33 +12,22 @@ class SubAgentTool:
     parameters = {
         "type": "object",
         "properties": {
-            "agent_name": {
-                "type": "string",
-                "description": "子代理名称"
-            },
-            "task": {
-                "type": "string",
-                "description": "要完成的特定任务"
-            },
+            "agent_name": {"type": "string", "description": "子代理名称"},
+            "task": {"type": "string", "description": "要完成的特定任务"},
             "context": {
                 "type": "string",
                 "description": "与任务相关的上下文信息",
-                "default": ""
+                "default": "",
             },
-            "goal": {
-                "type": "string",
-                "description": "任务的完成目标",
-                "default": ""
-            },
+            "goal": {"type": "string", "description": "任务的完成目标", "default": ""},
             "root_dir": {
                 "type": "string",
                 "description": "任务执行的根目录路径（可选）",
-                "default": "."
-            }
+                "default": ".",
+            },
         },
-        "required": ["agent_name", "task"]
+        "required": ["agent_name", "task"],
     }
-
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Create and run sub-agent"""
@@ -57,7 +46,6 @@ class SubAgentTool:
                 task_description = f"Context information:\n{context}\n\nTask:\n{task}"
             if goal:
                 task_description += f"\n\nCompletion goal:\n{goal}"
-
 
             # Store current directory
             original_dir = os.getcwd()
@@ -79,7 +67,7 @@ class SubAgentTool:
                 return {
                     "success": True,
                     "stdout": f"Sub-agent task completed\n\n{result}",
-                    "stderr": ""
+                    "stderr": "",
                 }
             finally:
                 # Always restore original directory
@@ -90,5 +78,5 @@ class SubAgentTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Sub-agent execution failed: {str(e)}"
+                "stderr": f"Sub-agent execution failed: {str(e)}",
             }

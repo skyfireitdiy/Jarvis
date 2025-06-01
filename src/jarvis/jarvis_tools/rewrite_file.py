@@ -47,16 +47,13 @@ class FileRewriteTool:
     parameters = {
         "type": "object",
         "properties": {
-            "file": {
-                "type": "string",
-                "description": "需要重写的文件路径"
-            },
+            "file": {"type": "string", "description": "需要重写的文件路径"},
             "content": {
                 "type": "string",
-                "description": "新的文件内容，将完全替换原文件内容"
-            }
+                "description": "新的文件内容，将完全替换原文件内容",
+            },
         },
-        "required": ["file", "content"]
+        "required": ["file", "content"],
     }
 
     def __init__(self):
@@ -82,41 +79,41 @@ class FileRewriteTool:
         import os
 
         from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-        
+
         stdout_messages = []
         stderr_messages = []
         success = True
-        
+
         file_path = args["file"]
         new_content = args["content"]
-        
+
         # 创建已处理文件变量，用于失败时回滚
         original_content = None
         processed = False
 
         try:
             file_exists = os.path.exists(file_path)
-            
+
             try:
                 # 如果文件存在，则读取原内容用于回滚
                 if file_exists:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         original_content = f.read()
-                
+
                 # 确保目录存在
                 os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
-                
+
                 # 写入新内容
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     f.write(new_content)
-                
+
                 processed = True
-                
+
                 action = "创建并写入" if not file_exists else "成功重写"
                 stdout_message = f"文件 {file_path} {action}"
                 stdout_messages.append(stdout_message)
                 PrettyOutput.print(stdout_message, OutputType.SUCCESS)
-                
+
             except Exception as e:
                 stderr_message = f"处理文件 {file_path} 时出错: {str(e)}"
                 stderr_messages.append(stderr_message)
@@ -128,7 +125,7 @@ class FileRewriteTool:
                 rollback_message = "操作失败，正在回滚修改..."
                 stderr_messages.append(rollback_message)
                 PrettyOutput.print(rollback_message, OutputType.WARNING)
-                
+
                 try:
                     if original_content is None:
                         # 如果是新创建的文件，则删除
@@ -137,10 +134,10 @@ class FileRewriteTool:
                         rollback_file_message = f"已删除新创建的文件: {file_path}"
                     else:
                         # 如果是修改的文件，则恢复原内容
-                        with open(file_path, 'w', encoding='utf-8') as f:
+                        with open(file_path, "w", encoding="utf-8") as f:
                             f.write(original_content)
                         rollback_file_message = f"已回滚文件: {file_path}"
-                        
+
                     stderr_messages.append(rollback_file_message)
                     PrettyOutput.print(rollback_file_message, OutputType.INFO)
                 except Exception as e:
@@ -151,19 +148,19 @@ class FileRewriteTool:
             return {
                 "success": success,
                 "stdout": "\n".join(stdout_messages),
-                "stderr": "\n".join(stderr_messages)
+                "stderr": "\n".join(stderr_messages),
             }
-            
+
         except Exception as e:
             error_msg = f"文件重写操作失败: {str(e)}"
             PrettyOutput.print(error_msg, OutputType.WARNING)
-            
+
             # 如果有已修改的文件，尝试回滚
             if processed:
                 rollback_message = "操作失败，正在回滚修改..."
                 stderr_messages.append(rollback_message)
                 PrettyOutput.print(rollback_message, OutputType.WARNING)
-                
+
                 try:
                     if original_content is None:
                         # 如果是新创建的文件，则删除
@@ -172,14 +169,14 @@ class FileRewriteTool:
                         stderr_messages.append(f"已删除新创建的文件: {file_path}")
                     else:
                         # 如果是修改的文件，则恢复原内容
-                        with open(file_path, 'w', encoding='utf-8') as f:
+                        with open(file_path, "w", encoding="utf-8") as f:
                             f.write(original_content)
                         stderr_messages.append(f"已回滚文件: {file_path}")
                 except:
                     stderr_messages.append(f"回滚文件失败: {file_path}")
-            
+
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": error_msg + "\n" + "\n".join(stderr_messages)
-            } 
+                "stderr": error_msg + "\n" + "\n".join(stderr_messages),
+            }

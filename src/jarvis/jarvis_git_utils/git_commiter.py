@@ -30,8 +30,16 @@ class GitCommitTool:
                 "description": "Git仓库的根目录路径（可选）",
                 "default": ".",
             },
-            "prefix": {"type": "string", "description": "提交信息前缀（可选）", "default": ""},
-            "suffix": {"type": "string", "description": "提交信息后缀（可选）", "default": ""},
+            "prefix": {
+                "type": "string",
+                "description": "提交信息前缀（可选）",
+                "default": "",
+            },
+            "suffix": {
+                "type": "string",
+                "description": "提交信息后缀（可选）",
+                "default": "",
+            },
         },
         "required": [],
     }
@@ -265,7 +273,8 @@ commit信息
                             spinner.write(f"⚠️ 无法删除临时文件: {str(e)}")
 
             PrettyOutput.print(
-                f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS
+                f"提交哈希: {commit_hash}\n提交消息: {commit_message}",
+                OutputType.SUCCESS,
             )
 
             return {

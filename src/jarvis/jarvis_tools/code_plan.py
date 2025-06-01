@@ -40,17 +40,14 @@ class CodePlanTool:
     parameters = {
         "type": "object",
         "properties": {
-            "requirement": {
-                "type": "string",
-                "description": "代码修改需求描述"
-            },
+            "requirement": {"type": "string", "description": "代码修改需求描述"},
             "root_dir": {
                 "type": "string",
                 "description": "代码库根目录路径（可选）",
-                "default": "."
-            }
+                "default": ".",
+            },
         },
-        "required": ["requirement"]
+        "required": ["requirement"],
     }
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -89,12 +86,9 @@ class CodePlanTool:
 
                 # 创建工具注册表
                 tool_registry: ToolRegistry = ToolRegistry()
-                tool_registry.use_tools([
-                    "execute_script", 
-                    "read_code", 
-                    "search_web", 
-                    "ask_user"
-                ])
+                tool_registry.use_tools(
+                    ["execute_script", "read_code", "search_web", "ask_user"]
+                )
 
                 # 创建并运行Agent
                 platform_registry: PlatformRegistry = PlatformRegistry()
@@ -113,30 +107,18 @@ class CodePlanTool:
                 task_input = f"分析并规划代码修改: {requirement}"
                 result = planner_agent.run(task_input)
 
-                return {
-                    "success": True,
-                    "stdout": result,
-                    "stderr": ""
-                }
+                return {"success": True, "stdout": result, "stderr": ""}
             except (OSError, RuntimeError) as e:
                 error_msg = f"代码规划失败: {str(e)}"
                 PrettyOutput.print(error_msg, OutputType.WARNING)
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": error_msg
-                }
+                return {"success": False, "stdout": "", "stderr": error_msg}
             finally:
                 # 恢复原始目录
                 os.chdir(original_dir)
         except (KeyError, ValueError) as e:
             error_msg = f"代码规划失败: {str(e)}"
             PrettyOutput.print(error_msg, OutputType.WARNING)
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": error_msg
-            }
+            return {"success": False, "stdout": "", "stderr": error_msg}
 
     def _create_system_prompt(self, requirement: str, git_root: str) -> str:
         """创建Agent的system prompt"""
@@ -234,6 +216,3 @@ class CodePlanTool:
    - 记录用户的任何特殊要求
 
 使用清晰的Markdown格式，重点突出修改计划和验证方案。"""
-
-
-

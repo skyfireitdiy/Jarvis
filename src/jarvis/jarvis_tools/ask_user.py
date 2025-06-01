@@ -9,20 +9,16 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 # 定义AskUserTool类，用于向用户提问
 class AskUserTool:
-    name="ask_user"
-    description="""当完成任务所需的信息缺失或关键决策信息不足时，向用户提问。用户可以输入多行文本，以空行结束。使用场景：1. 需要用户提供更多信息以完成任务；2. 需要用户做出关键决策；3. 需要用户确认重要操作；4. 需要用户提供额外信息"""
+    name = "ask_user"
+    description = """当完成任务所需的信息缺失或关键决策信息不足时，向用户提问。用户可以输入多行文本，以空行结束。使用场景：1. 需要用户提供更多信息以完成任务；2. 需要用户做出关键决策；3. 需要用户确认重要操作；4. 需要用户提供额外信息"""
     # 定义参数结构，指定必须包含的问题字段
-    parameters={
+    parameters = {
         "type": "object",
         "properties": {
-            "question": {
-                "type": "string",
-                "description": "要向用户提出的问题"
-            }
+            "question": {"type": "string", "description": "要向用户提出的问题"}
         },
-        "required": ["question"]
+        "required": ["question"],
     }
-
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行向用户提问的操作
@@ -48,16 +44,12 @@ class AskUserTool:
             user_response = get_multiline_input("请输入您的答案 (输入空行结束)")
 
             # 返回成功响应，包含用户输入的内容
-            return {
-                "success": True,
-                "stdout": user_response,
-                "stderr": ""
-            }
+            return {"success": True, "stdout": user_response, "stderr": ""}
 
         except Exception as e:
             # 如果发生异常，返回失败响应，包含错误信息
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Failed to ask user: {str(e)}"
+                "stderr": f"Failed to ask user: {str(e)}",
             }

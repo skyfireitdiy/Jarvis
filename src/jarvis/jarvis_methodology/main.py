@@ -17,8 +17,10 @@ import yaml  # type: ignore
 from yaspin import yaspin  # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.methodology import (_get_methodology_directory,
-                                             _load_all_methodologies)
+from jarvis.jarvis_utils.methodology import (
+    _get_methodology_directory,
+    _load_all_methodologies,
+)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -38,18 +40,24 @@ def import_methodology(input_file):
         # 保存合并后的方法论
         methodology_dir = _get_methodology_directory()
         for problem_type, content in merged_data.items():
-            safe_filename = hashlib.md5(problem_type.encode('utf-8')).hexdigest()
+            safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
             file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
 
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "problem_type": problem_type,
-                    "content": content
-                }, f, ensure_ascii=False, indent=2)
+                json.dump(
+                    {"problem_type": problem_type, "content": content},
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
 
-        PrettyOutput.print(f"成功导入 {len(import_data)} 个方法论（总计 {len(merged_data)} 个）", OutputType.SUCCESS)
+        PrettyOutput.print(
+            f"成功导入 {len(import_data)} 个方法论（总计 {len(merged_data)} 个）",
+            OutputType.SUCCESS,
+        )
     except (json.JSONDecodeError, OSError) as e:
         PrettyOutput.print(f"导入失败: {str(e)}", OutputType.ERROR)
+
 
 def export_methodology(output_file):
     """导出当前方法论到单个文件"""
@@ -59,9 +67,13 @@ def export_methodology(output_file):
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(methodologies, f, ensure_ascii=False, indent=2)
 
-        PrettyOutput.print(f"成功导出 {len(methodologies)} 个方法论到 {output_file}", OutputType.SUCCESS)
+        PrettyOutput.print(
+            f"成功导出 {len(methodologies)} 个方法论到 {output_file}",
+            OutputType.SUCCESS,
+        )
     except (OSError, TypeError) as e:
         PrettyOutput.print(f"导出失败: {str(e)}", OutputType.ERROR)
+
 
 def list_methodologies():
     """列出所有方法论"""
@@ -78,6 +90,7 @@ def list_methodologies():
     except (OSError, json.JSONDecodeError) as e:
         PrettyOutput.print(f"列出方法论失败: {str(e)}", OutputType.ERROR)
 
+
 def extract_methodology(input_file):
     """从文本文件中提取方法论"""
     try:
@@ -87,7 +100,7 @@ def extract_methodology(input_file):
 
         # 获取平台实例
         platform = PlatformRegistry().get_normal_platform()
-        
+
         # 构建提取提示
         prompt = f"""请从以下文本中提取方法论：
         
@@ -127,21 +140,24 @@ def extract_methodology(input_file):
                 return
 
             # 提取YAML部分
-            methodologies_start = response.find('<methodologies>') + len('<methodologies>')
-            methodologies_end = response.find('</methodologies>')
+            methodologies_start = response.find("<methodologies>") + len(
+                "<methodologies>"
+            )
+            methodologies_end = response.find("</methodologies>")
             if methodologies_start == -1 or methodologies_end == -1:
                 spinner.text = "响应格式无效"
                 spinner.fail("❌")
-                PrettyOutput.print("大模型未返回有效的<methodologies>格式", OutputType.ERROR)
+                PrettyOutput.print(
+                    "大模型未返回有效的<methodologies>格式", OutputType.ERROR
+                )
                 return
-                
+
             yaml_content = response[methodologies_start:methodologies_end].strip()
-            
+
             try:
                 data = yaml.safe_load(yaml_content)
                 extracted_methodologies = {
-                    item['problem_type']: item['content']
-                    for item in data
+                    item["problem_type"]: item["content"] for item in data
                 }
             except (yaml.YAMLError, KeyError, TypeError) as e:
                 spinner.text = "YAML解析失败"
@@ -164,18 +180,24 @@ def extract_methodology(input_file):
         # 保存合并后的方法论
         methodology_dir = _get_methodology_directory()
         for problem_type, content in merged_data.items():
-            safe_filename = hashlib.md5(problem_type.encode('utf-8')).hexdigest()
+            safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
             file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
 
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "problem_type": problem_type,
-                    "content": content
-                }, f, ensure_ascii=False, indent=2)
+                json.dump(
+                    {"problem_type": problem_type, "content": content},
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
 
-        PrettyOutput.print(f"成功从文件提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）", OutputType.SUCCESS)
+        PrettyOutput.print(
+            f"成功从文件提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）",
+            OutputType.SUCCESS,
+        )
     except Exception as e:
         PrettyOutput.print(f"提取失败: {str(e)}", OutputType.ERROR)
+
 
 def extract_methodology_from_url(url):
     """从URL提取方法论"""
@@ -184,7 +206,7 @@ def extract_methodology_from_url(url):
         platform = PlatformRegistry().get_normal_platform()
 
         platform.web = True
-        
+
         # 构建提取提示
         prompt = f"""请从以下URL内容中提取方法论：
         
@@ -223,21 +245,24 @@ def extract_methodology_from_url(url):
                 return
 
             # 提取YAML部分
-            methodologies_start = response.find('<methodologies>') + len('<methodologies>')
-            methodologies_end = response.find('</methodologies>')
+            methodologies_start = response.find("<methodologies>") + len(
+                "<methodologies>"
+            )
+            methodologies_end = response.find("</methodologies>")
             if methodologies_start == -1 or methodologies_end == -1:
                 spinner.text = "响应格式无效"
                 spinner.fail("❌")
-                PrettyOutput.print("大模型未返回有效的<methodologies>格式", OutputType.ERROR)
+                PrettyOutput.print(
+                    "大模型未返回有效的<methodologies>格式", OutputType.ERROR
+                )
                 return
-                
+
             yaml_content = response[methodologies_start:methodologies_end].strip()
-            
+
             try:
                 data = yaml.safe_load(yaml_content)
                 extracted_methodologies = {
-                    item['problem_type']: item['content']
-                    for item in data
+                    item["problem_type"]: item["content"] for item in data
                 }
             except (yaml.YAMLError, KeyError, TypeError) as e:
                 spinner.text = "YAML解析失败"
@@ -260,18 +285,24 @@ def extract_methodology_from_url(url):
         # 保存合并后的方法论
         methodology_dir = _get_methodology_directory()
         for problem_type, content in merged_data.items():
-            safe_filename = hashlib.md5(problem_type.encode('utf-8')).hexdigest()
+            safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
             file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
 
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "problem_type": problem_type,
-                    "content": content
-                }, f, ensure_ascii=False, indent=2)
+                json.dump(
+                    {"problem_type": problem_type, "content": content},
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
 
-        PrettyOutput.print(f"成功从URL提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）", OutputType.SUCCESS)
+        PrettyOutput.print(
+            f"成功从URL提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）",
+            OutputType.SUCCESS,
+        )
     except Exception as e:
         PrettyOutput.print(f"从URL提取失败: {str(e)}", OutputType.ERROR)
+
 
 def main():
     """方法论管理工具主函数"""
@@ -291,7 +322,9 @@ def main():
 
     # extract命令
     extract_parser = subparsers.add_parser("extract", help="从文本文件中提取方法论")
-    extract_parser.add_argument("input_file", type=str, help="要提取方法论的文本文件路径")
+    extract_parser.add_argument(
+        "input_file", type=str, help="要提取方法论的文本文件路径"
+    )
 
     # extract-url命令
     extract_url_parser = subparsers.add_parser("extract-url", help="从URL提取方法论")
@@ -309,6 +342,7 @@ def main():
         extract_methodology(args.input_file)
     elif args.command == "extract-url":
         extract_methodology_from_url(args.url)
+
 
 if __name__ == "__main__":
     main()

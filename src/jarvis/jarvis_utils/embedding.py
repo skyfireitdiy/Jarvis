@@ -11,6 +11,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 # 全局缓存，避免重复加载模型
 _global_tokenizers = {}
 
+
 def get_context_token_count(text: str) -> int:
     """使用分词器获取文本的token数量。
 
@@ -26,7 +27,7 @@ def get_context_token_count(text: str) -> int:
         total_tokens = 0
         chunk_size = 100  # 每次处理100个字符，避免超过模型最大长度（考虑到中文字符可能被编码成多个token）
         for i in range(0, len(text), chunk_size):
-            chunk = text[i:i + chunk_size]
+            chunk = text[i : i + chunk_size]
             tokens = tokenizer.encode(chunk)  # type: ignore
             total_tokens += len(tokens)
         return total_tokens
@@ -34,7 +35,10 @@ def get_context_token_count(text: str) -> int:
         PrettyOutput.print(f"计算token失败: {str(e)}", OutputType.WARNING)
         return len(text) // 4  # 每个token大约4个字符的粗略估计
 
-def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 50) -> List[str]:
+
+def split_text_into_chunks(
+    text: str, max_length: int = 512, min_length: int = 50
+) -> List[str]:
     """将文本分割成块，基于token数量进行切割。
 
     参数：
@@ -52,15 +56,18 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
         chunks = []
         current_chunk = ""
         current_tokens = 0
-        
+
         # 按较大的块处理文本，避免破坏token边界
         chunk_size = 50  # 每次处理50个字符
         for i in range(0, len(text), chunk_size):
-            chunk = text[i:i + chunk_size]
+            chunk = text[i : i + chunk_size]
             chunk_tokens = get_context_token_count(chunk)
-            
+
             # 如果当前块加上新块会超过最大长度，且当前块已经达到最小长度，则保存当前块
-            if current_tokens + chunk_tokens > max_length and current_tokens >= min_length:
+            if (
+                current_tokens + chunk_tokens > max_length
+                and current_tokens >= min_length
+            ):
                 chunks.append(current_chunk)
                 current_chunk = chunk
                 current_tokens = chunk_tokens
@@ -77,7 +84,7 @@ def split_text_into_chunks(text: str, max_length: int = 512, min_length: int = 5
     except Exception as e:
         PrettyOutput.print(f"文本分割失败: {str(e)}", OutputType.WARNING)
         # 发生错误时回退到简单的字符分割
-        return [text[i:i + max_length] for i in range(0, len(text), max_length)]
+        return [text[i : i + max_length] for i in range(0, len(text), max_length)]
 
 
 @functools.lru_cache(maxsize=1)
@@ -97,18 +104,14 @@ def load_tokenizer() -> AutoTokenizer:
 
     try:
         tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            cache_dir=cache_dir,
-            local_files_only=True
+            model_name, cache_dir=cache_dir, local_files_only=True
         )
     except Exception:
         tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            cache_dir=cache_dir,
-            local_files_only=False
+            model_name, cache_dir=cache_dir, local_files_only=False
         )
 
     # 保存到全局缓存
     _global_tokenizers[model_name] = tokenizer
 
-    return tokenizer # type: ignore
+    return tokenizer  # type: ignore

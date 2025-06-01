@@ -8,9 +8,14 @@ import yaml
 from prompt_toolkit import prompt
 from yaspin import yaspin
 
-from jarvis.jarvis_agent import (Agent, OutputType, PrettyOutput,
-                                 get_multiline_input,
-                                 origin_agent_system_prompt, user_confirm)
+from jarvis.jarvis_agent import (
+    Agent,
+    OutputType,
+    PrettyOutput,
+    get_multiline_input,
+    origin_agent_system_prompt,
+    user_confirm,
+)
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -29,7 +34,9 @@ def _load_tasks() -> Dict[str, str]:
         spinner_text = f"从{pre_command_path}加载预定义任务..."
         with yaspin(text=spinner_text, color="cyan") as spinner:
             try:
-                with open(pre_command_path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(
+                    pre_command_path, "r", encoding="utf-8", errors="ignore"
+                ) as f:
                     user_tasks = yaml.safe_load(f)
                 if isinstance(user_tasks, dict):
                     for name, desc in user_tasks.items():
@@ -48,7 +55,9 @@ def _load_tasks() -> Dict[str, str]:
         spinner_text = f"从{abs_path}加载预定义任务..."
         with yaspin(text=spinner_text, color="cyan") as spinner:
             try:
-                with open(pre_command_path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(
+                    pre_command_path, "r", encoding="utf-8", errors="ignore"
+                ) as f:
                     local_tasks = yaml.safe_load(f)
                 if isinstance(local_tasks, dict):
                     for name, desc in local_tasks.items():
@@ -62,18 +71,18 @@ def _load_tasks() -> Dict[str, str]:
 
     return tasks
 
+
 def _select_task(tasks: Dict[str, str]) -> str:
     """Let user select a task from the list or skip. Returns task description if selected."""
     if not tasks:
         return ""
-    
+
     task_names = list(tasks.keys())
     task_list = ["可用任务:"]
     for i, name in enumerate(task_names, 1):
         task_list.append(f"[{i}] {name}")
     task_list.append("[0] 跳过预定义任务")
     PrettyOutput.print("\n".join(task_list), OutputType.INFO)
-
 
     while True:
         try:
@@ -88,13 +97,19 @@ def _select_task(tasks: Dict[str, str]) -> str:
                 selected_task = tasks[task_names[choice - 1]]
                 PrettyOutput.print(f"将要执行任务:\n {selected_task}", OutputType.INFO)
                 # 询问是否需要补充信息
-                need_additional = user_confirm("需要为此任务添加补充信息吗？", default=False)
+                need_additional = user_confirm(
+                    "需要为此任务添加补充信息吗？", default=False
+                )
                 if need_additional:
                     additional_input = get_multiline_input("请输入补充信息：")
                     if additional_input:
-                        selected_task = f"{selected_task}\n\n补充信息:\n{additional_input}"
+                        selected_task = (
+                            f"{selected_task}\n\n补充信息:\n{additional_input}"
+                        )
                 return selected_task
-            PrettyOutput.print("无效的选择。请选择列表中的一个号码。", OutputType.WARNING)
+            PrettyOutput.print(
+                "无效的选择。请选择列表中的一个号码。", OutputType.WARNING
+            )
 
         except (KeyboardInterrupt, EOFError):
             return ""
@@ -104,26 +119,26 @@ def _select_task(tasks: Dict[str, str]) -> str:
 
 def main() -> None:
 
-    
-    parser = argparse.ArgumentParser(description='Jarvis AI assistant')
-    parser.add_argument('-p', '--platform', type=str, help='Platform to use')
-    parser.add_argument('-m', '--model', type=str, help='Model to use')
-    parser.add_argument('-t', '--task', type=str, help='Directly input task content from command line')
-    parser.add_argument('-f', '--config', type=str, help='Path to custom config file')
+    parser = argparse.ArgumentParser(description="Jarvis AI assistant")
+    parser.add_argument("-p", "--platform", type=str, help="Platform to use")
+    parser.add_argument("-m", "--model", type=str, help="Model to use")
+    parser.add_argument(
+        "-t", "--task", type=str, help="Directly input task content from command line"
+    )
+    parser.add_argument("-f", "--config", type=str, help="Path to custom config file")
     args = parser.parse_args()
-    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config)
+    init_env(
+        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config
+    )
 
     try:
         agent = Agent(
             system_prompt=origin_agent_system_prompt,
             platform=args.platform,
             model_name=args.model,
-            input_handler=[
-                shell_input_handler, 
-                builtin_input_handler
-            ],
+            input_handler=[shell_input_handler, builtin_input_handler],
             output_handler=[ToolRegistry()],
-            need_summary=False
+            need_summary=False,
         )
 
         # 优先处理命令行直接传入的任务
@@ -145,6 +160,7 @@ def main() -> None:
     except Exception as err:  # pylint: disable=broad-except
         PrettyOutput.print(f"初始化错误: {str(err)}", OutputType.ERROR)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

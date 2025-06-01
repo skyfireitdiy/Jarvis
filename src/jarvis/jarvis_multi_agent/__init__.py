@@ -67,18 +67,19 @@ content: |2
     def can_handle(self, response: str) -> bool:
         return len(self._extract_send_msg(response)) > 0
 
-
     def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
         send_messages = self._extract_send_msg(response)
         if len(send_messages) > 1:
-            return False, f"Send multiple messages, please only send one message at a time."
+            return (
+                False,
+                f"Send multiple messages, please only send one message at a time.",
+            )
         if len(send_messages) == 0:
             return False, ""
         return True, send_messages[0]
 
     def name(self) -> str:
         return "SEND_MESSAGE"
-
 
     @staticmethod
     def _extract_send_msg(content: str) -> List[Dict]:
@@ -87,12 +88,14 @@ content: |2
         Args:
             content: The content containing send message
         """
-        data = re.findall(ot("SEND_MESSAGE")+r'\n(.*?)\n'+ct("SEND_MESSAGE"), content, re.DOTALL)
+        data = re.findall(
+            ot("SEND_MESSAGE") + r"\n(.*?)\n" + ct("SEND_MESSAGE"), content, re.DOTALL
+        )
         ret = []
         for item in data:
             try:
                 msg = yaml.safe_load(item)
-                if 'to' in msg and 'content' in msg:
+                if "to" in msg and "content" in msg:
                     ret.append(msg)
             except Exception as e:
                 continue
@@ -100,7 +103,7 @@ content: |2
 
     def init_agents(self):
         for config in self.agents_config:
-            output_handler = config.get('output_handler', [])
+            output_handler = config.get("output_handler", [])
             if len(output_handler) == 0:
                 output_handler = [
                     ToolRegistry(),
@@ -108,9 +111,9 @@ content: |2
                 ]
             else:
                 output_handler.append(self)
-            config['output_handler'] = output_handler
+            config["output_handler"] = output_handler
             agent = Agent(**config)
-            self.agents[config['name']] = agent
+            self.agents[config["name"]] = agent
 
     def run(self, user_input: str) -> str:
         last_agent = self.main_agent_name
@@ -119,17 +122,22 @@ content: |2
             if isinstance(msg, str):
                 return msg
             elif isinstance(msg, Dict):
-                prompt  = f"""
+                prompt = f"""
 Please handle this message:
 from: {last_agent}
 content: {msg['content']}
 """
-                if msg['to'] not in self.agents:
-                    PrettyOutput.print(f"未找到智能体 {msg['to']}，正在重试...", OutputType.WARNING)
-                    msg = self.agents[last_agent].run(f"未找到智能体 {msg['to']}，可用智能体列表: {self.agents.keys()}")
+                if msg["to"] not in self.agents:
+                    PrettyOutput.print(
+                        f"未找到智能体 {msg['to']}，正在重试...", OutputType.WARNING
+                    )
+                    msg = self.agents[last_agent].run(
+                        f"未找到智能体 {msg['to']}，可用智能体列表: {self.agents.keys()}"
+                    )
                     continue
-                PrettyOutput.print(f"{last_agent} 正在向 {msg['to']} 发送消息...", OutputType.INFO)
-                last_agent = self.agents[msg['to']].name
-                msg = self.agents[msg['to']].run(prompt)
+                PrettyOutput.print(
+                    f"{last_agent} 正在向 {msg['to']} 发送消息...", OutputType.INFO
+                )
+                last_agent = self.agents[msg["to"]].name
+                msg = self.agents[msg["to"]].run(prompt)
         return ""
-

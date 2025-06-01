@@ -11,23 +11,23 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class FileAnalyzerTool:
     name = "file_analyzer"
-    description = """分析文件内容并提取关键信息。支持的文件：文本文件、word文档、pdf文件、图片"""
+    description = (
+        """分析文件内容并提取关键信息。支持的文件：文本文件、word文档、pdf文件、图片"""
+    )
     parameters = {
         "type": "object",
         "properties": {
             "file_paths": {
                 "type": "array",
-                "items": {
-                    "type": "string"
-                },
-                "description": "要分析的文件路径列表"
+                "items": {"type": "string"},
+                "description": "要分析的文件路径列表",
             },
             "prompt": {
                 "type": "string",
-                "description": "分析文件的提示词，指导模型提取什么样的信息"
-            }
+                "description": "分析文件的提示词，指导模型提取什么样的信息",
+            },
         },
-        "required": ["file_paths", "prompt"]
+        "required": ["file_paths", "prompt"],
     }
 
     @staticmethod
@@ -46,7 +46,7 @@ class FileAnalyzerTool:
         try:
             file_paths = args["file_paths"]
             prompt = args["prompt"]
-            
+
             agent = args["agent"]
             agent.reset_tool_call_count()
 
@@ -57,30 +57,26 @@ class FileAnalyzerTool:
                     valid_files.append(file_path)
                 else:
                     PrettyOutput.print(f"文件不存在: {file_path}", OutputType.WARNING)
-            
+
             if not valid_files:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "没有找到有效的文件"
-                }
+                return {"success": False, "stdout": "", "stderr": "没有找到有效的文件"}
 
             # 创建thinking平台实例
             platform = PlatformRegistry().get_thinking_platform()
-            
+
             if not platform:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "无法创建thinking平台实例"
+                    "stderr": "无法创建thinking平台实例",
                 }
-            
+
             # 设置系统消息
             system_message = """你是一个文件分析助手。你的任务是分析提供的文件内容，并根据用户的提示提取关键信息。
 请保持客观，只关注文件中实际存在的内容。如果无法确定某些信息，请明确指出。
 请以结构化的方式组织你的回答，使用标题、列表和代码块等格式来提高可读性。"""
             platform.set_system_prompt(system_message)
-            
+
             # 上传文件
             with yaspin(Spinners.dots, text="正在上传文件...") as spinner:
                 try:
@@ -92,7 +88,7 @@ class FileAnalyzerTool:
                         return {
                             "success": False,
                             "stdout": "",
-                            "stderr": "文件上传失败"
+                            "stderr": "文件上传失败",
                         }
                     spinner.text = "文件上传成功"
                     spinner.ok("✅")
@@ -102,11 +98,11 @@ class FileAnalyzerTool:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"文件上传失败: {str(e)}"
+                        "stderr": f"文件上传失败: {str(e)}",
                     }
 
             platform.set_suppress_output(False)
-            
+
             # 构建分析请求
             analysis_request = f"""
 请根据以下提示分析这些文件。
@@ -120,19 +116,11 @@ class FileAnalyzerTool:
                     analysis_result = platform.chat_until_success(analysis_request)
                 spinner.text = "分析完成"
                 spinner.ok("✅")
-            
+
             # 清理会话
             platform.delete_chat()
-            
-            return {
-                "success": True,
-                "stdout": analysis_result,
-                "stderr": ""
-            }
+
+            return {"success": True, "stdout": analysis_result, "stderr": ""}
 
         except Exception as e:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"文件分析失败: {str(e)}"
-            }
+            return {"success": False, "stdout": "", "stderr": f"文件分析失败: {str(e)}"}

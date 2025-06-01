@@ -19,19 +19,19 @@ class MethodologyTool:
             "operation": {
                 "type": "string",
                 "description": "操作类型（delete/update/add）",
-                "enum": ["delete", "update", "add"]
+                "enum": ["delete", "update", "add"],
             },
             "problem_type": {
                 "type": "string",
-                "description": "问题类型，例如：部署开源项目、生成提交信息"
+                "description": "问题类型，例如：部署开源项目、生成提交信息",
             },
             "content": {
                 "type": "string",
                 "description": "方法论内容（更新和添加时必填）",
-                "optional": True
-            }
+                "optional": True,
+            },
         },
-        "required": ["operation", "problem_type"]
+        "required": ["operation", "problem_type"],
     }
 
     def __init__(self):
@@ -58,9 +58,8 @@ class MethodologyTool:
             str: 方法论文件路径
         """
         # 使用MD5哈希作为文件名，避免文件名中的特殊字符
-        safe_filename = hashlib.md5(problem_type.encode('utf-8')).hexdigest()
+        safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
         return os.path.join(self.methodology_dir, f"{safe_filename}.json")
-
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行管理方法论的操作
@@ -82,7 +81,7 @@ class MethodologyTool:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少必要参数: operation和problem_type"
+                "stderr": "缺少必要参数: operation和problem_type",
             }
 
         try:
@@ -96,13 +95,13 @@ class MethodologyTool:
                     return {
                         "success": True,
                         "stdout": f"已删除问题类型'{problem_type}'对应的方法论",
-                        "stderr": ""
+                        "stderr": "",
                     }
                 else:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"未找到问题类型'{problem_type}'对应的方法论"
+                        "stderr": f"未找到问题类型'{problem_type}'对应的方法论",
                     }
 
             elif operation in ["update", "add"]:
@@ -110,7 +109,7 @@ class MethodologyTool:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "需要提供方法论内容"
+                        "stderr": "需要提供方法论内容",
                     }
 
                 # 确保目录存在
@@ -121,10 +120,12 @@ class MethodologyTool:
 
                 # 保存方法论到单独的文件
                 with open(file_path, "w", encoding="utf-8", errors="ignore") as f:
-                    json.dump({
-                        "problem_type": problem_type,
-                        "content": content
-                    }, f, ensure_ascii=False, indent=2)
+                    json.dump(
+                        {"problem_type": problem_type, "content": content},
+                        f,
+                        ensure_ascii=False,
+                        indent=2,
+                    )
 
                 PrettyOutput.print(f"方法论已保存到 {file_path}", OutputType.INFO)
 
@@ -132,20 +133,15 @@ class MethodologyTool:
                 return {
                     "success": True,
                     "stdout": f"{action}了问题类型'{problem_type}'对应的方法论",
-                    "stderr": ""
+                    "stderr": "",
                 }
 
             else:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"不支持的操作类型: {operation}"
+                    "stderr": f"不支持的操作类型: {operation}",
                 }
 
         except Exception as e:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"执行失败: {str(e)}"
-            }
-
+            return {"success": False, "stdout": "", "stderr": f"执行失败: {str(e)}"}

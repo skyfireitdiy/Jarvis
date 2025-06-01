@@ -118,7 +118,7 @@ class TongyiPlatform(BasePlatform):
                 # Determine content type based on fileKey extension
                 file_ext = os.path.splitext(file_info["fileKey"])[1].lower()
                 is_image = file_ext in self.IMAGE_EXTENSIONS
-                
+
                 contents.append(
                     {
                         "role": "user",
@@ -152,9 +152,11 @@ class TongyiPlatform(BasePlatform):
                 "specifiedModel": "",
                 "deepThink": True if self.model_name == "Thinking" else False,
                 "deepResearch": False,
-                "fileUploadBatchId": self.uploaded_file_info[0]["batchId"]
-                if self.uploaded_file_info
-                else "",
+                "fileUploadBatchId": (
+                    self.uploaded_file_info[0]["batchId"]
+                    if self.uploaded_file_info
+                    else ""
+                ),
             },
             "contents": contents,
         }
@@ -331,7 +333,7 @@ class TongyiPlatform(BasePlatform):
                         # Determine file type based on extension
                         file_ext = os.path.splitext(file_path)[1].lower()
                         is_image = file_ext in self.IMAGE_EXTENSIONS
-                        
+
                         uploaded_files.append(
                             {
                                 "fileKey": file_name,
@@ -347,13 +349,19 @@ class TongyiPlatform(BasePlatform):
                         headers = self._get_base_headers()
                         payload = {
                             "fileKeys": [f["fileKey"] for f in uploaded_files],
-                            "fileType": "image" if any(f["fileType"] == "image" for f in uploaded_files) else "file",
+                            "fileType": (
+                                "image"
+                                if any(f["fileType"] == "image" for f in uploaded_files)
+                                else "file"
+                            ),
                             "dir": upload_token["dir"],
                         }
 
                         response = requests.post(url, headers=headers, json=payload)
                         if response.status_code != 200:
-                            spinner.text = f"获取下载链接失败: HTTP {response.status_code}"
+                            spinner.text = (
+                                f"获取下载链接失败: HTTP {response.status_code}"
+                            )
                             spinner.fail("❌")
                             return False
 
@@ -393,9 +401,7 @@ class TongyiPlatform(BasePlatform):
                                 add_url, headers=headers, json=add_payload
                             )
                             if add_response.status_code != 200:
-                                spinner.text = (
-                                    f"添加文件到对话失败: HTTP {add_response.status_code}"
-                                )
+                                spinner.text = f"添加文件到对话失败: HTTP {add_response.status_code}"
                                 spinner.fail("❌")
                                 continue
 

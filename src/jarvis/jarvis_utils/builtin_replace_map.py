@@ -27,7 +27,7 @@ arguments:
 4. xxx问题的解决方案有哪些？
 5. xxx概念的详细解释是什么？
 """,
-        "description": "网页搜索"
+        "description": "网页搜索",
     },
     "Plan": {
         "append": True,
@@ -63,25 +63,25 @@ code_plan工具将：
 4. 评估修改影响范围
 5. 生成可执行的开发计划
 """,
-        "description": "生成代码修改计划"
+        "description": "生成代码修改计划",
     },
     "FindRelatedFiles": {
         "append": False,
         "template": f"""
 请使用工具在当前目录下查找与以下功能相关的文件：
-"""
+""",
     },
     "Dev": {
         "append": False,
         "template": f"""
 请调用create_code_agent开发以下需求：
-"""
+""",
     },
     "Fix": {
         "append": False,
         "template": f"""
 请修复以下问题：
-"""
+""",
     },
     "Check": {
         "append": True,
@@ -94,7 +94,7 @@ code_plan工具将：
 3. 检查完成后应报告结果
 4. 确保使用项目对应的静态检查工具
 """,
-        "description": "执行静态代码检查"
+        "description": "执行静态代码检查",
     },
     "ToolHelp": {
         "append": False,
@@ -182,6 +182,6 @@ arguments:
 </common_errors>
 </tool_system_guide>
 """,
-        "description": "工具使用系统"
-    }
+        "description": "工具使用系统",
+    },
 }

@@ -12,18 +12,26 @@ from yaspin import yaspin  # type: ignore
 # jarvis_platform 相关
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
+
 # jarvis_utils 相关
-from jarvis.jarvis_utils.config import (get_max_token_count,
-                                        get_max_tool_call_count,
-                                        is_auto_complete,
-                                        is_execute_tool_confirm,
-                                        is_use_analysis, is_use_methodology)
+from jarvis.jarvis_utils.config import (
+    get_max_token_count,
+    get_max_tool_call_count,
+    is_auto_complete,
+    is_execute_tool_confirm,
+    is_use_analysis,
+    is_use_methodology,
+)
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import (delete_agent, get_interrupt, make_agent_name,
-                                         set_agent, set_interrupt)
+from jarvis.jarvis_utils.globals import (
+    delete_agent,
+    get_interrupt,
+    make_agent_name,
+    set_agent,
+    set_interrupt,
+)
 from jarvis.jarvis_utils.input import get_multiline_input
-from jarvis.jarvis_utils.methodology import (load_methodology,
-                                             upload_methodology)
+from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import user_confirm
@@ -112,17 +120,13 @@ origin_agent_system_prompt = f"""
 
 
 class OutputHandlerProtocol(Protocol):
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
-    def can_handle(self, response: str) -> bool:
-        ...
+    def can_handle(self, response: str) -> bool: ...
 
-    def prompt(self) -> str:
-        ...
+    def prompt(self) -> str: ...
 
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
-        ...
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
 
 
 class Agent:
@@ -187,7 +191,9 @@ class Agent:
             if isinstance(platform, str):
                 self.model = PlatformRegistry().create_platform(platform)
                 if self.model is None:
-                    PrettyOutput.print(f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING)
+                    PrettyOutput.print(
+                        f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING
+                    )
                     self.model = PlatformRegistry().get_normal_platform()
             else:
                 self.model = platform
@@ -520,7 +526,9 @@ class Agent:
         if not self.execute_tool_confirm or user_confirm(
             f"需要执行{tool_list[0].name()}确认执行？", True
         ):
-            with yaspin(text=f"正在执行{tool_list[0].name()}...", color="cyan") as spinner:
+            with yaspin(
+                text=f"正在执行{tool_list[0].name()}...", color="cyan"
+            ) as spinner:
                 with spinner.hidden():
                     result = tool_list[0].handle(response, self)
                 spinner.text = f"{tool_list[0].name()}执行完成"
@@ -718,7 +726,6 @@ arguments:
                 spinner.text = "分析失败"
                 spinner.fail("❌")
 
-    
     def make_default_addon_prompt(self, need_complete: bool) -> str:
         """生成附加提示。
 
@@ -753,7 +760,6 @@ arguments:
 
         return addon_prompt
 
-
     def run(self, user_input: str) -> Any:
         """处理用户输入并执行任务
 
@@ -777,11 +783,7 @@ arguments:
             while True:
                 if self.first:
                     # 如果有上传文件，先上传文件
-                    if (
-                        self.files
-                        and self.model
-                        and self.model.support_upload_files()
-                    ):
+                    if self.files and self.model and self.model.support_upload_files():
                         self.model.upload_files(self.files)
 
                     # 如果启用方法论且没有上传文件，上传方法论
@@ -811,7 +813,6 @@ arguments:
 
                     if need_return:
                         return self.prompt
-                    
 
                     if self.after_tool_call_cb:
                         self.after_tool_call_cb(self)
