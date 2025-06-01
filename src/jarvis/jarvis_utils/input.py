@@ -98,6 +98,7 @@ class FileCompleter(Completer):
         all_completions.extend([
             (ot("Summary"), '总结'),
             (ot("Clear"), '清除历史'),
+            (ot("ToolUsage"), '工具使用说明'),
         ])
         
         # 2. 添加文件列表

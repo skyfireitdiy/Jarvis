@@ -5,7 +5,7 @@ from typing import Any, Tuple
 from jarvis.jarvis_utils.config import get_replace_map
 
 
-def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
+def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     """
     处理内置的特殊输入标记，并追加相应的提示词
 
@@ -16,6 +16,8 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     返回：
         Tuple[str, bool]: 处理后的输入和是否需要进一步处理
     """
+    from jarvis.jarvis_agent import Agent
+    agent: Agent = agent_
     # 查找特殊标记
     special_tags = re.findall(r"'<([^>]+)>'", user_input)
 
@@ -34,6 +36,11 @@ def builtin_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         elif tag == "Clear":
             agent.clear()
             return "", True
+        elif tag == "ToolUsage":
+            from jarvis.jarvis_tools.registry import ToolRegistry
+            tool_registry_  = agent.get_tool_registry()
+            tool_registry : ToolRegistry = tool_registry_ if tool_registry_ else ToolRegistry()
+            agent.set_addon_prompt(tool_registry.prompt())
         
         processed_tag = set()
         add_on_prompt = ""
