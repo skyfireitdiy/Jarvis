@@ -8,26 +8,13 @@
 
 *您的智能开发和系统交互助手*
 
-[核心特色](#core-features) • [视频介绍](#video-introduction) • [快速开始](#quick-start) • [配置说明](#configuration) • [工具说明](#tools) • [扩展开发](#extensions) • [贡献指南](#contributing) • [许可证](#license) • [Wiki文档](https://deepwiki.com/skyfireitdiy/Jarvis)
+[快速开始](#quick-start) • [核心功能](#core-features) • [配置说明](#configuration) • [工具说明](#tools) • [扩展开发](#extensions) • [贡献指南](#contributing) • [许可证](#license) • [Wiki文档](https://deepwiki.com/skyfireitdiy/Jarvis)
 </div>
 
 ---
 
-## 🌟 核心特色 <a id="core-features"></a>
-
-- 🆓 零成本接入：无缝集成腾讯元宝(推荐首选)、Kimi等优质模型，无需支付API费用，同时保留强大的文件处理、搜索和推理能力
-- 🛠️ 工具驱动：内置丰富工具集，涵盖脚本执行、代码开发、网页搜索、终端操作等核心功能
-- 👥 人机协作：支持实时交互，用户可随时介入指导，确保AI行为符合预期
-- 🔌 高度可扩展：支持自定义工具和平台，轻松集成MCP协议
-- 📈 智能进化：内置方法论系统，持续学习优化，越用越智能
-
-
-## 📺 视频介绍<a id="video-introduction"></a>
-
-[![视频介绍](docs/images/intro.png)](https://player.bilibili.com/player.html?isOutside=true&aid=114306578382907&bvid=BV1x2dAYeEpM&cid=29314583629&p=1)
-
-
 ## 🚀 快速开始 <a id="quick-start"></a>
+
 ### 系统要求
 - 目前只能在Linux系统下使用（很多工具依赖Linux系统）
 - Windows没有测试过，但Windows 10以上的用户可以在WSL上使用此工具
@@ -43,106 +30,6 @@ pip3 install -e .
 pip3 install jarvis-ai-assistant
 ```
 
-### 预定义任务(pre-command)
-
-您可以创建预定义任务文件来快速执行常用命令：
-
-1. 在`~/.jarvis/pre-command`或当前目录的`.jarvis/pre-command`文件中定义任务
-2. 使用YAML格式定义任务，例如：
-```yaml
-build: "构建项目并运行测试"
-deploy: "部署应用到生产环境"
-```
-3. 运行`jarvis`命令时会自动加载这些任务并提示选择执行
-
-### 最小化配置
-
-将以下配置写入到`~/.jarvis/config.yaml`文件中。
-
-#### 腾讯元宝 (推荐首选)
-```yaml
-JARVIS_PLATFORM: yuanbao  # 推荐使用腾讯元宝平台，适配性最佳
-JARVIS_MODEL: deep_seek_v3
-JARVIS_THINKING_PLATFORM: yuanbao
-JARVIS_THINKING_MODEL: deep_seek
-ENV:
-  YUANBAO_COOKIES: <元宝cookies>
-  YUANBAO_AGENT_ID: <元宝AgentID>
-```
-
-元宝cookies以及AgentID获取方式：
-
-![元宝cookies以及AgentID获取方式](docs/images/yuanbao.png)
-
-浏览器地址栏中那部分是AgentID。
-
-
-#### Kimi
-```yaml
-JARVIS_PLATFORM: kimi
-JARVIS_MODEL: kimi
-JARVIS_THINKING_PLATFORM: kimi
-JARVIS_THINKING_MODEL: k1
-
-ENV:
-  KIMI_API_KEY: <Kimi API KEY>
-```
-
-Kimi API Key获取方式：
-
-![Kimi API Key获取方式](docs/images/kimi.png)
-
-删除Bearer前缀，剩下的内容就是Kimi API Key。
-
-
-#### 通义千问
-```yaml
-JARVIS_PLATFORM: tongyi
-JARVIS_MODEL: Normal  # 可选模型：Normal, Thinking, Deep-Research, Code-Chat
-JARVIS_THINKING_PLATFORM: tongyi
-JARVIS_THINKING_MODEL: Thinking
-
-ENV:
-  TONGYI_COOKIES: <通义千问cookies>
-```
-
-通义千问cookies获取方式：
-
-![通义千问cookies获取方式](docs/images/tongyi.png)
-
-1. 登录[通义千问](https://www.tongyi.com/qianwen)
-2. 打开浏览器开发者工具（F12）
-3. 在Network标签页中找到任意请求
-4. 在请求头中找到Cookie字段，复制其值
-
-配置说明：
-1. `TONGYI_COOKIES`: 必填，用于身份验证
-2. 支持的模型：
-   - `Normal`: 标准对话模型
-   - `Thinking`: 深度思考模型
-   - `Deep-Research`: 深度研究模型
-   - `Code-Chat`: 代码对话模型
-
-
-#### OpenAI
-```yaml
-JARVIS_PLATFORM: openai
-JARVIS_MODEL: gpt-4o  # 默认模型，可选gpt-4-turbo, gpt-3.5-turbo等
-JARVIS_THINKING_PLATFORM: openai
-JARVIS_THINKING_MODEL: gpt-4o
-
-OPENAI_API_KEY: <OpenAI API Key>
-OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
-```
-
-配置说明：
-1. `OPENAI_API_KEY`: 必填。
-2. `OPENAI_API_BASE`: 可选，用于自定义API端点
-
-以上配置编写到`~/.jarvis/config.yaml`文件中。
-
-支持的模型可通过`jarvis-platform-manager --list-models`查看完整列表。
-
 ### 基本使用
 | 命令 | 快捷方式 | 功能描述 |
 |------|----------|----------|
@@ -152,7 +39,6 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 | `jarvis-platform-manager` | - | 使用平台管理功能 |
 | `jarvis-code-review` | - | 使用代码审查功能 |
 | `jarvis-git-commit` | `jgc` | 使用自动化git commit功能 |
-| `jarvis-code-agent` | `jca` | 使用代码代理功能 |
 | `jarvis-dev` | - | 使用dev功能（开发中） |
 | `jarvis-git-squash` | - | 使用git squash功能 |
 | `jarvis-multi-agent` | - | 使用多代理功能 |
@@ -161,17 +47,17 @@ OPENAI_API_BASE: https://api.openai.com/v1  # 可选，默认为官方API地址
 | `jarvis-git-details` | - | 使用git details功能 |
 | `jarvis-methodology` | - | 使用方法论功能 |
 
-## 💻 代码代理功能 (jarvis-code-agent)
+### 代码代理功能 (jarvis-code-agent)
 
-`jarvis-code-agent` 是Jarvis的代码分析与修改工具，主要功能包括：
+`jarvis-code-agent` 是Jarvis的代码分析与修改工具，专注于代码工程任务。
 
-### 1. 核心功能
+#### 1. 核心功能
 - 代码分析与修改
 - 代码审查与优化
 - 自动化git操作
 - 代码问题诊断与修复
 
-### 2. 使用方式
+#### 2. 使用方式
 ```bash
 # 基本用法
 jarvis-code-agent
@@ -183,21 +69,30 @@ jca
 jarvis-code-agent -p <平台> -m <模型> -r "需求描述"
 ```
 
-### 3. 命令行参数
+#### 3. 命令行参数
 | 参数 | 描述 |
 |------|------|
 | `-p/--platform` | 指定AI平台 (yuanbao/kimi/tongyi/openai) |
 | `-m/--model` | 指定模型名称 |
 | `-r/--requirement` | 直接指定需求描述 |
 
-### 4. 工作流程
-1. 初始化环境 (查找git根目录，检查未提交修改)
+#### 4. 工作流程
+1. 初始化环境（查找git根目录，检查未提交修改）
 2. 分析用户需求
 3. 执行代码修改
 4. 自动处理git提交
 5. 显示修改结果
 
-### 5. 示例
+#### 5. 使用规范
+代码代理遵循以下规范进行代码修改：
+1. 每次响应仅执行一步操作，先分析再修改，避免一步多改
+2. 充分利用工具理解用户需求和现有代码，禁止凭空假设
+3. 如果不清楚要修改的文件，必须先分析并找出需要修改的文件
+4. 代码编辑任务优先使用 edit_file 工具，确保搜索文本在目标文件中有且仅有一次精确匹配
+5. 如需大范围重写，才可使用 rewrite_file 工具
+6. 如遇信息不明，优先调用工具补充分析，不要主观臆断
+
+#### 6. 示例
 ```bash
 # 使用默认平台分析代码
 jca
@@ -209,21 +104,177 @@ jca -p yuanbao -m deep_seek_v3
 jca -r "修复src/example.py中的内存泄漏问题"
 ```
 
-## 🏗️ 平台管理功能
+### Git提交功能 (jarvis-git-commit)
 
-`jarvis-platform-manager` 提供以下子命令来管理AI平台和模型：
+`jarvis-git-commit` 是Jarvis的自动化git提交工具，能够智能分析代码变更并生成规范的提交信息。
 
-### 1. 列出支持的平台和模型
+#### 1. 核心功能
+- 自动分析git变更
+- 智能生成符合规范的提交信息
+- 支持自定义提交信息前缀和后缀
+- 自动处理大文件差异
+- 支持多行提交信息
+
+#### 2. 使用方式
 ```bash
+# 基本用法
+jarvis-git-commit
+
+# 或使用快捷命令
+jgc
+
+# 带参数使用
+jarvis-git-commit --root-dir <目录> --prefix "前缀" --suffix "后缀"
+```
+
+#### 3. 命令行参数
+| 参数 | 描述 |
+|------|------|
+| `--root-dir` | Git仓库的根目录路径（默认为当前目录） |
+| `--prefix` | 提交信息前缀（可选） |
+| `--suffix` | 提交信息后缀（可选） |
+
+#### 4. 提交信息格式
+提交信息遵循以下格式：
+```
+<类型>(<范围>): <主题>
+
+[可选] 详细描述变更内容和原因
+```
+
+类型说明：
+- `fix`: 修复bug
+- `feat`: 新功能
+- `docs`: 文档更新
+- `style`: 代码格式修改
+- `refactor`: 代码重构
+- `test`: 测试相关
+- `chore`: 其他修改
+
+格式规则：
+1. 类型必须使用上述预定义类型
+2. 范围表示变更的模块或组件（例如：auth, database, ui）
+3. 主题行不超过72个字符，不以句号结尾，使用祈使语气
+4. 详细描述部分应解释"是什么"和"为什么"，而非"如何"
+
+#### 5. 工作流程
+1. 检查git环境并确认有未提交的更改
+2. 自动暂存所有更改
+3. 分析代码差异
+4. 智能生成提交信息
+5. 执行git提交
+6. 显示提交结果
+
+#### 6. 示例
+```bash
+# 基本提交
+jgc
+
+# 指定仓库目录
+jgc --root-dir /path/to/repo
+
+# 添加提交信息前缀
+jgc --prefix "[紧急修复]"
+
+# 添加提交信息后缀
+jgc --suffix "相关issue: #123"
+```
+
+### 通用代理功能 (jarvis-agent)
+
+`jarvis-agent` 是Jarvis的核心代理工具，提供通用的AI助手功能，支持自定义配置和任务执行。
+
+#### 1. 核心功能
+- 通用任务处理
+- 自定义代理配置
+- 多步骤任务规划
+- 子代理任务拆分
+- 交互式任务执行
+
+#### 2. 使用方式
+```bash
+# 基本用法
+jarvis-agent
+
+# 带参数使用
+jarvis-agent -f <配置文件> -c <代理定义文件> -t "初始任务"
+```
+
+#### 3. 命令行参数
+| 参数 | 描述 |
+|------|------|
+| `-f/--config` | 指定配置文件路径（可选） |
+| `-c/--agent_definition` | 指定代理定义文件路径（可选） |
+| `-t/--task` | 指定初始任务（可选） |
+
+#### 4. 配置文件格式
+代理定义文件使用YAML格式：
+```yaml
+# 代理配置示例
+name: "自定义代理名称"
+system_prompt: "系统提示词"
+auto_complete: false
+need_summary: true
+```
+
+#### 5. 工作流程
+1. 初始化环境
+2. 加载配置文件（如果指定）
+3. 创建代理实例
+4. 执行初始任务（如果指定）
+5. 进入交互式模式（如果没有初始任务）
+6. 根据用户输入执行任务
+
+#### 6. 任务执行特点
+- 支持多行输入
+- 自动任务规划
+- 复杂任务自动拆分子代理
+- 交互式执行过程
+- 任务执行状态反馈
+
+#### 7. 示例
+```bash
+# 基本使用
+jarvis-agent
+
+# 使用配置文件
+jarvis-agent -f ~/.jarvis/config.yaml
+
+# 使用代理定义文件
+jarvis-agent -c custom_agent.yaml
+
+# 直接执行任务
+jarvis-agent -t "分析项目代码结构并生成文档"
+
+# 组合使用
+jarvis-agent -f config.yaml -c agent.yaml -t "优化项目性能"
+```
+
+### 平台管理功能 (jarvis-platform-manager)
+
+`jarvis-platform-manager` 是Jarvis的平台管理工具，用于管理AI平台、模型和提供API服务。
+
+#### 1. 核心功能
+- 查看支持的平台和模型
+- 与指定平台和模型进行交互式对话
+- 启动OpenAI兼容的API服务
+- 加载预定义角色进行对话
+
+#### 2. 子命令说明
+
+##### 2.1 查看平台信息
+```bash
+# 显示所有支持的平台和模型
 jarvis-platform-manager info
 ```
-显示所有支持的AI平台及其可用模型列表。
 
-### 2. 与指定平台和模型聊天
+##### 2.2 交互式对话
 ```bash
+# 与指定平台和模型对话
 jarvis-platform-manager chat -p <平台名称> -m <模型名称>
 ```
-启动交互式聊天会话，支持以下命令：
+
+可用命令：
 - `/bye` - 退出聊天
 - `/clear` - 清除当前会话
 - `/upload <文件路径>` - 上传文件到当前会话
@@ -231,17 +282,25 @@ jarvis-platform-manager chat -p <平台名称> -m <模型名称>
 - `/save <文件名>` - 保存最后一条消息
 - `/saveall <文件名>` - 保存完整对话历史
 
-### 3. 启动OpenAI兼容的API服务
+##### 2.3 启动API服务
 ```bash
+# 启动OpenAI兼容的API服务
 jarvis-platform-manager service --host <IP地址> --port <端口号> -p <平台名称> -m <模型名称>
 ```
-启动一个兼容OpenAI API的服务，可用于其他应用程序集成。
 
-### 4. 加载角色配置文件
+参数说明：
+- `--host`: 服务主机地址（默认：127.0.0.1）
+- `--port`: 服务端口（默认：8000）
+- `-p/--platform`: 指定默认平台
+- `-m/--model`: 指定默认模型
+
+##### 2.4 角色对话
 ```bash
+# 加载角色配置文件并开始对话
 jarvis-platform-manager role -c <配置文件路径>
 ```
-从YAML配置文件加载预定义角色进行对话。配置文件格式示例：
+
+角色配置文件格式（YAML）：
 ```yaml
 roles:
   - name: "代码助手"
@@ -256,17 +315,96 @@ roles:
     system_prompt: "你是一个技术文档撰写专家，擅长将复杂技术概念转化为清晰易懂的文字"
 ```
 
+#### 3. 示例
+```bash
+# 查看支持的平台和模型
+jarvis-platform-manager info
 
----
+# 与元宝平台的deep_seek_v3模型对话
+jarvis-platform-manager chat -p yuanbao -m deep_seek_v3
+
+# 启动API服务
+jarvis-platform-manager service --host 0.0.0.0 --port 8080 -p yuanbao -m deep_seek_v3
+
+# 使用角色配置文件
+jarvis-platform-manager role -c ~/.jarvis/roles.yaml
+```
+
+## 🌟 核心功能 <a id="core-features"></a>
+
+### 1. 主要特性
+- 🆓 零成本接入：无缝集成腾讯元宝(推荐首选)、Kimi等优质模型，无需支付API费用
+- 🛠️ 工具驱动：内置丰富工具集，涵盖脚本执行、代码开发、网页搜索、终端操作等核心功能
+- 👥 人机协作：支持实时交互，用户可随时介入指导，确保AI行为符合预期
+- 🔌 高度可扩展：支持自定义工具和平台，轻松集成MCP协议
+- 📈 智能进化：内置方法论系统，持续学习优化，越用越智能
+
+### 2. 视频介绍
+[![视频介绍](docs/images/intro.png)](https://player.bilibili.com/player.html?isOutside=true&aid=114306578382907&bvid=BV1x2dAYeEpM&cid=29314583629&p=1)
+
+### 3. 预定义任务
+您可以创建预定义任务文件来快速执行常用命令：
+
+1. 在`~/.jarvis/pre-command`或当前目录的`.jarvis/pre-command`文件中定义任务
+2. 使用YAML格式定义任务，例如：
+```yaml
+build: "构建项目并运行测试"
+deploy: "部署应用到生产环境"
+```
+3. 运行`jarvis`命令时会自动加载这些任务并提示选择执行
 
 ## ⚙️ 配置说明 <a id="configuration"></a>
-### 配置项
+
+### 1. 平台配置
+
+#### 腾讯元宝 (推荐首选)
+```yaml
+JARVIS_PLATFORM: yuanbao
+JARVIS_MODEL: deep_seek_v3
+JARVIS_THINKING_PLATFORM: yuanbao
+JARVIS_THINKING_MODEL: deep_seek
+ENV:
+  YUANBAO_COOKIES: <元宝cookies>
+  YUANBAO_AGENT_ID: <元宝AgentID>
+```
+
+#### Kimi
+```yaml
+JARVIS_PLATFORM: kimi
+JARVIS_MODEL: kimi
+JARVIS_THINKING_PLATFORM: kimi
+JARVIS_THINKING_MODEL: k1
+ENV:
+  KIMI_API_KEY: <Kimi API KEY>
+```
+
+#### 通义千问
+```yaml
+JARVIS_PLATFORM: tongyi
+JARVIS_MODEL: Normal
+JARVIS_THINKING_PLATFORM: tongyi
+JARVIS_THINKING_MODEL: Thinking
+ENV:
+  TONGYI_COOKIES: <通义千问cookies>
+```
+
+#### OpenAI
+```yaml
+JARVIS_PLATFORM: openai
+JARVIS_MODEL: gpt-4o
+JARVIS_THINKING_PLATFORM: openai
+JARVIS_THINKING_MODEL: gpt-4o
+OPENAI_API_KEY: <OpenAI API Key>
+OPENAI_API_BASE: https://api.openai.com/v1
+```
+
+### 2. 配置项说明
 | 变量名称 | 默认值 | 说明 |
 |----------|--------|------|
-| `ENV` | {} | 环境变量配置，用于设置系统环境变量 |
+| `ENV` | {} | 环境变量配置 |
 | `JARVIS_MAX_TOKEN_COUNT` | 960000 | 上下文窗口的最大token数量 |
 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
-| `JARVIS_AUTO_COMPLETE` | false | 是否启用自动完成功能（任务判定完成的时候会自动终止） |
+| `JARVIS_AUTO_COMPLETE` | false | 是否启用自动完成功能 |
 | `JARVIS_SHELL_NAME` | bash | 系统shell名称 |
 | `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
 | `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
@@ -274,8 +412,8 @@ roles:
 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 |
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
-| `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数，如果是0表示无限制 |
-| `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis（仅在以git仓库方式安装时有效） |
+| `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
+| `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis |
 | `JARVIS_MAX_BIG_CONTENT_SIZE` | 160000 | 最大大内容大小 |
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
 | `JARVIS_GIT_COMMIT_PROMPT` | "" | 自定义git提交信息生成提示模板 |
@@ -284,43 +422,30 @@ roles:
 | `JARVIS_USE_ANALYSIS` | true | 是否启用任务分析功能 |
 | `JARVIS_DATA_PATH` | ~/.jarvis | Jarvis数据存储目录路径 |
 
-所有配置编写到`~/.jarvis/config.yaml`文件中即可生效。
-
-### 配置文件格式
-配置文件仅支持YAML格式：
-```yaml
-JARVIS_PLATFORM: yuanbao
-JARVIS_MODEL: deep_seek_v3
-ENV:
-  YUANBAO_COOKIES: "your_cookies_here"
-```
-
----
 ## 🛠️ 工具说明 <a id="tools"></a>
-### 内置工具
+
+### 1. 内置工具
 | 工具名称 | 描述 |
 |----------|------|
 | ask_user | 交互式用户输入收集 |
 | chdir | 更改当前工作目录 |
-| rewrite_file | 文件重写工具，用于完全重写或创建文件，提供完整的文件内容替换 |
-| edit_file | 代码编辑工具，用于精确修改文件内容，支持搜索替换方式编辑 |
-| code_plan | 理解需求并制定详细的代码修改计划，在修改前获取用户确认 |
-| create_code_agent | 代码开发工具，当需要修改代码时使用 |
-| create_sub_agent | 创建子代理以处理特定任务，子代理将生成任务总结报告 |
-| execute_script | 执行脚本并返回结果，支持任意解释器。 |
-| file_analyzer | 分析文件内容并提取关键信息。支持的文件：文本文件、word文档、pdf文件、图片 |
-| file_operation | 文件批量操作工具，可批量读写多个文件，支持文本文件，适用于需要同时处理多个文件的场景（读取配置文件、保存生成内容等） |
-| methodology | 方法论管理工具，支持添加、更新和删除操作 |
-| read_code | 代码阅读与分析工具，用于读取源代码文件并添加行号，针对代码文件优化，提供更好的格式化输出和行号显示，适用于代码分析、审查和理解代码实现的场景 |
+| rewrite_file | 文件重写工具 |
+| edit_file | 代码编辑工具 |
+| code_plan | 理解需求并制定代码修改计划 |
+| create_code_agent | 代码开发工具 |
+| create_sub_agent | 创建子代理处理特定任务 |
+| execute_script | 执行脚本并返回结果 |
+| file_analyzer | 分析文件内容并提取关键信息 |
+| file_operation | 文件批量操作工具 |
+| methodology | 方法论管理工具 |
+| read_code | 代码阅读与分析工具 |
 | read_webpage | 读取网页内容并分析 |
 | search_web | 使用互联网搜索 |
-| virtual_tty | 控制虚拟终端执行各种操作，如启动终端、输入命令、获取输出等。 |
+| virtual_tty | 控制虚拟终端执行操作 |
 
+### 2. 命令替换功能
+支持使用特殊标记`'<tag>'`触发命令替换功能：
 
-### 命令替换功能
-Jarvis支持使用特殊标记`'<tag>'`来触发命令替换功能，其中`tag`是预定义的标记名称。系统会自动将这些标记替换为预定义的模板内容。
-
-#### 内置标记
 | 标记 | 功能 |
 |------|------|
 | `'Summary'` | 总结当前会话并清空历史记录 |
@@ -334,39 +459,28 @@ Jarvis支持使用特殊标记`'<tag>'`来触发命令替换功能，其中`tag`
 | `'Dev'` | 调用create_code_agent开发需求 |
 | `'Fix'` | 修复问题 |
 
-#### 自定义替换
-可以通过以下方式配置自定义替换规则：
-
-**配置文件**:
-在`~/.jarvis/config.yaml`中添加`JARVIS_REPLACE_MAP`配置项：
+### 3. 自定义替换配置
+在`~/.jarvis/config.yaml`中添加：
 ```yaml
 JARVIS_REPLACE_MAP:
   tag_name:
     template: "替换后的内容"
     description: "标记描述"
-    append: false  # 可选，true表示追加到输入末尾，false表示直接替换
+    append: false
 ```
 
-
-
-#### 文件路径补全
-在交互式输入中，输入`@`可以触发文件路径补全功能，支持模糊匹配。
-
-
-### 工具位置
-- 内置工具：`src/jarvis/tools/`
-- 用户工具：`~/.jarvis/tools/`
----
 ## 🛠️ 扩展开发 <a id="extensions"></a>
-### 添加新工具
+
+### 1. 添加新工具
 在 `~/.jarvis/tools/` 中创建新的 Python 文件：
 ```python
 from typing import Dict, Any
 from jarvis.utils import OutputType, PrettyOutput
+
 class CustomTool:
-    name = "工具名称"              # 调用时使用的工具名称
-    description = "工具描述"       # 工具用途
-    parameters = {                # 参数的 JSON Schema
+    name = "工具名称"
+    description = "工具描述"
+    parameters = {
         "type": "object",
         "properties": {
             "param1": {
@@ -376,22 +490,10 @@ class CustomTool:
         },
         "required": ["param1"]
     }
+    
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """执行工具功能
-        
-        参数：
-            args: 传递给工具的参数
-            
-        返回：
-            包含执行结果的字典：
-            {
-                "success": bool,
-                "stdout": str,  # 成功时的输出
-                "stderr": str,  # 可选的错误详情
-            }
-        """
         try:
-            # 在此实现工具逻辑
+            # 实现工具逻辑
             result = "工具执行结果"
             return {
                 "success": True,
@@ -406,116 +508,52 @@ class CustomTool:
             }
 ```
 
-
-### 添加MCP
-MCP(模型上下文协议)支持以下配置方式：
-
-#### 配置文件
-在`~/.jarvis/config.yaml`中添加`JARVIS_MCP`配置项：
+### 2. 添加MCP
+在`~/.jarvis/config.yaml`中添加：
 ```yaml
 JARVIS_MCP:
   - type: stdio  # 或 sse/streamable
     name: MCP名称
-    command: 可执行命令  # stdio模式必填
-    base_url: http://example.com/api  # sse/streamable模式必填
-    args: [参数列表]  # 可选
-    env:  # 可选环境变量
+    command: 可执行命令
+    base_url: http://example.com/api
+    args: [参数列表]
+    env:
       KEY: VALUE
-    enable: true  # 可选，默认为true
+    enable: true
 ```
 
-
-
-### 添加新大模型平台
+### 3. 添加新大模型平台
 在 `~/.jarvis/platforms/` 中创建新的 Python 文件：
 ```python
 from jarvis.jarvis_platform.base import BasePlatform
+
 class CustomPlatform(BasePlatform):
     def __init__(self):
-        # 初始化平台
         pass
 
     def __del__(self):
-        # 销毁平台
         pass
 
     def chat(self, message: str) -> str:
-        # 执行对话
         pass
 
     def upload_files(self, file_list: List[str]) -> bool:
-        # 上传文件
         pass
 
     def delete_chat(self):
-        # 删除对话
         pass
 
     def set_model_name(self, model_name: str):
-        # 设置模型名称
         pass
 
     def set_system_prompt(self, message: str):
-        # 设置系统消息
         pass
 
     def get_model_list(self) -> List[Tuple[str, str]]:
-        # 获取模型列表
         pass
 
     def name(self) -> str:
-        # 获取平台名称
         pass
-```
-
-
-## 💾 Git提交功能 (jarvis-git-commit)
-
-`jarvis-git-commit` 是Jarvis的自动化git提交工具，主要功能包括：
-
-### 1. 核心功能
-- 自动分析git变更
-- 生成符合规范的提交信息
-- 支持交互式确认提交
-- 批量处理多个提交
-
-### 2. 使用方式
-```bash
-# 基本用法
-jarvis-git-commit
-
-# 或使用快捷命令
-jgc
-
-# 带参数使用
-jarvis-git-commit -m "自定义提交信息"
-```
-
-### 3. 命令行参数
-| 参数 | 描述 |
-|------|------|
-| `-m/--message` | 指定自定义提交信息 |
-| `-a/--all` | 自动添加所有变更文件 |
-| `-n/--no-verify` | 跳过git hooks验证 |
-| `-f/--force` | 强制提交，即使有冲突 |
-
-### 4. 工作流程
-1. 检查当前git状态
-2. 分析变更内容
-3. 生成或确认提交信息
-4. 执行提交操作
-5. 显示提交结果
-
-### 5. 示例
-```bash
-# 使用默认方式提交
-jgc
-
-# 指定提交信息
-jgc -m "修复内存泄漏问题"
-
-# 自动添加所有变更并提交
-jgc -a
 ```
 
 ## 🤝 贡献指南 <a id="contributing"></a>
@@ -525,10 +563,7 @@ jgc -a
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 开启 Pull Request
 
----
-
 ## 📄 许可证 <a id="license"></a>
-
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
 ---
