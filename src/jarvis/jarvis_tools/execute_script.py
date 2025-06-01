@@ -63,7 +63,6 @@ class ScriptTool:
 
     def get_display_output(self, file_path: str) -> str:
         """消除控制字符，得到用户实际看到的文本，去除script命令首尾行"""
-        import re
         # 读取文件内容并尝试多种编码
         with open(file_path, 'rb') as f:
             data = f.read()

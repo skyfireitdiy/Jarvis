@@ -63,15 +63,7 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     if welcome_str:
         PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
 
-    config_file_path = Path(config_file) if config_file is not None else Path(os.path.expanduser("~/.jarvis/config.yaml"))
-
-    # 加载配置文件
-    if not config_file_path.exists():
-        old_config_file = config_file_path.parent / "env"
-        if old_config_file.exists():# 旧的配置文件存在
-            _read_old_config_file(old_config_file)
-    else:
-        _read_config_file(config_file_path.parent, config_file_path)
+    load_config(config_file)
 
     # 现在获取最终的数据目录(可能被配置文件修改)
     data_dir = Path(get_data_dir())
@@ -94,6 +86,17 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
 
     check_and_update_git_repo(str(script_dir))
+
+def load_config(config_file):
+    config_file_path = Path(config_file) if config_file is not None else Path(os.path.expanduser("~/.jarvis/config.yaml"))
+
+    # 加载配置文件
+    if not config_file_path.exists():
+        old_config_file = config_file_path.parent / "env"
+        if old_config_file.exists():# 旧的配置文件存在
+            _read_old_config_file(old_config_file)
+    else:
+        _read_config_file(config_file_path.parent, config_file_path)
 
 def _read_config_file(jarvis_dir, config_file):
     """读取并解析YAML格式的配置文件

@@ -374,7 +374,6 @@ def role_command(args):
 
 def service_command(args):
     """Process service subcommand - start OpenAI-compatible API server"""
-    import json
     import os
     import time
     import uuid

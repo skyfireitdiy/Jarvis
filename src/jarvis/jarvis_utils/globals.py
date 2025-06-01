@@ -8,7 +8,7 @@
 - 环境初始化
 """
 import os
-from typing import Any, Dict, Set
+from typing import Any, Set
 
 import colorama
 from rich.console import Console

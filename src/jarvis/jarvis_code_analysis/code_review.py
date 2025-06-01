@@ -674,7 +674,7 @@ def main():
     commit_parser.add_argument('commit', help='Commit SHA to review')
 
     # Current subcommand
-    current_parser = subparsers.add_parser('current', help='Review current changes')
+    subparsers.add_parser('current', help='Review current changes')
 
     # Range subcommand
     range_parser = subparsers.add_parser('range', help='Review commit range')

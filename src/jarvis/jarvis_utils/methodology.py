@@ -141,8 +141,6 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
     """
     from yaspin import yaspin  # type: ignore
 
-    from jarvis.jarvis_tools.registry import ToolRegistry
-
     prompt = tool_registery.prompt() if tool_registery else ""
 
     # 获取方法论目录

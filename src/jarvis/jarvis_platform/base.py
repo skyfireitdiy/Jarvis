@@ -16,8 +16,7 @@ from jarvis.jarvis_utils.globals import set_in_chat
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import (get_context_token_count,
-                                       is_context_overflow, while_success,
-                                       while_true)
+                                       while_success, while_true)
 
 
 class BasePlatform(ABC):
