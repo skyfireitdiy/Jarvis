@@ -99,6 +99,7 @@ class FileCompleter(Completer):
             (ot("Summary"), '总结'),
             (ot("Clear"), '清除历史'),
             (ot("ToolUsage"), '工具使用说明'),
+            (ot("ReloadConfig"), '重新加载配置'),
         ])
         
         # 2. 添加文件列表

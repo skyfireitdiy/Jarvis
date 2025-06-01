@@ -17,6 +17,7 @@ from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrupt
 
+g_config_file = None
 
 
 def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
@@ -63,7 +64,10 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     if welcome_str:
         PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
 
-    load_config(config_file)
+    global g_config_file
+    g_config_file = config_file
+
+    load_config()
 
     # 现在获取最终的数据目录(可能被配置文件修改)
     data_dir = Path(get_data_dir())
@@ -87,7 +91,8 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
 
     check_and_update_git_repo(str(script_dir))
 
-def load_config(config_file):
+def load_config():
+    config_file = g_config_file
     config_file_path = Path(config_file) if config_file is not None else Path(os.path.expanduser("~/.jarvis/config.yaml"))
 
     # 加载配置文件
