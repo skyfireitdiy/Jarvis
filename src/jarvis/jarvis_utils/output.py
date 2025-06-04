@@ -288,7 +288,10 @@ class PrettyOutput:
             else:
                 console.print(header, content)
         if traceback or output_type == OutputType.ERROR:
-            console.print_exception()
+            try:
+                console.print_exception()
+            except Exception as e:
+                console.print(f"Error: {e}")
 
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):
