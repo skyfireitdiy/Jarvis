@@ -14,8 +14,7 @@ import re
 import subprocess
 from typing import Any, Dict, List, Tuple
 
-from jarvis.jarvis_utils.config import (get_auto_update,
-                                        is_confirm_before_apply_patch)
+from jarvis.jarvis_utils.config import get_auto_update, is_confirm_before_apply_patch
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import user_confirm
 
@@ -129,16 +128,28 @@ def get_diff() -> str:
         str: 差异内容或错误信息
     """
     try:
-        # 暂存新增文件
-        subprocess.run(["git", "add", "-N", "."], check=True)
-
-        # 获取所有差异（包括新增文件）
-        result = subprocess.run(
-            ["git", "diff", "HEAD"], capture_output=True, text=False, check=True
+        # 检查是否为空仓库
+        head_check = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
         )
+        if head_check.returncode != 0:
+            # 空仓库情况，直接获取工作区差异
+            result = subprocess.run(
+                ["git", "diff"], capture_output=True, text=False, check=True
+            )
+        else:
+            # 暂存新增文件
+            subprocess.run(["git", "add", "-N", "."], check=True)
 
-        # 重置暂存区
-        subprocess.run(["git", "reset"], check=True)
+            # 获取所有差异（包括新增文件）
+            result = subprocess.run(
+                ["git", "diff", "HEAD"], capture_output=True, text=False, check=True
+            )
+
+            # 重置暂存区
+            subprocess.run(["git", "reset"], check=True)
 
         try:
             return result.stdout.decode("utf-8")
@@ -200,9 +211,7 @@ def handle_commit_workflow() -> bool:
     Returns:
         bool: 提交是否成功
     """
-    if is_confirm_before_apply_patch() and not user_confirm(
-        "是否要提交代码？", default=True
-    ):
+    if is_confirm_before_apply_patch() and not user_confirm("是否要提交代码？", default=True):
         revert_change()
         return False
 
@@ -406,9 +415,7 @@ def get_diff_file_list() -> List[str]:
         subprocess.run(["git", "reset"], check=True)
 
         if result.returncode != 0:
-            PrettyOutput.print(
-                f"获取差异文件列表失败: {result.stderr}", OutputType.ERROR
-            )
+            PrettyOutput.print(f"获取差异文件列表失败: {result.stderr}", OutputType.ERROR)
             return []
 
         return [f for f in result.stdout.splitlines() if f]
@@ -428,11 +435,11 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: 包含commit信息和文件清单的字典列表，格式为:
             [
                 {
-                    'hash': 提交hash,
-                    'message': 提交信息,
-                    'author': 作者,
-                    'date': 提交日期,
-                    'files': [修改的文件列表] (最多20个文件)
+                    'hash': str,
+                    'message': str,
+                    'author': str,
+                    'date': str,
+                    'files': List[str]  # 修改的文件列表 (最多20个文件)
                 },
                 ...
             ]
@@ -471,8 +478,9 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
                 text=True,
             )
             if files_result.returncode == 0:
-                files = list(set(filter(None, files_result.stdout.splitlines())))
-                commit["files"] = files[:20]  # 限制最多20个文件
+                file_lines = files_result.stdout.splitlines()
+                unique_files = set(filter(None, file_lines))
+                commit["files"] = list(unique_files)[:20]  # 限制最多20个文件
 
         return commits
 
