@@ -784,13 +784,23 @@ arguments:
             while True:
                 if self.first:
                     # 如果有上传文件，先上传文件
-                    if self.files and self.model and self.model.support_upload_files():
-                        self.model.upload_files(self.files)
-
-                    # 如果启用方法论且没有上传文件，上传方法论
-                    elif self.use_methodology:
-                        if not self.model or not upload_methodology(self.model):
-                            # 上传失败则回退到本地加载
+                    if self.model and self.model.support_upload_files():
+                        if self.use_methodology:
+                            if not upload_methodology(self.model, other_files=self.files):
+                                if self.files:
+                                    PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
+                                # 上传失败则回退到本地加载
+                                msg = self.prompt
+                                for handler in self.input_handler:
+                                    msg, _ = handler(msg, self)
+                                self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+                        elif self.files:
+                            if not self.model.upload_files(self.files):
+                                PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
+                    else:
+                        if self.files:
+                            PrettyOutput.print("不支持上传文件，将忽略文件列表", OutputType.WARNING)
+                        if self.use_methodology:
                             msg = self.prompt
                             for handler in self.input_handler:
                                 msg, _ = handler(msg, self)

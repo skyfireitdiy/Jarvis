@@ -10,7 +10,7 @@
 import json
 import os
 import tempfile
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -100,7 +100,7 @@ def _create_methodology_temp_file(methodologies: Dict[str, str]) -> Optional[str
         return None
 
 
-def upload_methodology(platform: BasePlatform) -> bool:
+def upload_methodology(platform: BasePlatform, other_files: List[str] = []) -> bool:
     """
     上传方法论文件到指定平台
 
@@ -125,7 +125,7 @@ def upload_methodology(platform: BasePlatform) -> bool:
         return False
 
     try:
-        return platform.upload_files([temp_file_path])
+        return platform.upload_files([temp_file_path, *other_files])
 
     finally:
         if temp_file_path and os.path.exists(temp_file_path):
