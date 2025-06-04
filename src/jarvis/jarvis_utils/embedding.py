@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 import functools
 import os
-from typing import List
-
-from transformers import AutoTokenizer
+from typing import Any, List
 
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -22,7 +20,8 @@ def get_context_token_count(text: str) -> int:
         int: 文本中的token数量
     """
     try:
-        tokenizer = load_tokenizer()
+        from transformers import AutoTokenizer  # type: ignore
+        tokenizer : AutoTokenizer = load_tokenizer()
         # 分批处理长文本，确保不超过模型最大长度
         total_tokens = 0
         chunk_size = 100  # 每次处理100个字符，避免超过模型最大长度（考虑到中文字符可能被编码成多个token）
@@ -88,13 +87,16 @@ def split_text_into_chunks(
 
 
 @functools.lru_cache(maxsize=1)
-def load_tokenizer() -> AutoTokenizer:
+def load_tokenizer() -> Any:
     """
     加载用于文本处理的分词器，使用缓存避免重复加载。
 
     返回：
         AutoTokenizer: 加载的分词器
     """
+
+    from transformers import AutoTokenizer  # type: ignore
+
     model_name = "gpt2"
     cache_dir = os.path.join(get_data_dir(), "huggingface", "hub")
 
