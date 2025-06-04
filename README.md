@@ -171,7 +171,7 @@ jgc --prefix "[紧急修复]"
 jgc --suffix "相关issue: #123"
 ```
 
-### 通用代理功能 (jarvis-agent)
+### 自定义代理功能 (jarvis-agent)
 
 `jarvis-agent` 是Jarvis的核心代理工具，提供通用的AI助手功能，支持自定义配置和任务执行。
 
