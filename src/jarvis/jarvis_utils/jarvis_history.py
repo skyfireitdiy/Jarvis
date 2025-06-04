@@ -1,7 +1,9 @@
 import os
-import yaml
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
+import yaml
+
 
 class JarvisHistory:
     def __init__(self):
@@ -24,12 +26,18 @@ class JarvisHistory:
         """Save recorded messages to YAML file"""
         if not self.current_file:
             raise RuntimeError("No recording session to stop.")
-        
+
+        # Skip saving if records is empty
+        if not self.records:
+            self.current_file = None
+            self.records = []
+            return
+
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.current_file), exist_ok=True)
-        
-        with open(self.current_file, 'w') as f:
-            yaml.safe_dump({"conversation": self.records}, f)
-        
+
+        with open(self.current_file, "w") as f:
+            yaml.safe_dump({"conversation": self.records}, f, allow_unicode=True)
+
         self.current_file = None
         self.records = []
