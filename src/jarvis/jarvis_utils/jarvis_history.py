@@ -25,6 +25,9 @@ class JarvisHistory:
         if not self.current_file:
             raise RuntimeError("No recording session to stop.")
         
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(self.current_file), exist_ok=True)
+        
         with open(self.current_file, 'w') as f:
             yaml.safe_dump({"conversation": self.records}, f)
         
