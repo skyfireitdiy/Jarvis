@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # 标准库导入
 import datetime
+from pathlib import Path
 import platform
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
@@ -13,7 +14,7 @@ from yaspin import yaspin  # type: ignore
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 # jarvis_utils 相关
-from jarvis.jarvis_utils.config import (get_max_token_count,
+from jarvis.jarvis_utils.config import (get_data_dir, get_max_token_count,
                                         get_max_tool_call_count,
                                         is_auto_complete,
                                         is_execute_tool_confirm,
@@ -23,6 +24,7 @@ from jarvis.jarvis_utils.globals import (delete_agent, get_interrupt,
                                          make_agent_name, set_agent,
                                          set_interrupt)
 from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.jarvis_history import JarvisHistory
 from jarvis.jarvis_utils.methodology import (load_methodology,
                                              upload_methodology)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -136,6 +138,7 @@ class Agent:
         self.prompt = ""
 
     def __del__(self):
+        self.history.stop_record()
         delete_agent(self.name)
 
     def __init__(
@@ -233,6 +236,9 @@ class Agent:
         self.tool_call_count = 0
         self.max_tool_call_count = get_max_tool_call_count()
         self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
+
+        self.history = JarvisHistory()
+        self.history.start_record(str(Path(get_data_dir())/"history"))
 
         self.execute_tool_confirm = (
             execute_tool_confirm
@@ -395,8 +401,10 @@ class Agent:
         if self.conversation_length > self.max_token_count:
             message = self._summarize_and_clear_history() + "\n\n" + message
             self.conversation_length += get_context_token_count(message)
+        self.history.append_msg("user", message)
         response = self.model.chat_until_success(message)  # type: ignore
         self.conversation_length += get_context_token_count(response)
+        self.history.append_msg("assistant", response)
         return response
 
     def generate_summary(self) -> str:
