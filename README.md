@@ -47,6 +47,63 @@ pip3 install jarvis-ai-assistant
 | `jarvis-git-details` | - | 使用git details功能 |
 | `jarvis-methodology` | - | 使用方法论功能 |
 
+### Jarvis功能 (jarvis)
+
+`jarvis` 是Jarvis的通用代理工具，提供开箱即用的AI助手功能。
+
+#### 1. 核心功能
+- 任务分析与规划
+- 代码分析与修改
+- 系统交互与操作
+- 方法论应用与优化
+- 多代理协作
+
+#### 2. 使用方式
+```bash
+# 基本用法
+jarvis
+
+# 带参数使用
+jarvis -p <平台> -m <模型> -t "初始任务"
+```
+
+#### 3. 命令行参数
+| 参数 | 描述 |
+|------|------|
+| `-p/--platform` | 指定AI平台 (yuanbao/kimi/tongyi/openai) |
+| `-m/--model` | 指定模型名称 |
+| `-t/--task` | 指定初始任务 |
+
+#### 4. 工作流程
+1. 初始化环境
+2. 加载默认配置
+3. 创建代理实例
+4. 执行初始任务（如果指定）
+5. 进入交互式模式（如果没有初始任务）
+6. 根据用户输入执行任务
+
+#### 5. 任务执行特点
+- 自动应用最佳方法论
+- 智能任务分解
+- 多工具协同工作
+- 实时进度反馈
+- 自动生成任务总结
+
+#### 6. 示例
+```bash
+# 基本使用
+jarvis
+
+# 指定平台和模型
+jarvis -p yuanbao -m deep_seek_v3
+
+# 直接执行任务
+jarvis -t "分析项目结构并生成架构图"
+
+# 组合使用
+jarvis -p kimi -m k1 -t "优化项目性能"
+```
+
 ### 代码代理功能 (jarvis-code-agent)
 
 `jarvis-code-agent` 是Jarvis的代码分析与修改工具，专注于代码工程任务。
