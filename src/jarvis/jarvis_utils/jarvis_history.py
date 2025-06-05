@@ -23,19 +23,17 @@ class JarvisHistory:
             raise RuntimeError("Recording not started. Call start_record first.")
         self.records.append({"role": role, "message": msg})
 
-    def save_history(self) -> None:
+    def save_history(self, filename: str) -> None:
         """Save recorded messages to YAML file"""
-        if not self.current_file:
-            raise RuntimeError("No recording session to save.")
 
         # Skip saving if records is empty
         if not self.records:
             return
 
         # Ensure directory exists
-        os.makedirs(os.path.dirname(self.current_file), exist_ok=True)
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-        with open(self.current_file, "w") as f:
+        with open(filename, "w") as f:
             yaml.safe_dump({"conversation": self.records}, f, allow_unicode=True)
 
     def stop_record(self) -> None:
@@ -43,7 +41,7 @@ class JarvisHistory:
         if not self.current_file:
             raise RuntimeError("No recording session to stop.")
 
-        self.save_history()
+        self.save_history(self.current_file)
         self.current_file = None
         self.records = []
 

@@ -473,13 +473,25 @@ class Agent:
         注意:
             当上下文长度超过最大值时使用
         """
-        summary = self.generate_summary()
-        self.clear_history()  # type: ignore
+        need_summary = True
+        tmp_file_name = ""
+        try:
+            if self.model and self.model.support_upload_files():
+                need_summary = False
+            if need_summary:
+                summary = self.generate_summary()
+            else:
+                import tempfile
+                tmp_file = tempfile.NamedTemporaryFile(delete=False)
+                tmp_file_name = tmp_file.name
+                self.history.save_history(tmp_file_name)
+            self.clear_history()  # type: ignore
 
-        if not summary:
-            return ""
+            if need_summary:
+                if not summary:
+                    return ""
 
-        return f"""
+                return f"""
 以下是之前对话的关键信息总结：
 
 <content>
@@ -487,7 +499,15 @@ class Agent:
 </content>
 
 请基于以上信息继续完成任务。请注意，这是之前对话的摘要，上下文长度已超过限制而被重置。请直接继续任务，无需重复已完成的步骤。如有需要，可以询问用户以获取更多信息。
-"""
+        """
+            else:
+                if self.model and self.model.upload_files([tmp_file_name]):
+                    return "上传的文件是历史对话信息，请基于历史对话信息继续完成任务。"
+                else:
+                    return ""
+        finally:
+            if tmp_file_name:
+                os.remove(tmp_file_name)
 
     def _call_tools(self, response: str) -> Tuple[bool, Any]:
         """调用工具执行响应
