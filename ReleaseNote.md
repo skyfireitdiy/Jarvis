@@ -1,3 +1,19 @@
+### Release Note - v0.1.196 2025-06-05
+
+#### **新功能 (Features)**  
+- 新增历史记录功能(JARVIS_USE_HISTORY_COUNT配置项)
+- 添加历史记录导出为Markdown的功能
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 调整首次运行时文件上传逻辑
+- 重构Agent初始化代码，提取_first_run方法
+- 优化历史记录处理逻辑
+
+#### **文档更新 (Documentation)**  
+- 更新README.md添加JARVIS_USE_HISTORY配置说明
+
+本次更新主要增加了历史记录功能，可以配置保存历史对话数量，并支持导出为Markdown格式，同时优化了代码结构和文件处理逻辑。
+
 ### Release Note - v0.1.195 2025-06-04
 
 #### **新功能 (Features)**  
