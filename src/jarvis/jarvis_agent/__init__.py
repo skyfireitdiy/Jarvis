@@ -845,8 +845,10 @@ arguments:
     def first_run(self):
         history_md = ""
         if self.history_count > 0 and self.model and self.model.support_upload_files():
-            history_md = str(Path(self.history_dir)/f"{self.name}_history.md")
-            self.history.export_history_to_markdown(self.history_dir, history_md, max_files=self.history_count)
+            import tempfile
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            history_md = str(Path(tempfile.gettempdir())/f"{self.name}_history_{timestamp}.md")
+            self.history.export_history_to_markdown(tempfile.gettempdir(), history_md, max_files=self.history_count)
             self.files.append(history_md)
 
                         # 如果有上传文件，先上传文件
