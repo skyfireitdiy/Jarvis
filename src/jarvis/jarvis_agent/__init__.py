@@ -788,89 +788,91 @@ arguments:
             set_agent(self.name, self)
 
             while True:
+                history_md = ""
+                if self.first:
+                    history_md = self.first_run()
                 try:
-                    history_md = ""
-                    if self.first:
-                        if self.history_count > 0 and self.model and self.model.support_upload_files():
-                            history_md = str(Path(self.history_dir)/f"{self.name}_history.md")
-                            self.history.export_history_to_markdown(self.history_dir, history_md, max_files=self.history_count)
-                            self.files.append(history_md)
+                    current_response = self._call_model(self.prompt, True)
+                    self.prompt = ""
 
-                        # 如果有上传文件，先上传文件
-                        if self.model and self.model.support_upload_files():
-                            if self.use_methodology:
-                                if not upload_methodology(self.model, other_files=self.files):
-                                    if self.files:
-                                        PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
-                                    # 上传失败则回退到本地加载
-                                    msg = self.prompt
-                                    for handler in self.input_handler:
-                                        msg, _ = handler(msg, self)
-                                    self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
-                            elif self.files:
-                                if not self.model.upload_files(self.files):
-                                    PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
-                        else:
-                            if self.files:
-                                PrettyOutput.print("不支持上传文件，将忽略文件列表", OutputType.WARNING)
-                            if self.use_methodology:
-                                msg = self.prompt
-                                for handler in self.input_handler:
-                                    msg, _ = handler(msg, self)
-                                self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
-
-                        self.first = False
-                    try:
-                        current_response = self._call_model(self.prompt, True)
-                        self.prompt = ""
-
-                        if get_interrupt():
-                            set_interrupt(False)
-                            user_input = self.multiline_inputer(
-                                f"模型交互期间被中断，请输入用户干预信息："
-                            )
-                            if user_input:
-                                self.prompt += f"{user_input}"
-                                continue
-
-                        need_return, self.prompt = self._call_tools(current_response)
-
-                        if need_return:
-                            return self.prompt
-
-                        if self.after_tool_call_cb:
-                            self.after_tool_call_cb(self)
-
-                        if self.prompt or self.addon_prompt:
-                            continue
-
-                        if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
-                            return self._complete_task()
-
-                        self.reset_tool_call_count()
-
-                        # 获取用户输入
+                    if get_interrupt():
+                        set_interrupt(False)
                         user_input = self.multiline_inputer(
-                            f"{self.name}: 请输入，或输入空行来结束当前任务："
+                            f"模型交互期间被中断，请输入用户干预信息："
                         )
-
                         if user_input:
-                            self.prompt = user_input
+                            self.prompt += f"{user_input}"
                             continue
 
-                        if not user_input:
-                            return self._complete_task()
+                    need_return, self.prompt = self._call_tools(current_response)
 
-                    except Exception as e:
-                        PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
-                        return f"Task failed: {str(e)}"
-                finally:
+                    if need_return:
+                        return self.prompt
+
+                    if self.after_tool_call_cb:
+                        self.after_tool_call_cb(self)
+
+                    if self.prompt or self.addon_prompt:
+                        continue
+
+                    if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
+                        return self._complete_task()
+
+                    self.reset_tool_call_count()
+
+                    # 获取用户输入
+                    user_input = self.multiline_inputer(
+                        f"{self.name}: 请输入，或输入空行来结束当前任务："
+                    )
+
+                    if user_input:
+                        self.prompt = user_input
+                        continue
+
+                    if not user_input:
+                        return self._complete_task()
+
+                except Exception as e:
                     if history_md:
                         os.remove(history_md)
+                    PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
+                    return f"Task failed: {str(e)}"
 
         except Exception as e:
             PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
             return f"Task failed: {str(e)}"
+
+    def first_run(self):
+        if self.history_count > 0 and self.model and self.model.support_upload_files():
+            history_md = str(Path(self.history_dir)/f"{self.name}_history.md")
+            self.history.export_history_to_markdown(self.history_dir, history_md, max_files=self.history_count)
+            self.files.append(history_md)
+
+                        # 如果有上传文件，先上传文件
+        if self.model and self.model.support_upload_files():
+            if self.use_methodology:
+                if not upload_methodology(self.model, other_files=self.files):
+                    if self.files:
+                        PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
+                                    # 上传失败则回退到本地加载
+                    msg = self.prompt
+                    for handler in self.input_handler:
+                        msg, _ = handler(msg, self)
+                    self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+            elif self.files:
+                if not self.model.upload_files(self.files):
+                    PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
+        else:
+            if self.files:
+                PrettyOutput.print("不支持上传文件，将忽略文件列表", OutputType.WARNING)
+            if self.use_methodology:
+                msg = self.prompt
+                for handler in self.input_handler:
+                    msg, _ = handler(msg, self)
+                self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+
+        self.first = False
+        return history_md
 
     def clear_history(self):
         """清空对话历史但保留系统提示
