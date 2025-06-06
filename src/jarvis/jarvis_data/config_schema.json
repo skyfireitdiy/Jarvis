@@ -201,6 +201,11 @@
       "description": "是否打印提示",
       "default": false
     },
+    "JARVIS_USE_HISTORY": {
+      "type": "boolean",
+      "description": "是否启用历史记录功能",
+      "default": false
+    },
     "JARVIS_REPLACE_MAP": {
       "type": "object",
       "description": "自定义替换映射表配置",
