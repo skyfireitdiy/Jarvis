@@ -201,7 +201,7 @@
       "description": "是否打印提示",
       "default": false
     },
-    "USE_HISTORY_COUNT": {
+    "JARVIS_USE_HISTORY_COUNT": {
       "type": "number",
       "description": "使用的历史记录数量",
       "default": 0

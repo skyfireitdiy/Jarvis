@@ -272,7 +272,7 @@ def get_history_count() -> int:
     返回：
         bool: 如果启用历史记录则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("USE_HISTORY_COUNT", 0)
+    return GLOBAL_CONFIG_DATA.get("JARVIS_USE_HISTORY_COUNT", 0)
 
 
 def get_mcp_config() -> List[Dict[str, Any]]:
