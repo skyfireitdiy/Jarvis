@@ -1,10 +1,9 @@
+import glob
 import os
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import yaml
-import glob
-from typing import Union
 
 
 class JarvisHistory:
@@ -45,19 +44,27 @@ class JarvisHistory:
         self.records = []
 
     @staticmethod
-    def export_history_to_markdown(input_dir: str, output_file: str) -> None:
+    def export_history_to_markdown(
+        input_dir: str, output_file: str, max_files: Optional[int] = None
+    ) -> None:
         """
         Export all history files in the directory to a single markdown file
 
         Args:
             input_dir: Directory containing history YAML files
             output_file: Path to output markdown file
+            max_files: Maximum number of history files to export (None for all)
         """
         # Find all history files in the directory
         history_files = glob.glob(os.path.join(input_dir, "history_*.yaml"))
 
         if not history_files:
             raise FileNotFoundError(f"No history files found in {input_dir}")
+
+        # Sort files by modification time (newest first) and limit to max_files
+        history_files.sort(key=os.path.getmtime, reverse=True)
+        if max_files is not None:
+            history_files = history_files[:max_files]
 
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
