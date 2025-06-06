@@ -201,10 +201,10 @@
       "description": "是否打印提示",
       "default": false
     },
-    "JARVIS_USE_HISTORY": {
-      "type": "boolean",
-      "description": "是否启用历史记录功能",
-      "default": false
+    "USE_HISTORY_COUNT": {
+      "type": "number",
+      "description": "使用的历史记录数量",
+      "default": 0
     },
     "JARVIS_REPLACE_MAP": {
       "type": "object",
