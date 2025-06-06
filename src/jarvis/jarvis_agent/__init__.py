@@ -790,7 +790,7 @@ arguments:
             while True:
                 history_md = ""
                 if self.first:
-                    history_md = self.first_run()
+                    history_md = self._first_run()
                 try:
                     current_response = self._call_model(self.prompt, True)
                     self.prompt = ""
@@ -842,7 +842,7 @@ arguments:
             PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
             return f"Task failed: {str(e)}"
 
-    def first_run(self):
+    def _first_run(self):
         history_md = ""
         if self.history_count > 0 and self.model and self.model.support_upload_files():
             import tempfile
