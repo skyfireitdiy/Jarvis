@@ -843,6 +843,7 @@ arguments:
             return f"Task failed: {str(e)}"
 
     def first_run(self):
+        history_md = ""
         if self.history_count > 0 and self.model and self.model.support_upload_files():
             history_md = str(Path(self.history_dir)/f"{self.name}_history.md")
             self.history.export_history_to_markdown(self.history_dir, history_md, max_files=self.history_count)
