@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 import yaml
+import glob
+from typing import Union
 
 
 class JarvisHistory:
@@ -41,3 +43,47 @@ class JarvisHistory:
 
         self.current_file = None
         self.records = []
+
+    @staticmethod
+    def export_history_to_markdown(input_dir: str, output_file: str) -> None:
+        """
+        Export all history files in the directory to a single markdown file
+
+        Args:
+            input_dir: Directory containing history YAML files
+            output_file: Path to output markdown file
+        """
+        # Find all history files in the directory
+        history_files = glob.glob(os.path.join(input_dir, "history_*.yaml"))
+
+        if not history_files:
+            raise FileNotFoundError(f"No history files found in {input_dir}")
+
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+        with open(output_file, "w", encoding="utf-8") as md_file:
+            md_file.write("# Jarvis Conversation History\n\n")
+
+            for history_file in sorted(history_files):
+                # Read YAML file
+                with open(history_file, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+
+                if not data or "conversation" not in data:
+                    continue
+
+                # Write file header with timestamp from filename
+                timestamp = os.path.basename(history_file)[
+                    8:-5
+                ]  # Extract timestamp from "history_YYYYMMDD_HHMMSS.yaml"
+                md_file.write(
+                    f"## Conversation at {timestamp[:4]}-{timestamp[4:6]}-{timestamp[6:8]} "
+                    f"{timestamp[9:11]}:{timestamp[11:13]}:{timestamp[13:15]}\n\n"
+                )
+
+                # Write conversation messages
+                for msg in data["conversation"]:
+                    md_file.write(f"**{msg['role']}**: {msg['message']}\n\n")
+
+                md_file.write("\n---\n\n")
