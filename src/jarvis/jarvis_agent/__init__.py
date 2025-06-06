@@ -19,7 +19,7 @@ from jarvis.jarvis_utils.config import (get_data_dir, get_max_token_count,
                                         get_max_tool_call_count,
                                         is_auto_complete,
                                         is_execute_tool_confirm,
-                                        is_use_analysis, is_use_history, is_use_methodology)
+                                        is_use_analysis, get_history_count, is_use_methodology)
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (delete_agent, get_interrupt,
                                          make_agent_name, set_agent,
@@ -160,7 +160,7 @@ class Agent:
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
         files: List[str] = [],
-        use_history: Optional[bool] = None,
+        history_count: Optional[int] = None,
     ):
         self.files = files
         """初始化Jarvis Agent实例
@@ -243,7 +243,7 @@ class Agent:
         self.history_dir = str(Path(get_data_dir())/"history")
         self.history.start_record(self.history_dir)
 
-        self.use_history = use_history if use_history is not None else is_use_history()
+        self.history_count = history_count if history_count is not None else get_history_count()
 
 
         self.execute_tool_confirm = (
@@ -791,9 +791,9 @@ arguments:
                 try:
                     history_md = ""
                     if self.first:
-                        if self.use_history and self.model and self.model.support_upload_files():
+                        if self.history_count > 0 and self.model and self.model.support_upload_files():
                             history_md = str(Path(self.history_dir)/f"{self.name}_history.md")
-                            self.history.export_history_to_markdown(self.history_dir, history_md, max_files=50)
+                            self.history.export_history_to_markdown(self.history_dir, history_md, max_files=self.history_count)
                             self.files.append(history_md)
 
                         # 如果有上传文件，先上传文件
