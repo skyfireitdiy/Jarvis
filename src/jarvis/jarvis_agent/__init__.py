@@ -868,7 +868,7 @@ arguments:
             import tempfile
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             history_md = str(Path(tempfile.gettempdir())/f"{self.name}_history_{timestamp}.md")
-            self.history.export_history_to_markdown(tempfile.gettempdir(), history_md, max_files=self.history_count)
+            self.history.export_history_to_markdown(self.history_dir, history_md, max_files=self.history_count)
             self.files.append(history_md)
 
                         # 如果有上传文件，先上传文件
@@ -882,9 +882,16 @@ arguments:
                     for handler in self.input_handler:
                         msg, _ = handler(msg, self)
                     self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+                else:
+                    if self.files:
+                        self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
+                    else:
+                        self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
             elif self.files:
                 if not self.model.upload_files(self.files):
                     PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
+                else:
+                    self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
         else:
             if self.files:
                 PrettyOutput.print("不支持上传文件，将忽略文件列表", OutputType.WARNING)
