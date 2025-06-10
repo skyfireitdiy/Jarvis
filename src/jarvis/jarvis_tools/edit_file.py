@@ -444,7 +444,7 @@ def fast_edit(
             # 如果有多处，报错
             if modified_content.count(search_text) > 1:
                 success = False
-                err_msg = f"搜索文本 {search_text} 在文件中存在多处，请检查补丁内容"
+                err_msg = f"搜索文本 ```\n{search_text}\n``` 在文件中存在多处，请检查补丁内容"
                 break
             # 应用替换
             modified_content = modified_content.replace(search_text, replace_text)
@@ -465,7 +465,7 @@ def fast_edit(
                 if indented_search in modified_content:
                     if modified_content.count(indented_search) > 1:
                         success = False
-                        err_msg = f"搜索文本 {indented_search} 在文件中存在多处，请检查补丁内容"
+                        err_msg = f"搜索文本 ```\n{indented_search}\n``` 在文件中存在多处，请检查补丁内容"
                         break
                     modified_content = modified_content.replace(
                         indented_search, indented_replace
@@ -478,7 +478,7 @@ def fast_edit(
 
             if not found:
                 success = False
-                err_msg = f"搜索文本 {search_text} 在文件中不存在，尝试增加1-16个空格缩进后仍未找到匹配"
+                err_msg = f"搜索文本 ```\n{search_text}\n``` 在文件中不存在，尝试增加1-16个空格缩进后仍未找到匹配"
                 break
     if not success:
         revert_file(filepath)
