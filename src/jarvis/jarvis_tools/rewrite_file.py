@@ -86,6 +86,8 @@ class FileRewriteTool:
 
         file_path = args["file"]
         new_content = args["content"]
+        agent = args.get("agent", None)
+        abs_path = os.path.abspath(file_path)
 
         # 创建已处理文件变量，用于失败时回滚
         original_content = None
@@ -97,20 +99,20 @@ class FileRewriteTool:
             try:
                 # 如果文件存在，则读取原内容用于回滚
                 if file_exists:
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(abs_path, "r", encoding="utf-8") as f:
                         original_content = f.read()
 
                 # 确保目录存在
-                os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
+                os.makedirs(os.path.dirname(abs_path), exist_ok=True)
 
                 # 写入新内容
-                with open(file_path, "w", encoding="utf-8") as f:
+                with open(abs_path, "w", encoding="utf-8") as f:
                     f.write(new_content)
 
                 processed = True
 
                 action = "创建并写入" if not file_exists else "成功重写"
-                stdout_message = f"文件 {file_path} {action}"
+                stdout_message = f"文件 {abs_path} {action}"
                 stdout_messages.append(stdout_message)
                 PrettyOutput.print(stdout_message, OutputType.SUCCESS)
 
@@ -129,14 +131,14 @@ class FileRewriteTool:
                 try:
                     if original_content is None:
                         # 如果是新创建的文件，则删除
-                        if os.path.exists(file_path):
-                            os.remove(file_path)
-                        rollback_file_message = f"已删除新创建的文件: {file_path}"
+                        if os.path.exists(abs_path):
+                            os.remove(abs_path)
+                        rollback_file_message = f"已删除新创建的文件: {abs_path}"
                     else:
                         # 如果是修改的文件，则恢复原内容
-                        with open(file_path, "w", encoding="utf-8") as f:
+                        with open(abs_path, "w", encoding="utf-8") as f:
                             f.write(original_content)
-                        rollback_file_message = f"已回滚文件: {file_path}"
+                        rollback_file_message = f"已回滚文件: {abs_path}"
 
                     stderr_messages.append(rollback_file_message)
                     PrettyOutput.print(rollback_file_message, OutputType.INFO)
@@ -144,6 +146,17 @@ class FileRewriteTool:
                     rollback_error = f"回滚文件 {file_path} 失败: {str(e)}"
                     stderr_messages.append(rollback_error)
                     PrettyOutput.print(rollback_error, OutputType.WARNING)
+
+            # 记录成功处理的文件（使用绝对路径）
+            if success and agent:
+                abs_path = os.path.abspath(file_path)
+                files = agent.get_user_data("files")
+                if files:
+                    if abs_path not in files:
+                        files.append(abs_path)
+                else:
+                    files = [abs_path]
+                agent.set_user_data("files", files)
 
             return {
                 "success": success,
