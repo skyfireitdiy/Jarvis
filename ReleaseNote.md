@@ -1,3 +1,25 @@
+### Release Note - v0.1.199 2025-06-10
+
+#### **新功能 (Features)**  
+- 无
+
+#### **修复 (Fixes)**  
+- 修复了edit_file工具的多处匹配错误提示格式
+- 修复了user_confirm函数中的KeyboardInterrupt异常处理问题
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 优化rewrite_file工具，统一使用绝对路径处理文件
+- 改进rewrite_file工具的文件列表记录功能
+- 移除了utils.py中不必要的空行
+
+#### **文档更新 (Documentation)**  
+- 无
+
+#### **其他 (Miscellaneous)**  
+- 更新了docs/images/wechat.png图片文件
+
+本次更新主要优化了文件工具的错误处理和路径处理逻辑，增强了工具的健壮性。
+
 ### Release Note - v0.1.197 2025-06-07
 
 #### **新功能 (Features)**  
