@@ -3,12 +3,14 @@ import hashlib
 import os
 import signal
 import subprocess
+import sys
 import tarfile
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import yaml
+
 from jarvis import __version__
 from jarvis.jarvis_utils.config import (get_data_dir, get_max_big_content_size,
                                         set_global_env_data)
@@ -89,7 +91,11 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
         # 检查是否是git仓库并更新
     from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
 
-    check_and_update_git_repo(str(script_dir))
+    if check_and_update_git_repo(str(script_dir)):
+        # 更新成功，用当前命令行参数启动新进程
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+        # 如果execv失败，退出当前进程
+        sys.exit(0)
 
 
 def load_config():
