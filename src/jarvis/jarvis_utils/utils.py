@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import yaml
-
 from jarvis import __version__
 from jarvis.jarvis_utils.config import (get_data_dir, get_max_big_content_size,
                                         set_global_env_data)
@@ -273,9 +272,12 @@ def user_confirm(tip: str, default: bool = True) -> bool:
     返回:
         bool: 用户确认返回True，否则返回False
     """
-    suffix = "[Y/n]" if default else "[y/N]"
-    ret = get_single_line_input(f"{tip} {suffix}: ")
-    return default if ret == "" else ret.lower() == "y"
+    try:
+        suffix = "[Y/n]" if default else "[y/N]"
+        ret = get_single_line_input(f"{tip} {suffix}: ")
+        return default if ret == "" else ret.lower() == "y"
+    except KeyboardInterrupt:
+        return False
 
 
 def get_file_line_count(filename: str) -> int:
