@@ -45,6 +45,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 tool_registry_ if tool_registry_ else ToolRegistry()
             )
             agent.set_addon_prompt(tool_registry.prompt())
+            return "", False
         elif tag == "ReloadConfig":
             from jarvis.jarvis_utils.utils import load_config
 
