@@ -149,6 +149,9 @@ class BasePlatform(ABC):
         response = re.sub(
             ot("think") + r".*?" + ct("think"), "", response, flags=re.DOTALL
         )
+        response = re.sub(
+            ot("thinking") + r".*?" + ct("thinking"), "", response, flags=re.DOTALL
+        )
         return response
 
     def chat_until_success(self, message: str) -> str:
