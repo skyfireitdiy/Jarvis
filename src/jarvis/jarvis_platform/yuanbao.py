@@ -98,7 +98,7 @@ class YuanbaoPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, data=payload), sleep_time=5
+                lambda: requests.post(url, headers=headers, data=payload, timeout=600), sleep_time=5
             )
             response_json = response.json()
 
@@ -264,7 +264,7 @@ class YuanbaoPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload), sleep_time=5
+                lambda: requests.post(url, headers=headers, json=payload, timeout=600), sleep_time=5
             )
 
             if response.status_code != 200:
@@ -482,7 +482,7 @@ class YuanbaoPlatform(BasePlatform):
         try:
             # 发送消息请求，获取流式响应
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload, stream=True),
+                lambda: requests.post(url, headers=headers, json=payload, stream=True, timeout=600),
                 sleep_time=5,
             )
 
@@ -556,7 +556,7 @@ class YuanbaoPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload), sleep_time=5
+                lambda: requests.post(url, headers=headers, json=payload, timeout=600), sleep_time=5
             )
 
             if response.status_code == 200:
