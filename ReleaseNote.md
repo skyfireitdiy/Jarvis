@@ -1,3 +1,25 @@
+### Release Note - v0.1.200 2025-06-13
+
+#### **新功能 (Features)**  
+- 添加了工具调用中断时的用户干预处理逻辑
+- 新增git仓库更新后的自动重启功能
+
+#### **修复 (Fixes)**  
+- 修复了builtin_input_handler中ReloadConfig的返回逻辑
+- 修复了Yuanbao平台请求超时问题
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 优化了Yuanbao平台所有请求的超时处理(统一设置为600秒)
+- 移除了builtin_replace_map.py中冗余的ToolHelp模板
+
+#### **文档更新 (Documentation)**  
+- 无
+
+#### **其他 (Miscellaneous)**  
+- 优化了utils.py的导入顺序
+
+本次更新主要增强了工具调用中断处理能力，优化了Yuanbao平台的请求稳定性，并简化了内置替换映射表。
+
 ### Release Note - v0.1.199 2025-06-10
 
 #### **新功能 (Features)**  
