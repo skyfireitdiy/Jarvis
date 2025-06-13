@@ -821,6 +821,11 @@ arguments:
                             f"模型交互期间被中断，请输入用户干预信息："
                         )
                         if user_input:
+                            # 如果有工具调用且用户确认继续，则将干预信息和工具执行结果拼接为prompt
+                            if any(handler.can_handle(current_response) for handler in self.output_handler):
+                                if user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
+                                    self.prompt = f"{user_input}\n\n{current_response}"
+                                    continue
                             self.prompt += f"{user_input}"
                             continue
 
