@@ -553,21 +553,21 @@ class ToolRegistry(OutputHandlerProtocol):
         for item in data:
             try:
                 msg = yaml.safe_load(item)
-                if "name" in msg and "arguments" in msg and "want" in msg:
-                    ret.append(msg)
-                else:
-                    return (
-                        {},
-                        f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments、want字段）。
-
-                    {tool_call_help}""",
-                    )
             except Exception as e:
                 return (
                     {},
-                    f"""工具调用格式错误，请检查工具调用格式。
-
+                    f"""yaml 解析失败，请检查工具调用格式。
                     {e}
+
+                {tool_call_help}""",
+                )
+
+            if "name" in msg and "arguments" in msg and "want" in msg:
+                ret.append(msg)
+            else:
+                return (
+                    {},
+                    f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments、want字段）。
 
                 {tool_call_help}""",
                 )
