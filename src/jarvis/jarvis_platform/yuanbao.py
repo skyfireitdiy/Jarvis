@@ -477,7 +477,6 @@ class YuanbaoPlatform(BasePlatform):
         if self.first_chat and self.system_message:
             payload["prompt"] = f"{self.system_message}\n\n{message}"
             payload["displayPrompt"] = payload["prompt"]
-            self.first_chat = False
 
         try:
             # 发送消息请求，获取流式响应
@@ -532,6 +531,7 @@ class YuanbaoPlatform(BasePlatform):
                 # 检测结束标志
                 elif line_str == "data: [DONE]":
                     return None
+            self.first_chat = False
             return None
 
         except Exception as e:
