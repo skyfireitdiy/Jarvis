@@ -125,12 +125,24 @@ class EditFileHandler(OutputHandler):
 
     def _parse_patches(self, response: str) -> Dict[str, List[Dict[str, str]]]:
         """解析响应中的补丁信息
+        
+        该方法使用正则表达式从响应文本中提取文件编辑指令(PATCH块)，
+        每个PATCH块可以包含多个DIFF块，每个DIFF块包含一组搜索和替换内容。
+        解析后会返回一个字典，键是文件路径，值是该文件对应的补丁列表。
 
         Args:
-            response: 包含补丁信息的响应字符串
+            response: 包含补丁信息的响应字符串，格式应符合PATCH指令规范
 
         Returns:
-            Dict[str, List[Dict[str, str]]]: 返回文件路径到补丁列表的映射
+            Dict[str, List[Dict[str, str]]]: 
+                返回解析后的补丁信息字典，结构为:
+                {
+                    "文件路径1": [
+                        {"search": "搜索文本1", "replace": "替换文本1"},
+                        {"search": "搜索文本2", "replace": "替换文本2"}
+                    ],
+                    "文件路径2": [...]
+                }
         """
         patches = {}
         for match in self.patch_pattern.finditer(response):
