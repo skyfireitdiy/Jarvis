@@ -78,7 +78,7 @@ class EditFileHandler(OutputHandler):
                 success, result = self._fast_edit(file_path, file_patches, spinner)
                 if not success:
                     # 如果fast_edit失败，尝试slow_edit模式
-                    success, result = self._slow_edit(
+                    success, result = EditFileHandler._slow_edit(
                         file_path, file_patches, spinner, agent
                     )
 
@@ -166,8 +166,9 @@ class EditFileHandler(OutputHandler):
                 patches[file_path] = diffs
         return patches
 
+    @staticmethod
     def _fast_edit(
-        self, file_path: str, patches: List[Dict[str, str]], spinner: Yaspin
+        file_path: str, patches: List[Dict[str, str]], spinner: Yaspin
     ) -> Tuple[bool, str]:
         """快速应用补丁到文件
 
@@ -257,8 +258,9 @@ class EditFileHandler(OutputHandler):
             revert_file(file_path)
             return False, f"文件修改失败: {str(e)}"
 
+    @staticmethod
     def _slow_edit(
-        self, file_path: str, patches: List[Dict[str, str]], spinner: Yaspin, agent: Any
+        file_path: str, patches: List[Dict[str, str]], spinner: Yaspin, agent: Any
     ) -> Tuple[bool, str]:
         """使用AI模型生成补丁并应用到文件
 
@@ -398,7 +400,7 @@ class EditFileHandler(OutputHandler):
 
                 if generated_patches:
                     # 尝试应用生成的补丁
-                    success, result = self._fast_edit(
+                    success, result = EditFileHandler._fast_edit(
                         file_path, generated_patches, spinner
                     )
                     if success:
