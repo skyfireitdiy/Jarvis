@@ -14,6 +14,7 @@ from yaspin import yaspin  # type: ignore
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.output_handlers.edit_file_handler import EditFileHandler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 # 忽略yaspin的类型检查
 from jarvis.jarvis_code_agent.lint import get_lint_tools
@@ -54,7 +55,7 @@ class CodeAgent:
                 "read_code",
                 "methodology",
                 "chdir",
-                "edit_file",
+                # "edit_file",
                 "rewrite_file",
             ]
         )
@@ -112,7 +113,7 @@ class CodeAgent:
             system_prompt=code_system_prompt,
             name="CodeAgent",
             auto_complete=False,
-            output_handler=[tool_registry],
+            output_handler=[tool_registry, EditFileHandler()],
             platform=platform_instance,
             input_handler=[shell_input_handler, builtin_input_handler],
             need_summary=need_summary,
