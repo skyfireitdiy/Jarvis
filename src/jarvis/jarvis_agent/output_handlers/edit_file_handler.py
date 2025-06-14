@@ -121,7 +121,7 @@ class EditFileHandler(OutputHandler):
         Returns:
             str: 返回处理器的名称字符串
         """
-        return "edit_file"
+        return "PATCH"
 
     def _parse_patches(self, response: str) -> Dict[str, List[Dict[str, str]]]:
         """解析响应中的补丁信息
