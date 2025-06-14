@@ -1,36 +1,53 @@
-from typing import Any, Dict, List, Tuple
-import re
 import os
+import re
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Tuple
 
-from jarvis.jarvis_agent.output_handler import OutputHandler
-from jarvis.jarvis_tools.file_operation import FileOperationTool
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.git_utils import revert_file
-from jarvis.jarvis_utils.utils import is_context_overflow
-from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.tag import ct, ot
 from yaspin import yaspin
 from yaspin.core import Yaspin
+
+from jarvis.jarvis_agent.output_handler import OutputHandler
+from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_tools.file_operation import FileOperationTool
+from jarvis.jarvis_utils.git_utils import revert_file
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.utils import is_context_overflow
 
 
 class EditFileHandler(OutputHandler):
     def __init__(self):
         self.patch_pattern = re.compile(
-            ot("PATCH file=([^>]+)") + r'\s*'
-            r'(?:' + ot("DIFF") + r'\s*'
-            + ot("SEARCH") + r'\s*(.*?)\s*' + ct("SEARCH") + r'\s*'
-            + ot("REPLACE") + r'\s*(.*?)\s*' + ct("REPLACE") + r'\s*'
-            + ct("DIFF") + r'\s*)+'
+            ot("PATCH file=([^>]+)") + r"\s*"
+            r"(?:"
+            + ot("DIFF")
+            + r"\s*"
+            + ot("SEARCH")
+            + r"\s*(.*?)\s*"
+            + ct("SEARCH")
+            + r"\s*"
+            + ot("REPLACE")
+            + r"\s*(.*?)\s*"
+            + ct("REPLACE")
+            + r"\s*"
+            + ct("DIFF")
+            + r"\s*)+"
             + ct("PATCH"),
-            re.DOTALL
+            re.DOTALL,
         )
         self.diff_pattern = re.compile(
-            ot("DIFF") + r'\s*'
-            + ot("SEARCH") + r'\s*(.*?)\s*' + ct("SEARCH") + r'\s*'
-            + ot("REPLACE") + r'\s*(.*?)\s*' + ct("REPLACE") + r'\s*'
+            ot("DIFF")
+            + r"\s*"
+            + ot("SEARCH")
+            + r"\s*(.*?)\s*"
+            + ct("SEARCH")
+            + r"\s*"
+            + ot("REPLACE")
+            + r"\s*(.*?)\s*"
+            + ct("REPLACE")
+            + r"\s*"
             + ct("DIFF"),
-            re.DOTALL
+            re.DOTALL,
         )
 
     def handle(self, response: str, agent: Any) -> Tuple[bool, str]:
@@ -52,15 +69,19 @@ class EditFileHandler(OutputHandler):
 
         for file_path, diffs in patches.items():
             file_path = os.path.abspath(file_path)
-            patches = [{"search": diff["search"], "replace": diff["replace"]} for diff in diffs]
-            
+            file_patches = [
+                {"search": diff["search"], "replace": diff["replace"]} for diff in diffs
+            ]
+
             with yaspin(text=f"正在处理文件 {file_path}...", color="cyan") as spinner:
                 # 首先尝试fast_edit模式
-                success, result = self._fast_edit(file_path, patches, spinner)
+                success, result = self._fast_edit(file_path, file_patches, spinner)
                 if not success:
                     # 如果fast_edit失败，尝试slow_edit模式
-                    success, result = self._slow_edit(file_path, patches, spinner, agent)
-                
+                    success, result = self._slow_edit(
+                        file_path, file_patches, spinner, agent
+                    )
+
                 if success:
                     results.append(f"✅ 文件 {file_path} 修改成功")
                 else:
@@ -112,7 +133,7 @@ class EditFileHandler(OutputHandler):
 
     def _parse_patches(self, response: str) -> Dict[str, List[Dict[str, str]]]:
         """解析响应中的补丁信息
-        
+
         该方法使用正则表达式从响应文本中提取文件编辑指令(PATCH块)，
         每个PATCH块可以包含多个DIFF块，每个DIFF块包含一组搜索和替换内容。
         解析后会返回一个字典，键是文件路径，值是该文件对应的补丁列表。
@@ -121,7 +142,7 @@ class EditFileHandler(OutputHandler):
             response: 包含补丁信息的响应字符串，格式应符合PATCH指令规范
 
         Returns:
-            Dict[str, List[Dict[str, str]]]: 
+            Dict[str, List[Dict[str, str]]]:
                 返回解析后的补丁信息字典，结构为:
                 {
                     "文件路径1": [
@@ -136,24 +157,37 @@ class EditFileHandler(OutputHandler):
             file_path = match.group(1)
             diffs = []
             for diff_match in self.diff_pattern.finditer(match.group(0)):
-                diffs.append({
-                    "search": diff_match.group(1).strip(),
-                    "replace": diff_match.group(2).strip()
-                })
+                diffs.append(
+                    {
+                        "search": diff_match.group(1).strip(),
+                        "replace": diff_match.group(2).strip(),
+                    }
+                )
             if diffs:
                 patches[file_path] = diffs
         return patches
 
-    def _fast_edit(self, file_path: str, patches: List[Dict[str, str]], spinner: Yaspin) -> Tuple[bool, str]:
+    def _fast_edit(
+        self, file_path: str, patches: List[Dict[str, str]], spinner: Yaspin
+    ) -> Tuple[bool, str]:
         """快速应用补丁到文件
 
+        该方法直接尝试将补丁应用到目标文件，适用于简单、明确的修改场景。
+        特点：
+        1. 直接进行字符串替换，效率高
+        2. 会自动处理缩进问题，尝试匹配不同缩进级别的代码
+        3. 确保搜索文本在文件中唯一匹配
+        4. 如果失败会自动回滚修改
+
         Args:
-            file_path: 要修改的文件路径
-            patches: 补丁列表
-            spinner: 进度显示对象
+            file_path: 要修改的文件路径，支持绝对路径和相对路径
+            patches: 补丁列表，每个补丁包含search(搜索文本)和replace(替换文本)
+            spinner: 进度显示对象，用于显示处理状态和结果
 
         Returns:
-            Tuple[bool, str]: 返回处理结果元组，第一个元素表示是否成功，第二个元素为结果信息
+            Tuple[bool, str]:
+                返回处理结果元组，第一个元素表示是否成功(True/False)，
+                第二个元素为结果信息，成功时为修改后的文件内容，失败时为错误信息
         """
         try:
             # 确保目录存在
@@ -176,7 +210,9 @@ class EditFileHandler(OutputHandler):
                 if search_text in modified_content:
                     if modified_content.count(search_text) > 1:
                         return False, f"搜索文本在文件中存在多处匹配：\n{search_text}"
-                    modified_content = modified_content.replace(search_text, replace_text)
+                    modified_content = modified_content.replace(
+                        search_text, replace_text
+                    )
                     spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
                 else:
                     # 尝试增加缩进重试
@@ -192,9 +228,16 @@ class EditFileHandler(OutputHandler):
                         )
                         if indented_search in modified_content:
                             if modified_content.count(indented_search) > 1:
-                                return False, f"搜索文本在文件中存在多处匹配：\n{indented_search}"
-                            modified_content = modified_content.replace(indented_search, indented_replace)
-                            spinner.write(f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)")
+                                return (
+                                    False,
+                                    f"搜索文本在文件中存在多处匹配：\n{indented_search}",
+                                )
+                            modified_content = modified_content.replace(
+                                indented_search, indented_replace
+                            )
+                            spinner.write(
+                                f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)"
+                            )
                             found = True
                             break
 
@@ -215,21 +258,33 @@ class EditFileHandler(OutputHandler):
             revert_file(file_path)
             return False, f"文件修改失败: {str(e)}"
 
-    def _slow_edit(self, file_path: str, patches: List[Dict[str, str]], spinner: Yaspin, agent: Any) -> Tuple[bool, str]:
+    def _slow_edit(
+        self, file_path: str, patches: List[Dict[str, str]], spinner: Yaspin, agent: Any
+    ) -> Tuple[bool, str]:
         """使用AI模型生成补丁并应用到文件
 
+        当_fast_edit方法失败时调用此方法，使用AI模型生成更精确的补丁。
+        特点：
+        1. 适用于复杂修改场景或需要上下文理解的修改
+        2. 会自动处理大文件上传问题
+        3. 会尝试最多3次生成有效的补丁
+        4. 生成的补丁会再次通过_fast_edit方法应用
+        5. 如果失败会自动回滚修改
+
         Args:
-            file_path: 要修改的文件路径
-            patches: 补丁列表
-            spinner: 进度显示对象
-            agent: 执行处理的agent实例
+            file_path: 要修改的文件路径，支持绝对路径和相对路径
+            patches: 补丁列表，每个补丁包含search(搜索文本)和replace(替换文本)
+            spinner: 进度显示对象，用于显示处理状态和结果
+            agent: 执行处理的agent实例，用于访问AI模型平台
 
         Returns:
-            Tuple[bool, str]: 返回处理结果元组，第一个元素表示是否成功，第二个元素为结果信息
+            Tuple[bool, str]:
+                返回处理结果元组，第一个元素表示是否成功(True/False)，
+                第二个元素为结果信息，成功时为修改后的文件内容，失败时为错误信息
         """
         try:
             model = PlatformRegistry().get_normal_platform()
-            
+
             # 读取原始文件内容
             file_content = ""
             if os.path.exists(file_path):
@@ -241,7 +296,11 @@ class EditFileHandler(OutputHandler):
 
             # 如果是大文件，尝试上传到模型平台
             with spinner.hidden():
-                if is_large_context and model.support_upload_files() and model.upload_files([file_path]):
+                if (
+                    is_large_context
+                    and model.support_upload_files()
+                    and model.upload_files([file_path])
+                ):
                     upload_success = True
 
             model.set_suppress_output(True)
@@ -249,11 +308,13 @@ class EditFileHandler(OutputHandler):
             # 构建补丁内容
             patch_content = []
             for patch in patches:
-                patch_content.append({
-                    "reason": "根据用户指令修改代码",
-                    "search": patch["search"],
-                    "replace": patch["replace"]
-                })
+                patch_content.append(
+                    {
+                        "reason": "根据用户指令修改代码",
+                        "search": patch["search"],
+                        "replace": patch["replace"],
+                    }
+                )
 
             # 构建提示词
             main_prompt = f"""
@@ -319,8 +380,9 @@ class EditFileHandler(OutputHandler):
 
                 # 解析生成的补丁
                 diff_blocks = re.finditer(
-                    ot("DIFF") + r'\s*'
-                    + r'>{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?'
+                    ot("DIFF")
+                    + r"\s*"
+                    + r">{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?"
                     + ct("DIFF"),
                     response,
                     re.DOTALL,
@@ -328,14 +390,18 @@ class EditFileHandler(OutputHandler):
 
                 generated_patches = []
                 for match in diff_blocks:
-                    generated_patches.append({
-                        "search": match.group(1).strip(),
-                        "replace": match.group(2).strip(),
-                    })
+                    generated_patches.append(
+                        {
+                            "search": match.group(1).strip(),
+                            "replace": match.group(2).strip(),
+                        }
+                    )
 
                 if generated_patches:
                     # 尝试应用生成的补丁
-                    success, result = self._fast_edit(file_path, generated_patches, spinner)
+                    success, result = self._fast_edit(
+                        file_path, generated_patches, spinner
+                    )
                     if success:
                         return True, result
 
@@ -345,4 +411,4 @@ class EditFileHandler(OutputHandler):
             spinner.text = f"文件修改失败: {str(e)}"
             spinner.fail("❌")
             revert_file(file_path)
-            return False, f"文件修改失败: {str(e)}" 
+            return False, f"文件修改失败: {str(e)}"
