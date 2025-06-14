@@ -33,7 +33,7 @@ class EditFileHandler(OutputHandler):
             re.DOTALL
         )
 
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
+    def handle(self, response: str, agent: Any) -> Tuple[bool, str]:
         """处理文件编辑响应
 
         Args:
@@ -41,7 +41,7 @@ class EditFileHandler(OutputHandler):
             agent: 执行处理的agent实例
 
         Returns:
-            Tuple[bool, Any]: 返回处理结果元组，第一个元素表示是否处理成功，第二个元素为处理结果
+            Tuple[bool, str]: 返回处理结果元组，第一个元素表示是否处理成功，第二个元素为处理结果汇总字符串
         """
         patches = self._parse_patches(response)
         if not patches:
@@ -62,26 +62,13 @@ class EditFileHandler(OutputHandler):
                     success, result = self._slow_edit(file_path, patches, spinner, agent)
                 
                 if success:
-                    results.append({
-                        "file": file_path,
-                        "success": True,
-                        "stdout": f"文件 {file_path} 修改成功",
-                        "stderr": ""
-                    })
+                    results.append(f"✅ 文件 {file_path} 修改成功")
                 else:
                     overall_success = False
-                    results.append({
-                        "file": file_path,
-                        "success": False,
-                        "stdout": "",
-                        "stderr": result
-                    })
+                    results.append(f"❌ 文件 {file_path} 修改失败: {result}")
 
-        return overall_success, {
-            "success": overall_success,
-            "stdout": "\n".join(r["stdout"] for r in results if r["success"]),
-            "stderr": "\n".join(r["stderr"] for r in results if not r["success"])
-        }
+        summary = "\n".join(results)
+        return False, summary
 
     def can_handle(self, response: str) -> bool:
         """判断是否能处理给定的响应
