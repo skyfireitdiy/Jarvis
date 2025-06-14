@@ -95,7 +95,7 @@ class CodeAgent:
 - 仅在命令行工具不足时使用专用工具
 
 ## 文件编辑工具使用规范
-- 对于部分文件内容修改，使用edit_file工具
+- 对于部分文件内容修改，使用PATCH
 - 对于需要重写整个文件内容，使用rewrite_file工具
 - 对于简单的修改，可以使用execute_script工具执行shell命令完成
 </code_engineer_guide>
