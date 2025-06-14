@@ -17,19 +17,10 @@
 - 支持大文件处理(自动上传到模型平台)
 - 提供3次重试机制确保操作可靠性
 """
-import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict
 
-import yaml
 from yaspin import yaspin
-from yaspin.core import Yaspin
 
-from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_tools.file_operation import FileOperationTool
-from jarvis.jarvis_utils.git_utils import revert_file
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import is_context_overflow
 from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
 
 
@@ -88,9 +79,6 @@ class FileSearchReplaceTool:
         "required": ["files"],
     }
 
-    def __init__(self):
-        """初始化文件搜索替换工具"""
-        self.edit_file_handler = EditFileHandler()
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """执行文件编辑操作，支持快速编辑和AI辅助编辑两种模式。
@@ -176,10 +164,10 @@ class FileSearchReplaceTool:
                         text=f"正在处理文件 {file_path}...", color="cyan"
                     ) as spinner:
                         # 首先尝试fast_edit模式
-                        success, temp_content = self.edit_file_handler._fast_edit(file_path, changes, spinner)
+                        success, temp_content = EditFileHandler._fast_edit(file_path, changes, spinner)
                         if not success:
                             # 如果fast_edit失败，尝试slow_edit模式
-                            success, temp_content = self.edit_file_handler._slow_edit(
+                            success, temp_content = EditFileHandler._slow_edit(
                                 file_path,
                                 changes,
                                 spinner,
