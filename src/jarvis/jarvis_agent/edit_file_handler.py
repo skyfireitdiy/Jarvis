@@ -85,7 +85,6 @@ class EditFileHandler(OutputHandler):
                 if success:
                     results.append(f"✅ 文件 {file_path} 修改成功")
                 else:
-                    overall_success = False
                     results.append(f"❌ 文件 {file_path} 修改失败: {result}")
 
         summary = "\n".join(results)
