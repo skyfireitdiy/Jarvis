@@ -1,3 +1,30 @@
+### Release Note - v0.1.201 2025-06-15
+
+#### **新功能 (Features)**  
+- 新增EditFileHandler类，用于处理文件编辑指令(PATCH块)
+- 支持通过PATCH指令进行精确的文件内容修改
+- 新增fast_edit和slow_edit两种编辑模式
+
+#### **修复 (Fixes)**  
+- 修复yuanbao平台首次聊天标志未正确重置的问题
+- 修复文件编辑工具中yaml解析失败时的错误处理
+- 修复thinking标签未正确处理的问题
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 重构文件编辑工具为多文件处理模式
+- 优化代码补丁生成逻辑，增加自动缩进匹配功能
+- 改进文件编辑失败时的回滚机制
+
+#### **文档更新 (Documentation)**  
+- 更新文件编辑指令格式文档
+- 添加PATCH处理器使用说明
+
+#### **其他 (Miscellaneous)**  
+- 移除旧的edit_file工具，改用新的EditFileHandler
+- 优化工具调用格式错误提示信息
+
+本次更新主要改进了文件编辑功能，新增了更精确的PATCH指令支持，并优化了编辑失败时的处理流程。
+
 ### Release Note - v0.1.200 2025-06-13
 
 #### **新功能 (Features)**  
