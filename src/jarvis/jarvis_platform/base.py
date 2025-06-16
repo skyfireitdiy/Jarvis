@@ -82,7 +82,7 @@ class BasePlatform(ABC):
                         while_true(
                             lambda: while_success(
                                 lambda: self.chat(
-                                    f"<part_content>{input}</part_content>请返回已收到"
+                                    f"<part_content>{input}</part_content>\n\n请返回已收到"
                                 ),
                                 5,
                             ),
