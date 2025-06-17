@@ -342,19 +342,13 @@ class EditFileHandler(OutputHandler):
 
 ## 输出模板
 {ot("DIFF")}
-{">" * 5} SEARCH
-[需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
-{'='*5}
-[替换后的新代码]
-{"<" * 5} REPLACE
+{ot("SEARCH")}[需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("SEARCH")}
+{ot("REPLACE")}[替换后的新代码]{ct("REPLACE")}
 {ct("DIFF")}
 
 {ot("DIFF")}
-{">" * 5} SEARCH
-[另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]
-{'='*5}
-[另一处替换后的新代码]
-{"<" * 5} REPLACE
+{ot("SEARCH")}[另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("SEARCH")}
+{ot("REPLACE")}[另一处替换后的新代码]{ct("REPLACE")}
 {ct("DIFF")}
 """
 
@@ -380,7 +374,14 @@ class EditFileHandler(OutputHandler):
                 diff_blocks = re.finditer(
                     ot("DIFF")
                     + r"\s*"
-                    + r">{4,} SEARCH\n?(.*?)\n?={4,}\n?(.*?)\s*<{4,} REPLACE\n?"
+                    + ot("SEARCH")
+                    + r"(.*?)"
+                    + ct("SEARCH")
+                    + r"\s*"
+                    + ot("REPLACE")
+                    + r"(.*?)"
+                    + ct("REPLACE")
+                    + r"\s*"
                     + ct("DIFF"),
                     response,
                     re.DOTALL,
