@@ -65,7 +65,6 @@ class EditFileHandler(OutputHandler):
             return False, "未找到有效的文件编辑指令"
 
         results = []
-        overall_success = True
 
         for file_path, diffs in patches.items():
             file_path = os.path.abspath(file_path)
