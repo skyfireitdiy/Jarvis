@@ -18,33 +18,33 @@ class EditFileHandler(OutputHandler):
         self.patch_pattern = re.compile(
             ot("PATCH file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))") + r"\s*"
             r"(?:"
-            + ot("diff")
+            + ot("DIFF")
             + r"\s*"
-            + ot("search")
+            + ot("SEARCH")
             + r"(.*?)"
-            + ct("search")
+            + ct("SEARCH")
             + r"\s*"
-            + ot("replace")
+            + ot("REPLACE")
             + r"(.*?)"
-            + ct("replace")
+            + ct("REPLACE")
             + r"\s*"
-            + ct("diff")
+            + ct("DIFF")
             + r"\s*)+"
             + ct("PATCH"),
             re.DOTALL,
         )
         self.diff_pattern = re.compile(
-            ot("diff")
+            ot("DIFF")
             + r"\s*"
-            + ot("search")
+            + ot("SEARCH")
             + r"(.*?)"
-            + ct("search")
+            + ct("SEARCH")
             + r"\s*"
-            + ot("replace")
+            + ot("REPLACE")
             + r"(.*?)"
-            + ct("replace")
+            + ct("REPLACE")
             + r"\s*"
-            + ct("diff"),
+            + ct("DIFF"),
             re.DOTALL,
         )
 
@@ -67,7 +67,7 @@ class EditFileHandler(OutputHandler):
         for file_path, diffs in patches.items():
             file_path = os.path.abspath(file_path)
             file_patches = [
-                {"search": diff["search"], "replace": diff["replace"]} for diff in diffs
+                {"SEARCH": diff["SEARCH"], "REPLACE": diff["REPLACE"]} for diff in diffs
             ]
 
             with yaspin(text=f"正在处理文件 {file_path}...", color="cyan") as spinner:
@@ -106,10 +106,10 @@ class EditFileHandler(OutputHandler):
         """
         return f"""文件编辑指令格式：
 {ot("PATCH file=文件路径")}
-{ot("diff")}
-{ot("search")}原始代码{ct("search")}
-{ot("replace")}新代码{ct("replace")}
-{ct("diff")}
+{ot("DIFF")}
+{ot("SEARCH")}原始代码{ct("SEARCH")}
+{ot("REPLACE")}新代码{ct("REPLACE")}
+{ct("DIFF")}
 {ct("PATCH")}
 
 可以返回多个PATCH块用于同时修改多个文件
@@ -139,8 +139,8 @@ class EditFileHandler(OutputHandler):
                 返回解析后的补丁信息字典，结构为:
                 {
                     "文件路径1": [
-                        {"search": "搜索文本1", "replace": "替换文本1"},
-                        {"search": "搜索文本2", "replace": "替换文本2"}
+                        {"SEARCH": "搜索文本1", "REPLACE": "替换文本1"},
+                        {"SEARCH": "搜索文本2", "REPLACE": "替换文本2"}
                     ],
                     "文件路径2": [...]
                 }
@@ -153,8 +153,8 @@ class EditFileHandler(OutputHandler):
             for diff_match in self.diff_pattern.finditer(match.group(0)):
                 diffs.append(
                     {
-                        "search": diff_match.group(1).strip(),
-                        "replace": diff_match.group(2).strip(),
+                        "SEARCH": diff_match.group(1).strip(),
+                        "REPLACE": diff_match.group(2).strip(),
                     }
                 )
             if diffs:
@@ -198,8 +198,8 @@ class EditFileHandler(OutputHandler):
             modified_content = file_content
             patch_count = 0
             for patch in patches:
-                search_text = patch["search"]
-                replace_text = patch["replace"]
+                search_text = patch["SEARCH"]
+                replace_text = patch["REPLACE"]
                 patch_count += 1
 
                 if search_text in modified_content:
@@ -310,8 +310,8 @@ class EditFileHandler(OutputHandler):
                 patch_content.append(
                     {
                         "reason": "根据用户指令修改代码",
-                        "search": patch["search"],
-                        "replace": patch["replace"],
+                        "SEARCH": patch["SEARCH"],
+                        "REPLACE": patch["REPLACE"],
                     }
                 )
 
@@ -334,23 +334,23 @@ class EditFileHandler(OutputHandler):
 4. **上下文完整性**：提供足够的上下文，确保补丁能准确应用
 
 ## 输出格式规范
-- 使用{ot("diff")}块包围每个需要修改的代码段
-- 每个{ot("diff")}块必须包含SEARCH部分和REPLACE部分
+- 使用{ot("DIFF")}块包围每个需要修改的代码段
+- 每个{ot("DIFF")}块必须包含SEARCH部分和REPLACE部分
 - SEARCH部分是需要查找的原始代码
 - REPLACE部分是替换后的新代码
 - 确保SEARCH部分能在原文件中**唯一匹配**
-- 如果修改较大，可以使用多个{ot("diff")}块
+- 如果修改较大，可以使用多个{ot("DIFF")}块
 
 ## 输出模板
-{ot("diff")}
-{ot("search")}[需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("search")}
-{ot("replace")}[替换后的新代码]{ct("replace")}
-{ct("diff")}
+{ot("DIFF")}
+{ot("SEARCH")}[需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("SEARCH")}
+{ot("REPLACE")}[替换后的新代码]{ct("REPLACE")}
+{ct("DIFF")}
 
-{ot("diff")}
-{ot("search")}[另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("search")}
-{ot("replace")}[另一处替换后的新代码]{ct("replace")}
-{ct("diff")}
+{ot("DIFF")}
+{ot("SEARCH")}[另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("SEARCH")}
+{ot("REPLACE")}[另一处替换后的新代码]{ct("REPLACE")}
+{ct("DIFF")}
 """
 
             # 尝试最多3次生成补丁
@@ -373,17 +373,17 @@ class EditFileHandler(OutputHandler):
 
                 # 解析生成的补丁
                 diff_blocks = re.finditer(
-                    ot("diff")
+                    ot("DIFF")
                     + r"\s*"
-                    + ot("search")
+                    + ot("SEARCH")
                     + r"(.*?)"
-                    + ct("search")
+                    + ct("SEARCH")
                     + r"\s*"
-                    + ot("replace")
+                    + ot("REPLACE")
                     + r"(.*?)"
-                    + ct("replace")
+                    + ct("REPLACE")
                     + r"\s*"
-                    + ct("diff"),
+                    + ct("DIFF"),
                     response,
                     re.DOTALL,
                 )
@@ -392,8 +392,8 @@ class EditFileHandler(OutputHandler):
                 for match in diff_blocks:
                     generated_patches.append(
                         {
-                            "search": match.group(1).strip(),
-                            "replace": match.group(2).strip(),
+                            "SEARCH": match.group(1).strip(),
+                            "REPLACE": match.group(2).strip(),
                         }
                     )
 
