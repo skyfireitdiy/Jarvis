@@ -23,11 +23,11 @@ class EditFileHandler(OutputHandler):
             + ot("DIFF")
             + r"\s*"
             + ot("SEARCH")
-            + r"\s*(.*?)\s*"
+            + r"\s*\n(.*?)"
             + ct("SEARCH")
             + r"\s*"
             + ot("REPLACE")
-            + r"\s*(.*?)\s*"
+            + r"\s*\n(.*?)"
             + ct("REPLACE")
             + r"\s*"
             + ct("DIFF")
@@ -39,11 +39,11 @@ class EditFileHandler(OutputHandler):
             ot("DIFF")
             + r"\s*"
             + ot("SEARCH")
-            + r"\s*(.*?)\s*"
+            + r"\s*\n(.*?)"
             + ct("SEARCH")
             + r"\s*"
             + ot("REPLACE")
-            + r"\s*(.*?)\s*"
+            + r"\s*\n(.*?)"
             + ct("REPLACE")
             + r"\s*"
             + ct("DIFF"),
