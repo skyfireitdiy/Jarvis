@@ -130,6 +130,7 @@ class EditFileHandler(OutputHandler):
         该方法使用正则表达式从响应文本中提取文件编辑指令(PATCH块)，
         每个PATCH块可以包含多个DIFF块，每个DIFF块包含一组搜索和替换内容。
         解析后会返回一个字典，键是文件路径，值是该文件对应的补丁列表。
+        如果同一个文件路径出现多次，会将所有DIFF块合并到一起。
 
         Args:
             response: 包含补丁信息的响应字符串，格式应符合PATCH指令规范
@@ -158,7 +159,10 @@ class EditFileHandler(OutputHandler):
                     }
                 )
             if diffs:
-                patches[file_path] = diffs
+                if file_path in patches:
+                    patches[file_path].extend(diffs)
+                else:
+                    patches[file_path] = diffs
         return patches
 
     @staticmethod
@@ -204,7 +208,10 @@ class EditFileHandler(OutputHandler):
 
                 if search_text in modified_content:
                     if modified_content.count(search_text) > 1:
-                        PrettyOutput.print(f"搜索文本在文件中存在多处匹配：\n{search_text}", output_type=OutputType.WARNING)
+                        PrettyOutput.print(
+                            f"搜索文本在文件中存在多处匹配：\n{search_text}",
+                            output_type=OutputType.WARNING,
+                        )
                         return False, f"搜索文本在文件中存在多处匹配：\n{search_text}"
                     modified_content = modified_content.replace(
                         search_text, replace_text
@@ -224,7 +231,10 @@ class EditFileHandler(OutputHandler):
                         )
                         if indented_search in modified_content:
                             if modified_content.count(indented_search) > 1:
-                                PrettyOutput.print(f"搜索文本在文件中存在多处匹配：\n{indented_search}", output_type=OutputType.WARNING)
+                                PrettyOutput.print(
+                                    f"搜索文本在文件中存在多处匹配：\n{indented_search}",
+                                    output_type=OutputType.WARNING,
+                                )
                                 return (
                                     False,
                                     f"搜索文本在文件中存在多处匹配：\n{indented_search}",
@@ -239,7 +249,10 @@ class EditFileHandler(OutputHandler):
                             break
 
                     if not found:
-                        PrettyOutput.print(f"搜索文本在文件中不存在：\n{search_text}", output_type=OutputType.WARNING)
+                        PrettyOutput.print(
+                            f"搜索文本在文件中不存在：\n{search_text}",
+                            output_type=OutputType.WARNING,
+                        )
                         return False, f"搜索文本在文件中不存在：\n{search_text}"
 
             # 写入修改后的内容
