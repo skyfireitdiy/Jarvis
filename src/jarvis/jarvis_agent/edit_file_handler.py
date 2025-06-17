@@ -23,11 +23,11 @@ class EditFileHandler(OutputHandler):
             + ot("DIFF")
             + r"\s*"
             + ot("SEARCH")
-            + r"\s*\n(.*?)"
+            + r"(.*?)"
             + ct("SEARCH")
             + r"\s*"
             + ot("REPLACE")
-            + r"\s*\n(.*?)"
+            + r"(.*?)"
             + ct("REPLACE")
             + r"\s*"
             + ct("DIFF")
@@ -39,11 +39,11 @@ class EditFileHandler(OutputHandler):
             ot("DIFF")
             + r"\s*"
             + ot("SEARCH")
-            + r"\s*\n(.*?)"
+            + r"(.*?)"
             + ct("SEARCH")
             + r"\s*"
             + ot("REPLACE")
-            + r"\s*\n(.*?)"
+            + r"(.*?)"
             + ct("REPLACE")
             + r"\s*"
             + ct("DIFF"),
@@ -110,15 +110,12 @@ class EditFileHandler(OutputHandler):
         return f"""文件编辑指令格式：
 {ot("PATCH file=文件路径")}
 {ot("DIFF")}
-{ot("SEARCH")}
-原始代码
-{ct("SEARCH")}
-{ot("REPLACE")}
-新代码
-{ct("REPLACE")}
+{ot("SEARCH")}原始代码{ct("SEARCH")}
+{ot("REPLACE")}新代码{ct("REPLACE")}
 {ct("DIFF")}
 {ct("PATCH")}
 
+可以返回多个PATCH块用于同时修改多个文件
 每个PATCH块可以包含多个DIFF块，每个DIFF块包含一组搜索和替换内容。
 搜索文本必须能在文件中唯一匹配，否则编辑将失败。"""
 
