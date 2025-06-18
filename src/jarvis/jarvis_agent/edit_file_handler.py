@@ -16,7 +16,7 @@ from jarvis.jarvis_utils.utils import is_context_overflow
 class EditFileHandler(OutputHandler):
     def __init__(self):
         self.patch_pattern = re.compile(
-            ot("PATCH file=([^>]+)") + r"\s*"
+            ot("PATCH file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))") + r"\s*"
             r"(?:"
             + ot("diff")
             + r"\s*"
@@ -147,7 +147,8 @@ class EditFileHandler(OutputHandler):
         """
         patches = {}
         for match in self.patch_pattern.finditer(response):
-            file_path = match.group(1)
+            # Get the file path from the appropriate capture group
+            file_path = match.group(1) or match.group(2) or match.group(3)
             diffs = []
             for diff_match in self.diff_pattern.finditer(match.group(0)):
                 diffs.append(
