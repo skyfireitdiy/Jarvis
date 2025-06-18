@@ -8,6 +8,7 @@ from yaspin.core import Yaspin
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.git_utils import revert_file
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow
 
@@ -17,33 +18,33 @@ class EditFileHandler(OutputHandler):
         self.patch_pattern = re.compile(
             ot("PATCH file=([^>]+)") + r"\s*"
             r"(?:"
-            + ot("DIFF")
+            + ot("diff")
             + r"\s*"
-            + ot("SEARCH")
+            + ot("search")
             + r"(.*?)"
-            + ct("SEARCH")
+            + ct("search")
             + r"\s*"
-            + ot("REPLACE")
+            + ot("replace")
             + r"(.*?)"
-            + ct("REPLACE")
+            + ct("replace")
             + r"\s*"
-            + ct("DIFF")
+            + ct("diff")
             + r"\s*)+"
             + ct("PATCH"),
             re.DOTALL,
         )
         self.diff_pattern = re.compile(
-            ot("DIFF")
+            ot("diff")
             + r"\s*"
-            + ot("SEARCH")
+            + ot("search")
             + r"(.*?)"
-            + ct("SEARCH")
+            + ct("search")
             + r"\s*"
-            + ot("REPLACE")
+            + ot("replace")
             + r"(.*?)"
-            + ct("REPLACE")
+            + ct("replace")
             + r"\s*"
-            + ct("DIFF"),
+            + ct("diff"),
             re.DOTALL,
         )
 
@@ -105,10 +106,10 @@ class EditFileHandler(OutputHandler):
         """
         return f"""文件编辑指令格式：
 {ot("PATCH file=文件路径")}
-{ot("DIFF")}
-{ot("SEARCH")}原始代码{ct("SEARCH")}
-{ot("REPLACE")}新代码{ct("REPLACE")}
-{ct("DIFF")}
+{ot("diff")}
+{ot("search")}原始代码{ct("search")}
+{ot("replace")}新代码{ct("replace")}
+{ct("diff")}
 {ct("PATCH")}
 
 可以返回多个PATCH块用于同时修改多个文件
@@ -202,6 +203,7 @@ class EditFileHandler(OutputHandler):
 
                 if search_text in modified_content:
                     if modified_content.count(search_text) > 1:
+                        PrettyOutput.print(f"搜索文本在文件中存在多处匹配：\n{search_text}", output_type=OutputType.WARNING)
                         return False, f"搜索文本在文件中存在多处匹配：\n{search_text}"
                     modified_content = modified_content.replace(
                         search_text, replace_text
@@ -221,6 +223,7 @@ class EditFileHandler(OutputHandler):
                         )
                         if indented_search in modified_content:
                             if modified_content.count(indented_search) > 1:
+                                PrettyOutput.print(f"搜索文本在文件中存在多处匹配：\n{indented_search}", output_type=OutputType.WARNING)
                                 return (
                                     False,
                                     f"搜索文本在文件中存在多处匹配：\n{indented_search}",
@@ -235,6 +238,7 @@ class EditFileHandler(OutputHandler):
                             break
 
                     if not found:
+                        PrettyOutput.print(f"搜索文本在文件中不存在：\n{search_text}", output_type=OutputType.WARNING)
                         return False, f"搜索文本在文件中不存在：\n{search_text}"
 
             # 写入修改后的内容
@@ -329,23 +333,23 @@ class EditFileHandler(OutputHandler):
 4. **上下文完整性**：提供足够的上下文，确保补丁能准确应用
 
 ## 输出格式规范
-- 使用{ot("DIFF")}块包围每个需要修改的代码段
-- 每个{ot("DIFF")}块必须包含SEARCH部分和REPLACE部分
+- 使用{ot("diff")}块包围每个需要修改的代码段
+- 每个{ot("diff")}块必须包含SEARCH部分和REPLACE部分
 - SEARCH部分是需要查找的原始代码
 - REPLACE部分是替换后的新代码
 - 确保SEARCH部分能在原文件中**唯一匹配**
-- 如果修改较大，可以使用多个{ot("DIFF")}块
+- 如果修改较大，可以使用多个{ot("diff")}块
 
 ## 输出模板
-{ot("DIFF")}
-{ot("SEARCH")}[需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("SEARCH")}
-{ot("REPLACE")}[替换后的新代码]{ct("REPLACE")}
-{ct("DIFF")}
+{ot("diff")}
+{ot("search")}[需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("search")}
+{ot("replace")}[替换后的新代码]{ct("replace")}
+{ct("diff")}
 
-{ot("DIFF")}
-{ot("SEARCH")}[另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("SEARCH")}
-{ot("REPLACE")}[另一处替换后的新代码]{ct("REPLACE")}
-{ct("DIFF")}
+{ot("diff")}
+{ot("search")}[另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("search")}
+{ot("replace")}[另一处替换后的新代码]{ct("replace")}
+{ct("diff")}
 """
 
             # 尝试最多3次生成补丁
@@ -368,17 +372,17 @@ class EditFileHandler(OutputHandler):
 
                 # 解析生成的补丁
                 diff_blocks = re.finditer(
-                    ot("DIFF")
+                    ot("diff")
                     + r"\s*"
-                    + ot("SEARCH")
+                    + ot("search")
                     + r"(.*?)"
-                    + ct("SEARCH")
+                    + ct("search")
                     + r"\s*"
-                    + ot("REPLACE")
+                    + ot("replace")
                     + r"(.*?)"
-                    + ct("REPLACE")
+                    + ct("replace")
                     + r"\s*"
-                    + ct("DIFF"),
+                    + ct("diff"),
                     response,
                     re.DOTALL,
                 )
