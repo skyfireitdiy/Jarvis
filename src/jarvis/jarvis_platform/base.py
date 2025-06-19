@@ -7,7 +7,6 @@ from rich import box
 from rich.live import Live
 from rich.panel import Panel
 from rich.text import Text
-from yaspin import yaspin
 
 from jarvis.jarvis_utils.config import (get_max_input_token_count,
                                         get_pretty_output, is_print_prompt)
@@ -65,35 +64,34 @@ class BasePlatform(ABC):
             max_chunk_size = get_max_input_token_count() - 1024  # 留出一些余量
             min_chunk_size = get_max_input_token_count() - 2048
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
-            with yaspin(text="正在提交长上下文...", color="cyan") as spinner:
-                prefix_prompt = f"""
-                我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
-                """
-                while_true(
-                    lambda: while_success(lambda: self.chat(prefix_prompt), 5), 5
+            print("正在提交长上下文...")
+            prefix_prompt = f"""
+            我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
+            """
+            while_true(lambda: while_success(lambda: self.chat(prefix_prompt), 5), 5)
+            submit_count = 0
+            length = 0
+            for input in inputs:
+                submit_count += 1
+                length += len(input)
+                print(
+                    f"正在提交第{submit_count}部分（共{len(inputs)}部分({length}/{len(message)})）"
                 )
-                submit_count = 0
-                length = 0
-                for input in inputs:
-                    submit_count += 1
-                    length += len(input)
-                    spinner.text = f"正在提交第{submit_count}部分（共{len(inputs)}部分({length}/{len(message)})）"
-                    list(
-                        while_true(
-                            lambda: while_success(
-                                lambda: self.chat(
-                                    f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
-                                ),
-                                5,
+                list(
+                    while_true(
+                        lambda: while_success(
+                            lambda: self.chat(
+                                f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
                             ),
                             5,
-                        )
+                        ),
+                        5,
                     )
-                    spinner.write(
-                        f"提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
-                    )
-                spinner.text = "提交完成"
-                spinner.ok("✅")
+                )
+                print(
+                    f"提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
+                )
+            print("提交完成 ✅")
             response = while_true(
                 lambda: while_success(
                     lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
