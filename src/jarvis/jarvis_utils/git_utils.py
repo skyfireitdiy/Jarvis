@@ -496,27 +496,90 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
     except subprocess.CalledProcessError:
         return []
 
-def confirm_add_new_files() -> None:
-    # 检查新增文件数量
-    new_files = subprocess.run(
+def _get_new_files() -> List[str]:
+    """获取新增文件列表"""
+    return subprocess.run(
         ["git", "ls-files", "--others", "--exclude-standard"],
         capture_output=True,
         text=True,
         check=True,
     ).stdout.splitlines()
-    
-    while len(new_files) > 20:
-        PrettyOutput.print(
-            f"检测到{len(new_files)}个新增文件(选择N将重新检测)",
-            OutputType.WARNING
-        )
-        if user_confirm("是否要添加这些文件（如果不需要请修改.gitignore文件以忽略不需要的文件）？", False):
-            break
-        
-        # 重新检查文件数量
-        new_files = subprocess.run(
-            ["git", "ls-files", "--others", "--exclude-standard"],
+
+def confirm_add_new_files() -> None:
+    """确认新增文件、代码行数和二进制文件"""
+    def _get_added_lines() -> int:
+        """获取新增代码行数"""
+        diff_stats = subprocess.run(
+            ["git", "diff", "--numstat"],
             capture_output=True,
             text=True,
             check=True,
         ).stdout.splitlines()
+        
+        added_lines = 0
+        for stat in diff_stats:
+            parts = stat.split()
+            if len(parts) >= 1:
+                try:
+                    added_lines += int(parts[0])
+                except ValueError:
+                    pass
+        return added_lines
+
+    def _get_binary_files(files: List[str]) -> List[str]:
+        """从文件列表中识别二进制文件"""
+        binary_files = []
+        for file in files:
+            try:
+                with open(file, 'rb') as f:
+                    if b'\x00' in f.read(1024):
+                        binary_files.append(file)
+            except (IOError, PermissionError):
+                continue
+        return binary_files
+
+    def _check_conditions(new_files: List[str], added_lines: int, binary_files: List[str]) -> bool:
+        """检查各种条件并打印提示信息"""
+        need_confirm = False
+        
+        if len(new_files) > 20:
+            PrettyOutput.print(
+                f"检测到{len(new_files)}个新增文件(选择N将重新检测)",
+                OutputType.WARNING
+            )
+            PrettyOutput.print("新增文件列表:", OutputType.INFO)
+            for file in new_files:
+                PrettyOutput.print(f"  - {file}", OutputType.INFO)
+            need_confirm = True
+        
+        if added_lines > 500:
+            PrettyOutput.print(
+                f"检测到{added_lines}行新增代码(选择N将重新检测)",
+                OutputType.WARNING
+            )
+            need_confirm = True
+        
+        if binary_files:
+            PrettyOutput.print(
+                f"检测到{len(binary_files)}个二进制文件(选择N将重新检测)",
+                OutputType.WARNING
+            )
+            PrettyOutput.print("二进制文件列表:", OutputType.INFO)
+            for file in binary_files:
+                PrettyOutput.print(f"  - {file}", OutputType.INFO)
+            need_confirm = True
+        
+        return need_confirm
+
+    while True:
+        new_files = _get_new_files()
+        added_lines = _get_added_lines()
+        binary_files = _get_binary_files(new_files)
+        
+        if not _check_conditions(new_files, added_lines, binary_files):
+            break
+            
+        if not user_confirm("是否要添加这些变更（如果不需要请修改.gitignore文件以忽略不需要的文件）？", False):
+            continue
+            
+        break
