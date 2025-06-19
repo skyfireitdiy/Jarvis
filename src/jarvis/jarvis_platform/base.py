@@ -82,7 +82,7 @@ class BasePlatform(ABC):
                         while_true(
                             lambda: while_success(
                                 lambda: self.chat(
-                                    f"<part_content>{input}</part_content>\n\n请返回已收到"
+                                    f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
                                 ),
                                 5,
                             ),
@@ -96,7 +96,7 @@ class BasePlatform(ABC):
                 spinner.ok("✅")
             response = while_true(
                 lambda: while_success(
-                    lambda: self._chat("内容已经全部提供完毕，请继续"), 5
+                    lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
                 ),
                 5,
             )
