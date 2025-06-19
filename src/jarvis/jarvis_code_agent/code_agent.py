@@ -140,36 +140,64 @@ class CodeAgent:
     def _handle_uncommitted_changes(self) -> None:
         """处理未提交的修改，包括：
         1. 提示用户确认是否提交
-        2. 如果确认，则暂存并提交所有修改
+        2. 如果确认，则检查新增文件数量
+        3. 如果新增文件超过20个，让用户确认是否添加
+        4. 如果用户拒绝添加大量文件，提示修改.gitignore并重新检测
+        5. 暂存并提交所有修改
         """
         if has_uncommitted_changes():
             PrettyOutput.print("检测到未提交的修改，是否要提交？", OutputType.WARNING)
-            if user_confirm("是否要提交？", True):
-                import subprocess
+            if not user_confirm("是否要提交？", True):
+                return
 
-                try:
-                    # 获取当前分支的提交总数
-                    commit_result = subprocess.run(
-                        ["git", "rev-list", "--count", "HEAD"],
+            import subprocess
+            try:
+                # 检查新增文件数量
+                new_files = subprocess.run(
+                    ["git", "ls-files", "--others", "--exclude-standard"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout.splitlines()
+                
+                while len(new_files) > 20:
+                    PrettyOutput.print(
+                        f"检测到{len(new_files)}个新增文件(选择N将重新检测)",
+                        OutputType.WARNING
+                    )
+                    if user_confirm("是否要添加这些文件（如果不需要请修改.gitignore文件以忽略不需要的文件）？", False):
+                        break
+                    
+                    # 重新检查文件数量
+                    new_files = subprocess.run(
+                        ["git", "ls-files", "--others", "--exclude-standard"],
                         capture_output=True,
                         text=True,
                         check=True,
-                    )
-                    if commit_result.returncode != 0:
-                        return
+                    ).stdout.splitlines()
 
-                    commit_count = int(commit_result.stdout.strip())
+                # 获取当前分支的提交总数
+                commit_result = subprocess.run(
+                    ["git", "rev-list", "--count", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                if commit_result.returncode != 0:
+                    return
 
-                    # 暂存所有修改
-                    subprocess.run(["git", "add", "."], check=True)
+                commit_count = int(commit_result.stdout.strip())
 
-                    # 提交变更
-                    subprocess.run(
-                        ["git", "commit", "-m", f"CheckPoint #{commit_count + 1}"],
-                        check=True,
-                    )
-                except subprocess.CalledProcessError as e:
-                    PrettyOutput.print(f"提交失败: {str(e)}", OutputType.ERROR)
+                # 暂存所有修改
+                subprocess.run(["git", "add", "."], check=True)
+
+                # 提交变更
+                subprocess.run(
+                    ["git", "commit", "-m", f"CheckPoint #{commit_count + 1}"],
+                    check=True,
+                )
+            except subprocess.CalledProcessError as e:
+                PrettyOutput.print(f"提交失败: {str(e)}", OutputType.ERROR)
 
     def _show_commit_history(
         self, start_commit: Optional[str], end_commit: Optional[str]
