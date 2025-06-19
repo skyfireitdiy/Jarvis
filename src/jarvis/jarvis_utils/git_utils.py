@@ -134,6 +134,7 @@ def get_diff() -> str:
             stderr=subprocess.PIPE,
             stdout=subprocess.PIPE,
         )
+        confirm_add_new_files()
         if head_check.returncode != 0:
             # 空仓库情况，直接获取工作区差异
             result = subprocess.run(
@@ -218,6 +219,12 @@ def handle_commit_workflow() -> bool:
     import subprocess
 
     try:
+
+        confirm_add_new_files()
+
+        if not has_uncommitted_changes():
+            return False
+
         # 获取当前分支的提交总数
         commit_result = subprocess.run(
             ["git", "rev-list", "--count", "HEAD"], capture_output=True, text=True
@@ -403,6 +410,8 @@ def get_diff_file_list() -> List[str]:
         List[str]: 修改和新增的文件路径列表
     """
     try:
+        confirm_add_new_files()
+        
         # 暂存新增文件
         subprocess.run(["git", "add", "-N", "."], check=True)
 
@@ -486,3 +495,28 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
 
     except subprocess.CalledProcessError:
         return []
+
+def confirm_add_new_files() -> None:
+    # 检查新增文件数量
+    new_files = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    
+    while len(new_files) > 20:
+        PrettyOutput.print(
+            f"检测到{len(new_files)}个新增文件(选择N将重新检测)",
+            OutputType.WARNING
+        )
+        if user_confirm("是否要添加这些文件（如果不需要请修改.gitignore文件以忽略不需要的文件）？", False):
+            break
+        
+        # 重新检查文件数量
+        new_files = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()

@@ -12,7 +12,7 @@ from yaspin import yaspin
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_git_commit_prompt
-from jarvis.jarvis_utils.git_utils import (find_git_root,
+from jarvis.jarvis_utils.git_utils import (confirm_add_new_files, find_git_root,
                                            has_uncommitted_changes)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
@@ -96,6 +96,11 @@ class GitCommitTool:
             if result is None:
                 return {"success": True, "stdout": "No changes to commit", "stderr": ""}
             original_dir = result
+
+            confirm_add_new_files()
+
+            if not has_uncommitted_changes():
+                return {"success": True, "stdout": "No changes to commit", "stderr": ""}
 
             with yaspin(text="正在初始化提交流程...", color="cyan") as spinner:
                 # 添加文件到暂存区
