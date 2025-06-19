@@ -384,6 +384,12 @@ class EditFileHandler(OutputHandler):
 """
                     response = model.chat_until_success(main_prompt + file_prompt)
 
+                # 检查是否被中断
+                from jarvis.jarvis_utils.globals import get_interrupt
+
+                if get_interrupt():
+                    return False, "用户中断了补丁应用"
+
                 # 解析生成的补丁
                 diff_blocks = re.finditer(
                     ot("DIFF")
