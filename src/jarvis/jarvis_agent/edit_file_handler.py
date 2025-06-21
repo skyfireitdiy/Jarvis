@@ -8,6 +8,7 @@ from yaspin.core import Yaspin
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.git_utils import revert_file
+from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow
@@ -322,7 +323,6 @@ class EditFileHandler(OutputHandler):
             for patch in patches:
                 patch_content.append(
                     {
-                        "reason": "根据用户指令修改代码",
                         "SEARCH": patch["SEARCH"],
                         "REPLACE": patch["REPLACE"],
                     }
@@ -385,9 +385,8 @@ class EditFileHandler(OutputHandler):
                     response = model.chat_until_success(main_prompt + file_prompt)
 
                 # 检查是否被中断
-                from jarvis.jarvis_utils.globals import get_interrupt
-
                 if get_interrupt():
+                    set_interrupt(False)
                     return False, "用户中断了补丁应用"
 
                 # 解析生成的补丁
