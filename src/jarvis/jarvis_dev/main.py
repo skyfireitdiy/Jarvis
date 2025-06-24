@@ -1227,7 +1227,7 @@ def main():
     while True:
         try:
             user_input = get_multiline_input(
-                "\nEnter your request (or press Enter to exit): "
+                "\n请输入你的需求："
             )
             if not user_input:
                 break

@@ -388,7 +388,7 @@ class EditFileHandler(OutputHandler):
                 # 检查是否被中断
                 if get_interrupt():
                     set_interrupt(False)
-                    user_input = get_multiline_input("补丁应用被中断，请输入补充信息:")
+                    user_input = agent.multiline_inputer("补丁应用被中断，请输入补充信息:")
                     if not user_input.strip():
                         return False, "用户中断了补丁应用"
                     return False, f"用户中断了补丁应用并提供了补充信息: {user_input}"
