@@ -2,14 +2,13 @@ import os
 import re
 from typing import Any, Dict, List, Tuple
 
-from yaspin import yaspin
-from yaspin.core import Yaspin
+from yaspin import yaspin # type: ignore
+from yaspin.core import Yaspin # type: ignore
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.git_utils import revert_file
 from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
-from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow

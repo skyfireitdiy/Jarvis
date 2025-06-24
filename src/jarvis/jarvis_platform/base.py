@@ -3,10 +3,10 @@ import re
 from abc import ABC, abstractmethod
 from typing import Generator, List, Tuple
 
-from rich import box
-from rich.live import Live
-from rich.panel import Panel
-from rich.text import Text
+from rich import box # type: ignore
+from rich.live import Live # type: ignore
+from rich.panel import Panel # type: ignore
+from rich.text import Text # type: ignore
 
 from jarvis.jarvis_utils.config import (get_max_input_token_count,
                                         get_pretty_output, is_print_prompt)
