@@ -3,7 +3,6 @@
 from typing import Any, Dict
 
 # 导入多行输入工具和输出工具
-from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -41,7 +40,7 @@ class AskUserTool:
             PrettyOutput.print(f"问题: {question}", OutputType.SYSTEM)
 
             # 获取用户输入
-            user_response = get_multiline_input("请输入您的答案 (输入空行结束)")
+            user_response = agent.multiline_inputer("请输入您的答案 (输入空行结束)")
 
             # 返回成功响应，包含用户输入的内容
             return {"success": True, "stdout": user_response, "stderr": ""}
