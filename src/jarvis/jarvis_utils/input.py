@@ -8,16 +8,16 @@
 - 带有模糊匹配的文件路径补全
 - 用于输入控制的自定义键绑定
 """
-from colorama import Fore
-from colorama import Style as ColoramaStyle
-from fuzzywuzzy import process
-from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import (CompleteEvent, Completer, Completion,
-                                       PathCompleter)
-from prompt_toolkit.document import Document
-from prompt_toolkit.formatted_text import FormattedText
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.styles import Style as PromptStyle
+from colorama import Fore # type: ignore
+from colorama import Style as ColoramaStyle # type: ignore
+from fuzzywuzzy import process # type: ignore
+from prompt_toolkit import PromptSession # type: ignore
+from prompt_toolkit.completion import (CompleteEvent, Completer, Completion, # type: ignore
+                                       PathCompleter) # type: ignore
+from prompt_toolkit.document import Document # type: ignore
+from prompt_toolkit.formatted_text import FormattedText # type: ignore
+from prompt_toolkit.key_binding import KeyBindings # type: ignore
+from prompt_toolkit.styles import Style as PromptStyle # type: ignore
 
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -217,7 +217,7 @@ def get_multiline_input(tip: str) -> str:
     try:
         import os
 
-        from prompt_toolkit.history import FileHistory
+        from prompt_toolkit.history import FileHistory # type: ignore
 
         from jarvis.jarvis_utils.config import get_data_dir
 
