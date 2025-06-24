@@ -9,6 +9,7 @@ from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.git_utils import revert_file
 from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
+from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow
@@ -387,7 +388,10 @@ class EditFileHandler(OutputHandler):
                 # 检查是否被中断
                 if get_interrupt():
                     set_interrupt(False)
-                    return False, "用户中断了补丁应用"
+                    user_input = get_multiline_input("补丁应用被中断，请输入补充信息:")
+                    if not user_input.strip():
+                        return False, "用户中断了补丁应用"
+                    return False, f"用户中断了补丁应用并提供了补充信息: {user_input}"
 
                 # 解析生成的补丁
                 diff_blocks = re.finditer(
