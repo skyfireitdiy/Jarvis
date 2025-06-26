@@ -2,8 +2,8 @@ import os
 import re
 from typing import Any, Dict, List, Tuple
 
-from yaspin import yaspin # type: ignore
-from yaspin.core import Yaspin # type: ignore
+from yaspin import yaspin  # type: ignore
+from yaspin.core import Yaspin  # type: ignore
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -147,7 +147,7 @@ class EditFileHandler(OutputHandler):
                     "文件路径2": [...]
                 }
         """
-        patches = {}
+        patches: Dict[str, List[Dict[str, str]]] = {}
         for match in self.patch_pattern.finditer(response):
             # Get the file path from the appropriate capture group
             file_path = match.group(1) or match.group(2) or match.group(3)
@@ -387,7 +387,8 @@ class EditFileHandler(OutputHandler):
                 # 检查是否被中断
                 if get_interrupt():
                     set_interrupt(False)
-                    user_input = agent.multiline_inputer("补丁应用被中断，请输入补充信息:")
+                    with spinner.hidden():
+                        user_input = agent.multiline_inputer("补丁应用被中断，请输入补充信息:")
                     if not user_input.strip():
                         return False, "用户中断了补丁应用"
                     return False, f"用户中断了补丁应用并提供了补充信息: {user_input}"
