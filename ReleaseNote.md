@@ -1,3 +1,28 @@
+### Release Note - v0.1.207 2025-06-27
+
+#### **新功能 (Features)**  
+- 新增'ToolUsage'命令，提示可用工具列表及使用方法
+- 新增'ReloadConfig'命令，重新加载配置文件
+- 新增'Check'命令，执行静态代码检查，包括错误和风格问题
+
+#### **修复 (Fixes)**  
+- 修复了分块提交内容时的响应处理逻辑
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 调整了JARVIS_CONFIRM_BEFORE_APPLY_PATCH默认值为false
+- 优化了Web搜索命令的描述，支持多种提问格式
+- 优化了'FindRelatedFiles'命令的描述，更准确地查找与功能相关的文件
+- 重构了分块提交内容时的响应处理逻辑，提高稳定性
+
+#### **文档更新 (Documentation)**  
+- 更新了README.md中的命令列表和描述
+- 更新了配置项JARVIS_CONFIRM_BEFORE_APPLY_PATCH的默认值说明
+
+#### **其他 (Miscellaneous)**  
+- 调整了部分代码格式和注释
+
+本次更新主要优化了命令功能、修复了配置一致性问题，并改进了大内容分块提交的处理逻辑。
+
 ### Release Note - v0.1.206 2025-06-27
 
 #### **优化与重构 (Refactors & Improvements)**  
