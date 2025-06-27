@@ -459,7 +459,7 @@ OPENAI_API_BASE: https://api.openai.com/v1
 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 推理任务使用的平台 |
 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 |
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
-| `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | true | 应用补丁前是否需要确认 |
+| `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | false | 应用补丁前是否需要确认 |
 | `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
 | `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis |
 | `JARVIS_MAX_BIG_CONTENT_SIZE` | 160000 | 最大大内容大小 |
