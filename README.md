@@ -499,14 +499,14 @@ OPENAI_API_BASE: https://api.openai.com/v1
 |------|------|
 | `'Summary'` | 总结当前会话并清空历史记录 |
 | `'Clear'` | 清空当前会话 |
-| `'CodeBase'` | 查询代码库 |
-| `'Web'` | 网页搜索 |
-| `'Methodology'` | 查找相关方法论 |
-| `'Plan'` | 生成代码修改计划 |
-| `'FindRelatedFiles'` | 查找相关文件 |
-| `'FindMethodology'` | 查找方法论 |
+| `'ToolUsage'` | 显示可用工具列表及使用方法 |
+| `'ReloadConfig'` | 重新加载配置文件 |
+| `'Web'` | 网页搜索，支持多种提问格式 |
+| `'Plan'` | 生成代码修改计划，提供详细需求描述 |
+| `'FindRelatedFiles'` | 查找与功能相关的文件 |
 | `'Dev'` | 调用create_code_agent开发需求 |
 | `'Fix'` | 修复问题 |
+| `'Check'` | 执行静态代码检查，包括错误和风格问题 |
 
 ### 3. 自定义替换配置
 在`~/.jarvis/config.yaml`中添加：
