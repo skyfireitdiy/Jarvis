@@ -71,28 +71,29 @@ class BasePlatform(ABC):
             while_true(lambda: while_success(lambda: self.chat(prefix_prompt), 5), 5)
             submit_count = 0
             length = 0
+            response = ""
             for input in inputs:
                 submit_count += 1
                 length += len(input)
                 print(
                     f"正在提交第{submit_count}部分（共{len(inputs)}部分({length}/{len(message)})）"
                 )
-                list(
-                    while_true(
-                        lambda: while_success(
-                            lambda: self.chat(
-                                f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
-                            ),
-                            5,
+                
+                response += "\n" + while_true(
+                    lambda: while_success(
+                        lambda: self.chat(
+                            f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
                         ),
                         5,
-                    )
+                    ),
+                    5,
                 )
+                
                 print(
                     f"提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
                 )
             print("提交完成 ✅")
-            response = while_true(
+            response += "\n" + while_true(
                 lambda: while_success(
                     lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
                 ),
