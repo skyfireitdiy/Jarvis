@@ -159,7 +159,7 @@
     "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
       "type": "boolean",
       "description": "应用补丁前是否需要确认",
-      "default": true
+      "default": false
     },
     "JARVIS_MAX_TOOL_CALL_COUNT": {
       "type": "number",
