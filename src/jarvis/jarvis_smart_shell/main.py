@@ -73,7 +73,7 @@ def install_jss_completion() -> int:
         f.write(f"""
 {start_marker}
 function fish_command_not_found
-    if test (string length "$argv") -lt 16
+    if test (string length "$argv") -lt 10
         return
     end
     commandline -r (jss request "$argv")
