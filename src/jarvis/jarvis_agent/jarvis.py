@@ -6,7 +6,6 @@ from typing import Dict
 
 import yaml
 from prompt_toolkit import prompt
-from yaspin import yaspin
 
 from jarvis.jarvis_agent import (Agent, OutputType, PrettyOutput,
                                  get_multiline_input,
@@ -26,43 +25,37 @@ def _load_tasks() -> Dict[str, str]:
     data_dir = get_data_dir()
     pre_command_path = os.path.join(data_dir, "pre-command")
     if os.path.exists(pre_command_path):
-        spinner_text = f"从{pre_command_path}加载预定义任务..."
-        with yaspin(text=spinner_text, color="cyan") as spinner:
-            try:
-                with open(
-                    pre_command_path, "r", encoding="utf-8", errors="ignore"
-                ) as f:
-                    user_tasks = yaml.safe_load(f)
-                if isinstance(user_tasks, dict):
-                    for name, desc in user_tasks.items():
-                        if desc:
-                            tasks[str(name)] = str(desc)
-                spinner.text = f"预定义任务加载完成{pre_command_path}"
-                spinner.ok("✅")
-            except (yaml.YAMLError, OSError):
-                spinner.text = f"预定义任务加载失败{pre_command_path}"
-                spinner.fail("❌")
+        print(f"🔍 从{pre_command_path}加载预定义任务...")
+        try:
+            with open(
+                pre_command_path, "r", encoding="utf-8", errors="ignore"
+            ) as f:
+                user_tasks = yaml.safe_load(f)
+            if isinstance(user_tasks, dict):
+                for name, desc in user_tasks.items():
+                    if desc:
+                        tasks[str(name)] = str(desc)
+            print(f"✅ 预定义任务加载完成 {pre_command_path}")
+        except (yaml.YAMLError, OSError):
+            print(f"❌ 预定义任务加载失败 {pre_command_path}")
 
     # Check .jarvis/pre-command in current directory
     pre_command_path = ".jarvis/pre-command"
     if os.path.exists(pre_command_path):
         abs_path = os.path.abspath(pre_command_path)
-        spinner_text = f"从{abs_path}加载预定义任务..."
-        with yaspin(text=spinner_text, color="cyan") as spinner:
-            try:
-                with open(
-                    pre_command_path, "r", encoding="utf-8", errors="ignore"
-                ) as f:
-                    local_tasks = yaml.safe_load(f)
-                if isinstance(local_tasks, dict):
-                    for name, desc in local_tasks.items():
-                        if desc:
-                            tasks[str(name)] = str(desc)
-                spinner.text = f"预定义任务加载完成{pre_command_path}"
-                spinner.ok("✅")
-            except (yaml.YAMLError, OSError):
-                spinner.text = f"预定义任务加载失败{pre_command_path}"
-                spinner.fail("❌")
+        print(f"🔍 从{abs_path}加载预定义任务...")
+        try:
+            with open(
+                pre_command_path, "r", encoding="utf-8", errors="ignore"
+            ) as f:
+                local_tasks = yaml.safe_load(f)
+            if isinstance(local_tasks, dict):
+                for name, desc in local_tasks.items():
+                    if desc:
+                        tasks[str(name)] = str(desc)
+            print(f"✅ 预定义任务加载完成 {pre_command_path}")
+        except (yaml.YAMLError, OSError):
+            print(f"❌ 预定义任务加载失败 {pre_command_path}")
 
     return tasks
 
