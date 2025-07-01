@@ -7,27 +7,35 @@ import platform
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
 # 第三方库导入
-from yaspin import yaspin  # type: ignore
 
 # 本地库导入
 # jarvis_agent 相关
 # jarvis_platform 相关
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
+
 # jarvis_utils 相关
-from jarvis.jarvis_utils.config import (get_data_dir, get_max_token_count,
-                                        get_max_tool_call_count,
-                                        is_auto_complete,
-                                        is_execute_tool_confirm,
-                                        is_use_analysis, get_history_count, is_use_methodology)
+from jarvis.jarvis_utils.config import (
+    get_data_dir,
+    get_max_token_count,
+    get_max_tool_call_count,
+    is_auto_complete,
+    is_execute_tool_confirm,
+    is_use_analysis,
+    get_history_count,
+    is_use_methodology,
+)
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import (delete_agent, get_interrupt,
-                                         make_agent_name, set_agent,
-                                         set_interrupt)
+from jarvis.jarvis_utils.globals import (
+    delete_agent,
+    get_interrupt,
+    make_agent_name,
+    set_agent,
+    set_interrupt,
+)
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.jarvis_history import JarvisHistory
-from jarvis.jarvis_utils.methodology import (load_methodology,
-                                             upload_methodology)
+from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import user_confirm
@@ -116,13 +124,17 @@ origin_agent_system_prompt = f"""
 
 
 class OutputHandlerProtocol(Protocol):
-    def name(self) -> str: ...
+    def name(self) -> str:
+        ...
 
-    def can_handle(self, response: str) -> bool: ...
+    def can_handle(self, response: str) -> bool:
+        ...
 
-    def prompt(self) -> str: ...
+    def prompt(self) -> str:
+        ...
 
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
+        ...
 
 
 class Agent:
@@ -189,9 +201,7 @@ class Agent:
             if isinstance(platform, str):
                 self.model = PlatformRegistry().create_platform(platform)
                 if self.model is None:
-                    PrettyOutput.print(
-                        f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING
-                    )
+                    PrettyOutput.print(f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING)
                     self.model = PlatformRegistry().get_normal_platform()
             else:
                 self.model = platform
@@ -240,11 +250,12 @@ class Agent:
         self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
 
         self.history = JarvisHistory()
-        self.history_dir = str(Path(get_data_dir())/"history")
+        self.history_dir = str(Path(get_data_dir()) / "history")
         self.history.start_record(self.history_dir)
 
-        self.history_count = history_count if history_count is not None else get_history_count()
-
+        self.history_count = (
+            history_count if history_count is not None else get_history_count()
+        )
 
         self.execute_tool_confirm = (
             execute_tool_confirm
@@ -422,8 +433,8 @@ class Agent:
         注意:
             仅生成摘要，不修改对话状态
         """
-        with yaspin(text="正在总结对话历史...", color="cyan") as spinner:
-            summary_prompt = """
+        print("正在总结对话历史...")
+        summary_prompt = """
 <summary_request>
 <objective>
 请对当前对话历史进行简明扼要的总结，提取关键信息和重要决策点。这个总结将作为上下文继续任务，因此需要保留对后续对话至关重要的内容。
@@ -447,14 +458,11 @@ class Agent:
 """
 
         try:
-            with spinner.hidden():
-                summary = self.model.chat_until_success(self.prompt + "\n" + summary_prompt)  # type: ignore
-            spinner.text = "总结对话历史完成"
-            spinner.ok("✅")
+            summary = self.model.chat_until_success(self.prompt + "\n" + summary_prompt)  # type: ignore
+            print("✅ 总结对话历史完成")
             return summary
         except Exception as e:
-            spinner.text = "总结对话历史失败"
-            spinner.fail("❌")
+            print("❌ 总结对话历史失败")
             return ""
 
     def _summarize_and_clear_history(self) -> str:
@@ -482,6 +490,7 @@ class Agent:
                 summary = self.generate_summary()
             else:
                 import tempfile
+
                 tmp_file = tempfile.NamedTemporaryFile(delete=False)
                 tmp_file_name = tmp_file.name
                 self.history.save_history(tmp_file_name)
@@ -553,15 +562,11 @@ class Agent:
         if not self.execute_tool_confirm or user_confirm(
             f"需要执行{tool_list[0].name()}确认执行？", True
         ):
-            with yaspin(
-                text=f"正在执行{tool_list[0].name()}...", color="cyan"
-            ) as spinner:
-                with spinner.hidden():
-                    result = tool_list[0].handle(response, self)
-                spinner.text = f"{tool_list[0].name()}执行完成"
-                spinner.ok("✅")
-                self.tool_call_count += 1
-                return result
+            print(f"正在执行{tool_list[0].name()}...")
+            result = tool_list[0].handle(response, self)
+            print(f"✅ {tool_list[0].name()}执行完成")
+            self.tool_call_count += 1
+            return result
         return False, ""
 
     def reset_tool_call_count(self):
@@ -581,21 +586,19 @@ class Agent:
         if self.use_analysis:
             self._analysis_task()
         if self.need_summary:
-            with yaspin(text="正在生成总结...", color="cyan") as spinner:
-                self.prompt = self.summary_prompt
-                with spinner.hidden():
-                    ret = self.model.chat_until_success(self.prompt)  # type: ignore
-                    spinner.text = "总结生成完成"
-                    spinner.ok("✅")
-                    return ret
+            print("正在生成总结...")
+            self.prompt = self.summary_prompt
+            ret = self.model.chat_until_success(self.prompt)  # type: ignore
+            print("✅ 总结生成完成")
+            return ret
 
         return "任务完成"
 
     def _analysis_task(self):
-        with yaspin(text="正在分析任务...", color="cyan") as spinner:
-            try:
-                # 让模型判断是否需要生成方法论
-                analysis_prompt = f"""<task_analysis>
+        print("正在分析任务...")
+        try:
+            # 让模型判断是否需要生成方法论
+            analysis_prompt = f"""<task_analysis>
 <request>
 当前任务已结束，请分析该任务的解决方案：
 1. 首先检查现有工具或方法论是否已经可以完成该任务，如果可以，直接说明即可，无需生成新内容
@@ -741,17 +744,12 @@ arguments:
 </output_requirements>
 </task_analysis>"""
 
-                self.prompt = analysis_prompt
-                with spinner.hidden():
-                    response = self.model.chat_until_success(self.prompt)  # type: ignore
-
-                with spinner.hidden():
-                    self._call_tools(response)
-                spinner.text = "分析完成"
-                spinner.ok("✅")
-            except Exception as e:
-                spinner.text = "分析失败"
-                spinner.fail("❌")
+            self.prompt = analysis_prompt
+            response = self.model.chat_until_success(self.prompt)  # type: ignore
+            self._call_tools(response)
+            print("✅ 分析完成")
+        except Exception as e:
+            print("❌ 分析失败")
 
     def make_default_addon_prompt(self, need_complete: bool) -> str:
         """生成附加提示。
@@ -817,12 +815,13 @@ arguments:
 
                     if get_interrupt():
                         set_interrupt(False)
-                        user_input = self.multiline_inputer(
-                            f"模型交互期间被中断，请输入用户干预信息："
-                        )
+                        user_input = self.multiline_inputer(f"模型交互期间被中断，请输入用户干预信息：")
                         if user_input:
                             # 如果有工具调用且用户确认继续，则将干预信息和工具执行结果拼接为prompt
-                            if any(handler.can_handle(current_response) for handler in self.output_handler):
+                            if any(
+                                handler.can_handle(current_response)
+                                for handler in self.output_handler
+                            ):
                                 if user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
                                     self.prompt = f"{user_input}\n\n{current_response}"
                                     continue
@@ -871,25 +870,32 @@ arguments:
         history_md = ""
         if self.history_count > 0 and self.model and self.model.support_upload_files():
             import tempfile
+
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            history_md = str(Path(tempfile.gettempdir())/f"{self.name}_history_{timestamp}.md")
-            self.history.export_history_to_markdown(self.history_dir, history_md, max_files=self.history_count)
+            history_md = str(
+                Path(tempfile.gettempdir()) / f"{self.name}_history_{timestamp}.md"
+            )
+            self.history.export_history_to_markdown(
+                self.history_dir, history_md, max_files=self.history_count
+            )
             self.files.append(history_md)
 
-                        # 如果有上传文件，先上传文件
+            # 如果有上传文件，先上传文件
         if self.model and self.model.support_upload_files():
             if self.use_methodology:
                 if not upload_methodology(self.model, other_files=self.files):
                     if self.files:
                         PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
-                                    # 上传失败则回退到本地加载
+                        # 上传失败则回退到本地加载
                     msg = self.prompt
                     for handler in self.input_handler:
                         msg, _ = handler(msg, self)
                     self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
                 else:
                     if self.files:
-                        self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
+                        self.prompt = (
+                            f"{self.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
+                        )
                     else:
                         self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
             elif self.files:
