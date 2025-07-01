@@ -477,14 +477,10 @@ OPENAI_API_BASE: https://api.openai.com/v1
 | 工具名称 | 描述 |
 |----------|------|
 | ask_user | 交互式用户输入收集 |
-| chdir | 更改当前工作目录 |
 | rewrite_file | 文件重写工具 |
 | edit_file | 代码编辑工具 |
-| create_code_agent | 代码开发工具 |
-| create_sub_agent | 创建子代理处理特定任务 |
 | execute_script | 执行脚本并返回结果 |
 | file_analyzer | 分析文件内容并提取关键信息 |
-| file_operation | 文件批量操作工具 |
 | methodology | 方法论管理工具 |
 | read_code | 代码阅读与分析工具 |
 | read_webpage | 读取网页内容并分析 |

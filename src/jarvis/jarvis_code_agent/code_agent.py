@@ -54,8 +54,6 @@ class CodeAgent:
                 "ask_user",
                 "read_code",
                 "methodology",
-                "chdir",
-                # "edit_file",
                 "rewrite_file",
             ]
         )

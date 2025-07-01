@@ -39,7 +39,7 @@ PM_PROMPT = f"""
 ### 1. 需求接收与分析
 1. 接收用户需求，使用ask_user工具澄清不明确点
 2. 使用search_web研究相关领域知识
-3. 使用file_operation记录需求文档
+3. 使用rewrite_file记录需求文档
 </step>
 
 <step>
@@ -47,7 +47,7 @@ PM_PROMPT = f"""
 1. 分析需求复杂度，确定所需角色
 2. 使用methodology选择合适的项目管理方法
 3. 创建项目计划和时间表
-4. 使用file_operation记录任务分配
+4. 使用rewrite_file记录任务分配
 5. 向BA发送需求分析任务
 6. 等待BA完成需求分析
 </step>
@@ -58,7 +58,7 @@ PM_PROMPT = f"""
 2. 向SA发送架构设计任务
 3. 协调BA和SA之间的沟通
 4. 等待SA完成架构设计
-5. 使用file_operation记录架构决策
+5. 使用rewrite_file记录架构决策
 </step>
 
 <step>
@@ -67,7 +67,7 @@ PM_PROMPT = f"""
 2. 向TL发送技术实施任务
 3. 协调SA和TL之间的沟通
 4. 使用execute_script监控开发进度
-5. 使用file_operation记录技术决策
+5. 使用rewrite_file记录技术决策
 </step>
 
 <step>
@@ -76,7 +76,7 @@ PM_PROMPT = f"""
 2. 向DEV发送具体开发任务
 3. 协调TL和DEV之间的沟通
 4. 使用execute_script监控代码提交
-5. 使用file_operation记录开发进度
+5. 使用rewrite_file记录开发进度
 </step>
 
 <step>
@@ -85,16 +85,16 @@ PM_PROMPT = f"""
 2. 向QA发送测试任务
 3. 协调DEV和QA之间的沟通
 4. 使用execute_script监控测试进度
-5. 使用file_operation记录测试结果
+5. 使用rewrite_file记录测试结果
 </step>
 
 <step>
 ### 7. 项目收尾与交付
 1. 收集所有角色的工作成果
-2. 使用file_operation整理项目文档
+2. 使用rewrite_file整理项目文档
 3. 使用execute_script执行最终检查
 4. 向用户交付项目成果
-5. 使用file_operation记录项目总结
+5. 使用rewrite_file记录项目总结
 </step>
 </workflow>
 
@@ -113,7 +113,7 @@ PM_PROMPT = f"""
 <tools>
 ## 工具使用指南
 - **ask_user**：获取用户需求和反馈，澄清不明确的需求点
-- **file_operation**：创建和管理项目文档，跟踪项目状态
+- **rewrite_file**：创建和管理项目文档，跟踪项目状态
 - **search_web**：研究相关领域知识，寻找最佳实践
 - **execute_script**：监控项目状态，执行自动化任务
 - **methodology**：采用适当的项目方法论和最佳实践
@@ -204,14 +204,14 @@ BA_PROMPT = f"""
 1. 接收PM的需求任务
 2. 使用ask_user工具澄清不明确点
 3. 使用search_web研究相关领域知识
-4. 使用file_operation记录需求文档
+4. 使用rewrite_file记录需求文档
 </step>
 
 <step>
 ### 2. 用户故事编写
 1. 分析用户角色和场景
 2. 编写用户故事和验收标准
-3. 使用file_operation记录用户故事
+3. 使用rewrite_file记录用户故事
 4. 向PM提交用户故事评审
 5. 根据反馈修改用户故事
 </step>
@@ -219,35 +219,35 @@ BA_PROMPT = f"""
 <step>
 ### 3. 功能规格定义
 1. 基于用户故事定义功能规格
-2. 使用file_operation记录功能规格
+2. 使用rewrite_file记录功能规格
 3. 向SA提交功能规格评审
 4. 根据反馈修改功能规格
-5. 使用file_operation更新文档
+5. 使用rewrite_file更新文档
 </step>
 
 <step>
 ### 4. 业务规则梳理
 1. 识别业务规则和约束
-2. 使用file_operation记录业务规则
+2. 使用rewrite_file记录业务规则
 3. 向DEV提交业务规则说明
 4. 根据反馈修改业务规则
-5. 使用file_operation更新文档
+5. 使用rewrite_file更新文档
 </step>
 
 <step>
 ### 5. 需求验证
 1. 参与功能测试
 2. 验证需求实现
-3. 使用file_operation记录验证结果
+3. 使用rewrite_file记录验证结果
 4. 向QA提交验证报告
-5. 使用file_operation更新文档
+5. 使用rewrite_file更新文档
 </step>
 </workflow>
 
 <tools>
 ## 工具使用指南
 - **ask_user**：获取用户需求和反馈，澄清不明确的需求点
-- **file_operation**：创建和管理需求文档，跟踪需求状态
+- **rewrite_file**：创建和管理需求文档，跟踪需求状态
 - **search_web**：研究相关领域知识，寻找最佳实践
 </tools>
 
@@ -338,7 +338,7 @@ SA_PROMPT = f"""
 1. 接收PM分配的架构设计任务
 2. 使用read_code深入理解关键代码
 3. 使用search_web研究技术趋势
-4. 使用file_operation记录需求理解
+4. 使用rewrite_file记录需求理解
 </step>
 
 <step>
@@ -346,53 +346,53 @@ SA_PROMPT = f"""
 1. 使用methodology选择架构设计方法
 2. 使用execute_script检查系统环境
 3. 使用search_web研究架构模式
-4. 使用file_operation记录设计规划
+4. 使用rewrite_file记录设计规划
 </step>
 
 <step>
 ### 3. 系统架构设计
 1. 设计系统整体架构
-2. 使用file_operation记录架构文档
+2. 使用rewrite_file记录架构文档
 3. 使用search_web研究技术选型
-4. 使用file_operation更新架构设计
+4. 使用rewrite_file更新架构设计
 </step>
 
 <step>
 ### 4. 组件设计
 1. 设计系统组件和模块
-2. 使用file_operation记录组件规格
+2. 使用rewrite_file记录组件规格
 3. 使用execute_script验证组件接口
-4. 使用file_operation更新组件设计
+4. 使用rewrite_file更新组件设计
 </step>
 
 <step>
 ### 5. 接口设计
 1. 设计系统接口和API
-2. 使用file_operation记录接口文档
+2. 使用rewrite_file记录接口文档
 3. 使用search_web研究接口规范
-4. 使用file_operation更新接口设计
+4. 使用rewrite_file更新接口设计
 </step>
 
 <step>
 ### 6. 数据模型设计
 1. 设计系统数据模型
-2. 使用file_operation记录数据模型
+2. 使用rewrite_file记录数据模型
 3. 使用execute_script验证数据约束
-4. 使用file_operation更新数据模型
+4. 使用rewrite_file更新数据模型
 </step>
 
 <step>
 ### 7. 架构验证与交付
-1. 使用file_operation整理架构文档
+1. 使用rewrite_file整理架构文档
 2. 使用execute_script生成架构报告
 3. 向PM提交架构设计结果
-4. 使用file_operation归档架构文档
+4. 使用rewrite_file归档架构文档
 </step>
 </workflow>
 
 <tools>
 ## 工具使用指南
-- **file_operation**：创建和管理架构文档和技术规格
+- **rewrite_file**：创建和管理架构文档和技术规格
 - **search_web**：研究架构模式和技术趋势
 - **execute_script**：检查系统环境和依赖关系
 - **read_code**：阅读和理解关键代码段
@@ -487,61 +487,61 @@ TL_PROMPT = f"""
 1. 接收PM分配的技术实施任务
 2. 使用lsp_get_diagnostics检查代码问题
 3. 使用execute_script验证技术环境
-4. 使用file_operation记录技术规划
+4. 使用rewrite_file记录技术规划
 </step>
 
 <step>
 ### 2. 技术方案制定
 1. 使用methodology选择开发方法
 2. 使用execute_script验证技术方案
-3. 使用file_operation记录技术方案
+3. 使用rewrite_file记录技术方案
 </step>
 
 <step>
 ### 3. 开发规范制定
 1. 制定代码规范和标准
-2. 使用file_operation记录开发规范
+2. 使用rewrite_file记录开发规范
 3. 使用execute_script验证规范执行
-4. 使用file_operation更新开发规范
+4. 使用rewrite_file更新开发规范
 </step>
 
 <step>
 ### 4. 任务分解与分配
 1. 分解技术任务为可执行单元
-2. 使用file_operation记录任务分解
+2. 使用rewrite_file记录任务分解
 3. 使用execute_script验证任务划分
-4. 使用file_operation更新任务分配
+4. 使用rewrite_file更新任务分配
 </step>
 
 <step>
 ### 5. 技术指导与支持
 1. 向DEV提供技术指导
-2. 使用file_operation记录指导内容
+2. 使用rewrite_file记录指导内容
 3. 使用lsp_get_diagnostics检查代码质量
-4. 使用file_operation更新技术文档
+4. 使用rewrite_file更新技术文档
 </step>
 
 <step>
 ### 6. 代码审查与优化
 1. 审查DEV提交的代码
-2. 使用file_operation记录审查结果
+2. 使用rewrite_file记录审查结果
 3. 使用lsp_get_diagnostics检查代码问题
 4. 使用execute_script验证代码质量
-5. 使用file_operation更新审查记录
+5. 使用rewrite_file更新审查记录
 </step>
 
 <step>
 ### 7. 技术总结与交付
-1. 使用file_operation整理技术文档
+1. 使用rewrite_file整理技术文档
 2. 使用execute_script生成技术报告
 3. 向PM提交技术实施结果
-4. 使用file_operation归档技术文档
+4. 使用rewrite_file归档技术文档
 </step>
 </workflow>
 
 <tools>
 ## 工具使用指南
-- **file_operation**：管理技术文档和指导文件
+- **rewrite_file**：管理技术文档和指导文件
 - **execute_script**：执行开发工具和命令
 - **methodology**：应用开发方法论和最佳实践
 </tools>
@@ -633,66 +633,65 @@ DEV_PROMPT = f"""
 1. 接收TL分配的开发任务
 2. 使用read_code理解现有实现
 3. 使用execute_script验证开发环境
-4. 使用file_operation记录任务分析
+4. 使用rewrite_file记录任务分析
 </step>
 
 <step>
 ### 2. 技术方案设计
 1. 分析实现方案
-2. 使用file_operation记录设计方案
+2. 使用rewrite_file记录设计方案
 3. 使用execute_script验证技术选型
-4. 使用file_operation更新技术方案
+4. 使用rewrite_file更新技术方案
 </step>
 
 <step>
 ### 3. 代码实现
 1. 使用create_code_agent生成代码
-2. 使用file_operation记录代码实现
+2. 使用rewrite_file记录代码实现
 3. 使用execute_script验证代码功能
-4. 使用file_operation更新代码文档
+4. 使用rewrite_file更新代码文档
 </step>
 
 <step>
 ### 4. 单元测试编写
 1. 编写单元测试代码
-2. 使用file_operation记录测试用例
+2. 使用rewrite_file记录测试用例
 3. 使用execute_script运行单元测试
-4. 使用file_operation更新测试文档
+4. 使用rewrite_file更新测试文档
 </step>
 
 <step>
 ### 5. 代码优化与重构
 1. 优化代码实现
-2. 使用file_operation记录优化方案
+2. 使用rewrite_file记录优化方案
 3. 使用execute_script验证优化效果
-4. 使用file_operation更新优化文档
+4. 使用rewrite_file更新优化文档
 </step>
 
 <step>
 ### 6. 代码审查与修改
 1. 接收TL的代码审查意见
-2. 使用file_operation记录修改计划
+2. 使用rewrite_file记录修改计划
 3. 使用create_code_agent修改代码
 4. 使用execute_script验证修改效果
-5. 使用file_operation更新代码文档
+5. 使用rewrite_file更新代码文档
 </step>
 
 <step>
 ### 7. 代码提交与交付
-1. 使用file_operation整理代码文档
+1. 使用rewrite_file整理代码文档
 2. 使用execute_script生成提交报告
 3. 向TL提交代码实现结果
-4. 使用file_operation归档开发文档
+4. 使用rewrite_file归档开发文档
 </step>
 </workflow>
 
 <tools>
 ## 工具使用指南
 - **create_code_agent**：创建专业代码开发代理
-- **file_operation**：管理源代码和配置文件
+- **rewrite_file**：管理源代码和配置文件
 - **execute_script**：执行开发命令和测试脚本
 - **read_code**：阅读和理解关键代码段
-- **create_sub_agent**：创建专门的子代理处理特定任务
 - **methodology**：应用开发方法论和最佳实践
 </tools>
 
@@ -807,63 +806,63 @@ QA_PROMPT = f"""
 1. 接收PM分配的测试任务
 2. 使用read_code理解功能实现
 3. 使用execute_script验证测试环境
-4. 使用file_operation记录测试需求
+4. 使用rewrite_file记录测试需求
 </step>
 
 <step>
 ### 2. 测试计划制定
 1. 使用methodology选择测试方法
-2. 使用file_operation记录测试计划
+2. 使用rewrite_file记录测试计划
 3. 使用execute_script验证测试工具
-4. 使用file_operation更新测试计划
+4. 使用rewrite_file更新测试计划
 </step>
 
 <step>
 ### 3. 测试用例设计
 1. 设计测试用例
-2. 使用file_operation记录测试用例
+2. 使用rewrite_file记录测试用例
 3. 使用execute_script验证测试用例
-4. 使用file_operation更新测试用例
+4. 使用rewrite_file更新测试用例
 </step>
 
 <step>
 ### 4. 测试环境准备
 1. 配置测试环境
-2. 使用file_operation记录环境配置
+2. 使用rewrite_file记录环境配置
 3. 使用execute_script验证环境配置
-4. 使用file_operation更新环境文档
+4. 使用rewrite_file更新环境文档
 </step>
 
 <step>
 ### 5. 测试执行
 1. 执行测试用例
-2. 使用file_operation记录测试结果
+2. 使用rewrite_file记录测试结果
 3. 使用lsp_get_diagnostics检查代码问题
 4. 使用execute_script验证测试结果
-5. 使用file_operation更新测试报告
+5. 使用rewrite_file更新测试报告
 </step>
 
 <step>
 ### 6. 缺陷管理
 1. 分析缺陷
-2. 使用file_operation记录缺陷信息
+2. 使用rewrite_file记录缺陷信息
 3. 使用execute_script验证缺陷修复
-4. 使用file_operation更新缺陷报告
+4. 使用rewrite_file更新缺陷报告
 </step>
 
 <step>
 ### 7. 质量评估与交付
-1. 使用file_operation整理测试文档
+1. 使用rewrite_file整理测试文档
 2. 使用execute_script生成质量报告
 3. 向PM提交测试结果
-4. 使用file_operation归档测试文档
+4. 使用rewrite_file归档测试文档
 </step>
 </workflow>
 
 <tools>
 ## 工具使用指南
 - **create_code_agent**：创建测试代码开发代理
-- **file_operation**：管理测试文档和测试脚本
+- **rewrite_file**：管理测试文档和测试脚本
 - **execute_script**：执行测试命令和测试套件
 - **read_code**：阅读和理解代码以设计测试用例
 - **methodology**：应用测试方法论和最佳实践
@@ -958,7 +957,7 @@ def create_dev_team() -> MultiAgent:
     PM_output_handler.use_tools(
         [
             "ask_user",
-            "file_operation",
+            "rewrite_file",
             "search_web",
             "execute_script",
             "methodology",
@@ -971,7 +970,7 @@ def create_dev_team() -> MultiAgent:
     BA_output_handler.use_tools(
         [
             "ask_user",
-            "file_operation",
+            "rewrite_file",
             "search_web",
             "execute_script",
             "read_webpage",
@@ -984,7 +983,7 @@ def create_dev_team() -> MultiAgent:
     SA_output_handler = ToolRegistry()
     SA_output_handler.use_tools(
         [
-            "file_operation",
+            "rewrite_file",
             "search_web",
             "execute_script",
             "read_code",
@@ -997,7 +996,7 @@ def create_dev_team() -> MultiAgent:
     TL_output_handler = ToolRegistry()
     TL_output_handler.use_tools(
         [
-            "file_operation",
+            "rewrite_file",
             "execute_script",
             "methodology",
             "edit_file",
@@ -1008,11 +1007,9 @@ def create_dev_team() -> MultiAgent:
     DEV_output_handler = ToolRegistry()
     DEV_output_handler.use_tools(
         [
-            "create_code_agent",
-            "file_operation",
+            "rewrite_file",
             "execute_script",
             "read_code",
-            "create_sub_agent",
             "methodology",
             "edit_file",
             "rewrite_file",
@@ -1022,8 +1019,7 @@ def create_dev_team() -> MultiAgent:
     QA_output_handler = ToolRegistry()
     QA_output_handler.use_tools(
         [
-            "create_code_agent",
-            "file_operation",
+            "rewrite_file",
             "execute_script",
             "read_code",
             "methodology",
@@ -1036,13 +1032,13 @@ def create_dev_team() -> MultiAgent:
     PM_PROMPT_EXTENSION = """
 ## 工具使用指南
 - **ask_user**：获取用户需求和反馈，澄清不明确的需求点
-- **file_operation**：创建和管理项目文档，跟踪项目状态
+- **rewrite_file**：创建和管理项目文档，跟踪项目状态
 - **search_web**：研究相关领域知识，寻找最佳实践
 - **execute_script**：监控项目状态，执行自动化任务
 - **methodology**：采用适当的项目方法论和最佳实践
 
 ## 文档管理规范
-每一步工作后，必须使用file_operation工具将结论性输出记录到项目文档中：
+每一步工作后，必须使用rewrite_file工具将结论性输出记录到项目文档中：
 1. 需求确认后，创建`requirements/project_requirements_v<version>.md`记录需求文档
 2. 任务分配后，创建`status_reports/task_assignments.md`记录任务分配情况
 3. 项目阶段完成后，创建`status_reports/project_status_report.md`记录项目进度
@@ -1056,14 +1052,14 @@ def create_dev_team() -> MultiAgent:
     BA_PROMPT_EXTENSION = """
 ## 工具使用指南
 - **ask_user**：深入了解用户需求，进行需求挖掘和验证
-- **file_operation**：创建和管理需求文档与分析资料
+- **rewrite_file**：创建和管理需求文档与分析资料
 - **search_web**：研究行业标准和最佳实践
 - **execute_script**：查询系统环境和配置信息
 - **read_webpage**：收集用户体验和行业趋势信息
 - **methodology**：应用需求分析和用户故事映射方法论
 
 ## 文档管理规范
-每一步分析后，必须使用file_operation工具将结论性输出记录到分析文档中：
+每一步分析后，必须使用rewrite_file工具将结论性输出记录到分析文档中：
 1. 需求分析完成后，创建`analysis/requirements_analysis_v<version>.md`记录分析结果
 2. 用户故事编写后，创建`analysis/user_stories_v<version>.md`记录用户故事
 3. 功能规格确定后，创建`specs/functional_specs.md`记录功能规格
@@ -1077,14 +1073,14 @@ def create_dev_team() -> MultiAgent:
     # Update SA prompt with tool usage guidance
     SA_PROMPT_EXTENSION = """
 ## 工具使用指南
-- **file_operation**：创建和管理架构文档和技术规格
+- **rewrite_file**：创建和管理架构文档和技术规格
 - **search_web**：研究架构模式和技术趋势
 - **execute_script**：检查系统环境和依赖关系
 - **read_code**：阅读和理解关键代码段
 - **methodology**：应用架构设计方法论和模式
 
 ## 文档管理规范
-每一步架构设计后，必须使用file_operation工具将结论性输出记录到架构文档中：
+每一步架构设计后，必须使用rewrite_file工具将结论性输出记录到架构文档中：
 1. 系统架构设计后，创建`architecture/system_architecture_v<version>.md`记录架构文档
 2. 架构图创建后，保存到`architecture/architecture_diagrams/`目录
 3. 组件规格定义后，创建`technical_specs/component_specs/<component_name>.md`
@@ -1098,11 +1094,11 @@ def create_dev_team() -> MultiAgent:
     # Update TL prompt with tool usage guidance
     TL_PROMPT_EXTENSION = """
 ## 工具使用指南
-- **file_operation**：管理技术文档和指导文件
+- **rewrite_file**：管理技术文档和指导文件
 - **execute_script**：执行开发工具和命令
 
 ## 文档管理规范
-每一步技术指导或审查后，必须使用file_operation工具将结论性输出记录到技术文档中：
+每一步技术指导或审查后，必须使用rewrite_file工具将结论性输出记录到技术文档中：
 1. 实施计划制定后，创建`technical/implementation_plan_v<version>.md`记录实施计划
 2. 任务分解后，创建`technical/task_breakdown.md`记录任务分解详情
 3. 编码标准制定后，创建`guidelines/coding_standards.md`记录编码标准
@@ -1118,13 +1114,12 @@ def create_dev_team() -> MultiAgent:
     DEV_PROMPT_EXTENSION = """
 ## 工具使用指南
 - **create_code_agent**：创建专业代码开发代理
-- **file_operation**：管理源代码和配置文件
+- **rewrite_file**：管理源代码和配置文件
 - **execute_script**：执行开发命令和测试脚本
 - **read_code**：阅读和理解关键代码段
-- **create_sub_agent**：创建专门的子代理处理特定任务
 
 ## 文档管理规范
-每一步代码实现或优化后，必须使用file_operation工具将结论性输出记录到开发文档中：
+每一步代码实现或优化后，必须使用rewrite_file工具将结论性输出记录到开发文档中：
 1. 功能实现完成后，创建`src/README.md`或更新模块说明文档，记录实现细节
 2. API实现后，更新`docs/api/<module_name>.md`记录API使用说明
 3. 复杂算法实现后，创建`docs/algorithms/<algorithm_name>.md`解释算法原理
@@ -1140,13 +1135,13 @@ def create_dev_team() -> MultiAgent:
     QA_PROMPT_EXTENSION = """
 ## 工具使用指南
 - **create_code_agent**：创建测试代码开发代理
-- **file_operation**：管理测试文档和测试脚本
+- **rewrite_file**：管理测试文档和测试脚本
 - **execute_script**：执行测试命令和测试套件
 - **execute_script**：执行各类脚本（Shell命令、Shell脚本、Python脚本）
 - **read_code**：阅读和理解代码以设计测试用例
 
 ## 文档管理规范
-每一步测试或质量评估后，必须使用file_operation工具将结论性输出记录到测试文档中：
+每一步测试或质量评估后，必须使用rewrite_file工具将结论性输出记录到测试文档中：
 1. 测试计划制定后，创建`testing/test_plan.md`记录测试计划
 2. 测试用例设计后，创建`testing/test_cases/<feature_name>_test_cases.md`记录测试用例
 3. 测试执行后，创建`testing/test_reports/test_report_<date>.md`记录测试报告
