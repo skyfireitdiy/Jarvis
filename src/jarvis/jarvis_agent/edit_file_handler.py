@@ -2,9 +2,6 @@ import os
 import re
 from typing import Any, Dict, List, Tuple
 
-from yaspin import yaspin  # type: ignore
-from yaspin.core import Yaspin  # type: ignore
-
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.git_utils import revert_file
@@ -71,19 +68,19 @@ class EditFileHandler(OutputHandler):
                 {"SEARCH": diff["SEARCH"], "REPLACE": diff["REPLACE"]} for diff in diffs
             ]
 
-            with yaspin(text=f"正在处理文件 {file_path}...", color="cyan") as spinner:
-                # 首先尝试fast_edit模式
-                success, result = self._fast_edit(file_path, file_patches, spinner)
-                if not success:
-                    # 如果fast_edit失败，尝试slow_edit模式
-                    success, result = EditFileHandler._slow_edit(
-                        file_path, file_patches, spinner, agent
-                    )
+            print(f"正在处理文件 {file_path}...")
+            # 首先尝试fast_edit模式
+            success, result = self._fast_edit(file_path, file_patches)
+            if not success:
+                # 如果fast_edit失败，尝试slow_edit模式
+                success, result = EditFileHandler._slow_edit(
+                    file_path, file_patches, agent
+                )
 
-                if success:
-                    results.append(f"✅ 文件 {file_path} 修改成功")
-                else:
-                    results.append(f"❌ 文件 {file_path} 修改失败: {result}")
+            if success:
+                results.append(f"✅ 文件 {file_path} 修改成功")
+            else:
+                results.append(f"❌ 文件 {file_path} 修改失败: {result}")
 
         summary = "\n".join(results)
         return False, summary
@@ -169,7 +166,7 @@ class EditFileHandler(OutputHandler):
 
     @staticmethod
     def _fast_edit(
-        file_path: str, patches: List[Dict[str, str]], spinner: Yaspin
+        file_path: str, patches: List[Dict[str, str]]
     ) -> Tuple[bool, str]:
         """快速应用补丁到文件
 
@@ -183,7 +180,6 @@ class EditFileHandler(OutputHandler):
         Args:
             file_path: 要修改的文件路径，支持绝对路径和相对路径
             patches: 补丁列表，每个补丁包含search(搜索文本)和replace(替换文本)
-            spinner: 进度显示对象，用于显示处理状态和结果
 
         Returns:
             Tuple[bool, str]:
@@ -223,7 +219,7 @@ class EditFileHandler(OutputHandler):
                     modified_content = modified_content.replace(
                         exact_search, replace_text
                     )
-                    spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
+                    print(f"✅ 补丁 #{patch_count} 应用成功")
                 else:
                     # 尝试增加缩进重试
                     found = False
@@ -249,9 +245,7 @@ class EditFileHandler(OutputHandler):
                             modified_content = modified_content.replace(
                                 indented_search, indented_replace
                             )
-                            spinner.write(
-                                f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)"
-                            )
+                            print(f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)")
                             found = True
                             break
 
@@ -266,19 +260,17 @@ class EditFileHandler(OutputHandler):
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(modified_content)
 
-            spinner.text = f"文件 {file_path} 修改完成，应用了 {patch_count} 个补丁"
-            spinner.ok("✅")
+            print(f"✅ 文件 {file_path} 修改完成，应用了 {patch_count} 个补丁")
             return True, modified_content
 
         except Exception as e:
-            spinner.text = f"文件修改失败: {str(e)}"
-            spinner.fail("❌")
+            print(f"❌ 文件修改失败: {str(e)}")
             revert_file(file_path)
             return False, f"文件修改失败: {str(e)}"
 
     @staticmethod
     def _slow_edit(
-        file_path: str, patches: List[Dict[str, str]], spinner: Yaspin, agent: Any
+        file_path: str, patches: List[Dict[str, str]], agent: Any
     ) -> Tuple[bool, str]:
         """使用AI模型生成补丁并应用到文件
 
@@ -293,7 +285,6 @@ class EditFileHandler(OutputHandler):
         Args:
             file_path: 要修改的文件路径，支持绝对路径和相对路径
             patches: 补丁列表，每个补丁包含search(搜索文本)和replace(替换文本)
-            spinner: 进度显示对象，用于显示处理状态和结果
             agent: 执行处理的agent实例，用于访问AI模型平台
 
         Returns:
@@ -314,13 +305,12 @@ class EditFileHandler(OutputHandler):
             upload_success = False
 
             # 如果是大文件，尝试上传到模型平台
-            with spinner.hidden():
-                if (
-                    is_large_context
-                    and model.support_upload_files()
-                    and model.upload_files([file_path])
-                ):
-                    upload_success = True
+            if (
+                is_large_context
+                and model.support_upload_files()
+                and model.upload_files([file_path])
+            ):
+                upload_success = True
 
             model.set_suppress_output(True)
 
@@ -393,8 +383,7 @@ class EditFileHandler(OutputHandler):
                 # 检查是否被中断
                 if get_interrupt():
                     set_interrupt(False)
-                    with spinner.hidden():
-                        user_input = agent.multiline_inputer("补丁应用被中断，请输入补充信息:")
+                    user_input = agent.multiline_inputer("补丁应用被中断，请输入补充信息:")
                     if not user_input.strip():
                         return False, "用户中断了补丁应用"
                     return False, f"用户中断了补丁应用并提供了补充信息: {user_input}"
@@ -428,7 +417,7 @@ class EditFileHandler(OutputHandler):
                 if generated_patches:
                     # 尝试应用生成的补丁
                     success, result = EditFileHandler._fast_edit(
-                        file_path, generated_patches, spinner
+                        file_path, generated_patches
                     )
                     if success:
                         return True, result
@@ -436,7 +425,6 @@ class EditFileHandler(OutputHandler):
             return False, "AI模型无法生成有效的补丁"
 
         except Exception as e:
-            spinner.text = f"文件修改失败: {str(e)}"
-            spinner.fail("❌")
+            print(f"❌ 文件修改失败: {str(e)}")
             revert_file(file_path)
             return False, f"文件修改失败: {str(e)}"
