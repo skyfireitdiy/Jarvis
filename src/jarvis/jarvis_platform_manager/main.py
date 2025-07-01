@@ -10,7 +10,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.input import get_multiline_input, get_single_line_input
+from jarvis.jarvis_utils.input import (get_multiline_input,
+                                       get_single_line_input)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
@@ -93,7 +94,8 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str):
 
             # Check if input is empty
             if not user_input.strip():
-                continue
+                PrettyOutput.print("检测到空输入，退出聊天", OutputType.INFO)
+                break
 
             # Check if it is a clear session command
             if user_input.strip() == "/clear":
@@ -189,9 +191,7 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str):
                         for entry in conversation_history:
                             f.write(f"{entry['role']}: {entry['content']}\n\n")
 
-                    PrettyOutput.print(
-                        f"所有对话已保存到 {file_path}", OutputType.SUCCESS
-                    )
+                    PrettyOutput.print(f"所有对话已保存到 {file_path}", OutputType.SUCCESS)
                 except Exception as e:
                     PrettyOutput.print(f"保存所有对话失败: {str(e)}", OutputType.ERROR)
                 continue
@@ -341,9 +341,14 @@ def role_command(args):
 
     # 显示可选角色列表
     PrettyOutput.section("可用角色", OutputType.SUCCESS)
-    output_str = "\n".join([f"{i}. {role['name']} - {role.get('description', '')}" for i, role in enumerate(config["roles"], 1)])
+    output_str = "\n".join(
+        [
+            f"{i}. {role['name']} - {role.get('description', '')}"
+            for i, role in enumerate(config["roles"], 1)
+        ]
+    )
     PrettyOutput.print(output_str, OutputType.INFO)
-        
+
     # 让用户选择角色
     try:
         choice = int(get_single_line_input("请选择角色(输入编号): "))
@@ -763,12 +768,8 @@ def main():
     service_parser.add_argument(
         "--port", type=int, default=8000, help="服务端口 (默认: 8000)"
     )
-    service_parser.add_argument(
-        "--platform", "-p", help="指定默认平台，当客户端未指定平台时使用"
-    )
-    service_parser.add_argument(
-        "--model", "-m", help="指定默认模型，当客户端未指定平台时使用"
-    )
+    service_parser.add_argument("--platform", "-p", help="指定默认平台，当客户端未指定平台时使用")
+    service_parser.add_argument("--model", "-m", help="指定默认模型，当客户端未指定平台时使用")
 
     # role subcommand
     role_parser = subparsers.add_parser("role", help="加载角色配置文件并开始对话")
