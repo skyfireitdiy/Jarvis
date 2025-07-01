@@ -480,7 +480,6 @@ OPENAI_API_BASE: https://api.openai.com/v1
 | chdir | 更改当前工作目录 |
 | rewrite_file | 文件重写工具 |
 | edit_file | 代码编辑工具 |
-| code_plan | 理解需求并制定代码修改计划 |
 | create_code_agent | 代码开发工具 |
 | create_sub_agent | 创建子代理处理特定任务 |
 | execute_script | 执行脚本并返回结果 |
