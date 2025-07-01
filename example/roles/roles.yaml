@@ -26,6 +26,11 @@ roles:
       4. 重点强化：突出关键信息
       5. 最终审核：确保润色后的文本符合要求
 
+      输出要求：
+      - 只输出纯文本内容
+      - 不要使用markdown格式
+      - 不要添加额外的格式符号
+
   - name: "活动策划专家"
     platform: "yuanbao"
     model: "deep_seek"
