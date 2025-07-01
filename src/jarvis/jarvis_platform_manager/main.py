@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.input import get_multiline_input, get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
@@ -53,7 +53,7 @@ def list_platforms():
             )
 
 
-def chat_with_model(platform_name: str, model_name: str):
+def chat_with_model(platform_name: str, model_name: str, system_prompt: str):
     """Chat with specified platform and model"""
     registry = PlatformRegistry.get_global_platform_registry()
     conversation_history = []  # 存储对话记录
@@ -67,6 +67,8 @@ def chat_with_model(platform_name: str, model_name: str):
     try:
         # Set model
         platform.set_model_name(model_name)
+        if system_prompt:
+            platform.set_system_prompt(system_prompt)
         platform.set_suppress_output(False)
         PrettyOutput.print(
             f"连接到 {platform_name} 平台 {model_name} 模型", OutputType.SUCCESS
@@ -255,7 +257,7 @@ def chat_command(args):
     """Process chat subcommand"""
     if not validate_platform_model(args):
         return
-    chat_with_model(args.platform, args.model)
+    chat_with_model(args.platform, args.model, "")
 
 
 def info_command(args):
@@ -339,14 +341,12 @@ def role_command(args):
 
     # 显示可选角色列表
     PrettyOutput.section("可用角色", OutputType.SUCCESS)
-    for i, role in enumerate(config["roles"], 1):
-        PrettyOutput.print(
-            f"{i}. {role['name']} - {role.get('description', '')}", OutputType.INFO
-        )
-
+    output_str = "\n".join([f"{i}. {role['name']} - {role.get('description', '')}" for i, role in enumerate(config["roles"], 1)])
+    PrettyOutput.print(output_str, OutputType.INFO)
+        
     # 让用户选择角色
     try:
-        choice = int(get_multiline_input("请选择角色(输入编号): "))
+        choice = int(get_single_line_input("请选择角色(输入编号): "))
         selected_role = config["roles"][choice - 1]
     except (ValueError, IndexError):
         PrettyOutput.print("无效的选择", OutputType.ERROR)
@@ -357,19 +357,9 @@ def role_command(args):
     model_name = selected_role["model"]
     system_prompt = selected_role.get("system_prompt", "")
 
-    registry = PlatformRegistry.get_global_platform_registry()
-    platform = registry.create_platform(platform_name)
-    if not platform:
-        PrettyOutput.print(f"创建平台 {platform_name} 失败", OutputType.WARNING)
-        return
-
-    platform.set_model_name(model_name)
-    if system_prompt:
-        platform.set_system_prompt(system_prompt)
-
     # 开始对话
     PrettyOutput.print(f"已选择角色: {selected_role['name']}", OutputType.SUCCESS)
-    chat_with_model(platform_name, model_name)
+    chat_with_model(platform_name, model_name, system_prompt)
 
 
 def service_command(args):
