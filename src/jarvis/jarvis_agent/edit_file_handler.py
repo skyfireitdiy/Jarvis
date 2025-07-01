@@ -153,10 +153,11 @@ class EditFileHandler(OutputHandler):
             file_path = match.group(1) or match.group(2) or match.group(3)
             diffs = []
             for diff_match in self.diff_pattern.finditer(match.group(0)):
-                diffs.append(
+                # 完全保留原始格式（包括所有空白和换行）
+                    diffs.append(
                     {
-                        "SEARCH": diff_match.group(1).strip(),
-                        "REPLACE": diff_match.group(2).strip(),
+                        "SEARCH": diff_match.group(1),  # 原始SEARCH内容
+                        "REPLACE": diff_match.group(2), # 原始REPLACE内容
                     }
                 )
             if diffs:
@@ -207,15 +208,20 @@ class EditFileHandler(OutputHandler):
                 replace_text = patch["REPLACE"]
                 patch_count += 1
 
-                if search_text in modified_content:
-                    if modified_content.count(search_text) > 1:
+                # 精确匹配搜索文本（保留原始换行和空格）
+                exact_search = search_text
+                
+                if exact_search in modified_content:
+                    if modified_content.count(exact_search) > 1:
                         PrettyOutput.print(
-                            f"搜索文本在文件中存在多处匹配：\n{search_text}",
+                            f"搜索文本在文件中存在多处匹配：\n{exact_search}",
                             output_type=OutputType.WARNING,
                         )
-                        return False, f"搜索文本在文件中存在多处匹配：\n{search_text}"
+                        return False, f"搜索文本在文件中存在多处匹配：\n{exact_search}"
+                    
+                    # 直接执行替换（保留所有原始格式）
                     modified_content = modified_content.replace(
-                        search_text, replace_text
+                        exact_search, replace_text
                     )
                     spinner.write(f"✅ 补丁 #{patch_count} 应用成功")
                 else:
