@@ -111,10 +111,20 @@ def get_shell_name() -> str:
     获取系统shell名称。
 
     返回：
-        str: Shell名称（例如bash, zsh），默认为bash
+        str: Shell名称（例如bash, zsh, fish），默认为bash
+
+    获取顺序：
+    1. 先从GLOBAL_CONFIG_DATA中获取JARVIS_SHELL配置
+    2. 再从GLOBAL_CONFIG_DATA中获取SHELL配置
+    3. 最后从环境变量SHELL获取
+    4. 如果都未配置，则默认返回bash
     """
-    shell_path = GLOBAL_CONFIG_DATA.get("SHELL", "/bin/bash")
-    return os.path.basename(shell_path)
+    shell_name = GLOBAL_CONFIG_DATA.get("JARVIS_SHELL")
+    if shell_name:
+        return shell_name.lower()
+    
+    shell_path = GLOBAL_CONFIG_DATA.get("SHELL", os.getenv("SHELL", "/bin/bash"))
+    return os.path.basename(shell_path).lower()
 
 
 def get_normal_platform_name() -> str:
