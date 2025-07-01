@@ -18,54 +18,105 @@ def execute_command(command: str, should_run: bool) -> None:
         os.system(command)
 
 
-def install_fish_completion() -> int:
-    """Install fish shell command completion with interactive choice
+def _check_fish_shell() -> bool:
+    """Check if current shell is fish
+    
+    Returns:
+        bool: True if fish shell, False otherwise
+    """
+    return get_shell_name() == "fish"
 
+def _get_config_file() -> str:
+    """Get fish config file path
+    
+    Returns:
+        str: Path to fish config file
+    """
+    return os.path.expanduser("~/.config/fish/config.fish")
+
+def _get_markers() -> tuple[str, str]:
+    """Get start and end markers for JSS completion
+    
+    Returns:
+        tuple: (start_marker, end_marker)
+    """
+    return (
+        "# ===== JARVIS JSS FISH COMPLETION START =====",
+        "# ===== JARVIS JSS FISH COMPLETION END ====="
+    )
+
+def install_jss_completion() -> int:
+    """Install JSS fish shell command completion
+    
     Returns:
         int: 0 if success, 1 if failed
     """
-    if get_shell_name() != "fish":
+    if not _check_fish_shell():
         print("当前不是fish shell，无需安装")
         return 0
 
-    # 使用fish命令检查函数是否已加载
-    check_cmd = 'functions --names | grep fish_command_not_found > /dev/null && echo "defined" || echo "undefined"'
-    result = os.popen(f"fish -c '{check_cmd}'").read().strip()
+    config_file = _get_config_file()
+    start_marker, end_marker = _get_markers()
 
-    if result == "defined":
-        print("fish_command_not_found函数已加载，无需安装")
+    if not os.path.exists(config_file):
+        print("未找到config.fish文件，将创建新文件")
+        os.makedirs(os.path.dirname(config_file), exist_ok=True)
+
+    with open(config_file, "r") as f:
+        content = f.read()
+
+    if start_marker in content:
+        print("JSS fish completion已安装，请执行: source ~/.config/fish/config.fish")
         return 0
 
-    config_file = os.path.expanduser("~/.config/fish/config.fish")
-
-    # 检查文件内容是否已定义但未加载
-    if os.path.exists(config_file):
-        with open(config_file, "r") as config:
-            if "function fish_command_not_found" in config.read():
-                print(
-                    "fish_command_not_found函数已定义但未加载，请执行: source ~/.config/fish/config.fish"
-                )
-                return 0
-
-    # 创建config.fish文件如果不存在
-    os.makedirs(os.path.dirname(config_file), exist_ok=True)
-
-    # 追加函数定义到config.fish
-    with open(config_file, "a") as config:
-        config.write(
-            """
+    with open(config_file, "a") as f:
+        f.write(f"""
+{start_marker}
 function fish_command_not_found
+    if test (string length "$argv") -lt 16
+        return
+    end
     commandline -r (jss request "$argv")
 end
 
 function __fish_command_not_found_handler --on-event fish_command_not_found
     fish_command_not_found "$argv"
 end
-"""
-        )
-    print(
-        "Fish shell命令补全功能已安装到config.fish，请执行: source ~/.config/fish/config.fish"
-    )
+{end_marker}
+""")
+    print("JSS fish completion已安装，请执行: source ~/.config/fish/config.fish")
+    return 0
+
+def uninstall_jss_completion() -> int:
+    """Uninstall JSS fish shell command completion
+    
+    Returns:
+        int: 0 if success, 1 if failed
+    """
+    if not _check_fish_shell():
+        print("当前不是fish shell，无需卸载")
+        return 0
+
+    config_file = _get_config_file()
+    start_marker, end_marker = _get_markers()
+
+    if not os.path.exists(config_file):
+        print("未找到JSS fish completion配置，无需卸载")
+        return 0
+
+    with open(config_file, "r") as f:
+        content = f.read()
+
+    if start_marker not in content:
+        print("未找到JSS fish completion配置，无需卸载")
+        return 0
+
+    new_content = content.split(start_marker)[0] + content.split(end_marker)[-1]
+    
+    with open(config_file, "w") as f:
+        f.write(new_content)
+    
+    print("JSS fish completion已卸载，请执行: source ~/.config/fish/config.fish")
     return 0
 
 
@@ -149,9 +200,17 @@ Example:
 
     # install子命令
     install_parser = subparsers.add_parser(
-        "install", help="安装fish shell的命令补全功能"
+        "install", help="安装JSS fish shell命令补全功能"
     )
     install_parser.add_argument(
+        "--shell", choices=["fish"], default="fish", help="指定shell类型(仅支持fish)"
+    )
+    
+    # 添加uninstall子命令
+    uninstall_parser = subparsers.add_parser(
+        "uninstall", help="卸载JSS fish shell命令补全功能"
+    )
+    uninstall_parser.add_argument(
         "--shell", choices=["fish"], default="fish", help="指定shell类型(仅支持fish)"
     )
 
@@ -165,8 +224,15 @@ Example:
         if args.shell != "fish":
             print(f"错误: 不支持的shell类型: {args.shell}, 仅支持fish")
             return 1
-        return install_fish_completion()
+        return install_jss_completion()
 
+    # 处理uninstall命令
+    if args.command == "uninstall":
+        if args.shell != "fish":
+            print(f"错误: 不支持的shell类型: {args.shell}, 仅支持fish")
+            return 1
+        return uninstall_jss_completion()
+        
     # 处理request命令
     if not args.request:
         # 检查是否在交互式终端中运行
