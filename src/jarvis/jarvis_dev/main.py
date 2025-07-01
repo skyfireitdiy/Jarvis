@@ -1118,6 +1118,7 @@ def create_dev_team() -> MultiAgent:
 - **execute_script**：执行开发命令和测试脚本
 - **read_code**：阅读和理解关键代码段
 
+
 ## 文档管理规范
 每一步代码实现或优化后，必须使用rewrite_file工具将结论性输出记录到开发文档中：
 1. 功能实现完成后，创建`src/README.md`或更新模块说明文档，记录实现细节
