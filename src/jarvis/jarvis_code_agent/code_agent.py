@@ -382,14 +382,15 @@ def main() -> None:
     PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
 
     try:
-        if args.requirement:
-            user_input = args.requirement
-        else:
-            user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
-        if not user_input:
-            sys.exit(0)
         agent = CodeAgent(platform=args.platform, model=args.model, need_summary=False)
-        agent.run(user_input)
+        if args.requirement:
+            agent.run(args.requirement)
+        else:
+            while True:
+                user_input = get_multiline_input("请输入你的需求（输入空行退出）:")    
+                if not user_input:
+                    return
+                agent.run(user_input)
 
     except RuntimeError as e:
         PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
