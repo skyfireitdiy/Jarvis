@@ -10,13 +10,10 @@ import subprocess
 import sys
 from typing import List, Optional, Tuple
 
-from yaspin import yaspin  # type: ignore
-
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
-# 忽略yaspin的类型检查
 from jarvis.jarvis_code_agent.lint import get_lint_tools
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -137,16 +134,14 @@ class CodeAgent:
         1. 查找git根目录
         2. 检查并处理未提交的修改
         """
-        with yaspin(text="正在初始化环境...", color="cyan") as spinner:
-            curr_dir = os.getcwd()
-            git_dir = find_git_root(curr_dir)
-            self.root_dir = git_dir
-            if has_uncommitted_changes():
-                with spinner.hidden():
-                    git_commiter = GitCommitTool()
-                    git_commiter.execute({})
-            spinner.text = "环境初始化完成"
-            spinner.ok("✅")
+        print("🔍 正在初始化环境...")
+        curr_dir = os.getcwd()
+        git_dir = find_git_root(curr_dir)
+        self.root_dir = git_dir
+        if has_uncommitted_changes():
+            git_commiter = GitCommitTool()
+            git_commiter.execute({})
+        print("✅ 环境初始化完成")
 
     def _handle_uncommitted_changes(self) -> None:
         """处理未提交的修改，包括：
