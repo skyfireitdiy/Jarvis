@@ -70,5 +70,4 @@ use_tools:
   - ask_user
   - execute_script
   - read_code
-  - file_operation
   - search_web
