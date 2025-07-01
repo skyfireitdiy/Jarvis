@@ -3,7 +3,7 @@
 import argparse
 import os
 import sys
-from typing import Optional
+from typing import Optional, Tuple
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_shell_name, set_config
@@ -34,11 +34,11 @@ def _get_config_file() -> str:
     """
     return os.path.expanduser("~/.config/fish/config.fish")
 
-def _get_markers() -> tuple[str, str]:
+def _get_markers() -> Tuple[str, str]:
     """Get start and end markers for JSS completion
     
     Returns:
-        tuple: (start_marker, end_marker)
+        Tuple[str, str]: (start_marker, end_marker)
     """
     return (
         "# ===== JARVIS JSS FISH COMPLETION START =====",
