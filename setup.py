@@ -51,7 +51,6 @@ setup(
             "jarvis-code-review=jarvis.jarvis_code_analysis.code_review:main",
             "jarvis-git-commit=jarvis.jarvis_git_utils.git_commiter:main", 
             "jgc=jarvis.jarvis_git_utils.git_commiter:main",
-            "jarvis-dev=jarvis.jarvis_dev.main:main",
             "jarvis-git-squash=jarvis.jarvis_git_squash.main:main",
             "jarvis-multi-agent=jarvis.jarvis_multi_agent.main:main",
             "jarvis-agent=jarvis.jarvis_agent.main:main",

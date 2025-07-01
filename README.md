@@ -39,7 +39,6 @@ pip3 install jarvis-ai-assistant
 | `jarvis-platform-manager` | - | 使用平台管理功能 |
 | `jarvis-code-review` | - | 使用代码审查功能 |
 | `jarvis-git-commit` | `jgc` | 使用自动化git commit功能 |
-| `jarvis-dev` | - | 使用dev功能（开发中） |
 | `jarvis-git-squash` | - | 使用git squash功能 |
 | `jarvis-multi-agent` | - | 使用多代理功能 |
 | `jarvis-agent` | - | 使用agent功能 |
