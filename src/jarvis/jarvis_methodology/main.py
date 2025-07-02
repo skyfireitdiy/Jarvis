@@ -14,11 +14,12 @@ import json
 import os
 
 import yaml  # type: ignore
-from yaspin import yaspin  # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.methodology import (_get_methodology_directory,
-                                             _load_all_methodologies)
+from jarvis.jarvis_utils.methodology import (
+    _get_methodology_directory,
+    _load_all_methodologies,
+)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -128,46 +129,40 @@ def extract_methodology(input_file):
 """
 
         # 调用大模型平台提取方法论
-        with yaspin(text="正在提取方法论...", color="yellow") as spinner:
-            try:
-                response = platform.chat_until_success(prompt)
-            except Exception as e:
-                spinner.text = "提取失败"
-                spinner.fail("❌")
-                PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
-                return
+        print("🔍 正在提取方法论...")
+        try:
+            response = platform.chat_until_success(prompt)
+        except Exception as e:
+            print("❌ 提取失败")
+            PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
+            return
 
-            # 提取YAML部分
-            methodologies_start = response.find("<methodologies>") + len(
-                "<methodologies>"
+        # 提取YAML部分
+        methodologies_start = response.find("<methodologies>") + len("<methodologies>")
+        methodologies_end = response.find("</methodologies>")
+        if methodologies_start == -1 or methodologies_end == -1:
+            print("❌ 响应格式无效")
+            PrettyOutput.print(
+                "大模型未返回有效的<methodologies>格式", OutputType.ERROR
             )
-            methodologies_end = response.find("</methodologies>")
-            if methodologies_start == -1 or methodologies_end == -1:
-                spinner.text = "响应格式无效"
-                spinner.fail("❌")
-                PrettyOutput.print(
-                    "大模型未返回有效的<methodologies>格式", OutputType.ERROR
-                )
-                return
+            return
 
-            yaml_content = response[methodologies_start:methodologies_end].strip()
+        yaml_content = response[methodologies_start:methodologies_end].strip()
 
-            try:
-                data = yaml.safe_load(yaml_content)
-                extracted_methodologies = {
-                    item["problem_type"]: item["content"] for item in data
-                }
-            except (yaml.YAMLError, KeyError, TypeError) as e:
-                spinner.text = "YAML解析失败"
-                spinner.fail("❌")
-                PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
-                return
+        try:
+            data = yaml.safe_load(yaml_content)
+            extracted_methodologies = {
+                item["problem_type"]: item["content"] for item in data
+            }
+        except (yaml.YAMLError, KeyError, TypeError) as e:
+            print("❌ YAML解析失败")
+            PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
+            return
 
-            if not extracted_methodologies:
-                spinner.text = "未提取到有效方法论"
-                spinner.fail("❌")
-                return
-            spinner.ok("✅")
+        if not extracted_methodologies:
+            print("❌ 未提取到有效方法论")
+            return
+        print("✅ 提取到有效方法论")
 
         # 加载现有方法论
         existing_methodologies = _load_all_methodologies()
@@ -233,46 +228,40 @@ def extract_methodology_from_url(url):
 6. 内容字段使用|保留多行格式
 """
         # 调用大模型平台提取方法论
-        with yaspin(text="正在从URL提取方法论...", color="yellow") as spinner:
-            try:
-                response = platform.chat_until_success(prompt)
-            except Exception as e:
-                spinner.text = "提取失败"
-                spinner.fail("❌")
-                PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
-                return
+        print("🔍 正在从URL提取方法论...")
+        try:
+            response = platform.chat_until_success(prompt)
+        except Exception as e:
+            print("❌ 提取失败")
+            PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
+            return
 
-            # 提取YAML部分
-            methodologies_start = response.find("<methodologies>") + len(
-                "<methodologies>"
+        # 提取YAML部分
+        methodologies_start = response.find("<methodologies>") + len("<methodologies>")
+        methodologies_end = response.find("</methodologies>")
+        if methodologies_start == -1 or methodologies_end == -1:
+            print("❌ 响应格式无效")
+            PrettyOutput.print(
+                "大模型未返回有效的<methodologies>格式", OutputType.ERROR
             )
-            methodologies_end = response.find("</methodologies>")
-            if methodologies_start == -1 or methodologies_end == -1:
-                spinner.text = "响应格式无效"
-                spinner.fail("❌")
-                PrettyOutput.print(
-                    "大模型未返回有效的<methodologies>格式", OutputType.ERROR
-                )
-                return
+            return
 
-            yaml_content = response[methodologies_start:methodologies_end].strip()
+        yaml_content = response[methodologies_start:methodologies_end].strip()
 
-            try:
-                data = yaml.safe_load(yaml_content)
-                extracted_methodologies = {
-                    item["problem_type"]: item["content"] for item in data
-                }
-            except (yaml.YAMLError, KeyError, TypeError) as e:
-                spinner.text = "YAML解析失败"
-                spinner.fail("❌")
-                PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
-                return
+        try:
+            data = yaml.safe_load(yaml_content)
+            extracted_methodologies = {
+                item["problem_type"]: item["content"] for item in data
+            }
+        except (yaml.YAMLError, KeyError, TypeError) as e:
+            print("❌ YAML解析失败")
+            PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
+            return
 
-            if not extracted_methodologies:
-                spinner.text = "未提取到有效方法论"
-                spinner.fail("❌")
-                return
-            spinner.ok("✅")
+        if not extracted_methodologies:
+            print("❌ 未提取到有效方法论")
+            return
+        print("✅ 提取到有效方法论")
 
         # 加载现有方法论
         existing_methodologies = _load_all_methodologies()
