@@ -27,11 +27,11 @@ LINT_TOOLS = {
     # Go
     ".go": ["go vet"],
     # Python
-    ".py": ["black", "pylint", "mypy", "isort"],
-    ".pyw": ["black", "pylint", "mypy", "isort"],
-    ".pyi": ["black", "pylint", "mypy", "isort"],
-    ".pyx": ["black", "pylint", "mypy", "isort"],
-    ".pxd": ["black", "pylint", "mypy", "isort"],
+    ".py": ["black", "pylint", "mypy"],
+    ".pyw": ["black", "pylint", "mypy"],
+    ".pyi": ["black", "pylint", "mypy"],
+    ".pyx": ["black", "pylint", "mypy"],
+    ".pxd": ["black", "pylint", "mypy"],
     # Rust
     ".rs": ["cargo clippy", "rustfmt"],
     ".rlib": ["cargo clippy", "rustfmt"],
