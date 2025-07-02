@@ -3,19 +3,21 @@ import re
 from abc import ABC, abstractmethod
 from typing import Generator, List, Tuple
 
-from rich import box # type: ignore
-from rich.live import Live # type: ignore
-from rich.panel import Panel # type: ignore
-from rich.text import Text # type: ignore
+from rich import box  # type: ignore
+from rich.live import Live  # type: ignore
+from rich.panel import Panel  # type: ignore
+from rich.text import Text  # type: ignore
 
-from jarvis.jarvis_utils.config import (get_max_input_token_count,
-                                        get_pretty_output, is_print_prompt)
+from jarvis.jarvis_utils.config import (
+    get_max_input_token_count,
+    get_pretty_output,
+    is_print_prompt,
+)
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.globals import set_in_chat
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import (get_context_token_count, while_success,
-                                       while_true)
+from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
 
 
 class BasePlatform(ABC):
@@ -64,7 +66,7 @@ class BasePlatform(ABC):
             max_chunk_size = get_max_input_token_count() - 1024  # 留出一些余量
             min_chunk_size = get_max_input_token_count() - 2048
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
-            print("正在提交长上下文...")
+            print("📤 正在提交长上下文...")
             prefix_prompt = f"""
             我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
             """
@@ -76,9 +78,9 @@ class BasePlatform(ABC):
                 submit_count += 1
                 length += len(input)
                 print(
-                    f"正在提交第{submit_count}部分（共{len(inputs)}部分({length}/{len(message)})）"
+                    f"📤 正在提交第{submit_count}部分（共{len(inputs)}部分({length}/{len(message)})）"
                 )
-                
+
                 response += "\n" + while_true(
                     lambda: while_success(
                         lambda: self.chat(
@@ -88,11 +90,11 @@ class BasePlatform(ABC):
                     ),
                     5,
                 )
-                
+
                 print(
-                    f"提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
+                    f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
                 )
-            print("提交完成 ✅")
+            print("✅ 提交完成")
             response += "\n" + while_true(
                 lambda: while_success(
                     lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
