@@ -262,7 +262,7 @@ commit信息
                     print("✅ 提交")
 
                 commit_hash = self._get_last_commit_hash()
-                print("完成提交")
+                print("✅ 完成提交")
             finally:
                 # 清理临时差异文件
                 if temp_diff_file_path is not None and os.path.exists(
