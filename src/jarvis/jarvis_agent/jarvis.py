@@ -4,7 +4,7 @@ import os
 import sys
 from typing import Dict
 
-import yaml
+import yaml  # type: ignore
 from prompt_toolkit import prompt  # type: ignore
 
 from jarvis.jarvis_agent import (
