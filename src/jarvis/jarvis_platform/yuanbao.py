@@ -7,11 +7,8 @@ import time
 import urllib.parse
 from typing import Dict, Generator, List, Tuple
 
-import requests
-from PIL import Image
-from yaspin import yaspin
-from yaspin.api import Yaspin
-from yaspin.spinners import Spinners
+import requests  # type: ignore
+from PIL import Image  # type: ignore
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -98,7 +95,8 @@ class YuanbaoPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, data=payload, timeout=600), sleep_time=5
+                lambda: requests.post(url, headers=headers, data=payload, timeout=600),
+                sleep_time=5,
             )
             response_json = response.json()
 
@@ -135,114 +133,108 @@ class YuanbaoPlatform(BasePlatform):
 
         for file_path in file_list:
             file_name = os.path.basename(file_path)
-            with yaspin(Spinners.dots, text=f"上传文件 {file_name}") as spinner:
-                try:
+            print(f"🔍 上传文件 {file_name}")
+            try:
 
-                    # 1. Prepare the file information
-                    spinner.text = f"准备文件信息: {file_name}"
-                    file_size = os.path.getsize(file_path)
-                    file_extension = os.path.splitext(file_path)[1].lower().lstrip(".")
+                # 1. Prepare the file information
+                print(f"🔍 准备文件信息: {file_name}")
+                file_size = os.path.getsize(file_path)
+                file_extension = os.path.splitext(file_path)[1].lower().lstrip(".")
 
-                    # Determine file_type using file extension
-                    file_type = "txt"  # Default type
+                # Determine file_type using file extension
+                file_type = "txt"  # Default type
 
-                    # Image types
-                    if file_extension in ["jpg", "jpeg", "png", "webp", "bmp", "gif"]:
-                        file_type = "image"
-                    # PDF type
-                    elif file_extension == "pdf":
-                        file_type = "pdf"
-                    # Spreadsheet types
-                    elif file_extension in ["xls", "xlsx"]:
-                        file_type = "excel"
-                    # Presentation types
-                    elif file_extension in ["ppt", "pptx"]:
-                        file_type = "ppt"
-                    # Document types
-                    elif file_extension in ["doc", "docx"]:
-                        file_type = "doc"
-                    # Code file types
-                    elif file_extension in [
-                        "bat",
-                        "c",
-                        "cpp",
-                        "cs",
-                        "css",
-                        "go",
-                        "h",
-                        "hpp",
-                        "ini",
-                        "java",
-                        "js",
-                        "json",
-                        "log",
-                        "lua",
-                        "php",
-                        "pl",
-                        "py",
-                        "rb",
-                        "sh",
-                        "sql",
-                        "swift",
-                        "tex",
-                        "toml",
-                        "vue",
-                        "yaml",
-                        "yml",
-                        "rs",
-                    ]:
-                        file_type = "code"
+                # Image types
+                if file_extension in ["jpg", "jpeg", "png", "webp", "bmp", "gif"]:
+                    file_type = "image"
+                # PDF type
+                elif file_extension == "pdf":
+                    file_type = "pdf"
+                # Spreadsheet types
+                elif file_extension in ["xls", "xlsx"]:
+                    file_type = "excel"
+                # Presentation types
+                elif file_extension in ["ppt", "pptx"]:
+                    file_type = "ppt"
+                # Document types
+                elif file_extension in ["doc", "docx"]:
+                    file_type = "doc"
+                # Code file types
+                elif file_extension in [
+                    "bat",
+                    "c",
+                    "cpp",
+                    "cs",
+                    "css",
+                    "go",
+                    "h",
+                    "hpp",
+                    "ini",
+                    "java",
+                    "js",
+                    "json",
+                    "log",
+                    "lua",
+                    "php",
+                    "pl",
+                    "py",
+                    "rb",
+                    "sh",
+                    "sql",
+                    "swift",
+                    "tex",
+                    "toml",
+                    "vue",
+                    "yaml",
+                    "yml",
+                    "rs",
+                ]:
+                    file_type = "code"
 
-                    # 2. Generate upload information
-                    spinner.text = f"获取上传信息: {file_name}"
-                    upload_info = self._generate_upload_info(file_name)
-                    if not upload_info:
-                        spinner.text = f"无法获取文件 {file_name} 的上传信息"
-                        spinner.fail("❌")
-                        return False
-
-                    # 3. Upload the file to COS
-                    spinner.text = f"上传文件到云存储: {file_name}"
-                    upload_success = self._upload_file_to_cos(
-                        file_path, upload_info, spinner
-                    )
-                    if not upload_success:
-                        spinner.text = f"上传文件 {file_name} 失败"
-                        spinner.fail("❌")
-                        return False
-
-                    # 4. Create file metadata for chat
-                    spinner.text = f"生成文件元数据: {file_name}"
-                    file_metadata = {
-                        "type": file_type,
-                        "docType": file_extension if file_extension else file_type,
-                        "url": upload_info.get("resourceUrl", ""),
-                        "fileName": file_name,
-                        "size": file_size,
-                        "width": 0,
-                        "height": 0,
-                    }
-
-                    # Get image dimensions if it's an image file
-                    if file_type == "image":
-                        try:
-                            with Image.open(file_path) as img:
-                                file_metadata["width"] = img.width
-                                file_metadata["height"] = img.height
-                        except Exception as e:
-                            spinner.write(
-                                f"⚠️ 无法获取图片 {file_name} 的尺寸: {str(e)}"
-                            )
-
-                    uploaded_files.append(file_metadata)
-                    spinner.text = f"文件 {file_name} 上传成功"
-                    spinner.ok("✅")
-                    time.sleep(3)  # 上传成功后等待3秒
-
-                except Exception as e:
-                    spinner.text = f"上传文件 {file_path} 时出错: {str(e)}"
-                    spinner.fail("❌")
+                # 2. Generate upload information
+                print(f"🔍 获取上传信息: {file_name}")
+                upload_info = self._generate_upload_info(file_name)
+                if not upload_info:
+                    print(f"❌ 无法获取文件 {file_name} 的上传信息")
                     return False
+
+                # 3. Upload the file to COS
+                print(f"🔍 上传文件到云存储: {file_name}")
+                upload_success = self._upload_file_to_cos(file_path, upload_info)
+                if not upload_success:
+                    print(f"❌ 上传文件 {file_name} 失败")
+                    return False
+
+                # 4. Create file metadata for chat
+                spinner.text = f"生成文件元数据: {file_name}"
+                file_metadata = {
+                    "type": file_type,
+                    "docType": file_extension if file_extension else file_type,
+                    "url": upload_info.get("resourceUrl", ""),
+                    "fileName": file_name,
+                    "size": file_size,
+                    "width": 0,
+                    "height": 0,
+                }
+
+                # Get image dimensions if it's an image file
+                if file_type == "image":
+                    try:
+                        with Image.open(file_path) as img:
+                            file_metadata["width"] = img.width
+                            file_metadata["height"] = img.height
+                    except Exception as e:
+                        spinner.write(f"⚠️ 无法获取图片 {file_name} 的尺寸: {str(e)}")
+
+                uploaded_files.append(file_metadata)
+                spinner.text = f"文件 {file_name} 上传成功"
+                spinner.ok("✅")
+                time.sleep(3)  # 上传成功后等待3秒
+
+            except Exception as e:
+                spinner.text = f"上传文件 {file_path} 时出错: {str(e)}"
+                spinner.fail("❌")
+                return False
 
         self.multimedia = uploaded_files
         return True
@@ -264,7 +256,8 @@ class YuanbaoPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload, timeout=600), sleep_time=5
+                lambda: requests.post(url, headers=headers, json=payload, timeout=600),
+                sleep_time=5,
             )
 
             if response.status_code != 200:
@@ -283,9 +276,7 @@ class YuanbaoPlatform(BasePlatform):
             PrettyOutput.print(f"获取上传信息时出错: {str(e)}", OutputType.ERROR)
             return {}
 
-    def _upload_file_to_cos(
-        self, file_path: str, upload_info: Dict, spinner: Yaspin
-    ) -> bool:
+    def _upload_file_to_cos(self, file_path: str, upload_info: Dict) -> bool:
         """使用提供的上传信息将文件上传到腾讯COS
 
         参数:
@@ -313,7 +304,7 @@ class YuanbaoPlatform(BasePlatform):
             with open(file_path, "rb") as file:
                 file_content = file.read()
 
-            spinner.write(f"ℹ️  上传文件大小: {len(file_content)}")
+            print(f"ℹ️  上传文件大小: {len(file_content)}")
 
             # Prepare headers for PUT request
             host = f"{upload_info['bucketName']}.{upload_info.get('accelerateDomain', 'cos.accelerate.myqcloud.com')}"
@@ -481,7 +472,9 @@ class YuanbaoPlatform(BasePlatform):
         try:
             # 发送消息请求，获取流式响应
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload, stream=True, timeout=600),
+                lambda: requests.post(
+                    url, headers=headers, json=payload, stream=True, timeout=600
+                ),
                 sleep_time=5,
             )
 
@@ -556,7 +549,8 @@ class YuanbaoPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload, timeout=600), sleep_time=5
+                lambda: requests.post(url, headers=headers, json=payload, timeout=600),
+                sleep_time=5,
             )
 
             if response.status_code == 200:

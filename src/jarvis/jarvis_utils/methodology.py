@@ -145,7 +145,6 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
     返回：
         str: 相关的方法论提示，如果未找到方法论则返回空字符串
     """
-    from yaspin import yaspin  # type: ignore
 
     prompt = tool_registery.prompt() if tool_registery else ""
 
@@ -156,14 +155,12 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
     try:
         # 加载所有方法论
-        with yaspin(text="加载方法论文件...", color="yellow") as spinner:
-            methodologies = _load_all_methodologies()
-            if not methodologies:
-                spinner.text = "没有找到方法论文件"
-                spinner.fail("❌")
-                return ""
-            spinner.text = f"加载方法论文件完成 (共 {len(methodologies)} 个)"
-            spinner.ok("✅")
+        print(f"🔍 加载方法论文件...")
+        methodologies = _load_all_methodologies()
+        if not methodologies:
+            print(f"❌ 没有找到方法论文件")
+            return ""
+        print(f"✅ 加载方法论文件完成 (共 {len(methodologies)} 个)")
 
         # 获取当前平台
         platform = PlatformRegistry().get_normal_platform()
@@ -207,14 +204,12 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
         try:
             if is_large_content:
                 # 创建临时文件
-                with yaspin(text="创建方法论临时文件...", color="yellow") as spinner:
-                    temp_file_path = _create_methodology_temp_file(methodologies)
-                    if not temp_file_path:
-                        spinner.text = "创建方法论临时文件失败"
-                        spinner.fail("❌")
-                        return ""
-                    spinner.text = f"创建方法论临时文件完成: {temp_file_path}"
-                    spinner.ok("✅")
+                print(f"🔍 创建方法论临时文件...")
+                temp_file_path = _create_methodology_temp_file(methodologies)
+                if not temp_file_path:
+                    print(f"❌ 创建方法论临时文件失败")
+                    return ""
+                print(f"✅ 创建方法论临时文件完成")
 
                 # 尝试上传文件
                 upload_success = platform.upload_files([temp_file_path])
