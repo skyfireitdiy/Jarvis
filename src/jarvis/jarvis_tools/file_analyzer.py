@@ -2,8 +2,6 @@
 import os
 from typing import Any, Dict
 
-from yaspin import yaspin  # type: ignore
-from yaspin.spinners import Spinners  # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -78,28 +76,24 @@ class FileAnalyzerTool:
             platform.set_system_prompt(system_message)
 
             # 上传文件
-            with yaspin(Spinners.dots, text="正在上传文件...") as spinner:
-                try:
-                    with spinner.hidden():
-                        upload_result = platform.upload_files(valid_files)
-                    if not upload_result:
-                        spinner.text = "文件上传失败"
-                        spinner.fail("❌")
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": "文件上传失败",
-                        }
-                    spinner.text = "文件上传成功"
-                    spinner.ok("✅")
-                except Exception as e:
-                    spinner.text = "文件上传失败"
-                    spinner.fail("❌")
+            print(f"🔍 正在上传文件...")
+            try:
+                upload_result = platform.upload_files(valid_files)
+                if not upload_result:
+                    print(f"❌ 文件上传失败")
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"文件上传失败: {str(e)}",
+                        "stderr": "文件上传失败",
                     }
+                print(f"✅ 文件上传成功")
+            except Exception as e:
+                print(f"❌ 文件上传失败: {str(e)}")
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"文件上传失败: {str(e)}",
+                }
 
             platform.set_suppress_output(False)
 
@@ -111,11 +105,9 @@ class FileAnalyzerTool:
 请提供详细的分析结果和理由。"""
 
             # 发送请求并获取分析结果
-            with yaspin(Spinners.dots, text="正在分析文件...") as spinner:
-                with spinner.hidden():
-                    analysis_result = platform.chat_until_success(analysis_request)
-                spinner.text = "分析完成"
-                spinner.ok("✅")
+            print(f"🔍 正在分析文件...")
+            analysis_result = platform.chat_until_success(analysis_request)
+            print(f"✅ 分析完成")
 
             # 清理会话
             platform.delete_chat()

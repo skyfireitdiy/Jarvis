@@ -5,9 +5,7 @@ import time
 import uuid
 from typing import Any, Dict, Generator, List, Tuple
 
-import requests
-from yaspin import yaspin
-from yaspin.spinners import Spinners
+import requests  # type: ignore
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -289,140 +287,124 @@ class TongyiPlatform(BasePlatform):
 
             for file_path in file_list:
                 file_name = os.path.basename(file_path)
-                with yaspin(Spinners.dots, text=f"上传文件 {file_name}") as spinner:
-                    try:
-                        if not os.path.exists(file_path):
-                            spinner.text = f"文件不存在: {file_path}"
-                            spinner.fail("❌")
-                            return False
-
-                        # Get file name and content type
-                        content_type = self._get_content_type(file_path)
-
-                        spinner.text = f"准备上传文件: {file_name}"
-
-                        # Prepare form data
-                        form_data = {
-                            "OSSAccessKeyId": upload_token["accessId"],
-                            "policy": upload_token["policy"],
-                            "signature": upload_token["signature"],
-                            "key": f"{upload_token['dir']}{file_name}",
-                            "dir": upload_token["dir"],
-                            "success_action_status": "200",
-                        }
-
-                        # Prepare files
-                        files = {
-                            "file": (file_name, open(file_path, "rb"), content_type)
-                        }
-
-                        spinner.text = f"正在上传文件: {file_name}"
-
-                        # Upload file
-                        response = requests.post(
-                            upload_token["host"], data=form_data, files=files
-                        )
-
-                        if response.status_code != 200:
-                            spinner.text = (
-                                f"上传失败 {file_name}: HTTP {response.status_code}"
-                            )
-                            spinner.fail("❌")
-                            return False
-
-                        # Determine file type based on extension
-                        file_ext = os.path.splitext(file_path)[1].lower()
-                        is_image = file_ext in self.IMAGE_EXTENSIONS
-
-                        uploaded_files.append(
-                            {
-                                "fileKey": file_name,
-                                "fileType": "image" if is_image else "file",
-                                "dir": upload_token["dir"],
-                            }
-                        )
-
-                        spinner.text = f"获取下载链接: {file_name}"
-
-                        # Get download links for uploaded files
-                        url = "https://api.tongyi.com/dialog/downloadLink/batch"
-                        headers = self._get_base_headers()
-                        payload = {
-                            "fileKeys": [f["fileKey"] for f in uploaded_files],
-                            "fileType": (
-                                "image"
-                                if any(f["fileType"] == "image" for f in uploaded_files)
-                                else "file"
-                            ),
-                            "dir": upload_token["dir"],
-                        }
-
-                        response = requests.post(url, headers=headers, json=payload)
-                        if response.status_code != 200:
-                            spinner.text = (
-                                f"获取下载链接失败: HTTP {response.status_code}"
-                            )
-                            spinner.fail("❌")
-                            return False
-
-                        result = response.json()
-                        if not result.get("success"):
-                            spinner.text = f"获取下载链接失败: {result.get('errorMsg')}"
-                            spinner.fail("❌")
-                            return False
-
-                        # Add files to chat
-                        self.uploaded_file_info = result.get("data", {}).get(
-                            "results", []
-                        )
-                        for file_info in self.uploaded_file_info:
-                            spinner.text = f"添加文件到对话: {file_name}"
-                            add_url = (
-                                "https://api.tongyi.com/assistant/api/chat/file/add"
-                            )
-                            add_payload = {
-                                "workSource": "chat",
-                                "terminal": "web",
-                                "workCode": "0",
-                                "channel": "home",
-                                "workType": "file",
-                                "module": "uploadhistory",
-                                "workName": file_info["fileKey"],
-                                "workId": file_info["docId"],
-                                "workResourcePath": file_info["url"],
-                                "sessionId": "",
-                                "batchId": str(uuid.uuid4()).replace("-", "")[
-                                    :32
-                                ],  # Generate random batchId
-                                "fileSize": os.path.getsize(file_path),
-                            }
-
-                            add_response = requests.post(
-                                add_url, headers=headers, json=add_payload
-                            )
-                            if add_response.status_code != 200:
-                                spinner.text = f"添加文件到对话失败: HTTP {add_response.status_code}"
-                                spinner.fail("❌")
-                                continue
-
-                            add_result = add_response.json()
-                            if not add_result.get("success"):
-                                spinner.text = (
-                                    f"添加文件到对话失败: {add_result.get('errorMsg')}"
-                                )
-                                spinner.fail("❌")
-                                continue
-
-                            file_info.update(add_result.get("data", {}))
-
-                        spinner.text = f"文件 {file_name} 上传成功"
-                        spinner.ok("✅")
-                        time.sleep(1)  # 短暂暂停以便用户看到成功状态
-
-                    except Exception as e:
-                        spinner.text = f"上传文件 {file_name} 时出错: {str(e)}"
-                        spinner.fail("❌")
+                print(f"🔍 上传文件 {file_name}")
+                try:
+                    if not os.path.exists(file_path):
+                        print(f"❌ 文件不存在: {file_path}")
                         return False
+
+                    # Get file name and content type
+                    content_type = self._get_content_type(file_path)
+
+                    print(f"🔍 准备上传文件: {file_name}")
+
+                    # Prepare form data
+                    form_data = {
+                        "OSSAccessKeyId": upload_token["accessId"],
+                        "policy": upload_token["policy"],
+                        "signature": upload_token["signature"],
+                        "key": f"{upload_token['dir']}{file_name}",
+                        "dir": upload_token["dir"],
+                        "success_action_status": "200",
+                    }
+
+                    # Prepare files
+                    files = {"file": (file_name, open(file_path, "rb"), content_type)}
+
+                    print(f"🔍 正在上传文件: {file_name}")
+
+                    # Upload file
+                    response = requests.post(
+                        upload_token["host"], data=form_data, files=files
+                    )
+
+                    if response.status_code != 200:
+                        print(f"❌ 上传失败 {file_name}: HTTP {response.status_code}")
+                        return False
+
+                    # Determine file type based on extension
+                    file_ext = os.path.splitext(file_path)[1].lower()
+                    is_image = file_ext in self.IMAGE_EXTENSIONS
+
+                    uploaded_files.append(
+                        {
+                            "fileKey": file_name,
+                            "fileType": "image" if is_image else "file",
+                            "dir": upload_token["dir"],
+                        }
+                    )
+
+                    print(f"🔍 获取下载链接: {file_name}")
+
+                    # Get download links for uploaded files
+                    url = "https://api.tongyi.com/dialog/downloadLink/batch"
+                    headers = self._get_base_headers()
+                    payload = {
+                        "fileKeys": [f["fileKey"] for f in uploaded_files],
+                        "fileType": (
+                            "image"
+                            if any(f["fileType"] == "image" for f in uploaded_files)
+                            else "file"
+                        ),
+                        "dir": upload_token["dir"],
+                    }
+
+                    response = requests.post(url, headers=headers, json=payload)
+                    if response.status_code != 200:
+                        print(f"❌ 获取下载链接失败: HTTP {response.status_code}")
+                        return False
+
+                    result = response.json()
+                    if not result.get("success"):
+                        print(f"❌ 获取下载链接失败: {result.get('errorMsg')}")
+                        return False
+
+                    # Add files to chat
+                    self.uploaded_file_info = result.get("data", {}).get("results", [])
+                    for file_info in self.uploaded_file_info:
+                        print(f"🔍 添加文件到对话: {file_name}")
+                        add_url = "https://api.tongyi.com/assistant/api/chat/file/add"
+                        add_payload = {
+                            "workSource": "chat",
+                            "terminal": "web",
+                            "workCode": "0",
+                            "channel": "home",
+                            "workType": "file",
+                            "module": "uploadhistory",
+                            "workName": file_info["fileKey"],
+                            "workId": file_info["docId"],
+                            "workResourcePath": file_info["url"],
+                            "sessionId": "",
+                            "batchId": str(uuid.uuid4()).replace("-", "")[
+                                :32
+                            ],  # Generate random batchId
+                            "fileSize": os.path.getsize(file_path),
+                        }
+
+                        add_response = requests.post(
+                            add_url, headers=headers, json=add_payload
+                        )
+                        if add_response.status_code != 200:
+                            print(
+                                f"❌ 添加文件到对话失败: HTTP {add_response.status_code}"
+                            )
+                            continue
+
+                        add_result = add_response.json()
+                        if not add_result.get("success"):
+                            print(
+                                f"❌ 添加文件到对话失败: {add_result.get('errorMsg')}"
+                            )
+                            continue
+
+                        file_info.update(add_result.get("data", {}))
+
+                    print(f"✅ 文件 {file_name} 上传成功")
+                    time.sleep(1)  # 短暂暂停以便用户看到成功状态
+
+                except Exception as e:
+                    print(f"❌ 上传文件 {file_name} 时出错: {str(e)}")
+                    return False
             return True
 
         except Exception as e:

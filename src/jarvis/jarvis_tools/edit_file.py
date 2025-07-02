@@ -19,8 +19,6 @@
 """
 from typing import Any, Dict
 
-from yaspin import yaspin
-
 from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
 
 
@@ -62,12 +60,18 @@ class FileSearchReplaceTool:
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "reason": {"type": "string", "description": "修改的原因"},
+                                    "reason": {
+                                        "type": "string",
+                                        "description": "修改的原因",
+                                    },
                                     "search": {
                                         "type": "string",
                                         "description": "需要查找的原始代码",
                                     },
-                                    "replace": {"type": "string", "description": "替换后的新代码"},
+                                    "replace": {
+                                        "type": "string",
+                                        "description": "替换后的新代码",
+                                    },
                                 },
                             },
                         },
@@ -78,7 +82,6 @@ class FileSearchReplaceTool:
         },
         "required": ["files"],
     }
-
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """执行文件编辑操作，支持快速编辑和AI辅助编辑两种模式。
@@ -152,46 +155,46 @@ class FileSearchReplaceTool:
                     if file_exists and agent:
                         files = agent.get_user_data("files")
                         if not files or file_path not in files:
-                            file_results.append({
-                                "file": file_path,
-                                "success": False,
-                                "stdout": "",
-                                "stderr": f"请先读取文件 {file_path} 的内容后再编辑"
-                            })
-                            continue
-
-                    with yaspin(
-                        text=f"正在处理文件 {file_path}...", color="cyan"
-                    ) as spinner:
-                        # 首先尝试fast_edit模式
-                        success, temp_content = EditFileHandler._fast_edit(file_path, changes, spinner)
-                        if not success:
-                            # 如果fast_edit失败，尝试slow_edit模式
-                            success, temp_content = EditFileHandler._slow_edit(
-                                file_path,
-                                changes,
-                                spinner,
-                                agent
-                            )
-                            if not success:
-                                spinner.text = f"文件 {file_path} 处理失败"
-                                spinner.fail("❌")
-                                file_results.append({
+                            file_results.append(
+                                {
                                     "file": file_path,
                                     "success": False,
                                     "stdout": "",
-                                    "stderr": temp_content
-                                })
-                                continue
-                            else:
-                                spinner.text = f"文件 {file_path} 内容生成完成"
-                                spinner.ok("✅")
+                                    "stderr": f"请先读取文件 {file_path} 的内容后再编辑",
+                                }
+                            )
+                            continue
+
+                    print(f"🔍 正在处理文件 {file_path}...")
+                    # 首先尝试fast_edit模式
+                    success, temp_content = EditFileHandler._fast_edit(
+                        file_path, changes
+                    )
+                    if not success:
+                        # 如果fast_edit失败，尝试slow_edit模式
+                        success, temp_content = EditFileHandler._slow_edit(
+                            file_path, changes, agent
+                        )
+                        if not success:
+                            print(f"❌ 文件 {file_path} 处理失败")
+                            file_results.append(
+                                {
+                                    "file": file_path,
+                                    "success": False,
+                                    "stdout": "",
+                                    "stderr": temp_content,
+                                }
+                            )
+                            continue
                         else:
-                            spinner.text = f"文件 {file_path} 内容生成完成"
-                            spinner.ok("✅")
+                            print(f"✅ 文件 {file_path} 内容生成完成")
+                    else:
+                        print(f"✅ 文件 {file_path} 内容生成完成")
 
                     # 只有当所有替换操作都成功时，才写回文件
-                    if success and (temp_content != original_content or not file_exists):
+                    if success and (
+                        temp_content != original_content or not file_exists
+                    ):
                         # 确保目录存在
                         os.makedirs(
                             os.path.dirname(os.path.abspath(file_path)), exist_ok=True
@@ -208,24 +211,28 @@ class FileSearchReplaceTool:
                         PrettyOutput.print(stdout_message, OutputType.SUCCESS)
                         overall_success = True
 
-                        file_results.append({
-                            "file": file_path,
-                            "success": True,
-                            "stdout": stdout_message,
-                            "stderr": ""
-                        })
+                        file_results.append(
+                            {
+                                "file": file_path,
+                                "success": True,
+                                "stdout": stdout_message,
+                                "stderr": "",
+                            }
+                        )
 
                 except Exception as e:
                     stderr_message = f"处理文件 {file_path} 时出错: {str(e)}"
                     stderr_messages.append(stderr_message)
                     PrettyOutput.print(stderr_message, OutputType.WARNING)
                     file_success = False
-                    file_results.append({
-                        "file": file_path,
-                        "success": False,
-                        "stdout": "",
-                        "stderr": stderr_message
-                    })
+                    file_results.append(
+                        {
+                            "file": file_path,
+                            "success": False,
+                            "stdout": "",
+                            "stderr": stderr_message,
+                        }
+                    )
 
             except Exception as e:
                 error_msg = f"文件搜索替换操作失败: {str(e)}"
@@ -251,12 +258,14 @@ class FileSearchReplaceTool:
                     except:
                         stderr_messages.append(f"回滚文件失败: {file_path}")
 
-                file_results.append({
-                    "file": file_path,
-                    "success": False,
-                    "stdout": "",
-                    "stderr": error_msg
-                })
+                file_results.append(
+                    {
+                        "file": file_path,
+                        "success": False,
+                        "stdout": "",
+                        "stderr": error_msg,
+                    }
+                )
 
         # 整合所有错误信息到stderr
         all_stderr = []
@@ -267,5 +276,5 @@ class FileSearchReplaceTool:
         return {
             "success": overall_success,
             "stdout": "\n".join(stdout_messages) if overall_success else "",
-            "stderr": "\n".join(all_stderr) if not overall_success else ""
+            "stderr": "\n".join(all_stderr) if not overall_success else "",
         }

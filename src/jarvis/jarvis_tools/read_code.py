@@ -2,8 +2,6 @@
 import os
 from typing import Any, Dict
 
-from yaspin import yaspin
-
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -46,89 +44,90 @@ class ReadCodeTool:
         """
         try:
             abs_path = os.path.abspath(filepath)
-            with yaspin(text=f"正在读取文件: {abs_path}...", color="cyan") as spinner:
-                # 文件存在性检查
-                if not os.path.exists(abs_path):
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"文件不存在: {abs_path}",
-                    }
+            print(f"🔍 正在读取文件: {abs_path}...")
+            # 文件存在性检查
+            if not os.path.exists(abs_path):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"文件不存在: {abs_path}",
+                }
 
-                # 文件大小限制检查（10MB）
-                if os.path.getsize(abs_path) > 10 * 1024 * 1024:
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "文件过大 (>10MB)",
-                    }
+            # 文件大小限制检查（10MB）
+            if os.path.getsize(abs_path) > 10 * 1024 * 1024:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "文件过大 (>10MB)",
+                }
 
-                # 读取文件内容
-                with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-                    lines = f.readlines()
+            # 读取文件内容
+            with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
 
-                total_lines = len(lines)
+            total_lines = len(lines)
 
-                # 处理空文件情况
-                if total_lines == 0:
-                    spinner.ok("✅")
-                    return {
-                        "success": True,
-                        "stdout": f"\n🔍 文件: {abs_path}\n📄 文件为空 (0行)\n",
-                        "stderr": "",
-                    }
+            # 处理空文件情况
+            if total_lines == 0:
+                print(f"✅ 文件读取完成: {abs_path}")
+                return {
+                    "success": True,
+                    "stdout": f"\n🔍 文件: {abs_path}\n📄 文件为空 (0行)\n",
+                    "stderr": "",
+                }
 
-                # 处理特殊值-1表示文件末尾
-                if end_line == -1:
-                    end_line = total_lines
+            # 处理特殊值-1表示文件末尾
+            if end_line == -1:
+                end_line = total_lines
+            else:
+                end_line = (
+                    max(1, min(end_line, total_lines))
+                    if end_line >= 0
+                    else total_lines + end_line + 1
+                )
+
+            start_line = (
+                max(1, min(start_line, total_lines))
+                if start_line >= 0
+                else total_lines + start_line + 1
+            )
+
+            if start_line > end_line:
+                print(
+                    f"❌ 无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})"
+                )
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})",
+                }
+
+            # 添加行号并构建输出内容
+            selected_lines = lines[start_line - 1 : end_line]
+            numbered_content = "".join(
+                [
+                    f"{i:4d}:{line}"
+                    for i, line in enumerate(selected_lines, start=start_line)
+                ]
+            )
+
+            # 构建输出格式
+            output = (
+                f"\n🔍 文件: {abs_path}\n"
+                f"📄 原始行号: {start_line}-{end_line} (共{total_lines}行) \n\n"
+                f"{numbered_content}\n\n"
+            )
+            print(f"✅ 文件读取完成: {abs_path}")
+
+            if agent:
+                files = agent.get_user_data("files")
+                if files:
+                    files.append(abs_path)
                 else:
-                    end_line = (
-                        max(1, min(end_line, total_lines))
-                        if end_line >= 0
-                        else total_lines + end_line + 1
-                    )
+                    files = [abs_path]
+                agent.set_user_data("files", files)
 
-                start_line = (
-                    max(1, min(start_line, total_lines))
-                    if start_line >= 0
-                    else total_lines + start_line + 1
-                )
-
-                if start_line > end_line:
-                    spinner.fail("❌")
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})",
-                    }
-
-                # 添加行号并构建输出内容
-                selected_lines = lines[start_line - 1 : end_line]
-                numbered_content = "".join(
-                    [
-                        f"{i:4d}:{line}"
-                        for i, line in enumerate(selected_lines, start=start_line)
-                    ]
-                )
-
-                # 构建输出格式
-                output = (
-                    f"\n🔍 文件: {abs_path}\n"
-                    f"📄 原始行号: {start_line}-{end_line} (共{total_lines}行) \n\n"
-                    f"{numbered_content}\n\n"
-                )
-                spinner.text = f"文件读取完成: {abs_path}"
-                spinner.ok("✅")
-
-                if agent:
-                    files = agent.get_user_data("files")
-                    if files:
-                        files.append(abs_path)
-                    else:
-                        files = [abs_path]
-                    agent.set_user_data("files", files)
-
-                return {"success": True, "stdout": output, "stderr": ""}
+            return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)

@@ -14,16 +14,12 @@ setup(
     package_dir={"": "src"},
     include_package_data=True,
     package_data={
-        "jarvis": [
-            "jarvis_data/huggingface.tar.gz",
-            "jarvis_data/config_schema.json"
-        ],
+        "jarvis": ["jarvis_data/huggingface.tar.gz", "jarvis_data/config_schema.json"],
     },
     install_requires=[
         "requests==2.32.3",
         "colorama==0.4.6",
         "prompt_toolkit==3.0.50",
-        "yaspin==2.4.0",
         "pygments==2.19.1",
         "fuzzywuzzy==0.18.0",
         "fastapi==0.115.12",
@@ -37,9 +33,7 @@ setup(
         "tabulate==0.9.0",
         "pyte==0.8.2",
     ],
-    extras_require={
-        "dev": ["pytest", "black", "isort", "mypy", "build", "twine"]
-    },
+    extras_require={"dev": ["pytest", "black", "isort", "mypy", "build", "twine"]},
     entry_points={
         "console_scripts": [
             "jarvis=jarvis.jarvis_agent.jarvis:main",
@@ -49,7 +43,7 @@ setup(
             "jss=jarvis.jarvis_smart_shell.main:main",
             "jarvis-platform-manager=jarvis.jarvis_platform_manager.main:main",
             "jarvis-code-review=jarvis.jarvis_code_analysis.code_review:main",
-            "jarvis-git-commit=jarvis.jarvis_git_utils.git_commiter:main", 
+            "jarvis-git-commit=jarvis.jarvis_git_utils.git_commiter:main",
             "jgc=jarvis.jarvis_git_utils.git_commiter:main",
             "jarvis-git-squash=jarvis.jarvis_git_squash.main:main",
             "jarvis-multi-agent=jarvis.jarvis_multi_agent.main:main",
