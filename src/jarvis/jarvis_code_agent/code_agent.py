@@ -19,12 +19,17 @@ from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
-from jarvis.jarvis_utils.git_utils import (confirm_add_new_files, find_git_root, get_commits_between,
-                                           get_diff, get_diff_file_list,
-                                           get_latest_commit_hash,
-                                           get_recent_commits_with_files,
-                                           handle_commit_workflow,
-                                           has_uncommitted_changes)
+from jarvis.jarvis_utils.git_utils import (
+    confirm_add_new_files,
+    find_git_root,
+    get_commits_between,
+    get_diff,
+    get_diff_file_list,
+    get_latest_commit_hash,
+    get_recent_commits_with_files,
+    handle_commit_workflow,
+    has_uncommitted_changes,
+)
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import get_loc_stats, init_env, user_confirm
@@ -134,7 +139,7 @@ class CodeAgent:
         1. 查找git根目录
         2. 检查并处理未提交的修改
         """
-        print("🔍 正在初始化环境...")
+        print("🚀 正在初始化环境...")
         curr_dir = os.getcwd()
         git_dir = find_git_root(curr_dir)
         self.root_dir = git_dir
@@ -380,7 +385,7 @@ def main() -> None:
             agent.run(args.requirement)
         else:
             while True:
-                user_input = get_multiline_input("请输入你的需求（输入空行退出）:")    
+                user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
                 if not user_input:
                     return
                 agent.run(user_input)

@@ -165,7 +165,7 @@ class FileSearchReplaceTool:
                             )
                             continue
 
-                    print(f"🔍 正在处理文件 {file_path}...")
+                    print(f"⚙️ 正在处理文件 {file_path}...")
                     # 首先尝试fast_edit模式
                     success, temp_content = EditFileHandler._fast_edit(
                         file_path, changes

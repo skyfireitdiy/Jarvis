@@ -76,7 +76,7 @@ class FileAnalyzerTool:
             platform.set_system_prompt(system_message)
 
             # 上传文件
-            print(f"🔍 正在上传文件...")
+            print(f"📤 正在上传文件...")
             try:
                 upload_result = platform.upload_files(valid_files)
                 if not upload_result:

@@ -311,7 +311,7 @@ class TongyiPlatform(BasePlatform):
                     # Prepare files
                     files = {"file": (file_name, open(file_path, "rb"), content_type)}
 
-                    print(f"🔍 正在上传文件: {file_name}")
+                    print(f"📤 正在上传文件: {file_name}")
 
                     # Upload file
                     response = requests.post(

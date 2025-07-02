@@ -206,7 +206,7 @@ class YuanbaoPlatform(BasePlatform):
                     return False
 
                 # 4. Create file metadata for chat
-                spinner.text = f"生成文件元数据: {file_name}"
+                print(f"🔍 生成文件元数据: {file_name}")
                 file_metadata = {
                     "type": file_type,
                     "docType": file_extension if file_extension else file_type,
@@ -224,16 +224,14 @@ class YuanbaoPlatform(BasePlatform):
                             file_metadata["width"] = img.width
                             file_metadata["height"] = img.height
                     except Exception as e:
-                        spinner.write(f"⚠️ 无法获取图片 {file_name} 的尺寸: {str(e)}")
+                        print(f"⚠️ 无法获取图片 {file_name} 的尺寸: {str(e)}")
 
                 uploaded_files.append(file_metadata)
-                spinner.text = f"文件 {file_name} 上传成功"
-                spinner.ok("✅")
+                print(f"✅ 文件 {file_name} 上传成功")
                 time.sleep(3)  # 上传成功后等待3秒
 
             except Exception as e:
-                spinner.text = f"上传文件 {file_path} 时出错: {str(e)}"
-                spinner.fail("❌")
+                print(f"❌ 上传文件 {file_path} 时出错: {str(e)}")
                 return False
 
         self.multimedia = uploaded_files

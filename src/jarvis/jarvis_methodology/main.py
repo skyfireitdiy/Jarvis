@@ -129,7 +129,7 @@ def extract_methodology(input_file):
 """
 
         # 调用大模型平台提取方法论
-        print("🔍 正在提取方法论...")
+        print("📥 正在提取方法论...")
         try:
             response = platform.chat_until_success(prompt)
         except Exception as e:
@@ -228,7 +228,7 @@ def extract_methodology_from_url(url):
 6. 内容字段使用|保留多行格式
 """
         # 调用大模型平台提取方法论
-        print("🔍 正在从URL提取方法论...")
+        print("📥 正在从URL提取方法论...")
         try:
             response = platform.chat_until_success(prompt)
         except Exception as e:

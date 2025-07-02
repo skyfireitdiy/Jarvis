@@ -79,7 +79,7 @@ class GitCommitTool:
 
     def _stage_changes(self) -> None:
         """Stage all changes for commit"""
-        print("🔍 正在添加文件到提交...")
+        print("📁 正在添加文件到提交...")
         subprocess.Popen(
             ["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         ).wait()
@@ -104,11 +104,11 @@ class GitCommitTool:
             if not has_uncommitted_changes():
                 return {"success": True, "stdout": "No changes to commit", "stderr": ""}
 
-            print("🔍 正在初始化提交流程...")
+            print("🚀 正在初始化提交流程...")
             self._stage_changes()
 
             # 获取差异
-            print("🔍 正在获取代码差异...")
+            print("📊 正在获取代码差异...")
             # 获取文件列表
             files_cmd = ["git", "diff", "--cached", "--name-only"]
             process = subprocess.Popen(
@@ -129,7 +129,7 @@ class GitCommitTool:
             try:
                 temp_diff_file_path = None
                 # 生成提交信息
-                print("🔍 正在生成提交消息...")
+                print("✨ 正在生成提交消息...")
 
                 # 准备提示信息
                 custom_prompt = get_git_commit_prompt()
@@ -176,7 +176,7 @@ commit信息
                             "stdout": "",
                             "stderr": "错误：差异文件太大，无法处理",
                         }
-                    print("🔍 正在上传代码差异文件...")
+                    print("📤 正在上传代码差异文件...")
                     # 创建临时文件并写入差异内容
                     with tempfile.NamedTemporaryFile(
                         mode="w", suffix=".diff", delete=False
@@ -198,7 +198,7 @@ commit信息
                 # 根据上传状态准备完整的提示
                 if is_large_content:
                     # 尝试生成提交信息
-                    print("🔍 正在生成提交消息...")
+                    print("✨ 正在生成提交消息...")
                     # 使用上传的文件
                     prompt = (
                         base_prompt
@@ -248,11 +248,11 @@ commit信息
                 print("✅ 生成提交消息")
 
                 # 执行提交
-                print("🔍 正在准备提交...")
+                print("⚙️ 正在准备提交...")
                 with tempfile.NamedTemporaryFile(mode="w", delete=True) as tmp_file:
                     tmp_file.write(commit_message)
                     tmp_file.flush()
-                    print("🔍 正在执行提交...")
+                    print("💾 正在执行提交...")
                     commit_cmd = ["git", "commit", "-F", tmp_file.name]
                     subprocess.Popen(
                         commit_cmd,

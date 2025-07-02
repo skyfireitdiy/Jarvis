@@ -431,7 +431,7 @@ class Agent:
         注意:
             仅生成摘要，不修改对话状态
         """
-        print("🔍 正在总结对话历史...")
+        print("📄 正在总结对话历史...")
         summary_prompt = """
 <summary_request>
 <objective>
@@ -584,7 +584,7 @@ class Agent:
         if self.use_analysis:
             self._analysis_task()
         if self.need_summary:
-            print("📝 正在生成总结...")
+            print("📄 正在生成总结...")
             self.prompt = self.summary_prompt
             ret = self.model.chat_until_success(self.prompt)  # type: ignore
             print("✅ 总结生成完成")
