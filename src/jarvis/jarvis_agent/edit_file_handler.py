@@ -68,7 +68,7 @@ class EditFileHandler(OutputHandler):
                 {"SEARCH": diff["SEARCH"], "REPLACE": diff["REPLACE"]} for diff in diffs
             ]
 
-            print(f"正在处理文件 {file_path}...")
+            print(f"📝 正在处理文件 {file_path}...")
             # 首先尝试fast_edit模式
             success, result = self._fast_edit(file_path, file_patches)
             if not success:
@@ -151,10 +151,10 @@ class EditFileHandler(OutputHandler):
             diffs = []
             for diff_match in self.diff_pattern.finditer(match.group(0)):
                 # 完全保留原始格式（包括所有空白和换行）
-                    diffs.append(
+                diffs.append(
                     {
                         "SEARCH": diff_match.group(1),  # 原始SEARCH内容
-                        "REPLACE": diff_match.group(2), # 原始REPLACE内容
+                        "REPLACE": diff_match.group(2),  # 原始REPLACE内容
                     }
                 )
             if diffs:
@@ -165,9 +165,7 @@ class EditFileHandler(OutputHandler):
         return patches
 
     @staticmethod
-    def _fast_edit(
-        file_path: str, patches: List[Dict[str, str]]
-    ) -> Tuple[bool, str]:
+    def _fast_edit(file_path: str, patches: List[Dict[str, str]]) -> Tuple[bool, str]:
         """快速应用补丁到文件
 
         该方法直接尝试将补丁应用到目标文件，适用于简单、明确的修改场景。
@@ -206,7 +204,7 @@ class EditFileHandler(OutputHandler):
 
                 # 精确匹配搜索文本（保留原始换行和空格）
                 exact_search = search_text
-                
+
                 if exact_search in modified_content:
                     if modified_content.count(exact_search) > 1:
                         PrettyOutput.print(
@@ -214,7 +212,7 @@ class EditFileHandler(OutputHandler):
                             output_type=OutputType.WARNING,
                         )
                         return False, f"搜索文本在文件中存在多处匹配：\n{exact_search}"
-                    
+
                     # 直接执行替换（保留所有原始格式）
                     modified_content = modified_content.replace(
                         exact_search, replace_text
@@ -245,7 +243,9 @@ class EditFileHandler(OutputHandler):
                             modified_content = modified_content.replace(
                                 indented_search, indented_replace
                             )
-                            print(f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)")
+                            print(
+                                f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)"
+                            )
                             found = True
                             break
 
@@ -383,7 +383,9 @@ class EditFileHandler(OutputHandler):
                 # 检查是否被中断
                 if get_interrupt():
                     set_interrupt(False)
-                    user_input = agent.multiline_inputer("补丁应用被中断，请输入补充信息:")
+                    user_input = agent.multiline_inputer(
+                        "补丁应用被中断，请输入补充信息:"
+                    )
                     if not user_input.strip():
                         return False, "用户中断了补丁应用"
                     return False, f"用户中断了补丁应用并提供了补充信息: {user_input}"
