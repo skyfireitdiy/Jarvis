@@ -12,9 +12,10 @@ Git工具模块
 import os
 import re
 import subprocess
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
-from jarvis.jarvis_utils.config import get_auto_update, is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import (get_auto_update,
+                                        is_confirm_before_apply_patch)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import user_confirm
 
@@ -219,7 +220,6 @@ def handle_commit_workflow() -> bool:
     import subprocess
 
     try:
-
         confirm_add_new_files()
 
         if not has_uncommitted_changes():
@@ -411,7 +411,7 @@ def get_diff_file_list() -> List[str]:
     """
     try:
         confirm_add_new_files()
-        
+
         # 暂存新增文件
         subprocess.run(["git", "add", "-N", "."], check=True)
 
@@ -488,13 +488,14 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
             )
             if files_result.returncode == 0:
                 file_lines = files_result.stdout.splitlines()
-                unique_files = set(filter(None, file_lines))
-                commit["files"] = list(unique_files)[:20]  # 限制最多20个文件
+                unique_files: Set[str] = set(filter(None, file_lines))
+                commit["files"] = list(unique_files)[:20]  # type: ignore[list-item] # 限制最多20个文件
 
         return commits
 
     except subprocess.CalledProcessError:
         return []
+
 
 def _get_new_files() -> List[str]:
     """获取新增文件列表"""
@@ -505,8 +506,10 @@ def _get_new_files() -> List[str]:
         check=True,
     ).stdout.splitlines()
 
+
 def confirm_add_new_files() -> None:
     """确认新增文件、代码行数和二进制文件"""
+
     def _get_added_lines() -> int:
         """获取新增代码行数"""
         diff_stats = subprocess.run(
@@ -515,7 +518,7 @@ def confirm_add_new_files() -> None:
             text=True,
             check=True,
         ).stdout.splitlines()
-        
+
         added_lines = 0
         for stat in diff_stats:
             parts = stat.split()
@@ -531,55 +534,53 @@ def confirm_add_new_files() -> None:
         binary_files = []
         for file in files:
             try:
-                with open(file, 'rb') as f:
-                    if b'\x00' in f.read(1024):
+                with open(file, "rb") as f:
+                    if b"\x00" in f.read(1024):
                         binary_files.append(file)
             except (IOError, PermissionError):
                 continue
         return binary_files
 
-    def _check_conditions(new_files: List[str], added_lines: int, binary_files: List[str]) -> bool:
+    def _check_conditions(
+        new_files: List[str], added_lines: int, binary_files: List[str]
+    ) -> bool:
         """检查各种条件并打印提示信息"""
         need_confirm = False
-        
+        output_lines = []
+
         if len(new_files) > 20:
-            PrettyOutput.print(
-                f"检测到{len(new_files)}个新增文件(选择N将重新检测)",
-                OutputType.WARNING
-            )
-            PrettyOutput.print("新增文件列表:", OutputType.INFO)
-            for file in new_files:
-                PrettyOutput.print(f"  - {file}", OutputType.INFO)
+            output_lines.append(f"检测到{len(new_files)}个新增文件(选择N将重新检测)")
+            output_lines.append("新增文件列表:")
+            output_lines.extend(f"  - {file}" for file in new_files)
             need_confirm = True
-        
+
         if added_lines > 500:
-            PrettyOutput.print(
-                f"检测到{added_lines}行新增代码(选择N将重新检测)",
-                OutputType.WARNING
-            )
+            output_lines.append(f"检测到{added_lines}行新增代码(选择N将重新检测)")
             need_confirm = True
-        
+
         if binary_files:
-            PrettyOutput.print(
-                f"检测到{len(binary_files)}个二进制文件(选择N将重新检测)",
-                OutputType.WARNING
-            )
-            PrettyOutput.print("二进制文件列表:", OutputType.INFO)
-            for file in binary_files:
-                PrettyOutput.print(f"  - {file}", OutputType.INFO)
+            output_lines.append(f"检测到{len(binary_files)}个二进制文件(选择N将重新检测)")
+            output_lines.append("二进制文件列表:")
+            output_lines.extend(f"  - {file}" for file in binary_files)
             need_confirm = True
-        
+
+        if output_lines:
+            PrettyOutput.print(
+                "\n".join(output_lines),
+                OutputType.WARNING if need_confirm else OutputType.INFO,
+            )
+
         return need_confirm
 
     while True:
         new_files = _get_new_files()
         added_lines = _get_added_lines()
         binary_files = _get_binary_files(new_files)
-        
+
         if not _check_conditions(new_files, added_lines, binary_files):
             break
-            
+
         if not user_confirm("是否要添加这些变更（如果不需要请修改.gitignore文件以忽略不需要的文件）？", False):
             continue
-            
+
         break
