@@ -5,11 +5,16 @@ import sys
 from typing import Dict
 
 import yaml
-from prompt_toolkit import prompt
+from prompt_toolkit import prompt  # type: ignore
 
-from jarvis.jarvis_agent import (Agent, OutputType, PrettyOutput,
-                                 get_multiline_input,
-                                 origin_agent_system_prompt, user_confirm)
+from jarvis.jarvis_agent import (
+    Agent,
+    OutputType,
+    PrettyOutput,
+    get_multiline_input,
+    origin_agent_system_prompt,
+    user_confirm,
+)
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -27,9 +32,7 @@ def _load_tasks() -> Dict[str, str]:
     if os.path.exists(pre_command_path):
         print(f"🔍 从{pre_command_path}加载预定义任务...")
         try:
-            with open(
-                pre_command_path, "r", encoding="utf-8", errors="ignore"
-            ) as f:
+            with open(pre_command_path, "r", encoding="utf-8", errors="ignore") as f:
                 user_tasks = yaml.safe_load(f)
             if isinstance(user_tasks, dict):
                 for name, desc in user_tasks.items():
@@ -45,9 +48,7 @@ def _load_tasks() -> Dict[str, str]:
         abs_path = os.path.abspath(pre_command_path)
         print(f"🔍 从{abs_path}加载预定义任务...")
         try:
-            with open(
-                pre_command_path, "r", encoding="utf-8", errors="ignore"
-            ) as f:
+            with open(pre_command_path, "r", encoding="utf-8", errors="ignore") as f:
                 local_tasks = yaml.safe_load(f)
             if isinstance(local_tasks, dict):
                 for name, desc in local_tasks.items():

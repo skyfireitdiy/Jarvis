@@ -5,11 +5,8 @@ import subprocess
 import tempfile
 from typing import Any, Dict, List
 
-from yaspin import yaspin
-
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_code_analysis.checklists.loader import \
-    get_language_checklist
+from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -281,167 +278,165 @@ class CodeReviewTool:
                 diff_output = ""
 
                 # Build git diff command based on review type
-                with yaspin(text="正在获取代码变更...", color="cyan") as spinner:
-                    if review_type == "commit":
-                        if "commit_sha" not in args:
-                            return {
-                                "success": False,
-                                "stdout": {},
-                                "stderr": "commit_sha is required for commit review type",
-                            }
-                        commit_sha = args["commit_sha"].strip()
-                        diff_cmd = f"git show {commit_sha} | cat -"
+                print("🔍 正在获取代码变更...")
 
-                        # Execute git command and get diff output
-                        diff_output = subprocess.check_output(
-                            diff_cmd, shell=True, text=True
+                if review_type == "commit":
+                    if "commit_sha" not in args:
+                        return {
+                            "success": False,
+                            "stdout": {},
+                            "stderr": "commit_sha is required for commit review type",
+                        }
+                    commit_sha = args["commit_sha"].strip()
+                    diff_cmd = f"git show {commit_sha} | cat -"
+
+                    # Execute git command and get diff output
+                    diff_output = subprocess.check_output(
+                        diff_cmd, shell=True, text=True
+                    )
+                    if not diff_output:
+                        return {
+                            "success": False,
+                            "stdout": {},
+                            "stderr": "No changes to review",
+                        }
+
+                    # Extract changed files using git command
+                    files_cmd = f"git show --name-only --pretty=format: {commit_sha} | grep -v '^$'"
+                    try:
+                        files_output = subprocess.check_output(
+                            files_cmd, shell=True, text=True
                         )
-                        if not diff_output:
-                            return {
-                                "success": False,
-                                "stdout": {},
-                                "stderr": "No changes to review",
-                            }
+                        file_paths = [
+                            f.strip() for f in files_output.split("\n") if f.strip()
+                        ]
+                    except subprocess.CalledProcessError:
+                        # Fallback to regex extraction if git command fails
+                        file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
+                        files = re.findall(file_pattern, diff_output)
+                        file_paths = [match[0] for match in files]
 
-                        # Extract changed files using git command
-                        files_cmd = f"git show --name-only --pretty=format: {commit_sha} | grep -v '^$'"
-                        try:
-                            files_output = subprocess.check_output(
-                                files_cmd, shell=True, text=True
-                            )
-                            file_paths = [
-                                f.strip() for f in files_output.split("\n") if f.strip()
-                            ]
-                        except subprocess.CalledProcessError:
-                            # Fallback to regex extraction if git command fails
-                            file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
-                            files = re.findall(file_pattern, diff_output)
-                            file_paths = [match[0] for match in files]
+                elif review_type == "range":
+                    if "start_commit" not in args or "end_commit" not in args:
+                        return {
+                            "success": False,
+                            "stdout": {},
+                            "stderr": "start_commit and end_commit are required for range review type",
+                        }
+                    start_commit = args["start_commit"].strip()
+                    end_commit = args["end_commit"].strip()
+                    diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
 
-                    elif review_type == "range":
-                        if "start_commit" not in args or "end_commit" not in args:
-                            return {
-                                "success": False,
-                                "stdout": {},
-                                "stderr": "start_commit and end_commit are required for range review type",
-                            }
-                        start_commit = args["start_commit"].strip()
-                        end_commit = args["end_commit"].strip()
-                        diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
+                    # Execute git command and get diff output
+                    diff_output = subprocess.check_output(
+                        diff_cmd, shell=True, text=True
+                    )
+                    if not diff_output:
+                        return {
+                            "success": False,
+                            "stdout": {},
+                            "stderr": "No changes to review",
+                        }
 
-                        # Execute git command and get diff output
-                        diff_output = subprocess.check_output(
-                            diff_cmd, shell=True, text=True
+                    # Extract changed files using git command
+                    files_cmd = f"git diff --name-only {start_commit}..{end_commit}"
+                    try:
+                        files_output = subprocess.check_output(
+                            files_cmd, shell=True, text=True
                         )
-                        if not diff_output:
-                            return {
-                                "success": False,
-                                "stdout": {},
-                                "stderr": "No changes to review",
-                            }
+                        file_paths = [
+                            f.strip() for f in files_output.split("\n") if f.strip()
+                        ]
+                    except subprocess.CalledProcessError:
+                        # Fallback to regex extraction if git command fails
+                        file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
+                        files = re.findall(file_pattern, diff_output)
+                        file_paths = [match[0] for match in files]
 
-                        # Extract changed files using git command
-                        files_cmd = f"git diff --name-only {start_commit}..{end_commit}"
-                        try:
-                            files_output = subprocess.check_output(
-                                files_cmd, shell=True, text=True
-                            )
-                            file_paths = [
-                                f.strip() for f in files_output.split("\n") if f.strip()
-                            ]
-                        except subprocess.CalledProcessError:
-                            # Fallback to regex extraction if git command fails
-                            file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
-                            files = re.findall(file_pattern, diff_output)
-                            file_paths = [match[0] for match in files]
+                elif review_type == "file":
+                    if "file_path" not in args:
+                        return {
+                            "success": False,
+                            "stdout": {},
+                            "stderr": "file_path is required for file review type",
+                        }
+                    file_path = args["file_path"].strip()
+                    file_paths = [file_path]
+                    diff_output = ReadCodeTool().execute(
+                        {"files": [{"path": file_path}]}
+                    )["stdout"]
 
-                    elif review_type == "file":
-                        if "file_path" not in args:
-                            return {
-                                "success": False,
-                                "stdout": {},
-                                "stderr": "file_path is required for file review type",
-                            }
-                        file_path = args["file_path"].strip()
-                        file_paths = [file_path]
-                        diff_output = ReadCodeTool().execute(
-                            {"files": [{"path": file_path}]}
-                        )["stdout"]
+                else:  # current changes
+                    diff_cmd = "git diff HEAD | cat -"
 
-                    else:  # current changes
-                        diff_cmd = "git diff HEAD | cat -"
+                    # Execute git command and get diff output
+                    diff_output = subprocess.check_output(
+                        diff_cmd, shell=True, text=True
+                    )
+                    if not diff_output:
+                        return {
+                            "success": False,
+                            "stdout": {},
+                            "stderr": "No changes to review",
+                        }
 
-                        # Execute git command and get diff output
-                        diff_output = subprocess.check_output(
-                            diff_cmd, shell=True, text=True
+                    # Extract changed files using git command
+                    files_cmd = "git diff --name-only HEAD"
+                    try:
+                        files_output = subprocess.check_output(
+                            files_cmd, shell=True, text=True
                         )
-                        if not diff_output:
-                            return {
-                                "success": False,
-                                "stdout": {},
-                                "stderr": "No changes to review",
-                            }
+                        file_paths = [
+                            f.strip() for f in files_output.split("\n") if f.strip()
+                        ]
+                    except subprocess.CalledProcessError:
+                        # Fallback to regex extraction if git command fails
+                        file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
+                        files = re.findall(file_pattern, diff_output)
+                        file_paths = [match[0] for match in files]
 
-                        # Extract changed files using git command
-                        files_cmd = "git diff --name-only HEAD"
-                        try:
-                            files_output = subprocess.check_output(
-                                files_cmd, shell=True, text=True
-                            )
-                            file_paths = [
-                                f.strip() for f in files_output.split("\n") if f.strip()
-                            ]
-                        except subprocess.CalledProcessError:
-                            # Fallback to regex extraction if git command fails
-                            file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
-                            files = re.findall(file_pattern, diff_output)
-                            file_paths = [match[0] for match in files]
+                # Detect languages from the file paths
+                detected_languages = self._detect_languages_from_files(file_paths)
 
-                    # Detect languages from the file paths
-                    detected_languages = self._detect_languages_from_files(file_paths)
-
-                    # Add review type and related information to the diff output
-                    review_info = f"""
+                # Add review type and related information to the diff output
+                review_info = f"""
 ----- 代码审查信息 -----
 审查类型: {review_type}"""
 
-                    # Add specific information based on review type
-                    if review_type == "commit":
-                        review_info += f"\n提交SHA: {args['commit_sha']}"
-                    elif review_type == "range":
-                        review_info += f"\n起始提交: {args['start_commit']}\n结束提交: {args['end_commit']}"
-                    elif review_type == "file":
-                        review_info += f"\n文件路径: {args['file_path']}"
-                    else:  # current changes
-                        review_info += "\n当前未提交修改"
+                # Add specific information based on review type
+                if review_type == "commit":
+                    review_info += f"\n提交SHA: {args['commit_sha']}"
+                elif review_type == "range":
+                    review_info += f"\n起始提交: {args['start_commit']}\n结束提交: {args['end_commit']}"
+                elif review_type == "file":
+                    review_info += f"\n文件路径: {args['file_path']}"
+                else:  # current changes
+                    review_info += "\n当前未提交修改"
 
-                    # Add file list
-                    if file_paths:
-                        review_info += "\n\n----- 变更文件列表 -----"
-                        for i, path in enumerate(file_paths, 1):
-                            review_info += f"\n{i}. {path}"
+                # Add file list
+                if file_paths:
+                    review_info += "\n\n----- 变更文件列表 -----"
+                    for i, path in enumerate(file_paths, 1):
+                        review_info += f"\n{i}. {path}"
 
-                    # Add language-specific checklists
-                    if detected_languages:
-                        review_info += "\n\n----- 检测到的编程语言 -----"
-                        review_info += (
-                            f"\n检测到的语言: {', '.join(detected_languages)}"
-                        )
+                # Add language-specific checklists
+                if detected_languages:
+                    review_info += "\n\n----- 检测到的编程语言 -----"
+                    review_info += f"\n检测到的语言: {', '.join(detected_languages)}"
 
-                        review_info += "\n\n----- 语言特定审查清单 -----"
-                        for lang in detected_languages:
-                            checklist = self._get_language_checklist(lang)
-                            if checklist:
-                                review_info += f"\n{checklist}"
+                    review_info += "\n\n----- 语言特定审查清单 -----"
+                    for lang in detected_languages:
+                        checklist = self._get_language_checklist(lang)
+                        if checklist:
+                            review_info += f"\n{checklist}"
 
-                    review_info += "\n------------------------\n\n"
+                review_info += "\n------------------------\n\n"
 
-                    # Combine review info with diff output
-                    diff_output = review_info + diff_output
+                # Combine review info with diff output
+                diff_output = review_info + diff_output
 
-                    PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")
-                    spinner.text = "代码变更获取完成"
-                    spinner.ok("✅")
+                PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")
+                print("✅ 代码变更获取完成")
 
                 system_prompt = """<code_review_guide>
 <role>
@@ -690,22 +685,16 @@ class CodeReviewTool:
                                 "stdout": "",
                                 "stderr": "代码差异太大，无法处理",
                             }
-
-                        with yaspin(
-                            text="正在上传代码差异文件...", color="cyan"
-                        ) as spinner:
-                            upload_success = agent.model.upload_files([temp_file_path])
-                            if upload_success:
-                                spinner.ok("✅")
-                                PrettyOutput.print(
-                                    f"已成功上传代码差异文件", OutputType.SUCCESS
-                                )
-                            else:
-                                return {
-                                    "success": False,
-                                    "stdout": "",
-                                    "stderr": "上传代码差异文件失败",
-                                }
+                        print("🔍 正在上传代码差异文件...")
+                        upload_success = agent.model.upload_files([temp_file_path])
+                        if upload_success:
+                            print("✅ 已成功上传代码差异文件")
+                        else:
+                            return {
+                                "success": False,
+                                "stdout": "",
+                                "stderr": "上传代码差异文件失败",
+                            }
 
                     # Prepare the prompt based on upload status
                     if is_large_content:
