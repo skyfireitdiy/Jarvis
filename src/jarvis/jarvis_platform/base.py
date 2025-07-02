@@ -81,7 +81,8 @@ class BasePlatform(ABC):
                     f"📤 正在提交第{submit_count}部分（共{len(inputs)}部分({length}/{len(message)})）"
                 )
 
-                response += "\n" + while_true(
+                response += "\n"
+                for trunk in while_true(
                     lambda: while_success(
                         lambda: self.chat(
                             f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
@@ -89,7 +90,8 @@ class BasePlatform(ABC):
                         5,
                     ),
                     5,
-                )
+                ):
+                    response += trunk
 
                 print(
                     f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
