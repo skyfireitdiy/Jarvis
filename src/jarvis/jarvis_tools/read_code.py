@@ -44,7 +44,7 @@ class ReadCodeTool:
         """
         try:
             abs_path = os.path.abspath(filepath)
-            print(f"🔍 正在读取文件: {abs_path}...")
+            print(f"📖 正在读取文件: {abs_path}...")
             # 文件存在性检查
             if not os.path.exists(abs_path):
                 return {

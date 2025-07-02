@@ -155,7 +155,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
     try:
         # 加载所有方法论
-        print(f"🔍 加载方法论文件...")
+        print(f"📁 加载方法论文件...")
         methodologies = _load_all_methodologies()
         if not methodologies:
             print(f"❌ 没有找到方法论文件")
@@ -204,7 +204,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
         try:
             if is_large_content:
                 # 创建临时文件
-                print(f"🔍 创建方法论临时文件...")
+                print(f"📝 创建方法论临时文件...")
                 temp_file_path = _create_methodology_temp_file(methodologies)
                 if not temp_file_path:
                     print(f"❌ 创建方法论临时文件失败")
