@@ -3,7 +3,7 @@ import os
 from functools import lru_cache
 from typing import Any, Dict, List
 
-import yaml
+import yaml  # type: ignore
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
 
@@ -122,7 +122,7 @@ def get_shell_name() -> str:
     shell_name = GLOBAL_CONFIG_DATA.get("JARVIS_SHELL")
     if shell_name:
         return shell_name.lower()
-    
+
     shell_path = GLOBAL_CONFIG_DATA.get("SHELL", os.getenv("SHELL", "/bin/bash"))
     return os.path.basename(shell_path).lower()
 

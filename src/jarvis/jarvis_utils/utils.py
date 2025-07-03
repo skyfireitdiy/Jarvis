@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
-import yaml
+import yaml  # type: ignore
 
 from jarvis import __version__
 from jarvis.jarvis_utils.config import (
@@ -26,21 +26,8 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 g_config_file = None
 
 
-def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
-    """初始化环境变量从jarvis_data/env文件
-    功能：
-    1. 创建不存在的jarvis_data目录
-    2. 加载环境变量到os.environ
-    3. 处理文件读取异常
-    4. 检查git仓库状态并在落后时更新
-    5. 统计当前命令使用次数
-    6. 注册SIGINT信号处理函数
-
-    参数:
-        welcome_str: 欢迎信息字符串
-        config_file: 配置文件路径，默认为None(使用~/.jarvis/config.yaml)
-    """
-    # 保存原始信号处理函数
+def _setup_signal_handler() -> None:
+    """设置SIGINT信号处理函数"""
     original_sigint = signal.getsignal(signal.SIGINT)
 
     def sigint_handler(signum, frame):
@@ -53,7 +40,16 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
                 original_sigint(signum, frame)
 
     signal.signal(signal.SIGINT, sigint_handler)
-    count_cmd_usage()
+
+
+def _show_welcome_message(welcome_str: str) -> None:
+    """显示欢迎信息
+
+    参数:
+        welcome_str: 欢迎信息字符串
+    """
+    if not welcome_str:
+        return
 
     jarvis_ascii_art = f"""
    ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
@@ -67,21 +63,16 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
  https://github.com/skyfireitdiy/Jarvis
  v{__version__}
 """
-    if welcome_str:
-        PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
+    PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
 
-    global g_config_file
-    g_config_file = config_file
 
-    load_config()
-
-    # 现在获取最终的数据目录(可能被配置文件修改)
+def _extract_huggingface_models() -> None:
+    """解压HuggingFace模型"""
     data_dir = Path(get_data_dir())
     script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
     hf_archive = script_dir / "jarvis_data" / "huggingface.tar.gz"
-
-    # 检查并解压huggingface模型
     hf_dir = data_dir / "huggingface" / "hub"
+
     if not hf_dir.exists() and hf_archive.exists():
         try:
             PrettyOutput.print("正在解压HuggingFace模型...", OutputType.INFO)
@@ -91,13 +82,47 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
         except Exception as e:
             PrettyOutput.print(f"解压HuggingFace模型失败: {e}", OutputType.ERROR)
 
-        # 检查是否是git仓库并更新
+
+def _check_git_updates() -> bool:
+    """检查并更新git仓库
+
+    返回:
+        bool: 是否需要重启进程
+    """
+    script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
     from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
 
-    if check_and_update_git_repo(str(script_dir)):
-        # 更新成功，用当前命令行参数启动新进程
+    return check_and_update_git_repo(str(script_dir))
+
+
+def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
+    """初始化Jarvis环境
+
+    参数:
+        welcome_str: 欢迎信息字符串
+        config_file: 配置文件路径，默认为None(使用~/.jarvis/config.yaml)
+    """
+    # 1. 设置信号处理
+    _setup_signal_handler()
+
+    # 2. 统计命令使用
+    count_cmd_usage()
+
+    # 3. 显示欢迎信息
+    if welcome_str:
+        _show_welcome_message(welcome_str)
+
+    # 4. 设置配置文件
+    global g_config_file
+    g_config_file = config_file
+    load_config()
+
+    # 5. 解压模型
+    _extract_huggingface_models()
+
+    # 6. 检查git更新
+    if _check_git_updates():
         os.execv(sys.executable, [sys.executable] + sys.argv)
-        # 如果execv失败，退出当前进程
         sys.exit(0)
 
 
