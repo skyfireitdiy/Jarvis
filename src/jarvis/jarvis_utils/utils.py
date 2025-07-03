@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import hashlib
+import json
 import os
 import signal
 import subprocess
@@ -12,11 +13,13 @@ from typing import Any, Callable, Dict, Optional
 import yaml
 
 from jarvis import __version__
-from jarvis.jarvis_utils.config import (get_data_dir, get_max_big_content_size,
-                                        set_global_env_data)
+from jarvis.jarvis_utils.config import (
+    get_data_dir,
+    get_max_big_content_size,
+    set_global_env_data,
+)
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import (get_in_chat, get_interrupt,
-                                         set_interrupt)
+from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrupt
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
@@ -152,6 +155,49 @@ def _read_config_file(jarvis_dir, config_file):
             os.environ.update(
                 {str(k): str(v) for k, v in config_data["ENV"].items() if v is not None}
             )
+
+
+def generate_default_config(schema_path: str, output_path: str) -> None:
+    """从schema文件生成默认的YAML格式配置文件
+
+    功能：
+    1. 从schema文件读取配置结构
+    2. 根据schema中的default值生成默认配置
+    3. 自动添加schema声明
+    4. 处理嵌套的schema结构
+    5. 保留注释和格式
+
+    参数:
+        schema_path: schema文件路径
+        output_path: 生成的配置文件路径
+    """
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema = json.load(f)
+
+    def _generate_from_schema(schema_dict: Dict[str, Any]) -> Dict[str, Any]:
+        config = {}
+        if "properties" in schema_dict:
+            for key, value in schema_dict["properties"].items():
+                if "default" in value:
+                    config[key] = value["default"]
+                elif "properties" in value:  # 处理嵌套对象
+                    config[key] = _generate_from_schema(value)
+        return config
+
+    default_config = _generate_from_schema(schema)
+
+    # 添加schema声明
+    rel_schema_path = Path(
+        os.path.relpath(
+            Path(schema_path),
+            start=Path(output_path).parent,
+        )
+    )
+    content = f"# yaml-language-server: $schema={rel_schema_path}\n"
+    content += yaml.dump(default_config, allow_unicode=True, sort_keys=False)
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
 
 
 def _read_old_config_file(config_file):
