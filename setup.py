@@ -42,6 +42,7 @@ setup(
             "jarvis-smart-shell=jarvis.jarvis_smart_shell.main:main",
             "jss=jarvis.jarvis_smart_shell.main:main",
             "jarvis-platform-manager=jarvis.jarvis_platform_manager.main:main",
+            "jpm=jarvis.jarvis_platform_manager.main:main",
             "jarvis-code-review=jarvis.jarvis_code_analysis.code_review:main",
             "jarvis-git-commit=jarvis.jarvis_git_utils.git_commiter:main",
             "jgc=jarvis.jarvis_git_utils.git_commiter:main",
