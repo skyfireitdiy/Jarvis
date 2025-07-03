@@ -37,7 +37,7 @@ class YuanbaoPlatform(BasePlatform):
         self.conversation_id = ""  # 会话ID，用于标识当前对话
         # 从环境变量中获取必要参数
         self.cookies = os.getenv("YUANBAO_COOKIES")  # 认证cookies
-        self.agent_id = os.getenv("YUANBAO_AGENT_ID")  # 代理ID
+        self.agent_id = "naQivTmsDa"
 
         if not self.cookies:
             PrettyOutput.print("YUANBAO_COOKIES 未设置", OutputType.WARNING)
