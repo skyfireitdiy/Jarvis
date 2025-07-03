@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 import functools
-import os
-from typing import Any, List
+from typing import List
 
-from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-
-# 全局缓存，避免重复加载模型
-_global_tokenizers = {}
 
 
 def get_context_token_count(text: str) -> int:
-    """使用分词器获取文本的token数量。
+    """使用tiktoken获取文本的token数量。
 
     参数：
         text: 要计算token的输入文本
@@ -20,16 +15,10 @@ def get_context_token_count(text: str) -> int:
         int: 文本中的token数量
     """
     try:
-        from transformers import AutoTokenizer  # type: ignore
-        tokenizer : AutoTokenizer = load_tokenizer()
-        # 分批处理长文本，确保不超过模型最大长度
-        total_tokens = 0
-        chunk_size = 100  # 每次处理100个字符，避免超过模型最大长度（考虑到中文字符可能被编码成多个token）
-        for i in range(0, len(text), chunk_size):
-            chunk = text[i : i + chunk_size]
-            tokens = tokenizer.encode(chunk)  # type: ignore
-            total_tokens += len(tokens)
-        return total_tokens
+        import tiktoken
+
+        encoding = tiktoken.get_encoding("cl100k_base")
+        return len(encoding.encode(text))
     except Exception as e:
         PrettyOutput.print(f"计算token失败: {str(e)}", OutputType.WARNING)
         return len(text) // 4  # 每个token大约4个字符的粗略估计
@@ -84,36 +73,3 @@ def split_text_into_chunks(
         PrettyOutput.print(f"文本分割失败: {str(e)}", OutputType.WARNING)
         # 发生错误时回退到简单的字符分割
         return [text[i : i + max_length] for i in range(0, len(text), max_length)]
-
-
-@functools.lru_cache(maxsize=1)
-def load_tokenizer() -> Any:
-    """
-    加载用于文本处理的分词器，使用缓存避免重复加载。
-
-    返回：
-        AutoTokenizer: 加载的分词器
-    """
-
-    from transformers import AutoTokenizer  # type: ignore
-
-    model_name = "gpt2"
-    cache_dir = os.path.join(get_data_dir(), "huggingface", "hub")
-
-    # 检查全局缓存
-    if model_name in _global_tokenizers:
-        return _global_tokenizers[model_name]
-
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name, cache_dir=cache_dir, local_files_only=True
-        )
-    except Exception:
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name, cache_dir=cache_dir, local_files_only=False
-        )
-
-    # 保存到全局缓存
-    _global_tokenizers[model_name] = tokenizer
-
-    return tokenizer  # type: ignore
