@@ -129,46 +129,82 @@ def load_config():
                 except Exception as e:
                     PrettyOutput.print(f"生成默认配置文件失败: {e}", OutputType.ERROR)
     else:
-        _read_config_file(config_file_path.parent, config_file_path)
+        _load_and_process_config(str(config_file_path.parent), str(config_file_path))
 
 
-def _read_config_file(jarvis_dir, config_file):
+from typing import Tuple
+
+
+def _load_config_file(config_file: str) -> Tuple[str, dict]:
     """读取并解析YAML格式的配置文件
 
+    参数:
+        config_file: 配置文件路径
+
+    返回:
+        Tuple[str, dict]: (文件原始内容, 解析后的配置字典)
+    """
+    with open(config_file, "r", encoding="utf-8") as f:
+        content = f.read()
+        config_data = yaml.safe_load(content) or {}
+        return content, config_data
+
+
+def _ensure_schema_declaration(
+    jarvis_dir: str, config_file: str, content: str, config_data: dict
+) -> None:
+    """确保配置文件包含schema声明
+
+    参数:
+        jarvis_dir: Jarvis数据目录路径
+        config_file: 配置文件路径
+        content: 配置文件原始内容
+        config_data: 解析后的配置字典
+    """
+    if (
+        isinstance(config_data, dict)
+        and "# yaml-language-server: $schema=" not in content
+    ):
+        schema_path = Path(
+            os.path.relpath(
+                Path(__file__).parent.parent / "jarvis_data" / "config_schema.json",
+                start=jarvis_dir,
+            )
+        )
+        with open(config_file, "w", encoding="utf-8") as f:
+            f.write(f"# yaml-language-server: $schema={schema_path}\n")
+            f.write(content)
+
+
+def _process_env_variables(config_data: dict) -> None:
+    """处理配置中的环境变量
+
+    参数:
+        config_data: 解析后的配置字典
+    """
+    if "ENV" in config_data and isinstance(config_data["ENV"], dict):
+        os.environ.update(
+            {str(k): str(v) for k, v in config_data["ENV"].items() if v is not None}
+        )
+
+
+def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
+    """加载并处理配置文件
+
     功能：
-    1. 读取配置文件内容
-    2. 检查并添加schema声明(如果缺失)
-    3. 将配置数据保存到全局变量
-    4. 设置环境变量(如果配置中有ENV字段)
+    1. 读取配置文件
+    2. 确保schema声明存在
+    3. 保存配置到全局变量
+    4. 处理环境变量
 
     参数:
         jarvis_dir: Jarvis数据目录路径
         config_file: 配置文件路径
     """
-    with open(config_file, "r", encoding="utf-8") as f:
-        content = f.read()
-        config_data = yaml.safe_load(content) or {}
-        if isinstance(config_data, dict):
-            # 检查是否已有schema声明，没有则添加
-            if "# yaml-language-server: $schema=" not in content:
-                schema_path = Path(
-                    os.path.relpath(
-                        Path(__file__).parent.parent
-                        / "jarvis_data"
-                        / "config_schema.json",
-                        start=jarvis_dir,
-                    )
-                )
-                with open(config_file, "w", encoding="utf-8") as f:
-                    f.write(f"# yaml-language-server: $schema={schema_path}\n")
-                    f.write(content)
-            # 保存到全局变量
-        set_global_env_data(config_data)
-        # 如果配置中有ENV键值对，则设置环境变量
-        if "ENV" in config_data and isinstance(config_data["ENV"], dict):
-            os.environ.update(
-                {str(k): str(v) for k, v in config_data["ENV"].items() if v is not None}
-            )
+    content, config_data = _load_config_file(config_file)
+    _ensure_schema_declaration(jarvis_dir, config_file, content, config_data)
+    set_global_env_data(config_data)
+    _process_env_variables(config_data)
 
 
 def generate_default_config(schema_path: str, output_path: str) -> None:
@@ -196,6 +232,8 @@ def generate_default_config(schema_path: str, output_path: str) -> None:
                     config[key] = value["default"]
                 elif "properties" in value:  # 处理嵌套对象
                     config[key] = _generate_from_schema(value)
+                elif value.get("type") == "array":  # 处理列表类型
+                    config[key] = []
         return config
 
     default_config = _generate_from_schema(schema)
