@@ -1,3 +1,39 @@
+### Release Note - v0.1.209 2025-07-04
+#### 1. 新功能(New Features)
+- **新增平台管理命令别名**  
+  在`pyproject.toml`和`setup.py`中为`jarvis-platform-manager`添加了`jpm`别名，提高命令可用性  
+- **新增HTTP工具模块**  
+  新增`src/jarvis/jarvis_utils/http.py`文件，提供统一的HTTP请求处理  
+- **新增自动安装机制**  
+  在`jarvis_utils/git_utils.py`中增加git更新后自动pip安装的逻辑  
+
+#### 2. Bug修复(Bug Fixes)
+- **修复编辑文件输出抑制问题**  
+  在`edit_file_handler.py`中修正输出抑制逻辑  
+
+- **修复文件上传逻辑**  
+  在各平台文件中统一使用新的HTTP模块处理上传  
+
+- **修复初始化流程**  
+  在`jarvis_agent/__init__.py`中移除无效的历史记录处理  
+
+#### 3. 性能优化(Performance Improvements)
+- **优化token计数**  
+  使用`tiktoken`替代`transformers`进行token计数  
+
+#### 4. 文档更新(Documentation)
+- **更新README文档**  
+  修正命令行别名说明和配置参数说明  
+
+- **更新配置schema**  
+  移除过期的配置参数如`JARVIS_AUTO_UPDATE`  
+
+#### 5. 其他变更(Other Changes)
+- **依赖项更新**  
+  移除`transformers`和`torch`，新增`tiktoken`和`pyyaml`  
+- **新增.gitignore规则**  
+
+
 # Release Note v0.1.208 - 2025-07-02
 
 ## 新增功能
