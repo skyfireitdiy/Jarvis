@@ -114,6 +114,20 @@ def load_config():
         old_config_file = config_file_path.parent / "env"
         if old_config_file.exists():  # 旧的配置文件存在
             _read_old_config_file(old_config_file)
+        else:
+            # 生成默认配置文件
+            schema_path = (
+                Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
+            )
+            if schema_path.exists():
+                try:
+                    config_file_path.parent.mkdir(parents=True, exist_ok=True)
+                    generate_default_config(str(schema_path), str(config_file_path))
+                    PrettyOutput.print(
+                        f"已生成默认配置文件: {config_file_path}", OutputType.INFO
+                    )
+                except Exception as e:
+                    PrettyOutput.print(f"生成默认配置文件失败: {e}", OutputType.ERROR)
     else:
         _read_config_file(config_file_path.parent, config_file_path)
 
