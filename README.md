@@ -412,7 +412,6 @@ JARVIS_THINKING_PLATFORM: yuanbao
 JARVIS_THINKING_MODEL: deep_seek
 ENV:
   YUANBAO_COOKIES: <元宝cookies>
-  YUANBAO_AGENT_ID: <元宝AgentID>
 ```
 
 #### Kimi
