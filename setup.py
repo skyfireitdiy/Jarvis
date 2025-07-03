@@ -31,6 +31,7 @@ setup(
         "openai==1.78.1",
         "tabulate==0.9.0",
         "pyte==0.8.2",
+        "pyyaml>=6.0.2",
     ],
     extras_require={"dev": ["pytest", "black", "isort", "mypy", "build", "twine"]},
     entry_points={
