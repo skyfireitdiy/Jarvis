@@ -209,10 +209,9 @@ def get_data_dir() -> str:
         str: 数据目录路径，优先从JARVIS_DATA_PATH环境变量获取，
              如果未设置或为空，则使用~/.jarvis作为默认值
     """
-    data_path = GLOBAL_CONFIG_DATA.get("JARVIS_DATA_PATH", "").strip()
-    if not data_path:
-        return os.path.expanduser("~/.jarvis")
-    return data_path
+    return os.path.expanduser(
+        GLOBAL_CONFIG_DATA.get("JARVIS_DATA_PATH", "~/.jarvis").strip()
+    )
 
 
 def get_auto_update() -> bool:
