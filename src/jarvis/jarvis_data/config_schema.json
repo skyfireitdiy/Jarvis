@@ -121,16 +121,6 @@
       "description": "模型能处理的最大输入token数量",
       "default": 32000
     },
-    "JARVIS_AUTO_COMPLETE": {
-      "type": "boolean",
-      "description": "是否启用自动补全功能",
-      "default": false
-    },
-    "SHELL": {
-      "type": "string",
-      "description": "系统shell名称(如: bash, zsh)",
-      "default": "/bin/bash"
-    },
     "JARVIS_PLATFORM": {
       "type": "string",
       "description": "常规操作平台名称",
@@ -160,11 +150,6 @@
       "type": "boolean",
       "description": "应用补丁前是否需要确认",
       "default": false
-    },
-    "JARVIS_MAX_TOOL_CALL_COUNT": {
-      "type": "number",
-      "description": "最大连续工具调用次数",
-      "default": 20
     },
     "JARVIS_DATA_PATH": {
       "type": "string",

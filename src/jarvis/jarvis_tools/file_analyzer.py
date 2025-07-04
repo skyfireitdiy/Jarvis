@@ -45,9 +45,6 @@ class FileAnalyzerTool:
             file_paths = args["file_paths"]
             prompt = args["prompt"]
 
-            agent = args["agent"]
-            agent.reset_tool_call_count()
-
             # 验证文件路径
             valid_files = []
             for file_path in file_paths:

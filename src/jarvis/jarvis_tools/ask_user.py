@@ -34,7 +34,6 @@ class AskUserTool:
 
             # 获取agent对象并重置工具调用计数
             agent = args["agent"]
-            agent.reset_tool_call_count()
 
             # 显示问题给用户
             PrettyOutput.print(f"问题: {question}", OutputType.SYSTEM)

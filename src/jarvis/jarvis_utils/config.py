@@ -96,16 +96,6 @@ def get_max_input_token_count() -> int:
     return int(GLOBAL_CONFIG_DATA.get("JARVIS_MAX_INPUT_TOKEN_COUNT", "32000"))
 
 
-def is_auto_complete() -> bool:
-    """
-    检查是否启用了自动补全功能。
-
-    返回：
-        bool: 如果启用了自动补全则返回True，默认为False
-    """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_COMPLETE", False) == True
-
-
 def get_shell_name() -> str:
     """
     获取系统shell名称。
@@ -119,10 +109,6 @@ def get_shell_name() -> str:
     3. 最后从环境变量SHELL获取
     4. 如果都未配置，则默认返回bash
     """
-    shell_name = GLOBAL_CONFIG_DATA.get("JARVIS_SHELL")
-    if shell_name:
-        return shell_name.lower()
-
     shell_path = GLOBAL_CONFIG_DATA.get("SHELL", os.getenv("SHELL", "/bin/bash"))
     return os.path.basename(shell_path).lower()
 
@@ -189,16 +175,6 @@ def is_confirm_before_apply_patch() -> bool:
         bool: 如果需要确认则返回True，默认为False
     """
     return GLOBAL_CONFIG_DATA.get("JARVIS_CONFIRM_BEFORE_APPLY_PATCH", False) == True
-
-
-def get_max_tool_call_count() -> int:
-    """
-    获取最大工具调用次数。
-
-    返回：
-        int: 最大连续工具调用次数，默认为20
-    """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_MAX_TOOL_CALL_COUNT", "20"))
 
 
 def get_data_dir() -> str:

@@ -16,10 +16,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 
 # jarvis_utils 相关
 from jarvis.jarvis_utils.config import (
-    get_data_dir,
     get_max_token_count,
-    get_max_tool_call_count,
-    is_auto_complete,
     is_execute_tool_confirm,
     is_use_analysis,
     is_use_methodology,
@@ -159,7 +156,7 @@ class Agent:
         platform: Union[Optional[BasePlatform], Optional[str]] = None,
         model_name: Optional[str] = None,
         summary_prompt: Optional[str] = None,
-        auto_complete: Optional[bool] = None,
+        auto_complete: bool = False,
         output_handler: List[OutputHandlerProtocol] = [],
         use_tools: List[str] = [],
         input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
@@ -244,8 +241,6 @@ class Agent:
         # Load configuration from environment variables
         self.addon_prompt = ""
 
-        self.tool_call_count = 0
-        self.max_tool_call_count = get_max_tool_call_count()
         self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
 
         self.history = JarvisHistory()
@@ -283,9 +278,7 @@ class Agent:
         )
 
         self.max_token_count = get_max_token_count()
-        self.auto_complete = (
-            auto_complete if auto_complete is not None else is_auto_complete()
-        )
+        self.auto_complete = auto_complete
         welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"
 
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
@@ -555,28 +548,16 @@ class Agent:
             )
         if len(tool_list) == 0:
             return False, ""
-        if (
-            self.max_tool_call_count > 0
-            and self.tool_call_count >= self.max_tool_call_count
-        ):
-            if user_confirm(f"工具调用次数超过限制，是否继续执行？", True):
-                self.reset_tool_call_count()
-            else:
-                return False, ""
-        if self.execute_tool_confirm:
-            self.reset_tool_call_count()
+
         if not self.execute_tool_confirm or user_confirm(
             f"需要执行{tool_list[0].name()}确认执行？", True
         ):
             print(f"🔧 正在执行{tool_list[0].name()}...")
             result = tool_list[0].handle(response, self)
             print(f"✅ {tool_list[0].name()}执行完成")
-            self.tool_call_count += 1
+
             return result
         return False, ""
-
-    def reset_tool_call_count(self):
-        self.tool_call_count = 0
 
     def _complete_task(self) -> str:
         """完成任务并生成总结(如果需要)
@@ -851,8 +832,6 @@ arguments:
 
                     if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
                         return self._complete_task()
-
-                    self.reset_tool_call_count()
 
                     # 获取用户输入
                     user_input = self.multiline_inputer(
