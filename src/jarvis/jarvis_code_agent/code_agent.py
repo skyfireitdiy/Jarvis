@@ -135,33 +135,63 @@ class CodeAgent:
 
         self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
 
-    def _init_env(self) -> None:
-        """初始化环境，包括：
-        1. 查找git根目录
-        2. 检查并处理未提交的修改
-        3. 检查并更新.gitignore文件
+    def _find_git_root(self) -> str:
+        """查找并切换到git根目录
+        
+        返回:
+            str: git根目录路径
         """
-        print("🚀 正在初始化环境...")
+        print("🔍 正在查找git根目录...")
         curr_dir = os.getcwd()
         git_dir = find_git_root_and_cd(curr_dir)
         self.root_dir = git_dir
+        print(f"✅ 已找到git根目录: {git_dir}")
+        return git_dir
+
+    def _update_gitignore(self, git_dir: str) -> None:
+        """检查并更新.gitignore文件，确保忽略.jarvis目录
         
-        # 检查并更新.gitignore文件
+        参数:
+            git_dir: git根目录路径
+        """
+        print("📝 正在检查.gitignore文件...")
         gitignore_path = os.path.join(git_dir, ".gitignore")
         jarvis_ignore = ".jarvis"
         
         if not os.path.exists(gitignore_path):
             with open(gitignore_path, "w") as f:
                 f.write(f"{jarvis_ignore}\n")
+            print(f"✅ 已创建.gitignore文件并添加'{jarvis_ignore}'")
         else:
             with open(gitignore_path, "r+") as f:
                 content = f.read()
                 if jarvis_ignore not in content.splitlines():
                     f.write(f"\n{jarvis_ignore}\n")
-        
+                    print(f"✅ 已更新.gitignore文件，添加'{jarvis_ignore}'")
+                else:
+                    print("ℹ️ .jarvis已在.gitignore中")
+
+    def _handle_git_changes(self) -> None:
+        """处理git仓库中的未提交修改"""
+        print("🔄 正在检查未提交的修改...")
         if has_uncommitted_changes():
+            print("⏳ 发现未提交修改，正在处理...")
             git_commiter = GitCommitTool()
             git_commiter.execute({})
+            print("✅ 未提交修改已处理完成")
+        else:
+            print("✅ 没有未提交的修改")
+
+    def _init_env(self) -> None:
+        """初始化环境，组合以下功能：
+        1. 查找git根目录
+        2. 检查并更新.gitignore文件
+        3. 处理未提交的修改
+        """
+        print("🚀 正在初始化环境...")
+        git_dir = self._find_git_root()
+        self._update_gitignore(git_dir)
+        self._handle_git_changes()
         print("✅ 环境初始化完成")
 
     def _handle_uncommitted_changes(self) -> None:
