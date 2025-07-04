@@ -14,7 +14,7 @@ import re
 import subprocess
 from typing import Any, Dict, List, Set, Tuple
 
-from jarvis.jarvis_utils.config import get_auto_update, is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import user_confirm
 
@@ -343,8 +343,6 @@ def check_and_update_git_repo(repo_path: str) -> bool:
         return False
 
     try:
-        if not get_auto_update():
-            return False
         # 检查是否有未提交的修改
         if has_uncommitted_changes():
             return False

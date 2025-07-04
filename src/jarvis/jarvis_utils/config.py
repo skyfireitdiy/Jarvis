@@ -190,16 +190,6 @@ def get_data_dir() -> str:
     )
 
 
-def get_auto_update() -> bool:
-    """
-    获取是否自动更新git仓库。
-
-    返回：
-        bool: 如果需要自动更新则返回True，默认为True
-    """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_UPDATE", True) == True
-
-
 def get_max_big_content_size() -> int:
     """
     获取最大大内容大小。
