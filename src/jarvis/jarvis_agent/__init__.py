@@ -247,8 +247,9 @@ class Agent:
         self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
 
         self.history = JarvisHistory()
-        self.history_dir = str(Path(get_data_dir()) / "history")
-        self.history.start_record(self.history_dir)
+        self.history_dir = str(Path.cwd() / ".jarvis" / "history")
+        if history_count > 0:
+            self.history.start_record(self.history_dir)
 
         self.history_count = history_count
 
