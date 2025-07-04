@@ -5,9 +5,8 @@ import time
 import uuid
 from typing import Any, Dict, Generator, List, Tuple
 
-import requests  # type: ignore
-
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_utils import http
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
 
@@ -161,7 +160,7 @@ class TongyiPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload, stream=True),
+                lambda: http.post(url, headers=headers, json=payload, stream=True),
                 sleep_time=5,
             )
             if response.status_code != 200:
@@ -258,7 +257,7 @@ class TongyiPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload), sleep_time=5
+                lambda: http.post(url, headers=headers, json=payload), sleep_time=5
             )
             if response.status_code != 200:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
@@ -314,7 +313,7 @@ class TongyiPlatform(BasePlatform):
                     print(f"📤 正在上传文件: {file_name}")
 
                     # Upload file
-                    response = requests.post(
+                    response = http.post(
                         upload_token["host"], data=form_data, files=files
                     )
 
@@ -349,7 +348,7 @@ class TongyiPlatform(BasePlatform):
                         "dir": upload_token["dir"],
                     }
 
-                    response = requests.post(url, headers=headers, json=payload)
+                    response = http.post(url, headers=headers, json=payload)
                     if response.status_code != 200:
                         print(f"❌ 获取下载链接失败: HTTP {response.status_code}")
                         return False
@@ -381,7 +380,7 @@ class TongyiPlatform(BasePlatform):
                             "fileSize": os.path.getsize(file_path),
                         }
 
-                        add_response = requests.post(
+                        add_response = http.post(
                             add_url, headers=headers, json=add_payload
                         )
                         if add_response.status_code != 200:
@@ -464,7 +463,7 @@ class TongyiPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload), sleep_time=5
+                lambda: http.post(url, headers=headers, json=payload), sleep_time=5
             )
             if response.status_code != 200:
                 PrettyOutput.print(
