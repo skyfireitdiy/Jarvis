@@ -130,14 +130,13 @@ class CodeAgent:
             platform=platform_instance,
             input_handler=[shell_input_handler, builtin_input_handler],
             need_summary=need_summary,
-            history_count=5,
         )
 
         self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
 
     def _find_git_root(self) -> str:
         """查找并切换到git根目录
-        
+
         返回:
             str: git根目录路径
         """
@@ -150,14 +149,14 @@ class CodeAgent:
 
     def _update_gitignore(self, git_dir: str) -> None:
         """检查并更新.gitignore文件，确保忽略.jarvis目录
-        
+
         参数:
             git_dir: git根目录路径
         """
         print("📝 正在检查.gitignore文件...")
         gitignore_path = os.path.join(git_dir, ".gitignore")
         jarvis_ignore = ".jarvis"
-        
+
         if not os.path.exists(gitignore_path):
             with open(gitignore_path, "w") as f:
                 f.write(f"{jarvis_ignore}\n")
