@@ -1,9 +1,9 @@
 import glob
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
-import yaml
+import yaml  # type: ignore
 
 
 class JarvisHistory:
