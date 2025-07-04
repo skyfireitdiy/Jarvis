@@ -12,6 +12,7 @@ Git工具模块
 import os
 import re
 import subprocess
+import sys
 from typing import Any, Dict, List, Set, Tuple
 
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
@@ -393,7 +394,49 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                 f"Jarvis已更新到tag {remote_tag_result.stdout.strip()}",
                 OutputType.SUCCESS,
             )
-            return True
+            
+            # 执行pip安装更新代码
+            try:
+                PrettyOutput.print("正在安装更新后的代码...", OutputType.INFO)
+                
+                # 检查是否在虚拟环境中
+                in_venv = hasattr(sys, 'real_prefix') or (
+                    hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix
+                )
+                
+                # 尝试普通安装
+                install_cmd = [sys.executable, "-m", "pip", "install", "-e", "."]
+                result = subprocess.run(
+                    install_cmd,
+                    cwd=git_root,
+                    capture_output=True,
+                    text=True
+                )
+                
+                if result.returncode == 0:
+                    PrettyOutput.print("代码更新安装成功", OutputType.SUCCESS)
+                    return True
+                
+                # 处理权限错误
+                error_msg = result.stderr.strip()
+                if not in_venv and ("Permission denied" in error_msg or "not writeable" in error_msg):
+                    if user_confirm("检测到权限问题，是否尝试用户级安装(--user)？", True):
+                        user_result = subprocess.run(
+                            install_cmd + ["--user"],
+                            cwd=git_root,
+                            capture_output=True,
+                            text=True
+                        )
+                        if user_result.returncode == 0:
+                            PrettyOutput.print("用户级代码安装成功", OutputType.SUCCESS)
+                            return True
+                        error_msg = user_result.stderr.strip()
+                
+                PrettyOutput.print(f"代码安装失败: {error_msg}", OutputType.ERROR)
+                return False
+            except Exception as e:
+                PrettyOutput.print(f"安装过程中发生意外错误: {str(e)}", OutputType.ERROR)
+                return False
         return False
     except Exception as e:
         PrettyOutput.print(f"Git仓库更新检查失败: {e}", OutputType.WARNING)
