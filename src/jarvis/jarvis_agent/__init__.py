@@ -878,7 +878,9 @@ arguments:
             self.history.export_history_to_markdown(
                 self.history_dir, history_md, max_files=self.history_count
             )
-            self.files.append(history_md)
+
+            if os.path.exists(history_md):
+                self.files.append(history_md)
 
             # 如果有上传文件，先上传文件
         if self.model and self.model.support_upload_files():

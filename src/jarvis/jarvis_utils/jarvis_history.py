@@ -62,7 +62,7 @@ class JarvisHistory:
         history_files = glob.glob(os.path.join(input_dir, "history_*.yaml"))
 
         if not history_files:
-            raise FileNotFoundError(f"No history files found in {input_dir}")
+            return
 
         # Sort files by modification time (newest first) and limit to max_files
         history_files.sort(key=os.path.getmtime, reverse=True)
