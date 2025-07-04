@@ -450,15 +450,12 @@ OPENAI_API_BASE: https://api.openai.com/v1
 | `ENV` | {} | 环境变量配置 |
 | `JARVIS_MAX_TOKEN_COUNT` | 960000 | 上下文窗口的最大token数量 |
 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
-| `JARVIS_AUTO_COMPLETE` | false | 是否启用自动完成功能 |
-| `JARVIS_SHELL_NAME` | bash | 系统shell名称 |
 | `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
 | `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 推理任务使用的平台 |
 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 |
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | false | 应用补丁前是否需要确认 |
-| `JARVIS_MAX_TOOL_CALL_COUNT` | 20 | 最大连续工具调用次数 |
 | `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis |
 | `JARVIS_MAX_BIG_CONTENT_SIZE` | 160000 | 最大大内容大小 |
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
