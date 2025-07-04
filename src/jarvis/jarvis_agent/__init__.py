@@ -146,7 +146,9 @@ class Agent:
         self.prompt = ""
 
     def __del__(self):
-        self.history.stop_record()
+        # 只有在记录启动时才停止记录
+        if hasattr(self, "history") and self.history.current_file:
+            self.history.stop_record()
         delete_agent(self.name)
 
     def __init__(
@@ -414,10 +416,18 @@ class Agent:
         if self.conversation_length > self.max_token_count:
             message = self._summarize_and_clear_history() + "\n\n" + message
             self.conversation_length += get_context_token_count(message)
-        self.history.append_msg("user", message)
+
+        # 只有在记录启动时才记录历史
+        if self.history.current_file:
+            self.history.append_msg("user", message)
+
         response = self.model.chat_until_success(message)  # type: ignore
         self.conversation_length += get_context_token_count(response)
-        self.history.append_msg("assistant", response)
+
+        # 只有在记录启动时才记录历史
+        if self.history.current_file:
+            self.history.append_msg("assistant", response)
+
         return response
 
     def generate_summary(self) -> str:
