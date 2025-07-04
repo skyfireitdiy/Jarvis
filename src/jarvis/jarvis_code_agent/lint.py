@@ -8,7 +8,7 @@ Lint工具配置模块
 import os
 from typing import Dict, List
 
-import yaml
+import yaml  # type: ignore
 
 from jarvis.jarvis_utils.config import get_data_dir
 

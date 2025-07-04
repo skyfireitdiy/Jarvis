@@ -201,11 +201,6 @@
       "description": "是否打印提示",
       "default": false
     },
-    "JARVIS_USE_HISTORY_COUNT": {
-      "type": "number",
-      "description": "使用的历史记录数量",
-      "default": 0
-    },
     "JARVIS_REPLACE_MAP": {
       "type": "object",
       "description": "自定义替换映射表配置",

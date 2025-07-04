@@ -274,16 +274,6 @@ def is_print_prompt() -> bool:
     return GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_PROMPT", False) == True
 
 
-def get_history_count() -> int:
-    """
-    获取是否启用历史记录功能。
-
-    返回：
-        bool: 如果启用历史记录则返回True，默认为False
-    """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_USE_HISTORY_COUNT", 0)
-
-
 def get_mcp_config() -> List[Dict[str, Any]]:
     """
     获取MCP配置列表。
