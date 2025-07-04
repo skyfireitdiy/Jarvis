@@ -161,7 +161,12 @@ class KimiModel(BasePlatform):
                 if not line:
                     continue
 
-                line = line.decode("utf-8")
+                # httpx 返回字符串，requests 返回字节，需要兼容处理
+                if isinstance(line, bytes):
+                    line = line.decode("utf-8")
+                else:
+                    line = str(line)
+
                 if not line.startswith("data: "):
                     continue
 
@@ -288,7 +293,12 @@ class KimiModel(BasePlatform):
                 if not line:
                     continue
 
-                line = line.decode("utf-8")
+                # httpx 返回字符串，requests 返回字节，需要兼容处理
+                if isinstance(line, bytes):
+                    line = line.decode("utf-8")
+                else:
+                    line = str(line)
+
                 if not line.startswith("data: "):
                     continue
 
