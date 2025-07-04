@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import functools
 from typing import List
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
