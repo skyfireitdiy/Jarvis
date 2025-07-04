@@ -22,7 +22,6 @@ from jarvis.jarvis_utils.config import (
     is_auto_complete,
     is_execute_tool_confirm,
     is_use_analysis,
-    get_history_count,
     is_use_methodology,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
@@ -168,7 +167,7 @@ class Agent:
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
         files: List[str] = [],
-        history_count: Optional[int] = None,
+        history_count: int = 0,
     ):
         self.files = files
         """初始化Jarvis Agent实例
@@ -251,9 +250,7 @@ class Agent:
         self.history_dir = str(Path(get_data_dir()) / "history")
         self.history.start_record(self.history_dir)
 
-        self.history_count = (
-            history_count if history_count is not None else get_history_count()
-        )
+        self.history_count = history_count
 
         self.execute_tool_confirm = (
             execute_tool_confirm
