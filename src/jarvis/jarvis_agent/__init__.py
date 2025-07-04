@@ -30,7 +30,6 @@ from jarvis.jarvis_utils.globals import (
     set_interrupt,
 )
 from jarvis.jarvis_utils.input import get_multiline_input
-from jarvis.jarvis_utils.jarvis_history import JarvisHistory
 from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
@@ -144,8 +143,6 @@ class Agent:
 
     def __del__(self):
         # 只有在记录启动时才停止记录
-        if hasattr(self, "history") and self.history.current_file:
-            self.history.stop_record()
         delete_agent(self.name)
 
     def __init__(
@@ -166,7 +163,6 @@ class Agent:
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
         files: List[str] = [],
-        history_count: int = 0,
     ):
         self.files = files
         """初始化Jarvis Agent实例
@@ -242,13 +238,6 @@ class Agent:
         self.addon_prompt = ""
 
         self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
-
-        self.history = JarvisHistory()
-        self.history_dir = str(Path.cwd() / ".jarvis" / "history")
-        if history_count > 0:
-            self.history.start_record(self.history_dir)
-
-        self.history_count = history_count
 
         self.execute_tool_confirm = (
             execute_tool_confirm
@@ -410,16 +399,8 @@ class Agent:
             message = self._summarize_and_clear_history() + "\n\n" + message
             self.conversation_length += get_context_token_count(message)
 
-        # 只有在记录启动时才记录历史
-        if self.history.current_file:
-            self.history.append_msg("user", message)
-
         response = self.model.chat_until_success(message)  # type: ignore
         self.conversation_length += get_context_token_count(response)
-
-        # 只有在记录启动时才记录历史
-        if self.history.current_file:
-            self.history.append_msg("assistant", response)
 
         return response
 
@@ -492,7 +473,6 @@ class Agent:
 
                 tmp_file = tempfile.NamedTemporaryFile(delete=False)
                 tmp_file_name = tmp_file.name
-                self.history.save_history(tmp_file_name)
             self.clear_history()  # type: ignore
 
             if need_summary:
@@ -793,9 +773,8 @@ arguments:
             set_agent(self.name, self)
 
             while True:
-                history_md = ""
                 if self.first:
-                    history_md = self._first_run()
+                    self._first_run()
                 try:
                     current_response = self._call_model(self.prompt, True)
                     self.prompt = ""
@@ -846,8 +825,6 @@ arguments:
                         return self._complete_task()
 
                 except Exception as e:
-                    if history_md:
-                        os.remove(history_md)
                     PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
                     return f"Task failed: {str(e)}"
 
@@ -856,22 +833,7 @@ arguments:
             return f"Task failed: {str(e)}"
 
     def _first_run(self):
-        history_md = ""
-        if self.history_count > 0 and self.model and self.model.support_upload_files():
-            import tempfile
-
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            history_md = str(
-                Path(tempfile.gettempdir()) / f"{self.name}_history_{timestamp}.md"
-            )
-            self.history.export_history_to_markdown(
-                self.history_dir, history_md, max_files=self.history_count
-            )
-
-            if os.path.exists(history_md):
-                self.files.append(history_md)
-
-            # 如果有上传文件，先上传文件
+        # 如果有上传文件，先上传文件
         if self.model and self.model.support_upload_files():
             if self.use_methodology:
                 if not upload_methodology(self.model, other_files=self.files):
@@ -906,7 +868,6 @@ arguments:
                 self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
 
         self.first = False
-        return history_md
 
     def clear_history(self):
         """清空对话历史但保留系统提示
