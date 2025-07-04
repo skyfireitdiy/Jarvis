@@ -14,13 +14,12 @@ import re
 import subprocess
 from typing import Any, Dict, List, Set, Tuple
 
-from jarvis.jarvis_utils.config import (get_auto_update,
-                                        is_confirm_before_apply_patch)
+from jarvis.jarvis_utils.config import get_auto_update, is_confirm_before_apply_patch
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import user_confirm
 
 
-def find_git_root(start_dir: str = ".") -> str:
+def find_git_root_and_cd(start_dir: str = ".") -> str:
     """
     切换到给定路径的Git根目录，如果不是Git仓库则初始化。
 
@@ -213,7 +212,9 @@ def handle_commit_workflow() -> bool:
     Returns:
         bool: 提交是否成功
     """
-    if is_confirm_before_apply_patch() and not user_confirm("是否要提交代码？", default=True):
+    if is_confirm_before_apply_patch() and not user_confirm(
+        "是否要提交代码？", default=True
+    ):
         revert_change()
         return False
 
@@ -337,7 +338,7 @@ def check_and_update_git_repo(repo_path: str) -> bool:
         bool: 是否执行了更新
     """
     curr_dir = os.path.abspath(os.getcwd())
-    git_root = find_git_root(repo_path)
+    git_root = find_git_root_and_cd(repo_path)
     if git_root is None:
         return False
 
@@ -424,7 +425,9 @@ def get_diff_file_list() -> List[str]:
         subprocess.run(["git", "reset"], check=True)
 
         if result.returncode != 0:
-            PrettyOutput.print(f"获取差异文件列表失败: {result.stderr}", OutputType.ERROR)
+            PrettyOutput.print(
+                f"获取差异文件列表失败: {result.stderr}", OutputType.ERROR
+            )
             return []
 
         return [f for f in result.stdout.splitlines() if f]
@@ -559,7 +562,9 @@ def confirm_add_new_files() -> None:
             need_confirm = True
 
         if binary_files:
-            output_lines.append(f"检测到{len(binary_files)}个二进制文件(选择N将重新检测)")
+            output_lines.append(
+                f"检测到{len(binary_files)}个二进制文件(选择N将重新检测)"
+            )
             output_lines.append("二进制文件列表:")
             output_lines.extend(f"  - {file}" for file in binary_files)
             need_confirm = True
@@ -580,7 +585,10 @@ def confirm_add_new_files() -> None:
         if not _check_conditions(new_files, added_lines, binary_files):
             break
 
-        if not user_confirm("是否要添加这些变更（如果不需要请修改.gitignore文件以忽略不需要的文件）？", False):
+        if not user_confirm(
+            "是否要添加这些变更（如果不需要请修改.gitignore文件以忽略不需要的文件）？",
+            False,
+        ):
             continue
 
         break
