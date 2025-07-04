@@ -468,63 +468,66 @@ class YuanbaoPlatform(BasePlatform):
             payload["displayPrompt"] = payload["prompt"]
 
         try:
-            # 发送消息请求，获取流式响应
-            response = while_success(
-                lambda: http.post(
-                    url,
-                    headers=headers,
-                    json=payload,
-                    stream=True,
-                ),
+            # 使用新的stream_post接口发送消息请求，获取流式响应
+            response_stream = while_success(
+                lambda: http.stream_post(url, headers=headers, json=payload),
                 sleep_time=5,
             )
 
-            # 检查响应状态
-            if response.status_code != 200:
-                error_msg = f"发送消息失败，状态码: {response.status_code}"
-                if hasattr(response, "text"):
-                    error_msg += f", 响应: {response.text}"
-                raise Exception(error_msg)
-
             in_thinking = False
+            response_data = b""
 
-            # 处理SSE流响应
-            for line in response.iter_lines():
-                if not line:
+            # 处理流式响应
+            for chunk in response_stream:
+                response_data += chunk
+
+                # 尝试解析SSE格式的数据
+                try:
+                    # 查找完整的数据行
+                    lines = response_data.decode("utf-8").split("\n")
+                    response_data = b""  # 重置缓冲区
+
+                    for line in lines:
+                        if not line.strip():
+                            continue
+
+                        # SSE格式的行通常以"data: "开头
+                        if line.startswith("data: "):
+                            try:
+                                data_str = line[6:]  # 移除"data: "前缀
+
+                                # 检查结束标志
+                                if data_str == "[DONE]":
+                                    self.first_chat = False
+                                    return None
+
+                                data = json.loads(data_str)
+
+                                # 处理文本类型的消息
+                                if data.get("type") == "text":
+                                    if in_thinking:
+                                        yield "</think>\n"
+                                        in_thinking = False
+                                    msg = data.get("msg", "")
+                                    if msg:
+                                        yield msg
+
+                                # 处理思考中的消息
+                                elif data.get("type") == "think":
+                                    if not in_thinking:
+                                        yield "<think>\n"
+                                        in_thinking = True
+                                    think_content = data.get("content", "")
+                                    if think_content:
+                                        yield think_content
+
+                            except json.JSONDecodeError:
+                                pass
+
+                except UnicodeDecodeError:
+                    # 如果解码失败，继续累积数据
                     continue
 
-                line_str = line.decode("utf-8")
-
-                # SSE格式的行通常以"data: "开头
-                if line_str.startswith("data: "):
-                    try:
-                        data_str = line_str[6:]  # 移除"data: "前缀
-                        data = json.loads(data_str)
-
-                        # 处理文本类型的消息
-                        if data.get("type") == "text":
-                            if in_thinking:
-                                yield "</think>\n"
-                                in_thinking = False
-                            msg = data.get("msg", "")
-                            if msg:
-                                yield msg
-
-                        # 处理思考中的消息
-                        elif data.get("type") == "think":
-                            if not in_thinking:
-                                yield "<think>\n"
-                                in_thinking = True
-                            think_content = data.get("content", "")
-                            if think_content:
-                                yield think_content
-
-                    except json.JSONDecodeError:
-                        pass
-
-                # 检测结束标志
-                elif line_str == "data: [DONE]":
-                    return None
             self.first_chat = False
             return None
 

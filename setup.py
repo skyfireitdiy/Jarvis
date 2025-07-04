@@ -32,6 +32,7 @@ setup(
         "tabulate==0.9.0",
         "pyte==0.8.2",
         "pyyaml>=6.0.2",
+        "httpx>=0.28.1",
     ],
     extras_require={"dev": ["pytest", "black", "isort", "mypy", "build", "twine"]},
     entry_points={

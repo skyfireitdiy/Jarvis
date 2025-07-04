@@ -9,6 +9,7 @@ Git工具模块
 - 获取最新提交的哈希值
 - 从Git差异中提取修改的行范围
 """
+import datetime
 import os
 import re
 import subprocess
@@ -344,6 +345,19 @@ def check_and_update_git_repo(repo_path: str) -> bool:
         return False
 
     try:
+        # 检查最新提交时间是否为今天
+        commit_date_result = subprocess.run(
+            ["git", "log", "-1", "--format=%cd", "--date=short"],
+            cwd=git_root,
+            capture_output=True,
+            text=True,
+        )
+        if commit_date_result.returncode == 0:
+            commit_date = commit_date_result.stdout.strip()
+            today = datetime.date.today().strftime("%Y-%m-%d")
+            if commit_date == today:
+                return False
+
         # 检查是否有未提交的修改
         if has_uncommitted_changes():
             return False

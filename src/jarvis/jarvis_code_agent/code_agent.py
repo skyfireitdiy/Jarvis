@@ -130,6 +130,8 @@ class CodeAgent:
             platform=platform_instance,
             input_handler=[shell_input_handler, builtin_input_handler],
             need_summary=need_summary,
+            use_methodology=False,  # 禁用方法论
+            use_analysis=False      # 禁用分析
         )
 
         self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
