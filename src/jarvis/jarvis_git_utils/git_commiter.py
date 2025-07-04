@@ -13,7 +13,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_git_commit_prompt
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
-    find_git_root,
+    find_git_root_and_cd,
     has_uncommitted_changes,
 )
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -71,7 +71,7 @@ class GitCommitTool:
         """Prepare git environment by changing directory and checking for changes"""
         original_dir = os.getcwd()
         os.chdir(root_dir)
-        find_git_root()
+        find_git_root_and_cd()
         if not has_uncommitted_changes():
             PrettyOutput.print("没有未提交的更改", OutputType.SUCCESS)
             return None

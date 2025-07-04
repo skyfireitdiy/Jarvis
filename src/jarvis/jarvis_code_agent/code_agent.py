@@ -21,7 +21,7 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
-    find_git_root,
+    find_git_root_and_cd,
     get_commits_between,
     get_diff,
     get_diff_file_list,
@@ -142,7 +142,7 @@ class CodeAgent:
         """
         print("🚀 正在初始化环境...")
         curr_dir = os.getcwd()
-        git_dir = find_git_root(curr_dir)
+        git_dir = find_git_root_and_cd(curr_dir)
         self.root_dir = git_dir
         if has_uncommitted_changes():
             git_commiter = GitCommitTool()
@@ -377,7 +377,7 @@ def main() -> None:
     args = parser.parse_args()
 
     curr_dir = os.getcwd()
-    git_dir = find_git_root(curr_dir)
+    git_dir = find_git_root_and_cd(curr_dir)
     PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
 
     try:
