@@ -39,7 +39,7 @@ class JarvisHistory:
     def stop_record(self) -> None:
         """Stop recording session and save messages"""
         if not self.current_file:
-            raise RuntimeError("No recording session to stop.")
+            return
 
         if self.records:  # Only save if conversation is not empty
             self.save_history(self.current_file)
