@@ -7,10 +7,10 @@ import time
 import urllib.parse
 from typing import Dict, Generator, List, Tuple
 
-import requests  # type: ignore
 from PIL import Image  # type: ignore
 
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_utils import http
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
 
@@ -95,9 +95,7 @@ class YuanbaoPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(
-                    url, headers=headers, data=payload, timeout=(600, 600)
-                ),
+                lambda: http.post(url, headers=headers, data=payload),
                 sleep_time=5,
             )
             response_json = response.json()
@@ -256,9 +254,7 @@ class YuanbaoPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(
-                    url, headers=headers, json=payload, timeout=(600, 600)
-                ),
+                lambda: http.post(url, headers=headers, json=payload),
                 sleep_time=5,
             )
 
@@ -335,7 +331,7 @@ class YuanbaoPlatform(BasePlatform):
             )
 
             # Upload the file
-            response = requests.put(url, headers=headers, data=file_content)
+            response = http.put(url, headers=headers, data=file_content)
 
             if response.status_code not in [200, 204]:
                 PrettyOutput.print(
@@ -474,12 +470,11 @@ class YuanbaoPlatform(BasePlatform):
         try:
             # 发送消息请求，获取流式响应
             response = while_success(
-                lambda: requests.post(
+                lambda: http.post(
                     url,
                     headers=headers,
                     json=payload,
                     stream=True,
-                    timeout=(600, 600),
                 ),
                 sleep_time=5,
             )
@@ -555,9 +550,7 @@ class YuanbaoPlatform(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(
-                    url, headers=headers, json=payload, timeout=(600, 600)
-                ),
+                lambda: http.post(url, headers=headers, json=payload),
                 sleep_time=5,
             )
 

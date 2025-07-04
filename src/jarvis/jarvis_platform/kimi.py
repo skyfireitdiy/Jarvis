@@ -7,9 +7,8 @@ import os
 import time
 from typing import Dict, Generator, List, Tuple
 
-import requests  # type: ignore
-
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_utils import http
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
 
@@ -67,7 +66,7 @@ class KimiModel(BasePlatform):
         }
         try:
             response = while_success(
-                lambda: requests.request("POST", url, headers=headers, data=payload),
+                lambda: http.post(url, headers=headers, data=payload),
                 sleep_time=5,
             )
             if response.status_code != 200:
@@ -95,7 +94,7 @@ class KimiModel(BasePlatform):
         }
 
         response = while_success(
-            lambda: requests.post(url, headers=headers, data=payload), sleep_time=5
+            lambda: http.post(url, headers=headers, data=payload), sleep_time=5
         )
         return response.json()
 
@@ -109,7 +108,7 @@ class KimiModel(BasePlatform):
             with open(file_path, "rb") as f:
                 content = f.read()
                 response = while_success(
-                    lambda: requests.put(presigned_url, data=content), sleep_time=5
+                    lambda: http.put(presigned_url, data=content), sleep_time=5
                 )
                 return response.status_code == 200
         except Exception as e:
@@ -136,7 +135,7 @@ class KimiModel(BasePlatform):
         }
 
         response = while_success(
-            lambda: requests.post(url, headers=headers, data=payload), sleep_time=5
+            lambda: http.post(url, headers=headers, data=payload), sleep_time=5
         )
         return response.json()
 
@@ -154,7 +153,7 @@ class KimiModel(BasePlatform):
         while retry_count < max_retries:
             payload = json.dumps({"ids": [file_id]}, ensure_ascii=False)
             response = while_success(
-                lambda: requests.post(url, headers=headers, data=payload, stream=True),
+                lambda: http.post(url, headers=headers, data=payload, stream=True),
                 sleep_time=5,
             )
 
@@ -281,7 +280,7 @@ class KimiModel(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.post(url, headers=headers, json=payload, stream=True),
+                lambda: http.post(url, headers=headers, json=payload, stream=True),
                 sleep_time=5,
             )
             # 如果禁止输出，则静默处理
@@ -323,7 +322,7 @@ class KimiModel(BasePlatform):
 
         try:
             response = while_success(
-                lambda: requests.delete(url, headers=headers), sleep_time=5
+                lambda: http.delete(url, headers=headers), sleep_time=5
             )
             if response.status_code == 200:
                 self.chat_id = ""
