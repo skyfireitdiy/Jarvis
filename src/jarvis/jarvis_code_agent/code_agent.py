@@ -139,11 +139,26 @@ class CodeAgent:
         """初始化环境，包括：
         1. 查找git根目录
         2. 检查并处理未提交的修改
+        3. 检查并更新.gitignore文件
         """
         print("🚀 正在初始化环境...")
         curr_dir = os.getcwd()
         git_dir = find_git_root_and_cd(curr_dir)
         self.root_dir = git_dir
+        
+        # 检查并更新.gitignore文件
+        gitignore_path = os.path.join(git_dir, ".gitignore")
+        jarvis_ignore = ".jarvis"
+        
+        if not os.path.exists(gitignore_path):
+            with open(gitignore_path, "w") as f:
+                f.write(f"{jarvis_ignore}\n")
+        else:
+            with open(gitignore_path, "r+") as f:
+                content = f.read()
+                if jarvis_ignore not in content.splitlines():
+                    f.write(f"\n{jarvis_ignore}\n")
+        
         if has_uncommitted_changes():
             git_commiter = GitCommitTool()
             git_commiter.execute({})
