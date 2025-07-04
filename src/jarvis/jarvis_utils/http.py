@@ -96,7 +96,7 @@ class EnhancedNoTimeoutHTTPAdapter(HTTPAdapter):
                     # 指数退避重试
                     wait_time = (2**attempt) * 1
                     print(
-                        f"请求失败，{wait_time}秒后重试... (尝试 {attempt + 1}/{max_attempts}): {str(e)}"
+                        f"⚠️ 请求失败，{wait_time}秒后重试... (尝试 {attempt + 1}/{max_attempts}): {str(e)}"
                     )
                     time.sleep(wait_time)
                     continue
