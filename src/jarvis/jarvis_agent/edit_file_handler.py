@@ -312,7 +312,7 @@ class EditFileHandler(OutputHandler):
             ):
                 upload_success = True
 
-            model.set_suppress_output(True)
+            model.set_suppress_output(False)
 
             # 构建补丁内容
             patch_content = []
