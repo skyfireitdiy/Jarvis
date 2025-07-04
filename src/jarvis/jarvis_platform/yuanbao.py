@@ -493,7 +493,11 @@ class YuanbaoPlatform(BasePlatform):
                 if not line:
                     continue
 
-                line_str = line.decode("utf-8")
+                # httpx 返回字符串，requests 返回字节，需要兼容处理
+                if isinstance(line, bytes):
+                    line_str = line.decode("utf-8")
+                else:
+                    line_str = line
 
                 # SSE格式的行通常以"data: "开头
                 if line_str.startswith("data: "):
