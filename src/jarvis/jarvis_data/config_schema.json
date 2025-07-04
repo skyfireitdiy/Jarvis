@@ -156,11 +156,6 @@
       "description": "Jarvis数据存储目录路径",
       "default": "~/.jarvis"
     },
-    "JARVIS_AUTO_UPDATE": {
-      "type": "boolean",
-      "description": "是否自动更新git仓库",
-      "default": true
-    },
     "JARVIS_MAX_BIG_CONTENT_SIZE": {
       "type": "number",
       "description": "最大大内容尺寸",

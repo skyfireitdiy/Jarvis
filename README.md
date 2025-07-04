@@ -456,7 +456,6 @@ OPENAI_API_BASE: https://api.openai.com/v1
 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 |
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | false | 应用补丁前是否需要确认 |
-| `JARVIS_AUTO_UPDATE` | true | 是否自动更新Jarvis |
 | `JARVIS_MAX_BIG_CONTENT_SIZE` | 160000 | 最大大内容大小 |
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
 | `JARVIS_GIT_COMMIT_PROMPT` | "" | 自定义git提交信息生成提示模板 |
