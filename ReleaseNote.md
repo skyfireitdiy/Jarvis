@@ -1,3 +1,19 @@
+### Release Note - v0.1.211 2025-07-05
+
+#### **新功能 (Features)**
+- 添加tiktoken模型
+- 添加提示信息复制到剪贴板功能
+
+#### **修复 (Fixes)**
+- 更新jarvis数据配置文件包含模式
+
+#### **优化与重构 (Refactors & Improvements)**
+- 移除HuggingFace模型解压功能
+- 修改获取最近提交信息以过滤当前用户
+
+本次更新主要增加了tiktoken相关功能支持，优化了提示交互体验，并改进了配置管理。
+
+
 ### Release Note - v0.1.210 2025-07-05
 
 #### **新功能 (Features)**  
