@@ -513,9 +513,16 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
             失败时返回空列表
     """
     try:
-        # 获取最近5次提交的基本信息
+        # 获取当前git用户名
+        current_author = subprocess.run(
+            ["git", "config", "user.name"],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+        # 获取当前用户最近5次提交的基本信息
         result = subprocess.run(
-            ["git", "log", "-5", "--pretty=format:%H%n%s%n%an%n%ad"],
+            ["git", "log", "-5", "--author=" + current_author, "--pretty=format:%H%n%s%n%an%n%ad"],
             capture_output=True,
             text=True,
         )
