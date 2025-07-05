@@ -52,12 +52,12 @@ class HumanPlatform(BasePlatform):
             session_info = f"(会话ID: {self.conversation_id})"
 
         if self.system_message and self.first_message:
-            prompt = f"{self.system_message}\n\n{message} {session_info}\n\n请回复:"
+            prompt = f"{self.system_message}\n\n{message} {session_info}"
             self.first_message = False
         else:
-            prompt = f"{message} {session_info}\n\n请回复:"
+            prompt = f"{message} {session_info}"
 
-        response = get_multiline_input(prompt)
+        response = get_multiline_input(prompt + "\n\n请回复:")
         yield response
         return None
 
