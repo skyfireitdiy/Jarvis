@@ -14,7 +14,7 @@ setup(
     package_dir={"": "src"},
     include_package_data=True,
     package_data={
-        "jarvis": ["jarvis_data/config_schema.json"],
+        "jarvis": ["jarvis_data/**/*"],
     },
     install_requires=[
         "requests==2.32.3",
