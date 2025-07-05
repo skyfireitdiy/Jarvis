@@ -66,23 +66,6 @@ def _show_welcome_message(welcome_str: str) -> None:
     PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
 
 
-def _extract_huggingface_models() -> None:
-    """解压HuggingFace模型"""
-    data_dir = Path(get_data_dir())
-    script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
-    hf_archive = script_dir / "jarvis_data" / "huggingface.tar.gz"
-    hf_dir = data_dir / "huggingface" / "hub"
-
-    if not hf_dir.exists() and hf_archive.exists():
-        try:
-            PrettyOutput.print("正在解压HuggingFace模型...", OutputType.INFO)
-            with tarfile.open(hf_archive, "r:gz") as tar:
-                tar.extractall(path=data_dir)
-            PrettyOutput.print("HuggingFace模型解压完成", OutputType.SUCCESS)
-        except Exception as e:
-            PrettyOutput.print(f"解压HuggingFace模型失败: {e}", OutputType.ERROR)
-
-
 def _check_git_updates() -> bool:
     """检查并更新git仓库
 
@@ -117,10 +100,7 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     g_config_file = config_file
     load_config()
 
-    # 5. 解压模型
-    _extract_huggingface_models()
-
-    # 6. 检查git更新
+    # 5. 检查git更新
     if _check_git_updates():
         os.execv(sys.executable, [sys.executable] + sys.argv)
         sys.exit(0)
