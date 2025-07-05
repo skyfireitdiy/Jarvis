@@ -57,6 +57,14 @@ class HumanPlatform(BasePlatform):
         else:
             prompt = f"{message} {session_info}"
 
+        # 将prompt复制到剪贴板
+        import subprocess
+        try:
+            subprocess.run(['xsel', '-ib'], input=prompt.encode('utf-8'), check=True)
+            PrettyOutput.print("提示已复制到剪贴板", OutputType.INFO)
+        except subprocess.CalledProcessError as e:
+            PrettyOutput.print(f"无法复制到剪贴板: {e}", OutputType.WARNING)
+
         response = get_multiline_input(prompt + "\n\n请回复:")
         yield response
         return None
