@@ -7,7 +7,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 # 设置tiktoken缓存目录
 script_dir = Path(__file__).parent
-tiktoken_cache_dir = script_dir / "../../jarvis_data/tiktoken"
+tiktoken_cache_dir = script_dir / "../jarvis_data/tiktoken"
 os.makedirs(tiktoken_cache_dir, exist_ok=True)
 os.environ["TIKTOKEN_CACHE_DIR"] = str(tiktoken_cache_dir.absolute())
 
