@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Jarvis Platform Manager Main Module.
+"""Jarvis平台管理器主模块。
 
-This module provides the main entry point for the Jarvis platform manager.
+该模块提供了Jarvis平台管理器的主要入口点。
 """
 import argparse
 import os
@@ -15,7 +15,7 @@ from jarvis.jarvis_platform_manager.service import start_service
 
 
 def list_platforms() -> None:
-    """List all supported platforms and models."""
+    """列出所有支持的平台和模型。"""
     registry = PlatformRegistry.get_global_platform_registry()
     platforms = registry.get_available_platforms()
 
@@ -53,7 +53,7 @@ def list_platforms() -> None:
 
 
 def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> None:
-    """Chat with specified platform and model."""
+    """与指定平台和模型进行对话。"""
     registry = PlatformRegistry.get_global_platform_registry()
     conversation_history: List[Dict[str, str]] = []  # 存储对话记录
 
@@ -190,9 +190,13 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                         for entry in conversation_history:
                             file_obj.write(f"{entry['role']}: {entry['content']}\n\n")
 
-                    PrettyOutput.print(f"所有对话已保存到 {file_path}", OutputType.SUCCESS)
+                    PrettyOutput.print(
+                        f"所有对话已保存到 {file_path}", OutputType.SUCCESS
+                    )
                 except Exception as exc:
-                    PrettyOutput.print(f"保存所有对话失败: {str(exc)}", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"保存所有对话失败: {str(exc)}", OutputType.ERROR
+                    )
                 continue
 
             # Check if it is a shell command
@@ -242,13 +246,13 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
 
 
 def validate_platform_model(args: argparse.Namespace) -> bool:
-    """Validate platform and model arguments.
+    """验证平台和模型参数。
 
-    Args:
-        args: Command line arguments.
+    参数:
+        args: 命令行参数。
 
-    Returns:
-        bool: True if platform and model are valid, False otherwise.
+    返回:
+        bool: 如果平台和模型有效返回True，否则返回False。
     """
     if not args.platform or not args.model:
         PrettyOutput.print(
@@ -260,10 +264,10 @@ def validate_platform_model(args: argparse.Namespace) -> bool:
 
 
 def chat_command(args: argparse.Namespace) -> None:
-    """Process chat subcommand.
+    """处理聊天子命令。
 
-    Args:
-        args: Command line arguments.
+    参数:
+        args: 命令行参数。
     """
     if not validate_platform_model(args):
         return
@@ -271,19 +275,19 @@ def chat_command(args: argparse.Namespace) -> None:
 
 
 def info_command(args: argparse.Namespace) -> None:
-    """Process info subcommand.
+    """处理信息子命令。
 
-    Args:
-        args: Command line arguments.
+    参数:
+        args: 命令行参数。
     """
     list_platforms()
 
 
 def service_command(args: argparse.Namespace) -> None:
-    """Process service subcommand - start OpenAI-compatible API server.
+    """处理服务子命令 - 启动OpenAI兼容的API服务。
 
-    Args:
-        args: Command line arguments.
+    参数:
+        args: 命令行参数。
     """
     start_service(
         host=args.host,
@@ -357,7 +361,7 @@ def role_command(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    """Main entry point for Jarvis platform manager."""
+    """Jarvis平台管理器的主入口点。"""
     init_env("欢迎使用 Jarvis-PlatformManager，您的平台管理助手已准备就绪！")
 
     parser = argparse.ArgumentParser(description="Jarvis AI 平台")
@@ -381,8 +385,12 @@ def main() -> None:
     service_parser.add_argument(
         "--port", type=int, default=8000, help="服务端口 (默认: 8000)"
     )
-    service_parser.add_argument("--platform", "-p", help="指定默认平台，当客户端未指定平台时使用")
-    service_parser.add_argument("--model", "-m", help="指定默认模型，当客户端未指定平台时使用")
+    service_parser.add_argument(
+        "--platform", "-p", help="指定默认平台，当客户端未指定平台时使用"
+    )
+    service_parser.add_argument(
+        "--model", "-m", help="指定默认模型，当客户端未指定平台时使用"
+    )
     service_parser.set_defaults(func=service_command)
 
     # role subcommand
