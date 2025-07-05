@@ -1,3 +1,29 @@
+### Release Note - v0.1.210 2025-07-05
+
+#### **新功能 (Features)**  
+- 新增httpx>=0.28.1依赖，用于改进HTTP请求处理
+- 实现stream_post流式POST请求方法，支持更高效的流式响应处理
+
+#### **修复 (Fixes)**  
+- 修复平台消息流处理逻辑，改进SSE格式数据解析
+- 修复git工具中最新提交日期检查逻辑
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 重构HTTP模块，从requests迁移到httpx库
+- 优化流式响应处理逻辑，减少内存使用
+- 改进代码结构，增加类型提示和文档字符串
+
+#### **文档更新 (Documentation)**  
+- 更新HTTP模块文档，反映新的httpx实现
+- 添加stream_post方法文档说明
+
+#### **其他 (Miscellaneous)**  
+- 禁用CodeAgent中的方法论和分析功能
+- 改进错误处理和连接稳定性
+
+本次更新主要改进了HTTP请求处理能力，迁移到更现代的httpx库，并优化了流式响应处理逻辑，提升了系统稳定性和性能。
+
+
 ### Release Note - v0.1.209 2025-07-04
 #### 1. 新功能(New Features)
 - **新增平台管理命令别名**  
