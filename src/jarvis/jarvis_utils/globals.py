@@ -8,6 +8,9 @@
 - 环境初始化
 """
 import os
+
+# 全局变量：保存最后一条消息
+last_message: str = ""
 from typing import Any, Set
 
 import colorama
@@ -142,6 +145,34 @@ def set_interrupt(status: bool) -> None:
 
 
 def get_interrupt() -> int:
+    """
+    获取当前中断信号状态。
+
+    返回:
+        int: 当前中断计数
+    """
+    return g_interrupt
+
+
+def set_last_message(message: str) -> None:
+    """
+    设置最后一条消息。
+
+    参数:
+        message: 要保存的消息
+    """
+    global last_message
+    last_message = message
+
+
+def get_last_message() -> str:
+    """
+    获取最后一条消息。
+
+    返回:
+        str: 最后一条消息
+    """
+    return last_message
     """
     获取当前中断信号状态。
 

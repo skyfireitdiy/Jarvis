@@ -166,6 +166,9 @@ class BasePlatform(ABC):
             result: str = while_true(
                 lambda: while_success(lambda: self._chat(message), 5), 5
             )
+            from jarvis.jarvis_utils.globals import set_last_message
+
+            set_last_message(result)
             return result
         finally:
             set_in_chat(False)
