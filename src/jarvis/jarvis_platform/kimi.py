@@ -151,34 +151,43 @@ class KimiModel(BasePlatform):
         retry_count = 0
 
         while retry_count < max_retries:
-            payload = json.dumps({"ids": [file_id]}, ensure_ascii=False)
-            response = while_success(
-                lambda: http.post(url, headers=headers, data=payload, stream=True),
+            payload = {"ids": [file_id]}
+            response_stream = while_success(
+                lambda: http.stream_post(url, headers=headers, json=payload),
                 sleep_time=5,
             )
 
-            for line in response.iter_lines():
-                if not line:
-                    continue
+            response_data = b""
+            
+            # 处理流式响应
+            for chunk in response_stream:
+                response_data += chunk
 
-                # httpx 返回字符串，requests 返回字节，需要兼容处理
-                if isinstance(line, bytes):
-                    line = line.decode("utf-8")
-                else:
-                    line = str(line)
-
-                if not line.startswith("data: "):
-                    continue
-
+                # 尝试解析SSE格式的数据
                 try:
-                    data = json.loads(line[6:])
-                    if data.get("event") == "resp":
-                        status = data.get("file_info", {}).get("status")
-                        if status == "parsed":
-                            return True
-                        elif status == "failed":
-                            return False
-                except json.JSONDecodeError:
+                    # 查找完整的数据行
+                    lines = response_data.decode("utf-8").split("\n")
+                    response_data = b""  # 重置缓冲区
+
+                    for line in lines:
+                        if not line.strip():
+                            continue
+
+                        # SSE格式的行通常以"data: "开头
+                        if line.startswith("data: "):
+                            try:
+                                data = json.loads(line[6:])
+                                if data.get("event") == "resp":
+                                    status = data.get("file_info", {}).get("status")
+                                    if status == "parsed":
+                                        return True
+                                    elif status == "failed":
+                                        return False
+                            except json.JSONDecodeError:
+                                continue
+
+                except UnicodeDecodeError:
+                    # 如果解码失败，继续累积数据
                     continue
 
             retry_count += 1
@@ -284,34 +293,44 @@ class KimiModel(BasePlatform):
         }
 
         try:
-            response = while_success(
-                lambda: http.post(url, headers=headers, json=payload, stream=True),
+            # 使用新的stream_post接口发送消息请求，获取流式响应
+            response_stream = while_success(
+                lambda: http.stream_post(url, headers=headers, json=payload),
                 sleep_time=5,
             )
-            # 如果禁止输出，则静默处理
-            for line in response.iter_lines():
-                if not line:
-                    continue
+            
+            response_data = b""
+            
+            # 处理流式响应
+            for chunk in response_stream:
+                response_data += chunk
 
-                # httpx 返回字符串，requests 返回字节，需要兼容处理
-                if isinstance(line, bytes):
-                    line = line.decode("utf-8")
-                else:
-                    line = str(line)
-
-                if not line.startswith("data: "):
-                    continue
-
+                # 尝试解析SSE格式的数据
                 try:
-                    data = json.loads(line[6:])
-                    event = data.get("event")
+                    # 查找完整的数据行
+                    lines = response_data.decode("utf-8").split("\n")
+                    response_data = b""  # 重置缓冲区
 
-                    if event == "cmpl":
-                        # 处理补全文本
-                        text = data.get("text", "")
-                        if text:
-                            yield text
-                except json.JSONDecodeError:
+                    for line in lines:
+                        if not line.strip():
+                            continue
+
+                        # SSE格式的行通常以"data: "开头
+                        if line.startswith("data: "):
+                            try:
+                                data = json.loads(line[6:])
+                                event = data.get("event")
+
+                                if event == "cmpl":
+                                    # 处理补全文本
+                                    text = data.get("text", "")
+                                    if text:
+                                        yield text
+                            except json.JSONDecodeError:
+                                continue
+
+                except UnicodeDecodeError:
+                    # 如果解码失败，继续累积数据
                     continue
 
             return None
