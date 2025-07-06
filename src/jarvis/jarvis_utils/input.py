@@ -190,7 +190,7 @@ def get_multiline_input(tip: str) -> str:
     """
     # 显示输入说明
     PrettyOutput.section(
-        "用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交，按 Ctrl+C 取消输入",
+        "用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交，Ctrl+L 复制最后一条消息，按 Ctrl+C 取消输入",
         OutputType.USER,
     )
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
