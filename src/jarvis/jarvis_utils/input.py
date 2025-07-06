@@ -8,16 +8,20 @@
 - 带有模糊匹配的文件路径补全
 - 用于输入控制的自定义键绑定
 """
-from colorama import Fore # type: ignore
-from colorama import Style as ColoramaStyle # type: ignore
-from fuzzywuzzy import process # type: ignore
-from prompt_toolkit import PromptSession # type: ignore
-from prompt_toolkit.completion import (CompleteEvent, Completer, Completion, # type: ignore
-                                       PathCompleter) # type: ignore
-from prompt_toolkit.document import Document # type: ignore
-from prompt_toolkit.formatted_text import FormattedText # type: ignore
-from prompt_toolkit.key_binding import KeyBindings # type: ignore
-from prompt_toolkit.styles import Style as PromptStyle # type: ignore
+from colorama import Fore  # type: ignore
+from colorama import Style as ColoramaStyle  # type: ignore
+from fuzzywuzzy import process  # type: ignore
+from prompt_toolkit import PromptSession  # type: ignore
+from prompt_toolkit.completion import (
+    CompleteEvent,
+    Completer,
+    Completion,  # type: ignore
+    PathCompleter,
+)  # type: ignore
+from prompt_toolkit.document import Document  # type: ignore
+from prompt_toolkit.formatted_text import FormattedText  # type: ignore
+from prompt_toolkit.key_binding import KeyBindings  # type: ignore
+from prompt_toolkit.styles import Style as PromptStyle  # type: ignore
 
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -208,6 +212,24 @@ def get_multiline_input(tip: str) -> str:
         """处理Ctrl+J以提交输入。"""
         event.current_buffer.validate_and_handle()
 
+    @bindings.add("c-l")
+    def _(event):
+        """处理Ctrl+L以复制最后一条消息到剪贴板。"""
+        from jarvis.jarvis_utils.globals import get_last_message
+        import subprocess
+
+        last_msg = get_last_message()
+        if last_msg:
+            try:
+                # 使用xsel将内容复制到剪贴板
+                process = subprocess.Popen(["xsel", "-b", "-i"], stdin=subprocess.PIPE)
+                process.communicate(input=last_msg.encode("utf-8"))
+                PrettyOutput.print("已将最后一条消息复制到剪贴板", OutputType.INFO)
+            except Exception as e:
+                PrettyOutput.print(f"复制到剪贴板失败: {e}", OutputType.ERROR)
+        else:
+            PrettyOutput.print("没有可复制的消息", OutputType.INFO)
+
     # 配置提示会话
     style = PromptStyle.from_dict(
         {
@@ -217,7 +239,7 @@ def get_multiline_input(tip: str) -> str:
     try:
         import os
 
-        from prompt_toolkit.history import FileHistory # type: ignore
+        from prompt_toolkit.history import FileHistory  # type: ignore
 
         from jarvis.jarvis_utils.config import get_data_dir
 
