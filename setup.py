@@ -31,10 +31,11 @@ setup(
         "openai==1.78.1",
         "tabulate==0.9.0",
         "pyte==0.8.2",
-        "pyyaml>=6.0.2",
+        "pyyaml>=5.3.1",
         "httpx>=0.28.1",
     ],
-    extras_require={"dev": ["pytest", "black", "isort", "mypy", "build", "twine"]},
+    extras_require={"dev": ["pytest", "black",
+                            "isort", "mypy", "build", "twine"]},
     entry_points={
         "console_scripts": [
             "jarvis=jarvis.jarvis_agent.jarvis:main",
