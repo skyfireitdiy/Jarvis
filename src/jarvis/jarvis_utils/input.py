@@ -38,7 +38,7 @@ def get_single_line_input(tip: str) -> str:
     返回：
         str: 用户的输入
     """
-    session = PromptSession(history=None)
+    session: PromptSession = PromptSession(history=None)
     style = PromptStyle.from_dict(
         {
             "prompt": "ansicyan",
@@ -190,7 +190,7 @@ def get_multiline_input(tip: str) -> str:
     """
     # 显示输入说明
     PrettyOutput.section(
-        "用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交，Ctrl+L 复制最后一条消息，按 Ctrl+C 取消输入",
+        "用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交，Ctrl+O 复制最后一条消息，按 Ctrl+C 取消输入",
         OutputType.USER,
     )
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
@@ -212,9 +212,9 @@ def get_multiline_input(tip: str) -> str:
         """处理Ctrl+J以提交输入。"""
         event.current_buffer.validate_and_handle()
 
-    @bindings.add("c-l")
+    @bindings.add("c-o")
     def _(event):
-        """处理Ctrl+L以复制最后一条消息到剪贴板。"""
+        """处理Ctrl+O以复制最后一条消息到剪贴板。"""
         from jarvis.jarvis_utils.globals import get_last_message
         import subprocess
 
@@ -246,7 +246,7 @@ def get_multiline_input(tip: str) -> str:
         # 获取数据目录路径
         history_dir = get_data_dir()
         # 初始化带历史记录的会话
-        session = PromptSession(
+        session: PromptSession = PromptSession(
             history=FileHistory(os.path.join(history_dir, "multiline_input_history")),
             completer=FileCompleter(),
             key_bindings=bindings,
