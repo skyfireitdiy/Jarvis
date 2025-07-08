@@ -212,35 +212,54 @@ class EditFileHandler(OutputHandler):
                     )
                     print(f"✅ 补丁 #{patch_count} 应用成功")
                 else:
-                    # 尝试增加缩进重试
                     found = False
-                    for space_count in range(1, 17):
-                        indented_search = "\n".join(
-                            " " * space_count + line if line.strip() else line
-                            for line in search_text.split("\n")
-                        )
-                        indented_replace = "\n".join(
-                            " " * space_count + line if line.strip() else line
-                            for line in replace_text.split("\n")
-                        )
-                        if indented_search in modified_content:
-                            if modified_content.count(indented_search) > 1:
-                                PrettyOutput.print(
-                                    f"搜索文本在文件中存在多处匹配：\n{indented_search}",
-                                    output_type=OutputType.WARNING,
-                                )
-                                return (
-                                    False,
-                                    f"搜索文本在文件中存在多处匹配：\n{indented_search}",
-                                )
+                    # 如果匹配不到，并且search与replace块的首尾都是换行，尝试去掉第一个和最后一个换行
+                    if (
+                        search_text.startswith("\n")
+                        and search_text.endswith("\n")
+                        and replace_text.startswith("\n")
+                        and replace_text.endswith("\n")
+                    ):
+                        stripped_search = search_text[1:-1]
+                        stripped_replace = replace_text[1:-1]
+                        if stripped_search in modified_content:
                             modified_content = modified_content.replace(
-                                indented_search, indented_replace
+                                stripped_search, stripped_replace
                             )
-                            print(
-                                f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)"
-                            )
+                            print(f"✅ 补丁 #{patch_count} 应用成功 (自动去除首尾换行)")
                             found = True
-                            break
+
+                    if not found:
+                        # 尝试增加缩进重试
+                        current_search = search_text
+                        current_replace = replace_text
+                        if (
+                            current_search.startswith("\n")
+                            and current_search.endswith("\n")
+                            and current_replace.startswith("\n")
+                            and current_replace.endswith("\n")
+                        ):
+                            current_search = current_search[1:-1]
+                            current_replace = current_replace[1:-1]
+
+                        for space_count in range(1, 17):
+                            indented_search = "\n".join(
+                                " " * space_count + line if line.strip() else line
+                                for line in current_search.split("\n")
+                            )
+                            indented_replace = "\n".join(
+                                " " * space_count + line if line.strip() else line
+                                for line in current_replace.split("\n")
+                            )
+                            if indented_search in modified_content:
+                                modified_content = modified_content.replace(
+                                    indented_search, indented_replace
+                                )
+                                print(
+                                    f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)"
+                                )
+                                found = True
+                                break
 
                     if not found:
                         PrettyOutput.print(
