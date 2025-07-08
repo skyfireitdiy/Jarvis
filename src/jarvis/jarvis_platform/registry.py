@@ -6,10 +6,13 @@ import sys
 from typing import Dict, List, Optional, Type
 
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import (get_data_dir, get_normal_model_name,
-                                        get_normal_platform_name,
-                                        get_thinking_model_name,
-                                        get_thinking_platform_name)
+from jarvis.jarvis_utils.config import (
+    get_data_dir,
+    get_normal_model_name,
+    get_normal_platform_name,
+    get_thinking_model_name,
+    get_thinking_platform_name,
+)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 REQUIRED_METHODS = [
@@ -94,7 +97,7 @@ class PlatformRegistry:
         Returns:
             Dict[str, Type[BasePlatform]]: Platform name to platform class mapping
         """
-        platforms = {}
+        platforms: Dict[str, Type[BasePlatform]] = {}
 
         # 确保目录存在
         if not os.path.exists(directory):
@@ -130,12 +133,20 @@ class PlatformRegistry:
                             inspect.isclass(obj)
                             and issubclass(obj, BasePlatform)
                             and obj != BasePlatform
-                            and hasattr(obj, "platform_name")
                         ):
                             # 检查平台实现
                             if not PlatformRegistry.check_platform_implementation(obj):
                                 continue
-                            platforms[obj.platform_name] = obj  # type: ignore
+                            try:
+                                # 实例化类以调用 platform_name 方法
+                                instance = obj()
+                                platform_name = instance.platform_name()
+                                platforms[platform_name] = obj
+                            except Exception as e:
+                                PrettyOutput.print(
+                                    f"实例化或注册平台失败 {obj.__name__}: {str(e)}",
+                                    OutputType.ERROR,
+                                )
                             break
                 except Exception as e:
                     PrettyOutput.print(

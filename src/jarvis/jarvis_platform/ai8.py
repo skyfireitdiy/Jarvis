@@ -12,7 +12,6 @@ from jarvis.jarvis_utils.utils import while_success
 class AI8Model(BasePlatform):
     """AI8 model implementation"""
 
-    platform_name = "ai8"
     BASE_URL = "https://ai8.rcouyi.com"
 
     def get_model_list(self) -> List[Tuple[str, str]]:
@@ -167,6 +166,10 @@ class AI8Model(BasePlatform):
         """Return model name"""
         return self.model_name
 
+    def platform_name(self) -> str:
+        """Return platform name"""
+        return "ai8"
+
     def delete_chat(self) -> bool:
         """Delete current chat session"""
         try:
@@ -235,7 +238,9 @@ class AI8Model(BasePlatform):
             PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
             return False
         except KeyError as e:
-            PrettyOutput.print(f"恢复失败: 会话文件格式不正确，缺少键 {e}", OutputType.ERROR)
+            PrettyOutput.print(
+                f"恢复失败: 会话文件格式不正确，缺少键 {e}", OutputType.ERROR
+            )
             return False
         except Exception as e:
             PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)

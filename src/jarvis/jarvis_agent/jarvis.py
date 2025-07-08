@@ -112,9 +112,18 @@ def main() -> None:
     parser.add_argument("-p", "--platform", type=str, help="Platform to use")
     parser.add_argument("-m", "--model", type=str, help="Model to use")
     parser.add_argument(
-        "-t", "--task", type=str, help="Directly input task content from command line"
+        "-t",
+        "--task",
+        type=str,
+        help="Directly input task content from command line",
     )
     parser.add_argument("-f", "--config", type=str, help="Path to custom config file")
+    parser.add_argument(
+        "--restore-session",
+        action="store_true",
+        help="Restore session from .jarvis/saved_session.json",
+        default=False,
+    )
     args = parser.parse_args()
     init_env(
         "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config
@@ -129,6 +138,13 @@ def main() -> None:
             output_handler=[ToolRegistry()],
             need_summary=False,
         )
+
+        # 尝试恢复会话
+        if args.restore_session:
+            if agent.restore_session():
+                PrettyOutput.print("会话已成功恢复。", OutputType.SUCCESS)
+            else:
+                PrettyOutput.print("无法恢复会话。", OutputType.WARNING)
 
         # 优先处理命令行直接传入的任务
         if args.task:

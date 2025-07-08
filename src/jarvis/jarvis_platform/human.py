@@ -17,8 +17,6 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class HumanPlatform(BasePlatform):
     """人类交互平台实现，模拟大模型但实际上与人交互"""
 
-    platform_name = "human"
-
     def get_model_list(self) -> List[Tuple[str, str]]:
         """获取支持的模型列表"""
         return [("human", "Human Interaction")]
@@ -125,6 +123,10 @@ class HumanPlatform(BasePlatform):
     def name(self) -> str:
         """平台名称"""
         return self.model_name
+
+    def platform_name(self) -> str:
+        """平台名称"""
+        return "human"
 
     def support_web(self) -> bool:
         """是否支持网页浏览功能"""
