@@ -206,13 +206,6 @@ class EditFileHandler(OutputHandler):
                 exact_search = search_text
 
                 if exact_search in modified_content:
-                    if modified_content.count(exact_search) > 1:
-                        PrettyOutput.print(
-                            f"搜索文本在文件中存在多处匹配：\n{exact_search}",
-                            output_type=OutputType.WARNING,
-                        )
-                        return False, f"搜索文本在文件中存在多处匹配：\n{exact_search}"
-
                     # 直接执行替换（保留所有原始格式）
                     modified_content = modified_content.replace(
                         exact_search, replace_text
