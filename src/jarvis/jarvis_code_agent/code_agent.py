@@ -419,6 +419,9 @@ def main() -> None:
     parser.add_argument(
         "-r", "--requirement", type=str, help="Requirement to process", default=None
     )
+    parser.add_argument(
+        "--restore-session", action="store_true", help="Restore session from .jarvis/saved_session.json", default=False
+    )
     args = parser.parse_args()
 
     curr_dir = os.getcwd()
