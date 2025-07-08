@@ -131,7 +131,8 @@ class OpenAIModel(BasePlatform):
         """
         return self.model_name
 
-    def platform_name(self) -> str:
+    @classmethod
+    def platform_name(cls) -> str:
         """
         获取当前平台的名称
 
