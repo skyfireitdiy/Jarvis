@@ -191,7 +191,8 @@ class OyiModel(BasePlatform):
         """Return model name"""
         return self.model_name
 
-    def platform_name(self) -> str:
+    @classmethod
+    def platform_name(cls) -> str:
         """Return platform name"""
         return "oyi"
 

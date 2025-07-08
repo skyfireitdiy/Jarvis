@@ -415,7 +415,8 @@ class KimiModel(BasePlatform):
         """Model name"""
         return self.model_name
 
-    def platform_name(self) -> str:
+    @classmethod
+    def platform_name(cls) -> str:
         """Platform name"""
         return "kimi"
 

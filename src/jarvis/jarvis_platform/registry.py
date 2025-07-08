@@ -138,9 +138,8 @@ class PlatformRegistry:
                             if not PlatformRegistry.check_platform_implementation(obj):
                                 continue
                             try:
-                                # 实例化类以调用 platform_name 方法
-                                instance = obj()
-                                platform_name = instance.platform_name()
+                                # 调用类方法 platform_name
+                                platform_name = obj.platform_name()
                                 platforms[platform_name] = obj
                             except Exception as e:
                                 PrettyOutput.print(

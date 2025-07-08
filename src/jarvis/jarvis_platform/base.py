@@ -180,8 +180,9 @@ class BasePlatform(ABC):
         """Model name"""
         raise NotImplementedError("name is not implemented")
 
+    @classmethod
     @abstractmethod
-    def platform_name(self) -> str:
+    def platform_name(cls) -> str:
         """Platform name"""
         raise NotImplementedError("platform_name is not implemented")
 

@@ -457,7 +457,8 @@ class TongyiPlatform(BasePlatform):
         """
         return self.model_name
 
-    def platform_name(self) -> str:
+    @classmethod
+    def platform_name(cls) -> str:
         """Get platform name
 
         Returns:
