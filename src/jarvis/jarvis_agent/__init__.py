@@ -119,17 +119,13 @@ origin_agent_system_prompt = f"""
 
 
 class OutputHandlerProtocol(Protocol):
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
-    def can_handle(self, response: str) -> bool:
-        ...
+    def can_handle(self, response: str) -> bool: ...
 
-    def prompt(self) -> str:
-        ...
+    def prompt(self) -> str: ...
 
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
-        ...
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
 
 
 class Agent:
@@ -195,7 +191,9 @@ class Agent:
             if isinstance(platform, str):
                 self.model = PlatformRegistry().create_platform(platform)
                 if self.model is None:
-                    PrettyOutput.print(f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING)
+                    PrettyOutput.print(
+                        f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING
+                    )
                     self.model = PlatformRegistry().get_normal_platform()
             else:
                 self.model = platform
@@ -365,14 +363,24 @@ class Agent:
             return False
         session_dir = os.path.join(os.getcwd(), ".jarvis")
         os.makedirs(session_dir, exist_ok=True)
-        session_file = os.path.join(session_dir, "saved_session.json")
+        platform_name = self.model.platform_name()
+        model_name = self.model.name().replace("/", "_").replace("\\", "_")
+        session_file = os.path.join(
+            session_dir, f"saved_session_{self.name}_{platform_name}_{model_name}.json"
+        )
         return self.model.save(session_file)
 
     def restore_session(self) -> bool:
         """从文件恢复会话状态"""
         if not self.model:
             return False  # No model, cannot restore
-        session_file = os.path.join(os.getcwd(), ".jarvis", "saved_session.json")
+        platform_name = self.model.platform_name()
+        model_name = self.model.name().replace("/", "_").replace("\\", "_")
+        session_file = os.path.join(
+            os.getcwd(),
+            ".jarvis",
+            f"saved_session_{self.name}_{platform_name}_{model_name}.json",
+        )
         if not os.path.exists(session_file):
             return False
 
@@ -810,14 +818,18 @@ arguments:
 
                     if get_interrupt():
                         set_interrupt(False)
-                        user_input = self.multiline_inputer(f"模型交互期间被中断，请输入用户干预信息：")
+                        user_input = self.multiline_inputer(
+                            f"模型交互期间被中断，请输入用户干预信息："
+                        )
                         if user_input:
                             # 如果有工具调用且用户确认继续，则将干预信息和工具执行结果拼接为prompt
                             if any(
                                 handler.can_handle(current_response)
                                 for handler in self.output_handler
                             ):
-                                if user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
+                                if user_confirm(
+                                    "检测到有工具调用，是否继续处理工具调用？", True
+                                ):
                                     self.prompt = f"{user_input}\n\n{current_response}"
                                     continue
                             self.prompt += f"{user_input}"
@@ -863,7 +875,9 @@ arguments:
             if self.use_methodology:
                 if not upload_methodology(self.model, other_files=self.files):
                     if self.files:
-                        PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
+                        PrettyOutput.print(
+                            "文件上传失败，将忽略文件列表", OutputType.WARNING
+                        )
                         # 上传失败则回退到本地加载
                     msg = self.prompt
                     for handler in self.input_handler:
@@ -871,14 +885,14 @@ arguments:
                     self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
                 else:
                     if self.files:
-                        self.prompt = (
-                            f"{self.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
-                        )
+                        self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
                     else:
                         self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
             elif self.files:
                 if not self.model.upload_files(self.files):
-                    PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
+                    PrettyOutput.print(
+                        "文件上传失败，将忽略文件列表", OutputType.WARNING
+                    )
                 else:
                     self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
         else:

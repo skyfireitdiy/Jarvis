@@ -21,8 +21,6 @@ class KimiModel(BasePlatform):
     - 消息收发
     """
 
-    platform_name = "kimi"
-
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
         return [
@@ -70,7 +68,9 @@ class KimiModel(BasePlatform):
                 sleep_time=5,
             )
             if response.status_code != 200:
-                PrettyOutput.print(f"错误：创建会话失败：{response.json()}", OutputType.ERROR)
+                PrettyOutput.print(
+                    f"错误：创建会话失败：{response.json()}", OutputType.ERROR
+                )
                 return False
             self.chat_id = response.json()["id"]
             return True
@@ -414,6 +414,10 @@ class KimiModel(BasePlatform):
     def name(self) -> str:
         """Model name"""
         return self.model_name
+
+    def platform_name(self) -> str:
+        """Platform name"""
+        return "kimi"
 
     def support_web(self) -> bool:
         """Kimi平台支持web功能"""

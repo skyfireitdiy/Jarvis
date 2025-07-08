@@ -17,8 +17,6 @@ class TongyiPlatform(BasePlatform):
     # Supported image formats
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff"}
 
-    platform_name = "tongyi"
-
     def __init__(self):
         """Initialize Tongyi platform"""
         super().__init__()
@@ -395,12 +393,16 @@ class TongyiPlatform(BasePlatform):
                             add_url, headers=headers, json=add_payload
                         )
                         if add_response.status_code != 200:
-                            print(f"❌ 添加文件到对话失败: HTTP {add_response.status_code}")
+                            print(
+                                f"❌ 添加文件到对话失败: HTTP {add_response.status_code}"
+                            )
                             continue
 
                         add_result = add_response.json()
                         if not add_result.get("success"):
-                            print(f"❌ 添加文件到对话失败: {add_result.get('errorMsg')}")
+                            print(
+                                f"❌ 添加文件到对话失败: {add_result.get('errorMsg')}"
+                            )
                             continue
 
                         file_info.update(add_result.get("data", {}))
@@ -454,6 +456,14 @@ class TongyiPlatform(BasePlatform):
             str: Platform name
         """
         return self.model_name
+
+    def platform_name(self) -> str:
+        """Get platform name
+
+        Returns:
+            str: Platform name
+        """
+        return "tongyi"
 
     def delete_chat(self) -> bool:
         """Delete chat history

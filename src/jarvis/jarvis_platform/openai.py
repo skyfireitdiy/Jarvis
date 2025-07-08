@@ -10,7 +10,6 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class OpenAIModel(BasePlatform):
-    platform_name = "openai"
 
     def __init__(self):
         """
@@ -131,6 +130,15 @@ class OpenAIModel(BasePlatform):
             str: 当前配置的模型名称
         """
         return self.model_name
+
+    def platform_name(self) -> str:
+        """
+        获取当前平台的名称
+
+        返回:
+            str: 当前平台的名称
+        """
+        return "openai"
 
     def delete_chat(self) -> bool:
         """

@@ -18,8 +18,6 @@ from jarvis.jarvis_utils.utils import while_success
 class YuanbaoPlatform(BasePlatform):
     """Hunyuan模型实现"""
 
-    platform_name = "yuanbao"
-
     def get_model_list(self) -> List[Tuple[str, str]]:
         """获取支持的模型列表"""
         return [
@@ -104,7 +102,9 @@ class YuanbaoPlatform(BasePlatform):
                 self.conversation_id = response_json["id"]
                 return True
             else:
-                PrettyOutput.print(f"错误：创建会话失败，响应: {response_json}", OutputType.ERROR)
+                PrettyOutput.print(
+                    f"错误：创建会话失败，响应: {response_json}", OutputType.ERROR
+                )
                 return False
         except Exception as e:
             PrettyOutput.print(f"错误：创建会话失败：{e}", OutputType.ERROR)
@@ -618,6 +618,10 @@ class YuanbaoPlatform(BasePlatform):
     def name(self) -> str:
         """模型名称"""
         return self.model_name
+
+    def platform_name(self) -> str:
+        """平台名称"""
+        return "yuanbao"
 
     def support_web(self) -> bool:
         """Yuanbao平台支持web功能"""

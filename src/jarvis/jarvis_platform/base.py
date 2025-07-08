@@ -95,10 +95,14 @@ class BasePlatform(ABC):
                 ):
                     response += trunk
 
-                print(f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}")
+                print(
+                    f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
+                )
             print("✅ 提交完成")
             response += "\n" + while_true(
-                lambda: while_success(lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5),
+                lambda: while_success(
+                    lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
+                ),
                 5,
             )
         else:
@@ -175,6 +179,11 @@ class BasePlatform(ABC):
     def name(self) -> str:
         """Model name"""
         raise NotImplementedError("name is not implemented")
+
+    @abstractmethod
+    def platform_name(self) -> str:
+        """Platform name"""
+        raise NotImplementedError("platform_name is not implemented")
 
     @abstractmethod
     def delete_chat(self) -> bool:

@@ -12,7 +12,6 @@ from jarvis.jarvis_utils.utils import while_success
 class OyiModel(BasePlatform):
     """Oyi model implementation"""
 
-    platform_name = "oyi"
     BASE_URL = "https://api-10086.rcouyi.com"
 
     def get_model_list(self) -> List[Tuple[str, str]]:
@@ -87,7 +86,9 @@ class OyiModel(BasePlatform):
                 self.conversation = data
                 return True
             else:
-                PrettyOutput.print(f"创建会话失败: {data['message']}", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"创建会话失败: {data['message']}", OutputType.WARNING
+                )
                 return False
 
         except Exception as e:
@@ -189,6 +190,10 @@ class OyiModel(BasePlatform):
     def name(self) -> str:
         """Return model name"""
         return self.model_name
+
+    def platform_name(self) -> str:
+        """Return platform name"""
+        return "oyi"
 
     def delete_chat(self) -> bool:
         """Delete current chat session"""
