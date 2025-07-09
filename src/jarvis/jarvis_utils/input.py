@@ -109,6 +109,7 @@ class FileCompleter(Completer):
                 (ot("Clear"), "清除历史"),
                 (ot("ToolUsage"), "工具使用说明"),
                 (ot("ReloadConfig"), "重新加载配置"),
+                (ot("SaveSession"), "保存当前会话"),
             ]
         )
 

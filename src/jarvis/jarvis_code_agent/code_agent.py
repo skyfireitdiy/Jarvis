@@ -427,6 +427,13 @@ def main() -> None:
 
     try:
         agent = CodeAgent(platform=args.platform, model=args.model, need_summary=False)
+
+        # 尝试恢复会话
+        if agent.agent.restore_session():
+            PrettyOutput.print(
+                "已从 .jarvis/saved_session.json 恢复会话。", OutputType.SUCCESS
+            )
+
         if args.requirement:
             agent.run(args.requirement)
         else:
