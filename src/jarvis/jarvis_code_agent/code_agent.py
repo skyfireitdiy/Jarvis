@@ -131,7 +131,7 @@ class CodeAgent:
             input_handler=[shell_input_handler, builtin_input_handler],
             need_summary=need_summary,
             use_methodology=False,  # 禁用方法论
-            use_analysis=False      # 禁用分析
+            use_analysis=False,  # 禁用分析
         )
 
         self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
@@ -359,9 +359,7 @@ class CodeAgent:
 
                 # 添加提交信息到final_ret
                 if commits:
-                    final_ret += (
-                        f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
-                    )
+                    final_ret += f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
                         f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
@@ -380,6 +378,7 @@ class CodeAgent:
 {file_list}
 {tool_info}
 如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
+注意：如果要进行静态检查，需要在所有的修改都完成之后进行集中检查
                     """
                         agent.set_addon_prompt(addon_prompt)
                 else:

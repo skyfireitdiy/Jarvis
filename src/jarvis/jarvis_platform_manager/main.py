@@ -190,13 +190,9 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                         for entry in conversation_history:
                             file_obj.write(f"{entry['role']}: {entry['content']}\n\n")
 
-                    PrettyOutput.print(
-                        f"所有对话已保存到 {file_path}", OutputType.SUCCESS
-                    )
+                    PrettyOutput.print(f"所有对话已保存到 {file_path}", OutputType.SUCCESS)
                 except Exception as exc:
-                    PrettyOutput.print(
-                        f"保存所有对话失败: {str(exc)}", OutputType.ERROR
-                    )
+                    PrettyOutput.print(f"保存所有对话失败: {str(exc)}", OutputType.ERROR)
                 continue
 
             # Check if it is a shell command
@@ -351,8 +347,8 @@ def role_command(args: argparse.Namespace) -> None:
         return
 
     # 初始化平台和模型
-    platform_name = selected_role["platform"]
-    model_name = selected_role["model"]
+    platform_name = args.platform or selected_role["platform"]
+    model_name = args.model or selected_role["model"]
     system_prompt = selected_role.get("system_prompt", "")
 
     # 开始对话
@@ -385,12 +381,8 @@ def main() -> None:
     service_parser.add_argument(
         "--port", type=int, default=8000, help="服务端口 (默认: 8000)"
     )
-    service_parser.add_argument(
-        "--platform", "-p", help="指定默认平台，当客户端未指定平台时使用"
-    )
-    service_parser.add_argument(
-        "--model", "-m", help="指定默认模型，当客户端未指定平台时使用"
-    )
+    service_parser.add_argument("--platform", "-p", help="指定默认平台，当客户端未指定平台时使用")
+    service_parser.add_argument("--model", "-m", help="指定默认模型，当客户端未指定平台时使用")
     service_parser.set_defaults(func=service_command)
 
     # role subcommand
@@ -401,6 +393,8 @@ def main() -> None:
         default="~/.jarvis/roles.yaml",
         help="角色配置文件路径(YAML格式，默认: ~/.jarvis/roles.yaml)",
     )
+    role_parser.add_argument("--platform", "-p", help="指定要使用的平台，覆盖角色配置")
+    role_parser.add_argument("--model", "-m", help="指定要使用的模型，覆盖角色配置")
     role_parser.set_defaults(func=role_command)
 
     args = parser.parse_args()
