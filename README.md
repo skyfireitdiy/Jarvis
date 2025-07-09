@@ -493,6 +493,7 @@ OPENAI_API_BASE: https://api.openai.com/v1
 | `'FindRelatedFiles'` | 查找与功能相关的文件 |
 | `'Fix'` | 修复问题 |
 | `'Check'` | 执行静态代码检查，包括错误和风格问题 |
+| `'SaveSession'` | 保存当前会话并退出 |
 
 ### 3. 自定义替换配置
 在`~/.jarvis/config.yaml`中添加：
