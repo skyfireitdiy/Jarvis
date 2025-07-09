@@ -82,9 +82,6 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
         while True:
             # Get user input
             user_input = get_multiline_input("")
-            conversation_history.append(
-                {"role": "user", "content": user_input}
-            )  # 记录用户输入
 
             # Check if input is cancelled
             if user_input.strip() == "/bye":
@@ -219,6 +216,9 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                 continue
 
             try:
+                conversation_history.append(
+                    {"role": "user", "content": user_input}
+                )  # 记录用户输入
                 # Send to model and get reply
                 response = platform.chat_until_success(user_input)
                 if not response:
