@@ -180,7 +180,7 @@ def start_service(
         request: ChatCompletionRequest,
     ) -> Response:
         """Create a chat completion in OpenAI-compatible format.
-        
+
         Returns:
             Response: Either a JSONResponse or StreamingResponse depending on the request.
         """
@@ -233,7 +233,7 @@ def start_service(
         if stream:
             # Return streaming response
             return StreamingResponse(
-                stream_chat_response(platform, message_text, model),
+                stream_chat_response(platform, message_text, model),  # type: ignore
                 media_type="text/event-stream",
             )
 
@@ -258,36 +258,36 @@ def start_service(
                 response_text,
             )
 
-            return JSONResponse({
-                "id": completion_id,
-                "object": "chat.completion",
-                "created": int(time.time()),
-                "model": model,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": response_text},
-                        "finish_reason": "stop",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": len(message_text) // 4,
-                    "completion_tokens": len(response_text) // 4,
-                    "total_tokens": (len(message_text) + len(response_text)) // 4,
-                },
-            })
+            return JSONResponse(
+                {
+                    "id": completion_id,
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "model": model,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {"role": "assistant", "content": response_text},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": len(message_text) // 4,
+                        "completion_tokens": len(response_text) // 4,
+                        "total_tokens": (len(message_text) + len(response_text)) // 4,
+                    },
+                }
+            )
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
-    async def stream_chat_response(
-        platform: Any, message: str, model_name: str
-    ) -> Any:
+    async def stream_chat_response(platform: Any, message: str, model_name: str) -> Any:
         """Stream chat response in OpenAI-compatible format."""
         completion_id = f"chatcmpl-{str(uuid.uuid4())}"
         created_time = int(time.time())
         conversation_id = str(uuid.uuid4())
 
-        # Modify first yield statement format
+        # Send the initial chunk with the role
         initial_data = {
             "id": completion_id,
             "object": "chat.completion.chunk",
@@ -300,21 +300,17 @@ def start_service(
         yield f"data: {json.dumps(initial_data)}\n\n"
 
         try:
-            # Get chat response directly
-            response = platform.chat_until_success(message)
+            # Use the streaming-capable chat method
+            response_generator = platform.chat(message)
 
-            # Record full response
             full_response = ""
+            has_content = False
 
-            # If there is a response, send it in chunks
-            if response:
-                # Split into small chunks for better streaming experience
-                chunk_size = 4
-                for i in range(0, len(response), chunk_size):
-                    chunk = response[i : i + chunk_size]
+            # Iterate over the generator and stream chunks
+            for chunk in response_generator:
+                if chunk:
+                    has_content = True
                     full_response += chunk
-
-                    # Create and send chunk
                     chunk_data = {
                         "id": completion_id,
                         "object": "chat.completion.chunk",
@@ -328,13 +324,10 @@ def start_service(
                             }
                         ],
                     }
-
                     yield f"data: {json.dumps(chunk_data)}\n\n"
 
-                    # Small delay to simulate streaming
-                    await asyncio.sleep(0.01)
-            else:
-                # If no output, send an empty content chunk
+            if not has_content:
+                no_response_message = "No response from model."
                 chunk_data = {
                     "id": completion_id,
                     "object": "chat.completion.chunk",
@@ -343,15 +336,15 @@ def start_service(
                     "choices": [
                         {
                             "index": 0,
-                            "delta": {"content": "No response from model."},
+                            "delta": {"content": no_response_message},
                             "finish_reason": None,
                         }
                     ],
                 }
                 yield f"data: {json.dumps(chunk_data)}\n\n"
-                full_response = "No response from model."
+                full_response = no_response_message
 
-            # Modify final yield statement format
+            # Send the final chunk with finish_reason
             final_data = {
                 "id": completion_id,
                 "object": "chat.completion.chunk",
@@ -361,72 +354,45 @@ def start_service(
             }
             yield f"data: {json.dumps(final_data)}\n\n"
 
-            # Send [DONE] marker
+            # Send the [DONE] marker
             yield "data: [DONE]\n\n"
 
-            # Log conversation to file
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            log_file = os.path.join(
-                logs_dir, f"stream_conversation_{conversation_id}_{timestamp}.json"
-            )
-
-            log_data = {
-                "conversation_id": conversation_id,
-                "timestamp": timestamp,
-                "model": model_name,
-                "message": message,
-                "response": full_response,
-            }
-
-            with open(log_file, "w", encoding="utf-8", errors="ignore") as f:
-                json.dump(log_data, f, ensure_ascii=False, indent=2)
-
-            PrettyOutput.print(
-                f"Stream conversation logged to {log_file}", OutputType.INFO
+            # Log the full conversation
+            log_conversation(
+                conversation_id,
+                [{"role": "user", "content": message}],
+                model_name,
+                full_response,
             )
 
         except Exception as exc:
-            # Send error message
-            error_msg = f"Error: {str(exc)}"
-            print(f"Streaming error: {error_msg}")
+            error_msg = f"Error during streaming: {str(exc)}"
+            PrettyOutput.print(error_msg, OutputType.ERROR)
 
-            res = json.dumps(
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": created_time,
-                    "model": model_name,
-                    "choices": [
-                        {
-                            "index": 0,
-                            "delta": {"content": error_msg},
-                            "finish_reason": "stop",
-                        }
-                    ],
-                }
-            )
-            yield f"data: {res}\n\n"
-            yield f"data: {json.dumps({'error': {'message': error_msg, 'type': 'server_error'}})}\n\n"
+            # Send error information in the stream
+            error_chunk = {
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": created_time,
+                "model": model_name,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": {"content": error_msg},
+                        "finish_reason": "stop",
+                    }
+                ],
+            }
+            yield f"data: {json.dumps(error_chunk)}\n\n"
             yield "data: [DONE]\n\n"
 
-            # Log error to file
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            log_file = os.path.join(
-                logs_dir, f"stream_error_{conversation_id}_{timestamp}.json"
+            # Log the error
+            log_conversation(
+                conversation_id,
+                [{"role": "user", "content": message}],
+                model_name,
+                response=f"ERROR: {error_msg}",
             )
-
-            log_data = {
-                "conversation_id": conversation_id,
-                "timestamp": timestamp,
-                "model": model_name,
-                "message": message,
-                "error": error_msg,
-            }
-
-            with open(log_file, "w", encoding="utf-8", errors="ignore") as f:
-                json.dump(log_data, f, ensure_ascii=False, indent=2)
-
-            PrettyOutput.print(f"Stream error logged to {log_file}", OutputType.ERROR)
 
     # Run the server
     uvicorn.run(app, host=host, port=port)

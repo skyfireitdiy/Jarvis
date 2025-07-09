@@ -73,8 +73,9 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
             f"连接到 {platform_name} 平台 {model_name} 模型", OutputType.SUCCESS
         )
         PrettyOutput.print(
-            "可用命令: /bye - 退出聊天, /clear - 清除会话, /upload - 上传文件, "
-            "/shell - 执行shell命令, /save - 保存当前对话, /saveall - 保存所有对话",
+            "可用命令: /bye - 退出, /clear - 清除会话, /upload - 上传文件, "
+            "/shell - 执行命令, /save - 保存对话, /saveall - 保存所有对话, "
+            "/save_session - 保存会话状态, /load_session - 加载会话状态",
             OutputType.INFO,
         )
 
@@ -190,6 +191,57 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                     PrettyOutput.print(f"所有对话已保存到 {file_path}", OutputType.SUCCESS)
                 except Exception as exc:
                     PrettyOutput.print(f"保存所有对话失败: {str(exc)}", OutputType.ERROR)
+                continue
+
+            # Check if it is a save_session command
+            if user_input.strip().startswith("/save_session"):
+                try:
+                    file_path = user_input.strip()[14:].strip()
+                    if not file_path:
+                        PrettyOutput.print(
+                            "请指定保存会话的文件名，例如: /save_session session.json",
+                            OutputType.WARNING,
+                        )
+                        continue
+
+                    # Remove quotes if present
+                    if (file_path.startswith('"') and file_path.endswith('"')) or (
+                        file_path.startswith("'") and file_path.endswith("'")
+                    ):
+                        file_path = file_path[1:-1]
+
+                    if platform.save(file_path):
+                        PrettyOutput.print(f"会话已保存到 {file_path}", OutputType.SUCCESS)
+                    else:
+                        PrettyOutput.print("保存会话失败", OutputType.ERROR)
+                except Exception as exc:
+                    PrettyOutput.print(f"保存会话失败: {str(exc)}", OutputType.ERROR)
+                continue
+
+            # Check if it is a load_session command
+            if user_input.strip().startswith("/load_session"):
+                try:
+                    file_path = user_input.strip()[14:].strip()
+                    if not file_path:
+                        PrettyOutput.print(
+                            "请指定加载会话的文件名，例如: /load_session session.json",
+                            OutputType.WARNING,
+                        )
+                        continue
+
+                    # Remove quotes if present
+                    if (file_path.startswith('"') and file_path.endswith('"')) or (
+                        file_path.startswith("'") and file_path.endswith("'")
+                    ):
+                        file_path = file_path[1:-1]
+
+                    if platform.restore(file_path):
+                        conversation_history = []  # Clear local history after loading
+                        PrettyOutput.print(f"会话已从 {file_path} 加载", OutputType.SUCCESS)
+                    else:
+                        PrettyOutput.print("加载会话失败", OutputType.ERROR)
+                except Exception as exc:
+                    PrettyOutput.print(f"加载会话失败: {str(exc)}", OutputType.ERROR)
                 continue
 
             # Check if it is a shell command

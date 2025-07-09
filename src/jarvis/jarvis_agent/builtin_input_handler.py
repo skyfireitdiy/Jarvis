@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
+import sys
 from typing import Any, Tuple
 
 from jarvis.jarvis_utils.config import get_replace_map
@@ -29,7 +30,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     replace_map = get_replace_map()
     # 处理每个标记
     for tag in special_tags:
-
         # 优先处理特殊标记
         if tag == "Summary":
             agent._summarize_and_clear_history()
@@ -50,6 +50,17 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_utils.utils import load_config
 
             load_config()
+            return "", True
+        elif tag == "SaveSession":
+            if agent.save_session():
+                from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
+                PrettyOutput.print("会话已成功保存。正在退出...", OutputType.SUCCESS)
+                sys.exit(0)
+            else:
+                from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
+                PrettyOutput.print("保存会话失败。", OutputType.ERROR)
             return "", True
 
         processed_tag = set()
