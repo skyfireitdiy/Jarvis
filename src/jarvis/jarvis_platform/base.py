@@ -27,10 +27,12 @@ class BasePlatform(ABC):
         """Initialize model"""
         self.suppress_output = True  # 添加输出控制标志
         self.web = False  # 添加web属性，默认false
+        self._saved = False
 
     def __del__(self):
         """Destroy model"""
-        self.delete_chat()
+        if not self._saved:
+            self.delete_chat()
 
     @abstractmethod
     def set_model_name(self, model_name: str):
@@ -93,14 +95,10 @@ class BasePlatform(ABC):
                 ):
                     response += trunk
 
-                print(
-                    f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
-                )
+                print(f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}")
             print("✅ 提交完成")
             response += "\n" + while_true(
-                lambda: while_success(
-                    lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
-                ),
+                lambda: while_success(lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5),
                 5,
             )
         else:
@@ -182,6 +180,34 @@ class BasePlatform(ABC):
     def delete_chat(self) -> bool:
         """Delete chat"""
         raise NotImplementedError("delete_chat is not implemented")
+
+    @abstractmethod
+    def save(self, file_path: str) -> bool:
+        """Save chat session to a file.
+
+        Note:
+            Implementations of this method should set `self._saved = True` upon successful saving
+            to prevent the session from being deleted on object destruction.
+
+        Args:
+            file_path: The path to save the session file.
+
+        Returns:
+            True if saving is successful, False otherwise.
+        """
+        raise NotImplementedError("save is not implemented")
+
+    @abstractmethod
+    def restore(self, file_path: str) -> bool:
+        """Restore chat session from a file.
+
+        Args:
+            file_path: The path to restore the session file from.
+
+        Returns:
+            True if restoring is successful, False otherwise.
+        """
+        raise NotImplementedError("restore is not implemented")
 
     @abstractmethod
     def set_system_prompt(self, message: str):

@@ -87,9 +87,7 @@ class OyiModel(BasePlatform):
                 self.conversation = data
                 return True
             else:
-                PrettyOutput.print(
-                    f"创建会话失败: {data['message']}", OutputType.WARNING
-                )
+                PrettyOutput.print(f"创建会话失败: {data['message']}", OutputType.WARNING)
                 return False
 
         except Exception as e:
@@ -229,6 +227,52 @@ class OyiModel(BasePlatform):
 
         except Exception as e:
             PrettyOutput.print(f"删除会话失败: {str(e)}", OutputType.ERROR)
+            return False
+
+    def save(self, file_path: str) -> bool:
+        """Save chat session to a file."""
+        if not self.conversation:
+            PrettyOutput.print("没有活动的会话可供保存", OutputType.WARNING)
+            return False
+
+        state = {
+            "conversation": self.conversation,
+            "messages": self.messages,
+            "model_name": self.model_name,
+            "system_prompt": self.system_prompt,
+            "first_chat": self.first_chat,
+        }
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=4)
+            self._saved = True
+            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            return True
+        except Exception as e:
+            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            return False
+
+    def restore(self, file_path: str) -> bool:
+        """Restore chat session from a file."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            self.conversation = state.get("conversation")
+            self.messages = state.get("messages", [])
+            self.model_name = state.get("model_name", "deepseek-chat")
+            self.system_prompt = state.get("system_prompt", "")
+            self.first_chat = state.get("first_chat", True)
+            self._saved = True
+
+            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            return True
+        except FileNotFoundError:
+            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            return False
+        except Exception as e:
+            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
             return False
 
     def get_available_models(self) -> List[str]:

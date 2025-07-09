@@ -1,5 +1,6 @@
 import os
-from typing import Generator, List, Tuple
+from typing import Any, Dict, Generator, List, Tuple
+
 from jarvis.jarvis_platform.base import BasePlatform
 import json
 
@@ -57,7 +58,6 @@ class AI8Model(BasePlatform):
     def create_conversation(self) -> bool:
         """Create a new conversation"""
         try:
-
             # 1. 创建会话
             response = while_success(
                 lambda: http.post(
@@ -117,13 +117,12 @@ class AI8Model(BasePlatform):
     def chat(self, message: str) -> Generator[str, None, None]:
         """Execute conversation"""
         try:
-
             # 确保有会话ID
             if not self.conversation:
                 if not self.create_conversation():
                     raise Exception("Failed to create conversation")
 
-            payload = {
+            payload: Dict[str, Any] = {
                 "text": message,
                 "sessionId": self.conversation["id"] if self.conversation else None,
                 "files": [],
@@ -184,7 +183,7 @@ class AI8Model(BasePlatform):
 
             data = response.json()
             if data["code"] == 0:
-                self.conversation = None
+                self.conversation = {}
                 return True
             else:
                 error_msg = f"删除会话失败: {data.get('msg', '未知错误')}"
@@ -193,6 +192,53 @@ class AI8Model(BasePlatform):
 
         except Exception as e:
             PrettyOutput.print(f"删除会话失败: {str(e)}", OutputType.ERROR)
+            return False
+
+    def save(self, file_path: str) -> bool:
+        """Save chat session to a file."""
+        if not self.conversation:
+            PrettyOutput.print("没有活动的会话可供保存", OutputType.WARNING)
+            return False
+
+        state = {
+            "conversation": self.conversation,
+            "model_name": self.model_name,
+            "system_prompt": self.system_prompt,
+        }
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=4)
+            self._saved = True
+            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            return True
+        except Exception as e:
+            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            return False
+
+    def restore(self, file_path: str) -> bool:
+        """Restore chat session from a file."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            self.conversation = state["conversation"]
+            self.model_name = state["model_name"]
+            self.system_prompt = state.get("system_prompt", "")
+
+            # A restored session should not be deleted on exit, as it's persistent.
+            self._saved = True
+
+            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            return True
+        except FileNotFoundError:
+            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            return False
+        except KeyError as e:
+            PrettyOutput.print(f"恢复失败: 会话文件格式不正确，缺少键 {e}", OutputType.ERROR)
+            return False
+        except Exception as e:
+            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
             return False
 
     def get_available_models(self) -> List[str]:

@@ -70,9 +70,7 @@ class KimiModel(BasePlatform):
                 sleep_time=5,
             )
             if response.status_code != 200:
-                PrettyOutput.print(
-                    f"错误：创建会话失败：{response.json()}", OutputType.ERROR
-                )
+                PrettyOutput.print(f"错误：创建会话失败：{response.json()}", OutputType.ERROR)
                 return False
             self.chat_id = response.json()["id"]
             return True
@@ -158,7 +156,7 @@ class KimiModel(BasePlatform):
             )
 
             response_data = b""
-            
+
             # 处理流式响应
             for chunk in response_stream:
                 response_data += chunk
@@ -298,9 +296,9 @@ class KimiModel(BasePlatform):
                 lambda: http.stream_post(url, headers=headers, json=payload),
                 sleep_time=5,
             )
-            
+
             response_data = b""
-            
+
             # 处理流式响应
             for chunk in response_stream:
                 response_data += chunk
@@ -365,6 +363,52 @@ class KimiModel(BasePlatform):
                 return False
         except Exception as e:
             PrettyOutput.print(f"删除会话时发生错误: {str(e)}", OutputType.ERROR)
+            return False
+
+    def save(self, file_path: str) -> bool:
+        """Save chat session to a file."""
+        if not self.chat_id:
+            PrettyOutput.print("没有活动的会话可供保存", OutputType.WARNING)
+            return False
+
+        state = {
+            "chat_id": self.chat_id,
+            "model_name": self.model_name,
+            "system_message": self.system_message,
+            "first_chat": self.first_chat,
+            "uploaded_files": self.uploaded_files,
+        }
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=4)
+            self._saved = True
+            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            return True
+        except Exception as e:
+            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            return False
+
+    def restore(self, file_path: str) -> bool:
+        """Restore chat session from a file."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            self.chat_id = state.get("chat_id", "")
+            self.model_name = state.get("model_name", "kimi")
+            self.system_message = state.get("system_message", "")
+            self.first_chat = state.get("first_chat", True)
+            self.uploaded_files = state.get("uploaded_files", [])
+            self._saved = True
+
+            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            return True
+        except FileNotFoundError:
+            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            return False
+        except Exception as e:
+            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
             return False
 
     def name(self) -> str:
