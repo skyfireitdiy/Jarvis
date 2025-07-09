@@ -104,9 +104,7 @@ class YuanbaoPlatform(BasePlatform):
                 self.conversation_id = response_json["id"]
                 return True
             else:
-                PrettyOutput.print(
-                    f"错误：创建会话失败，响应: {response_json}", OutputType.ERROR
-                )
+                PrettyOutput.print(f"错误：创建会话失败，响应: {response_json}", OutputType.ERROR)
                 return False
         except Exception as e:
             PrettyOutput.print(f"错误：创建会话失败：{e}", OutputType.ERROR)
@@ -135,7 +133,6 @@ class YuanbaoPlatform(BasePlatform):
             file_name = os.path.basename(file_path)
             print(f"🔍 上传文件 {file_name}")
             try:
-
                 # 1. Prepare the file information
                 print(f"🔍 准备文件信息: {file_name}")
                 file_size = os.path.getsize(file_path)
@@ -570,6 +567,52 @@ class YuanbaoPlatform(BasePlatform):
                 return False
         except Exception as e:
             PrettyOutput.print(f"删除会话时发生错误: {str(e)}", OutputType.ERROR)
+            return False
+
+    def save(self, file_path: str) -> bool:
+        """Save chat session to a file."""
+        if not self.conversation_id:
+            PrettyOutput.print("没有活动的会话可供保存", OutputType.WARNING)
+            return False
+
+        state = {
+            "conversation_id": self.conversation_id,
+            "system_message": self.system_message,
+            "first_chat": self.first_chat,
+            "model_name": self.model_name,
+            "multimedia": self.multimedia,
+        }
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=4)
+            self._saved = True
+            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            return True
+        except Exception as e:
+            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            return False
+
+    def restore(self, file_path: str) -> bool:
+        """Restore chat session from a file."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            self.conversation_id = state.get("conversation_id", "")
+            self.system_message = state.get("system_message", "")
+            self.first_chat = state.get("first_chat", True)
+            self.model_name = state.get("model_name", "deep_seek_v3")
+            self.multimedia = state.get("multimedia", [])
+            self._saved = True
+
+            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            return True
+        except FileNotFoundError:
+            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            return False
+        except Exception as e:
+            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
             return False
 
     def name(self) -> str:

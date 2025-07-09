@@ -264,7 +264,7 @@ class TongyiPlatform(BasePlatform):
         """
         url = "https://api.tongyi.com/dialog/uploadToken"
         headers = self._get_base_headers()
-        payload = {}
+        payload: Dict[str, Any] = {}
 
         try:
             response = while_success(
@@ -395,16 +395,12 @@ class TongyiPlatform(BasePlatform):
                             add_url, headers=headers, json=add_payload
                         )
                         if add_response.status_code != 200:
-                            print(
-                                f"❌ 添加文件到对话失败: HTTP {add_response.status_code}"
-                            )
+                            print(f"❌ 添加文件到对话失败: HTTP {add_response.status_code}")
                             continue
 
                         add_result = add_response.json()
                         if not add_result.get("success"):
-                            print(
-                                f"❌ 添加文件到对话失败: {add_result.get('errorMsg')}"
-                            )
+                            print(f"❌ 添加文件到对话失败: {add_result.get('errorMsg')}")
                             continue
 
                         file_info.update(add_result.get("data", {}))
@@ -489,6 +485,56 @@ class TongyiPlatform(BasePlatform):
             return True
         except Exception as e:
             PrettyOutput.print(f"Error deleting chat: {str(e)}", OutputType.ERROR)
+            return False
+
+    def save(self, file_path: str) -> bool:
+        """Save chat session to a file."""
+        if not self.session_id:
+            PrettyOutput.print("没有活动的会话可供保存", OutputType.WARNING)
+            return False
+
+        state = {
+            "session_id": self.session_id,
+            "request_id": self.request_id,
+            "msg_id": self.msg_id,
+            "model_name": self.model_name,
+            "uploaded_file_info": self.uploaded_file_info,
+            "system_message": self.system_message,
+            "first_chat": self.first_chat,
+        }
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=4)
+            self._saved = True
+            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            return True
+        except Exception as e:
+            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            return False
+
+    def restore(self, file_path: str) -> bool:
+        """Restore chat session from a file."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            self.session_id = state.get("session_id", "")
+            self.request_id = state.get("request_id", "")
+            self.msg_id = state.get("msg_id", "")
+            self.model_name = state.get("model_name", "")
+            self.uploaded_file_info = state.get("uploaded_file_info", [])
+            self.system_message = state.get("system_message", "")
+            self.first_chat = state.get("first_chat", True)
+            self._saved = True
+
+            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            return True
+        except FileNotFoundError:
+            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            return False
+        except Exception as e:
+            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
             return False
 
     def set_system_prompt(self, message: str):

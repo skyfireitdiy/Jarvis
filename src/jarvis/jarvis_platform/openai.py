@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 import os
 from typing import Dict, Generator, List, Tuple
 
@@ -97,7 +98,6 @@ class OpenAIModel(BasePlatform):
             当API调用失败时会抛出异常并打印错误信息
         """
         try:
-
             # Add user message to history
             self.messages.append({"role": "user", "content": message})
 
@@ -147,6 +147,43 @@ class OpenAIModel(BasePlatform):
         else:
             self.messages = []
         return True
+
+    def save(self, file_path: str) -> bool:
+        """Save chat session to a file."""
+        state = {
+            "messages": self.messages,
+            "model_name": self.model_name,
+        }
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=4)
+            self._saved = True
+            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            return True
+        except Exception as e:
+            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            return False
+
+    def restore(self, file_path: str) -> bool:
+        """Restore chat session from a file."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            self.messages = state.get("messages", [])
+            self.model_name = state.get("model_name", "gpt-4o")
+            # atexit.register(self.delete_chat)
+            self._saved = True
+
+            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            return True
+        except FileNotFoundError:
+            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            return False
+        except Exception as e:
+            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
+            return False
 
     def support_web(self) -> bool:
         """
