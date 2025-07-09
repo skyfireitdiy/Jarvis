@@ -97,16 +97,7 @@ def main():
         # 删除所有的 __pycache__ 目录
         print("Removing __pycache__ directories...")
         remove_pycache_directories()
-        # 清理旧的构建文件
-        print("Cleaning old build files...")
-        for path in ["build", "dist", "*.egg-info"]:
-            os.system(f"rm -rf {path}")
-        # 构建包
-        print("Building package...")
-        run_command(["python", "-m", "build"], "Failed to build package")
-        # 检查构建的包
-        print("Checking package...")
-        run_command(["twine", "check", "dist/*"], "Package check failed")
+
         # 提交版本更新
         print("Committing version update...")
         run_command(["git", "add", "."], "Failed to stage files")
