@@ -226,6 +226,7 @@ def get_multiline_input(tip: str) -> str:
                 subprocess.run(
                     ["xsel", "-b", "-i"], input=last_msg.encode("utf-8"), check=True
                 )
+                print(last_msg)
                 PrettyOutput.print("已将最后一条消息复制到剪贴板", OutputType.INFO)
             except subprocess.CalledProcessError as e:
                 PrettyOutput.print(f"复制到剪贴板失败: {e}", OutputType.ERROR)
