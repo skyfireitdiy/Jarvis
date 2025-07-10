@@ -32,8 +32,8 @@ class FileSearchReplaceTool:
 1. 指定需要修改的文件路径（单个或多个）
 2. 提供一组或多组修改，每个修改包含:
    - reason: 修改原因描述
-   - search: 需要查找的原始代码(必须包含足够上下文)
-   - replace: 替换后的新代码
+   - SEARCH: 需要查找的原始代码(必须包含足够上下文)
+   - REPLACE: 替换后的新代码
 3. 工具会自动选择最适合的编辑模式
 
 ## 核心原则
@@ -64,11 +64,11 @@ class FileSearchReplaceTool:
                                         "type": "string",
                                         "description": "修改的原因",
                                     },
-                                    "search": {
+                                    "SEARCH": {
                                         "type": "string",
                                         "description": "需要查找的原始代码",
                                     },
-                                    "replace": {
+                                    "REPLACE": {
                                         "type": "string",
                                         "description": "替换后的新代码",
                                     },
@@ -99,8 +99,8 @@ class FileSearchReplaceTool:
                     - path: 要修改的文件路径
                     - changes: 修改列表，每个修改包含:
                         - reason: 修改原因描述
-                        - search: 需要查找的原始代码(必须包含足够上下文)
-                        - replace: 替换后的新代码
+                        - SEARCH: 需要查找的原始代码(必须包含足够上下文)
+                        - REPLACE: 替换后的新代码
 
         返回:
             Dict[str, Any] 包含:
