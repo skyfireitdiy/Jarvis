@@ -102,7 +102,14 @@ def main():
         print("Committing version update...")
         run_command(["git", "add", "."], "Failed to stage files")
         run_command(
-            ["git", "commit", "-m", f"Bump version to {new_version}"],
+            [
+                "git",
+                "commit",
+                "--author",
+                "skyfire <skyfireitdiy@hotmail.com>",
+                "-m",
+                f"Bump version to {new_version}",
+            ],
             "Failed to commit version update",
         )
         # 创建标签
