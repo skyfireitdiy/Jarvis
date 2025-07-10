@@ -232,6 +232,8 @@ def get_multiline_input(tip: str) -> str:
         else:
             PrettyOutput.print("没有可复制的消息", OutputType.INFO)
 
+        event.app.invalidate()
+
     # 配置提示会话
     style = PromptStyle.from_dict(
         {
