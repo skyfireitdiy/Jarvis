@@ -378,7 +378,7 @@ class CodeAgent:
 {file_list}
 {tool_info}
 如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
-注意：如果要进行静态检查，需要在所有的修改都完成之后进行集中检查
+注意：如果要进行静态检查，需要在所有的修改都完成之后进行集中检查，如果文件有多个检查工具，尽量一次全部调用，不要分多次调用
                     """
                         agent.set_addon_prompt(addon_prompt)
                 else:
@@ -420,7 +420,10 @@ def main() -> None:
         "-r", "--requirement", type=str, help="Requirement to process", default=None
     )
     parser.add_argument(
-        "--restore-session", action="store_true", help="Restore session from .jarvis/saved_session.json", default=False
+        "--restore-session",
+        action="store_true",
+        help="Restore session from .jarvis/saved_session.json",
+        default=False,
     )
     args = parser.parse_args()
 
