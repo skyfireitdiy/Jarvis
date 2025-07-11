@@ -16,3 +16,4 @@ patches*
 .venv
 build
 uv.lock
+*.pdf
