@@ -434,44 +434,43 @@ def get_loc_stats() -> str:
 
 
 def copy_to_clipboard(text: str) -> None:
-    """将文本复制到剪贴板，依次尝试xsel和xclip
+    """将文本复制到剪贴板，依次尝试xsel和xclip (非阻塞)
 
     参数:
         text: 要复制的文本
     """
     # 尝试使用 xsel
     try:
-        subprocess.run(
+        process = subprocess.Popen(
             ["xsel", "-b", "-i"],
-            input=text.encode("utf-8"),
-            check=True,
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
+        if process.stdin:
+            process.stdin.write(text.encode("utf-8"))
+            process.stdin.close()
         return
     except FileNotFoundError:
         pass  # xsel 未安装，继续尝试下一个
-    except subprocess.CalledProcessError as e:
-        error_message = e.stderr.decode("utf-8").strip()
-        PrettyOutput.print(
-            f"使用xsel复制到剪贴板失败: {error_message}", OutputType.ERROR
-        )
-        return
+    except Exception as e:
+        PrettyOutput.print(f"使用xsel时出错: {e}", OutputType.WARNING)
 
     # 尝试使用 xclip
     try:
-        subprocess.run(
+        process = subprocess.Popen(
             ["xclip", "-selection", "clipboard"],
-            input=text.encode("utf-8"),
-            check=True,
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
+        if process.stdin:
+            process.stdin.write(text.encode("utf-8"))
+            process.stdin.close()
         return
     except FileNotFoundError:
         PrettyOutput.print(
             "xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING
         )
-    except subprocess.CalledProcessError as e:
-        error_message = e.stderr.decode("utf-8").strip()
-        PrettyOutput.print(
-            f"使用xclip复制到剪贴板失败: {error_message}", OutputType.ERROR
-        )
+    except Exception as e:
+        PrettyOutput.print(f"使用xclip时出错: {e}", OutputType.WARNING)
