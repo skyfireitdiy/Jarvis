@@ -2,7 +2,6 @@
 # 标准库导入
 import datetime
 import os
-from pathlib import Path
 import platform
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
@@ -29,11 +28,10 @@ from jarvis.jarvis_utils.globals import (
     set_agent,
     set_interrupt,
 )
-from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import user_confirm
 
 origin_agent_system_prompt = f"""
 <role>

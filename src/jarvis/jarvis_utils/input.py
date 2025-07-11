@@ -180,6 +180,24 @@ class FileCompleter(Completer):
         return tag
 
 
+def user_confirm(tip: str, default: bool = True) -> bool:
+    """提示用户确认是/否问题
+
+    参数:
+        tip: 显示给用户的消息
+        default: 用户直接回车时的默认响应
+
+    返回:
+        bool: 用户确认返回True，否则返回False
+    """
+    try:
+        suffix = "[Y/n]" if default else "[y/N]"
+        ret = get_single_line_input(f"{tip} {suffix}: ")
+        return default if ret == "" else ret.lower() == "y"
+    except KeyboardInterrupt:
+        return False
+
+
 def get_multiline_input(tip: str) -> str:
     """
     获取带有增强补全和确认功能的多行输入。
