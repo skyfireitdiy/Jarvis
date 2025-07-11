@@ -30,9 +30,9 @@ from jarvis.jarvis_utils.git_utils import (
     handle_commit_workflow,
     has_uncommitted_changes,
 )
-from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import get_loc_stats, init_env, user_confirm
+from jarvis.jarvis_utils.utils import get_loc_stats, init_env
 
 
 class CodeAgent:
@@ -359,7 +359,9 @@ class CodeAgent:
 
                 # 添加提交信息到final_ret
                 if commits:
-                    final_ret += f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
+                    final_ret += (
+                        f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
+                    )
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
                         f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"

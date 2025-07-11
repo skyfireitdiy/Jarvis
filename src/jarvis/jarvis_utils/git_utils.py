@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Set, Tuple
 
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import user_confirm
+from jarvis.jarvis_utils.input import user_confirm
 
 
 def find_git_root_and_cd(start_dir: str = ".") -> str:
@@ -408,48 +408,51 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                 f"Jarvis已更新到tag {remote_tag_result.stdout.strip()}",
                 OutputType.SUCCESS,
             )
-            
+
             # 执行pip安装更新代码
             try:
                 PrettyOutput.print("正在安装更新后的代码...", OutputType.INFO)
-                
+
                 # 检查是否在虚拟环境中
-                in_venv = hasattr(sys, 'real_prefix') or (
-                    hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix
+                in_venv = hasattr(sys, "real_prefix") or (
+                    hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
                 )
-                
+
                 # 尝试普通安装
                 install_cmd = [sys.executable, "-m", "pip", "install", "-e", "."]
                 result = subprocess.run(
-                    install_cmd,
-                    cwd=git_root,
-                    capture_output=True,
-                    text=True
+                    install_cmd, cwd=git_root, capture_output=True, text=True
                 )
-                
+
                 if result.returncode == 0:
                     PrettyOutput.print("代码更新安装成功", OutputType.SUCCESS)
                     return True
-                
+
                 # 处理权限错误
                 error_msg = result.stderr.strip()
-                if not in_venv and ("Permission denied" in error_msg or "not writeable" in error_msg):
-                    if user_confirm("检测到权限问题，是否尝试用户级安装(--user)？", True):
+                if not in_venv and (
+                    "Permission denied" in error_msg or "not writeable" in error_msg
+                ):
+                    if user_confirm(
+                        "检测到权限问题，是否尝试用户级安装(--user)？", True
+                    ):
                         user_result = subprocess.run(
                             install_cmd + ["--user"],
                             cwd=git_root,
                             capture_output=True,
-                            text=True
+                            text=True,
                         )
                         if user_result.returncode == 0:
                             PrettyOutput.print("用户级代码安装成功", OutputType.SUCCESS)
                             return True
                         error_msg = user_result.stderr.strip()
-                
+
                 PrettyOutput.print(f"代码安装失败: {error_msg}", OutputType.ERROR)
                 return False
             except Exception as e:
-                PrettyOutput.print(f"安装过程中发生意外错误: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(
+                    f"安装过程中发生意外错误: {str(e)}", OutputType.ERROR
+                )
                 return False
         return False
     except Exception as e:
@@ -522,7 +525,13 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
 
         # 获取当前用户最近5次提交的基本信息
         result = subprocess.run(
-            ["git", "log", "-5", "--author=" + current_author, "--pretty=format:%H%n%s%n%an%n%ad"],
+            [
+                "git",
+                "log",
+                "-5",
+                "--author=" + current_author,
+                "--pretty=format:%H%n%s%n%an%n%ad",
+            ],
             capture_output=True,
             text=True,
         )

@@ -5,7 +5,6 @@ import os
 import signal
 import subprocess
 import sys
-import tarfile
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -20,7 +19,6 @@ from jarvis.jarvis_utils.config import (
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrupt
-from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 g_config_file = None
@@ -371,24 +369,6 @@ def get_file_md5(filepath: str) -> str:
     return hashlib.md5(open(filepath, "rb").read(100 * 1024 * 1024)).hexdigest()
 
 
-def user_confirm(tip: str, default: bool = True) -> bool:
-    """提示用户确认是/否问题
-
-    参数:
-        tip: 显示给用户的消息
-        default: 用户直接回车时的默认响应
-
-    返回:
-        bool: 用户确认返回True，否则返回False
-    """
-    try:
-        suffix = "[Y/n]" if default else "[y/N]"
-        ret = get_single_line_input(f"{tip} {suffix}: ")
-        return default if ret == "" else ret.lower() == "y"
-    except KeyboardInterrupt:
-        return False
-
-
 def get_file_line_count(filename: str) -> int:
     """计算文件中的行数
 
@@ -472,7 +452,9 @@ def copy_to_clipboard(text: str) -> None:
         pass  # xsel 未安装，继续尝试下一个
     except subprocess.CalledProcessError as e:
         error_message = e.stderr.decode("utf-8").strip()
-        PrettyOutput.print(f"使用xsel复制到剪贴板失败: {error_message}", OutputType.ERROR)
+        PrettyOutput.print(
+            f"使用xsel复制到剪贴板失败: {error_message}", OutputType.ERROR
+        )
         return
 
     # 尝试使用 xclip
@@ -485,7 +467,11 @@ def copy_to_clipboard(text: str) -> None:
         )
         return
     except FileNotFoundError:
-        PrettyOutput.print("xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING)
+        PrettyOutput.print(
+            "xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING
+        )
     except subprocess.CalledProcessError as e:
         error_message = e.stderr.decode("utf-8").strip()
-        PrettyOutput.print(f"使用xclip复制到剪贴板失败: {error_message}", OutputType.ERROR)
+        PrettyOutput.print(
+            f"使用xclip复制到剪贴板失败: {error_message}", OutputType.ERROR
+        )

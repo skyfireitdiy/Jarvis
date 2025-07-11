@@ -6,7 +6,8 @@ from typing import Dict
 
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import init_env, user_confirm
+from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.input import user_confirm
 
 
 class GitSquashTool:

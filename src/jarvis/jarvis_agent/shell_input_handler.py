@@ -2,7 +2,7 @@
 from typing import Any, Tuple
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import user_confirm
+from jarvis.jarvis_utils.input import user_confirm
 
 
 def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
