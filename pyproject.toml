@@ -38,7 +38,7 @@ dependencies = [
     "pyte==0.8.2",
     "httpx>=0.28.1",
     "pyyaml>=5.3.1",
-    "playwright==1.45.1",
+    "ddgs==6.1.8",
     "beautifulsoup4==4.12.3",
     "lxml==5.2.2",
 ]
