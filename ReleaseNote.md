@@ -1,3 +1,24 @@
+### Release Note - v0.1.219 2025-07-11
+
+#### **新功能 (Features)**
+- **增强网页搜索能力**: `search_web` 工具现已集成 DuckDuckGo 搜索引擎。当底层大模型不支持网页搜索时，本工具可独立执行搜索、抓取网页内容并进行总结，极大地扩展了信息获取能力。
+
+#### **修复 (Fixes)**
+- (本次更新无修复内容)
+ 
+#### **优化与重构 (Refactors & Improvements)**
+- **代码结构优化**: 将用户确认函数 `user_confirm` 统一移动至 `jarvis_utils.input` 模块，提升了代码的组织性和可维护性。
+- **剪贴板功能增强**: 新增 `copy_to_clipboard` 工具函数，该函数能智能检测并依次尝试使用 `xsel` 和 `xclip` 命令，增强了在不同 Linux 环境下的剪贴板兼容性。
+- **依赖项更新**: 在 `pyproject.toml` 和 `setup.py` 中添加了 `ddgs`, `beautifulsoup4`, `lxml` 等依赖，以支持新的网页搜索功能。
+
+#### **文档更新 (Documentation)**
+- **新增技术文档**: 添加了完整的技术文档 `docs/technical_documentation.md`，详细介绍了 Jarvis 的设计哲学、核心架构、组件交互、配置方法以及开发者指南。
+
+#### **其他 (Miscellaneous)**
+- **更新 .gitignore**: 将 `*.pdf` 文件类型添加到忽略列表，避免将 PDF 文件意外提交到版本库。
+
+本次更新主要聚焦于增强系统的核心功能和提升开发者体验。通过引入独立的网页搜索能力，Jarvis 现在能够更自主地获取外部信息。同时，全面的技术文档和代码结构优化为未来的社区贡献和二次开发奠定了坚实的基础。
+
 ### Release Note - v0.1.214 2025-07-08
 
 #### **新功能 (Features)**
