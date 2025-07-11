@@ -12,6 +12,7 @@ from typing import Generator, List, Tuple
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.utils import copy_to_clipboard
 
 
 class HumanPlatform(BasePlatform):
@@ -57,13 +58,7 @@ class HumanPlatform(BasePlatform):
             prompt = f"{message} {session_info}"
 
         # 将prompt复制到剪贴板
-        import subprocess
-
-        try:
-            subprocess.run(["xsel", "-ib"], input=prompt.encode("utf-8"), check=True)
-            PrettyOutput.print("提示已复制到剪贴板", OutputType.INFO)
-        except subprocess.CalledProcessError as e:
-            PrettyOutput.print(f"无法复制到剪贴板: {e}", OutputType.WARNING)
+        copy_to_clipboard(prompt)
 
         response = get_multiline_input(prompt + "\n\n请回复:")
         yield response

@@ -451,3 +451,41 @@ def get_loc_stats() -> str:
         return result.stdout if result.returncode == 0 else ""
     except FileNotFoundError:
         return ""
+
+
+def copy_to_clipboard(text: str) -> None:
+    """将文本复制到剪贴板，依次尝试xsel和xclip
+
+    参数:
+        text: 要复制的文本
+    """
+    # 尝试使用 xsel
+    try:
+        subprocess.run(
+            ["xsel", "-b", "-i"],
+            input=text.encode("utf-8"),
+            check=True,
+            capture_output=True,
+        )
+        return
+    except FileNotFoundError:
+        pass  # xsel 未安装，继续尝试下一个
+    except subprocess.CalledProcessError as e:
+        error_message = e.stderr.decode("utf-8").strip()
+        PrettyOutput.print(f"使用xsel复制到剪贴板失败: {error_message}", OutputType.ERROR)
+        return
+
+    # 尝试使用 xclip
+    try:
+        subprocess.run(
+            ["xclip", "-selection", "clipboard"],
+            input=text.encode("utf-8"),
+            check=True,
+            capture_output=True,
+        )
+        return
+    except FileNotFoundError:
+        PrettyOutput.print("xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING)
+    except subprocess.CalledProcessError as e:
+        error_message = e.stderr.decode("utf-8").strip()
+        PrettyOutput.print(f"使用xclip复制到剪贴板失败: {error_message}", OutputType.ERROR)
