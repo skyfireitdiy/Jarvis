@@ -26,6 +26,7 @@ from prompt_toolkit.styles import Style as PromptStyle  # type: ignore
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.utils import copy_to_clipboard
 
 
 def get_single_line_input(tip: str) -> str:
@@ -217,19 +218,11 @@ def get_multiline_input(tip: str) -> str:
     def _(event):
         """处理Ctrl+O以复制最后一条消息到剪贴板。"""
         from jarvis.jarvis_utils.globals import get_last_message
-        import subprocess
 
         last_msg = get_last_message()
         if last_msg:
-            try:
-                # 使用xsel将内容复制到剪贴板
-                subprocess.run(
-                    ["xsel", "-b", "-i"], input=last_msg.encode("utf-8"), check=True
-                )
-                print(last_msg)
-                PrettyOutput.print("已将最后一条消息复制到剪贴板", OutputType.INFO)
-            except subprocess.CalledProcessError as e:
-                PrettyOutput.print(f"复制到剪贴板失败: {e}", OutputType.ERROR)
+            print(last_msg)
+            copy_to_clipboard(last_msg)
         else:
             PrettyOutput.print("没有可复制的消息", OutputType.INFO)
 
