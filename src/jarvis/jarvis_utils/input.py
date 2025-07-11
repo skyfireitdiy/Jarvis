@@ -239,7 +239,7 @@ def get_multiline_input(tip: str) -> str:
 
         last_msg = get_last_message()
         if last_msg:
-            event.app.print_text(f"\n{last_msg}")
+            print(f"{last_msg}")
             copy_to_clipboard(last_msg)
         else:
             PrettyOutput.print("没有可复制的消息", OutputType.INFO)
