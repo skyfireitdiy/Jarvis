@@ -40,9 +40,7 @@ class EmbeddingManager:
         self.model_config = self.embedding_models[self.mode]
         self.model_name = self.model_config["model_name"]
 
-        print(
-            f"Initializing EmbeddingManager in '{self.mode}' mode with model '{self.model_name}'..."
-        )
+        print(f"🚀 初始化嵌入管理器，模式: '{self.mode}', 模型: '{self.model_name}'...")
 
         # The salt for the cache is the model name to prevent collisions
         self.cache = EmbeddingCache(cache_dir=cache_dir, salt=str(self.model_name))
@@ -58,10 +56,8 @@ class EmbeddingManager:
                 show_progress=self.model_config.get("show_progress", False),
             )
         except Exception as e:
-            print(f"Error loading embedding model '{self.model_name}': {e}")
-            print(
-                "Please ensure you have 'sentence_transformers' and 'torch' installed."
-            )
+            print(f"❌ 加载嵌入模型 '{self.model_name}' 时出错: {e}")
+            print("请确保您已安装 'sentence_transformers' 和 'torch'。")
             raise
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
@@ -90,7 +86,7 @@ class EmbeddingManager:
         # Compute embeddings for texts that were not in the cache
         if texts_to_embed:
             print(
-                f"Cache miss. Computing embeddings for {len(texts_to_embed)} out of {len(texts)} documents."
+                f"🔎 缓存未命中。正在为 {len(texts_to_embed)}/{len(texts)} 个文档计算嵌入。"
             )
             new_embeddings = self.model.embed_documents(texts_to_embed)
 
@@ -101,9 +97,7 @@ class EmbeddingManager:
             for i, embedding in zip(indices_to_embed, new_embeddings):
                 cached_embeddings[i] = embedding
         else:
-            print(
-                f"Cache hit. All {len(texts)} document embeddings retrieved from cache."
-            )
+            print(f"✅ 缓存命中。所有 {len(texts)} 个文档的嵌入均从缓存中检索。")
 
         return cast(List[List[float]], cached_embeddings)
 

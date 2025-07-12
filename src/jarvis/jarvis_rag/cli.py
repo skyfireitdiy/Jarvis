@@ -10,10 +10,10 @@ from langchain_community.document_loaders import (
     TextLoader,
     UnstructuredMarkdownLoader,
 )
+from langchain_core.document_loaders.base import BaseLoader
 from rich.markdown import Markdown
 
 from jarvis.jarvis_utils.utils import init_env
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 
 
 def is_likely_text_file(file_path: Path) -> bool:
@@ -64,9 +64,8 @@ class _CustomPlatformLLM(LLMInterface):
 
     def __init__(self, platform: BasePlatform):
         self.platform = platform
-        PrettyOutput.print(
-            f"Using custom LLM: Platform='{platform.platform_name()}', Model='{platform.name()}'",
-            OutputType.SUCCESS,
+        print(
+            f"✅ 使用自定义LLM: 平台='{platform.platform_name()}', 模型='{platform.name()}'"
         )
 
     def generate(self, prompt: str, **kwargs) -> str:
@@ -81,15 +80,13 @@ def _create_custom_llm(platform_name: str, model_name: str) -> Optional[LLMInter
         registry = PlatformRegistry.get_global_platform_registry()
         platform_instance = registry.create_platform(platform_name)
         if not platform_instance:
-            PrettyOutput.print(
-                f"Error: Platform '{platform_name}' not found.", OutputType.ERROR
-            )
+            print(f"❌ 错误: 平台 '{platform_name}' 未找到。")
             return None
         platform_instance.set_model_name(model_name)
         platform_instance.set_suppress_output(True)
         return _CustomPlatformLLM(platform_instance)
     except Exception as e:
-        PrettyOutput.print(f"Error creating custom LLM: {e}", OutputType.ERROR)
+        print(f"❌ 创建自定义LLM时出错: {e}")
         return None
 
 
@@ -133,7 +130,7 @@ def add_documents(
                 continue
 
             if path.is_dir():
-                PrettyOutput.print(f"Scanning directory: {path}", OutputType.INFO)
+                print(f"🔍 正在扫描目录: {path}")
                 for item in path.rglob("*"):
                     if item.is_file() and is_likely_text_file(item):
                         files_to_process.add(item)
@@ -141,20 +138,13 @@ def add_documents(
                 if is_likely_text_file(path):
                     files_to_process.add(path)
                 else:
-                    PrettyOutput.print(
-                        f"Skipping likely binary file: {path}", OutputType.WARNING
-                    )
+                    print(f"⚠️ 跳过可能的二进制文件: {path}")
 
     if not files_to_process:
-        PrettyOutput.print(
-            f"No text files found in the specified paths.", OutputType.WARNING
-        )
+        print(f"⚠️ 在指定路径中未找到任何文本文件。")
         return
 
-    PrettyOutput.print(
-        f"Found {len(files_to_process)} unique file(s) to process.",
-        OutputType.SUCCESS,
-    )
+    print(f"✅ 发现 {len(files_to_process)} 个独立文件待处理。")
 
     try:
         pipeline = JarvisRAGPipeline(
@@ -166,6 +156,7 @@ def add_documents(
         )
 
         docs: List[Document] = []
+        loader: BaseLoader
         for file_path in sorted(list(files_to_process)):
             try:
                 if file_path.suffix.lower() == ".md":
@@ -174,28 +165,19 @@ def add_documents(
                     loader = TextLoader(str(file_path), encoding="utf-8")
 
                 docs.extend(loader.load())
-                PrettyOutput.print(f"Loaded: {file_path}", OutputType.INFO)
+                print(f"✅ 已加载: {file_path}")
             except Exception as e:
-                PrettyOutput.print(
-                    f"Failed to load {file_path}: {e}", OutputType.WARNING
-                )
+                print(f"⚠️ 加载失败 {file_path}: {e}")
 
         if not docs:
-            PrettyOutput.print(
-                "No documents were successfully loaded.", OutputType.ERROR
-            )
+            print("❌ 未能成功加载任何文档。")
             raise typer.Exit(code=1)
 
         pipeline.add_documents(docs)
-        PrettyOutput.print(
-            f"Successfully added content from {len(docs)} document(s) to the collection '{collection_name}'.",
-            OutputType.SUCCESS,
-        )
+        print(f"✅ 成功将 {len(docs)} 个文档的内容添加至集合 '{collection_name}'。")
 
     except Exception as e:
-        PrettyOutput.print(
-            f"A critical error occurred: {e}", OutputType.ERROR, traceback=True
-        )
+        print(f"❌ 发生严重错误: {e}")
         raise typer.Exit(code=1)
 
 
@@ -232,9 +214,7 @@ def query(
 ):
     """Queries the RAG knowledge base and prints the answer."""
     if model and not platform:
-        PrettyOutput.print(
-            "Error: --model requires --platform to be specified.", OutputType.ERROR
-        )
+        print("❌ 错误: --model 需要指定 --platform。")
         raise typer.Exit(code=1)
 
     try:
@@ -251,17 +231,17 @@ def query(
             collection_name=collection_name,
         )
 
-        PrettyOutput.print(f"Querying with: '{question}'", OutputType.INFO)
+        print(f"🤔 正在查询: '{question}'")
         answer = pipeline.query(question)
 
-        PrettyOutput.print("Answer:", OutputType.RESULT)
+        print("💬 答案:")
         # We can still use rich.markdown.Markdown as PrettyOutput uses rich underneath
         from jarvis.jarvis_utils.globals import console
 
         console.print(Markdown(answer))
 
     except Exception as e:
-        PrettyOutput.print(f"An error occurred: {e}", OutputType.ERROR, traceback=True)
+        print(f"❌ 发生错误: {e}")
         raise typer.Exit(code=1)
 
 

@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, List, cast
 
 import chromadb
 from langchain.docstore.document import Document
@@ -39,7 +39,7 @@ class ChromaRetriever:
             name=self.collection_name
         )
         print(
-            f"ChromaDB client initialized at '{db_path}' with collection '{collection_name}'."
+            f"✅ ChromaDB 客户端已在 '{db_path}' 初始化，集合为 '{collection_name}'。"
         )
 
     def add_documents(
@@ -58,7 +58,7 @@ class ChromaRetriever:
         )
         chunks = text_splitter.split_documents(documents)
 
-        print(f"Split {len(documents)} documents into {len(chunks)} chunks.")
+        print(f"📄 已将 {len(documents)} 个文档拆分为 {len(chunks)} 个块。")
 
         # Extract content and metadata
         chunk_texts = [chunk.page_content for chunk in chunks]
@@ -79,11 +79,11 @@ class ChromaRetriever:
         if chunk_texts:
             self.collection.add(
                 ids=ids,
-                embeddings=embeddings,
+                embeddings=cast(Any, embeddings),
                 documents=chunk_texts,
-                metadatas=metadatas,
+                metadatas=cast(Any, metadatas),
             )
-            print(f"Successfully added {len(chunks)} chunks to the collection.")
+            print(f"✅ 成功将 {len(chunks)} 个块添加到集合中。")
 
     def retrieve(self, query: str, n_results: int = 5) -> List[Document]:
         """
@@ -101,7 +101,7 @@ class ChromaRetriever:
 
         # Query the collection
         results = self.collection.query(
-            query_embeddings=[query_embedding],
+            query_embeddings=cast(Any, [query_embedding]),
             n_results=n_results,
         )
 

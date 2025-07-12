@@ -57,7 +57,7 @@ class OpenAI_LLM(LLMInterface):
 
         self.client = OpenAI(api_key=self.api_key)
         self.model_name = model_name
-        print(f"Initialized OpenAI LLM with model: {self.model_name}")
+        print(f"🚀 已初始化 OpenAI LLM，模型: {self.model_name}")
 
     def generate(self, prompt: str, **kwargs) -> str:
         """
@@ -89,8 +89,8 @@ class OpenAI_LLM(LLMInterface):
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"An error occurred while calling the OpenAI API: {e}")
-            return "Error: Could not get a response from the LLM."
+            print(f"❌ 调用 OpenAI API 时发生错误: {e}")
+            return "错误: 无法从LLM获取响应。"
 
 
 class JarvisPlatform_LLM(LLMInterface):
@@ -110,9 +110,9 @@ class JarvisPlatform_LLM(LLMInterface):
             self.platform.set_suppress_output(
                 False
             )  # Ensure no console output from the model
-            print(f"Initialized Jarvis Platform LLM with model: {self.platform.name()}")
+            print(f"🚀 已初始化 Jarvis 平台 LLM，模型: {self.platform.name()}")
         except Exception as e:
-            print(f"Failed to initialize Jarvis Platform LLM: {e}")
+            print(f"❌ 初始化 Jarvis 平台 LLM 失败: {e}")
             raise
 
     def generate(self, prompt: str, **kwargs) -> str:
@@ -130,5 +130,5 @@ class JarvisPlatform_LLM(LLMInterface):
             # Use the robust chat_until_success method
             return self.platform.chat_until_success(prompt)
         except Exception as e:
-            print(f"An error occurred while calling the Jarvis Platform model: {e}")
-            return "Error: Could not get a response from the local LLM."
+            print(f"❌ 调用 Jarvis 平台模型时发生错误: {e}")
+            return "错误: 无法从本地LLM获取响应。"
