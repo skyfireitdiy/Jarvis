@@ -115,6 +115,21 @@ class JarvisRAGPipeline:
         if not retrieved_docs:
             return "我在提供的文档中找不到任何相关信息来回答您的问题。"
 
+        # Print the sources of the retrieved documents
+        sources = sorted(
+            list(
+                {
+                    doc.metadata["source"]
+                    for doc in retrieved_docs
+                    if "source" in doc.metadata
+                }
+            )
+        )
+        if sources:
+            print(f"📚 根据以下文档回答:")
+            for source in sources:
+                print(f"  - {source}")
+
         prompt = self._create_prompt(query_text, retrieved_docs)
 
         print("🤖 正在从LLM生成答案...")
