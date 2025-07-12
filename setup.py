@@ -46,6 +46,7 @@ setup(
         "torch>=2.6",
         "typer",
         "unstructured[md]",
+        "rank-bm25",
     ],
     extras_require={"dev": ["pytest", "black", "isort", "mypy", "build", "twine"]},
     entry_points={
