@@ -36,94 +36,49 @@ from jarvis.jarvis_utils.tag import ct, ot
 origin_agent_system_prompt = f"""
 <role>
 # 🤖 角色
-你是一个专业的任务执行助手，擅长根据用户需求生成详细的任务执行计划并执行。
+你是一个专业的任务执行助手，根据用户需求制定并执行详细的计划。
 </role>
 
-<requirements>
-# 🔥 绝对行动要求
-1. 每个响应必须包含且仅包含一个工具调用
-2. 唯一例外：任务结束
-3. 空响应会触发致命错误
-</requirements>
-
-<violations>
-# 🚫 违规示例
-- 没有工具调用的分析 → 永久挂起
-- 未选择的多选项 → 永久挂起
-- 请求用户确认 → 永久挂起
-</violations>
-
-<workflow>
-# 🔄 问题解决流程
-1. 问题分析
-   - 重述问题以确认理解
-   - 分析根本原因（针对问题分析任务）
-   - 定义清晰、可实现的目标
-   → 必须调用分析工具
-
-2. 解决方案设计
-   - 生成多个可执行的解决方案
-   - 评估并选择最优方案
-   - 使用PlantUML创建详细行动计划
-   → 必须调用设计工具
-
-3. 执行
-   - 一次执行一个步骤
-   - 每个步骤只使用一个工具
-   - 等待工具结果后再继续
-   - 监控结果并根据需要调整
-   → 必须调用执行工具
-
-4. 任务完成
-   - 验证目标完成情况
-   - 如有价值则记录方法论
-</workflow>
-
-<principles>
-# ⚖️ 操作原则
-- 每个步骤一个操作
-- 下一步前必须等待结果
-- 除非任务完成否则必须生成可操作步骤
-- 根据反馈调整计划
-- 记录可复用的解决方案
-- 使用完成命令结束任务
-- 操作之间不能有中间思考状态
-- 所有决策必须表现为工具调用
-</principles>
-
 <rules>
-# ❗ 重要规则
-1. 每个步骤只能使用一个操作
-2. 必须等待操作执行结果
-3. 必须验证任务完成情况
-4. 必须生成可操作步骤
-5. 如果无需操作必须使用完成命令
-6. 永远不要使对话处于等待状态
-7. 始终使用用户语言交流
-8. 必须记录有价值的方法论
-9. 违反操作协议将导致系统崩溃
-10. 空响应会触发永久挂起
+# ❗ 核心规则
+1.  **单步操作**: 每个响应必须包含且仅包含一个工具调用。
+2.  **任务终结**: 当任务完成时，明确指出任务已完成。这是唯一可以不调用工具的例外。
+3.  **无响应错误**: 空响应或仅有分析无工具调用的响应是致命错误，会导致系统挂起。
+4.  **决策即工具**: 所有的决策和分析都必须通过工具调用来体现。
+5.  **等待结果**: 在继续下一步之前，必须等待当前工具的执行结果。
+6.  **持续推进**: 除非任务完成，否则必须生成可操作的下一步。
+7.  **记录沉淀**: 如果解决方案有普适价值，应记录为方法论。
+8.  **用户语言**: 始终使用用户的语言进行交流。
 </rules>
 
-<system_info>
-# 系统信息：
-{platform.platform()}
-{platform.version()}
+<workflow>
+# 🔄 工作流程
+1.  **分析**: 理解和分析问题，定义清晰的目标。
+2.  **设计**: 设计解决方案并制定详细的行动计划。
+3.  **执行**: 按照计划，一次一个步骤地执行。
+4.  **完成**: 验证任务是否达成目标，并进行总结。
+</workflow>
 
-# 当前时间
-{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+<system_info>
+# 系统信息
+- OS: {platform.platform()} {platform.version()}
+- Time: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 </system_info>
 """
 
 
 class OutputHandlerProtocol(Protocol):
-    def name(self) -> str: ...
+    def name(self) -> str:
+        ...
 
-    def can_handle(self, response: str) -> bool: ...
+    def can_handle(self, response: str) -> bool:
+        ...
 
-    def prompt(self) -> str: ...
+    def prompt(self) -> str:
+        ...
 
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
+        ...
 
 
 class Agent:
@@ -189,9 +144,7 @@ class Agent:
             if isinstance(platform, str):
                 self.model = PlatformRegistry().create_platform(platform)
                 if self.model is None:
-                    PrettyOutput.print(
-                        f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING
-                    )
+                    PrettyOutput.print(f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING)
                     self.model = PlatformRegistry().get_normal_platform()
             else:
                 self.model = platform
@@ -816,18 +769,14 @@ arguments:
 
                     if get_interrupt():
                         set_interrupt(False)
-                        user_input = self.multiline_inputer(
-                            f"模型交互期间被中断，请输入用户干预信息："
-                        )
+                        user_input = self.multiline_inputer(f"模型交互期间被中断，请输入用户干预信息：")
                         if user_input:
                             # 如果有工具调用且用户确认继续，则将干预信息和工具执行结果拼接为prompt
                             if any(
                                 handler.can_handle(current_response)
                                 for handler in self.output_handler
                             ):
-                                if user_confirm(
-                                    "检测到有工具调用，是否继续处理工具调用？", True
-                                ):
+                                if user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
                                     self.prompt = f"{user_input}\n\n{current_response}"
                                     continue
                             self.prompt += f"{user_input}"
@@ -873,9 +822,7 @@ arguments:
             if self.use_methodology:
                 if not upload_methodology(self.model, other_files=self.files):
                     if self.files:
-                        PrettyOutput.print(
-                            "文件上传失败，将忽略文件列表", OutputType.WARNING
-                        )
+                        PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
                         # 上传失败则回退到本地加载
                     msg = self.prompt
                     for handler in self.input_handler:
@@ -883,14 +830,14 @@ arguments:
                     self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
                 else:
                     if self.files:
-                        self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
+                        self.prompt = (
+                            f"{self.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
+                        )
                     else:
                         self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
             elif self.files:
                 if not self.model.upload_files(self.files):
-                    PrettyOutput.print(
-                        "文件上传失败，将忽略文件列表", OutputType.WARNING
-                    )
+                    PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
                 else:
                     self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
         else:
