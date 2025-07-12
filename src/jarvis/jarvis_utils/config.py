@@ -257,13 +257,13 @@ def get_mcp_config() -> List[Dict[str, Any]]:
 
 EMBEDDING_MODELS = {
     "performance": {
-        "model_name": "BAAI/bge-base-en-v1.5",
+        "model_name": "BAAI/bge-large-zh-v1.5",
         "model_kwargs": {"device": "cpu"},
         "encode_kwargs": {"normalize_embeddings": True},
         "show_progress": True,
     },
     "accuracy": {
-        "model_name": "BAAI/bge-large-en-v1.5",
+        "model_name": "BAAI/bge-large-zh-v1.5",
         "model_kwargs": {"device": "cuda" if torch.cuda.is_available() else "cpu"},
         "encode_kwargs": {"normalize_embeddings": True},
         "show_progress": True,
