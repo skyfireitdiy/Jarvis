@@ -36,7 +36,7 @@ class JarvisRAGPipeline:
 
         Args:
             llm: An instance of a class implementing LLMInterface.
-                 If None, defaults to OpenAI_LLM().
+                 If None, defaults to the ToolAgent_LLM.
             embedding_mode: The mode for the local embedding model. If None, uses config value.
             db_path: Path to the persistent vector database. If None, uses config value.
             collection_name: Name of the collection in the vector database.
