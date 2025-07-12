@@ -97,7 +97,7 @@ class JarvisPlatform_LLM(LLMInterface):
     """
     An implementation of the LLMInterface for the project's internal platform.
 
-    This class uses the PlatformRegistry to get the configured "thinking" model.
+    This class uses the PlatformRegistry to get the configured "normal" model.
     """
 
     def __init__(self):
@@ -106,7 +106,7 @@ class JarvisPlatform_LLM(LLMInterface):
         """
         try:
             self.registry = PlatformRegistry.get_global_platform_registry()
-            self.platform: BasePlatform = self.registry.get_thinking_platform()
+            self.platform: BasePlatform = self.registry.get_normal_platform()
             self.platform.set_suppress_output(
                 False
             )  # Ensure no console output from the model
