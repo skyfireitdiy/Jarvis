@@ -1,3 +1,28 @@
+### Release Note - v0.1.220 2025-07-13
+
+#### **新功能 (Features)**
+- **新增 RAG 框架 (`jarvis-rag`)**: 引入了一个全新的 `jarvis-rag` 命令行工具，用于构建、管理和查询本地化的RAG（检索增强生成）知识库。
+  - `jarvis-rag add`: 支持添加文件、目录或通配符模式的文档到知识库。
+  - `jarvis-rag query`: 支持向知识库提问，并可指定不同的大语言模型进行回答。
+- **支持 Python 3.12**: 项目现已正式支持 Python 3.12 版本。
+
+#### **修复 (Fixes)**
+- **元宝平台Cookie**: 修复了 `YUANBAO_COOKIES` 未设置时程序不抛出异常的问题，现在会明确提示用户进行设置。
+
+#### **优化与重构 (Refactors & Improvements)**
+- **Agent系统提示**: 重构并优化了核心Agent的系统提示（System Prompt），使其更清晰、更结构化，提升了与模型交互的稳定性。
+- **依赖库更新**: 升级了多个核心依赖库，如 `ddgs`, `beautifulsoup4`, `lxml` 等，以获取最新的功能和安全修复。
+- **提升Python版本要求**: 将项目的最低Python版本要求从 `3.8` 提升至 `3.9`。
+
+#### **文档更新 (Documentation)**
+- **README更新**: 详细更新了 `README.md` 文件，增加了 `jarvis-rag` 工具的完整使用说明和示例。
+
+#### **其他 (Miscellaneous)**
+- **项目配置**: 在 `pyproject.toml` 和 `setup.py` 中添加了 RAG 功能所需的新依赖项，并注册了新的 `jarvis-rag` 命令。
+- **配置结构**: 在 `config_schema.json` 中添加了 `JARVIS_RAG` 的相关配置项，用于RAG功能的详细设置。
+
+本次更新主要围绕 **本地化RAG知识库** 这一核心功能展开，极大地增强了Jarvis在特定领域知识问答和代码理解方面的能力。同时，通过对核心Agent的优化和依赖库的升级，提升了整体的稳定性和可维护性。
+
 ### Release Note - v0.1.219 2025-07-11
 
 #### **新功能 (Features)**
