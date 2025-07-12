@@ -181,6 +181,53 @@ def add_documents(
         raise typer.Exit(code=1)
 
 
+@app.command("list-docs", help="List all unique documents in the knowledge base.")
+def list_documents(
+    collection_name: str = typer.Option(
+        "jarvis_rag_collection",
+        "--collection",
+        "-c",
+        help="Name of the collection in the vector database.",
+    ),
+    db_path: Optional[Path] = typer.Option(
+        None, "--db-path", help="Path to the vector database. Overrides global config."
+    ),
+):
+    """Lists all unique documents in the specified collection."""
+    try:
+        pipeline = JarvisRAGPipeline(
+            db_path=str(db_path) if db_path else None,
+            collection_name=collection_name,
+        )
+
+        collection = pipeline.retriever.collection
+        results = collection.get()  # Get all items in the collection
+
+        if not results or not results["metadatas"]:
+            print("ℹ️ 知识库中没有找到任何文档。")
+            return
+
+        # Extract unique source file paths from metadata
+        sources = set()
+        for metadata in results["metadatas"]:
+            if metadata:
+                source = metadata.get("source")
+                if isinstance(source, str):
+                    sources.add(source)
+
+        if not sources:
+            print("ℹ️ 知识库中没有找到任何带有源信息的文档。")
+            return
+
+        print(f"📚 知识库 '{collection_name}' 中共有 {len(sources)} 个独立文档:")
+        for i, source in enumerate(sorted(list(sources)), 1):
+            print(f"  {i}. {source}")
+
+    except Exception as e:
+        print(f"❌ 发生错误: {e}")
+        raise typer.Exit(code=1)
+
+
 @app.command("query", help="Ask a question to the knowledge base.")
 def query(
     question: str = typer.Argument(..., help="The question to ask."),
