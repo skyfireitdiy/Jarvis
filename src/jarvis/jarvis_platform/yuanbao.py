@@ -38,7 +38,9 @@ class YuanbaoPlatform(BasePlatform):
         self.agent_id = "naQivTmsDa"
 
         if not self.cookies:
-            PrettyOutput.print("YUANBAO_COOKIES 未设置", OutputType.WARNING)
+            raise ValueError(
+                "YUANBAO_COOKIES environment variable not set. Please provide your cookies to use the Yuanbao platform."
+            )
 
         self.system_message = ""  # 系统消息，用于初始化对话
         self.first_chat = True  # 标识是否为第一次对话

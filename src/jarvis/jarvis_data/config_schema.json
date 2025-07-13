@@ -181,6 +181,36 @@
       "description": "是否打印提示",
       "default": false
     },
+    "JARVIS_RAG": {
+      "type": "object",
+      "description": "RAG框架的配置",
+      "properties": {
+        "embedding_mode": {
+          "type": "string",
+          "enum": [
+            "performance",
+            "accuracy"
+          ],
+          "default": "performance",
+          "description": "嵌入模型的模式, 'performance'表示性能优先, 'accuracy'表示准确度优先"
+        },
+        "embedding_cache_path": {
+          "type": "string",
+          "default": ".jarvis/rag/embeddings",
+          "description": "嵌入向量缓存的路径, 相对于当前工作目录"
+        },
+        "vector_db_path": {
+          "type": "string",
+          "default": ".jarvis/rag/vectordb",
+          "description": "向量数据库的持久化存储路径, 相对于当前工作目录"
+        }
+      },
+      "default": {
+        "embedding_mode": "performance",
+        "embedding_cache_path": ".jarvis/rag/embeddings",
+        "vector_db_path": ".jarvis/rag/vectordb"
+      }
+    },
     "JARVIS_REPLACE_MAP": {
       "type": "object",
       "description": "自定义替换映射表配置",

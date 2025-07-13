@@ -3,6 +3,7 @@ import os
 from functools import lru_cache
 from typing import Any, Dict, List
 
+import torch
 import yaml  # type: ignore
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
@@ -248,3 +249,73 @@ def get_mcp_config() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: MCP配置项列表，如果未配置则返回空列表
     """
     return GLOBAL_CONFIG_DATA.get("JARVIS_MCP", [])
+
+
+# ==============================================================================
+# RAG Framework Configuration
+# ==============================================================================
+
+EMBEDDING_MODELS = {
+    "performance": {
+        "model_name": "BAAI/bge-base-en-v1.5",
+        "model_kwargs": {"device": "cpu"},
+        "encode_kwargs": {"normalize_embeddings": True},
+        "show_progress": True,
+    },
+    "accuracy": {
+        "model_name": "BAAI/bge-large-en-v1.5",
+        "model_kwargs": {"device": "cuda" if torch.cuda.is_available() else "cpu"},
+        "encode_kwargs": {"normalize_embeddings": True},
+        "show_progress": True,
+    },
+}
+
+
+def get_rag_config() -> Dict[str, Any]:
+    """
+    获取RAG框架的配置。
+
+    返回:
+        Dict[str, Any]: RAG配置字典
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_RAG", {})
+
+
+def get_rag_embedding_models() -> Dict[str, Any]:
+    """
+    获取RAG嵌入模型的定义。
+
+    返回:
+        Dict[str, Any]: 嵌入模型配置字典
+    """
+    return EMBEDDING_MODELS
+
+
+def get_rag_embedding_mode() -> str:
+    """
+    获取RAG嵌入模型的模式。
+
+    返回:
+        str: 'performance' 或 'accuracy'
+    """
+    return get_rag_config().get("embedding_mode", "performance")
+
+
+def get_rag_embedding_cache_path() -> str:
+    """
+    获取RAG嵌入缓存的路径。
+
+    返回:
+        str: 缓存路径
+    """
+    return get_rag_config().get("embedding_cache_path", ".jarvis/rag/embeddings")
+
+
+def get_rag_vector_db_path() -> str:
+    """
+    获取RAG向量数据库的路径。
+
+    返回:
+        str: 数据库路径
+    """
+    return get_rag_config().get("vector_db_path", ".jarvis/rag/vectordb")
