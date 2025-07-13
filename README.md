@@ -480,7 +480,76 @@ OPENAI_API_BASE: https://api.openai.com/v1
 | search_web | 使用互联网搜索 |
 | virtual_tty | 控制虚拟终端执行操作 |
 
-### 2. 命令替换功能
+### 2. 🧠 RAG增强知识库 (`jarvis-rag`)
+
+`jarvis-rag` 是一个强大的命令行工具，用于构建、管理和查询本地化的RAG（检索增强生成）知识库。它允许您将自己的文档（代码、笔记、文章等）作为外部知识源，让AI能够基于这些具体内容进行回答，而不是仅仅依赖其通用训练数据。
+
+#### 核心功能
+
+- **本地化知识库**：所有文档索引和数据都存储在本地，确保数据隐私和安全。
+- **智能文档加载**：自动识别并加载多种文本文件，无需关心文件后缀。
+- **灵活的查询**：支持使用项目默认的“思考”模型或动态指定任意已注册的LLM进行查询。
+- **配置驱动**：通过 `config.toml` 或 `.jarvis/config.yaml` 进行集中配置。
+
+#### 子命令说明
+
+##### 2.1 添加文档到知识库 (`add`)
+
+此命令用于将文件、目录或符合通配符模式的文档添加到知识库中。
+
+```bash
+# 基本用法
+jarvis-rag add <文件路径/目录路径/通配符模式>...
+
+# 示例
+# 1. 添加单个文件
+jarvis-rag add ./docs/my_document.md
+
+# 2. 添加整个目录（将递归扫描所有文本文件）
+jarvis-rag add ./src/
+
+# 3. 使用通配符添加所有Python文件
+jarvis-rag add 'src/**/*.py'
+
+# 4. 混合添加
+jarvis-rag add README.md ./docs/ 'src/jarvis/jarvis_rag/*.py'
+```
+
+**参数与选项:**
+
+| 参数/选项 | 描述 |
+|---|---|
+| `paths` | **[必需]** 一个或多个文件路径、目录路径或用引号包裹的通配符模式。 |
+| `--collection` | 指定知识库的集合名称（默认为 `jarvis_rag_collection`）。 |
+| `--embedding-mode` | 覆盖全局配置，强制使用特定嵌入模式 (`performance` 或 `accuracy`)。 |
+| `--db-path` | 覆盖全局配置，指定向量数据库的存储路径。 |
+
+##### 2.2 查询知识库 (`query`)
+
+此命令用于向已建立的知识库提出问题。
+
+```bash
+# 基本用法
+jarvis-rag query "你的问题"
+
+# 示例
+# 1. 使用默认配置进行查询
+jarvis-rag query "请总结一下我添加的文档的核心内容"
+
+# 2. 指定使用Kimi模型进行查询
+jarvis-rag query "代码中的 'PlatformRegistry' 类是做什么用的？" --platform kimi --model moonshot-v1-8k
+```
+
+**参数与选项:**
+
+| 参数/选项 | 描述 |
+|---|---|
+| `question` | **[必需]** 你要向知识库提出的问题。 |
+| `--collection` | 指定要查询的知识库集合名称。 |
+| `--platform` | 指定一个平台名称来回答问题，覆盖默认的“思考”模型。 |
+| `--model` | 指定一个模型名称来回答问题，需要与 `--platform` 同时使用。 |
+
+### 3. 命令替换功能
 支持使用特殊标记`'<tag>'`触发命令替换功能：
 
 | 标记 | 功能 |
@@ -495,7 +564,7 @@ OPENAI_API_BASE: https://api.openai.com/v1
 | `'Check'` | 执行静态代码检查，包括错误和风格问题 |
 | `'SaveSession'` | 保存当前会话并退出 |
 
-### 3. 自定义替换配置
+### 4. 自定义替换配置
 在`~/.jarvis/config.yaml`中添加：
 ```yaml
 JARVIS_REPLACE_MAP:
