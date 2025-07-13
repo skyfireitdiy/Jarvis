@@ -463,6 +463,7 @@ OPENAI_API_BASE: https://api.openai.com/v1
 | `JARVIS_USE_METHODOLOGY` | true | 是否启用方法论功能 |
 | `JARVIS_USE_ANALYSIS` | true | 是否启用任务分析功能 |
 | `JARVIS_DATA_PATH` | ~/.jarvis | Jarvis数据存储目录路径 |
+| `JARVIS_RAG` | `{"embedding_model": "BAAI/bge-base-zh-v1.5"}` | RAG框架的配置 |
 
 ## 🛠️ 工具说明 <a id="tools"></a>
 
