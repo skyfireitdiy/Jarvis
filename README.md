@@ -521,7 +521,7 @@ jarvis-rag add README.md ./docs/ 'src/jarvis/jarvis_rag/*.py'
 |---|---|
 | `paths` | **[必需]** 一个或多个文件路径、目录路径或用引号包裹的通配符模式。 |
 | `--collection` | 指定知识库的集合名称（默认为 `jarvis_rag_collection`）。 |
-| `--embedding-mode` | 覆盖全局配置，强制使用特定嵌入模式 (`performance` 或 `accuracy`)。 |
+| `--embedding-model` | 覆盖全局配置，强制使用特定的嵌入模型名称。 |
 | `--db-path` | 覆盖全局配置，指定向量数据库的存储路径。 |
 
 ##### 2.2 查询知识库 (`query`)
@@ -548,6 +548,7 @@ jarvis-rag query "代码中的 'PlatformRegistry' 类是做什么用的？" --pl
 | `--collection` | 指定要查询的知识库集合名称。 |
 | `--platform` | 指定一个平台名称来回答问题，覆盖默认的“思考”模型。 |
 | `--model` | 指定一个模型名称来回答问题，需要与 `--platform` 同时使用。 |
+| `--embedding-model` | 覆盖全局配置，强制使用特定的嵌入模型名称。 |
 
 ### 3. 命令替换功能
 支持使用特殊标记`'<tag>'`触发命令替换功能：
