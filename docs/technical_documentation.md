@@ -296,6 +296,7 @@ stop
 | `JARVIS_GIT_COMMIT_PROMPT` | `jgc` 命令生成 Git Commit Message 时使用的自定义模板。 | `""` |
 | `JARVIS_REPLACE_MAP` | 定义在交互中使用的自定义快捷命令替换规则。 | `{}` |
 | `JARVIS_MCP` | 一个列表，用于定义所有模型上下文协议（MCP）的端点配置。 | `[]` |
+| `JARVIS_RAG` | RAG框架的配置。 | `{"embedding_model": "BAAI/bge-base-zh-v1.5"}` |
 | `ENV` | 一个字典，用于为 Jarvis 运行环境设置临时的环境变量。 | `{}` |
 
 ### 3.2. 数据流与“思考-行动”循环

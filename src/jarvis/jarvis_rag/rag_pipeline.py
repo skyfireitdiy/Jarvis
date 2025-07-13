@@ -1,5 +1,5 @@
 import os
-from typing import List, Literal, Optional, cast
+from typing import List, Optional
 
 from langchain.docstore.document import Document
 
@@ -9,10 +9,9 @@ from .query_rewriter import QueryRewriter
 from .reranker import Reranker
 from .retriever import ChromaRetriever
 from jarvis.jarvis_utils.config import (
-    get_rag_embedding_mode,
+    get_rag_embedding_model,
     get_rag_vector_db_path,
     get_rag_embedding_cache_path,
-    get_rag_embedding_models,
 )
 
 
@@ -27,7 +26,7 @@ class JarvisRAGPipeline:
     def __init__(
         self,
         llm: Optional[LLMInterface] = None,
-        embedding_mode: Optional[Literal["performance", "accuracy"]] = None,
+        embedding_model: Optional[str] = None,
         db_path: Optional[str] = None,
         collection_name: str = "jarvis_rag_collection",
     ):
@@ -37,14 +36,12 @@ class JarvisRAGPipeline:
         Args:
             llm: An instance of a class implementing LLMInterface.
                  If None, defaults to the ToolAgent_LLM.
-            embedding_mode: The mode for the local embedding model. If None, uses config value.
+            embedding_model: The name of the embedding model. If None, uses config value.
             db_path: Path to the persistent vector database. If None, uses config value.
             collection_name: Name of the collection in the vector database.
         """
         # Determine the embedding model to isolate data paths
-        _embedding_mode = embedding_mode or get_rag_embedding_mode()
-        embedding_models = get_rag_embedding_models()
-        model_name = embedding_models[_embedding_mode]["model_name"]
+        model_name = embedding_model or get_rag_embedding_model()
         sanitized_model_name = model_name.replace("/", "_").replace("\\", "_")
 
         # If a specific db_path is given, use it. Otherwise, create a model-specific path.
@@ -59,7 +56,7 @@ class JarvisRAGPipeline:
         )
 
         self.embedding_manager = EmbeddingManager(
-            mode=cast(Literal["performance", "accuracy"], _embedding_mode),
+            model_name=model_name,
             cache_dir=_final_cache_path,
         )
         self.retriever = ChromaRetriever(

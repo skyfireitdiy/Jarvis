@@ -105,11 +105,11 @@ def add_documents(
         "-c",
         help="Name of the collection in the vector database.",
     ),
-    embedding_mode: Optional[str] = typer.Option(
+    embedding_model: Optional[str] = typer.Option(
         None,
-        "--embedding-mode",
+        "--embedding-model",
         "-e",
-        help="Embedding mode ('performance' or 'accuracy'). Overrides global config.",
+        help="Embedding model name. Overrides global config.",
     ),
     db_path: Optional[Path] = typer.Option(
         None, "--db-path", help="Path to the vector database. Overrides global config."
@@ -148,9 +148,7 @@ def add_documents(
 
     try:
         pipeline = JarvisRAGPipeline(
-            embedding_mode=cast(
-                Optional[Literal["performance", "accuracy"]], embedding_mode
-            ),
+            embedding_model=embedding_model,
             db_path=str(db_path) if db_path else None,
             collection_name=collection_name,
         )
@@ -237,11 +235,11 @@ def query(
         "-c",
         help="Name of the collection in the vector database.",
     ),
-    embedding_mode: Optional[str] = typer.Option(
+    embedding_model: Optional[str] = typer.Option(
         None,
-        "--embedding-mode",
+        "--embedding-model",
         "-e",
-        help="Embedding mode ('performance' or 'accuracy'). Overrides global config.",
+        help="Embedding model name. Overrides global config.",
     ),
     db_path: Optional[Path] = typer.Option(
         None, "--db-path", help="Path to the vector database. Overrides global config."
@@ -271,9 +269,7 @@ def query(
 
         pipeline = JarvisRAGPipeline(
             llm=custom_llm,
-            embedding_mode=cast(
-                Optional[Literal["performance", "accuracy"]], embedding_mode
-            ),
+            embedding_model=embedding_model,
             db_path=str(db_path) if db_path else None,
             collection_name=collection_name,
         )
