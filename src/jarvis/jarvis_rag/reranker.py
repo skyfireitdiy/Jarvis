@@ -12,7 +12,7 @@ class Reranker:
     documents based on their relevance to a given query.
     """
 
-    def __init__(self, model_name: str = "BAAI/bge-reranker-base"):
+    def __init__(self, model_name: str):
         """
         Initializes the Reranker.
 
