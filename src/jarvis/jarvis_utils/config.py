@@ -276,6 +276,16 @@ def get_rag_embedding_model() -> str:
     return get_rag_config().get("embedding_model", "BAAI/bge-base-zh-v1.5")
 
 
+def get_rag_rerank_model() -> str:
+    """
+    获取RAG rerank模型的名称。
+
+    返回:
+        str: rerank模型的名称
+    """
+    return get_rag_config().get("rerank_model", "BAAI/bge-reranker-base")
+
+
 def get_rag_embedding_cache_path() -> str:
     """
     获取RAG嵌入缓存的路径。

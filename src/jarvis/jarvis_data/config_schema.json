@@ -189,10 +189,16 @@
           "type": "string",
           "default": "BAAI/bge-base-zh-v1.5",
           "description": "用于RAG的嵌入模型的名称, 默认为 'BAAI/bge-base-zh-v1.5'"
+        },
+        "rerank_model": {
+          "type": "string",
+          "default": "BAAI/bge-reranker-base",
+          "description": "用于RAG的rerank模型的名称, 默认为 'BAAI/bge-reranker-base'"
         }
       },
       "default": {
-        "embedding_model": "BAAI/bge-base-zh-v1.5"
+        "embedding_model": "BAAI/bge-base-zh-v1.5",
+        "rerank_model": "BAAI/bge-reranker-base"
       }
     },
     "JARVIS_REPLACE_MAP": {

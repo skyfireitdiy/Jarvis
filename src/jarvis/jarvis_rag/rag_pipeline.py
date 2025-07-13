@@ -10,6 +10,7 @@ from .reranker import Reranker
 from .retriever import ChromaRetriever
 from jarvis.jarvis_utils.config import (
     get_rag_embedding_model,
+    get_rag_rerank_model,
     get_rag_vector_db_path,
     get_rag_embedding_cache_path,
 )
@@ -66,7 +67,7 @@ class JarvisRAGPipeline:
         )
         # Default to the ToolAgent_LLM unless a specific LLM is provided
         self.llm = llm if llm is not None else ToolAgent_LLM()
-        self.reranker = Reranker()
+        self.reranker = Reranker(model_name=get_rag_rerank_model())
         # Use a standard LLM for the query rewriting task, not the agent
         self.query_rewriter = QueryRewriter(JarvisPlatform_LLM())
 
