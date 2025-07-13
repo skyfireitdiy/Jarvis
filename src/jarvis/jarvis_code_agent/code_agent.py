@@ -392,19 +392,19 @@ class CodeAgent:
             return
         # 用户确认最终结果
         if commited:
-            agent.prompt += final_ret
+            agent.session.prompt += final_ret
             return
         PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
         if not is_confirm_before_apply_patch() or user_confirm(
             "是否使用此回复？", default=True
         ):
-            agent.prompt += final_ret
+            agent.session.prompt += final_ret
             return
-        agent.prompt += final_ret
+        agent.session.prompt += final_ret
         custom_reply = get_multiline_input("请输入自定义回复")
         if custom_reply.strip():  # 如果自定义回复为空，返回空字符串
             agent.set_addon_prompt(custom_reply)
-        agent.prompt += final_ret
+        agent.session.prompt += final_ret
 
 
 def main() -> None:
