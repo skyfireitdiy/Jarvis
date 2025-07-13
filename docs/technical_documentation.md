@@ -76,7 +76,7 @@ Agent --> MCP: 集成外部应用
 
 Jarvis 的强大功能源于其模块化的设计，主要由以下几个核心组件构成。在深入了解每个组件之前，以下两张时序图分别展示了**初始化**和**任务执行**两个阶段中核心组件的交互流程，重点突出了关键类和方法调用。
 
-**初始化阶段 (Initialization Phase)**
+#### 初始化阶段 (Initialization Phase)
 
 ```plantuml
 @startuml
@@ -113,7 +113,7 @@ deactivate Agent
 @enduml
 ```
 
-**任务执行阶段 (Task Execution Phase)**
+#### 任务执行阶段 (Task Execution Phase)
 
 ```plantuml
 @startuml
@@ -668,7 +668,7 @@ jpm service -p yuanbao -m deep_seek_v3
 
 ## 6. 开发者指南
 
-### 5.1. 环境设置
+### 6.1. 环境设置
 
 为了进行开发，建议从源码安装 Jarvis：
 
@@ -680,7 +680,7 @@ pip3 install -e .
 
 这会以可编辑模式安装项目，你的代码更改会立即生效。
 
-### 5.2. 创建自定义工具
+### 6.2. 创建自定义工具
 
 为 Jarvis 添加新功能的最直接方式是创建自定义工具。
 
@@ -725,7 +725,7 @@ class my_tool:
 
 Jarvis 会在启动时自动发现并加载这个工具。
 
-### 5.3. 添加新平台
+### 6.3. 添加新平台
 
 要集成一个新的 LLM 平台：
 
@@ -733,7 +733,7 @@ Jarvis 会在启动时自动发现并加载这个工具。
 2.  定义一个继承自 `jarvis.jarvis_platform.base.BasePlatform` 的类。
 3.  实现所有必需的方法，如 `chat`, `name`, `set_model_name` 等。
 
-### 5.4. 贡献代码
+### 6.4. 贡献代码
 
 我们欢迎社区的贡献。请遵循以下标准流程：
 
