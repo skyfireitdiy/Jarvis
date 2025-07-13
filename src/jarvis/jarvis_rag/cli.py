@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, List, Literal, cast
 import mimetypes
 
+import pathspec
 import typer
 from langchain.docstore.document import Document
 from langchain_community.document_loaders import (
@@ -90,6 +91,34 @@ def _create_custom_llm(platform_name: str, model_name: str) -> Optional[LLMInter
         return None
 
 
+def _load_ragignore_spec() -> tuple[Optional[pathspec.PathSpec], Optional[Path]]:
+    """
+    Loads ignore patterns from the project root.
+    It first looks for `.jarvis/rag/.ragignore`. If not found, it falls back to `.gitignore`.
+    """
+    project_root_path = Path(_project_root)
+    ragignore_file = project_root_path / ".jarvis" / "rag" / ".ragignore"
+    gitignore_file = project_root_path / ".gitignore"
+
+    ignore_file_to_use = None
+    if ragignore_file.is_file():
+        ignore_file_to_use = ragignore_file
+    elif gitignore_file.is_file():
+        ignore_file_to_use = gitignore_file
+
+    if ignore_file_to_use:
+        try:
+            with open(ignore_file_to_use, "r", encoding="utf-8") as f:
+                patterns = f.read().splitlines()
+            spec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+            print(f"✅ 加载忽略规则: {ignore_file_to_use}")
+            return spec, project_root_path
+        except Exception as e:
+            print(f"⚠️ 加载 {ignore_file_to_use.name} 文件失败: {e}")
+
+    return None, None
+
+
 @app.command(
     "add",
     help="Add documents from files, directories, or glob patterns (e.g., 'src/**/*.py').",
@@ -113,6 +142,12 @@ def add_documents(
     ),
     db_path: Optional[Path] = typer.Option(
         None, "--db-path", help="Path to the vector database. Overrides global config."
+    ),
+    batch_size: int = typer.Option(
+        500,
+        "--batch-size",
+        "-b",
+        help="Number of documents to process in a single batch.",
     ),
 ):
     """Adds documents to the RAG knowledge base from various sources."""
@@ -141,7 +176,32 @@ def add_documents(
                     print(f"⚠️ 跳过可能的二进制文件: {path}")
 
     if not files_to_process:
-        print(f"⚠️ 在指定路径中未找到任何文本文件。")
+        print("⚠️ 在指定路径中未找到任何文本文件。")
+        return
+
+    # Filter files using .ragignore
+    ragignore_spec, ragignore_root = _load_ragignore_spec()
+    if ragignore_spec and ragignore_root:
+        initial_count = len(files_to_process)
+        retained_files = set()
+        for file_path in files_to_process:
+            try:
+                # Resolve the file path to an absolute path to ensure correct comparison
+                resolved_path = file_path.resolve()
+                relative_path = str(resolved_path.relative_to(ragignore_root))
+                if not ragignore_spec.match_file(relative_path):
+                    retained_files.add(file_path)
+            except ValueError:
+                # File is not under the project root, keep it
+                retained_files.add(file_path)
+
+        ignored_count = initial_count - len(retained_files)
+        if ignored_count > 0:
+            print(f"ℹ️ 根据 .ragignore 规则过滤掉 {ignored_count} 个文件。")
+        files_to_process = retained_files
+
+    if not files_to_process:
+        print("⚠️ 所有找到的文本文件都被忽略规则过滤掉了。")
         return
 
     print(f"✅ 发现 {len(files_to_process)} 个独立文件待处理。")
@@ -153,26 +213,40 @@ def add_documents(
             collection_name=collection_name,
         )
 
-        docs: List[Document] = []
+        docs_batch: List[Document] = []
+        total_docs_added = 0
         loader: BaseLoader
-        for file_path in sorted(list(files_to_process)):
+
+        sorted_files = sorted(list(files_to_process))
+        total_files = len(sorted_files)
+
+        for i, file_path in enumerate(sorted_files):
             try:
                 if file_path.suffix.lower() == ".md":
                     loader = UnstructuredMarkdownLoader(str(file_path))
                 else:  # Default to TextLoader for .txt and all code files
                     loader = TextLoader(str(file_path), encoding="utf-8")
 
-                docs.extend(loader.load())
-                print(f"✅ 已加载: {file_path}")
+                docs_batch.extend(loader.load())
+                print(f"✅ 已加载: {file_path} (文件 {i + 1}/{total_files})")
             except Exception as e:
                 print(f"⚠️ 加载失败 {file_path}: {e}")
 
-        if not docs:
+            # Process batch when it's full or it's the last file
+            if docs_batch and (len(docs_batch) >= batch_size or (i + 1) == total_files):
+                print(f"⚙️ 正在处理批次，包含 {len(docs_batch)} 个文档...")
+                pipeline.add_documents(docs_batch)
+                total_docs_added += len(docs_batch)
+                print(f"✅ 成功添加 {len(docs_batch)} 个文档。")
+                docs_batch = []  # Clear the batch
+
+        if total_docs_added == 0:
             print("❌ 未能成功加载任何文档。")
             raise typer.Exit(code=1)
 
-        pipeline.add_documents(docs)
-        print(f"✅ 成功将 {len(docs)} 个文档的内容添加至集合 '{collection_name}'。")
+        print(
+            f"✅ 成功将 {total_docs_added} 个文档的内容添加至集合 '{collection_name}'。"
+        )
 
     except Exception as e:
         print(f"❌ 发生严重错误: {e}")
