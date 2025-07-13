@@ -1,10 +1,7 @@
-from typing import List, Literal, cast
+import torch
+from typing import List, cast
 from langchain_huggingface import HuggingFaceEmbeddings
 
-from jarvis.jarvis_utils.config import (
-    get_rag_embedding_models,
-    get_rag_embedding_cache_path,
-)
 from .cache import EmbeddingCache
 
 
@@ -12,48 +9,38 @@ class EmbeddingManager:
     """
     Manages the loading and usage of local embedding models with caching.
 
-    This class handles the selection of embedding models based on a specified
-    mode ('performance' or 'accuracy'), loads the model from Hugging Face,
+    This class handles loading a specified model from Hugging Face
     and uses a disk-based cache to avoid re-computing embeddings for the
     same text.
     """
 
-    def __init__(
-        self,
-        mode: Literal["performance", "accuracy"],
-        cache_dir: str,
-    ):
+    def __init__(self, model_name: str, cache_dir: str):
         """
         Initializes the EmbeddingManager.
 
         Args:
-            mode: The desired mode, either 'performance' or 'accuracy'.
+            model_name: The name of the Hugging Face model to load.
             cache_dir: The directory to store the embedding cache.
         """
-        self.mode = mode
-        self.embedding_models = get_rag_embedding_models()
-        if mode not in self.embedding_models:
-            raise ValueError(
-                f"Invalid mode '{mode}'. Must be one of {list(self.embedding_models.keys())}"
-            )
+        self.model_name = model_name
 
-        self.model_config = self.embedding_models[self.mode]
-        self.model_name = self.model_config["model_name"]
-
-        print(f"🚀 初始化嵌入管理器，模式: '{self.mode}', 模型: '{self.model_name}'...")
+        print(f"🚀 初始化嵌入管理器, 模型: '{self.model_name}'...")
 
         # The salt for the cache is the model name to prevent collisions
-        self.cache = EmbeddingCache(cache_dir=cache_dir, salt=str(self.model_name))
+        self.cache = EmbeddingCache(cache_dir=cache_dir, salt=self.model_name)
         self.model = self._load_model()
 
     def _load_model(self) -> HuggingFaceEmbeddings:
         """Loads the Hugging Face embedding model based on the configuration."""
+        model_kwargs = {"device": "cuda" if torch.cuda.is_available() else "cpu"}
+        encode_kwargs = {"normalize_embeddings": True}
+
         try:
             return HuggingFaceEmbeddings(
                 model_name=self.model_name,
-                model_kwargs=self.model_config.get("model_kwargs"),
-                encode_kwargs=self.model_config.get("encode_kwargs"),
-                show_progress=self.model_config.get("show_progress", False),
+                model_kwargs=model_kwargs,
+                encode_kwargs=encode_kwargs,
+                show_progress=True,
             )
         except Exception as e:
             print(f"❌ 加载嵌入模型 '{self.model_name}' 时出错: {e}")
