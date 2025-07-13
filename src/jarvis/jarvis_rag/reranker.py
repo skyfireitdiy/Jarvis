@@ -48,7 +48,7 @@ class Reranker:
 
         # Combine documents with their scores and sort
         doc_with_scores = list(zip(documents, scores))
-        doc_with_scores.sort(key=lambda x: x[1], reverse=True)
+        doc_with_scores.sort(key=lambda x: x[1], reverse=True)  # type: ignore
 
         # Return the top N documents
         reranked_docs = [doc for doc, score in doc_with_scores[:top_n]]
