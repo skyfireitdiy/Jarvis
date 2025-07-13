@@ -41,7 +41,12 @@ dependencies = [
     "ddgs==9.0.2",
     "beautifulsoup4==4.13.4",
     "lxml==6.0.0",
-    # RAG dependencies
+]
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "isort", "mypy", "build", "twine"]
+rag = [
     "langchain",
     "langchain-community",
     "langchain-huggingface",
@@ -53,10 +58,6 @@ dependencies = [
     "unstructured[md]",
     "rank-bm25",
 ]
-requires-python = ">=3.9"
-
-[project.optional-dependencies]
-dev = ["pytest", "black", "isort", "mypy", "build", "twine"]
 
 [project.urls]
 Homepage = "https://github.com/skyfireitdiy/Jarvis"
