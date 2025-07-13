@@ -8,16 +8,16 @@ from sentence_transformers.cross_encoder import (  # type: ignore
 
 class Reranker:
     """
-    A reranker class that uses a Cross-Encoder model to re-score and sort
-    documents based on their relevance to a given query.
+    一个重排器类，使用Cross-Encoder模型根据文档与给定查询的相关性
+    对文档进行重新评分和排序。
     """
 
     def __init__(self, model_name: str):
         """
-        Initializes the Reranker.
+        初始化重排器。
 
-        Args:
-            model_name (str): The name of the Cross-Encoder model to use.
+        参数:
+            model_name (str): 要使用的Cross-Encoder模型的名称。
         """
         print(f"🔍 正在初始化重排模型: {model_name}...")
         self.model = CrossEncoder(model_name)
@@ -27,30 +27,30 @@ class Reranker:
         self, query: str, documents: List[Document], top_n: int = 5
     ) -> List[Document]:
         """
-        Reranks a list of documents based on their relevance to the query.
+        根据文档与查询的相关性对文档列表进行重排。
 
-        Args:
-            query (str): The user's query.
-            documents (List[Document]): The list of documents retrieved from the initial search.
-            top_n (int): The number of top documents to return after reranking.
+        参数:
+            query (str): 用户的查询。
+            documents (List[Document]): 从初始搜索中检索到的文档列表。
+            top_n (int): 重排后要返回的顶部文档数。
 
-        Returns:
-            List[Document]: A sorted list of the most relevant documents.
+        返回:
+            List[Document]: 一个已排序的最相关文档列表。
         """
         if not documents:
             return []
 
-        # Create pairs of [query, document_content] for scoring
+        # 创建 [查询, 文档内容] 对用于评分
         pairs = [[query, doc.page_content] for doc in documents]
 
-        # Get scores from the Cross-Encoder model
+        # 从Cross-Encoder模型获取分数
         scores = self.model.predict(pairs)
 
-        # Combine documents with their scores and sort
+        # 将文档与它们的分数结合并排序
         doc_with_scores = list(zip(documents, scores))
         doc_with_scores.sort(key=lambda x: x[1], reverse=True)  # type: ignore
 
-        # Return the top N documents
+        # 返回前N个文档
         reranked_docs = [doc for doc, score in doc_with_scores[:top_n]]
 
         return reranked_docs

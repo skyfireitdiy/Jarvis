@@ -4,22 +4,21 @@ from .llm_interface import LLMInterface
 
 class QueryRewriter:
     """
-    Uses an LLM to rewrite a user's query into multiple, diverse search
-    queries to enhance retrieval recall.
+    使用LLM将用户的查询重写为多个不同的搜索查询，以提高检索召回率。
     """
 
     def __init__(self, llm: LLMInterface):
         """
-        Initializes the QueryRewriter.
+        初始化QueryRewriter。
 
-        Args:
-            llm: An instance of a class implementing LLMInterface.
+        参数:
+            llm: 实现LLMInterface接口的类的实例。
         """
         self.llm = llm
         self.rewrite_prompt_template = self._create_prompt_template()
 
     def _create_prompt_template(self) -> str:
-        """Creates the prompt template for the multi-query rewriting task."""
+        """为多查询重写任务创建提示模板。"""
         return """
 你是一个精通检索的AI助手。你的任务是将以下这个单一的用户问题，从不同角度改写成 3 个不同的、但语义上相关的搜索查询。这有助于在知识库中进行更全面的搜索。
 
@@ -39,13 +38,13 @@ class QueryRewriter:
 
     def rewrite(self, query: str) -> List[str]:
         """
-        Rewrites the user query into multiple queries using the LLM.
+        使用LLM将用户查询重写为多个查询。
 
-        Args:
-            query: The original user query.
+        参数:
+            query: 原始用户查询。
 
-        Returns:
-            A list of rewritten, search-optimized queries.
+        返回:
+            一个经过重写、搜索优化的查询列表。
         """
         prompt = self.rewrite_prompt_template.format(query=query)
         print(f"✍️  正在将原始查询重写为多个搜索查询...")
@@ -55,7 +54,7 @@ class QueryRewriter:
             line.strip() for line in response_text.strip().split("\n") if line.strip()
         ]
 
-        # Also include the original query for robustness
+        # 同时包含原始查询以保证鲁棒性
         if query not in rewritten_queries:
             rewritten_queries.insert(0, query)
 
