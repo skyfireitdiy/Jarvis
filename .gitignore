@@ -17,3 +17,4 @@ patches*
 build
 uv.lock
 *.pdf
+plantuml-images

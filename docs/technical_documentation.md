@@ -109,6 +109,7 @@ deactivate PlatformRegistry
 Agent -> Agent : Builds system prompt\nwith tool definitions from ToolRegistry
 deactivate Agent
 
+newpage
 == Task Execution Phase ==
 Main -> Agent : run("user task")
 activate Agent
@@ -365,7 +366,7 @@ box "Jarvis Core" #LightBlue
     participant "MCP Client" as Client
 end box
 
-Client <- -> Server : **MCP (标准化双向连接)**
+Client <- -> Server : MCP (标准化双向连接)
 
 package "外部资源 (MCP Endpoints)" {
     box "本地服务" #LightGreen
@@ -415,7 +416,7 @@ title RAG 查询处理流程
 
 participant "用户查询" as UserQuery
 participant "QueryRewriter" as QR
-participant "ChromaRetriever\\n(Hybrid Search)" as Retriever
+participant "ChromaRetriever\n(Hybrid Search)" as Retriever
 participant "Reranker" as Reranker
 participant "JarvisPlatform_LLM" as LLM
 participant "最终答案" as FinalAnswer

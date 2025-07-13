@@ -1,0 +1,134 @@
+/* style.css for Pandoc PDF Conversion */
+
+/* --- Page Layout --- */
+@page {
+    size: A4 landscape;
+    margin: 2cm;
+}
+
+/* --- General Body and Typography --- */
+body {
+    font-family: "Garamond", "Georgia", "Times New Roman", serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #fff;
+    font-size: 12pt;
+}
+
+/* --- Headings --- */
+h1, h2, h3, h4, h5, h6 {
+    font-family: "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+    color: #2c3e50;
+    line-height: 1.2;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    page-break-after: avoid;
+}
+
+h1 {
+    font-size: 2.5em;
+    border-bottom: 2px solid #7f8c8d;
+    padding-bottom: 0.3em;
+    margin-bottom: 1em;
+}
+
+h2 {
+    font-size: 2em;
+    border-bottom: 1px solid #bdc3c7;
+    padding-bottom: 0.2em;
+}
+
+h3 {
+    font-size: 1.75em;
+}
+
+h4 {
+    font-size: 1.5em;
+}
+
+/* --- Paragraphs and Links --- */
+p {
+    margin-bottom: 1em;
+    text-align: justify;
+}
+
+a {
+    color: #2980b9;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* --- Code Blocks and Inline Code --- */
+pre {
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    padding: 1em;
+    font-size: 0.9em;
+    line-height: 1.4;
+    border-radius: 4px;
+    page-break-inside: avoid;
+    /* --- Crucial for preventing overflow in PDF --- */
+    white-space: pre-wrap; /* Tells the browser to wrap text, pandoc translates this for LaTeX */
+    word-wrap: break-word; /* Forces long, unbreakable words to break */
+}
+
+code {
+    font-family: "Noto Sans Mono CJK SC", "Menlo", "Monaco", "Consolas", monospace;
+    background-color: #ecf0f1;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    word-wrap: break-word; /* Also apply to inline code */
+}
+
+pre code {
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+}
+
+
+/* --- Blockquotes --- */
+blockquote {
+    border-left: 4px solid #bdc3c7;
+    padding-left: 1em;
+    color: #7f8c8d;
+    margin-left: 0;
+    page-break-inside: avoid;
+}
+
+
+/* --- Lists --- */
+ul, ol {
+    padding-left: 2em;
+}
+
+
+/* --- Tables --- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+    page-break-inside: avoid;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 0.5em;
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+/* --- PlantUML Diagrams --- */
+.plantuml {
+    display: block;
+    margin: 2em auto;
+    text-align: center;
+    page-break-inside: avoid;
+}
