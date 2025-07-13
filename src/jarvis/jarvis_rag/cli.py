@@ -19,29 +19,29 @@ from jarvis.jarvis_utils.utils import init_env
 
 def is_likely_text_file(file_path: Path) -> bool:
     """
-    Checks if a file is likely to be a text file by reading its beginning.
-    Avoids loading large binary files into memory.
+    通过读取文件开头部分，检查文件是否可能为文本文件。
+    此方法可以避免将大型二进制文件加载到内存中。
     """
     try:
-        # Heuristic 1: Check MIME type if available
+        # 启发式方法1：检查MIME类型（如果可用）
         mime_type, _ = mimetypes.guess_type(file_path)
         if mime_type and mime_type.startswith("text/"):
             return True
         if mime_type and any(x in mime_type for x in ["json", "xml", "javascript"]):
             return True
 
-        # Heuristic 2: Check for null bytes in the first few KB
+        # 启发式方法2：检查文件的前几KB中是否包含空字节
         with open(file_path, "rb") as f:
-            chunk = f.read(4096)  # Read first 4KB
+            chunk = f.read(4096)  # 读取前4KB
             if b"\x00" in chunk:
-                return False  # Null bytes are a strong indicator of a binary file
+                return False  # 空字节是二进制文件的强指示符
         return True
     except Exception:
         return False
 
 
-# Ensure the project root is in the Python path to allow absolute imports
-# This makes the script runnable as a module.
+# 确保项目根目录在Python路径中，以允许绝对导入
+# 这使得脚本可以作为模块运行。
 _project_root = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..")
 )
@@ -55,13 +55,13 @@ from jarvis.jarvis_rag.rag_pipeline import JarvisRAGPipeline
 
 app = typer.Typer(
     name="jarvis-rag",
-    help="A command-line tool to interact with the Jarvis RAG framework.",
+    help="一个与Jarvis RAG框架交互的命令行工具。",
     add_completion=False,
 )
 
 
 class _CustomPlatformLLM(LLMInterface):
-    """A simple wrapper to make a BasePlatform instance compatible with LLMInterface."""
+    """一个简单的包装器，使BasePlatform实例与LLMInterface兼容。"""
 
     def __init__(self, platform: BasePlatform):
         self.platform = platform
@@ -74,7 +74,7 @@ class _CustomPlatformLLM(LLMInterface):
 
 
 def _create_custom_llm(platform_name: str, model_name: str) -> Optional[LLMInterface]:
-    """Creates an LLM interface from a specific platform and model."""
+    """从指定的平台和模型创建LLM接口。"""
     if not platform_name or not model_name:
         return None
     try:
@@ -93,8 +93,8 @@ def _create_custom_llm(platform_name: str, model_name: str) -> Optional[LLMInter
 
 def _load_ragignore_spec() -> tuple[Optional[pathspec.PathSpec], Optional[Path]]:
     """
-    Loads ignore patterns from the project root.
-    It first looks for `.jarvis/rag/.ragignore`. If not found, it falls back to `.gitignore`.
+    从项目根目录加载忽略模式。
+    首先查找 `.jarvis/rag/.ragignore`，如果未找到，则回退到 `.gitignore`。
     """
     project_root_path = Path(_project_root)
     ragignore_file = project_root_path / ".jarvis" / "rag" / ".ragignore"
@@ -121,40 +121,40 @@ def _load_ragignore_spec() -> tuple[Optional[pathspec.PathSpec], Optional[Path]]
 
 @app.command(
     "add",
-    help="Add documents from files, directories, or glob patterns (e.g., 'src/**/*.py').",
+    help="从文件、目录或glob模式（例如 'src/**/*.py'）添加文档。",
 )
 def add_documents(
     paths: List[Path] = typer.Argument(
         ...,
-        help="File/directory paths or glob patterns. Shell expansion is supported.",
+        help="文件/目录路径或glob模式。支持Shell扩展。",
     ),
     collection_name: str = typer.Option(
         "jarvis_rag_collection",
         "--collection",
         "-c",
-        help="Name of the collection in the vector database.",
+        help="向量数据库中集合的名称。",
     ),
     embedding_model: Optional[str] = typer.Option(
         None,
         "--embedding-model",
         "-e",
-        help="Embedding model name. Overrides global config.",
+        help="嵌入模型的名称。覆盖全局配置。",
     ),
     db_path: Optional[Path] = typer.Option(
-        None, "--db-path", help="Path to the vector database. Overrides global config."
+        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
     ),
     batch_size: int = typer.Option(
         500,
         "--batch-size",
         "-b",
-        help="Number of documents to process in a single batch.",
+        help="单个批次中要处理的文档数。",
     ),
 ):
-    """Adds documents to the RAG knowledge base from various sources."""
+    """从不同来源向RAG知识库添加文档。"""
     files_to_process = set()
 
     for path_str in paths:
-        # Typer with List[Path] might not expand globs, so we do it manually
+        # Typer的List[Path]可能不会扩展glob，所以我们手动处理
         from glob import glob
 
         expanded_paths = glob(str(path_str), recursive=True)
@@ -179,20 +179,20 @@ def add_documents(
         print("⚠️ 在指定路径中未找到任何文本文件。")
         return
 
-    # Filter files using .ragignore
+    # 使用 .ragignore 过滤文件
     ragignore_spec, ragignore_root = _load_ragignore_spec()
     if ragignore_spec and ragignore_root:
         initial_count = len(files_to_process)
         retained_files = set()
         for file_path in files_to_process:
             try:
-                # Resolve the file path to an absolute path to ensure correct comparison
+                # 将文件路径解析为绝对路径以确保正确比较
                 resolved_path = file_path.resolve()
                 relative_path = str(resolved_path.relative_to(ragignore_root))
                 if not ragignore_spec.match_file(relative_path):
                     retained_files.add(file_path)
             except ValueError:
-                # File is not under the project root, keep it
+                # 文件不在项目根目录下，保留它
                 retained_files.add(file_path)
 
         ignored_count = initial_count - len(retained_files)
@@ -224,7 +224,7 @@ def add_documents(
             try:
                 if file_path.suffix.lower() == ".md":
                     loader = UnstructuredMarkdownLoader(str(file_path))
-                else:  # Default to TextLoader for .txt and all code files
+                else:  # 对.txt和所有代码文件默认使用TextLoader
                     loader = TextLoader(str(file_path), encoding="utf-8")
 
                 docs_batch.extend(loader.load())
@@ -232,13 +232,13 @@ def add_documents(
             except Exception as e:
                 print(f"⚠️ 加载失败 {file_path}: {e}")
 
-            # Process batch when it's full or it's the last file
+            # 当批处理已满或是最后一个文件时处理批处理
             if docs_batch and (len(docs_batch) >= batch_size or (i + 1) == total_files):
                 print(f"⚙️ 正在处理批次，包含 {len(docs_batch)} 个文档...")
                 pipeline.add_documents(docs_batch)
                 total_docs_added += len(docs_batch)
                 print(f"✅ 成功添加 {len(docs_batch)} 个文档。")
-                docs_batch = []  # Clear the batch
+                docs_batch = []  # 清空批处理
 
         if total_docs_added == 0:
             print("❌ 未能成功加载任何文档。")
@@ -253,19 +253,19 @@ def add_documents(
         raise typer.Exit(code=1)
 
 
-@app.command("list-docs", help="List all unique documents in the knowledge base.")
+@app.command("list-docs", help="列出知识库中所有唯一的文档。")
 def list_documents(
     collection_name: str = typer.Option(
         "jarvis_rag_collection",
         "--collection",
         "-c",
-        help="Name of the collection in the vector database.",
+        help="向量数据库中集合的名称。",
     ),
     db_path: Optional[Path] = typer.Option(
-        None, "--db-path", help="Path to the vector database. Overrides global config."
+        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
     ),
 ):
-    """Lists all unique documents in the specified collection."""
+    """列出指定集合中的所有唯一文档。"""
     try:
         pipeline = JarvisRAGPipeline(
             db_path=str(db_path) if db_path else None,
@@ -273,13 +273,13 @@ def list_documents(
         )
 
         collection = pipeline.retriever.collection
-        results = collection.get()  # Get all items in the collection
+        results = collection.get()  # 获取集合中的所有项目
 
         if not results or not results["metadatas"]:
             print("ℹ️ 知识库中没有找到任何文档。")
             return
 
-        # Extract unique source file paths from metadata
+        # 从元数据中提取唯一的源文件路径
         sources = set()
         for metadata in results["metadatas"]:
             if metadata:
@@ -300,38 +300,38 @@ def list_documents(
         raise typer.Exit(code=1)
 
 
-@app.command("query", help="Ask a question to the knowledge base.")
+@app.command("query", help="向知识库提问。")
 def query(
-    question: str = typer.Argument(..., help="The question to ask."),
+    question: str = typer.Argument(..., help="要提出的问题。"),
     collection_name: str = typer.Option(
         "jarvis_rag_collection",
         "--collection",
         "-c",
-        help="Name of the collection in the vector database.",
+        help="向量数据库中集合的名称。",
     ),
     embedding_model: Optional[str] = typer.Option(
         None,
         "--embedding-model",
         "-e",
-        help="Embedding model name. Overrides global config.",
+        help="嵌入模型的名称。覆盖全局配置。",
     ),
     db_path: Optional[Path] = typer.Option(
-        None, "--db-path", help="Path to the vector database. Overrides global config."
+        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
     ),
     platform: Optional[str] = typer.Option(
         None,
         "--platform",
         "-p",
-        help="Specify a platform name for the LLM. Overrides the default thinking model.",
+        help="为LLM指定平台名称。覆盖默认的思考模型。",
     ),
     model: Optional[str] = typer.Option(
         None,
         "--model",
         "-m",
-        help="Specify a model name for the LLM. Requires --platform.",
+        help="为LLM指定模型名称。需要 --platform。",
     ),
 ):
-    """Queries the RAG knowledge base and prints the answer."""
+    """查询RAG知识库并打印答案。"""
     if model and not platform:
         print("❌ 错误: --model 需要指定 --platform。")
         raise typer.Exit(code=1)
@@ -352,7 +352,7 @@ def query(
         answer = pipeline.query(question)
 
         print("💬 答案:")
-        # We can still use rich.markdown.Markdown as PrettyOutput uses rich underneath
+        # 我们仍然可以使用 rich.markdown.Markdown，因为 PrettyOutput 底层使用了 rich
         from jarvis.jarvis_utils.globals import console
 
         console.print(Markdown(answer))
@@ -374,8 +374,8 @@ except ImportError:
 def _check_rag_dependencies():
     if not _RAG_INSTALLED:
         print(
-            "❌ RAG dependencies are not installed. "
-            "Please run 'pip install \"jarvis-ai-assistant[rag]\"' to use this command."
+            "❌ RAG依赖项未安装。"
+            "请运行 'pip install \"jarvis-ai-assistant[rag]\"' 来使用此命令。"
         )
         raise typer.Exit(code=1)
 

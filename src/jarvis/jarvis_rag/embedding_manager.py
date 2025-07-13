@@ -7,31 +7,30 @@ from .cache import EmbeddingCache
 
 class EmbeddingManager:
     """
-    Manages the loading and usage of local embedding models with caching.
+    管理本地嵌入模型的加载和使用，并带有缓存功能。
 
-    This class handles loading a specified model from Hugging Face
-    and uses a disk-based cache to avoid re-computing embeddings for the
-    same text.
+    该类负责从Hugging Face加载指定的模型，并使用基于磁盘的缓存
+    来避免为相同文本重新计算嵌入。
     """
 
     def __init__(self, model_name: str, cache_dir: str):
         """
-        Initializes the EmbeddingManager.
+        初始化EmbeddingManager。
 
-        Args:
-            model_name: The name of the Hugging Face model to load.
-            cache_dir: The directory to store the embedding cache.
+        参数:
+            model_name: 要加载的Hugging Face模型的名称。
+            cache_dir: 用于存储嵌入缓存的目录。
         """
         self.model_name = model_name
 
         print(f"🚀 初始化嵌入管理器, 模型: '{self.model_name}'...")
 
-        # The salt for the cache is the model name to prevent collisions
+        # 缓存的salt是模型名称，以防止冲突
         self.cache = EmbeddingCache(cache_dir=cache_dir, salt=self.model_name)
         self.model = self._load_model()
 
     def _load_model(self) -> HuggingFaceEmbeddings:
-        """Loads the Hugging Face embedding model based on the configuration."""
+        """根据配置加载Hugging Face嵌入模型。"""
         model_kwargs = {"device": "cuda" if torch.cuda.is_available() else "cpu"}
         encode_kwargs = {"normalize_embeddings": True}
 
@@ -49,18 +48,18 @@ class EmbeddingManager:
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """
-        Computes embeddings for a list of documents, using the cache.
+        使用缓存为文档列表计算嵌入。
 
-        Args:
-            texts: A list of documents (strings) to embed.
+        参数:
+            texts: 要嵌入的文档（字符串）列表。
 
-        Returns:
-            A list of embeddings, one for each document.
+        返回:
+            一个嵌入列表，每个文档对应一个嵌入。
         """
         if not texts:
             return []
 
-        # Check cache for existing embeddings
+        # 检查缓存中是否已存在嵌入
         cached_embeddings = self.cache.get_batch(texts)
 
         texts_to_embed = []
@@ -70,17 +69,17 @@ class EmbeddingManager:
                 texts_to_embed.append(text)
                 indices_to_embed.append(i)
 
-        # Compute embeddings for texts that were not in the cache
+        # 为不在缓存中的文本计算嵌入
         if texts_to_embed:
             print(
                 f"🔎 缓存未命中。正在为 {len(texts_to_embed)}/{len(texts)} 个文档计算嵌入。"
             )
             new_embeddings = self.model.embed_documents(texts_to_embed)
 
-            # Store new embeddings in the cache
+            # 将新的嵌入存储在缓存中
             self.cache.set_batch(texts_to_embed, new_embeddings)
 
-            # Place new embeddings back into the results list
+            # 将新的嵌入放回结果列表中
             for i, embedding in zip(indices_to_embed, new_embeddings):
                 cached_embeddings[i] = embedding
         else:
@@ -90,7 +89,7 @@ class EmbeddingManager:
 
     def embed_query(self, text: str) -> List[float]:
         """
-        Computes the embedding for a single query.
-        Queries are typically not cached, but we can add it if needed.
+        为单个查询计算嵌入。
+        查询通常不被缓存，但如果需要可以添加。
         """
         return self.model.embed_query(text)
