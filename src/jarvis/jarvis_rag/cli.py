@@ -362,6 +362,25 @@ def query(
         raise typer.Exit(code=1)
 
 
+_RAG_INSTALLED = False
+try:
+    import langchain  # noqa
+
+    _RAG_INSTALLED = True
+except ImportError:
+    pass
+
+
+def _check_rag_dependencies():
+    if not _RAG_INSTALLED:
+        print(
+            "❌ RAG dependencies are not installed. "
+            "Please run 'pip install \"jarvis-ai-assistant[rag]\"' to use this command."
+        )
+        raise typer.Exit(code=1)
+
+
 def main():
+    _check_rag_dependencies()
     init_env(welcome_str="Jarvis RAG")
     app()
