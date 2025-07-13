@@ -74,12 +74,14 @@ Agent --> MCP: 集成外部应用
 
 ## 2. 核心组件
 
-Jarvis 的强大功能源于其模块化的设计，主要由以下几个核心组件构成。在深入了解每个组件之前，下图通过一个时序图展示了它们在一次典型的任务执行中是如何交互的，重点突出了关键类和方法调用。
+Jarvis 的强大功能源于其模块化的设计，主要由以下几个核心组件构成。在深入了解每个组件之前，以下两张时序图分别展示了**初始化**和**任务执行**两个阶段中核心组件的交互流程，重点突出了关键类和方法调用。
+
+**初始化阶段 (Initialization Phase)**
 
 ```plantuml
 @startuml
 !theme vibrant
-title 核心组件交互时序图 (Core Component Interaction)
+title 核心组件交互 - 初始化阶段 (Initialization)
 
 participant "main()" as Main
 participant "Agent" as Agent
@@ -108,8 +110,24 @@ deactivate PlatformRegistry
 
 Agent -> Agent : Builds system prompt\nwith tool definitions from ToolRegistry
 deactivate Agent
+@enduml
+```
 
-newpage
+**任务执行阶段 (Task Execution Phase)**
+
+```plantuml
+@startuml
+!theme vibrant
+title 核心组件交互 - 任务执行阶段 (Execution)
+
+participant "main()" as Main
+participant "Agent" as Agent
+participant "ToolRegistry" as ToolRegistry
+
+box "Dynamically Loaded" #LightBlue
+    participant "MyTool" as Tool
+end box
+
 == Task Execution Phase ==
 Main -> Agent : run("user task")
 activate Agent
@@ -129,7 +147,6 @@ deactivate ToolRegistry
 Agent -> Agent : _call_model("Tool output string")
 note over Agent : Loop continues...
 deactivate Agent
-
 @enduml
 ```
 
@@ -360,32 +377,31 @@ Jarvis 的极致扩展性，很大程度上得益于对**模型上下文协议�
 @startuml
 !theme vibrant
 
-box "Jarvis Core" #LightBlue
-    participant "Jarvis Agent" as Agent
-    participant "Tool Registry" as Registry
-    participant "MCP Client" as Client
-end box
-
-Client <- -> Server : MCP (标准化双向连接)
-
-package "外部资源 (MCP Endpoints)" {
-    box "本地服务" #LightGreen
-        participant "MCP Server" as Server
-        database "数据库" as DB
-        folder "文件系统" as FS
-    end box
-    
-    box "远程API" #LightCoral
-        participant "MCP Server" as Server2
-        cloud "GitHub API" as GitHub
-        cloud "Slack API" as Slack
-    end box
+package "Jarvis Core" #LightBlue {
+    component "Jarvis Agent" as Agent
+    component "Tool Registry" as Registry
+    component "MCP Client" as Client
 }
 
-Server -- DB
-Server -- FS
-Server2 -- GitHub
-Server2 -- Slack
+package "外部资源 (MCP Endpoints)" {
+    package "本地服务" #LightGreen {
+        component "MCP Server" as Server
+        database "数据库" as DB
+        folder "文件系统" as FS
+    }
+    
+    package "远程API" #LightCoral {
+        component "MCP Server" as Server2
+        cloud "GitHub API" as GitHub
+        cloud "Slack API" as Slack
+    }
+}
+
+Client <--> Server : "MCP (标准化双向连接)"
+Server --> DB
+Server --> FS
+Server2 --> GitHub
+Server2 --> Slack
 
 @enduml
 ```
