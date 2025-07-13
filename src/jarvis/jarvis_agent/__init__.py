@@ -9,6 +9,10 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
 # 本地库导入
 # jarvis_agent 相关
+from jarvis.jarvis_agent.prompt_builder import build_action_prompt
+from jarvis.jarvis_agent.protocols import OutputHandlerProtocol
+from jarvis.jarvis_agent.session_manager import SessionManager
+from jarvis.jarvis_agent.tool_executor import execute_tool_call
 from jarvis.jarvis_agent.prompts import (
     DEFAULT_SUMMARY_PROMPT,
     SUMMARY_REQUEST_PROMPT,
@@ -73,28 +77,12 @@ origin_agent_system_prompt = f"""
 """
 
 
-class OutputHandlerProtocol(Protocol):
-    def name(self) -> str: ...
-
-    def can_handle(self, response: str) -> bool: ...
-
-    def prompt(self) -> str: ...
-
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
-
-
 class Agent:
     def clear(self):
-        """清除当前对话历史，保留系统消息。
-
-        该方法将：
-        1. 调用模型的delete_chat方法清除对话历史
-        2. 重置对话长度计数器
-        3. 清空当前提示
         """
-        self.model.reset()  # type: ignore
-        self.conversation_length = 0
-        self.prompt = ""
+        Clears the current conversation history by delegating to the session manager.
+        """
+        self.session.clear()
 
     def __del__(self):
         # 只有在记录启动时才停止记录
@@ -164,6 +152,9 @@ class Agent:
 
         self.model.set_suppress_output(False)
 
+        # Initialize the session manager
+        self.session = SessionManager(model=self.model, agent_name=self.name)
+
         from jarvis.jarvis_tools.registry import ToolRegistry
 
         self.output_handler = output_handler if output_handler else [ToolRegistry()]
@@ -184,13 +175,10 @@ class Agent:
         self.use_analysis = (
             use_analysis if use_analysis is not None else is_use_analysis()
         )
-        self.prompt = ""
-        self.conversation_length = 0  # Use length counter instead
         self.system_prompt = system_prompt
         self.input_handler = input_handler if input_handler is not None else []
         self.need_summary = need_summary
         # Load configuration from environment variables
-        self.addon_prompt = ""
 
         self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
 
@@ -210,46 +198,7 @@ class Agent:
 
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
 
-        action_prompt = """
-<actions>
-# 🧰 可用操作
-以下是您可以使用的操作：
-"""
-
-        # 添加工具列表概览
-        action_prompt += "\n<overview>\n## Action List\n"
-        action_prompt += (
-            "[" + ", ".join([handler.name() for handler in self.output_handler]) + "]"
-        )
-        action_prompt += "\n</overview>"
-
-        # 添加每个工具的详细说明
-        action_prompt += "\n\n<details>\n# 📝 Action Details\n"
-        for handler in self.output_handler:
-            action_prompt += f"\n<tool>\n## {handler.name()}\n"
-            # 获取工具的提示词并确保格式正确
-            handler_prompt = handler.prompt().strip()
-            # 调整缩进以保持层级结构
-            handler_prompt = "\n".join(
-                "   " + line if line.strip() else line
-                for line in handler_prompt.split("\n")
-            )
-            action_prompt += handler_prompt + "\n</tool>\n"
-
-        # 添加工具使用总结
-        action_prompt += """
-</details>
-
-<rules>
-# ❗ 重要操作使用规则
-1. 一次对话只能使用一个操作，否则会出错
-2. 严格按照每个操作的格式执行
-3. 等待操作结果后再进行下一个操作
-4. 处理完结果后再调用新的操作
-5. 如果对操作使用不清楚，请请求帮助
-</rules>
-</actions>
-"""
+        action_prompt = build_action_prompt(self.output_handler) # type: ignore
 
         self.model.set_system_prompt(
             f"""
@@ -261,12 +210,12 @@ class Agent:
         self.first = True
 
     def set_user_data(self, key: str, value: Any):
-        """设置用户数据"""
-        self.user_data[key] = value
+        """Sets user data in the session."""
+        self.session.set_user_data(key, value)
 
     def get_user_data(self, key: str) -> Optional[Any]:
-        """获取用户数据"""
-        return self.user_data.get(key, None)
+        """Gets user data from the session."""
+        return self.session.get_user_data(key)
 
     def set_use_tools(self, use_tools):
         """设置要使用的工具列表"""
@@ -279,12 +228,8 @@ class Agent:
                 break
 
     def set_addon_prompt(self, addon_prompt: str):
-        """设置附加提示。
-
-        参数:
-            addon_prompt: 附加提示内容
-        """
-        self.addon_prompt = addon_prompt
+        """Sets the addon prompt in the session."""
+        self.session.set_addon_prompt(addon_prompt)
 
     def set_after_tool_call_cb(self, cb: Callable[[Any], None]):  # type: ignore
         """设置工具调用后回调函数。
@@ -295,41 +240,12 @@ class Agent:
         self.after_tool_call_cb = cb
 
     def save_session(self) -> bool:
-        """保存当前会话状态到文件"""
-        if not self.model:
-            PrettyOutput.print("没有可用的模型实例来保存会话。", OutputType.ERROR)
-            return False
-        session_dir = os.path.join(os.getcwd(), ".jarvis")
-        os.makedirs(session_dir, exist_ok=True)
-        platform_name = self.model.platform_name()
-        model_name = self.model.name().replace("/", "_").replace("\\", "_")
-        session_file = os.path.join(
-            session_dir, f"saved_session_{self.name}_{platform_name}_{model_name}.json"
-        )
-        return self.model.save(session_file)
+        """Saves the current session state by delegating to the session manager."""
+        return self.session.save_session()
 
     def restore_session(self) -> bool:
-        """从文件恢复会话状态"""
-        if not self.model:
-            return False  # No model, cannot restore
-        platform_name = self.model.platform_name()
-        model_name = self.model.name().replace("/", "_").replace("\\", "_")
-        session_file = os.path.join(
-            os.getcwd(),
-            ".jarvis",
-            f"saved_session_{self.name}_{platform_name}_{model_name}.json",
-        )
-        if not os.path.exists(session_file):
-            return False
-
-        if self.model.restore(session_file):
-            try:
-                os.remove(session_file)
-                PrettyOutput.print("会话已恢复，并已删除会话文件。", OutputType.SUCCESS)
-            except OSError as e:
-                PrettyOutput.print(f"删除会话文件失败: {e}", OutputType.ERROR)
-            return True
-        return False
+        """Restores the session state by delegating to the session manager."""
+        return self.session.restore_session()
 
     def get_tool_registry(self) -> Optional[Any]:
         """获取工具注册表实例"""
@@ -361,23 +277,23 @@ class Agent:
             if need_return:
                 return message
 
-        if self.addon_prompt:
-            message += f"\n\n{self.addon_prompt}"
-            self.addon_prompt = ""
+        if self.session.addon_prompt:
+            message += f"\n\n{self.session.addon_prompt}"
+            self.session.addon_prompt = ""
         else:
             message += f"\n\n{self.make_default_addon_prompt(need_complete)}"
 
         # 累加对话长度
-        self.conversation_length += get_context_token_count(message)
+        self.session.conversation_length += get_context_token_count(message)
 
-        if self.conversation_length > self.max_token_count:
+        if self.session.conversation_length > self.max_token_count:
             message = self._summarize_and_clear_history() + "\n\n" + message
-            self.conversation_length += get_context_token_count(message)
+            self.session.conversation_length += get_context_token_count(message)
 
         if not self.model:
             raise RuntimeError("Model not initialized")
         response = self.model.chat_until_success(message)  # type: ignore
-        self.conversation_length += get_context_token_count(response)
+        self.session.conversation_length += get_context_token_count(response)
 
         return response
 
@@ -395,7 +311,7 @@ class Agent:
             if not self.model:
                 raise RuntimeError("Model not initialized")
             summary = self.model.chat_until_success(
-                self.prompt + "\n" + SUMMARY_REQUEST_PROMPT
+                self.session.prompt + "\n" + SUMMARY_REQUEST_PROMPT
             )  # type: ignore
             print("✅ 总结对话历史完成")
             return summary
@@ -456,46 +372,10 @@ class Agent:
                 os.remove(tmp_file_name)
 
     def _call_tools(self, response: str) -> Tuple[bool, Any]:
-        """调用工具执行响应
-
-        参数:
-            response: 包含工具调用信息的响应字符串
-
-        返回:
-            Tuple[bool, Any]:
-                - 第一个元素表示是否需要返回结果
-                - 第二个元素是返回结果或错误信息
-
-        注意:
-            1. 一次只能执行一个工具
-            2. 如果配置了确认选项，会在执行前请求用户确认
-            3. 使用spinner显示执行状态
         """
-        tool_list = []
-        for handler in self.output_handler:
-            if handler.can_handle(response):
-                tool_list.append(handler)
-        if len(tool_list) > 1:
-            PrettyOutput.print(
-                f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}",
-                OutputType.WARNING,
-            )
-            return (
-                False,
-                f"操作失败：检测到多个操作。一次只能执行一个操作。尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}",
-            )
-        if len(tool_list) == 0:
-            return False, ""
-
-        if not self.execute_tool_confirm or user_confirm(
-            f"需要执行{tool_list[0].name()}确认执行？", True
-        ):
-            print(f"🔧 正在执行{tool_list[0].name()}...")
-            result = tool_list[0].handle(response, self)
-            print(f"✅ {tool_list[0].name()}执行完成")
-
-            return result
-        return False, ""
+        Delegates the tool execution to the external `execute_tool_call` function.
+        """
+        return execute_tool_call(response, self)
 
     def _complete_task(self) -> str:
         """完成任务并生成总结(如果需要)
@@ -512,10 +392,10 @@ class Agent:
             self._analysis_task()
         if self.need_summary:
             print("📄 正在生成总结...")
-            self.prompt = self.summary_prompt
+            self.session.prompt = self.summary_prompt
             if not self.model:
                 raise RuntimeError("Model not initialized")
-            ret = self.model.chat_until_success(self.prompt)  # type: ignore
+            ret = self.model.chat_until_success(self.session.prompt)  # type: ignore
             print("✅ 总结生成完成")
             return ret
 
@@ -527,10 +407,10 @@ class Agent:
             # 让模型判断是否需要生成方法论
             analysis_prompt = TASK_ANALYSIS_PROMPT
 
-            self.prompt = analysis_prompt
+            self.session.prompt = analysis_prompt
             if not self.model:
                 raise RuntimeError("Model not initialized")
-            response = self.model.chat_until_success(self.prompt)  # type: ignore
+            response = self.model.chat_until_success(self.session.prompt)  # type: ignore
             self._call_tools(response)
             print("✅ 分析完成")
         except Exception as e:
@@ -586,7 +466,7 @@ class Agent:
             4. 自动加载相关方法论(如果是首次运行)
         """
 
-        self.prompt = f"{user_input}"
+        self.session.prompt = f"{user_input}"
         try:
             set_agent(self.name, self)
 
@@ -594,8 +474,8 @@ class Agent:
                 if self.first:
                     self._first_run()
                 try:
-                    current_response = self._call_model(self.prompt, True)
-                    self.prompt = ""
+                    current_response = self._call_model(self.session.prompt, True)
+                    self.session.prompt = ""
 
                     if get_interrupt():
                         set_interrupt(False)
@@ -611,20 +491,24 @@ class Agent:
                                 if user_confirm(
                                     "检测到有工具调用，是否继续处理工具调用？", True
                                 ):
-                                    self.prompt = f"{user_input}\n\n{current_response}"
+                                    self.session.prompt = (
+                                        f"{user_input}\n\n{current_response}"
+                                    )
                                     continue
-                            self.prompt += f"{user_input}"
+                            self.session.prompt += f"{user_input}"
                             continue
 
-                    need_return, self.prompt = self._call_tools(current_response)
+                    need_return, self.session.prompt = self._call_tools(
+                        current_response
+                    )
 
                     if need_return:
-                        return self.prompt
+                        return self.session.prompt
 
                     if self.after_tool_call_cb:
                         self.after_tool_call_cb(self)
 
-                    if self.prompt or self.addon_prompt:
+                    if self.session.prompt or self.session.addon_prompt:
                         continue
 
                     if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
@@ -636,7 +520,7 @@ class Agent:
                     )
 
                     if user_input:
-                        self.prompt = user_input
+                        self.session.prompt = user_input
                         continue
 
                     if not user_input:
@@ -660,44 +544,35 @@ class Agent:
                             "文件上传失败，将忽略文件列表", OutputType.WARNING
                         )
                         # 上传失败则回退到本地加载
-                    msg = self.prompt
+                    msg = self.session.prompt
                     for handler in self.input_handler:
                         msg, _ = handler(msg, self)
-                    self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+                    self.session.prompt = f"{self.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
                 else:
                     if self.files:
-                        self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
+                        self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
                     else:
-                        self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
+                        self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
             elif self.files:
                 if not self.model.upload_files(self.files):
                     PrettyOutput.print(
                         "文件上传失败，将忽略文件列表", OutputType.WARNING
                     )
                 else:
-                    self.prompt = f"{self.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
+                    self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
         else:
             if self.files:
                 PrettyOutput.print("不支持上传文件，将忽略文件列表", OutputType.WARNING)
             if self.use_methodology:
-                msg = self.prompt
+                msg = self.session.prompt
                 for handler in self.input_handler:
                     msg, _ = handler(msg, self)
-                self.prompt = f"{self.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+                self.session.prompt = f"{self.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
 
         self.first = False
 
     def clear_history(self):
-        """清空对话历史但保留系统提示
-
-        该方法将：
-        1. 清空当前提示
-        2. 重置模型状态
-        3. 重置对话长度计数器
-
-        注意:
-            用于重置Agent状态而不影响系统消息
         """
-        self.prompt = ""
-        self.model.reset()  # type: ignore
-        self.conversation_length = 0  # 重置对话长度
+        Clears conversation history by delegating to the session manager.
+        """
+        self.session.clear_history()
