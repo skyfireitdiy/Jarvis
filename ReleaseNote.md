@@ -1,3 +1,34 @@
+### Release Note - v0.1.221 2025-07-14
+
+#### **新功能 (Features)**
+- (rag): 将 RAG 依赖项设为可选安装
+- (rag): 支持配置RAG重排模型
+- (rag): 为 add 命令添加 .ragignore 支持和批处理功能
+- (docs): 引入基于 PrinceXML 的 PDF 生成流程
+
+#### **修复 (Fixes)**
+- (暂无)
+
+#### **优化与重构 (Refactors & Improvements)**
+- (edit_file): 移除AI辅助编辑并优化补丁应用逻辑
+- (deps): 将RAG依赖项移至可选安装
+- (jarvis_agent): 重构 Agent 类以提升模块化
+- (jarvis_agent): 提取Agent提示词到独立文件
+- (rag): 简化RAG配置，直接指定嵌入模型
+
+#### **文档更新 (Documentation)**
+- (jarvis_rag): 将模块文档和注释翻译为中文
+- (docs): 修复技术文档中的标题格式和章节编号
+- (config): 添加 JARVIS_RAG 配置项文档
+- (cli): 更新CLI文档中嵌入模型参数名称
+- (docs): 优化技术文档中的图表
+- (rag): 补充 RAG 实现方案的技术文档
+
+#### **其他 (Miscellaneous)**
+- (reranker): 忽略 sort 方法的类型检查错误
+
+本次更新主要围绕RAG功能进行增强和优化，将其依赖项设为可选，并支持了重排模型配置和`.ragignore`文件。同时，对Agent和代码编辑工具进行了重构，提升了系统的模块化和稳定性。文档方面也进行了大量更新和改进，并引入了PDF生成流程。
+
 ### Release Note - v0.1.220 2025-07-13
 
 #### **新功能 (Features)**
