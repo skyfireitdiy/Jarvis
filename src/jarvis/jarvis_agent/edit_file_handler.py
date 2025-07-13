@@ -3,12 +3,8 @@ import re
 from typing import Any, Dict, List, Tuple
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
-from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.git_utils import revert_file
-from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import is_context_overflow
 
 
 class EditFileHandler(OutputHandler):
@@ -69,13 +65,7 @@ class EditFileHandler(OutputHandler):
             ]
 
             print(f"📝 正在处理文件 {file_path}...")
-            # 首先尝试fast_edit模式
             success, result = self._fast_edit(file_path, file_patches)
-            if not success:
-                # 如果fast_edit失败，尝试slow_edit模式
-                success, result = EditFileHandler._slow_edit(
-                    file_path, file_patches, agent
-                )
 
             if success:
                 results.append(f"✅ 文件 {file_path} 修改成功")
@@ -173,7 +163,7 @@ class EditFileHandler(OutputHandler):
         1. 直接进行字符串替换，效率高
         2. 会自动处理缩进问题，尝试匹配不同缩进级别的代码
         3. 确保搜索文本在文件中唯一匹配
-        4. 如果失败会自动回滚修改
+        4. 如果部分补丁失败，会继续应用剩余补丁，并报告失败信息
 
         Args:
             file_path: 要修改的文件路径，支持绝对路径和相对路径
@@ -181,8 +171,8 @@ class EditFileHandler(OutputHandler):
 
         Returns:
             Tuple[bool, str]:
-                返回处理结果元组，第一个元素表示是否成功(True/False)，
-                第二个元素为结果信息，成功时为修改后的文件内容，失败时为错误信息
+                返回处理结果元组，第一个元素表示是否所有补丁都成功应用，
+                第二个元素为结果信息，全部成功时为修改后的文件内容，部分或全部失败时为错误信息
         """
         try:
             # 确保目录存在
@@ -197,13 +187,17 @@ class EditFileHandler(OutputHandler):
             # 应用所有补丁
             modified_content = file_content
             patch_count = 0
+            failed_patches: List[Dict[str, Any]] = []
+            successful_patches = 0
+
             for patch in patches:
+                patch_count += 1
                 search_text = patch["SEARCH"]
                 replace_text = patch["REPLACE"]
-                patch_count += 1
 
                 # 精确匹配搜索文本（保留原始换行和空格）
                 exact_search = search_text
+                found = False
 
                 if exact_search in modified_content:
                     # 直接执行替换（保留所有原始格式）
@@ -211,8 +205,8 @@ class EditFileHandler(OutputHandler):
                         exact_search, replace_text
                     )
                     print(f"✅ 补丁 #{patch_count} 应用成功")
+                    found = True
                 else:
-                    found = False
                     # 如果匹配不到，并且search与replace块的首尾都是换行，尝试去掉第一个和最后一个换行
                     if (
                         search_text.startswith("\n")
@@ -261,184 +255,37 @@ class EditFileHandler(OutputHandler):
                                 found = True
                                 break
 
-                    if not found:
-                        PrettyOutput.print(
-                            f"搜索文本在文件中不存在：\n{search_text}",
-                            output_type=OutputType.WARNING,
-                        )
-                        return False, f"搜索文本在文件中不存在：\n{search_text}"
+                if found:
+                    successful_patches += 1
+                else:
+                    error_msg = "搜索文本在文件中不存在"
+                    PrettyOutput.print(
+                        f"{error_msg}：\n{search_text}",
+                        output_type=OutputType.WARNING,
+                    )
+                    failed_patches.append({"patch": patch, "error": error_msg})
 
             # 写入修改后的内容
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(modified_content)
+
+            if failed_patches:
+                error_details = [
+                    f"  - 失败的补丁: \n{p['patch']['SEARCH']}\n    错误: {p['error']}"
+                    for p in failed_patches
+                ]
+                summary = (
+                    f"文件 {file_path} 修改部分成功。\n"
+                    f"成功: {successful_patches}/{patch_count}, "
+                    f"失败: {len(failed_patches)}/{patch_count}.\n"
+                    f"失败详情:\n" + "\n".join(error_details)
+                )
+                print(f"❌ {summary}")
+                return False, summary
 
             print(f"✅ 文件 {file_path} 修改完成，应用了 {patch_count} 个补丁")
             return True, modified_content
 
         except Exception as e:
             print(f"❌ 文件修改失败: {str(e)}")
-            revert_file(file_path)
-            return False, f"文件修改失败: {str(e)}"
-
-    @staticmethod
-    def _slow_edit(
-        file_path: str, patches: List[Dict[str, str]], agent: Any
-    ) -> Tuple[bool, str]:
-        """使用AI模型生成补丁并应用到文件
-
-        当_fast_edit方法失败时调用此方法，使用AI模型生成更精确的补丁。
-        特点：
-        1. 适用于复杂修改场景或需要上下文理解的修改
-        2. 会自动处理大文件上传问题
-        3. 会尝试最多3次生成有效的补丁
-        4. 生成的补丁会再次通过_fast_edit方法应用
-        5. 如果失败会自动回滚修改
-
-        Args:
-            file_path: 要修改的文件路径，支持绝对路径和相对路径
-            patches: 补丁列表，每个补丁包含search(搜索文本)和replace(替换文本)
-            agent: 执行处理的agent实例，用于访问AI模型平台
-
-        Returns:
-            Tuple[bool, str]:
-                返回处理结果元组，第一个元素表示是否成功(True/False)，
-                第二个元素为结果信息，成功时为修改后的文件内容，失败时为错误信息
-        """
-        try:
-            model = PlatformRegistry().get_normal_platform()
-
-            # 读取原始文件内容
-            file_content = ""
-            if os.path.exists(file_path):
-                with open(file_path, "r", encoding="utf-8") as f:
-                    file_content = f.read()
-
-            is_large_context = is_context_overflow(file_content)
-            upload_success = False
-
-            # 如果是大文件，尝试上传到模型平台
-            if (
-                is_large_context
-                and model.support_upload_files()
-                and model.upload_files([file_path])
-            ):
-                upload_success = True
-
-            model.set_suppress_output(False)
-
-            # 构建补丁内容
-            patch_content = []
-            for patch in patches:
-                patch_content.append(
-                    {
-                        "SEARCH": patch["SEARCH"],
-                        "REPLACE": patch["REPLACE"],
-                    }
-                )
-
-            # 构建提示词
-            main_prompt = f"""
-# 代码补丁生成专家指南
-
-## 任务描述
-你是一位精确的代码补丁生成专家，需要根据补丁描述生成精确的代码差异。
-
-### 补丁内容
-```
-{str(patch_content)}
-```
-
-## 补丁生成要求
-1. **精确性**：严格按照补丁的意图修改代码
-2. **格式一致性**：严格保持原始代码的格式风格，如果补丁中缩进或者空行与原代码不一致，则需要修正补丁中的缩进或者空行
-3. **最小化修改**：只修改必要的代码部分，保持其他部分不变
-4. **上下文完整性**：提供足够的上下文，确保补丁能准确应用
-
-## 输出格式规范
-- 使用{ot("DIFF")}块包围每个需要修改的代码段
-- 每个{ot("DIFF")}块必须包含SEARCH部分和REPLACE部分
-- SEARCH部分是需要查找的原始代码
-- REPLACE部分是替换后的新代码
-- 确保SEARCH部分能在原文件中**唯一匹配**
-- 如果修改较大，可以使用多个{ot("DIFF")}块
-
-## 输出模板
-{ot("DIFF")}
-{ot("SEARCH")}[需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("SEARCH")}
-{ot("REPLACE")}[替换后的新代码]{ct("REPLACE")}
-{ct("DIFF")}
-
-{ot("DIFF")}
-{ot("SEARCH")}[另一处需要查找的原始代码，包含足够上下文，避免出现可匹配多处的情况]{ct("SEARCH")}
-{ot("REPLACE")}[另一处替换后的新代码]{ct("REPLACE")}
-{ct("DIFF")}
-"""
-
-            # 尝试最多3次生成补丁
-            for _ in range(3):
-                if is_large_context:
-                    if upload_success:
-                        response = model.chat_until_success(main_prompt)
-                    else:
-                        file_prompt = f"""
-# 原始代码
-{file_content}
-"""
-                        response = model.chat_until_success(main_prompt + file_prompt)
-                else:
-                    file_prompt = f"""
-# 原始代码
-{file_content}
-"""
-                    response = model.chat_until_success(main_prompt + file_prompt)
-
-                # 检查是否被中断
-                if get_interrupt():
-                    set_interrupt(False)
-                    user_input = agent.multiline_inputer(
-                        "补丁应用被中断，请输入补充信息:"
-                    )
-                    if not user_input.strip():
-                        return False, "用户中断了补丁应用"
-                    return False, f"用户中断了补丁应用并提供了补充信息: {user_input}"
-
-                # 解析生成的补丁
-                diff_blocks = re.finditer(
-                    ot("DIFF")
-                    + r"\s*"
-                    + ot("SEARCH")
-                    + r"(.*?)"
-                    + ct("SEARCH")
-                    + r"\s*"
-                    + ot("REPLACE")
-                    + r"(.*?)"
-                    + ct("REPLACE")
-                    + r"\s*"
-                    + ct("DIFF"),
-                    response,
-                    re.DOTALL,
-                )
-
-                generated_patches = []
-                for match in diff_blocks:
-                    generated_patches.append(
-                        {
-                            "SEARCH": match.group(1).strip(),
-                            "REPLACE": match.group(2).strip(),
-                        }
-                    )
-
-                if generated_patches:
-                    # 尝试应用生成的补丁
-                    success, result = EditFileHandler._fast_edit(
-                        file_path, generated_patches
-                    )
-                    if success:
-                        return True, result
-
-            return False, "AI模型无法生成有效的补丁"
-
-        except Exception as e:
-            print(f"❌ 文件修改失败: {str(e)}")
-            revert_file(file_path)
             return False, f"文件修改失败: {str(e)}"

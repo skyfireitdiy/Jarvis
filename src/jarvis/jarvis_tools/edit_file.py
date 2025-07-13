@@ -7,15 +7,12 @@
 2. 支持单个文件的编辑操作，包括创建新文件
 3. 实现原子操作：所有修改要么全部成功，要么全部回滚
 4. 严格匹配控制：每个搜索文本必须且只能匹配一次
-5. 支持两种编辑模式：快速编辑(fast_edit)和AI辅助编辑(slow_edit)
 
 核心特性:
 - 支持不存在的文件和空文件处理
 - 自动创建所需目录结构
 - 完善的错误处理和回滚机制
 - 严格的格式保持要求
-- 支持大文件处理(自动上传到模型平台)
-- 提供3次重试机制确保操作可靠性
 """
 from typing import Any, Dict
 
@@ -134,7 +131,6 @@ class FileSearchReplaceTool:
         for file_info in args["files"]:
             file_path = os.path.abspath(file_info["path"])
             changes = file_info["changes"]
-            agent = args.get("agent", None)
 
             # 创建已处理文件变量，用于失败时回滚
             original_content = None
@@ -152,44 +148,23 @@ class FileSearchReplaceTool:
                             content = f.read()
                             original_content = content
 
-                    if file_exists and agent:
-                        files = agent.get_user_data("files")
-                        if not files or file_path not in files:
-                            file_results.append(
-                                {
-                                    "file": file_path,
-                                    "success": False,
-                                    "stdout": "",
-                                    "stderr": f"请先读取文件 {file_path} 的内容后再编辑",
-                                }
-                            )
-                            continue
-
                     print(f"⚙️ 正在处理文件 {file_path}...")
-                    # 首先尝试fast_edit模式
                     success, temp_content = EditFileHandler._fast_edit(
                         file_path, changes
                     )
                     if not success:
-                        # 如果fast_edit失败，尝试slow_edit模式
-                        success, temp_content = EditFileHandler._slow_edit(
-                            file_path, changes, agent
+                        print(f"❌ 文件 {file_path} 处理失败")
+                        file_results.append(
+                            {
+                                "file": file_path,
+                                "success": False,
+                                "stdout": "",
+                                "stderr": temp_content,
+                            }
                         )
-                        if not success:
-                            print(f"❌ 文件 {file_path} 处理失败")
-                            file_results.append(
-                                {
-                                    "file": file_path,
-                                    "success": False,
-                                    "stdout": "",
-                                    "stderr": temp_content,
-                                }
-                            )
-                            continue
-                        else:
-                            print(f"✅ 文件 {file_path} 内容生成完成")
-                    else:
-                        print(f"✅ 文件 {file_path} 内容生成完成")
+                        continue
+
+                    print(f"✅ 文件 {file_path} 内容生成完成")
 
                     # 只有当所有替换操作都成功时，才写回文件
                     if success and (
