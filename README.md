@@ -33,18 +33,19 @@ pip3 install jarvis-ai-assistant
 ### 基本使用
 | 命令 | 快捷方式 | 功能描述 |
 |------|----------|----------|
-| `jarvis` | - | 使用通用代理 |
+| `jarvis` | `jvs` | 使用通用代理 |
 | `jarvis-code-agent` | `jca` | 使用代码代理 |
 | `jarvis-smart-shell` | `jss` | 使用智能shell功能 |
 | `jarvis-platform-manager` | `jpm` | 使用平台管理功能 |
-| `jarvis-code-review` | - | 使用代码审查功能 |
+| `jarvis-code-review` | `jcr` | 使用代码审查功能 |
 | `jarvis-git-commit` | `jgc` | 使用自动化git commit功能 |
-| `jarvis-git-squash` | - | 使用git squash功能 |
-| `jarvis-multi-agent` | - | 使用多代理功能 |
-| `jarvis-agent` | - | 使用agent功能 |
-| `jarvis-tool` | - | 使用工具功能 |
-| `jarvis-git-details` | - | 使用git details功能 |
-| `jarvis-methodology` | - | 使用方法论功能 |
+| `jarvis-git-squash` | `jgs` | 使用git squash功能 |
+| `jarvis-multi-agent` | `jma` | 使用多代理功能 |
+| `jarvis-agent` | `ja` | 使用agent功能 |
+| `jarvis-tool` | `jt` | 使用工具功能 |
+| `jarvis-git-details` | `jgd` | 使用git details功能 |
+| `jarvis-methodology` | `jm` | 使用方法论功能 |
+| `jarvis-rag` | `jrg` | 使用RAG功能 |
 
 ### Jarvis功能 (jarvis)
 

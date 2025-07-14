@@ -600,14 +600,18 @@ ENV:
 
 | 命令 | 快捷方式 | 功能描述 |
 |---|---|---|
-| `jarvis` | - | 通用型 AI 代理，适用于开放式任务和系统交互。 |
+| `jarvis` | `jvs` | 通用型 AI 代理，适用于开放式任务和系统交互。 |
 | `jarvis-code-agent` | `jca` | 专为代码开发任务设计的代理，精于代码分析与修改。 |
 | `jarvis-git-commit` | `jgc` | 自动化 Git 提交工具，能根据代码变更智能生成提交信息。 |
 | `jarvis-platform-manager` | `jpm` | AI 平台与模型管理工具，支持对话、API 服务等。 |
-| `jarvis-code-review` | - | 启动一次由 AI 辅助的代码审查会话。 |
-| `jarvis-git-squash` | - | 辅助进行 Git 的交互式 rebase，以合并提交。 |
-| `jarvis-multi-agent` | - | （实验性）运行多代理协作任务。 |
-| `jarvis-agent` | - | 启动一个可高度自定义配置的基础代理。 |
+| `jarvis-code-review` | `jcr` | 启动一次由 AI 辅助的代码审查会话。 |
+| `jarvis-git-squash` | `jgs` | 辅助进行 Git 的交互式 rebase，以合并提交。 |
+| `jarvis-multi-agent` | `jma` | （实验性）运行多代理协作任务。 |
+| `jarvis-agent` | `ja` | 启动一个可高度自定义配置的基础代理。 |
+| `jarvis-tool` | `jt` | 使用工具功能 |
+| `jarvis-git-details` | `jgd` | 使用git details功能 |
+| `jarvis-methodology` | `jm` | 使用方法论功能 |
+| `jarvis-rag` | `jrg` | 使用RAG功能 |
 
 ### 重点命令详解
 
