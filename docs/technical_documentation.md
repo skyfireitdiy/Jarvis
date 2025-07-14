@@ -435,17 +435,13 @@ participant "用户查询" as UserQuery
 participant "QueryRewriter" as QR
 participant "ChromaRetriever\n(Hybrid Search)" as Retriever
 participant "Reranker" as Reranker
-participant "JarvisPlatform_LLM" as LLM
+participant "LLM (Answer Generation)" as LLM
 participant "最终答案" as FinalAnswer
 
 UserQuery -> QR : 1. 重写查询
 QR --> Retriever : 2. 多个查询变体
 
-box "混合检索 (Hybrid Retrieval)" #LightBlue
-    Retriever -> Retriever : 2a. 向量检索 (ChromaDB)
-    Retriever -> Retriever : 2b. 关键词检索 (BM25)
-    Retriever -> Retriever : 2c. 结果融合 (RRF)
-end box
+Retriever -> Retriever : 2a. 向量检索 (ChromaDB)
 
 Retriever --> Reranker : 3. 统一的候选文档列表
 
@@ -465,25 +461,23 @@ LLM -> FinalAnswer : 6. 生成最终答案
     -   **目的**: 克服用户查询与文档语料库之间可能存在的“词汇鸿沟”。
     -   **实现**: 当用户提出一个问题时，该问题首先被送入 `QueryRewriter`。它利用一个 LLM 将原始查询从不同角度改写成多个语义上相似但表述多样的查询变体。例如，将“如何用 aiohttp 上传文件？”改写为“aiohttp 文件上传示例”、“异步 HTTP POST 文件”等。这一步显著提高了找到相关文档的可能性。
 
-2.  **混合检索 (Hybrid Retrieval)**:
+2.  **文档检索 (Document Retrieval)**:
     -   **组件**: `ChromaRetriever`
-    -   **目的**: 结合不同检索方法的优势，实现高召回率。
-    -   **实现**: `ChromaRetriever` 接收所有查询变体，并对每个变体并行执行两种检索策略：
-        -   **向量检索 (Dense Retrieval)**: 使用 `ChromaDB` 和强大的嵌入模型（如 BGE 系列）进行语义搜索，能够理解查询背后的意图，找到内容相关但关键词可能不匹配的文档。
-        -   **关键词检索 (Sparse Retrieval)**: 使用经典的 `BM25` 算法，它对查询中的特定关键词非常敏感，能有效召回那些精确匹配关键词的文档。
-    -   **结果融合**: 两种检索方法得到的结果列表，会通过 **倒数排序融合 (Reciprocal Rank Fusion, RRF)** 算法进行合并。RRF 是一种无需调参的、高效的排序融合算法，它能综合考虑文档在不同检索结果中的排名，给出一个更鲁棒的统一候选文档列表。
+    -   **目的**: 实现高效的语义检索，获得高相关度的文档。
+    -   **实现**: `ChromaRetriever` 接收所有查询变体，并对每个变体执行**向量检索**：
+        -   **向量检索 (Dense Retrieval)**: 使用 `ChromaDB` 和强大的嵌入模型（如 BGE 系列）进行语义搜索。这种方式能够理解查询背后的深层意图，从而找到那些在内容上高度相关、但可能不包含完全相同关键词的文档。
 
 3.  **重排 (Reranking)**:
     -   **组件**: `Reranker`
     -   **目的**: 在高召回率的基础上，进一步提升结果的精确率。
-    -   **实现**: 经过混合检索得到的候选文档列表，虽然相关性较高，但排序可能不是最优的。`Reranker` 使用一个更强大的、计算成本更高的 **交叉编码器 (Cross-Encoder)** 模型（如 `BAAI/bge-reranker-base`）。与在检索阶段独立编码查询和文档的双编码器不同，交叉编码器会同时处理“查询-文档”对，从而能更精确地判断文档与原始查询的真实相关性。它会对候选列表进行重新打分和排序，筛选出最相关的 Top-N 个文档。
+    -   **实现**: 经过向量检索得到的候选文档列表，虽然相关性较高，但排序可能不是最优的。`Reranker` 使用一个更强大的、计算成本更高的 **交叉编码器 (Cross-Encoder)** 模型（如 `BAAI/bge-reranker-base`）。与在检索阶段独立编码查询和文档的双编码器不同，交叉编码器会同时处理“查询-文档”对，从而能更精确地判断文档与原始查询的真实相关性。它会对候选列表进行重新打分和排序，筛选出最相关的 Top-N 个文档。
 
 4.  **答案生成 (Answer Generation)**:
     -   **组件**: `JarvisRAGPipeline` 与 `LLMInterface`
     -   **目的**: 基于最相关的上下文生成高质量的答案。
-    -   **实现**: `JarvisRAGPipeline` 将经过重排后的最优文档作为上下文，连同用户的原始查询，构建成一个最终的提示（Prompt）。这个提示被发送给一个大型语言模型（如 `ToolAgent_LLM`）。LLM 在被明确告知要参考所提供上下文的基础上，生成一个全面、准确且有据可查的答案。
+    -   **实现**: `JarvisRAGPipeline` 将经过重排后的最优文档作为上下文，连同用户的原始查询，构建成一个最终的提示（Prompt）。这个提示被发送给管线中配置的 `self.llm` 实例（默认为 `ToolAgent_LLM`，但可由用户在初始化时指定）。LLM 在被明确告知要参考所提供上下文的基础上，生成一个全面、准确且有据可查的答案。
 
-通过这一套“查询重写 -> 混合检索 -> 精准重排 -> 答案生成”的链式流程，Jarvis 的 RAG 系统能够在复杂的代码库和技术文档中，为用户提供高质量的问答体验。
+通过这一套“查询重写 -> 向量检索 -> 精准重排 -> 答案生成”的链式流程，Jarvis 的 RAG 系统能够在复杂的代码库和技术文档中，为用户提供高质量的问答体验。
 
 ## 4. 典型应用场景 (Typical Use Cases)
 
