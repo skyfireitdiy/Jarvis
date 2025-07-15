@@ -43,8 +43,7 @@ class CodeAgent:
 
     def __init__(
         self,
-        platform: Optional[str] = None,
-        model: Optional[str] = None,
+        llm_type: str = "normal",
         need_summary: bool = True,
     ):
         self.root_dir = os.getcwd()
@@ -113,21 +112,12 @@ class CodeAgent:
 10. 我不订阅闲 AI
 </say_to_llm>
 """
-        # 处理platform参数
-        platform_instance = (
-            PlatformRegistry().create_platform(platform)  # type: ignore
-            if platform
-            else PlatformRegistry().get_normal_platform()
-        )  # type: ignore
-        if model:
-            platform_instance.set_model_name(model)  # type: ignore
-
         self.agent = Agent(
             system_prompt=code_system_prompt,
             name="CodeAgent",
             auto_complete=False,
             output_handler=[tool_registry, EditFileHandler()],
-            platform=platform_instance,
+            llm_type=llm_type,
             input_handler=[shell_input_handler, builtin_input_handler],
             need_summary=need_summary,
             use_methodology=False,  # 禁用方法论
@@ -413,10 +403,11 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Jarvis Code Agent")
     parser.add_argument(
-        "-p", "--platform", type=str, help="Target platform name", default=None
-    )
-    parser.add_argument(
-        "-m", "--model", type=str, help="Model name to use", default=None
+        "--llm_type",
+        type=str,
+        default="normal",
+        choices=["normal", "thinking"],
+        help="LLM type to use",
     )
     parser.add_argument(
         "-r", "--requirement", type=str, help="Requirement to process", default=None
@@ -434,7 +425,7 @@ def main() -> None:
     PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
 
     try:
-        agent = CodeAgent(platform=args.platform, model=args.model, need_summary=False)
+        agent = CodeAgent(llm_type=args.llm_type, need_summary=False)
 
         # 尝试恢复会话
         if args.restore_session:

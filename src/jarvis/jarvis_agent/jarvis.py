@@ -109,8 +109,13 @@ def _select_task(tasks: Dict[str, str]) -> str:
 def main() -> None:
 
     parser = argparse.ArgumentParser(description="Jarvis AI assistant")
-    parser.add_argument("-p", "--platform", type=str, help="Platform to use")
-    parser.add_argument("-m", "--model", type=str, help="Model to use")
+    parser.add_argument(
+        "--llm_type",
+        type=str,
+        default="normal",
+        choices=["normal", "thinking"],
+        help="LLM type to use",
+    )
     parser.add_argument(
         "-t",
         "--task",
@@ -132,8 +137,7 @@ def main() -> None:
     try:
         agent = Agent(
             system_prompt=origin_agent_system_prompt,
-            platform=args.platform,
-            model_name=args.model,
+            llm_type=args.llm_type,
             input_handler=[shell_input_handler, builtin_input_handler],
             output_handler=[ToolRegistry()],
             need_summary=False,

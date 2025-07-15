@@ -44,10 +44,11 @@ def main():
     )
     parser.add_argument("-t", "--task", type=str, help="Initial task to execute")
     parser.add_argument(
-        "-p", "--platform", type=str, help="LLM platform to use, overriding config"
-    )
-    parser.add_argument(
-        "-m", "--model", type=str, help="LLM model to use, overriding config"
+        "--llm_type",
+        type=str,
+        default="normal",
+        choices=["normal", "thinking"],
+        help="LLM type to use, overriding config",
     )
     args = parser.parse_args()
 
@@ -58,10 +59,8 @@ def main():
     config = load_config(args.agent_definition) if args.agent_definition else {}
 
     # Override config with command-line arguments if provided
-    if args.platform:
-        config["platform"] = args.platform
-    if args.model:
-        config["model"] = args.model
+    if args.llm_type:
+        config["llm_type"] = args.llm_type
 
     # Create and run agent
     try:

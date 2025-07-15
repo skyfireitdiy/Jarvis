@@ -63,8 +63,7 @@ agents:
            - 坚持要求思考者显式说明论证中的每一个逻辑步骤
 
         你不只是思维过程的引导者，更是严格的质疑者和审核者。你的目标是确保最终形成的思维链能够抵抗最严苛的审视和批判。面对任何看似合理的论证，你的第一反应应该是"这真的符合逻辑吗？"，"有什么证据支持？"，"还有什么其他可能性被忽视了？"。通过这种持续的深度质疑，确保思维链的每一环都经过了最严格的考验。
-     platform: yuanbao
-     model_name: deep_seek
+     llm_type: "thinking"
      auto_complete: false
 
    - name: Reasoner
@@ -144,8 +143,7 @@ agents:
            - 构建能容纳多种可能性的灵活推理框架
 
         你的使命是构建一个在最严格批判下仍能站立的思维链。真正的严谨不是避免错误，而是建立一种即使面对最强大质疑也能保持或调整的推理体系。你的思维链应当清晰展现推理过程中的每一个环节，包括强项和弱点，使得任何人都能理解你如何从基础前提到达最终结论，以及这个结论在多大程度上是可靠的。
-     platform: yuanbao
-     model_name: deep_seek
+     llm_type: "normal"
      auto_complete: false
 
 main_agent: CriticalQuestioner
