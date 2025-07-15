@@ -199,7 +199,7 @@ class GitCommitAnalyzer:
 [检查代码是否符合行业最佳实践和项目规范]
 {ct("REPORT")}""",
             output_handler=[tool_registry],
-            platform=PlatformRegistry().get_normal_platform(),
+            llm_type="normal",
             auto_complete=True,
         )
 

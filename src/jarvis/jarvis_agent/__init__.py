@@ -26,6 +26,10 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 # jarvis_utils 相关
 from jarvis.jarvis_utils.config import (
     get_max_token_count,
+    get_normal_model_name,
+    get_normal_platform_name,
+    get_thinking_model_name,
+    get_thinking_platform_name,
     is_execute_tool_confirm,
     is_use_analysis,
     is_use_methodology,
@@ -93,8 +97,7 @@ class Agent:
         system_prompt: str,
         name: str = "Jarvis",
         description: str = "",
-        platform: Union[Optional[BasePlatform], Optional[str]] = None,
-        model_name: Optional[str] = None,
+        llm_type: str = "normal",
         summary_prompt: Optional[str] = None,
         auto_complete: bool = False,
         output_handler: List[OutputHandlerProtocol] = [],
@@ -114,8 +117,7 @@ class Agent:
             system_prompt: 系统提示词，定义Agent的行为准则
             name: Agent名称，默认为"Jarvis"
             description: Agent描述信息
-            platform: 平台实例或平台名称字符串
-            model_name: 使用的模型名称
+            llm_type: LLM类型，可以是 'normal' 或 'thinking'
             summary_prompt: 任务总结提示模板
             auto_complete: 是否自动完成任务
             output_handler: 输出处理器列表
@@ -130,22 +132,19 @@ class Agent:
         self.name = make_agent_name(name)
         self.description = description
         # 初始化平台和模型
-        if platform is not None:
-            if isinstance(platform, str):
-                self.model = PlatformRegistry().create_platform(platform)
-                if self.model is None:
-                    PrettyOutput.print(
-                        f"平台 {platform} 不存在，将使用普通模型", OutputType.WARNING
-                    )
-                    self.model = PlatformRegistry().get_normal_platform()
-            else:
-                self.model = platform
-        else:
-            self.model = (
-                PlatformRegistry.get_global_platform_registry().get_normal_platform()
-            )
+        if llm_type == "thinking":
+            platform_name = get_thinking_platform_name()
+            model_name = get_thinking_model_name()
+        else:  # 默认为 normal
+            platform_name = get_normal_platform_name()
+            model_name = get_normal_model_name()
 
-        if model_name is not None:
+        self.model = PlatformRegistry().create_platform(platform_name)
+        if self.model is None:
+            PrettyOutput.print(f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING)
+            self.model = PlatformRegistry().get_normal_platform()
+
+        if model_name:
             self.model.set_model_name(model_name)
 
         self.user_data: Dict[str, Any] = {}

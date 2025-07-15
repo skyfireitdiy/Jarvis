@@ -638,7 +638,7 @@ class CodeReviewTool:
 [在此处插入完整MARKDOWN格式的审查报告]
 {ct("REPORT")}""",
                     output_handler=[tool_registry],
-                    platform=PlatformRegistry().get_thinking_platform(),
+                    llm_type="thinking",
                     auto_complete=False,
                 )
 
