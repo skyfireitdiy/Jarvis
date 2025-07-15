@@ -20,9 +20,7 @@ def load_config(config_path: str) -> dict:
         dict: 配置字典
     """
     if not os.path.exists(config_path):
-        PrettyOutput.print(
-            f"配置文件 {config_path} 不存在，使用默认配置", OutputType.WARNING
-        )
+        PrettyOutput.print(f"配置文件 {config_path} 不存在，使用默认配置", OutputType.WARNING)
         return {}
 
     with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -45,15 +43,25 @@ def main():
         "-c", "--agent_definition", type=str, help="Path to agent definition file"
     )
     parser.add_argument("-t", "--task", type=str, help="Initial task to execute")
+    parser.add_argument(
+        "-p", "--platform", type=str, help="LLM platform to use, overriding config"
+    )
+    parser.add_argument(
+        "-m", "--model", type=str, help="LLM model to use, overriding config"
+    )
     args = parser.parse_args()
 
     # Initialize environment
-    init_env(
-        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config
-    )
+    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config)
 
     # Load configuration
     config = load_config(args.agent_definition) if args.agent_definition else {}
+
+    # Override config with command-line arguments if provided
+    if args.platform:
+        config["platform"] = args.platform
+    if args.model:
+        config["model"] = args.model
 
     # Create and run agent
     try:
