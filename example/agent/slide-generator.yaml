@@ -1,7 +1,5 @@
 name: SlideGenerator
 description: 幻灯片生成专家，负责根据用户需求生成幻灯片
-platform: yuanbao
-model_name: deep_seek
 system_prompt: |
   **System Prompt for Slidev Document Generation**
 

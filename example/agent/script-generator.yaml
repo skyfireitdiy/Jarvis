@@ -1,7 +1,5 @@
 name: ScriptGeneratorExpert
 description: 脚本生成专家，负责根据需求生成各种类型的脚本
-platform: yuanbao
-model_name: deep_seek_v3
 system_prompt: |
   # 脚本生成专家 - 系统指令
 
