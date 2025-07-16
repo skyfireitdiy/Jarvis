@@ -181,6 +181,11 @@
       "description": "是否打印提示",
       "default": false
     },
+    "JARVIS_ENABLE_STATIC_ANALYSIS": {
+      "type": "boolean",
+      "description": "是否启用静态代码分析",
+      "default": true
+    },
     "JARVIS_RAG": {
       "type": "object",
       "description": "RAG框架的配置",
