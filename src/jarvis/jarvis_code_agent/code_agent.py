@@ -18,7 +18,7 @@ from jarvis.jarvis_code_agent.lint import get_lint_tools
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import is_confirm_before_apply_patch, is_enable_static_analysis
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
     find_git_root_and_cd,
@@ -364,7 +364,7 @@ class CodeAgent:
                         if lint_tools_info
                         else ""
                     )
-                    if lint_tools_info:
+                    if lint_tools_info and is_enable_static_analysis():
                         addon_prompt = f"""
 请对以下修改的文件进行静态扫描:
 {file_list}

@@ -241,6 +241,16 @@ def is_print_prompt() -> bool:
     return GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_PROMPT", False) == True
 
 
+def is_enable_static_analysis() -> bool:
+    """
+    获取是否启用静态代码分析。
+
+    返回：
+        bool: 如果启用静态代码分析则返回True，默认为True
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STATIC_ANALYSIS", True) is True
+
+
 def get_mcp_config() -> List[Dict[str, Any]]:
     """
     获取MCP配置列表。
