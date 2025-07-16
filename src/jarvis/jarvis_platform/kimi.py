@@ -26,6 +26,7 @@ class KimiModel(BasePlatform):
         return [
             ("kimi", "基于网页的 Kimi，免费接口"),
             ("k1", "基于网页的 Kimi，深度思考模型"),
+            ("k2", "基于网页的 Kimi，深度思考模型 K2"),
         ]
 
     def __init__(self):
@@ -278,8 +279,9 @@ class KimiModel(BasePlatform):
             "use_search": True if self.web else False,
             "extend": {"sidebar": True},
             "kimiplus_id": "kimi",
-            "use_research": False,
-            "use_math": False,
+            "use_deep_research": False,
+            "use_semantic_memory": True,
+            "history": [],
             "refs": refs,
             "refs_file": refs_file,
             "model": self.model_name,
