@@ -1,3 +1,30 @@
+### Release Note - v0.1.222 2025-07-19
+
+#### **新功能 (Features)**
+- 为所有主要命令添加了快捷别名 (e.g., `jvs`, `jca`, `jcr`)，提升使用效率。
+- 新增 `jarvis-rag` (`jrg`) 命令，提供独立的RAG功能入口。
+- 新增 "GROW模型分析专家" 角色，用于结构化目标设定和问题解决。
+- 新增 `JARVIS_ENABLE_STATIC_ANALYSIS` 配置项，允许用户控制是否在代码修改后执行静态分析。
+- Kimi平台新增 "k2" 深度思考模型支持。
+
+#### **修复 (Fixes)**
+- (无)
+
+#### **优化与重构 (Refactors & Improvements)**
+- 重构了Agent的模型配置逻辑，使用 `llm_type` (`normal`/`thinking`)替代硬编码的 `platform` 和 `model_name`，增强了灵活性和可维护性。
+- 优化了PDF导出样式 (`style.css`)，改善了字体、边距和布局，并增加了页码。
+- 改进了会话恢复逻辑，确保恢复后能正确识别为非首次运行。
+- 简化了Agent示例配置文件，移除了冗余的模型定义。
+
+#### **文档更新 (Documentation)**
+- 更新了 `README.md`，加入了所有命令的快捷方式，并补充了新功能说明。
+- 更新了 `technical_documentation.md`，精简和澄清了RAG系统的架构描述。
+
+#### **其他 (Miscellaneous)**
+- (无)
+
+本次更新主要聚焦于提升用户体验和内部架构优化。引入了大量命令别名以方便日常使用，并对核心Agent的LLM调用机制进行了重构，使其更加灵活。同时，新增了RAG和GROW模型专家等功能，并优化了文档和PDF产出质量。
+
 ### Release Note - v0.1.221 2025-07-14
 
 #### **新功能 (Features)**
