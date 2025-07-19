@@ -155,11 +155,12 @@ def main() -> None:
             agent.run(args.task)
             sys.exit(0)
 
-        tasks = _load_tasks()
-        if tasks and (selected_task := _select_task(tasks)):
-            PrettyOutput.print(f"开始执行任务: \n{selected_task}", OutputType.INFO)
-            agent.run(selected_task)
-            sys.exit(0)
+        if agent.first:
+            tasks = _load_tasks()
+            if tasks and (selected_task := _select_task(tasks)):
+                PrettyOutput.print(f"开始执行任务: \n{selected_task}", OutputType.INFO)
+                agent.run(selected_task)
+                sys.exit(0)
 
         user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
         if user_input:

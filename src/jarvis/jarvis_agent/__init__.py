@@ -141,7 +141,9 @@ class Agent:
 
         self.model = PlatformRegistry().create_platform(platform_name)
         if self.model is None:
-            PrettyOutput.print(f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING)
+            PrettyOutput.print(
+                f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING
+            )
             self.model = PlatformRegistry().get_normal_platform()
 
         if model_name:
@@ -197,7 +199,7 @@ class Agent:
 
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
 
-        action_prompt = build_action_prompt(self.output_handler) # type: ignore
+        action_prompt = build_action_prompt(self.output_handler)  # type: ignore
 
         self.model.set_system_prompt(
             f"""
@@ -244,7 +246,10 @@ class Agent:
 
     def restore_session(self) -> bool:
         """Restores the session state by delegating to the session manager."""
-        return self.session.restore_session()
+        if self.session.restore_session():
+            self.first = False
+            return True
+        return False
 
     def get_tool_registry(self) -> Optional[Any]:
         """获取工具注册表实例"""
