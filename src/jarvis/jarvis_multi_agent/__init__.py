@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
@@ -14,9 +14,10 @@ from jarvis.jarvis_utils.tag import ct, ot
 class MultiAgent(OutputHandler):
     def __init__(self, agents_config: List[Dict], main_agent_name: str):
         self.agents_config = agents_config
-        self.agents = {}
-        self.init_agents()
+        self.agents_config_map = {c["name"]: c for c in agents_config}
+        self.agents: Dict[str, Agent] = {}
         self.main_agent_name = main_agent_name
+        self.original_question: Optional[str] = None
 
     def prompt(self) -> str:
         return f"""
@@ -101,43 +102,85 @@ content: |2
                 continue
         return ret
 
-    def init_agents(self):
-        for config in self.agents_config:
-            output_handler = config.get("output_handler", [])
-            if len(output_handler) == 0:
-                output_handler = [
-                    ToolRegistry(),
-                    self,
-                ]
-            else:
+    def _get_agent(self, name: str) -> Agent | None:
+        if name in self.agents:
+            return self.agents[name]
+
+        if name not in self.agents_config_map:
+            return None
+
+        config = self.agents_config_map[name].copy()
+
+        if name != self.main_agent_name and self.original_question:
+            system_prompt = config.get("system_prompt", "")
+            config["system_prompt"] = (
+                f"{system_prompt}\n\n# 原始问题\n{self.original_question}"
+            )
+
+        output_handler = config.get("output_handler", [])
+        if len(output_handler) == 0:
+            output_handler = [
+                ToolRegistry(),
+                self,
+            ]
+        else:
+            if not any(isinstance(h, MultiAgent) for h in output_handler):
                 output_handler.append(self)
-            config["output_handler"] = output_handler
-            agent = Agent(**config)
-            self.agents[config["name"]] = agent
+        config["output_handler"] = output_handler
+
+        agent = Agent(**config)
+        self.agents[name] = agent
+        return agent
 
     def run(self, user_input: str) -> str:
-        last_agent = self.main_agent_name
-        msg = self.agents[self.main_agent_name].run(user_input)
+        self.original_question = user_input
+        last_agent_name = self.main_agent_name
+
+        agent = self._get_agent(self.main_agent_name)
+        if not agent:
+            # This should not happen if main_agent_name is correctly configured
+            return f"主智能体 {self.main_agent_name} 未找到"
+
+        msg: Any = agent.run(user_input)
+
         while msg:
             if isinstance(msg, str):
                 return msg
-            elif isinstance(msg, Dict):
-                prompt = f"""
+
+            if not isinstance(msg, Dict):
+                # Should not happen if agent.run() returns str or Dict
+                PrettyOutput.print(f"未知消息类型: {type(msg)}", OutputType.WARNING)
+                break
+
+            prompt = f"""
 Please handle this message:
-from: {last_agent}
+from: {last_agent_name}
 content: {msg['content']}
 """
-                if msg["to"] not in self.agents:
-                    PrettyOutput.print(
-                        f"未找到智能体 {msg['to']}，正在重试...", OutputType.WARNING
-                    )
-                    msg = self.agents[last_agent].run(
-                        f"未找到智能体 {msg['to']}，可用智能体列表: {self.agents.keys()}"
-                    )
-                    continue
+            to_agent_name = msg.get("to")
+            if not to_agent_name:
+                return f"消息中未指定 `to` 字段"
+
+            if to_agent_name not in self.agents_config_map:
                 PrettyOutput.print(
-                    f"{last_agent} 正在向 {msg['to']} 发送消息...", OutputType.INFO
+                    f"未找到智能体 {to_agent_name}，正在重试...", OutputType.WARNING
                 )
-                last_agent = self.agents[msg["to"]].name
-                msg = self.agents[msg["to"]].run(prompt)
+                agent = self._get_agent(last_agent_name)
+                if not agent:
+                    return f"智能体 {last_agent_name} 未找到"
+                msg = agent.run(
+                    f"未找到智能体 {to_agent_name}，可用智能体列表: {list(self.agents_config_map.keys())}"
+                )
+                continue
+
+            PrettyOutput.print(
+                f"{last_agent_name} 正在向 {to_agent_name} 发送消息...", OutputType.INFO
+            )
+
+            agent = self._get_agent(to_agent_name)
+            if not agent:
+                return f"智能体 {to_agent_name} 未找到"
+
+            last_agent_name = agent.name
+            msg = agent.run(prompt)
         return ""
