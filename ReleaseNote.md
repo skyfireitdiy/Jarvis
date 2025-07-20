@@ -14,8 +14,7 @@
     -   **知识库(RAG)增强**: `jarvis-rag` 新增 `list-docs` 子命令，并为常用选项增加了简写形式和 `--batch-size` 选项。
 -   **模型更新**:
     -   在 `src/jarvis/jarvis_platform/kimi.py` 中，更新了 Kimi 平台的模型列表，以匹配最新的版本名称 (`k1.5`, `k1.5-thinking`, `k2-thinking`)。
-#### **修复 (Fixes)**
--   (本次更新无直接相关的代码修复)
+    
 #### **优化与重构 (Refactors & Improvements)**
 -   **实现智能体懒加载**:
     -   在 `src/jarvis/jarvis_multi_agent/__init__.py` 中，将智能体初始化方式改为按需懒加载 (`_get_agent`)，提升了多智能体系统的启动性能和资源利用率。
@@ -28,8 +27,7 @@
 #### **文档更新 (Documentation)**
 -   **更新 `README.md`**:
     -   全面更新了 `jarvis`, `jarvis-code-agent`, `jarvis-agent`, `jarvis-platform-manager`, 和 `jarvis-rag` 等所有命令行工具的参数和功能说明，以反映最新的功能变更。
-#### **其他 (Miscellaneous)**
--   (无)
+
 本次更新的核心是引入了结构化的“问题解决多智能体”工作流，并通过重构实现了智能体懒加载和中心化协调，大幅提升了系统的性能和可扩展性。同时，显著增强了AI教练的专业能力和命令行工具的易用性。
 
 
