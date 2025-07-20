@@ -29,7 +29,7 @@ agents:
 
       ## 消息发送指令
       - 当你完成问题定义报告后，必须使用 `SEND_MESSAGE` 工具将其发送给 `RootCauseAnalyzer`。
-    llm_type: "normal"
+    llm_type: "thinking"
     auto_complete: false
 
   - name: RootCauseAnalyzer
@@ -59,7 +59,7 @@ agents:
 
       ## 消息发送指令
       - 当你完成根因分析报告后，必须使用 `SEND_MESSAGE` 工具将其发送给 `SolutionArchitect`。
-    llm_type: "normal"
+    llm_type: "thinking"
     auto_complete: false
 
   - name: SolutionArchitect
@@ -91,7 +91,7 @@ agents:
 
       ## 消息发送指令
       - 完成方案设计后，根据是否需要编码，使用 `SEND_MESSAGE` 工具发送给 `CodeImplementer` 或 `VerificationSpecialist`。
-    llm_type: "normal"
+    llm_type: "thinking"
     auto_complete: false
 
   - name: CodeImplementer
