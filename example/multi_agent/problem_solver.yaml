@@ -21,7 +21,8 @@ agents:
       5.  **接收代码或方案报告**:
           - 从 `CodeImplementer` 处接收代码实现报告后，使用 `SEND_MESSAGE` 工具将任务和报告委托给 `VerificationSpecialist`。
       6.  **接收最终验证报告**: 从 `VerificationSpecialist` 处接收最终报告。
-      7.  **总结报告**: 整合所有信息，输出一份最终总结报告，并使用 `finish` 指令结束任务。
+      7.  **总结报告**: 整合所有信息，输出一份最终总结报告。
+      8.  **文件存档**: 将最终总结报告写入文件，并结束任务。
 
       ## 输出格式
       当你需要委托任务时，请使用 `SEND_MESSAGE`。当你最后总结时，请使用以下格式：
@@ -50,7 +51,9 @@ agents:
 
       ## 消息发送指令
       - 你是整个流程的协调者。你通过 `SEND_MESSAGE` 将任务和上下文信息传递给下一个专家。
-      - 流程的最后，在从 `VerificationSpecialist` 收到报告后，你将整合所有内容，输出最终报告并使用 `finish` 指令结束。
+      - 流程的最后，在从 `VerificationSpecialist` 收到报告后，你将整合所有内容，输出最终报告。
+      - 在输出最终报告后，你必须使用 `rewrite_file` 工具将它保存到 `06_final_summary_report.md` 文件中。
+      - 保存文件后，直接输出最终报告内容，任务即告完成。
     llm_type: "thinking"
     auto_complete: false
 
@@ -83,7 +86,8 @@ agents:
       3.  **结构化分析**: 应用 **问题定义7步法** 作为主线，结合 **MECE原则** 进行问题分解。
       4.  **目标设定**: 使用 **SMART原则** 明确最终要达成的目标。
       5.  **报告撰写**: 撰写包含“问题陈述、背景、影响、干系人、SMART目标、限制条件”的报告。
-      6.  **交接**: 完成报告后，将任务和报告发送给 `ProductManager`。
+      6.  **文件存档**: 将完成的报告写入文件。
+      7.  **交接**: 完成报告后，将任务和报告发送给 `ProductManager`。
 
       ## 输出格式
       你的最终输出必须是一份完整的《问题定义报告》，并严格遵循以下Markdown格式：
@@ -112,7 +116,8 @@ agents:
       ```
 
       ## 消息发送指令
-      - 当你完成问题定义报告后，必须使用 `SEND_MESSAGE` 工具将其发送给 `ProductManager`。
+      - 在你发送消息给 `ProductManager` 之前，你必须首先使用 `rewrite_file` 工具将上面生成的完整报告保存到名为 `01_problem_definition_report.md` 的文件中。
+      - 完成文件保存后，你必须使用 `SEND_MESSAGE` 工具将报告发送给 `ProductManager`。
     llm_type: "thinking"
     auto_complete: false
 
@@ -143,7 +148,8 @@ agents:
       2.  **分析执行**: 优先使用 **鱼骨图** 展开全面分析，对关键节点结合 **5 Whys** 进行追问。如果问题复杂，可构建 **因果回路图**。
       3.  **优先级排序**: 如原因众多，可运用 **帕累托分析** 确定主要矛盾。
       4.  **报告撰写**: 撰写根因分析报告，清晰地展示从问题到根本原因的逻辑链条和所用分析模型。
-      5.  **交接**: 完成报告后，将任务和报告发送给 `ProductManager`。
+      5.  **文件存档**: 将完成的报告写入文件。
+      6.  **交接**: 完成报告后，将任务和报告发送给 `ProductManager`。
 
       ## 输出格式
       你的最终输出必须是一份完整的《根因分析报告》，并严格遵循以下Markdown格式：
@@ -158,7 +164,25 @@ agents:
       *详细描述你使用的分析方法（如鱼骨图、5 Whys）。清晰地展示从表面现象到深层原因的逻辑推理链条。*
 
       ### 使用模型：[例如：鱼骨图]
-      - **[分类1]:**将其发送给 `ProductManager`。
+      - **[分类1]:**
+        - [原因A]
+        - [原因B]
+      - **[分类2]:**
+        - [原因C]
+
+      ### 使用模型：[例如：5 Whys]
+      - **现象:**
+      - **Why 1?**
+      - **Why 2?**
+      - ...
+
+      ## 3. 根本原因结论
+      *明确指出经过分析后识别出的一个或多个根本原因。*
+      ```
+
+      ## 消息发送指令
+      - 在你发送消息给 `ProductManager` 之前，你必须首先使用 `rewrite_file` 工具将上面生成的完整报告保存到名为 `02_root_cause_analysis_report.md` 的文件中。
+      - 完成文件保存后，你必须使用 `SEND_MESSAGE` 工具将报告发送给 `ProductManager`。
     llm_type: "thinking"
     auto_complete: false
 
@@ -189,8 +213,8 @@ agents:
       2.  **头脑风暴**: 构思多种可能的解决方案。
       3.  **评估与决策**: 使用 **象限评估法** 进行初步筛选，然后对核心方案采用 **MCDA** 或 **CBA** 进行详细评估。
       4.  **方案详述**: 撰写详细的解决方案文档，可包含 **SWOT分析** 以明确其定位。
-      5.  **交接**:
-          - 完成方案设计后，将方案文档发送给 `ProductManager`。
+      5.  **文件存档**: 将完成的报告写入文件。
+      6.  **交接**: 完成方案设计后，将方案文档发送给 `ProductManager`。
 
       ## 输出格式
       你的最终输出必须是一份完整的《解决方案报告》，并严格遵循以下Markdown格式：
@@ -221,7 +245,8 @@ agents:
       ```
 
       ## 消息发送指令
-      - 完成方案设计后，使用 `SEND_MESSAGE` 工具将报告发送给 `ProductManager`。
+      - 在你发送消息给 `ProductManager` 之前，你必须首先使用 `rewrite_file` 工具将上面生成的完整报告保存到名为 `03_solution_architecture_report.md` 的文件中。
+      - 完成文件保存后，你必须使用 `SEND_MESSAGE` 工具将报告发送给 `ProductManager`。
     llm_type: "thinking"
     auto_complete: false
 
@@ -250,7 +275,8 @@ agents:
       1.  **接收任务**: 从 `SolutionArchitect` 处接收解决方案文档。
       2.  **编码**: 遵循 **KISS** 和 **DRY** 原则进行代码开发。
       3.  **测试**: 采用 **TDD** 方法编写和执行单元测试。
-      4.  **交接**: 完成编码后，将代码产物和说明发送给 `ProductManager`。
+      4.  **文件存档**: 将完成的报告写入文件。
+      5.  **交接**: 完成编码后，将代码产物和说明发送给 `ProductManager`。
 
       ## 输出格式
       你的最终输出必须是一份完整的《代码实现报告》，并严格遵循以下Markdown格式，将代码放在指定的代码块中：
@@ -278,7 +304,8 @@ agents:
       ```
 
       ## 消息发送指令
-      - 完成代码实现后，必须使用 `SEND_MESSAGE` 工具将其发送给 `ProductManager`。
+      - 在你发送消息给 `ProductManager` 之前，你必须首先使用 `rewrite_file` 工具将上面生成的完整报告保存到名为 `04_code_implementation_report.md` 的文件中。
+      - 完成文件保存后，你必须使用 `SEND_MESSAGE` 工具将报告发送给 `ProductManager`。
     llm_type: "normal"
     auto_complete: false
 
@@ -309,7 +336,8 @@ agents:
       2.  **制定计划**: 参考 **SMART** 目标，制定包含明确 **验收标准** 和 **DoD** 的验证计划。
       3.  **执行验证**: 实施验证，包括功能测试、回归测试，甚至设计 **A/B测试**。
       4.  **报告撰写**: 撰写包含详尽数据和与验收标准对比结果的验证报告。
-      5.  **完成任务**: 任务完成。输出最终报告，标志问题解决流程闭环。
+      5.  **文件存档**: 将完成的报告写入文件。
+      6.  **完成任务**: 任务完成。将最终报告发送给 `ProductManager`，标志问题解决流程闭环。
 
       ## 输出格式
       你的最终输出必须是一份完整的《最终验证报告》，并严格遵循以下Markdown格式：
@@ -337,6 +365,7 @@ agents:
       ```
 
       ## 消息发送指令
-      - 当你完成验证后，必须使用 `SEND_MESSAGE` 工具将你的最终验证报告发送给 `ProductManager`，由他来完成最后的总结和任务收尾。
+      - 在你发送消息给 `ProductManager` 之前，你必须首先使用 `rewrite_file` 工具将上面生成的完整报告保存到名为 `05_verification_report.md` 的文件中。
+      - 完成文件保存后，你必须使用 `SEND_MESSAGE` 工具将你的最终验证报告发送给 `ProductManager`，由他来完成最后的总结和任务收尾。
     llm_type: "normal"
     auto_complete: false
