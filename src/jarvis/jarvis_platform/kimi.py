@@ -24,9 +24,9 @@ class KimiModel(BasePlatform):
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
         return [
-            ("kimi", "基于网页的 Kimi，免费接口"),
-            ("k1", "基于网页的 Kimi，深度思考模型"),
-            ("k2", "基于网页的 Kimi，深度思考模型 K2"),
+            ("k1.5", "基于网页的 Kimi，免费接口"),
+            ("k1.5-thinking", "基于网页的 Kimi，深度思考模型"),
+            ("k2-thinking", "基于网页的 Kimi，深度思考模型 K2"),
         ]
 
     def __init__(self):
