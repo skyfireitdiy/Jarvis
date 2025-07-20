@@ -26,7 +26,7 @@ class KimiModel(BasePlatform):
         return [
             ("k1.5", "基于网页的 Kimi，免费接口"),
             ("k1.5-thinking", "基于网页的 Kimi，深度思考模型"),
-            ("k2-thinking", "基于网页的 Kimi，深度思考模型 K2"),
+            ("k2", "基于网页的 Kimi，深度思考模型 K2"),
         ]
 
     def __init__(self):

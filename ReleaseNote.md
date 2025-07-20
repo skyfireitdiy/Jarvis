@@ -1,3 +1,38 @@
+### Release Note - v0.1.223 2025-07-20
+#### **新功能 (Features)**
+-   **新增问题解决多智能体(Problem Solver)示例**:
+    -   在 `example/multi_agent/` 目录下新增了 `problem_solver.yaml`，提供了一个完整、结构化的多智能体协作工作流。
+    -   该工作流包含产品经理、问题定义、根因分析、方案设计、代码实现和验证等多个专业智能体。
+    -   为所有智能体增加了文件存档步骤，在交接前会将报告（如 `01_problem_definition_report.md`）写入文件，确保流程可追溯。
+    -   为智能体添加了 `use_methodology` 和 `use_analysis` 控制开关，并引入了“禁止杜撰”、“主动提问”等交互原则。
+-   **丰富AI教练的方法论**:
+    -   在 `example/roles/roles.yaml` 中，为“技术教练”角色在问题定义、根因分析、方案评估等阶段，补充了大量业界标准方法论，如 `5W1H`、`帕累托分析`、`SWOT分析`、`成本效益分析(CBA)` 和
+`多标准决策分析(MCDA)` 等。
+-   **命令行工具功能增强**:
+    -   **统一模型选择**: 为 `jarvis` 和 `jarvis-code-agent` 引入 `--llm_type` 参数，以简化大语言模型的选择。
+    -   **会话管理**: 为 `jarvis` 和 `jarvis-code-agent` 新增 `--restore-session` 功能；为 `jarvis-platform-manager` 聊天模式增加了 `/save_session` 和 `/load_session` 命令。
+    -   **知识库(RAG)增强**: `jarvis-rag` 新增 `list-docs` 子命令，并为常用选项增加了简写形式和 `--batch-size` 选项。
+-   **模型更新**:
+    -   在 `src/jarvis/jarvis_platform/kimi.py` 中，更新了 Kimi 平台的模型列表，以匹配最新的版本名称 (`k1.5`, `k1.5-thinking`, `k2-thinking`)。
+#### **修复 (Fixes)**
+-   (本次更新无直接相关的代码修复)
+#### **优化与重构 (Refactors & Improvements)**
+-   **实现智能体懒加载**:
+    -   在 `src/jarvis/jarvis_multi_agent/__init__.py` 中，将智能体初始化方式改为按需懒加载 (`_get_agent`)，提升了多智能体系统的启动性能和资源利用率。
+-   **重构多智能体工作流**:
+    -   引入“产品经理”(`ProductManager`)作为核心协调者，将原有的线性流程重构为以产品经理为中心的“中心-辐射”模式，增强了工作流的集中控制与灵活性。
+-   **增强上下文传递**:
+    -   在调用子智能体时，自动将用户的原始问题追加到其系统提示中，为子智能体提供更完整的任务背景。
+-   **解耦提示生成逻辑**:
+    -   在 `src/jarvis/jarvis_agent/builtin_input_handler.py` 中，将工具使用提示的生成逻辑重构为独立的 `build_action_prompt` 函数，提高了代码的模块化和可维护性。
+#### **文档更新 (Documentation)**
+-   **更新 `README.md`**:
+    -   全面更新了 `jarvis`, `jarvis-code-agent`, `jarvis-agent`, `jarvis-platform-manager`, 和 `jarvis-rag` 等所有命令行工具的参数和功能说明，以反映最新的功能变更。
+#### **其他 (Miscellaneous)**
+-   (无)
+本次更新的核心是引入了结构化的“问题解决多智能体”工作流，并通过重构实现了智能体懒加载和中心化协调，大幅提升了系统的性能和可扩展性。同时，显著增强了AI教练的专业能力和命令行工具的易用性。
+
+
 ### Release Note - v0.1.222 2025-07-19
 
 #### **新功能 (Features)**
