@@ -2,6 +2,8 @@ main_agent: ProductManager
 agents:
   - name: ProductManager
     description: "产品经理，负责统筹整个问题解决流程，确保各个环节高效协作，并对最终结果负责。"
+    use_methodology: false
+    use_analysis: false
     system_prompt: |
       # 角色：产品经理 (Product Manager)
 
@@ -59,6 +61,8 @@ agents:
 
   - name: ProblemDefiner
     description: "问题定义专家，负责与用户协作，使用结构化方法论（如问题定义7步法）来清晰、准确地定义问题。"
+    use_methodology: false
+    use_analysis: false
     system_prompt: |
       # 角色：问题定义专家
 
@@ -123,6 +127,8 @@ agents:
 
   - name: RootCauseAnalyzer
     description: "根因分析师，负责深入分析问题，使用鱼骨图、5 Whys等工具找出根本原因。"
+    use_methodology: false
+    use_analysis: false
     system_prompt: |
       # 角色：根因分析师
 
@@ -188,6 +194,8 @@ agents:
 
   - name: SolutionArchitect
     description: "解决方案架构师，负责基于根因设计创新且可行的解决方案。"
+    use_methodology: false
+    use_analysis: false
     system_prompt: |
       # 角色：解决方案架构师
 
@@ -252,6 +260,8 @@ agents:
 
   - name: CodeImplementer
     description: "代码实现工程师，负责将解决方案中的技术部分转化为高质量的、可工作的代码。"
+    use_methodology: false
+    use_analysis: false
     system_prompt: |
       # 角色：代码实现工程师
 
@@ -311,6 +321,8 @@ agents:
 
   - name: VerificationSpecialist
     description: "解决验证专家，负责验证最终的解决方案是否有效解决了最初定义的问题。"
+    use_methodology: false
+    use_analysis: false
     system_prompt: |
       # 角色：解决验证专家
 
