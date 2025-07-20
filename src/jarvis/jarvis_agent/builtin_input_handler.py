@@ -39,12 +39,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "ToolUsage":
             from jarvis.jarvis_tools.registry import ToolRegistry
-
-            tool_registry_ = agent.get_tool_registry()
-            tool_registry: ToolRegistry = (
-                tool_registry_ if tool_registry_ else ToolRegistry()
-            )
-            agent.set_addon_prompt(tool_registry.prompt())
+            from jarvis.jarvis_agent.prompt_builder import build_action_prompt
+            action_prompt = build_action_prompt(agent.output_handler) # type: ignore
+            agent.set_addon_prompt(action_prompt)
             return "", False
         elif tag == "ReloadConfig":
             from jarvis.jarvis_utils.utils import load_config
