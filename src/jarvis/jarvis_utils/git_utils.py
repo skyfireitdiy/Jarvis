@@ -16,7 +16,7 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Set, Tuple
 
-from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import get_data_dir, is_confirm_before_apply_patch
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.input import user_confirm
 
@@ -339,25 +339,21 @@ def check_and_update_git_repo(repo_path: str) -> bool:
     返回:
         bool: 是否执行了更新
     """
+    # 检查上次检查日期
+    last_check_file = os.path.join(get_data_dir(), "last_git_check")
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    if os.path.exists(last_check_file):
+        with open(last_check_file, "r") as f:
+            last_check_date = f.read().strip()
+        if last_check_date == today_str:
+            return False
+
     curr_dir = os.path.abspath(os.getcwd())
     git_root = find_git_root_and_cd(repo_path)
     if git_root is None:
         return False
 
     try:
-        # 检查最新提交时间是否为今天
-        commit_date_result = subprocess.run(
-            ["git", "log", "-1", "--format=%cd", "--date=short"],
-            cwd=git_root,
-            capture_output=True,
-            text=True,
-        )
-        if commit_date_result.returncode == 0:
-            commit_date = commit_date_result.stdout.strip()
-            today = datetime.date.today().strftime("%Y-%m-%d")
-            if commit_date == today:
-                return False
-
         # 检查是否有未提交的修改
         if has_uncommitted_changes():
             return False
@@ -454,6 +450,9 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                     f"安装过程中发生意外错误: {str(e)}", OutputType.ERROR
                 )
                 return False
+        # 更新检查日期文件
+        with open(last_check_file, "w") as f:
+            f.write(today_str)
         return False
     except Exception as e:
         PrettyOutput.print(f"Git仓库更新检查失败: {e}", OutputType.WARNING)
