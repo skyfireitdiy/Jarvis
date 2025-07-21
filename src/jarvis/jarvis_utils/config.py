@@ -109,8 +109,7 @@ def get_shell_name() -> str:
     3. 最后从环境变量SHELL获取
     4. 如果都未配置，则默认返回bash
     """
-    shell_path = GLOBAL_CONFIG_DATA.get(
-        "SHELL", os.getenv("SHELL", "/bin/bash"))
+    shell_path = GLOBAL_CONFIG_DATA.get("SHELL", os.getenv("SHELL", "/bin/bash"))
     return os.path.basename(shell_path).lower()
 
 
@@ -142,8 +141,7 @@ def get_thinking_platform_name() -> str:
         str: 平台名称，默认为'yuanbao'
     """
     return GLOBAL_CONFIG_DATA.get(
-        "JARVIS_THINKING_PLATFORM", GLOBAL_CONFIG_DATA.get(
-            "JARVIS_PLATFORM", "yuanbao")
+        "JARVIS_THINKING_PLATFORM", GLOBAL_CONFIG_DATA.get("JARVIS_PLATFORM", "yuanbao")
     )
 
 
@@ -155,8 +153,7 @@ def get_thinking_model_name() -> str:
         str: 模型名称，默认为'deep_seek'
     """
     return GLOBAL_CONFIG_DATA.get(
-        "JARVIS_THINKING_MODEL", GLOBAL_CONFIG_DATA.get(
-            "JARVIS_MODEL", "deep_seek")
+        "JARVIS_THINKING_MODEL", GLOBAL_CONFIG_DATA.get("JARVIS_MODEL", "deep_seek")
     )
 
 
@@ -231,6 +228,16 @@ def is_use_analysis() -> bool:
         bool: 如果启用任务分析则返回True，默认为True
     """
     return GLOBAL_CONFIG_DATA.get("JARVIS_USE_ANALYSIS", True) == True
+
+
+def get_tool_load_dirs() -> List[str]:
+    """
+    获取工具加载目录。
+
+    返回:
+        List[str]: 工具加载目录列表
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_LOAD_DIRS", [])
 
 
 def is_print_prompt() -> bool:

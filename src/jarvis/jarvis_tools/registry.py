@@ -14,7 +14,7 @@ from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
 from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, get_tool_load_dirs
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow
@@ -286,18 +286,22 @@ class ToolRegistry(OutputHandlerProtocol):
             self.register_tool_by_file(str(file_path))
 
     def _load_external_tools(self) -> None:
-        """从jarvis_data/tools加载外部工具"""
-        external_tools_dir = Path(get_data_dir()) / "tools"
-        if not external_tools_dir.exists():
-            return
+        """从jarvis_data/tools和配置的目录加载外部工具"""
+        tool_dirs = [Path(get_data_dir()) / "tools"] + [
+            Path(p) for p in get_tool_load_dirs()
+        ]
 
-        # 遍历目录中的所有.py文件
-        for file_path in external_tools_dir.glob("*.py"):
-            # 跳过__init__.py
-            if file_path.name == "__init__.py":
+        for tool_dir in tool_dirs:
+            if not tool_dir.exists():
                 continue
 
-            self.register_tool_by_file(str(file_path))
+            # 遍历目录中的所有.py文件
+            for file_path in tool_dir.glob("*.py"):
+                # 跳过__init__.py
+                if file_path.name == "__init__.py":
+                    continue
+
+                self.register_tool_by_file(str(file_path))
 
     def register_mcp_tool_by_config(self, config: Dict[str, Any]) -> bool:
         """从配置字典加载并注册工具
@@ -406,12 +410,13 @@ class ToolRegistry(OutputHandlerProtocol):
                 return False
 
             # 创建MCP客户端
+            mcp_client: McpClient
             if config["type"] == "stdio":
-                mcp_client: McpClient = StdioMcpClient(config)
+                mcp_client = StdioMcpClient(config)
             elif config["type"] == "sse":
-                mcp_client: McpClient = SSEMcpClient(config)
+                mcp_client = SSEMcpClient(config)
             elif config["type"] == "streamable":
-                mcp_client: McpClient = StreamableMcpClient(config)
+                mcp_client = StreamableMcpClient(config)
             else:
                 raise ValueError(f"不支持的MCP客户端类型: {config['type']}")
 
