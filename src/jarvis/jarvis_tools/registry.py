@@ -165,11 +165,21 @@ class ToolRegistry(OutputHandlerProtocol):
             return tools_prompt
         return ""
 
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
-        tool_call, err_msg = self._extract_tool_calls(response)
-        if err_msg:
-            return False, err_msg
-        return False, self.handle_tool_calls(tool_call, agent)
+    def handle(self, response: str, agent_: Any) -> Tuple[bool, Any]:
+        try:
+            tool_call, err_msg = self._extract_tool_calls(response)
+            if err_msg:
+                return False, err_msg
+            return False, self.handle_tool_calls(tool_call, agent_)
+        except Exception as e:
+            PrettyOutput.print(f"工具调用处理失败: {str(e)}", OutputType.ERROR)
+            from jarvis.jarvis_agent import Agent
+
+            agent: Agent = agent_
+            return (
+                False,
+                f"工具调用处理失败: {str(e)}\n\n{agent.get_tool_usage_prompt()}",
+            )
 
     def __init__(self) -> None:
         """初始化工具注册表"""

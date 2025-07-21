@@ -92,6 +92,10 @@ class Agent:
         # 只有在记录启动时才停止记录
         delete_agent(self.name)
 
+    def get_tool_usage_prompt(self) -> str:
+        """获取工具使用提示"""
+        return build_action_prompt(self.output_handler)  # type: ignore
+
     def __init__(
         self,
         system_prompt: str,
@@ -199,7 +203,7 @@ class Agent:
 
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
 
-        action_prompt = build_action_prompt(self.output_handler)  # type: ignore
+        action_prompt = self.get_tool_usage_prompt()
 
         self.model.set_system_prompt(
             f"""
