@@ -118,7 +118,7 @@ class ToolRegistry(OutputHandlerProtocol):
         return "TOOL_CALL"
 
     def can_handle(self, response: str) -> bool:
-        return ToolRegistry._has_tool_calls_block(response)
+        return ot("TOOL_CALL") in response
 
     def prompt(self) -> str:
         """加载工具"""
@@ -564,6 +564,8 @@ class ToolRegistry(OutputHandlerProtocol):
         data = re.findall(
             ot("TOOL_CALL") + r"(.*?)" + ct("TOOL_CALL"), content, re.DOTALL
         )
+        if not data:
+            return {}, f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}"
         ret = []
         for item in data:
             try:
