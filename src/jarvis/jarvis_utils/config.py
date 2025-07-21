@@ -3,7 +3,6 @@ import os
 from functools import lru_cache
 from typing import Any, Dict, List
 
-import torch
 import yaml  # type: ignore
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
@@ -110,7 +109,8 @@ def get_shell_name() -> str:
     3. 最后从环境变量SHELL获取
     4. 如果都未配置，则默认返回bash
     """
-    shell_path = GLOBAL_CONFIG_DATA.get("SHELL", os.getenv("SHELL", "/bin/bash"))
+    shell_path = GLOBAL_CONFIG_DATA.get(
+        "SHELL", os.getenv("SHELL", "/bin/bash"))
     return os.path.basename(shell_path).lower()
 
 
@@ -142,7 +142,8 @@ def get_thinking_platform_name() -> str:
         str: 平台名称，默认为'yuanbao'
     """
     return GLOBAL_CONFIG_DATA.get(
-        "JARVIS_THINKING_PLATFORM", GLOBAL_CONFIG_DATA.get("JARVIS_PLATFORM", "yuanbao")
+        "JARVIS_THINKING_PLATFORM", GLOBAL_CONFIG_DATA.get(
+            "JARVIS_PLATFORM", "yuanbao")
     )
 
 
@@ -154,7 +155,8 @@ def get_thinking_model_name() -> str:
         str: 模型名称，默认为'deep_seek'
     """
     return GLOBAL_CONFIG_DATA.get(
-        "JARVIS_THINKING_MODEL", GLOBAL_CONFIG_DATA.get("JARVIS_MODEL", "deep_seek")
+        "JARVIS_THINKING_MODEL", GLOBAL_CONFIG_DATA.get(
+            "JARVIS_MODEL", "deep_seek")
     )
 
 
