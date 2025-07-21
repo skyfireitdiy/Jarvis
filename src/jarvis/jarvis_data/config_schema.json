@@ -176,6 +176,14 @@
       "description": "是否启用任务分析",
       "default": true
     },
+    "JARVIS_TOOL_LOAD_DIRS": {
+      "type": "array",
+      "description": "自定义工具加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "JARVIS_PRINT_PROMPT": {
       "type": "boolean",
       "description": "是否打印提示",
