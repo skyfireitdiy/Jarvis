@@ -229,7 +229,35 @@
           "template"
         ]
       }
+    },
+    "OPENAI_API_KEY": {
+      "type": "string",
+      "description": "OpenAI API Key"
+    },
+    "OPENAI_API_BASE": {
+      "type": "string",
+      "description": "OpenAI API Base URL"
+    },
+    "KIMI_API_KEY": {
+      "type": "string",
+      "description": "Kimi API Key"
+    },
+    "TONGYI_COOKIES": {
+      "type": "string",
+      "description": "Tongyi Cookies"
+    },
+    "YUANBAO_COOKIES": {
+      "type": "string",
+      "description": "Yuanbao Cookies"
+    },
+    "AI8_API_KEY": {
+      "type": "string",
+      "description": "AI8 API Key"
+    },
+    "OYI_API_KEY": {
+      "type": "string",
+      "description": "Oyi API Key"
     }
   },
-  "additionalProperties": false
+  "additionalProperties": true
 }
