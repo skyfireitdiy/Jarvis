@@ -20,34 +20,37 @@ def execute_command(command: str, should_run: bool) -> None:
 
 def _check_fish_shell() -> bool:
     """Check if current shell is fish
-    
+
     Returns:
         bool: True if fish shell, False otherwise
     """
     return get_shell_name() == "fish"
 
+
 def _get_config_file() -> str:
     """Get fish config file path
-    
+
     Returns:
         str: Path to fish config file
     """
     return os.path.expanduser("~/.config/fish/config.fish")
 
+
 def _get_markers() -> Tuple[str, str]:
     """Get start and end markers for JSS completion
-    
+
     Returns:
         Tuple[str, str]: (start_marker, end_marker)
     """
     return (
         "# ===== JARVIS JSS FISH COMPLETION START =====",
-        "# ===== JARVIS JSS FISH COMPLETION END ====="
+        "# ===== JARVIS JSS FISH COMPLETION END =====",
     )
+
 
 def install_jss_completion() -> int:
     """Install JSS fish shell command completion
-    
+
     Returns:
         int: 0 if success, 1 if failed
     """
@@ -70,7 +73,8 @@ def install_jss_completion() -> int:
         return 0
 
     with open(config_file, "a") as f:
-        f.write(f"""
+        f.write(
+            f"""
 {start_marker}
 function fish_command_not_found
     if test (string length "$argv") -lt 10
@@ -83,13 +87,15 @@ function __fish_command_not_found_handler --on-event fish_command_not_found
     fish_command_not_found "$argv"
 end
 {end_marker}
-""")
+"""
+        )
     print("JSS fish completion已安装，请执行: source ~/.config/fish/config.fish")
     return 0
 
+
 def uninstall_jss_completion() -> int:
     """Uninstall JSS fish shell command completion
-    
+
     Returns:
         int: 0 if success, 1 if failed
     """
@@ -112,10 +118,10 @@ def uninstall_jss_completion() -> int:
         return 0
 
     new_content = content.split(start_marker)[0] + content.split(end_marker)[-1]
-    
+
     with open(config_file, "w") as f:
         f.write(new_content)
-    
+
     print("JSS fish completion已卸载，请执行: source ~/.config/fish/config.fish")
     return 0
 
@@ -205,7 +211,7 @@ Example:
     install_parser.add_argument(
         "--shell", choices=["fish"], default="fish", help="指定shell类型(仅支持fish)"
     )
-    
+
     # 添加uninstall子命令
     uninstall_parser = subparsers.add_parser(
         "uninstall", help="卸载JSS fish shell命令补全功能"
@@ -232,7 +238,7 @@ Example:
             print(f"错误: 不支持的shell类型: {args.shell}, 仅支持fish")
             return 1
         return uninstall_jss_completion()
-        
+
     # 处理request命令
     if not args.request:
         # 检查是否在交互式终端中运行

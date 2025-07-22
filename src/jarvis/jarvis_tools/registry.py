@@ -565,7 +565,10 @@ class ToolRegistry(OutputHandlerProtocol):
             ot("TOOL_CALL") + r"(.*?)" + ct("TOOL_CALL"), content, re.DOTALL
         )
         if not data:
-            return {}, f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}"
+            return (
+                {},
+                f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}",
+            )
         ret = []
         for item in data:
             try:
