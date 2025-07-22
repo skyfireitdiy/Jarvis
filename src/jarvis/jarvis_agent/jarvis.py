@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import yaml  # type: ignore
 from prompt_toolkit import prompt  # type: ignore
@@ -104,8 +104,8 @@ def _select_task(tasks: Dict[str, str]) -> str:
             PrettyOutput.print(f"选择任务失败: {str(val_err)}", OutputType.ERROR)
 
 
-def main() -> None:
-
+def _parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Jarvis AI assistant")
     parser.add_argument(
         "--llm_type",
@@ -130,67 +130,87 @@ def main() -> None:
     parser.add_argument(
         "-e", "--edit", action="store_true", help="Edit the configuration file"
     )
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    if args.edit:
-        config_file_path = (
-            Path(args.config)
-            if args.config
-            else Path(os.path.expanduser("~/.jarvis/config.yaml"))
-        )
-        editors = ["nvim", "vim", "vi"]
-        editor = next((e for e in editors if shutil.which(e)), None)
 
-        if editor:
-            try:
-                subprocess.run([editor, config_file_path], check=True)
-                sys.exit(0)
-            except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                PrettyOutput.print(f"Failed to open editor: {e}", OutputType.ERROR)
-                sys.exit(1)
-        else:
-            PrettyOutput.print(
-                "No suitable editor found (nvim, vim, vi).", OutputType.ERROR
-            )
+def _handle_edit_mode(args: argparse.Namespace) -> None:
+    """If edit flag is set, open config file in editor and exit."""
+    if not args.edit:
+        return
+
+    config_file_path = (
+        Path(args.config)
+        if args.config
+        else Path(os.path.expanduser("~/.jarvis/config.yaml"))
+    )
+    editors = ["nvim", "vim", "vi"]
+    editor = next((e for e in editors if shutil.which(e)), None)
+
+    if editor:
+        try:
+            subprocess.run([editor, str(config_file_path)], check=True)
+            sys.exit(0)
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            PrettyOutput.print(f"Failed to open editor: {e}", OutputType.ERROR)
             sys.exit(1)
+    else:
+        PrettyOutput.print(
+            "No suitable editor found (nvim, vim, vi).", OutputType.ERROR
+        )
+        sys.exit(1)
+
+
+def _initialize_agent(args: argparse.Namespace) -> Agent:
+    """Initialize the agent and restore session if requested."""
+    agent = Agent(
+        system_prompt=origin_agent_system_prompt,
+        llm_type=args.llm_type,
+        input_handler=[shell_input_handler, builtin_input_handler],
+        output_handler=[ToolRegistry()],  # type: ignore
+        need_summary=False,
+    )
+
+    # 尝试恢复会话
+    if args.restore_session:
+        if agent.restore_session():
+            PrettyOutput.print("会话已成功恢复。", OutputType.SUCCESS)
+        else:
+            PrettyOutput.print("无法恢复会话。", OutputType.WARNING)
+    return agent
+
+
+def _get_and_run_task(agent: Agent, task_content: Optional[str] = None) -> None:
+    """Get task from various sources and run it."""
+    # 优先处理命令行直接传入的任务
+    if task_content:
+        agent.run(task_content)
+        sys.exit(0)
+
+    if agent.first:
+        tasks = _load_tasks()
+        if tasks and (selected_task := _select_task(tasks)):
+            PrettyOutput.print(f"开始执行任务: \n{selected_task}", OutputType.INFO)
+            agent.run(selected_task)
+            sys.exit(0)
+
+    user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
+    if user_input:
+        agent.run(user_input)
+    sys.exit(0)
+
+
+def main() -> None:
+    """Main function for Jarvis AI assistant."""
+    args = _parse_args()
+    _handle_edit_mode(args)
 
     init_env(
         "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config
     )
 
     try:
-        agent = Agent(
-            system_prompt=origin_agent_system_prompt,
-            llm_type=args.llm_type,
-            input_handler=[shell_input_handler, builtin_input_handler],
-            output_handler=[ToolRegistry()],  # type: ignore
-            need_summary=False,
-        )
-
-        # 尝试恢复会话
-        if args.restore_session:
-            if agent.restore_session():
-                PrettyOutput.print("会话已成功恢复。", OutputType.SUCCESS)
-            else:
-                PrettyOutput.print("无法恢复会话。", OutputType.WARNING)
-
-        # 优先处理命令行直接传入的任务
-        if args.task:
-            agent.run(args.task)
-            sys.exit(0)
-
-        if agent.first:
-            tasks = _load_tasks()
-            if tasks and (selected_task := _select_task(tasks)):
-                PrettyOutput.print(f"开始执行任务: \n{selected_task}", OutputType.INFO)
-                agent.run(selected_task)
-                sys.exit(0)
-
-        user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
-        if user_input:
-            agent.run(user_input)
-        sys.exit(0)
-
+        agent = _initialize_agent(args)
+        _get_and_run_task(agent, args.task)
     except Exception as err:  # pylint: disable=broad-except
         PrettyOutput.print(f"初始化错误: {str(err)}", OutputType.ERROR)
         sys.exit(1)
