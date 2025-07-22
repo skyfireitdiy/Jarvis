@@ -129,6 +129,7 @@ def load_config():
                     PrettyOutput.print(
                         f"已生成默认配置文件: {config_file_path}", OutputType.INFO
                     )
+                    sys.exit(0)
                 except Exception as e:
                     PrettyOutput.print(f"生成默认配置文件失败: {e}", OutputType.ERROR)
     else:
