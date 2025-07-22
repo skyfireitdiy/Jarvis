@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
 import argparse
 import os
+import shutil
+import subprocess
 import sys
+from pathlib import Path
 from typing import Dict
 
 import yaml  # type: ignore
 from prompt_toolkit import prompt  # type: ignore
 
-from jarvis.jarvis_agent import (
-    Agent,
-    OutputType,
-    PrettyOutput,
-    get_multiline_input,
-    origin_agent_system_prompt,
-    user_confirm,
-)
+from jarvis.jarvis_agent import (Agent, OutputType, PrettyOutput,
+                                 get_multiline_input,
+                                 origin_agent_system_prompt, user_confirm)
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -129,7 +127,33 @@ def main() -> None:
         help="Restore session from .jarvis/saved_session.json",
         default=False,
     )
+    parser.add_argument(
+        "-e", "--edit", action="store_true", help="Edit the configuration file"
+    )
     args = parser.parse_args()
+
+    if args.edit:
+        config_file_path = (
+            Path(args.config)
+            if args.config
+            else Path(os.path.expanduser("~/.jarvis/config.yaml"))
+        )
+        editors = ["nvim", "vim", "vi"]
+        editor = next((e for e in editors if shutil.which(e)), None)
+
+        if editor:
+            try:
+                subprocess.run([editor, config_file_path], check=True)
+                sys.exit(0)
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                PrettyOutput.print(f"Failed to open editor: {e}", OutputType.ERROR)
+                sys.exit(1)
+        else:
+            PrettyOutput.print(
+                "No suitable editor found (nvim, vim, vi).", OutputType.ERROR
+            )
+            sys.exit(1)
+
     init_env(
         "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config
     )
