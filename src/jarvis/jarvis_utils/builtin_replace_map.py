@@ -29,7 +29,6 @@ arguments:
 """,
         "description": "网页搜索",
     },
-    
     "FindRelatedFiles": {
         "append": False,
         "template": f"""

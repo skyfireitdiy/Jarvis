@@ -188,9 +188,13 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                         for entry in conversation_history:
                             file_obj.write(f"{entry['role']}: {entry['content']}\n\n")
 
-                    PrettyOutput.print(f"所有对话已保存到 {file_path}", OutputType.SUCCESS)
+                    PrettyOutput.print(
+                        f"所有对话已保存到 {file_path}", OutputType.SUCCESS
+                    )
                 except Exception as exc:
-                    PrettyOutput.print(f"保存所有对话失败: {str(exc)}", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"保存所有对话失败: {str(exc)}", OutputType.ERROR
+                    )
                 continue
 
             # Check if it is a save_session command
@@ -211,7 +215,9 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                         file_path = file_path[1:-1]
 
                     if platform.save(file_path):
-                        PrettyOutput.print(f"会话已保存到 {file_path}", OutputType.SUCCESS)
+                        PrettyOutput.print(
+                            f"会话已保存到 {file_path}", OutputType.SUCCESS
+                        )
                     else:
                         PrettyOutput.print("保存会话失败", OutputType.ERROR)
                 except Exception as exc:
@@ -237,7 +243,9 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
 
                     if platform.restore(file_path):
                         conversation_history = []  # Clear local history after loading
-                        PrettyOutput.print(f"会话已从 {file_path} 加载", OutputType.SUCCESS)
+                        PrettyOutput.print(
+                            f"会话已从 {file_path} 加载", OutputType.SUCCESS
+                        )
                     else:
                         PrettyOutput.print("加载会话失败", OutputType.ERROR)
                 except Exception as exc:
@@ -433,8 +441,12 @@ def main() -> None:
     service_parser.add_argument(
         "--port", type=int, default=8000, help="服务端口 (默认: 8000)"
     )
-    service_parser.add_argument("--platform", "-p", help="指定默认平台，当客户端未指定平台时使用")
-    service_parser.add_argument("--model", "-m", help="指定默认模型，当客户端未指定平台时使用")
+    service_parser.add_argument(
+        "--platform", "-p", help="指定默认平台，当客户端未指定平台时使用"
+    )
+    service_parser.add_argument(
+        "--model", "-m", help="指定默认模型，当客户端未指定平台时使用"
+    )
     service_parser.set_defaults(func=service_command)
 
     # role subcommand

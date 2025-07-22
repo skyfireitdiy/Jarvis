@@ -20,7 +20,9 @@ def load_config(config_path: str) -> dict:
         dict: 配置字典
     """
     if not os.path.exists(config_path):
-        PrettyOutput.print(f"配置文件 {config_path} 不存在，使用默认配置", OutputType.WARNING)
+        PrettyOutput.print(
+            f"配置文件 {config_path} 不存在，使用默认配置", OutputType.WARNING
+        )
         return {}
 
     with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -53,7 +55,9 @@ def main():
     args = parser.parse_args()
 
     # Initialize environment
-    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config)
+    init_env(
+        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config
+    )
 
     # Load configuration
     config = load_config(args.agent_definition) if args.agent_definition else {}
