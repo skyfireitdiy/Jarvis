@@ -490,6 +490,22 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
 
     PrettyOutput.print(f"正在更新{repo_type}库 '{repo_path.name}'...", OutputType.INFO)
     try:
+        # 检查是否有远程仓库
+        remote_result = subprocess.run(
+            ["git", "remote"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        if not remote_result.stdout.strip():
+            PrettyOutput.print(
+                f"'{repo_path.name}' 未配置远程仓库，跳过更新。",
+                OutputType.INFO,
+            )
+            return
+
         # 检查git仓库状态
         status_result = subprocess.run(
             ["git", "status", "--porcelain"],
