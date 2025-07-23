@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 from functools import lru_cache
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import yaml  # type: ignore
 
@@ -113,7 +113,7 @@ def get_shell_name() -> str:
     return os.path.basename(shell_path).lower()
 
 
-def _get_resolved_model_config(model_group_override: str = None) -> Dict[str, Any]:
+def _get_resolved_model_config(model_group_override: Optional[str] = None) -> Dict[str, Any]:
     """
     解析并合并模型配置，处理模型组。
 
@@ -152,7 +152,7 @@ def _get_resolved_model_config(model_group_override: str = None) -> Dict[str, An
     return resolved_config
 
 
-def get_normal_platform_name(model_group_override: str = None) -> str:
+def get_normal_platform_name(model_group_override: Optional[str] = None) -> str:
     """
     获取正常操作的平台名称。
 
@@ -163,7 +163,7 @@ def get_normal_platform_name(model_group_override: str = None) -> str:
     return config.get("JARVIS_PLATFORM", "yuanbao")
 
 
-def get_normal_model_name(model_group_override: str = None) -> str:
+def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
     """
     获取正常操作的模型名称。
 
@@ -174,7 +174,7 @@ def get_normal_model_name(model_group_override: str = None) -> str:
     return config.get("JARVIS_MODEL", "deep_seek_v3")
 
 
-def get_thinking_platform_name(model_group_override: str = None) -> str:
+def get_thinking_platform_name(model_group_override: Optional[str] = None) -> str:
     """
     获取思考操作的平台名称。
 
@@ -188,7 +188,7 @@ def get_thinking_platform_name(model_group_override: str = None) -> str:
     )
 
 
-def get_thinking_model_name(model_group_override: str = None) -> str:
+def get_thinking_model_name(model_group_override: Optional[str] = None) -> str:
     """
     获取思考操作的模型名称。
 
