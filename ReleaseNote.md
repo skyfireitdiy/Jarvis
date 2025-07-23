@@ -1,3 +1,31 @@
+### Release Note - v0.1.225 2025-07-23
+
+#### **新功能 (Features)**
+- (project): 完善核心文档并优化网页搜索功能
+- (cli): 添加 -e/--edit 命令行选项以编辑配置文件
+- (config): 生成默认配置后退出程序
+
+#### **修复 (Fixes)**
+- (jarvis_agent): 修复 output_handler 的类型检查错误
+
+#### **优化与重构 (Refactors & Improvements)**
+- (agent): 优化输入处理器执行逻辑，仅在用户输入时触发
+- (search_web): 使用 markdownify 替代 BeautifulSoup 解析网页内容
+- (code_agent): 移除无用的 methodology 工具
+- (project): 调整代码格式以提高可读性
+- (jarvis): 重构 main 函数以提升代码可读性
+
+#### **文档更新 (Documentation)**
+- (readme): 添加 -e/--edit 命令行选项文档
+- (product): 添加 Jarvis 产品汇报文档
+- (project): 新增 Jarvis AI 助手产品汇报文档
+
+#### **其他 (Miscellaneous)**
+- (deps): 使用markdownify替换beautifulsoup4并配置uv索引
+- 删除 Jarvis 产品汇报文档
+
+本次更新主要带来了多项新功能，修复了若干问题，进行了代码优化和重构，提升了系统的稳定性和易用性。
+
 ### Release Note - v0.1.224 2025-07-21
 
 #### **新功能 (Features)**
