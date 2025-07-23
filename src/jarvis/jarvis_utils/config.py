@@ -113,8 +113,7 @@ def get_shell_name() -> str:
     return os.path.basename(shell_path).lower()
 
 
-@lru_cache(maxsize=1)
-def _get_resolved_model_config() -> Dict[str, Any]:
+def _get_resolved_model_config(model_group_override: str = None) -> Dict[str, Any]:
     """
     解析并合并模型配置，处理模型组。
 
@@ -127,7 +126,7 @@ def _get_resolved_model_config() -> Dict[str, Any]:
         Dict[str, Any]: 解析后的模型配置字典
     """
     group_config = {}
-    model_group_name = GLOBAL_CONFIG_DATA.get("MODEL_GROUP")
+    model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get("MODEL_GROUP")
     # The format is a list of single-key dicts: [{'group_name': {...}}, ...]
     model_groups = GLOBAL_CONFIG_DATA.get("JARVIS_MODEL_GROUPS", [])
 
@@ -153,50 +152,52 @@ def _get_resolved_model_config() -> Dict[str, Any]:
     return resolved_config
 
 
-def get_normal_platform_name() -> str:
+def get_normal_platform_name(model_group_override: str = None) -> str:
     """
     获取正常操作的平台名称。
 
     返回：
         str: 平台名称，默认为'yuanbao'
     """
-    config = _get_resolved_model_config()
+    config = _get_resolved_model_config(model_group_override)
     return config.get("JARVIS_PLATFORM", "yuanbao")
 
 
-def get_normal_model_name() -> str:
+def get_normal_model_name(model_group_override: str = None) -> str:
     """
     获取正常操作的模型名称。
 
     返回：
         str: 模型名称，默认为'deep_seek_v3'
     """
-    config = _get_resolved_model_config()
+    config = _get_resolved_model_config(model_group_override)
     return config.get("JARVIS_MODEL", "deep_seek_v3")
 
 
-def get_thinking_platform_name() -> str:
+def get_thinking_platform_name(model_group_override: str = None) -> str:
     """
     获取思考操作的平台名称。
 
     返回：
         str: 平台名称，默认为正常操作平台
     """
-    config = _get_resolved_model_config()
+    config = _get_resolved_model_config(model_group_override)
     # Fallback to normal platform if thinking platform is not specified
-    return config.get("JARVIS_THINKING_PLATFORM", get_normal_platform_name())
+    return config.get(
+        "JARVIS_THINKING_PLATFORM", get_normal_platform_name(model_group_override)
+    )
 
 
-def get_thinking_model_name() -> str:
+def get_thinking_model_name(model_group_override: str = None) -> str:
     """
     获取思考操作的模型名称。
 
     返回：
         str: 模型名称，默认为正常操作模型
     """
-    config = _get_resolved_model_config()
+    config = _get_resolved_model_config(model_group_override)
     # Fallback to normal model if thinking model is not specified
-    return config.get("JARVIS_THINKING_MODEL", get_normal_model_name())
+    return config.get("JARVIS_THINKING_MODEL", get_normal_model_name(model_group_override))
 
 
 def is_execute_tool_confirm() -> bool:

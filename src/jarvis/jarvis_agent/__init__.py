@@ -102,6 +102,7 @@ class Agent:
         name: str = "Jarvis",
         description: str = "",
         llm_type: str = "normal",
+        model_group: Optional[str] = None,
         summary_prompt: Optional[str] = None,
         auto_complete: bool = False,
         output_handler: List[OutputHandlerProtocol] = [],
@@ -137,11 +138,11 @@ class Agent:
         self.description = description
         # 初始化平台和模型
         if llm_type == "thinking":
-            platform_name = get_thinking_platform_name()
-            model_name = get_thinking_model_name()
+            platform_name = get_thinking_platform_name(model_group)
+            model_name = get_thinking_model_name(model_group)
         else:  # 默认为 normal
-            platform_name = get_normal_platform_name()
-            model_name = get_normal_model_name()
+            platform_name = get_normal_platform_name(model_group)
+            model_name = get_normal_model_name(model_group)
 
         self.model = PlatformRegistry().create_platform(platform_name)
         if self.model is None:
