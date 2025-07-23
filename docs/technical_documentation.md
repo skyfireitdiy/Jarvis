@@ -274,12 +274,49 @@ stop
 
 所有从该文件加载的配置项都存储在一个全局字典中，并在程序运行时通过 `config.py` 中的 `get_*` 函数进行访问。这种设计避免了多层配置覆盖带来的复杂性和不确定性。
 
-#### 3.1.2. 关键配置项
+#### 3.1.2. 模型组配置
+
+为了提供更大的灵活性，Jarvis 支持**模型组**的概念。用户可以预先定义多套模型配置组合，并通过一个简单的设置快速切换。
+
+**工作机制**:
+
+1.  **定义组**: 在 `config.yaml` 中，通过 `JARVIS_MODEL_GROUPS` 列表定义模型组。每个组是一个单键字典，键是组名，值是该组的具体配置。
+2.  **选择组**: 通过 `MODEL_GROUP` 键指定当前要激活的组名。
+3.  **配置覆盖**: 系统在解析配置时，遵循明确的优先级顺序：
+    1.  **独立配置 (最高)**: 单独设置的 `JARVIS_PLATFORM`, `JARVIS_MODEL` 等总会覆盖所有其他设置。
+    2.  **模型组配置**: 如果未设置独立配置，则采用 `MODEL_GROUP` 指定的组内配置。
+    3.  **默认值 (最低)**: 如果两者都未提供，则使用代码中的硬编码默认值。
+
+**示例**:
+
+```yaml
+# 1. 定义模型组
+JARVIS_MODEL_GROUPS:
+  - kimi:
+      JARVIS_PLATFORM: kimi
+      JARVIS_MODEL: k1.5
+      JARVIS_THINKING_PLATFORM: kimi
+      JARVIS_THINKING_MODEL: k1.5-thinking
+  - ai8:
+      JARVIS_PLATFORM: ai8
+      JARVIS_MODEL: gemini-2.5-pro
+
+# 2. 选择要使用的模型组
+MODEL_GROUP: kimi
+
+# 3. (可选) 独立配置会覆盖组配置
+# 如果取消下面这行的注释，即使 MODEL_GROUP 是 'kimi', 常规模型也会使用 'gpt-4o'
+# JARVIS_MODEL: gpt-4o
+```
+
+#### 3.1.3. 关键配置项
 
 以下是 `config.yaml` 文件中支持的主要配置项及其说明：
 
 | 配置项 (Key) | 描述 | 默认值 |
 |---|---|---|
+| `MODEL_GROUP` | 当前激活的模型组名称。 | `null` |
+| `JARVIS_MODEL_GROUPS` | 预定义的模型配置组列表。 | `[]` |
 | `JARVIS_PLATFORM` | 默认使用的 AI 平台名称。 | `yuanbao` |
 | `JARVIS_MODEL` | 默认使用的模型名称。 | `deep_seek_v3` |
 | `JARVIS_THINKING_PLATFORM` | 用于内部思考、规划等任务的 AI 平台。 | 同 `JARVIS_PLATFORM` |
@@ -658,7 +695,7 @@ jca -r "将 src/utils.py 中的 requests 调用全部替换为 httpx"
 jpm info
 
 # 与指定的模型直接对话
-jpm chat -p kimi -m k1
+jpm chat -p kimi -m k1.5
 
 # 启动一个本地 API 服务
 jpm service -p yuanbao -m deep_seek_v3

@@ -113,6 +113,46 @@ def get_shell_name() -> str:
     return os.path.basename(shell_path).lower()
 
 
+@lru_cache(maxsize=1)
+def _get_resolved_model_config() -> Dict[str, Any]:
+    """
+    解析并合并模型配置，处理模型组。
+
+    优先级顺序:
+    1. 单独的环境变量 (JARVIS_PLATFORM, JARVIS_MODEL, etc.)
+    2. MODEL_GROUP 中定义的组配置
+    3. 代码中的默认值
+
+    返回:
+        Dict[str, Any]: 解析后的模型配置字典
+    """
+    group_config = {}
+    model_group_name = GLOBAL_CONFIG_DATA.get("MODEL_GROUP")
+    # The format is a list of single-key dicts: [{'group_name': {...}}, ...]
+    model_groups = GLOBAL_CONFIG_DATA.get("JARVIS_MODEL_GROUPS", [])
+
+    if model_group_name and isinstance(model_groups, list):
+        for group_item in model_groups:
+            if isinstance(group_item, dict) and model_group_name in group_item:
+                group_config = group_item[model_group_name]
+                break
+
+    # Start with group config
+    resolved_config = group_config.copy()
+
+    # Override with specific settings from GLOBAL_CONFIG_DATA
+    for key in [
+        "JARVIS_PLATFORM",
+        "JARVIS_MODEL",
+        "JARVIS_THINKING_PLATFORM",
+        "JARVIS_THINKING_MODEL",
+    ]:
+        if key in GLOBAL_CONFIG_DATA:
+            resolved_config[key] = GLOBAL_CONFIG_DATA[key]
+
+    return resolved_config
+
+
 def get_normal_platform_name() -> str:
     """
     获取正常操作的平台名称。
@@ -120,7 +160,8 @@ def get_normal_platform_name() -> str:
     返回：
         str: 平台名称，默认为'yuanbao'
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_PLATFORM", "yuanbao")
+    config = _get_resolved_model_config()
+    return config.get("JARVIS_PLATFORM", "yuanbao")
 
 
 def get_normal_model_name() -> str:
@@ -128,9 +169,10 @@ def get_normal_model_name() -> str:
     获取正常操作的模型名称。
 
     返回：
-        str: 模型名称，默认为'deep_seek'
+        str: 模型名称，默认为'deep_seek_v3'
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_MODEL", "deep_seek_v3")
+    config = _get_resolved_model_config()
+    return config.get("JARVIS_MODEL", "deep_seek_v3")
 
 
 def get_thinking_platform_name() -> str:
@@ -138,11 +180,11 @@ def get_thinking_platform_name() -> str:
     获取思考操作的平台名称。
 
     返回：
-        str: 平台名称，默认为'yuanbao'
+        str: 平台名称，默认为正常操作平台
     """
-    return GLOBAL_CONFIG_DATA.get(
-        "JARVIS_THINKING_PLATFORM", GLOBAL_CONFIG_DATA.get("JARVIS_PLATFORM", "yuanbao")
-    )
+    config = _get_resolved_model_config()
+    # Fallback to normal platform if thinking platform is not specified
+    return config.get("JARVIS_THINKING_PLATFORM", get_normal_platform_name())
 
 
 def get_thinking_model_name() -> str:
@@ -150,11 +192,11 @@ def get_thinking_model_name() -> str:
     获取思考操作的模型名称。
 
     返回：
-        str: 模型名称，默认为'deep_seek'
+        str: 模型名称，默认为正常操作模型
     """
-    return GLOBAL_CONFIG_DATA.get(
-        "JARVIS_THINKING_MODEL", GLOBAL_CONFIG_DATA.get("JARVIS_MODEL", "deep_seek")
-    )
+    config = _get_resolved_model_config()
+    # Fallback to normal model if thinking model is not specified
+    return config.get("JARVIS_THINKING_MODEL", get_normal_model_name())
 
 
 def is_execute_tool_confirm() -> bool:
