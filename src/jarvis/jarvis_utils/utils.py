@@ -7,7 +7,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
+from datetime import datetime
 
 import yaml  # type: ignore
 
@@ -475,3 +476,100 @@ def copy_to_clipboard(text: str) -> None:
         )
     except Exception as e:
         PrettyOutput.print(f"使用xclip时出错: {e}", OutputType.WARNING)
+
+
+def _pull_git_repo(repo_path: Path, repo_type: str):
+    """对指定的git仓库执行git pull操作，并根据commit hash判断是否有更新。"""
+    git_dir = repo_path / ".git"
+    if not git_dir.is_dir():
+        return
+
+    PrettyOutput.print(f"正在更新{repo_type}库 '{repo_path.name}'...", OutputType.INFO)
+    try:
+        # 获取更新前的commit hash
+        before_hash_result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        before_hash = before_hash_result.stdout.strip()
+
+        # 执行 git pull
+        pull_result = subprocess.run(
+            ["git", "pull"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60,
+        )
+
+        # 获取更新后的commit hash
+        after_hash_result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        after_hash = after_hash_result.stdout.strip()
+
+        if before_hash != after_hash:
+            PrettyOutput.print(f"{repo_type}库 '{repo_path.name}' 已更新。", OutputType.SUCCESS)
+            if pull_result.stdout.strip():
+                PrettyOutput.print(pull_result.stdout.strip(), OutputType.INFO)
+        else:
+            PrettyOutput.print(f"{repo_type}库 '{repo_path.name}' 已是最新版本。", OutputType.INFO)
+
+    except FileNotFoundError:
+        PrettyOutput.print(
+            f"git 命令未找到，跳过更新 '{repo_path.name}'。", OutputType.WARNING
+        )
+    except subprocess.TimeoutExpired:
+        PrettyOutput.print(f"更新 '{repo_path.name}' 超时。", OutputType.ERROR)
+    except subprocess.CalledProcessError as e:
+        error_message = e.stderr.strip() if e.stderr else str(e)
+        PrettyOutput.print(
+            f"更新 '{repo_path.name}' 失败: {error_message}", OutputType.ERROR
+        )
+    except Exception as e:
+        PrettyOutput.print(
+            f"更新 '{repo_path.name}' 时发生未知错误: {str(e)}", OutputType.ERROR
+        )
+
+
+def daily_check_git_updates(repo_dirs: List[str], repo_type: str):
+    """
+    对指定的目录列表执行每日一次的git更新检查。
+
+    Args:
+        repo_dirs (List[str]): 需要检查的git仓库目录列表。
+        repo_type (str): 仓库的类型名称，例如 "工具" 或 "方法论"，用于日志输出。
+    """
+    data_dir = Path(get_data_dir())
+    last_check_file = data_dir / f"{repo_type}_updates_last_check.txt"
+    should_check_for_updates = True
+
+    if last_check_file.exists():
+        try:
+            last_check_timestamp = float(last_check_file.read_text())
+            last_check_date = datetime.fromtimestamp(last_check_timestamp).date()
+            if last_check_date == datetime.now().date():
+                should_check_for_updates = False
+        except (ValueError, IOError):
+            pass
+
+    if should_check_for_updates:
+        PrettyOutput.print(f"执行每日{repo_type}库更新检查...", OutputType.INFO)
+        for repo_dir in repo_dirs:
+            p_repo_dir = Path(repo_dir)
+            if p_repo_dir.exists() and p_repo_dir.is_dir():
+                _pull_git_repo(p_repo_dir, repo_type)
+        try:
+            last_check_file.write_text(str(time.time()))
+        except IOError as e:
+            PrettyOutput.print(f"无法写入git更新检查时间戳: {e}", OutputType.WARNING)
