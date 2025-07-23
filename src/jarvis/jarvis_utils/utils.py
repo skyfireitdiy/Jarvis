@@ -486,6 +486,22 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
 
     PrettyOutput.print(f"正在更新{repo_type}库 '{repo_path.name}'...", OutputType.INFO)
     try:
+        # 检查git仓库状态
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        if status_result.stdout:
+            PrettyOutput.print(
+                f"检测到 '{repo_path.name}' 存在未提交的更改，跳过自动更新。",
+                OutputType.WARNING,
+            )
+            return
+
         # 获取更新前的commit hash
         before_hash_result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
