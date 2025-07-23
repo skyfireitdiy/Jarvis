@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_data_dir, get_methodology_dirs
+from jarvis.jarvis_utils.globals import get_agent, current_agent_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
 
@@ -170,7 +171,13 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
         print(f"✅ 加载方法论文件完成 (共 {len(methodologies)} 个)")
 
         # 获取当前平台
-        platform = PlatformRegistry().get_normal_platform()
+        agent = get_agent(current_agent_name)
+        if agent:
+            platform = agent.model
+            model_group = agent.model.model_group
+        else:
+            platform = PlatformRegistry().get_normal_platform()
+            model_group = None
         platform.set_suppress_output(False)
         if not platform:
             return ""
@@ -205,7 +212,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 """
 
         # 检查内容是否过大
-        is_large_content = is_context_overflow(full_content)
+        is_large_content = is_context_overflow(full_content, model_group)
         temp_file_path = None
 
         try:

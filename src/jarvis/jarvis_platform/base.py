@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
 from abc import ABC, abstractmethod
-from typing import Generator, List, Tuple
+from typing import Generator, List, Optional, Tuple
 
 from rich import box  # type: ignore
 from rich.live import Live  # type: ignore
@@ -28,6 +28,7 @@ class BasePlatform(ABC):
         self.suppress_output = True  # 添加输出控制标志
         self.web = False  # 添加web属性，默认false
         self._saved = False
+        self.model_group: Optional[str] = None
 
     def __del__(self):
         """Destroy model"""
@@ -64,9 +65,9 @@ class BasePlatform(ABC):
 
         input_token_count = get_context_token_count(message)
 
-        if input_token_count > get_max_input_token_count():
-            max_chunk_size = get_max_input_token_count() - 1024  # 留出一些余量
-            min_chunk_size = get_max_input_token_count() - 2048
+        if input_token_count > get_max_input_token_count(self.model_group):
+            max_chunk_size = get_max_input_token_count(self.model_group) - 1024  # 留出一些余量
+            min_chunk_size = get_max_input_token_count(self.model_group) - 2048
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
             print("📤 正在提交长上下文...")
             prefix_prompt = f"""
@@ -232,6 +233,10 @@ class BasePlatform(ABC):
     def set_suppress_output(self, suppress: bool):
         """Set whether to suppress output"""
         self.suppress_output = suppress
+
+    def set_model_group(self, model_group: Optional[str]):
+        """Set model group"""
+        self.model_group = model_group
 
     def set_web(self, web: bool):
         """Set web flag"""

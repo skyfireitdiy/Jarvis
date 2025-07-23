@@ -154,6 +154,8 @@ class Agent:
         if model_name:
             self.model.set_model_name(model_name)
 
+        self.model.set_model_group(model_group)
+
         self.user_data: Dict[str, Any] = {}
 
         self.model.set_suppress_output(False)
@@ -198,7 +200,7 @@ class Agent:
             summary_prompt if summary_prompt else DEFAULT_SUMMARY_PROMPT
         )
 
-        self.max_token_count = get_max_token_count()
+        self.max_token_count = get_max_token_count(model_group)
         self.auto_complete = auto_complete
         welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"
 

@@ -538,12 +538,12 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
             return []
 
         # 解析提交信息
-        commits = []
+        commits: List[Dict[str, Any]] = []
         lines = result.stdout.splitlines()
         for i in range(0, len(lines), 4):
             if i + 3 >= len(lines):
                 break
-            commit = {
+            commit: Dict[str, Any] = {
                 "hash": lines[i],
                 "message": lines[i + 1],
                 "author": lines[i + 2],

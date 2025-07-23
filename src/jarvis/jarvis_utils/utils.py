@@ -417,9 +417,13 @@ def count_cmd_usage() -> None:
     _update_cmd_stats(sys.argv[0])
 
 
-def is_context_overflow(content: str) -> bool:
+def is_context_overflow(
+    content: str, model_group_override: Optional[str] = None
+) -> bool:
     """判断文件内容是否超出上下文限制"""
-    return get_context_token_count(content) > get_max_big_content_size()
+    return get_context_token_count(content) > get_max_big_content_size(
+        model_group_override
+    )
 
 
 def get_loc_stats() -> str:

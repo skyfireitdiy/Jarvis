@@ -465,6 +465,7 @@ JARVIS_MODEL_GROUPS:
       JARVIS_MODEL: k1.5
       JARVIS_THINKING_PLATFORM: kimi
       JARVIS_THINKING_MODEL: k1.5-thinking
+      JARVIS_MAX_TOKEN_COUNT: 8192
   - ai8:
       JARVIS_PLATFORM: ai8
       JARVIS_MODEL: gemini-2.5-pro
@@ -473,7 +474,7 @@ JARVIS_MODEL_GROUPS:
       # JARVIS_THINKING_MODEL: gemini-2.5-pro
 
 # 选择要使用的模型组
-MODEL_GROUP: kimi
+JARVIS_MODEL_GROUP: kimi
 ```
 
 **配置优先级规则:**
@@ -481,7 +482,7 @@ MODEL_GROUP: kimi
 Jarvis 会按照以下顺序解析模型配置，序号越小优先级越高：
 
 1.  **独立配置**: 直接设置的 `JARVIS_PLATFORM`, `JARVIS_MODEL`, `JARVIS_THINKING_PLATFORM`, `JARVIS_THINKING_MODEL` 环境变量。这些配置会**覆盖**任何模型组中的设置。
-2.  **模型组配置**: 通过 `MODEL_GROUP` 选中的模型组配置。
+2.  **模型组配置**: 通过 `JARVIS_MODEL_GROUP` 选中的模型组配置。
 3.  **默认值**: 如果以上均未配置，则使用代码中定义的默认模型（如 `yuanbao` 和 `deep_seek_v3`）。
 
 ### 3. 全部配置项说明
@@ -489,16 +490,16 @@ Jarvis 会按照以下顺序解析模型配置，序号越小优先级越高：
 |----------|--------|------|
 | `ENV` | {} | 环境变量配置 |
 | `JARVIS_MODEL_GROUPS` | `[]` | 预定义的模型配置组列表 |
-| `MODEL_GROUP` | `null` | 选择要激活的模型组名称 |
-| `JARVIS_MAX_TOKEN_COUNT` | 960000 | 上下文窗口的最大token数量 |
-| `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
+| `JARVIS_MODEL_GROUP` | `null` | 选择要激活的模型组名称 |
+| `JARVIS_MAX_TOKEN_COUNT` | 960000 | 上下文窗口的最大token数量 (可被模型组覆盖) |
+| `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 (可被模型组覆盖) |
 | `JARVIS_PLATFORM` | yuanbao | 默认AI平台 (可被模型组覆盖) |
 | `JARVIS_MODEL` | deep_seek_v3 | 默认模型 (可被模型组覆盖) |
 | `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 推理任务使用的平台 (可被模型组覆盖) |
 | `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 (可被模型组覆盖) |
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | false | 应用补丁前是否需要确认 |
-| `JARVIS_MAX_BIG_CONTENT_SIZE` | 160000 | 最大大内容大小 |
+| `JARVIS_MAX_BIG_CONTENT_SIZE` | 160000 | 最大大内容大小 (可被模型组覆盖) |
 | `JARVIS_PRETTY_OUTPUT` | false | 是否启用PrettyOutput |
 | `JARVIS_GIT_COMMIT_PROMPT` | "" | 自定义git提交信息生成提示模板 |
 | `JARVIS_PRINT_PROMPT` | false | 是否打印提示 |
