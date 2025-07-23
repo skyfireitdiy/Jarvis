@@ -2,7 +2,7 @@
 import json
 import os
 import subprocess
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -17,7 +17,7 @@ class StdioMcpClient(McpClient):
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.process = None
+        self.process: Optional[subprocess.Popen] = None
         self.protocol_version = "2025-03-26"  # MCP协议版本
         self._start_process()
         self._initialize()

@@ -141,7 +141,7 @@
       "description": "思考操作模型名称",
       "default": "deep_seek"
     },
-    "MODEL_GROUP": {
+    "JARVIS_MODEL_GROUP": {
       "type": "string",
       "description": "选择一个预定义的模型组"
     },
@@ -164,6 +164,15 @@
             },
             "JARVIS_THINKING_MODEL": {
               "type": "string"
+            },
+            "JARVIS_MAX_TOKEN_COUNT": {
+              "type": "number"
+            },
+            "JARVIS_MAX_INPUT_TOKEN_COUNT": {
+              "type": "number"
+            },
+            "JARVIS_MAX_BIG_CONTENT_SIZE": {
+              "type": "number"
             }
           },
           "required": [

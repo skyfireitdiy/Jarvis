@@ -76,24 +76,26 @@ def get_replace_map() -> dict:
         return {**BUILTIN_REPLACE_MAP, **file_map}
 
 
-def get_max_token_count() -> int:
+def get_max_token_count(model_group_override: Optional[str] = None) -> int:
     """
     获取模型允许的最大token数量。
 
     返回:
         int: 模型能处理的最大token数量。
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_MAX_TOKEN_COUNT", "960000"))
+    config = _get_resolved_model_config(model_group_override)
+    return int(config.get("JARVIS_MAX_TOKEN_COUNT", "960000"))
 
 
-def get_max_input_token_count() -> int:
+def get_max_input_token_count(model_group_override: Optional[str] = None) -> int:
     """
     获取模型允许的最大输入token数量。
 
     返回:
         int: 模型能处理的最大输入token数量。
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_MAX_INPUT_TOKEN_COUNT", "32000"))
+    config = _get_resolved_model_config(model_group_override)
+    return int(config.get("JARVIS_MAX_INPUT_TOKEN_COUNT", "32000"))
 
 
 def get_shell_name() -> str:
@@ -119,14 +121,14 @@ def _get_resolved_model_config(model_group_override: Optional[str] = None) -> Di
 
     优先级顺序:
     1. 单独的环境变量 (JARVIS_PLATFORM, JARVIS_MODEL, etc.)
-    2. MODEL_GROUP 中定义的组配置
+    2. JARVIS_MODEL_GROUP 中定义的组配置
     3. 代码中的默认值
 
     返回:
         Dict[str, Any]: 解析后的模型配置字典
     """
     group_config = {}
-    model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get("MODEL_GROUP")
+    model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get("JARVIS_MODEL_GROUP")
     # The format is a list of single-key dicts: [{'group_name': {...}}, ...]
     model_groups = GLOBAL_CONFIG_DATA.get("JARVIS_MODEL_GROUPS", [])
 
@@ -145,6 +147,9 @@ def _get_resolved_model_config(model_group_override: Optional[str] = None) -> Di
         "JARVIS_MODEL",
         "JARVIS_THINKING_PLATFORM",
         "JARVIS_THINKING_MODEL",
+        "JARVIS_MAX_TOKEN_COUNT",
+        "JARVIS_MAX_INPUT_TOKEN_COUNT",
+        "JARVIS_MAX_BIG_CONTENT_SIZE",
     ]:
         if key in GLOBAL_CONFIG_DATA:
             resolved_config[key] = GLOBAL_CONFIG_DATA[key]
@@ -233,14 +238,15 @@ def get_data_dir() -> str:
     )
 
 
-def get_max_big_content_size() -> int:
+def get_max_big_content_size(model_group_override: Optional[str] = None) -> int:
     """
     获取最大大内容大小。
 
     返回：
         int: 最大大内容大小
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_MAX_BIG_CONTENT_SIZE", "160000"))
+    config = _get_resolved_model_config(model_group_override)
+    return int(config.get("JARVIS_MAX_BIG_CONTENT_SIZE", "160000"))
 
 
 def get_pretty_output() -> bool:

@@ -3,12 +3,13 @@ import os
 import re
 import subprocess
 import tempfile
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.read_code import ReadCodeTool
+from jarvis.jarvis_utils.globals import get_agent, current_agent_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
@@ -261,7 +262,9 @@ class CodeReviewTool:
         checklist = get_language_checklist(language)
         return checklist if checklist else ""
 
-    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], agent: Optional["Agent"] = None
+    ) -> Dict[str, Any]:
         try:
             review_type = args.get("review_type", "current").strip()
             root_dir = args.get("root_dir", ".")
@@ -570,9 +573,17 @@ class CodeReviewTool:
 
                 tool_registry = ToolRegistry()
                 tool_registry.dont_use_tools(["code_review"])
+                
+                # Use the provided agent's model_group or get it from globals
+                calling_agent = agent or get_agent(current_agent_name)
+                model_group = None
+                if calling_agent and hasattr(calling_agent, "model") and calling_agent.model:
+                    model_group = calling_agent.model.model_group
+
                 agent = Agent(
                     system_prompt=system_prompt,
                     name="Code Review Agent",
+                    model_group=model_group,
                     summary_prompt=f"""<code_review_report>
 <overview>
 # 整体评估
@@ -675,7 +686,7 @@ class CodeReviewTool:
 
                 try:
                     # Check if content is too large
-                    is_large_content = is_context_overflow(diff_output)
+                    is_large_content = is_context_overflow(diff_output, model_group)
 
                     # Upload the file to the agent's model
                     if is_large_content:

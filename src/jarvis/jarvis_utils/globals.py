@@ -11,7 +11,7 @@ import os
 
 # 全局变量：保存最后一条消息
 last_message: str = ""
-from typing import Any, Set
+from typing import Any, Dict, Set
 
 import colorama
 from rich.console import Console
@@ -22,7 +22,7 @@ colorama.init()
 # 禁用tokenizers并行以避免多进程问题
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # 全局代理管理
-global_agents: Set[str] = set()
+global_agents: Dict[str, Any] = {}
 current_agent_name: str = ""
 # 表示与大模型交互的深度(>0表示正在交互)
 g_in_chat: int = 0
@@ -66,6 +66,19 @@ def make_agent_name(agent_name: str) -> str:
     return agent_name
 
 
+def get_agent(agent_name: str) -> Any:
+    """
+    获取指定名称的代理实例。
+
+    参数：
+        agent_name: 代理名称
+
+    返回：
+        Any: 代理实例，如果不存在则返回None
+    """
+    return global_agents.get(agent_name)
+
+
 def set_agent(agent_name: str, agent: Any) -> None:
     """
     设置当前代理并将其添加到全局代理集合中。
@@ -74,7 +87,7 @@ def set_agent(agent_name: str, agent: Any) -> None:
         agent_name: 代理名称
         agent: 代理对象
     """
-    global_agents.add(agent_name)
+    global_agents[agent_name] = agent
     global current_agent_name
     current_agent_name = agent_name
 
@@ -101,7 +114,7 @@ def delete_agent(agent_name: str) -> None:
         agent_name: 要删除的代理名称
     """
     if agent_name in global_agents:
-        global_agents.remove(agent_name)
+        del global_agents[agent_name]
         global current_agent_name
         current_agent_name = ""
 
@@ -173,10 +186,3 @@ def get_last_message() -> str:
         str: 最后一条消息
     """
     return last_message
-    """
-    获取当前中断信号状态。
-
-    返回:
-        int: 当前中断计数
-    """
-    return g_interrupt

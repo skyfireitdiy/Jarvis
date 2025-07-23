@@ -16,6 +16,7 @@ from jarvis.jarvis_utils.git_utils import (
     find_git_root_and_cd,
     has_uncommitted_changes,
 )
+from jarvis.jarvis_utils.globals import get_agent, current_agent_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
@@ -162,11 +163,17 @@ commit信息
                 """
 
                 # 获取模型并尝试上传文件
-                platform = PlatformRegistry().get_normal_platform()
+                agent = get_agent(current_agent_name)
+                if agent:
+                    platform = agent.model
+                    model_group = agent.model.model_group
+                else:
+                    platform = PlatformRegistry().get_normal_platform()
+                    model_group = None
                 upload_success = False
 
                 # Check if content is too large
-                is_large_content = is_context_overflow(diff)
+                is_large_content = is_context_overflow(diff, model_group)
 
                 if is_large_content:
                     if not platform.support_upload_files():

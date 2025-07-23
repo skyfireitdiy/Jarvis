@@ -2,7 +2,7 @@
 import json
 import threading
 import time
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import parse_qs, urlencode, urljoin
 
 import requests
@@ -46,10 +46,10 @@ class SSEMcpClient(McpClient):
         self.session.headers.update(extra_headers)
 
         # SSE相关属性
-        self.sse_response = None
-        self.sse_thread = None
-        self.messages_endpoint = None
-        self.session_id = None  # 从SSE连接获取的会话ID
+        self.sse_response: Optional[requests.Response] = None
+        self.sse_thread: Optional[threading.Thread] = None
+        self.messages_endpoint: Optional[str] = None
+        self.session_id: Optional[str] = None
         self.pending_requests = {}  # 存储等待响应的请求 {id: Event}
         self.request_results = {}  # 存储请求结果 {id: result}
         self.notification_handlers = {}
@@ -123,13 +123,15 @@ class SSEMcpClient(McpClient):
             self.sse_response = self.session.get(
                 sse_url, stream=True, headers=sse_headers, timeout=30
             )
-            self.sse_response.raise_for_status()
+            if self.sse_response:
+                self.sse_response.raise_for_status()
 
             # 启动事件处理线程
             self.sse_thread = threading.Thread(
                 target=self._process_sse_events, daemon=True
             )
-            self.sse_thread.start()
+            if self.sse_thread:
+                self.sse_thread.start()
 
         except Exception as e:
             PrettyOutput.print(f"SSE连接失败: {str(e)}", OutputType.ERROR)

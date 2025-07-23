@@ -10,7 +10,7 @@
 """
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
@@ -175,7 +175,7 @@ class PrettyOutput:
             lang: 语法高亮的语言
             traceback: 是否显示错误的回溯信息
         """
-        styles = {
+        styles: Dict[OutputType, Dict[str, Any]] = {
             OutputType.SYSTEM: dict(bgcolor="#1e2b3c"),
             OutputType.CODE: dict(bgcolor="#1c2b1c"),
             OutputType.RESULT: dict(bgcolor="#1c1c2b"),

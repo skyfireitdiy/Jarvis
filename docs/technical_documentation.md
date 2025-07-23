@@ -281,10 +281,10 @@ stop
 **工作机制**:
 
 1.  **定义组**: 在 `config.yaml` 中，通过 `JARVIS_MODEL_GROUPS` 列表定义模型组。每个组是一个单键字典，键是组名，值是该组的具体配置。
-2.  **选择组**: 通过 `MODEL_GROUP` 键指定当前要激活的组名。
+2.  **选择组**: 通过 `JARVIS_MODEL_GROUP` 键指定当前要激活的组名。
 3.  **配置覆盖**: 系统在解析配置时，遵循明确的优先级顺序：
     1.  **独立配置 (最高)**: 单独设置的 `JARVIS_PLATFORM`, `JARVIS_MODEL` 等总会覆盖所有其他设置。
-    2.  **模型组配置**: 如果未设置独立配置，则采用 `MODEL_GROUP` 指定的组内配置。
+    2.  **模型组配置**: 如果未设置独立配置，则采用 `JARVIS_MODEL_GROUP` 指定的组内配置。
     3.  **默认值 (最低)**: 如果两者都未提供，则使用代码中的硬编码默认值。
 
 **示例**:
@@ -297,15 +297,16 @@ JARVIS_MODEL_GROUPS:
       JARVIS_MODEL: k1.5
       JARVIS_THINKING_PLATFORM: kimi
       JARVIS_THINKING_MODEL: k1.5-thinking
+      JARVIS_MAX_TOKEN_COUNT: 8192
   - ai8:
       JARVIS_PLATFORM: ai8
       JARVIS_MODEL: gemini-2.5-pro
 
 # 2. 选择要使用的模型组
-MODEL_GROUP: kimi
+JARVIS_MODEL_GROUP: kimi
 
 # 3. (可选) 独立配置会覆盖组配置
-# 如果取消下面这行的注释，即使 MODEL_GROUP 是 'kimi', 常规模型也会使用 'gpt-4o'
+# 如果取消下面这行的注释，即使 JARVIS_MODEL_GROUP 是 'kimi', 常规模型也会使用 'gpt-4o'
 # JARVIS_MODEL: gpt-4o
 ```
 
@@ -315,7 +316,7 @@ MODEL_GROUP: kimi
 
 | 配置项 (Key) | 描述 | 默认值 |
 |---|---|---|
-| `MODEL_GROUP` | 当前激活的模型组名称。 | `null` |
+| `JARVIS_MODEL_GROUP` | 当前激活的模型组名称。 | `null` |
 | `JARVIS_MODEL_GROUPS` | 预定义的模型配置组列表。 | `[]` |
 | `JARVIS_PLATFORM` | 默认使用的 AI 平台名称。 | `yuanbao` |
 | `JARVIS_MODEL` | 默认使用的模型名称。 | `deep_seek_v3` |
@@ -327,9 +328,9 @@ MODEL_GROUP: kimi
 | `JARVIS_USE_METHODOLOGY` | 是否启用方法论引擎（启动时加载、任务后分析）。 | `true` |
 | `JARVIS_USE_ANALYSIS` | 任务结束后是否进行分析以提炼新工具或方法论。 | `true` |
 | `JARVIS_PRINT_PROMPT` | 是否在控制台打印发送给 LLM 的完整提示，用于调试。 | `false` |
-| `JARVIS_MAX_TOKEN_COUNT` | Agent 对话历史的上下文总长度阈值。 | `960000` |
-| `JARVIS_MAX_INPUT_TOKEN_COUNT` | 单次输入给模型的最大 Token 数量。 | `32000` |
-| `JARVIS_MAX_BIG_CONTENT_SIZE`| 判断内容是否为“大内容”的 Token 阈值，超过则可能触发特殊处理（如存入文件）。| `160000` |
+| `JARVIS_MAX_TOKEN_COUNT` | Agent 对话历史的上下文总长度阈值 (可被模型组覆盖)。 | `960000` |
+| `JARVIS_MAX_INPUT_TOKEN_COUNT` | 单次输入给模型的最大 Token 数量 (可被模型组覆盖)。 | `32000` |
+| `JARVIS_MAX_BIG_CONTENT_SIZE`| 判断内容是否为“大内容”的 Token 阈值，超过则可能触发特殊处理（如存入文件）(可被模型组覆盖)。| `160000` |
 | `JARVIS_GIT_COMMIT_PROMPT` | `jgc` 命令生成 Git Commit Message 时使用的自定义模板。 | `""` |
 | `JARVIS_REPLACE_MAP` | 定义在交互中使用的自定义快捷命令替换规则。 | `{}` |
 | `JARVIS_MCP` | 一个列表，用于定义所有模型上下文协议（MCP）的端点配置。 | `[]` |
