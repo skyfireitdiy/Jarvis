@@ -74,6 +74,7 @@ jarvis --llm_type thinking -t "初始任务"
 | `-t/--task` | 直接从命令行输入任务内容 |
 | `-f/--config` | 自定义配置文件的路径 |
 | `--restore-session` | 从 .jarvis/saved_session.json 恢复会话 |
+| `-e/--edit` | 编辑配置文件 |
 
 #### 4. 工作流程
 1. 初始化环境
