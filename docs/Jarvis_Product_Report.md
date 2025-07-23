@@ -153,99 +153,101 @@ Jarvis 的强大能力使其能够深度融入日常工作的各个环节，以�
     3.  `'结合上述信息，按照周报模板生成周报 markdown 文件'`
     
 - **信息搜集与整合**:
-  - **场景**: 调研“云原生监控领域最新的技术趋势”，并整合成报告。
+  - **场景**: 调研“5G核心网UPF的最新开源实现方案”，并整合成报告。
   - **Jarvis 应用**:
-    1.  `'使用 search_web 工具搜索 "cloud native monitoring trends 2024"'`
-    2.  `'使用 read_webpage 工具，阅读搜索结果中排名靠前的5篇文章'`
-    3.  `'对阅读过的内容进行总结，提取关键技术（如 eBPF, OpenTelemetry, AIops）'`
+    1.  `'使用 search_web 工具搜索 "5G core UPF open source implementation"'`
+    2.  `'使用 read_webpage 工具，阅读搜索结果中相关的 GitHub 仓库和技术博客'`
+    3.  `'对阅读过的内容进行总结，提取关键项目（如 free5GC, Open5GS）的技术特点、编程语言（C/Go）和社区活跃度'`
     4.  `'将总结和关键点整理成一份调研报告'`
 
 ### 4.2 开发环境搭建
 
 对于新项目启动或新成员加入，环境搭建往往耗时且易出错。Jarvis 可将此过程变为“一句话的事”。
 
-- **场景**: 为一个新的 Python Web 项目（使用 FastAPI 和 PostgreSQL）搭建完整的本地开发环境。
+- **场景**: 为一个新的基于 Rust 的嵌入式网络监控应用，搭建支持交叉编译的开发环境（目标平台 aarch64-unknown-linux-gnu）。
 - **Jarvis 应用** (`jvs`):
-  1.  **用户输入**: `'帮我搭建一个 FastAPI 项目的开发环境，需要用到 PostgreSQL 数据库。'`
+  1.  **用户输入**: `'为我搭建一个 Rust 交叉编译环境，目标是 aarch64 平台的 Linux 系统。'`
   2.  **Jarvis 规划与执行**:
-      - **规划**: 识别出关键组件：Python, Poetry, Docker, FastAPI, PostgreSQL。
+      - **规划**: 识别出关键组件：Rust (rustup), aarch64-linux-gnu 交叉编译工具链, QEMU (用于模拟测试)。
       - **执行**:
-        - `'使用 virtual_tty 检查系统是否已安装 a. Python 3.10+ b. Docker c. Poetry'`
-        - `'如果 Poetry 未安装，则执行官方安装脚本 curl -sSL https://install.python-poetry.org | python3 -'`
-        - `'创建一个名为 "my-fastapi-project" 的新目录并进入'`
-        - `'执行 poetry init 初始化项目'`
-        - `'执行 poetry add fastapi uvicorn[standard] psycopg2-binary sqlalchemy'`
-        - `'创建 docker-compose.yml 文件，内容包含一个 PostgreSQL 服务，并配置好端口和数据卷'`
-        - `'使用 virtual_tty 启动 docker-compose up -d'`
-        - `'创建项目骨架 main.py, database.py, models.py，并在 main.py 中写入一个连接数据库并返回 "Hello World" 的基本 FastAPI 应用'`
-  3.  **结果**: 用户只需一条指令，即可获得一个包含完整依赖、数据库服务已启动、代码骨架已创建的可立即运行的项目环境。
+        - `'使用 virtual_tty 检查系统是否已安装 a. rustc b. aarch64-linux-gnu-gcc c. qemu-aarch64'`
+        - `'如果 rustc 未安装，则执行官方安装脚本 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh'`
+        - `'执行 rustup target add aarch64-unknown-linux-gnu 添加交叉编译目标'`
+        - `'检查并提示用户在 .cargo/config.toml 文件中配置 linker = "aarch64-linux-gnu-gcc"'`
+        - `'创建一个名为 "rust-embedded-monitor" 的新目录并进入'`
+        - `'执行 cargo new --bin . 初始化项目'`
+        - `'执行 cargo add pnet --features=std'`
+        - `'在 main.rs 中写入一个简单的使用 pnet 库捕获本机网络数据包的示例'`
+        - `'提供交叉编译指令：cargo build --target=aarch64-unknown-linux-gnu'`
+  3.  **结果**: 用户只需一条指令，即可获得一个配置好交叉编译工具链、包含基础网络库依赖和示例代码的可立即编译的项目环境。
 
 ### 4.3 代码开发与重构
 
 这是 Jarvis 的核心价值所在，`jarvis-code-agent` (`jca`) 能够像一名初级开发人员一样，根据需求完成编码任务。
 
 - **新功能开发**:
-  - **场景**: 在已有的 FastAPI 项目中，增加一个 `/users` 的 POST 接口，用于创建新用户，并包含数据校验和数据库存储逻辑。
+  - **场景**: 在一个C语言实现的嵌入式网关程序中，增加一个新的CLI（命令行接口）命令 `show ip route`，用于显示系统的路由表信息。
   - **Jarvis 应用** (`jca`):
-    1.  **用户输入**: `jca -r "在项目中增加一个创建用户的 POST /users 接口，请求体包含 username 和 email，username 为必填项，email 需符合邮箱格式。将用户信息存入数据库。"`
+    1.  **用户输入**: `jca -r "在cli模块中添加一个新的命令 'show ip route'，该命令需要读取并格式化输出 /proc/net/route 的内容。"`
     2.  **Jarvis 规划与执行**:
-        - **分析**: 理解需求，定位到需要修改和创建的文件（`main.py`, `models.py`, `schemas.py`）。
+        - **分析**: 理解需求，定位到需要修改的文件（如 `cli/cli_commands.c`, `cli/cli_parser.c`）和需要引用的头文件。
         - **执行**:
-          - `'分析 models.py，确认 User 表结构是否存在，如不存在则创建。'`
-          - `'创建 schemas.py 文件，并定义 UserCreate 的 Pydantic 模型，包含 username 和 email 字段，并为 email 添加格式校验。'`
-          - `'修改 main.py，导入 UserCreate schema，并添加一个新的 @app.post("/users") 路由。'`
-          - `'在路由函数中，实现接收请求、数据校验、创建 User 模型实例、存入数据库会话并提交的完整逻辑。'`
-          - `'自动格式化修改后的代码，并暂存变更。'`
-    3.  **结果**: Jarvis 自动完成相关文件的修改和创建，并生成一个符合规范的 Git commit（通过 `jgc`），用户只需审查和提交。
+          - `'分析 cli_commands.c，参考现有命令的实现，定义一个新的函数 cli_show_ip_route()。'`
+          - `'在该函数中，实现打开、读取并解析 /proc/net/route 文件的逻辑。'`
+          - `'将解析出的目标地址、网关、掩码等信息格式化为可读的表格形式输出。'`
+          - `'在 cli_parser.c 中注册新的命令 'show ip route' 并将其与 cli_show_ip_route 函数关联。'`
+          - `'更新相关的 Makefile 或头文件，确保新函数被正确编译和声明。'`
+    3.  **结果**: Jarvis 自动在正确的位置添加了新功能的代码，并处理了相关的注册和构建配置，用户只需审查和编译即可测试新命令。
 
 - **代码重构**:
-  - **场景**: 项目中的一个函数 `process_data` 过于庞大（超过200行），逻辑耦合严重，需要将其重构为多个内聚的小函数。
+  - **场景**: 在一个处理通信协议的 Rust 项目中，函数 `handle_incoming_pdu(pdu: &[u8])` 逻辑过于复杂，包含了报文解析、业务处理和应答封装，需要进行重构。
   - **Jarvis 应用** (`jca`):
-    1.  **用户输入**: `jca -r "重构 utils.py 文件中的 process_data 函数，将其拆分为多个职责单一的小函数，提高代码可读性和可维护性。"`
+    1.  **用户输入**: `jca -r "重构 pdu_handler.rs 文件中的 handle_incoming_pdu 函数，将其拆分为独立的解析、处理和响应函数，提高模块化程度。"`
     2.  **Jarvis 规划与执行**:
-        - `'读取并分析 utils.py 中 process_data 函数的逻辑。'`
-        - `'识别出函数内可独立拆分的逻辑块，如：数据加载、数据清洗、数据转换、数据存储。'`
-        - `'创建新的私有函数 _load_data, _clean_data, _transform_data, _save_data。'`
-        - `'将 process_data 函数的实现，替换为按顺序调用上述新创建的私有函数。'`
-        - `'确保重构后的函数签名和返回值与原始函数保持一致，避免破坏性变更。'`
-    3.  **结果**: 自动完成复杂函数的重构，将变更应用到文件，并等待用户确认。
+        - `'读取并分析 pdu_handler.rs 中 handle_incoming_pdu 函数的逻辑。'`
+        - `'识别出函数内可独立拆分的逻辑块：协议头解析、消息体验证、业务逻辑分发、构造响应报文。'`
+        - `'创建新的私有函数，如 parse_pdu(pdu: &[u8]) -> Result<Pdu, Error>，process_business_logic(pdu: &Pdu) -> Result<Response, Error>，build_response_pdu(response: &Response) -> Vec<u8>。'`
+        - `'将 handle_incoming_pdu 的实现，替换为按顺序调用上述新创建的函数，并处理它们之间的 Result 错误传递。'`
+        - `'确保重构后的函数对外接口和错误处理与原始函数保持兼容。'`
+    3.  **结果**: 自动完成复杂函数的重构，将代码分解为符合 Rust 设计哲学（如使用 Result 进行错误处理）的多个内聚单元，并等待用户确认。
 
 ### 4.4 故障定位与修复
 
 面对线上突发故障，Jarvis 可以成为快速响应、定位问题的得力助手。
 
-- **场景**: 线上服务出现 500 错误，Sentry 中上报了一个 `KeyError: 'user_id'` 的异常。
+- **场景**: 现场通信设备发生崩溃，生成了一个 coredump 文件。初步定位是处理特定SIP信令时发生段错误（Segmentation Fault）。
 - **Jarvis 应用** (`jvs` 或 `jca`):
-  1.  **用户输入**: `'Sentry 报警 KeyError: 'user_id'，日志显示错误发生在 'process_order' 函数，帮我定位并修复问题。这是相关的日志片段：[...]'`
+  1.  **用户输入**: `'设备上报了一个 coredump，gdb 初步定位在 sip_handler.c 的 process_sip_invite 函数。帮我分析 coredump 并定位根因。这是 coredump 和可执行文件路径：[...]'`
   2.  **Jarvis 规划与执行**:
       - **信息收集**:
-        - `'读取用户提供的日志，确认错误信息和堆栈。'`
-        - `'使用 read_code 工具，读取 'process_order' 函数及其上下文代码。'`
-        - `'使用 jarvis-rag query "处理订单时 user_id 为空可能是什么原因？"，查询已录入公司内部技术文档的 RAG 知识库，寻找类似案例。'`
+        - `'使用 virtual_tty 启动 gdb，加载可执行文件和 coredump 文件。'`
+        - `'在 gdb 中执行 backtrace (bt) 命令，获取崩溃时的函数调用栈。'`
+        - `'根据调用栈，定位到崩溃的具体代码行，并打印相关变量的值，特别是指针和数组索引。'`
+        - `'使用 jarvis-rag query "处理SIP INVITE消息时发生段错误的历史案例"，查询内部故障处理知识库。'`
       - **分析与诊断**:
-        - 结合代码、日志和 RAG 返回的内部知识（例如：“某些旧版本 APP 的支付回调缺少 user_id”），Jarvis 推断出问题根源：`在处理来自特定渠道的回调时，请求体中缺少 'user_id' 字段`。
+        - 结合调用栈、变量值（例如：发现一个指针为 NULL）和 RAG 返回的内部知识（例如：“某型号终端发来的 INVITE 消息可能缺少 'Contact' 头域”），Jarvis 推断出问题根源：`代码在处理缺少 'Contact' 头域的 INVITE 消息时，对一个空指针进行了访问`。
       - **修复与验证**:
-        - `'使用 edit_file 工具，在访问 'user_id' 之前增加一个条件判断和默认值处理，例如：user_id = data.get('user_id', DEFAULT_USER_ID)'`
-        - `'为该修复添加必要的日志记录，以便后续观察。'`
-        - `'编写一个单元测试用例，专门模拟缺少 'user_id' 的请求场景，并集成到测试套件中。'`
-  3.  **结果**: Jarvis 不仅修复了直接的 `KeyError`，还根据内部知识库提供了更健壮的解决方案，并补充了单元测试以防止问题复发。
+        - `'使用 edit_file 工具，在解引用指针前增加一个空指针检查。'`
+        - `'为该修复添加详细的错误日志，记录收到的畸形报文。'`
+        - `'编写一个新的单元测试用例（或报文重放脚本），专门构造缺少 'Contact' 头域的 INVITE 报文，确保修复后的代码能正确处理异常并返回错误码，而不是崩溃。'`
+  3.  **结果**: Jarvis 不仅定位了导致崩溃的直接原因并进行了修复，还结合内部知识库指出了问题场景，并补充了单元测试以防止问题复发。
 
 ### 4.5 DevOps 流程自动化
 
 通过将 Jarvis 的能力与 CI/CD 流水线结合，可以实现更高层次的自动化。
 
-- **场景**: 在代码合并到主分支后，自动完成版本号更新、生成发布日志、构建 Docker 镜像并推送到镜像仓库。
+- **场景**: C++ 语言编写的基站协议栈项目，在代码合并到发布分支后，自动完成版本更新、生成发布日志、交叉编译、打包固件并归档。
 - **Jarvis 应用** (作为 CI/CD 脚本的一部分):
-  1.  **触发**: Jenkins / GitLab CI 检测到 `main` 分支有新的合并。
+  1.  **触发**: Jenkins / GitLab CI 检测到 `release` 分支有新的合并。
   2.  **执行脚本调用 Jarvis**:
-      - **版本更新**: `jca -r "根据 conventional commits 规范，将项目版本号从 $(cat VERSION) 进行 'minor' 级别的提升，并更新到 VERSION 文件中"`
-      - **生成发布日志**: `jvs -t "读取 git log --since=<上次发布tag>，总结这段时间的主要变更，包括新功能、修复和重构，生成 CHANGELOG.md 的最新条目"`
-      - **构建与推送**:
+      - **版本更新**: `jca -r "根据 conventional commits 规范，将项目版本号从 $(cat VERSION) 进行 'patch' 级别的提升，并更新到 VERSION 文件和代码头文件中"`
+      - **生成发布日志**: `jvs -t "读取 git log --since=<上次发布tag>，总结这段时间的主要变更，包括协议优化、缺陷修复，生成 ReleaseNotes.md 的最新条目"`
+      - **构建与打包**:
         - `'读取 VERSION 文件获取最新版本号'`
-        - `'执行 docker build -t my-app:$(cat VERSION) .'`
-        - `'执行 docker push my-app:$(cat VERSION)'`
-        - `'调用自定义工具，通知团队成员新版本已发布'`
-  3.  **结果**: 整个发布流程无需人工干预，Jarvis 承担了其中需要智能分析（如判断版本升级类型、总结变更日志）和重复执行（构建、推送）的工作，极大地提升了发布效率和规范性。
+        - `'执行交叉编译脚本 build.sh --platform=arm-linux --version=$(cat VERSION)'`
+        - `'执行打包脚本 package.sh，将编译出的二进制文件、配置文件和依赖库打包成 a.b.c.tar.gz 固件包'`
+        - `'调用自定义工具，将固件包上传到 Artifactory，并通知测试团队准备验证'`
+  3.  **结果**: 整个发布流程无需人工干预，Jarvis 承担了其中需要智能分析（如判断版本升级类型、总结变更日志）和重复执行（编译、打包、归档）的工作，极大地提升了嵌入式软件发布流程的效率和规范性。
 
 ---
 
