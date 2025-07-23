@@ -139,7 +139,7 @@ def main() -> None:
             system_prompt=origin_agent_system_prompt,
             llm_type=args.llm_type,
             input_handler=[shell_input_handler, builtin_input_handler],
-            output_handler=[ToolRegistry()],
+            output_handler=[ToolRegistry()],  # type: ignore
             need_summary=False,
         )
 
