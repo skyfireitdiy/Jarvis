@@ -47,6 +47,7 @@ class CodeAgent:
     def __init__(
         self,
         llm_type: str = "normal",
+        model_group: Optional[str] = None,
         need_summary: bool = True,
     ):
         self.root_dir = os.getcwd()
@@ -120,6 +121,7 @@ class CodeAgent:
             auto_complete=False,
             output_handler=[tool_registry, EditFileHandler()],  # type: ignore
             llm_type=llm_type,
+            model_group=model_group,
             input_handler=[shell_input_handler, builtin_input_handler],
             need_summary=need_summary,
             use_methodology=False,  # 禁用方法论
@@ -412,6 +414,11 @@ def main() -> None:
         help="LLM type to use",
     )
     parser.add_argument(
+        "--model_group",
+        type=str,
+        help="Model group to use, overriding config",
+    )
+    parser.add_argument(
         "-r", "--requirement", type=str, help="Requirement to process", default=None
     )
     parser.add_argument(
@@ -427,7 +434,11 @@ def main() -> None:
     PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
 
     try:
-        agent = CodeAgent(llm_type=args.llm_type, need_summary=False)
+        agent = CodeAgent(
+            llm_type=args.llm_type,
+            model_group=args.model_group,
+            need_summary=False,
+        )
 
         # 尝试恢复会话
         if args.restore_session:

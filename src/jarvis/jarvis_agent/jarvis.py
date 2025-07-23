@@ -125,6 +125,11 @@ def _parse_args() -> argparse.Namespace:
         type=str,
         help="Directly input task content from command line",
     )
+    parser.add_argument(
+        "--model_group",
+        type=str,
+        help="Model group to use, overriding config",
+    )
     parser.add_argument("-f", "--config", type=str, help="Path to custom config file")
     parser.add_argument(
         "--restore-session",
@@ -170,6 +175,7 @@ def _initialize_agent(args: argparse.Namespace) -> Agent:
     agent = Agent(
         system_prompt=origin_agent_system_prompt,
         llm_type=args.llm_type,
+        model_group=args.model_group,
         input_handler=[shell_input_handler, builtin_input_handler],
         output_handler=[ToolRegistry()],  # type: ignore
         need_summary=False,

@@ -52,6 +52,11 @@ def main():
         choices=["normal", "thinking"],
         help="LLM type to use, overriding config",
     )
+    parser.add_argument(
+        "--model_group",
+        type=str,
+        help="Model group to use, overriding config",
+    )
     args = parser.parse_args()
 
     # Initialize environment
@@ -65,6 +70,8 @@ def main():
     # Override config with command-line arguments if provided
     if args.llm_type:
         config["llm_type"] = args.llm_type
+    if args.model_group:
+        config["model_group"] = args.model_group
 
     # Create and run agent
     try:
