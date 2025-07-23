@@ -6,6 +6,9 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
+import subprocess
+import time
+from datetime import datetime
 
 import yaml
 
@@ -285,14 +288,103 @@ class ToolRegistry(OutputHandlerProtocol):
 
             self.register_tool_by_file(str(file_path))
 
+    def _pull_git_repo(self, repo_path: Path):
+        """对指定的git仓库执行git pull操作，并根据commit hash判断是否有更新。"""
+        git_dir = repo_path / ".git"
+        if not git_dir.is_dir():
+            return
+
+        PrettyOutput.print(f"正在更新工具库 '{repo_path.name}'...", OutputType.INFO)
+        try:
+            # 获取更新前的commit hash
+            before_hash_result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            )
+            before_hash = before_hash_result.stdout.strip()
+
+            # 执行 git pull
+            pull_result = subprocess.run(
+                ["git", "pull"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=60,
+            )
+
+            # 获取更新后的commit hash
+            after_hash_result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            )
+            after_hash = after_hash_result.stdout.strip()
+
+            if before_hash != after_hash:
+                PrettyOutput.print(f"工具库 '{repo_path.name}' 已更新。", OutputType.SUCCESS)
+                if pull_result.stdout.strip():
+                    PrettyOutput.print(pull_result.stdout.strip(), OutputType.INFO)
+            else:
+                PrettyOutput.print(f"工具库 '{repo_path.name}' 已是最新版本。", OutputType.INFO)
+
+        except FileNotFoundError:
+            PrettyOutput.print(
+                f"git 命令未找到，跳过更新 '{repo_path.name}'。", OutputType.WARNING
+            )
+        except subprocess.TimeoutExpired:
+            PrettyOutput.print(f"更新 '{repo_path.name}' 超时。", OutputType.ERROR)
+        except subprocess.CalledProcessError as e:
+            error_message = e.stderr.strip() if e.stderr else str(e)
+            PrettyOutput.print(
+                f"更新 '{repo_path.name}' 失败: {error_message}", OutputType.ERROR
+            )
+        except Exception as e:
+            PrettyOutput.print(
+                f"更新 '{repo_path.name}' 时发生未知错误: {str(e)}", OutputType.ERROR
+            )
+
     def _load_external_tools(self) -> None:
         """从jarvis_data/tools和配置的目录加载外部工具"""
         tool_dirs = [Path(get_data_dir()) / "tools"] + [
             Path(p) for p in get_tool_load_dirs()
         ]
 
+        # --- 全局每日更新检查 ---
+        data_dir = Path(get_data_dir())
+        last_check_file = data_dir / "git_updates_last_check.txt"
+        should_check_for_updates = True
+
+        if last_check_file.exists():
+            try:
+                last_check_timestamp = float(last_check_file.read_text())
+                last_check_date = datetime.fromtimestamp(last_check_timestamp).date()
+                if last_check_date == datetime.now().date():
+                    should_check_for_updates = False
+            except (ValueError, IOError):
+                # 如果文件内容有问题或无法读取，则重新检查
+                pass
+
+        if should_check_for_updates:
+            PrettyOutput.print("执行每日工具库更新检查...", OutputType.INFO)
+            # 在这里调用 _pull_git_repo
+            for tool_dir in tool_dirs:
+                if tool_dir.exists() and tool_dir.is_dir():
+                    self._pull_git_repo(tool_dir)
+            try:
+                last_check_file.write_text(str(time.time()))
+            except IOError as e:
+                PrettyOutput.print(f"无法写入git更新检查时间戳: {e}", OutputType.WARNING)
+
         for tool_dir in tool_dirs:
-            if not tool_dir.exists():
+            if not tool_dir.exists() or not tool_dir.is_dir():
                 continue
 
             # 遍历目录中的所有.py文件
