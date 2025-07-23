@@ -424,9 +424,9 @@ ENV:
 #### Kimi
 ```yaml
 JARVIS_PLATFORM: kimi
-JARVIS_MODEL: kimi
+JARVIS_MODEL: k1.5
 JARVIS_THINKING_PLATFORM: kimi
-JARVIS_THINKING_MODEL: k1
+JARVIS_THINKING_MODEL: k1.5-thinking
 ENV:
   KIMI_API_KEY: <Kimi API KEY>
 ```
@@ -451,16 +451,51 @@ OPENAI_API_KEY: <OpenAI API Key>
 OPENAI_API_BASE: https://api.openai.com/v1
 ```
 
-### 2. 配置项说明
+### 2. 模型组配置 (高级)
+
+除了单独配置每个模型参数，您还可以定义和使用**模型组**来快速切换不同的模型组合。这对于需要在不同任务或平台间频繁切换的场景非常有用。
+
+**配置示例** (`~/.jarvis/config.yaml`):
+
+```yaml
+# 定义模型组
+JARVIS_MODEL_GROUPS:
+  - kimi:
+      JARVIS_PLATFORM: kimi
+      JARVIS_MODEL: k1.5
+      JARVIS_THINKING_PLATFORM: kimi
+      JARVIS_THINKING_MODEL: k1.5-thinking
+  - ai8:
+      JARVIS_PLATFORM: ai8
+      JARVIS_MODEL: gemini-2.5-pro
+      # 如果不指定思考模型，将自动使用常规模型
+      # JARVIS_THINKING_PLATFORM: ai8
+      # JARVIS_THINKING_MODEL: gemini-2.5-pro
+
+# 选择要使用的模型组
+MODEL_GROUP: kimi
+```
+
+**配置优先级规则:**
+
+Jarvis 会按照以下顺序解析模型配置，序号越小优先级越高：
+
+1.  **独立配置**: 直接设置的 `JARVIS_PLATFORM`, `JARVIS_MODEL`, `JARVIS_THINKING_PLATFORM`, `JARVIS_THINKING_MODEL` 环境变量。这些配置会**覆盖**任何模型组中的设置。
+2.  **模型组配置**: 通过 `MODEL_GROUP` 选中的模型组配置。
+3.  **默认值**: 如果以上均未配置，则使用代码中定义的默认模型（如 `yuanbao` 和 `deep_seek_v3`）。
+
+### 3. 全部配置项说明
 | 变量名称 | 默认值 | 说明 |
 |----------|--------|------|
 | `ENV` | {} | 环境变量配置 |
+| `JARVIS_MODEL_GROUPS` | `[]` | 预定义的模型配置组列表 |
+| `MODEL_GROUP` | `null` | 选择要激活的模型组名称 |
 | `JARVIS_MAX_TOKEN_COUNT` | 960000 | 上下文窗口的最大token数量 |
 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 32000 | 输入的最大token数量 |
-| `JARVIS_PLATFORM` | yuanbao | 默认AI平台 |
-| `JARVIS_MODEL` | deep_seek_v3 | 默认模型 |
-| `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 推理任务使用的平台 |
-| `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 |
+| `JARVIS_PLATFORM` | yuanbao | 默认AI平台 (可被模型组覆盖) |
+| `JARVIS_MODEL` | deep_seek_v3 | 默认模型 (可被模型组覆盖) |
+| `JARVIS_THINKING_PLATFORM` | JARVIS_PLATFORM | 推理任务使用的平台 (可被模型组覆盖) |
+| `JARVIS_THINKING_MODEL` | JARVIS_MODEL | 推理任务使用的模型 (可被模型组覆盖) |
 | `JARVIS_EXECUTE_TOOL_CONFIRM` | false | 执行工具前是否需要确认 |
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | false | 应用补丁前是否需要确认 |
 | `JARVIS_MAX_BIG_CONTENT_SIZE` | 160000 | 最大大内容大小 |
