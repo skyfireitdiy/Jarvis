@@ -10,14 +10,14 @@
 import json
 import os
 import tempfile
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_data_dir, get_methodology_dirs
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import is_context_overflow
-
+from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
 
 def _get_methodology_directory() -> str:
     """
@@ -44,6 +44,9 @@ def _load_all_methodologies() -> Dict[str, str]:
     """
     all_methodologies = {}
     methodology_dirs = [_get_methodology_directory()] + get_methodology_dirs()
+
+    # --- 全局每日更新检查 ---
+    daily_check_git_updates(methodology_dirs, "方法论")
 
     import glob
 
