@@ -290,7 +290,7 @@ class ToolRegistry(OutputHandlerProtocol):
         tool_dirs = [str(Path(get_data_dir()) / "tools")] + get_tool_load_dirs()
 
         # --- 全局每日更新检查 ---
-        daily_check_git_updates(tool_dirs, "工具")
+        daily_check_git_updates(tool_dirs, "tools")
 
         for tool_dir in tool_dirs:
             p_tool_dir = Path(tool_dir)

@@ -46,7 +46,7 @@ def _load_all_methodologies() -> Dict[str, str]:
     methodology_dirs = [_get_methodology_directory()] + get_methodology_dirs()
 
     # --- 全局每日更新检查 ---
-    daily_check_git_updates(methodology_dirs, "方法论")
+    daily_check_git_updates(methodology_dirs, "methodologies")
 
     import glob
 
