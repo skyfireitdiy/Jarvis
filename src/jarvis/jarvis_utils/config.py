@@ -240,6 +240,16 @@ def get_tool_load_dirs() -> List[str]:
     return GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_LOAD_DIRS", [])
 
 
+def get_methodology_dirs() -> List[str]:
+    """
+    获取方法论加载目录。
+
+    返回:
+        List[str]: 方法论加载目录列表
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_METHODOLOGY_DIRS", [])
+
+
 def is_print_prompt() -> bool:
     """
     获取是否打印提示。

@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, get_methodology_dirs
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import is_context_overflow
 
@@ -37,32 +37,36 @@ def _get_methodology_directory() -> str:
 
 def _load_all_methodologies() -> Dict[str, str]:
     """
-    加载所有方法论文件
+    从默认目录和配置的外部目录加载所有方法论文件。
 
     返回：
-        Dict[str, str]: 方法论字典，键为问题类型，值为方法论内容
+        Dict[str, str]: 方法论字典，键为问题类型，值为方法论内容。
     """
-    methodology_dir = _get_methodology_directory()
     all_methodologies = {}
-
-    if not os.path.exists(methodology_dir):
-        return all_methodologies
+    methodology_dirs = [_get_methodology_directory()] + get_methodology_dirs()
 
     import glob
 
-    for filepath in glob.glob(os.path.join(methodology_dir, "*.json")):
-        try:
-            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                methodology = json.load(f)
-                problem_type = methodology.get("problem_type", "")
-                content = methodology.get("content", "")
-                if problem_type and content:
-                    all_methodologies[problem_type] = content
-        except Exception as e:
-            filename = os.path.basename(filepath)
-            PrettyOutput.print(
-                f"加载方法论文件 {filename} 失败: {str(e)}", OutputType.WARNING
-            )
+    for directory in set(methodology_dirs):  # Use set to avoid duplicates
+        if not os.path.isdir(directory):
+            PrettyOutput.print(f"警告: 方法论目录不存在或不是一个目录: {directory}", OutputType.WARNING)
+            continue
+
+        for filepath in glob.glob(os.path.join(directory, "*.json")):
+            try:
+                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    methodology = json.load(f)
+                    problem_type = methodology.get("problem_type", "")
+                    content = methodology.get("content", "")
+                    if problem_type and content:
+                        if problem_type in all_methodologies:
+                            PrettyOutput.print(f"警告: 方法论 '{problem_type}' 被 '{filepath}' 覆盖。", OutputType.WARNING)
+                        all_methodologies[problem_type] = content
+            except Exception as e:
+                filename = os.path.basename(filepath)
+                PrettyOutput.print(
+                    f"加载方法论文件 {filename} 失败: {str(e)}", OutputType.WARNING
+                )
 
     return all_methodologies
 
