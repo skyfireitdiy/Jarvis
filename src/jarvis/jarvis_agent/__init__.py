@@ -213,6 +213,7 @@ class Agent:
 """
         )
         self.first = True
+        self.run_input_handlers_next_turn = False
 
     def set_user_data(self, key: str, value: Any):
         """Sets user data in the session."""
@@ -235,6 +236,10 @@ class Agent:
     def set_addon_prompt(self, addon_prompt: str):
         """Sets the addon prompt in the session."""
         self.session.set_addon_prompt(addon_prompt)
+
+    def set_run_input_handlers_next_turn(self, value: bool):
+        """Sets the flag to run input handlers on the next turn."""
+        self.run_input_handlers_next_turn = value
 
     def set_after_tool_call_cb(self, cb: Callable[[Any], None]):  # type: ignore
         """设置工具调用后回调函数。
@@ -264,7 +269,9 @@ class Agent:
                 return handler
         return None
 
-    def _call_model(self, message: str, need_complete: bool = False) -> str:
+    def _call_model(
+        self, message: str, need_complete: bool = False, run_input_handlers: bool = True
+    ) -> str:
         """调用AI模型并实现重试逻辑
 
         参数:
@@ -280,10 +287,11 @@ class Agent:
             3. 会自动添加附加提示
             4. 会检查并处理上下文长度限制
         """
-        for handler in self.input_handler:
-            message, need_return = handler(message, self)
-            if need_return:
-                return message
+        if run_input_handlers:
+            for handler in self.input_handler:
+                message, need_return = handler(message, self)
+                if need_return:
+                    return message
 
         if self.session.addon_prompt:
             message += f"\n\n{self.session.addon_prompt}"
@@ -478,12 +486,20 @@ class Agent:
         try:
             set_agent(self.name, self)
 
+            run_input_handlers = True
             while True:
+                if self.run_input_handlers_next_turn:
+                    run_input_handlers = True
+                    self.run_input_handlers_next_turn = False
+
                 if self.first:
                     self._first_run()
                 try:
-                    current_response = self._call_model(self.session.prompt, True)
+                    current_response = self._call_model(
+                        self.session.prompt, True, run_input_handlers
+                    )
                     self.session.prompt = ""
+                    run_input_handlers = False
 
                     if get_interrupt():
                         set_interrupt(False)
@@ -491,6 +507,7 @@ class Agent:
                             f"模型交互期间被中断，请输入用户干预信息："
                         )
                         if user_input:
+                            run_input_handlers = True
                             # 如果有工具调用且用户确认继续，则将干预信息和工具执行结果拼接为prompt
                             if any(
                                 handler.can_handle(current_response)
@@ -502,6 +519,7 @@ class Agent:
                                     self.session.prompt = (
                                         f"{user_input}\n\n{current_response}"
                                     )
+                                    run_input_handlers = False
                                     continue
                             self.session.prompt += f"{user_input}"
                             continue
@@ -529,6 +547,7 @@ class Agent:
 
                     if user_input:
                         self.session.prompt = user_input
+                        run_input_handlers = True
                         continue
 
                     if not user_input:
