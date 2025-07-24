@@ -27,7 +27,7 @@ class SearchWebTool:
         """Performs a web search, scrapes content, and summarizes the results."""
         try:
             PrettyOutput.print("▶️ 使用 DuckDuckGo 开始网页搜索...", OutputType.INFO)
-            results = list(DDGS().text(query, max_results=5))
+            results = list(DDGS().text(query, max_results=50))
 
             if not results:
                 return {
@@ -36,19 +36,30 @@ class SearchWebTool:
                     "success": False,
                 }
 
-            urls = [r["href"] for r in results]
             full_content = ""
             visited_urls = []
+            visited_count = 0
 
-            for url in urls:
+            for r in results:
+                if visited_count >= 10:
+                    PrettyOutput.print("ℹ️ 已成功获取10个网页，停止抓取。", OutputType.INFO)
+                    break
+
+                url = r["href"]
+                title = r.get("title", url)
+
                 try:
-                    PrettyOutput.print(f"📄 正在抓取内容: {url}", OutputType.INFO)
+                    PrettyOutput.print(
+                        f"📄 ({visited_count + 1}/10) 正在抓取: {title} ({url})",
+                        OutputType.INFO,
+                    )
                     response = http_get(url, timeout=10.0, follow_redirects=True)
                     soup = BeautifulSoup(response.text, "lxml")
                     body = soup.find("body")
                     if body:
                         full_content += body.get_text(" ", strip=True) + "\n\n"
                         visited_urls.append(url)
+                        visited_count += 1
                 except httpx.HTTPStatusError as e:
                     PrettyOutput.print(
                         f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}",
