@@ -124,7 +124,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """加载工具"""
         tools = self.get_all_tools()
         if tools:
-            tools_prompt = f"{tool_call_help}\n<tools_section>\n"
+            tools_prompt = f"<tools_section>\n"
             tools_prompt += "  <header>## 可用工具:</header>\n"
             tools_prompt += "  <tools_list>\n"
             for tool in tools:
