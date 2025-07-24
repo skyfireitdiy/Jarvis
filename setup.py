@@ -34,8 +34,8 @@ setup(
         "httpx>=0.28.1",
         "pyyaml>=5.3.1",
         "ddgs==9.0.2",
-        "beautifulsoup4==4.13.4",
         "lxml==6.0.0",
+        "markdownify>=1.1.0",
     ],
     extras_require={
         "dev": ["pytest", "black", "isort", "mypy", "build", "twine"],
