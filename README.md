@@ -20,13 +20,25 @@
 - Windows没有测试过，但Windows 10以上的用户可以在WSL上使用此工具
 
 ### 安装
+
+#### 一键安装 (推荐)
+只需一行命令即可完成所有安装和配置：
 ```bash
-# 从源码安装（推荐）
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"
+```
+> 该脚本会自动检测Python环境、克隆项目、安装依赖并设置好路径。
+
+#### 手动安装
+
+**1. 从源码安装**
+```bash
 git clone https://github.com/skyfireitdiy/Jarvis
 cd Jarvis
 pip3 install -e .
+```
 
-# 或者从PyPI安装（可能更新不及时）
+**2. 从PyPI安装 (可能不是最新版)**
+```bash
 pip3 install jarvis-ai-assistant
 ```
 
