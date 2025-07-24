@@ -3,7 +3,7 @@
 from typing import Any, Dict
 
 import httpx
-from bs4 import BeautifulSoup
+from markdownify import markdownify as md
 from ddgs import DDGS
 
 from jarvis.jarvis_agent import Agent
@@ -54,10 +54,9 @@ class SearchWebTool:
                         OutputType.INFO,
                     )
                     response = http_get(url, timeout=10.0, follow_redirects=True)
-                    soup = BeautifulSoup(response.text, "lxml")
-                    body = soup.find("body")
-                    if body:
-                        full_content += body.get_text(" ", strip=True) + "\n\n"
+                    content = md(response.text, strip=['script', 'style'])
+                    if content:
+                        full_content += content + "\n\n"
                         visited_urls.append(url)
                         visited_count += 1
                 except httpx.HTTPStatusError as e:
