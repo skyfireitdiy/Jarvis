@@ -57,7 +57,6 @@ class CodeAgent:
                 "search_web",
                 "ask_user",
                 "read_code",
-                "methodology",
                 "rewrite_file",
             ]
         )
@@ -119,7 +118,7 @@ class CodeAgent:
             system_prompt=code_system_prompt,
             name="CodeAgent",
             auto_complete=False,
-            output_handler=[tool_registry, EditFileHandler()],
+            output_handler=[tool_registry, EditFileHandler()],  # type: ignore
             llm_type=llm_type,
             input_handler=[shell_input_handler, builtin_input_handler],
             need_summary=need_summary,
