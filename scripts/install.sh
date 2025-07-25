@@ -60,13 +60,9 @@ if ! command -v jarvis &> /dev/null
 then
     echo "Warning: 'jarvis' command not found in PATH after installation."
     echo "Please add the Python scripts directory (e.g., ~/.local/bin) to your PATH."
-    echo "Attempting to run '$PYTHON_CMD -m jarvis.main' as a fallback."
-    "$PYTHON_CMD" -m jarvis.main --version
-else
-    echo "Running 'jarvis --version' to finalize installation..."
-    jarvis --version
+    echo "Attempting to run '$PYTHON_CMD -m jarvis.main -h' as a fallback."
+    "$PYTHON_CMD" -m jarvis.main -h
 fi
 
 echo -e "\n--- Installation and initialization complete! ---"
 echo "You can now use the 'jarvis' command."
-echo "The configuration file has been created at ~/.jarvis/config.yaml"
