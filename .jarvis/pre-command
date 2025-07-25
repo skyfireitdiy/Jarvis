@@ -6,7 +6,7 @@
   1. 检测是否有未提交的代码，如果有，使用"jgc"命令提交（jgc命令无参数）
   2. 使用命令获取最新的tag（版本号）
   3. 使用date命令获取当前时间
-  4. 执行`git diff <tag>..HEAD | cat -` 命令，获取从最新的tag到HEAD的所有代码修改commit信息（不要使用--oneline参数），并根据该信息生成简短的release_note的内容（不要写入文件），格式如下：
+  4. 执行`git diff <tag>..HEAD | cat -` 命令，获取从最新的tag到HEAD的所有代码修改commit信息（不要使用--oneline参数），并根据该信息生成简短的release_note的内容（不要写入文件），同时生成多种风格的朋友圈推广文案，Release Note格式参考如下：
     ```markdown
     ### Release Note - v{new_version} {current_date}
 
