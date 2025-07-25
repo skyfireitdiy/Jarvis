@@ -407,7 +407,9 @@ jarvis-platform-manager role -c ~/.jarvis/roles.yaml
 
 ### 2. 视频演示
 [使用jarvis-code-agent快速为jarvis扩展功能](https://www.bilibili.com/video/BV1TCgLzvE6Q/)
+
 [AI解放生产力，利用Jarvis 10分钟在x86_64下全自动搭建aarch64容器化Rust开发测试环境](https://www.bilibili.com/video/BV1K3ghzkEzZ/)
+
 [jarvis-code-agent](https://www.bilibili.com/video/BV1KugbzKE6U/)
 
 ### 3. 预定义任务
