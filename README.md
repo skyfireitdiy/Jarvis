@@ -405,8 +405,10 @@ jarvis-platform-manager role -c ~/.jarvis/roles.yaml
 - 🔌 高度可扩展：支持自定义工具和平台，轻松集成MCP协议
 - 📈 智能进化：内置方法论系统，持续学习优化，越用越智能
 
-### 2. 视频介绍
-[![视频介绍](docs/images/intro.png)](https://player.bilibili.com/player.html?isOutside=true&aid=114306578382907&bvid=BV1x2dAYeEpM&cid=29314583629&p=1)
+### 2. 视频演示
+[使用jarvis-code-agent快速为jarvis扩展功能](https://www.bilibili.com/video/BV1TCgLzvE6Q/)
+[AI解放生产力，利用Jarvis 10分钟在x86_64下全自动搭建aarch64容器化Rust开发测试环境](https://www.bilibili.com/video/BV1K3ghzkEzZ/)
+[jarvis-code-agent](https://www.bilibili.com/video/BV1KugbzKE6U/)
 
 ### 3. 预定义任务
 您可以创建预定义任务文件来快速执行常用命令：
