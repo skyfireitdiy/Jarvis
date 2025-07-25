@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import re
 from abc import ABC, abstractmethod
-from typing import Generator, List, Optional, Tuple
+from types import TracebackType
+from typing import Generator, List, Optional, Tuple, Type
+
+from typing_extensions import Self
 
 from rich import box  # type: ignore
 from rich.live import Live  # type: ignore
@@ -30,8 +33,17 @@ class BasePlatform(ABC):
         self._saved = False
         self.model_group: Optional[str] = None
 
-    def __del__(self):
-        """Destroy model"""
+    def __enter__(self) -> Self:
+        """Enter context manager"""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        """Exit context manager"""
         if not self._saved:
             self.delete_chat()
 
@@ -66,7 +78,9 @@ class BasePlatform(ABC):
         input_token_count = get_context_token_count(message)
 
         if input_token_count > get_max_input_token_count(self.model_group):
-            max_chunk_size = get_max_input_token_count(self.model_group) - 1024  # 留出一些余量
+            max_chunk_size = (
+                get_max_input_token_count(self.model_group) - 1024
+            )  # 留出一些余量
             min_chunk_size = get_max_input_token_count(self.model_group) - 2048
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
             print("📤 正在提交长上下文...")
@@ -96,14 +110,10 @@ class BasePlatform(ABC):
                 ):
                     response += trunk
 
-                print(
-                    f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
-                )
+                print(f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}")
             print("✅ 提交完成")
             response += "\n" + while_true(
-                lambda: while_success(
-                    lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
-                ),
+                lambda: while_success(lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5),
                 5,
             )
         else:
