@@ -12,6 +12,7 @@ from PIL import Image  # type: ignore
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_utils.utils import while_success
 
 
@@ -474,61 +475,54 @@ class YuanbaoPlatform(BasePlatform):
             )
 
             in_thinking = False
-            response_data = b""
 
             # 处理流式响应
-            for chunk in response_stream:
-                response_data += chunk
-
-                # 尝试解析SSE格式的数据
-                try:
-                    # 查找完整的数据行
-                    lines = response_data.decode("utf-8").split("\n")
-                    response_data = b""  # 重置缓冲区
-
-                    for line in lines:
-                        if not line.strip():
-                            continue
-
-                        # SSE格式的行通常以"data: "开头
-                        if line.startswith("data: "):
-                            try:
-                                data_str = line[6:]  # 移除"data: "前缀
-
-                                # 检查结束标志
-                                if data_str == "[DONE]":
-                                    self.first_chat = False
-                                    return None
-
-                                data = json.loads(data_str)
-
-                                # 处理文本类型的消息
-                                if data.get("type") == "text":
-                                    if in_thinking:
-                                        yield "</think>\n"
-                                        in_thinking = False
-                                    msg = data.get("msg", "")
-                                    if msg:
-                                        yield msg
-
-                                # 处理思考中的消息
-                                elif data.get("type") == "think":
-                                    if not in_thinking:
-                                        yield "<think>\n"
-                                        in_thinking = True
-                                    think_content = data.get("content", "")
-                                    if think_content:
-                                        yield think_content
-
-                            except json.JSONDecodeError:
-                                pass
-
-                except UnicodeDecodeError:
-                    # 如果解码失败，继续累积数据
+            for line in response_stream:
+                if not line.strip():
                     continue
 
+                # SSE格式的行通常以"data: "开头
+                if line.startswith("data: "):
+                    try:
+                        data_str = line[6:]  # 移除"data: "前缀
+
+                        # 检查结束标志
+                        if data_str == "[DONE]":
+                            self.first_chat = False
+                            return
+
+                        data = json.loads(data_str)
+
+                        # 处理文本类型的消息
+                        if data.get("type") == "text":
+                            if in_thinking:
+                                yield f"{ct('think')}\n"
+                                in_thinking = False
+                            msg = data.get("msg", "")
+                            if msg:
+                                yield msg
+
+                        # 处理思考中的消息
+                        elif data.get("type") == "think":
+                            if not in_thinking:
+                                yield f"{ot('think')}\n"
+                                in_thinking = True
+                            think_content = data.get("content", "")
+                            if think_content:
+                                yield think_content
+
+                    except json.JSONDecodeError:
+                        pass
+                else:
+                    try:
+                        data = json.loads(line)
+                        if "msg" in data:
+                            yield data["msg"]
+                    except json.JSONDecodeError:
+                        pass
+
             self.first_chat = False
-            return None
+            return
 
         except Exception as e:
             raise Exception(f"对话失败: {str(e)}")

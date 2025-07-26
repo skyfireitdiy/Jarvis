@@ -32,15 +32,21 @@ class AI8Model(BasePlatform):
 
         self.headers = {
             "Authorization": self.token,
+            "sec-ch-ua-platform": '"Windows"',
+            "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+            "sec-ch-ua-mobile": "?0",
             "Content-Type": "application/json",
             "Accept": "application/json, text/plain, */*",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            "X-APP-VERSION": "2.3.0",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+            "X-APP-VERSION": "2.4.2",
             "Origin": self.BASE_URL,
             "Referer": f"{self.BASE_URL}/chat?_userMenuKey=chat",
             "Sec-Fetch-Site": "same-origin",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Dest": "empty",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
+            "Connection": "keep-alive",
         }
 
         self.model_name = os.getenv("JARVIS_MODEL") or "deepseek-chat"
@@ -135,33 +141,30 @@ class AI8Model(BasePlatform):
                 "files": [],
             }
 
+            # 为流式请求构造专用的请求头，避免 'Accept' 和 'accept' 键冲突
+            stream_headers = self.headers.copy()
+            stream_headers["Accept"] = "text/event-stream"  # 添加流式专用的accept头
+
             # 使用stream_post进行流式请求
             response_stream = while_success(
                 lambda: http.stream_post(
                     f"{self.BASE_URL}/api/chat/completions",
-                    headers=self.headers,
+                    headers=stream_headers,
                     json=payload,
                 ),
                 sleep_time=5,
             )
 
             # 处理流式响应
-            for chunk in response_stream:
-                if chunk:
+            for line in response_stream:
+                if line and line.startswith("data: "):
                     try:
-                        line = chunk.decode("utf-8")
-                        if line.startswith("data: "):
-                            try:
-                                data = json.loads(line[6:])
-                                if data.get("type") == "string":
-                                    chunk_data = data.get("data", "")
-                                    if chunk_data:
-                                        yield chunk_data
-
-                            except json.JSONDecodeError:
-                                continue
-
-                    except UnicodeDecodeError:
+                        data = json.loads(line[6:])
+                        if data.get("type") == "string":
+                            chunk_data = data.get("data", "")
+                            if chunk_data:
+                                yield chunk_data
+                    except json.JSONDecodeError:
                         continue
 
             return None
@@ -247,9 +250,7 @@ class AI8Model(BasePlatform):
             PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
             return False
         except KeyError as e:
-            PrettyOutput.print(
-                f"恢复失败: 会话文件格式不正确，缺少键 {e}", OutputType.ERROR
-            )
+            PrettyOutput.print(f"恢复失败: 会话文件格式不正确，缺少键 {e}", OutputType.ERROR)
             return False
         except Exception as e:
             PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
