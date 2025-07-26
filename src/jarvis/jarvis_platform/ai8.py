@@ -60,7 +60,14 @@ class AI8Model(BasePlatform):
             # 1. 创建会话
             response = while_success(
                 lambda: http.post(
-                    f"{self.BASE_URL}/api/chat/session", headers=self.headers, json={}
+                    f"{self.BASE_URL}/api/chat/session",
+                    headers=self.headers,
+                    json={
+                        "mcp": [],
+                        "model": self.model_name,
+                        "plugins": [],
+                        "rags": [],
+                    },
                 ),
                 sleep_time=5,
             )
@@ -83,6 +90,7 @@ class AI8Model(BasePlatform):
                 "plugins": [],
                 "localPlugins": None,
                 "useAppId": 0,
+                "temperature": 0,
             }
 
             response = while_success(
