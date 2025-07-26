@@ -156,38 +156,23 @@ class KimiModel(BasePlatform):
                 sleep_time=5,
             )
 
-            response_data = b""
-
             # 处理流式响应
-            for chunk in response_stream:
-                response_data += chunk
-
-                # 尝试解析SSE格式的数据
-                try:
-                    # 查找完整的数据行
-                    lines = response_data.decode("utf-8").split("\n")
-                    response_data = b""  # 重置缓冲区
-
-                    for line in lines:
-                        if not line.strip():
-                            continue
-
-                        # SSE格式的行通常以"data: "开头
-                        if line.startswith("data: "):
-                            try:
-                                data = json.loads(line[6:])
-                                if data.get("event") == "resp":
-                                    status = data.get("file_info", {}).get("status")
-                                    if status == "parsed":
-                                        return True
-                                    elif status == "failed":
-                                        return False
-                            except json.JSONDecodeError:
-                                continue
-
-                except UnicodeDecodeError:
-                    # 如果解码失败，继续累积数据
+            for line in response_stream:
+                if not line.strip():
                     continue
+
+                # SSE格式的行通常以"data: "开头
+                if line.startswith("data: "):
+                    try:
+                        data = json.loads(line[6:])
+                        if data.get("event") == "resp":
+                            status = data.get("file_info", {}).get("status")
+                            if status == "parsed":
+                                return True
+                            elif status == "failed":
+                                return False
+                    except json.JSONDecodeError:
+                        continue
 
             retry_count += 1
             time.sleep(1)
@@ -299,39 +284,24 @@ class KimiModel(BasePlatform):
                 sleep_time=5,
             )
 
-            response_data = b""
-
             # 处理流式响应
-            for chunk in response_stream:
-                response_data += chunk
-
-                # 尝试解析SSE格式的数据
-                try:
-                    # 查找完整的数据行
-                    lines = response_data.decode("utf-8").split("\n")
-                    response_data = b""  # 重置缓冲区
-
-                    for line in lines:
-                        if not line.strip():
-                            continue
-
-                        # SSE格式的行通常以"data: "开头
-                        if line.startswith("data: "):
-                            try:
-                                data = json.loads(line[6:])
-                                event = data.get("event")
-
-                                if event == "cmpl":
-                                    # 处理补全文本
-                                    text = data.get("text", "")
-                                    if text:
-                                        yield text
-                            except json.JSONDecodeError:
-                                continue
-
-                except UnicodeDecodeError:
-                    # 如果解码失败，继续累积数据
+            for line in response_stream:
+                if not line.strip():
                     continue
+
+                # SSE格式的行通常以"data: "开头
+                if line.startswith("data: "):
+                    try:
+                        data = json.loads(line[6:])
+                        event = data.get("event")
+
+                        if event == "cmpl":
+                            # 处理补全文本
+                            text = data.get("text", "")
+                            if text:
+                                yield text
+                    except json.JSONDecodeError:
+                        continue
 
             return None
 

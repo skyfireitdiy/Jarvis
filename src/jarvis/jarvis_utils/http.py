@@ -1,140 +1,120 @@
 # -*- coding: utf-8 -*-
 
-import httpx
-from typing import Any, Dict, Optional, Union, AsyncGenerator, Generator
+import requests
+from typing import Any, Dict, Optional, Generator
 
 
-def get_httpx_client() -> httpx.Client:
+def get_requests_session() -> requests.Session:
     """
-    获取一个配置好的 httpx.Client 对象
+    获取一个配置好的 requests.Session 对象
 
     返回:
-        httpx.Client 对象
+        requests.Session 对象
     """
-    client = httpx.Client(
-        timeout=httpx.Timeout(None),  # 永不超时
-        headers={
+    session = requests.Session()
+    session.headers.update(
+        {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-        },
+        }
     )
-    return client
+    return session
 
 
-def get_async_httpx_client() -> httpx.AsyncClient:
-    """
-    获取一个配置好的 httpx.AsyncClient 对象
-
-    返回:
-        httpx.AsyncClient 对象
-    """
-    client = httpx.AsyncClient(
-        timeout=httpx.Timeout(None),  # 永不超时
-        headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-        },
-    )
-    return client
-
-
-# 增强版本的 HTTP 请求方法（使用 httpx 实现，带重试机制，解决连接中断问题）
+# 增强版本的 HTTP 请求方法（使用 requests 实现）
 def post(
     url: str,
     data: Optional[Any] = None,
     json: Optional[Dict[str, Any]] = None,
     **kwargs,
-) -> httpx.Response:
+) -> requests.Response:
     """
-    发送增强版永不超时的 POST 请求，使用 httpx 实现，包含重试机制
+    发送增强版永不超时的 POST 请求，使用 requests 实现
 
     参数:
         url: 请求的 URL
         data: (可选) 请求体数据 (表单数据或原始数据)
         json: (可选) JSON 数据，会自动设置 Content-Type
-        **kwargs: 其他传递给 httpx.post 的参数
+        **kwargs: 其他传递给 requests.post 的参数
 
     返回:
-        httpx.Response 对象
+        requests.Response 对象
 
     注意:
-        此方法使用 httpx 实现，包含自动重试机制，适用于解决"Response ended prematurely"等连接问题
+        此方法使用 requests 实现。要实现重试，请考虑使用 Session 和 HTTPAdapter。
+        永不超时通过 timeout=None 设置。
     """
-    client = get_httpx_client()
-    try:
-        response = client.post(url=url, data=data, json=json, **kwargs)
+    kwargs.setdefault("timeout", None)
+    with get_requests_session() as session:
+        response = session.post(url=url, data=data, json=json, **kwargs)
         response.raise_for_status()
         return response
-    finally:
-        client.close()
 
 
-def get(url: str, **kwargs) -> httpx.Response:
+def get(url: str, **kwargs) -> requests.Response:
     """
-    发送增强版永不超时的 GET 请求，使用 httpx 实现，包含重试机制
+    发送增强版永不超时的 GET 请求，使用 requests 实现
 
     参数:
         url: 请求的 URL
-        **kwargs: 其他传递给 httpx.get 的参数
+        **kwargs: 其他传递给 requests.get 的参数
 
     返回:
-        httpx.Response 对象
+        requests.Response 对象
 
     注意:
-        此方法使用 httpx 实现，包含自动重试机制，适用于解决"Response ended prematurely"等连接问题
+        此方法使用 requests 实现。
+        永不超时通过 timeout=None 设置。
     """
-    client = get_httpx_client()
-    try:
-        response = client.get(url=url, **kwargs)
+    kwargs.setdefault("timeout", None)
+    with get_requests_session() as session:
+        response = session.get(url=url, **kwargs)
         response.raise_for_status()
         return response
-    finally:
-        client.close()
 
 
-def put(url: str, data: Optional[Any] = None, **kwargs) -> httpx.Response:
+def put(url: str, data: Optional[Any] = None, **kwargs) -> requests.Response:
     """
-    发送增强版永不超时的 PUT 请求，使用 httpx 实现，包含重试机制
+    发送增强版永不超时的 PUT 请求，使用 requests 实现
 
     参数:
         url: 请求的 URL
         data: (可选) 请求体数据 (表单数据或原始数据)
-        **kwargs: 其他传递给 httpx.put 的参数
+        **kwargs: 其他传递给 requests.put 的参数
 
     返回:
-        httpx.Response 对象
+        requests.Response 对象
 
     注意:
-        此方法使用 httpx 实现，包含自动重试机制，适用于解决"Response ended prematurely"等连接问题
+        此方法使用 requests 实现。
+        永不超时通过 timeout=None 设置。
     """
-    client = get_httpx_client()
-    try:
-        response = client.put(url=url, data=data, **kwargs)
+    kwargs.setdefault("timeout", None)
+    with get_requests_session() as session:
+        response = session.put(url=url, data=data, **kwargs)
         response.raise_for_status()
         return response
-    finally:
-        client.close()
 
 
-def delete(url: str, **kwargs) -> httpx.Response:
+def delete(url: str, **kwargs) -> requests.Response:
     """
-    发送增强版永不超时的 DELETE 请求，使用 httpx 实现，包含重试机制
+    发送增强版永不超时的 DELETE 请求，使用 requests 实现
 
     参数:
         url: 请求的 URL
-        **kwargs: 其他传递给 httpx.delete 的参数
+        **kwargs: 其他传递给 requests.delete 的参数
 
     返回:
-        httpx.Response 对象
+        requests.Response 对象
 
     注意:
-        此方法使用 httpx 实现，包含自动重试机制，适用于解决"Response ended prematurely"等连接问题
+        此方法使用 requests 实现。
+        永不超时通过 timeout=None 设置。
     """
-    client = get_httpx_client()
-    try:
-        response = client.delete(url=url, **kwargs)
+    kwargs.setdefault("timeout", None)
+    with get_requests_session() as session:
+        response = session.delete(url=url, **kwargs)
         response.raise_for_status()
         return response
-    finally:
-        client.close()
 
 
 # 同步流式POST请求方法
@@ -143,36 +123,26 @@ def stream_post(
     data: Optional[Any] = None,
     json: Optional[Dict[str, Any]] = None,
     **kwargs,
-) -> Generator[bytes, None, None]:
+) -> Generator[str, None, None]:
     """
-    发送流式 POST 请求，使用 httpx 实现，返回标准 Generator
+    发送流式 POST 请求，使用 requests 实现，返回解码后的字符串行生成器
 
     参数:
         url: 请求的 URL
         data: (可选) 请求体数据 (表单数据或原始数据)
         json: (可选) JSON 数据，会自动设置 Content-Type
-        **kwargs: 其他传递给 httpx.post 的参数
+        **kwargs: 其他传递给 requests.post 的参数
 
     返回:
-        Generator[bytes, None, None]: 字节流生成器
+        Generator[str, None, None]: 字符串行生成器
 
     注意:
-        此方法使用 httpx 实现流式请求，适用于处理大文件下载或流式响应
+        此方法使用 requests 实现流式请求，适用于处理大文件下载或流式响应
     """
-    client = get_httpx_client()
-    try:
-        with client.stream("POST", url, data=data, json=json, **kwargs) as response:
+    kwargs.setdefault("timeout", None)
+    with get_requests_session() as session:
+        with session.post(url, data=data, json=json, stream=True, **kwargs) as response:
             response.raise_for_status()
-            buffer = b""
-            for chunk in response.iter_bytes():
-                buffer += chunk
-                lines = buffer.split(b"\n")
-                buffer = lines.pop()
-                for line in lines:
-                    line = line.rstrip(b"\r")
-                    if line:
-                        yield line
-            if buffer:
-                yield buffer.rstrip(b"\r")
-    finally:
-        client.close()
+            for line in response.iter_lines(chunk_size=1):
+                if line:
+                    yield line.decode("utf-8", errors="ignore")

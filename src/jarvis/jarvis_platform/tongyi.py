@@ -8,8 +8,8 @@ from typing import Any, Dict, Generator, List, Tuple
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_utils.utils import while_success
-
 
 class TongyiPlatform(BasePlatform):
     """Tongyi platform implementation"""
@@ -168,88 +168,74 @@ class TongyiPlatform(BasePlatform):
             thinking_content = ""
             text_content = ""
             in_thinking = False
-            response_data = b""
 
             # 处理流式响应
-            for chunk in response_stream:
-                response_data += chunk
-
-                # 尝试解析SSE格式的数据
-                try:
-                    # 查找完整的数据行
-                    lines = response_data.decode("utf-8").split("\n")
-                    response_data = b""  # 重置缓冲区
-
-                    for line in lines:
-                        if not line.strip():
-                            continue
-
-                        # SSE格式的行通常以"data: "开头
-                        if line.startswith("data: "):
-                            try:
-                                data = json.loads(line[6:])
-                                # 记录消息ID和会话ID
-                                if "msgId" in data:
-                                    msg_id = data["msgId"]
-                                if "sessionId" in data:
-                                    session_id = data["sessionId"]
-
-                                if "contents" in data and len(data["contents"]) > 0:
-                                    for content in data["contents"]:
-                                        if content.get("contentType") == "think":
-                                            if not in_thinking:
-                                                yield "<think>\n\n"
-                                                in_thinking = True
-                                            if content.get("incremental"):
-                                                tmp_content = json.loads(
-                                                    content.get("content")
-                                                )["content"]
-                                                thinking_content += tmp_content
-                                                yield tmp_content
-                                            else:
-                                                tmp_content = json.loads(
-                                                    content.get("content")
-                                                )["content"]
-                                                if len(thinking_content) < len(
-                                                    tmp_content
-                                                ):
-                                                    yield tmp_content[
-                                                        len(thinking_content) :
-                                                    ]
-                                                    thinking_content = tmp_content
-                                                else:
-                                                    yield "\r\n</think>\n"[
-                                                        len(thinking_content)
-                                                        - len(tmp_content) :
-                                                    ]
-                                                    thinking_content = tmp_content
-                                                in_thinking = False
-                                        elif content.get("contentType") == "text":
-                                            if in_thinking:
-                                                continue
-                                            if content.get("incremental"):
-                                                tmp_content = content.get("content")
-                                                text_content += tmp_content
-                                                yield tmp_content
-                                            else:
-                                                tmp_content = content.get("content")
-                                                if len(text_content) < len(tmp_content):
-                                                    yield tmp_content[
-                                                        len(text_content) :
-                                                    ]
-                                                    text_content = tmp_content
-
-                            except json.JSONDecodeError:
-                                continue
-
-                except UnicodeDecodeError:
-                    # 如果解码失败，继续累积数据
+            for line in response_stream:
+                if not line.strip():
                     continue
+
+                # SSE格式的行通常以"data: "开头
+                if line.startswith("data: "):
+                    try:
+                        data = json.loads(line[6:])
+                        # 记录消息ID和会话ID
+                        if "msgId" in data:
+                            msg_id = data["msgId"]
+                        if "sessionId" in data:
+                            session_id = data["sessionId"]
+
+                        if "contents" in data and len(data["contents"]) > 0:
+                            for content in data["contents"]:
+                                if content.get("contentType") == "think":
+                                    if not in_thinking:
+                                        yield f"{ot('think')}\n\n"
+                                        in_thinking = True
+                                    if content.get("incremental"):
+                                        tmp_content = json.loads(
+                                            content.get("content")
+                                        )["content"]
+                                        thinking_content += tmp_content
+                                        yield tmp_content
+                                    else:
+                                        tmp_content = json.loads(
+                                            content.get("content")
+                                        )["content"]
+                                        if len(thinking_content) < len(
+                                            tmp_content
+                                        ):
+                                            yield tmp_content[
+                                                len(thinking_content) :
+                                            ]
+                                            thinking_content = tmp_content
+                                        else:
+                                            yield f"\r\n{ct('think')}\n"[
+                                                len(thinking_content)
+                                                - len(tmp_content) :
+                                            ]
+                                            thinking_content = tmp_content
+                                        in_thinking = False
+                                elif content.get("contentType") == "text":
+                                    if in_thinking:
+                                        continue
+                                    if content.get("incremental"):
+                                        tmp_content = content.get("content")
+                                        text_content += tmp_content
+                                        yield tmp_content
+                                    else:
+                                        tmp_content = content.get("content")
+                                        if len(text_content) < len(tmp_content):
+                                            yield tmp_content[
+                                                len(text_content) :
+                                            ]
+                                            text_content = tmp_content
+
+                    except json.JSONDecodeError:
+                        continue
 
             self.msg_id = msg_id
             self.session_id = session_id
 
-            return None
+            return
 
         except Exception as e:
             raise Exception(f"Chat failed: {str(e)}")

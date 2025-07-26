@@ -2,9 +2,13 @@
 """A tool for searching the web."""
 from typing import Any, Dict
 
-import httpx
-from markdownify import markdownify as md
-from ddgs import DDGS
+import requests
+from markdownify import markdownify as md  # type: ignore
+
+# pylint: disable=import-error,missing-module-docstring
+# fmt: off
+from ddgs import DDGS  # type: ignore[import-not-found]
+# fmt: on
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -54,17 +58,17 @@ class SearchWebTool:
                         OutputType.INFO,
                     )
                     response = http_get(url, timeout=10.0, follow_redirects=True)
-                    content = md(response.text, strip=['script', 'style'])
+                    content = md(response.text, strip=["script", "style"])
                     if content:
                         full_content += content + "\n\n"
                         visited_urls.append(url)
                         visited_count += 1
-                except httpx.HTTPStatusError as e:
+                except requests.exceptions.HTTPError as e:
                     PrettyOutput.print(
                         f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}",
                         OutputType.WARNING,
                     )
-                except httpx.RequestError as e:
+                except requests.exceptions.RequestException as e:
                     PrettyOutput.print(f"⚠️ 请求错误: {e}", OutputType.WARNING)
 
             if not full_content.strip():
@@ -75,9 +79,7 @@ class SearchWebTool:
                 }
 
             url_list_str = "\n".join(f"  - {u}" for u in visited_urls)
-            PrettyOutput.print(
-                f"🔍 已成功访问并处理以下URL:\n{url_list_str}", OutputType.INFO
-            )
+            PrettyOutput.print(f"🔍 已成功访问并处理以下URL:\n{url_list_str}", OutputType.INFO)
 
             PrettyOutput.print("🧠 正在总结内容...", OutputType.INFO)
             summary_prompt = f"请为查询“{query}”总结以下内容：\n\n{full_content}"
