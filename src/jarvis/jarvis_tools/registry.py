@@ -594,13 +594,7 @@ class ToolRegistry(OutputHandlerProtocol):
                             OutputType.INFO,
                         )
                         PrettyOutput.print(fixed_content, OutputType.TOOL)
-                        if user_confirm("这是纠正后的，是否需要执行?", default=True):
-                            data = temp_data
-                        else:
-                            return (
-                                {},
-                                f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}",
-                            )
+                        data = temp_data
                     except (yaml.YAMLError, EOFError, KeyboardInterrupt):
                         # Even after fixing, it's not valid YAML, or user cancelled.
                         # Fall through to the original error.
