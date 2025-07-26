@@ -57,7 +57,7 @@ class SearchWebTool:
                         f"📄 ({visited_count + 1}/10) 正在抓取: {title} ({url})",
                         OutputType.INFO,
                     )
-                    response = http_get(url, timeout=10.0, follow_redirects=True)
+                    response = http_get(url, timeout=10.0, allow_redirects=True)
                     content = md(response.text, strip=["script", "style"])
                     if content:
                         full_content += content + "\n\n"
