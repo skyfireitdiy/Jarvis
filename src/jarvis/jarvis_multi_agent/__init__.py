@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
 
@@ -89,6 +89,8 @@ content: |2
         Args:
             content: The content containing send message
         """
+        if ot("SEND_MESSAGE") in content and ct("SEND_MESSAGE") not in content:
+            content += "\n" + ct("SEND_MESSAGE")
         data = re.findall(
             ot("SEND_MESSAGE") + r"\n(.*?)\n" + ct("SEND_MESSAGE"), content, re.DOTALL
         )
@@ -102,7 +104,7 @@ content: |2
                 continue
         return ret
 
-    def _get_agent(self, name: str) -> Agent | None:
+    def _get_agent(self, name: str) -> Union[Agent, None]:
         if name in self.agents:
             return self.agents[name]
 
@@ -113,9 +115,9 @@ content: |2
 
         if name != self.main_agent_name and self.original_question:
             system_prompt = config.get("system_prompt", "")
-            config["system_prompt"] = (
-                f"{system_prompt}\n\n# 原始问题\n{self.original_question}"
-            )
+            config[
+                "system_prompt"
+            ] = f"{system_prompt}\n\n# 原始问题\n{self.original_question}"
 
         output_handler = config.get("output_handler", [])
         if len(output_handler) == 0:
