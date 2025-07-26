@@ -163,7 +163,16 @@ def stream_post(
     try:
         with client.stream("POST", url, data=data, json=json, **kwargs) as response:
             response.raise_for_status()
+            buffer = b""
             for chunk in response.iter_bytes():
-                yield chunk
+                buffer += chunk
+                lines = buffer.split(b"\n")
+                buffer = lines.pop()
+                for line in lines:
+                    line = line.rstrip(b"\r")
+                    if line:
+                        yield line
+            if buffer:
+                yield buffer.rstrip(b"\r")
     finally:
         client.close()
