@@ -15,6 +15,7 @@ from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_data_dir, get_tool_load_dirs
+from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
@@ -106,14 +107,20 @@ arguments:
 
 
 class OutputHandlerProtocol(Protocol):
-    def name(self) -> str: ...
-    def can_handle(self, response: str) -> bool: ...
-    def prompt(self) -> str: ...
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
+    def name(self) -> str:
+        ...
+
+    def can_handle(self, response: str) -> bool:
+        ...
+
+    def prompt(self) -> str:
+        ...
+
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
+        ...
 
 
 class ToolRegistry(OutputHandlerProtocol):
-
     def name(self) -> str:
         return "TOOL_CALL"
 
@@ -131,7 +138,9 @@ class ToolRegistry(OutputHandlerProtocol):
                 try:
                     tools_prompt += "    <tool>\n"
                     tools_prompt += f"      <name>名称: {tool['name']}</name>\n"
-                    tools_prompt += f"      <description>描述: {tool['description']}</description>\n"
+                    tools_prompt += (
+                        f"      <description>描述: {tool['description']}</description>\n"
+                    )
                     tools_prompt += "      <parameters>\n"
                     tools_prompt += "        <yaml>|\n"
 
@@ -197,9 +206,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 with open(stats_file, "r", encoding="utf-8") as f:
                     return yaml.safe_load(f) or {}
             except Exception as e:
-                PrettyOutput.print(
-                    f"加载工具调用统计失败: {str(e)}", OutputType.WARNING
-                )
+                PrettyOutput.print(f"加载工具调用统计失败: {str(e)}", OutputType.WARNING)
         return {}
 
     def _update_tool_stats(self, name: str) -> None:
@@ -269,9 +276,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 config = yaml.safe_load(open(file_path, "r", encoding="utf-8"))
                 self.register_mcp_tool_by_config(config)
             except Exception as e:
-                PrettyOutput.print(
-                    f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING
-                )
+                PrettyOutput.print(f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING)
 
     def _load_builtin_tools(self) -> None:
         """从内置工具目录加载工具"""
@@ -508,7 +513,6 @@ class ToolRegistry(OutputHandlerProtocol):
                         and hasattr(item, "execute")
                         and item.name == module_name
                     ):
-
                         if hasattr(item, "check"):
                             if not item.check():
                                 continue
@@ -567,10 +571,43 @@ class ToolRegistry(OutputHandlerProtocol):
             ot("TOOL_CALL") + r"(.*?)" + ct("TOOL_CALL"), content, re.DOTALL
         )
         if not data:
-            return (
-                {},
-                f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}",
-            )
+            # can_handle 确保 ot("TOOL_CALL") 在内容中。
+            # 如果数据为空，则表示 ct("TOOL_CALL") 可能丢失。
+            if ot("TOOL_CALL") in content and ct("TOOL_CALL") not in content:
+                # 尝试通过附加结束标签来修复它
+                fixed_content = content.strip() + f"\n{ct('TOOL_CALL')}"
+
+                # 再次提取，并检查YAML是否有效
+                temp_data = re.findall(
+                    ot("TOOL_CALL") + r"(.*?)" + ct("TOOL_CALL"),
+                    fixed_content,
+                    re.DOTALL,
+                )
+
+                if temp_data:
+                    try:
+                        yaml.safe_load(temp_data[0])  # Check if valid YAML
+
+                        # Ask user for confirmation
+                        PrettyOutput.print(
+                            f"检测到缺失的 {ct('TOOL_CALL')} 标签，已自动修复。修复后的内容如下:",
+                            OutputType.INFO,
+                        )
+                        PrettyOutput.print(fixed_content, OutputType.TOOL)
+                        if user_confirm("这是纠正后的，是否需要执行?", default=False):
+                            data = temp_data
+                        else:
+                            return {}, "用户取消了工具调用。"
+                    except (yaml.YAMLError, EOFError, KeyboardInterrupt):
+                        # Even after fixing, it's not valid YAML, or user cancelled.
+                        # Fall through to the original error.
+                        pass
+
+            if not data:
+                return (
+                    {},
+                    f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}",
+                )
         ret = []
         for item in data:
             try:
@@ -685,9 +722,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         if len(output.splitlines()) > 60:
             lines = output.splitlines()
-            return "\n".join(
-                lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:]
-            )
+            return "\n".join(lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:])
         return output
 
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
