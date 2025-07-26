@@ -5,6 +5,7 @@ agents:
     description: "风险投资人，负责评估项目潜力，通过不断提问来深入了解项目，并最终做出投资决策。"
     use_methodology: false
     use_analysis: false
+    need_summary: false
     system_prompt: |
       # 角色：风险投资人 (Venture Capitalist)
 
@@ -71,6 +72,7 @@ agents:
     description: "项目所有者，负责清晰、有说服力地向风险投资人介绍自己的项目，并回答所有问题。"
     use_methodology: false
     use_analysis: false
+    need_summary: false
     system_prompt: |
       # 角色：项目所有者 (Project Owner)
 
