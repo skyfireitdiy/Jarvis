@@ -594,7 +594,7 @@ class ToolRegistry(OutputHandlerProtocol):
                             OutputType.INFO,
                         )
                         PrettyOutput.print(fixed_content, OutputType.TOOL)
-                        if user_confirm("这是纠正后的，是否需要执行?", default=False):
+                        if user_confirm("这是纠正后的，是否需要执行?", default=True):
                             data = temp_data
                         else:
                             return {}, "用户取消了工具调用。"
