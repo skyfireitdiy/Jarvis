@@ -55,7 +55,6 @@ pip3 install jarvis-ai-assistant
 | `jarvis-multi-agent` | `jma` | 使用多代理功能 |
 | `jarvis-agent` | `ja` | 使用agent功能 |
 | `jarvis-tool` | `jt` | 使用工具功能 |
-| `jarvis-git-details` | `jgd` | 使用git details功能 |
 | `jarvis-methodology` | `jm` | 使用方法论功能 |
 | `jarvis-rag` | `jrg` | 使用RAG功能 |
 
