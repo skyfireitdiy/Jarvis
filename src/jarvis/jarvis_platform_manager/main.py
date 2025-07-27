@@ -336,7 +336,7 @@ def chat_command(
     """与指定平台和模型聊天。"""
     if not validate_platform_model(platform, model):
         return
-    chat_with_model(platform, model, "")
+    chat_with_model(platform, model, "") # type: ignore
 
 
 @app.command("service")
