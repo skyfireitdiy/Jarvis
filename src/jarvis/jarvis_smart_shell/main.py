@@ -206,7 +206,7 @@ Example:
 
     # install子命令
     install_parser = subparsers.add_parser(
-        "install", help="安装JSS fish shell命令补全功能"
+        "install", help="为fish shell安装'命令未找到'处理器，实现自然语言命令执行"
     )
     install_parser.add_argument(
         "--shell", choices=["fish"], default="fish", help="指定shell类型(仅支持fish)"
@@ -214,7 +214,7 @@ Example:
 
     # 添加uninstall子命令
     uninstall_parser = subparsers.add_parser(
-        "uninstall", help="卸载JSS fish shell命令补全功能"
+        "uninstall", help="卸载JSS fish shell'命令未找到'处理器"
     )
     uninstall_parser.add_argument(
         "--shell", choices=["fish"], default="fish", help="指定shell类型(仅支持fish)"

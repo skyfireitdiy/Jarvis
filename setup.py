@@ -73,8 +73,6 @@ setup(
             "ja=jarvis.jarvis_agent.main:main",
             "jarvis-tool=jarvis.jarvis_tools.cli.main:main",
             "jt=jarvis.jarvis_tools.cli.main:main",
-            "jarvis-git-details=jarvis.jarvis_git_details.main:main",
-            "jgd=jarvis.jarvis_git_details.main:main",
             "jarvis-methodology=jarvis.jarvis_methodology.main:main",
             "jm=jarvis.jarvis_methodology.main:main",
             "jarvis-rag=jarvis.jarvis_rag.cli:main",

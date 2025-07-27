@@ -641,7 +641,6 @@ ENV:
 | `jarvis-multi-agent` | `jma` | （实验性）运行多代理协作任务。 |
 | `jarvis-agent` | `ja` | 启动一个可高度自定义配置的基础代理。 |
 | `jarvis-tool` | `jt` | 使用工具功能 |
-| `jarvis-git-details` | `jgd` | 使用git details功能 |
 | `jarvis-methodology` | `jm` | 使用方法论功能 |
 | `jarvis-rag` | `jrg` | 使用RAG功能 |
 
