@@ -4,11 +4,12 @@
 该模块提供CodeAgent类，用于处理代码修改任务。
 """
 
-import argparse
 import os
 import subprocess
 import sys
 from typing import List, Optional, Tuple
+
+import typer
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
@@ -36,6 +37,8 @@ from jarvis.jarvis_utils.git_utils import (
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import get_loc_stats, init_env
+
+app = typer.Typer(help="Jarvis Code Agent")
 
 
 class CodeAgent:
@@ -401,33 +404,27 @@ class CodeAgent:
         agent.session.prompt += final_ret
 
 
-def main() -> None:
+@app.command()
+def main(
+    llm_type: str = typer.Option(
+        "normal",
+        "--llm_type",
+        help="LLM type to use, choices are 'normal' and 'thinking'",
+    ),
+    model_group: Optional[str] = typer.Option(
+        None, "--model_group", help="Model group to use, overriding config"
+    ),
+    requirement: Optional[str] = typer.Option(
+        None, "-r", "--requirement", help="Requirement to process"
+    ),
+    restore_session: bool = typer.Option(
+        False,
+        "--restore-session",
+        help="Restore session from .jarvis/saved_session.json",
+    ),
+) -> None:
     """Jarvis主入口点。"""
     init_env("欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！")
-
-    parser = argparse.ArgumentParser(description="Jarvis Code Agent")
-    parser.add_argument(
-        "--llm_type",
-        type=str,
-        default="normal",
-        choices=["normal", "thinking"],
-        help="LLM type to use",
-    )
-    parser.add_argument(
-        "--model_group",
-        type=str,
-        help="Model group to use, overriding config",
-    )
-    parser.add_argument(
-        "-r", "--requirement", type=str, help="Requirement to process", default=None
-    )
-    parser.add_argument(
-        "--restore-session",
-        action="store_true",
-        help="Restore session from .jarvis/saved_session.json",
-        default=False,
-    )
-    args = parser.parse_args()
 
     curr_dir = os.getcwd()
     git_dir = find_git_root_and_cd(curr_dir)
@@ -435,13 +432,13 @@ def main() -> None:
 
     try:
         agent = CodeAgent(
-            llm_type=args.llm_type,
-            model_group=args.model_group,
+            llm_type=llm_type,
+            model_group=model_group,
             need_summary=False,
         )
 
         # 尝试恢复会话
-        if args.restore_session:
+        if restore_session:
             if agent.agent.restore_session():
                 PrettyOutput.print(
                     "已从 .jarvis/saved_session.json 恢复会话。", OutputType.SUCCESS
@@ -451,8 +448,8 @@ def main() -> None:
                     "无法从 .jarvis/saved_session.json 恢复会话。", OutputType.WARNING
                 )
 
-        if args.requirement:
-            agent.run(args.requirement)
+        if requirement:
+            agent.run(requirement)
         else:
             while True:
                 user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
@@ -466,4 +463,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    app()

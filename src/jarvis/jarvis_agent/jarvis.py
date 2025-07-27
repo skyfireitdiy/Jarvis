@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import argparse
 import os
 import shutil
 import subprocess
@@ -7,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional
 
+import typer
 import yaml  # type: ignore
 from prompt_toolkit import prompt  # type: ignore
 
@@ -23,6 +23,8 @@ from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.utils import init_env
+
+app = typer.Typer(help="Jarvis AI assistant")
 
 
 def _load_tasks() -> Dict[str, str]:
@@ -109,48 +111,14 @@ def _select_task(tasks: Dict[str, str]) -> str:
             PrettyOutput.print(f"选择任务失败: {str(val_err)}", OutputType.ERROR)
 
 
-def _parse_args() -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Jarvis AI assistant")
-    parser.add_argument(
-        "--llm_type",
-        type=str,
-        default="normal",
-        choices=["normal", "thinking"],
-        help="LLM type to use",
-    )
-    parser.add_argument(
-        "-t",
-        "--task",
-        type=str,
-        help="Directly input task content from command line",
-    )
-    parser.add_argument(
-        "--model_group",
-        type=str,
-        help="Model group to use, overriding config",
-    )
-    parser.add_argument("-f", "--config", type=str, help="Path to custom config file")
-    parser.add_argument(
-        "--restore-session",
-        action="store_true",
-        help="Restore session from .jarvis/saved_session.json",
-        default=False,
-    )
-    parser.add_argument(
-        "-e", "--edit", action="store_true", help="Edit the configuration file"
-    )
-    return parser.parse_args()
-
-
-def _handle_edit_mode(args: argparse.Namespace) -> None:
+def _handle_edit_mode(edit: bool, config: Optional[str]) -> None:
     """If edit flag is set, open config file in editor and exit."""
-    if not args.edit:
+    if not edit:
         return
 
     config_file_path = (
-        Path(args.config)
-        if args.config
+        Path(config)
+        if config
         else Path(os.path.expanduser("~/.jarvis/config.yaml"))
     )
     editors = ["nvim", "vim", "vi"]
@@ -159,30 +127,32 @@ def _handle_edit_mode(args: argparse.Namespace) -> None:
     if editor:
         try:
             subprocess.run([editor, str(config_file_path)], check=True)
-            sys.exit(0)
+            raise typer.Exit(code=0)
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             PrettyOutput.print(f"Failed to open editor: {e}", OutputType.ERROR)
-            sys.exit(1)
+            raise typer.Exit(code=1)
     else:
         PrettyOutput.print(
             "No suitable editor found (nvim, vim, vi).", OutputType.ERROR
         )
-        sys.exit(1)
+        raise typer.Exit(code=1)
 
 
-def _initialize_agent(args: argparse.Namespace) -> Agent:
+def _initialize_agent(
+    llm_type: str, model_group: Optional[str], restore_session: bool
+) -> Agent:
     """Initialize the agent and restore session if requested."""
     agent = Agent(
         system_prompt=origin_agent_system_prompt,
-        llm_type=args.llm_type,
-        model_group=args.model_group,
+        llm_type=llm_type,
+        model_group=model_group,
         input_handler=[shell_input_handler, builtin_input_handler],
         output_handler=[ToolRegistry()],  # type: ignore
         need_summary=False,
     )
 
     # 尝试恢复会话
-    if args.restore_session:
+    if restore_session:
         if agent.restore_session():
             PrettyOutput.print("会话已成功恢复。", OutputType.SUCCESS)
         else:
@@ -195,37 +165,58 @@ def _get_and_run_task(agent: Agent, task_content: Optional[str] = None) -> None:
     # 优先处理命令行直接传入的任务
     if task_content:
         agent.run(task_content)
-        sys.exit(0)
+        raise typer.Exit(code=0)
 
     if agent.first:
         tasks = _load_tasks()
         if tasks and (selected_task := _select_task(tasks)):
             PrettyOutput.print(f"开始执行任务: \n{selected_task}", OutputType.INFO)
             agent.run(selected_task)
-            sys.exit(0)
+            raise typer.Exit(code=0)
 
     user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
     if user_input:
         agent.run(user_input)
-    sys.exit(0)
+    raise typer.Exit(code=0)
 
 
-def main() -> None:
+@app.command()
+def main(
+    llm_type: str = typer.Option(
+        "normal",
+        "--llm_type",
+        help="LLM type to use, choices are 'normal' and 'thinking'",
+    ),
+    task: Optional[str] = typer.Option(
+        None, "-t", "--task", help="Directly input task content from command line"
+    ),
+    model_group: Optional[str] = typer.Option(
+        None, "--model_group", help="Model group to use, overriding config"
+    ),
+    config: Optional[str] = typer.Option(
+        None, "-f", "--config", help="Path to custom config file"
+    ),
+    restore_session: bool = typer.Option(
+        False,
+        "--restore-session",
+        help="Restore session from .jarvis/saved_session.json",
+    ),
+    edit: bool = typer.Option(
+        False, "-e", "--edit", help="Edit the configuration file"
+    ),
+) -> None:
     """Main function for Jarvis AI assistant."""
-    args = _parse_args()
-    _handle_edit_mode(args)
+    _handle_edit_mode(edit, config)
 
-    init_env(
-        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config
-    )
+    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config)
 
     try:
-        agent = _initialize_agent(args)
-        _get_and_run_task(agent, args.task)
+        agent = _initialize_agent(llm_type, model_group, restore_session)
+        _get_and_run_task(agent, task)
     except Exception as err:  # pylint: disable=broad-except
         PrettyOutput.print(f"初始化错误: {str(err)}", OutputType.ERROR)
-        sys.exit(1)
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
-    main()
+    app()

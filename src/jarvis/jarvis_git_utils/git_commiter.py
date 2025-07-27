@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import argparse
 import os
 import re
 import subprocess
@@ -7,6 +6,7 @@ import sys
 import tempfile
 from typing import Any, Dict, Optional
 
+import typer
 import yaml  # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -20,6 +20,8 @@ from jarvis.jarvis_utils.globals import get_agent, current_agent_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
+
+app = typer.Typer(help="Git commit tool")
 
 
 class GitCommitTool:
@@ -305,34 +307,32 @@ commit信息
             os.chdir(original_dir)
 
 
-def main():
-    init_env("欢迎使用 Jarvis-GitCommitTool，您的Git提交助手已准备就绪！")
-    parser = argparse.ArgumentParser(description="Git commit tool")
-    parser.add_argument(
-        "--root-dir", type=str, default=".", help="Root directory of the Git repository"
-    )
-    parser.add_argument(
+@app.command()
+def main(
+    root_dir: str = typer.Option(
+        ".", "--root-dir", help="Root directory of the Git repository"
+    ),
+    prefix: str = typer.Option(
+        "",
         "--prefix",
-        type=str,
-        default="",
         help="Prefix to prepend to commit message (separated by space)",
-    )
-    parser.add_argument(
+    ),
+    suffix: str = typer.Option(
+        "",
         "--suffix",
-        type=str,
-        default="",
         help="Suffix to append to commit message (separated by newline)",
-    )
-    args = parser.parse_args()
+    ),
+):
+    init_env("欢迎使用 Jarvis-GitCommitTool，您的Git提交助手已准备就绪！")
     tool = GitCommitTool()
     tool.execute(
         {
-            "root_dir": args.root_dir,
-            "prefix": args.prefix if hasattr(args, "prefix") else "",
-            "suffix": args.suffix if hasattr(args, "suffix") else "",
+            "root_dir": root_dir,
+            "prefix": prefix,
+            "suffix": suffix,
         }
     )
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    app()

@@ -3,15 +3,18 @@
 
 该模块提供了Jarvis平台管理器的主要入口点。
 """
-import argparse
 import os
 from typing import Any, Dict, List, Optional
+
+import typer
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.input import get_multiline_input, get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_platform_manager.service import start_service
+
+app = typer.Typer(help="Jarvis AI 平台")
 
 
 def list_platforms() -> None:
@@ -301,16 +304,17 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
             pass
 
 
-def validate_platform_model(args: argparse.Namespace) -> bool:
+def validate_platform_model(platform: Optional[str], model: Optional[str]) -> bool:
     """验证平台和模型参数。
 
     参数:
-        args: 命令行参数。
+        platform: 平台名称。
+        model: 模型名称。
 
     返回:
         bool: 如果平台和模型有效返回True，否则返回False。
     """
-    if not args.platform or not args.model:
+    if not platform or not model:
         PrettyOutput.print(
             "请指定平台和模型。使用 'jarvis info' 查看可用平台和模型。",
             OutputType.WARNING,
@@ -319,38 +323,36 @@ def validate_platform_model(args: argparse.Namespace) -> bool:
     return True
 
 
-def chat_command(args: argparse.Namespace) -> None:
-    """处理聊天子命令。
-
-    参数:
-        args: 命令行参数。
-    """
-    if not validate_platform_model(args):
+@app.command("chat")
+def chat_command(
+    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="指定要使用的平台"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="指定要使用的模型"),
+) -> None:
+    """与指定平台和模型聊天。"""
+    if not validate_platform_model(platform, model):
         return
-    chat_with_model(args.platform, args.model, "")
+    chat_with_model(platform, model, "")
 
 
-def info_command(args: argparse.Namespace) -> None:
-    """处理信息子命令。
-
-    参数:
-        args: 命令行参数。
-    """
+@app.command("info")
+def info_command() -> None:
+    """显示支持的平台和模型信息。"""
     list_platforms()
 
 
-def service_command(args: argparse.Namespace) -> None:
-    """处理服务子命令 - 启动OpenAI兼容的API服务。
-
-    参数:
-        args: 命令行参数。
-    """
-    start_service(
-        host=args.host,
-        port=args.port,
-        default_platform=args.platform,
-        default_model=args.model,
-    )
+@app.command("service")
+def service_command(
+    host: str = typer.Option("127.0.0.1", help="服务主机地址 (默认: 127.0.0.1)"),
+    port: int = typer.Option(8000, help="服务端口 (默认: 8000)"),
+    platform: Optional[str] = typer.Option(
+        None, "-p", "--platform", help="指定默认平台，当客户端未指定平台时使用"
+    ),
+    model: Optional[str] = typer.Option(
+        None, "-m", "--model", help="指定默认模型，当客户端未指定平台时使用"
+    ),
+) -> None:
+    """启动OpenAI兼容的API服务。"""
+    start_service(host=host, port=port, default_platform=platform, default_model=model)
 
 
 def load_role_config(config_path: str) -> Dict[str, Any]:
@@ -377,13 +379,24 @@ def load_role_config(config_path: str) -> Dict[str, Any]:
             return {}
 
 
-def role_command(args: argparse.Namespace) -> None:
-    """Process role subcommand - load role config and start chat.
-
-    Args:
-        args: Command line arguments.
-    """
-    config = load_role_config(args.config)
+@app.command("role")
+def role_command(
+    config_file: str = typer.Option(
+        "~/.jarvis/roles.yaml",
+        "--config",
+        "-c",
+        help="角色配置文件路径(YAML格式，默认: ~/.jarvis/roles.yaml)",
+    ),
+    platform: Optional[str] = typer.Option(
+        None, "--platform", "-p", help="指定要使用的平台，覆盖角色配置"
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", "-m", help="指定要使用的模型，覆盖角色配置"
+    ),
+) -> None:
+    """加载角色配置文件并开始对话。"""
+    config_path = os.path.expanduser(config_file)
+    config = load_role_config(config_path)
     if not config or "roles" not in config:
         PrettyOutput.print("无效的角色配置文件", OutputType.ERROR)
         return
@@ -407,8 +420,8 @@ def role_command(args: argparse.Namespace) -> None:
         return
 
     # 初始化平台和模型
-    platform_name = args.platform or selected_role["platform"]
-    model_name = args.model or selected_role["model"]
+    platform_name = platform or selected_role["platform"]
+    model_name = model or selected_role["model"]
     system_prompt = selected_role.get("system_prompt", "")
 
     # 开始对话
@@ -419,54 +432,7 @@ def role_command(args: argparse.Namespace) -> None:
 def main() -> None:
     """Jarvis平台管理器的主入口点。"""
     init_env("欢迎使用 Jarvis-PlatformManager，您的平台管理助手已准备就绪！")
-
-    parser = argparse.ArgumentParser(description="Jarvis AI 平台")
-    subparsers = parser.add_subparsers(dest="command", help="可用子命令")
-
-    # info subcommand
-    info_parser = subparsers.add_parser("info", help="显示支持的平台和模型信息")
-    info_parser.set_defaults(func=info_command)
-
-    # chat subcommand
-    chat_parser = subparsers.add_parser("chat", help="与指定平台和模型聊天")
-    chat_parser.add_argument("--platform", "-p", help="指定要使用的平台")
-    chat_parser.add_argument("--model", "-m", help="指定要使用的模型")
-    chat_parser.set_defaults(func=chat_command)
-
-    # service subcommand
-    service_parser = subparsers.add_parser("service", help="启动OpenAI兼容的API服务")
-    service_parser.add_argument(
-        "--host", default="127.0.0.1", help="服务主机地址 (默认: 127.0.0.1)"
-    )
-    service_parser.add_argument(
-        "--port", type=int, default=8000, help="服务端口 (默认: 8000)"
-    )
-    service_parser.add_argument(
-        "--platform", "-p", help="指定默认平台，当客户端未指定平台时使用"
-    )
-    service_parser.add_argument(
-        "--model", "-m", help="指定默认模型，当客户端未指定平台时使用"
-    )
-    service_parser.set_defaults(func=service_command)
-
-    # role subcommand
-    role_parser = subparsers.add_parser("role", help="加载角色配置文件并开始对话")
-    role_parser.add_argument(
-        "--config",
-        "-c",
-        default="~/.jarvis/roles.yaml",
-        help="角色配置文件路径(YAML格式，默认: ~/.jarvis/roles.yaml)",
-    )
-    role_parser.add_argument("--platform", "-p", help="指定要使用的平台，覆盖角色配置")
-    role_parser.add_argument("--model", "-m", help="指定要使用的模型，覆盖角色配置")
-    role_parser.set_defaults(func=role_command)
-
-    args = parser.parse_args()
-
-    if hasattr(args, "func"):
-        args.func(args)
-    else:
-        parser.print_help()
+    app()
 
 
 if __name__ == "__main__":
