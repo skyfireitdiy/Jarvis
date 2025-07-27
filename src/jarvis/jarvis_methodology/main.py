@@ -11,6 +11,7 @@
 import hashlib
 import json
 import os
+import sys
 from typing import Optional
 
 import typer
@@ -62,6 +63,7 @@ def import_methodology(
         )
     except (json.JSONDecodeError, OSError) as e:
         PrettyOutput.print(f"导入失败: {str(e)}", OutputType.ERROR)
+        raise typer.Exit(code=1)
 
 
 @app.command("export")
@@ -81,6 +83,7 @@ def export_methodology(
         )
     except (OSError, TypeError) as e:
         PrettyOutput.print(f"导出失败: {str(e)}", OutputType.ERROR)
+        raise typer.Exit(code=1)
 
 
 @app.command("list")
@@ -98,6 +101,7 @@ def list_methodologies():
             PrettyOutput.print(f"{i}. {problem_type}", OutputType.INFO)
     except (OSError, json.JSONDecodeError) as e:
         PrettyOutput.print(f"列出方法论失败: {str(e)}", OutputType.ERROR)
+        raise typer.Exit(code=1)
 
 
 @app.command("extract")
@@ -148,7 +152,7 @@ def extract_methodology(
         except Exception as e:
             print("❌ 提取失败")
             PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
-            return
+            raise typer.Exit(code=1)
 
         # 提取YAML部分
         methodologies_start = response.find("<methodologies>") + len("<methodologies>")
@@ -158,7 +162,7 @@ def extract_methodology(
             PrettyOutput.print(
                 "大模型未返回有效的<methodologies>格式", OutputType.ERROR
             )
-            return
+            raise typer.Exit(code=1)
 
         yaml_content = response[methodologies_start:methodologies_end].strip()
 
@@ -170,7 +174,7 @@ def extract_methodology(
         except (yaml.YAMLError, KeyError, TypeError) as e:
             print("❌ YAML解析失败")
             PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
-            return
+            raise typer.Exit(code=1)
 
         if not extracted_methodologies:
             print("❌ 未提取到有效方法论")
@@ -203,6 +207,7 @@ def extract_methodology(
         )
     except Exception as e:
         PrettyOutput.print(f"提取失败: {str(e)}", OutputType.ERROR)
+        raise typer.Exit(code=1)
 
 
 @app.command("extract-url")
@@ -248,7 +253,7 @@ def extract_methodology_from_url(url: str = typer.Argument(..., help="要提取�
         except Exception as e:
             print("❌ 提取失败")
             PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
-            return
+            raise typer.Exit(code=1)
 
         # 提取YAML部分
         methodologies_start = response.find("<methodologies>") + len("<methodologies>")
@@ -258,7 +263,7 @@ def extract_methodology_from_url(url: str = typer.Argument(..., help="要提取�
             PrettyOutput.print(
                 "大模型未返回有效的<methodologies>格式", OutputType.ERROR
             )
-            return
+            raise typer.Exit(code=1)
 
         yaml_content = response[methodologies_start:methodologies_end].strip()
 
@@ -270,7 +275,7 @@ def extract_methodology_from_url(url: str = typer.Argument(..., help="要提取�
         except (yaml.YAMLError, KeyError, TypeError) as e:
             print("❌ YAML解析失败")
             PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
-            return
+            raise typer.Exit(code=1)
 
         if not extracted_methodologies:
             print("❌ 未提取到有效方法论")
@@ -303,7 +308,13 @@ def extract_methodology_from_url(url: str = typer.Argument(..., help="要提取�
         )
     except Exception as e:
         PrettyOutput.print(f"从URL提取失败: {str(e)}", OutputType.ERROR)
+        raise typer.Exit(code=1)
+
+
+def main() -> None:
+    """Application entry point"""
+    app()
 
 
 if __name__ == "__main__":
-    app()
+    main()

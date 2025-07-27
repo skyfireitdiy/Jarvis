@@ -405,7 +405,7 @@ class CodeAgent:
 
 
 @app.command()
-def main(
+def cli(
     llm_type: str = typer.Option(
         "normal",
         "--llm_type",
@@ -454,13 +454,20 @@ def main(
             while True:
                 user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
                 if not user_input:
-                    return
+                    raise typer.Exit(code=0)
                 agent.run(user_input)
 
+    except typer.Exit:
+        raise
     except RuntimeError as e:
         PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
         sys.exit(1)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Application entry point."""
     app()
+
+
+if __name__ == "__main__":
+    main()

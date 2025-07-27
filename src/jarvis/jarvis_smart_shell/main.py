@@ -214,10 +214,16 @@ def request_command(
         raise typer.Exit(code=1)
 
 
-def main():
+def cli():
+    """Typer application entry point"""
     init_env("")
     set_config("JARVIS_PRINT_PROMPT", "false")
     app()
+
+
+def main():
+    """Main entry point for the script"""
+    cli()
 
 
 if __name__ == "__main__":

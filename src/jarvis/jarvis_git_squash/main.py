@@ -52,15 +52,19 @@ class GitSquashTool:
 
 
 @app.command()
-def main(
+def cli(
     commit_hash: str = typer.Argument(..., help="Base commit hash to squash from"),
     lang: str = typer.Option("Chinese", "--lang", help="Language for commit messages"),
 ):
-    init_env("欢迎使用 Jarvis-GitSquash，您的Git压缩助手已准备就"
-             "绪！")
+    init_env("欢迎使用 Jarvis-GitSquash，您的Git压缩助手已准备就绪！")
     tool = GitSquashTool()
     tool.execute({"commit_hash": commit_hash, "lang": lang})
 
 
-if __name__ == "__main__":
+def main():
+    """Application entry point"""
     app()
+
+
+if __name__ == "__main__":
+    main()

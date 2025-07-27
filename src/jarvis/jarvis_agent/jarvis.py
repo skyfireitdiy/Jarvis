@@ -111,14 +111,14 @@ def _select_task(tasks: Dict[str, str]) -> str:
             PrettyOutput.print(f"选择任务失败: {str(val_err)}", OutputType.ERROR)
 
 
-def _handle_edit_mode(edit: bool, config: Optional[str]) -> None:
+def _handle_edit_mode(edit: bool, config_file: Optional[str]) -> None:
     """If edit flag is set, open config file in editor and exit."""
     if not edit:
         return
 
     config_file_path = (
-        Path(config)
-        if config
+        Path(config_file)
+        if config_file
         else Path(os.path.expanduser("~/.jarvis/config.yaml"))
     )
     editors = ["nvim", "vim", "vi"]
@@ -180,8 +180,9 @@ def _get_and_run_task(agent: Agent, task_content: Optional[str] = None) -> None:
     raise typer.Exit(code=0)
 
 
-@app.command()
-def main(
+@app.callback(invoke_without_command=True)
+def run_cli(
+    ctx: typer.Context,
     llm_type: str = typer.Option(
         "normal",
         "--llm_type",
@@ -193,7 +194,7 @@ def main(
     model_group: Optional[str] = typer.Option(
         None, "--model_group", help="Model group to use, overriding config"
     ),
-    config: Optional[str] = typer.Option(
+    config_file: Optional[str] = typer.Option(
         None, "-f", "--config", help="Path to custom config file"
     ),
     restore_session: bool = typer.Option(
@@ -205,18 +206,28 @@ def main(
         False, "-e", "--edit", help="Edit the configuration file"
     ),
 ) -> None:
-    """Main function for Jarvis AI assistant."""
-    _handle_edit_mode(edit, config)
+    """Jarvis AI assistant command-line interface."""
+    if ctx.invoked_subcommand is not None:
+        return
+        
+    _handle_edit_mode(edit, config_file)
 
-    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config)
+    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file)
 
     try:
         agent = _initialize_agent(llm_type, model_group, restore_session)
         _get_and_run_task(agent, task)
+    except typer.Exit:
+        raise
     except Exception as err:  # pylint: disable=broad-except
         PrettyOutput.print(f"初始化错误: {str(err)}", OutputType.ERROR)
         raise typer.Exit(code=1)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Application entry point."""
     app()
+
+
+if __name__ == "__main__":
+    main()
