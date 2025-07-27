@@ -81,10 +81,10 @@ class TongyiPlatform(BasePlatform):
                 "contentType": "text",
                 "role": "user",
                 "ext": {
-                    "searchType": "",
+                    "searchType": "depth" if self.web else "",
                     "pptGenerate": False,
-                    "deepThink": False,
-                    "deepResearch": False,
+                    "deepThink": self.model_name == "Thinking",
+                    "deepResearch": self.model_name == "Deep-Research",
                 },
             }
         ]
@@ -98,10 +98,10 @@ class TongyiPlatform(BasePlatform):
                     "contentType": "text",
                     "role": "system",
                     "ext": {
-                        "searchType": "",
+                        "searchType": "depth" if self.web else "",
                         "pptGenerate": False,
-                        "deepThink": False,
-                        "deepResearch": False,
+                        "deepThink": self.model_name == "Thinking",
+                        "deepResearch": self.model_name == "Deep-Research",
                     },
                 },
             )
@@ -140,13 +140,13 @@ class TongyiPlatform(BasePlatform):
             "parentMsgId": self.msg_id,
             "params": {
                 "agentId": "",
-                "searchType": "",
+                "searchType": "depth" if self.web else "",
                 "pptGenerate": False,
                 "bizScene": "code_chat" if self.model_name == "Code-Chat" else "",
                 "bizSceneInfo": {},
                 "specifiedModel": "",
-                "deepThink": True if self.model_name == "Thinking" else False,
-                "deepResearch": False,
+                "deepThink": self.model_name == "Thinking",
+                "deepResearch": self.model_name == "Deep-Research",
                 "fileUploadBatchId": (
                     self.uploaded_file_info[0]["batchId"]
                     if self.uploaded_file_info
