@@ -9,8 +9,9 @@
 """
 import os
 
-# 全局变量：保存最后一条消息
-last_message: str = ""
+# 全局变量：保存消息历史
+message_history: list[str] = []
+MAX_HISTORY_SIZE = 50
 from typing import Any, Dict, Set
 
 import colorama
@@ -169,13 +170,18 @@ def get_interrupt() -> int:
 
 def set_last_message(message: str) -> None:
     """
-    设置最后一条消息。
+    将消息添加到历史记录中。
 
     参数:
         message: 要保存的消息
     """
-    global last_message
-    last_message = message
+    global message_history
+    if message:
+        # 避免重复添加
+        if not message_history or message_history[-1] != message:
+            message_history.append(message)
+            if len(message_history) > MAX_HISTORY_SIZE:
+                message_history.pop(0)
 
 
 def get_last_message() -> str:
@@ -183,6 +189,20 @@ def get_last_message() -> str:
     获取最后一条消息。
 
     返回:
-        str: 最后一条消息
+        str: 最后一条消息，如果历史记录为空则返回空字符串
     """
-    return last_message
+    global message_history
+    if message_history:
+        return message_history[-1]
+    return ""
+
+
+def get_message_history() -> list[str]:
+    """
+    获取完整的消息历史记录。
+
+    返回:
+        list[str]: 消息历史列表
+    """
+    global message_history
+    return message_history
