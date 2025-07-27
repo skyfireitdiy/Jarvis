@@ -210,7 +210,7 @@ def get_multiline_input(tip: str) -> str:
     """
     # 显示输入说明
     PrettyOutput.section(
-        "用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交，Ctrl+O 复制最后一条消息，按 Ctrl+C 取消输入",
+        "用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 提交，Ctrl+O 从历史记录中选择消息复制，按 Ctrl+C 取消输入",
         OutputType.USER,
     )
     print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
@@ -234,17 +234,47 @@ def get_multiline_input(tip: str) -> str:
 
     @bindings.add("c-o")
     def _(event):
-        """处理Ctrl+O以复制最后一条消息到剪贴板。"""
-        from jarvis.jarvis_utils.globals import get_last_message
+        """处理Ctrl+O以从历史记录中选择并复制消息。"""
+        from jarvis.jarvis_utils.globals import get_message_history
 
-        last_msg = get_last_message()
-        if last_msg:
-            print(f"{last_msg}")
-            copy_to_clipboard(last_msg)
-        else:
+        history = get_message_history()
+        if not history:
             PrettyOutput.print("没有可复制的消息", OutputType.INFO)
+            return
 
-        event.app.invalidate()
+        # 暂停当前App，显示选择列表
+        app = event.app
+        app.suspend_to_background()
+
+        try:
+            print("消息历史记录:")
+            for i, msg in enumerate(history):
+                # 缩短长消息以提高可读性
+                display_msg = (msg[:70] + "...") if len(msg) > 70 else msg
+                print(f"  {i + 1}: {display_msg.strip()}")
+
+            # 提示用户选择
+            while True:
+                try:
+                    choice_str = get_single_line_input("请输入要复制的条目序号 (或输入c取消): ")
+                    if choice_str.lower() == "c":
+                        print("已取消")
+                        return
+                    choice = int(choice_str) - 1
+                    if 0 <= choice < len(history):
+                        selected_msg = history[choice]
+                        copy_to_clipboard(selected_msg)
+                        PrettyOutput.print(f"已复制消息: {selected_msg[:70]}...", OutputType.SUCCESS)
+                        break
+                    else:
+                        print("无效的序号，请重试。")
+                except ValueError:
+                    print("无效的输入，请输入数字。")
+                except Exception:
+                    break
+        finally:
+            # 恢复App
+            app.resume_from_background()
 
     # 配置提示会话
     style = PromptStyle.from_dict(
