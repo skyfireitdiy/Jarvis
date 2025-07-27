@@ -308,7 +308,7 @@ commit信息
 
 
 @app.command()
-def main(
+def cli(
     root_dir: str = typer.Option(
         ".", "--root-dir", help="Root directory of the Git repository"
     ),
@@ -334,5 +334,10 @@ def main(
     )
 
 
-if __name__ == "__main__":
+def main():
+    """Application entry point"""
     app()
+
+
+if __name__ == "__main__":
+    main()

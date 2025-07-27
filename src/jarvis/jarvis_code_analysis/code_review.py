@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import tempfile
+import sys
 from typing import Any, Dict, List, Optional
 
 import typer
@@ -839,9 +840,15 @@ def review_file(
         PrettyOutput.print(result["stderr"], OutputType.WARNING)
 
 
-def main():
+def cli():
+    """Typer application entry point"""
     init_env("欢迎使用 Jarvis-CodeReview，您的代码审查助手已准备就绪！")
     app()
+
+
+def main():
+    """Main entry point for the script"""
+    cli()
 
 
 if __name__ == "__main__":

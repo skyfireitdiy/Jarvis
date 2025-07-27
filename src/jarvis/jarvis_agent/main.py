@@ -38,7 +38,7 @@ def load_config(config_path: str) -> dict:
 
 
 @app.command()
-def main(
+def cli(
     config_file: Optional[str] = typer.Option(
         None, "-f", "--config", help="Path to agent config file"
     ),
@@ -91,10 +91,17 @@ def main(
         except Exception as e:
             PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
+    except typer.Exit:
+        raise
     except Exception as e:
         PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
         raise typer.Exit(code=1)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Application entry point."""
     app()
+
+
+if __name__ == "__main__":
+    main()

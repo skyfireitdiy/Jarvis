@@ -4,6 +4,7 @@
 该模块提供了Jarvis平台管理器的主要入口点。
 """
 import os
+import sys
 from typing import Any, Dict, List, Optional
 
 import typer
@@ -17,6 +18,7 @@ from jarvis.jarvis_platform_manager.service import start_service
 app = typer.Typer(help="Jarvis AI 平台")
 
 
+@app.command("info")
 def list_platforms() -> None:
     """列出所有支持的平台和模型。"""
     registry = PlatformRegistry.get_global_platform_registry()
@@ -294,8 +296,11 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
             except Exception as exc:
                 PrettyOutput.print(f"聊天失败: {str(exc)}", OutputType.ERROR)
 
+    except typer.Exit:
+        raise
     except Exception as exc:
         PrettyOutput.print(f"初始化会话失败: {str(exc)}", OutputType.ERROR)
+        sys.exit(1)
     finally:
         # Clean up resources
         try:
@@ -332,12 +337,6 @@ def chat_command(
     if not validate_platform_model(platform, model):
         return
     chat_with_model(platform, model, "")
-
-
-@app.command("info")
-def info_command() -> None:
-    """显示支持的平台和模型信息。"""
-    list_platforms()
 
 
 @app.command("service")

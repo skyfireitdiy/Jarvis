@@ -130,9 +130,15 @@ def call_tool(
         raise typer.Exit(code=1)
 
 
-def main():
+def cli():
+    """Typer application entry point"""
     init_env("欢迎使用 Jarvis-Tools，您的工具系统已准备就绪！")
     app()
+
+
+def main():
+    """Main entry point for the script"""
+    cli()
 
 
 if __name__ == "__main__":
