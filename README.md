@@ -8,7 +8,7 @@
 
 *您的智能开发和系统交互助手*
 
-[快速开始](#quick-start) • [核心功能](#core-features) • [配置说明](#configuration) • [技术细节](docs/technical_documentation.md) • [Wiki文档](https://deepwiki.com/skyfireitdiy/Jarvis) • [贡献指南](#contributing) • [许可证](#license)
+[快速开始](#quick-start) • [核心功能](#core-features) • [配置说明](#configuration) • [Jarvis Book](#jarvis-book) • [技术细节](docs/technical_documentation.md) • [Wiki文档](https://deepwiki.com/skyfireitdiy/Jarvis) • [贡献指南](#contributing) • [许可证](#license)
 </div>
 
 ---
@@ -103,6 +103,22 @@ Jarvis 被设计为高度可扩展的框架。您可以轻松地：
 - **定义MCP**: 通过配置文件集成外部或自定义的命令协议。
 
 有关扩展开发的详细指南和[**技术细节**](docs/technical_documentation.md)，请访问我们的 [**开发者文档**](https://deepwiki.com/skyfireitdiy/Jarvis)。
+
+---
+
+## 📖 Jarvis Book <a id="jarvis-book"></a>
+
+欢迎阅读 Jarvis 的官方文档，这本开源书籍旨在为您提供从入门到精通的全方位指南。
+
+- **[第一章：项目介绍](docs/jarvis_book/1.项目介绍.md)**
+- **[第二章：快速开始](docs/jarvis_book/2.快速开始.md)**
+- **[第三章：核心概念与架构](docs/jarvis_book/3.核心概念与架构.md)**
+- **[第四章：使用指南](docs/jarvis_book/4.使用指南.md)**
+- **[第五章：工具开发](docs/jarvis_book/5.工具开发.md)**
+- **[第六章：高级主题](docs/jarvis_book/6.高级主题.md)**
+- **[第七章：参与贡献](docs/jarvis_book/7.参与贡献.md)**
+- **[第八章：常见问题](docs/jarvis_book/8.常见问题.md)**
+- **[第九章：附录](docs/jarvis_book/9.附录.md)**
 
 ---
 
