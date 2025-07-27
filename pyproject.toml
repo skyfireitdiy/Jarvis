@@ -61,6 +61,9 @@ rag = [
 [project.urls]
 Homepage = "https://github.com/skyfireitdiy/Jarvis"
 
+[tool.isort]
+profile = "black"
+
 [project.scripts]
 jarvis = "jarvis.jarvis_agent.jarvis:main"
 jvs = "jarvis.jarvis_agent.jarvis:main"
