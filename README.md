@@ -8,7 +8,7 @@
 
 *您的智能开发和系统交互助手*
 
-[快速开始](#quick-start) • [核心功能](#core-features) • [配置说明](#configuration) • [Jarvis Book](#jarvis-book) • [技术细节](docs/technical_documentation.md) • [Wiki文档](https://deepwiki.com/skyfireitdiy/Jarvis) • [贡献指南](#contributing) • [许可证](#license)
+[快速开始](#quick-start) • [核心功能](#core-features) • [配置说明](#configuration) • [Jarvis Book](#jarvis-book) • [技术细节](docs/technical_documentation.md) • [Wiki文档](docs/jarvis_book/1.项目介绍.md) • [贡献指南](#contributing) • [许可证](#license)
 </div>
 
 ---
@@ -51,7 +51,7 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 | `jarvis-rag` | `jrg` | 构建和查询本地化的RAG知识库 |
 | `jarvis-smart-shell` | `jss` | 实验性的智能Shell功能 |
 
-更多详细用法和参数，请查阅我们的 [**Wiki 文档**](https://deepwiki.com/skyfireitdiy/Jarvis)。
+更多详细用法和参数，请查阅我们的 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
 ---
 
@@ -91,7 +91,7 @@ ENV:
   YUANBAO_COOKIES: "在此处粘贴您的元宝Cookies"
 ```
 
-Jarvis 支持多种平台，包括 **Kimi**, **通义千问**, **OpenAI** 等。详细的配置选项、模型组设置以及所有可用参数，请参阅 [**配置文档**](https://deepwiki.com/skyfireitdiy/Jarvis)。
+Jarvis 支持多种平台，包括 **Kimi**, **通义千问**, **OpenAI** 等。详细的配置选项、模型组设置以及所有可用参数，请参阅 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
 ---
 
@@ -102,7 +102,7 @@ Jarvis 被设计为高度可扩展的框架。您可以轻松地：
 - **集成新LLM平台**: 在 `~/.jarvis/platforms/` 目录下添加新的平台适配器。
 - **定义MCP**: 通过配置文件集成外部或自定义的命令协议。
 
-有关扩展开发的详细指南和[**技术细节**](docs/technical_documentation.md)，请访问我们的 [**开发者文档**](https://deepwiki.com/skyfireitdiy/Jarvis)。
+有关扩展开发的详细指南和[**技术细节**](docs/technical_documentation.md)，请访问我们的 [**开发者文档**](docs/jarvis_book/5.功能扩展.md)。
 
 ---
 
@@ -114,7 +114,7 @@ Jarvis 被设计为高度可扩展的框架。您可以轻松地：
 - **[第二章：快速开始](docs/jarvis_book/2.快速开始.md)**
 - **[第三章：核心概念与架构](docs/jarvis_book/3.核心概念与架构.md)**
 - **[第四章：使用指南](docs/jarvis_book/4.使用指南.md)**
-- **[第五章：工具开发](docs/jarvis_book/5.工具开发.md)**
+- **[第五章：功能扩展](docs/jarvis_book/5.功能扩展.md)**
 - **[第六章：高级主题](docs/jarvis_book/6.高级主题.md)**
 - **[第七章：参与贡献](docs/jarvis_book/7.参与贡献.md)**
 - **[第八章：常见问题](docs/jarvis_book/8.常见问题.md)**
