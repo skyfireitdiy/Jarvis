@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
-import argparse
 import os
+from typing import Optional
 
+import typer
 import yaml
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
+
+app = typer.Typer(help="Jarvis AI assistant")
 
 
 def load_config(config_path: str) -> dict:
@@ -34,59 +37,53 @@ def load_config(config_path: str) -> dict:
             return {}
 
 
-def main():
-    """Main entry point for Jarvis agent"""
-    # Set up argument parser
-    parser = argparse.ArgumentParser(description="Jarvis AI assistant")
-    parser.add_argument(
-        "-f", "--config", type=str, required=False, help="Path to agent config file"
-    )
-    parser.add_argument(
-        "-c", "--agent_definition", type=str, help="Path to agent definition file"
-    )
-    parser.add_argument("-t", "--task", type=str, help="Initial task to execute")
-    parser.add_argument(
+@app.command()
+def main(
+    config_file: Optional[str] = typer.Option(
+        None, "-f", "--config", help="Path to agent config file"
+    ),
+    agent_definition: Optional[str] = typer.Option(
+        None, "-c", "--agent_definition", help="Path to agent definition file"
+    ),
+    task: Optional[str] = typer.Option(
+        None, "-t", "--task", help="Initial task to execute"
+    ),
+    llm_type: str = typer.Option(
+        "normal",
         "--llm_type",
-        type=str,
-        default="normal",
-        choices=["normal", "thinking"],
         help="LLM type to use, overriding config",
-    )
-    parser.add_argument(
-        "--model_group",
-        type=str,
-        help="Model group to use, overriding config",
-    )
-    args = parser.parse_args()
-
+    ),
+    model_group: Optional[str] = typer.Option(
+        None, "--model_group", help="Model group to use, overriding config"
+    ),
+):
+    """Main entry point for Jarvis agent"""
     # Initialize environment
-    init_env(
-        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=args.config
-    )
+    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file)
 
     # Load configuration
-    config = load_config(args.agent_definition) if args.agent_definition else {}
+    config = load_config(agent_definition) if agent_definition else {}
 
     # Override config with command-line arguments if provided
-    if args.llm_type:
-        config["llm_type"] = args.llm_type
-    if args.model_group:
-        config["model_group"] = args.model_group
+    if llm_type:
+        config["llm_type"] = llm_type
+    if model_group:
+        config["model_group"] = model_group
 
     # Create and run agent
     try:
         agent = Agent(**config)
 
         # Run agent with initial task if specified
-        if args.task:
-            PrettyOutput.print(f"执行初始任务: {args.task}", OutputType.INFO)
-            agent.run(args.task)
-            return 0
+        if task:
+            PrettyOutput.print(f"执行初始任务: {task}", OutputType.INFO)
+            agent.run(task)
+            raise typer.Exit(code=0)
 
         try:
             user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
             if not user_input:
-                return 0
+                raise typer.Exit(code=0)
             agent.set_addon_prompt(
                 "如果有必要，请先指定出行动计划，然后根据计划一步步执行，如果任务过于复杂，可以拆分子Agent进行执行，拆的子Agent需要掌握所有必要的任务信息，否则无法执行"
             )
@@ -96,10 +93,8 @@ def main():
 
     except Exception as e:
         PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
-        return 1
-
-    return 0
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
-    exit(main())
+    app()

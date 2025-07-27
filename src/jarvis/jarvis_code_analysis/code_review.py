@@ -5,6 +5,8 @@ import subprocess
 import tempfile
 from typing import Any, Dict, List, Optional
 
+import typer
+
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -13,6 +15,8 @@ from jarvis.jarvis_utils.globals import get_agent, current_agent_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
+
+app = typer.Typer(help="Autonomous code review tool")
 
 
 class CodeReviewTool:
@@ -762,59 +766,82 @@ def extract_code_report(result: str) -> str:
     return result
 
 
-def main():
-    """CLI entry point"""
-    import argparse
-
-    init_env("欢迎使用 Jarvis-CodeReview，您的代码审查助手已准备就绪！")
-
-    parser = argparse.ArgumentParser(description="Autonomous code review tool")
-    subparsers = parser.add_subparsers(dest="type")
-
-    # Commit subcommand
-    commit_parser = subparsers.add_parser("commit", help="Review specific commit")
-    commit_parser.add_argument("commit", help="Commit SHA to review")
-
-    # Current subcommand
-    subparsers.add_parser("current", help="Review current changes")
-
-    # Range subcommand
-    range_parser = subparsers.add_parser("range", help="Review commit range")
-    range_parser.add_argument("start_commit", help="Start commit SHA")
-    range_parser.add_argument("end_commit", help="End commit SHA")
-
-    # File subcommand
-    file_parser = subparsers.add_parser("file", help="Review specific file")
-    file_parser.add_argument("file", help="File path to review")
-
-    # Common arguments
-    parser.add_argument(
-        "--root-dir", type=str, help="Root directory of the codebase", default="."
-    )
-
-    # Set default subcommand to 'current'
-    parser.set_defaults(type="current")
-    args = parser.parse_args()
-
+@app.command("commit")
+def review_commit(
+    commit: str = typer.Argument(..., help="Commit SHA to review"),
+    root_dir: str = typer.Option(".", "--root-dir", help="Root directory of the codebase"),
+):
+    """Review specific commit"""
     tool = CodeReviewTool()
-    tool_args = {"review_type": args.type, "root_dir": args.root_dir}
-    if args.type == "commit":
-        tool_args["commit_sha"] = args.commit
-    elif args.type == "range":
-        tool_args["start_commit"] = args.start_commit
-        tool_args["end_commit"] = args.end_commit
-    elif args.type == "file":
-        tool_args["file_path"] = args.file
-
+    tool_args = {"review_type": "commit", "commit_sha": commit, "root_dir": root_dir}
     result = tool.execute(tool_args)
-
     if result["success"]:
         PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
         report = extract_code_report(result["stdout"])
         PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")
-
     else:
         PrettyOutput.print(result["stderr"], OutputType.WARNING)
+
+
+@app.command("current")
+def review_current(
+    root_dir: str = typer.Option(".", "--root-dir", help="Root directory of the codebase"),
+):
+    """Review current changes"""
+    tool = CodeReviewTool()
+    tool_args = {"review_type": "current", "root_dir": root_dir}
+    result = tool.execute(tool_args)
+    if result["success"]:
+        PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
+        report = extract_code_report(result["stdout"])
+        PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")
+    else:
+        PrettyOutput.print(result["stderr"], OutputType.WARNING)
+
+
+@app.command("range")
+def review_range(
+    start_commit: str = typer.Argument(..., help="Start commit SHA"),
+    end_commit: str = typer.Argument(..., help="End commit SHA"),
+    root_dir: str = typer.Option(".", "--root-dir", help="Root directory of the codebase"),
+):
+    """Review commit range"""
+    tool = CodeReviewTool()
+    tool_args = {
+        "review_type": "range",
+        "start_commit": start_commit,
+        "end_commit": end_commit,
+        "root_dir": root_dir,
+    }
+    result = tool.execute(tool_args)
+    if result["success"]:
+        PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
+        report = extract_code_report(result["stdout"])
+        PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")
+    else:
+        PrettyOutput.print(result["stderr"], OutputType.WARNING)
+
+
+@app.command("file")
+def review_file(
+    file: str = typer.Argument(..., help="File path to review"),
+    root_dir: str = typer.Option(".", "--root-dir", help="Root directory of the codebase"),
+):
+    """Review specific file"""
+    tool = CodeReviewTool()
+    tool_args = {"review_type": "file", "file_path": file, "root_dir": root_dir}
+    result = tool.execute(tool_args)
+    if result["success"]:
+        PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
+        report = extract_code_report(result["stdout"])
+        PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")
+    else:
+        PrettyOutput.print(result["stderr"], OutputType.WARNING)
+
+
+def main():
+    init_env("欢迎使用 Jarvis-CodeReview，您的代码审查助手已准备就绪！")
+    app()
 
 
 if __name__ == "__main__":

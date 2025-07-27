@@ -8,11 +8,12 @@
 - 列出所有方法论
 """
 
-import argparse
 import hashlib
 import json
 import os
+from typing import Optional
 
+import typer
 import yaml  # type: ignore
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -22,8 +23,13 @@ from jarvis.jarvis_utils.methodology import (
 )
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
+app = typer.Typer(help="方法论管理工具")
 
-def import_methodology(input_file):
+
+@app.command("import")
+def import_methodology(
+    input_file: str = typer.Argument(..., help="要导入的方法论文件路径")
+):
     """导入方法论文件（合并策略）"""
     try:
         # 加载现有方法论
@@ -58,7 +64,10 @@ def import_methodology(input_file):
         PrettyOutput.print(f"导入失败: {str(e)}", OutputType.ERROR)
 
 
-def export_methodology(output_file):
+@app.command("export")
+def export_methodology(
+    output_file: str = typer.Argument(..., help="导出文件路径")
+):
     """导出当前方法论到单个文件"""
     try:
         methodologies = _load_all_methodologies()
@@ -74,6 +83,7 @@ def export_methodology(output_file):
         PrettyOutput.print(f"导出失败: {str(e)}", OutputType.ERROR)
 
 
+@app.command("list")
 def list_methodologies():
     """列出所有方法论"""
     try:
@@ -90,7 +100,10 @@ def list_methodologies():
         PrettyOutput.print(f"列出方法论失败: {str(e)}", OutputType.ERROR)
 
 
-def extract_methodology(input_file):
+@app.command("extract")
+def extract_methodology(
+    input_file: str = typer.Argument(..., help="要提取方法论的文本文件路径")
+):
     """从文本文件中提取方法论"""
     try:
         # 读取文本文件内容
@@ -192,7 +205,8 @@ def extract_methodology(input_file):
         PrettyOutput.print(f"提取失败: {str(e)}", OutputType.ERROR)
 
 
-def extract_methodology_from_url(url):
+@app.command("extract-url")
+def extract_methodology_from_url(url: str = typer.Argument(..., help="要提取方法论的URL")):
     """从URL提取方法论"""
     try:
         # 获取平台实例
@@ -291,45 +305,5 @@ def extract_methodology_from_url(url):
         PrettyOutput.print(f"从URL提取失败: {str(e)}", OutputType.ERROR)
 
 
-def main():
-    """方法论管理工具主函数"""
-    parser = argparse.ArgumentParser(description="方法论管理工具")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # import命令
-    import_parser = subparsers.add_parser("import", help="导入方法论文件（合并策略）")
-    import_parser.add_argument("input_file", type=str, help="要导入的方法论文件路径")
-
-    # export命令
-    export_parser = subparsers.add_parser("export", help="导出当前方法论到单个文件")
-    export_parser.add_argument("output_file", type=str, help="导出文件路径")
-
-    # list命令
-    subparsers.add_parser("list", help="列出所有方法论")
-
-    # extract命令
-    extract_parser = subparsers.add_parser("extract", help="从文本文件中提取方法论")
-    extract_parser.add_argument(
-        "input_file", type=str, help="要提取方法论的文本文件路径"
-    )
-
-    # extract-url命令
-    extract_url_parser = subparsers.add_parser("extract-url", help="从URL提取方法论")
-    extract_url_parser.add_argument("url", type=str, help="要提取方法论的URL")
-
-    args = parser.parse_args()
-
-    if args.command == "import":
-        import_methodology(args.input_file)
-    elif args.command == "export":
-        export_methodology(args.output_file)
-    elif args.command == "list":
-        list_methodologies()
-    elif args.command == "extract":
-        extract_methodology(args.input_file)
-    elif args.command == "extract-url":
-        extract_methodology_from_url(args.url)
-
-
 if __name__ == "__main__":
-    main()
+    app()

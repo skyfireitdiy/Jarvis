@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
-import argparse
 import subprocess
-import sys
 from typing import Dict
+
+import typer
 
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.input import user_confirm
+
+app = typer.Typer(help="Git squash tool")
 
 
 class GitSquashTool:
@@ -49,18 +51,16 @@ class GitSquashTool:
             PrettyOutput.print(f"压缩提交失败: {str(e)}", OutputType.WARNING)
 
 
-def main():
-    init_env("欢迎使用 Jarvis-GitSquash，您的Git压缩助手已准备就绪！")
-    parser = argparse.ArgumentParser(description="Git squash tool")
-    parser.add_argument("commit_hash", type=str, help="Base commit hash to squash from")
-    parser.add_argument(
-        "--lang", type=str, default="Chinese", help="Language for commit messages"
-    )
-    args = parser.parse_args()
-
+@app.command()
+def main(
+    commit_hash: str = typer.Argument(..., help="Base commit hash to squash from"),
+    lang: str = typer.Option("Chinese", "--lang", help="Language for commit messages"),
+):
+    init_env("欢迎使用 Jarvis-GitSquash，您的Git压缩助手已准备就"
+             "绪！")
     tool = GitSquashTool()
-    tool.execute({"commit_hash": args.commit_hash, "lang": args.lang})
+    tool.execute({"commit_hash": commit_hash, "lang": lang})
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    app()
