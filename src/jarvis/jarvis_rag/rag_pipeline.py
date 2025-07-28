@@ -107,6 +107,30 @@ class JarvisRAGPipeline:
             )
         return self._retriever
 
+    def _get_collection(self):
+        """
+        在不加载嵌入模型的情况下，直接获取并返回Chroma集合对象。
+        这对于仅需要访问集合元数据（如列出文档）而无需嵌入功能的操作非常有用。
+        """
+        # 为了避免初始化embedding_manager，我们直接构建db_path
+        if self._retriever:
+            return self._retriever.collection
+
+        sanitized_model_name = self.embedding_model_name.replace("/", "_").replace(
+            "\\", "_"
+        )
+        _final_db_path = (
+            str(self.db_path)
+            if self.db_path
+            else os.path.join(get_rag_vector_db_path(), sanitized_model_name)
+        )
+
+        # 直接创建ChromaRetriever所使用的chroma_client，但绕过embedding_manager
+        import chromadb
+
+        chroma_client = chromadb.PersistentClient(path=_final_db_path)
+        return chroma_client.get_collection(name=self.collection_name)
+
     def _get_reranker(self) -> Reranker:
         if self._reranker is None:
             self._reranker = Reranker(model_name=get_rag_rerank_model())
