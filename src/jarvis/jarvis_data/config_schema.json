@@ -235,9 +235,37 @@
       "description": "是否启用静态代码分析",
       "default": true
     },
+    "JARVIS_RAG_GROUP": {
+      "type": "string",
+      "description": "选择一个预定义的RAG配置组"
+    },
+    "JARVIS_RAG_GROUPS": {
+      "type": "array",
+      "description": "预定义的RAG配置组",
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "embedding_model": {
+              "type": "string"
+            },
+            "rerank_model": {
+              "type": "string"
+            },
+            "use_bm25": {
+              "type": "boolean"
+            },
+            "use_rerank": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
     "JARVIS_RAG": {
       "type": "object",
-      "description": "RAG框架的配置",
+      "description": "RAG框架的顶层配置。注意：此处的设置将覆盖任何由JARVIS_RAG_GROUP选择的组配置。",
       "properties": {
         "embedding_model": {
           "type": "string",
