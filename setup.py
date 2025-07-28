@@ -35,6 +35,7 @@ setup(
         "ddgs==9.0.2",
         "lxml==6.0.0",
         "markdownify>=1.1.0",
+        "typer",
     ],
     extras_require={
         "dev": ["pytest", "black", "isort", "mypy", "build", "twine"],
@@ -46,7 +47,6 @@ setup(
             "diskcache",
             "sentence-transformers==2.7.0",
             "torch>=2.6",
-            "typer",
             "unstructured[md]",
             "rank-bm25",
         ],
