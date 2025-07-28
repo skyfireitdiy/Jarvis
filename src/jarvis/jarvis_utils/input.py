@@ -175,12 +175,20 @@ def _show_history_and_copy():
 
     while True:
         try:
-            prompt_text = f"{Fore.CYAN}请输入要复制的条目序号 (或输入c取消): {ColoramaStyle.RESET_ALL}"
+            prompt_text = f"{Fore.CYAN}请输入要复制的条目序号 (或输入c取消, 直接回车选择最后一条): {ColoramaStyle.RESET_ALL}"
             choice_str = input(prompt_text)
-            if choice_str.lower() == "c":
+
+            if not choice_str:  # User pressed Enter
+                if not history:
+                    print("没有历史记录可供选择。")
+                    break
+                choice = len(history) - 1
+            elif choice_str.lower() == "c":
                 print("已取消")
                 break
-            choice = int(choice_str) - 1
+            else:
+                choice = int(choice_str) - 1
+
             if 0 <= choice < len(history):
                 selected_msg = history[choice]
                 copy_to_clipboard(selected_msg)
