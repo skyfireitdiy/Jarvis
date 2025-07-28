@@ -12,7 +12,9 @@ class generate_new_tool:
     生成并注册新的Jarvis工具。该工具会在用户数据目录下创建新的工具文件，
     并自动注册到当前的工具注册表中。适用场景：1. 需要创建新的自定义工具；
     2. 扩展Jarvis功能；3. 自动化重复性操作；4. 封装特定领域的功能。
-    重要提示：在编写工具代码时，应尽量将工具执行的过程和结果打印出来，方便追踪工具的执行状态。
+    重要提示：
+    1. `tool_name` 参数必须与 `tool_code` 中定义的 `name` 属性完全一致。
+    2. 在编写工具代码时，应尽量将工具执行的过程和结果打印出来，方便追踪工具的执行状态。
     """
 
     parameters = {
@@ -73,6 +75,25 @@ class generate_new_tool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"工具名称 '{tool_name}' 不是有效的Python标识符",
+                }
+
+            # 验证工具代码中的名称是否与tool_name一致
+            import re
+
+            match = re.search(r"^\s*name\s*=\s*[\"'](.+?)[\"']", tool_code, re.MULTILINE)
+            if not match:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "无法在工具代码中找到 'name' 属性。请确保工具类中包含 'name = \"your_tool_name\"'。",
+                }
+
+            code_name = match.group(1)
+            if tool_name != code_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"工具名称不一致：参数 'tool_name' ('{tool_name}') 与代码中的 'name' 属性 ('{code_name}') 必须相同。",
                 }
 
             # 准备工具目录

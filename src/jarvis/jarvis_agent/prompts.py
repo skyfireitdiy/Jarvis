@@ -113,6 +113,31 @@ TASK_ANALYSIS_PROMPT = f"""<task_analysis>
            "stderr": f"操作失败: {{str(e)}}"
        }}
    ```
+4. **在工具中调用大模型**：如果工具需要调用大模型来完成子任务（例如，生成代码、分析文本等），为了避免干扰主对话流程，建议创建一个独立的大模型实例。
+   ```python
+    # 通过 agent 实例获取模型配置
+    agent = args.get("agent")
+    if not agent:
+        return {{"success": False, "stderr": "Agent not found."}}
+    
+    current_model = agent.model
+    platform_name = current_model.platform_name()
+    model_name = current_model.name()
+
+    # 创建独立的模型实例
+    from jarvis.jarvis_platform.registry import PlatformRegistry
+    llm = PlatformRegistry().create_platform(platform_name)
+    if not llm:
+        return {{"success": False, "stderr": f"Platform {{platform_name}} not found."}}
+    
+    llm.set_model_name(model_name)
+    llm.set_suppress_output(True) # 工具内的调用通常不需要流式输出
+
+    # 使用新实例调用大模型
+    PrettyOutput.print("正在执行子任务...", OutputType.INFO)
+    response = llm.chat_until_success("你的提示词")
+    PrettyOutput.print("子任务完成", OutputType.SUCCESS)
+   ```
 </tool_requirements>
 <methodology_requirements>
 方法论格式要求:
