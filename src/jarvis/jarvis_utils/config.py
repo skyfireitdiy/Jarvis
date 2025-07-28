@@ -334,14 +334,44 @@ def get_mcp_config() -> List[Dict[str, Any]]:
 # ==============================================================================
 
 
-def get_rag_config() -> Dict[str, Any]:
+def _get_resolved_rag_config(rag_group_override: Optional[str] = None) -> Dict[str, Any]:
     """
-    获取RAG框架的配置。
+    解析并合并RAG配置，处理RAG组。
+
+    优先级顺序:
+    1. JARVIS_RAG 中的顶级设置 (embedding_model, etc.)
+    2. JARVIS_RAG_GROUP 中定义的组配置
+    3. 代码中的默认值
 
     返回:
-        Dict[str, Any]: RAG配置字典
+        Dict[str, Any]: 解析后的RAG配置字典
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_RAG", {})
+    group_config = {}
+    rag_group_name = rag_group_override or GLOBAL_CONFIG_DATA.get("JARVIS_RAG_GROUP")
+    rag_groups = GLOBAL_CONFIG_DATA.get("JARVIS_RAG_GROUPS", [])
+
+    if rag_group_name and isinstance(rag_groups, list):
+        for group_item in rag_groups:
+            if isinstance(group_item, dict) and rag_group_name in group_item:
+                group_config = group_item[rag_group_name]
+                break
+
+    # Start with group config
+    resolved_config = group_config.copy()
+
+    # Override with specific settings from the top-level JARVIS_RAG dict
+    top_level_rag_config = GLOBAL_CONFIG_DATA.get("JARVIS_RAG", {})
+    if isinstance(top_level_rag_config, dict):
+        for key in [
+            "embedding_model",
+            "rerank_model",
+            "use_bm25",
+            "use_rerank",
+        ]:
+            if key in top_level_rag_config:
+                resolved_config[key] = top_level_rag_config[key]
+
+    return resolved_config
 
 
 def get_rag_embedding_model() -> str:
@@ -351,7 +381,8 @@ def get_rag_embedding_model() -> str:
     返回:
         str: 嵌入模型的名称
     """
-    return get_rag_config().get("embedding_model", "BAAI/bge-base-zh-v1.5")
+    config = _get_resolved_rag_config()
+    return config.get("embedding_model", "BAAI/bge-base-zh-v1.5")
 
 
 def get_rag_rerank_model() -> str:
@@ -361,7 +392,8 @@ def get_rag_rerank_model() -> str:
     返回:
         str: rerank模型的名称
     """
-    return get_rag_config().get("rerank_model", "BAAI/bge-reranker-base")
+    config = _get_resolved_rag_config()
+    return config.get("rerank_model", "BAAI/bge-reranker-base")
 
 
 def get_rag_embedding_cache_path() -> str:
@@ -391,7 +423,8 @@ def get_rag_use_bm25() -> bool:
     返回:
         bool: 如果使用BM25则返回True，默认为True
     """
-    return get_rag_config().get("use_bm25", True)
+    config = _get_resolved_rag_config()
+    return config.get("use_bm25", True) is True
 
 
 def get_rag_use_rerank() -> bool:
@@ -401,4 +434,5 @@ def get_rag_use_rerank() -> bool:
     返回:
         bool: 如果使用rerank则返回True，默认为True
     """
-    return get_rag_config().get("use_rerank", True)
+    config = _get_resolved_rag_config()
+    return config.get("use_rerank", True) is True
