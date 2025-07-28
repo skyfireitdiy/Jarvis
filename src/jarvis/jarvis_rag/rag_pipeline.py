@@ -151,22 +151,19 @@ class JarvisRAGPipeline:
         """
         self._get_retriever().add_documents(documents)
 
-    def _create_prompt(
-        self, query: str, context_docs: List[Document], source_files: List[str]
-    ) -> str:
+    def _create_prompt(self, query: str, context_docs: List[Document]) -> str:
         """为LLM或代理创建最终的提示。"""
-        context = "\n\n".join([doc.page_content for doc in context_docs])
-        sources_text = "\n".join([f"- {source}" for source in source_files])
+        context_details = []
+        for doc in context_docs:
+            source = doc.metadata.get("source", "未知来源")
+            content = doc.page_content
+            context_details.append(f"来源: {source}\n\n---\n{content}\n---")
+        context = "\n\n".join(context_details)
 
         prompt_template = f"""
         你是一个专家助手。请根据用户的问题，结合下面提供的参考信息来回答。
 
-        **重要**: 提供的上下文和文件列表**仅供参考**，可能不完整或已过时。在回答前，你应该**优先使用工具（如 read_code）来获取最新、最准确的信息**。
-
-        参考文件列表:
-        ---
-        {sources_text}
-        ---
+        **重要**: 提供的上下文**仅供参考**，可能不完整或已过时。在回答前，你应该**优先使用工具（如 read_code）来获取最新、最准确的信息**。
 
         参考上下文:
         ---
@@ -238,7 +235,7 @@ class JarvisRAGPipeline:
 
         # 4. 创建最终提示并生成答案
         # 我们使用原始的query_text作为给LLM的最终提示
-        prompt = self._create_prompt(query_text, retrieved_docs, sources)
+        prompt = self._create_prompt(query_text, retrieved_docs)
 
         print("🤖 正在从LLM生成答案...")
         answer = self.llm.generate(prompt)
