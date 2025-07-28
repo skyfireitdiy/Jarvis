@@ -248,11 +248,23 @@
           "type": "string",
           "default": "BAAI/bge-reranker-base",
           "description": "用于RAG的rerank模型的名称, 默认为 'BAAI/bge-reranker-base'"
+        },
+        "use_bm25": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否在RAG中为检索使用BM25, 默认为 true"
+        },
+        "use_rerank": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否在RAG中为检索使用rerank, 默认为 true"
         }
       },
       "default": {
         "embedding_model": "BAAI/bge-base-zh-v1.5",
-        "rerank_model": "BAAI/bge-reranker-base"
+        "rerank_model": "BAAI/bge-reranker-base",
+        "use_bm25": true,
+        "use_rerank": true
       }
     },
     "JARVIS_REPLACE_MAP": {
