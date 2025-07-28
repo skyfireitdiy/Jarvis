@@ -10,9 +10,10 @@
 import os
 
 # 全局变量：保存消息历史
-message_history: list[str] = []
+from typing import Any, Dict, Set, List
+
+message_history: List[str] = []
 MAX_HISTORY_SIZE = 50
-from typing import Any, Dict, Set
 
 import colorama
 from rich.console import Console
@@ -197,12 +198,12 @@ def get_last_message() -> str:
     return ""
 
 
-def get_message_history() -> list[str]:
+def get_message_history() -> List[str]:
     """
     获取完整的消息历史记录。
 
     返回:
-        list[str]: 消息历史列表
+        List[str]: 消息历史列表
     """
     global message_history
     return message_history

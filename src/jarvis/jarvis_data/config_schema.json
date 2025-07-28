@@ -141,11 +141,11 @@
       "description": "思考操作模型名称",
       "default": "deep_seek"
     },
-    "JARVIS_MODEL_GROUP": {
+    "JARVIS_LLM_GROUP": {
       "type": "string",
       "description": "选择一个预定义的模型组"
     },
-    "JARVIS_MODEL_GROUPS": {
+    "JARVIS_LLM_GROUPS": {
       "type": "array",
       "description": "预定义的模型配置组",
       "items": {

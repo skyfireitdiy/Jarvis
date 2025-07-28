@@ -280,18 +280,18 @@ stop
 
 **工作机制**:
 
-1.  **定义组**: 在 `config.yaml` 中，通过 `JARVIS_MODEL_GROUPS` 列表定义模型组。每个组是一个单键字典，键是组名，值是该组的具体配置。
-2.  **选择组**: 通过 `JARVIS_MODEL_GROUP` 键指定当前要激活的组名。
+1.  **定义组**: 在 `config.yaml` 中，通过 `JARVIS_LLM_GROUPS` 列表定义模型组。每个组是一个单键字典，键是组名，值是该组的具体配置。
+2.  **选择组**: 通过 `JARVIS_LLM_GROUP` 键指定当前要激活的组名。
 3.  **配置覆盖**: 系统在解析配置时，遵循明确的优先级顺序：
     1.  **独立配置 (最高)**: 单独设置的 `JARVIS_PLATFORM`, `JARVIS_MODEL` 等总会覆盖所有其他设置。
-    2.  **模型组配置**: 如果未设置独立配置，则采用 `JARVIS_MODEL_GROUP` 指定的组内配置。
+    2.  **模型组配置**: 如果未设置独立配置，则采用 `JARVIS_LLM_GROUP` 指定的组内配置。
     3.  **默认值 (最低)**: 如果两者都未提供，则使用代码中的硬编码默认值。
 
 **示例**:
 
 ```yaml
 # 1. 定义模型组
-JARVIS_MODEL_GROUPS:
+JARVIS_LLM_GROUPS:
   - kimi:
       JARVIS_PLATFORM: kimi
       JARVIS_MODEL: k1.5
@@ -303,10 +303,10 @@ JARVIS_MODEL_GROUPS:
       JARVIS_MODEL: gemini-2.5-pro
 
 # 2. 选择要使用的模型组
-JARVIS_MODEL_GROUP: kimi
+JARVIS_LLM_GROUP: kimi
 
 # 3. (可选) 独立配置会覆盖组配置
-# 如果取消下面这行的注释，即使 JARVIS_MODEL_GROUP 是 'kimi', 常规模型也会使用 'gpt-4o'
+# 如果取消下面这行的注释，即使 JARVIS_LLM_GROUP 是 'kimi', 常规模型也会使用 'gpt-4o'
 # JARVIS_MODEL: gpt-4o
 ```
 
@@ -316,8 +316,8 @@ JARVIS_MODEL_GROUP: kimi
 
 | 配置项 (Key) | 描述 | 默认值 |
 |---|---|---|
-| `JARVIS_MODEL_GROUP` | 当前激活的模型组名称。 | `null` |
-| `JARVIS_MODEL_GROUPS` | 预定义的模型配置组列表。 | `[]` |
+| `JARVIS_LLM_GROUP` | 当前激活的模型组名称。 | `null` |
+| `JARVIS_LLM_GROUPS` | 预定义的模型配置组列表。 | `[]` |
 | `JARVIS_PLATFORM` | 默认使用的 AI 平台名称。 | `yuanbao` |
 | `JARVIS_MODEL` | 默认使用的模型名称。 | `deep_seek_v3` |
 | `JARVIS_THINKING_PLATFORM` | 用于内部思考、规划等任务的 AI 平台。 | 同 `JARVIS_PLATFORM` |
