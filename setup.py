@@ -49,6 +49,7 @@ setup(
             "torch>=2.6",
             "unstructured[md]",
             "rank-bm25",
+            "pathspec",
         ],
     },
     entry_points={

@@ -41,6 +41,7 @@ dependencies = [
     "lxml==6.0.0",
     "markdownify>=1.1.0",
     "typer",
+    "pathspec",
 ]
 requires-python = ">=3.9,<3.13"
 
