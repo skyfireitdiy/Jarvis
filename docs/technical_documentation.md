@@ -334,7 +334,7 @@ JARVIS_MODEL_GROUP: kimi
 | `JARVIS_GIT_COMMIT_PROMPT` | `jgc` 命令生成 Git Commit Message 时使用的自定义模板。 | `""` |
 | `JARVIS_REPLACE_MAP` | 定义在交互中使用的自定义快捷命令替换规则。 | `{}` |
 | `JARVIS_MCP` | 一个列表，用于定义所有模型上下文协议（MCP）的端点配置。 | `[]` |
-| `JARVIS_RAG` | RAG框架的配置。 | `{"embedding_model": "BAAI/bge-base-zh-v1.5"}` |
+| `JARVIS_RAG` | RAG框架的配置。 | `{"embedding_model": "BAAI/bge-base-zh-v1.5", "rerank_model": "BAAI/bge-reranker-base", "use_bm25": true, "use_rerank": true}` |
 | `ENV` | 一个字典，用于为 Jarvis 运行环境设置临时的环境变量。 | `{}` |
 
 ### 3.2. 数据流与“思考-行动”循环
@@ -479,7 +479,7 @@ participant "最终答案" as FinalAnswer
 UserQuery -> QR : 1. 重写查询
 QR --> Retriever : 2. 多个查询变体
 
-Retriever -> Retriever : 2a. 向量检索 (ChromaDB)
+Retriever -> Retriever : 2a. 混合检索 (向量 + BM25)
 
 Retriever --> Reranker : 3. 统一的候选文档列表
 
@@ -502,8 +502,11 @@ LLM -> FinalAnswer : 6. 生成最终答案
 2.  **文档检索 (Document Retrieval)**:
     -   **组件**: `ChromaRetriever`
     -   **目的**: 实现高效的语义检索，获得高相关度的文档。
-    -   **实现**: `ChromaRetriever` 接收所有查询变体，并对每个变体执行**向量检索**：
-        -   **向量检索 (Dense Retrieval)**: 使用 `ChromaDB` 和强大的嵌入模型（如 BGE 系列）进行语义搜索。这种方式能够理解查询背后的深层意图，从而找到那些在内容上高度相关、但可能不包含完全相同关键词的文档。
+    -   **实现**: `ChromaRetriever` 接收所有查询变体，并对每个变体执行**混合检索**：
+        -   **混合检索 (Hybrid Search)**: Jarvis 结合了两种互补的检索策略来最大化召回率：
+          - **向量检索 (Dense Retrieval)**: 使用 `ChromaDB` 和强大的嵌入模型（如 BGE 系列）进行语义搜索。这种方式能够理解查询背后的深层意图，从而找到那些在内容上高度相关、但可能不包含完全相同关键词的文档。
+          - **关键字检索 (Sparse Retrieval)**: 使用 `BM25` 算法，这是一种经典的、基于关键字匹配的统计方法。它非常擅长找到那些精确包含用户查询中特定术语或罕见词的文档。
+- **结果融合**: 两种检索方法的结果通过 **倒数排序融合 (Reciprocal Rank Fusion, RRF)** 算法进行智能合并。RRF 综合考虑了文档在两种不同排名列表中的位置，给出一个统一的相关性分数，从而选出最全面的候选文档集。
 
 3.  **重排 (Reranking)**:
     -   **组件**: `Reranker`
@@ -515,7 +518,7 @@ LLM -> FinalAnswer : 6. 生成最终答案
     -   **目的**: 基于最相关的上下文生成高质量的答案。
     -   **实现**: `JarvisRAGPipeline` 将经过重排后的最优文档作为上下文，连同用户的原始查询，构建成一个最终的提示（Prompt）。这个提示被发送给管线中配置的 `self.llm` 实例（默认为 `ToolAgent_LLM`，但可由用户在初始化时指定）。LLM 在被明确告知要参考所提供上下文的基础上，生成一个全面、准确且有据可查的答案。
 
-通过这一套“查询重写 -> 向量检索 -> 精准重排 -> 答案生成”的链式流程，Jarvis 的 RAG 系统能够在复杂的代码库和技术文档中，为用户提供高质量的问答体验。
+通过这一套“查询重写 -> 混合检索 -> 精准重排 -> 答案生成”的链式流程，Jarvis 的 RAG 系统能够在复杂的代码库和技术文档中，为用户提供高质量的问答体验。
 
 ## 4. 典型应用场景 (Typical Use Cases)
 

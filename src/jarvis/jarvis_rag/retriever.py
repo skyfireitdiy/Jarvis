@@ -39,9 +39,7 @@ class ChromaRetriever:
         self.collection = self.client.get_or_create_collection(
             name=self.collection_name
         )
-        print(
-            f"✅ ChromaDB 客户端已在 '{db_path}' 初始化，集合为 '{collection_name}'。"
-        )
+        print(f"✅ ChromaDB 客户端已在 '{db_path}' 初始化，集合为 '{collection_name}'。")
 
         # BM25索引设置
         self.bm25_index_path = os.path.join(self.db_path, f"{collection_name}_bm25.pkl")
@@ -107,7 +105,9 @@ class ChromaRetriever:
         self.bm25_index = BM25Okapi(self.bm25_corpus)
         self._save_bm25_index()
 
-    def retrieve(self, query: str, n_results: int = 5) -> List[Document]:
+    def retrieve(
+        self, query: str, n_results: int = 5, use_bm25: bool = True
+    ) -> List[Document]:
         """
         使用向量搜索和BM25执行混合检索，然后使用倒数排序融合（RRF）
         对结果进行融合。
@@ -121,7 +121,7 @@ class ChromaRetriever:
 
         # 2. 关键字搜索 (BM25)
         bm25_docs = []
-        if self.bm25_index:
+        if self.bm25_index and use_bm25:
             tokenized_query = query.split()
             doc_scores = self.bm25_index.get_scores(tokenized_query)
 

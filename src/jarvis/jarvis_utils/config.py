@@ -382,3 +382,23 @@ def get_rag_vector_db_path() -> str:
         str: 数据库路径
     """
     return ".jarvis/rag/vectordb"
+
+
+def get_rag_use_bm25() -> bool:
+    """
+    获取RAG是否使用BM25。
+
+    返回:
+        bool: 如果使用BM25则返回True，默认为True
+    """
+    return get_rag_config().get("use_bm25", True)
+
+
+def get_rag_use_rerank() -> bool:
+    """
+    获取RAG是否使用rerank。
+
+    返回:
+        bool: 如果使用rerank则返回True，默认为True
+    """
+    return get_rag_config().get("use_rerank", True)

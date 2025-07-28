@@ -30,6 +30,8 @@ class JarvisRAGPipeline:
         embedding_model: Optional[str] = None,
         db_path: Optional[str] = None,
         collection_name: str = "jarvis_rag_collection",
+        use_bm25: bool = True,
+        use_rerank: bool = True,
     ):
         """
         初始化RAG管道。
@@ -40,6 +42,8 @@ class JarvisRAGPipeline:
             embedding_model: 嵌入模型的名称。如果为None，则使用配置值。
             db_path: 持久化向量数据库的路径。如果为None，则使用配置值。
             collection_name: 向量数据库中集合的名称。
+            use_bm25: 是否在检索中使用BM25。
+            use_rerank: 是否在检索后使用重排器。
         """
         # 确定嵌入模型以隔离数据路径
         model_name = embedding_model or get_rag_embedding_model()
@@ -70,6 +74,9 @@ class JarvisRAGPipeline:
         self.reranker = Reranker(model_name=get_rag_rerank_model())
         # 使用标准LLM执行查询重写任务，而不是代理
         self.query_rewriter = QueryRewriter(JarvisPlatform_LLM())
+
+        self.use_bm25 = use_bm25
+        self.use_rerank = use_rerank
 
         print("✅ JarvisRAGPipeline 初始化成功。")
 
@@ -128,7 +135,9 @@ class JarvisRAGPipeline:
         all_candidate_docs = []
         for q in rewritten_queries:
             print(f"🔍 正在为查询变体 '{q}' 进行混合检索...")
-            candidates = self.retriever.retrieve(q, n_results=n_results * 2)
+            candidates = self.retriever.retrieve(
+                q, n_results=n_results * 2, use_bm25=self.use_bm25
+            )
             all_candidate_docs.extend(candidates)
 
         # 对候选文档进行去重
@@ -139,12 +148,13 @@ class JarvisRAGPipeline:
             return "我在提供的文档中找不到任何相关信息来回答您的问题。"
 
         # 3. 根据*原始*查询对统一的候选池进行重排
-        print(
-            f"🔍 正在对 {len(unique_candidate_docs)} 个候选文档进行重排（基于原始问题）..."
-        )
-        retrieved_docs = self.reranker.rerank(
-            query_text, unique_candidate_docs, top_n=n_results
-        )
+        if self.use_rerank:
+            print(f"🔍 正在对 {len(unique_candidate_docs)} 个候选文档进行重排（基于原始问题）...")
+            retrieved_docs = self.reranker.rerank(
+                query_text, unique_candidate_docs, top_n=n_results
+            )
+        else:
+            retrieved_docs = unique_candidate_docs[:n_results]
 
         if not retrieved_docs:
             return "我在提供的文档中找不到任何相关信息来回答您的问题。"
