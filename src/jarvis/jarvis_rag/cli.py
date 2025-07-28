@@ -297,6 +297,63 @@ def list_documents(
         raise typer.Exit(code=1)
 
 
+@app.command("retrieve", help="仅从知识库检索相关文档，不生成答案。")
+def retrieve(
+    question: str = typer.Argument(..., help="要提出的问题。"),
+    collection_name: str = typer.Option(
+        "jarvis_rag_collection",
+        "--collection",
+        "-c",
+        help="向量数据库中集合的名称。",
+    ),
+    embedding_model: Optional[str] = typer.Option(
+        None,
+        "--embedding-model",
+        "-e",
+        help="嵌入模型的名称。覆盖全局配置。",
+    ),
+    db_path: Optional[Path] = typer.Option(None, "--db-path", help="向量数据库的路径。覆盖全局配置。"),
+    n_results: int = typer.Option(5, "--top-n", help="要检索的文档数量。"),
+):
+    """仅从RAG知识库检索文档并打印结果。"""
+    try:
+        # 如果未在命令行中指定，则从配置中加载RAG设置
+        final_embedding_model = embedding_model or get_rag_embedding_model()
+        use_bm25 = get_rag_use_bm25()
+        use_rerank = get_rag_use_rerank()
+
+        pipeline = JarvisRAGPipeline(
+            embedding_model=final_embedding_model,
+            db_path=str(db_path) if db_path else None,
+            collection_name=collection_name,
+            use_bm25=use_bm25,
+            use_rerank=use_rerank,
+        )
+
+        print(f"🤔 正在为问题检索文档: '{question}'")
+        retrieved_docs = pipeline.retrieve_only(question, n_results=n_results)
+
+        if not retrieved_docs:
+            print("ℹ️ 未找到相关文档。")
+            return
+
+        print(f"✅ 成功检索到 {len(retrieved_docs)} 个文档:")
+        from jarvis.jarvis_utils.globals import console
+
+        for i, doc in enumerate(retrieved_docs, 1):
+            source = doc.metadata.get("source", "未知来源")
+            content = doc.page_content
+            panel_title = f"文档 {i} | 来源: {source}"
+            console.print(
+                f"\n[bold magenta]{panel_title}[/bold magenta]"
+            )
+            console.print(Markdown(f"```\n{content}\n```"))
+
+    except Exception as e:
+        print(f"❌ 发生错误: {e}")
+        raise typer.Exit(code=1)
+
+
 @app.command("query", help="向知识库提问。")
 def query(
     question: str = typer.Argument(..., help="要提出的问题。"),
