@@ -164,10 +164,7 @@ arguments:
     from jarvis.jarvis_utils.output import PrettyOutput, OutputType
     class 工具名称:
         name = "工具名称"
-        description = "Tool for text transformation"
-                Tool description
-        适用场景：1. 格式化文本; 2. 处理标题; 3. 标准化输出
-        \"\"\"
+        description = "Tool description"
         parameters = {{
             "type": "object",
             "properties": {{
