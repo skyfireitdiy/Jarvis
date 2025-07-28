@@ -269,7 +269,7 @@ def list_documents(
             collection_name=collection_name,
         )
 
-        collection = pipeline._get_retriever().collection
+        collection = pipeline._get_collection()
         results = collection.get()  # 获取集合中的所有项目
 
         if not results or not results["metadatas"]:
