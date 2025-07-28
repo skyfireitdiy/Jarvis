@@ -143,36 +143,45 @@
     },
     "JARVIS_LLM_GROUP": {
       "type": "string",
-      "description": "选择一个预定义的模型组"
+      "description": "选择一个预定义的模型组",
+      "default": ""
     },
     "JARVIS_LLM_GROUPS": {
       "type": "array",
       "description": "预定义的模型配置组",
+      "default": [],
       "items": {
         "type": "object",
         "additionalProperties": {
           "type": "object",
           "properties": {
             "JARVIS_PLATFORM": {
-              "type": "string"
+              "type": "string",
+              "default": "yuanbao"
             },
             "JARVIS_MODEL": {
-              "type": "string"
+              "type": "string",
+              "default": "deep_seek_v3"
             },
             "JARVIS_THINKING_PLATFORM": {
-              "type": "string"
+              "type": "string",
+              "default": "yuanbao"
             },
             "JARVIS_THINKING_MODEL": {
-              "type": "string"
+              "type": "string",
+              "default": "deep_seek"
             },
             "JARVIS_MAX_TOKEN_COUNT": {
-              "type": "number"
+              "type": "number",
+              "default": 960000
             },
             "JARVIS_MAX_INPUT_TOKEN_COUNT": {
-              "type": "number"
+              "type": "number",
+              "default": 32000
             },
             "JARVIS_MAX_BIG_CONTENT_SIZE": {
-              "type": "number"
+              "type": "number",
+              "default": 160000
             }
           },
           "required": [
@@ -237,27 +246,33 @@
     },
     "JARVIS_RAG_GROUP": {
       "type": "string",
-      "description": "选择一个预定义的RAG配置组"
+      "description": "选择一个预定义的RAG配置组",
+      "default": ""
     },
     "JARVIS_RAG_GROUPS": {
       "type": "array",
       "description": "预定义的RAG配置组",
+      "default": [],
       "items": {
         "type": "object",
         "additionalProperties": {
           "type": "object",
           "properties": {
             "embedding_model": {
-              "type": "string"
+              "type": "string",
+              "default": "BAAI/bge-base-zh-v1.5"
             },
             "rerank_model": {
-              "type": "string"
+              "type": "string",
+              "default": "BAAI/bge-reranker-base"
             },
             "use_bm25": {
-              "type": "boolean"
+              "type": "boolean",
+              "default": true
             },
             "use_rerank": {
-              "type": "boolean"
+              "type": "boolean",
+              "default": true
             }
           }
         }
