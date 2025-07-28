@@ -340,6 +340,25 @@ def get_mcp_config() -> List[Dict[str, Any]]:
 # ==============================================================================
 
 
+DEFAULT_RAG_GROUPS = [
+    {
+        "text": {
+            "embedding_model": "BAAI/bge-m3",
+            "rerank_model": "BAAI/bge-reranker-v2-m3",
+            "use_bm25": True,
+            "use_rerank": True,
+        }
+    },
+    {
+        "code": {
+            "embedding_model": "Qodo/Qodo-Embed-1-7B",
+            "use_bm25": False,
+            "use_rerank": False,
+        }
+    },
+]
+
+
 def _get_resolved_rag_config(
     rag_group_override: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -356,7 +375,7 @@ def _get_resolved_rag_config(
     """
     group_config = {}
     rag_group_name = rag_group_override or GLOBAL_CONFIG_DATA.get("JARVIS_RAG_GROUP")
-    rag_groups = GLOBAL_CONFIG_DATA.get("JARVIS_RAG_GROUPS", [])
+    rag_groups = GLOBAL_CONFIG_DATA.get("JARVIS_RAG_GROUPS", DEFAULT_RAG_GROUPS)
 
     if rag_group_name and isinstance(rag_groups, list):
         for group_item in rag_groups:
@@ -390,7 +409,7 @@ def get_rag_embedding_model() -> str:
         str: 嵌入模型的名称
     """
     config = _get_resolved_rag_config()
-    return config.get("embedding_model", "BAAI/bge-base-zh-v1.5")
+    return config.get("embedding_model", "BAAI/bge-m3")
 
 
 def get_rag_rerank_model() -> str:
@@ -401,7 +420,7 @@ def get_rag_rerank_model() -> str:
         str: rerank模型的名称
     """
     config = _get_resolved_rag_config()
-    return config.get("rerank_model", "BAAI/bge-reranker-base")
+    return config.get("rerank_model", "BAAI/bge-reranker-v2-m3")
 
 
 def get_rag_embedding_cache_path() -> str:

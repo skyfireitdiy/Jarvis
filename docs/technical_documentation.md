@@ -335,7 +335,23 @@ JARVIS_LLM_GROUP: kimi
 | `JARVIS_REPLACE_MAP` | 定义在交互中使用的自定义快捷命令替换规则。 | `{}` |
 | `JARVIS_MCP` | 一个列表，用于定义所有模型上下文协议（MCP）的端点配置。 | `[]` |
 | `JARVIS_RAG_GROUP` | 当前激活的 RAG 配置组名称。 | `null` |
-| `JARVIS_RAG_GROUPS` | 预定义的 RAG 配置组列表。 | `[]` |
+| `JARVIS_RAG_GROUPS` | 预定义的 RAG 配置组列表。 | <pre lang="json"><code>[
+  {
+    "text": {
+      "embedding_model": "BAAI/bge-m3",
+      "rerank_model": "BAAI/bge-reranker-v2-m3",
+      "use_bm25": true,
+      "use_rerank": true
+    }
+  },
+  {
+    "code": {
+      "embedding_model": "Qodo/Qodo-Embed-1-7B",
+      "use_bm25": false,
+      "use_rerank": false
+    }
+  }
+]</code></pre> |
 | `JARVIS_RAG` | RAG框架的顶层配置，会覆盖组配置。 | `{}` |
 | `ENV` | 一个字典，用于为 Jarvis 运行环境设置临时的环境变量。 | `{}` |
 
@@ -513,7 +529,7 @@ LLM -> FinalAnswer : 6. 生成最终答案
 3.  **重排 (Reranking)**:
     -   **组件**: `Reranker`
     -   **目的**: 在高召回率的基础上，进一步提升结果的精确率。
-    -   **实现**: 经过向量检索得到的候选文档列表，虽然相关性较高，但排序可能不是最优的。`Reranker` 使用一个更强大的、计算成本更高的 **交叉编码器 (Cross-Encoder)** 模型（如 `BAAI/bge-reranker-base`）。与在检索阶段独立编码查询和文档的双编码器不同，交叉编码器会同时处理“查询-文档”对，从而能更精确地判断文档与原始查询的真实相关性。它会对候选列表进行重新打分和排序，筛选出最相关的 Top-N 个文档。
+    -   **实现**: 经过向量检索得到的候选文档列表，虽然相关性较高，但排序可能不是最优的。`Reranker` 使用一个更强大的、计算成本更高的 **交叉编码器 (Cross-Encoder)** 模型（如 `BAAI/bge-reranker-v2-m3`）。与在检索阶段独立编码查询和文档的双编码器不同，交叉编码器会同时处理“查询-文档”对，从而能更精确地判断文档与原始查询的真实相关性。它会对候选列表进行重新打分和排序，筛选出最相关的 Top-N 个文档。 |
 
 4.  **答案生成 (Answer Generation)**:
     -   **组件**: `JarvisRAGPipeline` 与 `LLMInterface`
