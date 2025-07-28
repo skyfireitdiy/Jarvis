@@ -169,7 +169,8 @@ def _show_history_and_copy():
 
     print("\n" + "=" * 20 + " 消息历史记录 " + "=" * 20)
     for i, msg in enumerate(history):
-        display_msg = (msg[:70] + "...") if len(msg) > 70 else msg
+        cleaned_msg = msg.replace("\n", r"\n")
+        display_msg = (cleaned_msg[:70] + "...") if len(cleaned_msg) > 70 else cleaned_msg
         print(f"  {i + 1}: {display_msg.strip()}")
     print("=" * 58 + "\n")
 
