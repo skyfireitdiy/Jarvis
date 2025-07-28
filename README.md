@@ -156,7 +156,7 @@ ENV:
 
 Jarvis 支持多种平台，包括 **Kimi**, **通义千问**, **OpenAI** 等。详细的配置选项、模型组设置以及所有可用参数，请参阅 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
-> **模型推荐**: 目前效果最好的模型是 `gemini-1.5-pro`，可以通过国内代理商购买，例如 [FoxiAI](https://foxi-ai.top)。
+> **模型推荐**: 目前效果最好的模型是 `gemini-2.5-pro`，可以通过国内代理商购买，例如 [FoxiAI](https://foxi-ai.top)。
 
 ---
 
