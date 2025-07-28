@@ -241,3 +241,43 @@ class JarvisRAGPipeline:
         answer = self.llm.generate(prompt)
 
         return answer
+
+    def retrieve_only(self, query_text: str, n_results: int = 5) -> List[Document]:
+        """
+        仅执行检索和重排，不生成答案。
+
+        参数:
+            query_text: 用户的原始问题。
+            n_results: 要检索的最终相关块的数量。
+
+        返回:
+            检索到的文档列表。
+        """
+        # 1. 重写查询
+        rewritten_queries = self._get_query_rewriter().rewrite(query_text)
+
+        # 2. 检索候选文档
+        all_candidate_docs = []
+        for q in rewritten_queries:
+            print(f"🔍 正在为查询变体 '{q}' 进行混合检索...")
+            candidates = self._get_retriever().retrieve(
+                q, n_results=n_results * 2, use_bm25=self.use_bm25
+            )
+            all_candidate_docs.extend(candidates)
+
+        unique_docs_dict = {doc.page_content: doc for doc in all_candidate_docs}
+        unique_candidate_docs = list(unique_docs_dict.values())
+
+        if not unique_candidate_docs:
+            return []
+
+        # 3. 重排
+        if self.use_rerank:
+            print(f"🔍 正在对 {len(unique_candidate_docs)} 个候选文档进行重排...")
+            retrieved_docs = self._get_reranker().rerank(
+                query_text, unique_candidate_docs, top_n=n_results
+            )
+        else:
+            retrieved_docs = unique_candidate_docs[:n_results]
+
+        return retrieved_docs
