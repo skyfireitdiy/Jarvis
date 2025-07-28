@@ -115,22 +115,26 @@ def get_shell_name() -> str:
     return os.path.basename(shell_path).lower()
 
 
-def _get_resolved_model_config(model_group_override: Optional[str] = None) -> Dict[str, Any]:
+def _get_resolved_model_config(
+    model_group_override: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     解析并合并模型配置，处理模型组。
 
     优先级顺序:
     1. 单独的环境变量 (JARVIS_PLATFORM, JARVIS_MODEL, etc.)
-    2. JARVIS_MODEL_GROUP 中定义的组配置
+    2. JARVIS_LLM_GROUP 中定义的组配置
     3. 代码中的默认值
 
     返回:
         Dict[str, Any]: 解析后的模型配置字典
     """
     group_config = {}
-    model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get("JARVIS_MODEL_GROUP")
+    model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get(
+        "JARVIS_LLM_GROUP"
+    )
     # The format is a list of single-key dicts: [{'group_name': {...}}, ...]
-    model_groups = GLOBAL_CONFIG_DATA.get("JARVIS_MODEL_GROUPS", [])
+    model_groups = GLOBAL_CONFIG_DATA.get("JARVIS_LLM_GROUPS", [])
 
     if model_group_name and isinstance(model_groups, list):
         for group_item in model_groups:
@@ -202,7 +206,9 @@ def get_thinking_model_name(model_group_override: Optional[str] = None) -> str:
     """
     config = _get_resolved_model_config(model_group_override)
     # Fallback to normal model if thinking model is not specified
-    return config.get("JARVIS_THINKING_MODEL", get_normal_model_name(model_group_override))
+    return config.get(
+        "JARVIS_THINKING_MODEL", get_normal_model_name(model_group_override)
+    )
 
 
 def is_execute_tool_confirm() -> bool:
@@ -334,7 +340,9 @@ def get_mcp_config() -> List[Dict[str, Any]]:
 # ==============================================================================
 
 
-def _get_resolved_rag_config(rag_group_override: Optional[str] = None) -> Dict[str, Any]:
+def _get_resolved_rag_config(
+    rag_group_override: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     解析并合并RAG配置，处理RAG组。
 
