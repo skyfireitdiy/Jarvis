@@ -74,15 +74,21 @@ def run_command(cmd: List[str], error_msg: str) -> None:
 
 def remove_pycache_directories():
     """删除所有的 __pycache__ 目录"""
+    import shutil
     for root, dirs, files in os.walk("."):
         for dir_name in dirs:
             if dir_name == "__pycache__":
                 pycache_dir = os.path.join(root, dir_name)
                 print(f"Removing {pycache_dir}")
-                os.system(f"rm -rf {pycache_dir}")
+                shutil.rmtree(pycache_dir)
     # 新增清理.mypy_cache目录
     print("Removing .mypy_cache directories...")
-    os.system("find . -name '.mypy_cache' | xargs -r rm -rvf")
+    # 使用Python的跨平台方式来查找和删除.mypy_cache目录
+    for root, dirs, files in os.walk("."):
+        if ".mypy_cache" in dirs:
+            mypy_cache_path = os.path.join(root, ".mypy_cache")
+            print(f"Removing {mypy_cache_path}")
+            shutil.rmtree(mypy_cache_path)
 
 
 def main():
