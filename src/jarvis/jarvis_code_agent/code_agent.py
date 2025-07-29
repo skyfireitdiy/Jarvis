@@ -192,8 +192,14 @@ class CodeAgent:
         self._update_gitignore(git_dir)
         self._handle_git_changes()
         # 配置git对换行符变化不敏感
-        subprocess.run(["git", "config", "core.autocrlf", "false"], check=True)
-        subprocess.run(["git", "config", "core.safecrlf", "false"], check=True)
+        PrettyOutput.print("⚠️ 即将修改git换行符敏感设置，这会影响所有文件的换行符处理方式", OutputType.WARNING)
+        if user_confirm("是否继续修改git换行符敏感设置？", True):
+            subprocess.run(["git", "config", "core.autocrlf", "false"], check=True)
+            subprocess.run(["git", "config", "core.safecrlf", "false"], check=True)
+            print("✅ git换行符敏感设置已更新")
+        else:
+            print("❌ 用户取消修改git换行符敏感设置")
+            sys.exit(0)
         print("✅ 环境初始化完成")
 
     def _handle_uncommitted_changes(self) -> None:
