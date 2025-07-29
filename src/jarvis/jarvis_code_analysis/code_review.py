@@ -769,8 +769,8 @@ def extract_code_report(result: str) -> str:
 
 @app.command("commit")
 def review_commit(
-    commit: str = typer.Argument(..., help="Commit SHA to review"),
-    root_dir: str = typer.Option(".", "--root-dir", help="Root directory of the codebase"),
+    commit: str = typer.Argument(..., help="要审查的提交SHA"),
+    root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
 ):
     """Review specific commit"""
     tool = CodeReviewTool()
@@ -786,7 +786,7 @@ def review_commit(
 
 @app.command("current")
 def review_current(
-    root_dir: str = typer.Option(".", "--root-dir", help="Root directory of the codebase"),
+    root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
 ):
     """Review current changes"""
     tool = CodeReviewTool()
@@ -802,9 +802,9 @@ def review_current(
 
 @app.command("range")
 def review_range(
-    start_commit: str = typer.Argument(..., help="Start commit SHA"),
-    end_commit: str = typer.Argument(..., help="End commit SHA"),
-    root_dir: str = typer.Option(".", "--root-dir", help="Root directory of the codebase"),
+    start_commit: str = typer.Argument(..., help="起始提交SHA"),
+    end_commit: str = typer.Argument(..., help="结束提交SHA"),
+    root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
 ):
     """Review commit range"""
     tool = CodeReviewTool()
@@ -825,8 +825,8 @@ def review_range(
 
 @app.command("file")
 def review_file(
-    file: str = typer.Argument(..., help="File path to review"),
-    root_dir: str = typer.Option(".", "--root-dir", help="Root directory of the codebase"),
+    file: str = typer.Argument(..., help="要审查的文件路径"),
+    root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
 ):
     """Review specific file"""
     tool = CodeReviewTool()
