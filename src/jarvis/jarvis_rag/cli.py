@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional, List, Literal, cast
+from typing import Optional, List, Literal, cast, Tuple
 import mimetypes
 
 import pathspec  # type: ignore
@@ -15,6 +15,11 @@ from langchain_core.document_loaders.base import BaseLoader
 from rich.markdown import Markdown
 
 from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.config import (
+    get_rag_embedding_model,
+    get_rag_use_bm25,
+    get_rag_use_rerank,
+)
 
 
 def is_likely_text_file(file_path: Path) -> bool:
@@ -65,9 +70,7 @@ class _CustomPlatformLLM(LLMInterface):
 
     def __init__(self, platform: BasePlatform):
         self.platform = platform
-        print(
-            f"✅ 使用自定义LLM: 平台='{platform.platform_name()}', 模型='{platform.name()}'"
-        )
+        print(f"✅ 使用自定义LLM: 平台='{platform.platform_name()}', 模型='{platform.name()}'")
 
     def generate(self, prompt: str, **kwargs) -> str:
         return self.platform.chat_until_success(prompt)
@@ -91,7 +94,7 @@ def _create_custom_llm(platform_name: str, model_name: str) -> Optional[LLMInter
         return None
 
 
-def _load_ragignore_spec() -> tuple[Optional[pathspec.PathSpec], Optional[Path]]:
+def _load_ragignore_spec() -> Tuple[Optional[pathspec.PathSpec], Optional[Path]]:
     """
     从项目根目录加载忽略模式。
     首先查找 `.jarvis/rag/.ragignore`，如果未找到，则回退到 `.gitignore`。
@@ -140,9 +143,7 @@ def add_documents(
         "-e",
         help="嵌入模型的名称。覆盖全局配置。",
     ),
-    db_path: Optional[Path] = typer.Option(
-        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
-    ),
+    db_path: Optional[Path] = typer.Option(None, "--db-path", help="向量数据库的路径。覆盖全局配置。"),
     batch_size: int = typer.Option(
         500,
         "--batch-size",
@@ -244,9 +245,7 @@ def add_documents(
             print("❌ 未能成功加载任何文档。")
             raise typer.Exit(code=1)
 
-        print(
-            f"✅ 成功将 {total_docs_added} 个文档的内容添加至集合 '{collection_name}'。"
-        )
+        print(f"✅ 成功将 {total_docs_added} 个文档的内容添加至集合 '{collection_name}'。")
 
     except Exception as e:
         print(f"❌ 发生严重错误: {e}")
@@ -261,9 +260,7 @@ def list_documents(
         "-c",
         help="向量数据库中集合的名称。",
     ),
-    db_path: Optional[Path] = typer.Option(
-        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
-    ),
+    db_path: Optional[Path] = typer.Option(None, "--db-path", help="向量数据库的路径。覆盖全局配置。"),
 ):
     """列出指定集合中的所有唯一文档。"""
     try:
@@ -272,7 +269,7 @@ def list_documents(
             collection_name=collection_name,
         )
 
-        collection = pipeline.retriever.collection
+        collection = pipeline._get_retriever().collection
         results = collection.get()  # 获取集合中的所有项目
 
         if not results or not results["metadatas"]:
@@ -315,9 +312,7 @@ def query(
         "-e",
         help="嵌入模型的名称。覆盖全局配置。",
     ),
-    db_path: Optional[Path] = typer.Option(
-        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
-    ),
+    db_path: Optional[Path] = typer.Option(None, "--db-path", help="向量数据库的路径。覆盖全局配置。"),
     platform: Optional[str] = typer.Option(
         None,
         "--platform",
@@ -341,11 +336,18 @@ def query(
         if (platform or model) and not custom_llm:
             raise typer.Exit(code=1)
 
+        # 如果未在命令行中指定，则从配置中加载RAG设置
+        final_embedding_model = embedding_model or get_rag_embedding_model()
+        use_bm25 = get_rag_use_bm25()
+        use_rerank = get_rag_use_rerank()
+
         pipeline = JarvisRAGPipeline(
             llm=custom_llm,
-            embedding_model=embedding_model,
+            embedding_model=final_embedding_model,
             db_path=str(db_path) if db_path else None,
             collection_name=collection_name,
+            use_bm25=use_bm25,
+            use_rerank=use_rerank,
         )
 
         print(f"🤔 正在查询: '{question}'")
@@ -373,10 +375,7 @@ except ImportError:
 
 def _check_rag_dependencies():
     if not _RAG_INSTALLED:
-        print(
-            "❌ RAG依赖项未安装。"
-            "请运行 'pip install \"jarvis-ai-assistant[rag]\"' 来使用此命令。"
-        )
+        print("❌ RAG依赖项未安装。" "请运行 'pip install \"jarvis-ai-assistant[rag]\"' 来使用此命令。")
         raise typer.Exit(code=1)
 
 
