@@ -159,23 +159,18 @@ class CodeAgent:
 
             # 如果任一配置未设置，提示并退出
             if not username or not email:
-                PrettyOutput.print("❌ Git 配置不完整", OutputType.ERROR)
+                missing_configs = []
                 if not username:
-                    PrettyOutput.print("  - 缺少 user.name 配置", OutputType.ERROR)
-                if not email:
-                    PrettyOutput.print("  - 缺少 user.email 配置", OutputType.ERROR)
-
-                PrettyOutput.print("\n请运行以下命令配置 Git：", OutputType.INFO)
-                if not username:
-                    PrettyOutput.print(
-                        '  git config --global user.name "Your Name"', OutputType.INFO
+                    missing_configs.append(
+                        '  git config --global user.name "Your Name"'
                     )
                 if not email:
-                    PrettyOutput.print(
-                        '  git config --global user.email "your.email@example.com"',
-                        OutputType.INFO,
+                    missing_configs.append(
+                        '  git config --global user.email "your.email@example.com"'
                     )
 
+                message = "❌ Git 配置不完整\n\n请运行以下命令配置 Git：\n" + "\n".join(missing_configs)
+                PrettyOutput.print(message, OutputType.WARNING)
                 sys.exit(1)
 
         except FileNotFoundError:
