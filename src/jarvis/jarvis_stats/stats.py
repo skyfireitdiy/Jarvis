@@ -69,6 +69,7 @@ class StatsManager:
         metric_name: str,
         amount: Union[int, float] = 1,
         tags: Optional[Dict[str, str]] = None,
+        group: Optional[str] = None,
     ):
         """
         增加计数型指标
@@ -83,7 +84,7 @@ class StatsManager:
             >>> stats.increment("page_views")
             >>> stats.increment("downloads", 5)
         """
-        self.add(metric_name, amount, unit="count", tags=tags)
+        self.add(metric_name, amount, unit="count", tags=tags, group=group)
 
     def list_metrics(self) -> List[str]:
         """
