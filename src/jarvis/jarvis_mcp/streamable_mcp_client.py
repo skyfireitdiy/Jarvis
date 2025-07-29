@@ -45,9 +45,9 @@ class StreamableMcpClient(McpClient):
         self.session.headers.update(extra_headers)
 
         # 请求相关属性
-        self.pending_requests = {}  # 存储等待响应的请求 {id: Event}
-        self.request_results = {}  # 存储请求结果 {id: result}
-        self.notification_handlers = {}
+        self.pending_requests: Dict[str, threading.Event] = {}  # 存储等待响应的请求 {id: Event}
+        self.request_results: Dict[str, Dict[str, Any]] = {}  # 存储请求结果 {id: result}
+        self.notification_handlers: Dict[str, List[Callable]] = {}
         self.event_lock = threading.Lock()
         self.request_id_counter = 0
 
@@ -70,9 +70,7 @@ class StreamableMcpClient(McpClient):
 
             # 验证服务器响应
             if "result" not in response:
-                raise RuntimeError(
-                    f"初始化失败: {response.get('error', 'Unknown error')}"
-                )
+                raise RuntimeError(f"初始化失败: {response.get('error', 'Unknown error')}")
 
             # 发送initialized通知
             self._send_notification("notifications/initialized", {})
@@ -143,9 +141,7 @@ class StreamableMcpClient(McpClient):
 
             # 发送请求到Streamable HTTP端点
             mcp_url = urljoin(self.base_url, "mcp")
-            response = self.session.post(
-                mcp_url, json=request, stream=True  # 启用流式传输
-            )
+            response = self.session.post(mcp_url, json=request, stream=True)  # 启用流式传输
             response.raise_for_status()
 
             # 处理流式响应
