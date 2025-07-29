@@ -91,19 +91,13 @@ def _select_task(tasks: Dict[str, str]) -> str:
                 selected_task = tasks[task_names[choice - 1]]
                 PrettyOutput.print(f"将要执行任务:\n {selected_task}", OutputType.INFO)
                 # 询问是否需要补充信息
-                need_additional = user_confirm(
-                    "需要为此任务添加补充信息吗？", default=False
-                )
+                need_additional = user_confirm("需要为此任务添加补充信息吗？", default=False)
                 if need_additional:
                     additional_input = get_multiline_input("请输入补充信息：")
                     if additional_input:
-                        selected_task = (
-                            f"{selected_task}\n\n补充信息:\n{additional_input}"
-                        )
+                        selected_task = f"{selected_task}\n\n补充信息:\n{additional_input}"
                 return selected_task
-            PrettyOutput.print(
-                "无效的选择。请选择列表中的一个号码。", OutputType.WARNING
-            )
+            PrettyOutput.print("无效的选择。请选择列表中的一个号码。", OutputType.WARNING)
 
         except (KeyboardInterrupt, EOFError):
             return ""
@@ -121,7 +115,16 @@ def _handle_edit_mode(edit: bool, config_file: Optional[str]) -> None:
         if config_file
         else Path(os.path.expanduser("~/.jarvis/config.yaml"))
     )
-    editors = ["nvim", "vim", "vi"]
+    # 根据操作系统选择合适的编辑器
+    import platform
+
+    if platform.system() == "Windows":
+        # 优先级：终端工具 -> 代码编辑器 -> 通用文本编辑器
+        editors = ["nvim", "vim", "nano", "code", "notepad++", "notepad"]
+    else:
+        # 优先级：终端工具 -> 代码编辑器 -> 通用文本编辑器
+        editors = ["nvim", "vim", "vi", "nano", "emacs", "code", "gedit", "kate"]
+
     editor = next((e for e in editors if shutil.which(e)), None)
 
     if editor:
@@ -133,7 +136,7 @@ def _handle_edit_mode(edit: bool, config_file: Optional[str]) -> None:
             raise typer.Exit(code=1)
     else:
         PrettyOutput.print(
-            "No suitable editor found (nvim, vim, vi).", OutputType.ERROR
+            f"No suitable editor found. Tried: {', '.join(editors)}", OutputType.ERROR
         )
         raise typer.Exit(code=1)
 
@@ -188,28 +191,22 @@ def run_cli(
         "--llm_type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
-    task: Optional[str] = typer.Option(
-        None, "-t", "--task", help="从命令行直接输入任务内容"
-    ),
+    task: Optional[str] = typer.Option(None, "-t", "--task", help="从命令行直接输入任务内容"),
     model_group: Optional[str] = typer.Option(
         None, "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
     ),
-    config_file: Optional[str] = typer.Option(
-        None, "-f", "--config", help="自定义配置文件路径"
-    ),
+    config_file: Optional[str] = typer.Option(None, "-f", "--config", help="自定义配置文件路径"),
     restore_session: bool = typer.Option(
         False,
         "--restore-session",
         help="从 .jarvis/saved_session.json 恢复会话",
     ),
-    edit: bool = typer.Option(
-        False, "-e", "--edit", help="编辑配置文件"
-    ),
+    edit: bool = typer.Option(False, "-e", "--edit", help="编辑配置文件"),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
         return
-        
+
     _handle_edit_mode(edit, config_file)
 
     init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file)

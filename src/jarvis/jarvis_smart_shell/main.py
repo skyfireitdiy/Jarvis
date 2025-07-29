@@ -170,8 +170,8 @@ def process_request(request: str) -> Optional[str]:
 4. 多个命令用&&连接
 
 # 示例
-输入: "查找Python文件"
-输出: find . -name "*.py"
+输入: "显示当前目录内容"
+输出: ls -la
 """
         model.set_system_prompt(system_message)
 
