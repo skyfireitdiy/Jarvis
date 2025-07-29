@@ -28,7 +28,6 @@ def _get_stats_dir():
     """获取统计数据目录"""
     global _initialized, _stats_dir
     if not _initialized:
-        init_env("", None)  # 初始化环境，不显示欢迎信息
         _stats_dir = Path(get_data_dir()) / "stats"
         _initialized = True
     return str(_stats_dir)
@@ -316,6 +315,8 @@ def demo():
 
 def main():
     """主入口函数"""
+    # 初始化环境，防止设置初始化太迟
+    init_env("", None)
     app()
 
 
