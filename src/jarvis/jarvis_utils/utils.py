@@ -379,35 +379,19 @@ def get_file_line_count(filename: str) -> int:
         return 0
 
 
-def _get_cmd_stats() -> Dict[str, int]:
-    """从数据目录获取命令调用统计"""
-    stats_file = Path(get_data_dir()) / "cmd_stat.yaml"
-    if stats_file.exists():
-        try:
-            with open(stats_file, "r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {}
-        except Exception as e:
-            PrettyOutput.print(f"加载命令调用统计失败: {str(e)}", OutputType.WARNING)
-    return {}
-
-
-def _update_cmd_stats(cmd_name: str) -> None:
-    """更新命令调用统计"""
-    stats = _get_cmd_stats()
-    stats[cmd_name] = stats.get(cmd_name, 0) + 1
-    stats_file = Path(get_data_dir()) / "cmd_stat.yaml"
-    try:
-        with open(stats_file, "w", encoding="utf-8") as f:
-            yaml.safe_dump(stats, f, allow_unicode=True)
-    except Exception as e:
-        PrettyOutput.print(f"保存命令调用统计失败: {str(e)}", OutputType.WARNING)
-
-
 def count_cmd_usage() -> None:
     """统计当前命令的使用次数"""
     import sys
+    import os
+    from jarvis.jarvis_stats.stats import StatsManager
 
-    _update_cmd_stats(sys.argv[0])
+    # 从完整路径中提取命令名称
+    cmd_path = sys.argv[0]
+    cmd_name = os.path.basename(cmd_path)
+    
+    # 使用 StatsManager 记录命令使用统计
+    stats_manager = StatsManager()
+    stats_manager.increment(cmd_name, group="command")
 
 
 def is_context_overflow(
