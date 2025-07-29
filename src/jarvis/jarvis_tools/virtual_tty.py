@@ -284,9 +284,11 @@ class VirtualTTYTool:
             # 创建输出读取线程
             def read_output():
                 while True:
-                    if process.poll() is not None:
+                    if process is None or process.poll() is not None:
                         break
                     try:
+                        if process.stdout is None:
+                            break
                         line = process.stdout.readline()
                         if line:
                             agent.tty_sessions[tty_id]["output_queue"].put(line)
