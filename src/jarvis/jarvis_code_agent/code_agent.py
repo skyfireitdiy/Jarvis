@@ -356,9 +356,7 @@ class CodeAgent:
 
                 # 添加提交信息到final_ret
                 if commits:
-                    final_ret += (
-                        f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
-                    )
+                    final_ret += f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
                         f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
@@ -425,6 +423,27 @@ def cli(
 ) -> None:
     """Jarvis主入口点。"""
     init_env("欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！")
+
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        curr_dir_path = os.getcwd()
+        PrettyOutput.print(f"警告：当前目录 '{curr_dir_path}' 不是一个git仓库。", OutputType.WARNING)
+        if user_confirm(f"是否要在 '{curr_dir_path}' 中初始化一个新的git仓库？", default=True):
+            try:
+                subprocess.run(["git", "init"], check=True, capture_output=True)
+                PrettyOutput.print("✅ 已成功初始化git仓库。", OutputType.SUCCESS)
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                PrettyOutput.print(f"❌ 初始化git仓库失败: {e}", OutputType.ERROR)
+                sys.exit(1)
+        else:
+            PrettyOutput.print("操作已取消。Jarvis需要在git仓库中运行。", OutputType.INFO)
+            sys.exit(0)
 
     curr_dir = os.getcwd()
     git_dir = find_git_root_and_cd(curr_dir)
