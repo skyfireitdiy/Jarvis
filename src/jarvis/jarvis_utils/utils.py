@@ -183,26 +183,23 @@ def _show_usage_stats() -> None:
             # 计算节省的时间
             # 基于经验估算：
             # - 每次工具调用平均节省5分钟（相比手动操作）
-            # - 每次代码修改平均节省10分钟（相比手动编写和调试）
-            # - 每行代码修改平均节省30秒（考虑思考、编写、测试时间）
+            # - 每行代码修改平均节省60秒（考虑思考、编写、测试时间）
             # - 每次提交平均节省15分钟（考虑整理、描述、检查时间）
+            # - 每个命令调用平均节省5分钟（相比手动执行）
 
             time_saved_minutes = 0
 
             # 工具调用节省的时间
             time_saved_minutes += total_tools * 5
 
-            # 代码修改节省的时间
-            time_saved_minutes += total_changes * 10
-
-            # 代码行数节省的时间
+            # 代码行数节省的时间（每行修改节省60秒）
             total_lines = sum(
                 count
                 for title, stats, _ in stats_output
                 if "代码行数" in title
                 for metric, count in stats.items()
             )
-            time_saved_minutes += total_lines * 0.5  # 30秒 = 0.5分钟
+            time_saved_minutes += total_lines * 1  # 60秒 = 1分钟
 
             # 提交节省的时间
             total_commits = sum(
@@ -212,6 +209,15 @@ def _show_usage_stats() -> None:
                 for metric, count in stats.items()
             )
             time_saved_minutes += total_commits * 15
+
+            # 命令调用节省的时间
+            total_commands = sum(
+                count
+                for title, stats, _ in stats_output
+                if "命令使用" in title
+                for metric, count in stats.items()
+            )
+            time_saved_minutes += total_commands * 5
 
             # 转换为更友好的格式
             if time_saved_minutes > 0:
@@ -246,6 +252,7 @@ def _show_usage_stats() -> None:
     except Exception as e:
         # 输出错误信息以便调试
         import traceback
+
         PrettyOutput.print(f"统计显示出错: {str(e)}", OutputType.ERROR)
         PrettyOutput.print(traceback.format_exc(), OutputType.ERROR)
 
