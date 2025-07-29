@@ -339,6 +339,33 @@ class CodeAgent:
                 "ℹ️ 跳过.gitattributes文件创建。如果遇到换行符问题，可以手动创建此文件。"
             )
 
+    def _record_code_changes_stats(self, diff_text: str) -> None:
+        """记录代码变更的统计信息。
+
+        Args:
+            diff_text: git diff的文本输出
+        """
+        from jarvis.jarvis_stats.stats import StatsManager
+        import re
+
+        stats_manager = StatsManager()
+
+        # 匹配插入行数
+        insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_text)
+        if insertions_match:
+            insertions = int(insertions_match.group(1))
+            stats_manager.increment(
+                "code_lines_inserted", amount=insertions, group="code_agent"
+            )
+
+        # 匹配删除行数
+        deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_text)
+        if deletions_match:
+            deletions = int(deletions_match.group(1))
+            stats_manager.increment(
+                "code_lines_deleted", amount=deletions, group="code_agent"
+            )
+
     def _handle_uncommitted_changes(self) -> None:
         """处理未提交的修改，包括：
         1. 提示用户确认是否提交
@@ -349,11 +376,6 @@ class CodeAgent:
         """
         if has_uncommitted_changes():
             # 获取代码变更统计
-            from jarvis.jarvis_stats.stats import StatsManager
-
-            stats_manager = StatsManager()
-
-            # 获取变更的代码行数
             try:
                 diff_result = subprocess.run(
                     ["git", "diff", "HEAD", "--shortstat"],
@@ -364,21 +386,7 @@ class CodeAgent:
                     check=True,
                 )
                 if diff_result.returncode == 0 and diff_result.stdout:
-                    # 解析输出，如: "2 files changed, 10 insertions(+), 5 deletions(-)"
-                    import re
-
-                    match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_result.stdout)
-                    if match:
-                        insertions = int(match.group(1))
-                        stats_manager.increment(
-                            "code_lines_inserted", amount=insertions, group="code_agent"
-                        )
-                    match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_result.stdout)
-                    if match:
-                        deletions = int(match.group(1))
-                        stats_manager.increment(
-                            "code_lines_deleted", amount=deletions, group="code_agent"
-                        )
+                    self._record_code_changes_stats(diff_result.stdout)
             except subprocess.CalledProcessError:
                 pass
 
@@ -387,6 +395,9 @@ class CodeAgent:
                 return
 
             # 用户确认修改，统计修改次数
+            from jarvis.jarvis_stats.stats import StatsManager
+
+            stats_manager = StatsManager()
             stats_manager.increment("code_modification_confirmed", group="code_agent")
 
             try:
@@ -551,6 +562,28 @@ class CodeAgent:
             modified_files = get_diff_file_list()
             commited = handle_commit_workflow()
             if commited:
+                # 统计代码行数变化
+                # 获取diff的统计信息
+                try:
+                    diff_result = subprocess.run(
+                        ["git", "diff", "HEAD~1", "HEAD", "--shortstat"],
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        check=True,
+                    )
+                    if diff_result.returncode == 0 and diff_result.stdout:
+                        self._record_code_changes_stats(diff_result.stdout)
+                except subprocess.CalledProcessError:
+                    pass
+
+                # 统计修改次数
+                from jarvis.jarvis_stats.stats import StatsManager
+
+                stats_manager = StatsManager()
+                stats_manager.increment("code_modifications", group="code_agent")
+
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()
                 commits = get_commits_between(start_hash, end_hash)
