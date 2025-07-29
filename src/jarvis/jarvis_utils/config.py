@@ -262,6 +262,12 @@ def get_pretty_output() -> bool:
     返回：
         bool: 如果启用PrettyOutput则返回True，默认为True
     """
+    import platform
+
+    # Windows系统强制设置为False
+    if platform.system() == "Windows":
+        return False
+
     return GLOBAL_CONFIG_DATA.get("JARVIS_PRETTY_OUTPUT", False) == True
 
 
