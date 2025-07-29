@@ -29,8 +29,11 @@ class StatsStorage:
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
-        # 数据文件路径
-        self.data_file = self.storage_dir / "stats_data.json"
+        # 数据目录路径
+        self.data_dir = self.storage_dir / "data"
+        self.data_dir.mkdir(exist_ok=True)
+
+        # 元数据文件路径
         self.meta_file = self.storage_dir / "stats_meta.json"
 
         # 初始化元数据
@@ -45,6 +48,10 @@ class StatsStorage:
                 "metrics": {},  # 存储各个指标的元信息
             }
             self._save_json(self.meta_file, meta)
+
+    def _get_data_file(self, date_str: str) -> Path:
+        """获取指定日期的数据文件路径"""
+        return self.data_dir / f"stats_{date_str}.json"
 
     def _load_json(self, filepath: Path) -> Dict:
         """加载JSON文件"""
@@ -107,21 +114,20 @@ class StatsStorage:
                 meta["metrics"][metric_name]["unit"] = unit
         self._save_json(self.meta_file, meta)
 
-        # 加载现有数据
-        data = self._load_json(self.data_file)
+        # 获取日期对应的数据文件
+        date_key = timestamp.strftime("%Y-%m-%d")
+        hour_key = timestamp.strftime("%H")
+        date_file = self._get_data_file(date_key)
 
-        # 组织数据结构：metric_name -> date -> hour -> records
+        # 加载日期文件的数据
+        data = self._load_json(date_file)
+
+        # 组织数据结构：metric_name -> hour -> records
         if metric_name not in data:
             data[metric_name] = {}
 
-        date_key = timestamp.strftime("%Y-%m-%d")
-        hour_key = timestamp.strftime("%H")
-
-        if date_key not in data[metric_name]:
-            data[metric_name][date_key] = {}
-
-        if hour_key not in data[metric_name][date_key]:
-            data[metric_name][date_key][hour_key] = []
+        if hour_key not in data[metric_name]:
+            data[metric_name][hour_key] = []
 
         # 添加数据记录
         record = {
@@ -129,10 +135,10 @@ class StatsStorage:
             "value": value,
             "tags": tags or {},
         }
-        data[metric_name][date_key][hour_key].append(record)
+        data[metric_name][hour_key].append(record)
 
-        # 保存数据
-        self._save_json(self.data_file, data)
+        # 保存数据到日期文件
+        self._save_json(date_file, data)
 
     def get_metrics(
         self,
@@ -153,11 +159,6 @@ class StatsStorage:
         Returns:
             数据记录列表
         """
-        data = self._load_json(self.data_file)
-
-        if metric_name not in data:
-            return []
-
         # 默认时间范围
         if end_time is None:
             end_time = datetime.now()
@@ -172,9 +173,18 @@ class StatsStorage:
 
         while current_date <= end_date:
             date_key = current_date.strftime("%Y-%m-%d")
+            date_file = self._get_data_file(date_key)
 
-            if date_key in data[metric_name]:
-                for hour_key, records in data[metric_name][date_key].items():
+            # 如果日期文件不存在，跳过
+            if not date_file.exists():
+                current_date += timedelta(days=1)
+                continue
+
+            # 加载日期文件的数据
+            data = self._load_json(date_file)
+
+            if metric_name in data:
+                for hour_key, records in data[metric_name].items():
                     for record in records:
                         record_time = datetime.fromisoformat(record["timestamp"])
 
@@ -276,20 +286,18 @@ class StatsStorage:
 
     def delete_old_data(self, days_to_keep: int = 30):
         """删除旧数据"""
-        data = self._load_json(self.data_file)
         cutoff_date = (datetime.now() - timedelta(days=days_to_keep)).date()
 
-        for metric_name in list(data.keys()):
-            for date_key in list(data[metric_name].keys()):
-                try:
-                    date = datetime.strptime(date_key, "%Y-%m-%d").date()
-                    if date < cutoff_date:
-                        del data[metric_name][date_key]
-                except ValueError:
-                    continue
+        # 遍历数据目录中的所有文件
+        for data_file in self.data_dir.glob("stats_*.json"):
+            try:
+                # 从文件名中提取日期
+                date_str = data_file.stem.replace("stats_", "")
+                file_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
-            # 如果指标下没有数据了，删除该指标
-            if not data[metric_name]:
-                del data[metric_name]
-
-        self._save_json(self.data_file, data)
+                # 如果文件日期早于截止日期，删除文件
+                if file_date < cutoff_date:
+                    data_file.unlink()
+            except (ValueError, OSError):
+                # 忽略无法解析或删除的文件
+                continue
