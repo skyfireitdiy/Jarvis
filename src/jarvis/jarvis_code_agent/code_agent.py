@@ -192,15 +192,41 @@ class CodeAgent:
         self._update_gitignore(git_dir)
         self._handle_git_changes()
         # 配置git对换行符变化不敏感
+        self._configure_line_ending_settings()
+        print("✅ 环境初始化完成")
+
+    def _configure_line_ending_settings(self) -> None:
+        """配置git对换行符变化不敏感，只在当前设置与目标设置不一致时修改"""
+        target_autocrlf = "false"
+        target_safecrlf = "false"
+        
+        # 获取当前设置
+        current_autocrlf = subprocess.run(
+            ["git", "config", "--get", "core.autocrlf"],
+            capture_output=True, text=True
+        ).stdout.strip()
+        
+        current_safecrlf = subprocess.run(
+            ["git", "config", "--get", "core.safecrlf"],
+            capture_output=True, text=True
+        ).stdout.strip()
+        
+        # 检查是否需要修改
+        need_change = (current_autocrlf != target_autocrlf or 
+                     current_safecrlf != target_safecrlf)
+        
+        if not need_change:
+            print("✅ git换行符敏感设置已符合要求")
+            return
+            
         PrettyOutput.print("⚠️ 即将修改git换行符敏感设置，这会影响所有文件的换行符处理方式", OutputType.WARNING)
         if user_confirm("是否继续修改git换行符敏感设置？", True):
-            subprocess.run(["git", "config", "core.autocrlf", "false"], check=True)
-            subprocess.run(["git", "config", "core.safecrlf", "false"], check=True)
+            subprocess.run(["git", "config", "core.autocrlf", target_autocrlf], check=True)
+            subprocess.run(["git", "config", "core.safecrlf", target_safecrlf], check=True)
             print("✅ git换行符敏感设置已更新")
         else:
             print("❌ 用户取消修改git换行符敏感设置")
             sys.exit(0)
-        print("✅ 环境初始化完成")
 
     def _handle_uncommitted_changes(self) -> None:
         """处理未提交的修改，包括：
