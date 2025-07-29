@@ -188,10 +188,6 @@ def _show_usage_stats() -> None:
             # - 每次提交平均节省15分钟（考虑整理、描述、检查时间）
 
             time_saved_minutes = 0
-            
-            # 调试输出
-            PrettyOutput.print(f"[DEBUG] 开始计算节省时间...", OutputType.INFO)
-            PrettyOutput.print(f"[DEBUG] total_tools={total_tools}, total_changes={total_changes}", OutputType.INFO)
 
             # 工具调用节省的时间
             time_saved_minutes += total_tools * 5
