@@ -8,6 +8,10 @@ import os
 
 from typing import Dict, List, Optional, Any
 from collections import OrderedDict
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich import box
 
 
 class StatsVisualizer:
@@ -27,6 +31,9 @@ class StatsVisualizer:
         # 确保最小尺寸
         self.width = max(self.width, 40)
         self.height = max(self.height, 10)
+
+        # 初始化Rich Console
+        self.console = Console()
 
     def _get_terminal_width(self) -> int:
         """获取终端宽度"""
@@ -228,6 +235,7 @@ class StatsVisualizer:
         aggregated_data: Dict[str, Dict[str, Any]],
         metric_name: str,
         unit: Optional[str] = None,
+        tags_filter: Optional[Dict[str, str]] = None,
     ) -> str:
         """
         显示数据摘要
@@ -236,35 +244,129 @@ class StatsVisualizer:
             aggregated_data: 聚合后的数据
             metric_name: 指标名称
             unit: 单位
+            tags_filter: 标签过滤条件
 
         Returns:
-            摘要字符串
+            摘要字符串（用于兼容性，实际会直接打印）
         """
         if not aggregated_data:
+            self.console.print("[yellow]无数据可显示[/yellow]")
             return "无数据可显示"
 
-        output = []
-        output.append(f"\n{metric_name} 统计摘要")
-        output.append("=" * self.width)
+        # 创建表格
+        table = Table(title=f"{metric_name} 统计摘要", box=box.ROUNDED)
 
-        # 表头
-        header = f"{'时间':^20} | {'计数':>6} | {'总和':>10} | {'平均':>10} | {'最小':>10} | {'最大':>10}"
-        output.append(header)
-        output.append("-" * len(header))
+        # 添加列
+        table.add_column("时间", justify="center", style="cyan")
+        table.add_column("计数", justify="right", style="green")
+        table.add_column("总和", justify="right", style="yellow")
+        table.add_column("平均", justify="right", style="yellow")
+        table.add_column("最小", justify="right", style="blue")
+        table.add_column("最大", justify="right", style="red")
 
-        # 数据行
+        # 添加数据行
         for time_key, stats in sorted(aggregated_data.items()):
-            row = f"{time_key:^20} | {stats['count']:>6} | {stats['sum']:>10.2f} | "
-            row += (
-                f"{stats['avg']:>10.2f} | {stats['min']:>10.2f} | {stats['max']:>10.2f}"
+            table.add_row(
+                time_key,
+                str(stats["count"]),
+                f"{stats['sum']:.2f}",
+                f"{stats['avg']:.2f}",
+                f"{stats['min']:.2f}",
+                f"{stats['max']:.2f}",
             )
-            output.append(row)
 
-        # 单位
+        # 显示表格
+        self.console.print(table)
+
+        # 显示单位信息
         if unit:
-            output.append(f"\n单位: {unit}")
+            self.console.print(f"\n[dim]单位: {unit}[/dim]")
 
-        return "\n".join(output)
+        # 显示过滤条件
+        if tags_filter:
+            filter_str = ", ".join([f"{k}={v}" for k, v in tags_filter.items()])
+            self.console.print(f"[dim]过滤条件: {filter_str}[/dim]")
+
+        return ""  # 返回空字符串，实际输出已经通过console打印
+
+    def show_table(
+        self,
+        records: List[Dict[str, Any]],
+        metric_name: str,
+        unit: Optional[str] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        tags_filter: Optional[Dict[str, str]] = None,
+    ) -> str:
+        """
+        使用Rich Table显示数据记录
+
+        Args:
+            records: 数据记录列表
+            metric_name: 指标名称
+            unit: 单位
+            start_time: 开始时间
+            end_time: 结束时间
+            tags_filter: 标签过滤条件
+
+        Returns:
+            空字符串（实际通过console打印）
+        """
+        if not records:
+            self.console.print(f"[yellow]没有找到指标 '{metric_name}' 的数据[/yellow]")
+            return ""
+
+        # 创建表格
+        table = Table(title=f"指标: {metric_name}", box=box.ROUNDED)
+
+        # 添加列
+        table.add_column("时间", style="cyan", no_wrap=True)
+        table.add_column("值", justify="right", style="yellow")
+        table.add_column("标签", style="dim")
+
+        # 只显示最近的20条记录
+        display_records = records[-20:] if len(records) > 20 else records
+
+        # 添加数据行
+        from datetime import datetime
+
+        for record in display_records:
+            timestamp = datetime.fromisoformat(record["timestamp"])
+            time_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+            value = f"{record['value']:.2f}"
+            tags_str = ", ".join(f"{k}={v}" for k, v in record.get("tags", {}).items())
+
+            table.add_row(time_str, value, tags_str)
+
+        # 显示表格
+        self.console.print(table)
+
+        # 显示元信息
+        info_items = []
+        if unit:
+            info_items.append(f"单位: {unit}")
+        if start_time and end_time:
+            info_items.append(f"时间范围: {start_time} ~ {end_time}")
+        if tags_filter:
+            filter_str = ", ".join([f"{k}={v}" for k, v in tags_filter.items()])
+            info_items.append(f"过滤条件: {filter_str}")
+
+        if info_items:
+            self.console.print(Panel(" | ".join(info_items), style="dim"))
+
+        # 统计信息
+        if len(records) > 0:
+            values = [r["value"] for r in records]
+            stats_info = (
+                f"总记录数: {len(records)} | "
+                f"显示: {len(display_records)} | "
+                f"最小值: {min(values):.2f} | "
+                f"最大值: {max(values):.2f} | "
+                f"平均值: {sum(values)/len(values):.2f}"
+            )
+            self.console.print(f"\n[dim]{stats_info}[/dim]")
+
+        return ""
 
     def _draw_line(self, canvas: List[List[str]], x1: int, y1: int, x2: int, y2: int):
         """在画布上绘制线条"""

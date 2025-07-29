@@ -54,7 +54,7 @@ class StatsManager:
             if tags is None:
                 tags = {}
             tags["group"] = group
-            
+
         self.storage.add_metric(
             metric_name=metric_name,
             value=float(amount),
@@ -128,7 +128,7 @@ class StatsManager:
 
     def plot(
         self,
-        metric_name: str,
+        metric_name: Optional[str] = None,
         last_hours: Optional[int] = None,
         last_days: Optional[int] = None,
         start_time: Optional[datetime] = None,
@@ -142,7 +142,7 @@ class StatsManager:
         绘制指标的折线图
 
         Args:
-            metric_name: 指标名称
+            metric_name: 指标名称（可选，不指定则根据标签过滤所有匹配的指标）
             last_hours: 最近N小时
             last_days: 最近N天
             start_time: 开始时间
@@ -155,7 +155,7 @@ class StatsManager:
         Examples:
             >>> stats = StatsManager()
             >>> stats.plot("response_time", last_hours=24)
-            >>> stats.plot("error_count", last_days=7, aggregation="daily")
+            >>> stats.plot(tags={"service": "api"}, last_days=7)
         """
         # 处理时间范围
         if end_time is None:
@@ -169,9 +169,16 @@ class StatsManager:
             else:
                 start_time = end_time - timedelta(days=7)
 
-        self._show_chart(
-            metric_name, start_time, end_time, aggregation, tags, width, height
-        )
+        # 如果指定了metric_name，显示单个图表
+        if metric_name:
+            self._show_chart(
+                metric_name, start_time, end_time, aggregation, tags, width, height
+            )
+        else:
+            # 如果没有指定metric_name，根据标签过滤获取所有匹配的指标
+            self._show_multiple_charts(
+                start_time, end_time, aggregation, tags, width, height
+            )
 
     def get_stats(
         self,
@@ -238,27 +245,34 @@ class StatsManager:
 
     def _show_metrics_summary(self):
         """显示所有指标摘要"""
+        from rich.console import Console
+        from rich.table import Table
+
+        console = Console()
         metrics = self.storage.list_metrics()
 
         if not metrics:
-            print("没有找到任何统计指标")
+            console.print("[yellow]没有找到任何统计指标[/yellow]")
             return
 
-        print("\n统计指标摘要")
-        print("=" * 80)
-        print(f"{'指标名称':<30} {'单位':<10} {'最后更新':<20} {'7天数据点':<10}")
-        print("-" * 80)
+        # 创建表格
+        table = Table(title="统计指标摘要")
+        table.add_column("指标名称", style="cyan")
+        table.add_column("单位", style="green")
+        table.add_column("最后更新", style="yellow")
+        table.add_column("7天数据点", style="magenta")
+
+        # 获取每个指标的信息
+        end_time = datetime.now()
+        start_time = end_time - timedelta(days=7)
 
         for metric in metrics:
             info = self.storage.get_metric_info(metric)
             if info:
-                # 获取最近7天的数据统计
-                end_time = datetime.now()
-                start_time = end_time - timedelta(days=7)
-                records = self.storage.get_metrics(metric, start_time, end_time)
-
                 unit = info.get("unit", "-")
                 last_updated = info.get("last_updated", "-")
+
+                # 格式化时间
                 if last_updated != "-":
                     try:
                         dt = datetime.fromisoformat(last_updated)
@@ -266,10 +280,14 @@ class StatsManager:
                     except:
                         pass
 
-                print(f"{metric:<30} {unit:<10} {last_updated:<20} {len(records):<10}")
+                # 获取数据点数
+                records = self.storage.get_metrics(metric, start_time, end_time)
+                count = len(records)
 
-        print("-" * 80)
-        print(f"总计: {len(metrics)} 个指标")
+                table.add_row(metric, unit, last_updated, str(count))
+
+        console.print(table)
+        console.print(f"\n[green]总计: {len(metrics)} 个指标[/green]")
 
     def _show_table(
         self,
@@ -281,43 +299,19 @@ class StatsManager:
         """以表格形式显示数据"""
         records = self.storage.get_metrics(metric_name, start_time, end_time, tags)
 
-        if not records:
-            print(f"没有找到指标 '{metric_name}' 的数据")
-            return
-
         # 获取指标信息
         info = self.storage.get_metric_info(metric_name)
         unit = info.get("unit", "") if info else ""
 
-        print(f"\n指标: {metric_name}")
-        if unit:
-            print(f"单位: {unit}")
-        print(
-            f"时间范围: {start_time.strftime('%Y-%m-%d %H:%M')} ~ {end_time.strftime('%Y-%m-%d %H:%M')}"
+        # 使用visualizer显示表格
+        self.visualizer.show_table(
+            records=records,
+            metric_name=metric_name,
+            unit=unit,
+            start_time=start_time.strftime("%Y-%m-%d %H:%M"),
+            end_time=end_time.strftime("%Y-%m-%d %H:%M"),
+            tags_filter=tags,
         )
-        print("=" * 80)
-        print(f"{'时间':<20} {'值':<15} {'标签':<40}")
-        print("-" * 80)
-
-        # 只显示最近的20条记录
-        display_records = records[-20:] if len(records) > 20 else records
-
-        for record in display_records:
-            timestamp = datetime.fromisoformat(record["timestamp"])
-            time_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-            value = record["value"]
-            tags_str = ", ".join(f"{k}={v}" for k, v in record.get("tags", {}).items())
-
-            print(f"{time_str:<20} {value:<15.2f} {tags_str:<40}")
-
-        # 统计信息
-        values = [r["value"] for r in records]
-        print("-" * 80)
-        print(f"显示 {len(display_records)} / {len(records)} 条记录")
-        if values:
-            print(
-                f"最大值: {max(values):.2f}, 最小值: {min(values):.2f}, 平均值: {sum(values)/len(values):.2f}"
-            )
 
     def _show_chart(
         self,
@@ -366,6 +360,46 @@ class StatsManager:
             f"\n时间范围: {start_time.strftime('%Y-%m-%d %H:%M')} ~ {end_time.strftime('%Y-%m-%d %H:%M')}"
         )
 
+    def _show_multiple_charts(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        aggregation: str,
+        tags: Optional[Dict[str, str]],
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+    ):
+        """根据标签过滤显示多个指标的图表"""
+        from rich.console import Console
+
+        console = Console()
+
+        # 获取所有指标
+        all_metrics = self.list_metrics()
+
+        # 根据标签过滤指标
+        matched_metrics = []
+        for metric in all_metrics:
+            # 获取该指标在时间范围内的数据
+            records = self.storage.get_metrics(metric, start_time, end_time, tags)
+            if records:  # 如果有匹配标签的数据
+                matched_metrics.append(metric)
+
+        if not matched_metrics:
+            console.print("[yellow]没有找到匹配标签的指标数据[/yellow]")
+            return
+
+        console.print(f"[green]找到 {len(matched_metrics)} 个匹配的指标[/green]")
+
+        # 为每个匹配的指标绘制图表
+        for i, metric in enumerate(matched_metrics):
+            if i > 0:
+                console.print("\n" + "=" * 80 + "\n")  # 分隔符
+
+            self._show_chart(
+                metric, start_time, end_time, aggregation, tags, width, height
+            )
+
     def _show_summary(
         self,
         metric_name: str,
@@ -389,8 +423,9 @@ class StatsManager:
         unit = info.get("unit", "") if info else ""
 
         # 显示汇总
-        summary = self.visualizer.show_summary(aggregated, metric_name, unit)
-        print(summary)
+        summary = self.visualizer.show_summary(aggregated, metric_name, unit, tags)
+        if summary:  # 如果返回了内容才打印（兼容性）
+            print(summary)
 
         # 显示时间范围
         print(
