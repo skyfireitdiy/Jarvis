@@ -129,6 +129,7 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 | `jarvis-platform-manager` | `jpm` | 管理和测试不同的大语言模型平台 |
 | `jarvis-rag` | `jrg` | 构建和查询本地化的RAG知识库 |
 | `jarvis-smart-shell` | `jss` | 实验性的智能Shell功能 |
+| `jarvis-stats` | `jst` | 统计和分析Jarvis的使用情况，追踪代码变更 |
 
 更多详细用法和参数，请查阅我们的 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
