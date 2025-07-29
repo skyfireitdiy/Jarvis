@@ -53,9 +53,16 @@ def add(
                 key, val = tag.split("=", 1)
                 tag_dict[key] = val
 
-    stats.increment(metric, amount=value, unit=unit, tags=tag_dict if tag_dict else None)
+    stats.increment(
+        metric,
+        amount=value,
+        unit=unit if unit else "count",
+        tags=tag_dict if tag_dict else None,
+    )
 
-    rprint(f"[green]✓[/green] 已添加数据: {metric}={value}" + (f" {unit}" if unit else ""))
+    rprint(
+        f"[green]✓[/green] 已添加数据: {metric}={value}" + (f" {unit}" if unit else "")
+    )
     if tag_dict:
         rprint(f"  标签: {tag_dict}")
 
@@ -94,7 +101,9 @@ def show(
     format: str = typer.Option(
         "table", "--format", "-f", help="显示格式: table/chart/summary"
     ),
-    aggregation: str = typer.Option("hourly", "--agg", "-a", help="聚合方式: hourly/daily"),
+    aggregation: str = typer.Option(
+        "hourly", "--agg", "-a", help="聚合方式: hourly/daily"
+    ),
     tags: Optional[List[str]] = typer.Option(
         None, "--tag", "-t", help="标签过滤，格式: key=value"
     ),
@@ -122,17 +131,21 @@ def show(
 
 @app.command()
 def plot(
-    metric: str = typer.Argument(..., help="指标名称"),
+    metric: Optional[str] = typer.Argument(
+        None, help="指标名称（可选，不指定则根据标签过滤所有匹配的指标）"
+    ),
     last_hours: Optional[int] = typer.Option(None, "--hours", "-h", help="最近N小时"),
     last_days: Optional[int] = typer.Option(None, "--days", "-d", help="最近N天"),
-    aggregation: str = typer.Option("hourly", "--agg", "-a", help="聚合方式: hourly/daily"),
+    aggregation: str = typer.Option(
+        "hourly", "--agg", "-a", help="聚合方式: hourly/daily"
+    ),
     width: Optional[int] = typer.Option(None, "--width", "-w", help="图表宽度"),
     height: Optional[int] = typer.Option(None, "--height", "-H", help="图表高度"),
     tags: Optional[List[str]] = typer.Option(
         None, "--tag", "-t", help="标签过滤，格式: key=value"
     ),
 ):
-    """绘制指标折线图"""
+    """绘制指标折线图，支持根据标签过滤显示多个指标"""
     stats = StatsManager(_get_stats_dir())
 
     # 解析标签
