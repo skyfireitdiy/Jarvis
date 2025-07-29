@@ -580,7 +580,7 @@ class CodeReviewTool:
 
                 tool_registry = ToolRegistry()
                 tool_registry.dont_use_tools(["code_review"])
-                
+
                 # Use the provided agent's model_group or get it from globals
                 calling_agent = agent or get_agent(current_agent_name)
                 model_group = None
@@ -655,7 +655,7 @@ class CodeReviewTool:
 {ot("REPORT")}
 [在此处插入完整MARKDOWN格式的审查报告]
 {ct("REPORT")}""",
-                    output_handler=[tool_registry],
+                    output_handler=[tool_registry],  # type: ignore
                     llm_type="thinking",
                     auto_complete=False,
                 )
