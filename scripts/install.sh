@@ -38,7 +38,18 @@ else
 fi
 
 echo "正在使用 uv 安装项目和依赖..."
-uv pip install .
+
+read -p "是否安装 RAG 功能? (这将安装 PyTorch 等较重的依赖) [y/N]: " choice
+case "$choice" in
+  y|Y )
+    echo "正在安装核心功能及 RAG 依赖..."
+    uv pip install '.[rag]'
+    ;;
+  * )
+    echo "正在安装核心功能..."
+    uv pip install .
+    ;;
+esac
 
 echo -e "\n--- 4. 初始化 Jarvis ---"
 CONFIG_FILE="$HOME/.jarvis/config.yaml"
