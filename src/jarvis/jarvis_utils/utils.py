@@ -243,14 +243,7 @@ def generate_default_config(schema_path: str, output_path: str) -> None:
 
     default_config = _generate_from_schema(schema)
 
-    # 添加schema声明
-    rel_schema_path = Path(
-        os.path.relpath(
-            Path(schema_path),
-            start=Path(output_path).parent,
-        )
-    )
-    content = f"# yaml-language-server: $schema={rel_schema_path}\n"
+    content = f"# yaml-language-server: $schema={schema}\n"
     content += yaml.dump(default_config, allow_unicode=True, sort_keys=False)
 
     with open(output_path, "w", encoding="utf-8") as f:
