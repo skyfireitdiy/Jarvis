@@ -9,7 +9,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.input import user_confirm
 
-app = typer.Typer(help="Git squash tool")
+app = typer.Typer(help="Git压缩工具")
 
 
 class GitSquashTool:
@@ -53,8 +53,8 @@ class GitSquashTool:
 
 @app.command()
 def cli(
-    commit_hash: str = typer.Argument(..., help="Base commit hash to squash from"),
-    lang: str = typer.Option("Chinese", "--lang", help="Language for commit messages"),
+    commit_hash: str = typer.Argument(..., help="要压缩的基础提交哈希"),
+    lang: str = typer.Option("Chinese", "--lang", help="提交信息的语言"),
 ):
     init_env("欢迎使用 Jarvis-GitSquash，您的Git压缩助手已准备就绪！")
     tool = GitSquashTool()

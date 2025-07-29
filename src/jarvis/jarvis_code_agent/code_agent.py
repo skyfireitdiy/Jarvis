@@ -38,7 +38,7 @@ from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import get_loc_stats, init_env
 
-app = typer.Typer(help="Jarvis Code Agent")
+app = typer.Typer(help="Jarvis 代码助手")
 
 
 class CodeAgent:
