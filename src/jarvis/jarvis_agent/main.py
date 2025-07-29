@@ -40,21 +40,21 @@ def load_config(config_path: str) -> dict:
 @app.command()
 def cli(
     config_file: Optional[str] = typer.Option(
-        None, "-f", "--config", help="Path to agent config file"
+        None, "-f", "--config", help="代理配置文件路径"
     ),
     agent_definition: Optional[str] = typer.Option(
-        None, "-c", "--agent_definition", help="Path to agent definition file"
+        None, "-c", "--agent_definition", help="代理定义文件路径"
     ),
     task: Optional[str] = typer.Option(
-        None, "-t", "--task", help="Initial task to execute"
+        None, "-t", "--task", help="初始任务内容"
     ),
     llm_type: str = typer.Option(
         "normal",
         "--llm_type",
-        help="LLM type to use, overriding config",
+        help="使用的LLM类型，覆盖配置文件中的设置",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "--model_group", help="Model group to use, overriding config"
+        None, "--model_group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
     """Main entry point for Jarvis agent"""

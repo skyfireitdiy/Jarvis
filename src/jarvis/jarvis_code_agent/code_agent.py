@@ -407,18 +407,18 @@ def cli(
     llm_type: str = typer.Option(
         "normal",
         "--llm_type",
-        help="LLM type to use, choices are 'normal' and 'thinking'",
+        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "--model_group", help="Model group to use, overriding config"
+        None, "--model_group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     requirement: Optional[str] = typer.Option(
-        None, "-r", "--requirement", help="Requirement to process"
+        None, "-r", "--requirement", help="要处理的需求描述"
     ),
     restore_session: bool = typer.Option(
         False,
         "--restore-session",
-        help="Restore session from .jarvis/saved_session.json",
+        help="从 .jarvis/saved_session.json 恢复会话状态",
     ),
 ) -> None:
     """Jarvis主入口点。"""
