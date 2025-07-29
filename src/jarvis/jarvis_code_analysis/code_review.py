@@ -310,11 +310,13 @@ class CodeReviewTool:
                         }
 
                     # Extract changed files using git command
-                    files_cmd = f"git show --name-only --pretty=format: {commit_sha} | grep -v '^$'"
+                    # Use git show with proper formatting to avoid needing grep
+                    files_cmd = f"git show --name-only --pretty=format: {commit_sha}"
                     try:
                         files_output = subprocess.check_output(
                             files_cmd, shell=True, text=True
                         )
+                        # Filter out empty lines without using grep
                         file_paths = [
                             f.strip() for f in files_output.split("\n") if f.strip()
                         ]
