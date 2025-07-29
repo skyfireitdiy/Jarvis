@@ -1,3 +1,36 @@
+### Release Note - v0.2.4 2025-07-30
+
+#### **新功能 (Features)**
+- 添加完整的统计功能模块 `jarvis-stats`，支持灵活的指标记录和可视化展示
+- 新增时间节省统计功能，自动计算用户通过使用Jarvis节省的开发时间
+- 为 `edit_file` 工具添加统计功能，记录工具使用情况
+
+#### **修复 (Fixes)**
+- 修复 Windows 系统下的多个兼容性问题
+  - 修复文件锁兼容性问题，使用临时文件+原子重命名替代fcntl
+  - 修复编码问题，为所有subprocess调用添加encoding和errors参数
+  - 修复 Windows 下 PrettyOutput 配置问题
+- 修正命令行参数名称从 `--model_group` 到 `--llm_group`
+
+#### **优化与重构 (Refactors & Improvements)**
+- 改进编辑器选择逻辑，根据操作系统自动选择合适的编辑器
+- 使用跨平台的Python方法替换系统命令
+- 使用 `uv` 重构安装脚本，提供更快速和稳定的安装体验
+
+#### **文档更新 (Documentation)**
+- 新增 Jarvis Book 官方文档，提供完整的中文使用指南
+- 添加 `jarvis-stats` 工具的详细文档和使用示例
+- 更新配置文档，新增 `JARVIS_METHODOLOGY_DIRS` 等配置项说明
+- 补充"Vibe Working"核心理念介绍，阐述人机协作新模式
+
+#### **其他 (Miscellaneous)**
+- 添加 `.gitattributes` 文件配置跨平台换行符规则
+- 优化 Git 配置检查，确保用户正确设置 username 和 email
+- 移除未使用的依赖项，减小安装包体积
+- 添加 RAG 功能的可选安装，允许用户根据需求选择
+
+本次更新主要聚焦于**数据驱动的效率提升**。通过新增的统计模块，用户可以精确量化AI助手带来的价值，从"感觉很有用"到"节省了28.5小时"的转变。同时，大幅改进了Windows兼容性和中文本地化，让更多开发者能够顺畅使用Jarvis。
+
 ### Release Note - v0.2.3 2025-07-29
 
 #### **新功能 (Features)**
