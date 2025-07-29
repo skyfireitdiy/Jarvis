@@ -77,6 +77,42 @@ def _check_git_updates() -> bool:
     return check_and_update_git_repo(str(script_dir))
 
 
+def _show_usage_stats() -> None:
+    """显示Jarvis使用统计信息"""
+    try:
+        from jarvis.jarvis_stats.stats import StatsManager
+        from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+        
+        stats_manager = StatsManager()
+        # 获取命令组的统计数据
+        cmd_stats = {}
+        metrics = stats_manager.list_metrics()
+        
+        for metric in metrics:
+            # 获取所有历史数据
+            from datetime import datetime
+            stats_data = stats_manager.get_stats(
+                metric_name=metric,
+                start_time=datetime(2000, 1, 1),
+                end_time=datetime.now(),
+                tags={"group": "command"}
+            )
+            if stats_data:
+                total = sum(point.value for point in stats_data)
+                if total > 0:
+                    cmd_stats[metric] = int(total)
+        
+        # 如果有统计数据，显示最常用的命令
+        if cmd_stats:
+            sorted_cmds = sorted(cmd_stats.items(), key=lambda x: x[1], reverse=True)[:5]
+            PrettyOutput.print("📊 Jarvis 使用统计", OutputType.INFO)
+            for cmd, count in sorted_cmds:
+                PrettyOutput.print(f"  • {cmd}: {count}次", OutputType.INFO)
+    except Exception:
+        # 忽略统计显示错误，不影响正常功能
+        pass
+
+
 def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     """初始化Jarvis环境
 
@@ -98,8 +134,12 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     global g_config_file
     g_config_file = config_file
     load_config()
+    
+    # 5. 显示历史统计数据（仅在显示欢迎信息时显示）
+    if welcome_str:
+        _show_usage_stats()
 
-    # 5. 检查git更新
+    # 6. 检查git更新
     if _check_git_updates():
         os.execv(sys.executable, [sys.executable] + sys.argv)
         sys.exit(0)
