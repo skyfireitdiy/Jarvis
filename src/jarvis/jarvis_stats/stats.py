@@ -30,6 +30,7 @@ class StatsManager:
         value: Union[int, float],
         unit: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
+        group: Optional[str] = None,
     ):
         """
         添加统计数据
@@ -39,13 +40,22 @@ class StatsManager:
             value: 指标值
             unit: 单位
             tags: 标签字典，用于数据分类
+            group: 分组名称，如 "tool" 表示工具组
 
         Examples:
             >>> stats = StatsManager()
             >>> stats.add("api_calls", 1)
             >>> stats.add("response_time", 0.123, "seconds")
             >>> stats.add("error_count", 1, tags={"type": "404", "endpoint": "/api/users"})
+            >>> stats.add("execute_script", 1, group="tool")  # 记录工具使用次数
+            >>> stats.add("search_web", 1, group="tool", tags={"query": "python"})
         """
+        # 如果指定了分组，自动添加到 tags 中
+        if group:
+            if tags is None:
+                tags = {}
+            tags["group"] = group
+            
         self.storage.add_metric(
             metric_name=metric_name,
             value=float(value),
