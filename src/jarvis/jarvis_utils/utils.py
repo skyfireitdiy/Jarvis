@@ -82,32 +82,106 @@ def _show_usage_stats() -> None:
     try:
         from jarvis.jarvis_stats.stats import StatsManager
         from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-        
+        from datetime import datetime
+
         stats_manager = StatsManager()
-        # 获取命令组的统计数据
-        cmd_stats = {}
-        metrics = stats_manager.list_metrics()
-        
-        for metric in metrics:
-            # 获取所有历史数据
-            from datetime import datetime
+
+        # 获取所有可用的指标
+        all_metrics = stats_manager.list_metrics()
+
+        # 根据指标名称和标签自动分类
+        categorized_stats: Dict[str, Dict[str, Any]] = {
+            "tool": {"title": "🔧 工具调用", "metrics": {}, "suffix": "次"},
+            "code": {"title": "📝 代码修改", "metrics": {}, "suffix": "次"},
+            "lines": {"title": "📊 代码行数", "metrics": {}, "suffix": "行"},
+            "commit": {"title": "💾 提交统计", "metrics": {}, "suffix": "个"},
+            "command": {"title": "📱 命令使用", "metrics": {}, "suffix": "次"},
+        }
+
+        # 遍历所有指标，获取统计数据
+        for metric in all_metrics:
+            # 获取该指标的所有数据
             stats_data = stats_manager.get_stats(
                 metric_name=metric,
                 start_time=datetime(2000, 1, 1),
                 end_time=datetime.now(),
-                tags={"group": "command"}
             )
-            if stats_data:
-                total = sum(point.value for point in stats_data)
-                if total > 0:
-                    cmd_stats[metric] = int(total)
-        
-        # 如果有统计数据，显示最常用的命令
-        if cmd_stats:
-            sorted_cmds = sorted(cmd_stats.items(), key=lambda x: x[1], reverse=True)[:5]
-            PrettyOutput.print("📊 Jarvis 使用统计", OutputType.INFO)
-            for cmd, count in sorted_cmds:
-                PrettyOutput.print(f"  • {cmd}: {count}次", OutputType.INFO)
+
+            if stats_data and isinstance(stats_data, dict) and "records" in stats_data:
+                # 按照标签分组统计
+                tag_totals: Dict[str, float] = {}
+                for record in stats_data["records"]:
+                    tags = record.get("tags", {})
+                    group = tags.get("group", "other")
+                    tag_totals[group] = tag_totals.get(group, 0) + record["value"]
+
+                # 根据标签将指标分配到相应类别
+                for group, total in tag_totals.items():
+                    if total > 0:
+                        if group == "tool":
+                            categorized_stats["tool"]["metrics"][metric] = int(total)
+                        elif group == "code_agent":
+                            # 根据指标名称细分
+                            if metric.startswith("code_lines_"):
+                                categorized_stats["lines"]["metrics"][metric] = int(
+                                    total
+                                )
+                            elif "commit" in metric:
+                                categorized_stats["commit"]["metrics"][metric] = int(
+                                    total
+                                )
+                            else:
+                                categorized_stats["code"]["metrics"][metric] = int(
+                                    total
+                                )
+                        elif group == "command":
+                            categorized_stats["command"]["metrics"][metric] = int(total)
+
+        # 构建输出
+        has_data = False
+        stats_output = []
+
+        for category, data in categorized_stats.items():
+            if data["metrics"]:
+                has_data = True
+                stats_output.append((data["title"], data["metrics"], data["suffix"]))
+
+        # 显示统计信息
+        if has_data:
+            # 构建统计信息字符串
+            stats_lines = ["📊 Jarvis 使用统计"]
+
+            for title, stats, suffix in stats_output:
+                if stats:
+                    stats_lines.append(f"\n{title}:")
+                    for metric, count in sorted(
+                        stats.items(), key=lambda x: x[1], reverse=True
+                    ):
+                        # 美化指标名称
+                        display_name = metric.replace("_", " ").title()
+                        stats_lines.append(f"  • {display_name}: {count:,} {suffix}")
+
+            # 总结统计
+            total_tools = sum(
+                stats.get(m, 0)
+                for _, stats, _ in stats_output
+                if "工具" in _[0]
+                for m in stats
+            )
+            total_changes = sum(
+                stats.get(m, 0)
+                for _, stats, _ in stats_output
+                if "代码修改" in _[0]
+                for m in stats
+            )
+
+            if total_tools > 0 or total_changes > 0:
+                stats_lines.append(
+                    f"\n📈 总计: 工具调用 {total_tools:,} 次, 代码修改 {total_changes:,} 次"
+                )
+
+            # 一次性输出所有统计信息
+            PrettyOutput.print("\n".join(stats_lines), OutputType.INFO)
     except Exception:
         # 忽略统计显示错误，不影响正常功能
         pass
@@ -134,7 +208,7 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     global g_config_file
     g_config_file = config_file
     load_config()
-    
+
     # 5. 显示历史统计数据（仅在显示欢迎信息时显示）
     if welcome_str:
         _show_usage_stats()
@@ -428,7 +502,7 @@ def count_cmd_usage() -> None:
     # 从完整路径中提取命令名称
     cmd_path = sys.argv[0]
     cmd_name = os.path.basename(cmd_path)
-    
+
     # 使用 StatsManager 记录命令使用统计
     stats_manager = StatsManager()
     stats_manager.increment(cmd_name, group="command")
@@ -497,7 +571,9 @@ def copy_to_clipboard(text: str) -> None:
             process.stdin.close()
         return
     except FileNotFoundError:
-        PrettyOutput.print("xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING)
+        PrettyOutput.print(
+            "xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING
+        )
     except Exception as e:
         PrettyOutput.print(f"使用xclip时出错: {e}", OutputType.WARNING)
 
@@ -592,7 +668,9 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             )
 
     except FileNotFoundError:
-        PrettyOutput.print(f"git 命令未找到，跳过更新 '{repo_path.name}'。", OutputType.WARNING)
+        PrettyOutput.print(
+            f"git 命令未找到，跳过更新 '{repo_path.name}'。", OutputType.WARNING
+        )
     except subprocess.TimeoutExpired:
         PrettyOutput.print(f"更新 '{repo_path.name}' 超时。", OutputType.ERROR)
     except subprocess.CalledProcessError as e:
@@ -601,7 +679,9 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             f"更新 '{repo_path.name}' 失败: {error_message}", OutputType.ERROR
         )
     except Exception as e:
-        PrettyOutput.print(f"更新 '{repo_path.name}' 时发生未知错误: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(
+            f"更新 '{repo_path.name}' 时发生未知错误: {str(e)}", OutputType.ERROR
+        )
 
 
 def daily_check_git_updates(repo_dirs: List[str], repo_type: str):
