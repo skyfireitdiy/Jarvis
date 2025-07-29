@@ -197,36 +197,96 @@ class CodeAgent:
 
     def _configure_line_ending_settings(self) -> None:
         """配置git对换行符变化不敏感，只在当前设置与目标设置不一致时修改"""
-        target_autocrlf = "false"
-        target_safecrlf = "false"
-        
-        # 获取当前设置
-        current_autocrlf = subprocess.run(
-            ["git", "config", "--get", "core.autocrlf"],
-            capture_output=True, text=True
-        ).stdout.strip()
-        
-        current_safecrlf = subprocess.run(
-            ["git", "config", "--get", "core.safecrlf"],
-            capture_output=True, text=True
-        ).stdout.strip()
-        
-        # 检查是否需要修改
-        need_change = (current_autocrlf != target_autocrlf or 
-                     current_safecrlf != target_safecrlf)
-        
+        target_settings = {
+            "core.autocrlf": "false",
+            "core.safecrlf": "false",
+            "core.whitespace": "cr-at-eol",  # 忽略行尾的CR
+        }
+
+        # 获取当前设置并检查是否需要修改
+        need_change = False
+        current_settings = {}
+        for key, target_value in target_settings.items():
+            result = subprocess.run(
+                ["git", "config", "--get", key], capture_output=True, text=True
+            )
+            current_value = result.stdout.strip()
+            current_settings[key] = current_value
+            if current_value != target_value:
+                need_change = True
+
         if not need_change:
             print("✅ git换行符敏感设置已符合要求")
             return
-            
+
         PrettyOutput.print("⚠️ 即将修改git换行符敏感设置，这会影响所有文件的换行符处理方式", OutputType.WARNING)
+        print("将进行以下设置：")
+        for key, value in target_settings.items():
+            current = current_settings.get(key, "未设置")
+            print(f"  {key}: {current} -> {value}")
+
         if user_confirm("是否继续修改git换行符敏感设置？", True):
-            subprocess.run(["git", "config", "core.autocrlf", target_autocrlf], check=True)
-            subprocess.run(["git", "config", "core.safecrlf", target_safecrlf], check=True)
+            for key, value in target_settings.items():
+                subprocess.run(["git", "config", key, value], check=True)
+
+            # 对于Windows系统，提示用户可以创建.gitattributes文件
+            if sys.platform.startswith("win"):
+                self._handle_windows_line_endings()
+
             print("✅ git换行符敏感设置已更新")
         else:
             print("❌ 用户取消修改git换行符敏感设置")
             sys.exit(0)
+
+    def _handle_windows_line_endings(self) -> None:
+        """在Windows系统上处理换行符问题，提供建议而非强制修改"""
+        gitattributes_path = os.path.join(self.root_dir, ".gitattributes")
+
+        # 检查是否已存在.gitattributes文件
+        if os.path.exists(gitattributes_path):
+            with open(gitattributes_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            # 如果已经有换行符相关配置，就不再提示
+            if any(keyword in content for keyword in ["text=", "eol=", "binary"]):
+                return
+
+        print("\n💡 提示：在Windows系统上，建议配置.gitattributes文件来避免换行符问题。")
+        print("这可以防止仅因换行符不同而导致整个文件被标记为修改。")
+
+        if user_confirm("是否要创建一个最小化的.gitattributes文件？", False):
+            # 最小化的内容，只影响特定类型的文件
+            minimal_content = """# Jarvis建议的最小化换行符配置
+# 保持现有文件的换行符不变，只对特定文件类型设置规则
+
+# Windows批处理文件需要CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell脚本需要LF
+*.sh text eol=lf
+
+# 二进制文件不应被修改
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+"""
+
+            if not os.path.exists(gitattributes_path):
+                with open(gitattributes_path, "w", encoding="utf-8", newline="\n") as f:
+                    f.write(minimal_content)
+                print("✅ 已创建最小化的.gitattributes文件")
+            else:
+                print("📝 将以下内容追加到现有.gitattributes文件：")
+                print(minimal_content)
+                if user_confirm("是否追加到现有文件？", True):
+                    with open(
+                        gitattributes_path, "a", encoding="utf-8", newline="\n"
+                    ) as f:
+                        f.write("\n" + minimal_content)
+                    print("✅ 已更新.gitattributes文件")
+        else:
+            print("ℹ️ 跳过.gitattributes文件创建。如果遇到换行符问题，可以手动创建此文件。")
 
     def _handle_uncommitted_changes(self) -> None:
         """处理未提交的修改，包括：
