@@ -339,9 +339,40 @@ class CodeAgent:
         5. 暂存并提交所有修改
         """
         if has_uncommitted_changes():
+            # 获取代码变更统计
+            from jarvis.jarvis_stats.stats import StatsManager
+            stats_manager = StatsManager()
+            
+            # 获取变更的代码行数
+            try:
+                diff_result = subprocess.run(
+                    ["git", "diff", "--shortstat"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    check=True,
+                )
+                if diff_result.returncode == 0 and diff_result.stdout:
+                    # 解析输出，如: "2 files changed, 10 insertions(+), 5 deletions(-)"
+                    import re
+                    match = re.search(r'(\d+)\s+insertions?\(\+\)', diff_result.stdout)
+                    if match:
+                        insertions = int(match.group(1))
+                        stats_manager.increment("code_lines_inserted", amount=insertions, group="code_agent")
+                    match = re.search(r'(\d+)\s+deletions?\(\-\)', diff_result.stdout)
+                    if match:
+                        deletions = int(match.group(1))
+                        stats_manager.increment("code_lines_deleted", amount=deletions, group="code_agent")
+            except subprocess.CalledProcessError:
+                pass
+            
             PrettyOutput.print("检测到未提交的修改，是否要提交？", OutputType.WARNING)
             if not user_confirm("是否要提交？", True):
                 return
+            
+            # 用户确认修改，统计修改次数
+            stats_manager.increment("code_modification_confirmed", group="code_agent")
 
             try:
                 confirm_add_new_files()
@@ -371,6 +402,9 @@ class CodeAgent:
                     ["git", "commit", "-m", f"CheckPoint #{commit_count + 1}"],
                     check=True,
                 )
+                
+                # 统计提交次数
+                stats_manager.increment("code_commits_accepted", group="code_agent")
             except subprocess.CalledProcessError as e:
                 PrettyOutput.print(f"提交失败: {str(e)}", OutputType.ERROR)
 
@@ -392,6 +426,11 @@ class CodeAgent:
             commits = []
 
         if commits:
+            # 统计生成的commit数量
+            from jarvis.jarvis_stats.stats import StatsManager
+            stats_manager = StatsManager()
+            stats_manager.increment("commits_generated", group="code_agent")
+            
             commit_messages = "检测到以下提交记录:\n" + "\n".join(
                 f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits
             )
@@ -403,6 +442,11 @@ class CodeAgent:
     ) -> None:
         """处理提交确认和可能的重置"""
         if commits and user_confirm("是否接受以上提交记录？", True):
+            # 统计接受的commit数量
+            from jarvis.jarvis_stats.stats import StatsManager
+            stats_manager = StatsManager()
+            stats_manager.increment("commits_accepted", group="code_agent")
+            
             subprocess.run(
                 ["git", "reset", "--mixed", str(start_commit)],
                 stdout=subprocess.DEVNULL,
