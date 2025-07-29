@@ -258,11 +258,15 @@ commit信息
 
                 # 执行提交
                 print("⚙️ 正在准备提交...")
-                with tempfile.NamedTemporaryFile(mode="w", delete=True) as tmp_file:
+                # Windows 兼容性：使用 delete=False 避免权限错误
+                tmp_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
+                tmp_file_path = tmp_file.name
+                try:
                     tmp_file.write(commit_message)
-                    tmp_file.flush()
+                    tmp_file.close()  # Windows 需要先关闭文件才能被其他进程读取
+
                     print("💾 正在执行提交...")
-                    commit_cmd = ["git", "commit", "-F", tmp_file.name]
+                    commit_cmd = ["git", "commit", "-F", tmp_file_path]
                     process = subprocess.Popen(
                         commit_cmd,
                         stdout=subprocess.PIPE,
@@ -280,6 +284,12 @@ commit信息
                         raise Exception(f"Git commit failed: {error_msg}")
 
                     print("✅ 提交")
+                finally:
+                    # 手动删除临时文件
+                    try:
+                        os.unlink(tmp_file_path)
+                    except Exception:
+                        pass
 
                 commit_hash = self._get_last_commit_hash()
                 print("✅ 完成提交")
