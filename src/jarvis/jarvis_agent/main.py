@@ -54,7 +54,7 @@ def cli(
         help="使用的LLM类型，覆盖配置文件中的设置",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "--model_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
     """Main entry point for Jarvis agent"""
