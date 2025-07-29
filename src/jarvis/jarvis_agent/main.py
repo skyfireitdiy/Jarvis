@@ -10,7 +10,7 @@ from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
-app = typer.Typer(help="Jarvis AI assistant")
+app = typer.Typer(help="Jarvis AI 助手")
 
 
 def load_config(config_path: str) -> dict:

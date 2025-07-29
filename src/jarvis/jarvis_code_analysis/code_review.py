@@ -17,7 +17,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 
-app = typer.Typer(help="Autonomous code review tool")
+app = typer.Typer(help="自动代码审查工具")
 
 
 class CodeReviewTool:
@@ -772,7 +772,7 @@ def review_commit(
     commit: str = typer.Argument(..., help="要审查的提交SHA"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
 ):
-    """Review specific commit"""
+    """审查指定的提交"""
     tool = CodeReviewTool()
     tool_args = {"review_type": "commit", "commit_sha": commit, "root_dir": root_dir}
     result = tool.execute(tool_args)
@@ -788,7 +788,7 @@ def review_commit(
 def review_current(
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
 ):
-    """Review current changes"""
+    """审查当前的变更"""
     tool = CodeReviewTool()
     tool_args = {"review_type": "current", "root_dir": root_dir}
     result = tool.execute(tool_args)
@@ -806,7 +806,7 @@ def review_range(
     end_commit: str = typer.Argument(..., help="结束提交SHA"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
 ):
-    """Review commit range"""
+    """审查提交范围"""
     tool = CodeReviewTool()
     tool_args = {
         "review_type": "range",
@@ -828,7 +828,7 @@ def review_file(
     file: str = typer.Argument(..., help="要审查的文件路径"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
 ):
-    """Review specific file"""
+    """审查指定的文件"""
     tool = CodeReviewTool()
     tool_args = {"review_type": "file", "file_path": file, "root_dir": root_dir}
     result = tool.execute(tool_args)

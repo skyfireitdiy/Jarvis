@@ -21,7 +21,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 
-app = typer.Typer(help="Git commit tool")
+app = typer.Typer(help="Git提交工具")
 
 
 class GitCommitTool:
@@ -310,17 +310,17 @@ commit信息
 @app.command()
 def cli(
     root_dir: str = typer.Option(
-        ".", "--root-dir", help="Root directory of the Git repository"
+        ".", "--root-dir", help="Git仓库的根目录路径"
     ),
     prefix: str = typer.Option(
         "",
         "--prefix",
-        help="Prefix to prepend to commit message (separated by space)",
+        help="提交信息前缀（用空格分隔）",
     ),
     suffix: str = typer.Option(
         "",
         "--suffix",
-        help="Suffix to append to commit message (separated by newline)",
+        help="提交信息后缀（用换行分隔）",
     ),
 ):
     init_env("欢迎使用 Jarvis-GitCommitTool，您的Git提交助手已准备就绪！")

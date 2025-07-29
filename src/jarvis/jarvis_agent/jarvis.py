@@ -24,7 +24,7 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.utils import init_env
 
-app = typer.Typer(help="Jarvis AI assistant")
+app = typer.Typer(help="Jarvis AI 助手")
 
 
 def _load_tasks() -> Dict[str, str]:
@@ -186,24 +186,24 @@ def run_cli(
     llm_type: str = typer.Option(
         "normal",
         "--llm_type",
-        help="LLM type to use, choices are 'normal' and 'thinking'",
+        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     task: Optional[str] = typer.Option(
-        None, "-t", "--task", help="Directly input task content from command line"
+        None, "-t", "--task", help="从命令行直接输入任务内容"
     ),
     model_group: Optional[str] = typer.Option(
-        None, "--model_group", help="Model group to use, overriding config"
+        None, "--model_group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     config_file: Optional[str] = typer.Option(
-        None, "-f", "--config", help="Path to custom config file"
+        None, "-f", "--config", help="自定义配置文件路径"
     ),
     restore_session: bool = typer.Option(
         False,
         "--restore-session",
-        help="Restore session from .jarvis/saved_session.json",
+        help="从 .jarvis/saved_session.json 恢复会话",
     ),
     edit: bool = typer.Option(
-        False, "-e", "--edit", help="Edit the configuration file"
+        False, "-e", "--edit", help="编辑配置文件"
     ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
