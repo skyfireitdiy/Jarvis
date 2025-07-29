@@ -90,6 +90,8 @@ jarvis-methodology = "jarvis.jarvis_methodology.main:main"
 jm = "jarvis.jarvis_methodology.main:main"
 jarvis-rag = "jarvis.jarvis_rag.cli:main"
 jrg = "jarvis.jarvis_rag.cli:main"
+jarvis-stats = "jarvis.jarvis_stats.cli:main"
+jst = "jarvis.jarvis_stats.cli:main"
 
 [[tool.uv.index]]
 url = "https://artsz.zte.com.cn/artifactory/api/pypi/public-pypi-virtual/simple"
