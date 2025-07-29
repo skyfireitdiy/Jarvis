@@ -55,6 +55,11 @@ class EditFileHandler(OutputHandler):
         patches = self._parse_patches(response)
         if not patches:
             return False, "未找到有效的文件编辑指令"
+        
+        # 记录 edit_file 工具调用统计
+        from jarvis.jarvis_stats.stats import StatsManager
+        stats_manager = StatsManager()
+        stats_manager.increment("edit_file", group="tool")
 
         results = []
 
