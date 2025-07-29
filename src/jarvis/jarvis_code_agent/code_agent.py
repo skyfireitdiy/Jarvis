@@ -169,7 +169,9 @@ class CodeAgent:
                         '  git config --global user.email "your.email@example.com"'
                     )
 
-                message = "❌ Git 配置不完整\n\n请运行以下命令配置 Git：\n" + "\n".join(missing_configs)
+                message = "❌ Git 配置不完整\n\n请运行以下命令配置 Git：\n" + "\n".join(
+                    missing_configs
+                )
                 PrettyOutput.print(message, OutputType.WARNING)
                 sys.exit(1)
 
@@ -266,7 +268,10 @@ class CodeAgent:
             print("✅ git换行符敏感设置已符合要求")
             return
 
-        PrettyOutput.print("⚠️ 即将修改git换行符敏感设置，这会影响所有文件的换行符处理方式", OutputType.WARNING)
+        PrettyOutput.print(
+            "⚠️ 即将修改git换行符敏感设置，这会影响所有文件的换行符处理方式",
+            OutputType.WARNING,
+        )
         print("将进行以下设置：")
         for key, value in target_settings.items():
             current = current_settings.get(key, "未设置")
@@ -297,7 +302,9 @@ class CodeAgent:
             if any(keyword in content for keyword in ["text=", "eol=", "binary"]):
                 return
 
-        print("\n💡 提示：在Windows系统上，建议配置.gitattributes文件来避免换行符问题。")
+        print(
+            "\n💡 提示：在Windows系统上，建议配置.gitattributes文件来避免换行符问题。"
+        )
         print("这可以防止仅因换行符不同而导致整个文件被标记为修改。")
 
         if user_confirm("是否要创建一个最小化的.gitattributes文件？", False):
@@ -328,7 +335,9 @@ class CodeAgent:
                         f.write("\n" + minimal_content)
                     print("✅ 已更新.gitattributes文件")
         else:
-            print("ℹ️ 跳过.gitattributes文件创建。如果遇到换行符问题，可以手动创建此文件。")
+            print(
+                "ℹ️ 跳过.gitattributes文件创建。如果遇到换行符问题，可以手动创建此文件。"
+            )
 
     def _handle_uncommitted_changes(self) -> None:
         """处理未提交的修改，包括：
@@ -341,12 +350,13 @@ class CodeAgent:
         if has_uncommitted_changes():
             # 获取代码变更统计
             from jarvis.jarvis_stats.stats import StatsManager
+
             stats_manager = StatsManager()
-            
+
             # 获取变更的代码行数
             try:
                 diff_result = subprocess.run(
-                    ["git", "diff", "--shortstat"],
+                    ["git", "diff", "HEAD", "--shortstat"],
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
@@ -356,21 +366,26 @@ class CodeAgent:
                 if diff_result.returncode == 0 and diff_result.stdout:
                     # 解析输出，如: "2 files changed, 10 insertions(+), 5 deletions(-)"
                     import re
-                    match = re.search(r'(\d+)\s+insertions?\(\+\)', diff_result.stdout)
+
+                    match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_result.stdout)
                     if match:
                         insertions = int(match.group(1))
-                        stats_manager.increment("code_lines_inserted", amount=insertions, group="code_agent")
-                    match = re.search(r'(\d+)\s+deletions?\(\-\)', diff_result.stdout)
+                        stats_manager.increment(
+                            "code_lines_inserted", amount=insertions, group="code_agent"
+                        )
+                    match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_result.stdout)
                     if match:
                         deletions = int(match.group(1))
-                        stats_manager.increment("code_lines_deleted", amount=deletions, group="code_agent")
+                        stats_manager.increment(
+                            "code_lines_deleted", amount=deletions, group="code_agent"
+                        )
             except subprocess.CalledProcessError:
                 pass
-            
+
             PrettyOutput.print("检测到未提交的修改，是否要提交？", OutputType.WARNING)
             if not user_confirm("是否要提交？", True):
                 return
-            
+
             # 用户确认修改，统计修改次数
             stats_manager.increment("code_modification_confirmed", group="code_agent")
 
@@ -402,7 +417,7 @@ class CodeAgent:
                     ["git", "commit", "-m", f"CheckPoint #{commit_count + 1}"],
                     check=True,
                 )
-                
+
                 # 统计提交次数
                 stats_manager.increment("code_commits_accepted", group="code_agent")
             except subprocess.CalledProcessError as e:
@@ -428,9 +443,10 @@ class CodeAgent:
         if commits:
             # 统计生成的commit数量
             from jarvis.jarvis_stats.stats import StatsManager
+
             stats_manager = StatsManager()
             stats_manager.increment("commits_generated", group="code_agent")
-            
+
             commit_messages = "检测到以下提交记录:\n" + "\n".join(
                 f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits
             )
@@ -444,9 +460,10 @@ class CodeAgent:
         if commits and user_confirm("是否接受以上提交记录？", True):
             # 统计接受的commit数量
             from jarvis.jarvis_stats.stats import StatsManager
+
             stats_manager = StatsManager()
             stats_manager.increment("commits_accepted", group="code_agent")
-            
+
             subprocess.run(
                 ["git", "reset", "--mixed", str(start_commit)],
                 stdout=subprocess.DEVNULL,
@@ -540,7 +557,9 @@ class CodeAgent:
 
                 # 添加提交信息到final_ret
                 if commits:
-                    final_ret += f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
+                    final_ret += (
+                        f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
+                    )
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
                         f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
@@ -617,8 +636,12 @@ def cli(
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         curr_dir_path = os.getcwd()
-        PrettyOutput.print(f"警告：当前目录 '{curr_dir_path}' 不是一个git仓库。", OutputType.WARNING)
-        if user_confirm(f"是否要在 '{curr_dir_path}' 中初始化一个新的git仓库？", default=True):
+        PrettyOutput.print(
+            f"警告：当前目录 '{curr_dir_path}' 不是一个git仓库。", OutputType.WARNING
+        )
+        if user_confirm(
+            f"是否要在 '{curr_dir_path}' 中初始化一个新的git仓库？", default=True
+        ):
             try:
                 subprocess.run(
                     ["git", "init"],
@@ -633,7 +656,9 @@ def cli(
                 PrettyOutput.print(f"❌ 初始化git仓库失败: {e}", OutputType.ERROR)
                 sys.exit(1)
         else:
-            PrettyOutput.print("操作已取消。Jarvis需要在git仓库中运行。", OutputType.INFO)
+            PrettyOutput.print(
+                "操作已取消。Jarvis需要在git仓库中运行。", OutputType.INFO
+            )
             sys.exit(0)
 
     curr_dir = os.getcwd()
