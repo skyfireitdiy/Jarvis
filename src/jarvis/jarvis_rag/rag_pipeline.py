@@ -60,25 +60,63 @@ class JarvisRAGPipeline:
             get_rag_embedding_cache_path(), sanitized_model_name
         )
 
-        self.embedding_manager = EmbeddingManager(
-            model_name=model_name,
-            cache_dir=_final_cache_path,
-        )
-        self.retriever = ChromaRetriever(
-            embedding_manager=self.embedding_manager,
-            db_path=_final_db_path,
-            collection_name=collection_name,
-        )
-        # 除非提供了特定的LLM，否则默认为ToolAgent_LLM
+        # 存储初始化参数以供延迟加载
         self.llm = llm if llm is not None else ToolAgent_LLM()
-        self.reranker = Reranker(model_name=get_rag_rerank_model())
-        # 使用标准LLM执行查询重写任务，而不是代理
-        self.query_rewriter = QueryRewriter(JarvisPlatform_LLM())
-
+        self.embedding_model_name = embedding_model or get_rag_embedding_model()
+        self.db_path = db_path
+        self.collection_name = collection_name
         self.use_bm25 = use_bm25
         self.use_rerank = use_rerank
 
-        print("✅ JarvisRAGPipeline 初始化成功。")
+        # 延迟加载的组件
+        self._embedding_manager: Optional[EmbeddingManager] = None
+        self._retriever: Optional[ChromaRetriever] = None
+        self._reranker: Optional[Reranker] = None
+        self._query_rewriter: Optional[QueryRewriter] = None
+
+        print("✅ JarvisRAGPipeline 初始化成功 (模型按需加载).")
+
+    def _get_embedding_manager(self) -> EmbeddingManager:
+        if self._embedding_manager is None:
+            sanitized_model_name = self.embedding_model_name.replace("/", "_").replace(
+                "\\", "_"
+            )
+            _final_cache_path = os.path.join(
+                get_rag_embedding_cache_path(), sanitized_model_name
+            )
+            self._embedding_manager = EmbeddingManager(
+                model_name=self.embedding_model_name,
+                cache_dir=_final_cache_path,
+            )
+        return self._embedding_manager
+
+    def _get_retriever(self) -> ChromaRetriever:
+        if self._retriever is None:
+            sanitized_model_name = self.embedding_model_name.replace("/", "_").replace(
+                "\\", "_"
+            )
+            _final_db_path = (
+                str(self.db_path)
+                if self.db_path
+                else os.path.join(get_rag_vector_db_path(), sanitized_model_name)
+            )
+            self._retriever = ChromaRetriever(
+                embedding_manager=self._get_embedding_manager(),
+                db_path=_final_db_path,
+                collection_name=self.collection_name,
+            )
+        return self._retriever
+
+    def _get_reranker(self) -> Reranker:
+        if self._reranker is None:
+            self._reranker = Reranker(model_name=get_rag_rerank_model())
+        return self._reranker
+
+    def _get_query_rewriter(self) -> QueryRewriter:
+        if self._query_rewriter is None:
+            # 使用标准LLM执行查询重写任务，而不是代理
+            self._query_rewriter = QueryRewriter(JarvisPlatform_LLM())
+        return self._query_rewriter
 
     def add_documents(self, documents: List[Document]):
         """
@@ -87,7 +125,7 @@ class JarvisRAGPipeline:
         参数:
             documents: 要添加的LangChain文档对象列表。
         """
-        self.retriever.add_documents(documents)
+        self._get_retriever().add_documents(documents)
 
     def _create_prompt(
         self, query: str, context_docs: List[Document], source_files: List[str]
@@ -129,13 +167,13 @@ class JarvisRAGPipeline:
             由LLM生成的答案。
         """
         # 1. 将原始查询重写为多个查询
-        rewritten_queries = self.query_rewriter.rewrite(query_text)
+        rewritten_queries = self._get_query_rewriter().rewrite(query_text)
 
         # 2. 为每个重写的查询检索初始候选文档
         all_candidate_docs = []
         for q in rewritten_queries:
             print(f"🔍 正在为查询变体 '{q}' 进行混合检索...")
-            candidates = self.retriever.retrieve(
+            candidates = self._get_retriever().retrieve(
                 q, n_results=n_results * 2, use_bm25=self.use_bm25
             )
             all_candidate_docs.extend(candidates)
@@ -150,7 +188,7 @@ class JarvisRAGPipeline:
         # 3. 根据*原始*查询对统一的候选池进行重排
         if self.use_rerank:
             print(f"🔍 正在对 {len(unique_candidate_docs)} 个候选文档进行重排（基于原始问题）...")
-            retrieved_docs = self.reranker.rerank(
+            retrieved_docs = self._get_reranker().rerank(
                 query_text, unique_candidate_docs, top_n=n_results
             )
         else:
