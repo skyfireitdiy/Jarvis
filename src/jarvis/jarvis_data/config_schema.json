@@ -139,7 +139,7 @@
     "JARVIS_THINKING_MODEL": {
       "type": "string",
       "description": "思考操作模型名称",
-      "default": "deep_seek"
+      "default": "deep_seek_v3"
     },
     "JARVIS_LLM_GROUP": {
       "type": "string",
@@ -169,7 +169,7 @@
             },
             "JARVIS_THINKING_MODEL": {
               "type": "string",
-              "default": "deep_seek"
+              "default": "deep_seek_v3"
             },
             "JARVIS_MAX_TOKEN_COUNT": {
               "type": "number",
@@ -234,6 +234,14 @@
       },
       "default": []
     },
+    "JARVIS_METHODOLOGY_DIRS": {
+      "type": "array",
+      "description": "方法论加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "JARVIS_PRINT_PROMPT": {
       "type": "boolean",
       "description": "是否打印提示",
@@ -260,11 +268,11 @@
           "properties": {
             "embedding_model": {
               "type": "string",
-              "default": "BAAI/bge-base-zh-v1.5"
+              "default": "BAAI/bge-m3"
             },
             "rerank_model": {
               "type": "string",
-              "default": "BAAI/bge-reranker-base"
+              "default": "BAAI/bge-reranker-v2-m3"
             },
             "use_bm25": {
               "type": "boolean",
@@ -284,13 +292,13 @@
       "properties": {
         "embedding_model": {
           "type": "string",
-          "default": "BAAI/bge-base-zh-v1.5",
-          "description": "用于RAG的嵌入模型的名称, 默认为 'BAAI/bge-base-zh-v1.5'"
+          "default": "BAAI/bge-m3",
+          "description": "用于RAG的嵌入模型的名称, 默认为 'BAAI/bge-m3'"
         },
         "rerank_model": {
           "type": "string",
-          "default": "BAAI/bge-reranker-base",
-          "description": "用于RAG的rerank模型的名称, 默认为 'BAAI/bge-reranker-base'"
+          "default": "BAAI/bge-reranker-v2-m3",
+          "description": "用于RAG的rerank模型的名称, 默认为 'BAAI/bge-reranker-v2-m3'"
         },
         "use_bm25": {
           "type": "boolean",
@@ -304,8 +312,8 @@
         }
       },
       "default": {
-        "embedding_model": "BAAI/bge-base-zh-v1.5",
-        "rerank_model": "BAAI/bge-reranker-base",
+        "embedding_model": "BAAI/bge-m3",
+        "rerank_model": "BAAI/bge-reranker-v2-m3",
         "use_bm25": true,
         "use_rerank": true
       }
@@ -361,6 +369,11 @@
     "OYI_API_KEY": {
       "type": "string",
       "description": "Oyi API Key"
+    },
+    "SHELL": {
+      "type": "string",
+      "description": "系统Shell路径，用于获取当前使用的shell类型",
+      "default": "/bin/bash"
     }
   },
   "additionalProperties": true
