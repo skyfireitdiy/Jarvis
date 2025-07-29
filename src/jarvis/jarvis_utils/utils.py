@@ -426,7 +426,9 @@ def get_loc_stats() -> str:
         str: loc命令输出的原始字符串，失败时返回空字符串
     """
     try:
-        result = subprocess.run(["loc"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["loc"], capture_output=True, text=True, encoding="utf-8", errors="replace"
+        )
         return result.stdout if result.returncode == 0 else ""
     except FileNotFoundError:
         return ""
@@ -471,9 +473,7 @@ def copy_to_clipboard(text: str) -> None:
             process.stdin.close()
         return
     except FileNotFoundError:
-        PrettyOutput.print(
-            "xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING
-        )
+        PrettyOutput.print("xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING)
     except Exception as e:
         PrettyOutput.print(f"使用xclip时出错: {e}", OutputType.WARNING)
 
@@ -492,6 +492,8 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             cwd=repo_path,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
             timeout=10,
         )
@@ -508,6 +510,8 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             cwd=repo_path,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
             timeout=10,
         )
@@ -524,6 +528,8 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             cwd=repo_path,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
             timeout=10,
         )
@@ -551,16 +557,18 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
         after_hash = after_hash_result.stdout.strip()
 
         if before_hash != after_hash:
-            PrettyOutput.print(f"{repo_type}库 '{repo_path.name}' 已更新。", OutputType.SUCCESS)
+            PrettyOutput.print(
+                f"{repo_type}库 '{repo_path.name}' 已更新。", OutputType.SUCCESS
+            )
             if pull_result.stdout.strip():
                 PrettyOutput.print(pull_result.stdout.strip(), OutputType.INFO)
         else:
-            PrettyOutput.print(f"{repo_type}库 '{repo_path.name}' 已是最新版本。", OutputType.INFO)
+            PrettyOutput.print(
+                f"{repo_type}库 '{repo_path.name}' 已是最新版本。", OutputType.INFO
+            )
 
     except FileNotFoundError:
-        PrettyOutput.print(
-            f"git 命令未找到，跳过更新 '{repo_path.name}'。", OutputType.WARNING
-        )
+        PrettyOutput.print(f"git 命令未找到，跳过更新 '{repo_path.name}'。", OutputType.WARNING)
     except subprocess.TimeoutExpired:
         PrettyOutput.print(f"更新 '{repo_path.name}' 超时。", OutputType.ERROR)
     except subprocess.CalledProcessError as e:
@@ -569,9 +577,7 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             f"更新 '{repo_path.name}' 失败: {error_message}", OutputType.ERROR
         )
     except Exception as e:
-        PrettyOutput.print(
-            f"更新 '{repo_path.name}' 时发生未知错误: {str(e)}", OutputType.ERROR
-        )
+        PrettyOutput.print(f"更新 '{repo_path.name}' 时发生未知错误: {str(e)}", OutputType.ERROR)
 
 
 def daily_check_git_updates(repo_dirs: List[str], repo_type: str):

@@ -214,9 +214,7 @@ def handle_commit_workflow() -> bool:
     Returns:
         bool: 提交是否成功
     """
-    if is_confirm_before_apply_patch() and not user_confirm(
-        "是否要提交代码？", default=True
-    ):
+    if is_confirm_before_apply_patch() and not user_confirm("是否要提交代码？", default=True):
         revert_change()
         return False
 
@@ -429,9 +427,7 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                 if not in_venv and (
                     "Permission denied" in error_msg or "not writeable" in error_msg
                 ):
-                    if user_confirm(
-                        "检测到权限问题，是否尝试用户级安装(--user)？", True
-                    ):
+                    if user_confirm("检测到权限问题，是否尝试用户级安装(--user)？", True):
                         user_result = subprocess.run(
                             install_cmd + ["--user"],
                             cwd=git_root,
@@ -446,9 +442,7 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                 PrettyOutput.print(f"代码安装失败: {error_msg}", OutputType.ERROR)
                 return False
             except Exception as e:
-                PrettyOutput.print(
-                    f"安装过程中发生意外错误: {str(e)}", OutputType.ERROR
-                )
+                PrettyOutput.print(f"安装过程中发生意外错误: {str(e)}", OutputType.ERROR)
                 return False
         # 更新检查日期文件
         with open(last_check_file, "w") as f:
@@ -482,9 +476,7 @@ def get_diff_file_list() -> List[str]:
         subprocess.run(["git", "reset"], check=True)
 
         if result.returncode != 0:
-            PrettyOutput.print(
-                f"获取差异文件列表失败: {result.stderr}", OutputType.ERROR
-            )
+            PrettyOutput.print(f"获取差异文件列表失败: {result.stderr}", OutputType.ERROR)
             return []
 
         return [f for f in result.stdout.splitlines() if f]
@@ -533,8 +525,10 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
-        if result.returncode != 0:
+        if result.returncode != 0 or result.stdout is None:
             return []
 
         # 解析提交信息
@@ -632,9 +626,7 @@ def confirm_add_new_files() -> None:
             need_confirm = True
 
         if binary_files:
-            output_lines.append(
-                f"检测到{len(binary_files)}个二进制文件(选择N将重新检测)"
-            )
+            output_lines.append(f"检测到{len(binary_files)}个二进制文件(选择N将重新检测)")
             output_lines.append("二进制文件列表:")
             output_lines.extend(f"  - {file}" for file in binary_files)
             need_confirm = True

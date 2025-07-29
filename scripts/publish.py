@@ -65,7 +65,7 @@ def update_version(version_type: str) -> str:
 def run_command(cmd: List[str], error_msg: str) -> None:
     """运行命令"""
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        subprocess.run(cmd, check=True, capture_output=True, text=True, encoding="utf-8", errors="replace")
     except subprocess.CalledProcessError as e:
         print(f"Error: {error_msg}")
         print(f"Stderr: {e.stderr}")

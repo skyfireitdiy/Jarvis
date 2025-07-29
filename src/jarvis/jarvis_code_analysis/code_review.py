@@ -300,7 +300,7 @@ class CodeReviewTool:
 
                     # Execute git command and get diff output
                     diff_output = subprocess.check_output(
-                        diff_cmd, shell=True, text=True
+                        diff_cmd, shell=True, text=True, encoding="utf-8", errors="replace"
                     )
                     if not diff_output:
                         return {
@@ -337,7 +337,7 @@ class CodeReviewTool:
 
                     # Execute git command and get diff output
                     diff_output = subprocess.check_output(
-                        diff_cmd, shell=True, text=True
+                        diff_cmd, shell=True, text=True, encoding="utf-8", errors="replace"
                     )
                     if not diff_output:
                         return {
@@ -379,7 +379,7 @@ class CodeReviewTool:
 
                     # Execute git command and get diff output
                     diff_output = subprocess.check_output(
-                        diff_cmd, shell=True, text=True
+                        diff_cmd, shell=True, text=True, encoding="utf-8", errors="replace"
                     )
                     if not diff_output:
                         return {
