@@ -40,25 +40,94 @@ def list_tools(
 
 
 @app.command("stat")
-def stat_tools(as_json: bool = typer.Option(False, "--json", help="以JSON格式输出")):
+def stat_tools(
+    as_json: bool = typer.Option(False, "--json", help="以JSON格式输出"),
+    last_days: Optional[int] = typer.Option(None, "--days", help="显示最近N天的统计（默认显示所有历史数据）"),
+    format: str = typer.Option("table", "--format", help="显示格式: table, chart, summary")
+):
     """显示工具调用统计信息"""
-    registry = ToolRegistry()
-    stats = registry._get_tool_stats()
-    tools = registry.get_all_tools()
+    from jarvis.jarvis_stats.stats import StatsManager
+    
+    stats_manager = StatsManager()
+    
+    if format == "table":
+        registry = ToolRegistry()
+        stats = registry._get_tool_stats()
+        tools = registry.get_all_tools()
 
-    table_data = []
-    for tool in tools:
-        name = tool["name"]
-        count = stats.get(name, 0)
-        table_data.append([name, count])
+        table_data = []
+        for tool in tools:
+            name = tool["name"]
+            count = stats.get(name, 0)
+            if count > 0:  # 只显示有调用记录的工具
+                table_data.append([name, count])
 
-    table_data.sort(key=lambda x: x[1], reverse=True)
+        table_data.sort(key=lambda x: x[1], reverse=True)
 
-    if as_json:
-        print(json.dumps(dict(table_data), indent=2))
+        if as_json:
+            print(json.dumps(dict(table_data), indent=2))
+        else:
+            time_desc = f"最近{last_days}天" if last_days else "所有历史"
+            PrettyOutput.section(f"工具调用统计 ({time_desc})", OutputType.SYSTEM)
+            if table_data:
+                print(tabulate(table_data, headers=["工具名称", "调用次数"], tablefmt="grid"))
+                print(f"\n总计: {len(table_data)} 个工具被使用，共 {sum(x[1] for x in table_data)} 次调用")
+            else:
+                print("暂无工具调用记录")
     else:
-        PrettyOutput.section("工具调用统计", OutputType.SYSTEM)
-        print(tabulate(table_data, headers=["工具名称", "调用次数"], tablefmt="grid"))
+        # 使用 stats 系统的高级功能
+        PrettyOutput.section("工具组统计", OutputType.SYSTEM)
+        # 显示所有标记为 tool 组的指标
+        metrics = stats_manager.list_metrics()
+        tool_metrics = []
+        
+        for metric in metrics:
+            # 检查是否是工具组的指标
+            if last_days:
+                stats_data = stats_manager.get_stats(
+                    metric_name=metric,
+                    last_days=last_days,
+                    tags={"group": "tool"}
+                )
+            else:
+                # 获取所有历史数据
+                from datetime import datetime
+                stats_data = stats_manager.get_stats(
+                    metric_name=metric,
+                    start_time=datetime(2000, 1, 1),
+                    end_time=datetime.now(),
+                    tags={"group": "tool"}
+                )
+            if stats_data and stats_data.get("records"):
+                tool_metrics.append(metric)
+        
+        if tool_metrics:
+            for metric in tool_metrics:
+                if format == "chart":
+                    if last_days:
+                        stats_manager.plot(metric, last_days=last_days, tags={"group": "tool"})
+                    else:
+                        from datetime import datetime
+                        stats_manager.plot(
+                            metric, 
+                            start_time=datetime(2000, 1, 1), 
+                            end_time=datetime.now(), 
+                            tags={"group": "tool"}
+                        )
+                elif format == "summary":
+                    if last_days:
+                        stats_manager.show(metric, last_days=last_days, format="summary", tags={"group": "tool"})
+                    else:
+                        from datetime import datetime
+                        stats_manager.show(
+                            metric, 
+                            start_time=datetime(2000, 1, 1), 
+                            end_time=datetime.now(), 
+                            format="summary", 
+                            tags={"group": "tool"}
+                        )
+        else:
+            print("暂无工具调用记录")
 
 
 @app.command("call")

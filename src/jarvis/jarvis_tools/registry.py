@@ -200,25 +200,44 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def _get_tool_stats(self) -> Dict[str, int]:
         """从数据目录获取工具调用统计"""
-        stats_file = Path(get_data_dir()) / "tool_stat.yaml"
-        if stats_file.exists():
-            try:
-                with open(stats_file, "r", encoding="utf-8") as f:
-                    return yaml.safe_load(f) or {}
-            except Exception as e:
-                PrettyOutput.print(f"加载工具调用统计失败: {str(e)}", OutputType.WARNING)
-        return {}
+        from jarvis.jarvis_stats.stats import StatsManager
+        from datetime import datetime, timedelta
+        
+        stats_manager = StatsManager()
+        
+        # 获取所有工具的统计数据
+        tool_stats = {}
+        tools = self.get_all_tools()
+        
+        # 获取所有历史数据（从很早的时间开始）
+        end_time = datetime.now()
+        start_time = datetime(2000, 1, 1)  # 使用一个足够早的时间
+        
+        for tool in tools:
+            tool_name = tool["name"]
+            # 获取该工具的统计数据
+            stats_data = stats_manager.get_stats(
+                metric_name=tool_name,
+                start_time=start_time,
+                end_time=end_time,
+                tags={"group": "tool"}
+            )
+            
+            # 计算总调用次数
+            if stats_data and "records" in stats_data:
+                total_count = sum(record["value"] for record in stats_data["records"])
+                tool_stats[tool_name] = int(total_count)
+            else:
+                tool_stats[tool_name] = 0
+                
+        return tool_stats
 
     def _update_tool_stats(self, name: str) -> None:
         """更新工具调用统计"""
-        stats = self._get_tool_stats()
-        stats[name] = stats.get(name, 0) + 1
-        stats_file = Path(get_data_dir()) / "tool_stat.yaml"
-        try:
-            with open(stats_file, "w", encoding="utf-8") as f:
-                yaml.safe_dump(stats, f, allow_unicode=True)
-        except Exception as e:
-            PrettyOutput.print(f"保存工具调用统计失败: {str(e)}", OutputType.WARNING)
+        from jarvis.jarvis_stats.stats import StatsManager
+        
+        stats_manager = StatsManager()
+        stats_manager.increment(name, group="tool")
 
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
