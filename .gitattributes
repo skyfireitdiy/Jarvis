@@ -1,70 +1,10 @@
-# Handle line endings automatically for files detected as text
-# and leave all files detected as binary untouched.
+# Jarvis建议的最小化换行符配置
+# 默认所有文本文件使用LF，只有Windows特定文件使用CRLF
+
+# 默认所有文本文件使用LF
 * text=auto eol=lf
 
-# Force batch scripts to always use CRLF line endings so Windows batch files work
+# Windows批处理文件需要CRLF
 *.bat text eol=crlf
 *.cmd text eol=crlf
-
-# Force bash scripts to always use LF line endings
-*.sh text eol=lf
-
-# Python files should always use LF
-*.py text eol=lf
-
-# Common text files
-*.txt text eol=lf
-*.md text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
-*.json text eol=lf
-*.toml text eol=lf
-*.ini text eol=lf
-*.cfg text eol=lf
-
-# Source code
-*.js text eol=lf
-*.ts text eol=lf
-*.jsx text eol=lf
-*.tsx text eol=lf
-*.css text eol=lf
-*.scss text eol=lf
-*.html text eol=lf
-*.xml text eol=lf
-*.java text eol=lf
-*.c text eol=lf
-*.cpp text eol=lf
-*.h text eol=lf
-*.hpp text eol=lf
-*.go text eol=lf
-*.rs text eol=lf
-*.rb text eol=lf
-*.php text eol=lf
-
-# Config files
-.gitignore text eol=lf
-.gitattributes text eol=lf
-.editorconfig text eol=lf
-Dockerfile text eol=lf
-Makefile text eol=lf
-
-# Binary files (should not be modified)
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.pdf binary
-*.zip binary
-*.tar binary
-*.gz binary
-*.7z binary
-*.exe binary
-*.dll binary
-*.so binary
-*.dylib binary
-*.pyc binary
-*.pyo binary
-*.pyd binary
-*.db binary
-*.sqlite binary
+*.ps1 text eol=crlf

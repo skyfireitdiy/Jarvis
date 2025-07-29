@@ -54,6 +54,9 @@ class CodeAgent:
         need_summary: bool = True,
     ):
         self.root_dir = os.getcwd()
+
+        # 检测 git username 和 email 是否已设置
+        self._check_git_config()
         tool_registry = ToolRegistry()  # type: ignore
         tool_registry.use_tools(
             [
@@ -132,6 +135,55 @@ class CodeAgent:
         )
 
         self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
+
+    def _check_git_config(self) -> None:
+        """检查 git username 和 email 是否已设置，如果没有则提示并退出"""
+        try:
+            # 检查 git user.name
+            result = subprocess.run(
+                ["git", "config", "--get", "user.name"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            username = result.stdout.strip()
+
+            # 检查 git user.email
+            result = subprocess.run(
+                ["git", "config", "--get", "user.email"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            email = result.stdout.strip()
+
+            # 如果任一配置未设置，提示并退出
+            if not username or not email:
+                PrettyOutput.print("❌ Git 配置不完整", OutputType.ERROR)
+                if not username:
+                    PrettyOutput.print("  - 缺少 user.name 配置", OutputType.ERROR)
+                if not email:
+                    PrettyOutput.print("  - 缺少 user.email 配置", OutputType.ERROR)
+
+                PrettyOutput.print("\n请运行以下命令配置 Git：", OutputType.INFO)
+                if not username:
+                    PrettyOutput.print(
+                        '  git config --global user.name "Your Name"', OutputType.INFO
+                    )
+                if not email:
+                    PrettyOutput.print(
+                        '  git config --global user.email "your.email@example.com"',
+                        OutputType.INFO,
+                    )
+
+                sys.exit(1)
+
+        except FileNotFoundError:
+            PrettyOutput.print("❌ 未找到 git 命令，请先安装 Git", OutputType.ERROR)
+            sys.exit(1)
+        except Exception as e:
+            PrettyOutput.print(f"❌ 检查 Git 配置时出错: {str(e)}", OutputType.ERROR)
+            sys.exit(1)
 
     def _find_git_root(self) -> str:
         """查找并切换到git根目录
@@ -256,20 +308,15 @@ class CodeAgent:
         if user_confirm("是否要创建一个最小化的.gitattributes文件？", False):
             # 最小化的内容，只影响特定类型的文件
             minimal_content = """# Jarvis建议的最小化换行符配置
-# 保持现有文件的换行符不变，只对特定文件类型设置规则
+# 默认所有文本文件使用LF，只有Windows特定文件使用CRLF
+
+# 默认所有文本文件使用LF
+* text=auto eol=lf
 
 # Windows批处理文件需要CRLF
 *.bat text eol=crlf
 *.cmd text eol=crlf
-
-# Shell脚本需要LF
-*.sh text eol=lf
-
-# 二进制文件不应被修改
-*.exe binary
-*.dll binary
-*.so binary
-*.dylib binary
+*.ps1 text eol=crlf
 """
 
             if not os.path.exists(gitattributes_path):
