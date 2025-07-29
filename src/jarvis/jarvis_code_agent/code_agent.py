@@ -185,11 +185,15 @@ class CodeAgent:
         1. 查找git根目录
         2. 检查并更新.gitignore文件
         3. 处理未提交的修改
+        4. 配置git对换行符变化不敏感
         """
         print("🚀 正在初始化环境...")
         git_dir = self._find_git_root()
         self._update_gitignore(git_dir)
         self._handle_git_changes()
+        # 配置git对换行符变化不敏感
+        subprocess.run(["git", "config", "core.autocrlf", "false"], check=True)
+        subprocess.run(["git", "config", "core.safecrlf", "false"], check=True)
         print("✅ 环境初始化完成")
 
     def _handle_uncommitted_changes(self) -> None:
