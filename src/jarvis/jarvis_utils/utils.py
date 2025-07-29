@@ -180,6 +180,67 @@ def _show_usage_stats() -> None:
                     f"\n📈 总计: 工具调用 {total_tools:,} 次, 代码修改 {total_changes:,} 次"
                 )
 
+            # 计算节省的时间
+            # 基于经验估算：
+            # - 每次工具调用平均节省5分钟（相比手动操作）
+            # - 每次代码修改平均节省10分钟（相比手动编写和调试）
+            # - 每行代码修改平均节省30秒（考虑思考、编写、测试时间）
+            # - 每次提交平均节省15分钟（考虑整理、描述、检查时间）
+
+            time_saved_minutes = 0
+
+            # 工具调用节省的时间
+            time_saved_minutes += total_tools * 5
+
+            # 代码修改节省的时间
+            time_saved_minutes += total_changes * 10
+
+            # 代码行数节省的时间
+            total_lines = sum(
+                stats.get(m, 0)
+                for _, stats, _ in stats_output
+                if "代码行数" in _[0]
+                for m in stats
+            )
+            time_saved_minutes += total_lines * 0.5  # 30秒 = 0.5分钟
+
+            # 提交节省的时间
+            total_commits = sum(
+                stats.get(m, 0)
+                for _, stats, _ in stats_output
+                if "提交统计" in _[0]
+                for m in stats
+            )
+            time_saved_minutes += total_commits * 15
+
+            # 转换为更友好的格式
+            if time_saved_minutes > 0:
+                hours = int(time_saved_minutes // 60)
+                minutes = int(time_saved_minutes % 60)
+
+                if hours > 24:
+                    days = hours // 24
+                    remaining_hours = hours % 24
+                    time_str = f"{days} 天 {remaining_hours} 小时 {minutes} 分钟"
+                elif hours > 0:
+                    time_str = f"{hours} 小时 {minutes} 分钟"
+                else:
+                    time_str = f"{minutes} 分钟"
+
+                stats_lines.append(f"\n⏱️  节省时间: 约 {time_str}")
+
+                # 根据节省的时间给出鼓励信息
+                if hours >= 100:
+                    stats_lines.append(
+                        "🎉 您已经通过 Jarvis 节省了超过100小时的开发时间！"
+                    )
+                elif hours >= 40:
+                    stats_lines.append("🚀 相当于节省了一整周的工作时间！")
+                elif hours >= 8:
+                    stats_lines.append("💪 相当于节省了一个工作日的时间！")
+                elif hours >= 1:
+                    stats_lines.append("✨ 积少成多，继续保持！")
+
             # 一次性输出所有统计信息
             PrettyOutput.print("\n".join(stats_lines), OutputType.INFO)
     except Exception:
