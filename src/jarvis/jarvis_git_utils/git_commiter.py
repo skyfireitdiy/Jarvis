@@ -263,11 +263,22 @@ commit信息
                     tmp_file.flush()
                     print("💾 正在执行提交...")
                     commit_cmd = ["git", "commit", "-F", tmp_file.name]
-                    subprocess.Popen(
+                    process = subprocess.Popen(
                         commit_cmd,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    ).wait()
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    stdout, stderr = process.communicate()
+
+                    if process.returncode != 0:
+                        # 如果提交失败，重置暂存区
+                        subprocess.run(["git", "reset", "HEAD"], check=False)
+                        error_msg = (
+                            stderr.strip() if stderr else "Unknown git commit error"
+                        )
+                        raise Exception(f"Git commit failed: {error_msg}")
+
                     print("✅ 提交")
 
                 commit_hash = self._get_last_commit_hash()
