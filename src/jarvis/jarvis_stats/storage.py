@@ -10,7 +10,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from collections import defaultdict
-import fcntl
+import sys
+import time
 
 
 class StatsStorage:
@@ -58,26 +59,51 @@ class StatsStorage:
         if not filepath.exists():
             return {}
 
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                # 使用文件锁避免并发读写问题
-                fcntl.flock(f.fileno(), fcntl.LOCK_SH)
-                data = json.load(f)
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-                return data
-        except Exception:
-            return {}
+        # 重试机制处理并发访问
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data
+            except (json.JSONDecodeError, IOError):
+                if attempt < max_retries - 1:
+                    time.sleep(0.1 * (attempt + 1))  # 递增延迟
+                    continue
+                return {}
+        return {}
 
     def _save_json(self, filepath: Path, data: Dict):
         """保存JSON文件"""
-        try:
-            with open(filepath, "w", encoding="utf-8") as f:
-                # 使用文件锁避免并发读写问题
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-                json.dump(data, f, ensure_ascii=False, indent=2)
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-        except Exception as e:
-            raise RuntimeError(f"保存数据失败: {e}")
+        # 使用临时文件+重命名的原子操作来避免并发写入问题
+        temp_filepath = filepath.with_suffix(".tmp")
+        max_retries = 3
+
+        for attempt in range(max_retries):
+            try:
+                # 先写入临时文件
+                with open(temp_filepath, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+
+                # Windows上需要先删除目标文件（如果存在）
+                if sys.platform == "win32" and filepath.exists():
+                    filepath.unlink()
+
+                # 原子性重命名
+                temp_filepath.rename(filepath)
+                return
+
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(0.1 * (attempt + 1))  # 递增延迟
+                    continue
+                # 清理临时文件
+                if temp_filepath.exists():
+                    try:
+                        temp_filepath.unlink()
+                    except OSError:
+                        pass
+                raise RuntimeError(f"保存数据失败: {e}") from e
 
     def add_metric(
         self,
