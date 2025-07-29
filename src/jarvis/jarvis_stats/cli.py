@@ -53,7 +53,7 @@ def add(
                 key, val = tag.split("=", 1)
                 tag_dict[key] = val
 
-    stats.add(metric, value, unit=unit, tags=tag_dict if tag_dict else None)
+    stats.increment(metric, amount=value, unit=unit, tags=tag_dict if tag_dict else None)
 
     rprint(f"[green]✓[/green] 已添加数据: {metric}={value}" + (f" {unit}" if unit else ""))
     if tag_dict:
@@ -281,9 +281,9 @@ def demo():
         for i in range(20):
             response_time = random.uniform(0.1, 2.0)
             status_code = random.choice(["200", "404", "500"])
-            stats.add(
+            stats.increment(
                 "demo_response_time",
-                response_time,
+                amount=response_time,
                 unit="seconds",
                 tags={"status": status_code},
             )

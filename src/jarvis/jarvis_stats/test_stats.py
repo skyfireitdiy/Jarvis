@@ -27,9 +27,9 @@ def test_basic_functionality():
     # 响应时间
     for i in range(30):
         response_time = random.uniform(0.1, 2.0)
-        stats.add(
+        stats.increment(
             "response_time",
-            response_time,
+            amount=response_time,
             unit="seconds",
             tags={"status": random.choice(["200", "404", "500"])},
         )
@@ -128,9 +128,9 @@ def test_tags_filtering():
         method = random.choice(methods)
         latency = random.uniform(10, 500)
 
-        stats.add(
+        stats.increment(
             "api_latency",
-            latency,
+            amount=latency,
             unit="ms",
             tags={"endpoint": endpoint, "method": method},
         )
