@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""A tool for searching the web."""
+"""网络搜索工具。"""
 from typing import Any, Dict
 
 import requests
@@ -17,7 +17,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class SearchWebTool:
-    """A class to handle web searches."""
+    """处理网络搜索的类。"""
 
     name = "search_web"
     description = "搜索互联网上的信息"
@@ -28,7 +28,7 @@ class SearchWebTool:
 
     def _search_with_ddgs(self, query: str, agent: Agent) -> Dict[str, Any]:
         # pylint: disable=too-many-locals, broad-except
-        """Performs a web search, scrapes content, and summarizes the results."""
+        """执行网络搜索、抓取内容并总结结果。"""
         try:
             PrettyOutput.print("▶️ 使用 DuckDuckGo 开始网页搜索...", OutputType.INFO)
             results = list(DDGS().text(query, max_results=50))
