@@ -216,6 +216,8 @@ class CodeAgent:
                     ["git", "rev-list", "--count", "HEAD"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     check=True,
                 )
                 if commit_result.returncode != 0:
@@ -436,7 +438,14 @@ def cli(
         PrettyOutput.print(f"警告：当前目录 '{curr_dir_path}' 不是一个git仓库。", OutputType.WARNING)
         if user_confirm(f"是否要在 '{curr_dir_path}' 中初始化一个新的git仓库？", default=True):
             try:
-                subprocess.run(["git", "init"], check=True, capture_output=True)
+                subprocess.run(
+                    ["git", "init"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
                 PrettyOutput.print("✅ 已成功初始化git仓库。", OutputType.SUCCESS)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 PrettyOutput.print(f"❌ 初始化git仓库失败: {e}", OutputType.ERROR)
