@@ -163,16 +163,16 @@ def _show_usage_stats() -> None:
 
             # 总结统计
             total_tools = sum(
-                stats.get(m, 0)
-                for _, stats, _ in stats_output
-                if "工具" in _[0]
-                for m in stats
+                count
+                for title, stats, _ in stats_output
+                if "工具" in title
+                for metric, count in stats.items()
             )
             total_changes = sum(
-                stats.get(m, 0)
-                for _, stats, _ in stats_output
-                if "代码修改" in _[0]
-                for m in stats
+                count
+                for title, stats, _ in stats_output
+                if "代码修改" in title
+                for metric, count in stats.items()
             )
 
             if total_tools > 0 or total_changes > 0:
@@ -188,6 +188,10 @@ def _show_usage_stats() -> None:
             # - 每次提交平均节省15分钟（考虑整理、描述、检查时间）
 
             time_saved_minutes = 0
+            
+            # 调试输出
+            PrettyOutput.print(f"[DEBUG] 开始计算节省时间...", OutputType.INFO)
+            PrettyOutput.print(f"[DEBUG] total_tools={total_tools}, total_changes={total_changes}", OutputType.INFO)
 
             # 工具调用节省的时间
             time_saved_minutes += total_tools * 5
@@ -197,19 +201,19 @@ def _show_usage_stats() -> None:
 
             # 代码行数节省的时间
             total_lines = sum(
-                stats.get(m, 0)
-                for _, stats, _ in stats_output
-                if "代码行数" in _[0]
-                for m in stats
+                count
+                for title, stats, _ in stats_output
+                if "代码行数" in title
+                for metric, count in stats.items()
             )
             time_saved_minutes += total_lines * 0.5  # 30秒 = 0.5分钟
 
             # 提交节省的时间
             total_commits = sum(
-                stats.get(m, 0)
-                for _, stats, _ in stats_output
-                if "提交统计" in _[0]
-                for m in stats
+                count
+                for title, stats, _ in stats_output
+                if "提交统计" in title
+                for metric, count in stats.items()
             )
             time_saved_minutes += total_commits * 15
 
@@ -243,9 +247,11 @@ def _show_usage_stats() -> None:
 
             # 一次性输出所有统计信息
             PrettyOutput.print("\n".join(stats_lines), OutputType.INFO)
-    except Exception:
-        # 忽略统计显示错误，不影响正常功能
-        pass
+    except Exception as e:
+        # 输出错误信息以便调试
+        import traceback
+        PrettyOutput.print(f"统计显示出错: {str(e)}", OutputType.ERROR)
+        PrettyOutput.print(traceback.format_exc(), OutputType.ERROR)
 
 
 def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
