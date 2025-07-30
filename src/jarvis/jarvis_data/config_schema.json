@@ -111,14 +111,9 @@
       "description": "Git提交信息生成提示模板",
       "default": ""
     },
-    "JARVIS_MAX_TOKEN_COUNT": {
-      "type": "number",
-      "description": "模型能处理的最大token数量",
-      "default": 960000
-    },
     "JARVIS_MAX_INPUT_TOKEN_COUNT": {
       "type": "number",
-      "description": "模型能处理的最大输入token数量",
+      "description": "模型能处理的最大输入token数量。其他token限制基于此值计算：最大token数量=此值×100，最大大内容尺寸=此值×5",
       "default": 32000
     },
     "JARVIS_PLATFORM": {
@@ -171,17 +166,9 @@
               "type": "string",
               "default": "deep_seek_v3"
             },
-            "JARVIS_MAX_TOKEN_COUNT": {
-              "type": "number",
-              "default": 960000
-            },
             "JARVIS_MAX_INPUT_TOKEN_COUNT": {
               "type": "number",
               "default": 32000
-            },
-            "JARVIS_MAX_BIG_CONTENT_SIZE": {
-              "type": "number",
-              "default": 160000
             }
           },
           "required": [
@@ -206,11 +193,7 @@
       "description": "Jarvis数据存储目录路径",
       "default": "~/.jarvis"
     },
-    "JARVIS_MAX_BIG_CONTENT_SIZE": {
-      "type": "number",
-      "description": "最大大内容尺寸",
-      "default": 160000
-    },
+
     "JARVIS_PRETTY_OUTPUT": {
       "type": "boolean",
       "description": "是否启用美化输出",
