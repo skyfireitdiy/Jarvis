@@ -46,7 +46,6 @@ PROJECT_ROOT="$(realpath "$SCRIPT_DIR/..")"
 STYLE_CSS="$SCRIPT_DIR/style.css"
 DEFAULT_INPUT_FILE="$PROJECT_ROOT/docs/technical_documentation.md"
 DEFAULT_OUTPUT_FILE="$PROJECT_ROOT/Jarvis_Technical_Documentation_Prince.pdf"
-DOC_TITLE="Jarvis Technical Documentation"
 TEMP_HTML_FILE=$(mktemp --suffix=.html)
 
 # --- Input Validation ---
@@ -57,6 +56,10 @@ fi
 
 INPUT_FILE="${1:-$DEFAULT_INPUT_FILE}"
 OUTPUT_FILE="${2:-$DEFAULT_OUTPUT_FILE}"
+
+# Derive document title from the output filename
+DOC_BASENAME=$(basename "$OUTPUT_FILE" .pdf)
+DOC_TITLE="${DOC_BASENAME//_/ }"
 
 # Resolve paths to be absolute
 INPUT_FILE_ABS="$(realpath "$INPUT_FILE")"
