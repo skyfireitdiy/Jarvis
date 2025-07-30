@@ -11,6 +11,10 @@ from typing import Any, Callable, Dict, List, Optional
 from datetime import datetime
 
 import yaml  # type: ignore
+from rich.console import Group
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from jarvis import __version__
 from jarvis.jarvis_utils.config import (
@@ -80,9 +84,15 @@ def _check_git_updates() -> bool:
 def _show_usage_stats() -> None:
     """显示Jarvis使用统计信息"""
     try:
+        from datetime import datetime
+
+        from rich.console import Console, Group
+        from rich.panel import Panel
+        from rich.table import Table
+        from rich.text import Text
+
         from jarvis.jarvis_stats.stats import StatsManager
         from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-        from datetime import datetime
 
         stats_manager = StatsManager()
 
@@ -148,18 +158,35 @@ def _show_usage_stats() -> None:
 
         # 显示统计信息
         if has_data:
-            # 构建统计信息字符串
-            stats_lines = ["📊 Jarvis 使用统计"]
+            # 1. 创建统计表格
+            table = Table(
+                show_header=True,
+                header_style="bold magenta",
+                title="📊 Jarvis 使用统计",
+                box=None,
+                padding=(0, 1),
+            )
+            table.add_column("分类", style="cyan", no_wrap=True, width=12)
+            table.add_column("指标", style="white")
+            table.add_column("数量", style="green", justify="right")
 
+            has_content = False
             for title, stats, suffix in stats_output:
                 if stats:
-                    stats_lines.append(f"\n{title}:")
-                    for metric, count in sorted(
-                        stats.items(), key=lambda x: x[1], reverse=True
-                    ):
-                        # 美化指标名称
+                    has_content = True
+                    sorted_stats = sorted(
+                        stats.items(), key=lambda item: item[1], reverse=True
+                    )
+                    for i, (metric, count) in enumerate(sorted_stats):
                         display_name = metric.replace("_", " ").title()
-                        stats_lines.append(f"  • {display_name}: {count:,} {suffix}")
+                        category_title = title if i == 0 else ""
+                        table.add_row(
+                            category_title, display_name, f"{count:,} {suffix}"
+                        )
+                    table.add_section()
+
+            # 2. 创建总结面板
+            summary_content = []
 
             # 总结统计
             total_tools = sum(
@@ -176,54 +203,46 @@ def _show_usage_stats() -> None:
             )
 
             if total_tools > 0 or total_changes > 0:
-                stats_lines.append(
-                    f"\n📈 总计: 工具调用 {total_tools:,} 次, 代码修改 {total_changes:,} 次"
+                summary_content.append(
+                    f"📈 [bold]总计[/bold]: 工具调用 {total_tools:,} 次, 代码修改 {total_changes:,} 次"
+                )
+
+            # 计算并显示采纳率
+            commit_stats = categorized_stats["commit"]["metrics"]
+            adopted_commits = commit_stats.get("commit_adopted", 0)
+            rejected_commits = commit_stats.get("commit_rejected", 0)
+            total_commits_for_rate = adopted_commits + rejected_commits
+
+            if total_commits_for_rate > 0:
+                adoption_rate = (adopted_commits / total_commits_for_rate) * 100
+                summary_content.append(
+                    f"🎯 [bold]采纳率[/bold]: {adoption_rate:.1f}% ({adopted_commits}/{total_commits_for_rate})"
                 )
 
             # 计算节省的时间
-            # 基于经验估算：
-            # 基于以下模型估算节省的时间：
-            # - 普通工具调用：2分钟/次
-            # - 代码智能体调用：10分钟/次
-            # - 新增代码行：0.8分钟/行 (48秒)
-            # - 删除代码行：0.2分钟/行 (12秒)
-            # - 提交：10分钟/次
-            # - 命令使用：1分钟/次
             time_saved_seconds = 0
-
-            # 区分普通工具和代码智能体
             tool_stats = categorized_stats["tool"]["metrics"]
             code_agent_changes = categorized_stats["code"]["metrics"]
             lines_stats = categorized_stats["lines"]["metrics"]
-            commit_stats = categorized_stats["commit"]["metrics"]
+            # commit_stats is already defined above
             command_stats = categorized_stats["command"]["metrics"]
-
-            # 普通工具调用节省的时间
             time_saved_seconds += tool_stats.get("execute_script", 0) * 2 * 60
             time_saved_seconds += tool_stats.get("search_web", 0) * 2 * 60
             time_saved_seconds += tool_stats.get("read_code", 0) * 2 * 60
-
-            # 代码智能体调用节省的时间
             total_code_agent_calls = sum(code_agent_changes.values())
             time_saved_seconds += total_code_agent_calls * 10 * 60
-
-            # 代码行数节省的时间 (修改一行约等于删除后新增，因此权重主要在新增行)
             time_saved_seconds += lines_stats.get("code_lines_added", 0) * 0.8 * 60
             time_saved_seconds += lines_stats.get("code_lines_deleted", 0) * 0.2 * 60
-
-            # 提交节省的时间
             time_saved_seconds += sum(commit_stats.values()) * 10 * 60
-
-            # 命令调用节省的时间
             time_saved_seconds += sum(command_stats.values()) * 1 * 60
 
-            # 转换为更友好的格式
+            time_str = ""
+            hours = 0
             if time_saved_seconds > 0:
                 total_minutes = int(time_saved_seconds / 60)
                 seconds = int(time_saved_seconds % 60)
                 hours = total_minutes // 60
                 minutes = total_minutes % 60
-
                 if hours >= 8:
                     days = hours // 8
                     remaining_hours = hours % 8
@@ -235,22 +254,42 @@ def _show_usage_stats() -> None:
                 else:
                     time_str = f"{seconds} 秒"
 
-                stats_lines.append(f"\n⏱️  节省时间: 约 {time_str}")
+                if summary_content:
+                    summary_content.append("")  # Add a separator line
+                summary_content.append(f"⏱️  [bold]节省时间[/bold]: 约 {time_str}")
 
-                # 根据节省的时间给出鼓励信息
+                encouragement = ""
                 if hours >= 100:
-                    stats_lines.append(
-                        "🎉 您已经通过 Jarvis 节省了超过100小时的开发时间！"
-                    )
+                    encouragement = "🎉 您已经通过 Jarvis 节省了超过100小时的开发时间！"
                 elif hours >= 40:
-                    stats_lines.append("🚀 相当于节省了一整周的工作时间！")
+                    encouragement = "🚀 相当于节省了一整周的工作时间！"
                 elif hours >= 8:
-                    stats_lines.append("💪 相当于节省了一个工作日的时间！")
+                    encouragement = "💪 相当于节省了一个工作日的时间！"
                 elif hours >= 1:
-                    stats_lines.append("✨ 积少成多，继续保持！")
+                    encouragement = "✨ 积少成多，继续保持！"
+                if encouragement:
+                    summary_content.append(
+                        f"[italic yellow]{encouragement}[/italic yellow]"
+                    )
 
-            # 一次性输出所有统计信息
-            PrettyOutput.print("\n".join(stats_lines), OutputType.INFO)
+            # 3. 组合并打印
+            render_items: List[Renderable] = []
+            if has_content:
+                render_items.append(table)
+
+            if summary_content:
+                summary_panel = Panel(
+                    Text("\n".join(summary_content), justify="left"),
+                    title="[bold cyan]✨ 总体表现 ✨[/bold cyan]",
+                    border_style="green",
+                    expand=False,
+                )
+                render_items.append(summary_panel)
+
+            if render_items:
+                console = Console()
+                render_group = Group(*render_items)
+                console.print(render_group)
     except Exception as e:
         # 输出错误信息以便调试
         import traceback
