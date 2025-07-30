@@ -11,7 +11,8 @@ from typing import Any, Callable, Dict, List, Optional
 from datetime import datetime
 
 import yaml  # type: ignore
-from rich.console import Group
+from rich.align import Align
+from rich.console import Group, RenderableType
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -83,6 +84,8 @@ def _check_git_updates() -> bool:
 
 def _show_usage_stats() -> None:
     """显示Jarvis使用统计信息"""
+    from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
     try:
         from datetime import datetime
 
@@ -92,7 +95,6 @@ def _show_usage_stats() -> None:
         from rich.text import Text
 
         from jarvis.jarvis_stats.stats import StatsManager
-        from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
         stats_manager = StatsManager()
 
@@ -106,6 +108,7 @@ def _show_usage_stats() -> None:
             "lines": {"title": "📊 代码行数", "metrics": {}, "suffix": "行"},
             "commit": {"title": "💾 提交统计", "metrics": {}, "suffix": "个"},
             "command": {"title": "📱 命令使用", "metrics": {}, "suffix": "次"},
+            "adoption": {"title": "🎯 采纳情况", "metrics": {}, "suffix": ""},
         }
 
         # 遍历所有指标，获取统计数据
@@ -147,6 +150,41 @@ def _show_usage_stats() -> None:
                         elif group == "command":
                             categorized_stats["command"]["metrics"][metric] = int(total)
 
+        # 计算采纳率并添加到统计中
+        commit_stats = categorized_stats["commit"]["metrics"]
+        # 尝试多种可能的指标名称
+        generated_commits = commit_stats.get(
+            "commits_generated", commit_stats.get("commit_generated", 0)
+        )
+        accepted_commits = commit_stats.get(
+            "commits_accepted",
+            commit_stats.get("commit_accepted", commit_stats.get("commit_adopted", 0)),
+        )
+        rejected_commits = commit_stats.get(
+            "commits_rejected", commit_stats.get("commit_rejected", 0)
+        )
+
+        # 如果有 generated 和 accepted，则使用这两个计算采纳率
+        if generated_commits > 0 and accepted_commits > 0:
+            adoption_rate = (accepted_commits / generated_commits) * 100
+            categorized_stats["adoption"]["metrics"][
+                "adoption_rate"
+            ] = f"{adoption_rate:.1f}%"
+            categorized_stats["adoption"]["metrics"][
+                "commits_status"
+            ] = f"{accepted_commits}/{generated_commits}"
+        elif accepted_commits > 0 or rejected_commits > 0:
+            # 否则使用 accepted 和 rejected 计算
+            total_commits = accepted_commits + rejected_commits
+            if total_commits > 0:
+                adoption_rate = (accepted_commits / total_commits) * 100
+                categorized_stats["adoption"]["metrics"][
+                    "adoption_rate"
+                ] = f"{adoption_rate:.1f}%"
+                categorized_stats["adoption"]["metrics"][
+                    "commits_status"
+                ] = f"{accepted_commits}/{total_commits}"
+
         # 构建输出
         has_data = False
         stats_output = []
@@ -159,31 +197,69 @@ def _show_usage_stats() -> None:
         # 显示统计信息
         if has_data:
             # 1. 创建统计表格
+            from rich import box
+
             table = Table(
                 show_header=True,
                 header_style="bold magenta",
                 title="📊 Jarvis 使用统计",
-                box=None,
+                title_justify="center",
+                box=box.ROUNDED,
                 padding=(0, 1),
             )
             table.add_column("分类", style="cyan", no_wrap=True, width=12)
-            table.add_column("指标", style="white")
-            table.add_column("数量", style="green", justify="right")
+            table.add_column("指标", style="white", width=20)
+            table.add_column("数量", style="green", justify="right", width=10)
+            table.add_column("分类", style="cyan", no_wrap=True, width=12)
+            table.add_column("指标", style="white", width=20)
+            table.add_column("数量", style="green", justify="right", width=10)
 
-            has_content = False
+            # 收集所有要显示的数据
+            all_rows = []
             for title, stats, suffix in stats_output:
                 if stats:
-                    has_content = True
                     sorted_stats = sorted(
                         stats.items(), key=lambda item: item[1], reverse=True
                     )
                     for i, (metric, count) in enumerate(sorted_stats):
                         display_name = metric.replace("_", " ").title()
                         category_title = title if i == 0 else ""
-                        table.add_row(
-                            category_title, display_name, f"{count:,} {suffix}"
-                        )
-                    table.add_section()
+                        # 处理不同类型的count值
+                        if isinstance(count, (int, float)):
+                            count_str = f"{count:,} {suffix}"
+                        else:
+                            # 对于字符串类型的count（如百分比或比率），直接使用
+                            count_str = str(count)
+                        all_rows.append((category_title, display_name, count_str))
+
+            # 以3行2列的方式添加数据
+            has_content = len(all_rows) > 0
+            # 计算需要多少行来显示所有数据
+            total_rows = len(all_rows)
+            rows_needed = (total_rows + 1) // 2  # 向上取整，因为是2列布局
+
+            for i in range(rows_needed):
+                left_idx = i
+                right_idx = i + rows_needed
+
+                if left_idx < len(all_rows):
+                    left_row = all_rows[left_idx]
+                else:
+                    left_row = ("", "", "")
+
+                if right_idx < len(all_rows):
+                    right_row = all_rows[right_idx]
+                else:
+                    right_row = ("", "", "")
+
+                table.add_row(
+                    left_row[0],
+                    left_row[1],
+                    left_row[2],
+                    right_row[0],
+                    right_row[1],
+                    right_row[2],
+                )
 
             # 2. 创建总结面板
             summary_content = []
@@ -202,22 +278,25 @@ def _show_usage_stats() -> None:
                 for metric, count in stats.items()
             )
 
-            if total_tools > 0 or total_changes > 0:
-                summary_content.append(
-                    f"📈 [bold]总计[/bold]: 工具调用 {total_tools:,} 次, 代码修改 {total_changes:,} 次"
-                )
+            # 统计代码行数
+            lines_stats = categorized_stats["lines"]["metrics"]
+            total_lines_added = lines_stats.get(
+                "code_lines_inserted", lines_stats.get("code_lines_added", 0)
+            )
+            total_lines_deleted = lines_stats.get("code_lines_deleted", 0)
+            total_lines_modified = total_lines_added + total_lines_deleted
 
-            # 计算并显示采纳率
-            commit_stats = categorized_stats["commit"]["metrics"]
-            adopted_commits = commit_stats.get("commit_adopted", 0)
-            rejected_commits = commit_stats.get("commit_rejected", 0)
-            total_commits_for_rate = adopted_commits + rejected_commits
+            if total_tools > 0 or total_changes > 0 or total_lines_modified > 0:
+                parts = []
+                if total_tools > 0:
+                    parts.append(f"工具调用 {total_tools:,} 次")
+                if total_changes > 0:
+                    parts.append(f"代码修改 {total_changes:,} 次")
+                if total_lines_modified > 0:
+                    parts.append(f"代码行数 {total_lines_modified:,} 行")
 
-            if total_commits_for_rate > 0:
-                adoption_rate = (adopted_commits / total_commits_for_rate) * 100
-                summary_content.append(
-                    f"🎯 [bold]采纳率[/bold]: {adoption_rate:.1f}% ({adopted_commits}/{total_commits_for_rate})"
-                )
+                if parts:
+                    summary_content.append(f"📈 总计: {', '.join(parts)}")
 
             # 计算节省的时间
             time_saved_seconds = 0
@@ -256,7 +335,7 @@ def _show_usage_stats() -> None:
 
                 if summary_content:
                     summary_content.append("")  # Add a separator line
-                summary_content.append(f"⏱️  [bold]节省时间[/bold]: 约 {time_str}")
+                summary_content.append(f"⏱️  节省时间: 约 {time_str}")
 
                 encouragement = ""
                 if hours >= 100:
@@ -268,23 +347,26 @@ def _show_usage_stats() -> None:
                 elif hours >= 1:
                     encouragement = "✨ 积少成多，继续保持！"
                 if encouragement:
-                    summary_content.append(
-                        f"[italic yellow]{encouragement}[/italic yellow]"
-                    )
+                    summary_content.append(encouragement)
 
             # 3. 组合并打印
-            render_items: List[Renderable] = []
+            render_items: List[RenderableType] = []
             if has_content:
-                render_items.append(table)
+                # 居中显示表格
+                centered_table = Align.center(table)
+                render_items.append(centered_table)
 
             if summary_content:
                 summary_panel = Panel(
                     Text("\n".join(summary_content), justify="left"),
-                    title="[bold cyan]✨ 总体表现 ✨[/bold cyan]",
+                    title="✨ 总体表现 ✨",
+                    title_align="center",
                     border_style="green",
                     expand=False,
                 )
-                render_items.append(summary_panel)
+                # 居中显示面板
+                centered_panel = Align.center(summary_panel)
+                render_items.append(centered_panel)
 
             if render_items:
                 console = Console()
