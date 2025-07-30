@@ -270,6 +270,20 @@ class StatsManager:
         print(f"已清理 {days_to_keep} 天前的数据")
 
     @staticmethod
+    def remove_metric(metric_name: str) -> bool:
+        """
+        删除指定的指标及其所有数据
+        
+        Args:
+            metric_name: 要删除的指标名称
+            
+        Returns:
+            True 如果成功删除，False 如果指标不存在
+        """
+        storage = StatsManager._get_storage()
+        return storage.delete_metric(metric_name)
+
+    @staticmethod
     def _show_metrics_summary(
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
