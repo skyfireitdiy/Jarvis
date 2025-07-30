@@ -325,6 +325,43 @@ class StatsStorage:
 
         return result
 
+    def delete_metric(self, metric_name: str) -> bool:
+        """
+        删除指定的指标及其所有数据
+        
+        Args:
+            metric_name: 要删除的指标名称
+            
+        Returns:
+            True 如果成功删除，False 如果指标不存在
+        """
+        # 检查指标是否存在
+        meta = self._load_json(self.meta_file)
+        if metric_name not in meta.get("metrics", {}):
+            return False
+            
+        # 从元数据中删除指标
+        del meta["metrics"][metric_name]
+        self._save_json(self.meta_file, meta)
+        
+        # 遍历所有数据文件，删除该指标的数据
+        for data_file in self.data_dir.glob("stats_*.json"):
+            try:
+                data = self._load_json(data_file)
+                if metric_name in data:
+                    del data[metric_name]
+                    # 如果文件中还有其他数据，保存更新后的文件
+                    if data:
+                        self._save_json(data_file, data)
+                    # 如果文件变空了，删除文件
+                    else:
+                        data_file.unlink()
+            except Exception:
+                # 忽略单个文件的错误，继续处理其他文件
+                pass
+                
+        return True
+
     def delete_old_data(self, days_to_keep: int = 30):
         """删除旧数据"""
         cutoff_date = (datetime.now() - timedelta(days=days_to_keep)).date()

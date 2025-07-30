@@ -306,6 +306,46 @@ def export(
 
 
 @app.command()
+def remove(
+    metric: str = typer.Argument(..., help="要删除的指标名称"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="跳过确认"),
+):
+    """删除指定的指标及其所有数据"""
+    if not yes:
+        # 显示指标信息供用户确认
+        stats = StatsManager(_get_stats_dir())
+        metrics = stats.list_metrics()
+        
+        if metric not in metrics:
+            rprint(f"[red]错误：指标 '{metric}' 不存在[/red]")
+            return
+            
+        # 获取指标的基本信息
+        info = stats._get_storage().get_metric_info(metric)
+        if info:
+            unit = info.get("unit", "-")
+            last_updated = info.get("last_updated", "-")
+            
+            rprint(f"\n[yellow]准备删除指标:[/yellow]")
+            rprint(f"  名称: {metric}")
+            rprint(f"  单位: {unit}")
+            rprint(f"  最后更新: {last_updated}")
+            
+        confirm = typer.confirm(f"\n确定要删除指标 '{metric}' 及其所有数据吗？")
+        if not confirm:
+            rprint("[yellow]已取消操作[/yellow]")
+            return
+    
+    stats = StatsManager(_get_stats_dir())
+    success = stats.remove_metric(metric)
+    
+    if success:
+        rprint(f"[green]✓[/green] 已成功删除指标: {metric}")
+    else:
+        rprint(f"[red]✗[/red] 删除失败：指标 '{metric}' 不存在")
+
+
+@app.command()
 def demo():
     """运行演示，展示统计模块的功能"""
     import random
