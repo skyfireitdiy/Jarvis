@@ -81,10 +81,10 @@ def get_max_token_count(model_group_override: Optional[str] = None) -> int:
     获取模型允许的最大token数量。
 
     返回:
-        int: 模型能处理的最大token数量。
+        int: 模型能处理的最大token数量，为最大输入token数量的100倍。
     """
-    config = _get_resolved_model_config(model_group_override)
-    return int(config.get("JARVIS_MAX_TOKEN_COUNT", "960000"))
+    max_input_tokens = get_max_input_token_count(model_group_override)
+    return max_input_tokens * 100
 
 
 def get_max_input_token_count(model_group_override: Optional[str] = None) -> int:
@@ -151,9 +151,7 @@ def _get_resolved_model_config(
         "JARVIS_MODEL",
         "JARVIS_THINKING_PLATFORM",
         "JARVIS_THINKING_MODEL",
-        "JARVIS_MAX_TOKEN_COUNT",
         "JARVIS_MAX_INPUT_TOKEN_COUNT",
-        "JARVIS_MAX_BIG_CONTENT_SIZE",
     ]:
         if key in GLOBAL_CONFIG_DATA:
             resolved_config[key] = GLOBAL_CONFIG_DATA[key]
@@ -249,10 +247,10 @@ def get_max_big_content_size(model_group_override: Optional[str] = None) -> int:
     获取最大大内容大小。
 
     返回：
-        int: 最大大内容大小
+        int: 最大大内容大小，为最大输入token数量的5倍
     """
-    config = _get_resolved_model_config(model_group_override)
-    return int(config.get("JARVIS_MAX_BIG_CONTENT_SIZE", "160000"))
+    max_input_tokens = get_max_input_token_count(model_group_override)
+    return max_input_tokens * 5
 
 
 def get_pretty_output() -> bool:

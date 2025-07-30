@@ -313,7 +313,7 @@ JARVIS_LLM_GROUPS:
       JARVIS_MODEL: k1.5
       JARVIS_THINKING_PLATFORM: kimi
       JARVIS_THINKING_MODEL: k1.5-thinking
-      JARVIS_MAX_TOKEN_COUNT: 8192
+      JARVIS_MAX_INPUT_TOKEN_COUNT: 8192
   - ai8:
       JARVIS_PLATFORM: ai8
       JARVIS_MODEL: gemini-2.5-pro
@@ -344,9 +344,7 @@ JARVIS_LLM_GROUP: kimi
 | `JARVIS_USE_METHODOLOGY` | 是否启用方法论引擎（启动时加载、任务后分析）。 | `true` |
 | `JARVIS_USE_ANALYSIS` | 任务结束后是否进行分析以提炼新工具或方法论。 | `true` |
 | `JARVIS_PRINT_PROMPT` | 是否在控制台打印发送给 LLM 的完整提示，用于调试。 | `false` |
-| `JARVIS_MAX_TOKEN_COUNT` | Agent 对话历史的上下文总长度阈值 (可被模型组覆盖)。 | `960000` |
-| `JARVIS_MAX_INPUT_TOKEN_COUNT` | 单次输入给模型的最大 Token 数量 (可被模型组覆盖)。 | `32000` |
-| `JARVIS_MAX_BIG_CONTENT_SIZE`| 判断内容是否为“大内容”的 Token 阈值，超过则可能触发特殊处理（如存入文件）(可被模型组覆盖)。| `160000` |
+| `JARVIS_MAX_INPUT_TOKEN_COUNT` | 单次输入给模型的最大 Token 数量 (可被模型组覆盖)。其他token限制基于此值动态计算：最大token总数=此值×100，最大大内容尺寸=此值×5。 | `32000` |
 | `JARVIS_GIT_COMMIT_PROMPT` | `jgc` 命令生成 Git Commit Message 时使用的自定义模板。 | `""` |
 | `JARVIS_REPLACE_MAP` | 定义在交互中使用的自定义快捷命令替换规则。 | `{}` |
 | `JARVIS_MCP` | 一个列表，用于定义所有模型上下文协议（MCP）的端点配置。 | `[]` |
