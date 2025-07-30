@@ -4,6 +4,7 @@
 使用 typer 提供友好的命令行交互
 """
 
+import builtins
 from datetime import datetime, timedelta
 from typing import Optional, List
 import typer
@@ -183,13 +184,14 @@ def list():
     table.add_column("单位", style="green")
     table.add_column("最后更新", style="yellow")
     table.add_column("7天数据点", style="magenta")
+    table.add_column("标签", style="blue")
 
     # 获取每个指标的信息
     end_time = datetime.now()
     start_time = end_time - timedelta(days=7)
 
     for metric in metrics:
-        info = stats.storage.get_metric_info(metric)
+        info = stats._get_storage().get_metric_info(metric)
         if info:
             unit = info.get("unit", "-")
             last_updated = info.get("last_updated", "-")
@@ -202,11 +204,36 @@ def list():
                 except:
                     pass
 
-            # 获取数据点数
-            records = stats.storage.get_metrics(metric, start_time, end_time)
+            # 获取数据点数和标签
+            records = stats._get_storage().get_metrics(metric, start_time, end_time)
             count = len(records)
+            
+            # 收集所有唯一的标签
+            all_tags = {}
+            for record in records:
+                tags = record.get("tags", {})
+                for k, v in tags.items():
+                    if k not in all_tags:
+                        all_tags[k] = set()
+                    all_tags[k].add(v)
+            
+            # 格式化标签显示
+            tag_str = ""
+            if all_tags:
+                tag_parts = []
+                for k, values in sorted(all_tags.items()):
+                    # 使用内置的list函数
+                    values_list = sorted(builtins.list(values))
+                    if len(values_list) == 1:
+                        tag_parts.append(f"{k}={values_list[0]}")
+                    else:
+                        # 转义方括号以避免Rich markup错误
+                        tag_parts.append(f"{k}=\\[{', '.join(values_list)}\\]")
+                tag_str = ", ".join(tag_parts)
+            else:
+                tag_str = "-"
 
-            table.add_row(metric, unit, last_updated, str(count))
+            table.add_row(metric, unit, last_updated, str(count), tag_str)
 
     console.print(table)
     rprint(f"\n[green]总计: {len(metrics)} 个指标[/green]")
