@@ -327,9 +327,10 @@ def _show_usage_stats() -> None:
                 seconds = int(time_saved_seconds % 60)
                 hours = total_minutes // 60
                 minutes = total_minutes % 60
-                if hours >= 8:
-                    days = hours // 8
-                    remaining_hours = hours % 8
+                # 使用24小时制的天数，而不是8小时工作日
+                if hours >= 24:
+                    days = hours // 24
+                    remaining_hours = hours % 24
                     time_str = f"{days} 天 {remaining_hours} 小时 {minutes} 分钟"
                 elif hours > 0:
                     time_str = f"{hours} 小时 {minutes} 分钟"
@@ -343,14 +344,30 @@ def _show_usage_stats() -> None:
                 summary_content.append(f"⏱️  节省时间: 约 {time_str}")
 
                 encouragement = ""
-                if hours >= 100:
-                    encouragement = "🎉 您已经通过 Jarvis 节省了超过100小时的开发时间！"
-                elif hours >= 40:
-                    encouragement = "🚀 相当于节省了一整周的工作时间！"
-                elif hours >= 8:
-                    encouragement = "💪 相当于节省了一个工作日的时间！"
+                # 计算工作日数（每天8小时）
+                work_days = hours // 8
+                work_weeks = work_days // 5  # 每周5个工作日
+                
+                if hours >= 1000:
+                    encouragement = f"🎉 您已经通过 Jarvis 节省了超过 {int(hours):,} 小时的开发时间！"
+                elif work_weeks >= 4:  # 4周或更多
+                    months = work_weeks // 4  # 粗略计算月份
+                    if months == 1:
+                        encouragement = f"🚀 相当于节省了约一个月（{work_days} 个工作日）的工作时间！"
+                    else:
+                        encouragement = f"🚀 相当于节省了约 {months} 个月（{work_days} 个工作日）的工作时间！"
+                elif work_weeks >= 1:  # 1周或更多
+                    if work_weeks == 1:
+                        encouragement = f"💪 相当于节省了一周（{work_days} 个工作日）的工作时间！"
+                    else:
+                        encouragement = f"💪 相当于节省了 {work_weeks} 周（{work_days} 个工作日）的工作时间！"
+                elif work_days >= 1:  # 1个工作日或更多
+                    if work_days == 1:
+                        encouragement = "✨ 相当于节省了一个工作日的时间！"
+                    else:
+                        encouragement = f"✨ 相当于节省了 {work_days} 个工作日的时间！"
                 elif hours >= 1:
-                    encouragement = "✨ 积少成多，继续保持！"
+                    encouragement = "⭐ 积少成多，继续保持！"
                 if encouragement:
                     summary_content.append(encouragement)
 
