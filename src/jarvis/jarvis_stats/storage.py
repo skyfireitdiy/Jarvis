@@ -240,8 +240,23 @@ class StatsStorage:
 
     def list_metrics(self) -> List[str]:
         """列出所有指标"""
+        # 从元数据文件获取指标
         meta = self._load_json(self.meta_file)
-        return list(meta.get("metrics", {}).keys())
+        metrics_from_meta = set(meta.get("metrics", {}).keys())
+        
+        # 扫描所有数据文件获取实际存在的指标
+        metrics_from_data = set()
+        for data_file in self.data_dir.glob("stats_*.json"):
+            try:
+                data = self._load_json(data_file)
+                metrics_from_data.update(data.keys())
+            except (json.JSONDecodeError, OSError):
+                # 忽略无法读取的文件
+                continue
+        
+        # 合并两个来源的指标并返回排序后的列表
+        all_metrics = metrics_from_meta.union(metrics_from_data)
+        return sorted(list(all_metrics))
 
     def aggregate_metrics(
         self,
