@@ -140,9 +140,13 @@ class StatsManager:
         else:
             # 根据格式显示数据
             if format == "chart":
-                StatsManager._show_chart(metric_name, start_time, end_time, aggregation, tags)
+                StatsManager._show_chart(
+                    metric_name, start_time, end_time, aggregation, tags
+                )
             elif format == "summary":
-                StatsManager._show_summary(metric_name, start_time, end_time, aggregation, tags)
+                StatsManager._show_summary(
+                    metric_name, start_time, end_time, aggregation, tags
+                )
             else:
                 StatsManager._show_table(metric_name, start_time, end_time, tags)
 
@@ -352,7 +356,7 @@ class StatsManager:
         """显示图表"""
         storage = StatsManager._get_storage()
         visualizer = StatsManager._get_visualizer()
-        
+
         # 获取聚合数据
         aggregated = storage.aggregate_metrics(
             metric_name, start_time, end_time, aggregation, tags
@@ -367,9 +371,20 @@ class StatsManager:
         unit = info.get("unit", "") if info else ""
 
         # 准备数据
-        data = {k: v["avg"] for k, v in aggregated.items()}
+        first_item = next(iter(aggregated.values()), None)
+        is_simple_count = (
+            first_item
+            and first_item.get("min") == 1
+            and first_item.get("max") == 1
+            and first_item.get("avg") == 1
+        )
 
-        # 设置可视化器尺寸
+        if unit == "count" or is_simple_count:
+            # 对于计数类指标，使用总和更有意义
+            data = {k: v["sum"] for k, v in aggregated.items()}
+        else:
+            # 对于其他指标（如耗时），使用平均值
+            data = {k: v["avg"] for k, v in aggregated.items()}  # 设置可视化器尺寸
         if width or height:
             visualizer.width = width or visualizer.width
             visualizer.height = height or visualizer.height
@@ -441,7 +456,7 @@ class StatsManager:
         """显示汇总信息"""
         storage = StatsManager._get_storage()
         visualizer = StatsManager._get_visualizer()
-        
+
         # 获取聚合数据
         aggregated = storage.aggregate_metrics(
             metric_name, start_time, end_time, aggregation, tags

@@ -36,6 +36,7 @@ setup(
         "lxml==6.0.0",
         "markdownify>=1.1.0",
         "typer",
+        "plotext==5.2.8",
     ],
     extras_require={
         "dev": ["pytest", "black", "isort", "mypy", "build", "twine"],

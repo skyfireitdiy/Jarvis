@@ -42,6 +42,7 @@ dependencies = [
     "markdownify>=1.1.0",
     "typer",
     "pathspec",
+    "plotext==5.2.8",
 ]
 requires-python = ">=3.9,<3.13"
 
@@ -64,6 +65,9 @@ Homepage = "https://github.com/skyfireitdiy/Jarvis"
 
 [tool.isort]
 profile = "black"
+
+[tool.mypy]
+ignore_missing_imports = true
 
 [project.scripts]
 jarvis = "jarvis.jarvis_agent.jarvis:main"
