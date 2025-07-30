@@ -697,12 +697,48 @@ def count_cmd_usage() -> None:
     import os
     from jarvis.jarvis_stats.stats import StatsManager
 
+    # 命令映射关系：将短命令映射到长命令
+    command_mapping = {
+        # jarvis主命令
+        "jvs": "jarvis",
+        # 代码代理
+        "jca": "jarvis-code-agent",
+        # 智能shell
+        "jss": "jarvis-smart-shell",
+        # 平台管理
+        "jpm": "jarvis-platform-manager",
+        # Git提交
+        "jgc": "jarvis-git-commit",
+        # 代码审查
+        "jcr": "jarvis-code-review",
+        # Git压缩
+        "jgs": "jarvis-git-squash",
+        # 多代理
+        "jma": "jarvis-multi-agent",
+        # 代理
+        "ja": "jarvis-agent",
+        # 工具
+        "jt": "jarvis-tool",
+        # 方法论
+        "jm": "jarvis-methodology",
+        # RAG
+        "jrg": "jarvis-rag",
+        # 统计
+        "jst": "jarvis-stats",
+    }
+
     # 从完整路径中提取命令名称
     cmd_path = sys.argv[0]
     cmd_name = os.path.basename(cmd_path)
+    
+    # 如果是短命令，映射到长命令
+    if cmd_name in command_mapping:
+        metric_name = command_mapping[cmd_name]
+    else:
+        metric_name = cmd_name
 
     # 使用 StatsManager 记录命令使用统计
-    StatsManager.increment(cmd_name, group="command")
+    StatsManager.increment(metric_name, group="command")
 
 
 def is_context_overflow(
