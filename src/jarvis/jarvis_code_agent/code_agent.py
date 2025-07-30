@@ -269,7 +269,7 @@ class CodeAgent:
             return
 
         PrettyOutput.print(
-            "⚠️ 即将修改git换行符敏感设置，这会影响所有文件的换行符处理方式",
+            "⚠️ 正在修改git换行符敏感设置，这会影响所有文件的换行符处理方式",
             OutputType.WARNING,
         )
         print("将进行以下设置：")
@@ -277,18 +277,15 @@ class CodeAgent:
             current = current_settings.get(key, "未设置")
             print(f"  {key}: {current} -> {value}")
 
-        if user_confirm("是否继续修改git换行符敏感设置？", True):
-            for key, value in target_settings.items():
-                subprocess.run(["git", "config", key, value], check=True)
+        # 直接执行设置，不需要用户确认
+        for key, value in target_settings.items():
+            subprocess.run(["git", "config", key, value], check=True)
 
-            # 对于Windows系统，提示用户可以创建.gitattributes文件
-            if sys.platform.startswith("win"):
-                self._handle_windows_line_endings()
+        # 对于Windows系统，提示用户可以创建.gitattributes文件
+        if sys.platform.startswith("win"):
+            self._handle_windows_line_endings()
 
-            print("✅ git换行符敏感设置已更新")
-        else:
-            print("❌ 用户取消修改git换行符敏感设置")
-            sys.exit(0)
+        print("✅ git换行符敏感设置已更新")
 
     def _handle_windows_line_endings(self) -> None:
         """在Windows系统上处理换行符问题，提供建议而非强制修改"""
