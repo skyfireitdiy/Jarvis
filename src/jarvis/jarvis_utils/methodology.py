@@ -149,6 +149,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
     参数：
         user_input: 用户输入文本，用于提示大模型
+        tool_registery: 工具注册表，用于获取工具列表
 
     返回：
         str: 相关的方法论提示，如果未找到方法论则返回空字符串
@@ -178,25 +179,89 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
         else:
             platform = PlatformRegistry().get_normal_platform()
             model_group = None
-        platform.set_suppress_output(False)
         if not platform:
             return ""
 
-        # 构建基础提示信息
-        base_prompt = f"""以下是所有可用的方法论内容：
+        platform.set_suppress_output(True)
+
+        # 步骤1：获取所有方法论的标题
+        methodology_titles = list(methodologies.keys())
+
+        # 步骤2：让大模型选择相关性高的方法论
+        selection_prompt = f"""以下是所有可用的方法论标题：
 
 """
-        # 构建完整内容
-        full_content = base_prompt
-        for problem_type, content in methodologies.items():
-            full_content += f"## {problem_type}\n\n{content}\n\n---\n\n"
+        for i, title in enumerate(methodology_titles, 1):
+            selection_prompt += f"{i}. {title}\n"
 
-        full_content += f"以下是所有可用的工具内容：\n\n"
-        full_content += prompt
+        selection_prompt += f"""
+以下是可用的工具列表：
+{prompt}
 
-        # 添加用户输入和输出要求
-        full_content += f"""
-请根据以上方法论和可调用的工具内容，规划/总结出以下用户需求的执行步骤: {user_input}
+用户需求：{user_input}
+
+请分析用户需求，从上述方法论中选择出与需求相关性较高的方法论（可以选择多个）。
+
+请严格按照以下格式返回序号：
+<NUM>序号1,序号2,序号3</NUM>
+
+例如：<NUM>1,3,5</NUM>
+
+如果没有相关的方法论，请返回：<NUM>none</NUM>
+
+注意：只返回<NUM>标签内的内容，不要有其他任何输出。
+"""
+
+        # 获取大模型选择的方法论序号
+        response = platform.chat_until_success(selection_prompt).strip()
+
+        # 重置平台，恢复输出
+        platform.reset()
+        platform.set_suppress_output(False)
+
+        # 从响应中提取<NUM>标签内的内容
+        import re
+        num_match = re.search(r'<NUM>(.*?)</NUM>', response, re.DOTALL)
+        
+        if not num_match:
+            # 如果没有找到<NUM>标签，尝试直接解析响应
+            selected_indices_str = response
+        else:
+            selected_indices_str = num_match.group(1).strip()
+
+        if selected_indices_str.lower() == "none":
+            return "没有历史方法论可参考"
+
+        # 解析选择的序号
+        selected_methodologies = {}
+        try:
+            if selected_indices_str:
+                indices = [int(idx.strip()) for idx in selected_indices_str.split(",") if idx.strip().isdigit()]
+                for idx in indices:
+                    if 1 <= idx <= len(methodology_titles):
+                        title = methodology_titles[idx - 1]
+                        selected_methodologies[title] = methodologies[title]
+        except Exception:
+            # 如果解析失败，返回空结果
+            return "没有历史方法论可参考"
+
+        if not selected_methodologies:
+            return "没有历史方法论可参考"
+
+        # 步骤3：将选择出来的方法论内容提供给大模型生成步骤
+        final_prompt = f"""以下是与用户需求相关的方法论内容：
+
+"""
+        for problem_type, content in selected_methodologies.items():
+            final_prompt += f"## {problem_type}\n\n{content}\n\n---\n\n"
+
+        final_prompt += f"""以下是所有可用的工具内容：
+
+{prompt}
+
+用户需求：{user_input}
+
+请根据以上方法论和可调用的工具内容，规划/总结出执行步骤。
 
 请按以下格式回复：
 ### 与该任务/需求相关的方法论
@@ -207,19 +272,18 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 2. [步骤2]
 3. [步骤3]
 
-如果没有匹配的方法论，请输出：没有历史方法论可参考
 除以上要求外，不要输出任何内容
 """
 
         # 检查内容是否过大
-        is_large_content = is_context_overflow(full_content, model_group)
+        is_large_content = is_context_overflow(final_prompt, model_group)
         temp_file_path = None
 
         try:
             if is_large_content:
-                # 创建临时文件
+                # 创建临时文件（只包含选中的方法论）
                 print(f"📝 创建方法论临时文件...")
-                temp_file_path = _create_methodology_temp_file(methodologies)
+                temp_file_path = _create_methodology_temp_file(selected_methodologies)
                 if not temp_file_path:
                     print(f"❌ 创建方法论临时文件失败")
                     return ""
@@ -229,11 +293,16 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
                 upload_success = platform.upload_files([temp_file_path])
 
                 if upload_success:
-                    # 使用上传的文件生成摘要
-                    return platform.chat_until_success(
-                        base_prompt
-                        + f"""
-请根据已上传的方法论和可调用的工具文件内容，规划/总结出以下用户需求的执行步骤: {user_input}
+                    # 使用上传的文件生成步骤
+                    upload_prompt = f"""已上传相关的方法论文件。
+
+以下是所有可用的工具内容：
+
+{prompt}
+
+用户需求：{user_input}
+
+请根据已上传的方法论和可调用的工具内容，规划/总结出执行步骤。
 
 请按以下格式回复：
 ### 与该任务/需求相关的方法论
@@ -244,14 +313,14 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 2. [步骤2]
 3. [步骤3]
 
-如果没有匹配的方法论，请输出：没有历史方法论可参考
 除以上要求外，不要输出任何内容
 """
-                    )
+                    return platform.chat_until_success(upload_prompt)
                 else:
                     return "没有历史方法论可参考"
-            # 如果内容不大或上传失败，直接使用chat_until_success
-            return platform.chat_until_success(full_content)
+
+            # 如果内容不大，直接使用chat_until_success
+            return platform.chat_until_success(final_prompt)
 
         finally:
             # 清理临时文件
