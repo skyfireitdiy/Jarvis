@@ -224,9 +224,9 @@ def _show_usage_stats() -> None:
                 hours = int(time_saved_minutes // 60)
                 minutes = int(time_saved_minutes % 60)
 
-                if hours > 24:
-                    days = hours // 24
-                    remaining_hours = hours % 24
+                if hours >= 8:
+                    days = hours // 8
+                    remaining_hours = hours % 8
                     time_str = f"{days} 天 {remaining_hours} 小时 {minutes} 分钟"
                 elif hours > 0:
                     time_str = f"{hours} 小时 {minutes} 分钟"
