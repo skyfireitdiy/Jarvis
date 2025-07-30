@@ -144,7 +144,7 @@ class ChromaRetriever:
                 ]
 
             # 按分数排序并取最高结果
-            bm25_results_with_docs.sort(key=lambda x: x[2], reverse=True)
+            bm25_results_with_docs.sort(key=lambda x: x[2], reverse=True)  # type: ignore
 
             for doc_text, metadata, _ in bm25_results_with_docs[: n_results * 2]:
                 bm25_docs.append(Document(page_content=doc_text, metadata=metadata))
