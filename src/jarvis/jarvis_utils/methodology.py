@@ -171,17 +171,7 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
             return ""
         print(f"✅ 加载方法论文件完成 (共 {len(methodologies)} 个)")
 
-        # 获取当前平台
-        agent = get_agent(current_agent_name)
-        if agent:
-            platform = agent.model
-            model_group = agent.model.model_group
-        else:
-            platform = PlatformRegistry().get_normal_platform()
-            model_group = None
-        if not platform:
-            return ""
-
+        platform = PlatformRegistry().get_normal_platform()
         platform.set_suppress_output(True)
 
         # 步骤1：获取所有方法论的标题
@@ -275,60 +265,8 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 除以上要求外，不要输出任何内容
 """
 
-        # 检查内容是否过大
-        is_large_content = is_context_overflow(final_prompt, model_group)
-        temp_file_path = None
-
-        try:
-            if is_large_content:
-                # 创建临时文件（只包含选中的方法论）
-                print(f"📝 创建方法论临时文件...")
-                temp_file_path = _create_methodology_temp_file(selected_methodologies)
-                if not temp_file_path:
-                    print(f"❌ 创建方法论临时文件失败")
-                    return ""
-                print(f"✅ 创建方法论临时文件完成")
-
-                # 尝试上传文件
-                upload_success = platform.upload_files([temp_file_path])
-
-                if upload_success:
-                    # 使用上传的文件生成步骤
-                    upload_prompt = f"""已上传相关的方法论文件。
-
-以下是所有可用的工具内容：
-
-{prompt}
-
-用户需求：{user_input}
-
-请根据已上传的方法论和可调用的工具内容，规划/总结出执行步骤。
-
-请按以下格式回复：
-### 与该任务/需求相关的方法论
-1. [方法论名字]
-2. [方法论名字]
-### 根据以上方法论，规划/总结出执行步骤
-1. [步骤1]
-2. [步骤2]
-3. [步骤3]
-
-除以上要求外，不要输出任何内容
-"""
-                    return platform.chat_until_success(upload_prompt)
-                else:
-                    return "没有历史方法论可参考"
-
-            # 如果内容不大，直接使用chat_until_success
-            return platform.chat_until_success(final_prompt)
-
-        finally:
-            # 清理临时文件
-            if temp_file_path and os.path.exists(temp_file_path):
-                try:
-                    os.remove(temp_file_path)
-                except Exception:
-                    pass
+        # 如果内容不大，直接使用chat_until_success
+        return platform.chat_until_success(final_prompt)
 
     except Exception as e:
         PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
