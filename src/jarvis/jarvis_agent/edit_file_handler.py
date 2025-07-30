@@ -58,8 +58,7 @@ class EditFileHandler(OutputHandler):
         
         # 记录 edit_file 工具调用统计
         from jarvis.jarvis_stats.stats import StatsManager
-        stats_manager = StatsManager()
-        stats_manager.increment("edit_file", group="tool")
+        StatsManager.increment("edit_file", group="tool")
 
         results = []
 

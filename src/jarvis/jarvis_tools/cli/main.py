@@ -48,8 +48,6 @@ def stat_tools(
     """显示工具调用统计信息"""
     from jarvis.jarvis_stats.stats import StatsManager
     
-    stats_manager = StatsManager()
-    
     if format == "table":
         registry = ToolRegistry()
         stats = registry._get_tool_stats()
@@ -78,13 +76,13 @@ def stat_tools(
         # 使用 stats 系统的高级功能
         PrettyOutput.section("工具组统计", OutputType.SYSTEM)
         # 显示所有标记为 tool 组的指标
-        metrics = stats_manager.list_metrics()
+        metrics = StatsManager.list_metrics()
         tool_metrics = []
         
         for metric in metrics:
             # 检查是否是工具组的指标
             if last_days:
-                stats_data = stats_manager.get_stats(
+                stats_data = StatsManager.get_stats(
                     metric_name=metric,
                     last_days=last_days,
                     tags={"group": "tool"}
@@ -92,7 +90,7 @@ def stat_tools(
             else:
                 # 获取所有历史数据
                 from datetime import datetime
-                stats_data = stats_manager.get_stats(
+                stats_data = StatsManager.get_stats(
                     metric_name=metric,
                     start_time=datetime(2000, 1, 1),
                     end_time=datetime.now(),
@@ -105,10 +103,10 @@ def stat_tools(
             for metric in tool_metrics:
                 if format == "chart":
                     if last_days:
-                        stats_manager.plot(metric, last_days=last_days, tags={"group": "tool"})
+                        StatsManager.plot(metric, last_days=last_days, tags={"group": "tool"})
                     else:
                         from datetime import datetime
-                        stats_manager.plot(
+                        StatsManager.plot(
                             metric, 
                             start_time=datetime(2000, 1, 1), 
                             end_time=datetime.now(), 
@@ -116,10 +114,10 @@ def stat_tools(
                         )
                 elif format == "summary":
                     if last_days:
-                        stats_manager.show(metric, last_days=last_days, format="summary", tags={"group": "tool"})
+                        StatsManager.show(metric, last_days=last_days, format="summary", tags={"group": "tool"})
                     else:
                         from datetime import datetime
-                        stats_manager.show(
+                        StatsManager.show(
                             metric, 
                             start_time=datetime(2000, 1, 1), 
                             end_time=datetime.now(), 

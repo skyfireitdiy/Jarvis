@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import platform
 import signal
 import subprocess
 import sys
@@ -96,10 +97,8 @@ def _show_usage_stats() -> None:
 
         from jarvis.jarvis_stats.stats import StatsManager
 
-        stats_manager = StatsManager()
-
         # 获取所有可用的指标
-        all_metrics = stats_manager.list_metrics()
+        all_metrics = StatsManager.list_metrics()
 
         # 根据指标名称和标签自动分类
         categorized_stats: Dict[str, Dict[str, Any]] = {
@@ -114,7 +113,7 @@ def _show_usage_stats() -> None:
         # 遍历所有指标，获取统计数据
         for metric in all_metrics:
             # 获取该指标的所有数据
-            stats_data = stats_manager.get_stats(
+            stats_data = StatsManager.get_stats(
                 metric_name=metric,
                 start_time=datetime(2000, 1, 1),
                 end_time=datetime.now(),
@@ -305,9 +304,15 @@ def _show_usage_stats() -> None:
             lines_stats = categorized_stats["lines"]["metrics"]
             # commit_stats is already defined above
             command_stats = categorized_stats["command"]["metrics"]
-            time_saved_seconds += tool_stats.get("execute_script", 0) * 2 * 60
-            time_saved_seconds += tool_stats.get("search_web", 0) * 2 * 60
-            time_saved_seconds += tool_stats.get("read_code", 0) * 2 * 60
+
+            # 统一的工具使用时间估算（每次调用节省2分钟）
+            DEFAULT_TOOL_TIME_SAVINGS = 2 * 60  # 秒
+
+            # 计算所有工具的时间节省
+            for tool_name, count in tool_stats.items():
+                time_saved_seconds += count * DEFAULT_TOOL_TIME_SAVINGS
+
+            # 其他类型的时间计算
             total_code_agent_calls = sum(code_agent_changes.values())
             time_saved_seconds += total_code_agent_calls * 10 * 60
             time_saved_seconds += lines_stats.get("code_lines_added", 0) * 0.8 * 60
@@ -697,8 +702,7 @@ def count_cmd_usage() -> None:
     cmd_name = os.path.basename(cmd_path)
 
     # 使用 StatsManager 记录命令使用统计
-    stats_manager = StatsManager()
-    stats_manager.increment(cmd_name, group="command")
+    StatsManager.increment(cmd_name, group="command")
 
 
 def is_context_overflow(

@@ -348,13 +348,11 @@ class CodeAgent:
         from jarvis.jarvis_stats.stats import StatsManager
         import re
 
-        stats_manager = StatsManager()
-
         # 匹配插入行数
         insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_text)
         if insertions_match:
             insertions = int(insertions_match.group(1))
-            stats_manager.increment(
+            StatsManager.increment(
                 "code_lines_inserted", amount=insertions, group="code_agent"
             )
 
@@ -362,7 +360,7 @@ class CodeAgent:
         deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_text)
         if deletions_match:
             deletions = int(deletions_match.group(1))
-            stats_manager.increment(
+            StatsManager.increment(
                 "code_lines_deleted", amount=deletions, group="code_agent"
             )
 
@@ -397,8 +395,7 @@ class CodeAgent:
             # 用户确认修改，统计修改次数
             from jarvis.jarvis_stats.stats import StatsManager
 
-            stats_manager = StatsManager()
-            stats_manager.increment("code_modification_confirmed", group="code_agent")
+            StatsManager.increment("code_modification_confirmed", group="code_agent")
 
             try:
                 confirm_add_new_files()
@@ -430,7 +427,7 @@ class CodeAgent:
                 )
 
                 # 统计提交次数
-                stats_manager.increment("code_commits_accepted", group="code_agent")
+                StatsManager.increment("code_commits_accepted", group="code_agent")
             except subprocess.CalledProcessError as e:
                 PrettyOutput.print(f"提交失败: {str(e)}", OutputType.ERROR)
 
@@ -455,8 +452,7 @@ class CodeAgent:
             # 统计生成的commit数量
             from jarvis.jarvis_stats.stats import StatsManager
 
-            stats_manager = StatsManager()
-            stats_manager.increment("commits_generated", group="code_agent")
+            StatsManager.increment("commits_generated", group="code_agent")
 
             commit_messages = "检测到以下提交记录:\n" + "\n".join(
                 f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits
@@ -472,8 +468,7 @@ class CodeAgent:
             # 统计接受的commit数量
             from jarvis.jarvis_stats.stats import StatsManager
 
-            stats_manager = StatsManager()
-            stats_manager.increment("commits_accepted", group="code_agent")
+            StatsManager.increment("commits_accepted", group="code_agent")
 
             subprocess.run(
                 ["git", "reset", "--mixed", str(start_commit)],
@@ -581,8 +576,7 @@ class CodeAgent:
                 # 统计修改次数
                 from jarvis.jarvis_stats.stats import StatsManager
 
-                stats_manager = StatsManager()
-                stats_manager.increment("code_modifications", group="code_agent")
+                StatsManager.increment("code_modifications", group="code_agent")
 
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()

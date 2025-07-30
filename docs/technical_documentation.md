@@ -26,7 +26,23 @@ Jarvis 的设计理念根植于一个核心观察：大型语言模型（LLM）�
         *   **技术栈无关**: 模型上下文协议（Model Context Protocol, MCP）是一个开放标准，它允许用任何编程语言编写的服务，只要遵循该协议，就能作为工具或数据源无缝、安全地集成到 Jarvis 中。
         *   **面向未来**: 随着新的 AI 模型和技术不断涌现，Jarvis 的插件化设计使其可以快速适配和集成，而无需重构核心逻辑。
 
-### 1.2. 高层架构
+### 1.2. Vibe Working: 一种更直觉的工作流
+
+Jarvis 的核心理念与一种新兴的人机协作模式 **"Vibe Working"** (氛围式工作)不谋而合。这个概念源于AI研究者Andrej Karpathy，指的是利用大语言模型（LLM），将人类头脑中模糊、直觉性的想法（即"Vibe"）高效转化为具体的、结构化的成果。
+
+这不再是传统的"指令-执行"模式，而是一种**对话式、迭代式**的共同创造过程。
+
+*   **从一个"感觉"开始**: 传统的自动化需要精确的输入和规则。而使用 Jarvis，你可以从一个模糊的目标开始，比如 `jca "给我写个脚本，监控这个网站的变化"` 或者 `jca "重构 'user' 模块，让它看起来更清爽"`。你提供的是方向和"感觉"，而不是详细的规格书。
+
+*   **迭代中逼近完美**: Jarvis (或其背后的LLM) 会提供一个初步的实现。这个版本可能不完美，但它是一个坚实的起点。接下来，你通过反馈来指导它，比如 `"这个地方的逻辑不对，应该先检查A再处理B"` 或者 `"变量名能再语义化一点吗？"`。通过这种快速的反馈循环，AI的产出将逐步逼近你的真实意图。
+
+*   **人与AI的角色转变**:
+    *   **你 (人类)**: 扮演**创意总监、品味判断者和方向引领者**。你负责提供愿景、经验和高层次的判断力，确保最终结果的质量和方向。
+    *   **Jarvis (AI)**: 扮演**强大的执行伙伴和灵感催化剂**。它负责处理所有繁重、重复和技术性的细节，并能提供意想不到的解决方案，激发你的新想法。
+
+Jarvis 正是为这种工作流而设计的工具。它通过无缝的命令行集成和强大的本地交互能力，将 "Vibe Working" 从一个抽象概念，变为了开发者触手可及的日常生产力工具，让你能更专注于**高价值的创造性思考**，而非琐碎的实现细节。
+
+### 1.3. 高层架构
 
 下图展示了 Jarvis 系统的高层架构，描绘了其核心组件以及它们之间的交互关系。
 
@@ -335,23 +351,7 @@ JARVIS_LLM_GROUP: kimi
 | `JARVIS_REPLACE_MAP` | 定义在交互中使用的自定义快捷命令替换规则。 | `{}` |
 | `JARVIS_MCP` | 一个列表，用于定义所有模型上下文协议（MCP）的端点配置。 | `[]` |
 | `JARVIS_RAG_GROUP` | 当前激活的 RAG 配置组名称。 | `null` |
-| `JARVIS_RAG_GROUPS` | 预定义的 RAG 配置组列表。 | <pre lang="json"><code>[
-  {
-    "text": {
-      "embedding_model": "BAAI/bge-m3",
-      "rerank_model": "BAAI/bge-reranker-v2-m3",
-      "use_bm25": true,
-      "use_rerank": true
-    }
-  },
-  {
-    "code": {
-      "embedding_model": "Qodo/Qodo-Embed-1-7B",
-      "use_bm25": false,
-      "use_rerank": false
-    }
-  }
-]</code></pre> |
+| `JARVIS_RAG_GROUPS` | 预定义的 RAG 配置组列表。 | `[{"text": {"embedding_model": "BAAI/bge-m3", "rerank_model": "BAAI/bge-reranker-v2-m3", "use_bm25": true, "use_rerank": true}}, {"code": {"embedding_model": "Qodo/Qodo-Embed-1-7B", "use_bm25": false, "use_rerank": false}}]` |
 | `JARVIS_RAG` | RAG框架的顶层配置，会覆盖组配置。 | `{}` |
 | `ENV` | 一个字典，用于为 Jarvis 运行环境设置临时的环境变量。 | `{}` |
 

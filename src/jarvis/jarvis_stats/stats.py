@@ -14,18 +14,37 @@ from jarvis.jarvis_stats.visualizer import StatsVisualizer
 class StatsManager:
     """统计管理器"""
 
+    # 类级别的存储和可视化器实例
+    _storage: Optional[StatsStorage] = None
+    _visualizer: Optional[StatsVisualizer] = None
+
+    @classmethod
+    def _get_storage(cls) -> StatsStorage:
+        """获取存储实例"""
+        if cls._storage is None:
+            cls._storage = StatsStorage()
+        return cls._storage
+
+    @classmethod
+    def _get_visualizer(cls) -> StatsVisualizer:
+        """获取可视化器实例"""
+        if cls._visualizer is None:
+            cls._visualizer = StatsVisualizer()
+        return cls._visualizer
+
     def __init__(self, storage_dir: Optional[str] = None):
         """
-        初始化统计管理器
+        初始化统计管理器（保留以兼容旧代码）
 
         Args:
             storage_dir: 存储目录路径
         """
-        self.storage = StatsStorage(storage_dir)
-        self.visualizer = StatsVisualizer()
+        # 如果提供了特定的存储目录，则重新初始化存储
+        if storage_dir is not None:
+            StatsManager._storage = StatsStorage(storage_dir)
 
+    @staticmethod
     def increment(
-        self,
         metric_name: str,
         amount: Union[int, float] = 1,
         tags: Optional[Dict[str, str]] = None,
@@ -43,11 +62,10 @@ class StatsManager:
             unit: 计量单位，默认为 "count"
 
         Examples:
-            >>> stats = StatsManager()
-            >>> stats.increment("page_views")
-            >>> stats.increment("downloads", 5)
-            >>> stats.increment("response_time", 0.123, unit="seconds")
-            >>> stats.increment("execute_script", 1, group="tool")
+            >>> StatsManager.increment("page_views")
+            >>> StatsManager.increment("downloads", 5)
+            >>> StatsManager.increment("response_time", 0.123, unit="seconds")
+            >>> StatsManager.increment("execute_script", 1, group="tool")
         """
         # 如果指定了分组，自动添加到 tags 中
         if group:
@@ -55,7 +73,8 @@ class StatsManager:
                 tags = {}
             tags["group"] = group
 
-        self.storage.add_metric(
+        storage = StatsManager._get_storage()
+        storage.add_metric(
             metric_name=metric_name,
             value=float(amount),
             unit=unit,
@@ -63,17 +82,19 @@ class StatsManager:
             tags=tags,
         )
 
-    def list_metrics(self) -> List[str]:
+    @staticmethod
+    def list_metrics() -> List[str]:
         """
         列出所有指标
 
         Returns:
             指标名称列表
         """
-        return self.storage.list_metrics()
+        storage = StatsManager._get_storage()
+        return storage.list_metrics()
 
+    @staticmethod
     def show(
-        self,
         metric_name: Optional[str] = None,
         last_hours: Optional[int] = None,
         last_days: Optional[int] = None,
@@ -97,10 +118,9 @@ class StatsManager:
             tags: 过滤标签
 
         Examples:
-            >>> stats = StatsManager()
-            >>> stats.show()  # 显示所有指标摘要
-            >>> stats.show("api_calls", last_hours=24)  # 显示最近24小时
-            >>> stats.show("response_time", last_days=7, format="chart")  # 图表显示
+            >>> StatsManager.show()  # 显示所有指标摘要
+            >>> StatsManager.show("api_calls", last_hours=24)  # 显示最近24小时
+            >>> StatsManager.show("response_time", last_days=7, format="chart")  # 图表显示
         """
         # 处理时间范围
         if end_time is None:
@@ -116,18 +136,18 @@ class StatsManager:
 
         if metric_name is None:
             # 显示所有指标摘要
-            self._show_metrics_summary()
+            StatsManager._show_metrics_summary()
         else:
             # 根据格式显示数据
             if format == "chart":
-                self._show_chart(metric_name, start_time, end_time, aggregation, tags)
+                StatsManager._show_chart(metric_name, start_time, end_time, aggregation, tags)
             elif format == "summary":
-                self._show_summary(metric_name, start_time, end_time, aggregation, tags)
+                StatsManager._show_summary(metric_name, start_time, end_time, aggregation, tags)
             else:
-                self._show_table(metric_name, start_time, end_time, tags)
+                StatsManager._show_table(metric_name, start_time, end_time, tags)
 
+    @staticmethod
     def plot(
-        self,
         metric_name: Optional[str] = None,
         last_hours: Optional[int] = None,
         last_days: Optional[int] = None,
@@ -153,9 +173,8 @@ class StatsManager:
             height: 图表高度
 
         Examples:
-            >>> stats = StatsManager()
-            >>> stats.plot("response_time", last_hours=24)
-            >>> stats.plot(tags={"service": "api"}, last_days=7)
+            >>> StatsManager.plot("response_time", last_hours=24)
+            >>> StatsManager.plot(tags={"service": "api"}, last_days=7)
         """
         # 处理时间范围
         if end_time is None:
@@ -171,17 +190,17 @@ class StatsManager:
 
         # 如果指定了metric_name，显示单个图表
         if metric_name:
-            self._show_chart(
+            StatsManager._show_chart(
                 metric_name, start_time, end_time, aggregation, tags, width, height
             )
         else:
             # 如果没有指定metric_name，根据标签过滤获取所有匹配的指标
-            self._show_multiple_charts(
+            StatsManager._show_multiple_charts(
                 start_time, end_time, aggregation, tags, width, height
             )
 
+    @staticmethod
     def get_stats(
-        self,
         metric_name: str,
         last_hours: Optional[int] = None,
         last_days: Optional[int] = None,
@@ -217,14 +236,15 @@ class StatsManager:
             else:
                 start_time = end_time - timedelta(days=7)
 
+        storage = StatsManager._get_storage()
         if aggregation:
             # 返回聚合数据
-            return self.storage.aggregate_metrics(
+            return storage.aggregate_metrics(
                 metric_name, start_time, end_time, aggregation, tags
             )
         else:
             # 返回原始数据
-            records = self.storage.get_metrics(metric_name, start_time, end_time, tags)
+            records = storage.get_metrics(metric_name, start_time, end_time, tags)
             return {
                 "metric": metric_name,
                 "records": records,
@@ -233,23 +253,27 @@ class StatsManager:
                 "end_time": end_time.isoformat(),
             }
 
-    def clean_old_data(self, days_to_keep: int = 30):
+    @staticmethod
+    def clean_old_data(days_to_keep: int = 30):
         """
         清理旧数据
 
         Args:
             days_to_keep: 保留最近N天的数据
         """
-        self.storage.delete_old_data(days_to_keep)
+        storage = StatsManager._get_storage()
+        storage.delete_old_data(days_to_keep)
         print(f"已清理 {days_to_keep} 天前的数据")
 
-    def _show_metrics_summary(self):
+    @staticmethod
+    def _show_metrics_summary():
         """显示所有指标摘要"""
         from rich.console import Console
         from rich.table import Table
 
         console = Console()
-        metrics = self.storage.list_metrics()
+        storage = StatsManager._get_storage()
+        metrics = storage.list_metrics()
 
         if not metrics:
             console.print("[yellow]没有找到任何统计指标[/yellow]")
@@ -267,7 +291,7 @@ class StatsManager:
         start_time = end_time - timedelta(days=7)
 
         for metric in metrics:
-            info = self.storage.get_metric_info(metric)
+            info = storage.get_metric_info(metric)
             if info:
                 unit = info.get("unit", "-")
                 last_updated = info.get("last_updated", "-")
@@ -281,7 +305,7 @@ class StatsManager:
                         pass
 
                 # 获取数据点数
-                records = self.storage.get_metrics(metric, start_time, end_time)
+                records = storage.get_metrics(metric, start_time, end_time)
                 count = len(records)
 
                 table.add_row(metric, unit, last_updated, str(count))
@@ -289,22 +313,24 @@ class StatsManager:
         console.print(table)
         console.print(f"\n[green]总计: {len(metrics)} 个指标[/green]")
 
+    @staticmethod
     def _show_table(
-        self,
         metric_name: str,
         start_time: datetime,
         end_time: datetime,
         tags: Optional[Dict[str, str]],
     ):
         """以表格形式显示数据"""
-        records = self.storage.get_metrics(metric_name, start_time, end_time, tags)
+        storage = StatsManager._get_storage()
+        visualizer = StatsManager._get_visualizer()
+        records = storage.get_metrics(metric_name, start_time, end_time, tags)
 
         # 获取指标信息
-        info = self.storage.get_metric_info(metric_name)
+        info = storage.get_metric_info(metric_name)
         unit = info.get("unit", "") if info else ""
 
         # 使用visualizer显示表格
-        self.visualizer.show_table(
+        visualizer.show_table(
             records=records,
             metric_name=metric_name,
             unit=unit,
@@ -313,8 +339,8 @@ class StatsManager:
             tags_filter=tags,
         )
 
+    @staticmethod
     def _show_chart(
-        self,
         metric_name: str,
         start_time: datetime,
         end_time: datetime,
@@ -324,8 +350,11 @@ class StatsManager:
         height: Optional[int] = None,
     ):
         """显示图表"""
+        storage = StatsManager._get_storage()
+        visualizer = StatsManager._get_visualizer()
+        
         # 获取聚合数据
-        aggregated = self.storage.aggregate_metrics(
+        aggregated = storage.aggregate_metrics(
             metric_name, start_time, end_time, aggregation, tags
         )
 
@@ -334,7 +363,7 @@ class StatsManager:
             return
 
         # 获取指标信息
-        info = self.storage.get_metric_info(metric_name)
+        info = storage.get_metric_info(metric_name)
         unit = info.get("unit", "") if info else ""
 
         # 准备数据
@@ -342,11 +371,11 @@ class StatsManager:
 
         # 设置可视化器尺寸
         if width or height:
-            self.visualizer.width = width or self.visualizer.width
-            self.visualizer.height = height or self.visualizer.height
+            visualizer.width = width or visualizer.width
+            visualizer.height = height or visualizer.height
 
         # 绘制图表
-        chart = self.visualizer.plot_line_chart(
+        chart = visualizer.plot_line_chart(
             data=data,
             title=f"{metric_name} - {aggregation}聚合",
             unit=unit,
@@ -360,8 +389,8 @@ class StatsManager:
             f"\n时间范围: {start_time.strftime('%Y-%m-%d %H:%M')} ~ {end_time.strftime('%Y-%m-%d %H:%M')}"
         )
 
+    @staticmethod
     def _show_multiple_charts(
-        self,
         start_time: datetime,
         end_time: datetime,
         aggregation: str,
@@ -373,15 +402,16 @@ class StatsManager:
         from rich.console import Console
 
         console = Console()
+        storage = StatsManager._get_storage()
 
         # 获取所有指标
-        all_metrics = self.list_metrics()
+        all_metrics = StatsManager.list_metrics()
 
         # 根据标签过滤指标
         matched_metrics = []
         for metric in all_metrics:
             # 获取该指标在时间范围内的数据
-            records = self.storage.get_metrics(metric, start_time, end_time, tags)
+            records = storage.get_metrics(metric, start_time, end_time, tags)
             if records:  # 如果有匹配标签的数据
                 matched_metrics.append(metric)
 
@@ -396,12 +426,12 @@ class StatsManager:
             if i > 0:
                 console.print("\n" + "=" * 80 + "\n")  # 分隔符
 
-            self._show_chart(
+            StatsManager._show_chart(
                 metric, start_time, end_time, aggregation, tags, width, height
             )
 
+    @staticmethod
     def _show_summary(
-        self,
         metric_name: str,
         start_time: datetime,
         end_time: datetime,
@@ -409,8 +439,11 @@ class StatsManager:
         tags: Optional[Dict[str, str]],
     ):
         """显示汇总信息"""
+        storage = StatsManager._get_storage()
+        visualizer = StatsManager._get_visualizer()
+        
         # 获取聚合数据
-        aggregated = self.storage.aggregate_metrics(
+        aggregated = storage.aggregate_metrics(
             metric_name, start_time, end_time, aggregation, tags
         )
 
@@ -419,11 +452,11 @@ class StatsManager:
             return
 
         # 获取指标信息
-        info = self.storage.get_metric_info(metric_name)
+        info = storage.get_metric_info(metric_name)
         unit = info.get("unit", "") if info else ""
 
         # 显示汇总
-        summary = self.visualizer.show_summary(aggregated, metric_name, unit, tags)
+        summary = visualizer.show_summary(aggregated, metric_name, unit, tags)
         if summary:  # 如果返回了内容才打印（兼容性）
             print(summary)
 
