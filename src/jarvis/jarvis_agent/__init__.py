@@ -511,7 +511,7 @@ class Agent:
                         )
                         if user_input:
                             run_input_handlers = True
-                            # 如果有工具调用且用户确认继续，则将干预信息和工具执行结果拼接为prompt
+                            # 如果有工具调用且用户确认继续，则继续执行工具调用
                             if any(
                                 handler.can_handle(current_response)
                                 for handler in self.output_handler
@@ -519,13 +519,19 @@ class Agent:
                                 if user_confirm(
                                     "检测到有工具调用，是否继续处理工具调用？", True
                                 ):
-                                    self.session.prompt = (
-                                        f"{user_input}\n\n{current_response}"
-                                    )
-                                    run_input_handlers = False
+                                    # 先添加用户干预信息到session
+                                    self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n用户同意继续工具调用。"
+                                    # 继续执行下面的工具调用逻辑，不要continue跳过
+                                else:
+                                    # 用户选择不继续处理工具调用
+                                    self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
                                     continue
-                            self.session.prompt += f"{user_input}"
-                            continue
+                            else:
+                                # 没有检测到工具调用
+                                self.session.prompt = (
+                                    f"被用户中断，用户补充信息为：{user_input}"
+                                )
+                                continue
 
                     need_return, self.session.prompt = self._call_tools(
                         current_response
