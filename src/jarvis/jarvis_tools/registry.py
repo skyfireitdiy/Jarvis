@@ -203,8 +203,6 @@ class ToolRegistry(OutputHandlerProtocol):
         from jarvis.jarvis_stats.stats import StatsManager
         from datetime import datetime, timedelta
         
-        stats_manager = StatsManager()
-        
         # 获取所有工具的统计数据
         tool_stats = {}
         tools = self.get_all_tools()
@@ -216,7 +214,7 @@ class ToolRegistry(OutputHandlerProtocol):
         for tool in tools:
             tool_name = tool["name"]
             # 获取该工具的统计数据
-            stats_data = stats_manager.get_stats(
+            stats_data = StatsManager.get_stats(
                 metric_name=tool_name,
                 start_time=start_time,
                 end_time=end_time,
@@ -236,8 +234,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """更新工具调用统计"""
         from jarvis.jarvis_stats.stats import StatsManager
         
-        stats_manager = StatsManager()
-        stats_manager.increment(name, group="tool")
+        StatsManager.increment(name, group="tool")
 
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
