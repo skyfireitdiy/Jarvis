@@ -136,7 +136,7 @@ class StatsManager:
 
         if metric_name is None:
             # 显示所有指标摘要
-            StatsManager._show_metrics_summary()
+            StatsManager._show_metrics_summary(start_time, end_time, tags)
         else:
             # 根据格式显示数据
             if format == "chart":
@@ -270,7 +270,11 @@ class StatsManager:
         print(f"已清理 {days_to_keep} 天前的数据")
 
     @staticmethod
-    def _show_metrics_summary():
+    def _show_metrics_summary(
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        tags: Optional[Dict[str, str]] = None,
+    ):
         """显示所有指标摘要"""
         from rich.console import Console
         from rich.table import Table
@@ -283,6 +287,12 @@ class StatsManager:
             console.print("[yellow]没有找到任何统计指标[/yellow]")
             return
 
+        # 如果没有指定时间范围，使用默认值
+        if end_time is None:
+            end_time = datetime.now()
+        if start_time is None:
+            start_time = end_time - timedelta(days=7)
+
         # 创建表格
         table = Table(title="统计指标摘要")
         table.add_column("指标名称", style="cyan")
@@ -290,12 +300,20 @@ class StatsManager:
         table.add_column("最后更新", style="yellow")
         table.add_column("7天数据点", style="magenta")
 
-        # 获取每个指标的信息
-        end_time = datetime.now()
-        start_time = end_time - timedelta(days=7)
-
+        # 过滤满足标签条件的指标
+        displayed_count = 0
         for metric in metrics:
+            # 获取该指标的记录
+            records = storage.get_metrics(metric, start_time, end_time, tags)
+            
+            # 如果指定了标签过滤，但没有匹配的记录，跳过该指标
+            if tags and len(records) == 0:
+                continue
+            
             info = storage.get_metric_info(metric)
+            unit = "-"
+            last_updated = "-"
+            
             if info:
                 unit = info.get("unit", "-")
                 last_updated = info.get("last_updated", "-")
@@ -308,14 +326,19 @@ class StatsManager:
                     except:
                         pass
 
-                # 获取数据点数
-                records = storage.get_metrics(metric, start_time, end_time)
-                count = len(records)
+            count = len(records)
+            table.add_row(metric, unit, last_updated, str(count))
+            displayed_count += 1
 
-                table.add_row(metric, unit, last_updated, str(count))
-
-        console.print(table)
-        console.print(f"\n[green]总计: {len(metrics)} 个指标[/green]")
+        if displayed_count == 0:
+            console.print("[yellow]没有找到符合条件的指标[/yellow]")
+            if tags:
+                console.print(f"过滤条件: {tags}")
+        else:
+            console.print(table)
+            console.print(f"\n[green]总计: {displayed_count} 个指标[/green]")
+            if tags:
+                console.print(f"过滤条件: {tags}")
 
     @staticmethod
     def _show_table(
