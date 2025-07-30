@@ -96,15 +96,23 @@ Jarvis 正是为这种工作流而设计的工具。它通过无缝的命令行�
 
 ### 系统要求
 - **Linux**: 完全支持。
-- **Windows**: 未经充分测试，建议在 [WSL](https://docs.microsoft.com/en-us/windows/wsl/install) 中使用。
+- **Windows**: 完全支持（需要 PowerShell）。
 
 ### 安装
 
 #### 一键安装 (推荐)
 只需一行命令即可完成所有安装和配置：
+
+**Linux/macOS:**
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"
 ```
+
+**Windows (PowerShell):**
+```powershell
+iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.ps1'))
+```
+
 > 该脚本会自动检测Python环境、克隆项目、安装依赖并设置好路径。
 
 #### 手动安装
