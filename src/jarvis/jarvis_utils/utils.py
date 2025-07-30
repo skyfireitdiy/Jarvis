@@ -182,47 +182,47 @@ def _show_usage_stats() -> None:
 
             # 计算节省的时间
             # 基于经验估算：
-            # - 每次工具调用平均节省5分钟（相比手动操作）
-            # - 每行代码修改平均节省60秒（考虑思考、编写、测试时间）
-            # - 每次提交平均节省15分钟（考虑整理、描述、检查时间）
-            # - 每个命令调用平均节省5分钟（相比手动执行）
+            # 基于以下模型估算节省的时间：
+            # - 普通工具调用：2分钟/次
+            # - 代码智能体调用：10分钟/次
+            # - 新增代码行：0.8分钟/行 (48秒)
+            # - 删除代码行：0.2分钟/行 (12秒)
+            # - 提交：10分钟/次
+            # - 命令使用：1分钟/次
+            time_saved_seconds = 0
 
-            time_saved_minutes = 0
+            # 区分普通工具和代码智能体
+            tool_stats = categorized_stats["tool"]["metrics"]
+            code_agent_changes = categorized_stats["code"]["metrics"]
+            lines_stats = categorized_stats["lines"]["metrics"]
+            commit_stats = categorized_stats["commit"]["metrics"]
+            command_stats = categorized_stats["command"]["metrics"]
 
-            # 工具调用节省的时间
-            time_saved_minutes += total_tools * 5
+            # 普通工具调用节省的时间
+            time_saved_seconds += tool_stats.get("execute_script", 0) * 2 * 60
+            time_saved_seconds += tool_stats.get("search_web", 0) * 2 * 60
+            time_saved_seconds += tool_stats.get("read_code", 0) * 2 * 60
 
-            # 代码行数节省的时间（每行修改节省60秒）
-            total_lines = sum(
-                count
-                for title, stats, _ in stats_output
-                if "代码行数" in title
-                for metric, count in stats.items()
-            )
-            time_saved_minutes += total_lines * 1  # 60秒 = 1分钟
+            # 代码智能体调用节省的时间
+            total_code_agent_calls = sum(code_agent_changes.values())
+            time_saved_seconds += total_code_agent_calls * 10 * 60
+
+            # 代码行数节省的时间 (修改一行约等于删除后新增，因此权重主要在新增行)
+            time_saved_seconds += lines_stats.get("code_lines_added", 0) * 0.8 * 60
+            time_saved_seconds += lines_stats.get("code_lines_deleted", 0) * 0.2 * 60
 
             # 提交节省的时间
-            total_commits = sum(
-                count
-                for title, stats, _ in stats_output
-                if "提交统计" in title
-                for metric, count in stats.items()
-            )
-            time_saved_minutes += total_commits * 15
+            time_saved_seconds += sum(commit_stats.values()) * 10 * 60
 
             # 命令调用节省的时间
-            total_commands = sum(
-                count
-                for title, stats, _ in stats_output
-                if "命令使用" in title
-                for metric, count in stats.items()
-            )
-            time_saved_minutes += total_commands * 5
+            time_saved_seconds += sum(command_stats.values()) * 1 * 60
 
             # 转换为更友好的格式
-            if time_saved_minutes > 0:
-                hours = int(time_saved_minutes // 60)
-                minutes = int(time_saved_minutes % 60)
+            if time_saved_seconds > 0:
+                total_minutes = int(time_saved_seconds / 60)
+                seconds = int(time_saved_seconds % 60)
+                hours = total_minutes // 60
+                minutes = total_minutes % 60
 
                 if hours >= 8:
                     days = hours // 8
@@ -230,8 +230,10 @@ def _show_usage_stats() -> None:
                     time_str = f"{days} 天 {remaining_hours} 小时 {minutes} 分钟"
                 elif hours > 0:
                     time_str = f"{hours} 小时 {minutes} 分钟"
+                elif total_minutes > 0:
+                    time_str = f"{minutes} 分钟 {seconds} 秒"
                 else:
-                    time_str = f"{minutes} 分钟"
+                    time_str = f"{seconds} 秒"
 
                 stats_lines.append(f"\n⏱️  节省时间: 约 {time_str}")
 
