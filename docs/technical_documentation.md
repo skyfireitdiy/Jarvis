@@ -240,6 +240,90 @@ Agent 的初始化过程是高度可配置的，允许用户根据需求定制�
 
 这使得社区可以方便地为 Jarvis 贡献对新 LLM 平台的支持。
 
+### 2.4. 记忆系统 (Memory System)
+
+Jarvis 内置了一个强大的记忆系统，用于存储和检索不同类型的信息，帮助系统在多次交互中保持上下文连续性和知识积累。
+
+#### 2.4.1. 记忆类型
+
+记忆系统支持三种不同的记忆类型，每种类型都有其特定的用途和存储位置：
+
+1. **短期记忆 (Short-term Memory)**
+   - **用途**: 存储当前任务相关的临时信息
+   - **存储位置**: 内存中（非持久化）
+   - **生命周期**: 仅在当前会话期间有效
+   - **使用场景**: 任务执行过程中的中间结果、临时决策、当前上下文信息
+
+2. **项目长期记忆 (Project Long-term Memory)**
+   - **用途**: 存储与当前项目相关的长期信息
+   - **存储位置**: 当前项目目录的 `.jarvis/memory` 下
+   - **生命周期**: 与项目共存，持久化存储
+   - **使用场景**: 项目特定的配置、代码库结构理解、项目约定、技术栈信息
+
+3. **全局长期记忆 (Global Long-term Memory)**
+   - **用途**: 存储通用的信息、用户喜好、知识、方法等
+   - **存储位置**: 数据目录的 `memory/global_long_term` 下
+   - **生命周期**: 跨项目持久化存储
+   - **使用场景**: 用户偏好设置、通用编程模式、最佳实践、常用解决方案
+
+#### 2.4.2. 记忆工具
+
+记忆系统通过两个核心工具提供功能：
+
+**save_memory 工具**
+- 用于保存信息到指定的记忆类型
+- 参数：
+  - `memory_type`: 记忆类型（short_term、project_long_term、global_long_term）
+  - `tags`: 标签列表，用于索引和检索
+  - `content`: 要保存的记忆内容
+
+**retrieve_memory 工具**
+- 用于从记忆系统中检索相关信息
+- 参数：
+  - `query`: 查询关键词
+  - `memory_types`: 要搜索的记忆类型列表（可选）
+  - `tags`: 用于过滤的标签列表（可选）
+  - `max_results`: 最大返回结果数（默认5）
+
+#### 2.4.3. 记忆存储格式
+
+记忆以 JSON 格式存储，每个记忆条目包含以下字段：
+- `id`: 唯一标识符（时间戳格式）
+- `type`: 记忆类型
+- `tags`: 标签列表
+- `content`: 记忆内容
+- `created_at`: 创建时间
+- `updated_at`: 更新时间
+
+#### 2.4.4. 使用示例
+
+```python
+# 保存项目相关的长期记忆
+save_memory(
+    memory_type="project_long_term",
+    tags=["api", "authentication", "jwt"],
+    content="项目使用JWT进行API认证，token有效期为24小时，刷新token有效期为7天"
+)
+
+# 保存全局通用知识
+save_memory(
+    memory_type="global_long_term",
+    tags=["python", "best_practice", "error_handling"],
+    content="Python异常处理最佳实践：使用具体的异常类型，避免裸露的except，总是记录异常信息"
+)
+
+# 检索相关记忆
+retrieve_memory(
+    query="authentication",
+    memory_types=["project_long_term", "global_long_term"],
+    max_results=3
+)
+```
+
+#### 2.4.5. 自动记忆提示
+
+当 Jarvis Agent 检测到可用的记忆工具时，会自动在系统提示中添加相关指引，提醒在适当的时候使用记忆系统保存和检索信息。这确保了重要信息不会丢失，并能在需要时快速检索相关知识。
+
 ## 3. 架构设计
 
 ### 3.1. 配置系统
