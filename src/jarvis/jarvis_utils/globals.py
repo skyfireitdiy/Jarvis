@@ -263,12 +263,14 @@ def clear_short_term_memories() -> None:
 def get_all_memory_tags() -> Dict[str, List[str]]:
     """
     获取所有记忆类型中的标签集合。
+    每个类型最多返回200个标签，超过时随机提取。
     
     返回:
         Dict[str, List[str]]: 按记忆类型分组的标签列表
     """
     from pathlib import Path
     import json
+    import random
     from jarvis.jarvis_utils.config import get_data_dir
     
     tags_by_type = {
@@ -277,11 +279,17 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
         "global_long_term": []
     }
     
+    MAX_TAGS_PER_TYPE = 200
+    
     # 获取短期记忆标签
     short_term_tags = set()
     for memory in short_term_memories:
         short_term_tags.update(memory.get("tags", []))
-    tags_by_type["short_term"] = sorted(list(short_term_tags))
+    short_term_tags_list = sorted(list(short_term_tags))
+    if len(short_term_tags_list) > MAX_TAGS_PER_TYPE:
+        tags_by_type["short_term"] = sorted(random.sample(short_term_tags_list, MAX_TAGS_PER_TYPE))
+    else:
+        tags_by_type["short_term"] = short_term_tags_list
     
     # 获取项目长期记忆标签
     project_memory_dir = Path(".jarvis/memory")
@@ -294,7 +302,11 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
                     project_tags.update(memory_data.get("tags", []))
             except Exception:
                 pass
-        tags_by_type["project_long_term"] = sorted(list(project_tags))
+        project_tags_list = sorted(list(project_tags))
+        if len(project_tags_list) > MAX_TAGS_PER_TYPE:
+            tags_by_type["project_long_term"] = sorted(random.sample(project_tags_list, MAX_TAGS_PER_TYPE))
+        else:
+            tags_by_type["project_long_term"] = project_tags_list
     
     # 获取全局长期记忆标签
     global_memory_dir = Path(get_data_dir()) / "memory" / "global_long_term"
@@ -307,6 +319,10 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
                     global_tags.update(memory_data.get("tags", []))
             except Exception:
                 pass
-        tags_by_type["global_long_term"] = sorted(list(global_tags))
+        global_tags_list = sorted(list(global_tags))
+        if len(global_tags_list) > MAX_TAGS_PER_TYPE:
+            tags_by_type["global_long_term"] = sorted(random.sample(global_tags_list, MAX_TAGS_PER_TYPE))
+        else:
+            tags_by_type["global_long_term"] = global_tags_list
     
     return tags_by_type
