@@ -204,9 +204,9 @@ class EditFileHandler(OutputHandler):
                 found = False
 
                 if exact_search in modified_content:
-                    # 直接执行替换（保留所有原始格式）
+                    # 直接执行替换（保留所有原始格式），只替换第一个匹配
                     modified_content = modified_content.replace(
-                        exact_search, replace_text
+                        exact_search, replace_text, 1
                     )
                     print(f"✅ 补丁 #{patch_count} 应用成功")
                     found = True
@@ -222,7 +222,7 @@ class EditFileHandler(OutputHandler):
                         stripped_replace = replace_text[1:-1]
                         if stripped_search in modified_content:
                             modified_content = modified_content.replace(
-                                stripped_search, stripped_replace
+                                stripped_search, stripped_replace, 1
                             )
                             print(f"✅ 补丁 #{patch_count} 应用成功 (自动去除首尾换行)")
                             found = True
@@ -251,7 +251,7 @@ class EditFileHandler(OutputHandler):
                             )
                             if indented_search in modified_content:
                                 modified_content = modified_content.replace(
-                                    indented_search, indented_replace
+                                    indented_search, indented_replace, 1
                                 )
                                 print(
                                     f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)"
