@@ -480,7 +480,10 @@ class Agent:
             
             # 如果有save_memory工具，添加相关提示
             if "save_memory" in tool_names:
-                memory_prompts += "\n    - 如果有关键信息需要记忆，请调用save_memory工具进行记忆"
+                memory_prompts += "\n    - 如果有关键信息需要记忆，请调用save_memory工具进行记忆："
+                memory_prompts += "\n      * project_long_term: 保存与当前项目相关的长期信息"
+                memory_prompts += "\n      * global_long_term: 保存通用的信息、用户喜好、知识、方法等"
+                memory_prompts += "\n      * short_term: 保存当前任务相关的临时信息"
             
             # 如果有retrieve_memory工具，添加相关提示
             if "retrieve_memory" in tool_names:
