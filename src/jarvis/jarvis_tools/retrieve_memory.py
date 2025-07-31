@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -129,6 +130,12 @@ class RetrieveMemoryTool:
             # 按创建时间排序（最新的在前）
             all_memories.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
+            # 限制最多返回50条记忆，随机选取
+            if len(all_memories) > 50:
+                all_memories = random.sample(all_memories, 50)
+                # 重新排序，保持时间顺序
+                all_memories.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+
             # 如果指定了限制，只返回前N个
             if limit:
                 all_memories = all_memories[:limit]
@@ -139,15 +146,41 @@ class RetrieveMemoryTool:
             if tags:
                 PrettyOutput.print(f"使用标签过滤: {', '.join(tags)}", OutputType.INFO)
 
-            # 格式化输出
-            result = {
-                "total_count": len(all_memories),
-                "memory_types": types_to_search,
-                "filter_tags": tags,
-                "memories": all_memories,
-            }
+            # 格式化为Markdown输出
+            markdown_output = f"# 记忆检索结果\n\n"
+            markdown_output += f"**检索到 {len(all_memories)} 条记忆**\n\n"
+            
+            if tags:
+                markdown_output += f"**使用标签过滤**: {', '.join(tags)}\n\n"
+            
+            markdown_output += f"**记忆类型**: {', '.join(types_to_search)}\n\n"
+            
+            markdown_output += "---\n\n"
+            
+            # 输出所有记忆
+            for i, memory in enumerate(all_memories):
+                markdown_output += f"## {i+1}. {memory.get('id', '未知ID')}\n\n"
+                markdown_output += f"**类型**: {memory.get('type', '未知类型')}\n\n"
+                markdown_output += f"**标签**: {', '.join(memory.get('tags', []))}\n\n"
+                markdown_output += f"**创建时间**: {memory.get('created_at', '未知时间')}\n\n"
+                
+                # 内容部分
+                content = memory.get('content', '')
+                if content:
+                    markdown_output += f"**内容**:\n\n{content}\n\n"
+                
+                # 如果有额外的元数据
+                metadata = {k: v for k, v in memory.items() 
+                           if k not in ['id', 'type', 'tags', 'created_at', 'content']}
+                if metadata:
+                    markdown_output += f"**其他信息**:\n"
+                    for key, value in metadata.items():
+                        markdown_output += f"- {key}: {value}\n"
+                    markdown_output += "\n"
+                
+                markdown_output += "---\n\n"
 
-            # 如果记忆较多，显示摘要
+            # 如果记忆较多，在终端显示摘要
             if len(all_memories) > 5:
                 PrettyOutput.print(f"记忆较多，仅显示前5条摘要：", OutputType.INFO)
                 for i, memory in enumerate(all_memories[:5]):
@@ -163,7 +196,7 @@ class RetrieveMemoryTool:
 
             return {
                 "success": True,
-                "stdout": json.dumps(result, ensure_ascii=False, indent=2),
+                "stdout": markdown_output,
                 "stderr": "",
             }
 
