@@ -400,8 +400,18 @@ class StatsManager:
         print(chart)
 
         # 显示时间范围
-        print(
-            f"\n时间范围: {start_time.strftime('%Y-%m-%d %H:%M')} ~ {end_time.strftime('%Y-%m-%d %H:%M')}"
+        from rich.panel import Panel
+        from rich.console import Console
+
+        console = Console()
+        console.print(
+            Panel(
+                f"[cyan]{start_time.strftime('%Y-%m-%d %H:%M')}[/] ~ [cyan]{end_time.strftime('%Y-%m-%d %H:%M')}[/]",
+                title="[bold]时间范围[/bold]",
+                expand=False,
+                style="dim",
+                border_style="green",
+            )
         )
 
     @staticmethod
@@ -476,6 +486,16 @@ class StatsManager:
             print(summary)
 
         # 显示时间范围
-        print(
-            f"\n时间范围: {start_time.strftime('%Y-%m-%d %H:%M')} ~ {end_time.strftime('%Y-%m-%d %H:%M')}"
+        from rich.panel import Panel
+        from rich.console import Console
+
+        console = Console()
+        console.print(
+            Panel(
+                f"[cyan]{start_time.strftime('%Y-%m-%d %H:%M')}[/] ~ [cyan]{end_time.strftime('%Y-%m-%d %H:%M')}[/]",
+                title="[bold]时间范围[/bold]",
+                expand=False,
+                style="dim",
+                border_style="green",
+            )
         )
