@@ -5,6 +5,7 @@
 """
 
 import os
+import io
 from typing import Dict, List, Optional, Any
 from collections import OrderedDict
 import plotext as plt
@@ -75,10 +76,25 @@ class StatsVisualizer:
             min_val = min(values)
             max_val = max(values)
             avg_val = sum(values) / len(values)
-            stats_info = (
-                f"\n最小值: {min_val:.2f}, 最大值: {max_val:.2f}, 平均值: {avg_val:.2f}"
+            stats_info_text = (
+                f"最小值: {min_val:.2f}, 最大值: {max_val:.2f}, 平均值: {avg_val:.2f}"
             )
-            return chart + stats_info
+
+            # 使用StringIO捕获Panel输出
+            string_io = io.StringIO()
+            temp_console = Console(file=string_io, width=self.width)
+            temp_console.print(
+                Panel(
+                    stats_info_text,
+                    title="[bold]数据统计[/bold]",
+                    expand=False,
+                    style="dim",
+                    border_style="blue",
+                )
+            )
+            stats_panel_str = string_io.getvalue()
+
+            return chart + "\n" + stats_panel_str.strip()
         return chart
 
     def plot_bar_chart(
@@ -227,24 +243,40 @@ class StatsVisualizer:
         if unit:
             info_items.append(f"单位: {unit}")
         if start_time and end_time:
-            info_items.append(f"时间范围: {start_time} ~ {end_time}")
+            info_items.append(f"时间范围: [cyan]{start_time}[/] ~ [cyan]{end_time}[/]")
         if tags_filter:
             filter_str = ", ".join([f"{k}={v}" for k, v in tags_filter.items()])
             info_items.append(f"过滤条件: {filter_str}")
 
         if info_items:
-            self.console.print(Panel(" | ".join(info_items), style="dim"))
+            self.console.print(
+                Panel(
+                    " | ".join(info_items),
+                    title="[bold]查询详情[/bold]",
+                    expand=False,
+                    style="dim",
+                    border_style="green",
+                )
+            )
 
         # 统计信息
         if len(records) > 0:
             values = [r["value"] for r in records]
-            stats_info = (
+            stats_info_text = (
                 f"总记录数: {len(records)} | "
                 f"显示: {len(display_records)} | "
                 f"最小值: {min(values):.2f} | "
                 f"最大值: {max(values):.2f} | "
                 f"平均值: {sum(values)/len(values):.2f}"
             )
-            self.console.print(f"\n[dim]{stats_info}[/dim]")
+            self.console.print(
+                Panel(
+                    stats_info_text,
+                    title="[bold]数据统计[/bold]",
+                    expand=False,
+                    style="dim",
+                    border_style="blue",
+                )
+            )
 
         return ""
