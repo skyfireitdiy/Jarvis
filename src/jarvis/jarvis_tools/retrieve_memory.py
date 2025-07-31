@@ -22,6 +22,7 @@ class RetrieveMemoryTool:
     - all: 从所有类型中检索
     
     可以通过标签过滤检索结果，支持多个标签（满足任一标签即可）
+    注意：标签数量建议不要超过10个，以保证检索效率
     """
 
     parameters = {
@@ -149,35 +150,40 @@ class RetrieveMemoryTool:
             # 格式化为Markdown输出
             markdown_output = f"# 记忆检索结果\n\n"
             markdown_output += f"**检索到 {len(all_memories)} 条记忆**\n\n"
-            
+
             if tags:
                 markdown_output += f"**使用标签过滤**: {', '.join(tags)}\n\n"
-            
+
             markdown_output += f"**记忆类型**: {', '.join(types_to_search)}\n\n"
-            
+
             markdown_output += "---\n\n"
-            
+
             # 输出所有记忆
             for i, memory in enumerate(all_memories):
                 markdown_output += f"## {i+1}. {memory.get('id', '未知ID')}\n\n"
                 markdown_output += f"**类型**: {memory.get('type', '未知类型')}\n\n"
                 markdown_output += f"**标签**: {', '.join(memory.get('tags', []))}\n\n"
-                markdown_output += f"**创建时间**: {memory.get('created_at', '未知时间')}\n\n"
-                
+                markdown_output += (
+                    f"**创建时间**: {memory.get('created_at', '未知时间')}\n\n"
+                )
+
                 # 内容部分
-                content = memory.get('content', '')
+                content = memory.get("content", "")
                 if content:
                     markdown_output += f"**内容**:\n\n{content}\n\n"
-                
+
                 # 如果有额外的元数据
-                metadata = {k: v for k, v in memory.items() 
-                           if k not in ['id', 'type', 'tags', 'created_at', 'content']}
+                metadata = {
+                    k: v
+                    for k, v in memory.items()
+                    if k not in ["id", "type", "tags", "created_at", "content"]
+                }
                 if metadata:
                     markdown_output += f"**其他信息**:\n"
                     for key, value in metadata.items():
                         markdown_output += f"- {key}: {value}\n"
                     markdown_output += "\n"
-                
+
                 markdown_output += "---\n\n"
 
             # 如果记忆较多，在终端显示摘要
