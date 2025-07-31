@@ -505,7 +505,9 @@ def load_config():
             if schema_path.exists():
                 try:
                     config_file_path.parent.mkdir(parents=True, exist_ok=True)
-                    generate_default_config(str(schema_path), str(config_file_path))
+                    generate_default_config(
+                        str(schema_path.absolute()), str(config_file_path)
+                    )
                     PrettyOutput.print(
                         f"已生成默认配置文件: {config_file_path}", OutputType.INFO
                     )
@@ -622,7 +624,7 @@ def generate_default_config(schema_path: str, output_path: str) -> None:
 
     default_config = _generate_from_schema(schema)
 
-    content = f"# yaml-language-server: $schema={schema}\n"
+    content = f"# yaml-language-server: $schema={schema_path}\n"
     content += yaml.dump(default_config, allow_unicode=True, sort_keys=False)
 
     with open(output_path, "w", encoding="utf-8") as f:
