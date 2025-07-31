@@ -268,22 +268,30 @@ Jarvis 内置了一个强大的记忆系统，用于存储和检索不同类型�
 
 #### 2.4.2. 记忆工具
 
-记忆系统通过两个核心工具提供功能：
+记忆系统通过三个核心工具提供完整的记忆管理功能：
 
 **save_memory 工具**
-- 用于保存信息到指定的记忆类型
+- 用于保存信息到指定的记忆类型，支持批量保存
 - 参数：
-  - `memory_type`: 记忆类型（short_term、project_long_term、global_long_term）
-  - `tags`: 标签列表，用于索引和检索
-  - `content`: 要保存的记忆内容
+  - `memories`: 记忆数组，每个元素包含：
+    - `memory_type`: 记忆类型（short_term、project_long_term、global_long_term）
+    - `tags`: 标签列表，用于索引和检索
+    - `content`: 要保存的记忆内容
 
 **retrieve_memory 工具**
 - 用于从记忆系统中检索相关信息
 - 参数：
-  - `query`: 查询关键词
-  - `memory_types`: 要搜索的记忆类型列表（可选）
+  - `memory_types`: 要搜索的记忆类型列表（支持 "all" 检索所有类型）
   - `tags`: 用于过滤的标签列表（可选）
-  - `max_results`: 最大返回结果数（默认5）
+  - `limit`: 返回结果的最大数量（可选）
+
+**clear_memory 工具**
+- 用于批量清除指定的记忆，支持多种清除方式
+- 参数：
+  - `memory_types`: 要清除的记忆类型列表（支持 "all" 清除所有类型）
+  - `tags`: 要清除的记忆标签列表（可选）
+  - `memory_ids`: 要清除的具体记忆ID列表（可选）
+  - `confirm`: 确认清除操作（必须为 true）
 
 #### 2.4.3. 记忆存储格式
 
@@ -298,25 +306,46 @@ Jarvis 内置了一个强大的记忆系统，用于存储和检索不同类型�
 #### 2.4.4. 使用示例
 
 ```python
-# 保存项目相关的长期记忆
+# 批量保存多条记忆
 save_memory(
-    memory_type="project_long_term",
-    tags=["api", "authentication", "jwt"],
-    content="项目使用JWT进行API认证，token有效期为24小时，刷新token有效期为7天"
-)
-
-# 保存全局通用知识
-save_memory(
-    memory_type="global_long_term",
-    tags=["python", "best_practice", "error_handling"],
-    content="Python异常处理最佳实践：使用具体的异常类型，避免裸露的except，总是记录异常信息"
+    memories=[
+        {
+            "memory_type": "project_long_term",
+            "tags": ["api", "authentication", "jwt"],
+            "content": "项目使用JWT进行API认证，token有效期为24小时，刷新token有效期为7天"
+        },
+        {
+            "memory_type": "global_long_term",
+            "tags": ["python", "best_practice", "error_handling"],
+            "content": "Python异常处理最佳实践：使用具体的异常类型，避免裸露的except，总是记录异常信息"
+        },
+        {
+            "memory_type": "short_term",
+            "tags": ["current_task", "debugging"],
+            "content": "正在调试用户认证模块的token过期问题"
+        }
+    ]
 )
 
 # 检索相关记忆
 retrieve_memory(
-    query="authentication",
     memory_types=["project_long_term", "global_long_term"],
-    max_results=3
+    tags=["authentication"],
+    limit=5
+)
+
+# 清除特定标签的记忆
+clear_memory(
+    memory_types=["all"],
+    tags=["outdated", "deprecated"],
+    confirm=True
+)
+
+# 按ID清除特定记忆
+clear_memory(
+    memory_types=["project_long_term"],
+    memory_ids=["20250731_123456_789012", "20250731_234567_890123"],
+    confirm=True
 )
 ```
 

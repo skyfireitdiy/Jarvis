@@ -67,6 +67,7 @@ class CodeAgent:
                 "rewrite_file",
                 "save_memory",
                 "retrieve_memory",
+                "clear_memory",
             ]
         )
         code_system_prompt = """
