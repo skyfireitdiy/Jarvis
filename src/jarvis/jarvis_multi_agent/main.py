@@ -7,6 +7,7 @@ import yaml
 from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 app = typer.Typer(help="多智能体系统启动器")
 
