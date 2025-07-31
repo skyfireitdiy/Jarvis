@@ -30,6 +30,35 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 g_config_file = None
 
+COMMAND_MAPPING = {
+    # jarvis主命令
+    "jvs": "jarvis",
+    # 代码代理
+    "jca": "jarvis-code-agent",
+    # 智能shell
+    "jss": "jarvis-smart-shell",
+    # 平台管理
+    "jpm": "jarvis-platform-manager",
+    # Git提交
+    "jgc": "jarvis-git-commit",
+    # 代码审查
+    "jcr": "jarvis-code-review",
+    # Git压缩
+    "jgs": "jarvis-git-squash",
+    # 多代理
+    "jma": "jarvis-multi-agent",
+    # 代理
+    "ja": "jarvis-agent",
+    # 工具
+    "jt": "jarvis-tool",
+    # 方法论
+    "jm": "jarvis-methodology",
+    # RAG
+    "jrg": "jarvis-rag",
+    # 统计
+    "jst": "jarvis-stats",
+}
+
 
 def _setup_signal_handler() -> None:
     """设置SIGINT信号处理函数"""
@@ -148,6 +177,15 @@ def _show_usage_stats() -> None:
                                 )
                         elif group == "command":
                             categorized_stats["command"]["metrics"][metric] = int(total)
+
+        # 合并长短命令的历史统计数据
+        command_stats = categorized_stats["command"]["metrics"]
+        if command_stats:
+            merged_stats: Dict[str, int] = {}
+            for metric, count in command_stats.items():
+                long_command = COMMAND_MAPPING.get(metric, metric)
+                merged_stats[long_command] = merged_stats.get(long_command, 0) + count
+            categorized_stats["command"]["metrics"] = merged_stats
 
         # 计算采纳率并添加到统计中
         commit_stats = categorized_stats["commit"]["metrics"]
@@ -348,7 +386,7 @@ def _show_usage_stats() -> None:
                 remaining_days_after_months = remaining_days_after_years % 20
                 work_days = remaining_days_after_months
                 remaining_hours = int(hours % 8)  # 剩余不足一个工作日的小时数
-                
+
                 # 构建时间描述
                 time_parts = []
                 if work_years > 0:
@@ -359,17 +397,25 @@ def _show_usage_stats() -> None:
                     time_parts.append(f"{work_days} 个工作日")
                 if remaining_hours > 0:
                     time_parts.append(f"{remaining_hours} 小时")
-                
+
                 if time_parts:
                     time_description = "、".join(time_parts)
                     if work_years >= 1:
-                        encouragement = f"🎉 相当于节省了 {time_description} 的工作时间！"
+                        encouragement = (
+                            f"🎉 相当于节省了 {time_description} 的工作时间！"
+                        )
                     elif work_months >= 1:
-                        encouragement = f"🚀 相当于节省了 {time_description} 的工作时间！"
+                        encouragement = (
+                            f"🚀 相当于节省了 {time_description} 的工作时间！"
+                        )
                     elif work_days >= 1:
-                        encouragement = f"💪 相当于节省了 {time_description} 的工作时间！"
+                        encouragement = (
+                            f"💪 相当于节省了 {time_description} 的工作时间！"
+                        )
                     else:
-                        encouragement = f"✨ 相当于节省了 {time_description} 的工作时间！"
+                        encouragement = (
+                            f"✨ 相当于节省了 {time_description} 的工作时间！"
+                        )
                 elif hours >= 1:
                     encouragement = f"⭐ 相当于节省了 {int(hours)} 小时的工作时间，积少成多，继续保持！"
                 if encouragement:
@@ -718,43 +764,13 @@ def count_cmd_usage() -> None:
     import os
     from jarvis.jarvis_stats.stats import StatsManager
 
-    # 命令映射关系：将短命令映射到长命令
-    command_mapping = {
-        # jarvis主命令
-        "jvs": "jarvis",
-        # 代码代理
-        "jca": "jarvis-code-agent",
-        # 智能shell
-        "jss": "jarvis-smart-shell",
-        # 平台管理
-        "jpm": "jarvis-platform-manager",
-        # Git提交
-        "jgc": "jarvis-git-commit",
-        # 代码审查
-        "jcr": "jarvis-code-review",
-        # Git压缩
-        "jgs": "jarvis-git-squash",
-        # 多代理
-        "jma": "jarvis-multi-agent",
-        # 代理
-        "ja": "jarvis-agent",
-        # 工具
-        "jt": "jarvis-tool",
-        # 方法论
-        "jm": "jarvis-methodology",
-        # RAG
-        "jrg": "jarvis-rag",
-        # 统计
-        "jst": "jarvis-stats",
-    }
-
     # 从完整路径中提取命令名称
     cmd_path = sys.argv[0]
     cmd_name = os.path.basename(cmd_path)
-    
+
     # 如果是短命令，映射到长命令
-    if cmd_name in command_mapping:
-        metric_name = command_mapping[cmd_name]
+    if cmd_name in COMMAND_MAPPING:
+        metric_name = COMMAND_MAPPING[cmd_name]
     else:
         metric_name = cmd_name
 
