@@ -396,7 +396,7 @@ class Agent:
         """
         return execute_tool_call(response, self)
 
-    def _complete_task(self) -> str:
+    def _complete_task(self, auto_completed: bool = False) -> str:
         """完成任务并生成总结(如果需要)
 
         返回:
@@ -407,8 +407,26 @@ class Agent:
             2. 对于子Agent: 可能会生成总结(如果启用)
             3. 使用spinner显示生成状态
         """
+        satisfaction_feedback = ""
+
+        if not auto_completed and self.use_analysis:
+            if user_confirm("您对本次任务的完成是否满意？", True):
+                satisfaction_feedback = "\n\n用户对本次任务的完成表示满意。"
+            else:
+                feedback = self.multiline_inputer(
+                    "请提供您的反馈意见（可留空直接回车）:"
+                )
+                if feedback:
+                    satisfaction_feedback = (
+                        f"\n\n用户对本次任务的完成不满意，反馈意见如下：\n{feedback}"
+                    )
+                else:
+                    satisfaction_feedback = (
+                        "\n\n用户对本次任务的完成不满意，未提供具体反馈意见。"
+                    )
+
         if self.use_analysis:
-            self._analysis_task()
+            self._analysis_task(satisfaction_feedback)
         if self.need_summary:
             print("📄 正在生成总结...")
             self.session.prompt = self.summary_prompt
@@ -420,11 +438,13 @@ class Agent:
 
         return "任务完成"
 
-    def _analysis_task(self):
+    def _analysis_task(self, satisfaction_feedback: str = ""):
         print("🔍 正在分析任务...")
         try:
             # 让模型判断是否需要生成方法论
             analysis_prompt = TASK_ANALYSIS_PROMPT
+            if satisfaction_feedback:
+                analysis_prompt += satisfaction_feedback
 
             self.session.prompt = analysis_prompt
             if not self.model:
@@ -547,7 +567,7 @@ class Agent:
                         continue
 
                     if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
-                        return self._complete_task()
+                        return self._complete_task(auto_completed=True)
 
                     # 获取用户输入
                     user_input = self.multiline_inputer(
@@ -560,7 +580,7 @@ class Agent:
                         continue
 
                     if not user_input:
-                        return self._complete_task()
+                        return self._complete_task(auto_completed=False)
 
                 except Exception as e:
                     PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
