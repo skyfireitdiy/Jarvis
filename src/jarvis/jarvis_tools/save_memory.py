@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
@@ -15,6 +16,8 @@ class SaveMemoryTool:
     name = "save_memory"
     description = """保存信息到长短期记忆系统。
     
+    支持批量保存多条记忆，可以同时保存不同类型的记忆。
+    
     支持的记忆类型：
     - project_long_term: 项目长期记忆（与当前项目相关的信息）
     - global_long_term: 全局长期记忆（通用的信息、用户喜好、知识、方法等）
@@ -27,19 +30,36 @@ class SaveMemoryTool:
     parameters = {
         "type": "object",
         "properties": {
-            "memory_type": {
-                "type": "string",
-                "enum": ["project_long_term", "global_long_term", "short_term"],
-                "description": "记忆类型",
-            },
-            "tags": {
+            "memories": {
                 "type": "array",
-                "items": {"type": "string"},
-                "description": "用于索引记忆的标签列表",
-            },
-            "content": {"type": "string", "description": "要保存的记忆内容"},
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "memory_type": {
+                            "type": "string",
+                            "enum": [
+                                "project_long_term",
+                                "global_long_term",
+                                "short_term",
+                            ],
+                            "description": "记忆类型",
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "用于索引记忆的标签列表",
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "要保存的记忆内容",
+                        },
+                    },
+                    "required": ["memory_type", "tags", "content"],
+                },
+                "description": "要保存的记忆列表",
+            }
         },
-        "required": ["memory_type", "tags", "content"],
+        "required": ["memories"],
     }
 
     def __init__(self):
@@ -58,81 +78,122 @@ class SaveMemoryTool:
 
     def _generate_memory_id(self) -> str:
         """生成唯一的记忆ID"""
+        # 添加微秒级时间戳确保唯一性
+        time.sleep(0.001)  # 确保不同记忆有不同的时间戳
         return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+
+    def _save_single_memory(self, memory_data: Dict[str, Any]) -> Dict[str, Any]:
+        """保存单条记忆"""
+        memory_type = memory_data["memory_type"]
+        tags = memory_data.get("tags", [])
+        content = memory_data.get("content", "")
+
+        # 生成记忆ID
+        memory_id = self._generate_memory_id()
+
+        # 创建记忆对象
+        memory_obj = {
+            "id": memory_id,
+            "type": memory_type,
+            "tags": tags,
+            "content": content,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        }
+
+        if memory_type == "short_term":
+            # 短期记忆保存到全局变量
+            add_short_term_memory(memory_obj)
+
+            result = {
+                "memory_id": memory_id,
+                "memory_type": memory_type,
+                "tags": tags,
+                "storage": "memory",
+                "message": f"短期记忆已成功保存到内存，ID: {memory_id}",
+            }
+        else:
+            # 长期记忆保存到文件
+            # 获取存储目录并确保存在
+            memory_dir = self._get_memory_dir(memory_type)
+            memory_dir.mkdir(parents=True, exist_ok=True)
+
+            # 保存记忆文件
+            memory_file = memory_dir / f"{memory_id}.json"
+            with open(memory_file, "w", encoding="utf-8") as f:
+                json.dump(memory_obj, f, ensure_ascii=False, indent=2)
+
+            result = {
+                "memory_id": memory_id,
+                "memory_type": memory_type,
+                "tags": tags,
+                "file_path": str(memory_file),
+                "message": f"记忆已成功保存，ID: {memory_id}",
+            }
+
+        return result
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行保存记忆操作"""
         try:
-            memory_type = args["memory_type"]
-            tags = args.get("tags", [])
-            content = args.get("content", "")
+            memories = args.get("memories", [])
 
-            # 生成记忆ID
-            memory_id = self._generate_memory_id()
+            if not memories:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "没有提供要保存的记忆",
+                }
 
-            # 创建记忆对象
-            memory_data = {
-                "id": memory_id,
-                "type": memory_type,
-                "tags": tags,
-                "content": content,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat(),
+            results = []
+            success_count = 0
+            failed_count = 0
+
+            # 保存每条记忆
+            for i, memory_data in enumerate(memories):
+                try:
+                    result = self._save_single_memory(memory_data)
+                    results.append(result)
+                    success_count += 1
+
+                    # 打印单条记忆保存信息
+                    memory_type = memory_data["memory_type"]
+                    tags = memory_data.get("tags", [])
+                    PrettyOutput.print(
+                        f"[{i+1}/{len(memories)}] {memory_type} 记忆已保存\n"
+                        f"ID: {result['memory_id']}\n"
+                        f"标签: {', '.join(tags)}",
+                        OutputType.SUCCESS,
+                    )
+                except Exception as e:
+                    failed_count += 1
+                    error_msg = f"保存第 {i+1} 条记忆失败: {str(e)}"
+                    PrettyOutput.print(error_msg, OutputType.ERROR)
+                    results.append(
+                        {
+                            "error": error_msg,
+                            "memory_type": memory_data.get("memory_type", "unknown"),
+                            "tags": memory_data.get("tags", []),
+                        }
+                    )
+
+            # 生成总结报告
+            PrettyOutput.print(
+                f"\n批量保存完成：成功 {success_count} 条，失败 {failed_count} 条",
+                OutputType.INFO,
+            )
+
+            # 构建返回结果
+            output = {
+                "total": len(memories),
+                "success": success_count,
+                "failed": failed_count,
+                "results": results,
             }
-
-            if memory_type == "short_term":
-                # 短期记忆保存到全局变量
-                add_short_term_memory(memory_data)
-
-                # 打印成功信息
-                PrettyOutput.print(
-                    f"短期记忆已保存\n"
-                    f"ID: {memory_id}\n"
-                    f"类型: {memory_type}\n"
-                    f"标签: {', '.join(tags)}\n"
-                    f"存储位置: 内存（非持久化）",
-                    OutputType.SUCCESS,
-                )
-
-                result = {
-                    "memory_id": memory_id,
-                    "memory_type": memory_type,
-                    "tags": tags,
-                    "storage": "memory",
-                    "message": f"短期记忆已成功保存到内存，ID: {memory_id}",
-                }
-            else:
-                # 长期记忆保存到文件
-                # 获取存储目录并确保存在
-                memory_dir = self._get_memory_dir(memory_type)
-                memory_dir.mkdir(parents=True, exist_ok=True)
-
-                # 保存记忆文件
-                memory_file = memory_dir / f"{memory_id}.json"
-                with open(memory_file, "w", encoding="utf-8") as f:
-                    json.dump(memory_data, f, ensure_ascii=False, indent=2)
-
-                # 打印成功信息
-                PrettyOutput.print(
-                    f"记忆已保存\n"
-                    f"ID: {memory_id}\n"
-                    f"类型: {memory_type}\n"
-                    f"标签: {', '.join(tags)}\n"
-                    f"位置: {memory_file}",
-                    OutputType.SUCCESS,
-                )
-
-                result = {
-                    "memory_id": memory_id,
-                    "memory_type": memory_type,
-                    "tags": tags,
-                    "file_path": str(memory_file),
-                    "message": f"记忆已成功保存，ID: {memory_id}",
-                }
 
             return {
                 "success": True,
-                "stdout": json.dumps(result, ensure_ascii=False, indent=2),
+                "stdout": json.dumps(output, ensure_ascii=False, indent=2),
                 "stderr": "",
             }
 

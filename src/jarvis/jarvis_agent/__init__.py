@@ -614,8 +614,19 @@ class Agent:
         memory_tags = get_all_memory_tags()
         memory_tags_prompt = ""
         
+        # 检查是否有save_memory工具
+        tool_registry = self.get_tool_registry()
+        has_save_memory = False
+        if tool_registry:
+            tool_names = [tool.name for tool in tool_registry.tools.values()]
+            has_save_memory = "save_memory" in tool_names
+        
+        # 如果有save_memory工具，添加记录关键信息的提示
+        if has_save_memory:
+            memory_tags_prompt = "\n\n💡 提示：在分析任务之前，建议使用 save_memory 工具将关键信息记录下来，便于后续检索和复用。"
+        
         if any(tags for tags in memory_tags.values()):
-            memory_tags_prompt = "\n\n系统中存在以下记忆标签，你可以使用 retrieve_memory 工具检索相关记忆："
+            memory_tags_prompt += "\n\n系统中存在以下记忆标签，你可以使用 retrieve_memory 工具检索相关记忆："
             for memory_type, tags in memory_tags.items():
                 if tags:
                     type_name = {
