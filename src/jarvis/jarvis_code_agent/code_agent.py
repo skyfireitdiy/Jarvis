@@ -65,6 +65,8 @@ class CodeAgent:
                 "ask_user",
                 "read_code",
                 "rewrite_file",
+                "save_memory",
+                "retrieve_memory",
             ]
         )
         code_system_prompt = """
