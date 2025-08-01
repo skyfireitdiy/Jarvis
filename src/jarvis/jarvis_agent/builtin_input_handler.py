@@ -1,40 +1,33 @@
 # -*- coding: utf-8 -*-
+import re
+import sys
 from typing import Any, Tuple
+
+from jarvis.jarvis_utils.config import get_replace_map
 
 
 def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     """
-    内置输入处理器，处理特殊标记和替换
+    处理内置的特殊输入标记，并追加相应的提示词
+
+    参数：
+        user_input: 用户输入
+        agent: 代理对象
+
+    返回：
+        Tuple[str, bool]: 处理后的输入和是否需要进一步处理
     """
-    agent = agent_
-    # 定义特殊标记的处理
-    special_tags = [
-        "Summary",
-        "Clear",
-        "ToolUsage",
-        "ReloadConfig",
-        "SaveSession",
-        "RestoreSession",
-    ]
-    replace_map = {
-        "Thinking": {
-            "template": "\n请再仔细思考并分析一下，找出可能的错误和问题。",
-            "append": True,
-        },
-        "DirectAnswer": {
-            "template": "\n请不要执行任何操作，直接对问题进行回答。",
-            "append": True,
-        },
-    }
+    from jarvis.jarvis_agent import Agent
 
-    # 从用户输入中提取标记
-    import re
+    agent: Agent = agent_
+    # 查找特殊标记
+    special_tags = re.findall(r"'<([^>]+)>'", user_input)
 
-    pattern = r"'<(\w+)>'"
-    tags = re.findall(pattern, user_input)
+    if not special_tags:
+        return user_input, False
 
-    processed_tag = []
-
+    # 获取替换映射表
+    replace_map = get_replace_map()
     # 处理每个标记
     for tag in special_tags:
         # 优先处理特殊标记
@@ -56,28 +49,22 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             if agent.save_session():
                 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
-                PrettyOutput.print("会话已保存", OutputType.SYSTEM)
+                PrettyOutput.print("会话已成功保存。正在退出...", OutputType.SUCCESS)
+                sys.exit(0)
             else:
                 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
-                PrettyOutput.print("会话保存失败", OutputType.ERROR)
-            return "", True
-        elif tag == "RestoreSession":
-            if agent.restore_session():
-                from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-
-                PrettyOutput.print("会话已恢复", OutputType.SYSTEM)
-            else:
-                from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-
-                PrettyOutput.print("会话恢复失败", OutputType.ERROR)
+                PrettyOutput.print("保存会话失败。", OutputType.ERROR)
             return "", True
 
-    add_on_prompt = ""
-    for tag in tags:
+        processed_tag = set()
+        add_on_prompt = ""
+
+        # 处理普通替换标记
         if tag in replace_map:
+            processed_tag.add(tag)
             if (
-                replace_map[tag].get("append", False)
+                "append" in replace_map[tag]
                 and replace_map[tag]["append"]
                 and tag not in processed_tag
             ):
@@ -88,19 +75,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     f"'<{tag}>'", replace_map[tag]["template"]
                 )
 
-    # 检查工具列表并添加记忆工具相关提示
-    tool_registry = agent.get_tool_registry()
-    if tool_registry:
-        tool_names = [tool.name for tool in tool_registry.tools.values()]
-
-        # 如果有save_memory工具，添加相关提示
-        if "save_memory" in tool_names:
-            add_on_prompt += "\n如果有关键信息需要记忆，请调用save_memory工具进行记忆。"
-
-        # 如果有retrieve_memory工具，添加相关提示
-        if "retrieve_memory" in tool_names:
-            add_on_prompt += "\n如果需要检索相关记忆信息，请调用retrieve_memory工具。"
-
-    agent.set_addon_prompt(add_on_prompt)
+        agent.set_addon_prompt(add_on_prompt)
 
     return user_input, False
