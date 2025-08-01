@@ -246,7 +246,7 @@ def _handle_share_methodology(config_file: Optional[str] = None) -> None:
     central_repo_path = os.path.join(get_data_dir(), "central_methodology_repo")
     if not os.path.exists(central_repo_path):
         PrettyOutput.print(f"正在克隆中心方法论仓库...", OutputType.INFO)
-        subprocess.run(["git", "clone", central_repo], cwd=get_data_dir(), check=True)
+        subprocess.run(["git", "clone", central_repo, central_repo_path], check=True)
     else:
         PrettyOutput.print(f"正在更新中心方法论仓库...", OutputType.INFO)
         subprocess.run(["git", "pull"], cwd=central_repo_path, check=True)
