@@ -472,6 +472,20 @@ class Agent:
             else ""
         )
 
+        # 检查工具列表并添加记忆工具相关提示
+        memory_prompts = ""
+        tool_registry = self.get_tool_registry()
+        if tool_registry:
+            tool_names = [tool.name for tool in tool_registry.tools.values()]
+            
+            # 如果有save_memory工具，添加相关提示
+            if "save_memory" in tool_names:
+                memory_prompts += "\n    - 如果有关键信息需要记忆，请调用save_memory工具进行记忆"
+            
+            # 如果有retrieve_memory工具，添加相关提示
+            if "retrieve_memory" in tool_names:
+                memory_prompts += "\n    - 如果需要检索相关记忆信息，请调用retrieve_memory工具"
+
         addon_prompt = f"""
 <system_prompt>
     请判断是否已经完成任务，如果已经完成：
@@ -481,7 +495,7 @@ class Agent:
     - 仅包含一个操作
     - 如果信息不明确，请请求用户补充
     - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
-    - 操作列表：{action_handlers}
+    - 操作列表：{action_handlers}{memory_prompts}
 </system_prompt>
 
 请继续。
@@ -591,6 +605,23 @@ class Agent:
             return f"Task failed: {str(e)}"
 
     def _first_run(self):
+        # 获取所有记忆标签并添加到提示中
+        from jarvis.jarvis_utils.globals import get_all_memory_tags
+        
+        memory_tags = get_all_memory_tags()
+        memory_tags_prompt = ""
+        
+        if any(tags for tags in memory_tags.values()):
+            memory_tags_prompt = "\n\n系统中存在以下记忆标签，你可以使用 retrieve_memory 工具检索相关记忆："
+            for memory_type, tags in memory_tags.items():
+                if tags:
+                    type_name = {
+                        "short_term": "短期记忆",
+                        "project_long_term": "项目长期记忆", 
+                        "global_long_term": "全局长期记忆"
+                    }.get(memory_type, memory_type)
+                    memory_tags_prompt += f"\n- {type_name}: {', '.join(tags)}"
+        
         # 如果有上传文件，先上传文件
         if self.model and self.model.support_upload_files():
             if self.use_methodology:
@@ -603,12 +634,12 @@ class Agent:
                     msg = self.session.prompt
                     for handler in self.input_handler:
                         msg, _ = handler(msg, self)
-                    self.session.prompt = f"{self.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+                    self.session.prompt = f"{self.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}{memory_tags_prompt}"
                 else:
                     if self.files:
-                        self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
+                        self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。{memory_tags_prompt}"
                     else:
-                        self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
+                        self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。{memory_tags_prompt}"
             elif self.files:
                 if not self.model.upload_files(self.files):
                     PrettyOutput.print(
@@ -624,6 +655,10 @@ class Agent:
                 for handler in self.input_handler:
                     msg, _ = handler(msg, self)
                 self.session.prompt = f"{self.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
+        
+        # 添加记忆标签提示
+        if memory_tags_prompt:
+            self.session.prompt = f"{self.session.prompt}{memory_tags_prompt}"
 
         self.first = False
 

@@ -258,3 +258,55 @@ def clear_short_term_memories() -> None:
     """
     global short_term_memories
     short_term_memories.clear()
+
+
+def get_all_memory_tags() -> Dict[str, List[str]]:
+    """
+    获取所有记忆类型中的标签集合。
+    
+    返回:
+        Dict[str, List[str]]: 按记忆类型分组的标签列表
+    """
+    from pathlib import Path
+    import json
+    from jarvis.jarvis_utils.config import get_data_dir
+    
+    tags_by_type = {
+        "short_term": [],
+        "project_long_term": [],
+        "global_long_term": []
+    }
+    
+    # 获取短期记忆标签
+    short_term_tags = set()
+    for memory in short_term_memories:
+        short_term_tags.update(memory.get("tags", []))
+    tags_by_type["short_term"] = sorted(list(short_term_tags))
+    
+    # 获取项目长期记忆标签
+    project_memory_dir = Path(".jarvis/memory")
+    if project_memory_dir.exists():
+        project_tags = set()
+        for memory_file in project_memory_dir.glob("*.json"):
+            try:
+                with open(memory_file, "r", encoding="utf-8") as f:
+                    memory_data = json.load(f)
+                    project_tags.update(memory_data.get("tags", []))
+            except Exception:
+                pass
+        tags_by_type["project_long_term"] = sorted(list(project_tags))
+    
+    # 获取全局长期记忆标签
+    global_memory_dir = Path(get_data_dir()) / "memory" / "global_long_term"
+    if global_memory_dir.exists():
+        global_tags = set()
+        for memory_file in global_memory_dir.glob("*.json"):
+            try:
+                with open(memory_file, "r", encoding="utf-8") as f:
+                    memory_data = json.load(f)
+                    global_tags.update(memory_data.get("tags", []))
+            except Exception:
+                pass
+        tags_by_type["global_long_term"] = sorted(list(global_tags))
+    
+    return tags_by_type
