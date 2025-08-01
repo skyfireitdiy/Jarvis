@@ -204,7 +204,7 @@ class PrettyOutput:
                 color="red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
             ),
             OutputType.INFO: RichStyle(
-                color="gold1", frame=True, bgcolor="#2b2b1c", meta={"icon": "ℹ️"}
+                color="bright_cyan", frame=True, bgcolor="#2b2b1c", meta={"icon": "ℹ️"}
             ),
             OutputType.PLANNING: RichStyle(
                 color="purple",
