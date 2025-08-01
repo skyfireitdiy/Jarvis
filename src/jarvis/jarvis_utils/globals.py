@@ -10,10 +10,15 @@
 import os
 
 # 全局变量：保存消息历史
-from typing import Any, Dict, Set, List
+from typing import Any, Dict, Set, List, Optional
+from datetime import datetime
 
 message_history: List[str] = []
 MAX_HISTORY_SIZE = 50
+
+# 短期记忆存储
+short_term_memories: List[Dict[str, Any]] = []
+MAX_SHORT_TERM_MEMORIES = 100
 
 import colorama
 from rich.console import Console
@@ -207,3 +212,49 @@ def get_message_history() -> List[str]:
     """
     global message_history
     return message_history
+
+
+def add_short_term_memory(memory_data: Dict[str, Any]) -> None:
+    """
+    添加短期记忆到全局存储。
+
+    参数:
+        memory_data: 包含记忆信息的字典
+    """
+    global short_term_memories
+    short_term_memories.append(memory_data)
+    # 如果超过最大数量，删除最旧的记忆
+    if len(short_term_memories) > MAX_SHORT_TERM_MEMORIES:
+        short_term_memories.pop(0)
+
+
+def get_short_term_memories(tags: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    """
+    获取短期记忆，可选择按标签过滤。
+
+    参数:
+        tags: 用于过滤的标签列表（可选）
+
+    返回:
+        List[Dict[str, Any]]: 符合条件的短期记忆列表
+    """
+    global short_term_memories
+    if not tags:
+        return short_term_memories.copy()
+
+    # 按标签过滤
+    filtered_memories = []
+    for memory in short_term_memories:
+        memory_tags = memory.get("tags", [])
+        if any(tag in memory_tags for tag in tags):
+            filtered_memories.append(memory)
+
+    return filtered_memories
+
+
+def clear_short_term_memories() -> None:
+    """
+    清空所有短期记忆。
+    """
+    global short_term_memories
+    short_term_memories.clear()
