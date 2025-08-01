@@ -456,6 +456,8 @@ JARVIS_LLM_GROUP: kimi
 | `JARVIS_CONFIRM_BEFORE_APPLY_PATCH` | 在应用代码补丁前是否需要用户二次确认。 | `false` |
 | `JARVIS_USE_METHODOLOGY` | 是否启用方法论引擎（启动时加载、任务后分析）。 | `true` |
 | `JARVIS_USE_ANALYSIS` | 任务结束后是否进行分析以提炼新工具或方法论。 | `true` |
+| `JARVIS_METHODOLOGY_DIRS` | 额外的方法论加载目录列表。 | `[]` |
+| `JARVIS_CENTRAL_METHODOLOGY_REPO` | 中心方法论Git仓库地址，用于团队共享方法论。 | `""` |
 | `JARVIS_PRINT_PROMPT` | 是否在控制台打印发送给 LLM 的完整提示，用于调试。 | `false` |
 | `JARVIS_MAX_INPUT_TOKEN_COUNT` | 单次输入给模型的最大 Token 数量 (可被模型组覆盖)。其他token限制基于此值动态计算：最大token总数=此值×100，最大大内容尺寸=此值×5。 | `32000` |
 | `JARVIS_GIT_COMMIT_PROMPT` | `jgc` 命令生成 Git Commit Message 时使用的自定义模板。 | `""` |
