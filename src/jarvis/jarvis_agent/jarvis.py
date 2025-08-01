@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import typer
 import yaml  # type: ignore
@@ -91,13 +91,19 @@ def _select_task(tasks: Dict[str, str]) -> str:
                 selected_task = tasks[task_names[choice - 1]]
                 PrettyOutput.print(f"将要执行任务:\n {selected_task}", OutputType.INFO)
                 # 询问是否需要补充信息
-                need_additional = user_confirm("需要为此任务添加补充信息吗？", default=False)
+                need_additional = user_confirm(
+                    "需要为此任务添加补充信息吗？", default=False
+                )
                 if need_additional:
                     additional_input = get_multiline_input("请输入补充信息：")
                     if additional_input:
-                        selected_task = f"{selected_task}\n\n补充信息:\n{additional_input}"
+                        selected_task = (
+                            f"{selected_task}\n\n补充信息:\n{additional_input}"
+                        )
                 return selected_task
-            PrettyOutput.print("无效的选择。请选择列表中的一个号码。", OutputType.WARNING)
+            PrettyOutput.print(
+                "无效的选择。请选择列表中的一个号码。", OutputType.WARNING
+            )
 
         except (KeyboardInterrupt, EOFError):
             return ""
@@ -183,6 +189,199 @@ def _get_and_run_task(agent: Agent, task_content: Optional[str] = None) -> None:
     raise typer.Exit(code=0)
 
 
+def _parse_selection(selection_str: str, max_value: int) -> List[int]:
+    """解析用户输入的选择字符串，支持逗号分隔和范围选择
+
+    例如: "1,2,3,4-9,20" -> [1, 2, 3, 4, 5, 6, 7, 8, 9, 20]
+    """
+    selected: set[int] = set()
+    parts = selection_str.split(",")
+
+    for part in parts:
+        part = part.strip()
+        if "-" in part:
+            # 处理范围选择
+            try:
+                start_str, end_str = part.split("-")
+                start_num = int(start_str.strip())
+                end_num = int(end_str.strip())
+                if 1 <= start_num <= max_value and 1 <= end_num <= max_value:
+                    selected.update(range(start_num, end_num + 1))
+            except ValueError:
+                continue
+        else:
+            # 处理单个数字
+            try:
+                num = int(part)
+                if 1 <= num <= max_value:
+                    selected.add(num)
+            except ValueError:
+                continue
+
+    return sorted(list(selected))
+
+
+def _handle_share_methodology(config_file: Optional[str] = None) -> None:
+    """处理方法论分享功能"""
+    from jarvis.jarvis_utils.config import (
+        get_central_methodology_repo,
+        get_methodology_dirs,
+        get_data_dir,
+    )
+    import glob
+    import json
+    import shutil
+
+    # 获取中心方法论仓库配置
+    central_repo = get_central_methodology_repo()
+    if not central_repo:
+        PrettyOutput.print(
+            "错误：未配置中心方法论仓库（JARVIS_CENTRAL_METHODOLOGY_REPO）",
+            OutputType.ERROR,
+        )
+        PrettyOutput.print("请在配置文件中设置中心方法论仓库的Git地址", OutputType.INFO)
+        raise typer.Exit(code=1)
+
+    # 克隆或更新中心方法论仓库
+    central_repo_path = os.path.join(get_data_dir(), "central_methodology_repo")
+    if not os.path.exists(central_repo_path):
+        PrettyOutput.print(f"正在克隆中心方法论仓库...", OutputType.INFO)
+        subprocess.run(["git", "clone", central_repo], cwd=get_data_dir(), check=True)
+    else:
+        PrettyOutput.print(f"正在更新中心方法论仓库...", OutputType.INFO)
+        subprocess.run(["git", "pull"], cwd=central_repo_path, check=True)
+
+    # 获取中心仓库中已有的方法论
+    existing_methodologies = set()
+    for filepath in glob.glob(os.path.join(central_repo_path, "*.json")):
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                methodology = json.load(f)
+                problem_type = methodology.get("problem_type", "")
+                if problem_type:
+                    existing_methodologies.add(problem_type)
+        except Exception:
+            pass
+
+    # 获取所有方法论目录
+    from jarvis.jarvis_utils.methodology import _get_methodology_directory
+
+    methodology_dirs = [_get_methodology_directory()] + get_methodology_dirs()
+
+    # 收集所有方法论文件（排除中心仓库目录和已存在的方法论）
+    all_methodologies = {}
+    methodology_files = []
+    seen_problem_types = set()  # 用于去重
+
+    for directory in set(methodology_dirs):
+        # 跳过中心仓库目录
+        if os.path.abspath(directory) == os.path.abspath(central_repo_path):
+            continue
+
+        if not os.path.isdir(directory):
+            continue
+
+        for filepath in glob.glob(os.path.join(directory, "*.json")):
+            try:
+                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    methodology = json.load(f)
+                    problem_type = methodology.get("problem_type", "")
+                    # 排除已存在于中心仓库的方法论，以及本地重复的方法论
+                    if (
+                        problem_type
+                        and problem_type not in existing_methodologies
+                        and problem_type not in seen_problem_types
+                    ):
+                        methodology_files.append(
+                            {
+                                "path": filepath,
+                                "problem_type": problem_type,
+                                "directory": directory,
+                            }
+                        )
+                        all_methodologies[problem_type] = methodology
+                        seen_problem_types.add(problem_type)
+            except Exception:
+                pass
+
+    if not methodology_files:
+        PrettyOutput.print(
+            "没有找到新的方法论文件（所有方法论可能已存在于中心仓库）",
+            OutputType.WARNING,
+        )
+        raise typer.Exit(code=0)
+
+    # 显示可选的方法论
+    PrettyOutput.print("\n可分享的方法论（已排除中心仓库中已有的）：", OutputType.INFO)
+    for i, meth in enumerate(methodology_files, 1):
+        dir_name = os.path.basename(meth["directory"])
+        PrettyOutput.print(
+            f"[{i}] {meth['problem_type']} (来自: {dir_name})", OutputType.INFO
+        )
+
+    # 让用户选择要分享的方法论
+    while True:
+        try:
+            choice_str = prompt(
+                "\n请选择要分享的方法论编号（支持格式: 1,2,3,4-9,20 或 all）："
+            ).strip()
+            if choice_str == "0":
+                raise typer.Exit(code=0)
+
+            selected_methodologies = []
+            if choice_str.lower() == "all":
+                selected_methodologies = methodology_files
+            else:
+                selected_indices = _parse_selection(choice_str, len(methodology_files))
+                if not selected_indices:
+                    PrettyOutput.print("无效的选择", OutputType.WARNING)
+                    continue
+                selected_methodologies = [
+                    methodology_files[i - 1] for i in selected_indices
+                ]
+
+            # 确认操作
+            PrettyOutput.print(f"\n将要分享以下方法论到中心仓库：", OutputType.INFO)
+            for meth in selected_methodologies:
+                PrettyOutput.print(f"- {meth['problem_type']}", OutputType.INFO)
+
+            if not user_confirm("确认分享这些方法论吗？"):
+                continue
+
+            # 复制选中的方法论到中心仓库
+            for meth in selected_methodologies:
+                src_file = meth["path"]
+                dst_file = os.path.join(central_repo_path, os.path.basename(src_file))
+                shutil.copy2(src_file, dst_file)
+                PrettyOutput.print(
+                    f"已复制: {meth['problem_type']}", OutputType.SUCCESS
+                )
+
+            # 提交并推送更改
+            PrettyOutput.print("\n正在提交更改...", OutputType.INFO)
+            subprocess.run(["git", "add", "."], cwd=central_repo_path, check=True)
+
+            commit_msg = f"Add {len(selected_methodologies)} methodology(ies) from local collection"
+            subprocess.run(
+                ["git", "commit", "-m", commit_msg], cwd=central_repo_path, check=True
+            )
+
+            PrettyOutput.print("正在推送到远程仓库...", OutputType.INFO)
+            subprocess.run(["git", "push"], cwd=central_repo_path, check=True)
+
+            PrettyOutput.print("\n方法论已成功分享到中心仓库！", OutputType.SUCCESS)
+            break
+
+        except ValueError:
+            PrettyOutput.print("请输入有效的数字", OutputType.WARNING)
+        except subprocess.CalledProcessError as e:
+            PrettyOutput.print(f"Git操作失败: {str(e)}", OutputType.ERROR)
+            raise typer.Exit(code=1)
+        except Exception as e:
+            PrettyOutput.print(f"分享方法论时出错: {str(e)}", OutputType.ERROR)
+            raise typer.Exit(code=1)
+
+
 @app.callback(invoke_without_command=True)
 def run_cli(
     ctx: typer.Context,
@@ -191,17 +390,24 @@ def run_cli(
         "--llm_type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
-    task: Optional[str] = typer.Option(None, "-t", "--task", help="从命令行直接输入任务内容"),
+    task: Optional[str] = typer.Option(
+        None, "-t", "--task", help="从命令行直接输入任务内容"
+    ),
     model_group: Optional[str] = typer.Option(
         None, "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
     ),
-    config_file: Optional[str] = typer.Option(None, "-f", "--config", help="自定义配置文件路径"),
+    config_file: Optional[str] = typer.Option(
+        None, "-f", "--config", help="自定义配置文件路径"
+    ),
     restore_session: bool = typer.Option(
         False,
         "--restore-session",
         help="从 .jarvis/saved_session.json 恢复会话",
     ),
     edit: bool = typer.Option(False, "-e", "--edit", help="编辑配置文件"),
+    share_methodology: bool = typer.Option(
+        False, "--share-methodology", help="分享本地方法论到中心方法论仓库"
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -209,7 +415,15 @@ def run_cli(
 
     _handle_edit_mode(edit, config_file)
 
-    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file)
+    # 处理方法论分享
+    if share_methodology:
+        init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
+        _handle_share_methodology(config_file)
+        raise typer.Exit(code=0)
+
+    init_env(
+        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file
+    )
 
     try:
         agent = _initialize_agent(llm_type, model_group, restore_session)
