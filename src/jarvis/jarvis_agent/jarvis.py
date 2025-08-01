@@ -312,12 +312,13 @@ def _handle_share_methodology(config_file: Optional[str] = None) -> None:
         raise typer.Exit(code=0)
 
     # 显示可选的方法论
-    PrettyOutput.print("\n可分享的方法论（已排除中心仓库中已有的）：", OutputType.INFO)
+    methodology_list = ["\n可分享的方法论（已排除中心仓库中已有的）："]
     for i, meth in enumerate(methodology_files, 1):
         dir_name = os.path.basename(meth["directory"])
-        PrettyOutput.print(
-            f"[{i}] {meth['problem_type']} (来自: {dir_name})", OutputType.INFO
-        )
+        methodology_list.append(f"[{i}] {meth['problem_type']} (来自: {dir_name})")
+
+    # 一次性打印所有方法论
+    PrettyOutput.print("\n".join(methodology_list), OutputType.INFO)
 
     # 让用户选择要分享的方法论
     while True:
@@ -341,21 +342,25 @@ def _handle_share_methodology(config_file: Optional[str] = None) -> None:
                 ]
 
             # 确认操作
-            PrettyOutput.print(f"\n将要分享以下方法论到中心仓库：", OutputType.INFO)
+            share_list = ["\n将要分享以下方法论到中心仓库："]
             for meth in selected_methodologies:
-                PrettyOutput.print(f"- {meth['problem_type']}", OutputType.INFO)
+                share_list.append(f"- {meth['problem_type']}")
+            PrettyOutput.print("\n".join(share_list), OutputType.INFO)
 
             if not user_confirm("确认分享这些方法论吗？"):
                 continue
 
             # 复制选中的方法论到中心仓库
+            copied_list = []
             for meth in selected_methodologies:
                 src_file = meth["path"]
                 dst_file = os.path.join(central_repo_path, os.path.basename(src_file))
                 shutil.copy2(src_file, dst_file)
-                PrettyOutput.print(
-                    f"已复制: {meth['problem_type']}", OutputType.SUCCESS
-                )
+                copied_list.append(f"已复制: {meth['problem_type']}")
+
+            # 一次性显示所有复制结果
+            if copied_list:
+                PrettyOutput.print("\n".join(copied_list), OutputType.SUCCESS)
 
             # 提交并推送更改
             PrettyOutput.print("\n正在提交更改...", OutputType.INFO)
