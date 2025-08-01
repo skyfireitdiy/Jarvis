@@ -216,9 +216,11 @@ def _get_multiline_input_internal(tip: str) -> str:
     @bindings.add("enter")
     def _(event):
         if event.current_buffer.complete_state:
-            event.current_buffer.apply_completion(
-                event.current_buffer.complete_state.current_completion
-            )
+            completion = event.current_buffer.complete_state.current_completion
+            if completion:
+                event.current_buffer.apply_completion(completion)
+            else:
+                event.current_buffer.insert_text("\n")
         else:
             event.current_buffer.insert_text("\n")
 
