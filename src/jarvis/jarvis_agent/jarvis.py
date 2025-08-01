@@ -252,14 +252,15 @@ def _handle_share_methodology(config_file: Optional[str] = None) -> None:
         subprocess.run(["git", "pull"], cwd=central_repo_path, check=True)
 
     # 获取中心仓库中已有的方法论
-    existing_methodologies = set()
+    existing_methodologies = {}  # 改为字典，存储 problem_type -> content 的映射
     for filepath in glob.glob(os.path.join(central_repo_path, "*.json")):
         try:
             with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
                 methodology = json.load(f)
                 problem_type = methodology.get("problem_type", "")
-                if problem_type:
-                    existing_methodologies.add(problem_type)
+                content = methodology.get("content", "")
+                if problem_type and content:
+                    existing_methodologies[problem_type] = content
         except Exception:
             pass
 
@@ -286,10 +287,22 @@ def _handle_share_methodology(config_file: Optional[str] = None) -> None:
                 with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
                     methodology = json.load(f)
                     problem_type = methodology.get("problem_type", "")
-                    # 排除已存在于中心仓库的方法论，以及本地重复的方法论
+                    content = methodology.get("content", "")
+                    # 基于内容判断是否已存在于中心仓库
+                    is_duplicate = False
+                    if problem_type in existing_methodologies:
+                        # 如果problem_type相同，比较内容
+                        if (
+                            content.strip()
+                            == existing_methodologies[problem_type].strip()
+                        ):
+                            is_duplicate = True
+
+                    # 排除已存在于中心仓库的方法论（基于内容），以及本地重复的方法论
                     if (
                         problem_type
-                        and problem_type not in existing_methodologies
+                        and content
+                        and not is_duplicate
                         and problem_type not in seen_problem_types
                     ):
                         methodology_files.append(
