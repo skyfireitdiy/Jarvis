@@ -309,6 +309,16 @@ def get_methodology_dirs() -> List[str]:
     return GLOBAL_CONFIG_DATA.get("JARVIS_METHODOLOGY_DIRS", [])
 
 
+def get_central_methodology_repo() -> str:
+    """
+    获取中心方法论Git仓库地址。
+
+    返回:
+        str: 中心方法论Git仓库地址，如果未配置则返回空字符串
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_METHODOLOGY_REPO", "")
+
+
 def is_print_prompt() -> bool:
     """
     获取是否打印提示。

@@ -15,10 +15,15 @@ from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_data_dir, get_methodology_dirs
+from jarvis.jarvis_utils.config import (
+    get_data_dir,
+    get_methodology_dirs,
+    get_central_methodology_repo,
+)
 from jarvis.jarvis_utils.globals import get_agent, current_agent_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
+
 
 def _get_methodology_directory() -> str:
     """
@@ -46,6 +51,29 @@ def _load_all_methodologies() -> Dict[str, str]:
     all_methodologies = {}
     methodology_dirs = [_get_methodology_directory()] + get_methodology_dirs()
 
+    # 如果配置了中心方法论仓库，将其添加到加载路径
+    central_repo = get_central_methodology_repo()
+    if central_repo:
+        # 中心方法论仓库存储在数据目录下的特定位置
+        central_repo_path = os.path.join(get_data_dir(), "central_methodology_repo")
+        methodology_dirs.append(central_repo_path)
+
+        # 确保中心方法论仓库被克隆/更新
+        if not os.path.exists(central_repo_path):
+            try:
+                import subprocess
+
+                PrettyOutput.print(
+                    f"正在克隆中心方法论仓库: {central_repo}", OutputType.INFO
+                )
+                subprocess.run(
+                    ["git", "clone", central_repo, central_repo_path], check=True
+                )
+            except Exception as e:
+                PrettyOutput.print(
+                    f"克隆中心方法论仓库失败: {str(e)}", OutputType.ERROR
+                )
+
     # --- 全局每日更新检查 ---
     daily_check_git_updates(methodology_dirs, "methodologies")
 
@@ -53,7 +81,9 @@ def _load_all_methodologies() -> Dict[str, str]:
 
     for directory in set(methodology_dirs):  # Use set to avoid duplicates
         if not os.path.isdir(directory):
-            PrettyOutput.print(f"警告: 方法论目录不存在或不是一个目录: {directory}", OutputType.WARNING)
+            PrettyOutput.print(
+                f"警告: 方法论目录不存在或不是一个目录: {directory}", OutputType.WARNING
+            )
             continue
 
         for filepath in glob.glob(os.path.join(directory, "*.json")):
@@ -64,7 +94,10 @@ def _load_all_methodologies() -> Dict[str, str]:
                     content = methodology.get("content", "")
                     if problem_type and content:
                         if problem_type in all_methodologies:
-                            PrettyOutput.print(f"警告: 方法论 '{problem_type}' 被 '{filepath}' 覆盖。", OutputType.WARNING)
+                            PrettyOutput.print(
+                                f"警告: 方法论 '{problem_type}' 被 '{filepath}' 覆盖。",
+                                OutputType.WARNING,
+                            )
                         all_methodologies[problem_type] = content
             except Exception as e:
                 filename = os.path.basename(filepath)
@@ -211,8 +244,9 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
         # 从响应中提取<NUM>标签内的内容
         import re
-        num_match = re.search(r'<NUM>(.*?)</NUM>', response, re.DOTALL)
-        
+
+        num_match = re.search(r"<NUM>(.*?)</NUM>", response, re.DOTALL)
+
         if not num_match:
             # 如果没有找到<NUM>标签，尝试直接解析响应
             selected_indices_str = response
@@ -226,7 +260,11 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
         selected_methodologies = {}
         try:
             if selected_indices_str:
-                indices = [int(idx.strip()) for idx in selected_indices_str.split(",") if idx.strip().isdigit()]
+                indices = [
+                    int(idx.strip())
+                    for idx in selected_indices_str.split(",")
+                    if idx.strip().isdigit()
+                ]
                 for idx in indices:
                     if 1 <= idx <= len(methodology_titles):
                         title = methodology_titles[idx - 1]
