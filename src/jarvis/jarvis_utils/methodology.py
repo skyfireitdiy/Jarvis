@@ -94,10 +94,7 @@ def _load_all_methodologies() -> Dict[str, str]:
                     content = methodology.get("content", "")
                     if problem_type and content:
                         if problem_type in all_methodologies:
-                            PrettyOutput.print(
-                                f"警告: 方法论 '{problem_type}' 被 '{filepath}' 覆盖。",
-                                OutputType.WARNING,
-                            )
+                            pass
                         all_methodologies[problem_type] = content
             except Exception as e:
                 filename = os.path.basename(filepath)
