@@ -245,7 +245,7 @@ class StatsStorage:
         metrics_from_meta = set(meta.get("metrics", {}).keys())
         
         # 扫描所有数据文件获取实际存在的指标
-        metrics_from_data = set()
+        metrics_from_data: set[str] = set()
         for data_file in self.data_dir.glob("stats_*.json"):
             try:
                 data = self._load_json(data_file)
@@ -285,7 +285,7 @@ class StatsStorage:
             return {}
 
         # 聚合数据
-        aggregated = defaultdict(
+        aggregated: Dict[str, Dict[str, Any]] = defaultdict(
             lambda: {
                 "count": 0,
                 "sum": 0,
