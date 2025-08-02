@@ -100,3 +100,7 @@ jst = "jarvis.jarvis_stats.cli:main"
 [[tool.uv.index]]
 url = "https://artsz.zte.com.cn/artifactory/api/pypi/public-pypi-virtual/simple"
 default = true
+
+[[tool.uv.index]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
