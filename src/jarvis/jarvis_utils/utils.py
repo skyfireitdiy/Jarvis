@@ -337,6 +337,13 @@ def _show_usage_stats() -> None:
                 if parts:
                     summary_content.append(f"📈 总计: {', '.join(parts)}")
 
+                # 添加代码采纳率显示
+                adoption_metrics = categorized_stats["adoption"]["metrics"]
+                if "adoption_rate" in adoption_metrics:
+                    summary_content.append(
+                        f"✅ 代码采纳率: {adoption_metrics['adoption_rate']}"
+                    )
+
 
 
             # 计算节省的时间
