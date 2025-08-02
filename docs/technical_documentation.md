@@ -70,6 +70,7 @@ package "知识库 (Knowledge Base)" {
 
 package "功能模块 (Functional Modules)" {
   [工具集 (Tools)] as Tools
+  [中心工具库 (Git)] as CentralTools
   [AI 平台 (AI Platforms)] as Platforms
   [模型上下文协议 (MCP)] as MCP
 }
@@ -88,6 +89,7 @@ LocalMethodologies <--> CentralRepo : "同步/分享"
 MethodologyEngine --> Agent
 
 ToolRegistry --> Tools
+Tools <--> CentralTools : "同步/分享"
 PlatformRegistry --> Platforms
 
 Agent --> Tools: 执行工具
