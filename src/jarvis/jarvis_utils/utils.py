@@ -222,8 +222,6 @@ def _show_usage_stats() -> None:
                     "commits_status"
                 ] = f"{accepted_commits}/{total_commits}"
 
-
-
         # 构建输出
         has_data = False
         stats_output = []
@@ -343,8 +341,6 @@ def _show_usage_stats() -> None:
                     summary_content.append(
                         f"✅ 代码采纳率: {adoption_metrics['adoption_rate']}"
                     )
-
-
 
             # 计算节省的时间
             time_saved_seconds = 0
@@ -956,6 +952,25 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             timeout=10,
         )
         before_hash = before_hash_result.stdout.strip()
+
+        # 检查是否是空仓库
+        ls_remote_result = subprocess.run(
+            ["git", "ls-remote", "--heads", "origin"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=True,
+            timeout=10,
+        )
+
+        if not ls_remote_result.stdout.strip():
+            PrettyOutput.print(
+                f"{repo_type}库 '{repo_path.name}' 的远程仓库是空的，跳过更新。",
+                OutputType.INFO,
+            )
+            return
 
         # 执行 git pull
         pull_result = subprocess.run(

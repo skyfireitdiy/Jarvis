@@ -247,7 +247,26 @@ def _handle_share_tool(config_file: Optional[str] = None) -> None:
         subprocess.run(["git", "clone", central_repo, central_repo_path], check=True)
     else:
         PrettyOutput.print(f"正在更新中心工具仓库...", OutputType.INFO)
-        subprocess.run(["git", "pull"], cwd=central_repo_path, check=True)
+        # 检查是否是空仓库
+        try:
+            # 先尝试获取远程分支信息
+            result = subprocess.run(
+                ["git", "ls-remote", "--heads", "origin"],
+                cwd=central_repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            # 如果有远程分支，执行pull
+            if result.stdout.strip():
+                subprocess.run(["git", "pull"], cwd=central_repo_path, check=True)
+            else:
+                PrettyOutput.print(
+                    "中心工具仓库是空的，将初始化为新仓库", OutputType.INFO
+                )
+        except subprocess.CalledProcessError:
+            # 如果命令失败，可能是网络问题或其他错误
+            PrettyOutput.print("无法连接到远程仓库，将跳过更新", OutputType.WARNING)
 
     # 获取中心仓库中已有的工具文件名
     existing_tools = set()
@@ -348,7 +367,25 @@ def _handle_share_tool(config_file: Optional[str] = None) -> None:
             )
 
             PrettyOutput.print("正在推送到远程仓库...", OutputType.INFO)
-            subprocess.run(["git", "push"], cwd=central_repo_path, check=True)
+            # 检查是否需要设置上游分支（空仓库的情况）
+            try:
+                # 先尝试普通推送
+                subprocess.run(["git", "push"], cwd=central_repo_path, check=True)
+            except subprocess.CalledProcessError:
+                # 如果失败，可能是空仓库，尝试设置上游分支
+                try:
+                    subprocess.run(
+                        ["git", "push", "-u", "origin", "main"],
+                        cwd=central_repo_path,
+                        check=True,
+                    )
+                except subprocess.CalledProcessError:
+                    # 如果main分支不存在，尝试master分支
+                    subprocess.run(
+                        ["git", "push", "-u", "origin", "master"],
+                        cwd=central_repo_path,
+                        check=True,
+                    )
 
             PrettyOutput.print("\n工具已成功分享到中心仓库！", OutputType.SUCCESS)
             PrettyOutput.print(
@@ -394,7 +431,26 @@ def _handle_share_methodology(config_file: Optional[str] = None) -> None:
         subprocess.run(["git", "clone", central_repo, central_repo_path], check=True)
     else:
         PrettyOutput.print(f"正在更新中心方法论仓库...", OutputType.INFO)
-        subprocess.run(["git", "pull"], cwd=central_repo_path, check=True)
+        # 检查是否是空仓库
+        try:
+            # 先尝试获取远程分支信息
+            result = subprocess.run(
+                ["git", "ls-remote", "--heads", "origin"],
+                cwd=central_repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            # 如果有远程分支，执行pull
+            if result.stdout.strip():
+                subprocess.run(["git", "pull"], cwd=central_repo_path, check=True)
+            else:
+                PrettyOutput.print(
+                    "中心方法论仓库是空的，将初始化为新仓库", OutputType.INFO
+                )
+        except subprocess.CalledProcessError:
+            # 如果命令失败，可能是网络问题或其他错误
+            PrettyOutput.print("无法连接到远程仓库，将跳过更新", OutputType.WARNING)
 
     # 获取中心仓库中已有的方法论
     existing_methodologies = {}  # 改为字典，存储 problem_type -> content 的映射
@@ -530,7 +586,25 @@ def _handle_share_methodology(config_file: Optional[str] = None) -> None:
             )
 
             PrettyOutput.print("正在推送到远程仓库...", OutputType.INFO)
-            subprocess.run(["git", "push"], cwd=central_repo_path, check=True)
+            # 检查是否需要设置上游分支（空仓库的情况）
+            try:
+                # 先尝试普通推送
+                subprocess.run(["git", "push"], cwd=central_repo_path, check=True)
+            except subprocess.CalledProcessError:
+                # 如果失败，可能是空仓库，尝试设置上游分支
+                try:
+                    subprocess.run(
+                        ["git", "push", "-u", "origin", "main"],
+                        cwd=central_repo_path,
+                        check=True,
+                    )
+                except subprocess.CalledProcessError:
+                    # 如果main分支不存在，尝试master分支
+                    subprocess.run(
+                        ["git", "push", "-u", "origin", "master"],
+                        cwd=central_repo_path,
+                        check=True,
+                    )
 
             PrettyOutput.print("\n方法论已成功分享到中心仓库！", OutputType.SUCCESS)
             break
