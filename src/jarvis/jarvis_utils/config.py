@@ -319,6 +319,16 @@ def get_central_methodology_repo() -> str:
     return GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_METHODOLOGY_REPO", "")
 
 
+def get_central_tool_repo() -> str:
+    """
+    获取中心工具Git仓库地址。
+
+    返回:
+        str: 中心工具Git仓库地址，如果未配置则返回空字符串
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_TOOL_REPO", "")
+
+
 def is_print_prompt() -> bool:
     """
     获取是否打印提示。

@@ -221,6 +221,151 @@ def _parse_selection(selection_str: str, max_value: int) -> List[int]:
     return sorted(list(selected))
 
 
+def _handle_share_tool(config_file: Optional[str] = None) -> None:
+    """处理工具分享功能"""
+    from jarvis.jarvis_utils.config import (
+        get_central_tool_repo,
+        get_data_dir,
+    )
+    import glob
+    import shutil
+
+    # 获取中心工具仓库配置
+    central_repo = get_central_tool_repo()
+    if not central_repo:
+        PrettyOutput.print(
+            "错误：未配置中心工具仓库（JARVIS_CENTRAL_TOOL_REPO）",
+            OutputType.ERROR,
+        )
+        PrettyOutput.print("请在配置文件中设置中心工具仓库的Git地址", OutputType.INFO)
+        raise typer.Exit(code=1)
+
+    # 克隆或更新中心工具仓库
+    central_repo_path = os.path.join(get_data_dir(), "central_tool_repo")
+    if not os.path.exists(central_repo_path):
+        PrettyOutput.print(f"正在克隆中心工具仓库...", OutputType.INFO)
+        subprocess.run(["git", "clone", central_repo, central_repo_path], check=True)
+    else:
+        PrettyOutput.print(f"正在更新中心工具仓库...", OutputType.INFO)
+        subprocess.run(["git", "pull"], cwd=central_repo_path, check=True)
+
+    # 获取中心仓库中已有的工具文件名
+    existing_tools = set()
+    for filepath in glob.glob(os.path.join(central_repo_path, "*.py")):
+        existing_tools.add(os.path.basename(filepath))
+
+    # 只从数据目录的tools目录获取工具
+    local_tools_dir = os.path.join(get_data_dir(), "tools")
+    if not os.path.exists(local_tools_dir):
+        PrettyOutput.print(
+            f"本地工具目录不存在: {local_tools_dir}",
+            OutputType.WARNING,
+        )
+        raise typer.Exit(code=0)
+
+    # 收集本地工具文件（排除已存在的）
+    tool_files = []
+    for filepath in glob.glob(os.path.join(local_tools_dir, "*.py")):
+        filename = os.path.basename(filepath)
+        # 跳过__init__.py和已存在的文件
+        if filename == "__init__.py" or filename in existing_tools:
+            continue
+
+        # 尝试获取工具名称（通过简单解析）
+        tool_name = filename[:-3]  # 移除.py后缀
+        tool_files.append(
+            {
+                "path": filepath,
+                "filename": filename,
+                "tool_name": tool_name,
+            }
+        )
+
+    if not tool_files:
+        PrettyOutput.print(
+            "没有找到新的工具文件（所有工具可能已存在于中心仓库）",
+            OutputType.WARNING,
+        )
+        raise typer.Exit(code=0)
+
+    # 显示可选的工具
+    tool_list = ["\n可分享的工具（已排除中心仓库中已有的）："]
+    for i, tool in enumerate(tool_files, 1):
+        tool_list.append(f"[{i}] {tool['tool_name']} ({tool['filename']})")
+
+    # 一次性打印所有工具
+    PrettyOutput.print("\n".join(tool_list), OutputType.INFO)
+
+    # 让用户选择要分享的工具
+    while True:
+        try:
+            choice_str = prompt(
+                "\n请选择要分享的工具编号（支持格式: 1,2,3,4-9,20 或 all）："
+            ).strip()
+            if choice_str == "0":
+                raise typer.Exit(code=0)
+
+            selected_tools = []
+            if choice_str.lower() == "all":
+                selected_tools = tool_files
+            else:
+                selected_indices = _parse_selection(choice_str, len(tool_files))
+                if not selected_indices:
+                    PrettyOutput.print("无效的选择", OutputType.WARNING)
+                    continue
+                selected_tools = [tool_files[i - 1] for i in selected_indices]
+
+            # 确认操作
+            share_list = [
+                "\n将要分享以下工具到中心仓库（注意：文件将被移动而非复制）："
+            ]
+            for tool in selected_tools:
+                share_list.append(f"- {tool['tool_name']} ({tool['filename']})")
+            PrettyOutput.print("\n".join(share_list), OutputType.WARNING)
+
+            if not user_confirm("确认移动这些工具到中心仓库吗？（原文件将被删除）"):
+                continue
+
+            # 移动选中的工具到中心仓库
+            moved_list = []
+            for tool in selected_tools:
+                src_file = tool["path"]
+                dst_file = os.path.join(central_repo_path, tool["filename"])
+                shutil.move(src_file, dst_file)  # 使用move而不是copy
+                moved_list.append(f"已移动: {tool['tool_name']}")
+
+            # 一次性显示所有移动结果
+            if moved_list:
+                PrettyOutput.print("\n".join(moved_list), OutputType.SUCCESS)
+
+            # 提交并推送更改
+            PrettyOutput.print("\n正在提交更改...", OutputType.INFO)
+            subprocess.run(["git", "add", "."], cwd=central_repo_path, check=True)
+
+            commit_msg = f"Add {len(selected_tools)} tool(s) from local collection"
+            subprocess.run(
+                ["git", "commit", "-m", commit_msg], cwd=central_repo_path, check=True
+            )
+
+            PrettyOutput.print("正在推送到远程仓库...", OutputType.INFO)
+            subprocess.run(["git", "push"], cwd=central_repo_path, check=True)
+
+            PrettyOutput.print("\n工具已成功分享到中心仓库！", OutputType.SUCCESS)
+            PrettyOutput.print(
+                f"原文件已从 {local_tools_dir} 移动到中心仓库", OutputType.INFO
+            )
+            break
+
+        except ValueError:
+            PrettyOutput.print("请输入有效的数字", OutputType.WARNING)
+        except subprocess.CalledProcessError as e:
+            PrettyOutput.print(f"Git操作失败: {str(e)}", OutputType.ERROR)
+            raise typer.Exit(code=1)
+        except Exception as e:
+            PrettyOutput.print(f"分享工具时出错: {str(e)}", OutputType.ERROR)
+            raise typer.Exit(code=1)
+
+
 def _handle_share_methodology(config_file: Optional[str] = None) -> None:
     """处理方法论分享功能"""
     from jarvis.jarvis_utils.config import (
@@ -426,6 +571,9 @@ def run_cli(
     share_methodology: bool = typer.Option(
         False, "--share-methodology", help="分享本地方法论到中心方法论仓库"
     ),
+    share_tool: bool = typer.Option(
+        False, "--share-tool", help="分享本地工具到中心工具仓库"
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -437,6 +585,12 @@ def run_cli(
     if share_methodology:
         init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
         _handle_share_methodology(config_file)
+        raise typer.Exit(code=0)
+
+    # 处理工具分享
+    if share_tool:
+        init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
+        _handle_share_tool(config_file)
         raise typer.Exit(code=0)
 
     init_env(

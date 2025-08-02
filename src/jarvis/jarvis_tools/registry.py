@@ -107,17 +107,13 @@ arguments:
 
 
 class OutputHandlerProtocol(Protocol):
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
-    def can_handle(self, response: str) -> bool:
-        ...
+    def can_handle(self, response: str) -> bool: ...
 
-    def prompt(self) -> str:
-        ...
+    def prompt(self) -> str: ...
 
-    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
-        ...
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]: ...
 
 
 class ToolRegistry(OutputHandlerProtocol):
@@ -138,9 +134,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 try:
                     tools_prompt += "    <tool>\n"
                     tools_prompt += f"      <name>名称: {tool['name']}</name>\n"
-                    tools_prompt += (
-                        f"      <description>描述: {tool['description']}</description>\n"
-                    )
+                    tools_prompt += f"      <description>描述: {tool['description']}</description>\n"
                     tools_prompt += "      <parameters>\n"
                     tools_prompt += "        <yaml>|\n"
 
@@ -202,15 +196,15 @@ class ToolRegistry(OutputHandlerProtocol):
         """从数据目录获取工具调用统计"""
         from jarvis.jarvis_stats.stats import StatsManager
         from datetime import datetime, timedelta
-        
+
         # 获取所有工具的统计数据
         tool_stats = {}
         tools = self.get_all_tools()
-        
+
         # 获取所有历史数据（从很早的时间开始）
         end_time = datetime.now()
         start_time = datetime(2000, 1, 1)  # 使用一个足够早的时间
-        
+
         for tool in tools:
             tool_name = tool["name"]
             # 获取该工具的统计数据
@@ -218,22 +212,22 @@ class ToolRegistry(OutputHandlerProtocol):
                 metric_name=tool_name,
                 start_time=start_time,
                 end_time=end_time,
-                tags={"group": "tool"}
+                tags={"group": "tool"},
             )
-            
+
             # 计算总调用次数
             if stats_data and "records" in stats_data:
                 total_count = sum(record["value"] for record in stats_data["records"])
                 tool_stats[tool_name] = int(total_count)
             else:
                 tool_stats[tool_name] = 0
-                
+
         return tool_stats
 
     def _update_tool_stats(self, name: str) -> None:
         """更新工具调用统计"""
         from jarvis.jarvis_stats.stats import StatsManager
-        
+
         StatsManager.increment(name, group="tool")
 
     def use_tools(self, name: List[str]) -> None:
@@ -292,7 +286,9 @@ class ToolRegistry(OutputHandlerProtocol):
                 config = yaml.safe_load(open(file_path, "r", encoding="utf-8"))
                 self.register_mcp_tool_by_config(config)
             except Exception as e:
-                PrettyOutput.print(f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING
+                )
 
     def _load_builtin_tools(self) -> None:
         """从内置工具目录加载工具"""
@@ -308,7 +304,32 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def _load_external_tools(self) -> None:
         """从jarvis_data/tools和配置的目录加载外部工具"""
+        from jarvis.jarvis_utils.config import get_central_tool_repo
+
         tool_dirs = [str(Path(get_data_dir()) / "tools")] + get_tool_load_dirs()
+
+        # 如果配置了中心工具仓库，将其添加到加载路径
+        central_repo = get_central_tool_repo()
+        if central_repo:
+            # 中心工具仓库存储在数据目录下的特定位置
+            central_repo_path = os.path.join(get_data_dir(), "central_tool_repo")
+            tool_dirs.append(central_repo_path)
+
+            # 确保中心工具仓库被克隆/更新
+            if not os.path.exists(central_repo_path):
+                try:
+                    import subprocess
+
+                    PrettyOutput.print(
+                        f"正在克隆中心工具仓库: {central_repo}", OutputType.INFO
+                    )
+                    subprocess.run(
+                        ["git", "clone", central_repo, central_repo_path], check=True
+                    )
+                except Exception as e:
+                    PrettyOutput.print(
+                        f"克隆中心工具仓库失败: {str(e)}", OutputType.ERROR
+                    )
 
         # --- 全局每日更新检查 ---
         daily_check_git_updates(tool_dirs, "tools")
@@ -662,6 +683,10 @@ class ToolRegistry(OutputHandlerProtocol):
             parameters: 工具参数定义
             func: 工具执行函数
         """
+        if name in self.tools:
+            PrettyOutput.print(
+                f"警告: 工具 '{name}' 已存在，将被覆盖", OutputType.WARNING
+            )
         self.tools[name] = Tool(name, description, parameters, func)
 
     def get_tool(self, name: str) -> Optional[Tool]:
@@ -735,7 +760,9 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         if len(output.splitlines()) > 60:
             lines = output.splitlines()
-            return "\n".join(lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:])
+            return "\n".join(
+                lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:]
+            )
         return output
 
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
