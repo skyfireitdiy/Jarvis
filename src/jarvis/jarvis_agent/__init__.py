@@ -449,8 +449,50 @@ class Agent:
             self.session.prompt = analysis_prompt
             if not self.model:
                 raise RuntimeError("Model not initialized")
-            response = self.model.chat_until_success(self.session.prompt)  # type: ignore
-            self._call_tools(response)
+
+            # 循环处理工具调用，直到没有工具调用为止
+            while True:
+                response = self.model.chat_until_success(self.session.prompt)  # type: ignore
+                self.session.prompt = ""
+
+                # 处理用户中断
+                if get_interrupt():
+                    set_interrupt(False)
+                    user_input = self.multiline_inputer(
+                        f"分析任务期间被中断，请输入用户干预信息："
+                    )
+                    if user_input:
+                        # 如果有工具调用且用户确认继续，则继续执行工具调用
+                        if any(
+                            handler.can_handle(response)
+                            for handler in self.output_handler
+                        ):
+                            if user_confirm(
+                                "检测到有工具调用，是否继续处理工具调用？", True
+                            ):
+                                # 先添加用户干预信息到session
+                                self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n用户同意继续工具调用。"
+                                # 继续执行下面的工具调用逻辑
+                            else:
+                                # 用户选择不继续处理工具调用
+                                self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
+                                continue
+                        else:
+                            # 没有检测到工具调用
+                            self.session.prompt = (
+                                f"被用户中断，用户补充信息为：{user_input}"
+                            )
+                            continue
+                    else:
+                        # 用户输入为空，退出分析
+                        break
+
+                need_return, self.session.prompt = self._call_tools(response)
+
+                # 如果没有工具调用或者没有新的提示，退出循环
+                if not self.session.prompt:
+                    break
+
             print("✅ 分析完成")
         except Exception as e:
             print("❌ 分析失败")
@@ -477,17 +519,25 @@ class Agent:
         tool_registry = self.get_tool_registry()
         if tool_registry:
             tool_names = [tool.name for tool in tool_registry.tools.values()]
-            
+
             # 如果有save_memory工具，添加相关提示
             if "save_memory" in tool_names:
-                memory_prompts += "\n    - 如果有关键信息需要记忆，请调用save_memory工具进行记忆："
-                memory_prompts += "\n      * project_long_term: 保存与当前项目相关的长期信息"
-                memory_prompts += "\n      * global_long_term: 保存通用的信息、用户喜好、知识、方法等"
+                memory_prompts += (
+                    "\n    - 如果有关键信息需要记忆，请调用save_memory工具进行记忆："
+                )
+                memory_prompts += (
+                    "\n      * project_long_term: 保存与当前项目相关的长期信息"
+                )
+                memory_prompts += (
+                    "\n      * global_long_term: 保存通用的信息、用户喜好、知识、方法等"
+                )
                 memory_prompts += "\n      * short_term: 保存当前任务相关的临时信息"
-            
+
             # 如果有retrieve_memory工具，添加相关提示
             if "retrieve_memory" in tool_names:
-                memory_prompts += "\n    - 如果需要检索相关记忆信息，请调用retrieve_memory工具"
+                memory_prompts += (
+                    "\n    - 如果需要检索相关记忆信息，请调用retrieve_memory工具"
+                )
 
         addon_prompt = f"""
 <system_prompt>
@@ -569,6 +619,9 @@ class Agent:
                                     f"被用户中断，用户补充信息为：{user_input}"
                                 )
                                 continue
+                        else:
+                            # 用户输入为空，完成任务
+                            return self._complete_task(auto_completed=False)
 
                     need_return, self.session.prompt = self._call_tools(
                         current_response
@@ -610,32 +663,32 @@ class Agent:
     def _first_run(self):
         # 获取所有记忆标签并添加到提示中
         from jarvis.jarvis_utils.globals import get_all_memory_tags
-        
+
         memory_tags = get_all_memory_tags()
         memory_tags_prompt = ""
-        
+
         # 检查是否有save_memory工具
         tool_registry = self.get_tool_registry()
         has_save_memory = False
         if tool_registry:
             tool_names = [tool.name for tool in tool_registry.tools.values()]
             has_save_memory = "save_memory" in tool_names
-        
+
         # 如果有save_memory工具，添加记录关键信息的提示
         if has_save_memory:
             memory_tags_prompt = "\n\n💡 提示：在分析任务之前，建议使用 save_memory 工具将关键信息记录下来，便于后续检索和复用。"
-        
+
         if any(tags for tags in memory_tags.values()):
             memory_tags_prompt += "\n\n系统中存在以下记忆标签，你可以使用 retrieve_memory 工具检索相关记忆："
             for memory_type, tags in memory_tags.items():
                 if tags:
                     type_name = {
                         "short_term": "短期记忆",
-                        "project_long_term": "项目长期记忆", 
-                        "global_long_term": "全局长期记忆"
+                        "project_long_term": "项目长期记忆",
+                        "global_long_term": "全局长期记忆",
                     }.get(memory_type, memory_type)
                     memory_tags_prompt += f"\n- {type_name}: {', '.join(tags)}"
-        
+
         # 如果有上传文件，先上传文件
         if self.model and self.model.support_upload_files():
             if self.use_methodology:
@@ -669,7 +722,7 @@ class Agent:
                 for handler in self.input_handler:
                     msg, _ = handler(msg, self)
                 self.session.prompt = f"{self.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{load_methodology(msg, self.get_tool_registry())}"
-        
+
         # 添加记忆标签提示
         if memory_tags_prompt:
             self.session.prompt = f"{self.session.prompt}{memory_tags_prompt}"
