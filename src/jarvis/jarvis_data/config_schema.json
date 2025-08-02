@@ -230,6 +230,11 @@
       "description": "中心方法论Git仓库地址，该仓库会自动添加到方法论加载路径中",
       "default": ""
     },
+    "JARVIS_CENTRAL_TOOL_REPO": {
+      "type": "string",
+      "description": "中心工具库Git仓库地址，该仓库会自动克隆到数据目录并加载其中的工具",
+      "default": ""
+    },
     "JARVIS_PRINT_PROMPT": {
       "type": "boolean",
       "description": "是否打印提示",
