@@ -222,18 +222,7 @@ def _show_usage_stats() -> None:
                     "commits_status"
                 ] = f"{accepted_commits}/{total_commits}"
 
-        # 计算代码生成采纳率
-        code_stats = categorized_stats["code"]["metrics"]
-        lines_stats = categorized_stats["lines"]["metrics"]
-        # 获取代码生成和采纳的相关指标
-        total_code_generated = sum(code_stats.values()) + sum(lines_stats.values())
-        if total_code_generated > 0:
-            # 假设所有生成的代码行都被采纳（暂时无拒绝统计）
-            # 可以基于代码修改次数和代码行数来估算采纳率
-            code_adoption_rate = 100.0  # 默认100%采纳率
-            categorized_stats["adoption"]["metrics"][
-                "code_adoption_rate"
-            ] = f"{code_adoption_rate:.1f}%"
+
 
         # 构建输出
         has_data = False
@@ -348,12 +337,7 @@ def _show_usage_stats() -> None:
                 if parts:
                     summary_content.append(f"📈 总计: {', '.join(parts)}")
 
-                # 添加代码生成采纳率显示
-                adoption_metrics = categorized_stats["adoption"]["metrics"]
-                if "code_adoption_rate" in adoption_metrics:
-                    summary_content.append(
-                        f"✅ 代码生成采纳率: {adoption_metrics['code_adoption_rate']}"
-                    )
+
 
             # 计算节省的时间
             time_saved_seconds = 0
