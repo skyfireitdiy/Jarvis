@@ -148,9 +148,18 @@ def _handle_edit_mode(edit: bool, config_file: Optional[str]) -> None:
 
 
 def _initialize_agent(
-    llm_type: str, model_group: Optional[str], restore_session: bool
+    llm_type: str,
+    model_group: Optional[str],
+    tool_group: Optional[str],
+    restore_session: bool,
 ) -> Agent:
     """Initialize the agent and restore session if requested."""
+    # 如果提供了 tool_group 参数，设置到配置中
+    if tool_group:
+        from jarvis.jarvis_utils.config import set_config
+
+        set_config("JARVIS_TOOL_GROUP", tool_group)
+
     agent = Agent(
         system_prompt=origin_agent_system_prompt,
         llm_type=llm_type,
@@ -633,6 +642,9 @@ def run_cli(
     model_group: Optional[str] = typer.Option(
         None, "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
     ),
+    tool_group: Optional[str] = typer.Option(
+        None, "--tool_group", help="使用的工具组，覆盖配置文件中的设置"
+    ),
     config_file: Optional[str] = typer.Option(
         None, "-f", "--config", help="自定义配置文件路径"
     ),
@@ -672,7 +684,7 @@ def run_cli(
     )
 
     try:
-        agent = _initialize_agent(llm_type, model_group, restore_session)
+        agent = _initialize_agent(llm_type, model_group, tool_group, restore_session)
         _get_and_run_task(agent, task)
     except typer.Exit:
         raise

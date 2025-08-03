@@ -191,6 +191,8 @@ class ToolRegistry(OutputHandlerProtocol):
         self._load_builtin_tools()
         self._load_external_tools()
         self._load_mcp_tools()
+        # 应用工具配置组过滤
+        self._apply_tool_config_filter()
 
     def _get_tool_stats(self) -> Dict[str, int]:
         """从数据目录获取工具调用统计"""
@@ -257,6 +259,36 @@ class ToolRegistry(OutputHandlerProtocol):
         self.tools = {
             name: tool for name, tool in self.tools.items() if name not in names
         }
+
+    def _apply_tool_config_filter(self) -> None:
+        """应用工具配置组的过滤规则"""
+        from jarvis.jarvis_utils.config import get_tool_use_list, get_tool_dont_use_list
+
+        use_list = get_tool_use_list()
+        dont_use_list = get_tool_dont_use_list()
+
+        # 如果配置了 use 列表，只保留列表中的工具
+        if use_list:
+            filtered_tools = {}
+            for tool_name in use_list:
+                if tool_name in self.tools:
+                    filtered_tools[tool_name] = self.tools[tool_name]
+                else:
+                    PrettyOutput.print(
+                        f"警告: 配置的工具 '{tool_name}' 不存在",
+                        OutputType.WARNING,
+                    )
+            self.tools = filtered_tools
+
+        # 如果配置了 dont_use 列表，排除列表中的工具
+        if dont_use_list:
+            for tool_name in dont_use_list:
+                if tool_name in self.tools:
+                    del self.tools[tool_name]
+                    PrettyOutput.print(
+                        f"已排除工具: {tool_name}",
+                        OutputType.INFO,
+                    )
 
     def _load_mcp_tools(self) -> None:
         """加载MCP工具，优先从配置获取，其次从目录扫描"""
