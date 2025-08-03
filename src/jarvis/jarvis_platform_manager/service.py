@@ -195,11 +195,16 @@ def start_service(
         if "/" in model:
             platform_name, model_name = model.split("/", 1)
         else:
-            # Use default platform and model if not specified
-            if default_platform and default_model:
-                platform_name, model_name = default_platform, default_model
+            # Use default platform if not specified in the model name
+            if default_platform:
+                platform_name = default_platform
+                model_name = model
             else:
-                platform_name, model_name = "oyi", model  # Default to OYI platform
+                raise HTTPException(
+                    status_code=400,
+                    detail="Model name must be in 'platform/model_name' format "
+                    "or a default platform must be set.",
+                )
 
         # Get platform instance
         platform = get_platform_instance(platform_name, model_name)

@@ -391,10 +391,6 @@
       "type": "string",
       "description": "AI8 API Key"
     },
-    "OYI_API_KEY": {
-      "type": "string",
-      "description": "Oyi API Key"
-    },
     "SHELL": {
       "type": "string",
       "description": "系统Shell路径，用于获取当前使用的shell类型",
