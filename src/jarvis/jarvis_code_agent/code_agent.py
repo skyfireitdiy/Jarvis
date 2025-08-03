@@ -17,7 +17,6 @@ from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_code_agent.lint import get_lint_tools
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
-from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
@@ -70,7 +69,25 @@ class CodeAgent:
                 "clear_memory",
             ]
         )
-        code_system_prompt = """
+        code_system_prompt = self._get_system_prompt()
+        self.agent = Agent(
+            system_prompt=code_system_prompt,
+            name="CodeAgent",
+            auto_complete=False,
+            output_handler=[tool_registry, EditFileHandler()],  # type: ignore
+            llm_type=llm_type,
+            model_group=model_group,
+            input_handler=[shell_input_handler, builtin_input_handler],
+            need_summary=need_summary,
+            use_methodology=False,  # 禁用方法论
+            use_analysis=False,  # 禁用分析
+        )
+
+        self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
+
+    def _get_system_prompt(self) -> str:
+        """获取代码工程师的系统提示词"""
+        return """
 <code_engineer_guide>
 ## 角色定位
 你是Jarvis系统的代码工程师，一个专业的代码分析和修改助手。你的职责是：
@@ -124,20 +141,6 @@ class CodeAgent:
 10. 我不订阅闲 AI
 </say_to_llm>
 """
-        self.agent = Agent(
-            system_prompt=code_system_prompt,
-            name="CodeAgent",
-            auto_complete=False,
-            output_handler=[tool_registry, EditFileHandler()],  # type: ignore
-            llm_type=llm_type,
-            model_group=model_group,
-            input_handler=[shell_input_handler, builtin_input_handler],
-            need_summary=need_summary,
-            use_methodology=False,  # 禁用方法论
-            use_analysis=False,  # 禁用分析
-        )
-
-        self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
 
     def _check_git_config(self) -> None:
         """检查 git username 和 email 是否已设置，如果没有则提示并退出"""
@@ -209,11 +212,11 @@ class CodeAgent:
         jarvis_ignore = ".jarvis"
 
         if not os.path.exists(gitignore_path):
-            with open(gitignore_path, "w") as f:
+            with open(gitignore_path, "w", encoding="utf-8") as f:
                 f.write(f"{jarvis_ignore}\n")
             print(f"✅ 已创建.gitignore文件并添加'{jarvis_ignore}'")
         else:
-            with open(gitignore_path, "r+") as f:
+            with open(gitignore_path, "r+", encoding="utf-8") as f:
                 content = f.read()
                 if jarvis_ignore not in content.splitlines():
                     f.write(f"\n{jarvis_ignore}\n")
@@ -260,7 +263,10 @@ class CodeAgent:
         current_settings = {}
         for key, target_value in target_settings.items():
             result = subprocess.run(
-                ["git", "config", "--get", key], capture_output=True, text=True
+                ["git", "config", "--get", key],
+                capture_output=True,
+                text=True,
+                check=False,
             )
             current_value = result.stdout.strip()
             current_settings[key] = current_value
@@ -522,7 +528,7 @@ class CodeAgent:
 
             if project_info:
                 enhanced_input = (
-                    f"项目概况:\n"
+                    "项目概况:\n"
                     + "\n\n".join(project_info)
                     + "\n\n"
                     + first_tip
