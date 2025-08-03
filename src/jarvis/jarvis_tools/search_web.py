@@ -31,7 +31,7 @@ class SearchWebTool:
         """执行网络搜索、抓取内容并总结结果。"""
         try:
             PrettyOutput.print("▶️ 使用 DuckDuckGo 开始网页搜索...", OutputType.INFO)
-            results = list(DDGS().text(query, max_results=50))
+            results = list(DDGS().text(query, max_results=50, page=3))
 
             if not results:
                 return {
