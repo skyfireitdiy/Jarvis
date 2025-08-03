@@ -211,3 +211,23 @@ class OpenAIModel(BasePlatform):
             bool: 当前是否支持上传文件 (OpenAI平台始终返回False)
         """
         return False
+
+    @classmethod
+    def get_required_env_keys(cls) -> List[str]:
+        """
+        获取OpenAI平台所需的环境变量键列表
+
+        返回:
+            List[str]: 环境变量键的列表
+        """
+        return ["OPENAI_API_KEY", "OPENAI_API_BASE"]
+
+    @classmethod
+    def get_env_defaults(cls) -> Dict[str, str]:
+        """
+        获取OpenAI平台环境变量的默认值
+
+        返回:
+            Dict[str, str]: 环境变量默认值的字典
+        """
+        return {"OPENAI_API_BASE": "https://api.openai.com/v1"}

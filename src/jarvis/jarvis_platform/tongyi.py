@@ -11,6 +11,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_utils.utils import while_success
 
+
 class TongyiPlatform(BasePlatform):
     """Tongyi platform implementation"""
 
@@ -200,12 +201,8 @@ class TongyiPlatform(BasePlatform):
                                         tmp_content = json.loads(
                                             content.get("content")
                                         )["content"]
-                                        if len(thinking_content) < len(
-                                            tmp_content
-                                        ):
-                                            yield tmp_content[
-                                                len(thinking_content) :
-                                            ]
+                                        if len(thinking_content) < len(tmp_content):
+                                            yield tmp_content[len(thinking_content) :]
                                             thinking_content = tmp_content
                                         else:
                                             yield f"\r\n{ct('think')}\n"[
@@ -224,9 +221,7 @@ class TongyiPlatform(BasePlatform):
                                     else:
                                         tmp_content = content.get("content")
                                         if len(text_content) < len(tmp_content):
-                                            yield tmp_content[
-                                                len(text_content) :
-                                            ]
+                                            yield tmp_content[len(text_content) :]
                                             text_content = tmp_content
 
                     except json.JSONDecodeError:
@@ -562,3 +557,13 @@ class TongyiPlatform(BasePlatform):
             bool: True if web is supported, False otherwise
         """
         return True
+
+    @classmethod
+    def get_required_env_keys(cls) -> List[str]:
+        """
+        获取通义平台所需的环境变量键列表
+
+        返回:
+            List[str]: 环境变量键的列表
+        """
+        return ["TONGYI_COOKIES"]

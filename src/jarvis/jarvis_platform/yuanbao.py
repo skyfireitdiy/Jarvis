@@ -623,3 +623,13 @@ class YuanbaoPlatform(BasePlatform):
     def support_web(self) -> bool:
         """Yuanbao平台支持web功能"""
         return True
+
+    @classmethod
+    def get_required_env_keys(cls) -> List[str]:
+        """
+        获取元宝平台所需的环境变量键列表
+
+        返回:
+            List[str]: 环境变量键的列表
+        """
+        return ["YUANBAO_COOKIES"]
