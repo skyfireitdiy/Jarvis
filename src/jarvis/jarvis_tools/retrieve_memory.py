@@ -4,9 +4,10 @@ import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, get_max_input_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.globals import get_short_term_memories
+from jarvis.jarvis_utils.embedding import get_context_token_count
 
 
 class RetrieveMemoryTool:
@@ -131,14 +132,41 @@ class RetrieveMemoryTool:
             # 按创建时间排序（最新的在前）
             all_memories.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
-            # 限制最多返回50条记忆，随机选取
-            if len(all_memories) > 50:
-                all_memories = random.sample(all_memories, 50)
-                # 重新排序，保持时间顺序
-                all_memories.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+            # 获取最大输入token数的2/3作为记忆的token限制
+            max_input_tokens = get_max_input_token_count()
+            memory_token_limit = int(max_input_tokens * 2 / 3)
 
-            # 如果指定了限制，只返回前N个
-            if limit:
+            # 基于token限制和条数限制筛选记忆
+            filtered_memories: List[Dict[str, Any]] = []
+            total_tokens = 0
+
+            for memory in all_memories:
+                # 计算当前记忆的token数量
+                memory_content = json.dumps(memory, ensure_ascii=False)
+                memory_tokens = get_context_token_count(memory_content)
+
+                # 检查是否超过token限制
+                if total_tokens + memory_tokens > memory_token_limit:
+                    PrettyOutput.print(
+                        f"达到token限制 ({total_tokens}/{memory_token_limit})，停止加载更多记忆",
+                        OutputType.INFO,
+                    )
+                    break
+
+                # 检查是否超过50条限制
+                if len(filtered_memories) >= 50:
+                    PrettyOutput.print(
+                        f"达到记忆条数限制 (50条)，停止加载更多记忆", OutputType.INFO
+                    )
+                    break
+
+                filtered_memories.append(memory)
+                total_tokens += memory_tokens
+
+            all_memories = filtered_memories
+
+            # 如果指定了额外的限制，只返回前N个
+            if limit and len(all_memories) > limit:
                 all_memories = all_memories[:limit]
 
             # 打印结果摘要
