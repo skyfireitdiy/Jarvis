@@ -13,6 +13,9 @@ from jarvis.jarvis_agent.prompt_builder import build_action_prompt
 from jarvis.jarvis_agent.protocols import OutputHandlerProtocol
 from jarvis.jarvis_agent.session_manager import SessionManager
 from jarvis.jarvis_agent.tool_executor import execute_tool_call
+from jarvis.jarvis_agent.memory_manager import MemoryManager
+from jarvis.jarvis_agent.task_analyzer import TaskAnalyzer
+from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
 from jarvis.jarvis_agent.prompts import (
     DEFAULT_SUMMARY_PROMPT,
     SUMMARY_REQUEST_PROMPT,
@@ -43,7 +46,6 @@ from jarvis.jarvis_utils.globals import (
     set_interrupt,
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
-from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 
@@ -160,6 +162,11 @@ class Agent:
             summary_prompt,
             model_group,
         )
+
+        # 初始化管理器
+        self.memory_manager = MemoryManager(self)
+        self.task_analyzer = TaskAnalyzer(self)
+        self.file_methodology_manager = FileMethodologyManager(self)
 
         # 设置系统提示词
         self._setup_system_prompt()
@@ -452,26 +459,7 @@ class Agent:
 
     def _handle_history_with_file_upload(self) -> str:
         """使用文件上传方式处理历史"""
-        import tempfile
-
-        tmp_file_name = ""
-        try:
-            tmp_file = tempfile.NamedTemporaryFile(
-                delete=False, mode="w", encoding="utf-8"
-            )
-            tmp_file_name = tmp_file.name
-            tmp_file.write(self.session.prompt)
-            tmp_file.close()
-
-            self.clear_history()
-
-            if self.model and self.model.upload_files([tmp_file_name]):
-                return "上传的文件是历史对话信息，请基于历史对话信息继续完成任务。"
-            else:
-                return ""
-        finally:
-            if tmp_file_name and os.path.exists(tmp_file_name):
-                os.remove(tmp_file_name)
+        return self.file_methodology_manager.handle_history_with_file_upload()
 
     def _format_summary_message(self, summary: str) -> str:
         """格式化摘要消息"""
@@ -502,29 +490,16 @@ class Agent:
             2. 对于子Agent: 可能会生成总结(如果启用)
             3. 使用spinner显示生成状态
         """
-        satisfaction_feedback = ""
-
-        if not auto_completed and self.use_analysis:
-            if user_confirm("您对本次任务的完成是否满意？", True):
-                satisfaction_feedback = "\n\n用户对本次任务的完成表示满意。"
-            else:
-                feedback = self.multiline_inputer(
-                    "请提供您的反馈意见（可留空直接回车）:"
-                )
-                if feedback:
-                    satisfaction_feedback = (
-                        f"\n\n用户对本次任务的完成不满意，反馈意见如下：\n{feedback}"
-                    )
-                else:
-                    satisfaction_feedback = (
-                        "\n\n用户对本次任务的完成不满意，未提供具体反馈意见。"
-                    )
+        # 收集满意度反馈
+        satisfaction_feedback = self.task_analyzer.collect_satisfaction_feedback(
+            auto_completed
+        )
 
         if self.use_analysis:
-            self._analysis_task(satisfaction_feedback)
+            self.task_analyzer.analysis_task(satisfaction_feedback)
         else:
             # 如果没有开启分析，也提示用户是否有值得记忆的信息
-            self._prompt_memory_save()
+            self.memory_manager.prompt_memory_save()
 
         if self.need_summary:
             # 在生成总结前也提示保存记忆（如果之前没有提示过）
@@ -533,7 +508,7 @@ class Agent:
                 pass
             else:
                 # 如果开启了分析，在生成总结前也给一次保存记忆的机会
-                self._prompt_memory_save()
+                self.memory_manager.prompt_memory_save()
 
             print("📄 正在生成总结...")
             self.session.prompt = self.summary_prompt
@@ -544,79 +519,6 @@ class Agent:
             return ret
 
         return "任务完成"
-
-    def _analysis_task(self, satisfaction_feedback: str = ""):
-        """分析任务并生成方法论"""
-        print("🔍 正在分析任务...")
-        try:
-            # 准备分析提示
-            self.session.prompt = self._prepare_analysis_prompt(satisfaction_feedback)
-
-            if not self.model:
-                raise RuntimeError("Model not initialized")
-
-            # 循环处理工具调用，直到没有工具调用为止
-            self._process_analysis_loop()
-
-            print("✅ 分析完成")
-        except Exception as e:
-            print("❌ 分析失败")
-
-    def _prepare_analysis_prompt(self, satisfaction_feedback: str) -> str:
-        """准备分析提示"""
-        analysis_prompt = TASK_ANALYSIS_PROMPT
-        if satisfaction_feedback:
-            analysis_prompt += satisfaction_feedback
-        return analysis_prompt
-
-    def _process_analysis_loop(self):
-        """处理分析循环"""
-        while True:
-            response = self.model.chat_until_success(self.session.prompt)  # type: ignore
-            self.session.prompt = ""
-
-            # 处理用户中断
-            if get_interrupt():
-                if not self._handle_analysis_interrupt(response):
-                    break
-
-            # 执行工具调用
-            need_return, self.session.prompt = self._call_tools(response)
-
-            # 如果没有工具调用或者没有新的提示，退出循环
-            if not self.session.prompt:
-                break
-
-    def _handle_analysis_interrupt(self, response: str) -> bool:
-        """处理分析过程中的用户中断
-
-        返回:
-            bool: True 继续分析，False 退出分析
-        """
-        set_interrupt(False)
-        user_input = self.multiline_inputer(f"分析任务期间被中断，请输入用户干预信息：")
-
-        if not user_input:
-            # 用户输入为空，退出分析
-            return False
-
-        if self._has_tool_calls(response):
-            self.session.prompt = self._handle_interrupt_with_tool_calls(user_input)
-        else:
-            self.session.prompt = f"被用户中断，用户补充信息为：{user_input}"
-
-        return True
-
-    def _has_tool_calls(self, response: str) -> bool:
-        """检查响应中是否有工具调用"""
-        return any(handler.can_handle(response) for handler in self.output_handler)
-
-    def _handle_interrupt_with_tool_calls(self, user_input: str) -> str:
-        """处理有工具调用时的中断"""
-        if user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
-            return f"被用户中断，用户补充信息为：{user_input}\n\n用户同意继续工具调用。"
-        else:
-            return f"被用户中断，用户补充信息为：{user_input}\n\n检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
 
     def make_default_addon_prompt(self, need_complete: bool) -> str:
         """生成附加提示。
@@ -636,29 +538,10 @@ class Agent:
         )
 
         # 检查工具列表并添加记忆工具相关提示
-        memory_prompts = ""
         tool_registry = self.get_tool_registry()
-        if tool_registry:
-            tool_names = [tool.name for tool in tool_registry.tools.values()]
-
-            # 如果有save_memory工具，添加相关提示
-            if "save_memory" in tool_names:
-                memory_prompts += (
-                    "\n    - 如果有关键信息需要记忆，请调用save_memory工具进行记忆："
-                )
-                memory_prompts += (
-                    "\n      * project_long_term: 保存与当前项目相关的长期信息"
-                )
-                memory_prompts += (
-                    "\n      * global_long_term: 保存通用的信息、用户喜好、知识、方法等"
-                )
-                memory_prompts += "\n      * short_term: 保存当前任务相关的临时信息"
-
-            # 如果有retrieve_memory工具，添加相关提示
-            if "retrieve_memory" in tool_names:
-                memory_prompts += (
-                    "\n    - 如果需要检索相关记忆信息，请调用retrieve_memory工具"
-                )
+        memory_prompts = self.memory_manager.add_memory_prompts_to_addon(
+            "", tool_registry
+        )
 
         addon_prompt = f"""
 <system_prompt>
@@ -781,7 +664,7 @@ class Agent:
             # 用户输入为空，完成任务
             return self._complete_task(auto_completed=False)
 
-        if self._has_tool_calls(current_response):
+        if any(handler.can_handle(current_response) for handler in self.output_handler):
             if user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
                 self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n用户同意继续工具调用。"
                 return None  # 继续执行工具调用
@@ -811,154 +694,16 @@ class Agent:
     def _first_run(self):
         """首次运行初始化"""
         # 准备记忆标签提示
-        memory_tags_prompt = self._prepare_memory_tags_prompt()
+        memory_tags_prompt = self.memory_manager.prepare_memory_tags_prompt()
 
         # 处理文件上传和方法论加载
-        self._handle_files_and_methodology()
+        self.file_methodology_manager.handle_files_and_methodology()
 
         # 添加记忆标签提示
         if memory_tags_prompt:
             self.session.prompt = f"{self.session.prompt}{memory_tags_prompt}"
 
         self.first = False
-
-    def _prepare_memory_tags_prompt(self) -> str:
-        """准备记忆标签提示"""
-        from jarvis.jarvis_utils.globals import get_all_memory_tags
-
-        memory_tags = get_all_memory_tags()
-        memory_tags_prompt = ""
-
-        # 检查是否有save_memory工具
-        if self._has_save_memory_tool():
-            memory_tags_prompt = "\n\n💡 提示：在分析任务之前，建议使用 save_memory 工具将关键信息记录下来，便于后续检索和复用。"
-
-        # 构建记忆标签列表
-        if any(tags for tags in memory_tags.values()):
-            memory_tags_prompt += self._format_memory_tags(memory_tags)
-
-        return memory_tags_prompt
-
-    def _has_save_memory_tool(self) -> bool:
-        """检查是否有save_memory工具"""
-        tool_registry = self.get_tool_registry()
-        if tool_registry:
-            tool_names = [tool.name for tool in tool_registry.tools.values()]
-            return "save_memory" in tool_names
-        return False
-
-    def _format_memory_tags(self, memory_tags: dict) -> str:
-        """格式化记忆标签"""
-        prompt = (
-            "\n\n系统中存在以下记忆标签，你可以使用 retrieve_memory 工具检索相关记忆："
-        )
-
-        type_names = {
-            "short_term": "短期记忆",
-            "project_long_term": "项目长期记忆",
-            "global_long_term": "全局长期记忆",
-        }
-
-        for memory_type, tags in memory_tags.items():
-            if tags:
-                type_name = type_names.get(memory_type, memory_type)
-                prompt += f"\n- {type_name}: {', '.join(tags)}"
-
-        return prompt
-
-    def _handle_files_and_methodology(self):
-        """处理文件上传和方法论加载"""
-        if self.model and self.model.support_upload_files():
-            self._handle_file_upload_mode()
-        else:
-            self._handle_local_mode()
-
-    def _handle_file_upload_mode(self):
-        """处理支持文件上传的模式"""
-        if self.use_methodology:
-            self._handle_methodology_upload()
-        elif self.files:
-            self._handle_files_upload()
-
-    def _handle_methodology_upload(self):
-        """处理方法论上传"""
-        if not upload_methodology(self.model, other_files=self.files):  # type: ignore
-            if self.files:
-                PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
-            # 上传失败则回退到本地加载
-            self._load_local_methodology()
-        else:
-            # 上传成功
-            memory_tags_prompt = self._prepare_memory_tags_prompt()
-            if self.files:
-                self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。{memory_tags_prompt}"
-            else:
-                self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。{memory_tags_prompt}"
-
-    def _handle_files_upload(self):
-        """处理普通文件上传"""
-        if not self.model.upload_files(self.files):  # type: ignore
-            PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
-        else:
-            self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
-
-    def _handle_local_mode(self):
-        """处理本地模式（不支持文件上传）"""
-        if self.files:
-            PrettyOutput.print("不支持上传文件，将忽略文件列表", OutputType.WARNING)
-        if self.use_methodology:
-            self._load_local_methodology()
-
-    def _load_local_methodology(self):
-        """加载本地方法论"""
-        msg = self.session.prompt
-        for handler in self.input_handler:
-            msg, _ = handler(msg, self)
-
-        memory_tags_prompt = self._prepare_memory_tags_prompt()
-        methodology = load_methodology(msg, self.get_tool_registry())
-        self.session.prompt = f"{self.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{methodology}{memory_tags_prompt}"
-
-    def _prompt_memory_save(self):
-        """让大模型自动判断并保存值得记忆的信息"""
-        # 检查是否有记忆相关工具
-        tool_registry = self.get_tool_registry()
-        if not tool_registry:
-            return
-
-        tool_names = [tool.name for tool in tool_registry.tools.values()]
-        if "save_memory" not in tool_names:
-            return
-
-        print("🔍 正在分析是否有值得记忆的信息...")
-
-        # 构建提示词，让大模型自己判断并保存记忆
-        prompt = """请回顾本次任务的整个过程，判断是否有值得长期记忆或项目记忆的信息。
-
-如果有以下类型的信息，请使用 save_memory 工具保存：
-1. 解决问题的新方法或技巧（适合保存为 global_long_term）
-2. 项目相关的重要发现或配置（适合保存为 project_long_term）
-3. 用户的偏好或习惯（适合保存为 global_long_term）
-4. 重要的技术知识或经验（适合保存为 global_long_term）
-5. 项目特定的实现细节或约定（适合保存为 project_long_term）
-
-请分析并保存有价值的信息，选择合适的记忆类型和标签。如果没有值得记忆的信息，请直接说明。"""
-
-        # 处理记忆保存
-        try:
-            response = self.model.chat_until_success(prompt)  # type: ignore
-
-            # 执行工具调用（如果有）
-            need_return, result = self._call_tools(response)
-
-            # 根据响应判断是否保存了记忆
-            if "save_memory" in response:
-                print("✅ 已自动保存有价值的信息到记忆系统")
-            else:
-                print("📝 本次任务没有特别需要记忆的信息")
-
-        except Exception as e:
-            print(f"❌ 记忆分析失败: {str(e)}")
 
     def clear_history(self):
         """
