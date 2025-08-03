@@ -116,18 +116,12 @@ class MemoryManager:
                 memory_prompts += (
                     "\n    - 如果有关键信息需要记忆，请调用save_memory工具进行记忆："
                 )
-                memory_prompts += (
-                    "\n      * project_long_term: 保存与当前项目相关的长期信息"
-                )
-                memory_prompts += (
-                    "\n      * global_long_term: 保存通用的信息、用户喜好、知识、方法等"
-                )
-                memory_prompts += "\n      * short_term: 保存当前任务相关的临时信息"
+                memory_prompts += "\n      * project_long_term: 保存与当前项目相关的长期信息（如：架构决策、关键配置、特定实现）"
+                memory_prompts += "\n      * global_long_term: 保存通用的信息、用户喜好、知识、方法等（如：常用命令、个人偏好、解决方案）"
+                memory_prompts += "\n      * short_term: 保存当前任务相关的临时信息（如：当前处理的文件、用户中间需求）"
 
             # 如果有retrieve_memory工具，添加相关提示
             if "retrieve_memory" in tool_names:
-                memory_prompts += (
-                    "\n    - 如果需要检索相关记忆信息，请调用retrieve_memory工具"
-                )
+                memory_prompts += "\n    - 如果需要获取上下文或寻找解决方案，请调用retrieve_memory工具检索相关记忆"
 
         return memory_prompts
