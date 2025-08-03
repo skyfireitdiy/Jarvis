@@ -165,7 +165,7 @@ class Agent:
         self._setup_system_prompt()
 
         # 打印欢迎信息
-        welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型" # type: ignore
+        welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"  # type: ignore
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
 
     def _init_model(self, llm_type: str, model_group: Optional[str]):
@@ -192,7 +192,7 @@ class Agent:
 
     def _init_session(self):
         """初始化会话管理器"""
-        self.session = SessionManager(model=self.model, agent_name=self.name) # type: ignore
+        self.session = SessionManager(model=self.model, agent_name=self.name)  # type: ignore
 
     def _init_handlers(
         self,
@@ -250,7 +250,7 @@ class Agent:
     def _setup_system_prompt(self):
         """设置系统提示词"""
         action_prompt = self.get_tool_usage_prompt()
-        self.model.set_system_prompt( # type: ignore
+        self.model.set_system_prompt(  # type: ignore
             f"""
 {self.system_prompt}
 
@@ -522,7 +522,19 @@ class Agent:
 
         if self.use_analysis:
             self._analysis_task(satisfaction_feedback)
+        else:
+            # 如果没有开启分析，也提示用户是否有值得记忆的信息
+            self._prompt_memory_save()
+
         if self.need_summary:
+            # 在生成总结前也提示保存记忆（如果之前没有提示过）
+            if not self.use_analysis:
+                # 已经在上面提示过了，这里不需要重复
+                pass
+            else:
+                # 如果开启了分析，在生成总结前也给一次保存记忆的机会
+                self._prompt_memory_save()
+
             print("📄 正在生成总结...")
             self.session.prompt = self.summary_prompt
             if not self.model:
@@ -870,7 +882,7 @@ class Agent:
 
     def _handle_methodology_upload(self):
         """处理方法论上传"""
-        if not upload_methodology(self.model, other_files=self.files): # type: ignore
+        if not upload_methodology(self.model, other_files=self.files):  # type: ignore
             if self.files:
                 PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
             # 上传失败则回退到本地加载
@@ -885,7 +897,7 @@ class Agent:
 
     def _handle_files_upload(self):
         """处理普通文件上传"""
-        if not self.model.upload_files(self.files): # type: ignore
+        if not self.model.upload_files(self.files):  # type: ignore
             PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
         else:
             self.session.prompt = f"{self.session.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
@@ -906,6 +918,47 @@ class Agent:
         memory_tags_prompt = self._prepare_memory_tags_prompt()
         methodology = load_methodology(msg, self.get_tool_registry())
         self.session.prompt = f"{self.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{methodology}{memory_tags_prompt}"
+
+    def _prompt_memory_save(self):
+        """让大模型自动判断并保存值得记忆的信息"""
+        # 检查是否有记忆相关工具
+        tool_registry = self.get_tool_registry()
+        if not tool_registry:
+            return
+
+        tool_names = [tool.name for tool in tool_registry.tools.values()]
+        if "save_memory" not in tool_names:
+            return
+
+        print("🔍 正在分析是否有值得记忆的信息...")
+
+        # 构建提示词，让大模型自己判断并保存记忆
+        prompt = """请回顾本次任务的整个过程，判断是否有值得长期记忆或项目记忆的信息。
+
+如果有以下类型的信息，请使用 save_memory 工具保存：
+1. 解决问题的新方法或技巧（适合保存为 global_long_term）
+2. 项目相关的重要发现或配置（适合保存为 project_long_term）
+3. 用户的偏好或习惯（适合保存为 global_long_term）
+4. 重要的技术知识或经验（适合保存为 global_long_term）
+5. 项目特定的实现细节或约定（适合保存为 project_long_term）
+
+请分析并保存有价值的信息，选择合适的记忆类型和标签。如果没有值得记忆的信息，请直接说明。"""
+
+        # 处理记忆保存
+        try:
+            response = self.model.chat_until_success(prompt)  # type: ignore
+
+            # 执行工具调用（如果有）
+            need_return, result = self._call_tools(response)
+
+            # 根据响应判断是否保存了记忆
+            if "save_memory" in response:
+                print("✅ 已自动保存有价值的信息到记忆系统")
+            else:
+                print("📝 本次任务没有特别需要记忆的信息")
+
+        except Exception as e:
+            print(f"❌ 记忆分析失败: {str(e)}")
 
     def clear_history(self):
         """
