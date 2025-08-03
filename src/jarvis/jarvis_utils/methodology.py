@@ -19,10 +19,12 @@ from jarvis.jarvis_utils.config import (
     get_data_dir,
     get_methodology_dirs,
     get_central_methodology_repo,
+    get_max_input_token_count,
 )
 from jarvis.jarvis_utils.globals import get_agent, current_agent_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
+from jarvis.jarvis_utils.embedding import get_context_token_count
 
 
 def _get_methodology_directory() -> str:
@@ -273,14 +275,16 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
         if not selected_methodologies:
             return "没有历史方法论可参考"
 
+        # 获取最大输入token数的2/3作为方法论的token限制
+        max_input_tokens = get_max_input_token_count()
+        methodology_token_limit = int(max_input_tokens * 2 / 3)
+
         # 步骤3：将选择出来的方法论内容提供给大模型生成步骤
-        final_prompt = f"""以下是与用户需求相关的方法论内容：
+        # 首先构建基础提示词部分
+        base_prompt = f"""以下是与用户需求相关的方法论内容：
 
 """
-        for problem_type, content in selected_methodologies.items():
-            final_prompt += f"## {problem_type}\n\n{content}\n\n---\n\n"
-
-        final_prompt += f"""以下是所有可用的工具内容：
+        suffix_prompt = f"""以下是所有可用的工具内容：
 
 {prompt}
 
@@ -299,6 +303,45 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
 
 除以上要求外，不要输出任何内容
 """
+
+        # 计算基础部分的token数
+        base_tokens = get_context_token_count(base_prompt + suffix_prompt)
+        available_tokens = methodology_token_limit - base_tokens
+
+        # 基于token限制筛选方法论内容
+        final_prompt = base_prompt
+        selected_count = 0
+        total_methodology_tokens = 0
+
+        for problem_type, content in selected_methodologies.items():
+            methodology_text = f"## {problem_type}\n\n{content}\n\n---\n\n"
+            methodology_tokens = get_context_token_count(methodology_text)
+
+            # 检查是否会超过token限制
+            if total_methodology_tokens + methodology_tokens > available_tokens:
+                PrettyOutput.print(
+                    f"达到方法论token限制 ({total_methodology_tokens}/{available_tokens})，停止加载更多方法论",
+                    OutputType.INFO,
+                )
+                break
+
+            final_prompt += methodology_text
+            total_methodology_tokens += methodology_tokens
+            selected_count += 1
+
+        # 如果一个方法论都没有加载成功
+        if selected_count == 0:
+            PrettyOutput.print(
+                "警告：由于token限制，无法加载任何方法论内容", OutputType.WARNING
+            )
+            return "没有历史方法论可参考"
+
+        final_prompt += suffix_prompt
+
+        PrettyOutput.print(
+            f"成功加载 {selected_count} 个方法论，总token数: {total_methodology_tokens}",
+            OutputType.INFO,
+        )
 
         # 如果内容不大，直接使用chat_until_success
         return platform.chat_until_success(final_prompt)
