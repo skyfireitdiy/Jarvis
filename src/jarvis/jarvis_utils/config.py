@@ -487,3 +487,57 @@ def get_rag_use_rerank() -> bool:
     """
     config = _get_resolved_rag_config()
     return config.get("use_rerank", True) is True
+
+
+# ==============================================================================
+# Tool Configuration
+# ==============================================================================
+
+
+def _get_resolved_tool_config(
+    tool_group_override: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    解析并合并工具配置，处理工具组。
+
+    优先级顺序:
+    1. JARVIS_TOOL_GROUP 中定义的组配置
+    2. 默认配置（所有工具都启用）
+
+    返回:
+        Dict[str, Any]: 解析后的工具配置字典，包含 'use' 和 'dont_use' 列表
+    """
+    group_config = {}
+    tool_group_name = tool_group_override or GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_GROUP")
+    tool_groups = GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_GROUPS", [])
+
+    if tool_group_name and isinstance(tool_groups, list):
+        for group_item in tool_groups:
+            if isinstance(group_item, dict) and tool_group_name in group_item:
+                group_config = group_item[tool_group_name]
+                break
+
+    # 如果没有找到配置组，返回默认配置（空列表表示使用所有工具）
+    return group_config.copy() if group_config else {"use": [], "dont_use": []}
+
+
+def get_tool_use_list() -> List[str]:
+    """
+    获取要使用的工具列表。
+
+    返回:
+        List[str]: 要使用的工具名称列表，空列表表示使用所有工具
+    """
+    config = _get_resolved_tool_config()
+    return config.get("use", [])
+
+
+def get_tool_dont_use_list() -> List[str]:
+    """
+    获取不使用的工具列表。
+
+    返回:
+        List[str]: 不使用的工具名称列表
+    """
+    config = _get_resolved_tool_config()
+    return config.get("dont_use", [])

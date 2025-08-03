@@ -245,6 +245,38 @@
       "description": "是否启用静态代码分析",
       "default": true
     },
+    "JARVIS_TOOL_GROUP": {
+      "type": "string",
+      "description": "选择一个预定义的工具配置组",
+      "default": ""
+    },
+    "JARVIS_TOOL_GROUPS": {
+      "type": "array",
+      "description": "预定义的工具配置组",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "use": {
+              "type": "array",
+              "description": "要使用的工具名称列表",
+              "items": {
+                "type": "string"
+              }
+            },
+            "dont_use": {
+              "type": "array",
+              "description": "不使用的工具名称列表",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "JARVIS_RAG_GROUP": {
       "type": "string",
       "description": "选择一个预定义的RAG配置组",
