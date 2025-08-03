@@ -250,7 +250,9 @@ class AI8Model(BasePlatform):
             PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
             return False
         except KeyError as e:
-            PrettyOutput.print(f"恢复失败: 会话文件格式不正确，缺少键 {e}", OutputType.ERROR)
+            PrettyOutput.print(
+                f"恢复失败: 会话文件格式不正确，缺少键 {e}", OutputType.ERROR
+            )
             return False
         except Exception as e:
             PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
@@ -322,3 +324,13 @@ class AI8Model(BasePlatform):
 
     def upload_files(self, file_list: List[str]) -> bool:
         return False
+
+    @classmethod
+    def get_required_env_keys(cls) -> List[str]:
+        """
+        获取AI8平台所需的环境变量键列表
+
+        返回:
+            List[str]: 环境变量键的列表
+        """
+        return ["AI8_API_KEY"]

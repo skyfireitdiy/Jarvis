@@ -2,7 +2,7 @@
 import re
 from abc import ABC, abstractmethod
 from types import TracebackType
-from typing import Generator, List, Optional, Tuple, Type
+from typing import Dict, Generator, List, Optional, Tuple, Type
 
 from typing_extensions import Self
 
@@ -110,10 +110,14 @@ class BasePlatform(ABC):
                 ):
                     response += trunk
 
-                print(f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}")
+                print(
+                    f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
+                )
             print("✅ 提交完成")
             response += "\n" + while_true(
-                lambda: while_success(lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5),
+                lambda: while_success(
+                    lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
+                ),
                 5,
             )
         else:
@@ -239,6 +243,17 @@ class BasePlatform(ABC):
     def get_model_list(self) -> List[Tuple[str, str]]:
         """Get model list"""
         raise NotImplementedError("get_model_list is not implemented")
+
+    @classmethod
+    @abstractmethod
+    def get_required_env_keys(cls) -> List[str]:
+        """Get required env keys"""
+        raise NotImplementedError("get_required_env_keys is not implemented")
+
+    @classmethod
+    def get_env_defaults(cls) -> Dict[str, str]:
+        """Get env default values"""
+        return {}
 
     def set_suppress_output(self, suppress: bool):
         """Set whether to suppress output"""

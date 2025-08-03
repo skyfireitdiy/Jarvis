@@ -10,9 +10,9 @@ import string
 from typing import Generator, List, Tuple
 
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_utils.clipboard import copy_to_clipboard
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import copy_to_clipboard
 
 
 class HumanPlatform(BasePlatform):
@@ -131,3 +131,13 @@ class HumanPlatform(BasePlatform):
     def support_upload_files(self) -> bool:
         """是否支持文件上传功能"""
         return False
+
+    @classmethod
+    def get_required_env_keys(cls) -> List[str]:
+        """
+        获取Human平台所需的环境变量键列表
+
+        返回:
+            List[str]: 环境变量键的列表
+        """
+        return []

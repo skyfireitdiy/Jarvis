@@ -491,6 +491,153 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
         sys.exit(0)
 
 
+def _interactive_config_setup(config_file_path: Path):
+    """交互式配置引导"""
+    from jarvis.jarvis_platform.registry import PlatformRegistry
+    from jarvis.jarvis_utils.input import (
+        get_choice,
+        get_single_line_input as get_input,
+        user_confirm as get_yes_no,
+    )
+
+    PrettyOutput.print(
+        "欢迎使用 Jarvis！未找到配置文件，现在开始引导配置。", OutputType.INFO
+    )
+
+    # 1. 选择平台
+    registry = PlatformRegistry.get_global_platform_registry()
+    platforms = registry.get_available_platforms()
+    platform_name = get_choice("请选择您要使用的AI平台", platforms)
+
+    # 2. 配置环境变量
+    platform_class = registry.platforms.get(platform_name)
+    if not platform_class:
+        PrettyOutput.print(f"平台 '{platform_name}' 加载失败。", OutputType.ERROR)
+        sys.exit(1)
+
+    env_vars = {}
+    required_keys = platform_class.get_required_env_keys()
+    defaults = platform_class.get_env_defaults()
+    if required_keys:
+        PrettyOutput.print(
+            f"请输入 {platform_name} 平台所需的配置信息:", OutputType.INFO
+        )
+        for key in required_keys:
+            default_value = defaults.get(key, "")
+            prompt_text = f"  - {key}"
+            if default_value:
+                prompt_text += f" (默认: {default_value})"
+            prompt_text += ": "
+
+            value = get_input(prompt_text, default=default_value)
+            env_vars[key] = value
+            os.environ[key] = value  # 立即设置环境变量以便后续测试
+
+    # 3. 选择模型
+    try:
+        platform_instance = registry.create_platform(platform_name)
+        if not platform_instance:
+            PrettyOutput.print(f"无法创建平台 '{platform_name}'。", OutputType.ERROR)
+            sys.exit(1)
+
+        model_list_tuples = platform_instance.get_model_list()
+        model_choices = [f"{name} ({desc})" for name, desc in model_list_tuples]
+        model_display_name = get_choice("请选择要使用的模型", model_choices)
+
+        # 从显示名称反向查找模型ID
+        selected_index = model_choices.index(model_display_name)
+        model_name, _ = model_list_tuples[selected_index]
+
+    except Exception:
+        PrettyOutput.print("获取模型列表失败", OutputType.ERROR)
+        if not get_yes_no("无法获取模型列表，是否继续配置？"):
+            sys.exit(1)
+        model_name = get_input("请输入模型名称:")
+
+    # 4. 测试配置
+    PrettyOutput.print("正在测试配置...", OutputType.INFO)
+    test_passed = False
+    try:
+        platform_instance = registry.create_platform(platform_name)
+        if platform_instance:
+            platform_instance.set_model_name(model_name)
+            response_generator = platform_instance.chat("hello")
+            response = "".join(response_generator)
+            if response:
+                PrettyOutput.print(
+                    f"测试成功，模型响应: {response}", OutputType.SUCCESS
+                )
+                test_passed = True
+            else:
+                PrettyOutput.print("测试失败，模型没有响应。", OutputType.ERROR)
+        else:
+            PrettyOutput.print("测试失败，无法创建平台实例。", OutputType.ERROR)
+    except Exception:
+        PrettyOutput.print("测试失败", OutputType.ERROR)
+
+    # 5. 生成并保存配置
+    config_data = {
+        "ENV": env_vars,
+        "JARVIS_PLATFORM": platform_name,
+        "JARVIS_THINKING_PLATFORM": platform_name,
+        "JARVIS_MODEL": model_name,
+        "JARVIS_THINKING_MODEL": model_name,
+    }
+
+    if test_passed:
+        PrettyOutput.print("配置已测试通过，将为您生成配置文件。", OutputType.SUCCESS)
+    else:
+        if not get_yes_no("配置测试失败，您确定要保存这个配置吗？"):
+            PrettyOutput.print("配置未保存。", OutputType.INFO)
+            sys.exit(0)
+
+    try:
+        schema_path = (
+            Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
+        )
+        if schema_path.exists():
+            config_file_path.parent.mkdir(parents=True, exist_ok=True)
+            # 使用现有的函数生成默认结构，然后覆盖引导配置
+            generate_default_config(str(schema_path.absolute()), str(config_file_path))
+
+            # 读取刚生成的默认配置
+            with open(config_file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                default_config = yaml.safe_load(
+                    content.split("\n", 1)[1]
+                )  # 跳过 schema 行
+
+            # 合并用户配置
+            if default_config is None:
+                default_config = {}
+            default_config.update(config_data)
+
+            # 写回合并后的配置
+            final_content = (
+                f"# yaml-language-server: $schema={str(schema_path.absolute())}\n"
+            )
+            final_content += yaml.dump(
+                default_config, allow_unicode=True, sort_keys=False
+            )
+            with open(config_file_path, "w", encoding="utf-8") as f:
+                f.write(final_content)
+
+            PrettyOutput.print(
+                f"配置文件已生成: {config_file_path}", OutputType.SUCCESS
+            )
+            PrettyOutput.print("配置完成，请重新启动Jarvis。", OutputType.INFO)
+            sys.exit(0)
+        else:
+            PrettyOutput.print(
+                "未找到config schema，无法生成配置文件。", OutputType.ERROR
+            )
+            sys.exit(1)
+
+    except Exception:
+        PrettyOutput.print("生成配置文件失败", OutputType.ERROR)
+        sys.exit(1)
+
+
 def load_config():
     config_file = g_config_file
     config_file_path = (
@@ -505,24 +652,12 @@ def load_config():
         if old_config_file.exists():  # 旧的配置文件存在
             _read_old_config_file(old_config_file)
         else:
-            # 生成默认配置文件
-            schema_path = (
-                Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
-            )
-            if schema_path.exists():
-                try:
-                    config_file_path.parent.mkdir(parents=True, exist_ok=True)
-                    generate_default_config(
-                        str(schema_path.absolute()), str(config_file_path)
-                    )
-                    PrettyOutput.print(
-                        f"已生成默认配置文件: {config_file_path}", OutputType.INFO
-                    )
-                    sys.exit(0)
-                except Exception as e:
-                    PrettyOutput.print(f"生成默认配置文件失败: {e}", OutputType.ERROR)
+            _interactive_config_setup(config_file_path)
     else:
         _load_and_process_config(str(config_file_path.parent), str(config_file_path))
+
+
+from typing import Tuple
 
 
 from typing import Tuple
@@ -594,10 +729,24 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         jarvis_dir: Jarvis数据目录路径
         config_file: 配置文件路径
     """
-    content, config_data = _load_config_file(config_file)
-    _ensure_schema_declaration(jarvis_dir, config_file, content, config_data)
-    set_global_env_data(config_data)
-    _process_env_variables(config_data)
+    from jarvis.jarvis_utils.input import user_confirm as get_yes_no
+
+    try:
+        content, config_data = _load_config_file(config_file)
+        _ensure_schema_declaration(jarvis_dir, config_file, content, config_data)
+        set_global_env_data(config_data)
+        _process_env_variables(config_data)
+    except Exception:
+        PrettyOutput.print("加载配置文件失败", OutputType.ERROR)
+        if get_yes_no("配置文件格式错误，是否删除并重新配置？"):
+            try:
+                os.remove(config_file)
+                PrettyOutput.print(
+                    "已删除损坏的配置文件，请重启Jarvis以重新配置。", OutputType.SUCCESS
+                )
+            except Exception:
+                PrettyOutput.print("删除配置文件失败", OutputType.ERROR)
+        sys.exit(1)
 
 
 def generate_default_config(schema_path: str, output_path: str) -> None:
@@ -809,91 +958,6 @@ def get_loc_stats() -> str:
         return result.stdout if result.returncode == 0 else ""
     except FileNotFoundError:
         return ""
-
-
-def copy_to_clipboard(text: str) -> None:
-    """将文本复制到剪贴板，支持Windows、macOS和Linux
-
-    参数:
-        text: 要复制的文本
-    """
-    print("--- 剪贴板内容开始 ---")
-    print(text)
-    print("--- 剪贴板内容结束 ---")
-
-    system = platform.system()
-
-    # Windows系统
-    if system == "Windows":
-        try:
-            # 使用Windows的clip命令
-            process = subprocess.Popen(
-                ["clip"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                shell=True,
-            )
-            if process.stdin:
-                process.stdin.write(text.encode("utf-8"))
-                process.stdin.close()
-            return
-        except Exception as e:
-            PrettyOutput.print(f"使用Windows clip命令时出错: {e}", OutputType.WARNING)
-
-    # macOS系统
-    elif system == "Darwin":
-        try:
-            process = subprocess.Popen(
-                ["pbcopy"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            if process.stdin:
-                process.stdin.write(text.encode("utf-8"))
-                process.stdin.close()
-            return
-        except Exception as e:
-            PrettyOutput.print(f"使用macOS pbcopy命令时出错: {e}", OutputType.WARNING)
-
-    # Linux系统
-    else:
-        # 尝试使用 xsel
-        try:
-            process = subprocess.Popen(
-                ["xsel", "-b", "-i"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            if process.stdin:
-                process.stdin.write(text.encode("utf-8"))
-                process.stdin.close()
-            return
-        except FileNotFoundError:
-            pass  # xsel 未安装，继续尝试下一个
-        except Exception as e:
-            PrettyOutput.print(f"使用xsel时出错: {e}", OutputType.WARNING)
-
-        # 尝试使用 xclip
-        try:
-            process = subprocess.Popen(
-                ["xclip", "-selection", "clipboard"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            if process.stdin:
-                process.stdin.write(text.encode("utf-8"))
-                process.stdin.close()
-            return
-        except FileNotFoundError:
-            PrettyOutput.print(
-                "xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING
-            )
-        except Exception as e:
-            PrettyOutput.print(f"使用xclip时出错: {e}", OutputType.WARNING)
 
 
 def _pull_git_repo(repo_path: Path, repo_type: str):
