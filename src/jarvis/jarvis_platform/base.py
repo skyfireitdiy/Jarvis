@@ -87,7 +87,7 @@ class BasePlatform(ABC):
             prefix_prompt = f"""
             我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
             """
-            while_true(lambda: while_success(lambda: self.chat(prefix_prompt), 5), 5)
+            while_true(lambda: while_success(lambda: self._chat(prefix_prompt), 5), 5)
             submit_count = 0
             length = 0
             response = ""
@@ -101,7 +101,7 @@ class BasePlatform(ABC):
                 response += "\n"
                 for trunk in while_true(
                     lambda: while_success(
-                        lambda: self.chat(
+                        lambda: self._chat(
                             f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
                         ),
                         5,
