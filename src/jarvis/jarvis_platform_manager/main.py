@@ -27,13 +27,13 @@ def list_platforms() -> None:
     PrettyOutput.section("Supported platforms and models", OutputType.SUCCESS)
 
     for platform_name in platforms:
-        # Create platform instance
-        platform = registry.create_platform(platform_name)
-        if not platform:
-            continue
-
-        # Get the list of models supported by the platform
         try:
+            # Create platform instance
+            platform = registry.create_platform(platform_name)
+            if not platform:
+                continue
+
+            # Get the list of models supported by the platform
             models = platform.get_model_list()
 
             # Print platform name
@@ -51,10 +51,8 @@ def list_platforms() -> None:
             else:
                 PrettyOutput.print("  • 没有可用的模型信息", OutputType.WARNING)
 
-        except Exception as exc:
-            PrettyOutput.print(
-                f"获取 {platform_name} 的模型列表失败: {str(exc)}", OutputType.WARNING
-            )
+        except Exception:
+            PrettyOutput.print(f"创建 {platform_name} 平台失败", OutputType.WARNING)
 
 
 def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> None:
@@ -330,13 +328,15 @@ def validate_platform_model(platform: Optional[str], model: Optional[str]) -> bo
 
 @app.command("chat")
 def chat_command(
-    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="指定要使用的平台"),
+    platform: Optional[str] = typer.Option(
+        None, "--platform", "-p", help="指定要使用的平台"
+    ),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="指定要使用的模型"),
 ) -> None:
     """与指定平台和模型聊天。"""
     if not validate_platform_model(platform, model):
         return
-    chat_with_model(platform, model, "") # type: ignore
+    chat_with_model(platform, model, "")  # type: ignore
 
 
 @app.command("service")
