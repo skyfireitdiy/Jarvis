@@ -60,6 +60,28 @@ class ShareManager(ABC):
             subprocess.run(
                 ["git", "clone", self.central_repo_url, self.repo_path], check=True
             )
+            # 检查并添加.gitignore文件
+            gitignore_path = os.path.join(self.repo_path, ".gitignore")
+            modified = False
+            if not os.path.exists(gitignore_path):
+                with open(gitignore_path, "w") as f:
+                    f.write("__pycache__/\n")
+                modified = True
+            else:
+                with open(gitignore_path, "r+") as f:
+                    content = f.read()
+                    if "__pycache__" not in content:
+                        f.write("\n__pycache__/\n")
+                        modified = True
+            
+            if modified:
+                subprocess.run(["git", "add", ".gitignore"], cwd=self.repo_path, check=True)
+                subprocess.run(
+                    ["git", "commit", "-m", "chore: add __pycache__ to .gitignore"], 
+                    cwd=self.repo_path, 
+                    check=True
+                )
+                subprocess.run(["git", "push"], cwd=self.repo_path, check=True)
         else:
             PrettyOutput.print(
                 f"正在更新中心{self.get_resource_type()}仓库...", OutputType.INFO
