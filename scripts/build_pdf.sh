@@ -45,7 +45,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(realpath "$SCRIPT_DIR/..")"
 STYLE_CSS="$SCRIPT_DIR/style.css"
 DEFAULT_INPUT_FILE="$PROJECT_ROOT/docs/technical_documentation.md"
-DEFAULT_OUTPUT_FILE="$PROJECT_ROOT/Jarvis_Technical_Documentation_Prince.pdf"
+# DEFAULT_OUTPUT_FILE is no longer needed as the output filename is derived from the input filename.
 TEMP_HTML_FILE=$(mktemp --suffix=.html)
 
 # --- Input Validation ---
@@ -55,7 +55,13 @@ if [ "$#" -gt 2 ]; then
 fi
 
 INPUT_FILE="${1:-$DEFAULT_INPUT_FILE}"
-OUTPUT_FILE="${2:-$DEFAULT_OUTPUT_FILE}"
+# If output file is not provided, derive it from input file name
+if [ -z "${2:-}" ]; then
+    INPUT_BASENAME=$(basename "$INPUT_FILE" .md)
+    OUTPUT_FILE="$PROJECT_ROOT/$INPUT_BASENAME.pdf"
+else
+    OUTPUT_FILE="$2"
+fi
 
 # Derive document title from the output filename
 DOC_BASENAME=$(basename "$OUTPUT_FILE" .pdf)
