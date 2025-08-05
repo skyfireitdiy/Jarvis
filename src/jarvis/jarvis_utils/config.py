@@ -339,6 +339,16 @@ def is_print_prompt() -> bool:
     return GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_PROMPT", False) == True
 
 
+def is_force_save_memory() -> bool:
+    """
+    获取是否强制保存记忆。
+
+    返回：
+        bool: 如果强制保存记忆则返回True，默认为True
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_FORCE_SAVE_MEMORY", True) is True
+
+
 def is_enable_static_analysis() -> bool:
     """
     获取是否启用静态代码分析。
