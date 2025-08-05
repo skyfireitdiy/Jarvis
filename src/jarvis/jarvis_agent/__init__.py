@@ -34,6 +34,7 @@ from jarvis.jarvis_utils.config import (
     get_thinking_model_name,
     get_thinking_platform_name,
     is_execute_tool_confirm,
+    is_force_save_memory,
     is_use_analysis,
     is_use_methodology,
 )
@@ -115,6 +116,7 @@ class Agent:
         multiline_inputer: Optional[Callable[[str], str]] = None,
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
+        force_save_memory: Optional[bool] = None,
         files: List[str] = [],
     ):
         """初始化Jarvis Agent实例
@@ -134,6 +136,7 @@ class Agent:
             multiline_inputer: 多行输入处理器
             use_methodology: 是否使用方法论
             use_analysis: 是否使用任务分析
+            force_save_memory: 是否强制保存记忆
         """
         # 基础属性初始化
         self.files = files
@@ -161,6 +164,7 @@ class Agent:
             execute_tool_confirm,
             summary_prompt,
             model_group,
+            force_save_memory,
         )
 
         # 初始化管理器
@@ -186,9 +190,7 @@ class Agent:
 
         self.model = PlatformRegistry().create_platform(platform_name)
         if self.model is None:
-            PrettyOutput.print(
-                f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING
-            )
+            PrettyOutput.print(f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING)
             self.model = PlatformRegistry().get_normal_platform()
 
         if model_name:
@@ -227,6 +229,7 @@ class Agent:
         execute_tool_confirm: Optional[bool],
         summary_prompt: Optional[str],
         model_group: Optional[str],
+        force_save_memory: Optional[bool],
     ):
         """初始化配置选项"""
         # 如果有上传文件，自动禁用方法论
@@ -253,6 +256,12 @@ class Agent:
         )
 
         self.max_token_count = get_max_token_count(model_group)
+
+        self.force_save_memory = (
+            force_save_memory
+            if force_save_memory is not None
+            else is_force_save_memory()
+        )
 
     def _setup_system_prompt(self):
         """设置系统提示词"""
@@ -440,9 +449,10 @@ class Agent:
             当上下文长度超过最大值时使用
         """
         # 在清理历史之前，提示用户保存重要记忆
-        print("📌 对话历史即将被总结和清理，请先保存重要信息...")
-        self.memory_manager.prompt_memory_save()
-        
+        if self.force_save_memory:
+            print("📌 对话历史即将被总结和清理，请先保存重要信息...")
+            self.memory_manager.prompt_memory_save()
+
         if self._should_use_file_upload():
             return self._handle_history_with_file_upload()
         else:
@@ -504,10 +514,10 @@ class Agent:
             self.task_analyzer.analysis_task(satisfaction_feedback)
         else:
             # 如果没有开启分析，也提示用户是否有值得记忆的信息
-            self.memory_manager.prompt_memory_save()
+            if self.force_save_memory:
+                self.memory_manager.prompt_memory_save()
 
         if self.need_summary:
-
             print("📄 正在生成总结...")
             self.session.prompt = self.summary_prompt
             if not self.model:
@@ -679,9 +689,7 @@ class Agent:
         返回:
             str: "continue" 或 "complete"
         """
-        user_input = self.multiline_inputer(
-            f"{self.name}: 请输入，或输入空行来结束当前任务："
-        )
+        user_input = self.multiline_inputer(f"{self.name}: 请输入，或输入空行来结束当前任务：")
 
         if user_input:
             self.session.prompt = user_input

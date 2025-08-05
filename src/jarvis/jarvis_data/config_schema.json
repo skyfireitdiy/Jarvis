@@ -245,6 +245,11 @@
       "description": "是否启用静态代码分析",
       "default": true
     },
+    "JARVIS_FORCE_SAVE_MEMORY": {
+      "type": "boolean",
+      "description": "是否强制保存记忆",
+      "default": true
+    },
     "JARVIS_TOOL_GROUP": {
       "type": "string",
       "description": "选择一个预定义的工具配置组",
