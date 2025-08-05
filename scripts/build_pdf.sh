@@ -58,7 +58,7 @@ INPUT_FILE="${1:-$DEFAULT_INPUT_FILE}"
 # If output file is not provided, derive it from input file name
 if [ -z "${2:-}" ]; then
     INPUT_BASENAME=$(basename "$INPUT_FILE" .md)
-    OUTPUT_FILE="$PROJECT_ROOT/$INPUT_BASENAME.pdf"
+    OUTPUT_FILE="./$INPUT_BASENAME.pdf"
 else
     OUTPUT_FILE="$2"
 fi
