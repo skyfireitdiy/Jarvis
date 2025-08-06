@@ -236,20 +236,26 @@ def get_short_term_memories(tags: Optional[List[str]] = None) -> List[Dict[str, 
         tags: 用于过滤的标签列表（可选）
 
     返回:
-        List[Dict[str, Any]]: 符合条件的短期记忆列表
+        List[Dict[str, Any]]: 符合条件的短期记忆列表，按创建时间降序排列
     """
     global short_term_memories
-    if not tags:
-        return short_term_memories.copy()
 
-    # 按标签过滤
-    filtered_memories = []
-    for memory in short_term_memories:
-        memory_tags = memory.get("tags", [])
-        if any(tag in memory_tags for tag in tags):
-            filtered_memories.append(memory)
+    # 获取记忆副本
+    memories_copy = short_term_memories.copy()
 
-    return filtered_memories
+    # 按标签过滤（如果提供了标签）
+    if tags:
+        filtered_memories = []
+        for memory in memories_copy:
+            memory_tags = memory.get("tags", [])
+            if any(tag in memory_tags for tag in tags):
+                filtered_memories.append(memory)
+        memories_copy = filtered_memories
+
+    # 按创建时间排序（最新的在前）
+    memories_copy.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+
+    return memories_copy
 
 
 def clear_short_term_memories() -> None:
