@@ -23,6 +23,7 @@ from jarvis.jarvis_utils.config import (
 )
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.utils import init_env
 
 
 class MemoryOrganizer:
@@ -188,7 +189,7 @@ tags:
         try:
             # 调用大模型 - 收集完整响应
             response_parts = []
-            for chunk in self.platform.chat(prompt): # type: ignore
+            for chunk in self.platform.chat(prompt):  # type: ignore
                 response_parts.append(chunk)
             response = "".join(response_parts)
 
@@ -370,12 +371,162 @@ tags:
                         OutputType.WARNING,
                     )
 
+    def export_memories(
+        self,
+        memory_types: List[str],
+        output_file: Path,
+        tags: Optional[List[str]] = None,
+    ) -> int:
+        """
+        导出指定类型的记忆到文件
+
+        参数：
+            memory_types: 要导出的记忆类型列表
+            output_file: 输出文件路径
+            tags: 可选的标签过滤器
+
+        返回：
+            导出的记忆数量
+        """
+        all_memories = []
+
+        for memory_type in memory_types:
+            PrettyOutput.print(f"正在导出 {memory_type} 类型的记忆...", OutputType.INFO)
+            memories = self._load_memories(memory_type)
+
+            # 如果指定了标签，进行过滤
+            if tags:
+                filtered_memories = []
+                for memory in memories:
+                    memory_tags = set(memory.get("tags", []))
+                    if any(tag in memory_tags for tag in tags):
+                        filtered_memories.append(memory)
+                memories = filtered_memories
+
+            # 添加记忆类型信息并移除文件路径
+            for memory in memories:
+                memory["memory_type"] = memory_type
+                memory.pop("file_path", None)
+
+            all_memories.extend(memories)
+            PrettyOutput.print(
+                f"从 {memory_type} 导出了 {len(memories)} 个记忆", OutputType.INFO
+            )
+
+        # 保存到文件
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(all_memories, f, ensure_ascii=False, indent=2)
+
+        PrettyOutput.print(
+            f"成功导出 {len(all_memories)} 个记忆到 {output_file}", OutputType.SUCCESS
+        )
+
+        return len(all_memories)
+
+    def import_memories(
+        self,
+        input_file: Path,
+        overwrite: bool = False,
+    ) -> Dict[str, int]:
+        """
+        从文件导入记忆
+
+        参数：
+            input_file: 输入文件路径
+            overwrite: 是否覆盖已存在的记忆
+
+        返回：
+            导入统计 {memory_type: count}
+        """
+        # 读取记忆文件
+        if not input_file.exists():
+            raise FileNotFoundError(f"导入文件不存在: {input_file}")
+
+        with open(input_file, "r", encoding="utf-8") as f:
+            memories = json.load(f)
+
+        if not isinstance(memories, list):
+            raise ValueError("导入文件格式错误，应为记忆列表")
+
+        PrettyOutput.print(f"准备导入 {len(memories)} 个记忆", OutputType.INFO)
+
+        # 统计导入结果
+        import_stats: Dict[str, int] = defaultdict(int)
+        skipped_count = 0
+
+        for memory in memories:
+            memory_type = memory.get("memory_type", memory.get("type"))
+            if not memory_type:
+                PrettyOutput.print(
+                    f"跳过没有类型的记忆: {memory.get('id', '未知')}",
+                    OutputType.WARNING,
+                )
+                skipped_count += 1
+                continue
+
+            # 确定保存路径
+            if memory_type == "project_long_term":
+                memory_dir = self.project_memory_dir
+            elif memory_type == "global_long_term":
+                memory_dir = self.global_memory_dir / memory_type
+            else:
+                PrettyOutput.print(
+                    f"跳过不支持的记忆类型: {memory_type}", OutputType.WARNING
+                )
+                skipped_count += 1
+                continue
+
+            memory_dir.mkdir(parents=True, exist_ok=True)
+
+            # 检查是否已存在
+            memory_id = memory.get("id")
+            if not memory_id:
+                import uuid
+
+                memory_id = f"imported_{uuid.uuid4().hex[:8]}"
+                memory["id"] = memory_id
+
+            memory_file = memory_dir / f"{memory_id}.json"
+
+            if memory_file.exists() and not overwrite:
+                PrettyOutput.print(f"跳过已存在的记忆: {memory_id}", OutputType.INFO)
+                skipped_count += 1
+                continue
+
+            # 保存记忆
+            with open(memory_file, "w", encoding="utf-8") as f:
+                # 清理记忆数据
+                clean_memory = {
+                    "id": memory["id"],
+                    "type": memory_type,
+                    "tags": memory.get("tags", []),
+                    "content": memory.get("content", ""),
+                    "created_at": memory.get("created_at", ""),
+                }
+                if "merged_from" in memory:
+                    clean_memory["merged_from"] = memory["merged_from"]
+
+                json.dump(clean_memory, f, ensure_ascii=False, indent=2)
+
+            import_stats[memory_type] += 1
+
+        # 显示导入结果
+        PrettyOutput.print("\n导入完成！", OutputType.SUCCESS)
+        for memory_type, count in import_stats.items():
+            PrettyOutput.print(f"{memory_type}: 导入了 {count} 个记忆", OutputType.INFO)
+
+        if skipped_count > 0:
+            PrettyOutput.print(f"跳过了 {skipped_count} 个记忆", OutputType.WARNING)
+
+        return dict(import_stats)
+
 
 app = typer.Typer(help="记忆整理工具 - 合并具有相似标签的记忆")
 
 
-@app.command()
-def cli(
+@app.command("organize")
+def organize(
     memory_type: str = typer.Option(
         "project_long_term",
         "--type",
@@ -398,13 +549,13 @@ def cli(
     示例：
 
     # 整理项目长期记忆，最小重叠标签数为3
-    jarvis-memory-organizer --type project_long_term --min-overlap 3
+    jarvis-memory-organizer organize --type project_long_term --min-overlap 3
 
     # 整理全局长期记忆，模拟运行
-    jarvis-memory-organizer --type global_long_term --dry-run
+    jarvis-memory-organizer organize --type global_long_term --dry-run
 
     # 使用默认设置（最小重叠数2）整理项目记忆
-    jarvis-memory-organizer
+    jarvis-memory-organizer organize
     """
     # 验证参数
     if memory_type not in ["project_long_term", "global_long_term"]:
@@ -436,8 +587,116 @@ def cli(
         raise typer.Exit(1)
 
 
+@app.command("export")
+def export(
+    output: Path = typer.Argument(
+        ...,
+        help="导出文件路径（JSON格式）",
+    ),
+    memory_types: List[str] = typer.Option(
+        ["project_long_term", "global_long_term"],
+        "--type",
+        "-t",
+        help="要导出的记忆类型（可多次指定）",
+    ),
+    tags: Optional[List[str]] = typer.Option(
+        None,
+        "--tag",
+        help="按标签过滤（可多次指定）",
+    ),
+):
+    """
+    导出记忆到文件。
+
+    示例：
+
+    # 导出所有记忆到文件
+    jarvis-memory-organizer export memories.json
+
+    # 只导出项目长期记忆
+    jarvis-memory-organizer export project_memories.json -t project_long_term
+
+    # 导出带特定标签的记忆
+    jarvis-memory-organizer export tagged_memories.json --tag Python --tag API
+    """
+    try:
+        organizer = MemoryOrganizer()
+
+        # 验证记忆类型
+        valid_types = ["project_long_term", "global_long_term"]
+        for mt in memory_types:
+            if mt not in valid_types:
+                PrettyOutput.print(f"错误：不支持的记忆类型 '{mt}'", OutputType.ERROR)
+                raise typer.Exit(1)
+
+        count = organizer.export_memories(
+            memory_types=memory_types,
+            output_file=output,
+            tags=tags,
+        )
+
+        if count > 0:
+            raise typer.Exit(0)
+        else:
+            PrettyOutput.print("没有找到要导出的记忆", OutputType.WARNING)
+            raise typer.Exit(0)
+
+    except Exception as e:
+        PrettyOutput.print(f"导出失败: {str(e)}", OutputType.ERROR)
+        raise typer.Exit(1)
+
+
+@app.command("import")
+def import_memories(
+    input: Path = typer.Argument(
+        ...,
+        help="导入文件路径（JSON格式）",
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        "-o",
+        help="覆盖已存在的记忆",
+    ),
+):
+    """
+    从文件导入记忆。
+
+    示例：
+
+    # 导入记忆文件
+    jarvis-memory-organizer import memories.json
+
+    # 导入并覆盖已存在的记忆
+    jarvis-memory-organizer import memories.json --overwrite
+    """
+    try:
+        organizer = MemoryOrganizer()
+
+        stats = organizer.import_memories(
+            input_file=input,
+            overwrite=overwrite,
+        )
+
+        total_imported = sum(stats.values())
+        if total_imported > 0:
+            raise typer.Exit(0)
+        else:
+            PrettyOutput.print("没有导入任何记忆", OutputType.WARNING)
+            raise typer.Exit(0)
+
+    except FileNotFoundError as e:
+        PrettyOutput.print(str(e), OutputType.ERROR)
+        raise typer.Exit(1)
+    except Exception as e:
+        PrettyOutput.print(f"导入失败: {str(e)}", OutputType.ERROR)
+        raise typer.Exit(1)
+
+
 def main():
     """Application entry point"""
+    # 统一初始化环境
+    init_env("欢迎使用记忆整理工具！")
     app()
 
 
