@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Any
 from collections import defaultdict
 import sys
 import time
+import uuid
 
 
 class StatsStorage:
@@ -76,7 +77,9 @@ class StatsStorage:
     def _save_json(self, filepath: Path, data: Dict):
         """保存JSON文件"""
         # 使用临时文件+重命名的原子操作来避免并发写入问题
-        temp_filepath = filepath.with_suffix(".tmp")
+        # 使用唯一的临时文件名避免并发冲突
+        temp_suffix = f".tmp.{uuid.uuid4().hex[:8]}"
+        temp_filepath = filepath.with_suffix(temp_suffix)
         max_retries = 3
 
         for attempt in range(max_retries):
