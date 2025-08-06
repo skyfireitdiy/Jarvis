@@ -567,3 +567,22 @@ class TongyiPlatform(BasePlatform):
             List[str]: 环境变量键的列表
         """
         return ["TONGYI_COOKIES"]
+
+    @classmethod
+    def get_env_config_guide(cls) -> Dict[str, str]:
+        """
+        获取环境变量配置指导
+
+        返回:
+            Dict[str, str]: 环境变量名到配置指导的映射
+        """
+        return {
+            "TONGYI_COOKIES": (
+                "1. 登录通义千问网页版: https://tongyi.aliyun.com/\n"
+                "2. 打开浏览器开发者工具 (F12)\n"
+                '3. 切换到"网络"(Network)标签页\n'
+                "4. 刷新页面或发送一条消息\n"
+                "5. 找到 conversation 请求或任意发往 api.tongyi.com 的请求\n"
+                '6. 在"请求标头"中复制完整的 Cookie 值'
+            )
+        }

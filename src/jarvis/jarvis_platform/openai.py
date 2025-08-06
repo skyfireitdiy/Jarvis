@@ -223,6 +223,33 @@ class OpenAIModel(BasePlatform):
         return ["OPENAI_API_KEY", "OPENAI_API_BASE"]
 
     @classmethod
+    def get_env_config_guide(cls) -> Dict[str, str]:
+        """
+        获取环境变量配置指导
+
+        返回:
+            Dict[str, str]: 环境变量名到配置指导的映射
+        """
+        return {
+            "OPENAI_API_KEY": (
+                "请输入您的 OpenAI API Key:\n"
+                "获取方式一（官方）:\n"
+                "1. 登录 OpenAI 平台: https://platform.openai.com/\n"
+                "2. 进入 API Keys 页面\n"
+                "3. 创建新的 API Key 或使用现有的\n"
+                "4. 复制 API Key (以 sk- 开头)\n"
+                "\n获取方式二（第三方代理）:\n"
+                "如果使用第三方代理服务，请从代理服务商处获取 API Key"
+            ),
+            "OPENAI_API_BASE": (
+                "请输入 API Base URL:\n"
+                "- 官方 API: https://api.openai.com/v1\n"
+                "- 如使用代理或第三方服务，请输入对应的 Base URL\n"
+                "- 例如: https://your-proxy.com/v1"
+            ),
+        }
+
+    @classmethod
     def get_env_defaults(cls) -> Dict[str, str]:
         """
         获取OpenAI平台环境变量的默认值
