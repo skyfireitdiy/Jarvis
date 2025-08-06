@@ -192,20 +192,14 @@ def _show_usage_stats() -> None:
 
         # 计算采纳率并添加到统计中
         commit_stats = categorized_stats["commit"]["metrics"]
-        # 尝试多种可能的指标名称
-        generated_commits = commit_stats.get(
-            "commits_generated", commit_stats.get("commit_generated", 0)
-        )
-        accepted_commits = commit_stats.get(
-            "commits_accepted",
-            commit_stats.get("commit_accepted", commit_stats.get("commit_adopted", 0)),
-        )
-        rejected_commits = commit_stats.get(
-            "commits_rejected", commit_stats.get("commit_rejected", 0)
-        )
+        # 使用精确的指标名称
+        generated_commits = commit_stats.get("commits_generated", 0)
+        accepted_commits = commit_stats.get("commits_accepted", 0)
+        # rejected_commits 没有实际统计，通过计算得出
+        rejected_commits = max(0, generated_commits - accepted_commits)
 
-        # 如果有 generated 和 accepted，则使用这两个计算采纳率
-        if generated_commits > 0 and accepted_commits > 0:
+        # 如果有 generated，则计算采纳率
+        if generated_commits > 0:
             adoption_rate = (accepted_commits / generated_commits) * 100
             categorized_stats["adoption"]["metrics"][
                 "adoption_rate"
@@ -213,17 +207,6 @@ def _show_usage_stats() -> None:
             categorized_stats["adoption"]["metrics"][
                 "commits_status"
             ] = f"{accepted_commits}/{generated_commits}"
-        elif accepted_commits > 0 or rejected_commits > 0:
-            # 否则使用 accepted 和 rejected 计算
-            total_commits = accepted_commits + rejected_commits
-            if total_commits > 0:
-                adoption_rate = (accepted_commits / total_commits) * 100
-                categorized_stats["adoption"]["metrics"][
-                    "adoption_rate"
-                ] = f"{adoption_rate:.1f}%"
-                categorized_stats["adoption"]["metrics"][
-                    "commits_status"
-                ] = f"{accepted_commits}/{total_commits}"
 
         # 构建输出
         has_data = False
