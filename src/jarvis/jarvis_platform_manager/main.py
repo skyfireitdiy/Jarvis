@@ -9,10 +9,10 @@ from typing import Any, Dict, List, Optional
 
 import typer
 from jarvis.jarvis_utils.config import (
-    get_normal_platform_name, 
+    get_normal_platform_name,
     get_normal_model_name,
     get_thinking_platform_name,
-    get_thinking_model_name
+    get_thinking_model_name,
 )
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -79,16 +79,11 @@ def chat_with_model(
     registry = PlatformRegistry.get_global_platform_registry()
     conversation_history: List[Dict[str, str]] = []  # 存储对话记录
 
-    # Create platform instance based on llm_type
-    if llm_type == "thinking":
-        platform = registry.get_thinking_platform()
-        if platform_name and platform.platform_name() != platform_name:  # type: ignore
-            platform.set_model_name(model_name)  # type: ignore
-    else:
-        platform = registry.get_normal_platform()
-        if platform_name and platform.platform_name() != platform_name:  # type: ignore
-            platform.set_model_name(model_name)  # type: ignore
-    
+    # Create platform instance
+    platform = registry.create_platform(platform_name)
+    if platform:
+        platform.set_model_name(model_name)
+
     if not platform:
         PrettyOutput.print(f"创建平台 {platform_name} 失败", OutputType.WARNING)
         return
@@ -372,11 +367,13 @@ def chat_command(
     """与指定平台和模型聊天。"""
     # 如果未提供平台或模型参数，则从config获取默认值
     platform = platform or (
-        get_thinking_platform_name(llm_group) if llm_type == "thinking" 
+        get_thinking_platform_name(llm_group)
+        if llm_type == "thinking"
         else get_normal_platform_name(llm_group)
     )
     model = model or (
-        get_thinking_model_name(llm_group) if llm_type == "thinking"
+        get_thinking_model_name(llm_group)
+        if llm_type == "thinking"
         else get_normal_model_name(llm_group)
     )
 
