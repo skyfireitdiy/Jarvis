@@ -438,6 +438,15 @@ def role_command(
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="指定要使用的模型，覆盖角色配置"
     ),
+    llm_type: Optional[str] = typer.Option(
+        None,
+        "-t",
+        "--llm_type",
+        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式），覆盖角色配置",
+    ),
+    llm_group: Optional[str] = typer.Option(
+        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
 ) -> None:
     """加载角色配置文件并开始对话。"""
     config_path = os.path.expanduser(config_file)
@@ -464,14 +473,54 @@ def role_command(
         PrettyOutput.print("无效的选择", OutputType.ERROR)
         return
 
+    # 获取llm_type，优先使用命令行参数，否则使用角色配置，默认为normal
+    role_llm_type = llm_type or selected_role.get("llm_type", "normal")
+
     # 初始化平台和模型
-    platform_name = platform or selected_role["platform"]
-    model_name = model or selected_role["model"]
+    # 如果提供了platform或model参数，优先使用命令行参数
+    # 否则，如果提供了llm_group，根据llm_type从配置中获取
+    # 最后才使用角色配置中的platform和model
+    if platform:
+        platform_name = platform
+    elif llm_group:
+        platform_name = (
+            get_thinking_platform_name(llm_group)
+            if role_llm_type == "thinking"
+            else get_normal_platform_name(llm_group)
+        )
+    else:
+        platform_name = selected_role.get("platform")
+        if not platform_name:
+            # 如果角色配置中没有platform，使用默认配置
+            platform_name = (
+                get_thinking_platform_name()
+                if role_llm_type == "thinking"
+                else get_normal_platform_name()
+            )
+
+    if model:
+        model_name = model
+    elif llm_group:
+        model_name = (
+            get_thinking_model_name(llm_group)
+            if role_llm_type == "thinking"
+            else get_normal_model_name(llm_group)
+        )
+    else:
+        model_name = selected_role.get("model")
+        if not model_name:
+            # 如果角色配置中没有model，使用默认配置
+            model_name = (
+                get_thinking_model_name()
+                if role_llm_type == "thinking"
+                else get_normal_model_name()
+            )
+
     system_prompt = selected_role.get("system_prompt", "")
 
     # 开始对话
     PrettyOutput.print(f"已选择角色: {selected_role['name']}", OutputType.SUCCESS)
-    chat_with_model(platform_name, model_name, system_prompt)
+    chat_with_model(platform_name, model_name, system_prompt, role_llm_type)
 
 
 def main() -> None:
