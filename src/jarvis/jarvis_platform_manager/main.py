@@ -8,7 +8,12 @@ import sys
 from typing import Any, Dict, List, Optional
 
 import typer
-from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
+from jarvis.jarvis_utils.config import (
+    get_normal_platform_name, 
+    get_normal_model_name,
+    get_thinking_platform_name,
+    get_thinking_model_name
+)
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.input import get_multiline_input, get_single_line_input
@@ -60,13 +65,30 @@ def list_platforms(
             PrettyOutput.print(f"创建 {platform_name} 平台失败", OutputType.WARNING)
 
 
-def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> None:
-    """与指定平台和模型进行对话。"""
+def chat_with_model(
+    platform_name: str, model_name: str, system_prompt: str, llm_type: str = "normal"
+) -> None:
+    """与指定平台和模型进行对话。
+
+    参数:
+        platform_name: 平台名称
+        model_name: 模型名称
+        system_prompt: 系统提示语
+        llm_type: LLM类型，可选值：'normal'(普通)或 'thinking'(思考模式)
+    """
     registry = PlatformRegistry.get_global_platform_registry()
     conversation_history: List[Dict[str, str]] = []  # 存储对话记录
 
-    # Create platform instance
-    platform = registry.create_platform(platform_name)
+    # Create platform instance based on llm_type
+    if llm_type == "thinking":
+        platform = registry.get_thinking_platform()
+        if platform_name and platform.platform_name() != platform_name:  # type: ignore
+            platform.set_model_name(model_name)  # type: ignore
+    else:
+        platform = registry.get_normal_platform()
+        if platform_name and platform.platform_name() != platform_name:  # type: ignore
+            platform.set_model_name(model_name)  # type: ignore
+    
     if not platform:
         PrettyOutput.print(f"创建平台 {platform_name} 失败", OutputType.WARNING)
         return
@@ -105,7 +127,7 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
             # Check if it is a clear session command
             if user_input.strip() == "/clear":
                 try:
-                    platform.reset()
+                    platform.reset()  # type: ignore[no-untyped-call]  # type: ignore[no-untyped-call]  # type: ignore[no-untyped-call]
                     platform.set_model_name(model_name)  # Reinitialize session
                     conversation_history = []  # 重置对话记录
                     PrettyOutput.print("会话已清除", OutputType.SUCCESS)
@@ -339,20 +361,28 @@ def chat_command(
     model: Optional[str] = typer.Option(None, "--model", "-m", help="指定要使用的模型"),
     llm_type: str = typer.Option(
         "normal",
-        "-t", "--llm_type",
+        "-t",
+        "--llm_type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
-    ),) -> None:
+    ),
+) -> None:
     """与指定平台和模型聊天。"""
     # 如果未提供平台或模型参数，则从config获取默认值
-    platform = platform or get_normal_platform_name(llm_group)
-    model = model or get_normal_model_name(llm_group)
+    platform = platform or (
+        get_thinking_platform_name(llm_group) if llm_type == "thinking" 
+        else get_normal_platform_name(llm_group)
+    )
+    model = model or (
+        get_thinking_model_name(llm_group) if llm_type == "thinking"
+        else get_normal_model_name(llm_group)
+    )
 
     if not validate_platform_model(platform, model):
         return
-    chat_with_model(platform, model, "")  # type: ignore
+    chat_with_model(platform, model, "", llm_type)
 
 
 @app.command("service")
