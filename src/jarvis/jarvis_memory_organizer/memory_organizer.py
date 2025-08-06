@@ -20,6 +20,8 @@ from jarvis.jarvis_utils.config import (
     get_data_dir,
     get_normal_platform_name,
     get_normal_model_name,
+    get_thinking_platform_name,
+    get_thinking_model_name,
 )
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -29,13 +31,24 @@ from jarvis.jarvis_utils.utils import init_env
 class MemoryOrganizer:
     """记忆整理器，用于合并具有相似标签的记忆"""
 
-    def __init__(self):
+    def __init__(self, llm_group: Optional[str] = None, llm_type: Optional[str] = None):
         """初始化记忆整理器"""
         self.project_memory_dir = Path(".jarvis/memory")
         self.global_memory_dir = Path(get_data_dir()) / "memory"
+
+        # 根据 llm_type 选择对应的平台和模型获取函数
+        if llm_type == "thinking":
+            platform_name_func = get_thinking_platform_name
+            model_name_func = get_thinking_model_name
+        else:
+            platform_name_func = get_normal_platform_name
+            model_name_func = get_normal_model_name
+
+        # 确定平台和模型
+        platform_name = platform_name_func(model_group_override=llm_group)
+        model_name = model_name_func(model_group_override=llm_group)
+
         # 获取当前配置的平台实例
-        platform_name = get_normal_platform_name()
-        model_name = get_normal_model_name()
         registry = PlatformRegistry.get_global_platform_registry()
         self.platform = registry.create_platform(platform_name)
         if self.platform and model_name:
@@ -225,7 +238,10 @@ tags:
             return None
 
     def organize_memories(
-        self, memory_type: str, min_overlap: int = 2, dry_run: bool = False
+        self,
+        memory_type: str,
+        min_overlap: int = 2,
+        dry_run: bool = False,
     ) -> Dict[str, Any]:
         """
         整理指定类型的记忆
@@ -542,6 +558,15 @@ def organize(
         "--dry-run",
         help="模拟运行，只显示将要进行的操作但不实际执行",
     ),
+    llm_group: Optional[str] = typer.Option(
+        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
+    llm_type: Optional[str] = typer.Option(
+        "normal",
+        "-t",
+        "--llm_type",
+        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
+    ),
 ):
     """
     整理和合并具有相似标签的记忆。
@@ -571,7 +596,7 @@ def organize(
 
     # 创建整理器并执行
     try:
-        organizer = MemoryOrganizer()
+        organizer = MemoryOrganizer(llm_group=llm_group, llm_type=llm_type)
         stats = organizer.organize_memories(
             memory_type=memory_type, min_overlap=min_overlap, dry_run=dry_run
         )
