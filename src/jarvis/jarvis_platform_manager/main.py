@@ -339,13 +339,12 @@ def chat_command(
     model: Optional[str] = typer.Option(None, "--model", "-m", help="指定要使用的模型"),
     llm_type: str = typer.Option(
         "normal",
-        "--llm_type",
+        "-t", "--llm_type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     llm_group: Optional[str] = typer.Option(
-        None, "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
-    ),
-) -> None:
+        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+    ),) -> None:
     """与指定平台和模型聊天。"""
     # 如果未提供平台或模型参数，则从config获取默认值
     platform = platform or get_normal_platform_name(llm_group)
