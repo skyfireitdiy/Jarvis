@@ -26,6 +26,7 @@ from jarvis.jarvis_utils.config import (
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrupt
+from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 g_config_file = None
@@ -998,11 +999,36 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             timeout=10,
         )
         if status_result.stdout:
-            PrettyOutput.print(
-                f"检测到 '{repo_path.name}' 存在未提交的更改，跳过自动更新。",
-                OutputType.WARNING,
-            )
-            return
+            if user_confirm(
+                f"检测到 '{repo_path.name}' 存在未提交的更改，是否放弃这些更改并更新？"
+            ):
+                try:
+                    subprocess.run(
+                        ["git", "checkout", "."],
+                        cwd=repo_path,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        check=True,
+                        timeout=10,
+                    )
+                except (
+                    subprocess.CalledProcessError,
+                    subprocess.TimeoutExpired,
+                    FileNotFoundError,
+                ) as e:
+                    PrettyOutput.print(
+                        f"放弃 '{repo_path.name}' 的更改失败: {str(e)}",
+                        OutputType.ERROR,
+                    )
+                    return
+            else:
+                PrettyOutput.print(
+                    f"跳过更新 '{repo_path.name}' 以保留未提交的更改。",
+                    OutputType.INFO,
+                )
+                return
 
         # 获取更新前的commit hash
         before_hash_result = subprocess.run(

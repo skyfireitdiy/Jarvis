@@ -19,9 +19,25 @@ $VENV_DIR = "$DEST_DIR\.venv"
 
 Write-Host "`n--- 2. 克隆或更新 Jarvis 仓库 ---" -ForegroundColor Green
 if (Test-Path $DEST_DIR) {
-    Write-Host "目录 $DEST_DIR 已存在，正在拉取最新代码..."
+    Write-Host "目录 $DEST_DIR 已存在，正在检查更新..."
     Push-Location $DEST_DIR
-    git pull
+    $status = git status --porcelain
+    if ($status) {
+        $choice = Read-Host "检测到 '$DEST_DIR' 存在未提交的更改，是否放弃这些更改并更新？ [y/N]"
+        if ($choice -eq 'y' -or $choice -eq 'Y') {
+            Write-Host "正在放弃更改..."
+            git checkout .
+            Write-Host "正在拉取最新代码..."
+            git pull
+        }
+        else {
+            Write-Host "跳过更新以保留未提交的更改。"
+        }
+    }
+    else {
+        Write-Host "正在拉取最新代码..."
+        git pull
+    }
     Pop-Location
 }
 else {
