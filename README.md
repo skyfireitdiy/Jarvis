@@ -164,13 +164,19 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 | 命令 | 快捷方式 | 功能描述 |
 |------|----------|----------|
 | `jarvis` | `jvs` | 通用AI代理，适用于多种任务 |
+| `jarvis-agent` | `ja` | AI代理基础功能，处理会话和任务 |
 | `jarvis-code-agent` | `jca` | 专注于代码分析、修改和生成的代码代理 |
+| `jarvis-code-review` | `jcr` | 智能代码审查工具 |
 | `jarvis-git-commit` | `jgc` | 自动化分析代码变更并生成规范的Git提交信息 |
+| `jarvis-git-squash` | `jgs` | Git提交历史整理工具 |
 | `jarvis-platform-manager` | `jpm` | 管理和测试不同的大语言模型平台 |
+| `jarvis-multi-agent` | `jma` | 多智能体协作系统 |
+| `jarvis-tool` | `jt` | 工具管理与调用系统 |
+| `jarvis-methodology` | `jm` | 方法论知识库管理 |
 | `jarvis-rag` | `jrg` | 构建和查询本地化的RAG知识库 |
 | `jarvis-smart-shell` | `jss` | 实验性的智能Shell功能 |
 | `jarvis-stats` | `jst` | 通用统计模块，支持记录和可视化任意指标数据 |
-| `jarvis-memory-organizer` | `jmo` | 整理和合并具有相似标签的记忆 |
+| `jarvis-memory-organizer` | `jmo` | 记忆管理工具，支持整理、合并、导入导出记忆 |
 
 更多详细用法和参数，请查阅我们的 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
