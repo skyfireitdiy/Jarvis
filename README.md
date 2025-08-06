@@ -170,6 +170,7 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 | `jarvis-rag` | `jrg` | 构建和查询本地化的RAG知识库 |
 | `jarvis-smart-shell` | `jss` | 实验性的智能Shell功能 |
 | `jarvis-stats` | `jst` | 通用统计模块，支持记录和可视化任意指标数据 |
+| `jarvis-memory-organizer` | `jmo` | 整理和合并具有相似标签的记忆 |
 
 更多详细用法和参数，请查阅我们的 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 

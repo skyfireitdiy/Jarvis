@@ -58,6 +58,8 @@ COMMAND_MAPPING = {
     "jrg": "jarvis-rag",
     # 统计
     "jst": "jarvis-stats",
+    # 记忆整理
+    "jmo": "jarvis-memory-organizer",
 }
 
 

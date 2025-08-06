@@ -75,6 +75,8 @@ setup(
             "ja=jarvis.jarvis_agent.main:main",
             "jarvis-tool=jarvis.jarvis_tools.cli.main:main",
             "jt=jarvis.jarvis_tools.cli.main:main",
+            "jarvis-memory-organizer=jarvis.jarvis_memory_organizer.memory_organizer:main",
+            "jmo=jarvis.jarvis_memory_organizer.memory_organizer:main",
             "jarvis-methodology=jarvis.jarvis_methodology.main:main",
             "jm=jarvis.jarvis_methodology.main:main",
             "jarvis-rag=jarvis.jarvis_rag.cli:main",
