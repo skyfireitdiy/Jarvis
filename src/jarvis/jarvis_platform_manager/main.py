@@ -119,8 +119,14 @@ def chat_with_model(
                 PrettyOutput.print("检测到空输入，退出聊天", OutputType.INFO)
                 break
 
+            # Parse command and arguments
+            stripped_input = user_input.strip()
+            parts = stripped_input.split(None, 1)
+            command = parts[0] if parts else ""
+            args = parts[1] if len(parts) > 1 else ""
+
             # Check if it is a clear session command
-            if user_input.strip() == "/clear":
+            if command == "/clear":
                 try:
                     platform.reset()  # type: ignore[no-untyped-call]  # type: ignore[no-untyped-call]  # type: ignore[no-untyped-call]
                     platform.set_model_name(model_name)  # Reinitialize session
@@ -131,9 +137,9 @@ def chat_with_model(
                 continue
 
             # Check if it is an upload command
-            if user_input.strip().startswith("/upload"):
+            if command == "/upload":
                 try:
-                    file_path = user_input.strip()[8:].strip()
+                    file_path = args
                     if not file_path:
                         PrettyOutput.print(
                             '请指定要上传的文件路径，例如: /upload /path/to/file 或 /upload "/path/with spaces/file"',
@@ -161,9 +167,9 @@ def chat_with_model(
                 continue
 
             # Check if it is a save command
-            if user_input.strip().startswith("/save"):
+            if command == "/save":
                 try:
-                    file_path = user_input.strip()[5:].strip()
+                    file_path = args
                     if not file_path:
                         PrettyOutput.print(
                             "请指定保存文件名，例如: /save last_message.txt",
@@ -192,9 +198,9 @@ def chat_with_model(
                 continue
 
             # Check if it is a saveall command
-            if user_input.strip().startswith("/saveall"):
+            if command == "/saveall":
                 try:
-                    file_path = user_input.strip()[8:].strip()
+                    file_path = args
                     if not file_path:
                         PrettyOutput.print(
                             "请指定保存文件名，例如: /saveall all_conversations.txt",
@@ -223,9 +229,9 @@ def chat_with_model(
                 continue
 
             # Check if it is a save_session command
-            if user_input.strip().startswith("/save_session"):
+            if command == "/save_session":
                 try:
-                    file_path = user_input.strip()[14:].strip()
+                    file_path = args
                     if not file_path:
                         PrettyOutput.print(
                             "请指定保存会话的文件名，例如: /save_session session.json",
@@ -250,9 +256,9 @@ def chat_with_model(
                 continue
 
             # Check if it is a load_session command
-            if user_input.strip().startswith("/load_session"):
+            if command == "/load_session":
                 try:
-                    file_path = user_input.strip()[14:].strip()
+                    file_path = args
                     if not file_path:
                         PrettyOutput.print(
                             "请指定加载会话的文件名，例如: /load_session session.json",
@@ -278,18 +284,18 @@ def chat_with_model(
                 continue
 
             # Check if it is a shell command
-            if user_input.strip().startswith("/shell"):
+            if command == "/shell":
                 try:
-                    command = user_input.strip()[6:].strip()
-                    if not command:
+                    shell_command = args
+                    if not shell_command:
                         PrettyOutput.print(
                             "请指定要执行的shell命令，例如: /shell ls -l",
                             OutputType.WARNING,
                         )
                         continue
 
-                    PrettyOutput.print(f"执行命令: {command}", OutputType.INFO)
-                    return_code = os.system(command)
+                    PrettyOutput.print(f"执行命令: {shell_command}", OutputType.INFO)
+                    return_code = os.system(shell_command)
                     if return_code == 0:
                         PrettyOutput.print("命令执行完成", OutputType.SUCCESS)
                     else:
