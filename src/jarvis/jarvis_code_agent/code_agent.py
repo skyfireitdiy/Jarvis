@@ -431,9 +431,6 @@ class CodeAgent:
                     ["git", "commit", "-m", f"CheckPoint #{commit_count + 1}"],
                     check=True,
                 )
-
-                # 统计提交次数
-                StatsManager.increment("code_commits_accepted", group="code_agent")
             except subprocess.CalledProcessError as e:
                 PrettyOutput.print(f"提交失败: {str(e)}", OutputType.ERROR)
 
