@@ -8,6 +8,7 @@ import sys
 from typing import Any, Dict, List, Optional
 
 import typer
+from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.input import get_multiline_input, get_single_line_input
@@ -334,6 +335,10 @@ def chat_command(
     model: Optional[str] = typer.Option(None, "--model", "-m", help="指定要使用的模型"),
 ) -> None:
     """与指定平台和模型聊天。"""
+    # 如果未提供平台或模型参数，则从config获取默认值
+    platform = platform or get_normal_platform_name()
+    model = model or get_normal_model_name()
+    
     if not validate_platform_model(platform, model):
         return
     chat_with_model(platform, model, "")  # type: ignore
@@ -351,6 +356,9 @@ def service_command(
     ),
 ) -> None:
     """启动OpenAI兼容的API服务。"""
+    # 如果未提供平台或模型参数，则从config获取默认值
+    platform = platform or get_normal_platform_name()
+    model = model or get_normal_model_name()
     start_service(host=host, port=port, default_platform=platform, default_model=model)
 
 
