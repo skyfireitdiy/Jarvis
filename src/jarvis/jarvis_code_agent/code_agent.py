@@ -398,11 +398,6 @@ class CodeAgent:
             if not user_confirm("是否要提交？", True):
                 return
 
-            # 用户确认修改，统计修改次数
-            from jarvis.jarvis_stats.stats import StatsManager
-
-            StatsManager.increment("code_modification_confirmed", group="code_agent")
-
             try:
                 confirm_add_new_files()
 
