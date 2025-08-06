@@ -50,13 +50,12 @@ def cli(
     ),
     llm_type: str = typer.Option(
         "normal",
-        "--llm_type",
+        "-t", "--llm_type",
         help="使用的LLM类型，覆盖配置文件中的设置",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
-    ),
-):
+        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+    ),):
     """Main entry point for Jarvis agent"""
     # Initialize environment
     init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file)

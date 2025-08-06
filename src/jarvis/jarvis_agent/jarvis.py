@@ -19,17 +19,17 @@ def run_cli(
     ctx: typer.Context,
     llm_type: str = typer.Option(
         "normal",
-        "--llm_type",
+        "-t", "--llm_type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     task: Optional[str] = typer.Option(
-        None, "-t", "--task", help="从命令行直接输入任务内容"
+        None, "-T", "--task", help="从命令行直接输入任务内容"
     ),
     model_group: Optional[str] = typer.Option(
-        None, "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     tool_group: Optional[str] = typer.Option(
-        None, "--tool_group", help="使用的工具组，覆盖配置文件中的设置"
+        None, "-G", "--tool_group", help="使用的工具组，覆盖配置文件中的设置"
     ),
     config_file: Optional[str] = typer.Option(
         None, "-f", "--config", help="自定义配置文件路径"
