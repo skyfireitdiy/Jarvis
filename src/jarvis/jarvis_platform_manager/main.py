@@ -20,22 +20,26 @@ app = typer.Typer(help="Jarvis AI 平台")
 
 
 @app.command("info")
-def list_platforms() -> None:
-    """列出所有支持的平台和模型。"""
+def list_platforms(
+    platform: Optional[str] = typer.Option(
+        None, "--platform", "-p", help="指定要查看的平台"
+    )
+) -> None:
+    """列出所有支持的平台和模型，或指定平台的详细信息。"""
     registry = PlatformRegistry.get_global_platform_registry()
-    platforms = registry.get_available_platforms()
+    platform_names = [platform] if platform else registry.get_available_platforms()
 
     PrettyOutput.section("Supported platforms and models", OutputType.SUCCESS)
 
-    for platform_name in platforms:
+    for platform_name in platform_names:
         try:
             # Create platform instance
-            platform = registry.create_platform(platform_name)
-            if not platform:
+            platform_instance = registry.create_platform(platform_name)
+            if not platform_instance:
                 continue
 
             # Get the list of models supported by the platform
-            models = platform.get_model_list()
+            models = platform_instance.get_model_list()
 
             # Print platform name
             PrettyOutput.section(f"{platform_name}", OutputType.SUCCESS)
@@ -338,7 +342,7 @@ def chat_command(
     # 如果未提供平台或模型参数，则从config获取默认值
     platform = platform or get_normal_platform_name()
     model = model or get_normal_model_name()
-    
+
     if not validate_platform_model(platform, model):
         return
     chat_with_model(platform, model, "")  # type: ignore
