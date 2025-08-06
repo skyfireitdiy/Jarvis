@@ -195,8 +195,6 @@ def _show_usage_stats() -> None:
         # 使用精确的指标名称
         generated_commits = commit_stats.get("commits_generated", 0)
         accepted_commits = commit_stats.get("commits_accepted", 0)
-        # rejected_commits 没有实际统计，通过计算得出
-        rejected_commits = max(0, generated_commits - accepted_commits)
 
         # 如果有 generated，则计算采纳率
         if generated_commits > 0:
