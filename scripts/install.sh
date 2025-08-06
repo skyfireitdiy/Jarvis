@@ -19,9 +19,25 @@ VENV_DIR="$DEST_DIR/.venv"
 
 echo -e "\n--- 2. 克隆或更新 Jarvis 仓库 ---"
 if [ -d "$DEST_DIR" ]; then
-    echo "目录 $DEST_DIR 已存在，正在拉取最新代码..."
+    echo "目录 $DEST_DIR 已存在，正在检查更新..."
     cd "$DEST_DIR"
-    git pull
+    if [ -n "$(git status --porcelain)" ]; then
+        read -p "检测到 '$DEST_DIR' 存在未提交的更改，是否放弃这些更改并更新？ [y/N]: " choice
+        case "$choice" in
+          y|Y )
+            echo "正在放弃更改..."
+            git checkout .
+            echo "正在拉取最新代码..."
+            git pull
+            ;;
+          * )
+            echo "跳过更新以保留未提交的更改。"
+            ;;
+        esac
+    else
+        echo "正在拉取最新代码..."
+        git pull
+    fi
 else
     echo "正在克隆仓库到 $DEST_DIR..."
     git clone "$REPO_URL" "$DEST_DIR"

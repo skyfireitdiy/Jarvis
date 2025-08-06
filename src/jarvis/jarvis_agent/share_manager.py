@@ -98,6 +98,27 @@ class ShareManager(ABC):
                 )
                 # 如果有远程分支，执行pull
                 if result.stdout.strip():
+                    # 检查是否有未提交的更改
+                    status_result = subprocess.run(
+                        ["git", "status", "--porcelain"],
+                        cwd=self.repo_path,
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+                    if status_result.stdout:
+                        if user_confirm(
+                            f"检测到中心{self.get_resource_type()}仓库 '{self.repo_name}' 存在未提交的更改，是否放弃这些更改并更新？"
+                        ):
+                            subprocess.run(
+                                ["git", "checkout", "."], cwd=self.repo_path, check=True
+                            )
+                        else:
+                            PrettyOutput.print(
+                                f"跳过更新 '{self.repo_name}' 以保留未提交的更改。",
+                                OutputType.INFO,
+                            )
+                            return
                     subprocess.run(["git", "pull"], cwd=self.repo_path, check=True)
                 else:
                     PrettyOutput.print(
