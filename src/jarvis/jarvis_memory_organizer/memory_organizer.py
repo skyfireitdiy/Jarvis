@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+记忆整理工具 - 用于合并具有相似标签的记忆
+
+该工具会查找具有高度重叠标签的记忆，并使用大模型将它们合并成一个新的记忆。
+"""
+
+import json
+import sys
+from collections import defaultdict
+from itertools import combinations
+from pathlib import Path
+from typing import Dict, List, Set, Tuple, Any, Optional
+
+import typer
+import yaml
+
+from jarvis.jarvis_utils.config import (
+    get_data_dir,
+    get_normal_platform_name,
+    get_normal_model_name,
+)
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_platform.registry import PlatformRegistry
+
+
+class MemoryOrganizer:
+    """记忆整理器，用于合并具有相似标签的记忆"""
+
+    def __init__(self):
+        """初始化记忆整理器"""
+        self.project_memory_dir = Path(".jarvis/memory")
+        self.global_memory_dir = Path(get_data_dir()) / "memory"
+        # 获取当前配置的平台实例
+        platform_name = get_normal_platform_name()
+        model_name = get_normal_model_name()
+        registry = PlatformRegistry.get_global_platform_registry()
+        self.platform = registry.create_platform(platform_name)
+        if self.platform and model_name:
+            self.platform.set_model_name(model_name)
+
+    def _get_memory_files(self, memory_type: str) -> List[Path]:
+        """获取指定类型的所有记忆文件"""
+        if memory_type == "project_long_term":
+            memory_dir = self.project_memory_dir
+        elif memory_type == "global_long_term":
+            memory_dir = self.global_memory_dir / memory_type
+        else:
+            raise ValueError(f"不支持的记忆类型: {memory_type}")
+
+        if not memory_dir.exists():
+            return []
+
+        return list(memory_dir.glob("*.json"))
+
+    def _load_memories(self, memory_type: str) -> List[Dict[str, Any]]:
+        """加载指定类型的所有记忆"""
+        memories = []
+        memory_files = self._get_memory_files(memory_type)
+
+        for memory_file in memory_files:
+            try:
+                with open(memory_file, "r", encoding="utf-8") as f:
+                    memory_data = json.load(f)
+                    memory_data["file_path"] = str(memory_file)
+                    memories.append(memory_data)
+            except Exception as e:
+                PrettyOutput.print(
+                    f"读取记忆文件 {memory_file} 失败: {str(e)}", OutputType.WARNING
+                )
+
+        return memories
+
+    def _find_overlapping_memories(
+        self, memories: List[Dict[str, Any]], min_overlap: int
+    ) -> Dict[int, List[Set[int]]]:
+        """
+        查找具有重叠标签的记忆组
+
+        返回：{重叠数量: [记忆索引集合列表]}
+        """
+        # 构建标签到记忆索引的映射
+        tag_to_memories = defaultdict(set)
+        for i, memory in enumerate(memories):
+            for tag in memory.get("tags", []):
+                tag_to_memories[tag].add(i)
+
+        # 查找具有共同标签的记忆对
+        overlap_groups = defaultdict(list)
+        processed_groups = set()
+
+        # 对每对记忆计算标签重叠数
+        for i in range(len(memories)):
+            for j in range(i + 1, len(memories)):
+                tags_i = set(memories[i].get("tags", []))
+                tags_j = set(memories[j].get("tags", []))
+                overlap_count = len(tags_i & tags_j)
+
+                if overlap_count >= min_overlap:
+                    # 查找包含这两个记忆的最大组
+                    group = {i, j}
+
+                    # 扩展组，包含所有与组内记忆有足够重叠的记忆
+                    changed = True
+                    while changed:
+                        changed = False
+                        for k in range(len(memories)):
+                            if k not in group:
+                                # 检查与组内所有记忆的最小重叠数
+                                min_overlap_with_group = min(
+                                    len(
+                                        set(memories[k].get("tags", []))
+                                        & set(memories[m].get("tags", []))
+                                    )
+                                    for m in group
+                                )
+                                if min_overlap_with_group >= min_overlap:
+                                    group.add(k)
+                                    changed = True
+
+                    # 将组转换为有序元组以便去重
+                    group_tuple = tuple(sorted(group))
+                    if group_tuple not in processed_groups:
+                        processed_groups.add(group_tuple)
+                        overlap_groups[min_overlap].append(set(group_tuple))
+
+        return overlap_groups
+
+    def _merge_memories_with_llm(
+        self, memories: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """使用大模型合并多个记忆"""
+        # 准备合并提示
+        memory_contents = []
+        all_tags = set()
+
+        # 按创建时间排序，最新的在前
+        sorted_memories = sorted(
+            memories, key=lambda m: m.get("created_at", ""), reverse=True
+        )
+
+        for memory in sorted_memories:
+            memory_contents.append(
+                f"记忆ID: {memory.get('id', '未知')}\n"
+                f"创建时间: {memory.get('created_at', '未知')}\n"
+                f"标签: {', '.join(memory.get('tags', []))}\n"
+                f"内容:\n{memory.get('content', '')}"
+            )
+            all_tags.update(memory.get("tags", []))
+
+        prompt = f"""请将以下{len(memories)}个相关记忆合并成一个综合性的记忆。
+
+原始记忆（按时间从新到旧排序）：
+{"="*50}
+{(("="*50) + "\n").join(memory_contents)}
+{"="*50}
+
+原始标签集合：{', '.join(sorted(all_tags))}
+
+请完成以下任务：
+1. 分析这些记忆的共同主题和关键信息
+2. 将它们合并成一个连贯、完整的记忆
+3. 生成新的标签列表（保留重要标签，去除冗余，可以添加新的概括性标签）
+4. 确保合并后的记忆保留了所有重要信息
+5. **重要**：越近期的记忆权重越高，优先保留最新记忆中的信息
+
+请将合并结果放在 <merged_memory> 标签内，使用YAML格式：
+
+<merged_memory>
+content: |
+  合并后的记忆内容
+  可以是多行文本
+tags:
+  - 标签1
+  - 标签2
+  - 标签3
+</merged_memory>
+
+注意：
+- 内容要全面但简洁
+- 标签要准确反映内容主题
+- 保持专业和客观的语气
+- 最近的记忆信息优先级更高
+- 只输出 <merged_memory> 标签内的内容，不要有其他说明
+"""
+
+        try:
+            # 调用大模型 - 收集完整响应
+            response_parts = []
+            for chunk in self.platform.chat(prompt): # type: ignore
+                response_parts.append(chunk)
+            response = "".join(response_parts)
+
+            # 解析响应
+            import re
+            import yaml
+
+            # 提取 <merged_memory> 标签内的内容
+            yaml_match = re.search(
+                r"<merged_memory>(.*?)</merged_memory>",
+                response,
+                re.DOTALL | re.IGNORECASE,
+            )
+
+            if yaml_match:
+                yaml_content = yaml_match.group(1).strip()
+                try:
+                    result = yaml.safe_load(yaml_content)
+                    return {
+                        "content": result.get("content", ""),
+                        "tags": result.get("tags", []),
+                        "type": memories[0].get("type", "unknown"),
+                        "merged_from": [m.get("id", "") for m in memories],
+                    }
+                except yaml.YAMLError as e:
+                    raise ValueError(f"无法解析YAML内容: {str(e)}")
+            else:
+                raise ValueError("无法从模型响应中提取 <merged_memory> 标签内容")
+
+        except Exception as e:
+            PrettyOutput.print(f"调用大模型合并记忆失败: {str(e)}", OutputType.WARNING)
+            # 返回 None 表示合并失败，跳过这组记忆
+            return None
+
+    def organize_memories(
+        self, memory_type: str, min_overlap: int = 2, dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        整理指定类型的记忆
+
+        参数：
+            memory_type: 记忆类型
+            min_overlap: 最小标签重叠数
+            dry_run: 是否只进行模拟运行
+
+        返回：
+            整理结果统计
+        """
+        PrettyOutput.print(
+            f"开始整理{memory_type}类型的记忆，最小重叠标签数: {min_overlap}",
+            OutputType.INFO,
+        )
+
+        # 加载记忆
+        memories = self._load_memories(memory_type)
+        if not memories:
+            PrettyOutput.print("没有找到需要整理的记忆", OutputType.INFO)
+            return {"processed": 0, "merged": 0}
+
+        PrettyOutput.print(f"加载了 {len(memories)} 个记忆", OutputType.INFO)
+
+        # 统计信息
+        stats = {
+            "total_memories": len(memories),
+            "processed_groups": 0,
+            "merged_memories": 0,
+            "created_memories": 0,
+        }
+
+        # 从高重叠度开始处理
+        max_tags = max(len(m.get("tags", [])) for m in memories)
+
+        for overlap_count in range(min(max_tags, 5), min_overlap - 1, -1):
+            overlap_groups = self._find_overlapping_memories(memories, overlap_count)
+
+            if overlap_count in overlap_groups:
+                groups = overlap_groups[overlap_count]
+                PrettyOutput.print(
+                    f"\n发现 {len(groups)} 个具有 {overlap_count} 个重叠标签的记忆组",
+                    OutputType.INFO,
+                )
+
+                for group in groups:
+                    group_memories = [memories[i] for i in group]
+
+                    # 显示将要合并的记忆
+                    PrettyOutput.print(
+                        f"\n准备合并 {len(group_memories)} 个记忆:", OutputType.INFO
+                    )
+                    for mem in group_memories:
+                        PrettyOutput.print(
+                            f"  - ID: {mem.get('id', '未知')}, "
+                            f"标签: {', '.join(mem.get('tags', []))[:50]}...",
+                            OutputType.INFO,
+                        )
+
+                    if not dry_run:
+                        # 合并记忆
+                        merged_memory = self._merge_memories_with_llm(group_memories)
+
+                        # 如果合并失败，跳过这组
+                        if merged_memory is None:
+                            PrettyOutput.print(
+                                "  跳过这组记忆的合并", OutputType.WARNING
+                            )
+                            continue
+
+                        # 保存新记忆
+                        self._save_merged_memory(
+                            merged_memory, memory_type, [memories[i] for i in group]
+                        )
+
+                        stats["processed_groups"] += 1
+                        stats["merged_memories"] += len(group)
+                        stats["created_memories"] += 1
+
+                        # 从列表中移除已合并的记忆
+                        for i in sorted(group, reverse=True):
+                            del memories[i]
+                    else:
+                        PrettyOutput.print("  [模拟运行] 跳过实际合并", OutputType.INFO)
+
+        # 显示统计信息
+        PrettyOutput.print("\n整理完成！", OutputType.SUCCESS)
+        PrettyOutput.print(f"总记忆数: {stats['total_memories']}", OutputType.INFO)
+        PrettyOutput.print(f"处理的组数: {stats['processed_groups']}", OutputType.INFO)
+        PrettyOutput.print(f"合并的记忆数: {stats['merged_memories']}", OutputType.INFO)
+        PrettyOutput.print(
+            f"创建的新记忆数: {stats['created_memories']}", OutputType.INFO
+        )
+
+        return stats
+
+    def _save_merged_memory(
+        self,
+        memory: Dict[str, Any],
+        memory_type: str,
+        original_memories: List[Dict[str, Any]],
+    ):
+        """保存合并后的记忆并删除原始记忆"""
+        import uuid
+        from datetime import datetime
+
+        # 生成新的记忆ID
+        memory["id"] = f"merged_{uuid.uuid4().hex[:8]}"
+        memory["created_at"] = datetime.now().isoformat()
+        memory["type"] = memory_type
+
+        # 确定保存路径
+        if memory_type == "project_long_term":
+            memory_dir = self.project_memory_dir
+        else:
+            memory_dir = self.global_memory_dir / memory_type
+
+        memory_dir.mkdir(parents=True, exist_ok=True)
+
+        # 保存新记忆
+        new_file = memory_dir / f"{memory['id']}.json"
+        with open(new_file, "w", encoding="utf-8") as f:
+            json.dump(memory, f, ensure_ascii=False, indent=2)
+
+        PrettyOutput.print(
+            f"创建新记忆: {memory['id']} (标签: {', '.join(memory['tags'][:3])}...)",
+            OutputType.SUCCESS,
+        )
+
+        # 删除原始记忆文件
+        for orig_memory in original_memories:
+            if "file_path" in orig_memory:
+                try:
+                    Path(orig_memory["file_path"]).unlink()
+                    PrettyOutput.print(
+                        f"删除原始记忆: {orig_memory.get('id', '未知')}",
+                        OutputType.INFO,
+                    )
+                except Exception as e:
+                    PrettyOutput.print(
+                        f"删除记忆文件失败 {orig_memory['file_path']}: {str(e)}",
+                        OutputType.WARNING,
+                    )
+
+
+app = typer.Typer(help="记忆整理工具 - 合并具有相似标签的记忆")
+
+
+@app.command()
+def cli(
+    memory_type: str = typer.Option(
+        "project_long_term",
+        "--type",
+        help="要整理的记忆类型（project_long_term 或 global_long_term）",
+    ),
+    min_overlap: int = typer.Option(
+        2,
+        "--min-overlap",
+        help="最小标签重叠数，必须大于等于2",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="模拟运行，只显示将要进行的操作但不实际执行",
+    ),
+):
+    """
+    整理和合并具有相似标签的记忆。
+
+    示例：
+
+    # 整理项目长期记忆，最小重叠标签数为3
+    jarvis-memory-organizer --type project_long_term --min-overlap 3
+
+    # 整理全局长期记忆，模拟运行
+    jarvis-memory-organizer --type global_long_term --dry-run
+
+    # 使用默认设置（最小重叠数2）整理项目记忆
+    jarvis-memory-organizer
+    """
+    # 验证参数
+    if memory_type not in ["project_long_term", "global_long_term"]:
+        PrettyOutput.print(
+            f"错误：不支持的记忆类型 '{memory_type}'，请选择 'project_long_term' 或 'global_long_term'",
+            OutputType.ERROR,
+        )
+        raise typer.Exit(1)
+
+    if min_overlap < 2:
+        PrettyOutput.print("错误：最小重叠数必须大于等于2", OutputType.ERROR)
+        raise typer.Exit(1)
+
+    # 创建整理器并执行
+    try:
+        organizer = MemoryOrganizer()
+        stats = organizer.organize_memories(
+            memory_type=memory_type, min_overlap=min_overlap, dry_run=dry_run
+        )
+
+        # 根据结果返回适当的退出码
+        if stats.get("processed_groups", 0) > 0 or dry_run:
+            raise typer.Exit(0)
+        else:
+            raise typer.Exit(0)  # 即使没有处理也是正常退出
+
+    except Exception as e:
+        PrettyOutput.print(f"记忆整理失败: {str(e)}", OutputType.ERROR)
+        raise typer.Exit(1)
+
+
+def main():
+    """Application entry point"""
+    app()
+
+
+if __name__ == "__main__":
+    main()
