@@ -255,6 +255,15 @@ class BasePlatform(ABC):
         """Get env default values"""
         return {}
 
+    @classmethod
+    def get_env_config_guide(cls) -> Dict[str, str]:
+        """Get environment variable configuration guide
+
+        Returns:
+            Dict[str, str]: A dictionary mapping env key names to their configuration instructions
+        """
+        return {}
+
     def set_suppress_output(self, suppress: bool):
         """Set whether to suppress output"""
         self.suppress_output = suppress

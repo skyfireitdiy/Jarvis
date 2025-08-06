@@ -405,3 +405,23 @@ class KimiModel(BasePlatform):
             List[str]: 环境变量键的列表
         """
         return ["KIMI_API_KEY"]
+
+    @classmethod
+    def get_env_config_guide(cls) -> Dict[str, str]:
+        """
+        获取环境变量配置指导
+
+        返回:
+            Dict[str, str]: 环境变量名到配置指导的映射
+        """
+        return {
+            "KIMI_API_KEY": (
+                "1. 登录 Kimi 网页版: https://kimi.moonshot.cn/\n"
+                "2. 打开浏览器开发者工具 (F12)\n"
+                '3. 切换到"网络"(Network)标签页\n'
+                "4. 在 Kimi 中发送一条消息\n"
+                "5. 找到 stream 请求\n"
+                '6. 在"请求标头"中找到 authorization 字段\n'
+                "7. 复制 Bearer 后面的 API Key 部分"
+            )
+        }

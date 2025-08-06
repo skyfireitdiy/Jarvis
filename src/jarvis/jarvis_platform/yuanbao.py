@@ -633,3 +633,21 @@ class YuanbaoPlatform(BasePlatform):
             List[str]: 环境变量键的列表
         """
         return ["YUANBAO_COOKIES"]
+
+    @classmethod
+    def get_env_config_guide(cls) -> Dict[str, str]:
+        """
+        获取环境变量配置指导
+
+        返回:
+            Dict[str, str]: 环境变量名到配置指导的映射
+        """
+        return {
+            "YUANBAO_COOKIES": (
+                "1. 登录腾讯元宝网页版: https://yuanbao.tencent.com/\n"
+                "2. 打开浏览器开发者工具 (F12)\n"
+                '3. 切换到"网络"(Network)标签页\n'
+                "4. 刷新页面，找到任意一个发往 yuanbao.tencent.com 的请求\n"
+                '5. 在"请求标头"中复制完整的 Cookie 值'
+            )
+        }

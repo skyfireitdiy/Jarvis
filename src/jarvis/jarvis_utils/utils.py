@@ -519,11 +519,22 @@ def _interactive_config_setup(config_file_path: Path):
     env_vars = {}
     required_keys = platform_class.get_required_env_keys()
     defaults = platform_class.get_env_defaults()
+    config_guide = platform_class.get_env_config_guide()
     if required_keys:
         PrettyOutput.print(
             f"请输入 {platform_name} 平台所需的配置信息:", OutputType.INFO
         )
+
+        # 如果有配置指导，先显示总体说明
+        if config_guide:
+            PrettyOutput.print(f"\n配置获取方法:", OutputType.INFO)
+
         for key in required_keys:
+            # 显示该环境变量的配置指导
+            if key in config_guide and config_guide[key]:
+                PrettyOutput.print(f"\n{key} 获取方法:", OutputType.INFO)
+                PrettyOutput.print(config_guide[key], OutputType.INFO)
+
             default_value = defaults.get(key, "")
             prompt_text = f"  - {key}"
             if default_value:
