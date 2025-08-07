@@ -52,6 +52,7 @@ from jarvis.jarvis_utils.globals import (
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.utils import show_agent_startup_stats
 
 origin_agent_system_prompt = f"""
 <role>
@@ -85,40 +86,6 @@ origin_agent_system_prompt = f"""
 - Time: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 </system_info>
 """
-
-
-def _print_agent_startup_stats():
-    """输出启动时的统计信息"""
-    try:
-        from jarvis.jarvis_utils.methodology import _load_all_methodologies
-        from jarvis.jarvis_tools.registry import ToolRegistry
-        from jarvis.jarvis_utils.config import get_data_dir
-        from pathlib import Path
-
-        methodologies = _load_all_methodologies()
-        methodology_count = len(methodologies)
-
-        tool_registry = ToolRegistry()
-        tool_count = len(tool_registry.get_all_tools())
-
-        global_memory_dir = Path(get_data_dir()) / "memory" / "global_long_term"
-        global_memory_count = 0
-        if global_memory_dir.exists():
-            global_memory_count = len(list(global_memory_dir.glob("*.json")))
-
-        project_memory_dir = Path(".jarvis/memory")
-        project_memory_count = 0
-        if project_memory_dir.exists():
-            project_memory_count = len(list(project_memory_dir.glob("*.json")))
-
-        stats_message = f"📚 本地方法论: {methodology_count} | 🛠️ 可用工具: {tool_count} | 🧠 全局记忆: {global_memory_count}"
-        if project_memory_count > 0:
-            stats_message += f" | 📝 项目记忆: {project_memory_count}"
-
-        PrettyOutput.print(stats_message, OutputType.INFO)
-
-    except Exception as e:
-        PrettyOutput.print(f"加载统计信息失败: {e}", OutputType.WARNING)
 
 
 class Agent:
@@ -217,7 +184,7 @@ class Agent:
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
 
         # 输出统计信息
-        _print_agent_startup_stats()
+        show_agent_startup_stats()
 
     def _init_model(self, llm_type: str, model_group: Optional[str]):
         """初始化模型平台"""
