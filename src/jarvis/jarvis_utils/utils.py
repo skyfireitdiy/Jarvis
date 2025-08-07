@@ -443,63 +443,6 @@ def _show_usage_stats() -> None:
         PrettyOutput.print(traceback.format_exc(), OutputType.ERROR)
 
 
-def show_agent_startup_stats() -> None:
-    """输出启动时的统计信息"""
-    try:
-        from jarvis.jarvis_utils.methodology import _load_all_methodologies
-        from jarvis.jarvis_tools.registry import ToolRegistry
-        from jarvis.jarvis_utils.config import get_data_dir
-        from pathlib import Path
-        from rich.console import Console
-        from rich.panel import Panel
-        from rich.text import Text
-        from rich.align import Align
-
-        methodologies = _load_all_methodologies()
-        methodology_count = len(methodologies)
-
-        tool_registry = ToolRegistry()
-        tool_count = len(tool_registry.get_all_tools())
-
-        global_memory_dir = Path(get_data_dir()) / "memory" / "global_long_term"
-        global_memory_count = 0
-        if global_memory_dir.exists():
-            global_memory_count = len(list(global_memory_dir.glob("*.json")))
-
-        project_memory_dir = Path(".jarvis/memory")
-        project_memory_count = 0
-        if project_memory_dir.exists():
-            project_memory_count = len(list(project_memory_dir.glob("*.json")))
-
-        stats_parts = [
-            f"📚  本地方法论: [bold cyan]{methodology_count}[/bold cyan]",
-            f"🛠️  可用工具: [bold green]{tool_count}[/bold green]",
-            f"🧠  全局记忆: [bold yellow]{global_memory_count}[/bold yellow]",
-        ]
-
-        if project_memory_count > 0:
-            stats_parts.append(
-                f"📝  项目记忆: [bold magenta]{project_memory_count}[/bold magenta]"
-            )
-
-        stats_text = Text.from_markup(" | ".join(stats_parts), justify="center")
-
-        panel = Panel(
-            stats_text,
-            title="✨ Jarvis 资源概览 ✨",
-            title_align="center",
-            border_style="blue",
-            padding=(1, 2),
-            expand=True,
-        )
-
-        console = Console()
-        console.print(panel)
-
-    except Exception as e:
-        PrettyOutput.print(f"加载统计信息失败: {e}", OutputType.WARNING)
-
-
 def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     """初始化Jarvis环境
 
@@ -710,7 +653,6 @@ def load_config():
 
 
 from typing import Tuple
-
 
 from typing import Tuple
 
