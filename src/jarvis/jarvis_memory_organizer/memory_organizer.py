@@ -398,11 +398,18 @@ tags:
         for orig_memory in original_memories:
             if "file_path" in orig_memory:
                 try:
-                    Path(orig_memory["file_path"]).unlink()
-                    PrettyOutput.print(
-                        f"删除原始记忆: {orig_memory.get('id', '未知')}",
-                        OutputType.INFO,
-                    )
+                    file_path = Path(orig_memory["file_path"])
+                    if file_path.exists():
+                        file_path.unlink()
+                        PrettyOutput.print(
+                            f"删除原始记忆: {orig_memory.get('id', '未知')}",
+                            OutputType.INFO,
+                        )
+                    else:
+                        PrettyOutput.print(
+                            f"原始记忆文件已不存在，跳过删除: {orig_memory.get('id', '未知')}",
+                            OutputType.INFO,
+                        )
                 except Exception as e:
                     PrettyOutput.print(
                         f"删除记忆文件失败 {orig_memory['file_path']}: {str(e)}",
