@@ -2,13 +2,55 @@
 # Exit on any error
 $ErrorActionPreference = "Stop"
 
-Write-Host "--- 1. 检查 uv 环境 ---" -ForegroundColor Green
+# 设置 Python 构建镜像以加速安装
+$env:UV_PYTHON_INSTALL_MIRROR = "https://python-standalone.org/mirror/astral-sh/python-build-standalone/"
+Write-Host "已设置 Python 安装镜像: $($env:UV_PYTHON_INSTALL_MIRROR)" -ForegroundColor Cyan
+
+Write-Host "--- 1. 检查或安装 uv 环境 ---" -ForegroundColor Green
 $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
 if (-not $uvCommand) {
-    Write-Host "错误: 'uv' 未安装." -ForegroundColor Red
-    Write-Host "请先运行以下命令安装:"
-    Write-Host "powershell -c `"irm https://astral.sh/uv/install.ps1 | iex`"" -ForegroundColor Yellow
-    exit 1
+    Write-Host "'uv' 未安装，正在尝试自动安装..." -ForegroundColor Yellow
+    
+    # 优先尝试 pip3
+    $pip3Command = Get-Command pip3 -ErrorAction SilentlyContinue
+    if ($pip3Command) {
+        Write-Host "尝试使用 'pip3 install uv --user'..."
+        try {
+            pip3 install uv --user
+            # 重新获取命令
+            $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
+            if ($uvCommand) {
+                Write-Host "uv 使用 pip3 安装成功。" -ForegroundColor Green
+            } else {
+                # 如果pip安装后找不到命令，可能在用户路径下，我们继续尝试irm
+                throw "pip3 install uv succeeded but uv command not found in current session's PATH."
+            }
+        } catch {
+            Write-Host "pip3 安装失败或未在 PATH 中找到, 回退到 irm 安装..." -ForegroundColor Yellow
+            try {
+                irm https://astral.sh/uv/install.ps1 | iex
+            } catch {
+                # 忽略错误，让最后的检查来处理失败情况
+            }
+        }
+    } else {
+        Write-Host "未找到 pip3，使用 irm 安装 uv..." -ForegroundColor Yellow
+        try {
+            irm https://astral.sh/uv/install.ps1 | iex
+        } catch {
+            # 忽略错误，让最后的检查来处理失败情况
+        }
+    }
+    
+    # 再次检查 uv 是否成功安装
+    $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
+    if (-not $uvCommand) {
+        Write-Host "错误: 'uv' 自动安装失败。" -ForegroundColor Red
+        Write-Host "请访问 https://github.com/astral-sh/uv#installation 手动安装后重试。" -ForegroundColor Yellow
+        exit 1
+    }
+} else {
+    Write-Host "uv 已安装."
 }
 Write-Host "发现 uv: $(uv --version)"
 
