@@ -41,9 +41,13 @@ def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
     if not agent.execute_tool_confirm or user_confirm(
         f"需要执行{tool_to_execute.name()}确认执行？", True
     ):
-        print(f"🔧 正在执行{tool_to_execute.name()}...")
-        result = tool_to_execute.handle(response, agent)
-        print(f"✅ {tool_to_execute.name()}执行完成")
-        return result
+        try:
+            print(f"🔧 正在执行{tool_to_execute.name()}...")
+            result = tool_to_execute.handle(response, agent)
+            print(f"✅ {tool_to_execute.name()}执行完成")
+            return result
+        except Exception as e:
+            PrettyOutput.print(f"工具执行失败: {str(e)}", OutputType.ERROR)
+            return False, str(e)
 
     return False, ""
