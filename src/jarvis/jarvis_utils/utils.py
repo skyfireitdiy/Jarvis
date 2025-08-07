@@ -451,7 +451,7 @@ def _show_usage_stats(welcome_str: str) -> None:
 
             # 使命 Panel
             mission_text = Text(
-                "为每一位开发者配备一个无缝集成于其工作流的智能命令行伙伴，通过自然、高效的对话，将创造性的想法转化为精确、可执行的代码与解决方案。",
+                "为开发者提供智能命令行伙伴，通过自然高效的对话，将创意精准转化为可执行代码。",
                 justify="center",
                 style="italic",
             )
@@ -464,14 +464,14 @@ def _show_usage_stats(welcome_str: str) -> None:
             )
             right_column_items.append(mission_panel)
 
-            right_column_group = Group(*right_column_items)
+            left_column_group = Group(*right_column_items)
 
             # 将左侧表格和右侧组合添加到布局中
             if has_content:
-                layout_table.add_row(table, right_column_group)
+                layout_table.add_row(left_column_group, table)
             else:
                 # 如果没有统计数据，只显示右侧
-                layout_table.add_row("", right_column_group)
+                layout_table.add_row(left_column_group)
 
             # 打印最终的布局
             if has_content or summary_content:
@@ -481,10 +481,11 @@ def _show_usage_stats(welcome_str: str) -> None:
                 # 将整体布局封装在一个最终的Panel中，以提供整体边框
                 final_panel = Panel(
                     layout_table,
-                    title="Jarvis Status",
+                    title="Jarvis AI Assistant",
                     title_align="center",
                     border_style="blue",
-                    box=box.HEAVY,
+                    box=box.ROUNDED,
+                    padding=(0, 1),
                 )
                 console.print(final_panel)
     except Exception as e:
