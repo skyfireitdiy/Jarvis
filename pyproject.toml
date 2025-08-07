@@ -97,10 +97,16 @@ jrg = "jarvis.jarvis_rag.cli:main"
 jarvis-stats = "jarvis.jarvis_stats.cli:main"
 jst = "jarvis.jarvis_stats.cli:main"
 
-[[tool.uv.index]]
-url = "https://artsz.zte.com.cn/artifactory/api/pypi/public-pypi-virtual/simple"
-default = true
+
 
 [[tool.uv.index]]
 name = "tsinghua"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+
+[[tool.uv.index]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple/"
+
+[[tool.uv.index]]
+name = "ustc"
+url = "https://pypi.mirrors.ustc.edu.cn/simple/"
