@@ -3,6 +3,7 @@
 import datetime
 import os
 import platform
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
 # 第三方库导入
@@ -14,6 +15,7 @@ from jarvis.jarvis_agent.protocols import OutputHandlerProtocol
 from jarvis.jarvis_agent.session_manager import SessionManager
 from jarvis.jarvis_agent.tool_executor import execute_tool_call
 from jarvis.jarvis_agent.memory_manager import MemoryManager
+from jarvis.jarvis_memory_organizer.memory_organizer import MemoryOrganizer
 from jarvis.jarvis_agent.task_analyzer import TaskAnalyzer
 from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
 from jarvis.jarvis_agent.prompts import (
@@ -28,6 +30,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 
 # jarvis_utils 相关
 from jarvis.jarvis_utils.config import (
+    get_data_dir,
     get_max_token_count,
     get_normal_model_name,
     get_normal_platform_name,
@@ -515,6 +518,8 @@ class Agent:
         if self.use_analysis:
             self.task_analyzer.analysis_task(satisfaction_feedback)
 
+        self._check_and_organize_memory()
+
         if self.need_summary:
             print("📄 正在生成总结...")
             self.session.prompt = self.summary_prompt
@@ -710,6 +715,71 @@ class Agent:
             self.session.prompt = f"{self.session.prompt}{memory_tags_prompt}"
 
         self.first = False
+
+    def _check_and_organize_memory(self):
+        """
+        检查记忆库状态，如果满足条件则提示用户整理。
+        每天只检测一次。
+        """
+        try:
+            # 检查项目记忆
+            self._perform_memory_check("project_long_term", Path(".jarvis"), "project")
+            # 检查全局记忆
+            self._perform_memory_check(
+                "global_long_term",
+                Path(get_data_dir()),
+                "global",
+            )
+        except Exception as e:
+            PrettyOutput.print(f"检查记忆库时发生意外错误: {e}", OutputType.WARNING)
+
+    def _perform_memory_check(self, memory_type: str, base_path: Path, scope_name: str):
+        """执行特定范围的记忆检查和整理"""
+        check_file = base_path / ".last_memory_organizer_check"
+        now = datetime.datetime.now()
+
+        if check_file.exists():
+            try:
+                last_check_time = datetime.datetime.fromisoformat(
+                    check_file.read_text()
+                )
+                if (now - last_check_time).total_seconds() < 24 * 3600:
+                    return  # 24小时内已检查
+            except (ValueError, FileNotFoundError):
+                # 文件内容无效或文件在读取时被删除，继续执行检查
+                pass
+
+        # 立即更新检查时间，防止并发或重复检查
+        base_path.mkdir(parents=True, exist_ok=True)
+        check_file.write_text(now.isoformat())
+
+        organizer = MemoryOrganizer()
+        # NOTE: 使用受保护方法以避免重复实现逻辑
+        memories = organizer._load_memories(memory_type)
+
+        if len(memories) < 200:
+            return
+
+        # NOTE: 使用受保护方法以避免重复实现逻辑
+        overlap_groups = organizer._find_overlapping_memories(memories, min_overlap=3)
+        has_significant_overlap = any(groups for groups in overlap_groups.values())
+
+        if not has_significant_overlap:
+            return
+
+        prompt = (
+            f"检测到您的 '{scope_name}' 记忆库中包含 {len(memories)} 条记忆，"
+            f"并且存在3个以上标签重叠的记忆。\n"
+            f"是否立即整理记忆库以优化性能和相关性？"
+        )
+        if user_confirm(prompt, default=True):
+            PrettyOutput.print(
+                f"正在开始整理 '{scope_name}' ({memory_type}) 记忆库...",
+                OutputType.INFO,
+            )
+            organizer.organize_memories(memory_type, min_overlap=3)
+        else:
+            PrettyOutput.print(f"已取消 '{scope_name}' 记忆库整理。", OutputType.INFO)
 
     def clear_history(self):
         """
