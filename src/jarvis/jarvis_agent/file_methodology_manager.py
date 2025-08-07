@@ -83,8 +83,8 @@ class FileMethodologyManager:
         methodology = load_methodology(
             msg,
             self.agent.get_tool_registry(),
-            platform_name=self.agent.model.platform,
-            model_name=self.agent.model.model,
+            platform_name=self.agent.model.platform_name(),
+            model_name=self.agent.model.name(),
         )
         self.agent.session.prompt = f"{self.agent.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{methodology}{memory_tags_prompt}"
 
