@@ -199,7 +199,6 @@ def _show_usage_stats(welcome_str: str) -> None:
             table = Table(
                 show_header=True,
                 header_style="bold magenta",
-                title="📊 Jarvis 使用统计",
                 title_justify="center",
                 box=box.ROUNDED,
                 padding=(0, 1),
