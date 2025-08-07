@@ -692,9 +692,7 @@ def cli(
             sys.exit(0)
 
     curr_dir = os.getcwd()
-    git_dir = find_git_root_and_cd(curr_dir)
-    PrettyOutput.print(f"当前目录: {git_dir}", OutputType.INFO)
-
+    find_git_root_and_cd(curr_dir)
     try:
         agent = CodeAgent(
             llm_type=llm_type,

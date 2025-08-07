@@ -128,18 +128,18 @@ def show_agent_startup_stats(agent_name: str, model_name: str) -> None:
         panel_content.append(f"📁  工作目录: {current_dir}", style="dim white")
         panel_content.append("\n\n")
         panel_content.append(stats_text)
+        panel_content.justify = "center"
 
         panel = Panel(
-            Align.center(panel_content),
+            panel_content,
             title="✨ Jarvis 资源概览 ✨",
             title_align="center",
             border_style="blue",
-            padding=(1, 2),
             expand=False,
         )
 
         console = Console()
-        console.print(panel)
+        console.print(Align.center(panel))
 
     except Exception as e:
         PrettyOutput.print(f"加载统计信息失败: {e}", OutputType.WARNING)
