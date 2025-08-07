@@ -39,4 +39,11 @@ class Tool:
         返回:
             Dict[str, Any]: 工具执行结果
         """
-        return self.func(arguments)
+        try:
+            return self.func(arguments)
+        except Exception as e:
+            return {
+                "success": False,
+                "stderr": f"工具 {self.name} 执行失败: {str(e)}",
+                "stdout": "",
+            }
