@@ -404,7 +404,8 @@ def _show_usage_stats(welcome_str: str) -> None:
 
             # 欢迎信息 Panel
             if welcome_str:
-                jarvis_ascii_art_str = """   ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
+                jarvis_ascii_art_str = """
+   ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
    ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝
    ██║███████║██████╔╝██║   ██║██║███████╗
 ██╗██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║
@@ -483,7 +484,7 @@ def _show_usage_stats(welcome_str: str) -> None:
                     title="Jarvis AI Assistant",
                     title_align="center",
                     border_style="blue",
-                    box=box.ROUNDED,
+                    box=box.HEAVY,
                     padding=(0, 1),
                 )
                 console.print(final_panel)
