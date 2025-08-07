@@ -478,8 +478,8 @@ def _show_usage_stats(welcome_str: str) -> None:
                     pad_edge=False,
                 )
                 # 左右布局，左侧为总结信息，右侧为统计表格
-                layout_table.add_column(ratio=4)  # 左侧
-                layout_table.add_column(ratio=6)  # 右侧
+                layout_table.add_column(ratio=5)  # 左侧
+                layout_table.add_column(ratio=5)  # 右侧
 
                 if has_content:
                     # 将总结信息放在左侧，统计表格放在右侧
