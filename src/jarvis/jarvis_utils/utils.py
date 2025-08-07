@@ -79,30 +79,6 @@ def _setup_signal_handler() -> None:
     signal.signal(signal.SIGINT, sigint_handler)
 
 
-def _show_welcome_message(welcome_str: str) -> None:
-    """显示欢迎信息
-
-    参数:
-        welcome_str: 欢迎信息字符串
-    """
-    if not welcome_str:
-        return
-
-    jarvis_ascii_art = f"""
-   ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
-   ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝
-   ██║███████║██████╔╝██║   ██║██║███████╗
-██╗██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║
-╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║
- ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝
- {welcome_str}
-
- https://github.com/skyfireitdiy/Jarvis
- v{__version__}
-"""
-    PrettyOutput.print_gradient_text(jarvis_ascii_art, (0, 120, 255), (0, 255, 200))
-
-
 def _check_git_updates() -> bool:
     """检查并更新git仓库
 
@@ -115,7 +91,7 @@ def _check_git_updates() -> bool:
     return check_and_update_git_repo(str(script_dir))
 
 
-def _show_usage_stats() -> None:
+def _show_usage_stats(welcome_str: str) -> None:
     """显示Jarvis使用统计信息"""
     from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
@@ -413,28 +389,104 @@ def _show_usage_stats() -> None:
                     summary_content.append(encouragement)
 
             # 3. 组合并打印
-            render_items: List[RenderableType] = []
-            if has_content:
-                # 居中显示表格
-                centered_table = Align.center(table)
-                render_items.append(centered_table)
+            # 创建左右布局
+            layout_table = Table(
+                show_header=False,
+                box=None,
+                padding=0,
+                expand=True,
+                pad_edge=False,
+            )
+            layout_table.add_column(ratio=6)  # 左侧，统计表格
+            layout_table.add_column(ratio=4)  # 右侧，总结和愿景
 
+            # 右侧内容：总体表现 + 使命与愿景
+            right_column_items = []
+
+            # 欢迎信息 Panel
+            if welcome_str:
+                jarvis_ascii_art_str = """   ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
+   ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝
+   ██║███████║██████╔╝██║   ██║██║███████╗
+██╗██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║
+╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║
+ ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝"""
+
+                welcome_panel_content = Group(
+                    Align.center(Text(jarvis_ascii_art_str, style="bold blue")),
+                    Align.center(Text(welcome_str, style="bold")),
+                    "",  # for a blank line
+                    Align.center(Text(f"v{__version__}")),
+                    Align.center(Text("https://github.com/skyfireitdiy/Jarvis")),
+                )
+
+                welcome_panel = Panel(
+                    welcome_panel_content, border_style="yellow", expand=True
+                )
+                right_column_items.append(welcome_panel)
             if summary_content:
                 summary_panel = Panel(
                     Text("\n".join(summary_content), justify="left"),
                     title="✨ 总体表现 ✨",
                     title_align="center",
                     border_style="green",
-                    expand=False,
+                    expand=True,
                 )
-                # 居中显示面板
-                centered_panel = Align.center(summary_panel)
-                render_items.append(centered_panel)
+                right_column_items.append(summary_panel)
 
-            if render_items:
+            # 愿景 Panel
+            vision_text = Text(
+                "重新定义开发者体验，打破人与工具的界限，构建开发者与AI之间真正的共生伙伴关系。",
+                justify="center",
+                style="italic",
+            )
+            vision_panel = Panel(
+                vision_text,
+                title="🔭 愿景 (Vision) 🔭",
+                title_align="center",
+                border_style="cyan",
+                expand=True,
+            )
+            right_column_items.append(vision_panel)
+
+            # 使命 Panel
+            mission_text = Text(
+                "为每一位开发者配备一个无缝集成于其工作流的智能命令行伙伴，通过自然、高效的对话，将创造性的想法转化为精确、可执行的代码与解决方案。",
+                justify="center",
+                style="italic",
+            )
+            mission_panel = Panel(
+                mission_text,
+                title="🎯 使命 (Mission) 🎯",
+                title_align="center",
+                border_style="magenta",
+                expand=True,
+            )
+            right_column_items.append(mission_panel)
+
+            right_column_group = Group(*right_column_items)
+
+            # 将左侧表格和右侧组合添加到布局中
+            if has_content:
+                layout_table.add_row(table, right_column_group)
+            else:
+                # 如果没有统计数据，只显示右侧
+                layout_table.add_row("", right_column_group)
+
+            # 打印最终的布局
+            if has_content or summary_content:
                 console = Console()
-                render_group = Group(*render_items)
-                console.print(render_group)
+                from rich import box
+
+                # 将整体布局封装在一个最终的Panel中，以提供整体边框
+                final_panel = Panel(
+                    layout_table,
+                    title="Jarvis Status",
+                    title_align="center",
+                    border_style="blue",
+                    box=box.HEAVY,
+                )
+                console.print(final_panel)
     except Exception as e:
         # 输出错误信息以便调试
         import traceback
@@ -456,20 +508,16 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     # 2. 统计命令使用
     count_cmd_usage()
 
-    # 3. 显示欢迎信息
-    if welcome_str:
-        _show_welcome_message(welcome_str)
-
-    # 4. 设置配置文件
+    # 3. 设置配置文件
     global g_config_file
     g_config_file = config_file
     load_config()
 
-    # 5. 显示历史统计数据（仅在显示欢迎信息时显示）
+    # 4. 显示历史统计数据（仅在显示欢迎信息时显示）
     if welcome_str:
-        _show_usage_stats()
+        _show_usage_stats(welcome_str)
 
-    # 6. 检查git更新
+    # 5. 检查git更新
     if _check_git_updates():
         os.execv(sys.executable, [sys.executable] + sys.argv)
         sys.exit(0)
