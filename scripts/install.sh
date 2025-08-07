@@ -3,12 +3,43 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-echo "--- 1. 检查 uv 环境 ---"
+# 设置 Python 构建镜像以加速安装
+export UV_PYTHON_INSTALL_MIRROR="https://python-standalone.org/mirror/astral-sh/python-build-standalone/"
+echo "已设置 Python 安装镜像: $UV_PYTHON_INSTALL_MIRROR"
+
+echo "--- 1. 检查或安装 uv 环境 ---"
 if ! command -v uv &> /dev/null; then
-    echo "错误: 'uv' 未安装."
-    echo "请先运行以下命令安装:"
-    echo "curl -LsSf https://astral.sh/uv/install.sh | sh"
-    exit 1
+    echo "'uv' 未安装，正在尝试自动安装..."
+    # 优先尝试 pip3
+    if command -v pip3 &> /dev/null; then
+        echo "尝试使用 'pip3 install uv --user'..."
+        if pip3 install uv --user; then
+            # 将 pip 用户目录添加到 PATH
+            export PATH="$HOME/.local/bin:$PATH"
+            echo "uv 使用 pip3 安装成功。"
+        else
+            echo "pip3 安装失败，回退到 curl 安装..."
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+        fi
+    else
+        echo "未找到 pip3，使用 curl 安装 uv..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+    fi
+
+    # 尝试 source cargo env 以使 uv 在当前会话中可用
+    if [ -f "$HOME/.cargo/env" ]; then
+        # shellcheck disable=SC1090
+        source "$HOME/.cargo/env"
+    fi
+
+    # 再次检查 uv 是否成功安装
+    if ! command -v uv &> /dev/null; then
+        echo "错误: 'uv' 自动安装失败。"
+        echo "请访问 https://github.com/astral-sh/uv#installation 手动安装后重试。"
+        exit 1
+    fi
+else
+    echo "uv 已安装."
 fi
 echo "发现 uv: $(uv --version)"
 
@@ -22,7 +53,7 @@ if [ -d "$DEST_DIR" ]; then
     echo "目录 $DEST_DIR 已存在，正在检查更新..."
     cd "$DEST_DIR"
     if [ -n "$(git status --porcelain)" ]; then
-        read -p "检测到 '$DEST_DIR' 存在未提交的更改，是否放弃这些更改并更新？ [y/N]: " choice
+        read -r -p "检测到 '$DEST_DIR' 存在未提交的更改，是否放弃这些更改并更新？ [y/N]: " choice
         case "$choice" in
           y|Y )
             echo "正在放弃更改..."
@@ -55,7 +86,7 @@ fi
 
 echo "正在使用 uv 安装项目和依赖..."
 
-read -p "是否安装 RAG 功能? (这将安装 PyTorch 等较重的依赖) [y/N]: " choice
+read -r -p "是否安装 RAG 功能? (这将安装 PyTorch 等较重的依赖) [y/N]: " choice
 case "$choice" in
   y|Y )
     echo "正在安装核心功能及 RAG 依赖..."
