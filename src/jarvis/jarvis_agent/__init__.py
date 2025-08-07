@@ -190,7 +190,9 @@ class Agent:
 
         self.model = PlatformRegistry().create_platform(platform_name)
         if self.model is None:
-            PrettyOutput.print(f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING)
+            PrettyOutput.print(
+                f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING
+            )
             self.model = PlatformRegistry().get_normal_platform()
 
         if model_name:
@@ -512,10 +514,6 @@ class Agent:
 
         if self.use_analysis:
             self.task_analyzer.analysis_task(satisfaction_feedback)
-        else:
-            # 如果没有开启分析，也提示用户是否有值得记忆的信息
-            if self.force_save_memory:
-                self.memory_manager.prompt_memory_save()
 
         if self.need_summary:
             print("📄 正在生成总结...")
@@ -689,7 +687,9 @@ class Agent:
         返回:
             str: "continue" 或 "complete"
         """
-        user_input = self.multiline_inputer(f"{self.name}: 请输入，或输入空行来结束当前任务：")
+        user_input = self.multiline_inputer(
+            f"{self.name}: 请输入，或输入空行来结束当前任务："
+        )
 
         if user_input:
             self.session.prompt = user_input
