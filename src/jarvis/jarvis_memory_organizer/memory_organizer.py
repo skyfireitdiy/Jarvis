@@ -278,8 +278,23 @@ tags:
         # 从高重叠度开始处理
         max_tags = max(len(m.get("tags", [])) for m in memories)
 
+        # 创建一个标记已删除记忆的集合
+        deleted_indices = set()
+
         for overlap_count in range(min(max_tags, 5), min_overlap - 1, -1):
-            overlap_groups = self._find_overlapping_memories(memories, overlap_count)
+            # 过滤掉已删除的记忆
+            active_memories = [
+                (i, mem) for i, mem in enumerate(memories) if i not in deleted_indices
+            ]
+            if not active_memories:
+                break
+
+            # 创建索引映射：原始索引 -> 活跃索引
+            active_memory_list = [mem for _, mem in active_memories]
+
+            overlap_groups = self._find_overlapping_memories(
+                active_memory_list, overlap_count
+            )
 
             if overlap_count in overlap_groups:
                 groups = overlap_groups[overlap_count]
@@ -289,7 +304,13 @@ tags:
                 )
 
                 for group in groups:
-                    group_memories = [memories[i] for i in group]
+                    # 将活跃索引转换回原始索引
+                    original_indices = set()
+                    for active_idx in group:
+                        original_idx = active_memories[active_idx][0]
+                        original_indices.add(original_idx)
+
+                    group_memories = [memories[i] for i in original_indices]
 
                     # 显示将要合并的记忆
                     PrettyOutput.print(
@@ -315,16 +336,17 @@ tags:
 
                         # 保存新记忆
                         self._save_merged_memory(
-                            merged_memory, memory_type, [memories[i] for i in group]
+                            merged_memory,
+                            memory_type,
+                            [memories[i] for i in original_indices],
                         )
 
                         stats["processed_groups"] += 1
-                        stats["merged_memories"] += len(group)
+                        stats["merged_memories"] += len(original_indices)
                         stats["created_memories"] += 1
 
-                        # 从列表中移除已合并的记忆
-                        for i in sorted(group, reverse=True):
-                            del memories[i]
+                        # 标记这些记忆已被删除
+                        deleted_indices.update(original_indices)
                     else:
                         PrettyOutput.print("  [模拟运行] 跳过实际合并", OutputType.INFO)
 
