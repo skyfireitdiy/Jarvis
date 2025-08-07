@@ -450,7 +450,7 @@ def _show_usage_stats(welcome_str: str) -> None:
 
             # 使命 Panel
             mission_text = Text(
-                "为开发者提供智能命令行伙伴，通过自然高效的对话，将创意精准转化为可执行代码。",
+                "通过深度人机协作，将开发者的灵感（Vibe）高效落地为代码与行动，释放创造之力。",
                 justify="center",
                 style="italic",
             )
