@@ -52,7 +52,98 @@ from jarvis.jarvis_utils.globals import (
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import show_agent_startup_stats
+
+
+def show_agent_startup_stats(agent_name: str, model_name: str) -> None:
+    """输出启动时的统计信息
+
+    参数:
+        agent_name: Agent的名称
+        model_name: 使用的模型名称
+    """
+    try:
+        from jarvis.jarvis_utils.methodology import _load_all_methodologies
+        from jarvis.jarvis_tools.registry import ToolRegistry
+        from jarvis.jarvis_utils.config import get_data_dir
+        from pathlib import Path
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.text import Text
+        from rich.align import Align
+        import os
+
+        methodologies = _load_all_methodologies()
+        methodology_count = len(methodologies)
+
+        # 获取工具数量
+        # 创建一个临时的工具注册表类来获取所有工具（不应用过滤）
+        class TempToolRegistry(ToolRegistry):
+            def _apply_tool_config_filter(self) -> None:
+                """重写过滤方法，不执行任何过滤"""
+                pass
+
+        # 获取所有工具的数量
+        tool_registry_all = TempToolRegistry()
+        total_tool_count = len(tool_registry_all.tools)
+
+        # 获取可用工具的数量（应用过滤）
+        tool_registry = ToolRegistry()
+        available_tool_count = len(tool_registry.get_all_tools())
+
+        global_memory_dir = Path(get_data_dir()) / "memory" / "global_long_term"
+        global_memory_count = 0
+        if global_memory_dir.exists():
+            global_memory_count = len(list(global_memory_dir.glob("*.json")))
+
+        # 检查项目记忆
+        project_memory_dir = Path(".jarvis/memory")
+        project_memory_count = 0
+        if project_memory_dir.exists():
+            project_memory_count = len(list(project_memory_dir.glob("*.json")))
+
+        # 获取当前工作目录
+        current_dir = os.getcwd()
+
+        # 构建欢迎信息
+        welcome_message = f"{agent_name} 初始化完成 - 使用 {model_name} 模型"
+
+        stats_parts = [
+            f"📚  本地方法论: [bold cyan]{methodology_count}[/bold cyan]",
+            f"🛠️  工具: [bold green]{available_tool_count}/{total_tool_count}[/bold green] (可用/全部)",
+            f"🧠  全局记忆: [bold yellow]{global_memory_count}[/bold yellow]",
+        ]
+
+        # 如果有项目记忆，添加到统计信息中
+        if project_memory_count > 0:
+            stats_parts.append(
+                f"📝  项目记忆: [bold magenta]{project_memory_count}[/bold magenta]"
+            )
+
+        stats_text = Text.from_markup(" | ".join(stats_parts), justify="center")
+
+        # 创建包含欢迎信息和统计信息的面板内容
+        panel_content = Text()
+        panel_content.append(welcome_message, style="bold white")
+        panel_content.append("\n")
+        panel_content.append(f"📁  工作目录: {current_dir}", style="dim white")
+        panel_content.append("\n\n")
+        panel_content.append(stats_text)
+
+        panel = Panel(
+            Align.center(panel_content),
+            title="✨ Jarvis 资源概览 ✨",
+            title_align="center",
+            border_style="blue",
+            padding=(1, 2),
+            expand=False,
+        )
+
+        console = Console()
+        console.print(panel)
+
+    except Exception as e:
+        PrettyOutput.print(f"加载统计信息失败: {e}", OutputType.WARNING)
+
 
 origin_agent_system_prompt = f"""
 <role>
@@ -179,12 +270,8 @@ class Agent:
         # 设置系统提示词
         self._setup_system_prompt()
 
-        # 打印欢迎信息
-        welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"  # type: ignore
-        PrettyOutput.print(welcome_message, OutputType.SYSTEM)
-
-        # 输出统计信息
-        show_agent_startup_stats()
+        # 输出统计信息（包含欢迎信息）
+        show_agent_startup_stats(name, self.model.name())  # type: ignore
 
     def _init_model(self, llm_type: str, model_group: Optional[str]):
         """初始化模型平台"""
