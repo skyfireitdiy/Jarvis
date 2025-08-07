@@ -103,6 +103,8 @@ def _show_usage_stats(welcome_str: str) -> None:
         from rich.table import Table
         from rich.text import Text
 
+        console = Console()
+
         from jarvis.jarvis_stats.stats import StatsManager
 
         # 获取所有可用的指标
@@ -388,16 +390,7 @@ def _show_usage_stats(welcome_str: str) -> None:
                     summary_content.append(encouragement)
 
             # 3. 组合并打印
-            # 创建左右布局
-            layout_table = Table(
-                show_header=False,
-                box=None,
-                padding=0,
-                expand=True,
-                pad_edge=False,
-            )
-            layout_table.add_column(ratio=6)  # 左侧，统计表格
-            layout_table.add_column(ratio=4)  # 右侧，总结和愿景
+            from rich import box
 
             # 右侧内容：总体表现 + 使命与愿景
             right_column_items = []
@@ -464,23 +457,43 @@ def _show_usage_stats(welcome_str: str) -> None:
             )
             right_column_items.append(mission_panel)
 
-            left_column_group = Group(*right_column_items)
+            right_column_group = Group(*right_column_items)
 
-            # 将左侧表格和右侧组合添加到布局中
-            if has_content:
-                layout_table.add_row(left_column_group, table)
+            layout_renderable: RenderableType
+
+            if console.width < 200:
+                # 上下布局
+                layout_items = []
+                layout_items.append(right_column_group)
+                if has_content:
+                    layout_items.append(table)
+                layout_renderable = Group(*layout_items)
             else:
-                # 如果没有统计数据，只显示右侧
-                layout_table.add_row(left_column_group)
+                # 左右布局（当前）
+                layout_table = Table(
+                    show_header=False,
+                    box=None,
+                    padding=0,
+                    expand=True,
+                    pad_edge=False,
+                )
+                # 左右布局，左侧为统计表格，右侧为总结信息
+                layout_table.add_column(ratio=6)  # 左侧
+                layout_table.add_column(ratio=4)  # 右侧
+
+                if has_content:
+                    # 将统计表格放在左侧，总结信息放在右侧
+                    layout_table.add_row(table, right_column_group)
+                else:
+                    # 如果没有统计数据，则总结信息占满
+                    layout_table.add_row(right_column_group)
+                layout_renderable = layout_table
 
             # 打印最终的布局
             if has_content or summary_content:
-                console = Console()
-                from rich import box
-
                 # 将整体布局封装在一个最终的Panel中，以提供整体边框
                 final_panel = Panel(
-                    layout_table,
+                    layout_renderable,
                     title="Jarvis AI Assistant",
                     title_align="center",
                     border_style="blue",
