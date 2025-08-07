@@ -309,7 +309,9 @@ def get_modified_line_ranges() -> Dict[str, List[Tuple[int, int]]]:
             start_line = int(range_match.group(1))  # 保持从1开始
             line_count = int(range_match.group(2)) if range_match.group(2) else 1
             end_line = start_line + line_count - 1
-            result[current_file] = (start_line, end_line)
+            if current_file not in result:
+                result[current_file] = []
+            result[current_file].append((start_line, end_line))
 
     return result
 
@@ -414,8 +416,23 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                     hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
                 )
 
-                # 尝试普通安装
-                install_cmd = [sys.executable, "-m", "pip", "install", "-e", "."]
+                is_uv_env = False
+                if in_venv:
+                    # 检查是否在uv创建的虚拟环境内
+                    if sys.platform == "win32":
+                        uv_path = os.path.join(sys.prefix, "Scripts", "uv.exe")
+                    else:
+                        uv_path = os.path.join(sys.prefix, "bin", "uv")
+                    if os.path.exists(uv_path):
+                        is_uv_env = True
+
+                # 根据环境选择安装命令
+                if is_uv_env:
+                    install_cmd = ["uv", "pip", "install", "-e", "."]
+                else:
+                    install_cmd = [sys.executable, "-m", "pip", "install", "-e", "."]
+
+                # 尝试安装
                 result = subprocess.run(
                     install_cmd, cwd=git_root, capture_output=True, text=True
                 )
