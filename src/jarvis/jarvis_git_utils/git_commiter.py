@@ -184,8 +184,6 @@ commit信息
                 else:
                     platform = PlatformRegistry().get_normal_platform()
 
-                print(os.environ.get("KIMI_API_KEY", "no"))
-
                 # Ensure platform is not None
                 if not platform:
                     return {
