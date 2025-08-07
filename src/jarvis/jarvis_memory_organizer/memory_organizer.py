@@ -629,6 +629,9 @@ def organize(
         else:
             raise typer.Exit(0)  # 即使没有处理也是正常退出
 
+    except typer.Exit:
+        # typer.Exit 是正常的退出方式，直接传播
+        raise
     except Exception as e:
         PrettyOutput.print(f"记忆整理失败: {str(e)}", OutputType.ERROR)
         raise typer.Exit(1)
