@@ -463,7 +463,7 @@ def _show_usage_stats(welcome_str: str) -> None:
 
             if console.width < 200:
                 # 上下布局
-                layout_items = []
+                layout_items: List[RenderableType] = []
                 layout_items.append(right_column_group)
                 if has_content:
                     layout_items.append(table)
