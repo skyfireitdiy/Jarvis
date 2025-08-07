@@ -477,13 +477,13 @@ def _show_usage_stats(welcome_str: str) -> None:
                     expand=True,
                     pad_edge=False,
                 )
-                # 左右布局，左侧为统计表格，右侧为总结信息
-                layout_table.add_column(ratio=6)  # 左侧
-                layout_table.add_column(ratio=4)  # 右侧
+                # 左右布局，左侧为总结信息，右侧为统计表格
+                layout_table.add_column(ratio=4)  # 左侧
+                layout_table.add_column(ratio=6)  # 右侧
 
                 if has_content:
-                    # 将统计表格放在左侧，总结信息放在右侧
-                    layout_table.add_row(table, right_column_group)
+                    # 将总结信息放在左侧，统计表格放在右侧
+                    layout_table.add_row(right_column_group, table)
                 else:
                     # 如果没有统计数据，则总结信息占满
                     layout_table.add_row(right_column_group)
