@@ -166,12 +166,34 @@ commit信息
 
                 # 获取模型并尝试上传文件
                 agent = get_agent(current_agent_name)
-                if agent:
-                    platform = agent.model
+                platform_name = None
+                model_name = None
+                model_group = None
+
+                if agent and hasattr(agent, "model") and agent.model:
+                    # Record the platform_name and model_name from the agent
+                    platform_name = agent.model.platform_name()
+                    model_name = agent.model.name()
                     model_group = agent.model.model_group
+
+                # Create a new platform instance
+                if platform_name:
+                    platform = PlatformRegistry().create_platform(platform_name)
+                    if platform and model_name:
+                        platform.set_model_name(model_name)
                 else:
                     platform = PlatformRegistry().get_normal_platform()
-                    model_group = None
+
+                print(os.environ.get("KIMI_API_KEY", "no"))
+
+                # Ensure platform is not None
+                if not platform:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "错误：无法创建平台实例",
+                    }
+
                 upload_success = False
 
                 # Check if content is too large
@@ -330,9 +352,7 @@ commit信息
 
 @app.command()
 def cli(
-    root_dir: str = typer.Option(
-        ".", "--root-dir", help="Git仓库的根目录路径"
-    ),
+    root_dir: str = typer.Option(".", "--root-dir", help="Git仓库的根目录路径"),
     prefix: str = typer.Option(
         "",
         "--prefix",

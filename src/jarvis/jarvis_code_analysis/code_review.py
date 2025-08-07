@@ -300,7 +300,11 @@ class CodeReviewTool:
 
                     # Execute git command and get diff output
                     diff_output = subprocess.check_output(
-                        diff_cmd, shell=True, text=True, encoding="utf-8", errors="replace"
+                        diff_cmd,
+                        shell=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
                     )
                     if not diff_output:
                         return {
@@ -339,7 +343,11 @@ class CodeReviewTool:
 
                     # Execute git command and get diff output
                     diff_output = subprocess.check_output(
-                        diff_cmd, shell=True, text=True, encoding="utf-8", errors="replace"
+                        diff_cmd,
+                        shell=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
                     )
                     if not diff_output:
                         return {
@@ -381,7 +389,11 @@ class CodeReviewTool:
 
                     # Execute git command and get diff output
                     diff_output = subprocess.check_output(
-                        diff_cmd, shell=True, text=True, encoding="utf-8", errors="replace"
+                        diff_cmd,
+                        shell=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
                     )
                     if not diff_output:
                         return {
@@ -581,16 +593,30 @@ class CodeReviewTool:
                 tool_registry = ToolRegistry()
                 tool_registry.dont_use_tools(["code_review"])
 
-                # Use the provided agent's model_group or get it from globals
+                # Get platform_name and model_name from the provided agent
                 calling_agent = agent or get_agent(current_agent_name)
-                model_group = None
-                if calling_agent and hasattr(calling_agent, "model") and calling_agent.model:
-                    model_group = calling_agent.model.model_group
+                platform_name = None
+                model_name = None
+
+                if (
+                    calling_agent
+                    and hasattr(calling_agent, "model")
+                    and calling_agent.model
+                ):
+                    # Record the platform_name and model_name from the agent
+                    platform_name = calling_agent.model.platform_name()
+                    model_name = calling_agent.model.name()
+
+                # Create a new platform instance if we have the platform info
+                review_model = None
+                if platform_name:
+                    review_model = PlatformRegistry().create_platform(platform_name)
+                    if review_model and model_name:
+                        review_model.set_model_name(model_name)
 
                 agent = Agent(
                     system_prompt=system_prompt,
                     name="Code Review Agent",
-                    model_group=model_group,
                     summary_prompt=f"""<code_review_report>
 <overview>
 # 整体评估
@@ -660,6 +686,10 @@ class CodeReviewTool:
                     auto_complete=False,
                 )
 
+                # Replace the agent's model with our custom platform instance
+                if review_model:
+                    agent.model = review_model
+
                 # Determine if we need to split the diff due to size
                 max_diff_size = 100 * 1024 * 1024  # Limit to 100MB
 
@@ -693,7 +723,9 @@ class CodeReviewTool:
 
                 try:
                     # Check if content is too large
-                    is_large_content = is_context_overflow(diff_output, model_group)
+                    is_large_content = is_context_overflow(
+                        diff_output, review_model.model_group if review_model else None
+                    )
 
                     # Upload the file to the agent's model
                     if is_large_content:
