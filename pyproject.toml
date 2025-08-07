@@ -101,9 +101,8 @@ jst = "jarvis.jarvis_stats.cli:main"
 
 
 
-[[tool.uv.index]]
-name = "tsinghua"
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+[tool.uv]
+index-strategy = "unsafe-first-match"
 
 [[tool.uv.index]]
 name = "aliyun"
@@ -112,3 +111,7 @@ url = "https://mirrors.aliyun.com/pypi/simple/"
 [[tool.uv.index]]
 name = "ustc"
 url = "https://pypi.mirrors.ustc.edu.cn/simple/"
+
+[[tool.uv.index]]
+name = "netease"
+url = "https://mirrors.163.com/pypi/simple/"
