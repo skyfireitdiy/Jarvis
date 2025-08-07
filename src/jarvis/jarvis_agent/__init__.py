@@ -182,6 +182,39 @@ class Agent:
         welcome_message = f"{name} 初始化完成 - 使用 {self.model.name()} 模型"  # type: ignore
         PrettyOutput.print(welcome_message, OutputType.SYSTEM)
 
+        # 输出统计信息
+        try:
+            from jarvis.jarvis_utils.methodology import _load_all_methodologies
+            from jarvis.jarvis_tools.registry import ToolRegistry
+            from jarvis.jarvis_utils.config import get_data_dir
+            import os
+            from pathlib import Path
+
+            methodologies = _load_all_methodologies()
+            methodology_count = len(methodologies)
+
+            tool_registry = ToolRegistry()
+            tool_count = len(tool_registry.get_all_tools())
+
+            global_memory_dir = Path(get_data_dir()) / "memory" / "global_long_term"
+            global_memory_count = 0
+            if global_memory_dir.exists():
+                global_memory_count = len(list(global_memory_dir.glob("*.json")))
+
+            project_memory_dir = Path(".jarvis/memory")
+            project_memory_count = 0
+            if project_memory_dir.exists():
+                project_memory_count = len(list(project_memory_dir.glob("*.json")))
+
+            stats_message = f"📚 本地方法论: {methodology_count} | 🛠️ 可用工具: {tool_count} | 🧠 全局记忆: {global_memory_count}"
+            if project_memory_count > 0:
+                stats_message += f" | 📝 项目记忆: {project_memory_count}"
+
+            PrettyOutput.print(stats_message, OutputType.INFO)
+
+        except Exception as e:
+            PrettyOutput.print(f"加载统计信息失败: {e}", OutputType.WARNING)
+
     def _init_model(self, llm_type: str, model_group: Optional[str]):
         """初始化模型平台"""
         if llm_type == "thinking":
