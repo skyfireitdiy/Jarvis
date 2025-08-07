@@ -117,14 +117,46 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercon
 
 #### 手动安装
 ```bash
+# 1. 克隆仓库
 git clone https://github.com/skyfireitdiy/Jarvis
+
+# 2. 进入项目目录
 cd Jarvis
+
+# 3. 安装项目为可编辑模式
 pip3 install -e .
 ```
+> **提示**: 使用 `-e .` (可编辑模式) 安装后，您对源码的任何修改都会立刻生效，非常适合开发者。
+
 或者从PyPI安装 (可能不是最新版):
 ```bash
 pip3 install jarvis-ai-assistant
 ```
+
+**通过 uv 安装 (推荐)**
+```bash
+# 1. 安装 uv (如果未安装)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. 克隆仓库
+git clone https://github.com/skyfireitdiy/Jarvis
+
+# 3. 进入项目目录
+cd Jarvis
+
+# 4. 创建虚拟环境并安装
+uv venv
+
+# 安装基础功能
+uv pip install .
+
+# 可选: 安装RAG功能(包含PyTorch等较重的依赖)
+# uv pip install .[rag]
+```
+
+> **提示**: 安装完成后，建议将虚拟环境激活命令添加到您的 shell 配置文件中:
+> - Bash/Zsh: 在 ~/.bashrc 或 ~/.zshrc 中添加 `source /path/to/Jarvis/.venv/bin/activate`
+> - Fish: 在 ~/.config/fish/config.fish 中添加 `source /path/to/Jarvis/.venv/bin/activate.fish`
 
 ### 基本使用
 Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及其快捷方式：
