@@ -484,6 +484,10 @@ class CodeAgent:
             )
             git_commiter = GitCommitTool()
             git_commiter.execute({})
+
+            # 在用户接受commit后，根据配置决定是否保存记忆
+            if self.agent.force_save_memory:
+                self.agent.memory_manager.prompt_memory_save()
         elif start_commit:
             os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
             PrettyOutput.print("已重置到初始提交", OutputType.INFO)
@@ -642,7 +646,8 @@ class CodeAgent:
 def cli(
     llm_type: str = typer.Option(
         "normal",
-        "-t", "--llm_type",
+        "-t",
+        "--llm_type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     model_group: Optional[str] = typer.Option(
