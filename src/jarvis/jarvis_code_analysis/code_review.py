@@ -593,26 +593,44 @@ class CodeReviewTool:
                 tool_registry = ToolRegistry()
                 tool_registry.dont_use_tools(["code_review"])
 
-                # Get platform_name and model_name from the provided agent
-                calling_agent = agent or get_agent(current_agent_name)
-                platform_name = None
-                model_name = None
+                # Get llm_type and model_group from args
+                llm_type = args.get("llm_type", "normal")
+                model_group = args.get("model_group")
 
+                # Get platform and model based on llm_type and model_group
+                from jarvis.jarvis_utils.config import (
+                    get_normal_platform_name,
+                    get_normal_model_name,
+                    get_thinking_platform_name,
+                    get_thinking_model_name,
+                )
+
+                if llm_type == "thinking":
+                    platform_name = get_thinking_platform_name(model_group)
+                    model_name = get_thinking_model_name(model_group)
+                else:
+                    platform_name = get_normal_platform_name(model_group)
+                    model_name = get_normal_model_name(model_group)
+
+                # If no explicit parameters, try to get from existing agent
+                calling_agent = agent or get_agent(current_agent_name)
                 if (
-                    calling_agent
+                    not platform_name
+                    and calling_agent
                     and hasattr(calling_agent, "model")
                     and calling_agent.model
                 ):
-                    # Record the platform_name and model_name from the agent
                     platform_name = calling_agent.model.platform_name()
                     model_name = calling_agent.model.name()
 
-                # Create a new platform instance if we have the platform info
+                # Create a new platform instance
                 review_model = None
                 if platform_name:
                     review_model = PlatformRegistry().create_platform(platform_name)
                     if review_model and model_name:
                         review_model.set_model_name(model_name)
+                        if model_group:
+                            review_model.model_group = model_group
 
                 agent = Agent(
                     system_prompt=system_prompt,
@@ -805,10 +823,25 @@ def extract_code_report(result: str) -> str:
 def review_commit(
     commit: str = typer.Argument(..., help="要审查的提交SHA"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
+    llm_type: str = typer.Option(
+        "normal",
+        "-t",
+        "--llm_type",
+        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
+    ),
+    model_group: Optional[str] = typer.Option(
+        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
 ):
     """审查指定的提交"""
     tool = CodeReviewTool()
-    tool_args = {"review_type": "commit", "commit_sha": commit, "root_dir": root_dir}
+    tool_args = {
+        "review_type": "commit",
+        "commit_sha": commit,
+        "root_dir": root_dir,
+        "llm_type": llm_type,
+        "model_group": model_group,
+    }
     result = tool.execute(tool_args)
     if result["success"]:
         PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
@@ -821,10 +854,24 @@ def review_commit(
 @app.command("current")
 def review_current(
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
+    llm_type: str = typer.Option(
+        "normal",
+        "-t",
+        "--llm_type",
+        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
+    ),
+    model_group: Optional[str] = typer.Option(
+        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
 ):
     """审查当前的变更"""
     tool = CodeReviewTool()
-    tool_args = {"review_type": "current", "root_dir": root_dir}
+    tool_args = {
+        "review_type": "current",
+        "root_dir": root_dir,
+        "llm_type": llm_type,
+        "model_group": model_group,
+    }
     result = tool.execute(tool_args)
     if result["success"]:
         PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
@@ -839,6 +886,15 @@ def review_range(
     start_commit: str = typer.Argument(..., help="起始提交SHA"),
     end_commit: str = typer.Argument(..., help="结束提交SHA"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
+    llm_type: str = typer.Option(
+        "normal",
+        "-t",
+        "--llm_type",
+        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
+    ),
+    model_group: Optional[str] = typer.Option(
+        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
 ):
     """审查提交范围"""
     tool = CodeReviewTool()
@@ -847,6 +903,8 @@ def review_range(
         "start_commit": start_commit,
         "end_commit": end_commit,
         "root_dir": root_dir,
+        "llm_type": llm_type,
+        "model_group": model_group,
     }
     result = tool.execute(tool_args)
     if result["success"]:
@@ -861,10 +919,25 @@ def review_range(
 def review_file(
     file: str = typer.Argument(..., help="要审查的文件路径"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
+    llm_type: str = typer.Option(
+        "normal",
+        "-t",
+        "--llm_type",
+        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
+    ),
+    model_group: Optional[str] = typer.Option(
+        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
 ):
     """审查指定的文件"""
     tool = CodeReviewTool()
-    tool_args = {"review_type": "file", "file_path": file, "root_dir": root_dir}
+    tool_args = {
+        "review_type": "file",
+        "file_path": file,
+        "root_dir": root_dir,
+        "llm_type": llm_type,
+        "model_group": model_group,
+    }
     result = tool.execute(tool_args)
     if result["success"]:
         PrettyOutput.section("自动代码审查结果:", OutputType.SUCCESS)
