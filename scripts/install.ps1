@@ -1,4 +1,4 @@
-# Jarvis Installation Script for Windows PowerShell
+# Jarvis Installation Script for Windows PowerShell (in English)
 # Exit on any error
 $ErrorActionPreference = "Stop"
 
@@ -11,18 +11,18 @@ $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
 if (-not $uvCommand) {
     Write-Host "'uv' not found, attempting automatic installation..." -ForegroundColor Yellow
     
-    # 优先尝试 pip3
+    # Try pip3 first
     $pip3Command = Get-Command pip3 -ErrorAction SilentlyContinue
     if ($pip3Command) {
         Write-Host "Trying 'pip3 install uv --user'..."
         try {
             pip3 install uv --user
-            # 重新获取命令
+            # Re-acquire the command
             $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
             if ($uvCommand) {
                 Write-Host "uv installed successfully using pip3." -ForegroundColor Green
             } else {
-                # 如果pip安装后找不到命令，可能在用户路径下，我们继续尝试irm
+                # If pip installation succeeds but the command is not found in PATH, continue with irm installation
                 throw "pip3 install uv succeeded but uv command not found in current session's PATH."
             }
         } catch {
@@ -30,7 +30,7 @@ if (-not $uvCommand) {
             try {
                 irm https://astral.sh/uv/install.ps1 | iex
             } catch {
-                # 忽略错误，让最后的检查来处理失败情况
+                # Ignore errors and let the final check handle failures
             }
         }
     } else {
@@ -38,11 +38,11 @@ if (-not $uvCommand) {
         try {
             irm https://astral.sh/uv/install.ps1 | iex
         } catch {
-            # 忽略错误，让最后的检查来处理失败情况
+            # Ignore errors and let the final check handle failures
         }
     }
     
-    # 再次检查 uv 是否成功安装
+    # Check again if uv was installed successfully
     $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
     if (-not $uvCommand) {
         Write-Host "Error: 'uv' automatic installation failed." -ForegroundColor Red
@@ -52,7 +52,7 @@ if (-not $uvCommand) {
 } else {
     Write-Host "uv is already installed."
 }
-Write-Host "发现 uv: $(uv --version)"
+Write-Host "Found uv: $(uv --version)"
 
 # Define repo URL and destination directory
 $REPO_URL = "https://github.com/skyfireitdiy/Jarvis"
@@ -77,7 +77,7 @@ if (Test-Path $DEST_DIR) {
         }
     }
     else {
-        Write-Host "正在拉取最新代码..."
+        Write-Host "Pulling latest code..."
         git pull
     }
     Pop-Location
