@@ -112,18 +112,44 @@ switch ($choice) {
     }
 }
 
-Write-Host "`n--- 4. Initialize Jarvis ---" -ForegroundColor Green
-$CONFIG_FILE = "$env:USERPROFILE\.jarvis\config.yaml"
-if (Test-Path $CONFIG_FILE) {
-    Write-Host "Configuration file $CONFIG_FILE exists, skipping initialization."
+Write-Host "`n--- 4. Configure PowerShell Profile ---" -ForegroundColor Green
+$PROFILE_FILE = $PROFILE
+$ACTIVATE_COMMAND = "& `"$VENV_DIR\Scripts\Activate.ps1`""
+
+$choice = Read-Host "Would you like to add virtual environment activation to your PowerShell profile? [y/N]"
+if ($choice -eq 'y' -or $choice -eq 'Y') {
+    # Create profile directory if it doesn't exist
+    $profileDir = Split-Path -Parent $PROFILE_FILE
+    if (-not (Test-Path $profileDir)) {
+        New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+    }
+    
+    # Check if activation command already exists in profile
+    if (Test-Path $PROFILE_FILE) {
+        $profileContent = Get-Content $PROFILE_FILE -Raw
+        if ($profileContent -match [regex]::Escape($ACTIVATE_COMMAND)) {
+            Write-Host "Virtual environment activation already exists in profile." -ForegroundColor Yellow
+        }
+        else {
+            Add-Content -Path $PROFILE_FILE -Value "`n# Jarvis virtual environment activation`n$ACTIVATE_COMMAND"
+            Write-Host "Added virtual environment activation to $PROFILE_FILE" -ForegroundColor Green
+        }
+    }
+    else {
+        Set-Content -Path $PROFILE_FILE -Value "# Jarvis virtual environment activation`n$ACTIVATE_COMMAND"
+        Write-Host "Created $PROFILE_FILE with virtual environment activation" -ForegroundColor Green
+    }
+    Write-Host "The virtual environment will be automatically activated in new PowerShell sessions." -ForegroundColor Green
 }
 else {
-    Write-Host "Running 'jarvis' to generate configuration file..."
-    & "$VENV_DIR\Scripts\jarvis.exe"
+    Write-Host "Skipping profile modification." -ForegroundColor Yellow
 }
 
-Write-Host "`n--- 5. Installation and initialization complete! ---" -ForegroundColor Green
-Write-Host "Run the following command to activate virtual environment:" -ForegroundColor Yellow
+Write-Host "`n--- 5. Installation complete! ---" -ForegroundColor Green
+Write-Host "To manually activate the virtual environment, run:" -ForegroundColor Yellow
 Write-Host "  $VENV_DIR\Scripts\Activate.ps1"
 Write-Host ""
 Write-Host "After activation, you can use the 'jarvis' command."
+Write-Host ""
+Write-Host "To initialize Jarvis configuration, run:" -ForegroundColor Yellow
+Write-Host "  jarvis"
