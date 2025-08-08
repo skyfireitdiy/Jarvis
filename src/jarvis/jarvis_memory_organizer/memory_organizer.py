@@ -163,11 +163,13 @@ class MemoryOrganizer:
             )
             all_tags.update(memory.get("tags", []))
 
+        memory_contents_str = (("="*50) + "\n").join(memory_contents)
+
         prompt = f"""请将以下{len(memories)}个相关记忆合并成一个综合性的记忆。
 
 原始记忆（按时间从新到旧排序）：
 {"="*50}
-{(("="*50) + "\n").join(memory_contents)}
+{memory_contents_str}
 {"="*50}
 
 原始标签集合：{', '.join(sorted(all_tags))}
