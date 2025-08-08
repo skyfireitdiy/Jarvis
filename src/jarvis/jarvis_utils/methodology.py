@@ -175,13 +175,20 @@ def upload_methodology(platform: BasePlatform, other_files: List[str] = []) -> b
                 pass
 
 
-def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> str:
+def load_methodology(
+    user_input: str,
+    tool_registery: Optional[Any] = None,
+    platform_name: Optional[str] = None,
+    model_name: Optional[str] = None,
+) -> str:
     """
     加载方法论并上传到大模型。
 
     参数：
         user_input: 用户输入文本，用于提示大模型
         tool_registery: 工具注册表，用于获取工具列表
+        platform_name (str, optional): 指定的平台名称. Defaults to None.
+        model_name (str, optional): 指定的模型名称. Defaults to None.
 
     返回：
         str: 相关的方法论提示，如果未找到方法论则返回空字符串
@@ -203,7 +210,17 @@ def load_methodology(user_input: str, tool_registery: Optional[Any] = None) -> s
             return ""
         print(f"✅ 加载方法论文件完成 (共 {len(methodologies)} 个)")
 
-        platform = PlatformRegistry().get_normal_platform()
+        if platform_name:
+            platform = PlatformRegistry().create_platform(platform_name)
+            if platform and model_name:
+                platform.set_model_name(model_name)
+        else:
+            platform = PlatformRegistry().get_normal_platform()
+
+        if not platform:
+            PrettyOutput.print("无法创建平台实例", OutputType.ERROR)
+            return ""
+
         platform.set_suppress_output(True)
 
         # 步骤1：获取所有方法论的标题

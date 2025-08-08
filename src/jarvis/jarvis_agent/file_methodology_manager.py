@@ -80,7 +80,12 @@ class FileMethodologyManager:
 
         memory_manager = MemoryManager(self.agent)
         memory_tags_prompt = memory_manager.prepare_memory_tags_prompt()
-        methodology = load_methodology(msg, self.agent.get_tool_registry())
+        methodology = load_methodology(
+            msg,
+            self.agent.get_tool_registry(),
+            platform_name=self.agent.model.platform,
+            model_name=self.agent.model.model,
+        )
         self.agent.session.prompt = f"{self.agent.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{methodology}{memory_tags_prompt}"
 
     def handle_history_with_file_upload(self) -> str:
