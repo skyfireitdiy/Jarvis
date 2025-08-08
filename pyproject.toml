@@ -112,6 +112,3 @@ url = "https://mirrors.aliyun.com/pypi/simple/"
 name = "ustc"
 url = "https://pypi.mirrors.ustc.edu.cn/simple/"
 
-[[tool.uv.index]]
-name = "netease"
-url = "https://mirrors.163.com/pypi/simple/"
