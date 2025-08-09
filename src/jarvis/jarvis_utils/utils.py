@@ -136,13 +136,23 @@ def _check_pip_updates() -> bool:
                 if uv_path.exists():
                     is_uv_env = True
 
+            # 检测是否安装了 RAG 特性
+            rag_installed = False
+            try:
+                import langchain  # noqa
+
+                rag_installed = True
+            except ImportError:
+                pass
+
             # 提供更新命令
+            package_spec = (
+                "jarvis-ai-assistant[rag]" if rag_installed else "jarvis-ai-assistant"
+            )
             if is_uv_env:
-                update_cmd = "uv pip install --upgrade jarvis-ai-assistant"
+                update_cmd = f"uv pip install --upgrade {package_spec}"
             else:
-                update_cmd = (
-                    f"{sys.executable} -m pip install --upgrade jarvis-ai-assistant"
-                )
+                update_cmd = f"{sys.executable} -m pip install --upgrade {package_spec}"
 
             PrettyOutput.print(f"请手动执行以下命令更新: {update_cmd}", OutputType.INFO)
 
@@ -156,8 +166,8 @@ def _check_pip_updates() -> bool:
     return False
 
 
-def _check_git_updates() -> bool:
-    """检查并更新git仓库或pip包
+def _check_jarvis_updates() -> bool:
+    """检查并更新Jarvis本身（git仓库或pip包）
 
     返回:
         bool: 是否需要重启进程
@@ -615,8 +625,8 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     if welcome_str:
         _show_usage_stats(welcome_str)
 
-    # 5. 检查git更新
-    if _check_git_updates():
+    # 5. 检查Jarvis更新
+    if _check_jarvis_updates():
         os.execv(sys.executable, [sys.executable] + sys.argv)
         sys.exit(0)
 

@@ -427,10 +427,40 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                         is_uv_env = True
 
                 # 根据环境选择安装命令
-                if is_uv_env:
-                    install_cmd = ["uv", "pip", "install", "-e", "."]
+                # 检测是否安装了 RAG 特性
+                rag_installed = False
+                try:
+                    import langchain  # noqa
+
+                    rag_installed = True
+                except ImportError:
+                    pass
+
+                # 根据环境和 RAG 特性选择安装命令
+                if rag_installed:
+                    if is_uv_env:
+                        install_cmd = ["uv", "pip", "install", "-e", ".[rag]"]
+                    else:
+                        install_cmd = [
+                            sys.executable,
+                            "-m",
+                            "pip",
+                            "install",
+                            "-e",
+                            ".[rag]",
+                        ]
                 else:
-                    install_cmd = [sys.executable, "-m", "pip", "install", "-e", "."]
+                    if is_uv_env:
+                        install_cmd = ["uv", "pip", "install", "-e", "."]
+                    else:
+                        install_cmd = [
+                            sys.executable,
+                            "-m",
+                            "pip",
+                            "install",
+                            "-e",
+                            ".",
+                        ]
 
                 # 尝试安装
                 result = subprocess.run(
