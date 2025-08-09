@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, date
 
 import yaml  # type: ignore
 from rich.align import Align
@@ -79,16 +79,100 @@ def _setup_signal_handler() -> None:
     signal.signal(signal.SIGINT, sigint_handler)
 
 
+def _check_pip_updates() -> bool:
+    """检查pip安装的Jarvis是否有更新
+
+    返回:
+        bool: 是否执行了更新（总是返回False，因为pip更新需要用户手动执行）
+    """
+    import urllib.request
+    import urllib.error
+    from packaging import version
+
+    # 检查上次检查日期
+    last_check_file = Path(get_data_dir()) / "last_pip_check"
+    today_str = date.today().strftime("%Y-%m-%d")
+
+    if last_check_file.exists():
+        try:
+            last_check_date = last_check_file.read_text().strip()
+            if last_check_date == today_str:
+                return False
+        except Exception:
+            pass
+
+    try:
+        # 获取PyPI上的最新版本
+        url = "https://pypi.org/pypi/jarvis-ai-assistant/json"
+        try:
+            with urllib.request.urlopen(url, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                latest_version = data["info"]["version"]
+        except (urllib.error.URLError, KeyError, json.JSONDecodeError) as e:
+            return False
+
+        # 比较版本
+        current_ver = version.parse(__version__)
+        latest_ver = version.parse(latest_version)
+
+        if latest_ver > current_ver:
+            PrettyOutput.print(
+                f"检测到新版本 v{latest_version} (当前版本: v{__version__})",
+                OutputType.INFO,
+            )
+
+            # 检测是否在虚拟环境中
+            in_venv = hasattr(sys, "real_prefix") or (
+                hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+            )
+
+            # 检测是否使用uv
+            is_uv_env = False
+            if in_venv:
+                if sys.platform == "win32":
+                    uv_path = Path(sys.prefix) / "Scripts" / "uv.exe"
+                else:
+                    uv_path = Path(sys.prefix) / "bin" / "uv"
+                if uv_path.exists():
+                    is_uv_env = True
+
+            # 提供更新命令
+            if is_uv_env:
+                update_cmd = "uv pip install --upgrade jarvis-ai-assistant"
+            else:
+                update_cmd = (
+                    f"{sys.executable} -m pip install --upgrade jarvis-ai-assistant"
+                )
+
+            PrettyOutput.print(f"请手动执行以下命令更新: {update_cmd}", OutputType.INFO)
+
+        # 更新检查日期
+        last_check_file.write_text(today_str)
+
+    except Exception as e:
+        # 静默处理错误，不影响正常使用
+        pass
+
+    return False
+
+
 def _check_git_updates() -> bool:
-    """检查并更新git仓库
+    """检查并更新git仓库或pip包
 
     返回:
         bool: 是否需要重启进程
     """
     script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
-    from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
 
-    return check_and_update_git_repo(str(script_dir))
+    # 先检查是否是git源码安装
+    git_dir = script_dir / ".git"
+    if git_dir.exists():
+        from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
+
+        return check_and_update_git_repo(str(script_dir))
+
+    # 检查是否是pip/uv pip安装的版本
+    return _check_pip_updates()
 
 
 def _show_usage_stats(welcome_str: str) -> None:
