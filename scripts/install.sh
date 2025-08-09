@@ -115,3 +115,29 @@ echo "  - Fish:"
 echo "    source $VENV_DIR/bin/activate.fish"
 echo ""
 echo "激活后，您就可以使用 'jarvis' 命令。"
+
+# 检测用户shell类型并询问是否自动配置
+echo -e "\n--- 6. Shell 环境配置 (可选) ---"
+current_shell=$(basename "$SHELL")
+case "$current_shell" in
+    bash|zsh|fish)
+        echo "检测到您正在使用 $current_shell，可以自动添加环境配置到您的 rc 文件。"
+        read -r -p "是否自动添加 'source $VENV_DIR/bin/activate' 到您的 ~/.${current_shell}rc 文件? [y/N]: " choice
+        case "$choice" in
+            y|Y )
+                if [ "$current_shell" = "fish" ]; then
+                    echo "source $VENV_DIR/bin/activate.fish" >> "$HOME/.config/fish/config.fish"
+                else
+                    echo "source $VENV_DIR/bin/activate" >> "$HOME/.${current_shell}rc"
+                fi
+                echo "已成功添加到 ~/.${current_shell}rc 文件。下次启动 shell 时将自动激活 Jarvis。"
+                ;;
+            * )
+                echo "跳过自动配置。"
+                ;;
+        esac
+        ;;
+    *)
+        echo "检测到您正在使用 $current_shell，暂不支持自动配置。"
+        ;;
+esac
