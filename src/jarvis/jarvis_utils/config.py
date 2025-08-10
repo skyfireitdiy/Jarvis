@@ -385,7 +385,7 @@ DEFAULT_RAG_GROUPS = [
     },
     {
         "code": {
-            "embedding_model": "Qodo/Qodo-Embed-1-7B",
+            "embedding_model": "Qodo/Qodo-Embed-1-1.5B",
             "use_bm25": False,
             "use_rerank": False,
         }
