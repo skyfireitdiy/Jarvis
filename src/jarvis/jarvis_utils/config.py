@@ -500,6 +500,31 @@ def get_rag_use_rerank() -> bool:
 
 
 # ==============================================================================
+# Web Search Configuration
+# ==============================================================================
+
+
+def get_web_search_platform_name() -> Optional[str]:
+    """
+    获取Web搜索使用的平台名称。
+
+    返回:
+        Optional[str]: 平台名称，如果未配置则返回None
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_WEB_SEARCH_PLATFORM")
+
+
+def get_web_search_model_name() -> Optional[str]:
+    """
+    获取Web搜索使用的模型名称。
+
+    返回:
+        Optional[str]: 模型名称，如果未配置则返回None
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_WEB_SEARCH_MODEL")
+
+
+# ==============================================================================
 # Tool Configuration
 # ==============================================================================
 
