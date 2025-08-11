@@ -43,6 +43,7 @@ dependencies = [
     "typer",
     "pathspec",
     "plotext==5.2.8",
+    "packaging>=24.2",
 ]
 requires-python = ">=3.9,<3.13"
 
@@ -103,6 +104,10 @@ jst = "jarvis.jarvis_stats.cli:main"
 
 [tool.uv]
 index-strategy = "unsafe-first-match"
+
+[[tool.uv.index]]
+url = "https://artsz.zte.com.cn/artifactory/api/pypi/public-pypi-virtual/simple"
+default = true
 
 [[tool.uv.index]]
 name = "aliyun"
