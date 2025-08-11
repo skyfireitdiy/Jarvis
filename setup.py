@@ -37,6 +37,7 @@ setup(
         "markdownify>=1.1.0",
         "typer",
         "plotext==5.2.8",
+        "packaging",
     ],
     extras_require={
         "dev": ["pytest", "black", "isort", "mypy", "build", "twine"],
