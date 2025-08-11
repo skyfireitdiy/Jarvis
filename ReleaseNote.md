@@ -1,3 +1,17 @@
+## Release Note - v0.3.11 2025-08-11
+
+#### **新功能 (Features)**  
+- 支持独立配置Web搜索使用的平台和模型，通过`JARVIS_WEB_SEARCH_PLATFORM`和`JARVIS_WEB_SEARCH_MODEL`环境变量进行设置
+- 新增Web搜索配置优先级逻辑，当配置了专门的搜索平台和模型时，优先使用配置项而非默认模型选择流程
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 优化Web搜索工具的实现逻辑，增强平台选择和模型配置的灵活性
+- 改进配置系统，新增Web搜索相关配置项到配置schema中
+
+#### **文档更新 (Documentation)**  
+- 更新配置文档，新增Web搜索相关环境变量的说明和配置示例
+
+本次更新主要增强了Web搜索功能的配置灵活性，允许用户为搜索操作单独配置平台和模型，提升了系统的可定制性。
 ### Release Note - v0.3.8 2025-08-10
 
 #### **优化与重构 (Refactors & Improvements)**  
