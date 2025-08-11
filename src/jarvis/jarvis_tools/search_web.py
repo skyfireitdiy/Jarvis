@@ -12,6 +12,10 @@ from ddgs import DDGS  # type: ignore[import-not-found]
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import (
+    get_web_search_platform_name,
+    get_web_search_model_name,
+)
 from jarvis.jarvis_utils.http import get as http_get
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
@@ -136,6 +140,25 @@ class SearchWebTool:
                 "success": False,
             }
 
+        # 检查是否配置了专门的 Web 搜索平台和模型
+        web_search_platform = get_web_search_platform_name()
+        web_search_model = get_web_search_model_name()
+
+        # 如果配置了专门的 Web 搜索平台和模型，优先使用
+        if web_search_platform and web_search_model:
+            model = PlatformRegistry().create_platform(web_search_platform)
+            if model:
+                model.set_model_name(web_search_model)
+                if model.support_web():
+                    model.set_web(True)
+                    model.set_suppress_output(False)
+                    return {
+                        "stdout": model.chat_until_success(query),
+                        "stderr": "",
+                        "success": True,
+                    }
+
+        # 否则使用现有的模型选择流程
         if agent.model.support_web():
             model = PlatformRegistry().create_platform(agent.model.platform_name())
             if not model:
