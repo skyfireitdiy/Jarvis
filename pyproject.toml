@@ -106,7 +106,7 @@ jst = "jarvis.jarvis_stats.cli:main"
 index-strategy = "unsafe-first-match"
 
 [[tool.uv.index]]
-url = "https://artsz.zte.com.cn/artifactory/api/pypi/public-pypi-virtual/simple"
+url = "https://mirrors.cloud.tencent.com/pypi/simple"
 default = true
 
 [[tool.uv.index]]

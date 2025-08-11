@@ -51,24 +51,31 @@ class CodeAgent:
         llm_type: str = "normal",
         model_group: Optional[str] = None,
         need_summary: bool = True,
+        append_tools: Optional[str] = None,
     ):
         self.root_dir = os.getcwd()
 
         # 检测 git username 和 email 是否已设置
         self._check_git_config()
         tool_registry = ToolRegistry()  # type: ignore
-        tool_registry.use_tools(
-            [
-                "execute_script",
-                "search_web",
-                "ask_user",
-                "read_code",
-                "rewrite_file",
-                "save_memory",
-                "retrieve_memory",
-                "clear_memory",
-            ]
-        )
+        base_tools = [
+            "execute_script",
+            "search_web",
+            "ask_user",
+            "read_code",
+            "rewrite_file",
+            "save_memory",
+            "retrieve_memory",
+            "clear_memory",
+        ]
+        
+        if append_tools:
+            additional_tools = [tool.strip() for tool in append_tools.split(",")]
+            base_tools.extend(additional_tools)
+            # 去重
+            base_tools = list(dict.fromkeys(base_tools))
+            
+        tool_registry.use_tools(base_tools)
         code_system_prompt = self._get_system_prompt()
         self.agent = Agent(
             system_prompt=code_system_prompt,
