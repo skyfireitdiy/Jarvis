@@ -363,11 +363,11 @@ def chat_command(
     llm_type: str = typer.Option(
         "normal",
         "-t",
-        "--llm_type",
+        "--llm-type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     llm_group: Optional[str] = typer.Option(
-        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ) -> None:
     """与指定平台和模型聊天。"""
@@ -447,11 +447,11 @@ def role_command(
     llm_type: Optional[str] = typer.Option(
         None,
         "-t",
-        "--llm_type",
+        "--llm-type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式），覆盖角色配置",
     ),
     llm_group: Optional[str] = typer.Option(
-        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ) -> None:
     """加载角色配置文件并开始对话。"""

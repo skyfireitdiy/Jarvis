@@ -826,11 +826,11 @@ def review_commit(
     llm_type: str = typer.Option(
         "normal",
         "-t",
-        "--llm_type",
+        "--llm-type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
     """审查指定的提交"""
@@ -857,11 +857,11 @@ def review_current(
     llm_type: str = typer.Option(
         "normal",
         "-t",
-        "--llm_type",
+        "--llm-type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
     """审查当前的变更"""
@@ -889,11 +889,11 @@ def review_range(
     llm_type: str = typer.Option(
         "normal",
         "-t",
-        "--llm_type",
+        "--llm-type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
     """审查提交范围"""
@@ -922,11 +922,11 @@ def review_file(
     llm_type: str = typer.Option(
         "normal",
         "-t",
-        "--llm_type",
+        "--llm-type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
     """审查指定的文件"""

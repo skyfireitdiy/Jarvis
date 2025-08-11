@@ -43,18 +43,18 @@ def cli(
         None, "-f", "--config", help="代理配置文件路径"
     ),
     agent_definition: Optional[str] = typer.Option(
-        None, "-c", "--agent_definition", help="代理定义文件路径"
+        None, "-c", "--agent-definition", help="代理定义文件路径"
     ),
     task: Optional[str] = typer.Option(
         None, "-t", "--task", help="初始任务内容"
     ),
     llm_type: str = typer.Option(
         "normal",
-        "-t", "--llm_type",
+        "-t", "--llm-type",
         help="使用的LLM类型，覆盖配置文件中的设置",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),):
     """Main entry point for Jarvis agent"""
     # Initialize environment

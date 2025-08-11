@@ -389,11 +389,11 @@ def cli(
     llm_type: str = typer.Option(
         "normal",
         "-t",
-        "--llm_type",
+        "--llm-type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
     model_group: Optional[str] = typer.Option(
-        None, "-g", "--llm_group", help="使用的模型组，覆盖配置文件中的设置"
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
     init_env("欢迎使用 Jarvis-GitCommitTool，您的Git提交助手已准备就绪！")
