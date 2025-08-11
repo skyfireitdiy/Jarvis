@@ -655,6 +655,9 @@ def cli(
     requirement: Optional[str] = typer.Option(
         None, "-r", "--requirement", help="要处理的需求描述"
     ),
+    append_tools: Optional[str] = typer.Option(
+        None, "--append-tools", help="要追加的工具列表，用逗号分隔"
+    ),
     restore_session: bool = typer.Option(
         False,
         "--restore-session",
@@ -705,6 +708,7 @@ def cli(
             llm_type=llm_type,
             model_group=model_group,
             need_summary=False,
+            append_tools=append_tools,
         )
 
         # 尝试恢复会话
