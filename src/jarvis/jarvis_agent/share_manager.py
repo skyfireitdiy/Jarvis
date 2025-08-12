@@ -2,7 +2,7 @@
 """分享管理模块，负责工具和方法论的分享功能"""
 import os
 import subprocess
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Set
 from abc import ABC, abstractmethod
 
 from prompt_toolkit import prompt
@@ -16,7 +16,7 @@ def parse_selection(selection_str: str, max_value: int) -> List[int]:
 
     例如: "1,2,3,4-9,20" -> [1, 2, 3, 4, 5, 6, 7, 8, 9, 20]
     """
-    selected: set[int] = set()
+    selected: Set[int] = set()
     parts = selection_str.split(",")
 
     for part in parts:
@@ -73,13 +73,15 @@ class ShareManager(ABC):
                     if "__pycache__" not in content:
                         f.write("\n__pycache__/\n")
                         modified = True
-            
+
             if modified:
-                subprocess.run(["git", "add", ".gitignore"], cwd=self.repo_path, check=True)
                 subprocess.run(
-                    ["git", "commit", "-m", "chore: add __pycache__ to .gitignore"], 
-                    cwd=self.repo_path, 
-                    check=True
+                    ["git", "add", ".gitignore"], cwd=self.repo_path, check=True
+                )
+                subprocess.run(
+                    ["git", "commit", "-m", "chore: add __pycache__ to .gitignore"],
+                    cwd=self.repo_path,
+                    check=True,
                 )
                 subprocess.run(["git", "push"], cwd=self.repo_path, check=True)
         else:
@@ -163,9 +165,7 @@ class ShareManager(ABC):
     def select_resources(self, resources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """让用户选择要分享的资源"""
         # 显示可选的资源
-        resource_list = [
-            f"\n可分享的{self.get_resource_type()}（已排除中心仓库中已有的）："
-        ]
+        resource_list = [f"\n可分享的{self.get_resource_type()}（已排除中心仓库中已有的）："]
         for i, resource in enumerate(resources, 1):
             resource_list.append(f"[{i}] {self.format_resource_display(resource)}")
 
