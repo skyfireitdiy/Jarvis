@@ -32,7 +32,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     for tag in special_tags:
         # 优先处理特殊标记
         if tag == "Summary":
-            agent._summarize_and_clear_history()
+            summary = agent._summarize_and_clear_history()
+            memory_tags_prompt = agent.memory_manager.prepare_memory_tags_prompt()
+            if summary:
+                # 将摘要和记忆标签设置为新会话的初始提示
+                agent.session.prompt = summary + "\n" + memory_tags_prompt
             return "", True
         elif tag == "Clear":
             agent.clear()
