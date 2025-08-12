@@ -442,9 +442,10 @@ class Agent:
             4. 会检查并处理上下文长度限制
         """
         # 处理输入
-        message = self._process_input(message, run_input_handlers)
-        if run_input_handlers and self._should_return_early(message):
-            return message
+        if run_input_handlers:
+            message = self._process_input(message)
+            if not message:
+                return ""
 
         # 添加附加提示
         message = self._add_addon_prompt(message, need_complete)
@@ -457,20 +458,15 @@ class Agent:
 
         return response
 
-    def _process_input(self, message: str, run_input_handlers: bool) -> str:
+    def _process_input(self, message: str) -> str:
         """处理输入消息"""
-        if run_input_handlers:
-            for handler in self.input_handler:
-                message, need_return = handler(message, self)
-                if need_return:
-                    self._last_handler_returned = True
-                    return message
+        for handler in self.input_handler:
+            message, need_return = handler(message, self)
+            if need_return:
+                self._last_handler_returned = True
+                return message
         self._last_handler_returned = False
         return message
-
-    def _should_return_early(self, message: str) -> bool:
-        """检查是否需要提前返回"""
-        return hasattr(self, "_last_handler_returned") and self._last_handler_returned
 
     def _add_addon_prompt(self, message: str, need_complete: bool) -> str:
         """添加附加提示到消息"""
@@ -709,12 +705,8 @@ class Agent:
                 current_response = self._call_model(
                     self.session.prompt, True, run_input_handlers
                 )
-                # 仅当输入处理器没有指示提前返回时才清空提示
-                if (
-                    not hasattr(self, "_last_handler_returned")
-                    or not self._last_handler_returned
-                ):
-                    self.session.prompt = ""
+
+                self.session.prompt = ""
                 run_input_handlers = False
 
                 # 处理中断

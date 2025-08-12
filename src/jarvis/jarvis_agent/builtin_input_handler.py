@@ -34,13 +34,14 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         if tag == "Summary":
             summary = agent._summarize_and_clear_history()
             memory_tags_prompt = agent.memory_manager.prepare_memory_tags_prompt()
+            prompt = ""
             if summary:
                 # 将摘要和记忆标签设置为新会话的初始提示
-                agent.session.prompt = summary + "\n" + memory_tags_prompt
+                prompt = summary + "\n" + memory_tags_prompt
             else:
                 # 即使没有摘要，也确保设置记忆标签作为新会话的初始提示
-                agent.session.prompt = memory_tags_prompt
-            return "", True
+                prompt = memory_tags_prompt
+            return prompt, True
         elif tag == "Clear":
             agent.clear()
             return "", True
