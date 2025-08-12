@@ -19,21 +19,18 @@ def run_cli(
     ctx: typer.Context,
     llm_type: str = typer.Option(
         "normal",
-        "-t", "--llm-type",
+        "-t",
+        "--llm-type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
-    task: Optional[str] = typer.Option(
-        None, "-T", "--task", help="从命令行直接输入任务内容"
-    ),
+    task: Optional[str] = typer.Option(None, "-T", "--task", help="从命令行直接输入任务内容"),
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     tool_group: Optional[str] = typer.Option(
         None, "-G", "--tool-group", help="使用的工具组，覆盖配置文件中的设置"
     ),
-    config_file: Optional[str] = typer.Option(
-        None, "-f", "--config", help="自定义配置文件路径"
-    ),
+    config_file: Optional[str] = typer.Option(None, "-f", "--config", help="自定义配置文件路径"),
     restore_session: bool = typer.Option(
         False,
         "--restore-session",
@@ -43,9 +40,7 @@ def run_cli(
     share_methodology: bool = typer.Option(
         False, "--share-methodology", help="分享本地方法论到中心方法论仓库"
     ),
-    share_tool: bool = typer.Option(
-        False, "--share-tool", help="分享本地工具到中心工具仓库"
-    ),
+    share_tool: bool = typer.Option(False, "--share-tool", help="分享本地工具到中心工具仓库"),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -59,21 +54,19 @@ def run_cli(
     # 处理方法论分享
     if share_methodology:
         init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
-        manager = MethodologyShareManager()
-        manager.run()
+        methodology_manager = MethodologyShareManager()
+        methodology_manager.run()
         return
 
     # 处理工具分享
     if share_tool:
         init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
-        manager = ToolShareManager()
-        manager.run()
+        tool_manager = ToolShareManager()
+        tool_manager.run()
         return
 
     # 初始化环境
-    init_env(
-        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file
-    )
+    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file)
 
     # 运行主流程
     try:
