@@ -48,13 +48,10 @@ class FileMethodologyManager:
             # 上传成功
             from jarvis.jarvis_agent.memory_manager import MemoryManager
 
-            memory_manager = MemoryManager(self.agent)
-            memory_tags_prompt = memory_manager.prepare_memory_tags_prompt()
-
             if self.agent.files:
-                self.agent.session.prompt = f"{self.agent.session.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。{memory_tags_prompt}"
+                self.agent.session.prompt = f"{self.agent.session.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
             else:
-                self.agent.session.prompt = f"{self.agent.session.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。{memory_tags_prompt}"
+                self.agent.session.prompt = f"{self.agent.session.prompt}\n\n上传的文件包含历史对话信息，可以从中获取一些经验信息。"
 
     def _handle_files_upload(self):
         """处理普通文件上传"""
@@ -79,14 +76,13 @@ class FileMethodologyManager:
         from jarvis.jarvis_agent.memory_manager import MemoryManager
 
         memory_manager = MemoryManager(self.agent)
-        memory_tags_prompt = memory_manager.prepare_memory_tags_prompt()
         methodology = load_methodology(
             msg,
             self.agent.get_tool_registry(),
             platform_name=self.agent.model.platform_name(),
             model_name=self.agent.model.name(),
         )
-        self.agent.session.prompt = f"{self.agent.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{methodology}{memory_tags_prompt}"
+        self.agent.session.prompt = f"{self.agent.session.prompt}\n\n以下是历史类似问题的执行经验，可参考：\n{methodology}"
 
     def handle_history_with_file_upload(self) -> str:
         """使用文件上传方式处理历史"""
