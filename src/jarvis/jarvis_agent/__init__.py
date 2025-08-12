@@ -568,7 +568,8 @@ class Agent:
         # 清理历史（但不清理prompt，因为prompt会在builtin_input_handler中设置）
         if self.model:
             self.model.reset()
-        self.session.conversation_length = 0
+        # 重置会话
+        self.session.clear_history()
 
         return formatted_summary
 
@@ -708,7 +709,12 @@ class Agent:
                 current_response = self._call_model(
                     self.session.prompt, True, run_input_handlers
                 )
-                self.session.prompt = ""
+                # 仅当输入处理器没有指示提前返回时才清空提示
+                if (
+                    not hasattr(self, "_last_handler_returned")
+                    or not self._last_handler_returned
+                ):
+                    self.session.prompt = ""
                 run_input_handlers = False
 
                 # 处理中断
