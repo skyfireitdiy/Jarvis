@@ -284,9 +284,7 @@ class Agent:
 
         self.model = PlatformRegistry().create_platform(platform_name)
         if self.model is None:
-            PrettyOutput.print(
-                f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING
-            )
+            PrettyOutput.print(f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING)
             self.model = PlatformRegistry().get_normal_platform()
 
         if model_name:
@@ -561,12 +559,18 @@ class Agent:
     def _handle_history_with_summary(self) -> str:
         """使用摘要方式处理历史"""
         summary = self.generate_summary()
-        self.clear_history()
 
-        if not summary:
-            return ""
+        # 先获取格式化的摘要消息
+        formatted_summary = ""
+        if summary:
+            formatted_summary = self._format_summary_message(summary)
 
-        return self._format_summary_message(summary)
+        # 清理历史（但不清理prompt，因为prompt会在builtin_input_handler中设置）
+        if self.model:
+            self.model.reset()
+        self.session.conversation_length = 0
+
+        return formatted_summary
 
     def _handle_history_with_file_upload(self) -> str:
         """使用文件上传方式处理历史"""
@@ -783,9 +787,7 @@ class Agent:
         返回:
             str: "continue" 或 "complete"
         """
-        user_input = self.multiline_inputer(
-            f"{self.name}: 请输入，或输入空行来结束当前任务："
-        )
+        user_input = self.multiline_inputer(f"{self.name}: 请输入，或输入空行来结束当前任务：")
 
         if user_input:
             self.session.prompt = user_input
