@@ -43,7 +43,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 prompt = memory_tags_prompt
             return prompt, True
         elif tag == "Clear":
-            agent.clear()
+            agent.clear_history()
             return "", True
         elif tag == "ToolUsage":
             agent.set_addon_prompt(agent.get_tool_usage_prompt())
