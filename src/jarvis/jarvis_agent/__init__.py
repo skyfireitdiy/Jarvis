@@ -180,11 +180,11 @@ origin_agent_system_prompt = f"""
 
 
 class Agent:
-    def clear(self):
+    def clear_history(self):
         """
         Clears the current conversation history by delegating to the session manager.
         """
-        self.session.clear()
+        self.session.clear_history()
 
     def __del__(self):
         # 只有在记录启动时才停止记录
@@ -284,7 +284,9 @@ class Agent:
 
         self.model = PlatformRegistry().create_platform(platform_name)
         if self.model is None:
-            PrettyOutput.print(f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING)
+            PrettyOutput.print(
+                f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING
+            )
             self.model = PlatformRegistry().get_normal_platform()
 
         if model_name:
@@ -715,12 +717,16 @@ class Agent:
                     if isinstance(interrupt_result, tuple):
                         run_input_handlers, should_continue = interrupt_result
                         if should_continue:
+                            self.run_input_handlers_next_turn = True
                             continue
                     else:
                         return interrupt_result
 
                 # 处理工具调用
-                need_return, self.session.prompt = self._call_tools(current_response)
+                need_return, prompt = self._call_tools(current_response)
+                if self.session.prompt and prompt:
+                    self.session.prompt += "\n\n" + prompt
+                    
                 if need_return:
                     return self.session.prompt
 
@@ -785,7 +791,9 @@ class Agent:
         返回:
             str: "continue" 或 "complete"
         """
-        user_input = self.multiline_inputer(f"{self.name}: 请输入，或输入空行来结束当前任务：")
+        user_input = self.multiline_inputer(
+            f"{self.name}: 请输入，或输入空行来结束当前任务："
+        )
 
         if user_input:
             self.session.prompt = user_input
@@ -871,9 +879,3 @@ class Agent:
             organizer.organize_memories(memory_type, min_overlap=3)
         else:
             PrettyOutput.print(f"已取消 '{scope_name}' 记忆库整理。", OutputType.INFO)
-
-    def clear_history(self):
-        """
-        Clears conversation history by delegating to the session manager.
-        """
-        self.session.clear_history()
