@@ -34,14 +34,6 @@ class SessionManager:
         """Sets the addon prompt for the next model call."""
         self.addon_prompt = addon_prompt
 
-    def clear(self):
-        """
-        Clears the current conversation history, prompt, and length counter.
-        """
-        self.model.reset()
-        self.conversation_length = 0
-        self.prompt = ""
-
     def save_session(self) -> bool:
         """Saves the current session state to a file."""
         session_dir = os.path.join(os.getcwd(), ".jarvis")
