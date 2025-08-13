@@ -726,7 +726,9 @@ class Agent:
                 need_return, prompt = self._call_tools(current_response)
                 if self.session.prompt and prompt:
                     self.session.prompt += "\n\n" + prompt
-                    
+                else:
+                    self.session.prompt = prompt
+
                 if need_return:
                     return self.session.prompt
 
