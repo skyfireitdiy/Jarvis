@@ -239,7 +239,10 @@ class CodeAgent:
         if has_uncommitted_changes():
             print("⏳ 发现未提交修改，正在处理...")
             git_commiter = GitCommitTool()
-            git_commiter.execute({})
+            git_commiter.execute({
+                "prefix": prefix,
+                "suffix": suffix
+            })
             print("✅ 未提交修改已处理完成")
         else:
             print("✅ 没有未提交的修改")
@@ -489,7 +492,10 @@ class CodeAgent:
                 check=True,
             )
             git_commiter = GitCommitTool()
-            git_commiter.execute({})
+            git_commiter.execute({
+                "prefix": prefix,
+                "suffix": suffix
+            })
 
             # 在用户接受commit后，根据配置决定是否保存记忆
             if self.agent.force_save_memory:
@@ -498,7 +504,7 @@ class CodeAgent:
             os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
             PrettyOutput.print("已重置到初始提交", OutputType.INFO)
 
-    def run(self, user_input: str) -> Optional[str]:
+    def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
         """使用给定的用户输入运行代码代理。
 
         参数:
@@ -671,6 +677,16 @@ def cli(
         "--restore-session",
         help="从 .jarvis/saved_session.json 恢复会话状态",
     ),
+    prefix: str = typer.Option(
+        "",
+        "--prefix",
+        help="提交信息前缀（用空格分隔）",
+    ),
+    suffix: str = typer.Option(
+        "",
+        "--suffix",
+        help="提交信息后缀（用换行分隔）",
+    ),
 ) -> None:
     """Jarvis主入口点。"""
     init_env("欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！")
@@ -731,13 +747,13 @@ def cli(
                 )
 
         if requirement:
-            agent.run(requirement)
+            agent.run(requirement, prefix=prefix, suffix=suffix)
         else:
             while True:
                 user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
                 if not user_input:
                     raise typer.Exit(code=0)
-                agent.run(user_input)
+                agent.run(user_input, prefix=prefix, suffix=suffix)
 
     except typer.Exit:
         raise
