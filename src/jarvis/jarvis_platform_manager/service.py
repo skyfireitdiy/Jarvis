@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import time
+import threading
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
@@ -72,8 +73,16 @@ def start_service(
 ) -> None:
     """Start OpenAI-compatible API server."""
     # Create logs directory if it doesn't exist
-    logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-    os.makedirs(logs_dir, exist_ok=True)
+    # Prefer environment variable, then user directory, fall back to CWD
+    logs_dir = os.environ.get("JARVIS_LOG_DIR")
+    if not logs_dir:
+        logs_dir = os.path.join(os.path.expanduser("~"), ".jarvis", "logs")
+    try:
+        os.makedirs(logs_dir, exist_ok=True)
+    except Exception:
+        # As a last resort, use current working directory
+        logs_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(logs_dir, exist_ok=True)
 
     app = FastAPI(title="Jarvis API Server")
 
@@ -81,7 +90,7 @@ def start_service(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -228,23 +237,23 @@ def start_service(
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
 
-        # Log the conversation
-        log_conversation(
-            conversation_id,
-            [{"role": m.role, "content": m.content} for m in messages],
-            model,
-        )
+        # Logging moved to post-response to avoid duplicates
 
         if stream:
             # Return streaming response
             return StreamingResponse(
                 stream_chat_response(platform, message_text, model),  # type: ignore
                 media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
             )
 
         # Get chat response
         try:
-            response_text = platform.chat_until_success(message_text)
+            # Run potentially blocking call in a thread to avoid blocking the event loop
+            loop = asyncio.get_running_loop()
+            response_text = await loop.run_in_executor(
+                None, lambda: platform.chat_until_success(message_text)
+            )
 
             # Create response in OpenAI format
             completion_id = f"chatcmpl-{str(uuid.uuid4())}"
@@ -287,10 +296,30 @@ def start_service(
             raise HTTPException(status_code=500, detail=str(exc))
 
     async def stream_chat_response(platform: Any, message: str, model_name: str) -> Any:
-        """Stream chat response in OpenAI-compatible format."""
+        """Stream chat response in OpenAI-compatible format without blocking the event loop."""
         completion_id = f"chatcmpl-{str(uuid.uuid4())}"
         created_time = int(time.time())
         conversation_id = str(uuid.uuid4())
+
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+        SENTINEL = object()
+
+        def producer() -> None:
+            try:
+                for chunk in platform.chat(message):
+                    if chunk:
+                        asyncio.run_coroutine_threadsafe(queue.put(chunk), loop)
+            except Exception as exc:
+                # Use a special dict to pass error across thread boundary
+                asyncio.run_coroutine_threadsafe(
+                    queue.put({"__error__": str(exc)}), loop
+                )
+            finally:
+                asyncio.run_coroutine_threadsafe(queue.put(SENTINEL), loop)
+
+        # Start producer thread
+        threading.Thread(target=producer, daemon=True).start()
 
         # Send the initial chunk with the role
         initial_data = {
@@ -304,36 +333,20 @@ def start_service(
         }
         yield f"data: {json.dumps(initial_data)}\n\n"
 
-        try:
-            # Use the streaming-capable chat method
-            response_generator = platform.chat(message)
+        full_response = ""
+        has_content = False
 
-            full_response = ""
-            has_content = False
+        while True:
+            item = await queue.get()
+            if item is SENTINEL:
+                break
 
-            # Iterate over the generator and stream chunks
-            for chunk in response_generator:
-                if chunk:
-                    has_content = True
-                    full_response += chunk
-                    chunk_data = {
-                        "id": completion_id,
-                        "object": "chat.completion.chunk",
-                        "created": created_time,
-                        "model": model_name,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": {"content": chunk},
-                                "finish_reason": None,
-                            }
-                        ],
-                    }
-                    yield f"data: {json.dumps(chunk_data)}\n\n"
+            if isinstance(item, dict) and "__error__" in item:
+                error_msg = f"Error during streaming: {item['__error__']}"
+                PrettyOutput.print(error_msg, OutputType.ERROR)
 
-            if not has_content:
-                no_response_message = "No response from model."
-                chunk_data = {
+                # Send error information in the stream
+                error_chunk = {
                     "id": completion_id,
                     "object": "chat.completion.chunk",
                     "created": created_time,
@@ -341,41 +354,28 @@ def start_service(
                     "choices": [
                         {
                             "index": 0,
-                            "delta": {"content": no_response_message},
-                            "finish_reason": None,
+                            "delta": {"content": error_msg},
+                            "finish_reason": "stop",
                         }
                     ],
                 }
-                yield f"data: {json.dumps(chunk_data)}\n\n"
-                full_response = no_response_message
+                yield f"data: {json.dumps(error_chunk)}\n\n"
+                yield "data: [DONE]\n\n"
 
-            # Send the final chunk with finish_reason
-            final_data = {
-                "id": completion_id,
-                "object": "chat.completion.chunk",
-                "created": created_time,
-                "model": model_name,
-                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-            }
-            yield f"data: {json.dumps(final_data)}\n\n"
+                # Log the error
+                log_conversation(
+                    conversation_id,
+                    [{"role": "user", "content": message}],
+                    model_name,
+                    response=f"ERROR: {error_msg}",
+                )
+                return
 
-            # Send the [DONE] marker
-            yield "data: [DONE]\n\n"
-
-            # Log the full conversation
-            log_conversation(
-                conversation_id,
-                [{"role": "user", "content": message}],
-                model_name,
-                full_response,
-            )
-
-        except Exception as exc:
-            error_msg = f"Error during streaming: {str(exc)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
-
-            # Send error information in the stream
-            error_chunk = {
+            # Normal chunk
+            chunk = item
+            has_content = True
+            full_response += chunk
+            chunk_data = {
                 "id": completion_id,
                 "object": "chat.completion.chunk",
                 "created": created_time,
@@ -383,21 +383,51 @@ def start_service(
                 "choices": [
                     {
                         "index": 0,
-                        "delta": {"content": error_msg},
-                        "finish_reason": "stop",
+                        "delta": {"content": chunk},
+                        "finish_reason": None,
                     }
                 ],
             }
-            yield f"data: {json.dumps(error_chunk)}\n\n"
-            yield "data: [DONE]\n\n"
+            yield f"data: {json.dumps(chunk_data)}\n\n"
 
-            # Log the error
-            log_conversation(
-                conversation_id,
-                [{"role": "user", "content": message}],
-                model_name,
-                response=f"ERROR: {error_msg}",
-            )
+        if not has_content:
+            no_response_message = "No response from model."
+            chunk_data = {
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": created_time,
+                "model": model_name,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": {"content": no_response_message},
+                        "finish_reason": None,
+                    }
+                ],
+            }
+            yield f"data: {json.dumps(chunk_data)}\n\n"
+            full_response = no_response_message
+
+        # Send the final chunk with finish_reason
+        final_data = {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": created_time,
+            "model": model_name,
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        }
+        yield f"data: {json.dumps(final_data)}\n\n"
+
+        # Send the [DONE] marker
+        yield "data: [DONE]\n\n"
+
+        # Log the full conversation
+        log_conversation(
+            conversation_id,
+            [{"role": "user", "content": message}],
+            model_name,
+            full_response,
+        )
 
     # Run the server
     uvicorn.run(app, host=host, port=port)
