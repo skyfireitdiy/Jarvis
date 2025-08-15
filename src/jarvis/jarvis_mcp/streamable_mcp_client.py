@@ -4,7 +4,7 @@ import threading
 from typing import Any, Callable, Dict, List
 from urllib.parse import urljoin
 
-import requests
+import requests  # type: ignore[import-untyped]
 
 from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -25,6 +25,8 @@ class StreamableMcpClient(McpClient):
         self.base_url = config.get("base_url", "")
         if not self.base_url:
             raise ValueError("No base_url specified in config")
+        # Normalize base_url to ensure trailing slash for urljoin correctness
+        self.base_url = self.base_url.rstrip("/") + "/"
 
         # 设置HTTP客户端
         self.session = requests.Session()
@@ -43,6 +45,8 @@ class StreamableMcpClient(McpClient):
         # 添加额外的HTTP头
         extra_headers = config.get("headers", {})
         self.session.headers.update(extra_headers)
+        # Request timeouts (connect, read) in seconds; can be overridden via config["timeout"]
+        self.timeout = config.get("timeout", (10, 300))
 
         # 请求相关属性
         self.pending_requests: Dict[str, threading.Event] = {}  # 存储等待响应的请求 {id: Event}
@@ -141,7 +145,9 @@ class StreamableMcpClient(McpClient):
 
             # 发送请求到Streamable HTTP端点
             mcp_url = urljoin(self.base_url, "mcp")
-            response = self.session.post(mcp_url, json=request, stream=True)  # 启用流式传输
+            response = self.session.post(
+                mcp_url, json=request, stream=True, timeout=self.timeout
+            )  # 启用流式传输
             response.raise_for_status()
 
             # 处理流式响应
@@ -149,17 +155,21 @@ class StreamableMcpClient(McpClient):
             for line in response.iter_lines(decode_unicode=True):
                 if line:
                     try:
-                        data = json.loads(line)
+                        line_data = line
+                        if isinstance(line_data, str) and line_data.startswith("data:"):
+                            # Handle SSE-formatted lines like "data: {...}"
+                            line_data = line_data.split(":", 1)[1].strip()
+                        data = json.loads(line_data)
                         if "id" in data and data["id"] == req_id:
                             # 这是我们的请求响应
                             result = data
                             break
                         elif "method" in data:
                             # 这是一个通知
-                            method = data.get("method", "")
+                            notify_method = data.get("method", "")
                             params = data.get("params", {})
-                            if method in self.notification_handlers:
-                                for handler in self.notification_handlers[method]:
+                            if notify_method in self.notification_handlers:
+                                for handler in self.notification_handlers[notify_method]:
                                     try:
                                         handler(params)
                                     except Exception as e:
@@ -171,6 +181,8 @@ class StreamableMcpClient(McpClient):
                         PrettyOutput.print(f"无法解析响应: {line}", OutputType.WARNING)
                         continue
 
+            # Ensure response is closed after streaming
+            response.close()
             if result is None:
                 raise RuntimeError(f"未收到响应: {method}")
 
@@ -198,8 +210,9 @@ class StreamableMcpClient(McpClient):
 
             # 发送通知到Streamable HTTP端点
             mcp_url = urljoin(self.base_url, "mcp")
-            response = self.session.post(mcp_url, json=notification)
+            response = self.session.post(mcp_url, json=notification, timeout=self.timeout)
             response.raise_for_status()
+            response.close()
 
         except Exception as e:
             PrettyOutput.print(f"发送通知失败: {str(e)}", OutputType.ERROR)
