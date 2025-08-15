@@ -68,13 +68,15 @@ class CodeAgent:
             "retrieve_memory",
             "clear_memory",
         ]
-        
+
         if append_tools:
-            additional_tools = [tool.strip() for tool in append_tools.split(",")]
+            additional_tools = [
+                t for t in (tool.strip() for tool in append_tools.split(",")) if t
+            ]
             base_tools.extend(additional_tools)
             # 去重
             base_tools = list(dict.fromkeys(base_tools))
-            
+
         tool_registry.use_tools(base_tools)
         code_system_prompt = self._get_system_prompt()
         self.agent = Agent(
@@ -412,18 +414,23 @@ class CodeAgent:
                     return
 
                 # 获取当前分支的提交总数
-                commit_result = subprocess.run(
-                    ["git", "rev-list", "--count", "HEAD"],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    check=True,
-                )
-                if commit_result.returncode != 0:
-                    return
-
-                commit_count = int(commit_result.stdout.strip())
+                # 兼容空仓库或无 HEAD 的场景：失败时将提交计数视为 0，继续执行提交流程
+                commit_count = 0
+                try:
+                    commit_result = subprocess.run(
+                        ["git", "rev-list", "--count", "HEAD"],
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        check=False,
+                    )
+                    if commit_result.returncode == 0:
+                        out = commit_result.stdout.strip()
+                        if out.isdigit():
+                            commit_count = int(out)
+                except Exception:
+                    commit_count = 0
 
                 # 暂存所有修改
                 subprocess.run(["git", "add", "."], check=True)
@@ -634,11 +641,12 @@ class CodeAgent:
         ):
             agent.session.prompt += final_ret
             return
-        agent.session.prompt += final_ret
+        # 用户未确认，允许输入自定义回复作为附加提示
         custom_reply = get_multiline_input("请输入自定义回复")
-        if custom_reply.strip():  # 如果自定义回复为空，返回空字符串
+        if custom_reply.strip():  # 如果自定义回复为空，不设置附加提示
             agent.set_addon_prompt(custom_reply)
         agent.session.prompt += final_ret
+        return
 
 
 @app.command()
