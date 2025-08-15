@@ -51,7 +51,7 @@ from jarvis.jarvis_utils.globals import (
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.tag import ot
 
 
 def show_agent_startup_stats(agent_name: str, model_name: str) -> None:
@@ -188,7 +188,12 @@ class Agent:
 
     def __del__(self):
         # 只有在记录启动时才停止记录
-        delete_agent(self.name)
+        try:
+            name = getattr(self, "name", None)
+            if name:
+                delete_agent(name)
+        except Exception:
+            pass
 
     def get_tool_usage_prompt(self) -> str:
         """获取工具使用提示"""
@@ -203,8 +208,8 @@ class Agent:
         model_group: Optional[str] = None,
         summary_prompt: Optional[str] = None,
         auto_complete: bool = False,
-        output_handler: List[OutputHandlerProtocol] = [],
-        use_tools: List[str] = [],
+        output_handler: Optional[List[OutputHandlerProtocol]] = None,
+        use_tools: Optional[List[str]] = None,
         input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
         execute_tool_confirm: Optional[bool] = None,
         need_summary: bool = True,
@@ -212,7 +217,7 @@ class Agent:
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
         force_save_memory: Optional[bool] = None,
-        files: List[str] = [],
+        files: Optional[List[str]] = None,
     ):
         """初始化Jarvis Agent实例
 
@@ -225,7 +230,6 @@ class Agent:
             auto_complete: 是否自动完成任务
             output_handler: 输出处理器列表
             input_handler: 输入处理器列表
-            max_context_length: 最大上下文长度
             execute_tool_confirm: 执行工具前是否需要确认
             need_summary: 是否需要生成总结
             multiline_inputer: 多行输入处理器
@@ -234,7 +238,7 @@ class Agent:
             force_save_memory: 是否强制保存记忆
         """
         # 基础属性初始化
-        self.files = files
+        self.files = files or []
         self.name = make_agent_name(name)
         self.description = description
         self.system_prompt = system_prompt
@@ -250,7 +254,15 @@ class Agent:
         self._init_session()
 
         # 初始化处理器
-        self._init_handlers(output_handler, input_handler, multiline_inputer, use_tools)
+        safe_output_handlers: List[OutputHandlerProtocol] = []
+        if output_handler:
+            safe_output_handlers = output_handler
+        safe_use_tools: List[str] = []
+        if use_tools:
+            safe_use_tools = use_tools
+        self._init_handlers(
+            safe_output_handlers, input_handler, multiline_inputer, safe_use_tools
+        )
 
         # 初始化配置
         self._init_config(
@@ -528,7 +540,7 @@ class Agent:
 
         该方法将:
         1. 提示用户保存重要记忆
-        2. 调用_generate_summary生成摘要
+        2. 调用 generate_summary 生成摘要
         3. 清除对话历史
         4. 保留系统消息
         5. 添加摘要作为新上下文
@@ -566,6 +578,8 @@ class Agent:
         # 清理历史（但不清理prompt，因为prompt会在builtin_input_handler中设置）
         if self.model:
             self.model.reset()
+            # 重置后重新设置系统提示词，确保系统约束仍然生效
+            self._setup_system_prompt()
         # 重置会话
         self.session.clear_history()
 
