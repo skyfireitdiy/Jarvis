@@ -54,7 +54,9 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ot
 
 
-def show_agent_startup_stats(agent_name: str, model_name: str) -> None:
+def show_agent_startup_stats(
+    agent_name: str, model_name: str, tool_registry_instance: Optional[Any] = None
+) -> None:
     """输出启动时的统计信息
 
     参数:
@@ -87,8 +89,11 @@ def show_agent_startup_stats(agent_name: str, model_name: str) -> None:
         total_tool_count = len(tool_registry_all.tools)
 
         # 获取可用工具的数量（应用过滤）
-        tool_registry = ToolRegistry()
-        available_tool_count = len(tool_registry.get_all_tools())
+        if tool_registry_instance is not None:
+            available_tool_count = len(tool_registry_instance.get_all_tools())
+        else:
+            tool_registry = ToolRegistry()
+            available_tool_count = len(tool_registry.get_all_tools())
 
         global_memory_dir = Path(get_data_dir()) / "memory" / "global_long_term"
         global_memory_count = 0
@@ -283,7 +288,7 @@ class Agent:
         self._setup_system_prompt()
 
         # 输出统计信息（包含欢迎信息）
-        show_agent_startup_stats(name, self.model.name())  # type: ignore
+        show_agent_startup_stats(name, self.model.name(), self.get_tool_registry())  # type: ignore
 
     def _init_model(self, llm_type: str, model_group: Optional[str]):
         """初始化模型平台"""
