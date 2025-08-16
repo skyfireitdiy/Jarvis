@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
@@ -32,6 +32,7 @@ tool_call_help = f"""
 {ot("TOOL_CALL")}
 want: 想要从执行结果中获取到的信息，如果工具输出内容过长，会根据此字段尝试提取有效信息
 name: 工具名称
+
 arguments:
   param1: 值1
   param2: 值2
@@ -51,6 +52,7 @@ arguments:
 - 完全按照上述格式
 - 使用正确的YAML格式，2个空格作为缩进
 - 包含所有必需参数
+- 工具版本由工具实现声明，调用时无需传版本；系统会根据工具版本自动处理 agent 传递（2.0 中 arguments 不应包含 agent）
 </rule>
 
 <rule>
@@ -77,6 +79,7 @@ arguments:
 {ot("TOOL_CALL")}
 want: 当前的git状态，期望获取xxx的提交记录
 name: execute_script
+
 arguments:
   interpreter: bash
   script_content: |2
@@ -595,6 +598,9 @@ class ToolRegistry(OutputHandlerProtocol):
                             description=tool_instance.description,
                             parameters=tool_instance.parameters,
                             func=tool_instance.execute,
+                            protocol_version=getattr(
+                                tool_instance, "protocol_version", "1.0"
+                            ),
                         )
                         tool_found = True
                         break
@@ -630,7 +636,7 @@ class ToolRegistry(OutputHandlerProtocol):
             content: 包含工具调用的内容
 
         返回:
-            Tuple[Dict[str, Dict[str, Any]], str]: 
+            Tuple[Dict[str, Dict[str, Any]], str]:
                 - 第一个元素是提取的工具调用字典
                 - 第二个元素是错误消息字符串(成功时为"")
 
@@ -708,6 +714,7 @@ class ToolRegistry(OutputHandlerProtocol):
         description: str,
         parameters: Any,
         func: Callable[..., Dict[str, Any]],
+        protocol_version: str = "1.0",
     ) -> None:
         """注册新工具
 
@@ -721,7 +728,7 @@ class ToolRegistry(OutputHandlerProtocol):
             PrettyOutput.print(
                 f"警告: 工具 '{name}' 已存在，将被覆盖", OutputType.WARNING
             )
-        self.tools[name] = Tool(name, description, parameters, func)
+        self.tools[name] = Tool(name, description, parameters, func, protocol_version)
 
     def get_tool(self, name: str) -> Optional[Tool]:
         """获取工具
@@ -742,12 +749,15 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         return [tool.to_dict() for tool in self.tools.values()]
 
-    def execute_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def execute_tool(
+        self, name: str, arguments: Dict[str, Any], agent: Optional[Any] = None
+    ) -> Dict[str, Any]:
         """执行指定工具
 
         参数:
             name: 工具名称
             arguments: 工具参数
+            agent: 智能体实例（由系统内部传递，用于v2.0分离agent与参数）
 
         返回:
             Dict[str, Any]: 包含执行结果的字典，包含success、stdout和stderr字段
@@ -763,7 +773,23 @@ class ToolRegistry(OutputHandlerProtocol):
         # 更新工具调用统计
         self._update_tool_stats(name)
 
-        return tool.execute(arguments)
+        # 根据工具实现声明的协议版本分发调用方式
+        try:
+            if getattr(tool, "protocol_version", "1.0") == "2.0":
+                # v2.0: agent与参数分离传递
+                return tool.func(arguments, agent)  # type: ignore[misc]
+            else:
+                # v1.0: 兼容旧实现，将agent注入到arguments（如果提供）
+                args_to_call = arguments.copy() if isinstance(arguments, dict) else {}
+                if agent is not None:
+                    args_to_call["agent"] = agent
+                return tool.execute(args_to_call)
+        except TypeError:
+            # 兼容处理：如果函数签名不匹配，回退到旧方式
+            args_to_call = arguments.copy() if isinstance(arguments, dict) else {}
+            if agent is not None:
+                args_to_call["agent"] = agent
+            return tool.execute(args_to_call)
 
     def _format_tool_output(self, stdout: str, stderr: str) -> str:
         """格式化工具输出为可读字符串
@@ -802,14 +828,14 @@ class ToolRegistry(OutputHandlerProtocol):
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
         try:
             name = tool_call["name"]  # 确保name是str类型
-            args = tool_call["arguments"]  # args已经是Dict[str, Any]
+            args = tool_call["arguments"]  # 原始参数（来自外部协议）
             want = tool_call["want"]
-            args["agent"] = agent
 
             from jarvis.jarvis_agent import Agent
 
             agent_instance: Agent = agent
 
+            # 如果args是字符串，尝试解析为JSON
             if isinstance(args, str):
                 try:
                     args = json.loads(args)
@@ -819,8 +845,8 @@ class ToolRegistry(OutputHandlerProtocol):
                     )
                     return ""
 
-            # 执行工具调用
-            result = self.execute_tool(name, args)  # 修正参数传递
+            # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
+            result = self.execute_tool(name, args, agent)
 
             # 格式化输出
             output = self._format_tool_output(
@@ -853,8 +879,9 @@ class ToolRegistry(OutputHandlerProtocol):
                             [output_file]
                         )
                         if upload_success:
-                            # 删除args的agent键
-                            args.pop("agent", None)
+                            # 删除args的agent键（保持协议v2.0的“参数与agent分离”在可视化中的一致性）
+                            if isinstance(args, dict):
+                                args.pop("agent", None)
                             prompt = f"""
 以下是之前对话的关键信息总结：
 
