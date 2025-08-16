@@ -52,8 +52,10 @@ class CodeAgent:
         model_group: Optional[str] = None,
         need_summary: bool = True,
         append_tools: Optional[str] = None,
+        tool_group: Optional[str] = None,
     ):
         self.root_dir = os.getcwd()
+        self.tool_group = tool_group
 
         # 检测 git username 和 email 是否已设置
         self._check_git_config()
@@ -239,10 +241,7 @@ class CodeAgent:
         if has_uncommitted_changes():
             print("⏳ 发现未提交修改，正在处理...")
             git_commiter = GitCommitTool()
-            git_commiter.execute({
-                "prefix": prefix,
-                "suffix": suffix
-            })
+            git_commiter.execute({"prefix": prefix, "suffix": suffix})
             print("✅ 未提交修改已处理完成")
         else:
             print("✅ 没有未提交的修改")
@@ -496,10 +495,7 @@ class CodeAgent:
                 check=True,
             )
             git_commiter = GitCommitTool()
-            git_commiter.execute({
-                "prefix": prefix,
-                "suffix": suffix
-            })
+            git_commiter.execute({"prefix": prefix, "suffix": suffix})
 
             # 在用户接受commit后，根据配置决定是否保存记忆
             if self.agent.force_save_memory:
@@ -670,6 +666,12 @@ def cli(
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
+    tool_group: Optional[str] = typer.Option(
+        None, "-G", "--tool-group", help="使用的工具组，覆盖配置文件中的设置"
+    ),
+    config_file: Optional[str] = typer.Option(
+        None, "-f", "--config", help="配置文件路径"
+    ),
     requirement: Optional[str] = typer.Option(
         None, "-r", "--requirement", help="要处理的需求描述"
     ),
@@ -693,7 +695,10 @@ def cli(
     ),
 ) -> None:
     """Jarvis主入口点。"""
-    init_env("欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！")
+    init_env(
+        "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
+        config_file=config_file,
+    )
 
     try:
         subprocess.run(
@@ -737,6 +742,7 @@ def cli(
             model_group=model_group,
             need_summary=False,
             append_tools=append_tools,
+            tool_group=tool_group,
         )
 
         # 尝试恢复会话
