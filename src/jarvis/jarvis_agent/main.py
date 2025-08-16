@@ -3,7 +3,7 @@ import os
 from typing import Optional
 
 import typer
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -45,20 +45,22 @@ def cli(
     agent_definition: Optional[str] = typer.Option(
         None, "-c", "--agent-definition", help="代理定义文件路径"
     ),
-    task: Optional[str] = typer.Option(
-        None, "-t", "--task", help="初始任务内容"
-    ),
+    task: Optional[str] = typer.Option(None, "-T", "--task", help="初始任务内容"),
     llm_type: str = typer.Option(
         "normal",
-        "-t", "--llm-type",
+        "-t",
+        "--llm-type",
         help="使用的LLM类型，覆盖配置文件中的设置",
     ),
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
-    ),):
+    ),
+):
     """Main entry point for Jarvis agent"""
     # Initialize environment
-    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file)
+    init_env(
+        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file
+    )
 
     # Load configuration
     config = load_config(agent_definition) if agent_definition else {}
@@ -77,21 +79,27 @@ def cli(
         if task:
             PrettyOutput.print(f"执行初始任务: {task}", OutputType.INFO)
             agent.run(task)
-            raise typer.Exit(code=0)
+            return
 
         try:
             user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
             if not user_input:
-                raise typer.Exit(code=0)
+                return
             agent.set_addon_prompt(
                 "如果有必要，请先指定出行动计划，然后根据计划一步步执行，如果任务过于复杂，可以拆分子Agent进行执行，拆的子Agent需要掌握所有必要的任务信息，否则无法执行"
             )
             agent.run(user_input)
+        except KeyboardInterrupt:
+            # 用户主动取消输入，正常退出
+            return
+        except typer.Exit:
+            # 来自输入流程的正常退出
+            return
         except Exception as e:
             PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
 
     except typer.Exit:
-        raise
+        return
     except Exception as e:
         PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
         raise typer.Exit(code=1)
