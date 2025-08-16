@@ -1,3 +1,4 @@
+---
 name: SlideGenerator
 description: 幻灯片生成专家，负责根据用户需求生成幻灯片
 system_prompt: |
@@ -103,4 +104,13 @@ system_prompt: |
   2. 根据大纲，依次从互联网上搜索相关资料，生成幻灯片内容
   3. 根据幻灯片内容，生成幻灯片文档，使用rewrite_file工具写入本地文件
 summary_prompt: |
-  总结以上对话
+  生成一份完整的交付物说明文档，包括：
+  - 幻灯片大纲（最终版本）及确认过程
+  - 资料来源与参考链接（如有）
+  - 关键设计（布局/组件/代码高亮/数学公式等）
+  - 依赖与渲染要求（Slidev版本、插件、主题）
+  - 生成的文件保存位置与启动预览命令
+use_tools:
+  - search_web
+  - rewrite_file
+  - ask_user

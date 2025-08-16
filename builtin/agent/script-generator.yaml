@@ -1,3 +1,4 @@
+---
 name: ScriptGeneratorExpert
 description: 脚本生成专家，负责根据需求生成各种类型的脚本
 system_prompt: |
@@ -69,3 +70,7 @@ use_tools:
   - execute_script
   - read_code
   - search_web
+need_summary: true
+use_methodology: false
+use_analysis: false
+auto_complete: true

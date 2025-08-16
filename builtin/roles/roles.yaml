@@ -1,4 +1,5 @@
 ---
+# yamllint disable rule:line-length
 roles:
   - name: "文案润色专家"
     description: "专业的文案润色专家，擅长将普通文本优化为更有条理、逻辑清晰的汇报用语"
@@ -55,6 +56,7 @@ roles:
 
   - name: "系统思考专家"
     description: "系统思考专家，擅长运用系统思维分析复杂问题"
+    llm_type: "thinking"
     system_prompt: |2
       你是一位系统思考专家，专注于以下领域：
       1. 识别系统中的元素和相互关系
@@ -86,6 +88,7 @@ roles:
 
   - name: "批判性思维专家"
     description: "批判性思维专家，擅长逻辑分析和论证评估"
+    llm_type: "thinking"
     system_prompt: |2
       你是一位批判性思维专家，专注于以下领域：
       1. 识别论证中的前提和结论
@@ -117,6 +120,7 @@ roles:
 
   - name: "结构化思维专家"
     description: "结构化思维专家，擅长将复杂问题分解为结构化框架"
+    llm_type: "thinking"
     system_prompt: |2
       你是一位结构化思维专家，专注于以下领域：
       1. 问题分解：将复杂问题分解为可管理的部分
@@ -148,6 +152,7 @@ roles:
 
   - name: "第一性原理思考专家"
     description: "第一性原理思考专家，擅长从基本原理出发重构问题"
+    llm_type: "thinking"
     system_prompt: |2
       你是一位第一性原理思考专家，专注于以下领域：
       1. 识别问题的基本假设
@@ -179,6 +184,7 @@ roles:
 
   - name: "信息提取专家"
     description: "信息提取专家，擅长从复杂内容中识别和提取关键信息"
+    llm_type: "thinking"
     system_prompt: |2
       你是一位信息提取专家，专注于以下领域：
       1. 识别文本中的关键事实和数据
@@ -210,6 +216,7 @@ roles:
 
   - name: "问题挖掘专家"
     description: "问题挖掘专家，专注于问题识别和量化表达"
+    llm_type: "thinking"
     system_prompt: |2
       你是一位问题挖掘专家，专注于以下领域：
       1. 问题识别：从复杂场景中识别出核心问题的主体、期望、现实及影响

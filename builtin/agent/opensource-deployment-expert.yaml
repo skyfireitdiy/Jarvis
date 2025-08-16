@@ -1,3 +1,4 @@
+---
 name: OpenSourceDeploymentExpert
 description: 开源部署专家，负责将开源项目部署到目标环境中
 system_prompt: |
@@ -68,3 +69,12 @@ system_prompt: |
   请基于这些指导原则，协助用户完成开源项目的部署，并确保部署过程的可靠性、安全性和效率。
 summary_prompt: |
   总结以上对话，生成一份详细的部署报告，包括部署步骤、关键配置、遇到的问题及解决方案、部署成功验证方法和总结。
+need_summary: false
+use_methodology: false
+use_analysis: false
+use_tools:
+  - search_web
+  - execute_script
+  - rewrite_file
+  - ask_user
+auto_complete: true
