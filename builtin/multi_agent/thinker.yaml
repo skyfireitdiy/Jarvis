@@ -1,3 +1,5 @@
+---
+description: "多智能体：批判-推理双人协作，通过对抗式质询与严谨推理构建稳健思维链"
 agents:
    - name: CriticalQuestioner
      description: 批判性思维者，负责质疑、挑战并验证推理过程的严密性和可靠性

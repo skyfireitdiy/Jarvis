@@ -1,4 +1,6 @@
 ---
+# yamllint disable rule:line-length
+description: "多智能体：风投评审对话——VC与项目负责人往复问答，最终产出标准化《投资备忘录》"
 main_agent: VentureCapitalist
 agents:
   - name: VentureCapitalist
