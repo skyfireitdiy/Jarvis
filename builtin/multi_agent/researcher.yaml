@@ -1,3 +1,6 @@
+---
+description: "多智能体：高质量技术研究协作——研究主导/技术专家/实施专家协同，产出严谨且可执行的技术研究报告"
+main_agent: ResearchLead
 agents:
    - name: ResearchLead
      description: 研究主导者，负责问题定义、研究框架设计、过程协调和高质量技术报告整合
@@ -213,5 +216,3 @@ agents:
         你的实施分析应当兼具务实性和战略性，不仅提供"如何做"的详细指导，还提供"为什么这样做"的明确理由，确保技术投资能够实现最大的业务价值，同时有效管理风险和不确定性。
      llm_type: "normal"
      auto_complete: false
-
-main_agent: ResearchLead
