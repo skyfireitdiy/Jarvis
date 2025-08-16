@@ -1,3 +1,21 @@
+### Release Note - v0.3.15 2025-08-16
+
+#### **新功能 (Features)**  
+- 为提交信息添加前缀和后缀参数支持
+- 修正script_cotent拼写错误为script_content
+
+#### **修复 (Fixes)**  
+- 修复流式客户端的URL拼接、超时及响应处理问题
+- 修复阻塞调用与日志目录配置问题
+- 为_git相关方法添加prefix和suffix参数
+
+#### **文档更新 (Documentation)**  
+- 更新 _extract_tool_calls 方法的返回类型注释
+- 添加TODO文档记录项目待办事项
+- 移除已完成的拼写修复任务
+
+本次更新主要改进了代码提交的灵活性，修复了多个API和客户端问题，并完善了项目文档。
+
 ### Release Note - v0.3.14 2025-08-15
 
 #### **新功能 (Features)**
