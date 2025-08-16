@@ -110,6 +110,7 @@ summary_prompt: |
   - 关键设计（布局/组件/代码高亮/数学公式等）
   - 依赖与渲染要求（Slidev版本、插件、主题）
   - 生成的文件保存位置与启动预览命令
+need_summary: true
 use_tools:
   - search_web
   - rewrite_file
