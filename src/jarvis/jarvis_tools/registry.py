@@ -630,7 +630,9 @@ class ToolRegistry(OutputHandlerProtocol):
             content: 包含工具调用的内容
 
         返回:
-            List[Dict]: 包含名称和参数的提取工具调用列表
+            Tuple[Dict[str, Dict[str, Any]], str]: 
+                - 第一个元素是提取的工具调用字典
+                - 第二个元素是错误消息字符串(成功时为"")
 
         异常:
             Exception: 如果工具调用缺少必要字段
