@@ -2,19 +2,8 @@
 - 优先级：P0 > P1 > P2
 - 工作量：S（≤0.5天）、M（0.5–2天）、L（>2天）
 
-## 一、功能与覆盖缺失
-- [ ] [P0][M] 在执行前对 arguments 做 JSON Schema 校验（基于 tool.parameters）
-  - 统一参数错误提示，避免错误下沉至工具内部
-- [ ] [P1][M] 工具分组/标签与可见性控制
-  - 支持按组加载、配置集（profiles）快速切换
-- [ ] [P1][M] 工具热重载/卸载
-  - 支持 CLI reload 或 watch；冲突检测与回退
-- [ ] [P2][L] 工具权限/沙箱执行策略
-  - 文件系统/环境变量权限限制、签名/白名单、风险提示
 
 ## 二、逻辑错误与易错点
-- [ ] [P1][M] OutputHandler.handle 返回值语义核对
-  - 成功处理应返回 (True, …)（与上层管道契约一致）
 - [ ] [P0][M] 禁止将 agent 注入到 args 污染工具参数
   - 改为上下文参数或显式 execute(agent, arguments) 方式
 - [ ] [P1][M] register_tool_by_file 约束过强
