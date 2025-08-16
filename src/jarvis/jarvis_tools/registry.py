@@ -79,7 +79,7 @@ want: 当前的git状态，期望获取xxx的提交记录
 name: execute_script
 arguments:
   interpreter: bash
-  script_cotent: |2
+  script_content: |2
     git status --porcelain
 {ct("TOOL_CALL")}
 </string_format>

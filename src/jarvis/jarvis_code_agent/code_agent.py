@@ -233,7 +233,7 @@ class CodeAgent:
                 else:
                     print("ℹ️ .jarvis已在.gitignore中")
 
-    def _handle_git_changes(self) -> None:
+    def _handle_git_changes(self, prefix: str, suffix: str) -> None:
         """处理git仓库中的未提交修改"""
         print("🔄 正在检查未提交的修改...")
         if has_uncommitted_changes():
@@ -247,7 +247,7 @@ class CodeAgent:
         else:
             print("✅ 没有未提交的修改")
 
-    def _init_env(self) -> None:
+    def _init_env(self, prefix: str, suffix: str) -> None:
         """初始化环境，组合以下功能：
         1. 查找git根目录
         2. 检查并更新.gitignore文件
@@ -257,7 +257,7 @@ class CodeAgent:
         print("🚀 正在初始化环境...")
         git_dir = self._find_git_root()
         self._update_gitignore(git_dir)
-        self._handle_git_changes()
+        self._handle_git_changes(prefix, suffix)
         # 配置git对换行符变化不敏感
         self._configure_line_ending_settings()
         print("✅ 环境初始化完成")
@@ -476,7 +476,11 @@ class CodeAgent:
         return commits
 
     def _handle_commit_confirmation(
-        self, commits: List[Tuple[str, str]], start_commit: Optional[str]
+        self,
+        commits: List[Tuple[str, str]],
+        start_commit: Optional[str],
+        prefix: str,
+        suffix: str,
     ) -> None:
         """处理提交确认和可能的重置"""
         if commits and user_confirm("是否接受以上提交记录？", True):
@@ -514,7 +518,7 @@ class CodeAgent:
             str: 描述执行结果的输出，成功时返回None
         """
         try:
-            self._init_env()
+            self._init_env(prefix, suffix)
             start_commit = get_latest_commit_hash()
 
             # 获取项目统计信息并附加到用户输入
@@ -563,7 +567,7 @@ class CodeAgent:
             self._handle_uncommitted_changes()
             end_commit = get_latest_commit_hash()
             commits = self._show_commit_history(start_commit, end_commit)
-            self._handle_commit_confirmation(commits, start_commit)
+            self._handle_commit_confirmation(commits, start_commit, prefix, suffix)
             return None
 
         except RuntimeError as e:
