@@ -10,6 +10,10 @@ from jarvis.jarvis_agent.config_editor import ConfigEditor
 from jarvis.jarvis_agent.methodology_share_manager import MethodologyShareManager
 from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
 from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.input import user_confirm
+import os
+import sys
+import subprocess
 
 app = typer.Typer(help="Jarvis AI 助手")
 
@@ -23,14 +27,18 @@ def run_cli(
         "--llm-type",
         help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
     ),
-    task: Optional[str] = typer.Option(None, "-T", "--task", help="从命令行直接输入任务内容"),
+    task: Optional[str] = typer.Option(
+        None, "-T", "--task", help="从命令行直接输入任务内容"
+    ),
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     tool_group: Optional[str] = typer.Option(
         None, "-G", "--tool-group", help="使用的工具组，覆盖配置文件中的设置"
     ),
-    config_file: Optional[str] = typer.Option(None, "-f", "--config", help="自定义配置文件路径"),
+    config_file: Optional[str] = typer.Option(
+        None, "-f", "--config", help="自定义配置文件路径"
+    ),
     restore_session: bool = typer.Option(
         False,
         "--restore-session",
@@ -40,7 +48,9 @@ def run_cli(
     share_methodology: bool = typer.Option(
         False, "--share-methodology", help="分享本地方法论到中心方法论仓库"
     ),
-    share_tool: bool = typer.Option(False, "--share-tool", help="分享本地工具到中心工具仓库"),
+    share_tool: bool = typer.Option(
+        False, "--share-tool", help="分享本地工具到中心工具仓库"
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -65,8 +75,49 @@ def run_cli(
         tool_manager.run()
         return
 
+    # 在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+        )
+        if res.returncode == 0:
+            git_root = res.stdout.strip()
+            if git_root and os.path.isdir(git_root):
+                PrettyOutput.print(
+                    f"检测到当前位于 Git 仓库: {git_root}", OutputType.INFO
+                )
+                if user_confirm(
+                    "检测到Git仓库，是否切换到代码开发模式（jca）？", default=False
+                ):
+                    # 构建并切换到 jarvis-code-agent 命令，传递兼容参数
+                    args = ["jarvis-code-agent"]
+                    if llm_type:
+                        args += ["-t", llm_type]
+                    if model_group:
+                        args += ["-g", model_group]
+                    if tool_group:
+                        args += ["-G", tool_group]
+                    if config_file:
+                        args += ["-f", config_file]
+                    if restore_session:
+                        args += ["--restore-session"]
+                    if task:
+                        args += ["-r", task]
+                    PrettyOutput.print(
+                        "正在切换到 'jca'（jarvis-code-agent）以进入代码开发模式...",
+                        OutputType.INFO,
+                    )
+                    os.execvp(args[0], args)
+    except Exception:
+        # 静默忽略检测异常，不影响主流程
+        pass
+
     # 初始化环境
-    init_env("欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file)
+    init_env(
+        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file
+    )
 
     # 运行主流程
     try:
