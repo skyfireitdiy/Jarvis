@@ -235,6 +235,30 @@
       },
       "default": []
     },
+    "JARVIS_AGENT_DEFINITION_DIRS": {
+      "type": "array",
+      "description": "agent 定义加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "JARVIS_MULTI_AGENT_DIRS": {
+      "type": "array",
+      "description": "multi_agent 加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "JARVIS_ROLES_DIRS": {
+      "type": "array",
+      "description": "roles 加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "JARVIS_CENTRAL_METHODOLOGY_REPO": {
       "type": "string",
       "description": "中心方法论Git仓库地址，该仓库会自动添加到方法论加载路径中",
@@ -259,6 +283,16 @@
       "type": "boolean",
       "description": "是否强制保存记忆",
       "default": true
+    },
+    "JARVIS_ENABLE_GIT_JCA_SWITCH": {
+      "type": "boolean",
+      "description": "在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）",
+      "default": false
+    },
+    "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR": {
+      "type": "boolean",
+      "description": "在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择",
+      "default": false
     },
     "JARVIS_TOOL_GROUP": {
       "type": "string",
