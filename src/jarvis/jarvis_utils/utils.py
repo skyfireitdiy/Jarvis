@@ -886,6 +886,50 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         _ensure_schema_declaration(jarvis_dir, config_file, content, config_data)
         set_global_env_data(config_data)
         _process_env_variables(config_data)
+
+        # 首次运行提示：为新功能开关询问用户（默认关闭）
+        changed = False
+        if "JARVIS_ENABLE_GIT_JCA_SWITCH" not in config_data:
+            enable_jca = get_yes_no(
+                "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
+                default=False,
+            )
+            config_data["JARVIS_ENABLE_GIT_JCA_SWITCH"] = bool(enable_jca)
+            changed = True
+        if "JARVIS_ENABLE_BUILTIN_SELECTOR" not in config_data:
+            enable_selector = get_yes_no(
+                "在进入默认通用代理前，是否先列出内置配置（agent/multi_agent/roles）供选择？",
+                default=False,
+            )
+            config_data["JARVIS_ENABLE_BUILTIN_SELECTOR"] = bool(enable_selector)
+            changed = True
+
+        if changed:
+            # 保留schema声明，如无则自动补充
+            header = ""
+            try:
+                with open(config_file, "r", encoding="utf-8") as rf:
+                    first_line = rf.readline()
+                    if first_line.startswith("# yaml-language-server: $schema="):
+                        header = first_line
+            except Exception:
+                header = ""
+            yaml_str = yaml.dump(config_data, allow_unicode=True, sort_keys=False)
+            if not header:
+                schema_path = Path(
+                    os.path.relpath(
+                        Path(__file__).parent.parent
+                        / "jarvis_data"
+                        / "config_schema.json",
+                        start=jarvis_dir,
+                    )
+                )
+                header = f"# yaml-language-server: $schema={schema_path}\n"
+            with open(config_file, "w", encoding="utf-8") as wf:
+                wf.write(header)
+                wf.write(yaml_str)
+            # 更新全局配置
+            set_global_env_data(config_data)
     except Exception:
         PrettyOutput.print("加载配置文件失败", OutputType.ERROR)
         if get_yes_no("配置文件格式错误，是否删除并重新配置？"):

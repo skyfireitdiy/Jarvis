@@ -576,3 +576,19 @@ def get_tool_dont_use_list() -> List[str]:
     """
     config = _get_resolved_tool_config()
     return config.get("dont_use", [])
+
+
+def is_enable_git_repo_jca_switch() -> bool:
+    """
+    是否启用：在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）
+    默认关闭
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_GIT_JCA_SWITCH", False) is True
+
+
+def is_enable_builtin_config_selector() -> bool:
+    """
+    是否启用：在进入默认通用代理前，列出内置配置（agent/multi_agent/roles）供选择
+    默认关闭
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_BUILTIN_SELECTOR", False) is True
