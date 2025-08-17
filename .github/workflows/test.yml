@@ -1,10 +1,11 @@
+---
 name: Run Python Tests
 
-on:
+'on':
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
@@ -28,3 +29,21 @@ jobs:
 
       - name: Run tests
         run: pytest -v
+
+  install:
+    name: Run install.sh and verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run install script (non-interactive)
+        run: |
+          yes '' | bash scripts/install.sh
+
+      - name: Verify installation
+        run: |
+          set -euo pipefail
+          test -x "$HOME/Jarvis/.venv/bin/jarvis"
+          
