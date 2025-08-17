@@ -1,3 +1,34 @@
+### Release Note - v0.3.17 2025-08-17
+
+#### 新功能 (Features)
+- 启动前可选交互：在检测到当前目录为 Git 仓库时，可提示并一键切换至代码开发模式（jca），提高代码任务体验（配置项：JARVIS_ENABLE_GIT_JCA_SWITCH）。
+- 启动前内置配置选择器：进入默认通用代理前可列出可用的 agent/multi_agent/roles 配置，直接选择并启动（配置项：JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR）。
+- 可扩展的配置加载目录：新增 JARVIS_AGENT_DEFINITION_DIRS、JARVIS_MULTI_AGENT_DIRS、JARVIS_ROLES_DIRS，用于扫描自定义配置目录，支持多目录并去重。
+- 首次运行配置向导：引导设置 Pretty Output、打印 Prompt、静态分析、方法论系统、分析流程、强制保存记忆及中心仓库地址等关键开关，自动写回 ~/.jarvis/config.yaml，默认值可交互选择。
+- 多行输入体验升级：首次按 Enter 时以一次性提示引导用户使用 Ctrl+J 确认提交，多行编辑更友好、可持续记忆提示状态。
+
+#### 修复 (Fixes)
+- 向后兼容增强：SessionManager 新增 clear() 别名方法，兼容历史调用与既有测试场景。
+
+#### 优化与重构 (Refactors & Improvements)
+- jarvis-agent 启动流程重构：预加载配置不干扰后续 init_env，异常更健壮；基于配置的目录扫描与每日 Git 更新检查；角色清单展示更详细。
+- 预定义任务交互升级：TaskManager 使用 rich 表格展示任务列表，配合清晰的“[0] 跳过”指引，选择体验更直观。
+- 安装流程简化：install.sh 取消自动运行 jarvis 初始化，优化步骤编号与输出文案，更贴合非交互式安装。
+- 输入组件文案统一：多行输入帮助提示更精炼，关键操作（Ctrl+J 确认）更明显。
+- 类型与静态检查增强：补充类型标注与兼容注释，提升静态分析与CI稳定性。
+
+#### 文档更新 (Documentation)
+- 安装与使用手册新增“可选的启动行为设置”“启动前的可选交互”等章节，详解两项新开关的使用方式与配置示例。
+- 配置文档补充 JARVIS_ENABLE_GIT_JCA_SWITCH、JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR 及多配置目录项的说明与默认值。
+- Schema 文档同步更新，确保编辑器联动校验与智能提示。
+
+#### 其他 (Miscellaneous)
+- CI 工作流完善：新增安装脚本验证 Job，确保 scripts/install.sh 在 CI 环境可顺利运行并验证可执行文件生成。
+- 统一与清理：YAML 风格与字段对齐调整，细节一致性更好。
+- 测试覆盖提升：新增 jarvis CLI、ShareManager、TaskManager 的单元测试用例，增强回归保障。
+
+本次更新主要面向“启动体验与可配置性提升、交互友好度增强、安装流程与稳定性优化”，同时完善了文档与测试以保障整体质量。
+
 ### Release Note - v0.3.16 2025-08-16
 
 #### **新功能 (Features)**  
