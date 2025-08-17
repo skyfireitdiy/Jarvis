@@ -67,10 +67,18 @@ class SessionManager:
             return True
         return False
 
-    def clear_history(self):
+    def clear_history(self) -> None:
         """
         Clears conversation history but keeps the system prompt by resetting the model state.
         """
         self.prompt = ""
         self.model.reset()
         self.conversation_length = 0
+
+    def clear(self) -> None:
+        """
+        Clears the session state, resetting prompt and conversation length while
+        preserving user_data. This method is an alias of clear_history for backward
+        compatibility with existing tests and callers.
+        """
+        self.clear_history()
