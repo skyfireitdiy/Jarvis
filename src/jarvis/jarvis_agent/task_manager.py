@@ -3,7 +3,7 @@
 import os
 from typing import Dict
 
-import yaml
+import yaml  # type: ignore
 from prompt_toolkit import prompt
 from rich.table import Table
 from rich.console import Console
@@ -74,10 +74,8 @@ class TaskManager:
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("No.", style="cyan", no_wrap=True)
         table.add_column("任务名", style="bold")
-        table.add_column("描述", style="white")
         for i, name in enumerate(task_names, 1):
-            desc = str(tasks.get(name, ""))
-            table.add_row(str(i), name, desc)
+            table.add_row(str(i), name)
         Console().print(table)
         PrettyOutput.print("[0] 跳过预定义任务", OutputType.INFO)
 
