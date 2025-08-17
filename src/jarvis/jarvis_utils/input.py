@@ -15,7 +15,7 @@ from colorama import Fore
 from colorama import Style as ColoramaStyle
 from fuzzywuzzy import process
 from prompt_toolkit import PromptSession
-from prompt_toolkit.application import Application
+from prompt_toolkit.application import Application, run_in_terminal
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.completion import (
     Completer,
@@ -348,7 +348,7 @@ def _get_multiline_input_internal(tip: str) -> str:
 
             def _show_notice():
                 print(
-                    f"{Fore.YELLOW}提示：当前支持多行输入。输入完成请使用 Ctrl+J 或 Ctrl+Enter 确认；Enter 仅用于换行。{ColoramaStyle.RESET_ALL}"
+                    f"{Fore.YELLOW}提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。{ColoramaStyle.RESET_ALL}"
                 )
                 try:
                     input("按回车继续...")
@@ -360,7 +360,7 @@ def _get_multiline_input_internal(tip: str) -> str:
                 except Exception:
                     pass
 
-            event.app.run_in_terminal(_show_notice)
+            run_in_terminal(_show_notice)
             return
 
         if event.current_buffer.complete_state:
@@ -373,11 +373,6 @@ def _get_multiline_input_internal(tip: str) -> str:
             event.current_buffer.insert_text("\n")
 
     @bindings.add("c-j")
-    def _(event):
-        event.current_buffer.validate_and_handle()
-
-    # Also allow Ctrl+Enter (Ctrl+M) to submit for better UX
-    @bindings.add("c-m")
     def _(event):
         event.current_buffer.validate_and_handle()
 
@@ -414,7 +409,7 @@ def get_multiline_input(tip: str) -> str:
     此函数处理控制流，允许在不破坏终端状态的情况下处理历史记录复制。
     """
     PrettyOutput.section(
-        "用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J/Ctrl+Enter 确认，Ctrl+O 从历史记录中选择消息复制，按 Ctrl+C/D 取消输入",
+        "用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 确认，Ctrl+O 从历史记录中选择消息复制，按 Ctrl+C/D 取消输入",
         OutputType.USER,
     )
 
@@ -423,7 +418,7 @@ def get_multiline_input(tip: str) -> str:
 
         if user_input == CTRL_O_SENTINEL:
             _show_history_and_copy()
-            tip = "请继续输入（或按Ctrl+J/Ctrl+Enter确认）:"
+            tip = "请继续输入（或按Ctrl+J确认）:"
             continue
         else:
             if not user_input:
