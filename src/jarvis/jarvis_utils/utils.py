@@ -880,6 +880,7 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         config_file: 配置文件路径
     """
     from jarvis.jarvis_utils.input import user_confirm as get_yes_no
+    from jarvis.jarvis_utils.input import get_single_line_input
 
     try:
         content, config_data = _load_config_file(config_file)
@@ -887,22 +888,119 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         set_global_env_data(config_data)
         _process_env_variables(config_data)
 
-        # 首次运行提示：为新功能开关询问用户（默认关闭）
+        # 首次运行提示：为新功能开关询问用户（默认值见各配置的getter）
+        def _ask_and_set(_key, _tip, _default, _type="bool"):
+            try:
+                if _key in config_data:
+                    return False
+                if _type == "bool":
+                    val = get_yes_no(_tip, default=bool(_default))
+                    config_data[_key] = bool(val)
+                else:
+                    val = get_single_line_input(f"{_tip}", default=str(_default or ""))
+                    config_data[_key] = val.strip()
+                return True
+            except Exception:
+                # 出现异常时按默认值设置，避免中断流程
+                config_data[_key] = (
+                    bool(_default) if _type == "bool" else str(_default or "")
+                )
+                return True
+
         changed = False
-        if "JARVIS_ENABLE_GIT_JCA_SWITCH" not in config_data:
-            enable_jca = get_yes_no(
+        # 现有两个开关
+        changed = (
+            _ask_and_set(
+                "JARVIS_ENABLE_GIT_JCA_SWITCH",
                 "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
-                default=False,
+                False,
+                "bool",
             )
-            config_data["JARVIS_ENABLE_GIT_JCA_SWITCH"] = bool(enable_jca)
-            changed = True
-        if "JARVIS_ENABLE_BUILTIN_SELECTOR" not in config_data:
-            enable_selector = get_yes_no(
+            or changed
+        )
+        changed = (
+            _ask_and_set(
+                "JARVIS_ENABLE_BUILTIN_SELECTOR",
                 "在进入默认通用代理前，是否先列出内置配置（agent/multi_agent/roles）供选择？",
-                default=False,
+                False,
+                "bool",
             )
-            config_data["JARVIS_ENABLE_BUILTIN_SELECTOR"] = bool(enable_selector)
-            changed = True
+            or changed
+        )
+
+        # 新增的配置项交互
+        changed = (
+            _ask_and_set(
+                "JARVIS_PRETTY_OUTPUT",
+                "是否启用更美观的终端输出（Pretty Output）？",
+                False,
+                "bool",
+            )
+            or changed
+        )
+        changed = (
+            _ask_and_set(
+                "JARVIS_PRINT_PROMPT",
+                "是否打印发送给模型的提示词（Prompt）？",
+                False,
+                "bool",
+            )
+            or changed
+        )
+        changed = (
+            _ask_and_set(
+                "JARVIS_ENABLE_STATIC_ANALYSIS",
+                "是否启用静态代码分析（Static Analysis）？",
+                True,
+                "bool",
+            )
+            or changed
+        )
+        changed = (
+            _ask_and_set(
+                "JARVIS_USE_METHODOLOGY",
+                "是否启用方法论系统（Methodology）？",
+                True,
+                "bool",
+            )
+            or changed
+        )
+        changed = (
+            _ask_and_set(
+                "JARVIS_USE_ANALYSIS",
+                "是否启用分析流程（Analysis）？",
+                True,
+                "bool",
+            )
+            or changed
+        )
+        changed = (
+            _ask_and_set(
+                "JARVIS_FORCE_SAVE_MEMORY",
+                "是否强制保存会话记忆？",
+                True,
+                "bool",
+            )
+            or changed
+        )
+        changed = (
+            _ask_and_set(
+                "JARVIS_CENTRAL_METHODOLOGY_REPO",
+                "请输入中心方法论仓库地址（可留空跳过）：",
+                "",
+                "str",
+            )
+            or changed
+        )
+        changed = (
+            _ask_and_set(
+                "JARVIS_CENTRAL_TOOL_REPO",
+                "请输入中心工具仓库地址（可留空跳过）：",
+                "",
+                "str",
+            )
+            or changed
+        )
 
         if changed:
             # 保留schema声明，如无则自动补充
