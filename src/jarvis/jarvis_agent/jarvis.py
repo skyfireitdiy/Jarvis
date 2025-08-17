@@ -182,6 +182,13 @@ def run_cli(
                         seen.add(key)
                         unique_dirs.append(Path(d))
 
+                # 每日自动更新配置目录（如目录为Git仓库则执行git pull，每日仅一次）
+                try:
+                    jutils.daily_check_git_updates([str(p) for p in unique_dirs], cat)
+                except Exception:
+                    # 忽略更新过程中的所有异常，避免影响主流程
+                    pass
+
                 for dir_path in unique_dirs:
                     if not dir_path.exists():
                         continue
