@@ -98,16 +98,8 @@ case "$choice" in
     ;;
 esac
 
-echo -e "\n--- 4. 初始化 Jarvis ---"
-CONFIG_FILE="$HOME/.jarvis/config.yaml"
-if [ -f "$CONFIG_FILE" ]; then
-    echo "配置文件 $CONFIG_FILE 已存在，跳过初始化。"
-else
-    echo "正在运行 'jarvis' 来生成配置文件..."
-    "$VENV_DIR/bin/jarvis"
-fi
 
-echo -e "\n--- 5. 安装与初始化完成! ---"
+echo -e "\n--- 4. 安装完成! ---"
 echo "请根据您使用的 Shell，运行以下命令激活虚拟环境:"
 echo "  - Bash / Zsh:"
 echo "    source $VENV_DIR/bin/activate"
@@ -117,7 +109,7 @@ echo ""
 echo "激活后，您就可以使用 'jarvis' 命令。"
 
 # 检测用户shell类型并询问是否自动配置
-echo -e "\n--- 6. Shell 环境配置 (可选) ---"
+echo -e "\n--- 5. Shell 环境配置 (可选) ---"
 current_shell=$(basename "$SHELL")
 case "$current_shell" in
     bash|zsh|fish)
