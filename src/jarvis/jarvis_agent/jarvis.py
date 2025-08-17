@@ -13,6 +13,9 @@ from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.config import (
     is_enable_git_repo_jca_switch,
     is_enable_builtin_config_selector,
+    get_agent_definition_dirs,
+    get_multi_agent_dirs,
+    get_roles_dirs,
 )
 import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_utils.input import user_confirm, get_single_line_input
@@ -147,54 +150,92 @@ def run_cli(
 
             options = []
             for cat, cmd, pattern in categories:
-                dir_path = builtin_root / cat
-                if not dir_path.exists():
-                    continue
-                for fpath in sorted(dir_path.glob(pattern)):
-                    # 解析YAML以获取可读名称/描述（失败时静默降级为文件名）
-                    name = fpath.stem
-                    desc = ""
+                # 构建待扫描目录列表：优先使用配置中的目录，其次回退到内置目录
+                search_dirs = []
+                try:
+                    if cat == "agent":
+                        search_dirs.extend(
+                            [Path(p) for p in get_agent_definition_dirs() if p]
+                        )
+                    elif cat == "multi_agent":
+                        search_dirs.extend(
+                            [Path(p) for p in get_multi_agent_dirs() if p]
+                        )
+                    elif cat == "roles":
+                        search_dirs.extend([Path(p) for p in get_roles_dirs() if p])
+                except Exception:
+                    # 忽略配置读取异常
+                    pass
+
+                # 追加内置目录
+                search_dirs.append(builtin_root / cat)
+
+                # 去重并保留顺序
+                unique_dirs = []
+                seen = set()
+                for d in search_dirs:
                     try:
-                        with open(fpath, "r", encoding="utf-8", errors="ignore") as fh:
-                            data = yaml.safe_load(fh) or {}
-                        if isinstance(data, dict):
-                            name = data.get("name") or data.get("title") or name
-                            desc = data.get("description") or data.get("desc") or ""
-                            if cat == "roles" and isinstance(data.get("roles"), list):
-                                if not desc:
-                                    desc = f"{len(data['roles'])} 个角色"
+                        key = str(Path(d).resolve())
                     except Exception:
-                        # 忽略解析错误，使用默认显示
-                        pass
+                        key = str(d)
+                    if key not in seen:
+                        seen.add(key)
+                        unique_dirs.append(Path(d))
 
-                    # 为 roles 构建详细信息（每个角色的名称与描述）
-                    details = ""
-                    if cat == "roles":
-                        roles = (data or {}).get("roles", [])
-                        if isinstance(roles, list):
-                            lines = []
-                            for role in roles:
-                                if isinstance(role, dict):
-                                    rname = str(role.get("name", "") or "")
-                                    rdesc = str(role.get("description", "") or "")
-                                    lines.append(
-                                        f"{rname} - {rdesc}" if rdesc else rname
-                                    )
-                            details = "\n".join([ln for ln in lines if ln])
-                        # 如果没有角色详情，退回到统计信息
-                        if not details and isinstance((data or {}).get("roles"), list):
-                            details = f"{len(data['roles'])} 个角色"
+                for dir_path in unique_dirs:
+                    if not dir_path.exists():
+                        continue
+                    for fpath in sorted(dir_path.glob(pattern)):
+                        # 解析YAML以获取可读名称/描述（失败时静默降级为文件名）
+                        name = fpath.stem
+                        desc = ""
+                        try:
+                            with open(
+                                fpath, "r", encoding="utf-8", errors="ignore"
+                            ) as fh:
+                                data = yaml.safe_load(fh) or {}
+                            if isinstance(data, dict):
+                                name = data.get("name") or data.get("title") or name
+                                desc = data.get("description") or data.get("desc") or ""
+                                if cat == "roles" and isinstance(
+                                    data.get("roles"), list
+                                ):
+                                    if not desc:
+                                        desc = f"{len(data['roles'])} 个角色"
+                        except Exception:
+                            # 忽略解析错误，使用默认显示
+                            pass
 
-                    options.append(
-                        {
-                            "category": cat,
-                            "cmd": cmd,
-                            "file": str(fpath),
-                            "name": str(name),
-                            "desc": str(desc),
-                            "details": str(details),
-                        }
-                    )
+                        # 为 roles 构建详细信息（每个角色的名称与描述）
+                        details = ""
+                        if cat == "roles":
+                            roles = (data or {}).get("roles", [])
+                            if isinstance(roles, list):
+                                lines = []
+                                for role in roles:
+                                    if isinstance(role, dict):
+                                        rname = str(role.get("name", "") or "")
+                                        rdesc = str(role.get("description", "") or "")
+                                        lines.append(
+                                            f"{rname} - {rdesc}" if rdesc else rname
+                                        )
+                                details = "\n".join([ln for ln in lines if ln])
+                            # 如果没有角色详情，退回到统计信息
+                            if not details and isinstance(
+                                (data or {}).get("roles"), list
+                            ):
+                                details = f"{len(data['roles'])} 个角色"
+
+                        options.append(
+                            {
+                                "category": cat,
+                                "cmd": cmd,
+                                "file": str(fpath),
+                                "name": str(name),
+                                "desc": str(desc),
+                                "details": str(details),
+                            }
+                        )
 
             if options:
                 PrettyOutput.section("可用的内置配置", OutputType.SUCCESS)
