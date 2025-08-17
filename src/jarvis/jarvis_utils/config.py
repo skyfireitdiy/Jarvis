@@ -309,6 +309,36 @@ def get_methodology_dirs() -> List[str]:
     return GLOBAL_CONFIG_DATA.get("JARVIS_METHODOLOGY_DIRS", [])
 
 
+def get_agent_definition_dirs() -> List[str]:
+    """
+    获取 agent 定义的加载目录。
+
+    返回:
+        List[str]: agent 定义加载目录列表
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_AGENT_DEFINITION_DIRS", [])
+
+
+def get_multi_agent_dirs() -> List[str]:
+    """
+    获取 multi_agent 的加载目录。
+
+    返回:
+        List[str]: multi_agent 加载目录列表
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_MULTI_AGENT_DIRS", [])
+
+
+def get_roles_dirs() -> List[str]:
+    """
+    获取 roles 的加载目录。
+
+    返回:
+        List[str]: roles 加载目录列表
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_ROLES_DIRS", [])
+
+
 def get_central_methodology_repo() -> str:
     """
     获取中心方法论Git仓库地址。
