@@ -40,6 +40,28 @@ from jarvis.jarvis_utils.tag import ot
 # Sentinel value to indicate that Ctrl+O was pressed
 CTRL_O_SENTINEL = "__CTRL_O_PRESSED__"
 
+# Persistent hint marker for multiline input (shown only once across runs)
+_MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
+
+
+def _multiline_hint_already_shown() -> bool:
+    """Check if the multiline Enter hint has been shown before (persisted)."""
+    try:
+        return os.path.exists(_MULTILINE_HINT_MARK_FILE)
+    except Exception:
+        return False
+
+
+def _mark_multiline_hint_shown() -> None:
+    """Persist that the multiline Enter hint has been shown."""
+    try:
+        os.makedirs(os.path.dirname(_MULTILINE_HINT_MARK_FILE), exist_ok=True)
+        with open(_MULTILINE_HINT_MARK_FILE, "w", encoding="utf-8") as f:
+            f.write("1")
+    except Exception:
+        # Non-critical persistence failure; ignore to avoid breaking input flow
+        pass
+
 
 def get_single_line_input(tip: str, default: str = "") -> str:
     """
@@ -315,8 +337,32 @@ def _get_multiline_input_internal(tip: str) -> str:
     """
     bindings = KeyBindings()
 
+    # Show a one-time hint on the first Enter press in this invocation
+    first_enter_hint_shown = False
+
     @bindings.add("enter")
     def _(event):
+        nonlocal first_enter_hint_shown
+        if not first_enter_hint_shown and not _multiline_hint_already_shown():
+            first_enter_hint_shown = True
+
+            def _show_notice():
+                print(
+                    f"{Fore.YELLOW}提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。{ColoramaStyle.RESET_ALL}"
+                )
+                try:
+                    input("按回车继续...")
+                except Exception:
+                    pass
+                # Persist the hint so it won't be shown again in future runs
+                try:
+                    _mark_multiline_hint_shown()
+                except Exception:
+                    pass
+
+            event.app.run_in_terminal(_show_notice)
+            return
+
         if event.current_buffer.complete_state:
             completion = event.current_buffer.complete_state.current_completion
             if completion:
