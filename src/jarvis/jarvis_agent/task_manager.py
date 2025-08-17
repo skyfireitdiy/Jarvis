@@ -5,6 +5,8 @@ from typing import Dict
 
 import yaml
 from prompt_toolkit import prompt
+from rich.table import Table
+from rich.console import Console
 
 from jarvis.jarvis_agent import (
     OutputType,
@@ -68,11 +70,16 @@ class TaskManager:
             return ""
 
         task_names = list(tasks.keys())
-        task_list = ["可用任务:"]
+        # 使用 rich.Table 展示预定义任务
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("No.", style="cyan", no_wrap=True)
+        table.add_column("任务名", style="bold")
+        table.add_column("描述", style="white")
         for i, name in enumerate(task_names, 1):
-            task_list.append(f"[{i}] {name}")
-        task_list.append("[0] 跳过预定义任务")
-        PrettyOutput.print("\n".join(task_list), OutputType.INFO)
+            desc = str(tasks.get(name, ""))
+            table.add_row(str(i), name, desc)
+        Console().print(table)
+        PrettyOutput.print("[0] 跳过预定义任务", OutputType.INFO)
 
         while True:
             try:
