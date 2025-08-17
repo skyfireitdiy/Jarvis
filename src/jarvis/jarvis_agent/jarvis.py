@@ -204,13 +204,19 @@ def run_cli(
                 table.add_column("类型", style="green", no_wrap=True)
                 table.add_column("名称", style="bold")
                 table.add_column("文件", style="dim")
+                table.add_column("描述", style="white")
 
                 for idx, opt in enumerate(options, 1):
                     category = opt.get("category", "")
                     name = opt.get("name", "")
                     file_path = opt.get("file", "")
-                    # 不显示描述或详情列，避免过长内容影响展示
-                    table.add_row(str(idx), category, name, file_path)
+                    # 描述列显示配置描述；角色列单独展示角色列表（仅 roles 类别有值）
+                    # 描述列显示配置描述；若为 roles 则显示角色列表
+                    if category == "roles":
+                        desc_display = opt.get("details", "")
+                    else:
+                        desc_display = opt.get("desc", "")
+                    table.add_row(str(idx), category, name, file_path, desc_display)
 
                 Console().print(table)
 
