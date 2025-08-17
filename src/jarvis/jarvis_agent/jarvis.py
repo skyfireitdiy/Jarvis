@@ -30,71 +30,107 @@ from rich.console import Console
 app = typer.Typer(help="Jarvis AI 助手")
 
 
-@app.callback(invoke_without_command=True)
-def run_cli(
-    ctx: typer.Context,
-    llm_type: str = typer.Option(
-        "normal",
-        "-t",
-        "--llm-type",
-        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
-    ),
-    task: Optional[str] = typer.Option(
-        None, "-T", "--task", help="从命令行直接输入任务内容"
-    ),
-    model_group: Optional[str] = typer.Option(
-        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
-    ),
-    tool_group: Optional[str] = typer.Option(
-        None, "-G", "--tool-group", help="使用的工具组，覆盖配置文件中的设置"
-    ),
-    config_file: Optional[str] = typer.Option(
-        None, "-f", "--config", help="自定义配置文件路径"
-    ),
-    restore_session: bool = typer.Option(
-        False,
-        "--restore-session",
-        help="从 .jarvis/saved_session.json 恢复会话",
-    ),
-    edit: bool = typer.Option(False, "-e", "--edit", help="编辑配置文件"),
-    share_methodology: bool = typer.Option(
-        False, "--share-methodology", help="分享本地方法论到中心方法论仓库"
-    ),
-    share_tool: bool = typer.Option(
-        False, "--share-tool", help="分享本地工具到中心工具仓库"
-    ),
-) -> None:
-    """Jarvis AI assistant command-line interface."""
-    if ctx.invoked_subcommand is not None:
-        return
+def print_commands_overview() -> None:
+    """打印命令与快捷方式总览表。"""
+    try:
+        cmd_table = Table(show_header=True, header_style="bold magenta")
+        cmd_table.add_column("命令", style="bold")
+        cmd_table.add_column("快捷方式", style="cyan")
+        cmd_table.add_column("功能描述", style="white")
 
-    # 处理配置文件编辑
+        cmd_table.add_row("jarvis", "jvs", "通用AI代理，适用于多种任务")
+        cmd_table.add_row("jarvis-agent", "ja", "AI代理基础功能，处理会话和任务")
+        cmd_table.add_row(
+            "jarvis-code-agent",
+            "jca",
+            "专注于代码分析、修改和生成的代码代理",
+        )
+        cmd_table.add_row("jarvis-code-review", "jcr", "智能代码审查工具")
+        cmd_table.add_row(
+            "jarvis-git-commit",
+            "jgc",
+            "自动化分析代码变更并生成规范的Git提交信息",
+        )
+        cmd_table.add_row("jarvis-git-squash", "jgs", "Git提交历史整理工具")
+        cmd_table.add_row(
+            "jarvis-platform-manager",
+            "jpm",
+            "管理和测试不同的大语言模型平台",
+        )
+        cmd_table.add_row("jarvis-multi-agent", "jma", "多智能体协作系统")
+        cmd_table.add_row("jarvis-tool", "jt", "工具管理与调用系统")
+        cmd_table.add_row("jarvis-methodology", "jm", "方法论知识库管理")
+        cmd_table.add_row(
+            "jarvis-rag",
+            "jrg",
+            "构建和查询本地化的RAG知识库",
+        )
+        cmd_table.add_row("jarvis-smart-shell", "jss", "实验性的智能Shell功能")
+        cmd_table.add_row(
+            "jarvis-stats",
+            "jst",
+            "通用统计模块，支持记录和可视化任意指标数据",
+        )
+        cmd_table.add_row(
+            "jarvis-memory-organizer",
+            "jmo",
+            "记忆管理工具，支持整理、合并、导入导出记忆",
+        )
+
+        Console().print(cmd_table)
+    except Exception:
+        # 静默忽略渲染异常，避免影响主流程
+        pass
+
+def handle_edit_option(edit: bool, config_file: Optional[str]) -> bool:
+    """处理配置文件编辑选项，返回是否已处理并需提前结束。"""
     if edit:
         ConfigEditor.edit_config(config_file)
-        return
+        return True
+    return False
 
-    # 处理方法论分享
+
+def handle_share_methodology_option(
+    share_methodology: bool, config_file: Optional[str]
+) -> bool:
+    """处理方法论分享选项，返回是否已处理并需提前结束。"""
     if share_methodology:
         init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
         methodology_manager = MethodologyShareManager()
         methodology_manager.run()
-        return
+        return True
+    return False
 
-    # 处理工具分享
+
+def handle_share_tool_option(share_tool: bool, config_file: Optional[str]) -> bool:
+    """处理工具分享选项，返回是否已处理并需提前结束。"""
     if share_tool:
         init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
         tool_manager = ToolShareManager()
         tool_manager.run()
-        return
+        return True
+    return False
 
-    # 预加载配置（仅用于读取功能开关），不会显示欢迎信息或影响后续 init_env
+
+def preload_config_for_flags(config_file: Optional[str]) -> None:
+    """预加载配置（仅用于读取功能开关），不会显示欢迎信息或影响后续 init_env。"""
     try:
         jutils.g_config_file = config_file
         jutils.load_config()
     except Exception:
+        # 静默忽略配置加载异常
         pass
 
-    # 在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）
+
+def try_switch_to_jca_if_git_repo(
+    llm_type: str,
+    model_group: Optional[str],
+    tool_group: Optional[str],
+    config_file: Optional[str],
+    restore_session: bool,
+    task: Optional[str],
+) -> None:
+    """在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）。"""
     if is_enable_git_repo_jca_switch():
         try:
             res = subprocess.run(
@@ -134,7 +170,15 @@ def run_cli(
             # 静默忽略检测异常，不影响主流程
             pass
 
-    # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
+
+def handle_builtin_config_selector(
+    llm_type: str,
+    model_group: Optional[str],
+    tool_group: Optional[str],
+    config_file: Optional[str],
+    task: Optional[str],
+) -> None:
+    """在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）。"""
     if is_enable_builtin_config_selector():
         try:
             # 优先使用项目内置目录，若不存在则回退到指定的绝对路径
@@ -258,7 +302,6 @@ def run_cli(
                     category = opt.get("category", "")
                     name = opt.get("name", "")
                     file_path = opt.get("file", "")
-                    # 描述列显示配置描述；角色列单独展示角色列表（仅 roles 类别有值）
                     # 描述列显示配置描述；若为 roles 则显示角色列表
                     if category == "roles":
                         desc_display = opt.get("details", "")
@@ -316,6 +359,71 @@ def run_cli(
         except Exception:
             # 静默忽略内置配置扫描错误，不影响主流程
             pass
+
+
+@app.callback(invoke_without_command=True)
+def run_cli(
+    ctx: typer.Context,
+    llm_type: str = typer.Option(
+        "normal",
+        "-t",
+        "--llm-type",
+        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
+    ),
+    task: Optional[str] = typer.Option(
+        None, "-T", "--task", help="从命令行直接输入任务内容"
+    ),
+    model_group: Optional[str] = typer.Option(
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
+    tool_group: Optional[str] = typer.Option(
+        None, "-G", "--tool-group", help="使用的工具组，覆盖配置文件中的设置"
+    ),
+    config_file: Optional[str] = typer.Option(
+        None, "-f", "--config", help="自定义配置文件路径"
+    ),
+    restore_session: bool = typer.Option(
+        False,
+        "--restore-session",
+        help="从 .jarvis/saved_session.json 恢复会话",
+    ),
+    edit: bool = typer.Option(False, "-e", "--edit", help="编辑配置文件"),
+    share_methodology: bool = typer.Option(
+        False, "--share-methodology", help="分享本地方法论到中心方法论仓库"
+    ),
+    share_tool: bool = typer.Option(
+        False, "--share-tool", help="分享本地工具到中心工具仓库"
+    ),
+) -> None:
+    """Jarvis AI assistant command-line interface."""
+    if ctx.invoked_subcommand is not None:
+        return
+
+    # 使用 rich 输出命令与快捷方式总览
+    print_commands_overview()
+
+    # 处理配置文件编辑
+    if handle_edit_option(edit, config_file):
+        return
+
+    # 处理方法论分享
+    if handle_share_methodology_option(share_methodology, config_file):
+        return
+
+    # 处理工具分享
+    if handle_share_tool_option(share_tool, config_file):
+        return
+
+    # 预加载配置（仅用于读取功能开关），不会显示欢迎信息或影响后续 init_env
+    preload_config_for_flags(config_file)
+
+    # 在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）
+    try_switch_to_jca_if_git_repo(
+        llm_type, model_group, tool_group, config_file, restore_session, task
+    )
+
+    # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
+    handle_builtin_config_selector(llm_type, model_group, tool_group, config_file, task)
 
     # 初始化环境
     init_env(
