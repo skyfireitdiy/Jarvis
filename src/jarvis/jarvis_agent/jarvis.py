@@ -204,21 +204,13 @@ def run_cli(
                 table.add_column("类型", style="green", no_wrap=True)
                 table.add_column("名称", style="bold")
                 table.add_column("文件", style="dim")
-                table.add_column("描述/详情", style="white")
 
                 for idx, opt in enumerate(options, 1):
                     category = opt.get("category", "")
                     name = opt.get("name", "")
                     file_path = opt.get("file", "")
-                    # multi_agent: 优先显示顶层描述
-                    # roles: 显示每个角色名称与描述（多行）
-                    # 其他：显示 desc
-                    if category == "roles" and opt.get("details"):
-                        detail = opt["details"]
-                    else:
-                        detail = opt.get("desc", "")
-
-                    table.add_row(str(idx), category, name, file_path, detail)
+                    # 不显示描述或详情列，避免过长内容影响展示
+                    table.add_row(str(idx), category, name, file_path)
 
                 Console().print(table)
 
