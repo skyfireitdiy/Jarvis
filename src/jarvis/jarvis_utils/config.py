@@ -618,7 +618,9 @@ def is_enable_git_repo_jca_switch() -> bool:
 
 def is_enable_builtin_config_selector() -> bool:
     """
-    是否启用：在进入默认通用代理前，列出内置配置（agent/multi_agent/roles）供选择
+    是否启用：在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择
     默认关闭
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_BUILTIN_SELECTOR", False) is True
+    return (
+        GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR", False) is True
+    )

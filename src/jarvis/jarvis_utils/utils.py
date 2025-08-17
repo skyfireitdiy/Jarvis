@@ -920,8 +920,8 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         )
         changed = (
             _ask_and_set(
-                "JARVIS_ENABLE_BUILTIN_SELECTOR",
-                "在进入默认通用代理前，是否先列出内置配置（agent/multi_agent/roles）供选择？",
+                "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR",
+                "在进入默认通用代理前，是否先列出可用配置（agent/multi_agent/roles）供选择？",
                 False,
                 "bool",
             )
