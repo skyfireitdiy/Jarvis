@@ -82,7 +82,7 @@ class TaskManager:
         while True:
             try:
                 choice_str = prompt(
-                    "\n请选择一个任务编号（0 跳过预定义任务）："
+                    "\n请选择一个任务编号（0 或者直接回车跳过预定义任务）："
                 ).strip()
                 if not choice_str:
                     return ""
