@@ -240,6 +240,7 @@ def handle_builtin_config_selector(
                         # 解析YAML以获取可读名称/描述（失败时静默降级为文件名）
                         name = fpath.stem
                         desc = ""
+                        roles_count = 0
                         try:
                             with open(
                                 fpath, "r", encoding="utf-8", errors="ignore"
@@ -251,8 +252,9 @@ def handle_builtin_config_selector(
                                 if cat == "roles" and isinstance(
                                     data.get("roles"), list
                                 ):
+                                    roles_count = len(data["roles"])
                                     if not desc:
-                                        desc = f"{len(data['roles'])} 个角色"
+                                        desc = f"{roles_count} 个角色"
                         except Exception:
                             # 忽略解析错误，使用默认显示
                             pass
@@ -285,6 +287,7 @@ def handle_builtin_config_selector(
                                 "name": str(name),
                                 "desc": str(desc),
                                 "details": str(details),
+                                "roles_count": int(roles_count),
                             }
                         )
 
@@ -302,9 +305,16 @@ def handle_builtin_config_selector(
                     category = opt.get("category", "")
                     name = opt.get("name", "")
                     file_path = opt.get("file", "")
-                    # 描述列显示配置描述；若为 roles 则显示角色列表
+                    # 描述列显示配置描述；若为 roles 同时显示角色数量与列表
                     if category == "roles":
-                        desc_display = opt.get("details", "")
+                        count = opt.get("roles_count")
+                        details = opt.get("details", "")
+                        parts = []
+                        if isinstance(count, int) and count > 0:
+                            parts.append(f"{count} 个角色")
+                        if details:
+                            parts.append(details)
+                        desc_display = "\n".join(parts) if parts else ""
                     else:
                         desc_display = opt.get("desc", "")
                     table.add_row(str(idx), category, name, file_path, desc_display)
