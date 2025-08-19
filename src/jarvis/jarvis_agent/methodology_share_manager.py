@@ -151,12 +151,12 @@ class MethodologyShareManager(ShareManager):
                     "没有找到新的方法论文件（所有方法论可能已存在于中心仓库）",
                     OutputType.WARNING,
                 )
-                raise typer.Exit(code=0)
+                return
 
             # 选择要分享的资源
             selected_resources = self.select_resources(local_resources)
             if not selected_resources:
-                raise typer.Exit(code=0)
+                return
 
             # 分享资源
             copied_list = self.share_resources(selected_resources)
