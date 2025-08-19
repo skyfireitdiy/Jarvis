@@ -791,6 +791,8 @@ class Agent:
         set_interrupt(False)
         user_input = self.multiline_inputer(f"模型交互期间被中断，请输入用户干预信息：")
 
+        self.run_input_handlers_next_turn = True
+
         if not user_input:
             # 用户输入为空，完成任务
             return self._complete_task(auto_completed=False)
