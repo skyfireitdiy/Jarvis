@@ -29,7 +29,7 @@ class TaskManager:
         data_dir = get_data_dir()
         pre_command_path = os.path.join(data_dir, "pre-command")
         if os.path.exists(pre_command_path):
-            print(f"🔍 从{pre_command_path}加载预定义任务...")
+            PrettyOutput.print(f"从{pre_command_path}加载预定义任务...", OutputType.INFO)
             try:
                 with open(
                     pre_command_path, "r", encoding="utf-8", errors="ignore"
@@ -39,15 +39,15 @@ class TaskManager:
                     for name, desc in user_tasks.items():
                         if desc:
                             tasks[str(name)] = str(desc)
-                print(f"✅ 预定义任务加载完成 {pre_command_path}")
+                PrettyOutput.print(f"预定义任务加载完成 {pre_command_path}", OutputType.SUCCESS)
             except (yaml.YAMLError, OSError):
-                print(f"❌ 预定义任务加载失败 {pre_command_path}")
+                PrettyOutput.print(f"预定义任务加载失败 {pre_command_path}", OutputType.ERROR)
 
         # Check .jarvis/pre-command in current directory
         pre_command_path = ".jarvis/pre-command"
         if os.path.exists(pre_command_path):
             abs_path = os.path.abspath(pre_command_path)
-            print(f"🔍 从{abs_path}加载预定义任务...")
+            PrettyOutput.print(f"从{abs_path}加载预定义任务...", OutputType.INFO)
             try:
                 with open(
                     pre_command_path, "r", encoding="utf-8", errors="ignore"
@@ -57,9 +57,9 @@ class TaskManager:
                     for name, desc in local_tasks.items():
                         if desc:
                             tasks[str(name)] = str(desc)
-                print(f"✅ 预定义任务加载完成 {pre_command_path}")
+                PrettyOutput.print(f"预定义任务加载完成 {pre_command_path}", OutputType.SUCCESS)
             except (yaml.YAMLError, OSError):
-                print(f"❌ 预定义任务加载失败 {pre_command_path}")
+                PrettyOutput.print(f"预定义任务加载失败 {pre_command_path}", OutputType.ERROR)
 
         return tasks
 

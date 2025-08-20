@@ -20,6 +20,7 @@ from jarvis.jarvis_utils.config import (
     get_rag_use_bm25,
     get_rag_use_rerank,
 )
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 def is_likely_text_file(file_path: Path) -> bool:
@@ -70,7 +71,10 @@ class _CustomPlatformLLM(LLMInterface):
 
     def __init__(self, platform: BasePlatform):
         self.platform = platform
-        print(f"✅ 使用自定义LLM: 平台='{platform.platform_name()}', 模型='{platform.name()}'")
+        PrettyOutput.print(
+            f"使用自定义LLM: 平台='{platform.platform_name()}', 模型='{platform.name()}'",
+            OutputType.INFO,
+        )
 
     def generate(self, prompt: str, **kwargs) -> str:
         return self.platform.chat_until_success(prompt)
@@ -84,13 +88,13 @@ def _create_custom_llm(platform_name: str, model_name: str) -> Optional[LLMInter
         registry = PlatformRegistry.get_global_platform_registry()
         platform_instance = registry.create_platform(platform_name)
         if not platform_instance:
-            print(f"❌ 错误: 平台 '{platform_name}' 未找到。")
+            PrettyOutput.print(f"错误: 平台 '{platform_name}' 未找到。", OutputType.ERROR)
             return None
         platform_instance.set_model_name(model_name)
         platform_instance.set_suppress_output(True)
         return _CustomPlatformLLM(platform_instance)
     except Exception as e:
-        print(f"❌ 创建自定义LLM时出错: {e}")
+        PrettyOutput.print(f"创建自定义LLM时出错: {e}", OutputType.ERROR)
         return None
 
 
@@ -114,10 +118,10 @@ def _load_ragignore_spec() -> Tuple[Optional[pathspec.PathSpec], Optional[Path]]
             with open(ignore_file_to_use, "r", encoding="utf-8") as f:
                 patterns = f.read().splitlines()
             spec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
-            print(f"✅ 加载忽略规则: {ignore_file_to_use}")
+            PrettyOutput.print(f"加载忽略规则: {ignore_file_to_use}", OutputType.SUCCESS)
             return spec, project_root_path
         except Exception as e:
-            print(f"⚠️ 加载 {ignore_file_to_use.name} 文件失败: {e}")
+            PrettyOutput.print(f"加载 {ignore_file_to_use.name} 文件失败: {e}", OutputType.WARNING)
 
     return None, None
 
@@ -166,7 +170,7 @@ def add_documents(
                 continue
 
             if path.is_dir():
-                print(f"🔍 正在扫描目录: {path}")
+                PrettyOutput.print(f"正在扫描目录: {path}", OutputType.INFO)
                 for item in path.rglob("*"):
                     if item.is_file() and is_likely_text_file(item):
                         files_to_process.add(item)
@@ -174,10 +178,10 @@ def add_documents(
                 if is_likely_text_file(path):
                     files_to_process.add(path)
                 else:
-                    print(f"⚠️ 跳过可能的二进制文件: {path}")
+                    PrettyOutput.print(f"跳过可能的二进制文件: {path}", OutputType.WARNING)
 
     if not files_to_process:
-        print("⚠️ 在指定路径中未找到任何文本文件。")
+        PrettyOutput.print("在指定路径中未找到任何文本文件。", OutputType.WARNING)
         return
 
     # 使用 .ragignore 过滤文件
@@ -198,14 +202,14 @@ def add_documents(
 
         ignored_count = initial_count - len(retained_files)
         if ignored_count > 0:
-            print(f"ℹ️ 根据 .ragignore 规则过滤掉 {ignored_count} 个文件。")
+            PrettyOutput.print(f"根据 .ragignore 规则过滤掉 {ignored_count} 个文件。", OutputType.INFO)
         files_to_process = retained_files
 
     if not files_to_process:
-        print("⚠️ 所有找到的文本文件都被忽略规则过滤掉了。")
+        PrettyOutput.print("所有找到的文本文件都被忽略规则过滤掉了。", OutputType.WARNING)
         return
 
-    print(f"✅ 发现 {len(files_to_process)} 个独立文件待处理。")
+    PrettyOutput.print(f"发现 {len(files_to_process)} 个独立文件待处理。", OutputType.INFO)
 
     try:
         pipeline = JarvisRAGPipeline(
@@ -229,26 +233,26 @@ def add_documents(
                     loader = TextLoader(str(file_path), encoding="utf-8")
 
                 docs_batch.extend(loader.load())
-                print(f"✅ 已加载: {file_path} (文件 {i + 1}/{total_files})")
+                PrettyOutput.print(f"已加载: {file_path} (文件 {i + 1}/{total_files})", OutputType.INFO)
             except Exception as e:
-                print(f"⚠️ 加载失败 {file_path}: {e}")
+                PrettyOutput.print(f"加载失败 {file_path}: {e}", OutputType.WARNING)
 
             # 当批处理已满或是最后一个文件时处理批处理
             if docs_batch and (len(docs_batch) >= batch_size or (i + 1) == total_files):
-                print(f"⚙️ 正在处理批次，包含 {len(docs_batch)} 个文档...")
+                PrettyOutput.print(f"正在处理批次，包含 {len(docs_batch)} 个文档...", OutputType.INFO)
                 pipeline.add_documents(docs_batch)
                 total_docs_added += len(docs_batch)
-                print(f"✅ 成功添加 {len(docs_batch)} 个文档。")
+                PrettyOutput.print(f"成功添加 {len(docs_batch)} 个文档。", OutputType.SUCCESS)
                 docs_batch = []  # 清空批处理
 
         if total_docs_added == 0:
-            print("❌ 未能成功加载任何文档。")
+            PrettyOutput.print("未能成功加载任何文档。", OutputType.ERROR)
             raise typer.Exit(code=1)
 
-        print(f"✅ 成功将 {total_docs_added} 个文档的内容添加至集合 '{collection_name}'。")
+        PrettyOutput.print(f"成功将 {total_docs_added} 个文档的内容添加至集合 '{collection_name}'。", OutputType.SUCCESS)
 
     except Exception as e:
-        print(f"❌ 发生严重错误: {e}")
+        PrettyOutput.print(f"发生严重错误: {e}", OutputType.ERROR)
         raise typer.Exit(code=1)
 
 
@@ -273,7 +277,7 @@ def list_documents(
         results = collection.get()  # 获取集合中的所有项目
 
         if not results or not results["metadatas"]:
-            print("ℹ️ 知识库中没有找到任何文档。")
+            PrettyOutput.print("知识库中没有找到任何文档。", OutputType.INFO)
             return
 
         # 从元数据中提取唯一的源文件路径
@@ -285,15 +289,15 @@ def list_documents(
                     sources.add(source)
 
         if not sources:
-            print("ℹ️ 知识库中没有找到任何带有源信息的文档。")
+            PrettyOutput.print("知识库中没有找到任何带有源信息的文档。", OutputType.INFO)
             return
 
-        print(f"📚 知识库 '{collection_name}' 中共有 {len(sources)} 个独立文档:")
+        PrettyOutput.print(f"知识库 '{collection_name}' 中共有 {len(sources)} 个独立文档:", OutputType.INFO)
         for i, source in enumerate(sorted(list(sources)), 1):
-            print(f"  {i}. {source}")
+            PrettyOutput.print(f"  {i}. {source}", OutputType.INFO)
 
     except Exception as e:
-        print(f"❌ 发生错误: {e}")
+        PrettyOutput.print(f"发生错误: {e}", OutputType.ERROR)
         raise typer.Exit(code=1)
 
 
@@ -330,14 +334,14 @@ def retrieve(
             use_rerank=use_rerank,
         )
 
-        print(f"🤔 正在为问题检索文档: '{question}'")
+        PrettyOutput.print(f"正在为问题检索文档: '{question}'", OutputType.INFO)
         retrieved_docs = pipeline.retrieve_only(question, n_results=n_results)
 
         if not retrieved_docs:
-            print("ℹ️ 未找到相关文档。")
+            PrettyOutput.print("未找到相关文档。", OutputType.INFO)
             return
 
-        print(f"✅ 成功检索到 {len(retrieved_docs)} 个文档:")
+        PrettyOutput.print(f"成功检索到 {len(retrieved_docs)} 个文档:", OutputType.SUCCESS)
         from jarvis.jarvis_utils.globals import console
 
         for i, doc in enumerate(retrieved_docs, 1):
@@ -350,7 +354,7 @@ def retrieve(
             console.print(Markdown(f"```\n{content}\n```"))
 
     except Exception as e:
-        print(f"❌ 发生错误: {e}")
+        PrettyOutput.print(f"发生错误: {e}", OutputType.ERROR)
         raise typer.Exit(code=1)
 
 
@@ -385,7 +389,7 @@ def query(
 ):
     """查询RAG知识库并打印答案。"""
     if model and not platform:
-        print("❌ 错误: --model 需要指定 --platform。")
+        PrettyOutput.print("错误: --model 需要指定 --platform。", OutputType.ERROR)
         raise typer.Exit(code=1)
 
     try:
@@ -407,17 +411,17 @@ def query(
             use_rerank=use_rerank,
         )
 
-        print(f"🤔 正在查询: '{question}'")
+        PrettyOutput.print(f"正在查询: '{question}'", OutputType.INFO)
         answer = pipeline.query(question)
 
-        print("💬 答案:")
+        PrettyOutput.print("答案:", OutputType.INFO)
         # 我们仍然可以使用 rich.markdown.Markdown，因为 PrettyOutput 底层使用了 rich
         from jarvis.jarvis_utils.globals import console
 
         console.print(Markdown(answer))
 
     except Exception as e:
-        print(f"❌ 发生错误: {e}")
+        PrettyOutput.print(f"发生错误: {e}", OutputType.ERROR)
         raise typer.Exit(code=1)
 
 
@@ -432,7 +436,7 @@ except ImportError:
 
 def _check_rag_dependencies():
     if not _RAG_INSTALLED:
-        print("❌ RAG依赖项未安装。" "请运行 'pip install \"jarvis-ai-assistant[rag]\"' 来使用此命令。")
+        PrettyOutput.print("RAG依赖项未安装。请运行 'pip install \"jarvis-ai-assistant[rag]\"' 来使用此命令。", OutputType.ERROR)
         raise typer.Exit(code=1)
 
 

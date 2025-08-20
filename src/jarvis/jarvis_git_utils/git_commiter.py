@@ -132,7 +132,7 @@ class GitCommitTool:
             try:
                 temp_diff_file_path = None
                 # 生成提交信息
-                print("✨ 正在生成提交消息...")
+                PrettyOutput.print("正在生成提交消息...", OutputType.INFO)
 
                 # 准备提示信息
                 custom_prompt = get_git_commit_prompt()
@@ -224,7 +224,7 @@ commit信息
 
                 if is_large_content:
                     if not platform.support_upload_files():
-                        print("❌ 差异文件太大，无法处理")
+                        PrettyOutput.print("差异文件太大，无法处理", OutputType.ERROR)
                         return {
                             "success": False,
                             "stdout": "",
@@ -243,7 +243,7 @@ commit信息
                     if upload_success:
                         pass
                     else:
-                        print("❌ 上传代码差异文件失败")
+                        PrettyOutput.print("上传代码差异文件失败", OutputType.ERROR)
                         return {
                             "success": False,
                             "stdout": "",
@@ -345,7 +345,7 @@ commit信息
                     try:
                         os.unlink(temp_diff_file_path)
                     except Exception as e:
-                        print(f"⚠️ 无法删除临时文件: {str(e)}")
+                        PrettyOutput.print(f"无法删除临时文件: {str(e)}", OutputType.WARNING)
 
             PrettyOutput.print(
                 f"提交哈希: {commit_hash}\n提交消息: {commit_message}",

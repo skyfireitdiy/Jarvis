@@ -572,7 +572,7 @@ class Agent:
         """
         # 在清理历史之前，提示用户保存重要记忆
         if self.force_save_memory:
-            print("📌 对话历史即将被总结和清理，请先保存重要信息...")
+            PrettyOutput.print("对话历史即将被总结和清理，请先保存重要信息...", OutputType.INFO)
             self.memory_manager.prompt_memory_save()
 
         if self._should_use_file_upload():

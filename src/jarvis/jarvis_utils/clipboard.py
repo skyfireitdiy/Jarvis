@@ -11,9 +11,9 @@ def copy_to_clipboard(text: str) -> None:
     参数:
         text: 要复制的文本
     """
-    print("--- 剪贴板内容开始 ---")
-    print(text)
-    print("--- 剪贴板内容结束 ---")
+    PrettyOutput.print("--- 剪贴板内容开始 ---", OutputType.INFO)
+    PrettyOutput.print(text, OutputType.CODE, lang="text")
+    PrettyOutput.print("--- 剪贴板内容结束 ---", OutputType.INFO)
 
     system = platform.system()
 
