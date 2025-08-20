@@ -134,11 +134,11 @@ class BasePlatform(ABC):
                     with Live(panel, refresh_per_second=10, transient=False) as live:
                         for s in self.chat(message):
                             response += s
-                            if is_immediate_abort() and get_interrupt():
-                                return response
                             text_content.append(s, style="bright_white")
                             panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
                             live.update(panel)
+                            if is_immediate_abort() and get_interrupt():
+                                return response
                         end_time = time.time()
                         duration = end_time - start_time
                         panel.subtitle = (
