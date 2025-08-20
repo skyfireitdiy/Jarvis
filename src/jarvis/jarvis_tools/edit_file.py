@@ -148,7 +148,7 @@ class FileSearchReplaceTool:
                             content = f.read()
                             original_content = content
 
-                    PrettyOutput.print(f"正在处理文件 {file_path}...", OutputType.INFO)
+
                     success, temp_content = EditFileHandler._fast_edit(
                         file_path, changes
                     )
@@ -164,7 +164,7 @@ class FileSearchReplaceTool:
                         )
                         continue
 
-                    PrettyOutput.print(f"文件 {file_path} 内容生成完成", OutputType.SUCCESS)
+
 
                     # 只有当所有替换操作都成功时，才写回文件
                     if success and (
@@ -183,7 +183,7 @@ class FileSearchReplaceTool:
                         action = "创建并写入" if not file_exists else "成功修改"
                         stdout_message = f"文件 {file_path} {action} 完成"
                         stdout_messages.append(stdout_message)
-                        PrettyOutput.print(stdout_message, OutputType.SUCCESS)
+
                         overall_success = True
 
                         file_results.append(

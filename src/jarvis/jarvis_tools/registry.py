@@ -287,10 +287,7 @@ class ToolRegistry(OutputHandlerProtocol):
             for tool_name in dont_use_list:
                 if tool_name in self.tools:
                     del self.tools[tool_name]
-                    PrettyOutput.print(
-                        f"已排除工具: {tool_name}",
-                        OutputType.INFO,
-                    )
+
 
     def _load_mcp_tools(self) -> None:
         """加载MCP工具，优先从配置获取，其次从目录扫描"""
@@ -354,9 +351,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 try:
                     import subprocess
 
-                    PrettyOutput.print(
-                        f"正在克隆中心工具仓库: {central_repo}", OutputType.INFO
-                    )
+
                     subprocess.run(
                         ["git", "clone", central_repo, central_repo_path], check=True
                     )
@@ -399,10 +394,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
             # 检查enable标志
             if not config.get("enable", True):
-                PrettyOutput.print(
-                    f"MCP配置{config.get('name', '')}已禁用(enable=false)，跳过注册",
-                    OutputType.INFO,
-                )
+
                 return False
 
             name = config.get("name", "mcp")
@@ -414,10 +406,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     args.pop("agent", None)
                     args.pop("want", None)
                     ret = client.get_resource_list()
-                    PrettyOutput.print(
-                        f"MCP {name} 资源列表:\n{yaml.safe_dump(ret, allow_unicode=True)}",
-                        OutputType.TOOL,
-                    )
+
                     return {
                         "success": True,
                         "stdout": yaml.safe_dump(ret, allow_unicode=True),
@@ -438,10 +427,7 @@ class ToolRegistry(OutputHandlerProtocol):
                             "stderr": "缺少必需的uri参数",
                         }
                     ret = client.get_resource(args["uri"])
-                    PrettyOutput.print(
-                        f"MCP {name} 获取资源:\n{yaml.safe_dump(ret, allow_unicode=True)}",
-                        OutputType.TOOL,
-                    )
+
                     return ret
 
                 return execute
@@ -452,10 +438,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     args.pop("agent", None)
                     args.pop("want", None)
                     ret = client.execute(tool_name, args)
-                    PrettyOutput.print(
-                        f"MCP {name} {tool_name} 执行结果:\n{yaml.safe_dump(ret, allow_unicode=True)}",
-                        OutputType.TOOL,
-                    )
+
                     return ret
 
                 return execute
@@ -665,11 +648,8 @@ class ToolRegistry(OutputHandlerProtocol):
                         yaml.safe_load(temp_data[0])  # Check if valid YAML
 
                         # Ask user for confirmation
-                        PrettyOutput.print(
-                            f"检测到缺失的 {ct('TOOL_CALL')} 标签，已自动修复。修复后的内容如下:",
-                            OutputType.INFO,
-                        )
-                        PrettyOutput.print(fixed_content, OutputType.TOOL)
+
+
                         data = temp_data
                     except (yaml.YAMLError, EOFError, KeyboardInterrupt):
                         # Even after fixing, it's not valid YAML, or user cancelled.

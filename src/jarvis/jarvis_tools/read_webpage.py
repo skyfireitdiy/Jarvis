@@ -48,7 +48,7 @@ class WebpageTool:
                 if model:
                     model.set_model_name(web_search_model)
                     if model.support_web():
-                        PrettyOutput.print("▶️ 使用配置的 Web 搜索平台读取网页...", OutputType.INFO)
+
                         model.set_web(True)
                         model.set_suppress_output(False)  # type: ignore
                         prompt = f"""请帮我处理这个网页：{url}
@@ -63,7 +63,7 @@ class WebpageTool:
             # 2) 然后尝试使用默认平台（normal）的 web 能力
             model = PlatformRegistry().get_normal_platform()
             if model.support_web():
-                PrettyOutput.print("▶️ 使用默认平台的 Web 能力读取网页...", OutputType.INFO)
+
                 model.set_web(True)
                 model.set_suppress_output(False)  # type: ignore
                 prompt = f"""请帮我处理这个网页：{url}
@@ -76,7 +76,7 @@ class WebpageTool:
                 return {"success": True, "stdout": response, "stderr": ""}
 
             # 3) 回退：使用 requests 抓取网页，再用模型分析
-            PrettyOutput.print("ℹ️ 当前模型不支持Web，使用requests抓取网页并进行分析。", OutputType.INFO)
+
             try:
                 resp = http_get(url, timeout=10.0, allow_redirects=True)
                 content_md = md(resp.text, strip=["script", "style"])
@@ -90,7 +90,7 @@ class WebpageTool:
             if not content_md or not content_md.strip():
                 return {"success": False, "stdout": "", "stderr": "无法从网页抓取有效内容。"}
 
-            PrettyOutput.print("🧠 正在分析抓取到的网页内容...", OutputType.INFO)
+
             summary_prompt = f"""以下是网页 {url} 的内容（已转换为Markdown）：
 ----------------
 {content_md}

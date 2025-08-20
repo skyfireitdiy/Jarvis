@@ -210,9 +210,7 @@ class ClearMemoryTool:
                 total_removed += result["removed"]
 
             # 生成结果报告
-            PrettyOutput.print(
-                f"记忆清除完成，共清除 {total_removed} 条记忆", OutputType.SUCCESS
-            )
+
 
             # 详细报告
             report = f"# 记忆清除报告\n\n"
@@ -235,10 +233,7 @@ class ClearMemoryTool:
             # 在终端显示摘要
             for memory_type, result in results.items():
                 if result["removed"] > 0:
-                    PrettyOutput.print(
-                        f"{memory_type}: 清除了 {result['removed']}/{result['total']} 条记忆",
-                        OutputType.INFO,
-                    )
+
 
             return {
                 "success": True,

@@ -147,17 +147,12 @@ class RetrieveMemoryTool:
 
                 # 检查是否超过token限制
                 if total_tokens + memory_tokens > memory_token_limit:
-                    PrettyOutput.print(
-                        f"达到token限制 ({total_tokens}/{memory_token_limit})，停止加载更多记忆",
-                        OutputType.INFO,
-                    )
+
                     break
 
                 # 检查是否超过50条限制
                 if len(filtered_memories) >= 50:
-                    PrettyOutput.print(
-                        f"达到记忆条数限制 (50条)，停止加载更多记忆", OutputType.INFO
-                    )
+
                     break
 
                 filtered_memories.append(memory)
@@ -170,10 +165,10 @@ class RetrieveMemoryTool:
                 all_memories = all_memories[:limit]
 
             # 打印结果摘要
-            PrettyOutput.print(f"检索到 {len(all_memories)} 条记忆", OutputType.INFO)
+
 
             if tags:
-                PrettyOutput.print(f"使用标签过滤: {', '.join(tags)}", OutputType.INFO)
+                pass
 
             # 格式化为Markdown输出
             markdown_output = f"# 记忆检索结果\n\n"
@@ -216,17 +211,11 @@ class RetrieveMemoryTool:
 
             # 如果记忆较多，在终端显示摘要
             if len(all_memories) > 5:
-                PrettyOutput.print(f"记忆较多，仅显示前5条摘要：", OutputType.INFO)
+                # 静默模式下不再打印摘要，完整结果已包含在返回的markdown_output中
                 for i, memory in enumerate(all_memories[:5]):
                     content_preview = memory.get("content", "")[:100]
                     if len(memory.get("content", "")) > 100:
                         content_preview += "..."
-                    PrettyOutput.print(
-                        f"{i+1}. [{memory.get('type')}] {memory.get('id')}\n"
-                        f"   标签: {', '.join(memory.get('tags', []))}\n"
-                        f"   内容: {content_preview}",
-                        OutputType.INFO,
-                    )
 
             return {
                 "success": True,
