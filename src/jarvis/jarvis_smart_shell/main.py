@@ -258,9 +258,7 @@ command_not_found_handler() {{
     local suggestion edited
     suggestion=$(jss request "$text")
     if [ -n "$suggestion" ]; then
-        # 交互式：使用 vared 预填命令，用户可直接回车执行或编辑
         if [[ -o interactive ]]; then
-            # 交互式：默认用编辑器打开建议，保存退出后执行；未修改则执行建议
             local editor="${{VISUAL:-${{EDITOR:-vi}}}}"
             local tmpfile edited
             tmpfile="$(mktemp -t jss-edit-XXXXXX)"
