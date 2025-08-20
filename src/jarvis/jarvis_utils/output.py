@@ -274,19 +274,13 @@ class PrettyOutput:
         panel = Panel(
             content,
             border_style=header_styles[output_type],
-            title=header,
-            title_align="left",
             padding=(0, 0),
             highlight=True,
         )
         if get_pretty_output():
             console.print(panel)
         else:
-            if len(text.strip().splitlines()) > 1:
-                console.print(header)
-                console.print(content)
-            else:
-                console.print(header, content)
+            console.print(content)
         if traceback or output_type == OutputType.ERROR:
             try:
                 console.print_exception()
