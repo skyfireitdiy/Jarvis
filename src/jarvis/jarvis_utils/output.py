@@ -389,6 +389,7 @@ class PrettyOutput:
         """获取当前已注册的输出后端列表（副本）。"""
         return list(_output_sinks)
 
+    @staticmethod
     def print_gradient_text(
         text: str, start_color: Tuple[int, int, int], end_color: Tuple[int, int, int]
     ) -> None:
