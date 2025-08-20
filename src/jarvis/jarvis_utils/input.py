@@ -69,7 +69,8 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     """
     session: PromptSession = PromptSession(history=None)
     style = PromptStyle.from_dict({"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"})
-    return session.prompt(f"{tip}", default=default, style=style)
+    prompt = FormattedText([("class:prompt", f"👤 ❯ {tip}")])
+    return session.prompt(prompt, default=default, style=style)
 
 
 def get_choice(tip: str, choices: List[str]) -> str:
@@ -427,7 +428,7 @@ def _get_multiline_input_internal(tip: str) -> str:
     )
 
     # Tip is shown in bottom toolbar; avoid extra print
-    prompt = FormattedText([("class:prompt", ">>> ")])
+    prompt = FormattedText([("class:prompt", "👤 ❯ ")])
 
     try:
         return session.prompt(
