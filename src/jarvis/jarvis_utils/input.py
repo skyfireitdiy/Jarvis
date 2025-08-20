@@ -26,6 +26,8 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.enums import DEFAULT_BUFFER
+from prompt_toolkit.filters import has_focus
 from prompt_toolkit.layout.containers import Window
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
@@ -373,11 +375,11 @@ def _get_multiline_input_internal(tip: str) -> str:
         else:
             event.current_buffer.insert_text("\n")
 
-    @bindings.add("c-j")
+    @bindings.add("c-j", filter=has_focus(DEFAULT_BUFFER))
     def _(event):
         event.current_buffer.validate_and_handle()
 
-    @bindings.add("c-o")
+    @bindings.add("c-o", filter=has_focus(DEFAULT_BUFFER))
     def _(event):
         """Handle Ctrl+O by exiting the prompt and returning the sentinel value."""
         event.app.exit(result=CTRL_O_SENTINEL)
