@@ -10,7 +10,7 @@
 """
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any, List
 
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
@@ -22,6 +22,8 @@ from rich.text import Text
 
 from jarvis.jarvis_utils.config import get_pretty_output
 from jarvis.jarvis_utils.globals import console, get_agent_list
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
 
 class OutputType(Enum):
@@ -55,6 +57,181 @@ class OutputType(Enum):
     DEBUG = "DEBUG"
     USER = "USER"
     TOOL = "TOOL"
+
+
+@dataclass
+class OutputEvent:
+    """
+    输出事件的通用结构，供不同输出后端（Sink）消费。
+    - text: 文本内容
+    - output_type: 输出类型
+    - timestamp: 是否显示时间戳
+    - lang: 语法高亮语言（可选，不提供则自动检测）
+    - traceback: 是否显示异常堆栈
+    - section: 若为章节标题输出，填入标题文本；否则为None
+    - context: 额外上下文（预留给TUI/日志等）
+    """
+    text: str
+    output_type: OutputType
+    timestamp: bool = True
+    lang: Optional[str] = None
+    traceback: bool = False
+    section: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+class OutputSink(ABC):
+    """输出后端抽象接口，不同前端（控制台/TUI/SSE/日志）实现该接口以消费输出事件。"""
+
+    @abstractmethod
+    def emit(self, event: OutputEvent) -> None:  # pragma: no cover - 抽象方法
+        raise NotImplementedError
+
+
+class ConsoleOutputSink(OutputSink):
+    """
+    默认控制台输出实现，保持与原 PrettyOutput 行为一致。
+    """
+
+    def emit(self, event: OutputEvent) -> None:
+        # 章节输出
+        if event.section is not None:
+            text = Text(event.section, style=event.output_type.value, justify="center")
+            panel = Panel(text, border_style=event.output_type.value)
+            if get_pretty_output():
+                console.print(panel)
+            else:
+                console.print(text)
+            return
+
+        # 普通内容输出
+        lang = (
+            event.lang
+            if event.lang is not None
+            else PrettyOutput._detect_language(event.text, default_lang="markdown")
+        )
+
+        # 与原实现保持一致的样式定义
+        styles: Dict[OutputType, Dict[str, Any]] = {
+            OutputType.SYSTEM: dict(bgcolor="#1e2b3c"),
+            OutputType.CODE: dict(bgcolor="#1c2b1c"),
+            OutputType.RESULT: dict(bgcolor="#1c1c2b"),
+            OutputType.ERROR: dict(bgcolor="#2b1c1c"),
+            OutputType.INFO: dict(bgcolor="#2b2b1c", meta={"icon": "ℹ️"}),
+            OutputType.PLANNING: dict(bgcolor="#2b1c2b"),
+            OutputType.PROGRESS: dict(bgcolor="#1c1c1c"),
+            OutputType.SUCCESS: dict(bgcolor="#1c2b1c"),
+            OutputType.WARNING: dict(bgcolor="#2b2b1c"),
+            OutputType.DEBUG: dict(bgcolor="#1c1c1c"),
+            OutputType.USER: dict(bgcolor="#1c2b2b"),
+            OutputType.TOOL: dict(bgcolor="#1c2b2b"),
+        }
+
+        header_styles = {
+            OutputType.SYSTEM: RichStyle(
+                color="bright_cyan", bgcolor="#1e2b3c", frame=True, meta={"icon": "🤖"}
+            ),
+            OutputType.CODE: RichStyle(
+                color="green", bgcolor="#1c2b1c", frame=True, meta={"icon": "📝"}
+            ),
+            OutputType.RESULT: RichStyle(
+                color="bright_blue", bgcolor="#1c1c2b", frame=True, meta={"icon": "✨"}
+            ),
+            OutputType.ERROR: RichStyle(
+                color="red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
+            ),
+            OutputType.INFO: RichStyle(
+                color="bright_cyan", frame=True, bgcolor="#2b2b1c", meta={"icon": "ℹ️"}
+            ),
+            OutputType.PLANNING: RichStyle(
+                color="purple",
+                bold=True,
+                frame=True,
+                bgcolor="#2b1c2b",
+                meta={"icon": "📋"},
+            ),
+            OutputType.PROGRESS: RichStyle(
+                color="white",
+                encircle=True,
+                frame=True,
+                bgcolor="#1c1c1c",
+                meta={"icon": "⏳"},
+            ),
+            OutputType.SUCCESS: RichStyle(
+                color="bright_green",
+                bold=True,
+                strike=False,
+                bgcolor="#1c2b1c",
+                meta={"icon": "✅"},
+            ),
+            OutputType.WARNING: RichStyle(
+                color="yellow",
+                bold=True,
+                blink2=True,
+                bgcolor="#2b2b1c",
+                meta={"icon": "⚠️"},
+            ),
+            OutputType.DEBUG: RichStyle(
+                color="grey58",
+                dim=True,
+                conceal=True,
+                bgcolor="#1c1c1c",
+                meta={"icon": "🔍"},
+            ),
+            OutputType.USER: RichStyle(
+                color="spring_green2",
+                frame=True,
+                bgcolor="#1c2b2b",
+                meta={"icon": "👤"},
+            ),
+            OutputType.TOOL: RichStyle(
+                color="dark_sea_green4",
+                bgcolor="#1c2b2b",
+                frame=True,
+                meta={"icon": "🔧"},
+            ),
+        }
+
+        header = Text(
+            PrettyOutput._format(event.output_type, event.timestamp),
+            style=header_styles[event.output_type],
+        )
+        content = Syntax(
+            event.text,
+            lang,
+            theme="monokai",
+            word_wrap=True,
+            background_color=styles[event.output_type]["bgcolor"],
+        )
+        panel = Panel(
+            content,
+            border_style=header_styles[event.output_type],
+            padding=(0, 0),
+            highlight=True,
+        )
+        if get_pretty_output():
+            console.print(panel)
+        else:
+            console.print(content)
+        if event.traceback or event.output_type == OutputType.ERROR:
+            try:
+                console.print_exception()
+            except Exception as e:
+                console.print(f"Error: {e}")
+
+
+# 模块级输出分发器（默认注册控制台后端）
+_output_sinks: List[OutputSink] = [ConsoleOutputSink()]
+
+
+def emit_output(event: OutputEvent) -> None:
+    """向所有已注册的输出后端广播事件。"""
+    for sink in list(_output_sinks):
+        try:
+            sink.emit(event)
+        except Exception as e:
+            # 后端故障不影响其他后端
+            console.print(f"[输出后端错误] {sink.__class__.__name__}: {e}")
 
 
 class PrettyOutput:
@@ -166,144 +343,52 @@ class PrettyOutput:
         traceback: bool = False,
     ):
         """
-        使用样式和语法高亮打印格式化输出。
-
-        参数：
-            text: 要打印的文本内容
-            output_type: 输出类型（影响样式）
-            timestamp: 是否显示时间戳
-            lang: 语法高亮的语言
-            traceback: 是否显示错误的回溯信息
+        使用样式和语法高亮打印格式化输出（已抽象为事件 + Sink 机制）。
+        保持对现有调用方的向后兼容，同时为TUI/日志等前端预留扩展点。
         """
-        styles: Dict[OutputType, Dict[str, Any]] = {
-            OutputType.SYSTEM: dict(bgcolor="#1e2b3c"),
-            OutputType.CODE: dict(bgcolor="#1c2b1c"),
-            OutputType.RESULT: dict(bgcolor="#1c1c2b"),
-            OutputType.ERROR: dict(bgcolor="#2b1c1c"),
-            OutputType.INFO: dict(bgcolor="#2b2b1c", meta={"icon": "ℹ️"}),
-            OutputType.PLANNING: dict(bgcolor="#2b1c2b"),
-            OutputType.PROGRESS: dict(bgcolor="#1c1c1c"),
-            OutputType.SUCCESS: dict(bgcolor="#1c2b1c"),
-            OutputType.WARNING: dict(bgcolor="#2b2b1c"),
-            OutputType.DEBUG: dict(bgcolor="#1c1c1c"),
-            OutputType.USER: dict(bgcolor="#1c2b2b"),
-            OutputType.TOOL: dict(bgcolor="#1c2b2b"),
-        }
-
-        header_styles = {
-            OutputType.SYSTEM: RichStyle(
-                color="bright_cyan", bgcolor="#1e2b3c", frame=True, meta={"icon": "🤖"}
-            ),
-            OutputType.CODE: RichStyle(
-                color="green", bgcolor="#1c2b1c", frame=True, meta={"icon": "📝"}
-            ),
-            OutputType.RESULT: RichStyle(
-                color="bright_blue", bgcolor="#1c1c2b", frame=True, meta={"icon": "✨"}
-            ),
-            OutputType.ERROR: RichStyle(
-                color="red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
-            ),
-            OutputType.INFO: RichStyle(
-                color="bright_cyan", frame=True, bgcolor="#2b2b1c", meta={"icon": "ℹ️"}
-            ),
-            OutputType.PLANNING: RichStyle(
-                color="purple",
-                bold=True,
-                frame=True,
-                bgcolor="#2b1c2b",
-                meta={"icon": "📋"},
-            ),
-            OutputType.PROGRESS: RichStyle(
-                color="white",
-                encircle=True,
-                frame=True,
-                bgcolor="#1c1c1c",
-                meta={"icon": "⏳"},
-            ),
-            OutputType.SUCCESS: RichStyle(
-                color="bright_green",
-                bold=True,
-                strike=False,
-                bgcolor="#1c2b1c",
-                meta={"icon": "✅"},
-            ),
-            OutputType.WARNING: RichStyle(
-                color="yellow",
-                bold=True,
-                blink2=True,
-                bgcolor="#2b2b1c",
-                meta={"icon": "⚠️"},
-            ),
-            OutputType.DEBUG: RichStyle(
-                color="grey58",
-                dim=True,
-                conceal=True,
-                bgcolor="#1c1c1c",
-                meta={"icon": "🔍"},
-            ),
-            OutputType.USER: RichStyle(
-                color="spring_green2",
-                frame=True,
-                bgcolor="#1c2b2b",
-                meta={"icon": "👤"},
-            ),
-            OutputType.TOOL: RichStyle(
-                color="dark_sea_green4",
-                bgcolor="#1c2b2b",
-                frame=True,
-                meta={"icon": "🔧"},
-            ),
-        }
-
-        lang = (
-            lang
-            if lang is not None
-            else PrettyOutput._detect_language(text, default_lang="markdown")
+        event = OutputEvent(
+            text=text,
+            output_type=output_type,
+            timestamp=timestamp,
+            lang=lang,
+            traceback=traceback,
         )
-        header = Text(
-            PrettyOutput._format(output_type, timestamp),
-            style=header_styles[output_type],
-        )
-        content = Syntax(
-            text,
-            lang,
-            theme="monokai",
-            word_wrap=True,
-            background_color=styles[output_type]["bgcolor"],
-        )
-        panel = Panel(
-            content,
-            border_style=header_styles[output_type],
-            padding=(0, 0),
-            highlight=True,
-        )
-        if get_pretty_output():
-            console.print(panel)
-        else:
-            console.print(content)
-        if traceback or output_type == OutputType.ERROR:
-            try:
-                console.print_exception()
-            except Exception as e:
-                console.print(f"Error: {e}")
+        emit_output(event)
 
     @staticmethod
     def section(title: str, output_type: OutputType = OutputType.INFO):
         """
-        在样式化面板中打印章节标题。
-
-        参数：
-            title: 章节标题文本
-            output_type: 输出类型（影响样式）
+        在样式化面板中打印章节标题（通过事件 + Sink 机制分发）。
         """
-        text = Text(title, style=output_type.value, justify="center")
-        panel = Panel(text, border_style=output_type.value)
-        if get_pretty_output():
-            console.print(panel)
-        else:
-            console.print(text)
+        event = OutputEvent(
+            text="",
+            output_type=output_type,
+            section=title,
+        )
+        emit_output(event)
 
     @staticmethod
+    # Sink管理（为外部注册自定义后端预留）
+    @staticmethod
+    def add_sink(sink: OutputSink) -> None:
+        """注册一个新的输出后端。"""
+        _output_sinks.append(sink)
+
+    @staticmethod
+    def clear_sinks(keep_default: bool = True) -> None:
+        """清空已注册的输出后端；可选择保留默认控制台后端。"""
+        if keep_default:
+            globals()["_output_sinks"] = [
+                s for s in _output_sinks if isinstance(s, ConsoleOutputSink)
+            ]
+        else:
+            _output_sinks.clear()
+
+    @staticmethod
+    def get_sinks() -> List[OutputSink]:
+        """获取当前已注册的输出后端列表（副本）。"""
+        return list(_output_sinks)
+
     def print_gradient_text(
         text: str, start_color: Tuple[int, int, int], end_color: Tuple[int, int, int]
     ) -> None:
