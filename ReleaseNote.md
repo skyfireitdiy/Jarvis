@@ -1,3 +1,32 @@
+### Release Note - v0.3.19 2025-08-20
+
+#### **新功能 (Features)**
+- 智能 Shell（JSS）扩展：在原有 fish 的基础上，新增 bash 与 zsh 的“命令未找到”智能建议与可编辑执行支持；交互模式可直接编辑建议并回车执行，非交互模式自动输出建议。
+- 角色体系模块化：将原先的 builtin/roles/roles.yaml 拆分为多模块文件，新增/完善以下角色包：
+  - coaching_roles.yaml、hr_roles.yaml、planning_roles.yaml、thinking_roles.yaml、writing_roles.yaml
+  - 内容覆盖“公司技术教练认证首席导师”“GROW 模型分析专家”“活动策划专家”等丰富角色。
+- 统计能力增强：引入 totals 总量缓存与快速总量查询；自动解析并写回指标分组；StatsManager 新增 get_metric_total / get_metric_info / resolve_metric_group 等 API。
+
+#### **修复 (Fixes)**
+- 输入兼容性修复：新增 Agent._multiline_input 包装，兼容仅接受单参数的自定义多行输入器（TypeError 兜底），避免交互中断。
+- 提交流程稳健性：Git 提交在 Windows 下的临时文件读写与清理更加可靠；大 diff 上传/处理路径更加稳健，失败信息更清晰。
+
+#### **优化与重构 (Refactors & Improvements)**
+- 输出体验统一：广泛替换零散 print 为 PrettyOutput，统一信息分级与展示；模型流式输出增加“按 Ctrl+C 中断”提示，并在非“花屏”模式下清晰回显与耗时统计。
+- 多行输入体验升级：底部工具栏展示快捷键（@ 文件补全、Tab 选择、Ctrl+J 确认、Ctrl+O 历史复制、Ctrl+C/D 取消），提示信息更友好。
+- RAG 与 CLI 体验：检索/重排/统计/工具列表/调用等输出统一风格，错误与代码块高亮，过程提示更清晰；RAG 日志与提示更易读。
+- 统计看板性能：使用快速总量读取，避免全量扫描；使用分组信息提升看板展示准确性；表格与布局对齐优化。
+- Git/提交与跨平台：更安全的临时文件处理，异常分支更完善；换行符建议与提示更贴合实际。
+- 终端工具一致性：VirtualTTY、文件读写、网页读取、搜索等工具的日志与错误输出统一为 PrettyOutput，减少噪声日志。
+
+#### **文档更新 (Documentation)**
+- 角色定义内容结构化与拆分，角色说明更清晰、可维护（coaching/hr/planning/thinking/writing 五大模块）。
+
+#### **其他 (Miscellaneous)**
+- 多处细节健壮性提升、异常处理完善、提示文案统一与国际化倾向。
+
+本次更新主要聚焦于：智能 Shell 覆盖更多主流终端（bash/zsh）、角色体系模块化重构、控制台交互与日志输出的统一优化、统计系统的性能与分组增强，以及输入体验的全面提升。
+
 ### Release Note - v0.3.18 2025-08-19
 
 #### **新功能 (Features)**  
