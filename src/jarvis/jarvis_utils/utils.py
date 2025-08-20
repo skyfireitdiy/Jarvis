@@ -212,46 +212,37 @@ def _show_usage_stats(welcome_str: str) -> None:
             "commit": {"title": "💾 提交统计", "metrics": {}, "suffix": "个"},
             "command": {"title": "📱 命令使用", "metrics": {}, "suffix": "次"},
             "adoption": {"title": "🎯 采纳情况", "metrics": {}, "suffix": ""},
+            "other": {"title": "📦 其他指标", "metrics": {}, "suffix": ""},
         }
 
-        # 遍历所有指标，获取统计数据
+        # 遍历所有指标，使用快速总量读取以避免全量扫描
         for metric in all_metrics:
-            # 获取该指标的所有数据
-            stats_data = StatsManager.get_stats(
-                metric_name=metric,
-                start_time=datetime(2000, 1, 1),
-                end_time=datetime.now(),
-            )
+            try:
+                total = StatsManager.get_metric_total(metric)
+            except Exception:
+                total = 0.0
 
-            if stats_data and isinstance(stats_data, dict) and "records" in stats_data:
-                # 按照标签分组统计
-                tag_totals: Dict[str, float] = {}
-                for record in stats_data["records"]:
-                    tags = record.get("tags", {})
-                    group = tags.get("group", "other")
-                    tag_totals[group] = tag_totals.get(group, 0) + record["value"]
+            if not total or total <= 0:
+                continue
 
-                # 根据标签将指标分配到相应类别
-                for group, total in tag_totals.items():
-                    if total > 0:
-                        if group == "tool":
-                            categorized_stats["tool"]["metrics"][metric] = int(total)
-                        elif group == "code_agent":
-                            # 根据指标名称细分
-                            if metric.startswith("code_lines_"):
-                                categorized_stats["lines"]["metrics"][metric] = int(
-                                    total
-                                )
-                            elif "commit" in metric:
-                                categorized_stats["commit"]["metrics"][metric] = int(
-                                    total
-                                )
-                            else:
-                                categorized_stats["code"]["metrics"][metric] = int(
-                                    total
-                                )
-                        elif group == "command":
-                            categorized_stats["command"]["metrics"][metric] = int(total)
+            # 优先使用元信息中的分组（在写入指标时已记录）
+            info = StatsManager.get_metric_info(metric) or {}
+            group = info.get("group", "other")
+
+            if group == "tool":
+                categorized_stats["tool"]["metrics"][metric] = int(total)
+            elif group == "code_agent":
+                # 根据指标名称细分
+                if metric.startswith("code_lines_"):
+                    categorized_stats["lines"]["metrics"][metric] = int(total)
+                elif "commit" in metric:
+                    categorized_stats["commit"]["metrics"][metric] = int(total)
+                else:
+                    categorized_stats["code"]["metrics"][metric] = int(total)
+            elif group == "command":
+                categorized_stats["command"]["metrics"][metric] = int(total)
+            else:
+                categorized_stats["other"]["metrics"][metric] = int(total)
 
         # 合并长短命令的历史统计数据
         command_stats = categorized_stats["command"]["metrics"]

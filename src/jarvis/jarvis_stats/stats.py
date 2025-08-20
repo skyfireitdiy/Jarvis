@@ -94,6 +94,46 @@ class StatsManager:
         return storage.list_metrics()
 
     @staticmethod
+    def get_metric_total(metric_name: str) -> float:
+        """
+        获取指标的累计总量（快速路径）
+        优先从总量缓存读取；若不存在则回溯历史数据计算一次后缓存
+        """
+        storage = StatsManager._get_storage()
+        try:
+            return float(storage.get_metric_total(metric_name))
+        except Exception:
+            return 0.0
+
+    @staticmethod
+    def get_metric_info(metric_name: str) -> Optional[Dict[str, Any]]:
+        """
+        获取指标元信息（包含unit、created_at、last_updated、group等）
+        - 若缺少group，会尝试基于历史记录的tags进行推断并写回，然后返回最新信息
+        """
+        storage = StatsManager._get_storage()
+        info = storage.get_metric_info(metric_name)
+        if not info or not info.get("group"):
+            try:
+                grp = storage.resolve_metric_group(metric_name)  # 触发一次分组解析与回填
+                if grp:
+                    info = storage.get_metric_info(metric_name)
+            except Exception:
+                pass
+        return info
+
+    @staticmethod
+    def resolve_metric_group(metric_name: str) -> Optional[str]:
+        """
+        主动解析并写回某个指标的分组信息（调用底层存储的推断逻辑）
+        """
+        storage = StatsManager._get_storage()
+        try:
+            return storage.resolve_metric_group(metric_name)
+        except Exception:
+            return None
+
+    @staticmethod
     def show(
         metric_name: Optional[str] = None,
         last_hours: Optional[int] = None,
