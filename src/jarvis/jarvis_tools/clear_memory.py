@@ -211,7 +211,6 @@ class ClearMemoryTool:
 
             # 生成结果报告
 
-
             # 详细报告
             report = f"# 记忆清除报告\n\n"
             report += f"**总计清除**: {total_removed} 条记忆\n\n"
@@ -229,11 +228,6 @@ class ClearMemoryTool:
                 report += f"- 原有记忆: {result['total']} 条\n"
                 report += f"- 已清除: {result['removed']} 条\n"
                 report += f"- 剩余: {result['total'] - result['removed']} 条\n\n"
-
-            # 在终端显示摘要
-            for memory_type, result in results.items():
-                if result["removed"] > 0:
-
 
             return {
                 "success": True,
