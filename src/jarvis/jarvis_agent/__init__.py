@@ -413,6 +413,19 @@ class Agent:
         """Sets the flag to run input handlers on the next turn."""
         self.run_input_handlers_next_turn = value
 
+    def _multiline_input(self, tip: str, print_on_empty: bool) -> str:
+        """
+        Safe wrapper for multiline input to optionally suppress empty-input notice.
+        If the configured multiline_inputer supports 'print_on_empty' keyword, pass it;
+        otherwise, fall back to calling with a single argument for compatibility.
+        """
+        try:
+            # Try to pass the keyword for enhanced input handler
+            return self.multiline_inputer(tip, print_on_empty=print_on_empty)  # type: ignore
+        except TypeError:
+            # Fallback for custom handlers that only accept one argument
+            return self.multiline_inputer(tip)  # type: ignore
+
     def set_after_tool_call_cb(self, cb: Callable[[Any], None]):  # type: ignore
         """设置工具调用后回调函数。
 
@@ -789,7 +802,7 @@ class Agent:
             return None
 
         set_interrupt(False)
-        user_input = self.multiline_inputer(f"模型交互期间被中断，请输入用户干预信息：")
+        user_input = self._multiline_input("模型交互期间被中断，请输入用户干预信息：", False)
 
         self.run_input_handlers_next_turn = True
 
@@ -814,9 +827,7 @@ class Agent:
         返回:
             str: "continue" 或 "complete"
         """
-        user_input = self.multiline_inputer(
-            f"{self.name}: 请输入，或输入空行来结束当前任务："
-        )
+        user_input = self._multiline_input(f"{self.name}: 请输入，或输入空行来结束当前任务：", False)
 
         if user_input:
             self.session.prompt = user_input
