@@ -114,7 +114,6 @@ class FileRewriteTool:
                 action = "创建并写入" if not file_exists else "成功重写"
                 stdout_message = f"文件 {abs_path} {action}"
                 stdout_messages.append(stdout_message)
-                PrettyOutput.print(stdout_message, OutputType.SUCCESS)
 
             except Exception as e:
                 stderr_message = f"处理文件 {file_path} 时出错: {str(e)}"
@@ -126,7 +125,6 @@ class FileRewriteTool:
             if not success and processed:
                 rollback_message = "操作失败，正在回滚修改..."
                 stderr_messages.append(rollback_message)
-                PrettyOutput.print(rollback_message, OutputType.WARNING)
 
                 try:
                     if original_content is None:
@@ -141,7 +139,6 @@ class FileRewriteTool:
                         rollback_file_message = f"已回滚文件: {abs_path}"
 
                     stderr_messages.append(rollback_file_message)
-                    PrettyOutput.print(rollback_file_message, OutputType.INFO)
                 except Exception as e:
                     rollback_error = f"回滚文件 {file_path} 失败: {str(e)}"
                     stderr_messages.append(rollback_error)
@@ -172,7 +169,6 @@ class FileRewriteTool:
             if processed:
                 rollback_message = "操作失败，正在回滚修改..."
                 stderr_messages.append(rollback_message)
-                PrettyOutput.print(rollback_message, OutputType.WARNING)
 
                 try:
                     if original_content is None:

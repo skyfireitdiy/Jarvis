@@ -34,7 +34,7 @@ class SearchWebTool:
         # pylint: disable=too-many-locals, broad-except
         """执行网络搜索、抓取内容并总结结果。"""
         try:
-            PrettyOutput.print("▶️ 使用 DuckDuckGo 开始网页搜索...", OutputType.INFO)
+
             results = list(DDGS().text(query, max_results=50, page=3))
 
             if not results:
@@ -50,17 +50,14 @@ class SearchWebTool:
 
             for r in results:
                 if visited_count >= 10:
-                    PrettyOutput.print("ℹ️ 已成功获取10个网页，停止抓取。", OutputType.INFO)
+
                     break
 
                 url = r["href"]
                 title = r.get("title", url)
 
                 try:
-                    PrettyOutput.print(
-                        f"📄 ({visited_count + 1}/10) 正在抓取: {title} ({url})",
-                        OutputType.INFO,
-                    )
+
                     response = http_get(url, timeout=10.0, allow_redirects=True)
                     content = md(response.text, strip=["script", "style"])
                     if content:
@@ -83,9 +80,9 @@ class SearchWebTool:
                 }
 
             url_list_str = "\n".join(f"  - {u}" for u in visited_urls)
-            PrettyOutput.print(f"🔍 已成功访问并处理以下URL:\n{url_list_str}", OutputType.INFO)
 
-            PrettyOutput.print("🧠 正在总结内容...", OutputType.INFO)
+
+
             summary_prompt = f"请为查询“{query}”总结以下内容：\n\n{full_content}"
 
             if not agent.model:

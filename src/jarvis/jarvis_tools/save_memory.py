@@ -159,12 +159,7 @@ class SaveMemoryTool:
                     # 打印单条记忆保存信息
                     memory_type = memory_data["memory_type"]
                     tags = memory_data.get("tags", [])
-                    PrettyOutput.print(
-                        f"[{i+1}/{len(memories)}] {memory_type} 记忆已保存\n"
-                        f"ID: {result['memory_id']}\n"
-                        f"标签: {', '.join(tags)}",
-                        OutputType.SUCCESS,
-                    )
+
                 except Exception as e:
                     failed_count += 1
                     error_msg = f"保存第 {i+1} 条记忆失败: {str(e)}"
@@ -178,10 +173,7 @@ class SaveMemoryTool:
                     )
 
             # 生成总结报告
-            PrettyOutput.print(
-                f"\n批量保存完成：成功 {success_count} 条，失败 {failed_count} 条",
-                OutputType.INFO,
-            )
+
 
             # 构建返回结果
             output = {

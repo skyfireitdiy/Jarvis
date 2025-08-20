@@ -123,9 +123,7 @@ class generate_new_tool:
                 tool_registry = agent.get_tool_registry()
                 if tool_registry:
                     # 尝试加载并注册新工具
-                    PrettyOutput.print(
-                        f"正在注册工具 '{tool_name}'...", OutputType.INFO
-                    )
+
                     if tool_registry.register_tool_by_file(str(tool_file_path)):
                         success_message += f"\n已成功注册到当前会话的工具注册表中"
                         registration_successful = True
@@ -148,12 +146,7 @@ class generate_new_tool:
                     )
                     success_message += f"\n注册到当前会话失败，可能需要重新启动Jarvis"
 
-            PrettyOutput.print(
-                f"工具 '{tool_name}' 创建"
-                + ("并注册" if registration_successful else "")
-                + "成功！",
-                OutputType.SUCCESS,
-            )
+
 
             # 检查并安装缺失的依赖
             try:
@@ -181,13 +174,11 @@ class generate_new_tool:
                     try:
                         __import__(pkg)
                     except ImportError:
-                        PrettyOutput.print(
-                            f"检测到缺失依赖: {pkg}, 正在尝试安装...", OutputType.INFO
-                        )
+
                         import subprocess
 
                         subprocess.run(["pip", "install", pkg], check=True)
-                        PrettyOutput.print(f"成功安装依赖: {pkg}", OutputType.SUCCESS)
+
             except Exception as e:
                 PrettyOutput.print(f"依赖检查/安装失败: {str(e)}", OutputType.WARNING)
 
@@ -201,11 +192,9 @@ class generate_new_tool:
             # 删除已创建的文件
             if tool_file_path and tool_file_path.exists():
                 try:
-                    PrettyOutput.print(
-                        f"正在删除已创建的文件 {tool_file_path}...", OutputType.INFO
-                    )
+
                     tool_file_path.unlink()
-                    PrettyOutput.print(f"文件已删除", OutputType.SUCCESS)
+
                 except Exception as delete_error:
                     PrettyOutput.print(
                         f"删除文件失败: {str(delete_error)}", OutputType.ERROR
