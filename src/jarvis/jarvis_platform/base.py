@@ -84,7 +84,7 @@ class BasePlatform(ABC):
             )  # 留出一些余量
             min_chunk_size = get_max_input_token_count(self.model_group) - 2048
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
-            print("📤 正在提交长上下文...")
+            print(f"📤 长上下文，分批提交，共{len(inputs)}部分...")
             prefix_prompt = f"""
             我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
             """
@@ -95,9 +95,7 @@ class BasePlatform(ABC):
             for input in inputs:
                 submit_count += 1
                 length += len(input)
-                print(
-                    f"📤 正在提交第{submit_count}部分（共{len(inputs)}部分({length}/{len(message)})）"
-                )
+
 
                 response += "\n"
                 for trunk in while_true(
@@ -111,9 +109,7 @@ class BasePlatform(ABC):
                 ):
                     response += trunk
 
-                print(
-                    f"📤 提交第{submit_count}部分完成，当前进度：{length}/{len(message)}"
-                )
+
             print("✅ 提交完成")
             response += "\n" + while_true(
                 lambda: while_success(

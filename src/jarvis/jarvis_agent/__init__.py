@@ -540,17 +540,17 @@ class Agent:
         注意:
             仅生成摘要，不修改对话状态
         """
-        print("📄 正在总结对话历史...")
+
         try:
             if not self.model:
                 raise RuntimeError("Model not initialized")
             summary = self.model.chat_until_success(
                 self.session.prompt + "\n" + SUMMARY_REQUEST_PROMPT
             )  # type: ignore
-            print("✅ 总结对话历史完成")
+
             return summary
         except Exception as e:
-            print("❌ 总结对话历史失败")
+            PrettyOutput.print("总结对话历史失败", OutputType.ERROR)
             return ""
 
     def _summarize_and_clear_history(self) -> str:
@@ -647,12 +647,12 @@ class Agent:
         self._check_and_organize_memory()
 
         if self.need_summary:
-            print("📄 正在生成总结...")
+
             self.session.prompt = self.summary_prompt
             if not self.model:
                 raise RuntimeError("Model not initialized")
             ret = self.model.chat_until_success(self.session.prompt)  # type: ignore
-            print("✅ 总结生成完成")
+
             return ret
 
         return "任务完成"

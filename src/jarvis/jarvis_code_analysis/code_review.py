@@ -286,7 +286,6 @@ class CodeReviewTool:
                 diff_output = ""
 
                 # Build git diff command based on review type
-                print("📊 正在获取代码变更...")
 
                 if review_type == "commit":
                     if "commit_sha" not in args:
@@ -458,7 +457,6 @@ class CodeReviewTool:
                 diff_output = review_info + diff_output
 
                 PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")
-                print("✅ 代码变更获取完成")
 
                 system_prompt = """<code_review_guide>
 <role>
@@ -753,10 +751,10 @@ class CodeReviewTool:
                                 "stdout": "",
                                 "stderr": "代码差异太大，无法处理",
                             }
-                        print("📤 正在上传代码差异文件...")
+
                         upload_success = agent.model.upload_files([temp_file_path])
                         if upload_success:
-                            print("✅ 已成功上传代码差异文件")
+                            pass
                         else:
                             return {
                                 "success": False,

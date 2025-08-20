@@ -8,6 +8,7 @@ from typing import Optional
 from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_agent.prompts import TASK_ANALYSIS_PROMPT
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class TaskAnalyzer:
@@ -24,7 +25,7 @@ class TaskAnalyzer:
 
     def analysis_task(self, satisfaction_feedback: str = ""):
         """分析任务并生成方法论"""
-        print("🔍 正在分析任务...")
+
         try:
             # 准备分析提示
             self.agent.session.prompt = self._prepare_analysis_prompt(
@@ -37,9 +38,9 @@ class TaskAnalyzer:
             # 循环处理工具调用，直到没有工具调用为止
             self._process_analysis_loop()
 
-            print("✅ 分析完成")
+
         except Exception as e:
-            print("❌ 分析失败")
+            PrettyOutput.print("分析失败", OutputType.ERROR)
 
     def _prepare_analysis_prompt(self, satisfaction_feedback: str) -> str:
         """准备分析提示"""

@@ -44,7 +44,7 @@ class ReadCodeTool:
         """
         try:
             abs_path = os.path.abspath(filepath)
-            print(f"📖 正在读取文件: {abs_path}...")
+
             # 文件存在性检查
             if not os.path.exists(abs_path):
                 return {
@@ -69,7 +69,6 @@ class ReadCodeTool:
 
             # 处理空文件情况
             if total_lines == 0:
-                print(f"✅ 文件读取完成: {abs_path}")
                 return {
                     "success": True,
                     "stdout": f"\n🔍 文件: {abs_path}\n📄 文件为空 (0行)\n",
@@ -93,9 +92,7 @@ class ReadCodeTool:
             )
 
             if start_line > end_line:
-                print(
-                    f"❌ 无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})"
-                )
+
                 return {
                     "success": False,
                     "stdout": "",
@@ -117,7 +114,7 @@ class ReadCodeTool:
                 f"📄 原始行号: {start_line}-{end_line} (共{total_lines}行) \n\n"
                 f"{numbered_content}\n\n"
             )
-            print(f"✅ 文件读取完成: {abs_path}")
+
 
             if agent:
                 files = agent.get_user_data("files")

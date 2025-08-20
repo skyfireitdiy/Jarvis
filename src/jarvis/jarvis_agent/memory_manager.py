@@ -74,7 +74,7 @@ class MemoryManager:
         if "save_memory" not in tool_names:
             return
 
-        print("🔍 正在分析是否有值得记忆的信息...")
+
 
         # 构建提示词，让大模型自己判断并保存记忆
         prompt = """请回顾本次任务的整个过程，判断是否有值得长期记忆或项目记忆的信息。
@@ -97,12 +97,12 @@ class MemoryManager:
 
             # 根据响应判断是否保存了记忆
             if "save_memory" in response:
-                print("✅ 已自动保存有价值的信息到记忆系统")
+                PrettyOutput.print("已自动保存有价值的信息到记忆系统", OutputType.SUCCESS)
             else:
-                print("📝 本次任务没有特别需要记忆的信息")
+                PrettyOutput.print("本次任务没有特别需要记忆的信息", OutputType.INFO)
 
         except Exception as e:
-            print(f"❌ 记忆分析失败: {str(e)}")
+            PrettyOutput.print(f"记忆分析失败: {str(e)}", OutputType.ERROR)
 
     def add_memory_prompts_to_addon(self, addon_prompt: str, tool_registry) -> str:
         """在附加提示中添加记忆相关提示"""
