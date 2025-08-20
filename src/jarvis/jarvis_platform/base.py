@@ -15,9 +15,10 @@ from jarvis.jarvis_utils.config import (
     get_max_input_token_count,
     get_pretty_output,
     is_print_prompt,
+    is_immediate_abort,
 )
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
-from jarvis.jarvis_utils.globals import set_in_chat
+from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
@@ -137,6 +138,8 @@ class BasePlatform(ABC):
                     with Live(panel, refresh_per_second=10, transient=False) as live:
                         for s in self.chat(message):
                             response += s
+                            if is_immediate_abort() and get_interrupt():
+                                return response
                             text_content.append(s, style="bright_white")
                             panel.subtitle = "[yellow]正在回答...[/yellow]"
                             live.update(panel)
@@ -150,10 +153,14 @@ class BasePlatform(ABC):
                     for s in self.chat(message):
                         print(s, end="", flush=True)
                         response += s
+                        if is_immediate_abort() and get_interrupt():
+                            return response
                     print()
             else:
                 for s in self.chat(message):
                     response += s
+                    if is_immediate_abort() and get_interrupt():
+                        return response
         # Keep original think tag handling
         response = re.sub(
             ot("think") + r".*?" + ct("think"), "", response, flags=re.DOTALL

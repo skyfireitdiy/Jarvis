@@ -949,6 +949,15 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         )
         changed = (
             _ask_and_set(
+                "JARVIS_IMMEDIATE_ABORT",
+                "是否启用立即中断？\n- 选择 是/true：在对话输出流的每次迭代中检测到用户中断（例如 Ctrl+C）时，立即返回当前已生成的内容并停止继续输出。\n- 选择 否/false：不会在输出过程中立刻返回，而是按既有流程处理（不中途打断输出）。",
+                False,
+                "bool",
+            )
+            or changed
+        )
+        changed = (
+            _ask_and_set(
                 "JARVIS_ENABLE_STATIC_ANALYSIS",
                 "是否启用静态代码分析（Static Analysis）？",
                 True,
