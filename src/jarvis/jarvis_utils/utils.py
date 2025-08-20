@@ -551,7 +551,7 @@ def _show_usage_stats(welcome_str: str) -> None:
                 layout_items: List[RenderableType] = []
                 layout_items.append(right_column_group)
                 if has_content:
-                    layout_items.append(table)
+                    layout_items.append(Align.center(table))
                 layout_renderable = Group(*layout_items)
             else:
                 # 左右布局（当前）
@@ -567,8 +567,8 @@ def _show_usage_stats(welcome_str: str) -> None:
                 layout_table.add_column(ratio=5)  # 右侧
 
                 if has_content:
-                    # 将总结信息放在左侧，统计表格放在右侧
-                    layout_table.add_row(right_column_group, table)
+                    # 将总结信息放在左侧，统计表格放在右侧（表格居中显示）
+                    layout_table.add_row(right_column_group, Align.center(table))
                 else:
                     # 如果没有统计数据，则总结信息占满
                     layout_table.add_row(right_column_group)
