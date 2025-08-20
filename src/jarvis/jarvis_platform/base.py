@@ -150,6 +150,8 @@ class BasePlatform(ABC):
                         )
                         live.update(panel)
                 else:
+                    # Print a clear prefix line before streaming model output (non-pretty mode)
+                    print(f"🤖 模型输出 - {self.name()}", flush=True)
                     for s in self.chat(message):
                         print(s, end="", flush=True)
                         response += s

@@ -68,7 +68,7 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     获取支持历史记录的单行输入。
     """
     session: PromptSession = PromptSession(history=None)
-    style = PromptStyle.from_dict({"prompt": "ansicyan"})
+    style = PromptStyle.from_dict({"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"})
     return session.prompt(f"{tip}", default=default, style=style)
 
 
@@ -337,8 +337,8 @@ def _get_multiline_input_internal(tip: str) -> str:
     """
     bindings = KeyBindings()
 
-    # Show a one-time hint on the first Enter press in this invocation
-    first_enter_hint_shown = False
+    # Show a one-time hint on the first Enter press in this invocation (disabled; using inlay toolbar instead)
+    first_enter_hint_shown = True
 
     @bindings.add("enter")
     def _(event):
@@ -381,8 +381,40 @@ def _get_multiline_input_internal(tip: str) -> str:
         """Handle Ctrl+O by exiting the prompt and returning the sentinel value."""
         event.app.exit(result=CTRL_O_SENTINEL)
 
-    style = PromptStyle.from_dict({"prompt": "ansicyan"})
+    style = PromptStyle.from_dict(
+        {
+            "prompt": "ansibrightmagenta bold",
+            "bottom-toolbar": "bg:#4b145b #ffd6ff bold",
+            "bt.tip": "bold fg:#ff5f87",
+            "bt.sep": "fg:#ffb3de",
+            "bt.key": "bg:#d7005f #ffffff bold",
+            "bt.label": "fg:#ffd6ff",
+        }
+    )
 
+    def _bottom_toolbar():
+        return FormattedText(
+            [
+                ("class:bt.tip", f" {tip} "),
+                ("class:bt.sep", " • "),
+                ("class:bt.label", "快捷键: "),
+                ("class:bt.key", "@"),
+                ("class:bt.label", " 文件补全 "),
+                ("class:bt.sep", " • "),
+                ("class:bt.key", "Tab"),
+                ("class:bt.label", " 选择 "),
+                ("class:bt.sep", " • "),
+                ("class:bt.key", "Ctrl+J"),
+                ("class:bt.label", " 确认 "),
+                ("class:bt.sep", " • "),
+                ("class:bt.key", "Ctrl+O"),
+                ("class:bt.label", " 历史复制 "),
+                ("class:bt.sep", " • "),
+                ("class:bt.key", "Ctrl+C/D"),
+                ("class:bt.label", " 取消 "),
+            ]
+        )
+    
     history_dir = get_data_dir()
     session: PromptSession = PromptSession(
         history=FileHistory(os.path.join(history_dir, "multiline_input_history")),
@@ -394,11 +426,16 @@ def _get_multiline_input_internal(tip: str) -> str:
         mouse_support=False,
     )
 
-    print(f"{Fore.GREEN}{tip}{ColoramaStyle.RESET_ALL}")
+    # Tip is shown in bottom toolbar; avoid extra print
     prompt = FormattedText([("class:prompt", ">>> ")])
 
     try:
-        return session.prompt(prompt, style=style, pre_run=lambda: None).strip()
+        return session.prompt(
+            prompt,
+            style=style,
+            pre_run=lambda: None,
+            bottom_toolbar=_bottom_toolbar,
+        ).strip()
     except (KeyboardInterrupt, EOFError):
         return ""
 
@@ -408,10 +445,7 @@ def get_multiline_input(tip: str) -> str:
     获取带有增强补全和确认功能的多行输入。
     此函数处理控制流，允许在不破坏终端状态的情况下处理历史记录复制。
     """
-    PrettyOutput.section(
-        "用户输入 - 使用 @ 触发文件补全，Tab 选择补全项，Ctrl+J 确认，Ctrl+O 从历史记录中选择消息复制，按 Ctrl+C/D 取消输入",
-        OutputType.USER,
-    )
+
 
     while True:
         user_input = _get_multiline_input_internal(tip)
