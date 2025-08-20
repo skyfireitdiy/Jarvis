@@ -128,7 +128,7 @@ class BasePlatform(ABC):
             panel = Panel(
                 text_content,
                 title=f"[bold cyan]{self.name()}[/bold cyan]",
-                subtitle="[dim]思考中...[/dim]",
+                subtitle="[dim]思考中... (按 Ctrl+C 中断)[/dim]",
                 border_style="bright_blue",
                 box=box.ROUNDED,
             )
@@ -141,7 +141,7 @@ class BasePlatform(ABC):
                             if is_immediate_abort() and get_interrupt():
                                 return response
                             text_content.append(s, style="bright_white")
-                            panel.subtitle = "[yellow]正在回答...[/yellow]"
+                            panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
                             live.update(panel)
                         end_time = time.time()
                         duration = end_time - start_time
@@ -151,13 +151,16 @@ class BasePlatform(ABC):
                         live.update(panel)
                 else:
                     # Print a clear prefix line before streaming model output (non-pretty mode)
-                    print(f"🤖 模型输出 - {self.name()}", flush=True)
+                    print(f"🤖 模型输出 - {self.name()}  (按 Ctrl+C 中断)", flush=True)
                     for s in self.chat(message):
                         print(s, end="", flush=True)
                         response += s
                         if is_immediate_abort() and get_interrupt():
                             return response
                     print()
+                    end_time = time.time()
+                    duration = end_time - start_time
+                    print(f"✓ 对话完成耗时: {duration:.2f}秒")
             else:
                 for s in self.chat(message):
                     response += s
