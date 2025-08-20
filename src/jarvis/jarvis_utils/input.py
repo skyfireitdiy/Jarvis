@@ -440,13 +440,15 @@ def _get_multiline_input_internal(tip: str) -> str:
         return ""
 
 
-def get_multiline_input(tip: str) -> str:
+def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     """
     获取带有增强补全和确认功能的多行输入。
     此函数处理控制流，允许在不破坏终端状态的情况下处理历史记录复制。
+
+    参数:
+        tip: 提示文本，将显示在底部工具栏中
+        print_on_empty: 当输入为空字符串时，是否打印“输入已取消”提示。默认打印。
     """
-
-
     while True:
         user_input = _get_multiline_input_internal(tip)
 
@@ -455,6 +457,6 @@ def get_multiline_input(tip: str) -> str:
             tip = "请继续输入（或按Ctrl+J确认）:"
             continue
         else:
-            if not user_input:
+            if not user_input and print_on_empty:
                 PrettyOutput.print("\n输入已取消", OutputType.INFO)
             return user_input
