@@ -1152,7 +1152,7 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
             return func()
         except Exception as e:
             PrettyOutput.print(
-                f"执行失败: {str(e)}, 等待 {sleep_time}s...", OutputType.WARNING
+                f"重试中，等待 {sleep_time}s...", OutputType.WARNING
             )
             time.sleep(sleep_time)
             continue
@@ -1176,7 +1176,7 @@ def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
         ret = func()
         if ret:
             break
-        PrettyOutput.print(f"执行失败, 等待 {sleep_time}s...", OutputType.WARNING)
+        PrettyOutput.print(f"重试中，等待 {sleep_time}s...", OutputType.WARNING)
         time.sleep(sleep_time)
     return ret
 
@@ -1258,7 +1258,7 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
     if not git_dir.is_dir():
         return
 
-    PrettyOutput.print(f"正在更新{repo_type}库 '{repo_path.name}'...", OutputType.INFO)
+
     try:
         # 检查是否有远程仓库
         remote_result = subprocess.run(
@@ -1272,10 +1272,6 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             timeout=10,
         )
         if not remote_result.stdout.strip():
-            PrettyOutput.print(
-                f"'{repo_path.name}' 未配置远程仓库，跳过更新。",
-                OutputType.INFO,
-            )
             return
 
         # 检查git仓库状态
@@ -1347,10 +1343,6 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
         )
 
         if not ls_remote_result.stdout.strip():
-            PrettyOutput.print(
-                f"{repo_type}库 '{repo_path.name}' 的远程仓库是空的，跳过更新。",
-                OutputType.INFO,
-            )
             return
 
         # 执行 git pull
@@ -1377,12 +1369,6 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
         if before_hash != after_hash:
             PrettyOutput.print(
                 f"{repo_type}库 '{repo_path.name}' 已更新。", OutputType.SUCCESS
-            )
-            if pull_result.stdout.strip():
-                PrettyOutput.print(pull_result.stdout.strip(), OutputType.INFO)
-        else:
-            PrettyOutput.print(
-                f"{repo_type}库 '{repo_path.name}' 已是最新版本。", OutputType.INFO
             )
 
     except FileNotFoundError:
@@ -1424,7 +1410,7 @@ def daily_check_git_updates(repo_dirs: List[str], repo_type: str):
             pass
 
     if should_check_for_updates:
-        PrettyOutput.print(f"执行每日{repo_type}库更新检查...", OutputType.INFO)
+
         for repo_dir in repo_dirs:
             p_repo_dir = Path(repo_dir)
             if p_repo_dir.exists() and p_repo_dir.is_dir():

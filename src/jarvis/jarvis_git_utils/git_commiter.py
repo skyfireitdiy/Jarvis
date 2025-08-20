@@ -82,11 +82,11 @@ class GitCommitTool:
 
     def _stage_changes(self) -> None:
         """Stage all changes for commit"""
-        print("📁 正在添加文件到提交...")
+
         subprocess.Popen(
             ["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         ).wait()
-        print("✅ 添加文件到提交")
+
 
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute automatic commit process with support for multi-line messages and special characters"""
@@ -107,11 +107,11 @@ class GitCommitTool:
             if not has_uncommitted_changes():
                 return {"success": True, "stdout": "No changes to commit", "stderr": ""}
 
-            print("🚀 正在初始化提交流程...")
+
             self._stage_changes()
 
             # 获取差异
-            print("📊 正在获取代码差异...")
+
             # 获取文件列表
             files_cmd = ["git", "diff", "--cached", "--name-only"]
             process = subprocess.Popen(
@@ -128,7 +128,7 @@ class GitCommitTool:
                 stderr=subprocess.PIPE,
             )
             diff = process.communicate()[0].decode(errors="ignore")
-            print(f"✅ 获取差异 ({file_count} 个文件)")
+
             try:
                 temp_diff_file_path = None
                 # 生成提交信息
@@ -230,7 +230,7 @@ commit信息
                             "stdout": "",
                             "stderr": "错误：差异文件太大，无法处理",
                         }
-                    print("📤 正在上传代码差异文件...")
+
                     # 创建临时文件并写入差异内容
                     with tempfile.NamedTemporaryFile(
                         mode="w", suffix=".diff", delete=False
@@ -238,10 +238,10 @@ commit信息
                         temp_diff_file_path = temp_diff_file.name
                         temp_diff_file.write(diff)
                         temp_diff_file.flush()
-                        print(f"✅ 差异内容已写入临时文件")
+
                     upload_success = platform.upload_files([temp_diff_file_path])
                     if upload_success:
-                        print("✅ 成功上传代码差异文件")
+                        pass
                     else:
                         print("❌ 上传代码差异文件失败")
                         return {
@@ -252,7 +252,6 @@ commit信息
                 # 根据上传状态准备完整的提示
                 if is_large_content:
                     # 尝试生成提交信息
-                    print("✨ 正在生成提交消息...")
                     # 使用上传的文件
                     prompt = (
                         base_prompt
@@ -299,10 +298,10 @@ commit信息
                     {ct("COMMIT_MESSAGE")}
                     """
                     commit_message = platform.chat_until_success(prompt)
-                print("✅ 生成提交消息")
+
 
                 # 执行提交
-                print("⚙️ 正在准备提交...")
+
                 # Windows 兼容性：使用 delete=False 避免权限错误
                 tmp_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
                 tmp_file_path = tmp_file.name
@@ -310,7 +309,7 @@ commit信息
                     tmp_file.write(commit_message)
                     tmp_file.close()  # Windows 需要先关闭文件才能被其他进程读取
 
-                    print("💾 正在执行提交...")
+
                     commit_cmd = ["git", "commit", "-F", tmp_file_path]
                     process = subprocess.Popen(
                         commit_cmd,
@@ -328,7 +327,7 @@ commit信息
                         )
                         raise Exception(f"Git commit failed: {error_msg}")
 
-                    print("✅ 提交")
+
                 finally:
                     # 手动删除临时文件
                     try:
@@ -337,7 +336,7 @@ commit信息
                         pass
 
                 commit_hash = self._get_last_commit_hash()
-                print("✅ 完成提交")
+
             finally:
                 # 清理临时差异文件
                 if temp_diff_file_path is not None and os.path.exists(
