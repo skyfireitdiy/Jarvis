@@ -139,7 +139,7 @@ def _check_pip_updates() -> bool:
             # 检测是否安装了 RAG 特性
             rag_installed = False
             try:
-                import langchain  # noqa
+                import langchain  # type: ignore # noqa
 
                 rag_installed = True
             except ImportError:
