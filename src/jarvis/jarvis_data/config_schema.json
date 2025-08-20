@@ -294,6 +294,11 @@
       "description": "在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择",
       "default": false
     },
+    "JARVIS_IMMEDIATE_ABORT": {
+      "type": "boolean",
+      "description": "是否启用立即中断：在对话迭代中检测到中断信号时立即返回",
+      "default": false
+    },
     "JARVIS_TOOL_GROUP": {
       "type": "string",
       "description": "选择一个预定义的工具配置组",
