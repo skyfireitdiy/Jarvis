@@ -8,6 +8,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from rank_bm25 import BM25Okapi  # type: ignore
 
 from .embedding_manager import EmbeddingManager
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class ChromaRetriever:
@@ -39,7 +40,10 @@ class ChromaRetriever:
         self.collection = self.client.get_or_create_collection(
             name=self.collection_name
         )
-        print(f"✅ ChromaDB 客户端已在 '{db_path}' 初始化，集合为 '{collection_name}'。")
+        PrettyOutput.print(
+            f"ChromaDB 客户端已在 '{db_path}' 初始化，集合为 '{collection_name}'。",
+            OutputType.SUCCESS,
+        )
 
         # BM25索引设置
         self.bm25_index_path = os.path.join(self.db_path, f"{collection_name}_bm25.pkl")
@@ -48,24 +52,24 @@ class ChromaRetriever:
     def _load_or_initialize_bm25(self):
         """从磁盘加载BM25索引或初始化一个新索引。"""
         if os.path.exists(self.bm25_index_path):
-            print("🔍 正在加载现有的 BM25 索引...")
+            PrettyOutput.print("正在加载现有的 BM25 索引...", OutputType.INFO)
             with open(self.bm25_index_path, "rb") as f:
                 data = pickle.load(f)
                 self.bm25_corpus = data["corpus"]
                 self.bm25_index = BM25Okapi(self.bm25_corpus)
-            print("✅ BM25 索引加载成功。")
+            PrettyOutput.print("BM25 索引加载成功。", OutputType.SUCCESS)
         else:
-            print("⚠️ 未找到 BM25 索引，将初始化一个新的。")
+            PrettyOutput.print("未找到 BM25 索引，将初始化一个新的。", OutputType.WARNING)
             self.bm25_corpus = []
             self.bm25_index = None
 
     def _save_bm25_index(self):
         """将BM25索引保存到磁盘。"""
         if self.bm25_index:
-            print("💾 正在保存 BM25 索引...")
+            PrettyOutput.print("正在保存 BM25 索引...", OutputType.INFO)
             with open(self.bm25_index_path, "wb") as f:
                 pickle.dump({"corpus": self.bm25_corpus, "index": self.bm25_index}, f)
-            print("✅ BM25 索引保存成功。")
+            PrettyOutput.print("BM25 索引保存成功。", OutputType.SUCCESS)
 
     def add_documents(
         self, documents: List[Document], chunk_size=1000, chunk_overlap=100
@@ -78,7 +82,10 @@ class ChromaRetriever:
         )
         chunks = text_splitter.split_documents(documents)
 
-        print(f"📄 已将 {len(documents)} 个文档拆分为 {len(chunks)} 个块。")
+        PrettyOutput.print(
+            f"已将 {len(documents)} 个文档拆分为 {len(chunks)} 个块。",
+            OutputType.INFO,
+        )
 
         if not chunks:
             return
@@ -97,7 +104,10 @@ class ChromaRetriever:
             documents=chunk_texts,
             metadatas=cast(Any, metadatas),
         )
-        print(f"✅ 成功将 {len(chunks)} 个块添加到 ChromaDB 集合中。")
+        PrettyOutput.print(
+            f"成功将 {len(chunks)} 个块添加到 ChromaDB 集合中。",
+            OutputType.SUCCESS,
+        )
 
         # 更新并保存BM25索引
         tokenized_chunks = [doc.split() for doc in chunk_texts]

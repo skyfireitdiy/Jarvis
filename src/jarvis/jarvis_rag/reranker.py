@@ -4,6 +4,7 @@ from langchain.docstore.document import Document
 from sentence_transformers.cross_encoder import (  # type: ignore
     CrossEncoder,
 )
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class Reranker:
@@ -19,9 +20,9 @@ class Reranker:
         参数:
             model_name (str): 要使用的Cross-Encoder模型的名称。
         """
-        print(f"🔍 正在初始化重排模型: {model_name}...")
+        PrettyOutput.print(f"正在初始化重排模型: {model_name}...", OutputType.INFO)
         self.model = CrossEncoder(model_name)
-        print("✅ 重排模型初始化成功。")
+        PrettyOutput.print("重排模型初始化成功。", OutputType.SUCCESS)
 
     def rerank(
         self, query: str, documents: List[Document], top_n: int = 5

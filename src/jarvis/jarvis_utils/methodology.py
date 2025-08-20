@@ -203,12 +203,12 @@ def load_methodology(
 
     try:
         # 加载所有方法论
-        print(f"📁 加载方法论文件...")
+        PrettyOutput.print("📁 加载方法论文件...", OutputType.INFO)
         methodologies = _load_all_methodologies()
         if not methodologies:
-            print(f"❌ 没有找到方法论文件")
+            PrettyOutput.print("没有找到方法论文件", OutputType.WARNING)
             return ""
-        print(f"✅ 加载方法论文件完成 (共 {len(methodologies)} 个)")
+        PrettyOutput.print(f"加载方法论文件完成 (共 {len(methodologies)} 个)", OutputType.SUCCESS)
 
         if platform_name:
             platform = PlatformRegistry().create_platform(platform_name)

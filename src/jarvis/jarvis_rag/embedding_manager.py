@@ -3,6 +3,7 @@ from typing import List, cast
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from .cache import EmbeddingCache
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class EmbeddingManager:
@@ -23,7 +24,7 @@ class EmbeddingManager:
         """
         self.model_name = model_name
 
-        print(f"🚀 初始化嵌入管理器, 模型: '{self.model_name}'...")
+        PrettyOutput.print(f"初始化嵌入管理器, 模型: '{self.model_name}'...", OutputType.INFO)
 
         # 缓存的salt是模型名称，以防止冲突
         self.cache = EmbeddingCache(cache_dir=cache_dir, salt=self.model_name)
@@ -42,8 +43,8 @@ class EmbeddingManager:
                 show_progress=True,
             )
         except Exception as e:
-            print(f"❌ 加载嵌入模型 '{self.model_name}' 时出错: {e}")
-            print("请确保您已安装 'sentence_transformers' 和 'torch'。")
+            PrettyOutput.print(f"加载嵌入模型 '{self.model_name}' 时出错: {e}", OutputType.ERROR)
+            PrettyOutput.print("请确保您已安装 'sentence_transformers' 和 'torch'。", OutputType.WARNING)
             raise
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
@@ -71,8 +72,9 @@ class EmbeddingManager:
 
         # 为不在缓存中的文本计算嵌入
         if texts_to_embed:
-            print(
-                f"🔎 缓存未命中。正在为 {len(texts_to_embed)}/{len(texts)} 个文档计算嵌入。"
+            PrettyOutput.print(
+                f"缓存未命中。正在为 {len(texts_to_embed)}/{len(texts)} 个文档计算嵌入。",
+                OutputType.INFO,
             )
             new_embeddings = self.model.embed_documents(texts_to_embed)
 
@@ -83,7 +85,10 @@ class EmbeddingManager:
             for i, embedding in zip(indices_to_embed, new_embeddings):
                 cached_embeddings[i] = embedding
         else:
-            print(f"✅ 缓存命中。所有 {len(texts)} 个文档的嵌入均从缓存中检索。")
+            PrettyOutput.print(
+                f"缓存命中。所有 {len(texts)} 个文档的嵌入均从缓存中检索。",
+                OutputType.SUCCESS,
+            )
 
         return cast(List[List[float]], cached_embeddings)
 

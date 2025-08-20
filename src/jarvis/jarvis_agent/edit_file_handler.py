@@ -68,7 +68,7 @@ class EditFileHandler(OutputHandler):
                 {"SEARCH": diff["SEARCH"], "REPLACE": diff["REPLACE"]} for diff in diffs
             ]
 
-            print(f"📝 正在处理文件 {file_path}...")
+            PrettyOutput.print(f"正在处理文件 {file_path}...", OutputType.INFO)
             success, result = self._fast_edit(file_path, file_patches)
 
             if success:
@@ -208,7 +208,7 @@ class EditFileHandler(OutputHandler):
                     modified_content = modified_content.replace(
                         exact_search, replace_text, 1
                     )
-                    print(f"✅ 补丁 #{patch_count} 应用成功")
+                    PrettyOutput.print(f"补丁 #{patch_count} 应用成功", OutputType.SUCCESS)
                     found = True
                 else:
                     # 如果匹配不到，并且search与replace块的首尾都是换行，尝试去掉第一个和最后一个换行
@@ -224,7 +224,7 @@ class EditFileHandler(OutputHandler):
                             modified_content = modified_content.replace(
                                 stripped_search, stripped_replace, 1
                             )
-                            print(f"✅ 补丁 #{patch_count} 应用成功 (自动去除首尾换行)")
+                            PrettyOutput.print(f"补丁 #{patch_count} 应用成功 (自动去除首尾换行)", OutputType.SUCCESS)
                             found = True
 
                     if not found:
@@ -253,8 +253,9 @@ class EditFileHandler(OutputHandler):
                                 modified_content = modified_content.replace(
                                     indented_search, indented_replace, 1
                                 )
-                                print(
-                                    f"✅ 补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)"
+                                PrettyOutput.print(
+                                    f"补丁 #{patch_count} 应用成功 (自动增加 {space_count} 个空格缩进)",
+                                    OutputType.SUCCESS,
                                 )
                                 found = True
                                 break
@@ -284,12 +285,12 @@ class EditFileHandler(OutputHandler):
                     f"失败: {len(failed_patches)}/{patch_count}.\n"
                     f"失败详情:\n" + "\n".join(error_details)
                 )
-                print(f"❌ {summary}")
+                PrettyOutput.print(summary, OutputType.ERROR)
                 return False, summary
 
-            print(f"✅ 文件 {file_path} 修改完成，应用了 {patch_count} 个补丁")
+            PrettyOutput.print(f"文件 {file_path} 修改完成，应用了 {patch_count} 个补丁", OutputType.SUCCESS)
             return True, modified_content
 
         except Exception as e:
-            print(f"❌ 文件修改失败: {str(e)}")
+            PrettyOutput.print(f"文件修改失败: {str(e)}", OutputType.ERROR)
             return False, f"文件修改失败: {str(e)}"

@@ -185,16 +185,16 @@ class KimiModel(BasePlatform):
             return True
 
         if not self.chat_id:
-            print("🚀 正在创建聊天会话...")
+            PrettyOutput.print("正在创建聊天会话...", OutputType.INFO)
             if not self._create_chat():
-                print("❌ 创建聊天会话失败")
+                PrettyOutput.print("创建聊天会话失败", OutputType.ERROR)
                 return False
-            print("✅ 创建聊天会话成功")
+            PrettyOutput.print("创建聊天会话成功", OutputType.SUCCESS)
 
         uploaded_files = []
         for index, file_path in enumerate(file_list, 1):
             file_name = os.path.basename(file_path)
-            print(f"🔍 处理文件 [{index}/{len(file_list)}]: {file_name}")
+            PrettyOutput.print(f"处理文件 [{index}/{len(file_list)}]: {file_name}", OutputType.INFO)
             try:
                 mime_type, _ = mimetypes.guess_type(file_path)
                 action = (
@@ -202,34 +202,34 @@ class KimiModel(BasePlatform):
                 )
 
                 # 获取预签名URL
-                print(f"🔍 获取上传URL: {file_name}")
+                PrettyOutput.print(f"获取上传URL: {file_name}", OutputType.INFO)
                 presigned_data = self._get_presigned_url(file_path, action)
 
                 # 上传文件
-                print(f"🔍 上传文件: {file_name}")
+                PrettyOutput.print(f"上传文件: {file_name}", OutputType.INFO)
                 if self._upload_file(file_path, presigned_data["url"]):
                     # 获取文件信息
-                    print(f"🔍 获取文件信息: {file_name}")
+                    PrettyOutput.print(f"获取文件信息: {file_name}", OutputType.INFO)
                     file_info = self._get_file_info(presigned_data, file_name, action)
 
                     # 只有文件需要解析
                     if action == "file":
-                        print(f"🔍 等待文件解析: {file_name}")
+                        PrettyOutput.print(f"等待文件解析: {file_name}", OutputType.INFO)
                         if self._wait_for_parse(file_info["id"]):
                             uploaded_files.append(file_info)
-                            print(f"✅ 文件处理完成: {file_name}")
+                            PrettyOutput.print(f"文件处理完成: {file_name}", OutputType.SUCCESS)
                         else:
-                            print(f"❌ 文件解析失败: {file_name}")
+                            PrettyOutput.print(f"文件解析失败: {file_name}", OutputType.ERROR)
                             return False
                     else:
                         uploaded_files.append(file_info)
-                        print(f"✅ 图片处理完成: {file_name}")
+                        PrettyOutput.print(f"图片处理完成: {file_name}", OutputType.SUCCESS)
                 else:
-                    print(f"❌ 文件上传失败: {file_name}")
+                    PrettyOutput.print(f"文件上传失败: {file_name}", OutputType.ERROR)
                     return False
 
             except Exception as e:
-                print(f"❌ 处理文件出错 {file_path}: {str(e)}")
+                PrettyOutput.print(f"处理文件出错 {file_path}: {str(e)}", OutputType.ERROR)
                 return False
 
         self.uploaded_files = uploaded_files

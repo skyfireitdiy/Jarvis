@@ -276,16 +276,16 @@ class TongyiPlatform(BasePlatform):
 
             for file_path in file_list:
                 file_name = os.path.basename(file_path)
-                print(f"🔍 上传文件 {file_name}")
+                PrettyOutput.print(f"上传文件 {file_name}", OutputType.INFO)
                 try:
                     if not os.path.exists(file_path):
-                        print(f"❌ 文件不存在: {file_path}")
+                        PrettyOutput.print(f"文件不存在: {file_path}", OutputType.ERROR)
                         return False
 
                     # Get file name and content type
                     content_type = self._get_content_type(file_path)
 
-                    print(f"🔍 准备上传文件: {file_name}")
+                    PrettyOutput.print(f"准备上传文件: {file_name}", OutputType.INFO)
 
                     # Prepare form data
                     form_data = {
@@ -300,7 +300,7 @@ class TongyiPlatform(BasePlatform):
                     # Prepare files
                     files = {"file": (file_name, open(file_path, "rb"), content_type)}
 
-                    print(f"📤 正在上传文件: {file_name}")
+                    PrettyOutput.print(f"正在上传文件: {file_name}", OutputType.INFO)
 
                     # Upload file
                     response = http.post(
@@ -308,7 +308,7 @@ class TongyiPlatform(BasePlatform):
                     )
 
                     if response.status_code != 200:
-                        print(f"❌ 上传失败 {file_name}: HTTP {response.status_code}")
+                        PrettyOutput.print(f"上传失败 {file_name}: HTTP {response.status_code}", OutputType.ERROR)
                         return False
 
                     # Determine file type based on extension
@@ -323,7 +323,7 @@ class TongyiPlatform(BasePlatform):
                         }
                     )
 
-                    print(f"🔍 获取下载链接: {file_name}")
+                    PrettyOutput.print(f"获取下载链接: {file_name}", OutputType.INFO)
 
                     # Get download links for uploaded files
                     url = "https://api.tongyi.com/dialog/downloadLink/batch"
@@ -340,18 +340,18 @@ class TongyiPlatform(BasePlatform):
 
                     response = http.post(url, headers=headers, json=payload)
                     if response.status_code != 200:
-                        print(f"❌ 获取下载链接失败: HTTP {response.status_code}")
+                        PrettyOutput.print(f"获取下载链接失败: HTTP {response.status_code}", OutputType.ERROR)
                         return False
 
                     result = response.json()
                     if not result.get("success"):
-                        print(f"❌ 获取下载链接失败: {result.get('errorMsg')}")
+                        PrettyOutput.print(f"获取下载链接失败: {result.get('errorMsg')}", OutputType.ERROR)
                         return False
 
                     # Add files to chat
                     self.uploaded_file_info = result.get("data", {}).get("results", [])
                     for file_info in self.uploaded_file_info:
-                        print(f"🔍 添加文件到对话: {file_name}")
+                        PrettyOutput.print(f"添加文件到对话: {file_name}", OutputType.INFO)
                         add_url = "https://api.tongyi.com/assistant/api/chat/file/add"
                         add_payload = {
                             "workSource": "chat",
@@ -374,25 +374,27 @@ class TongyiPlatform(BasePlatform):
                             add_url, headers=headers, json=add_payload
                         )
                         if add_response.status_code != 200:
-                            print(
-                                f"❌ 添加文件到对话失败: HTTP {add_response.status_code}"
+                            PrettyOutput.print(
+                                f"添加文件到对话失败: HTTP {add_response.status_code}",
+                                OutputType.ERROR,
                             )
                             continue
 
                         add_result = add_response.json()
                         if not add_result.get("success"):
-                            print(
-                                f"❌ 添加文件到对话失败: {add_result.get('errorMsg')}"
+                            PrettyOutput.print(
+                                f"添加文件到对话失败: {add_result.get('errorMsg')}",
+                                OutputType.ERROR,
                             )
                             continue
 
                         file_info.update(add_result.get("data", {}))
 
-                    print(f"✅ 文件 {file_name} 上传成功")
+                    PrettyOutput.print(f"文件 {file_name} 上传成功", OutputType.SUCCESS)
                     time.sleep(1)  # 短暂暂停以便用户看到成功状态
 
                 except Exception as e:
-                    print(f"❌ 上传文件 {file_name} 时出错: {str(e)}")
+                    PrettyOutput.print(f"上传文件 {file_name} 时出错: {str(e)}", OutputType.ERROR)
                     return False
             return True
 

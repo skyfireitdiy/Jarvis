@@ -73,19 +73,19 @@ class FileAnalyzerTool:
             platform.set_system_prompt(system_message)
 
             # 上传文件
-            print(f"📤 正在上传文件...")
+            PrettyOutput.print("正在上传文件...", OutputType.INFO)
             try:
                 upload_result = platform.upload_files(valid_files)
                 if not upload_result:
-                    print(f"❌ 文件上传失败")
+                    PrettyOutput.print("文件上传失败", OutputType.ERROR)
                     return {
                         "success": False,
                         "stdout": "",
                         "stderr": "文件上传失败",
                     }
-                print(f"✅ 文件上传成功")
+                PrettyOutput.print("文件上传成功", OutputType.SUCCESS)
             except Exception as e:
-                print(f"❌ 文件上传失败: {str(e)}")
+                PrettyOutput.print(f"文件上传失败: {str(e)}", OutputType.ERROR)
                 return {
                     "success": False,
                     "stdout": "",
@@ -102,9 +102,9 @@ class FileAnalyzerTool:
 请提供详细的分析结果和理由。"""
 
             # 发送请求并获取分析结果
-            print(f"🔍 正在分析文件...")
+            PrettyOutput.print("正在分析文件...", OutputType.INFO)
             analysis_result = platform.chat_until_success(analysis_request)
-            print(f"✅ 分析完成")
+            PrettyOutput.print("分析完成", OutputType.SUCCESS)
 
             # 清理会话
             platform.delete_chat()

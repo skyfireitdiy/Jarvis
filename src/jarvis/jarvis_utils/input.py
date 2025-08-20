@@ -292,14 +292,14 @@ def _show_history_and_copy():
         PrettyOutput.print("没有可复制的消息", OutputType.INFO)
         return
 
-    print("\n" + "=" * 20 + " 消息历史记录 " + "=" * 20)
+    PrettyOutput.print("\n" + "=" * 20 + " 消息历史记录 " + "=" * 20, OutputType.INFO)
     for i, msg in enumerate(history):
         cleaned_msg = msg.replace("\n", r"\n")
         display_msg = (
             (cleaned_msg[:70] + "...") if len(cleaned_msg) > 70 else cleaned_msg
         )
-        print(f"  {i + 1}: {display_msg.strip()}")
-    print("=" * 58 + "\n")
+        PrettyOutput.print(f"  {i + 1}: {display_msg.strip()}", OutputType.INFO)
+    PrettyOutput.print("=" * 58 + "\n", OutputType.INFO)
 
     while True:
         try:
@@ -308,11 +308,11 @@ def _show_history_and_copy():
 
             if not choice_str:  # User pressed Enter
                 if not history:
-                    print("没有历史记录可供选择。")
+                    PrettyOutput.print("没有历史记录可供选择。", OutputType.INFO)
                     break
                 choice = len(history) - 1
             elif choice_str.lower() == "c":
-                print("已取消")
+                PrettyOutput.print("已取消", OutputType.INFO)
                 break
             else:
                 choice = int(choice_str) - 1
@@ -325,11 +325,11 @@ def _show_history_and_copy():
                 )
                 break
             else:
-                print("无效的序号，请重试。")
+                PrettyOutput.print("无效的序号，请重试。", OutputType.WARNING)
         except ValueError:
-            print("无效的输入，请输入数字。")
+            PrettyOutput.print("无效的输入，请输入数字。", OutputType.WARNING)
         except (KeyboardInterrupt, EOFError):
-            print("\n操作取消")
+            PrettyOutput.print("\n操作取消", OutputType.INFO)
             break
 
 
@@ -350,8 +350,9 @@ def _get_multiline_input_internal(tip: str) -> str:
             first_enter_hint_shown = True
 
             def _show_notice():
-                print(
-                    f"{Fore.YELLOW}提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。{ColoramaStyle.RESET_ALL}"
+                PrettyOutput.print(
+                    "提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。",
+                    OutputType.INFO,
                 )
                 try:
                     input("按回车继续...")

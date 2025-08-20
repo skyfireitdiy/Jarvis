@@ -18,7 +18,7 @@ from jarvis.jarvis_utils.config import (
     is_immediate_abort,
 )
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
-from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt
+from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
@@ -84,7 +84,7 @@ class BasePlatform(ABC):
             )  # 留出一些余量
             min_chunk_size = get_max_input_token_count(self.model_group) - 2048
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
-            print(f"📤 长上下文，分批提交，共{len(inputs)}部分...")
+            PrettyOutput.print(f"长上下文，分批提交，共{len(inputs)}部分...", OutputType.INFO)
             prefix_prompt = f"""
             我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
             """
@@ -110,7 +110,7 @@ class BasePlatform(ABC):
                     response += trunk
 
 
-            print("✅ 提交完成")
+            PrettyOutput.print("提交完成", OutputType.SUCCESS)
             response += "\n" + while_true(
                 lambda: while_success(
                     lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
@@ -147,16 +147,16 @@ class BasePlatform(ABC):
                         live.update(panel)
                 else:
                     # Print a clear prefix line before streaming model output (non-pretty mode)
-                    print(f"🤖 模型输出 - {self.name()}  (按 Ctrl+C 中断)", flush=True)
+                    console.print(f"🤖 模型输出 - {self.name()}  (按 Ctrl+C 中断)", soft_wrap=False)
                     for s in self.chat(message):
-                        print(s, end="", flush=True)
+                        console.print(s, end="")
                         response += s
                         if is_immediate_abort() and get_interrupt():
                             return response
-                    print()
+                    console.print()
                     end_time = time.time()
                     duration = end_time - start_time
-                    print(f"✓ 对话完成耗时: {duration:.2f}秒")
+                    console.print(f"✓ 对话完成耗时: {duration:.2f}秒")
             else:
                 for s in self.chat(message):
                     response += s

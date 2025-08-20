@@ -225,15 +225,15 @@ class CodeAgent:
         if not os.path.exists(gitignore_path):
             with open(gitignore_path, "w", encoding="utf-8") as f:
                 f.write(f"{jarvis_ignore}\n")
-            print(f"✅ 已创建.gitignore文件并添加'{jarvis_ignore}'")
+            PrettyOutput.print(f"已创建 .gitignore 并添加 '{jarvis_ignore}'", OutputType.SUCCESS)
         else:
             with open(gitignore_path, "r+", encoding="utf-8") as f:
                 content = f.read()
                 if jarvis_ignore not in content.splitlines():
                     f.write(f"\n{jarvis_ignore}\n")
-                    print(f"✅ 已更新.gitignore文件，添加'{jarvis_ignore}'")
-                else:
-
+                    PrettyOutput.print(
+                        f"已更新 .gitignore，添加 '{jarvis_ignore}'", OutputType.SUCCESS
+                    )
 
     def _handle_git_changes(self, prefix: str, suffix: str) -> None:
         """处理git仓库中的未提交修改"""
@@ -242,9 +242,6 @@ class CodeAgent:
 
             git_commiter = GitCommitTool()
             git_commiter.execute({"prefix": prefix, "suffix": suffix})
-
-        else:
-
 
     def _init_env(self, prefix: str, suffix: str) -> None:
         """初始化环境，组合以下功能：
@@ -259,7 +256,6 @@ class CodeAgent:
         self._handle_git_changes(prefix, suffix)
         # 配置git对换行符变化不敏感
         self._configure_line_ending_settings()
-
 
     def _configure_line_ending_settings(self) -> None:
         """配置git对换行符变化不敏感，只在当前设置与目标设置不一致时修改"""
@@ -292,10 +288,10 @@ class CodeAgent:
             "⚠️ 正在修改git换行符敏感设置，这会影响所有文件的换行符处理方式",
             OutputType.WARNING,
         )
-        print("将进行以下设置：")
+        PrettyOutput.print("将进行以下设置：", OutputType.INFO)
         for key, value in target_settings.items():
             current = current_settings.get(key, "未设置")
-            print(f"  {key}: {current} -> {value}")
+            PrettyOutput.print(f"{key}: {current} -> {value}", OutputType.INFO)
 
         # 直接执行设置，不需要用户确认
         for key, value in target_settings.items():
@@ -305,7 +301,7 @@ class CodeAgent:
         if sys.platform.startswith("win"):
             self._handle_windows_line_endings()
 
-        print("✅ git换行符敏感设置已更新")
+        PrettyOutput.print("git换行符敏感设置已更新", OutputType.SUCCESS)
 
     def _handle_windows_line_endings(self) -> None:
         """在Windows系统上处理换行符问题，提供建议而非强制修改"""
@@ -319,10 +315,8 @@ class CodeAgent:
             if any(keyword in content for keyword in ["text=", "eol=", "binary"]):
                 return
 
-        print(
-            "\n💡 提示：在Windows系统上，建议配置.gitattributes文件来避免换行符问题。"
-        )
-        print("这可以防止仅因换行符不同而导致整个文件被标记为修改。")
+        PrettyOutput.print("提示：在Windows系统上，建议配置 .gitattributes 文件来避免换行符问题。", OutputType.INFO)
+        PrettyOutput.print("这可以防止仅因换行符不同而导致整个文件被标记为修改。", OutputType.INFO)
 
         if user_confirm("是否要创建一个最小化的.gitattributes文件？", False):
             # 最小化的内容，只影响特定类型的文件
@@ -341,20 +335,18 @@ class CodeAgent:
             if not os.path.exists(gitattributes_path):
                 with open(gitattributes_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(minimal_content)
-                print("✅ 已创建最小化的.gitattributes文件")
+                PrettyOutput.print("已创建最小化的 .gitattributes 文件", OutputType.SUCCESS)
             else:
-                print("📝 将以下内容追加到现有.gitattributes文件：")
-                print(minimal_content)
+                PrettyOutput.print("将以下内容追加到现有 .gitattributes 文件：", OutputType.INFO)
+                PrettyOutput.print(minimal_content, OutputType.CODE, lang="text")
                 if user_confirm("是否追加到现有文件？", True):
                     with open(
                         gitattributes_path, "a", encoding="utf-8", newline="\n"
                     ) as f:
                         f.write("\n" + minimal_content)
-                    print("✅ 已更新.gitattributes文件")
+                    PrettyOutput.print("已更新 .gitattributes 文件", OutputType.SUCCESS)
         else:
-            print(
-                "ℹ️ 跳过.gitattributes文件创建。如果遇到换行符问题，可以手动创建此文件。"
-            )
+            PrettyOutput.print("跳过 .gitattributes 文件创建。如遇换行符问题，可手动创建此文件。", OutputType.INFO)
 
     def _record_code_changes_stats(self, diff_text: str) -> None:
         """记录代码变更的统计信息。

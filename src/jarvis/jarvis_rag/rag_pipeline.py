@@ -8,6 +8,7 @@ from .llm_interface import JarvisPlatform_LLM, LLMInterface, ToolAgent_LLM
 from .query_rewriter import QueryRewriter
 from .reranker import Reranker
 from .retriever import ChromaRetriever
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.config import (
     get_rag_embedding_model,
     get_rag_rerank_model,
@@ -74,7 +75,7 @@ class JarvisRAGPipeline:
         self._reranker: Optional[Reranker] = None
         self._query_rewriter: Optional[QueryRewriter] = None
 
-        print("✅ JarvisRAGPipeline 初始化成功 (模型按需加载).")
+        PrettyOutput.print("JarvisRAGPipeline 初始化成功 (模型按需加载).", OutputType.SUCCESS)
 
     def _get_embedding_manager(self) -> EmbeddingManager:
         if self._embedding_manager is None:
@@ -193,7 +194,7 @@ class JarvisRAGPipeline:
         # 2. 为每个重写的查询检索初始候选文档
         all_candidate_docs = []
         for q in rewritten_queries:
-            print(f"🔍 正在为查询变体 '{q}' 进行混合检索...")
+            PrettyOutput.print(f"正在为查询变体 '{q}' 进行混合检索...", OutputType.INFO)
             candidates = self._get_retriever().retrieve(
                 q, n_results=n_results * 2, use_bm25=self.use_bm25
             )
@@ -208,7 +209,7 @@ class JarvisRAGPipeline:
 
         # 3. 根据*原始*查询对统一的候选池进行重排
         if self.use_rerank:
-            print(f"🔍 正在对 {len(unique_candidate_docs)} 个候选文档进行重排（基于原始问题）...")
+            PrettyOutput.print(f"正在对 {len(unique_candidate_docs)} 个候选文档进行重排（基于原始问题）...", OutputType.INFO)
             retrieved_docs = self._get_reranker().rerank(
                 query_text, unique_candidate_docs, top_n=n_results
             )
@@ -229,15 +230,15 @@ class JarvisRAGPipeline:
             )
         )
         if sources:
-            print(f"📚 根据以下文档回答:")
+            PrettyOutput.print("根据以下文档回答:", OutputType.INFO)
             for source in sources:
-                print(f"  - {source}")
+                PrettyOutput.print(f"  - {source}", OutputType.INFO)
 
         # 4. 创建最终提示并生成答案
         # 我们使用原始的query_text作为给LLM的最终提示
         prompt = self._create_prompt(query_text, retrieved_docs)
 
-        print("🤖 正在从LLM生成答案...")
+        PrettyOutput.print("正在从LLM生成答案...", OutputType.INFO)
         answer = self.llm.generate(prompt)
 
         return answer
@@ -259,7 +260,7 @@ class JarvisRAGPipeline:
         # 2. 检索候选文档
         all_candidate_docs = []
         for q in rewritten_queries:
-            print(f"🔍 正在为查询变体 '{q}' 进行混合检索...")
+            PrettyOutput.print(f"正在为查询变体 '{q}' 进行混合检索...", OutputType.INFO)
             candidates = self._get_retriever().retrieve(
                 q, n_results=n_results * 2, use_bm25=self.use_bm25
             )
@@ -273,7 +274,7 @@ class JarvisRAGPipeline:
 
         # 3. 重排
         if self.use_rerank:
-            print(f"🔍 正在对 {len(unique_candidate_docs)} 个候选文档进行重排...")
+            PrettyOutput.print(f"正在对 {len(unique_candidate_docs)} 个候选文档进行重排...", OutputType.INFO)
             retrieved_docs = self._get_reranker().rerank(
                 query_text, unique_candidate_docs, top_n=n_results
             )
