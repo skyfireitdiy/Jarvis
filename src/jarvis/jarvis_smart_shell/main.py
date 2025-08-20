@@ -88,13 +88,43 @@ def _get_bash_markers() -> Tuple[str, str]:
     )
 
 
+def _check_zsh_shell() -> bool:
+    """Check if current shell is zsh
+
+    Returns:
+        bool: True if zsh shell, False otherwise
+    """
+    return get_shell_name() == "zsh"
+
+
+def _get_zsh_config_file() -> str:
+    """Get zsh config file path
+
+    Returns:
+        str: Path to zsh config file (~/.zshrc)
+    """
+    return os.path.expanduser("~/.zshrc")
+
+
+def _get_zsh_markers() -> Tuple[str, str]:
+    """Get start and end markers for JSS completion in zsh
+
+    Returns:
+        Tuple[str, str]: (start_marker, end_marker)
+    """
+    return (
+        "# ===== JARVIS JSS ZSH COMPLETION START =====",
+        "# ===== JARVIS JSS ZSH COMPLETION END =====",
+    )
+
+
 @app.command("install")
 def install_jss_completion(
-    shell: str = typer.Option("fish", help="指定shell类型(支持fish, bash)"),
+    shell: str = typer.Option("fish", help="指定shell类型(支持fish, bash, zsh)"),
 ) -> None:
     """为指定的shell安装'命令未找到'处理器，实现自然语言命令建议"""
-    if shell not in ("fish", "bash"):
-        print(f"错误: 不支持的shell类型: {shell}, 仅支持fish, bash")
+    if shell not in ("fish", "bash", "zsh"):
+        print(f"错误: 不支持的shell类型: {shell}, 仅支持fish, bash, zsh")
         raise typer.Exit(code=1)
 
     if shell == "fish":
@@ -148,6 +178,113 @@ end
         if start_marker in content:
             print("JSS bash completion已安装，请执行: source ~/.bashrc")
             return
+        else:
+            with open(config_file, "a") as f:
+                f.write(
+                    f"""
+{start_marker}
+# Bash 'command not found' handler for JSS
+# 行为：
+# - 生成可编辑的建议命令，用户可直接编辑后回车执行
+# - 非交互模式下仅打印建议
+command_not_found_handle() {{
+    local cmd="$1"
+    shift || true
+    local text="$cmd $*"
+
+    # 与 fish 行为保持一致：对过短输入不处理
+    if [ ${{#text}} -lt 10 ]; then
+        return 127
+    fi
+
+    local suggestion edited
+    suggestion=$(jss request "$text")
+    if [ -n "$suggestion" ]; then
+        # 交互式：用 readline 预填命令，用户可直接回车执行或编辑
+        if [[ $- == *i* ]]; then
+            edited="$suggestion"
+            # -e 启用 readline；-i 预填默认值；无提示前缀，使体验更接近 fish 的“替换命令行”
+            read -e -i "$edited" edited
+            if [ -n "$edited" ]; then
+                eval "$edited"
+                return $?
+            fi
+        else
+            # 非交互：仅打印建议
+            printf '%s\n' "$suggestion"
+        fi
+    fi
+    return 127
+}}
+{end_marker}
+"""
+                )
+            print("JSS bash completion已安装，请执行: source ~/.bashrc")
+    elif shell == "zsh":
+        config_file = _get_zsh_config_file()
+        start_marker, end_marker = _get_zsh_markers()
+
+        if not os.path.exists(config_file):
+            print("未找到~/.zshrc文件，将创建新文件")
+            os.makedirs(os.path.dirname(config_file), exist_ok=True)
+            with open(config_file, "w") as f:
+                f.write("")
+
+        with open(config_file, "r") as f:
+            content = f.read()
+
+        if start_marker in content:
+            print("JSS zsh completion已安装，请执行: source ~/.zshrc")
+            return
+
+        with open(config_file, "a") as f:
+            f.write(
+                f"""
+{start_marker}
+# Zsh 'command not found' handler for JSS
+# 行为：
+# - 生成可编辑的建议命令，用户可直接编辑后回车执行
+# - 非交互模式下仅打印建议
+command_not_found_handler() {{
+    local cmd="$1"
+    shift || true
+    local text="$cmd $*"
+
+    # 与 fish 行为保持一致：对过短输入不处理
+    if [ ${{#text}} -lt 10 ]; then
+        return 127
+    fi
+
+    local suggestion edited
+    suggestion=$(jss request "$text")
+    if [ -n "$suggestion" ]; then
+        # 交互式：使用 vared 预填命令，用户可直接回车执行或编辑
+        if [[ -o interactive ]]; then
+            # 交互式：默认用编辑器打开建议，保存退出后执行；未修改则执行建议
+            local editor="${{VISUAL:-${{EDITOR:-vi}}}}"
+            local tmpfile edited
+            tmpfile="$(mktemp -t jss-edit-XXXXXX)"
+            printf '%s\n' "$suggestion" > "$tmpfile"
+            "$editor" "$tmpfile"
+            edited="$(sed -n '/./{{p;q;}}' "$tmpfile" | tr -d '\r')"
+            rm -f "$tmpfile"
+            if [ -z "$edited" ]; then
+                edited="$suggestion"
+            fi
+            eval "$edited"
+            return $?
+        else
+            # 非交互：仅打印建议
+            print -r -- "$suggestion"
+        fi
+    fi
+    return 127
+}}
+{end_marker}
+"""
+            )
+        print("JSS zsh completion已安装，请执行: source ~/.zshrc")
+        return
 
         with open(config_file, "a") as f:
             f.write(
@@ -194,11 +331,11 @@ command_not_found_handle() {{
 
 @app.command("uninstall")
 def uninstall_jss_completion(
-    shell: str = typer.Option("fish", help="指定shell类型(支持fish, bash)"),
+    shell: str = typer.Option("fish", help="指定shell类型(支持fish, bash, zsh)"),
 ) -> None:
     """卸载JSS shell'命令未找到'处理器"""
-    if shell not in ("fish", "bash"):
-        print(f"错误: 不支持的shell类型: {shell}, 仅支持fish, bash")
+    if shell not in ("fish", "bash", "zsh"):
+        print(f"错误: 不支持的shell类型: {shell}, 仅支持fish, bash, zsh")
         raise typer.Exit(code=1)
 
     if shell == "fish":
@@ -243,6 +380,27 @@ def uninstall_jss_completion(
             f.write(new_content)
 
         print("JSS bash completion已卸载，请执行: source ~/.bashrc")
+    elif shell == "zsh":
+        config_file = _get_zsh_config_file()
+        start_marker, end_marker = _get_zsh_markers()
+
+        if not os.path.exists(config_file):
+            print("未找到JSS zsh completion配置，无需卸载")
+            return
+
+        with open(config_file, "r") as f:
+            content = f.read()
+
+        if start_marker not in content:
+            print("未找到JSS zsh completion配置，无需卸载")
+            return
+
+        new_content = content.split(start_marker)[0] + content.split(end_marker)[-1]
+
+        with open(config_file, "w") as f:
+            f.write(new_content)
+
+        print("JSS zsh completion已卸载，请执行: source ~/.zshrc")
 
 
 def process_request(request: str) -> Optional[str]:
