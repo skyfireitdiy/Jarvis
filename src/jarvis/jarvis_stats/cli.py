@@ -16,6 +16,7 @@ from pathlib import Path
 from .stats import StatsManager
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 app = typer.Typer(help="Jarvis 统计模块命令行工具")
 console = Console()
@@ -291,7 +292,7 @@ def export(
 
     if output == "json":
         # JSON格式输出
-        print(json.dumps(data, indent=2, ensure_ascii=False))
+        PrettyOutput.print(json.dumps(data, indent=2, ensure_ascii=False), OutputType.CODE, lang="json")
     else:
         # CSV格式输出
         records = data.get("records", [])

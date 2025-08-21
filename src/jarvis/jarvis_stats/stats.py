@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Union, Any
 
 from jarvis.jarvis_stats.storage import StatsStorage
 from jarvis.jarvis_stats.visualizer import StatsVisualizer
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class StatsManager:
@@ -307,7 +308,6 @@ class StatsManager:
         """
         storage = StatsManager._get_storage()
         storage.delete_old_data(days_to_keep)
-        print(f"已清理 {days_to_keep} 天前的数据")
 
     @staticmethod
     def remove_metric(metric_name: str) -> bool:
@@ -440,7 +440,7 @@ class StatsManager:
         )
 
         if not aggregated:
-            print(f"没有找到指标 '{metric_name}' 的数据")
+            PrettyOutput.print(f"没有找到指标 '{metric_name}' 的数据", OutputType.WARNING)
             return
 
         # 获取指标信息
@@ -474,7 +474,7 @@ class StatsManager:
             show_values=True,
         )
 
-        print(chart)
+        PrettyOutput.print(chart, OutputType.CODE, lang="text")
 
         # 显示时间范围
         from rich.panel import Panel
@@ -550,7 +550,7 @@ class StatsManager:
         )
 
         if not aggregated:
-            print(f"没有找到指标 '{metric_name}' 的数据")
+            PrettyOutput.print(f"没有找到指标 '{metric_name}' 的数据", OutputType.WARNING)
             return
 
         # 获取指标信息
@@ -560,7 +560,7 @@ class StatsManager:
         # 显示汇总
         summary = visualizer.show_summary(aggregated, metric_name, unit, tags)
         if summary:  # 如果返回了内容才打印（兼容性）
-            print(summary)
+            PrettyOutput.print(summary, OutputType.INFO)
 
         # 显示时间范围
         from rich.panel import Panel
