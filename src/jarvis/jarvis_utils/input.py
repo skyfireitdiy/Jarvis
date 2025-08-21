@@ -388,7 +388,7 @@ def _get_multiline_input_internal(tip: str) -> str:
     @bindings.add("c-t", filter=has_focus(DEFAULT_BUFFER))
     def _(event):
         """Return a shell command like '!bash' for upper input_handler to execute."""
-        def _gen_shell_cmd() -> str:
+        def _gen_shell_cmd() -> str:  # type: ignore
             try:
                 import os
                 import shutil
@@ -450,7 +450,7 @@ def _get_multiline_input_internal(tip: str) -> str:
                 ("class:bt.label", " 取消 "),
             ]
         )
-    
+
     history_dir = get_data_dir()
     session: PromptSession = PromptSession(
         history=FileHistory(os.path.join(history_dir, "multiline_input_history")),
