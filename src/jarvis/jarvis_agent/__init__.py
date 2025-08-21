@@ -223,6 +223,7 @@ class Agent:
         use_analysis: Optional[bool] = None,
         force_save_memory: Optional[bool] = None,
         files: Optional[List[str]] = None,
+        confirm_callback: Optional[Callable[[str, bool], bool]] = None,
     ):
         """初始化Jarvis Agent实例
 
@@ -241,6 +242,7 @@ class Agent:
             use_methodology: 是否使用方法论
             use_analysis: 是否使用任务分析
             force_save_memory: 是否强制保存记忆
+            confirm_callback: 用户确认回调函数，签名为 (tip: str, default: bool) -> bool；默认使用CLI的user_confirm
         """
         # 基础属性初始化
         self.files = files or []
@@ -253,6 +255,11 @@ class Agent:
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
         self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
+
+        # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
+        self.user_confirm: Callable[[str, bool], bool] = (
+            confirm_callback or user_confirm  # type: ignore[assignment]
+        )
 
         # 初始化模型和会话
         self._init_model(llm_type, model_group)
@@ -811,7 +818,7 @@ class Agent:
             return self._complete_task(auto_completed=False)
 
         if any(handler.can_handle(current_response) for handler in self.output_handler):
-            if user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
+            if self.user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
                 self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n用户同意继续工具调用。"
                 return None  # 继续执行工具调用
             else:
@@ -905,7 +912,7 @@ class Agent:
             f"并且存在3个以上标签重叠的记忆。\n"
             f"是否立即整理记忆库以优化性能和相关性？"
         )
-        if user_confirm(prompt, default=True):
+        if self.user_confirm(prompt, True):
             PrettyOutput.print(
                 f"正在开始整理 '{scope_name}' ({memory_type}) 记忆库...",
                 OutputType.INFO,
