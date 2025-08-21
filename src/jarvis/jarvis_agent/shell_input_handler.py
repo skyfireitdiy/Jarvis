@@ -11,9 +11,24 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
     if len(cmdline) == 0:
         return user_input, False
     else:
-        script = "\n".join([c[1:] for c in cmdline])
+        marker = "# JARVIS-NOCONFIRM"
+
+        def _clean(line: str) -> str:
+            s = line[1:]  # remove leading '!'
+            # strip no-confirm marker if present
+            idx = s.find(marker)
+            if idx != -1:
+                s = s[:idx]
+            return s.rstrip()
+
+        # Build script while stripping the no-confirm marker from each line
+        script = "\n".join([_clean(c) for c in cmdline])
         PrettyOutput.print(script, OutputType.CODE, lang="bash")
-        if user_confirm(f"是否要执行以上shell脚本？", default=True):
+
+        # If any line contains the no-confirm marker, skip the pre-execution confirmation
+        no_confirm = any(marker in c for c in cmdline)
+
+        if no_confirm or user_confirm(f"是否要执行以上shell脚本？", default=True):
             from jarvis.jarvis_tools.registry import ToolRegistry
 
             output = ToolRegistry().handle_tool_calls(
