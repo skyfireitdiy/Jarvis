@@ -385,6 +385,35 @@ def _get_multiline_input_internal(tip: str) -> str:
         """Handle Ctrl+O by exiting the prompt and returning the sentinel value."""
         event.app.exit(result=CTRL_O_SENTINEL)
 
+    @bindings.add("c-t", filter=has_focus(DEFAULT_BUFFER))
+    def _(event):
+        """Return a shell command like '!bash' for upper input_handler to execute."""
+        def _gen_shell_cmd() -> str:
+            try:
+                import os
+                import shutil
+
+                if os.name == "nt":
+                    # Prefer PowerShell if available, otherwise fallback to cmd
+                    for name in ("pwsh", "powershell", "cmd"):
+                        if name == "cmd" or shutil.which(name):
+                            return f"!{name}"
+                else:
+                    shell_path = os.environ.get("SHELL", "")
+                    if shell_path:
+                        base = os.path.basename(shell_path)
+                        if base:
+                            return f"!{base}"
+                    for name in ("fish", "zsh", "bash", "sh"):
+                        if shutil.which(name):
+                            return f"!{name}"
+                    return "!bash"
+            except Exception:
+                return "!bash"
+
+        # Append a special marker to indicate no-confirm execution in shell_input_handler
+        event.app.exit(result=_gen_shell_cmd() + " # JARVIS-NOCONFIRM")
+
     style = PromptStyle.from_dict(
         {
             "prompt": "ansibrightmagenta bold",
@@ -413,6 +442,9 @@ def _get_multiline_input_internal(tip: str) -> str:
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+O"),
                 ("class:bt.label", " 历史复制 "),
+                ("class:bt.sep", " • "),
+                ("class:bt.key", "Ctrl+T"),
+                ("class:bt.label", " 终端(!SHELL) "),
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+C/D"),
                 ("class:bt.label", " 取消 "),
