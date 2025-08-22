@@ -38,7 +38,6 @@ class TaskAnalyzer:
             # 循环处理工具调用，直到没有工具调用为止
             self._process_analysis_loop()
 
-
         except Exception as e:
             PrettyOutput.print("分析失败", OutputType.ERROR)
 

@@ -54,6 +54,7 @@ FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
 # Persistent hint marker for multiline input (shown only once across runs)
 _MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
 
+
 def _display_width(s: str) -> int:
     """Calculate printable width of a string in terminal columns (handles wide chars)."""
     try:
@@ -67,6 +68,7 @@ def _display_width(s: str) -> int:
         return w
     except Exception:
         return len(s)
+
 
 def _calc_prompt_rows(prev_text: str) -> int:
     """
@@ -101,9 +103,6 @@ def _calc_prompt_rows(prev_text: str) -> int:
     return max(1, total_rows)
 
 
-
-
-
 def _multiline_hint_already_shown() -> bool:
     """Check if the multiline Enter hint has been shown before (persisted)."""
     try:
@@ -128,7 +127,9 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     获取支持历史记录的单行输入。
     """
     session: PromptSession = PromptSession(history=None)
-    style = PromptStyle.from_dict({"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"})
+    style = PromptStyle.from_dict(
+        {"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"}
+    )
     prompt = FormattedText([("class:prompt", f"👤 > {tip}")])
     return session.prompt(prompt, default=default, style=style)
 
@@ -288,6 +289,7 @@ class FileCompleter(Completer):
         try:
             if current_sym == "@":
                 import subprocess
+
                 if self._git_files_cache is None:
                     result = subprocess.run(
                         ["git", "ls-files"],
@@ -304,13 +306,16 @@ class FileCompleter(Completer):
                 paths = self._git_files_cache or []
             else:
                 import os as _os
+
                 if self._all_files_cache is None:
                     files: list[str] = []
                     for root, dirs, fnames in _os.walk(".", followlinks=False):
                         # Exclude .git directory
                         dirs[:] = [d for d in dirs if d != ".git"]
                         for name in fnames:
-                            files.append(_os.path.relpath(_os.path.join(root, name), "."))
+                            files.append(
+                                _os.path.relpath(_os.path.join(root, name), ".")
+                            )
                             if len(files) > self._max_walk_files:
                                 break
                         if len(files) > self._max_walk_files:
@@ -420,7 +425,9 @@ def _show_history_and_copy():
             break
 
 
-def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cursor: int | None = None) -> str:
+def _get_multiline_input_internal(
+    tip: str, preset: str | None = None, preset_cursor: int | None = None
+) -> str:
     """
     Internal function to get multiline input using prompt_toolkit.
     Returns a sentinel value if Ctrl+O is pressed.
@@ -475,6 +482,7 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
     @bindings.add("c-t", filter=has_focus(DEFAULT_BUFFER))
     def _(event):
         """Return a shell command like '!bash' for upper input_handler to execute."""
+
         def _gen_shell_cmd() -> str:  # type: ignore
             try:
                 import os
@@ -506,7 +514,6 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
         # Append a special marker to indicate no-confirm execution in shell_input_handler
         event.app.exit(result=_gen_shell_cmd() + " # JARVIS-NOCONFIRM")
 
-
     @bindings.add("@", filter=has_focus(DEFAULT_BUFFER), eager=True)
     def _(event):
         """
@@ -517,6 +524,7 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
         """
         try:
             import shutil
+
             buf = event.current_buffer
             if shutil.which("fzf") is None:
                 buf.insert_text("@")
@@ -526,7 +534,9 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
             doc = buf.document
             text = doc.text
             cursor = doc.cursor_position
-            payload = f"{cursor}:{base64.b64encode(text.encode('utf-8')).decode('ascii')}"
+            payload = (
+                f"{cursor}:{base64.b64encode(text.encode('utf-8')).decode('ascii')}"
+            )
             event.app.exit(result=FZF_REQUEST_SENTINEL_PREFIX + payload)
             return
         except Exception:
@@ -542,6 +552,7 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
         """
         try:
             import shutil
+
             buf = event.current_buffer
             if shutil.which("fzf") is None:
                 buf.insert_text("#")
@@ -551,7 +562,9 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
             doc = buf.document
             text = doc.text
             cursor = doc.cursor_position
-            payload = f"{cursor}:{base64.b64encode(text.encode('utf-8')).decode('ascii')}"
+            payload = (
+                f"{cursor}:{base64.b64encode(text.encode('utf-8')).decode('ascii')}"
+            )
             event.app.exit(result=FZF_REQUEST_ALL_SENTINEL_PREFIX + payload)
             return
         except Exception:
@@ -617,6 +630,7 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
     def _pre_run():
         try:
             from prompt_toolkit.application.current import get_app as _ga
+
             app = _ga()
             buf = app.current_buffer
             if preset is not None and preset_cursor is not None:
@@ -649,19 +663,25 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     preset: str | None = None
     preset_cursor: int | None = None
     while True:
-        user_input = _get_multiline_input_internal(tip, preset=preset, preset_cursor=preset_cursor)
+        user_input = _get_multiline_input_internal(
+            tip, preset=preset, preset_cursor=preset_cursor
+        )
 
         if user_input == CTRL_O_SENTINEL:
             _show_history_and_copy()
             tip = "请继续输入（或按Ctrl+J确认）:"
             continue
-        elif isinstance(user_input, str) and user_input.startswith(FZF_REQUEST_SENTINEL_PREFIX):
+        elif isinstance(user_input, str) and user_input.startswith(
+            FZF_REQUEST_SENTINEL_PREFIX
+        ):
             # Handle fzf request outside the prompt, then prefill new text.
             try:
                 payload = user_input[len(FZF_REQUEST_SENTINEL_PREFIX) :]
                 sep_index = payload.find(":")
                 cursor = int(payload[:sep_index])
-                text = base64.b64decode(payload[sep_index + 1 :].encode("ascii")).decode("utf-8")
+                text = base64.b64decode(
+                    payload[sep_index + 1 :].encode("ascii")
+                ).decode("utf-8")
             except Exception:
                 # Malformed payload; just continue without change.
                 preset = None
@@ -675,7 +695,9 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 import subprocess
 
                 if shutil.which("fzf") is None:
-                    PrettyOutput.print("未检测到 fzf，无法打开文件选择器。", OutputType.WARNING)
+                    PrettyOutput.print(
+                        "未检测到 fzf，无法打开文件选择器。", OutputType.WARNING
+                    )
                 else:
                     files: list[str] = []
                     try:
@@ -686,15 +708,20 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             text=True,
                         )
                         if r.returncode == 0:
-                            files = [line for line in r.stdout.splitlines() if line.strip()]
+                            files = [
+                                line for line in r.stdout.splitlines() if line.strip()
+                            ]
                     except Exception:
                         files = []
 
                     if not files:
                         import os as _os
+
                         for root, _, fnames in _os.walk(".", followlinks=False):
                             for name in fnames:
-                                files.append(_os.path.relpath(_os.path.join(root, name), "."))
+                                files.append(
+                                    _os.path.relpath(_os.path.join(root, name), ".")
+                                )
                             if len(files) > 10000:
                                 break
 
@@ -702,17 +729,38 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
                     else:
                         try:
-                            specials = [ot("Summary"), ot("Clear"), ot("ToolUsage"), ot("ReloadConfig"), ot("SaveSession")]
+                            specials = [
+                                ot("Summary"),
+                                ot("Clear"),
+                                ot("ToolUsage"),
+                                ot("ReloadConfig"),
+                                ot("SaveSession"),
+                            ]
                         except Exception:
                             specials = []
                         try:
                             replace_map = get_replace_map()
-                            builtin_tags = [ot(tag) for tag in replace_map.keys() if isinstance(tag, str) and tag.strip()]
+                            builtin_tags = [
+                                ot(tag)
+                                for tag in replace_map.keys()
+                                if isinstance(tag, str) and tag.strip()
+                            ]
                         except Exception:
                             builtin_tags = []
-                        items = [s for s in specials if isinstance(s, str) and s.strip()] + builtin_tags + files
+                        items = (
+                            [s for s in specials if isinstance(s, str) and s.strip()]
+                            + builtin_tags
+                            + files
+                        )
                         proc = subprocess.run(
-                            ["fzf", "--prompt", "Files> ", "--height", "40%", "--border"],
+                            [
+                                "fzf",
+                                "--prompt",
+                                "Files> ",
+                                "--height",
+                                "40%",
+                                "--border",
+                            ],
                             input="\n".join(items),
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
@@ -750,19 +798,23 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             try:
                 rows_total = _calc_prompt_rows(text)
                 for _ in range(rows_total):
-                    sys.stdout.write("\x1b[1A")       # 光标上移一行
-                    sys.stdout.write("\x1b[2K\r")     # 清除整行
+                    sys.stdout.write("\x1b[1A")  # 光标上移一行
+                    sys.stdout.write("\x1b[2K\r")  # 清除整行
                 sys.stdout.flush()
             except Exception:
                 pass
             continue
-        elif isinstance(user_input, str) and user_input.startswith(FZF_REQUEST_ALL_SENTINEL_PREFIX):
+        elif isinstance(user_input, str) and user_input.startswith(
+            FZF_REQUEST_ALL_SENTINEL_PREFIX
+        ):
             # Handle fzf request (all-files mode, excluding .git) outside the prompt, then prefill new text.
             try:
                 payload = user_input[len(FZF_REQUEST_ALL_SENTINEL_PREFIX) :]
                 sep_index = payload.find(":")
                 cursor = int(payload[:sep_index])
-                text = base64.b64decode(payload[sep_index + 1 :].encode("ascii")).decode("utf-8")
+                text = base64.b64decode(
+                    payload[sep_index + 1 :].encode("ascii")
+                ).decode("utf-8")
             except Exception:
                 # Malformed payload; just continue without change.
                 preset = None
@@ -776,16 +828,21 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 import subprocess
 
                 if shutil.which("fzf") is None:
-                    PrettyOutput.print("未检测到 fzf，无法打开文件选择器。", OutputType.WARNING)
+                    PrettyOutput.print(
+                        "未检测到 fzf，无法打开文件选择器。", OutputType.WARNING
+                    )
                 else:
                     files: list[str] = []
                     try:
                         import os as _os
+
                         for root, dirs, fnames in _os.walk(".", followlinks=False):
                             # Exclude .git directories
                             dirs[:] = [d for d in dirs if d != ".git"]
                             for name in fnames:
-                                files.append(_os.path.relpath(_os.path.join(root, name), "."))
+                                files.append(
+                                    _os.path.relpath(_os.path.join(root, name), ".")
+                                )
                                 if len(files) > 10000:
                                     break
                             if len(files) > 10000:
@@ -797,17 +854,38 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
                     else:
                         try:
-                            specials = [ot("Summary"), ot("Clear"), ot("ToolUsage"), ot("ReloadConfig"), ot("SaveSession")]
+                            specials = [
+                                ot("Summary"),
+                                ot("Clear"),
+                                ot("ToolUsage"),
+                                ot("ReloadConfig"),
+                                ot("SaveSession"),
+                            ]
                         except Exception:
                             specials = []
                         try:
                             replace_map = get_replace_map()
-                            builtin_tags = [ot(tag) for tag in replace_map.keys() if isinstance(tag, str) and tag.strip()]
+                            builtin_tags = [
+                                ot(tag)
+                                for tag in replace_map.keys()
+                                if isinstance(tag, str) and tag.strip()
+                            ]
                         except Exception:
                             builtin_tags = []
-                        items = [s for s in specials if isinstance(s, str) and s.strip()] + builtin_tags + files
+                        items = (
+                            [s for s in specials if isinstance(s, str) and s.strip()]
+                            + builtin_tags
+                            + files
+                        )
                         proc = subprocess.run(
-                            ["fzf", "--prompt", "Files(all)> ", "--height", "40%", "--border"],
+                            [
+                                "fzf",
+                                "--prompt",
+                                "Files(all)> ",
+                                "--height",
+                                "40%",
+                                "--border",
+                            ],
                             input="\n".join(items),
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
@@ -851,7 +929,9 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             except Exception:
                 pass
             continue
-        elif isinstance(user_input, str) and user_input.startswith(FZF_INSERT_SENTINEL_PREFIX):
+        elif isinstance(user_input, str) and user_input.startswith(
+            FZF_INSERT_SENTINEL_PREFIX
+        ):
             # 从哨兵载荷中提取新文本，作为下次进入提示的预填内容
             preset = user_input[len(FZF_INSERT_SENTINEL_PREFIX) :]
             preset_cursor = len(preset)

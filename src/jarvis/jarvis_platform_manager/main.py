@@ -26,7 +26,9 @@ app = typer.Typer(help="Jarvis AI 平台")
 
 @app.command("info")
 def list_platforms(
-    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="指定要查看的平台")
+    platform: Optional[str] = typer.Option(
+        None, "--platform", "-p", help="指定要查看的平台"
+    )
 ) -> None:
     """列出所有支持的平台和模型，或指定平台的详细信息。"""
     registry = PlatformRegistry.get_global_platform_registry()
@@ -217,9 +219,13 @@ def chat_with_model(
                         for entry in conversation_history:
                             file_obj.write(f"{entry['role']}: {entry['content']}\n\n")
 
-                    PrettyOutput.print(f"所有对话已保存到 {file_path}", OutputType.SUCCESS)
+                    PrettyOutput.print(
+                        f"所有对话已保存到 {file_path}", OutputType.SUCCESS
+                    )
                 except Exception as exc:
-                    PrettyOutput.print(f"保存所有对话失败: {str(exc)}", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"保存所有对话失败: {str(exc)}", OutputType.ERROR
+                    )
                 continue
 
             # Check if it is a save_session command
@@ -240,7 +246,9 @@ def chat_with_model(
                         file_path = file_path[1:-1]
 
                     if platform.save(file_path):
-                        PrettyOutput.print(f"会话已保存到 {file_path}", OutputType.SUCCESS)
+                        PrettyOutput.print(
+                            f"会话已保存到 {file_path}", OutputType.SUCCESS
+                        )
                     else:
                         PrettyOutput.print("保存会话失败", OutputType.ERROR)
                 except Exception as exc:
@@ -266,7 +274,9 @@ def chat_with_model(
 
                     if platform.restore(file_path):
                         conversation_history = []  # Clear local history after loading
-                        PrettyOutput.print(f"会话已从 {file_path} 加载", OutputType.SUCCESS)
+                        PrettyOutput.print(
+                            f"会话已从 {file_path} 加载", OutputType.SUCCESS
+                        )
                     else:
                         PrettyOutput.print("加载会话失败", OutputType.ERROR)
                 except Exception as exc:
@@ -346,7 +356,9 @@ def validate_platform_model(platform: Optional[str], model: Optional[str]) -> bo
 
 @app.command("chat")
 def chat_command(
-    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="指定要使用的平台"),
+    platform: Optional[str] = typer.Option(
+        None, "--platform", "-p", help="指定要使用的平台"
+    ),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="指定要使用的模型"),
     llm_type: str = typer.Option(
         "normal",
@@ -429,7 +441,9 @@ def role_command(
     platform: Optional[str] = typer.Option(
         None, "--platform", "-p", help="指定要使用的平台，覆盖角色配置"
     ),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="指定要使用的模型，覆盖角色配置"),
+    model: Optional[str] = typer.Option(
+        None, "--model", "-m", help="指定要使用的模型，覆盖角色配置"
+    ),
     llm_type: Optional[str] = typer.Option(
         None,
         "-t",

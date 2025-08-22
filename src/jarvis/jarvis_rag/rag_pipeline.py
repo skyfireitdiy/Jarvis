@@ -75,7 +75,9 @@ class JarvisRAGPipeline:
         self._reranker: Optional[Reranker] = None
         self._query_rewriter: Optional[QueryRewriter] = None
 
-        PrettyOutput.print("JarvisRAGPipeline 初始化成功 (模型按需加载).", OutputType.SUCCESS)
+        PrettyOutput.print(
+            "JarvisRAGPipeline 初始化成功 (模型按需加载).", OutputType.SUCCESS
+        )
 
     def _get_embedding_manager(self) -> EmbeddingManager:
         if self._embedding_manager is None:
@@ -209,7 +211,10 @@ class JarvisRAGPipeline:
 
         # 3. 根据*原始*查询对统一的候选池进行重排
         if self.use_rerank:
-            PrettyOutput.print(f"正在对 {len(unique_candidate_docs)} 个候选文档进行重排（基于原始问题）...", OutputType.INFO)
+            PrettyOutput.print(
+                f"正在对 {len(unique_candidate_docs)} 个候选文档进行重排（基于原始问题）...",
+                OutputType.INFO,
+            )
             retrieved_docs = self._get_reranker().rerank(
                 query_text, unique_candidate_docs, top_n=n_results
             )
@@ -274,7 +279,10 @@ class JarvisRAGPipeline:
 
         # 3. 重排
         if self.use_rerank:
-            PrettyOutput.print(f"正在对 {len(unique_candidate_docs)} 个候选文档进行重排...", OutputType.INFO)
+            PrettyOutput.print(
+                f"正在对 {len(unique_candidate_docs)} 个候选文档进行重排...",
+                OutputType.INFO,
+            )
             retrieved_docs = self._get_reranker().rerank(
                 query_text, unique_candidate_docs, top_n=n_results
             )

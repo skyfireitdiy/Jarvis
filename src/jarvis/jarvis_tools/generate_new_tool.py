@@ -80,7 +80,9 @@ class generate_new_tool:
             # 验证工具代码中的名称是否与tool_name一致
             import re
 
-            match = re.search(r"^\s*name\s*=\s*[\"'](.+?)[\"']", tool_code, re.MULTILINE)
+            match = re.search(
+                r"^\s*name\s*=\s*[\"'](.+?)[\"']", tool_code, re.MULTILINE
+            )
             if not match:
                 return {
                     "success": False,
@@ -145,8 +147,6 @@ class generate_new_tool:
                         "未找到工具注册表，无法自动注册工具", OutputType.WARNING
                     )
                     success_message += f"\n注册到当前会话失败，可能需要重新启动Jarvis"
-
-
 
             # 检查并安装缺失的依赖
             try:

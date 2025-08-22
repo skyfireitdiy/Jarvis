@@ -49,8 +49,12 @@ class StreamableMcpClient(McpClient):
         self.timeout = config.get("timeout", (10, 300))
 
         # 请求相关属性
-        self.pending_requests: Dict[str, threading.Event] = {}  # 存储等待响应的请求 {id: Event}
-        self.request_results: Dict[str, Dict[str, Any]] = {}  # 存储请求结果 {id: result}
+        self.pending_requests: Dict[str, threading.Event] = (
+            {}
+        )  # 存储等待响应的请求 {id: Event}
+        self.request_results: Dict[str, Dict[str, Any]] = (
+            {}
+        )  # 存储请求结果 {id: result}
         self.notification_handlers: Dict[str, List[Callable]] = {}
         self.event_lock = threading.Lock()
         self.request_id_counter = 0
@@ -74,7 +78,9 @@ class StreamableMcpClient(McpClient):
 
             # 验证服务器响应
             if "result" not in response:
-                raise RuntimeError(f"初始化失败: {response.get('error', 'Unknown error')}")
+                raise RuntimeError(
+                    f"初始化失败: {response.get('error', 'Unknown error')}"
+                )
 
             # 发送initialized通知
             self._send_notification("notifications/initialized", {})
@@ -169,7 +175,9 @@ class StreamableMcpClient(McpClient):
                             notify_method = data.get("method", "")
                             params = data.get("params", {})
                             if notify_method in self.notification_handlers:
-                                for handler in self.notification_handlers[notify_method]:
+                                for handler in self.notification_handlers[
+                                    notify_method
+                                ]:
                                     try:
                                         handler(params)
                                     except Exception as e:
@@ -210,7 +218,9 @@ class StreamableMcpClient(McpClient):
 
             # 发送通知到Streamable HTTP端点
             mcp_url = urljoin(self.base_url, "mcp")
-            response = self.session.post(mcp_url, json=notification, timeout=self.timeout)
+            response = self.session.post(
+                mcp_url, json=notification, timeout=self.timeout
+            )
             response.raise_for_status()
             response.close()
 

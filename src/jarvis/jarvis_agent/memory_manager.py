@@ -74,8 +74,6 @@ class MemoryManager:
         if "save_memory" not in tool_names:
             return
 
-
-
         # 构建提示词，让大模型自己判断并保存记忆
         prompt = """请回顾本次任务的整个过程，判断是否有值得长期记忆或项目记忆的信息。
 
@@ -97,7 +95,9 @@ class MemoryManager:
 
             # 根据响应判断是否保存了记忆
             if "save_memory" in response:
-                PrettyOutput.print("已自动保存有价值的信息到记忆系统", OutputType.SUCCESS)
+                PrettyOutput.print(
+                    "已自动保存有价值的信息到记忆系统", OutputType.SUCCESS
+                )
             else:
                 PrettyOutput.print("本次任务没有特别需要记忆的信息", OutputType.INFO)
 

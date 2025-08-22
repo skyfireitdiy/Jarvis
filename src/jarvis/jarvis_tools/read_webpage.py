@@ -81,15 +81,25 @@ class WebpageTool:
                 resp = http_get(url, timeout=10.0, allow_redirects=True)
                 content_md = md(resp.text, strip=["script", "style"])
             except requests.exceptions.HTTPError as e:
-                PrettyOutput.print(f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}", OutputType.WARNING)
-                return {"success": False, "stdout": "", "stderr": f"HTTP错误：{e.response.status_code}"}
+                PrettyOutput.print(
+                    f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}",
+                    OutputType.WARNING,
+                )
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"HTTP错误：{e.response.status_code}",
+                }
             except requests.exceptions.RequestException as e:
                 PrettyOutput.print(f"⚠️ 请求错误: {e}", OutputType.WARNING)
                 return {"success": False, "stdout": "", "stderr": f"请求错误：{e}"}
 
             if not content_md or not content_md.strip():
-                return {"success": False, "stdout": "", "stderr": "无法从网页抓取有效内容。"}
-
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "无法从网页抓取有效内容。",
+                }
 
             summary_prompt = f"""以下是网页 {url} 的内容（已转换为Markdown）：
 ----------------

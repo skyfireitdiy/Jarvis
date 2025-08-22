@@ -604,7 +604,10 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
     # 0. 检查是否处于Jarvis打开的终端环境，避免嵌套
     try:
         if os.environ.get("JARVIS_TERMINAL") == "1":
-            PrettyOutput.print("检测到当前终端由 Jarvis 打开。再次启动可能导致嵌套。", OutputType.WARNING)
+            PrettyOutput.print(
+                "检测到当前终端由 Jarvis 打开。再次启动可能导致嵌套。",
+                OutputType.WARNING,
+            )
             if not user_confirm("是否仍要继续启动 Jarvis？", default=False):
                 PrettyOutput.print("已取消启动以避免终端嵌套。", OutputType.INFO)
                 sys.exit(0)
@@ -748,7 +751,9 @@ def _interactive_config_setup(config_file_path: Path):
     set_global_env_data(config_data)
     _process_env_variables(config_data)
     try:
-        schema_path = Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
+        schema_path = (
+            Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
+        )
         config_file_path.parent.mkdir(parents=True, exist_ok=True)
         header = ""
         if schema_path.exists():
@@ -844,7 +849,9 @@ def _process_env_variables(config_data: dict) -> None:
         )
 
 
-def _collect_optional_config_interactively(config_data: dict, ask_all: bool = False) -> bool:
+def _collect_optional_config_interactively(
+    config_data: dict, ask_all: bool = False
+) -> bool:
     """
     复用的交互式配置收集逻辑：
     - ask_all=False（默认）：仅对缺省的新功能开关/可选项逐项询问，已存在项跳过
@@ -948,126 +955,190 @@ def _collect_optional_config_interactively(config_data: dict, ask_all: bool = Fa
 
     changed = False
     # 现有两个开关
-    changed = _ask_and_set(
-        "JARVIS_ENABLE_GIT_JCA_SWITCH",
-        "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
-        False,
-        "bool",
-    ) or changed
-    changed = _ask_and_set(
-        "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR",
-        "在进入默认通用代理前，是否先列出可用配置（agent/multi_agent/roles）供选择？",
-        False,
-        "bool",
-    ) or changed
+    changed = (
+        _ask_and_set(
+            "JARVIS_ENABLE_GIT_JCA_SWITCH",
+            "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
+            False,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR",
+            "在进入默认通用代理前，是否先列出可用配置（agent/multi_agent/roles）供选择？",
+            False,
+            "bool",
+        )
+        or changed
+    )
 
     # 新增的配置项交互（通用体验相关）
-    changed = _ask_and_set(
-        "JARVIS_PRETTY_OUTPUT",
-        "是否启用更美观的终端输出（Pretty Output）？",
-        False,
-        "bool",
-    ) or changed
-    changed = _ask_and_set(
-        "JARVIS_PRINT_PROMPT",
-        "是否打印发送给模型的提示词（Prompt）？",
-        False,
-        "bool",
-    ) or changed
-    changed = _ask_and_set(
-        "JARVIS_IMMEDIATE_ABORT",
-        "是否启用立即中断？\n- 选择 是/true：在对话输出流的每次迭代中检测到用户中断（例如 Ctrl+C）时，立即返回当前已生成的内容并停止继续输出。\n- 选择 否/false：不会在输出过程中立刻返回，而是按既有流程处理（不中途打断输出）。",
-        False,
-        "bool",
-    ) or changed
-    changed = _ask_and_set(
-        "JARVIS_ENABLE_STATIC_ANALYSIS",
-        "是否启用静态代码分析（Static Analysis）？",
-        True,
-        "bool",
-    ) or changed
-    changed = _ask_and_set(
-        "JARVIS_USE_METHODOLOGY",
-        "是否启用方法论系统（Methodology）？",
-        True,
-        "bool",
-    ) or changed
-    changed = _ask_and_set(
-        "JARVIS_USE_ANALYSIS",
-        "是否启用分析流程（Analysis）？",
-        True,
-        "bool",
-    ) or changed
-    changed = _ask_and_set(
-        "JARVIS_FORCE_SAVE_MEMORY",
-        "是否强制保存会话记忆？",
-        True,
-        "bool",
-    ) or changed
+    changed = (
+        _ask_and_set(
+            "JARVIS_PRETTY_OUTPUT",
+            "是否启用更美观的终端输出（Pretty Output）？",
+            False,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_PRINT_PROMPT",
+            "是否打印发送给模型的提示词（Prompt）？",
+            False,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_IMMEDIATE_ABORT",
+            "是否启用立即中断？\n- 选择 是/true：在对话输出流的每次迭代中检测到用户中断（例如 Ctrl+C）时，立即返回当前已生成的内容并停止继续输出。\n- 选择 否/false：不会在输出过程中立刻返回，而是按既有流程处理（不中途打断输出）。",
+            False,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_ENABLE_STATIC_ANALYSIS",
+            "是否启用静态代码分析（Static Analysis）？",
+            True,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_USE_METHODOLOGY",
+            "是否启用方法论系统（Methodology）？",
+            True,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_USE_ANALYSIS",
+            "是否启用分析流程（Analysis）？",
+            True,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_FORCE_SAVE_MEMORY",
+            "是否强制保存会话记忆？",
+            True,
+            "bool",
+        )
+        or changed
+    )
 
     # 代码与工具操作安全提示
-    changed = _ask_and_set(
-        "JARVIS_EXECUTE_TOOL_CONFIRM",
-        "执行工具前是否需要确认？",
-        False,
-        "bool",
-    ) or changed
-    changed = _ask_and_set(
-        "JARVIS_CONFIRM_BEFORE_APPLY_PATCH",
-        "应用补丁前是否需要确认？",
-        False,
-        "bool",
-    ) or changed
+    changed = (
+        _ask_and_set(
+            "JARVIS_EXECUTE_TOOL_CONFIRM",
+            "执行工具前是否需要确认？",
+            False,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_CONFIRM_BEFORE_APPLY_PATCH",
+            "应用补丁前是否需要确认？",
+            False,
+            "bool",
+        )
+        or changed
+    )
 
     # 数据目录与最大输入Token
     from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir  # lazy import
-    changed = _ask_and_set_optional_str(
-        "JARVIS_DATA_PATH",
-        f"是否自定义数据目录路径(JARVIS_DATA_PATH)？留空使用默认: {_get_data_dir()}",
-    ) or changed
-    changed = _ask_and_set_int(
-        "JARVIS_MAX_INPUT_TOKEN_COUNT",
-        "自定义最大输入Token数量（留空使用默认: 32000）",
-        32000,
-    ) or changed
+
+    changed = (
+        _ask_and_set_optional_str(
+            "JARVIS_DATA_PATH",
+            f"是否自定义数据目录路径(JARVIS_DATA_PATH)？留空使用默认: {_get_data_dir()}",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set_int(
+            "JARVIS_MAX_INPUT_TOKEN_COUNT",
+            "自定义最大输入Token数量（留空使用默认: 32000）",
+            32000,
+        )
+        or changed
+    )
 
     # 目录类配置（逗号分隔）
-    changed = _ask_and_set_list(
-        "JARVIS_TOOL_LOAD_DIRS",
-        "指定工具加载目录（逗号分隔，留空跳过）：",
-    ) or changed
-    changed = _ask_and_set_list(
-        "JARVIS_METHODOLOGY_DIRS",
-        "指定方法论加载目录（逗号分隔，留空跳过）：",
-    ) or changed
-    changed = _ask_and_set_list(
-        "JARVIS_AGENT_DEFINITION_DIRS",
-        "指定 agent 定义加载目录（逗号分隔，留空跳过）：",
-    ) or changed
-    changed = _ask_and_set_list(
-        "JARVIS_MULTI_AGENT_DIRS",
-        "指定 multi_agent 加载目录（逗号分隔，留空跳过）：",
-    ) or changed
-    changed = _ask_and_set_list(
-        "JARVIS_ROLES_DIRS",
-        "指定 roles 加载目录（逗号分隔，留空跳过）：",
-    ) or changed
+    changed = (
+        _ask_and_set_list(
+            "JARVIS_TOOL_LOAD_DIRS",
+            "指定工具加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set_list(
+            "JARVIS_METHODOLOGY_DIRS",
+            "指定方法论加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set_list(
+            "JARVIS_AGENT_DEFINITION_DIRS",
+            "指定 agent 定义加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set_list(
+            "JARVIS_MULTI_AGENT_DIRS",
+            "指定 multi_agent 加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set_list(
+            "JARVIS_ROLES_DIRS",
+            "指定 roles 加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
 
     # Web 搜索配置（可选）
-    changed = _ask_and_set_optional_str(
-        "JARVIS_WEB_SEARCH_PLATFORM",
-        "配置 Web 搜索平台名称（留空跳过）：",
-    ) or changed
-    changed = _ask_and_set_optional_str(
-        "JARVIS_WEB_SEARCH_MODEL",
-        "配置 Web 搜索模型名称（留空跳过）：",
-    ) or changed
+    changed = (
+        _ask_and_set_optional_str(
+            "JARVIS_WEB_SEARCH_PLATFORM",
+            "配置 Web 搜索平台名称（留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set_optional_str(
+            "JARVIS_WEB_SEARCH_MODEL",
+            "配置 Web 搜索模型名称（留空跳过）：",
+        )
+        or changed
+    )
 
     # Git 提交提示词（可选）
-    changed = _ask_and_set_optional_str(
-        "JARVIS_GIT_COMMIT_PROMPT",
-        "自定义 Git 提交提示模板（留空跳过）：",
-    ) or changed
+    changed = (
+        _ask_and_set_optional_str(
+            "JARVIS_GIT_COMMIT_PROMPT",
+            "自定义 Git 提交提示模板（留空跳过）：",
+        )
+        or changed
+    )
 
     # RAG 配置（可选）
     try:
@@ -1075,6 +1146,7 @@ def _collect_optional_config_interactively(config_data: dict, ask_all: bool = Fa
             get_rag_embedding_model as _get_rag_embedding_model,
             get_rag_rerank_model as _get_rag_rerank_model,
         )
+
         rag_default_embed = _get_rag_embedding_model()
         rag_default_rerank = _get_rag_rerank_model()
     except Exception:
@@ -1111,18 +1183,24 @@ def _collect_optional_config_interactively(config_data: dict, ask_all: bool = Fa
         pass
 
     # 中心仓库配置
-    changed = _ask_and_set(
-        "JARVIS_CENTRAL_METHODOLOGY_REPO",
-        "请输入中心方法论仓库地址（可留空跳过）：",
-        "",
-        "str",
-    ) or changed
-    changed = _ask_and_set(
-        "JARVIS_CENTRAL_TOOL_REPO",
-        "请输入中心工具仓库地址（可留空跳过）：",
-        "",
-        "str",
-    ) or changed
+    changed = (
+        _ask_and_set(
+            "JARVIS_CENTRAL_METHODOLOGY_REPO",
+            "请输入中心方法论仓库地址（可留空跳过）：",
+            "",
+            "str",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_CENTRAL_TOOL_REPO",
+            "请输入中心工具仓库地址（可留空跳过）：",
+            "",
+            "str",
+        )
+        or changed
+    )
 
     # 已移除 LLM 组配置交互
 
@@ -1134,11 +1212,14 @@ def _collect_optional_config_interactively(config_data: dict, ask_all: bool = Fa
     # SHELL 覆盖（可选）
     try:
         default_shell = os.getenv("SHELL", "/bin/bash")
-        changed = _ask_and_set_optional_str(
-            "SHELL",
-            f"覆盖 SHELL 路径（留空使用系统默认: {default_shell}）：",
-            default_shell,
-        ) or changed
+        changed = (
+            _ask_and_set_optional_str(
+                "SHELL",
+                f"覆盖 SHELL 路径（留空使用系统默认: {default_shell}）：",
+                default_shell,
+            )
+            or changed
+        )
     except Exception:
         pass
 
@@ -1251,7 +1332,9 @@ def generate_default_config(schema_path: str, output_path: str) -> None:
 def _load_default_config_from_schema() -> dict:
     """从 schema 生成默认配置字典，用于对比并剔除等于默认值的键"""
     try:
-        schema_path = Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
+        schema_path = (
+            Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
+        )
         if not schema_path.exists():
             return {}
         with open(schema_path, "r", encoding="utf-8") as f:
@@ -1272,6 +1355,7 @@ def _load_default_config_from_schema() -> dict:
         return _generate_from_schema(schema)
     except Exception:
         return {}
+
 
 def _prune_defaults_with_schema(config_data: dict) -> bool:
     """
@@ -1380,9 +1464,7 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
         try:
             return func()
         except Exception as e:
-            PrettyOutput.print(
-                f"重试中，等待 {sleep_time}s...", OutputType.WARNING
-            )
+            PrettyOutput.print(f"重试中，等待 {sleep_time}s...", OutputType.WARNING)
             time.sleep(sleep_time)
             continue
 
@@ -1486,7 +1568,6 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
     git_dir = repo_path / ".git"
     if not git_dir.is_dir():
         return
-
 
     try:
         # 检查是否有远程仓库

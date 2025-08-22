@@ -67,9 +67,7 @@ def import_methodology(
 
 
 @app.command("export")
-def export_methodology(
-    output_file: str = typer.Argument(..., help="导出文件路径")
-):
+def export_methodology(output_file: str = typer.Argument(..., help="导出文件路径")):
     """导出当前方法论到单个文件"""
     try:
         methodologies = _load_all_methodologies()
@@ -211,7 +209,9 @@ def extract_methodology(
 
 
 @app.command("extract-url")
-def extract_methodology_from_url(url: str = typer.Argument(..., help="要提取方法论的URL")):
+def extract_methodology_from_url(
+    url: str = typer.Argument(..., help="要提取方法论的URL")
+):
     """从URL提取方法论"""
     try:
         # 获取平台实例

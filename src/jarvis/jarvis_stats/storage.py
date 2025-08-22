@@ -347,15 +347,24 @@ class StatsStorage:
                 info = meta["metrics"].get(metric_name)
                 now_iso = datetime.now().isoformat()
                 if info is None:
-                    info = {"unit": None, "created_at": now_iso, "last_updated": now_iso}
+                    info = {
+                        "unit": None,
+                        "created_at": now_iso,
+                        "last_updated": now_iso,
+                    }
                     meta["metrics"][metric_name] = info
                 if not info.get("group"):
                     inferred_group = None
                     if group_counts:
-                        inferred_group = max(group_counts.items(), key=lambda kv: kv[1])[0]
+                        inferred_group = max(
+                            group_counts.items(), key=lambda kv: kv[1]
+                        )[0]
                     # 名称启发式作为补充
                     if not inferred_group:
-                        if metric_name.startswith("code_lines_") or "commit" in metric_name:
+                        if (
+                            metric_name.startswith("code_lines_")
+                            or "commit" in metric_name
+                        ):
                             inferred_group = "code_agent"
                     if inferred_group:
                         info["group"] = inferred_group
@@ -381,7 +390,9 @@ class StatsStorage:
         try:
             # 优先从元数据读取
             meta = self._load_json(self.meta_file)
-            metrics_meta = meta.get("metrics", {}) if isinstance(meta.get("metrics"), dict) else {}
+            metrics_meta = (
+                meta.get("metrics", {}) if isinstance(meta.get("metrics"), dict) else {}
+            )
             info = metrics_meta.get(metric_name)
             if info and isinstance(info, dict):
                 grp = info.get("group")
@@ -420,7 +431,11 @@ class StatsStorage:
                     metrics_meta = meta["metrics"]
                 if info is None:
                     now_iso = datetime.now().isoformat()
-                    info = {"unit": None, "created_at": now_iso, "last_updated": now_iso}
+                    info = {
+                        "unit": None,
+                        "created_at": now_iso,
+                        "last_updated": now_iso,
+                    }
                     metrics_meta[metric_name] = info
                 info["group"] = inferred_group
                 self._save_json(self.meta_file, meta)
@@ -461,7 +476,9 @@ class StatsStorage:
             pass
 
         # 合并三个来源的指标并返回排序后的列表
-        all_metrics = metrics_from_meta.union(metrics_from_data).union(metrics_from_totals)
+        all_metrics = metrics_from_meta.union(metrics_from_data).union(
+            metrics_from_totals
+        )
         return sorted(list(all_metrics))
 
     def aggregate_metrics(

@@ -87,7 +87,6 @@ class GitCommitTool:
             ["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         ).wait()
 
-
     def execute(self, args: Dict) -> Dict[str, Any]:
         """Execute automatic commit process with support for multi-line messages and special characters"""
         try:
@@ -106,7 +105,6 @@ class GitCommitTool:
 
             if not has_uncommitted_changes():
                 return {"success": True, "stdout": "No changes to commit", "stderr": ""}
-
 
             self._stage_changes()
 
@@ -299,7 +297,6 @@ commit信息
                     """
                     commit_message = platform.chat_until_success(prompt)
 
-
                 # 执行提交
 
                 # Windows 兼容性：使用 delete=False 避免权限错误
@@ -308,7 +305,6 @@ commit信息
                 try:
                     tmp_file.write(commit_message)
                     tmp_file.close()  # Windows 需要先关闭文件才能被其他进程读取
-
 
                     commit_cmd = ["git", "commit", "-F", tmp_file_path]
                     process = subprocess.Popen(
@@ -327,7 +323,6 @@ commit信息
                         )
                         raise Exception(f"Git commit failed: {error_msg}")
 
-
                 finally:
                     # 手动删除临时文件
                     try:
@@ -345,7 +340,9 @@ commit信息
                     try:
                         os.unlink(temp_diff_file_path)
                     except Exception as e:
-                        PrettyOutput.print(f"无法删除临时文件: {str(e)}", OutputType.WARNING)
+                        PrettyOutput.print(
+                            f"无法删除临时文件: {str(e)}", OutputType.WARNING
+                        )
 
             PrettyOutput.print(
                 f"提交哈希: {commit_hash}\n提交消息: {commit_message}",

@@ -288,7 +288,6 @@ class ToolRegistry(OutputHandlerProtocol):
                 if tool_name in self.tools:
                     del self.tools[tool_name]
 
-
     def _load_mcp_tools(self) -> None:
         """加载MCP工具，优先从配置获取，其次从目录扫描"""
         from jarvis.jarvis_utils.config import get_mcp_config
@@ -350,7 +349,6 @@ class ToolRegistry(OutputHandlerProtocol):
             if not os.path.exists(central_repo_path):
                 try:
                     import subprocess
-
 
                     subprocess.run(
                         ["git", "clone", central_repo, central_repo_path], check=True
@@ -648,7 +646,6 @@ class ToolRegistry(OutputHandlerProtocol):
                         yaml.safe_load(temp_data[0])  # Check if valid YAML
 
                         # Ask user for confirmation
-
 
                         data = temp_data
                     except (yaml.YAMLError, EOFError, KeyboardInterrupt):

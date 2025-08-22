@@ -71,6 +71,7 @@ class OutputEvent:
     - section: 若为章节标题输出，填入标题文本；否则为None
     - context: 额外上下文（预留给TUI/日志等）
     """
+
     text: str
     output_type: OutputType
     timestamp: bool = True
@@ -213,7 +214,9 @@ class ConsoleOutputSink(OutputSink):
             console.print(panel)
         else:
             console.print(content)
-        if event.traceback or (event.output_type == OutputType.ERROR and is_print_error_traceback()):
+        if event.traceback or (
+            event.output_type == OutputType.ERROR and is_print_error_traceback()
+        ):
             try:
                 console.print_exception()
             except Exception as e:

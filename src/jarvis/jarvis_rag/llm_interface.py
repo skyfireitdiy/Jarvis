@@ -103,7 +103,10 @@ class JarvisPlatform_LLM(LLMInterface):
             self.registry = PlatformRegistry.get_global_platform_registry()
             self.platform: BasePlatform = self.registry.get_normal_platform()
             self.platform.set_suppress_output(False)  # 确保模型没有控制台输出
-            PrettyOutput.print(f"已初始化 Jarvis 平台 LLM，模型: {self.platform.name()}", OutputType.INFO)
+            PrettyOutput.print(
+                f"已初始化 Jarvis 平台 LLM，模型: {self.platform.name()}",
+                OutputType.INFO,
+            )
         except Exception as e:
             PrettyOutput.print(f"初始化 Jarvis 平台 LLM 失败: {e}", OutputType.ERROR)
             raise

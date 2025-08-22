@@ -234,7 +234,9 @@ class CodeAgent:
         if not os.path.exists(gitignore_path):
             with open(gitignore_path, "w", encoding="utf-8") as f:
                 f.write(f"{jarvis_ignore}\n")
-            PrettyOutput.print(f"已创建 .gitignore 并添加 '{jarvis_ignore}'", OutputType.SUCCESS)
+            PrettyOutput.print(
+                f"已创建 .gitignore 并添加 '{jarvis_ignore}'", OutputType.SUCCESS
+            )
         else:
             with open(gitignore_path, "r+", encoding="utf-8") as f:
                 content = f.read()
@@ -324,8 +326,13 @@ class CodeAgent:
             if any(keyword in content for keyword in ["text=", "eol=", "binary"]):
                 return
 
-        PrettyOutput.print("提示：在Windows系统上，建议配置 .gitattributes 文件来避免换行符问题。", OutputType.INFO)
-        PrettyOutput.print("这可以防止仅因换行符不同而导致整个文件被标记为修改。", OutputType.INFO)
+        PrettyOutput.print(
+            "提示：在Windows系统上，建议配置 .gitattributes 文件来避免换行符问题。",
+            OutputType.INFO,
+        )
+        PrettyOutput.print(
+            "这可以防止仅因换行符不同而导致整个文件被标记为修改。", OutputType.INFO
+        )
 
         if user_confirm("是否要创建一个最小化的.gitattributes文件？", False):
             # 最小化的内容，只影响特定类型的文件
@@ -344,9 +351,13 @@ class CodeAgent:
             if not os.path.exists(gitattributes_path):
                 with open(gitattributes_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(minimal_content)
-                PrettyOutput.print("已创建最小化的 .gitattributes 文件", OutputType.SUCCESS)
+                PrettyOutput.print(
+                    "已创建最小化的 .gitattributes 文件", OutputType.SUCCESS
+                )
             else:
-                PrettyOutput.print("将以下内容追加到现有 .gitattributes 文件：", OutputType.INFO)
+                PrettyOutput.print(
+                    "将以下内容追加到现有 .gitattributes 文件：", OutputType.INFO
+                )
                 PrettyOutput.print(minimal_content, OutputType.CODE, lang="text")
                 if user_confirm("是否追加到现有文件？", True):
                     with open(
@@ -355,7 +366,10 @@ class CodeAgent:
                         f.write("\n" + minimal_content)
                     PrettyOutput.print("已更新 .gitattributes 文件", OutputType.SUCCESS)
         else:
-            PrettyOutput.print("跳过 .gitattributes 文件创建。如遇换行符问题，可手动创建此文件。", OutputType.INFO)
+            PrettyOutput.print(
+                "跳过 .gitattributes 文件创建。如遇换行符问题，可手动创建此文件。",
+                OutputType.INFO,
+            )
 
     def _record_code_changes_stats(self, diff_text: str) -> None:
         """记录代码变更的统计信息。

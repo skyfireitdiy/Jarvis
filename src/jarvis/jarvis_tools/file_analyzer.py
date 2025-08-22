@@ -105,7 +105,6 @@ class FileAnalyzerTool:
 
             analysis_result = platform.chat_until_success(analysis_request)
 
-
             # 清理会话
             platform.delete_chat()
 
