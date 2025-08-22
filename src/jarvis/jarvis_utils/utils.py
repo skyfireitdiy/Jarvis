@@ -753,6 +753,7 @@ def _interactive_config_setup(config_file_path: Path):
         header = ""
         if schema_path.exists():
             header = f"# yaml-language-server: $schema={str(schema_path.absolute())}\n"
+        _prune_defaults_with_schema(config_data)
         yaml_str = yaml.dump(config_data, allow_unicode=True, sort_keys=False)
         with open(config_file_path, "w", encoding="utf-8") as f:
             if header:
@@ -861,15 +862,21 @@ def _collect_optional_config_interactively(config_data: dict) -> bool:
                 return False
             if _type == "bool":
                 val = get_yes_no(_tip, default=bool(_default))
+                # 选择与默认相同则不写入，避免冗余
+                if bool(val) == bool(_default):
+                    return False
                 config_data[_key] = bool(val)
             else:
                 val = get_single_line_input(f"{_tip}", default=str(_default or ""))
-                config_data[_key] = val.strip()
+                v = ("" if val is None else str(val)).strip()
+                # 输入与默认相同则不写入
+                if v == str(_default or "").strip():
+                    return False
+                config_data[_key] = v
             return True
         except Exception:
-            # 出现异常时按默认值设置，避免中断流程
-            config_data[_key] = bool(_default) if _type == "bool" else str(_default or "")
-            return True
+            # 异常时不写入默认值，保持精简
+            return False
 
     def _ask_and_set_optional_str(_key, _tip, _default: str = "") -> bool:
         try:
@@ -881,6 +888,9 @@ def _collect_optional_config_interactively(config_data: dict) -> bool:
             val = val.strip()
             if val == "":
                 return False
+            # 与默认值相同则不写入
+            if val == str(_default or "").strip():
+                return False
             config_data[_key] = val
             return True
         except Exception:
@@ -891,9 +901,10 @@ def _collect_optional_config_interactively(config_data: dict) -> bool:
             if _key in config_data:
                 return False
             val_str = get_single_line_input(f"{_tip}", default=str(_default))
-            if val_str is None or str(val_str).strip() == "":
+            s = "" if val_str is None else str(val_str).strip()
+            if s == "" or s == str(_default).strip():
                 return False
-            config_data[_key] = int(str(val_str).strip())
+            config_data[_key] = int(s)
             return True
         except Exception:
             return False
@@ -1100,30 +1111,7 @@ def _collect_optional_config_interactively(config_data: dict) -> bool:
 
     # 已移除 工具组配置交互
 
-    # 替换映射配置（可选）
-    try:
-        if "JARVIS_REPLACE_MAP" not in config_data:
-            replace_map_str = get_single_line_input(
-                "配置替换映射（JARVIS_REPLACE_MAP，JSON一行，例：{\"old\":\"new\"}，留空跳过）：",
-                default="",
-            )
-            if replace_map_str and replace_map_str.strip():
-                parsed = None
-                try:
-                    parsed = json.loads(replace_map_str)
-                except Exception:
-                    try:
-                        parsed = yaml.safe_load(replace_map_str)
-                    except Exception:
-                        parsed = None
-                if isinstance(parsed, dict):
-                    config_data["JARVIS_REPLACE_MAP"] = parsed
-                    changed = True
-                else:
-                    PrettyOutput.print("JARVIS_REPLACE_MAP 格式无效，已跳过。", OutputType.WARNING)
-    except Exception:
-        pass
-
+    # 已移除：替换映射（JARVIS_REPLACE_MAP）的交互式配置，保持最简交互
     # SHELL 覆盖（可选）
     try:
         default_shell = os.getenv("SHELL", "/bin/bash")
@@ -1135,26 +1123,7 @@ def _collect_optional_config_interactively(config_data: dict) -> bool:
     except Exception:
         pass
 
-    # MCP 配置（可选）
-    try:
-        if "JARVIS_MCP" not in config_data:
-            mcp_str = get_single_line_input(
-                "配置 MCP（JARVIS_MCP，JSON一行，例：[{'name':'xxx','args':{}}]，留空跳过）：",
-                default="",
-            )
-            if mcp_str and mcp_str.strip():
-                try:
-                    mcp_val = json.loads(mcp_str)
-                except Exception:
-                    mcp_val = None
-                if isinstance(mcp_val, list):
-                    config_data["JARVIS_MCP"] = mcp_val
-                    changed = True
-                else:
-                    PrettyOutput.print("JARVIS_MCP 格式无效，已跳过。", OutputType.WARNING)
-    except Exception:
-        pass
-
+    # 已移除：MCP（JARVIS_MCP）的交互式配置，保持最简交互
     return changed
 
 
@@ -1181,9 +1150,11 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         _process_env_variables(config_data)
 
         # 统一使用交互式配置收集逻辑（复用）
-        changed = _collect_optional_config_interactively(config_data)
+        changed_interactive = _collect_optional_config_interactively(config_data)
+        # 加载 schema 默认并剔除等于默认值的项
+        pruned = _prune_defaults_with_schema(config_data)
 
-        if changed:
+        if changed_interactive or pruned:
             # 保留schema声明，如无则自动补充
             header = ""
             try:
@@ -1258,6 +1229,66 @@ def generate_default_config(schema_path: str, output_path: str) -> None:
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
+
+
+def _load_default_config_from_schema() -> dict:
+    """从 schema 生成默认配置字典，用于对比并剔除等于默认值的键"""
+    try:
+        schema_path = Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
+        if not schema_path.exists():
+            return {}
+        with open(schema_path, "r", encoding="utf-8") as f:
+            schema = json.load(f)
+
+        def _generate_from_schema(schema_dict: Dict[str, Any]) -> Dict[str, Any]:
+            cfg: Dict[str, Any] = {}
+            if isinstance(schema_dict, dict) and "properties" in schema_dict:
+                for key, value in schema_dict["properties"].items():
+                    if "default" in value:
+                        cfg[key] = value["default"]
+                    elif value.get("type") == "array":
+                        cfg[key] = []
+                    elif "properties" in value:
+                        cfg[key] = _generate_from_schema(value)
+            return cfg
+
+        return _generate_from_schema(schema)
+    except Exception:
+        return {}
+
+def _prune_defaults_with_schema(config_data: dict) -> bool:
+    """
+    删除与 schema 默认值一致的配置项，返回是否发生了变更
+    仅处理 schema 中定义的键，未在 schema 中的键不会被修改
+    """
+    defaults = _load_default_config_from_schema()
+    if not defaults or not isinstance(config_data, dict):
+        return False
+
+    changed = False
+
+    def _prune_node(node: dict, default_node: dict):
+        nonlocal changed
+        for key in list(node.keys()):
+            if key in default_node:
+                dv = default_node[key]
+                v = node[key]
+                if isinstance(dv, dict) and isinstance(v, dict):
+                    _prune_node(v, dv)
+                    if not v:
+                        del node[key]
+                        changed = True
+                elif isinstance(dv, list) and isinstance(v, list):
+                    if v == dv:
+                        del node[key]
+                        changed = True
+                else:
+                    if v == dv:
+                        del node[key]
+                        changed = True
+
+    _prune_node(config_data, defaults)
+    return changed
 
 
 def _read_old_config_file(config_file):
