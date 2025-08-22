@@ -71,10 +71,41 @@ class SubCodeAgentTool:
             background: str = str(args.get("background", "")).strip()
             enhanced_task = f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
 
-            # 创建 CodeAgent（使用系统默认配置），子Agent需要 summary
+            # 继承父Agent的模型组与工具使用集（用于覆盖默认值）
+            parent_agent = args.get("agent")
+            # 如未注入父Agent，尝试从全局获取当前或任一已注册Agent
+            if parent_agent is None:
+                try:
+                    from jarvis.jarvis_utils import globals as G  # 延迟导入避免循环
+                    curr = getattr(G, "current_agent_name", "")
+                    if curr:
+                        parent_agent = getattr(G, "global_agents", {}).get(curr)
+                    if parent_agent is None and getattr(G, "global_agents", {}):
+                        try:
+                            parent_agent = next(iter(G.global_agents.values()))
+                        except Exception:
+                            parent_agent = None
+                except Exception:
+                    parent_agent = None
+            model_group = None
+            use_tools: list[str] = []
+            try:
+                if parent_agent is not None:
+                    if getattr(parent_agent, "model", None):
+                        model_group = getattr(parent_agent.model, "model_group", None)
+                    parent_registry = parent_agent.get_tool_registry()
+                    if parent_registry:
+                        for t in parent_registry.get_all_tools():
+                            if isinstance(t, dict) and t.get("name"):
+                                use_tools.append(str(t["name"]))
+            except Exception:
+                pass
+
+            # 创建 CodeAgent（子Agent需要 summary；继承父Agent模型组如可用）
             try:
                 code_agent = CodeAgent(
-                    need_summary=True,  # 强制子Agent需要总结
+                    need_summary=True,
+                    model_group=model_group,
                 )
             except SystemExit as se:
                 # 将底层 sys.exit 转换为工具错误，避免终止进程
@@ -87,6 +118,17 @@ class SubCodeAgentTool:
             # 子Agent需要自动完成
             try:
                 code_agent.agent.auto_complete = True
+                # 同步父Agent工具使用集（如可用）
+                if use_tools:
+                    code_agent.agent.set_use_tools(use_tools)
+                # 同步父Agent的模型名称（如可用），以尽量保持平台与模型一致
+                if parent_agent is not None and getattr(parent_agent, "model", None) and getattr(code_agent.agent, "model", None):
+                    try:
+                        parent_model_name = parent_agent.model.name()  # type: ignore[attr-defined]
+                        if parent_model_name:
+                            code_agent.agent.model.set_model_name(parent_model_name)  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
             except Exception:
                 pass
 

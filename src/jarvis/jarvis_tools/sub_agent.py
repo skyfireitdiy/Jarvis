@@ -62,10 +62,60 @@ class SubAgentTool:
             background: str = str(args.get("background", "")).strip()
             enhanced_task = f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
 
-            # 无需依赖父Agent：直接使用系统默认/全局配置
+            # 读取背景信息并组合任务
+            background: str = str(args.get("background", "")).strip()
+            enhanced_task = f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
+
+            # 继承父Agent的运行参数（用于覆盖默认值）；若无父Agent则使用默认/全局配置
+            parent_agent = args.get("agent")
+            # 如未注入父Agent，尝试从全局获取当前或任一已注册Agent
+            if parent_agent is None:
+                try:
+                    from jarvis.jarvis_utils import globals as G  # 延迟导入避免循环
+                    curr = getattr(G, "current_agent_name", "")
+                    if curr:
+                        parent_agent = getattr(G, "global_agents", {}).get(curr)
+                    if parent_agent is None and getattr(G, "global_agents", {}):
+                        try:
+                            parent_agent = next(iter(G.global_agents.values()))
+                        except Exception:
+                            parent_agent = None
+                except Exception:
+                    parent_agent = None
+            # 默认/全局
             system_prompt = origin_agent_system_prompt
             need_summary = True
             auto_complete = True
+
+            # 可继承参数
+            model_group = None
+            summary_prompt = None
+            execute_tool_confirm = None
+            use_methodology = None
+            use_analysis = None
+            force_save_memory = None
+            use_tools: list[str] = []
+
+            try:
+                if parent_agent is not None:
+                    # 继承模型组
+                    if getattr(parent_agent, "model", None):
+                        model_group = getattr(parent_agent.model, "model_group", None)
+                    # 继承开关类参数
+                    summary_prompt = getattr(parent_agent, "summary_prompt", None)
+                    execute_tool_confirm = getattr(parent_agent, "execute_tool_confirm", None)
+                    use_methodology = getattr(parent_agent, "use_methodology", None)
+                    use_analysis = getattr(parent_agent, "use_analysis", None)
+                    force_save_memory = getattr(parent_agent, "force_save_memory", None)
+                    # 继承工具使用集（名称列表）
+                    parent_registry = parent_agent.get_tool_registry()
+                    if parent_registry:
+                        for t in parent_registry.get_all_tools():
+                            if isinstance(t, dict) and t.get("name"):
+                                use_tools.append(str(t["name"]))
+            except Exception:
+                # 忽略继承失败，退回默认配置
+                pass
 
             # 为避免交互阻塞：提供自动确认与空输入处理器
             def _auto_confirm(tip: str, default: bool = True) -> bool:
@@ -80,21 +130,35 @@ class SubAgentTool:
                 name="SubAgent",
                 description="Temporary sub agent for executing a subtask",
                 llm_type="normal",  # 使用默认模型类型
-                model_group=None,  # 使用默认模型组
-                summary_prompt=None,
+                model_group=model_group,  # 继承父Agent模型组（如可用）
+                summary_prompt=summary_prompt,  # 继承父Agent总结提示词（如可用）
                 auto_complete=auto_complete,
                 output_handler=None,  # 默认 ToolRegistry
-                use_tools=None,  # 默认工具集
-                input_handler=None,  # 避免交互
-                execute_tool_confirm=None,  # 使用全局配置
+                use_tools=None,  # 初始不限定，稍后同步父Agent工具集
+                input_handler=None,  # 允许使用系统默认输入链
+                execute_tool_confirm=execute_tool_confirm,  # 继承父Agent（如可用）
                 need_summary=need_summary,
-                multiline_inputer=None,  # 允许用户进行多行输入（使用系统默认输入器）
-                use_methodology=None,  # 使用全局配置
-                use_analysis=False,  # 使用全局配置
-                force_save_memory=None,  # 使用全局配置
+                multiline_inputer=None,  # 使用系统默认输入器（允许用户输入）
+                use_methodology=use_methodology,  # 继承父Agent（如可用）
+                use_analysis=use_analysis,  # 继承父Agent（如可用）
+                force_save_memory=force_save_memory,  # 继承父Agent（如可用）
                 files=None,
                 confirm_callback=_auto_confirm,  # 自动确认
             )
+
+            # 同步父Agent的模型名称与工具使用集（若可用）
+            try:
+                if parent_agent is not None and getattr(parent_agent, "model", None) and getattr(agent, "model", None):
+                    try:
+                        model_name = parent_agent.model.name()  # type: ignore[attr-defined]
+                        if model_name:
+                            agent.model.set_model_name(model_name)  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                if use_tools:
+                    agent.set_use_tools(use_tools)
+            except Exception:
+                pass
 
             # 执行任务
             result = agent.run(enhanced_task)
