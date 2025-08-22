@@ -601,6 +601,16 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
         welcome_str: 欢迎信息字符串
         config_file: 配置文件路径，默认为None(使用~/.jarvis/config.yaml)
     """
+    # 0. 检查是否处于Jarvis打开的终端环境，避免嵌套
+    try:
+        if os.environ.get("JARVIS_TERMINAL") == "1":
+            PrettyOutput.print("检测到当前终端由 Jarvis 打开。再次启动可能导致嵌套。", OutputType.WARNING)
+            if not user_confirm("是否仍要继续启动 Jarvis？", default=False):
+                PrettyOutput.print("已取消启动以避免终端嵌套。", OutputType.INFO)
+                sys.exit(0)
+    except Exception:
+        pass
+
     # 1. 设置信号处理
     _setup_signal_handler()
 
