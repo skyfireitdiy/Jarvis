@@ -20,7 +20,7 @@ from rich.style import Style as RichStyle
 from rich.syntax import Syntax
 from rich.text import Text
 
-from jarvis.jarvis_utils.config import get_pretty_output
+from jarvis.jarvis_utils.config import get_pretty_output, is_print_error_traceback
 from jarvis.jarvis_utils.globals import console, get_agent_list
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -213,7 +213,7 @@ class ConsoleOutputSink(OutputSink):
             console.print(panel)
         else:
             console.print(content)
-        if event.traceback or event.output_type == OutputType.ERROR:
+        if event.traceback or (event.output_type == OutputType.ERROR and is_print_error_traceback()):
             try:
                 console.print_exception()
             except Exception as e:

@@ -389,6 +389,16 @@ def is_print_prompt() -> bool:
     return GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_PROMPT", False) == True
 
 
+def is_print_error_traceback() -> bool:
+    """
+    获取是否在错误输出时打印回溯调用链。
+    
+    返回：
+        bool: 如果打印回溯则返回True，默认为False（不打印）
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_ERROR_TRACEBACK", False) is True
+
+
 def is_force_save_memory() -> bool:
     """
     获取是否强制保存记忆。

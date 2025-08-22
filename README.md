@@ -218,6 +218,14 @@ ENV:
   YUANBAO_COOKIES: "在此处粘贴您的元宝Cookies"
 ```
 
+提示：错误回溯输出控制
+- 默认情况下，当 PrettyOutput 打印错误信息（OutputType.ERROR）时，不会自动打印回溯调用链。
+- 如需全局启用错误回溯，请在配置中设置：
+```yaml
+JARVIS_PRINT_ERROR_TRACEBACK: true
+```
+- 也可以在单次调用时通过传入 `traceback=True` 临时开启回溯打印。
+
 Jarvis 支持多种平台，包括 **Kimi**, **通义千问**, **OpenAI** 等。详细的配置选项、模型组设置以及所有可用参数，请参阅 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
 > **模型推荐**: 目前效果较好的模型是 `claude-opus-4-20250514`，可以通过国内代理商购买，例如 [FoxiAI](https://foxi-ai.top)。
