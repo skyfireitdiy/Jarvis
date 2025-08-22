@@ -42,9 +42,9 @@ def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
         f"需要执行{tool_to_execute.name()}确认执行？", True
     ):
         try:
-
+            print(f"🔧 正在执行{tool_to_execute.name()}...")
             result = tool_to_execute.handle(response, agent)
-
+            print(f"✅ {tool_to_execute.name()}执行完成")
             return result
         except Exception as e:
             PrettyOutput.print(f"工具执行失败: {str(e)}", OutputType.ERROR)
