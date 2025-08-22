@@ -1,3 +1,36 @@
+### Release Note - v0.3.21 2025-08-22
+
+#### 新功能 (Features)
+- 交互式配置向导：新增 jvs -I/--interactive-config，可在启动前基于现有配置逐项确认并保存
+- 子任务工具：新增 sub_agent 与 sub_code_agent，支持将子任务托管给子 Agent/CodeAgent，自动完成并生成总结
+- 上下文补全增强：支持 # 触发“全量文件模式”（排除 .git）；@ 为“Git 文件模式”；安装 fzf 时提供文件选择器
+- 错误回溯可控：新增配置 JARVIS_PRINT_ERROR_TRACEBACK，支持全局或单次开启错误回溯打印
+- RAG 增强：检索器引入索引清单与源文件变更/删除检测，提示重新索引，确保知识库一致性
+
+#### 修复 (Fixes)
+- read_webpage 工具异常处理与返回结构修复，提升抓取失败时的可观测性
+- 多处边界与稳定性修复：平台文件上传、会话保存/恢复、工具执行提示等环节更稳健
+
+#### 优化与重构 (Refactors & Improvements)
+- 输出体验统一：PrettyOutput 文案与状态更一致；工具执行前后增加状态提示
+- 配置目录支持 ~ 与环境变量展开（工具/方法论/Agent/多Agent/角色目录）
+- 默认包索引调整：uv 默认源改为 pypi.org，新增 tencent 镜像（与 aliyun 共存）
+- CodeAgent 默认工具集加入 sub_code_agent；Windows 下 .gitattributes 提示与处理更友好
+- 智能 Shell（jss）安装/卸载提示优化，兼容 fish/bash/zsh
+- RAG 管线日志更清晰；BM25 索引的初始化与保存流程优化
+- 交互式输入增强：新增在终端内快捷打开独立 Shell，并避免在 Jarvis 打开的终端中再次启动造成嵌套
+
+#### 文档更新 (Documentation)
+- README 增加错误回溯配置说明与使用示例
+- 使用指南补充 @/# 两种文件模式、内置指令与交互式配置引导
+- 配置项文档新增 JARVIS_PRINT_ERROR_TRACEBACK；补充 --share-tool 与 -I 的用法示例
+
+#### 其他 (Miscellaneous)
+- 广泛的代码风格与结构细化，去除多余空行与不一致用法
+- 统计与工具注册细节调整，提示信息更聚焦
+
+本次更新主要围绕“可配置性、可观测性与易用性”展开：引入交互式配置、可控错误回溯、上下文补全/选择器全面升级，并完善子Agent工作流与 RAG 一致性检测，整体体验更顺滑可靠。
+
 ### Release Note - v0.3.20 2025-08-21
 
 #### **新功能 (Features)**
