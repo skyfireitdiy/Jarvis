@@ -9,7 +9,10 @@
 - 用于输入控制的自定义键绑定
 """
 import os
+import sys
+import base64
 from typing import Iterable, List
+import wcwidth
 
 from colorama import Fore
 from colorama import Style as ColoramaStyle
@@ -41,9 +44,84 @@ from jarvis.jarvis_utils.tag import ot
 
 # Sentinel value to indicate that Ctrl+O was pressed
 CTRL_O_SENTINEL = "__CTRL_O_PRESSED__"
+# Sentinel prefix to indicate that Ctrl+F (fzf) inserted content should prefill next prompt
+FZF_INSERT_SENTINEL_PREFIX = "__FZF_INSERT__::"
+# Sentinel to request running fzf outside the prompt and then prefill next prompt
+FZF_REQUEST_SENTINEL_PREFIX = "__FZF_REQUEST__::"
 
 # Persistent hint marker for multiline input (shown only once across runs)
 _MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
+
+def _display_width(s: str) -> int:
+    """Calculate printable width of a string in terminal columns (handles wide chars)."""
+    try:
+        w = 0
+        for ch in s:
+            cw = wcwidth.wcwidth(ch)
+            if cw is None or cw < 0:
+                # Fallback for unknown width chars (e.g. emoji on some terminals)
+                cw = 1
+            w += cw
+        return w
+    except Exception:
+        return len(s)
+
+def _calc_prompt_rows(prev_text: str) -> int:
+    """
+    Estimate how many terminal rows the previous prompt occupied.
+    Considers prompt prefix and soft-wrapping across terminal columns.
+    """
+    try:
+        cols = os.get_terminal_size().columns
+    except Exception:
+        cols = 80
+    prefix = "👤 ❯ "
+    prefix_w = _display_width(prefix)
+
+    if prev_text is None:
+        return 1
+
+    lines = prev_text.splitlines()
+    if not lines:
+        lines = [""]
+    # If the text ends with a newline, there is a visible empty line at the end.
+    if prev_text.endswith("\n"):
+        lines.append("")
+    total_rows = 0
+    for i, line in enumerate(lines):
+        lw = _display_width(line)
+        if i == 0:
+            width = prefix_w + lw
+        else:
+            width = lw
+        rows = max(1, (width + cols - 1) // cols)
+        total_rows += rows
+    return max(1, total_rows)
+
+
+def _calc_toolbar_rows(tip: str) -> int:
+    """
+    Estimate how many rows the bottom toolbar occupies (may soft-wrap).
+    """
+    try:
+        cols = os.get_terminal_size().columns
+    except Exception:
+        cols = 80
+    # Construct a plain-text version of toolbar content
+    parts = [
+        " ", tip, " ",
+        " • ", "快捷键: ", "@", " 文件补全 ",
+        " • ", "Tab", " 选择 ",
+        " • ", "Ctrl+J", " 确认 ",
+        " • ", "Ctrl+O", " 历史复制 ",
+        " • ", "Ctrl+F", " FZF文件 ",
+        " • ", "Ctrl+T", " 终端(!SHELL) ",
+        " • ", "Ctrl+C/D", " 取消 ",
+    ]
+    toolbar_text = "".join(parts)
+    width = _display_width(toolbar_text)
+    rows = max(1, (width + cols - 1) // cols)
+    return rows
 
 
 def _multiline_hint_already_shown() -> bool:
@@ -333,7 +411,7 @@ def _show_history_and_copy():
             break
 
 
-def _get_multiline_input_internal(tip: str) -> str:
+def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cursor: int | None = None) -> str:
     """
     Internal function to get multiline input using prompt_toolkit.
     Returns a sentinel value if Ctrl+O is pressed.
@@ -414,10 +492,25 @@ def _get_multiline_input_internal(tip: str) -> str:
         # Append a special marker to indicate no-confirm execution in shell_input_handler
         event.app.exit(result=_gen_shell_cmd() + " # JARVIS-NOCONFIRM")
 
-    @bindings.add("c-f", filter=has_focus(DEFAULT_BUFFER))
+    @bindings.add("c-f", filter=has_focus(DEFAULT_BUFFER), eager=True)
     def _(event):
         """Open fzf to select a file and insert/replace at current cursor position."""
         selected = {"value": ""}
+        # Early exit: request outer loop to run fzf (synchronously) and prefill next prompt.
+        try:
+            doc = event.current_buffer.document
+            text = doc.text
+            cursor = doc.cursor_position
+            payload = f"{cursor}:{base64.b64encode(text.encode('utf-8')).decode('ascii')}"
+            event.app.exit(result=FZF_REQUEST_SENTINEL_PREFIX + payload)
+            return
+        except Exception:
+            pass
+        # DEBUG: keybinding triggered
+        try:
+            run_in_terminal(lambda: PrettyOutput.print("DEBUG: Ctrl+F 触发", OutputType.INFO))
+        except Exception:
+            pass
 
         def _run_fzf():
             try:
@@ -460,29 +553,72 @@ def _get_multiline_input_internal(tip: str) -> str:
                     stderr=subprocess.PIPE,
                     text=True,
                 )
-                sel = proc.stdout.strip()
+                sel_raw = proc.stdout
+                sel = sel_raw.strip()
+                # DEBUG: fzf returned
+                try:
+                    run_in_terminal(lambda: PrettyOutput.print(f"DEBUG: fzf 返回 code={proc.returncode}, out_len={len(sel_raw)}, sel='{sel}'", OutputType.INFO))
+                except Exception:
+                    pass
                 if sel:
                     selected["value"] = sel
             except Exception as e:
                 PrettyOutput.print(f"文件选择失败: {e}", OutputType.ERROR)
 
         run_in_terminal(_run_fzf)
+        # DEBUG: after fzf, show current selected value
+        try:
+            run_in_terminal(lambda: PrettyOutput.print(f"DEBUG: fzf 选择结果='{selected.get('value','')}'", OutputType.INFO))
+        except Exception:
+            pass
         if selected["value"]:
-            buf = event.current_buffer
-            # If user is in '@...' context (no space since last '@'), replace it like a completion would.
+            value = selected["value"]
+            # 进入 selected 分支
             try:
-                text_before = buf.document.text_before_cursor
+                run_in_terminal(lambda: PrettyOutput.print("DEBUG: 进入 selected 分支", OutputType.INFO))
+            except Exception:
+                pass
+            # 使用“哨兵返回 + 外层预填”的方案；首选 set_document + validate_and_handle 让 prompt() 返回哨兵
+            try:
+                buf = event.current_buffer
+                doc = buf.document
+                text = doc.text
+                cursor = doc.cursor_position
+                text_before = doc.text_before_cursor
                 last_at = text_before.rfind("@")
                 if last_at != -1 and " " not in text_before[last_at + 1 :]:
-                    # Delete from the '@' to cursor, then insert the selected path (quoted)
-                    buf.delete_before_cursor(count=len(text_before) - last_at)
-                    buf.insert_text(f"'{selected['value']}'")
+                    # 替换 @... 片段
+                    new_text = text[:last_at] + f"'{value}'" + text[cursor:]
                 else:
-                    # Otherwise, just insert at cursor
-                    buf.insert_text(f"'{selected['value']}'")
+                    # 普通插入
+                    new_text = text[:cursor] + f"'{value}'" + text[cursor:]
+                sentinel_payload = FZF_INSERT_SENTINEL_PREFIX + new_text
+                # 调试：构造载荷
+                try:
+                    run_in_terminal(lambda: PrettyOutput.print(f"DEBUG: 构造FZF哨兵载荷 len={len(sentinel_payload)}", OutputType.INFO))
+                except Exception:
+                    pass
+                from prompt_toolkit.document import Document as _Doc
+                buf.set_document(_Doc(sentinel_payload, cursor_position=len(sentinel_payload)), bypass_readonly=True)  # type: ignore
+                try:
+                    run_in_terminal(lambda: PrettyOutput.print("DEBUG: set_document+提交 返回FZF哨兵", OutputType.INFO))
+                except Exception:
+                    pass
+                event.current_buffer.validate_and_handle()
+                try:
+                    run_in_terminal(lambda: PrettyOutput.print("DEBUG: 已调用 validate_and_handle()", OutputType.INFO))
+                except Exception:
+                    pass
             except Exception:
-                # Fallback to simple insert on any unexpected error
-                event.current_buffer.insert_text(f"'{selected['value']}'")
+                # 回退：直接通过 app.exit 返回哨兵
+                try:
+                    run_in_terminal(lambda: PrettyOutput.print("DEBUG: 回退 app.exit 返回FZF哨兵", OutputType.WARNING))
+                except Exception:
+                    pass
+                try:
+                    event.app.exit(result=FZF_INSERT_SENTINEL_PREFIX + f"'{value}'")
+                except Exception:
+                    pass
 
     style = PromptStyle.from_dict(
         {
@@ -538,12 +674,24 @@ def _get_multiline_input_internal(tip: str) -> str:
     # Tip is shown in bottom toolbar; avoid extra print
     prompt = FormattedText([("class:prompt", "👤 ❯ ")])
 
+    def _pre_run():
+        try:
+            from prompt_toolkit.application.current import get_app as _ga
+            app = _ga()
+            buf = app.current_buffer
+            if preset is not None and preset_cursor is not None:
+                cp = max(0, min(len(buf.text), preset_cursor))
+                buf.cursor_position = cp
+        except Exception:
+            pass
+
     try:
         return session.prompt(
             prompt,
             style=style,
-            pre_run=lambda: None,
+            pre_run=_pre_run,
             bottom_toolbar=_bottom_toolbar,
+            default=(preset or ""),
         ).strip()
     except (KeyboardInterrupt, EOFError):
         return ""
@@ -558,14 +706,126 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
         tip: 提示文本，将显示在底部工具栏中
         print_on_empty: 当输入为空字符串时，是否打印“输入已取消”提示。默认打印。
     """
+    preset: str | None = None
+    preset_cursor: int | None = None
     while True:
-        user_input = _get_multiline_input_internal(tip)
+        user_input = _get_multiline_input_internal(tip, preset=preset, preset_cursor=preset_cursor)
 
         if user_input == CTRL_O_SENTINEL:
             _show_history_and_copy()
             tip = "请继续输入（或按Ctrl+J确认）:"
             continue
+        elif isinstance(user_input, str) and user_input.startswith(FZF_REQUEST_SENTINEL_PREFIX):
+            # Handle fzf request outside the prompt, then prefill new text.
+            try:
+                payload = user_input[len(FZF_REQUEST_SENTINEL_PREFIX) :]
+                sep_index = payload.find(":")
+                cursor = int(payload[:sep_index])
+                text = base64.b64decode(payload[sep_index + 1 :].encode("ascii")).decode("utf-8")
+            except Exception:
+                # Malformed payload; just continue without change.
+                preset = None
+                tip = "FZF 预填失败，继续输入:"
+                continue
+
+            # Run fzf to get a file selection synchronously (outside prompt)
+            selected_path = ""
+            try:
+                import shutil
+                import subprocess
+
+                if shutil.which("fzf") is None:
+                    PrettyOutput.print("未检测到 fzf，无法打开文件选择器。", OutputType.WARNING)
+                else:
+                    files: list[str] = []
+                    try:
+                        r = subprocess.run(
+                            ["git", "ls-files"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                        )
+                        if r.returncode == 0:
+                            files = [line for line in r.stdout.splitlines() if line.strip()]
+                    except Exception:
+                        files = []
+
+                    if not files:
+                        import os as _os
+                        for root, _, fnames in _os.walk(".", followlinks=False):
+                            for name in fnames:
+                                files.append(_os.path.relpath(_os.path.join(root, name), "."))
+                            if len(files) > 10000:
+                                break
+
+                    if not files:
+                        PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
+                    else:
+                        proc = subprocess.run(
+                            ["fzf", "--prompt", "Files> ", "--height", "40%", "--border"],
+                            input="\n".join(files),
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                        )
+                        sel = proc.stdout.strip()
+                        if sel:
+                            selected_path = sel
+            except Exception as e:
+                PrettyOutput.print(f"FZF 执行失败: {e}", OutputType.ERROR)
+
+            # Compute new text based on selection (or keep original if none)
+            if selected_path:
+                text_before = text[:cursor]
+                last_at = text_before.rfind("@")
+                if last_at != -1 and " " not in text_before[last_at + 1 :]:
+                    # Replace @... segment
+                    inserted = f"'{selected_path}'"
+                    new_text = text[:last_at] + inserted + text[cursor:]
+                    new_cursor = last_at + len(inserted)
+                else:
+                    # Plain insert
+                    inserted = f"'{selected_path}'"
+                    new_text = text[:cursor] + inserted + text[cursor:]
+                    new_cursor = cursor + len(inserted)
+                preset = new_text
+                preset_cursor = new_cursor
+                tip = "已插入文件，继续编辑或按Ctrl+J确认:"
+            else:
+                # No selection; keep original text and cursor
+                preset = text
+                preset_cursor = cursor
+                tip = "未选择文件或已取消，继续编辑:"
+            # 清除上一条输入行（多行安全），避免多清，保守仅按提示行估算
+            try:
+                rows_total = _calc_prompt_rows(text)
+                for _ in range(rows_total):
+                    sys.stdout.write("\x1b[1A")       # 光标上移一行
+                    sys.stdout.write("\x1b[2K\r")     # 清除整行
+                sys.stdout.flush()
+            except Exception:
+                pass
+            continue
+        elif isinstance(user_input, str) and user_input.startswith(FZF_INSERT_SENTINEL_PREFIX):
+            # 从哨兵载荷中提取新文本，作为下次进入提示的预填内容
+            preset = user_input[len(FZF_INSERT_SENTINEL_PREFIX) :]
+            preset_cursor = len(preset)
+            try:
+                PrettyOutput.print("DEBUG: 收到FZF哨兵，预填并重启输入", OutputType.INFO)
+            except Exception:
+                pass
+            # 清除上一条输入行（多行安全），避免多清，保守仅按提示行估算
+            try:
+                rows_total = _calc_prompt_rows(preset)
+                for _ in range(rows_total):
+                    sys.stdout.write("\x1b[1A")
+                    sys.stdout.write("\x1b[2K\r")
+                sys.stdout.flush()
+            except Exception:
+                pass
+            tip = "已插入文件，继续编辑或按Ctrl+J确认:"
+            continue
         else:
             if not user_input and print_on_empty:
-                PrettyOutput.print("\n输入已取消", OutputType.INFO)
+                PrettyOutput.print("输入已取消", OutputType.INFO)
             return user_input
