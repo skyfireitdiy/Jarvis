@@ -48,6 +48,8 @@ CTRL_O_SENTINEL = "__CTRL_O_PRESSED__"
 FZF_INSERT_SENTINEL_PREFIX = "__FZF_INSERT__::"
 # Sentinel to request running fzf outside the prompt and then prefill next prompt
 FZF_REQUEST_SENTINEL_PREFIX = "__FZF_REQUEST__::"
+# Sentinel to request running fzf outside the prompt for all-files mode (exclude .git)
+FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
 
 # Persistent hint marker for multiline input (shown only once across runs)
 _MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
@@ -237,24 +239,36 @@ class FileCompleter(Completer):
         self.max_suggestions = 10
         self.min_score = 10
         self.replace_map = get_replace_map()
+        # Caches for file lists to avoid repeated expensive scans
+        self._git_files_cache = None
+        self._all_files_cache = None
+        self._max_walk_files = 10000
 
     def get_completions(
         self, document: Document, _: CompleteEvent
     ) -> Iterable[Completion]:
         text = document.text_before_cursor
         cursor_pos = document.cursor_position
-        at_positions = [i for i, char in enumerate(text) if char == "@"]
-        if not at_positions:
+
+        # Support both '@' (git files) and '#' (all files excluding .git)
+        sym_positions = [(i, ch) for i, ch in enumerate(text) if ch in ("@", "#")]
+        if not sym_positions:
             return
-        current_at_pos = at_positions[-1]
-        if cursor_pos <= current_at_pos:
-            return
-        text_after_at = text[current_at_pos + 1 : cursor_pos]
-        if " " in text_after_at:
+        current_pos = None
+        current_sym = None
+        for i, ch in sym_positions:
+            if i < cursor_pos:
+                current_pos = i
+                current_sym = ch
+        if current_pos is None:
             return
 
-        file_path = text_after_at.strip()
-        replace_length = len(text_after_at) + 1
+        text_after = text[current_pos + 1 : cursor_pos]
+        if " " in text_after:
+            return
+
+        token = text_after.strip()
+        replace_length = len(text_after) + 1
 
         all_completions = []
         all_completions.extend(
@@ -270,29 +284,46 @@ class FileCompleter(Completer):
             ]
         )
 
+        # File path candidates
         try:
-            import subprocess
-
-            result = subprocess.run(
-                ["git", "ls-files"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            if result.returncode == 0:
-                all_completions.extend(
-                    [
-                        (path, "File")
-                        for path in result.stdout.splitlines()
-                        if path.strip()
-                    ]
-                )
+            if current_sym == "@":
+                import subprocess
+                if self._git_files_cache is None:
+                    result = subprocess.run(
+                        ["git", "ls-files"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    if result.returncode == 0:
+                        self._git_files_cache = [
+                            p for p in result.stdout.splitlines() if p.strip()
+                        ]
+                    else:
+                        self._git_files_cache = []
+                paths = self._git_files_cache or []
+            else:
+                import os as _os
+                if self._all_files_cache is None:
+                    files: list[str] = []
+                    for root, dirs, fnames in _os.walk(".", followlinks=False):
+                        # Exclude .git directory
+                        dirs[:] = [d for d in dirs if d != ".git"]
+                        for name in fnames:
+                            files.append(_os.path.relpath(_os.path.join(root, name), "."))
+                            if len(files) > self._max_walk_files:
+                                break
+                        if len(files) > self._max_walk_files:
+                            break
+                    self._all_files_cache = files
+                paths = self._all_files_cache or []
+            all_completions.extend([(path, "File") for path in paths])
         except Exception:
             pass
 
-        if file_path:
+        if token:
             scored_items = process.extract(
-                file_path,
+                token,
                 [item[0] for item in all_completions],
                 limit=self.max_suggestions,
             )
@@ -300,20 +331,20 @@ class FileCompleter(Completer):
                 (item[0], item[1]) for item in scored_items if item[1] > self.min_score
             ]
             completion_map = {item[0]: item[1] for item in all_completions}
-            for text, score in scored_items:
-                display_text = f"{text} ({score}%)" if score < 100 else text
+            for t, score in scored_items:
+                display_text = f"{t} ({score}%)" if score < 100 else t
                 yield Completion(
-                    text=f"'{text}'",
+                    text=f"'{t}'",
                     start_position=-replace_length,
                     display=display_text,
-                    display_meta=completion_map.get(text, ""),
+                    display_meta=completion_map.get(t, ""),
                 )
         else:
-            for text, desc in all_completions[: self.max_suggestions]:
+            for t, desc in all_completions[: self.max_suggestions]:
                 yield Completion(
-                    text=f"'{text}'",
+                    text=f"'{t}'",
                     start_position=-replace_length,
-                    display=text,
+                    display=t,
                     display_meta=desc,
                 )
 
@@ -496,6 +527,31 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
         except Exception:
             try:
                 event.current_buffer.insert_text("@")
+            except Exception:
+                pass
+
+    @bindings.add("#", filter=has_focus(DEFAULT_BUFFER), eager=True)
+    def _(event):
+        """
+        使用 # 触发 fzf（当 fzf 存在），以“全量文件模式”进行选择（排除 .git）；否则仅插入 # 启用内置补全
+        """
+        try:
+            import shutil
+            buf = event.current_buffer
+            if shutil.which("fzf") is None:
+                buf.insert_text("#")
+                return
+            # 先插入 '#'
+            buf.insert_text("#")
+            doc = buf.document
+            text = doc.text
+            cursor = doc.cursor_position
+            payload = f"{cursor}:{base64.b64encode(text.encode('utf-8')).decode('ascii')}"
+            event.app.exit(result=FZF_REQUEST_ALL_SENTINEL_PREFIX + payload)
+            return
+        except Exception:
+            try:
+                event.current_buffer.insert_text("#")
             except Exception:
                 pass
 
@@ -686,6 +742,96 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 for _ in range(rows_total):
                     sys.stdout.write("\x1b[1A")       # 光标上移一行
                     sys.stdout.write("\x1b[2K\r")     # 清除整行
+                sys.stdout.flush()
+            except Exception:
+                pass
+            continue
+        elif isinstance(user_input, str) and user_input.startswith(FZF_REQUEST_ALL_SENTINEL_PREFIX):
+            # Handle fzf request (all-files mode, excluding .git) outside the prompt, then prefill new text.
+            try:
+                payload = user_input[len(FZF_REQUEST_ALL_SENTINEL_PREFIX) :]
+                sep_index = payload.find(":")
+                cursor = int(payload[:sep_index])
+                text = base64.b64decode(payload[sep_index + 1 :].encode("ascii")).decode("utf-8")
+            except Exception:
+                # Malformed payload; just continue without change.
+                preset = None
+                tip = "FZF 预填失败，继续输入:"
+                continue
+
+            # Run fzf to get a file selection synchronously (outside prompt) with all files (exclude .git)
+            selected_path = ""
+            try:
+                import shutil
+                import subprocess
+
+                if shutil.which("fzf") is None:
+                    PrettyOutput.print("未检测到 fzf，无法打开文件选择器。", OutputType.WARNING)
+                else:
+                    files: list[str] = []
+                    try:
+                        import os as _os
+                        for root, dirs, fnames in _os.walk(".", followlinks=False):
+                            # Exclude .git directories
+                            dirs[:] = [d for d in dirs if d != ".git"]
+                            for name in fnames:
+                                files.append(_os.path.relpath(_os.path.join(root, name), "."))
+                                if len(files) > 10000:
+                                    break
+                            if len(files) > 10000:
+                                break
+                    except Exception:
+                        files = []
+
+                    if not files:
+                        PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
+                    else:
+                        try:
+                            specials = [ot("Summary"), ot("Clear"), ot("ToolUsage"), ot("ReloadConfig"), ot("SaveSession")]
+                        except Exception:
+                            specials = []
+                        items = [s for s in specials if isinstance(s, str) and s.strip()] + files
+                        proc = subprocess.run(
+                            ["fzf", "--prompt", "Files(all)> ", "--height", "40%", "--border"],
+                            input="\n".join(items),
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                        )
+                        sel = proc.stdout.strip()
+                        if sel:
+                            selected_path = sel
+            except Exception as e:
+                PrettyOutput.print(f"FZF 执行失败: {e}", OutputType.ERROR)
+
+            # Compute new text based on selection (or keep original if none)
+            if selected_path:
+                text_before = text[:cursor]
+                last_hash = text_before.rfind("#")
+                if last_hash != -1 and " " not in text_before[last_hash + 1 :]:
+                    # Replace #... segment
+                    inserted = f"'{selected_path}'"
+                    new_text = text[:last_hash] + inserted + text[cursor:]
+                    new_cursor = last_hash + len(inserted)
+                else:
+                    # Plain insert
+                    inserted = f"'{selected_path}'"
+                    new_text = text[:cursor] + inserted + text[cursor:]
+                    new_cursor = cursor + len(inserted)
+                preset = new_text
+                preset_cursor = new_cursor
+                tip = "已插入文件，继续编辑或按Ctrl+J确认:"
+            else:
+                # No selection; keep original text and cursor
+                preset = text
+                preset_cursor = cursor
+                tip = "未选择文件或已取消，继续编辑:"
+            # 清除上一条输入行（多行安全），避免多清，保守仅按提示行估算
+            try:
+                rows_total = _calc_prompt_rows(text)
+                for _ in range(rows_total):
+                    sys.stdout.write("\x1b[1A")
+                    sys.stdout.write("\x1b[2K\r")
                 sys.stdout.flush()
             except Exception:
                 pass
