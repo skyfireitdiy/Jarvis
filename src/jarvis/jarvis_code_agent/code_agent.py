@@ -69,6 +69,7 @@ class CodeAgent:
             "save_memory",
             "retrieve_memory",
             "clear_memory",
+            "sub_code_agent",
         ]
 
         if append_tools:
@@ -137,6 +138,14 @@ class CodeAgent:
 - 对于部分文件内容修改，使用PATCH
 - 对于需要重写整个文件内容，使用rewrite_file工具
 - 对于简单的修改，可以使用execute_script工具执行shell命令完成
+
+## 子任务与子CodeAgent
+- 当出现以下情况时，优先使用 sub_code_agent 工具将子任务托管给子 CodeAgent（自动完成并生成总结）：
+  - 需要在当前任务下并行推进较大且相对独立的代码改造
+  - 涉及多文件/多模块的大范围变更，或需要较长的工具调用链
+  - 需要隔离上下文以避免污染当前对话（如探索性改动、PoC）
+  - 需要专注于单一子问题，阶段性产出可独立复用的结果
+- 其余常规、小粒度改动直接在当前 Agent 中完成即可
 </code_engineer_guide>
 
 <say_to_llm>
