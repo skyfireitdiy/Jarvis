@@ -114,10 +114,10 @@ def handle_share_tool_option(share_tool: bool, config_file: Optional[str]) -> bo
 
 def handle_interactive_config_option(
     interactive_config: bool, config_file: Optional[str]
-) -> None:
-    """处理交互式配置选项，在当前配置基础上进行配置（支持覆盖现有设置），不中断主流程。"""
+) -> bool:
+    """处理交互式配置选项，返回是否已处理并需提前结束。"""
     if not interactive_config:
-        return
+        return False
     try:
         config_path = (
             Path(config_file)
@@ -127,7 +127,7 @@ def handle_interactive_config_option(
         if not config_path.exists():
             # 无现有配置时，进入完整引导流程（该流程内会写入并退出）
             jutils._interactive_config_setup(config_path)
-            return
+            return True
 
         # 读取现有配置
         _, config_data = jutils._load_config_file(str(config_path))
@@ -138,7 +138,7 @@ def handle_interactive_config_option(
         )
         if not changed:
             PrettyOutput.print("没有需要更新的配置项，保持现有配置。", OutputType.INFO)
-            return
+            return True
 
         # 剔除与 schema 默认值一致的键，保持配置精简
         try:
@@ -177,8 +177,10 @@ def handle_interactive_config_option(
             wf.write(yaml_str)
 
         PrettyOutput.print(f"配置已更新: {config_path}", OutputType.SUCCESS)
+        return True
     except Exception as e:
         PrettyOutput.print(f"交互式配置失败: {e}", OutputType.ERROR)
+        return True
 
 
 def preload_config_for_flags(config_file: Optional[str]) -> None:
@@ -514,7 +516,8 @@ def run_cli(
         return
 
     # 交互式配置（基于现有配置补充设置）
-    handle_interactive_config_option(interactive_config, config_file)
+    if handle_interactive_config_option(interactive_config, config_file):
+        return
 
     # 预加载配置（仅用于读取功能开关），不会显示欢迎信息或影响后续 init_env
     preload_config_for_flags(config_file)
