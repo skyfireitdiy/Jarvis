@@ -40,7 +40,7 @@ class ConfigEditor:
 
         if editor:
             try:
-                subprocess.run([editor, str(config_file_path)], check=True)
+                subprocess.run([editor, str(config_file_path)], check=True, shell=(platform.system() == "Windows"))
                 raise typer.Exit(code=0)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 PrettyOutput.print(f"Failed to open editor: {e}", OutputType.ERROR)
