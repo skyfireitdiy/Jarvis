@@ -1149,12 +1149,10 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         set_global_env_data(config_data)
         _process_env_variables(config_data)
 
-        # 统一使用交互式配置收集逻辑（复用）
-        changed_interactive = _collect_optional_config_interactively(config_data)
         # 加载 schema 默认并剔除等于默认值的项
         pruned = _prune_defaults_with_schema(config_data)
 
-        if changed_interactive or pruned:
+        if pruned:
             # 保留schema声明，如无则自动补充
             header = ""
             try:
