@@ -414,6 +414,62 @@ def _get_multiline_input_internal(tip: str) -> str:
         # Append a special marker to indicate no-confirm execution in shell_input_handler
         event.app.exit(result=_gen_shell_cmd() + " # JARVIS-NOCONFIRM")
 
+    @bindings.add("c-f", filter=has_focus(DEFAULT_BUFFER))
+    def _(event):
+        """Open fzf to select a file and insert the selection at cursor."""
+        selected = {"value": ""}
+
+        def _run_fzf():
+            try:
+                import shutil
+                import subprocess
+                import os
+
+                if not shutil.which("fzf"):
+                    PrettyOutput.print("未检测到 fzf，无法打开文件选择器。", OutputType.WARNING)
+                    return
+
+                files = []
+                try:
+                    r = subprocess.run(
+                        ["git", "ls-files"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    if r.returncode == 0:
+                        files = [line for line in r.stdout.splitlines() if line.strip()]
+                except Exception:
+                    files = []
+
+                if not files:
+                    for root, _, fnames in os.walk(".", followlinks=False):
+                        for name in fnames:
+                            files.append(os.path.relpath(os.path.join(root, name), "."))
+                        if len(files) > 10000:
+                            break
+
+                if not files:
+                    PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
+                    return
+
+                proc = subprocess.run(
+                    ["fzf", "--prompt", "Files> ", "--height", "40%", "--border"],
+                    input="\n".join(files),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                sel = proc.stdout.strip()
+                if sel:
+                    selected["value"] = sel
+            except Exception as e:
+                PrettyOutput.print(f"文件选择失败: {e}", OutputType.ERROR)
+
+        run_in_terminal(_run_fzf)
+        if selected["value"]:
+            event.current_buffer.insert_text(f"'{selected['value']}'")
+
     style = PromptStyle.from_dict(
         {
             "prompt": "ansibrightmagenta bold",
@@ -442,6 +498,9 @@ def _get_multiline_input_internal(tip: str) -> str:
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+O"),
                 ("class:bt.label", " 历史复制 "),
+                ("class:bt.sep", " • "),
+                ("class:bt.key", "Ctrl+F"),
+                ("class:bt.label", " FZF文件 "),
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+T"),
                 ("class:bt.label", " 终端(!SHELL) "),
