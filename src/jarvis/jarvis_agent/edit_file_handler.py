@@ -273,12 +273,19 @@ class EditFileHandler(OutputHandler):
                     f"  - 失败的补丁: \n{p['patch']['SEARCH']}\n    错误: {p['error']}"
                     for p in failed_patches
                 ]
-                summary = (
-                    f"文件 {file_path} 修改部分成功。\n"
-                    f"成功: {successful_patches}/{patch_count}, "
-                    f"失败: {len(failed_patches)}/{patch_count}.\n"
-                    f"失败详情:\n" + "\n".join(error_details)
-                )
+                if successful_patches == 0:
+                    summary = (
+                        f"文件 {file_path} 修改失败（全部失败）。\n"
+                        f"失败: {len(failed_patches)}/{patch_count}.\n"
+                        f"失败详情:\n" + "\n".join(error_details)
+                    )
+                else:
+                    summary = (
+                        f"文件 {file_path} 修改部分成功。\n"
+                        f"成功: {successful_patches}/{patch_count}, "
+                        f"失败: {len(failed_patches)}/{patch_count}.\n"
+                        f"失败详情:\n" + "\n".join(error_details)
+                    )
                 PrettyOutput.print(summary, OutputType.ERROR)
                 return False, summary
 
