@@ -63,8 +63,6 @@ class SubCodeAgentTool:
             def _auto_confirm(tip: str, default: bool = True) -> bool:
                 return default
 
-
-
             code_agent_module.user_confirm = _auto_confirm
 
             # 读取背景信息并组合任务
@@ -101,11 +99,44 @@ class SubCodeAgentTool:
             except Exception:
                 pass
 
-            # 创建 CodeAgent（子Agent需要 summary；继承父Agent模型组如可用）
+            # 创建 CodeAgent：参数优先使用父Agent的配置（若可获取），否则使用默认
+            # 推断/继承 llm_type、need_summary、tool_group
+            llm_type = "normal"
+            tool_group = None
+            try:
+                if parent_agent is not None:
+                    llm_type = getattr(parent_agent, "llm_type", llm_type)
+                    tool_group = getattr(parent_agent, "tool_group", tool_group)
+            except Exception:
+                pass
+
+            # 依据父Agent已启用工具集，推导 append_tools（作为在 CodeAgent 基础工具上的增量）
+            append_tools = None
+            try:
+                base_tools = [
+                    "execute_script",
+                    "search_web",
+                    "ask_user",
+                    "read_code",
+                    "rewrite_file",
+                    "save_memory",
+                    "retrieve_memory",
+                    "clear_memory",
+                    "sub_code_agent",
+                ]
+                if use_tools:
+                    extras = [t for t in use_tools if t not in base_tools]
+                    append_tools = ",".join(extras) if extras else None
+            except Exception:
+                append_tools = None
+
             try:
                 code_agent = CodeAgent(
-                    need_summary=True,
+                    llm_type=llm_type,
                     model_group=model_group,
+                    need_summary=True,
+                    append_tools=append_tools,
+                    tool_group=tool_group,
                 )
             except SystemExit as se:
                 # 将底层 sys.exit 转换为工具错误，避免终止进程
