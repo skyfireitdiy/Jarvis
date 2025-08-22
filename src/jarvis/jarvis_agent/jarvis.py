@@ -112,6 +112,75 @@ def handle_share_tool_option(share_tool: bool, config_file: Optional[str]) -> bo
     return False
 
 
+def handle_interactive_config_option(
+    interactive_config: bool, config_file: Optional[str]
+) -> None:
+    """处理交互式配置选项，在当前配置基础上进行配置（支持覆盖现有设置），不中断主流程。"""
+    if not interactive_config:
+        return
+    try:
+        config_path = (
+            Path(config_file)
+            if config_file is not None
+            else Path(os.path.expanduser("~/.jarvis/config.yaml"))
+        )
+        if not config_path.exists():
+            # 无现有配置时，进入完整引导流程（该流程内会写入并退出）
+            jutils._interactive_config_setup(config_path)
+            return
+
+        # 读取现有配置
+        _, config_data = jutils._load_config_file(str(config_path))
+
+        # 复用 utils 中的交互式配置逻辑，对所有项进行询问，默认值来自现有配置
+        changed = jutils._collect_optional_config_interactively(
+            config_data, ask_all=True
+        )
+        if not changed:
+            PrettyOutput.print("没有需要更新的配置项，保持现有配置。", OutputType.INFO)
+            return
+
+        # 剔除与 schema 默认值一致的键，保持配置精简
+        try:
+            jutils._prune_defaults_with_schema(config_data)
+        except Exception:
+            pass
+
+        # 生成/保留 schema 头
+        header = ""
+        try:
+            with open(config_path, "r", encoding="utf-8") as rf:
+                first_line = rf.readline()
+                if first_line.startswith("# yaml-language-server: $schema="):
+                    header = first_line
+        except Exception:
+            header = ""
+
+        yaml_str = yaml.dump(config_data, allow_unicode=True, sort_keys=False)
+        if not header:
+            try:
+                schema_path = Path(
+                    os.path.relpath(
+                        Path(__file__).resolve().parents[1]
+                        / "jarvis_data"
+                        / "config_schema.json",
+                        start=str(config_path.parent),
+                    )
+                )
+                header = f"# yaml-language-server: $schema={schema_path}\n"
+            except Exception:
+                header = ""
+
+        with open(config_path, "w", encoding="utf-8") as wf:
+            if header:
+                wf.write(header)
+            wf.write(yaml_str)
+
+        PrettyOutput.print(f"配置已更新: {config_path}", OutputType.SUCCESS)
+    except Exception as e:
+        PrettyOutput.print(f"交互式配置失败: {e}", OutputType.ERROR)
+
+
 def preload_config_for_flags(config_file: Optional[str]) -> None:
     """预加载配置（仅用于读取功能开关），不会显示欢迎信息或影响后续 init_env。"""
     try:
@@ -418,6 +487,12 @@ def run_cli(
     share_tool: bool = typer.Option(
         False, "--share-tool", help="分享本地工具到中心工具仓库"
     ),
+    interactive_config: bool = typer.Option(
+        False,
+        "-I",
+        "--interactive-config",
+        help="启动交互式配置向导（基于当前配置补充设置）",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -437,6 +512,9 @@ def run_cli(
     # 处理工具分享
     if handle_share_tool_option(share_tool, config_file):
         return
+
+    # 交互式配置（基于现有配置补充设置）
+    handle_interactive_config_option(interactive_config, config_file)
 
     # 预加载配置（仅用于读取功能开关），不会显示欢迎信息或影响后续 init_env
     preload_config_for_flags(config_file)

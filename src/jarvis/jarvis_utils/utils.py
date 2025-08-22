@@ -844,10 +844,11 @@ def _process_env_variables(config_data: dict) -> None:
         )
 
 
-def _collect_optional_config_interactively(config_data: dict) -> bool:
+def _collect_optional_config_interactively(config_data: dict, ask_all: bool = False) -> bool:
     """
     复用的交互式配置收集逻辑：
-    - 为缺省的新功能开关/可选项逐项询问
+    - ask_all=False（默认）：仅对缺省的新功能开关/可选项逐项询问，已存在项跳过
+    - ask_all=True：对所有项进行询问，默认值取自当前配置文件，可覆盖现有设置
     - 修改传入的 config_data
     - 包含更多来自 config.py 的可选项
     返回:
@@ -858,69 +859,87 @@ def _collect_optional_config_interactively(config_data: dict) -> bool:
 
     def _ask_and_set(_key, _tip, _default, _type="bool"):
         try:
-            if _key in config_data:
+            if not ask_all and _key in config_data:
                 return False
             if _type == "bool":
-                val = get_yes_no(_tip, default=bool(_default))
-                # 选择与默认相同则不写入，避免冗余
-                if bool(val) == bool(_default):
+                cur = bool(config_data.get(_key, _default))
+                val = get_yes_no(_tip, default=cur)
+                # 与当前值相同则不写入，避免冗余
+                if bool(val) == cur:
                     return False
                 config_data[_key] = bool(val)
             else:
-                val = get_single_line_input(f"{_tip}", default=str(_default or ""))
+                cur = str(config_data.get(_key, _default or ""))
+                val = get_single_line_input(f"{_tip}", default=cur)
                 v = ("" if val is None else str(val)).strip()
-                # 输入与默认相同则不写入
-                if v == str(_default or "").strip():
+                # 输入与当前值相同则不写入
+                if v == cur:
                     return False
                 config_data[_key] = v
             return True
         except Exception:
-            # 异常时不写入默认值，保持精简
+            # 异常时不写入，保持精简
             return False
 
     def _ask_and_set_optional_str(_key, _tip, _default: str = "") -> bool:
         try:
-            if _key in config_data:
+            if not ask_all and _key in config_data:
                 return False
-            val = get_single_line_input(f"{_tip}", default=str(_default or ""))
+            cur = str(config_data.get(_key, _default or ""))
+            val = get_single_line_input(f"{_tip}", default=cur)
             if val is None:
                 return False
-            val = val.strip()
-            if val == "":
+            s = str(val).strip()
+            # 空输入表示不改变
+            if s == "":
                 return False
-            # 与默认值相同则不写入
-            if val == str(_default or "").strip():
+            if s == cur:
                 return False
-            config_data[_key] = val
+            config_data[_key] = s
             return True
         except Exception:
             return False
 
     def _ask_and_set_int(_key, _tip, _default: int) -> bool:
         try:
-            if _key in config_data:
+            if not ask_all and _key in config_data:
                 return False
-            val_str = get_single_line_input(f"{_tip}", default=str(_default))
+            cur = str(config_data.get(_key, _default))
+            val_str = get_single_line_input(f"{_tip}", default=cur)
             s = "" if val_str is None else str(val_str).strip()
-            if s == "" or s == str(_default).strip():
+            if s == "" or s == cur:
                 return False
-            config_data[_key] = int(s)
+            try:
+                v = int(s)
+            except Exception:
+                return False
+            if str(v) == cur:
+                return False
+            config_data[_key] = v
             return True
         except Exception:
             return False
 
     def _ask_and_set_list(_key, _tip) -> bool:
         try:
-            if _key in config_data:
+            if not ask_all and _key in config_data:
                 return False
-            val = get_single_line_input(f"{_tip}", default="")
+            cur_val = config_data.get(_key, [])
+            if isinstance(cur_val, list):
+                cur_display = ", ".join([str(x) for x in cur_val])
+            else:
+                cur_display = str(cur_val or "")
+            val = get_single_line_input(f"{_tip}", default=cur_display)
             if val is None:
                 return False
-            val = val.strip()
-            if not val:
+            s = str(val).strip()
+            if s == cur_display.strip():
                 return False
-            items = [s.strip() for s in val.split(",") if s.strip()]
-            if not items:
+            if not s:
+                # 输入为空表示不改变
+                return False
+            items = [x.strip() for x in s.split(",") if x.strip()]
+            if isinstance(cur_val, list) and items == cur_val:
                 return False
             config_data[_key] = items
             return True
