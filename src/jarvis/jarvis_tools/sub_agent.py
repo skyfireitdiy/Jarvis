@@ -121,9 +121,6 @@ class SubAgentTool:
             def _auto_confirm(tip: str, default: bool = True) -> bool:
                 return default
 
-            def _no_input(tip: str, print_on_empty: bool = False) -> str:
-                return ""
-
             # 创建子Agent（其余配置使用默认/全局）
             agent = Agent(
                 system_prompt=system_prompt,
