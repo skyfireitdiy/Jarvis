@@ -296,7 +296,11 @@ def get_tool_load_dirs() -> List[str]:
     返回:
         List[str]: 工具加载目录列表
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_LOAD_DIRS", [])
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_LOAD_DIRS", [])
+        if p
+    ]
 
 
 def get_methodology_dirs() -> List[str]:
@@ -306,7 +310,11 @@ def get_methodology_dirs() -> List[str]:
     返回:
         List[str]: 方法论加载目录列表
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_METHODOLOGY_DIRS", [])
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("JARVIS_METHODOLOGY_DIRS", [])
+        if p
+    ]
 
 
 def get_agent_definition_dirs() -> List[str]:
@@ -316,7 +324,11 @@ def get_agent_definition_dirs() -> List[str]:
     返回:
         List[str]: agent 定义加载目录列表
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_AGENT_DEFINITION_DIRS", [])
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("JARVIS_AGENT_DEFINITION_DIRS", [])
+        if p
+    ]
 
 
 def get_multi_agent_dirs() -> List[str]:
@@ -326,7 +338,11 @@ def get_multi_agent_dirs() -> List[str]:
     返回:
         List[str]: multi_agent 加载目录列表
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_MULTI_AGENT_DIRS", [])
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("JARVIS_MULTI_AGENT_DIRS", [])
+        if p
+    ]
 
 
 def get_roles_dirs() -> List[str]:
@@ -336,7 +352,11 @@ def get_roles_dirs() -> List[str]:
     返回:
         List[str]: roles 加载目录列表
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ROLES_DIRS", [])
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("JARVIS_ROLES_DIRS", [])
+        if p
+    ]
 
 
 def get_central_methodology_repo() -> str:

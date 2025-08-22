@@ -199,14 +199,28 @@ def handle_builtin_config_selector(
                 try:
                     if cat == "agent":
                         search_dirs.extend(
-                            [Path(p) for p in get_agent_definition_dirs() if p]
+                            [
+                                Path(os.path.expanduser(os.path.expandvars(str(p))))
+                                for p in get_agent_definition_dirs()
+                                if p
+                            ]
                         )
                     elif cat == "multi_agent":
                         search_dirs.extend(
-                            [Path(p) for p in get_multi_agent_dirs() if p]
+                            [
+                                Path(os.path.expanduser(os.path.expandvars(str(p))))
+                                for p in get_multi_agent_dirs()
+                                if p
+                            ]
                         )
                     elif cat == "roles":
-                        search_dirs.extend([Path(p) for p in get_roles_dirs() if p])
+                        search_dirs.extend(
+                            [
+                                Path(os.path.expanduser(os.path.expandvars(str(p))))
+                                for p in get_roles_dirs()
+                                if p
+                            ]
+                        )
                 except Exception:
                     # 忽略配置读取异常
                     pass
