@@ -148,12 +148,13 @@ class FileSearchReplaceTool:
                             content = f.read()
                             original_content = content
 
-
                     success, temp_content = EditFileHandler._fast_edit(
                         file_path, changes
                     )
                     if not success:
-                        PrettyOutput.print(f"文件 {file_path} 处理失败", OutputType.ERROR)
+                        PrettyOutput.print(
+                            f"文件 {file_path} 处理失败", OutputType.ERROR
+                        )
                         file_results.append(
                             {
                                 "file": file_path,
@@ -163,8 +164,6 @@ class FileSearchReplaceTool:
                             }
                         )
                         continue
-
-
 
                     # 只有当所有替换操作都成功时，才写回文件
                     if success and (

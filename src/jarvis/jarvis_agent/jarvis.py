@@ -82,6 +82,7 @@ def print_commands_overview() -> None:
         # 静默忽略渲染异常，避免影响主流程
         pass
 
+
 def handle_edit_option(edit: bool, config_file: Optional[str]) -> bool:
     """处理配置文件编辑选项，返回是否已处理并需提前结束。"""
     if edit:

@@ -594,7 +594,9 @@ class Agent:
         """
         # 在清理历史之前，提示用户保存重要记忆
         if self.force_save_memory:
-            PrettyOutput.print("对话历史即将被总结和清理，请先保存重要信息...", OutputType.INFO)
+            PrettyOutput.print(
+                "对话历史即将被总结和清理，请先保存重要信息...", OutputType.INFO
+            )
             self.memory_manager.prompt_memory_save()
 
         if self._should_use_file_upload():
@@ -824,7 +826,9 @@ class Agent:
             return None
 
         set_interrupt(False)
-        user_input = self._multiline_input("模型交互期间被中断，请输入用户干预信息：", False)
+        user_input = self._multiline_input(
+            "模型交互期间被中断，请输入用户干预信息：", False
+        )
 
         self.run_input_handlers_next_turn = True
 
@@ -849,7 +853,9 @@ class Agent:
         返回:
             str: "continue" 或 "complete"
         """
-        user_input = self._multiline_input(f"{self.name}: 请输入，或输入空行来结束当前任务：", False)
+        user_input = self._multiline_input(
+            f"{self.name}: 请输入，或输入空行来结束当前任务：", False
+        )
 
         if user_input:
             self.session.prompt = user_input

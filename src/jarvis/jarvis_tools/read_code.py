@@ -115,7 +115,6 @@ class ReadCodeTool:
                 f"{numbered_content}\n\n"
             )
 
-
             if agent:
                 files = agent.get_user_data("files")
                 if files:

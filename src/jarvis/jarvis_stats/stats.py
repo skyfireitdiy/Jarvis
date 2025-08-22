@@ -116,7 +116,9 @@ class StatsManager:
         info = storage.get_metric_info(metric_name)
         if not info or not info.get("group"):
             try:
-                grp = storage.resolve_metric_group(metric_name)  # 触发一次分组解析与回填
+                grp = storage.resolve_metric_group(
+                    metric_name
+                )  # 触发一次分组解析与回填
                 if grp:
                     info = storage.get_metric_info(metric_name)
             except Exception:
@@ -313,10 +315,10 @@ class StatsManager:
     def remove_metric(metric_name: str) -> bool:
         """
         删除指定的指标及其所有数据
-        
+
         Args:
             metric_name: 要删除的指标名称
-            
+
         Returns:
             True 如果成功删除，False 如果指标不存在
         """
@@ -359,15 +361,15 @@ class StatsManager:
         for metric in metrics:
             # 获取该指标的记录
             records = storage.get_metrics(metric, start_time, end_time, tags)
-            
+
             # 如果指定了标签过滤，但没有匹配的记录，跳过该指标
             if tags and len(records) == 0:
                 continue
-            
+
             info = storage.get_metric_info(metric)
             unit = "-"
             last_updated = "-"
-            
+
             if info:
                 unit = info.get("unit", "-")
                 last_updated = info.get("last_updated", "-")
@@ -440,7 +442,9 @@ class StatsManager:
         )
 
         if not aggregated:
-            PrettyOutput.print(f"没有找到指标 '{metric_name}' 的数据", OutputType.WARNING)
+            PrettyOutput.print(
+                f"没有找到指标 '{metric_name}' 的数据", OutputType.WARNING
+            )
             return
 
         # 获取指标信息
@@ -550,7 +554,9 @@ class StatsManager:
         )
 
         if not aggregated:
-            PrettyOutput.print(f"没有找到指标 '{metric_name}' 的数据", OutputType.WARNING)
+            PrettyOutput.print(
+                f"没有找到指标 '{metric_name}' 的数据", OutputType.WARNING
+            )
             return
 
         # 获取指标信息

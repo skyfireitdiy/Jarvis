@@ -55,9 +55,10 @@ class EditFileHandler(OutputHandler):
         patches = self._parse_patches(response)
         if not patches:
             return False, "未找到有效的文件编辑指令"
-        
+
         # 记录 edit_file 工具调用统计
         from jarvis.jarvis_stats.stats import StatsManager
+
         StatsManager.increment("edit_file", group="tool")
 
         results = []
@@ -67,7 +68,6 @@ class EditFileHandler(OutputHandler):
             file_patches = [
                 {"SEARCH": diff["SEARCH"], "REPLACE": diff["REPLACE"]} for diff in diffs
             ]
-
 
             success, result = self._fast_edit(file_path, file_patches)
 
@@ -288,7 +288,6 @@ class EditFileHandler(OutputHandler):
                     )
                 PrettyOutput.print(summary, OutputType.ERROR)
                 return False, summary
-
 
             return True, modified_content
 

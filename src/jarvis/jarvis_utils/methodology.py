@@ -208,7 +208,9 @@ def load_methodology(
         if not methodologies:
             PrettyOutput.print("没有找到方法论文件", OutputType.WARNING)
             return ""
-        PrettyOutput.print(f"加载方法论文件完成 (共 {len(methodologies)} 个)", OutputType.SUCCESS)
+        PrettyOutput.print(
+            f"加载方法论文件完成 (共 {len(methodologies)} 个)", OutputType.SUCCESS
+        )
 
         if platform_name:
             platform = PlatformRegistry().create_platform(platform_name)

@@ -194,7 +194,9 @@ class KimiModel(BasePlatform):
         uploaded_files = []
         for index, file_path in enumerate(file_list, 1):
             file_name = os.path.basename(file_path)
-            PrettyOutput.print(f"处理文件 [{index}/{len(file_list)}]: {file_name}", OutputType.INFO)
+            PrettyOutput.print(
+                f"处理文件 [{index}/{len(file_list)}]: {file_name}", OutputType.INFO
+            )
             try:
                 mime_type, _ = mimetypes.guess_type(file_path)
                 action = (
@@ -214,22 +216,32 @@ class KimiModel(BasePlatform):
 
                     # 只有文件需要解析
                     if action == "file":
-                        PrettyOutput.print(f"等待文件解析: {file_name}", OutputType.INFO)
+                        PrettyOutput.print(
+                            f"等待文件解析: {file_name}", OutputType.INFO
+                        )
                         if self._wait_for_parse(file_info["id"]):
                             uploaded_files.append(file_info)
-                            PrettyOutput.print(f"文件处理完成: {file_name}", OutputType.SUCCESS)
+                            PrettyOutput.print(
+                                f"文件处理完成: {file_name}", OutputType.SUCCESS
+                            )
                         else:
-                            PrettyOutput.print(f"文件解析失败: {file_name}", OutputType.ERROR)
+                            PrettyOutput.print(
+                                f"文件解析失败: {file_name}", OutputType.ERROR
+                            )
                             return False
                     else:
                         uploaded_files.append(file_info)
-                        PrettyOutput.print(f"图片处理完成: {file_name}", OutputType.SUCCESS)
+                        PrettyOutput.print(
+                            f"图片处理完成: {file_name}", OutputType.SUCCESS
+                        )
                 else:
                     PrettyOutput.print(f"文件上传失败: {file_name}", OutputType.ERROR)
                     return False
 
             except Exception as e:
-                PrettyOutput.print(f"处理文件出错 {file_path}: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(
+                    f"处理文件出错 {file_path}: {str(e)}", OutputType.ERROR
+                )
                 return False
 
         self.uploaded_files = uploaded_files

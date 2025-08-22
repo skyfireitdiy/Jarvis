@@ -165,7 +165,9 @@ class ShareManager(ABC):
     def select_resources(self, resources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """让用户选择要分享的资源"""
         # 显示可选的资源
-        resource_list = [f"\n可分享的{self.get_resource_type()}（已排除中心仓库中已有的）："]
+        resource_list = [
+            f"\n可分享的{self.get_resource_type()}（已排除中心仓库中已有的）："
+        ]
         for i, resource in enumerate(resources, 1):
             resource_list.append(f"[{i}] {self.format_resource_display(resource)}")
 

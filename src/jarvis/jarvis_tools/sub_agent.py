@@ -36,7 +36,7 @@ class SubAgentTool:
             "background": {
                 "type": "string",
                 "description": "任务背景与已知信息（可选，将与任务一并提供给子Agent）",
-            }
+            },
         },
         "required": ["task"],
     }
@@ -60,11 +60,15 @@ class SubAgentTool:
 
             # 读取背景信息并组合任务
             background: str = str(args.get("background", "")).strip()
-            enhanced_task = f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
+            enhanced_task = (
+                f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
+            )
 
             # 读取背景信息并组合任务
             background: str = str(args.get("background", "")).strip()
-            enhanced_task = f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
+            enhanced_task = (
+                f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
+            )
 
             # 继承父Agent的运行参数（用于覆盖默认值）；若无父Agent则使用默认/全局配置
             parent_agent = args.get("agent")
@@ -72,6 +76,7 @@ class SubAgentTool:
             if parent_agent is None:
                 try:
                     from jarvis.jarvis_utils import globals as G  # 延迟导入避免循环
+
                     curr = getattr(G, "current_agent_name", "")
                     if curr:
                         parent_agent = getattr(G, "global_agents", {}).get(curr)
@@ -103,7 +108,9 @@ class SubAgentTool:
                         model_group = getattr(parent_agent.model, "model_group", None)
                     # 继承开关类参数
                     summary_prompt = getattr(parent_agent, "summary_prompt", None)
-                    execute_tool_confirm = getattr(parent_agent, "execute_tool_confirm", None)
+                    execute_tool_confirm = getattr(
+                        parent_agent, "execute_tool_confirm", None
+                    )
                     use_methodology = getattr(parent_agent, "use_methodology", None)
                     use_analysis = getattr(parent_agent, "use_analysis", None)
                     force_save_memory = getattr(parent_agent, "force_save_memory", None)
@@ -145,7 +152,11 @@ class SubAgentTool:
 
             # 同步父Agent的模型名称与工具使用集（若可用）
             try:
-                if parent_agent is not None and getattr(parent_agent, "model", None) and getattr(agent, "model", None):
+                if (
+                    parent_agent is not None
+                    and getattr(parent_agent, "model", None)
+                    and getattr(agent, "model", None)
+                ):
                     try:
                         model_name = parent_agent.model.name()  # type: ignore[attr-defined]
                         if model_name:
@@ -179,4 +190,8 @@ class SubAgentTool:
             }
 
         except Exception as e:
-            return {"success": False, "stdout": "", "stderr": f"执行子任务失败: {str(e)}"}
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"执行子任务失败: {str(e)}",
+            }

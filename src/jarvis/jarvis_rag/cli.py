@@ -88,7 +88,9 @@ def _create_custom_llm(platform_name: str, model_name: str) -> Optional[LLMInter
         registry = PlatformRegistry.get_global_platform_registry()
         platform_instance = registry.create_platform(platform_name)
         if not platform_instance:
-            PrettyOutput.print(f"错误: 平台 '{platform_name}' 未找到。", OutputType.ERROR)
+            PrettyOutput.print(
+                f"错误: 平台 '{platform_name}' 未找到。", OutputType.ERROR
+            )
             return None
         platform_instance.set_model_name(model_name)
         platform_instance.set_suppress_output(True)
@@ -118,10 +120,14 @@ def _load_ragignore_spec() -> Tuple[Optional[pathspec.PathSpec], Optional[Path]]
             with open(ignore_file_to_use, "r", encoding="utf-8") as f:
                 patterns = f.read().splitlines()
             spec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
-            PrettyOutput.print(f"加载忽略规则: {ignore_file_to_use}", OutputType.SUCCESS)
+            PrettyOutput.print(
+                f"加载忽略规则: {ignore_file_to_use}", OutputType.SUCCESS
+            )
             return spec, project_root_path
         except Exception as e:
-            PrettyOutput.print(f"加载 {ignore_file_to_use.name} 文件失败: {e}", OutputType.WARNING)
+            PrettyOutput.print(
+                f"加载 {ignore_file_to_use.name} 文件失败: {e}", OutputType.WARNING
+            )
 
     return None, None
 
@@ -147,7 +153,9 @@ def add_documents(
         "-e",
         help="嵌入模型的名称。覆盖全局配置。",
     ),
-    db_path: Optional[Path] = typer.Option(None, "--db-path", help="向量数据库的路径。覆盖全局配置。"),
+    db_path: Optional[Path] = typer.Option(
+        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
+    ),
     batch_size: int = typer.Option(
         500,
         "--batch-size",
@@ -178,7 +186,9 @@ def add_documents(
                 if is_likely_text_file(path):
                     files_to_process.add(path)
                 else:
-                    PrettyOutput.print(f"跳过可能的二进制文件: {path}", OutputType.WARNING)
+                    PrettyOutput.print(
+                        f"跳过可能的二进制文件: {path}", OutputType.WARNING
+                    )
 
     if not files_to_process:
         PrettyOutput.print("在指定路径中未找到任何文本文件。", OutputType.WARNING)
@@ -202,14 +212,20 @@ def add_documents(
 
         ignored_count = initial_count - len(retained_files)
         if ignored_count > 0:
-            PrettyOutput.print(f"根据 .ragignore 规则过滤掉 {ignored_count} 个文件。", OutputType.INFO)
+            PrettyOutput.print(
+                f"根据 .ragignore 规则过滤掉 {ignored_count} 个文件。", OutputType.INFO
+            )
         files_to_process = retained_files
 
     if not files_to_process:
-        PrettyOutput.print("所有找到的文本文件都被忽略规则过滤掉了。", OutputType.WARNING)
+        PrettyOutput.print(
+            "所有找到的文本文件都被忽略规则过滤掉了。", OutputType.WARNING
+        )
         return
 
-    PrettyOutput.print(f"发现 {len(files_to_process)} 个独立文件待处理。", OutputType.INFO)
+    PrettyOutput.print(
+        f"发现 {len(files_to_process)} 个独立文件待处理。", OutputType.INFO
+    )
 
     try:
         pipeline = JarvisRAGPipeline(
@@ -233,23 +249,32 @@ def add_documents(
                     loader = TextLoader(str(file_path), encoding="utf-8")
 
                 docs_batch.extend(loader.load())
-                PrettyOutput.print(f"已加载: {file_path} (文件 {i + 1}/{total_files})", OutputType.INFO)
+                PrettyOutput.print(
+                    f"已加载: {file_path} (文件 {i + 1}/{total_files})", OutputType.INFO
+                )
             except Exception as e:
                 PrettyOutput.print(f"加载失败 {file_path}: {e}", OutputType.WARNING)
 
             # 当批处理已满或是最后一个文件时处理批处理
             if docs_batch and (len(docs_batch) >= batch_size or (i + 1) == total_files):
-                PrettyOutput.print(f"正在处理批次，包含 {len(docs_batch)} 个文档...", OutputType.INFO)
+                PrettyOutput.print(
+                    f"正在处理批次，包含 {len(docs_batch)} 个文档...", OutputType.INFO
+                )
                 pipeline.add_documents(docs_batch)
                 total_docs_added += len(docs_batch)
-                PrettyOutput.print(f"成功添加 {len(docs_batch)} 个文档。", OutputType.SUCCESS)
+                PrettyOutput.print(
+                    f"成功添加 {len(docs_batch)} 个文档。", OutputType.SUCCESS
+                )
                 docs_batch = []  # 清空批处理
 
         if total_docs_added == 0:
             PrettyOutput.print("未能成功加载任何文档。", OutputType.ERROR)
             raise typer.Exit(code=1)
 
-        PrettyOutput.print(f"成功将 {total_docs_added} 个文档的内容添加至集合 '{collection_name}'。", OutputType.SUCCESS)
+        PrettyOutput.print(
+            f"成功将 {total_docs_added} 个文档的内容添加至集合 '{collection_name}'。",
+            OutputType.SUCCESS,
+        )
 
     except Exception as e:
         PrettyOutput.print(f"发生严重错误: {e}", OutputType.ERROR)
@@ -264,7 +289,9 @@ def list_documents(
         "-c",
         help="向量数据库中集合的名称。",
     ),
-    db_path: Optional[Path] = typer.Option(None, "--db-path", help="向量数据库的路径。覆盖全局配置。"),
+    db_path: Optional[Path] = typer.Option(
+        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
+    ),
 ):
     """列出指定集合中的所有唯一文档。"""
     try:
@@ -289,10 +316,15 @@ def list_documents(
                     sources.add(source)
 
         if not sources:
-            PrettyOutput.print("知识库中没有找到任何带有源信息的文档。", OutputType.INFO)
+            PrettyOutput.print(
+                "知识库中没有找到任何带有源信息的文档。", OutputType.INFO
+            )
             return
 
-        PrettyOutput.print(f"知识库 '{collection_name}' 中共有 {len(sources)} 个独立文档:", OutputType.INFO)
+        PrettyOutput.print(
+            f"知识库 '{collection_name}' 中共有 {len(sources)} 个独立文档:",
+            OutputType.INFO,
+        )
         for i, source in enumerate(sorted(list(sources)), 1):
             PrettyOutput.print(f"  {i}. {source}", OutputType.INFO)
 
@@ -316,7 +348,9 @@ def retrieve(
         "-e",
         help="嵌入模型的名称。覆盖全局配置。",
     ),
-    db_path: Optional[Path] = typer.Option(None, "--db-path", help="向量数据库的路径。覆盖全局配置。"),
+    db_path: Optional[Path] = typer.Option(
+        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
+    ),
     n_results: int = typer.Option(5, "--top-n", help="要检索的文档数量。"),
 ):
     """仅从RAG知识库检索文档并打印结果。"""
@@ -341,16 +375,16 @@ def retrieve(
             PrettyOutput.print("未找到相关文档。", OutputType.INFO)
             return
 
-        PrettyOutput.print(f"成功检索到 {len(retrieved_docs)} 个文档:", OutputType.SUCCESS)
+        PrettyOutput.print(
+            f"成功检索到 {len(retrieved_docs)} 个文档:", OutputType.SUCCESS
+        )
         from jarvis.jarvis_utils.globals import console
 
         for i, doc in enumerate(retrieved_docs, 1):
             source = doc.metadata.get("source", "未知来源")
             content = doc.page_content
             panel_title = f"文档 {i} | 来源: {source}"
-            console.print(
-                f"\n[bold magenta]{panel_title}[/bold magenta]"
-            )
+            console.print(f"\n[bold magenta]{panel_title}[/bold magenta]")
             console.print(Markdown(f"```\n{content}\n```"))
 
     except Exception as e:
@@ -373,7 +407,9 @@ def query(
         "-e",
         help="嵌入模型的名称。覆盖全局配置。",
     ),
-    db_path: Optional[Path] = typer.Option(None, "--db-path", help="向量数据库的路径。覆盖全局配置。"),
+    db_path: Optional[Path] = typer.Option(
+        None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
+    ),
     platform: Optional[str] = typer.Option(
         None,
         "--platform",
@@ -436,7 +472,10 @@ except ImportError:
 
 def _check_rag_dependencies():
     if not _RAG_INSTALLED:
-        PrettyOutput.print("RAG依赖项未安装。请运行 'pip install \"jarvis-ai-assistant[rag]\"' 来使用此命令。", OutputType.ERROR)
+        PrettyOutput.print(
+            "RAG依赖项未安装。请运行 'pip install \"jarvis-ai-assistant[rag]\"' 来使用此命令。",
+            OutputType.ERROR,
+        )
         raise typer.Exit(code=1)
 
 

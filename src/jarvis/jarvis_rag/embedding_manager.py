@@ -24,7 +24,9 @@ class EmbeddingManager:
         """
         self.model_name = model_name
 
-        PrettyOutput.print(f"初始化嵌入管理器, 模型: '{self.model_name}'...", OutputType.INFO)
+        PrettyOutput.print(
+            f"初始化嵌入管理器, 模型: '{self.model_name}'...", OutputType.INFO
+        )
 
         # 缓存的salt是模型名称，以防止冲突
         self.cache = EmbeddingCache(cache_dir=cache_dir, salt=self.model_name)
@@ -43,8 +45,13 @@ class EmbeddingManager:
                 show_progress=True,
             )
         except Exception as e:
-            PrettyOutput.print(f"加载嵌入模型 '{self.model_name}' 时出错: {e}", OutputType.ERROR)
-            PrettyOutput.print("请确保您已安装 'sentence_transformers' 和 'torch'。", OutputType.WARNING)
+            PrettyOutput.print(
+                f"加载嵌入模型 '{self.model_name}' 时出错: {e}", OutputType.ERROR
+            )
+            PrettyOutput.print(
+                "请确保您已安装 'sentence_transformers' 和 'torch'。",
+                OutputType.WARNING,
+            )
             raise
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:

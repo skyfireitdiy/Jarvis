@@ -84,7 +84,9 @@ class BasePlatform(ABC):
             )  # 留出一些余量
             min_chunk_size = get_max_input_token_count(self.model_group) - 2048
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
-            PrettyOutput.print(f"长上下文，分批提交，共{len(inputs)}部分...", OutputType.INFO)
+            PrettyOutput.print(
+                f"长上下文，分批提交，共{len(inputs)}部分...", OutputType.INFO
+            )
             prefix_prompt = f"""
             我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
             """
@@ -95,7 +97,6 @@ class BasePlatform(ABC):
             for input in inputs:
                 submit_count += 1
                 length += len(input)
-
 
                 response += "\n"
                 for trunk in while_true(
@@ -108,7 +109,6 @@ class BasePlatform(ABC):
                     5,
                 ):
                     response += trunk
-
 
             PrettyOutput.print("提交完成", OutputType.SUCCESS)
             response += "\n" + while_true(
@@ -135,7 +135,9 @@ class BasePlatform(ABC):
                         for s in self.chat(message):
                             response += s
                             text_content.append(s, style="bright_white")
-                            panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                            panel.subtitle = (
+                                "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                            )
                             live.update(panel)
                             if is_immediate_abort() and get_interrupt():
                                 return response
@@ -147,7 +149,10 @@ class BasePlatform(ABC):
                         live.update(panel)
                 else:
                     # Print a clear prefix line before streaming model output (non-pretty mode)
-                    console.print(f"🤖 模型输出 - {self.name()}  (按 Ctrl+C 中断)", soft_wrap=False)
+                    console.print(
+                        f"🤖 模型输出 - {self.name()}  (按 Ctrl+C 中断)",
+                        soft_wrap=False,
+                    )
                     for s in self.chat(message):
                         console.print(s, end="")
                         response += s

@@ -127,7 +127,9 @@ class VirtualTTYTool:
         try:
             if action == "launch":
                 if args.get("keys", "") != "":
-                    PrettyOutput.print("启动虚拟终端时，不能同时指定 keys 参数", OutputType.ERROR)
+                    PrettyOutput.print(
+                        "启动虚拟终端时，不能同时指定 keys 参数", OutputType.ERROR
+                    )
                     return {
                         "success": False,
                         "stdout": "",
@@ -136,7 +138,9 @@ class VirtualTTYTool:
 
                 result = self._launch_tty(agent, tty_id)
                 if not result["success"]:
-                    PrettyOutput.print(f"启动虚拟终端 [{tty_id}] 失败", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"启动虚拟终端 [{tty_id}] 失败", OutputType.ERROR
+                    )
                 return result
             elif action == "send_keys":
                 keys = args.get("keys", "").strip()
@@ -145,26 +149,34 @@ class VirtualTTYTool:
 
                 result = self._input_command(agent, tty_id, keys, timeout, add_enter)
                 if not result["success"]:
-                    PrettyOutput.print(f"发送按键序列到终端 [{tty_id}] 失败", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"发送按键序列到终端 [{tty_id}] 失败", OutputType.ERROR
+                    )
                 return result
             elif action == "output":
                 timeout = args.get("timeout", 5.0)  # 默认5秒超时
 
                 result = self._get_output(agent, tty_id, timeout)
                 if not result["success"]:
-                    PrettyOutput.print(f"获取终端 [{tty_id}] 输出失败", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"获取终端 [{tty_id}] 输出失败", OutputType.ERROR
+                    )
                 return result
             elif action == "close":
 
                 result = self._close_tty(agent, tty_id)
                 if not result["success"]:
-                    PrettyOutput.print(f"关闭虚拟终端 [{tty_id}] 失败", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"关闭虚拟终端 [{tty_id}] 失败", OutputType.ERROR
+                    )
                 return result
             elif action == "get_screen":
 
                 result = self._get_screen(agent, tty_id)
                 if not result["success"]:
-                    PrettyOutput.print(f"获取终端 [{tty_id}] 屏幕内容失败", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"获取终端 [{tty_id}] 屏幕内容失败", OutputType.ERROR
+                    )
                 return result
             elif action == "list":
 
@@ -230,8 +242,6 @@ class VirtualTTYTool:
                     except BlockingIOError:
                         continue
 
-
-
                 return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
@@ -296,8 +306,6 @@ class VirtualTTYTool:
                     output += line
                 except _queue.Empty:
                     continue
-
-
 
             return {"success": True, "stdout": output, "stderr": ""}
 
@@ -668,9 +676,9 @@ class VirtualTTYTool:
                         {
                             "id": tty_id,
                             "status": status,
-                            "pid": tty_data["process"].pid
-                            if tty_data["process"]
-                            else None,
+                            "pid": (
+                                tty_data["process"].pid if tty_data["process"] else None
+                            ),
                             "shell": tty_data["shell"],
                         }
                     )

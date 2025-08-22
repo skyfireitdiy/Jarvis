@@ -108,8 +108,6 @@ def start_service(
             OutputType.INFO,
         )
 
-
-
     # Platform and model cache
     platform_instances: Dict[str, Any] = {}
 
@@ -178,7 +176,10 @@ def start_service(
                                 }
                             )
             except Exception as exc:
-                PrettyOutput.print(f"Error getting models for {default_platform}: {str(exc)}", OutputType.ERROR)
+                PrettyOutput.print(
+                    f"Error getting models for {default_platform}: {str(exc)}",
+                    OutputType.ERROR,
+                )
 
         # Return model list
         return {"object": "list", "data": model_list}

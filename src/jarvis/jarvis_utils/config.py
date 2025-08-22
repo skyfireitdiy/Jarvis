@@ -392,7 +392,7 @@ def is_print_prompt() -> bool:
 def is_print_error_traceback() -> bool:
     """
     获取是否在错误输出时打印回溯调用链。
-    
+
     返回：
         bool: 如果打印回溯则返回True，默认为False（不打印）
     """

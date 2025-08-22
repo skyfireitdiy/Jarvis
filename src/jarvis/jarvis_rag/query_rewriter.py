@@ -58,7 +58,9 @@ English version of the query
         """
         prompt = self.rewrite_prompt_template.format(query=query)
         PrettyOutput.print(
-            "正在将原始查询重写为多个搜索查询...", output_type=OutputType.INFO, timestamp=False
+            "正在将原始查询重写为多个搜索查询...",
+            output_type=OutputType.INFO,
+            timestamp=False,
         )
 
         import re

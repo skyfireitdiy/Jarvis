@@ -308,7 +308,10 @@ class TongyiPlatform(BasePlatform):
                     )
 
                     if response.status_code != 200:
-                        PrettyOutput.print(f"上传失败 {file_name}: HTTP {response.status_code}", OutputType.ERROR)
+                        PrettyOutput.print(
+                            f"上传失败 {file_name}: HTTP {response.status_code}",
+                            OutputType.ERROR,
+                        )
                         return False
 
                     # Determine file type based on extension
@@ -340,18 +343,26 @@ class TongyiPlatform(BasePlatform):
 
                     response = http.post(url, headers=headers, json=payload)
                     if response.status_code != 200:
-                        PrettyOutput.print(f"获取下载链接失败: HTTP {response.status_code}", OutputType.ERROR)
+                        PrettyOutput.print(
+                            f"获取下载链接失败: HTTP {response.status_code}",
+                            OutputType.ERROR,
+                        )
                         return False
 
                     result = response.json()
                     if not result.get("success"):
-                        PrettyOutput.print(f"获取下载链接失败: {result.get('errorMsg')}", OutputType.ERROR)
+                        PrettyOutput.print(
+                            f"获取下载链接失败: {result.get('errorMsg')}",
+                            OutputType.ERROR,
+                        )
                         return False
 
                     # Add files to chat
                     self.uploaded_file_info = result.get("data", {}).get("results", [])
                     for file_info in self.uploaded_file_info:
-                        PrettyOutput.print(f"添加文件到对话: {file_name}", OutputType.INFO)
+                        PrettyOutput.print(
+                            f"添加文件到对话: {file_name}", OutputType.INFO
+                        )
                         add_url = "https://api.tongyi.com/assistant/api/chat/file/add"
                         add_payload = {
                             "workSource": "chat",
@@ -394,7 +405,9 @@ class TongyiPlatform(BasePlatform):
                     time.sleep(1)  # 短暂暂停以便用户看到成功状态
 
                 except Exception as e:
-                    PrettyOutput.print(f"上传文件 {file_name} 时出错: {str(e)}", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"上传文件 {file_name} 时出错: {str(e)}", OutputType.ERROR
+                    )
                     return False
             return True
 

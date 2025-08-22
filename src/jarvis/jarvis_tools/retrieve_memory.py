@@ -166,7 +166,6 @@ class RetrieveMemoryTool:
 
             # 打印结果摘要
 
-
             if tags:
                 pass
 

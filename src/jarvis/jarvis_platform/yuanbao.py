@@ -195,7 +195,9 @@ class YuanbaoPlatform(BasePlatform):
                 PrettyOutput.print(f"获取上传信息: {file_name}", OutputType.INFO)
                 upload_info = self._generate_upload_info(file_name)
                 if not upload_info:
-                    PrettyOutput.print(f"无法获取文件 {file_name} 的上传信息", OutputType.ERROR)
+                    PrettyOutput.print(
+                        f"无法获取文件 {file_name} 的上传信息", OutputType.ERROR
+                    )
                     return False
 
                 # 3. Upload the file to COS
@@ -224,14 +226,19 @@ class YuanbaoPlatform(BasePlatform):
                             file_metadata["width"] = img.width
                             file_metadata["height"] = img.height
                     except Exception as e:
-                        PrettyOutput.print(f"无法获取图片 {file_name} 的尺寸: {str(e)}", OutputType.WARNING)
+                        PrettyOutput.print(
+                            f"无法获取图片 {file_name} 的尺寸: {str(e)}",
+                            OutputType.WARNING,
+                        )
 
                 uploaded_files.append(file_metadata)
                 PrettyOutput.print(f"文件 {file_name} 上传成功", OutputType.SUCCESS)
                 time.sleep(3)  # 上传成功后等待3秒
 
             except Exception as e:
-                PrettyOutput.print(f"上传文件 {file_path} 时出错: {str(e)}", OutputType.ERROR)
+                PrettyOutput.print(
+                    f"上传文件 {file_path} 时出错: {str(e)}", OutputType.ERROR
+                )
                 return False
 
         self.multimedia = uploaded_files

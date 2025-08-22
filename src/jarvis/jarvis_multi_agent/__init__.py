@@ -115,9 +115,9 @@ content: |2
 
         if name != self.main_agent_name and self.original_question:
             system_prompt = config.get("system_prompt", "")
-            config[
-                "system_prompt"
-            ] = f"{system_prompt}\n\n# 原始问题\n{self.original_question}"
+            config["system_prompt"] = (
+                f"{system_prompt}\n\n# 原始问题\n{self.original_question}"
+            )
 
         output_handler = config.get("output_handler", [])
         if len(output_handler) == 0:

@@ -174,7 +174,6 @@ class SaveMemoryTool:
 
             # 生成总结报告
 
-
             # 构建返回结果
             output = {
                 "total": len(memories),

@@ -50,8 +50,12 @@ class SSEMcpClient(McpClient):
         self.sse_thread: Optional[threading.Thread] = None
         self.messages_endpoint: Optional[str] = None
         self.session_id: Optional[str] = None
-        self.pending_requests: Dict[str, threading.Event] = {}  # 存储等待响应的请求 {id: Event}
-        self.request_results: Dict[str, Dict[str, Any]] = {}  # 存储请求结果 {id: result}
+        self.pending_requests: Dict[str, threading.Event] = (
+            {}
+        )  # 存储等待响应的请求 {id: Event}
+        self.request_results: Dict[str, Dict[str, Any]] = (
+            {}
+        )  # 存储请求结果 {id: result}
         self.notification_handlers: Dict[str, List[Callable]] = {}
         self.event_lock = threading.Lock()
         self.request_id_counter = 0
@@ -95,7 +99,9 @@ class SSEMcpClient(McpClient):
 
             # 验证服务器响应
             if "result" not in response:
-                raise RuntimeError(f"初始化失败: {response.get('error', 'Unknown error')}")
+                raise RuntimeError(
+                    f"初始化失败: {response.get('error', 'Unknown error')}"
+                )
 
             # 发送initialized通知
             self._send_notification("notifications/initialized", {})

@@ -51,7 +51,9 @@ class ChromaRetriever:
         self.bm25_index_path = os.path.join(self.db_path, f"{collection_name}_bm25.pkl")
         self._load_or_initialize_bm25()
         # 清单文件用于检测源文件的变更/删除
-        self.manifest_path = os.path.join(self.db_path, f"{collection_name}_manifest.json")
+        self.manifest_path = os.path.join(
+            self.db_path, f"{collection_name}_manifest.json"
+        )
 
     def _load_or_initialize_bm25(self):
         """从磁盘加载BM25索引或初始化一个新索引。"""
@@ -63,7 +65,9 @@ class ChromaRetriever:
                 self.bm25_index = BM25Okapi(self.bm25_corpus)
             PrettyOutput.print("BM25 索引加载成功。", OutputType.SUCCESS)
         else:
-            PrettyOutput.print("未找到 BM25 索引，将初始化一个新的。", OutputType.WARNING)
+            PrettyOutput.print(
+                "未找到 BM25 索引，将初始化一个新的。", OutputType.WARNING
+            )
             self.bm25_corpus = []
             self.bm25_index = None
 
@@ -95,7 +99,9 @@ class ChromaRetriever:
         except Exception as e:
             PrettyOutput.print(f"保存索引清单失败: {e}", OutputType.WARNING)
 
-    def _compute_md5(self, file_path: str, chunk_size: int = 1024 * 1024) -> Optional[str]:
+    def _compute_md5(
+        self, file_path: str, chunk_size: int = 1024 * 1024
+    ) -> Optional[str]:
         """流式计算文件的MD5，避免占用过多内存。失败时返回None。"""
         try:
             md5 = hashlib.md5()
@@ -117,7 +123,10 @@ class ChromaRetriever:
             try:
                 if isinstance(src, str) and os.path.exists(src):
                     st = os.stat(src)
-                    entry = {"mtime": float(st.st_mtime), "size": int(st.st_size)}  # type: ignore[dict-item]
+                    entry: Dict[str, Any] = {
+                        "mtime": float(st.st_mtime),
+                        "size": int(st.st_size),
+                    }
                     md5sum = self._compute_md5(src)
                     if md5sum:
                         entry["md5"] = md5sum
@@ -127,7 +136,9 @@ class ChromaRetriever:
                 continue
         if updated > 0:
             self._save_manifest(manifest)
-            PrettyOutput.print(f"已更新索引清单，记录 {updated} 个源文件状态。", OutputType.INFO)
+            PrettyOutput.print(
+                f"已更新索引清单，记录 {updated} 个源文件状态。", OutputType.INFO
+            )
 
     def _detect_changed_or_deleted(self) -> Dict[str, List[str]]:
         """检测已记录的源文件是否发生变化或被删除。"""
@@ -147,14 +158,18 @@ class ChromaRetriever:
                 md5_old = info.get("md5")
                 if md5_old:
                     # 仅在mtime变化时计算md5以降低开销
-                    mtime_changed = abs(float(info.get("mtime", 0.0)) - float(st.st_mtime)) >= 1e-6
+                    mtime_changed = (
+                        abs(float(info.get("mtime", 0.0)) - float(st.st_mtime)) >= 1e-6
+                    )
                     if mtime_changed:
                         md5_new = self._compute_md5(src)
                         if not md5_new or md5_new != md5_old:
                             changed.append(src)
                 else:
                     # 没有记录md5，回退使用mtime判断
-                    mtime_changed = abs(float(info.get("mtime", 0.0)) - float(st.st_mtime)) >= 1e-6
+                    mtime_changed = (
+                        abs(float(info.get("mtime", 0.0)) - float(st.st_mtime)) >= 1e-6
+                    )
                     if mtime_changed:
                         changed.append(src)
             except Exception:
@@ -177,7 +192,9 @@ class ChromaRetriever:
             for p in changed[:5]:
                 PrettyOutput.print(f"  变更: {p}", OutputType.WARNING)
             if len(changed) > 5:
-                PrettyOutput.print(f"  ... 以及另外 {len(changed) - 5} 个文件", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"  ... 以及另外 {len(changed) - 5} 个文件", OutputType.WARNING
+                )
         if deleted:
             PrettyOutput.print(
                 f"检测到 {len(deleted)} 个已索引文件已被删除，建议清理并重新索引。",
@@ -186,7 +203,9 @@ class ChromaRetriever:
             for p in deleted[:5]:
                 PrettyOutput.print(f"  删除: {p}", OutputType.WARNING)
             if len(deleted) > 5:
-                PrettyOutput.print(f"  ... 以及另外 {len(deleted) - 5} 个文件", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"  ... 以及另外 {len(deleted) - 5} 个文件", OutputType.WARNING
+                )
         PrettyOutput.print(
             "提示：请使用 'jarvis-rag add <路径>' 重新索引相关文件，以更新向量库与BM25索引。",
             OutputType.INFO,
@@ -236,7 +255,11 @@ class ChromaRetriever:
         self.bm25_index = BM25Okapi(self.bm25_corpus)
         self._save_bm25_index()
         # 更新索引清单（用于检测源文件变更/删除）
-        source_list = [md.get("source") for md in metadatas if md and isinstance(md.get("source"), str)]
+        source_list = [
+            md.get("source")
+            for md in metadatas
+            if md and isinstance(md.get("source"), str)
+        ]
         self._update_manifest_with_sources(cast(List[str], source_list))
 
     def retrieve(
