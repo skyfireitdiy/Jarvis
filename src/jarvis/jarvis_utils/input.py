@@ -520,9 +520,14 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
                     PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
                     return
 
+                try:
+                    specials = [ot("Summary"), ot("Clear"), ot("ToolUsage"), ot("ReloadConfig"), ot("SaveSession")]
+                except Exception:
+                    specials = []
+                items = [s for s in specials if isinstance(s, str) and s.strip()] + files
                 proc = subprocess.run(
                     ["fzf", "--prompt", "Files> ", "--height", "40%", "--border"],
-                    input="\n".join(files),
+                    input="\n".join(items),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -564,6 +569,34 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
                 except Exception:
                     pass
 
+    @bindings.add("@", filter=has_focus(DEFAULT_BUFFER), eager=True)
+    def _(event):
+        """
+        使用 @ 触发 fzf（当 fzf 存在）；否则仅插入 @ 以启用内置补全
+        逻辑：
+        - 若检测到系统存在 fzf，则先插入 '@'，随后请求外层运行 fzf 并在返回后进行替换/插入
+        - 若不存在 fzf 或发生异常，则直接插入 '@'
+        """
+        try:
+            import shutil
+            buf = event.current_buffer
+            if shutil.which("fzf") is None:
+                buf.insert_text("@")
+                return
+            # 先插入 '@'，以便外层根据最后一个 '@' 进行片段替换
+            buf.insert_text("@")
+            doc = buf.document
+            text = doc.text
+            cursor = doc.cursor_position
+            payload = f"{cursor}:{base64.b64encode(text.encode('utf-8')).decode('ascii')}"
+            event.app.exit(result=FZF_REQUEST_SENTINEL_PREFIX + payload)
+            return
+        except Exception:
+            try:
+                event.current_buffer.insert_text("@")
+            except Exception:
+                pass
+
     style = PromptStyle.from_dict(
         {
             "prompt": "ansibrightmagenta bold",
@@ -593,7 +626,7 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
                 ("class:bt.key", "Ctrl+O"),
                 ("class:bt.label", " 历史复制 "),
                 ("class:bt.sep", " • "),
-                ("class:bt.key", "Ctrl+F"),
+                ("class:bt.key", "Ctrl+F/@"),
                 ("class:bt.label", " FZF文件 "),
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+T"),
@@ -705,9 +738,14 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                     if not files:
                         PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
                     else:
+                        try:
+                            specials = [ot("Summary"), ot("Clear"), ot("ToolUsage"), ot("ReloadConfig"), ot("SaveSession")]
+                        except Exception:
+                            specials = []
+                        items = [s for s in specials if isinstance(s, str) and s.strip()] + files
                         proc = subprocess.run(
                             ["fzf", "--prompt", "Files> ", "--height", "40%", "--border"],
-                            input="\n".join(files),
+                            input="\n".join(items),
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
