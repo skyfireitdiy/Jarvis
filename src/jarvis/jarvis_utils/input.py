@@ -470,104 +470,6 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
         # Append a special marker to indicate no-confirm execution in shell_input_handler
         event.app.exit(result=_gen_shell_cmd() + " # JARVIS-NOCONFIRM")
 
-    @bindings.add("c-f", filter=has_focus(DEFAULT_BUFFER), eager=True)
-    def _(event):
-        """Open fzf to select a file and insert/replace at current cursor position."""
-        selected = {"value": ""}
-        # Early exit: request outer loop to run fzf (synchronously) and prefill next prompt.
-        try:
-            doc = event.current_buffer.document
-            text = doc.text
-            cursor = doc.cursor_position
-            payload = f"{cursor}:{base64.b64encode(text.encode('utf-8')).decode('ascii')}"
-            event.app.exit(result=FZF_REQUEST_SENTINEL_PREFIX + payload)
-            return
-        except Exception:
-            pass
-
-
-        def _run_fzf():
-            try:
-                import shutil
-                import subprocess
-                import os
-
-                if not shutil.which("fzf"):
-                    PrettyOutput.print("未检测到 fzf，无法打开文件选择器。", OutputType.WARNING)
-                    return
-
-                files = []
-                try:
-                    r = subprocess.run(
-                        ["git", "ls-files"],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                    )
-                    if r.returncode == 0:
-                        files = [line for line in r.stdout.splitlines() if line.strip()]
-                except Exception:
-                    files = []
-
-                if not files:
-                    for root, _, fnames in os.walk(".", followlinks=False):
-                        for name in fnames:
-                            files.append(os.path.relpath(os.path.join(root, name), "."))
-                        if len(files) > 10000:
-                            break
-
-                if not files:
-                    PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
-                    return
-
-                try:
-                    specials = [ot("Summary"), ot("Clear"), ot("ToolUsage"), ot("ReloadConfig"), ot("SaveSession")]
-                except Exception:
-                    specials = []
-                items = [s for s in specials if isinstance(s, str) and s.strip()] + files
-                proc = subprocess.run(
-                    ["fzf", "--prompt", "Files> ", "--height", "40%", "--border"],
-                    input="\n".join(items),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-                sel_raw = proc.stdout
-                sel = sel_raw.strip()
-
-                if sel:
-                    selected["value"] = sel
-            except Exception as e:
-                PrettyOutput.print(f"文件选择失败: {e}", OutputType.ERROR)
-
-        run_in_terminal(_run_fzf)
-
-        if selected["value"]:
-            value = selected["value"]
-            # 使用“哨兵返回 + 外层预填”的方案；首选 set_document + validate_and_handle 让 prompt() 返回哨兵
-            try:
-                buf = event.current_buffer
-                doc = buf.document
-                text = doc.text
-                cursor = doc.cursor_position
-                text_before = doc.text_before_cursor
-                last_at = text_before.rfind("@")
-                if last_at != -1 and " " not in text_before[last_at + 1 :]:
-                    # 替换 @... 片段
-                    new_text = text[:last_at] + f"'{value}'" + text[cursor:]
-                else:
-                    # 普通插入
-                    new_text = text[:cursor] + f"'{value}'" + text[cursor:]
-                sentinel_payload = FZF_INSERT_SENTINEL_PREFIX + new_text
-                from prompt_toolkit.document import Document as _Doc
-                buf.set_document(_Doc(sentinel_payload, cursor_position=len(sentinel_payload)), bypass_readonly=True)  # type: ignore
-                event.current_buffer.validate_and_handle()
-            except Exception:
-                # 回退：直接通过 app.exit 返回哨兵
-                try:
-                    event.app.exit(result=FZF_INSERT_SENTINEL_PREFIX + f"'{value}'")
-                except Exception:
-                    pass
 
     @bindings.add("@", filter=has_focus(DEFAULT_BUFFER), eager=True)
     def _(event):
@@ -626,7 +528,7 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
                 ("class:bt.key", "Ctrl+O"),
                 ("class:bt.label", " 历史复制 "),
                 ("class:bt.sep", " • "),
-                ("class:bt.key", "Ctrl+F/@"),
+                ("class:bt.key", "@"),
                 ("class:bt.label", " FZF文件 "),
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+T"),
