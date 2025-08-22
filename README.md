@@ -8,7 +8,7 @@
 
 *您的智能开发和系统交互助手*
 
-[快速开始](#quick-start) • [核心功能](#core-features) • [配置说明](#configuration) • [Jarvis Book](#jarvis-book) • [技术细节](docs/technical_documentation.md) • [Wiki文档](docs/jarvis_book/1.项目介绍.md) • [贡献指南](#contributing) • [许可证](#license)
+[快速开始](#quick-start) • [核心功能](#core-features) • [配置说明](#configuration) • [Jarvis Book](#jarvis-book) • [Wiki文档](docs/jarvis_book/1.项目介绍.md) • [贡献指南](#contributing) • [许可证](#license)
 </div>
 
 ---
