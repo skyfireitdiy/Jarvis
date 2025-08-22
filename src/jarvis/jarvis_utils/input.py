@@ -416,7 +416,7 @@ def _get_multiline_input_internal(tip: str) -> str:
 
     @bindings.add("c-f", filter=has_focus(DEFAULT_BUFFER))
     def _(event):
-        """Open fzf to select a file and insert the selection at cursor."""
+        """Open fzf to select a file and insert/replace at current cursor position."""
         selected = {"value": ""}
 
         def _run_fzf():
@@ -468,7 +468,21 @@ def _get_multiline_input_internal(tip: str) -> str:
 
         run_in_terminal(_run_fzf)
         if selected["value"]:
-            event.current_buffer.insert_text(f"'{selected['value']}'")
+            buf = event.current_buffer
+            # If user is in '@...' context (no space since last '@'), replace it like a completion would.
+            try:
+                text_before = buf.document.text_before_cursor
+                last_at = text_before.rfind("@")
+                if last_at != -1 and " " not in text_before[last_at + 1 :]:
+                    # Delete from the '@' to cursor, then insert the selected path (quoted)
+                    buf.delete_before_cursor(count=len(text_before) - last_at)
+                    buf.insert_text(f"'{selected['value']}'")
+                else:
+                    # Otherwise, just insert at cursor
+                    buf.insert_text(f"'{selected['value']}'")
+            except Exception:
+                # Fallback to simple insert on any unexpected error
+                event.current_buffer.insert_text(f"'{selected['value']}'")
 
     style = PromptStyle.from_dict(
         {
