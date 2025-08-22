@@ -176,6 +176,21 @@ origin_agent_system_prompt = f"""
 4.  **完成**: 验证任务是否达成目标，并进行总结。
 </workflow>
 
+<sub_agents_guide>
+# 子任务工具使用建议
+- 使用 sub_code_agent（代码子Agent）当：
+  - 需要在当前任务下并行推进较大且相对独立的代码改造
+  - 涉及多文件/多模块的大范围变更，或需要较长的工具调用链
+  - 需要隔离上下文以避免污染当前对话（如探索性改动、PoC）
+  - 需要专注于单一代码子问题，阶段性产出可复用的结果
+- 使用 sub_agent（通用子Agent）当：
+  - 子任务不是以代码改造为主（如调研、方案撰写、评审总结、用例设计、文档生成等）
+  - 只是需要短期分流一个轻量的辅助性子任务
+说明：
+- 两者仅需参数 task（可选 background 提供上下文），完成后返回结果给父Agent
+- 子Agent将自动完成并生成总结，请在上层根据返回结果继续编排
+</sub_agents_guide>
+
 <system_info>
 # 系统信息
 - OS: {platform.platform()} {platform.version()}
