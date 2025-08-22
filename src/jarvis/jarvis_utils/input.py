@@ -75,7 +75,7 @@ def _calc_prompt_rows(prev_text: str) -> int:
         cols = os.get_terminal_size().columns
     except Exception:
         cols = 80
-    prefix = "👤 ❯ "
+    prefix = "👤 > "
     prefix_w = _display_width(prefix)
 
     if prev_text is None:
@@ -127,7 +127,7 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     """
     session: PromptSession = PromptSession(history=None)
     style = PromptStyle.from_dict({"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"})
-    prompt = FormattedText([("class:prompt", f"👤 ❯ {tip}")])
+    prompt = FormattedText([("class:prompt", f"👤 > {tip}")])
     return session.prompt(prompt, default=default, style=style)
 
 
@@ -649,7 +649,7 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
     )
 
     # Tip is shown in bottom toolbar; avoid extra print
-    prompt = FormattedText([("class:prompt", "👤 ❯ ")])
+    prompt = FormattedText([("class:prompt", "👤 > ")])
 
     def _pre_run():
         try:
