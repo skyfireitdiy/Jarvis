@@ -99,29 +99,7 @@ def _calc_prompt_rows(prev_text: str) -> int:
     return max(1, total_rows)
 
 
-def _calc_toolbar_rows(tip: str) -> int:
-    """
-    Estimate how many rows the bottom toolbar occupies (may soft-wrap).
-    """
-    try:
-        cols = os.get_terminal_size().columns
-    except Exception:
-        cols = 80
-    # Construct a plain-text version of toolbar content
-    parts = [
-        " ", tip, " ",
-        " • ", "快捷键: ", "@", " 文件补全 ",
-        " • ", "Tab", " 选择 ",
-        " • ", "Ctrl+J", " 确认 ",
-        " • ", "Ctrl+O", " 历史复制 ",
-        " • ", "Ctrl+F", " FZF文件 ",
-        " • ", "Ctrl+T", " 终端(!SHELL) ",
-        " • ", "Ctrl+C/D", " 取消 ",
-    ]
-    toolbar_text = "".join(parts)
-    width = _display_width(toolbar_text)
-    rows = max(1, (width + cols - 1) // cols)
-    return rows
+
 
 
 def _multiline_hint_already_shown() -> bool:
@@ -506,11 +484,7 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
             return
         except Exception:
             pass
-        # DEBUG: keybinding triggered
-        try:
-            run_in_terminal(lambda: PrettyOutput.print("DEBUG: Ctrl+F 触发", OutputType.INFO))
-        except Exception:
-            pass
+
 
         def _run_fzf():
             try:
@@ -555,29 +529,16 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
                 )
                 sel_raw = proc.stdout
                 sel = sel_raw.strip()
-                # DEBUG: fzf returned
-                try:
-                    run_in_terminal(lambda: PrettyOutput.print(f"DEBUG: fzf 返回 code={proc.returncode}, out_len={len(sel_raw)}, sel='{sel}'", OutputType.INFO))
-                except Exception:
-                    pass
+
                 if sel:
                     selected["value"] = sel
             except Exception as e:
                 PrettyOutput.print(f"文件选择失败: {e}", OutputType.ERROR)
 
         run_in_terminal(_run_fzf)
-        # DEBUG: after fzf, show current selected value
-        try:
-            run_in_terminal(lambda: PrettyOutput.print(f"DEBUG: fzf 选择结果='{selected.get('value','')}'", OutputType.INFO))
-        except Exception:
-            pass
+
         if selected["value"]:
             value = selected["value"]
-            # 进入 selected 分支
-            try:
-                run_in_terminal(lambda: PrettyOutput.print("DEBUG: 进入 selected 分支", OutputType.INFO))
-            except Exception:
-                pass
             # 使用“哨兵返回 + 外层预填”的方案；首选 set_document + validate_and_handle 让 prompt() 返回哨兵
             try:
                 buf = event.current_buffer
@@ -593,28 +554,11 @@ def _get_multiline_input_internal(tip: str, preset: str | None = None, preset_cu
                     # 普通插入
                     new_text = text[:cursor] + f"'{value}'" + text[cursor:]
                 sentinel_payload = FZF_INSERT_SENTINEL_PREFIX + new_text
-                # 调试：构造载荷
-                try:
-                    run_in_terminal(lambda: PrettyOutput.print(f"DEBUG: 构造FZF哨兵载荷 len={len(sentinel_payload)}", OutputType.INFO))
-                except Exception:
-                    pass
                 from prompt_toolkit.document import Document as _Doc
                 buf.set_document(_Doc(sentinel_payload, cursor_position=len(sentinel_payload)), bypass_readonly=True)  # type: ignore
-                try:
-                    run_in_terminal(lambda: PrettyOutput.print("DEBUG: set_document+提交 返回FZF哨兵", OutputType.INFO))
-                except Exception:
-                    pass
                 event.current_buffer.validate_and_handle()
-                try:
-                    run_in_terminal(lambda: PrettyOutput.print("DEBUG: 已调用 validate_and_handle()", OutputType.INFO))
-                except Exception:
-                    pass
             except Exception:
                 # 回退：直接通过 app.exit 返回哨兵
-                try:
-                    run_in_terminal(lambda: PrettyOutput.print("DEBUG: 回退 app.exit 返回FZF哨兵", OutputType.WARNING))
-                except Exception:
-                    pass
                 try:
                     event.app.exit(result=FZF_INSERT_SENTINEL_PREFIX + f"'{value}'")
                 except Exception:
@@ -810,10 +754,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             # 从哨兵载荷中提取新文本，作为下次进入提示的预填内容
             preset = user_input[len(FZF_INSERT_SENTINEL_PREFIX) :]
             preset_cursor = len(preset)
-            try:
-                PrettyOutput.print("DEBUG: 收到FZF哨兵，预填并重启输入", OutputType.INFO)
-            except Exception:
-                pass
+
             # 清除上一条输入行（多行安全），避免多清，保守仅按提示行估算
             try:
                 rows_total = _calc_prompt_rows(preset)
