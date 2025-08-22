@@ -705,7 +705,12 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             specials = [ot("Summary"), ot("Clear"), ot("ToolUsage"), ot("ReloadConfig"), ot("SaveSession")]
                         except Exception:
                             specials = []
-                        items = [s for s in specials if isinstance(s, str) and s.strip()] + files
+                        try:
+                            replace_map = get_replace_map()
+                            builtin_tags = [ot(tag) for tag in replace_map.keys() if isinstance(tag, str) and tag.strip()]
+                        except Exception:
+                            builtin_tags = []
+                        items = [s for s in specials if isinstance(s, str) and s.strip()] + builtin_tags + files
                         proc = subprocess.run(
                             ["fzf", "--prompt", "Files> ", "--height", "40%", "--border"],
                             input="\n".join(items),
@@ -795,7 +800,12 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             specials = [ot("Summary"), ot("Clear"), ot("ToolUsage"), ot("ReloadConfig"), ot("SaveSession")]
                         except Exception:
                             specials = []
-                        items = [s for s in specials if isinstance(s, str) and s.strip()] + files
+                        try:
+                            replace_map = get_replace_map()
+                            builtin_tags = [ot(tag) for tag in replace_map.keys() if isinstance(tag, str) and tag.strip()]
+                        except Exception:
+                            builtin_tags = []
+                        items = [s for s in specials if isinstance(s, str) and s.strip()] + builtin_tags + files
                         proc = subprocess.run(
                             ["fzf", "--prompt", "Files(all)> ", "--height", "40%", "--border"],
                             input="\n".join(items),
