@@ -29,6 +29,9 @@ from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrup
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
+# 向后兼容：导出 get_yes_no 供外部模块引用
+get_yes_no = user_confirm
+
 g_config_file = None
 
 COMMAND_MAPPING = {
