@@ -211,6 +211,95 @@ class ChromaRetriever:
             OutputType.INFO,
         )
 
+    def detect_index_changes(self) -> Dict[str, List[str]]:
+        """
+        公共方法：检测索引变更（变更与删除）。
+        返回:
+            {'changed': List[str], 'deleted': List[str]}
+        """
+        return self._detect_changed_or_deleted()
+
+    def _remove_sources_from_manifest(self, sources: List[str]) -> None:
+        """从manifest中移除指定源文件记录并保存。"""
+        if not sources:
+            return
+        manifest = self._load_manifest()
+        removed = 0
+        for src in set(sources):
+            if src in manifest:
+                manifest.pop(src, None)
+                removed += 1
+        if removed > 0:
+            self._save_manifest(manifest)
+            PrettyOutput.print(f"已从索引清单中移除 {removed} 个已删除的源文件记录。", OutputType.INFO)
+
+    def update_index_for_changes(self, changed: List[str], deleted: List[str]) -> None:
+        """
+        公共方法：根据变更与删除列表更新索引。
+        - 对 deleted: 从向量库按 metadata.source 删除
+        - 对 changed: 先删除旧条目，再从源文件重建并添加
+        - 最后：从集合重建BM25索引，更新manifest
+        """
+        changed = list(dict.fromkeys([p for p in (changed or []) if isinstance(p, str)]))
+        deleted = list(dict.fromkeys([p for p in (deleted or []) if isinstance(p, str)]))
+
+        if not changed and not deleted:
+            return
+
+        # 先处理删除
+        for src in deleted:
+            try:
+                self.collection.delete(where={"source": src})  # type: ignore[arg-type]
+            except Exception as e:
+                PrettyOutput.print(f"删除源 '{src}' 时出错: {e}", OutputType.WARNING)
+
+        # 再处理变更（重建）
+        docs_to_add: List[Document] = []
+        for src in changed:
+            try:
+                # 删除旧条目
+                try:
+                    self.collection.delete(where={"source": src})  # type: ignore[arg-type]
+                except Exception:
+                    pass
+                # 读取源文件内容（作为单文档载入，由 add_documents 进行拆分与嵌入）
+                with open(src, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                docs_to_add.append(Document(page_content=content, metadata={"source": src}))
+            except Exception as e:
+                PrettyOutput.print(f"重建源 '{src}' 内容时出错: {e}", OutputType.WARNING)
+
+        if docs_to_add:
+            try:
+                # 复用现有拆分与嵌入逻辑
+                self.add_documents(docs_to_add)
+            except Exception as e:
+                PrettyOutput.print(f"添加变更文档到索引时出错: {e}", OutputType.ERROR)
+
+        # 重建BM25索引，确保删除后的语料被清理
+        try:
+            all_docs_in_collection = self.collection.get()
+            all_documents = all_docs_in_collection.get("documents") or []
+            self.bm25_corpus = [str(text).split() for text in all_documents if text]
+            self.bm25_index = BM25Okapi(self.bm25_corpus) if self.bm25_corpus else None
+            self._save_bm25_index()
+        except Exception as e:
+            PrettyOutput.print(f"重建BM25索引失败: {e}", OutputType.WARNING)
+
+        # 更新manifest：变更文件更新状态；删除文件从清单中移除
+        try:
+            if changed:
+                self._update_manifest_with_sources(changed)
+            if deleted:
+                self._remove_sources_from_manifest(deleted)
+        except Exception as e:
+            PrettyOutput.print(f"更新索引清单时出错: {e}", OutputType.WARNING)
+
+        PrettyOutput.print(
+            f"索引已更新：变更 {len(changed)} 个，删除 {len(deleted)} 个。",
+            OutputType.SUCCESS,
+        )
+
     def add_documents(
         self, documents: List[Document], chunk_size=1000, chunk_overlap=100
     ):
