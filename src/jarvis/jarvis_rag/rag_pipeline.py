@@ -15,6 +15,7 @@ from jarvis.jarvis_utils.config import (
     get_rag_vector_db_path,
     get_rag_embedding_cache_path,
 )
+from jarvis.jarvis_utils.utils import get_yes_no
 
 
 class JarvisRAGPipeline:
@@ -145,6 +146,37 @@ class JarvisRAGPipeline:
             self._query_rewriter = QueryRewriter(JarvisPlatform_LLM())
         return self._query_rewriter
 
+    def _pre_search_update_index_if_needed(self) -> None:
+        """
+        在重写query之前执行：
+        - 检测索引变更（变更/删除）
+        - 询问用户是否立即更新索引
+        - 如确认，则执行增量更新并重建BM25
+        """
+        try:
+            retriever = self._get_retriever()
+            result = retriever.detect_index_changes()
+            changed = result.get("changed", [])
+            deleted = result.get("deleted", [])
+            if not changed and not deleted:
+                return
+            # 打印摘要
+            PrettyOutput.print(
+                f"检测到索引可能不一致：变更 {len(changed)} 个，删除 {len(deleted)} 个。",
+                OutputType.WARNING,
+            )
+            for p in (changed[:3] if changed else []):
+                PrettyOutput.print(f"  变更: {p}", OutputType.WARNING)
+            for p in (deleted[:3] if deleted else []):
+                PrettyOutput.print(f"  删除: {p}", OutputType.WARNING)
+            # 询问用户
+            if get_yes_no("检测到索引变更，是否现在更新索引后再开始检索？", default=True):
+                retriever.update_index_for_changes(changed, deleted)
+            else:
+                PrettyOutput.print("已跳过索引更新，将直接使用当前索引进行检索。", OutputType.INFO)
+        except Exception as e:
+            PrettyOutput.print(f"检索前索引检查失败：{e}", OutputType.WARNING)
+
     def add_documents(self, documents: List[Document]):
         """
         将文档添加到向量知识库。
@@ -190,6 +222,8 @@ class JarvisRAGPipeline:
         返回:
             由LLM生成的答案。
         """
+        # 0. 检测索引变更并可选更新（在重写query之前）
+        self._pre_search_update_index_if_needed()
         # 1. 将原始查询重写为多个查询
         rewritten_queries = self._get_query_rewriter().rewrite(query_text)
 
@@ -259,6 +293,8 @@ class JarvisRAGPipeline:
         返回:
             检索到的文档列表。
         """
+        # 0. 检测索引变更并可选更新（在重写query之前）
+        self._pre_search_update_index_if_needed()
         # 1. 重写查询
         rewritten_queries = self._get_query_rewriter().rewrite(query_text)
 
