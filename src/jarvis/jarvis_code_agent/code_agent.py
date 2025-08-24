@@ -70,6 +70,7 @@ class CodeAgent:
             "retrieve_memory",
             "clear_memory",
             "sub_code_agent",
+            "edit_file",
         ]
 
         if append_tools:
@@ -86,7 +87,7 @@ class CodeAgent:
             system_prompt=code_system_prompt,
             name="CodeAgent",
             auto_complete=False,
-            output_handler=[tool_registry, EditFileHandler()],  # type: ignore
+            output_handler=[tool_registry],  # type: ignore
             llm_type=llm_type,
             model_group=model_group,
             input_handler=[shell_input_handler, builtin_input_handler],
@@ -135,7 +136,7 @@ class CodeAgent:
 - 仅在命令行工具不足时使用专用工具
 
 ## 文件编辑工具使用规范
-- 对于部分文件内容修改，使用PATCH
+- 对于部分文件内容修改，使用edit_file工具
 - 对于需要重写整个文件内容，使用rewrite_file工具
 - 对于简单的修改，可以使用execute_script工具执行shell命令完成
 
