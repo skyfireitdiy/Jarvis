@@ -172,10 +172,14 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def handle(self, response: str, agent_: Any) -> Tuple[bool, Any]:
         try:
-            tool_call, err_msg = self._extract_tool_calls(response)
+            tool_call, err_msg, auto_completed = self._extract_tool_calls(response)
             if err_msg:
                 return False, err_msg
-            return False, self.handle_tool_calls(tool_call, agent_)
+            result = self.handle_tool_calls(tool_call, agent_)
+            if auto_completed:
+                # 如果自动补全了结束标签，在结果中添加说明信息
+                result = f"检测到工具调用缺少结束标签，已自动补全{ct('TOOL_CALL')}。请确保后续工具调用包含完整的开始和结束标签。\n\n{result}"
+            return False, result
         except Exception as e:
             PrettyOutput.print(f"工具调用处理失败: {str(e)}", OutputType.ERROR)
             from jarvis.jarvis_agent import Agent
@@ -609,16 +613,17 @@ class ToolRegistry(OutputHandlerProtocol):
         )
 
     @staticmethod
-    def _extract_tool_calls(content: str) -> Tuple[Dict[str, Dict[str, Any]], str]:
+    def _extract_tool_calls(content: str) -> Tuple[Dict[str, Dict[str, Any]], str, bool]:
         """从内容中提取工具调用。
 
         参数:
             content: 包含工具调用的内容
 
         返回:
-            Tuple[Dict[str, Dict[str, Any]], str]:
+            Tuple[Dict[str, Dict[str, Any]], str, bool]:
                 - 第一个元素是提取的工具调用字典
                 - 第二个元素是错误消息字符串(成功时为"")
+                - 第三个元素是是否自动补全了结束标签
 
         异常:
             Exception: 如果工具调用缺少必要字段
@@ -627,6 +632,7 @@ class ToolRegistry(OutputHandlerProtocol):
         data = re.findall(
             ot("TOOL_CALL") + r"(.*?)" + ct("TOOL_CALL"), content, re.DOTALL
         )
+        auto_completed = False
         if not data:
             # can_handle 确保 ot("TOOL_CALL") 在内容中。
             # 如果数据为空，则表示 ct("TOOL_CALL") 可能丢失。
@@ -648,6 +654,7 @@ class ToolRegistry(OutputHandlerProtocol):
                         # Ask user for confirmation
 
                         data = temp_data
+                        auto_completed = True
                     except (yaml.YAMLError, EOFError, KeyboardInterrupt):
                         # Even after fixing, it's not valid YAML, or user cancelled.
                         # Fall through to the original error.
@@ -657,6 +664,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 return (
                     {},
                     f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}",
+                    False,
                 )
         ret = []
         for item in data:
@@ -669,6 +677,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     {e}
 
                 {tool_call_help}""",
+                    False,
                 )
 
             if "name" in msg and "arguments" in msg and "want" in msg:
@@ -679,10 +688,11 @@ class ToolRegistry(OutputHandlerProtocol):
                     f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments、want字段）。
 
                 {tool_call_help}""",
+                    False,
                 )
         if len(ret) > 1:
-            return {}, "检测到多个工具调用，请一次只处理一个工具调用。"
-        return ret[0] if ret else {}, ""
+            return {}, "检测到多个工具调用，请一次只处理一个工具调用。", False
+        return ret[0] if ret else {}, "", auto_completed
 
     def register_tool(
         self,
