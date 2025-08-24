@@ -613,7 +613,9 @@ class ToolRegistry(OutputHandlerProtocol):
         )
 
     @staticmethod
-    def _extract_tool_calls(content: str) -> Tuple[Dict[str, Dict[str, Any]], str, bool]:
+    def _extract_tool_calls(
+        content: str,
+    ) -> Tuple[Dict[str, Dict[str, Any]], str, bool]:
         """从内容中提取工具调用。
 
         参数:

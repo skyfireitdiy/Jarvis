@@ -70,7 +70,6 @@ class CodeAgent:
             "retrieve_memory",
             "clear_memory",
             "sub_code_agent",
-            "edit_file",
         ]
 
         if append_tools:
@@ -87,7 +86,7 @@ class CodeAgent:
             system_prompt=code_system_prompt,
             name="CodeAgent",
             auto_complete=False,
-            output_handler=[tool_registry],  # type: ignore
+            output_handler=[tool_registry, EditFileHandler()],  # type: ignore
             llm_type=llm_type,
             model_group=model_group,
             input_handler=[shell_input_handler, builtin_input_handler],
@@ -640,7 +639,7 @@ class CodeAgent:
                     if lint_tools_info and is_enable_static_analysis():
                         addon_prompt = f"""
 请对以下修改的文件进行静态扫描:
-{file_list}
+    {file_list}
 {tool_info}
 如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
 注意：如果要进行静态检查，需要在所有的修改都完成之后进行集中检查，如果文件有多个检查工具，尽量一次全部调用，不要分多次调用

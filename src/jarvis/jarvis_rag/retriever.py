@@ -231,7 +231,9 @@ class ChromaRetriever:
                 removed += 1
         if removed > 0:
             self._save_manifest(manifest)
-            PrettyOutput.print(f"已从索引清单中移除 {removed} 个已删除的源文件记录。", OutputType.INFO)
+            PrettyOutput.print(
+                f"已从索引清单中移除 {removed} 个已删除的源文件记录。", OutputType.INFO
+            )
 
     def update_index_for_changes(self, changed: List[str], deleted: List[str]) -> None:
         """
@@ -240,8 +242,12 @@ class ChromaRetriever:
         - 对 changed: 先删除旧条目，再从源文件重建并添加
         - 最后：从集合重建BM25索引，更新manifest
         """
-        changed = list(dict.fromkeys([p for p in (changed or []) if isinstance(p, str)]))
-        deleted = list(dict.fromkeys([p for p in (deleted or []) if isinstance(p, str)]))
+        changed = list(
+            dict.fromkeys([p for p in (changed or []) if isinstance(p, str)])
+        )
+        deleted = list(
+            dict.fromkeys([p for p in (deleted or []) if isinstance(p, str)])
+        )
 
         if not changed and not deleted:
             return
@@ -265,9 +271,13 @@ class ChromaRetriever:
                 # 读取源文件内容（作为单文档载入，由 add_documents 进行拆分与嵌入）
                 with open(src, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-                docs_to_add.append(Document(page_content=content, metadata={"source": src}))
+                docs_to_add.append(
+                    Document(page_content=content, metadata={"source": src})
+                )
             except Exception as e:
-                PrettyOutput.print(f"重建源 '{src}' 内容时出错: {e}", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"重建源 '{src}' 内容时出错: {e}", OutputType.WARNING
+                )
 
         if docs_to_add:
             try:

@@ -165,15 +165,19 @@ class JarvisRAGPipeline:
                 f"检测到索引可能不一致：变更 {len(changed)} 个，删除 {len(deleted)} 个。",
                 OutputType.WARNING,
             )
-            for p in (changed[:3] if changed else []):
+            for p in changed[:3] if changed else []:
                 PrettyOutput.print(f"  变更: {p}", OutputType.WARNING)
-            for p in (deleted[:3] if deleted else []):
+            for p in deleted[:3] if deleted else []:
                 PrettyOutput.print(f"  删除: {p}", OutputType.WARNING)
             # 询问用户
-            if get_yes_no("检测到索引变更，是否现在更新索引后再开始检索？", default=True):
+            if get_yes_no(
+                "检测到索引变更，是否现在更新索引后再开始检索？", default=True
+            ):
                 retriever.update_index_for_changes(changed, deleted)
             else:
-                PrettyOutput.print("已跳过索引更新，将直接使用当前索引进行检索。", OutputType.INFO)
+                PrettyOutput.print(
+                    "已跳过索引更新，将直接使用当前索引进行检索。", OutputType.INFO
+                )
         except Exception as e:
             PrettyOutput.print(f"检索前索引检查失败：{e}", OutputType.WARNING)
 

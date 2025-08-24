@@ -146,9 +146,7 @@ class FileSearchReplaceTool:
                         }
                     )
                 else:
-                    PrettyOutput.print(
-                        f"文件 {file_path} 处理失败", OutputType.ERROR
-                    )
+                    PrettyOutput.print(f"文件 {file_path} 处理失败", OutputType.ERROR)
                     file_results.append(
                         {
                             "file": file_path,
