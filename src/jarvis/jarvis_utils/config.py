@@ -632,6 +632,16 @@ def get_tool_dont_use_list() -> List[str]:
     return config.get("dont_use", [])
 
 
+def get_tool_filter_threshold() -> int:
+    """
+    获取AI工具筛选的阈值。
+
+    返回:
+        int: 当工具数量超过此阈值时，触发AI筛选。默认为30
+    """
+    return int(GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_FILTER_THRESHOLD", 30))
+
+
 def is_enable_git_repo_jca_switch() -> bool:
     """
     是否启用：在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）
