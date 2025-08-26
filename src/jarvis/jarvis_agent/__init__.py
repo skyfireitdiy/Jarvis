@@ -858,6 +858,10 @@ class Agent:
 
     def _first_run(self):
         """首次运行初始化"""
+        # 如果工具过多，使用AI进行筛选
+        if self.session.prompt:
+            self._filter_tools_if_needed(self.session.prompt)
+
         # 准备记忆标签提示
         memory_tags_prompt = self.memory_manager.prepare_memory_tags_prompt()
 
@@ -869,6 +873,88 @@ class Agent:
             self.session.prompt = f"{self.session.prompt}{memory_tags_prompt}"
 
         self.first = False
+
+    def _filter_tools_if_needed(self, task: str):
+        """如果工具数量超过阈值，使用大模型筛选相关工具"""
+        import re
+        from jarvis.jarvis_tools.registry import ToolRegistry
+
+        tool_registry = self.get_tool_registry()
+        if not isinstance(tool_registry, ToolRegistry):
+            return
+
+        all_tools = tool_registry.get_all_tools()
+        if len(all_tools) <= 30:
+            return
+
+        # 为工具选择构建提示
+        tools_prompt_part = ""
+        tool_names = []
+        for i, tool in enumerate(all_tools, 1):
+            tool_names.append(tool["name"])
+            tools_prompt_part += f"{i}. {tool['name']}: {tool['description']}\n"
+
+        selection_prompt = f"""
+用户任务是：
+<task>
+{task}
+</task>
+
+这是一个可用工具的列表：
+<tools>
+{tools_prompt_part}
+</tools>
+
+请根据用户任务，从列表中选择最相关的工具。
+请仅返回所选工具的编号，以逗号分隔。例如：1, 5, 12
+"""
+        PrettyOutput.print("工具数量超过30个，正在使用AI筛选相关工具...", OutputType.INFO)
+
+        # 使用临时模型实例调用模型，以避免污染历史记录
+        try:
+            from jarvis.jarvis_platform.registry import PlatformRegistry
+
+            temp_model = PlatformRegistry().create_platform(
+                self.model.platform_name()  # type: ignore
+            )
+            if not temp_model:
+                raise RuntimeError("为工具选择创建临时模型失败。")
+
+            temp_model.set_model_name(self.model.name())  # type: ignore
+            temp_model.set_system_prompt("你是一个帮助筛选工具的助手。")
+            selected_tools_str = temp_model.chat_until_success(
+                selection_prompt
+            )  # type: ignore
+
+            # 解析响应并筛选工具
+            selected_indices = [
+                int(i.strip()) for i in re.findall(r"\d+", selected_tools_str)
+            ]
+            selected_tool_names = [
+                tool_names[i - 1]
+                for i in selected_indices
+                if 0 < i <= len(tool_names)
+            ]
+
+            if selected_tool_names:
+                # 移除重复项
+                selected_tool_names = sorted(list(set(selected_tool_names)))
+                tool_registry.use_tools(selected_tool_names)
+                # 使用筛选后的工具列表重新设置系统提示
+                self._setup_system_prompt()
+                PrettyOutput.print(
+                    f"已筛选出 {len(selected_tool_names)} 个相关工具: {', '.join(selected_tool_names)}",
+                    OutputType.SUCCESS,
+                )
+            else:
+                PrettyOutput.print(
+                    "AI 未能筛选出任何相关工具，将使用所有工具。", OutputType.WARNING
+                )
+
+        except Exception as e:
+            PrettyOutput.print(
+                f"工具筛选失败: {e}，将使用所有工具。", OutputType.ERROR
+            )
 
     def _check_and_organize_memory(self):
         """
