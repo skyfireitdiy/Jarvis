@@ -453,7 +453,7 @@ def handle_builtin_config_selector(
 def run_cli(
     ctx: typer.Context,
     task: Optional[str] = typer.Option(
-        None, "-t", "-T", "--task", help="从命令行直接输入任务内容"
+        None, "-T", "--task", help="从命令行直接输入任务内容"
     ),
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"

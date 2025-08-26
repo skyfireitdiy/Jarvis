@@ -72,8 +72,6 @@ class TestJarvisCLI:
         monkeypatch.setattr(jarvis_mod, "AgentManager", DummyAgentManager)
 
         args = [
-            "-t",
-            "thinking",
             "--task",
             "do something",
             "-g",
