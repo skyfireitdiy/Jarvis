@@ -158,6 +158,8 @@ class StreamableMcpClient(McpClient):
 
             # 处理流式响应
             result = None
+            warning_lines = []
+            error_lines = []
             for line in response.iter_lines(decode_unicode=True):
                 if line:
                     try:
@@ -175,20 +177,19 @@ class StreamableMcpClient(McpClient):
                             notify_method = data.get("method", "")
                             params = data.get("params", {})
                             if notify_method in self.notification_handlers:
-                                for handler in self.notification_handlers[
-                                    notify_method
-                                ]:
+                                for handler in self.notification_handlers[notify_method]:
                                     try:
                                         handler(params)
                                     except Exception as e:
-                                        PrettyOutput.print(
-                                            f"处理通知时出错 ({method}): {e}",
-                                            OutputType.ERROR,
-                                        )
+                                        error_lines.append(f"处理通知时出错 ({notify_method}): {e}")
                     except json.JSONDecodeError:
-                        PrettyOutput.print(f"无法解析响应: {line}", OutputType.WARNING)
+                        warning_lines.append(f"无法解析响应: {line}")
                         continue
 
+            if warning_lines:
+                PrettyOutput.print("\n".join(warning_lines), OutputType.WARNING)
+            if error_lines:
+                PrettyOutput.print("\n".join(error_lines), OutputType.ERROR)
             # Ensure response is closed after streaming
             response.close()
             if result is None:

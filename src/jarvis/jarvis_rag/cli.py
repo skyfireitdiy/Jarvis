@@ -321,12 +321,11 @@ def list_documents(
             )
             return
 
-        PrettyOutput.print(
-            f"知识库 '{collection_name}' 中共有 {len(sources)} 个独立文档:",
-            OutputType.INFO,
-        )
+        # 避免在循环中逐条打印，先拼接后统一打印
+        lines = [f"知识库 '{collection_name}' 中共有 {len(sources)} 个独立文档:"]
         for i, source in enumerate(sorted(list(sources)), 1):
-            PrettyOutput.print(f"  {i}. {source}", OutputType.INFO)
+            lines.append(f"  {i}. {source}")
+        PrettyOutput.print("\n".join(lines), OutputType.INFO)
 
     except Exception as e:
         PrettyOutput.print(f"发生错误: {e}", OutputType.ERROR)

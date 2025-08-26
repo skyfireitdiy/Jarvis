@@ -39,18 +39,22 @@ def list_tools(
             )
     else:
         PrettyOutput.section("可用工具列表", OutputType.SYSTEM)
+        # 为避免 PrettyOutput 对每行加框造成信息稀疏，先拼接字符串再统一打印
+        lines = []
+        import json as _json  # local import to ensure available
         for tool in tools:
-            PrettyOutput.print(f"\n{tool['name']}", OutputType.SUCCESS)
-            PrettyOutput.print(f"   描述: {tool['description']}", OutputType.INFO)
+            lines.append(f"\n{tool['name']}")
+            lines.append(f"   描述: {tool['description']}")
             if detailed:
-                PrettyOutput.print("   参数:", OutputType.INFO)
-                import json as _json  # local import to ensure available
-
-                PrettyOutput.print(
-                    _json.dumps(tool["parameters"], ensure_ascii=False, indent=2),
-                    OutputType.CODE,
-                    lang="json",
-                )
+                lines.append("   参数:")
+                # 使用 Markdown 代码块统一展示参数
+                lines.append("```json")
+                try:
+                    lines.append(_json.dumps(tool["parameters"], ensure_ascii=False, indent=2))
+                except Exception:
+                    lines.append(str(tool.get("parameters")))
+                lines.append("```")
+        PrettyOutput.print("\n".join(lines), OutputType.INFO, lang="markdown")
 
 
 @app.command("stat")
@@ -202,15 +206,18 @@ def call_tool(
     missing_params = [p for p in required_params if p not in tool_args]
 
     if missing_params:
-        PrettyOutput.print(
-            f"错误: 缺少必需参数: {', '.join(missing_params)}", OutputType.ERROR
-        )
-        PrettyOutput.print("\n参数说明:", OutputType.INFO)
+        # 先拼接提示与参数说明，再统一打印，避免循环中逐条打印
         params = tool_obj.parameters.get("properties", {})
+        lines = [
+            f"错误: 缺少必需参数: {', '.join(missing_params)}",
+            "",
+            "参数说明:",
+        ]
         for param_name in required_params:
             param_info = params.get(param_name, {})
             desc = param_info.get("description", "无描述")
-            PrettyOutput.print(f"  - {param_name}: {desc}", OutputType.INFO)
+            lines.append(f"  - {param_name}: {desc}")
+        PrettyOutput.print("\n".join(lines), OutputType.ERROR)
         raise typer.Exit(code=1)
 
     result = registry.execute_tool(tool_name, tool_args)

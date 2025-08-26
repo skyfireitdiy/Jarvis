@@ -81,11 +81,13 @@ def _load_all_methodologies() -> Dict[str, str]:
 
     import glob
 
+    # 收集循环中的提示，统一打印，避免逐条加框
+    warn_dirs: List[str] = []
+    error_lines: List[str] = []
+
     for directory in set(methodology_dirs):  # Use set to avoid duplicates
         if not os.path.isdir(directory):
-            PrettyOutput.print(
-                f"警告: 方法论目录不存在或不是一个目录: {directory}", OutputType.WARNING
-            )
+            warn_dirs.append(f"警告: 方法论目录不存在或不是一个目录: {directory}")
             continue
 
         for filepath in glob.glob(os.path.join(directory, "*.json")):
@@ -100,10 +102,13 @@ def _load_all_methodologies() -> Dict[str, str]:
                         all_methodologies[problem_type] = content
             except Exception as e:
                 filename = os.path.basename(filepath)
-                PrettyOutput.print(
-                    f"加载方法论文件 {filename} 失败: {str(e)}", OutputType.WARNING
-                )
+                error_lines.append(f"加载方法论文件 {filename} 失败: {str(e)}")
 
+    # 统一打印目录警告与文件加载失败信息
+    if warn_dirs:
+        PrettyOutput.print("\n".join(warn_dirs), OutputType.WARNING)
+    if error_lines:
+        PrettyOutput.print("\n".join(error_lines), OutputType.WARNING)
     return all_methodologies
 
 

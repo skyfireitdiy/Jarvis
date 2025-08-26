@@ -299,10 +299,12 @@ class CodeAgent:
             "⚠️ 正在修改git换行符敏感设置，这会影响所有文件的换行符处理方式",
             OutputType.WARNING,
         )
-        PrettyOutput.print("将进行以下设置：", OutputType.INFO)
+        # 避免在循环中逐条打印，先拼接后统一打印
+        lines = ["将进行以下设置："]
         for key, value in target_settings.items():
             current = current_settings.get(key, "未设置")
-            PrettyOutput.print(f"{key}: {current} -> {value}", OutputType.INFO)
+            lines.append(f"{key}: {current} -> {value}")
+        PrettyOutput.print("\n".join(lines), OutputType.INFO)
 
         # 直接执行设置，不需要用户确认
         for key, value in target_settings.items():

@@ -210,13 +210,14 @@ class SSEMcpClient(McpClient):
 
                 # 调用已注册的处理器
                 if method in self.notification_handlers:
+                    error_lines: list[str] = []
                     for handler in self.notification_handlers[method]:
                         try:
                             handler(params)
                         except Exception as e:
-                            PrettyOutput.print(
-                                f"处理通知时出错 ({method}): {e}", OutputType.ERROR
-                            )
+                            error_lines.append(f"处理通知时出错 ({method}): {e}")
+                    if error_lines:
+                        PrettyOutput.print("\n".join(error_lines), OutputType.ERROR)
         except json.JSONDecodeError:
             PrettyOutput.print(f"无法解析SSE事件: {data}", OutputType.WARNING)
         except Exception as e:

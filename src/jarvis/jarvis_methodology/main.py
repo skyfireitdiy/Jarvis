@@ -94,9 +94,11 @@ def list_methodologies():
             PrettyOutput.print("没有找到方法论", OutputType.INFO)
             return
 
-        PrettyOutput.print("可用方法论:", OutputType.INFO)
+        # 先拼接再统一打印，避免在循环中逐条输出造成信息稀疏
+        lines = ["可用方法论:"]
         for i, (problem_type, _) in enumerate(methodologies.items(), 1):
-            PrettyOutput.print(f"{i}. {problem_type}", OutputType.INFO)
+            lines.append(f"{i}. {problem_type}")
+        PrettyOutput.print("\n".join(lines), OutputType.INFO)
     except (OSError, json.JSONDecodeError) as e:
         PrettyOutput.print(f"列出方法论失败: {str(e)}", OutputType.ERROR)
         raise typer.Exit(code=1)

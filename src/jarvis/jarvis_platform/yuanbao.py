@@ -134,10 +134,11 @@ class YuanbaoPlatform(BasePlatform):
 
         for file_path in file_list:
             file_name = os.path.basename(file_path)
-            PrettyOutput.print(f"上传文件 {file_name}", OutputType.INFO)
+            log_lines: list[str] = []
+            log_lines.append(f"上传文件 {file_name}")
             try:
                 # 1. Prepare the file information
-                PrettyOutput.print(f"准备文件信息: {file_name}", OutputType.INFO)
+                log_lines.append(f"准备文件信息: {file_name}")
                 file_size = os.path.getsize(file_path)
                 file_extension = os.path.splitext(file_path)[1].lower().lstrip(".")
 
@@ -192,23 +193,23 @@ class YuanbaoPlatform(BasePlatform):
                     file_type = "code"
 
                 # 2. Generate upload information
-                PrettyOutput.print(f"获取上传信息: {file_name}", OutputType.INFO)
+                log_lines.append(f"获取上传信息: {file_name}")
                 upload_info = self._generate_upload_info(file_name)
                 if not upload_info:
-                    PrettyOutput.print(
-                        f"无法获取文件 {file_name} 的上传信息", OutputType.ERROR
-                    )
+                    log_lines.append(f"无法获取文件 {file_name} 的上传信息")
+                    PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
                     return False
 
                 # 3. Upload the file to COS
-                PrettyOutput.print(f"上传文件到云存储: {file_name}", OutputType.INFO)
+                log_lines.append(f"上传文件到云存储: {file_name}")
                 upload_success = self._upload_file_to_cos(file_path, upload_info)
                 if not upload_success:
-                    PrettyOutput.print(f"上传文件 {file_name} 失败", OutputType.ERROR)
+                    log_lines.append(f"上传文件 {file_name} 失败")
+                    PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
                     return False
 
                 # 4. Create file metadata for chat
-                PrettyOutput.print(f"生成文件元数据: {file_name}", OutputType.INFO)
+                log_lines.append(f"生成文件元数据: {file_name}")
                 file_metadata = {
                     "type": file_type,
                     "docType": file_extension if file_extension else file_type,
@@ -226,19 +227,16 @@ class YuanbaoPlatform(BasePlatform):
                             file_metadata["width"] = img.width
                             file_metadata["height"] = img.height
                     except Exception as e:
-                        PrettyOutput.print(
-                            f"无法获取图片 {file_name} 的尺寸: {str(e)}",
-                            OutputType.WARNING,
-                        )
+                        log_lines.append(f"无法获取图片 {file_name} 的尺寸: {str(e)}")
 
                 uploaded_files.append(file_metadata)
-                PrettyOutput.print(f"文件 {file_name} 上传成功", OutputType.SUCCESS)
+                log_lines.append(f"文件 {file_name} 上传成功")
+                PrettyOutput.print("\n".join(log_lines), OutputType.INFO)
                 time.sleep(3)  # 上传成功后等待3秒
 
             except Exception as e:
-                PrettyOutput.print(
-                    f"上传文件 {file_path} 时出错: {str(e)}", OutputType.ERROR
-                )
+                log_lines.append(f"上传文件 {file_path} 时出错: {str(e)}")
+                PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
                 return False
 
         self.multimedia = uploaded_files
