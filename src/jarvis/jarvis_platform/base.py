@@ -137,23 +137,49 @@ class BasePlatform(ABC):
                     buffer_count = 0
                     with Live(panel, refresh_per_second=4, transient=False) as live:
                         for s in self.chat(message):
-                            response += s
+                            response += s  # Accumulate the full response string
                             buffer.append(s)
                             buffer_count += 1
-                            
+
                             # 积累一定量或达到最后再更新，减少闪烁
                             if buffer_count >= 5 or s == "":
+                                # Append buffered content to the Text object
                                 text_content.append("".join(buffer), style="bright_white")
                                 buffer.clear()
                                 buffer_count = 0
+
+                                # --- Scrolling Logic ---
+                                # Calculate available height in the panel
+                                max_text_height = console.height - 5  # Leave space for borders/titles
+                                if max_text_height <= 0:
+                                    max_text_height = 1
+
+                                # Get the actual number of lines the text will wrap to
+                                lines = text_content.wrap(
+                                    console,
+                                    console.width - 4 if console.width > 4 else 1,
+                                )
+
+                                # If content overflows, truncate to show only the last few lines
+                                if len(lines) > max_text_height:
+                                    new_text = "\n".join(
+                                        text_content.plain.splitlines()[-max_text_height:]
+                                    )
+                                    text_content.plain = new_text
+
                                 panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
                                 live.update(panel)
-                            
+
                             if is_immediate_abort() and get_interrupt():
-                                return response
-                        # 确保最后剩余内容被刷新
+                                return response  # Return the partial response immediately
+
+                        # Ensure any remaining content in the buffer is displayed
                         if buffer:
                             text_content.append("".join(buffer), style="bright_white")
+
+                        # At the end, display the entire response
+                        text_content.plain = response
+
                         end_time = time.time()
                         duration = end_time - start_time
                         panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
