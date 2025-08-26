@@ -225,6 +225,14 @@ JARVIS_PRINT_ERROR_TRACEBACK: true
 ```
 - 也可以在单次调用时通过传入 `traceback=True` 临时开启回溯打印。
 
+提示：AI 工具筛选阈值
+- 当可用工具数量过多时，可能会干扰模型的决策。Jarvis 支持在可用工具数量超过阈值时，先让 AI 自动筛选相关工具再启动，以专注于本次任务。
+- 默认阈值为 30，可在配置中调整：
+```yaml
+# ~/.jarvis/config.yaml
+JARVIS_TOOL_FILTER_THRESHOLD: 30
+```
+
 Jarvis 支持多种平台，包括 **Kimi**, **通义千问**, **OpenAI** 等。详细的配置选项、模型组设置以及所有可用参数，请参阅 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
 > **模型推荐**: 目前效果较好的模型是 `claude-opus-4-20250514`，可以通过国内代理商购买，例如 [FoxiAI](https://foxi-ai.top)。
