@@ -113,6 +113,7 @@ class PlatformRegistry:
         if directory not in sys.path:
             sys.path.append(directory)
 
+        error_lines = []
         # 遍历目录下的所有.py文件
         for filename in os.listdir(directory):
             if filename.endswith(".py") and not filename.startswith("__"):
@@ -142,16 +143,15 @@ class PlatformRegistry:
                                 platform_name = obj.platform_name()
                                 platforms[platform_name] = obj
                             except Exception as e:
-                                PrettyOutput.print(
-                                    f"实例化或注册平台失败 {obj.__name__}: {str(e)}",
-                                    OutputType.ERROR,
+                                error_lines.append(
+                                    f"实例化或注册平台失败 {obj.__name__}: {str(e)}"
                                 )
                             break
                 except Exception as e:
-                    PrettyOutput.print(
-                        f"加载平台 {module_name} 失败: {str(e)}", OutputType.ERROR
-                    )
+                    error_lines.append(f"加载平台 {module_name} 失败: {str(e)}")
 
+        if error_lines:
+            PrettyOutput.print("\n".join(error_lines), OutputType.ERROR)
         return platforms
 
     @staticmethod

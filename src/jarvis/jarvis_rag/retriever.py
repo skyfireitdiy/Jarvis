@@ -184,32 +184,26 @@ class ChromaRetriever:
         deleted = result["deleted"]
         if not changed and not deleted:
             return
+        # 为避免在循环中逐条打印，先拼接后统一打印
+        lines: list[str] = []
         if changed:
-            PrettyOutput.print(
-                f"检测到 {len(changed)} 个已索引文件发生变化，建议重新索引以保证检索准确性。",
-                OutputType.WARNING,
+            lines.append(
+                f"检测到 {len(changed)} 个已索引文件发生变化，建议重新索引以保证检索准确性。"
             )
-            for p in changed[:5]:
-                PrettyOutput.print(f"  变更: {p}", OutputType.WARNING)
+            lines.extend([f"  变更: {p}" for p in changed[:5]])
             if len(changed) > 5:
-                PrettyOutput.print(
-                    f"  ... 以及另外 {len(changed) - 5} 个文件", OutputType.WARNING
-                )
+                lines.append(f"  ... 以及另外 {len(changed) - 5} 个文件")
         if deleted:
-            PrettyOutput.print(
-                f"检测到 {len(deleted)} 个已索引文件已被删除，建议清理并重新索引。",
-                OutputType.WARNING,
+            lines.append(
+                f"检测到 {len(deleted)} 个已索引文件已被删除，建议清理并重新索引。"
             )
-            for p in deleted[:5]:
-                PrettyOutput.print(f"  删除: {p}", OutputType.WARNING)
+            lines.extend([f"  删除: {p}" for p in deleted[:5]])
             if len(deleted) > 5:
-                PrettyOutput.print(
-                    f"  ... 以及另外 {len(deleted) - 5} 个文件", OutputType.WARNING
-                )
-        PrettyOutput.print(
-            "提示：请使用 'jarvis-rag add <路径>' 重新索引相关文件，以更新向量库与BM25索引。",
-            OutputType.INFO,
+                lines.append(f"  ... 以及另外 {len(deleted) - 5} 个文件")
+        lines.append(
+            "提示：请使用 'jarvis-rag add <路径>' 重新索引相关文件，以更新向量库与BM25索引。"
         )
+        PrettyOutput.print("\n".join(lines), OutputType.WARNING)
 
     def detect_index_changes(self) -> Dict[str, List[str]]:
         """
@@ -253,14 +247,18 @@ class ChromaRetriever:
             return
 
         # 先处理删除
+        delete_errors: list[str] = []
         for src in deleted:
             try:
                 self.collection.delete(where={"source": src})  # type: ignore[arg-type]
             except Exception as e:
-                PrettyOutput.print(f"删除源 '{src}' 时出错: {e}", OutputType.WARNING)
+                delete_errors.append(f"删除源 '{src}' 时出错: {e}")
+        if delete_errors:
+            PrettyOutput.print("\n".join(delete_errors), OutputType.WARNING)
 
         # 再处理变更（重建）
         docs_to_add: List[Document] = []
+        rebuild_errors: list[str] = []
         for src in changed:
             try:
                 # 删除旧条目
@@ -275,9 +273,9 @@ class ChromaRetriever:
                     Document(page_content=content, metadata={"source": src})
                 )
             except Exception as e:
-                PrettyOutput.print(
-                    f"重建源 '{src}' 内容时出错: {e}", OutputType.WARNING
-                )
+                rebuild_errors.append(f"重建源 '{src}' 内容时出错: {e}")
+        if rebuild_errors:
+            PrettyOutput.print("\n".join(rebuild_errors), OutputType.WARNING)
 
         if docs_to_add:
             try:

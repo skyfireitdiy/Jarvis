@@ -673,13 +673,20 @@ def _interactive_config_setup(config_file_path: Path):
 
         # 如果有配置指导，先显示总体说明
         if config_guide:
-            PrettyOutput.print(f"\n配置获取方法:", OutputType.INFO)
+            # 为避免 PrettyOutput 在循环中为每行加框，先拼接后统一打印
+            guide_lines = ["", "配置获取方法:"]
+            for key in required_keys:
+                if key in config_guide and config_guide[key]:
+                    guide_lines.append(f"")
+                    guide_lines.append(f"{key} 获取方法:")
+                    guide_lines.append(str(config_guide[key]))
+            PrettyOutput.print("\n".join(guide_lines), OutputType.INFO)
+        else:
+            # 若无指导，仍需遍历以保持后续逻辑一致
+            pass
 
         for key in required_keys:
-            # 显示该环境变量的配置指导
-            if key in config_guide and config_guide[key]:
-                PrettyOutput.print(f"\n{key} 获取方法:", OutputType.INFO)
-                PrettyOutput.print(config_guide[key], OutputType.INFO)
+            # 显示该环境变量的配置指导（上文已统一打印，此处不再逐条打印）
 
             default_value = defaults.get(key, "")
             prompt_text = f"  - {key}"
@@ -1454,7 +1461,7 @@ def _read_old_config_file(config_file):
 
 
 def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
-    """循环执行函数直到成功
+    """循环执行函数直到成功（累计日志后统一打印，避免逐次加框）
 
     参数：
     func -- 要执行的函数
@@ -1463,17 +1470,25 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
     返回：
     函数执行结果
     """
+    logs: List[str] = []
+    result: Any = None
+    success = False
     while True:
         try:
-            return func()
-        except Exception as e:
-            PrettyOutput.print(f"重试中，等待 {sleep_time}s...", OutputType.WARNING)
+            result = func()
+            success = True
+            break
+        except Exception:
+            logs.append(f"重试中，等待 {sleep_time}s...")
             time.sleep(sleep_time)
             continue
+    if logs:
+        PrettyOutput.print("\n".join(logs), OutputType.WARNING)
+    return result
 
 
 def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
-    """循环执行函数直到返回True
+    """循环执行函数直到返回True（累计日志后统一打印，避免逐次加框）
 
     参数:
         func: 要执行的函数，必须返回布尔值
@@ -1486,12 +1501,16 @@ def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
         与while_success不同，此函数只检查返回是否为True，
         不捕获异常，异常会直接抛出
     """
+    logs: List[str] = []
+    ret: bool = False
     while True:
         ret = func()
         if ret:
             break
-        PrettyOutput.print(f"重试中，等待 {sleep_time}s...", OutputType.WARNING)
+        logs.append(f"重试中，等待 {sleep_time}s...")
         time.sleep(sleep_time)
+    if logs:
+        PrettyOutput.print("\n".join(logs), OutputType.WARNING)
     return ret
 
 

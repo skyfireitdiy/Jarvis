@@ -384,14 +384,17 @@ def _show_history_and_copy():
         PrettyOutput.print("没有可复制的消息", OutputType.INFO)
         return
 
-    PrettyOutput.print("\n" + "=" * 20 + " 消息历史记录 " + "=" * 20, OutputType.INFO)
+    # 为避免 PrettyOutput 在循环中为每行加框，先拼接后统一打印
+    lines = []
+    lines.append("\n" + "=" * 20 + " 消息历史记录 " + "=" * 20)
     for i, msg in enumerate(history):
         cleaned_msg = msg.replace("\n", r"\n")
         display_msg = (
             (cleaned_msg[:70] + "...") if len(cleaned_msg) > 70 else cleaned_msg
         )
-        PrettyOutput.print(f"  {i + 1}: {display_msg.strip()}", OutputType.INFO)
-    PrettyOutput.print("=" * 58 + "\n", OutputType.INFO)
+        lines.append(f"  {i + 1}: {display_msg.strip()}")
+    lines.append("=" * 58 + "\n")
+    PrettyOutput.print("\n".join(lines), OutputType.INFO)
 
     while True:
         try:

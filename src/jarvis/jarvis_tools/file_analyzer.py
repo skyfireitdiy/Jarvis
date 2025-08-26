@@ -45,13 +45,19 @@ class FileAnalyzerTool:
             file_paths = args["file_paths"]
             prompt = args["prompt"]
 
-            # 验证文件路径
+            # 验证文件路径（先收集不存在的文件，统一打印一次）
             valid_files = []
+            missing_files = []
             for file_path in file_paths:
                 if os.path.exists(file_path):
                     valid_files.append(file_path)
                 else:
-                    PrettyOutput.print(f"文件不存在: {file_path}", OutputType.WARNING)
+                    missing_files.append(file_path)
+            if missing_files:
+                PrettyOutput.print(
+                    "以下文件不存在:\n" + "\n".join(f"  - {p}" for p in missing_files),
+                    OutputType.WARNING,
+                )
 
             if not valid_files:
                 return {"success": False, "stdout": "", "stderr": "没有找到有效的文件"}

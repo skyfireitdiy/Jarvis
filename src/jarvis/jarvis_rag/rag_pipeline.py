@@ -161,14 +161,15 @@ class JarvisRAGPipeline:
             if not changed and not deleted:
                 return
             # 打印摘要
-            PrettyOutput.print(
-                f"检测到索引可能不一致：变更 {len(changed)} 个，删除 {len(deleted)} 个。",
-                OutputType.WARNING,
-            )
-            for p in changed[:3] if changed else []:
-                PrettyOutput.print(f"  变更: {p}", OutputType.WARNING)
-            for p in deleted[:3] if deleted else []:
-                PrettyOutput.print(f"  删除: {p}", OutputType.WARNING)
+            # 先拼接列表信息再统一打印，避免循环中逐条打印
+            lines = [
+                f"检测到索引可能不一致：变更 {len(changed)} 个，删除 {len(deleted)} 个。"
+            ]
+            if changed:
+                lines.extend([f"  变更: {p}" for p in changed[:3]])
+            if deleted:
+                lines.extend([f"  删除: {p}" for p in deleted[:3]])
+            PrettyOutput.print("\n".join(lines), OutputType.WARNING)
             # 询问用户
             if get_yes_no(
                 "检测到索引变更，是否现在更新索引后再开始检索？", default=True
@@ -232,9 +233,12 @@ class JarvisRAGPipeline:
         rewritten_queries = self._get_query_rewriter().rewrite(query_text)
 
         # 2. 为每个重写的查询检索初始候选文档
+        PrettyOutput.print(
+            "将为以下查询变体进行混合检索:\n" + "\n".join([f"  - {q}" for q in rewritten_queries]),
+            OutputType.INFO,
+        )
         all_candidate_docs = []
         for q in rewritten_queries:
-            PrettyOutput.print(f"正在为查询变体 '{q}' 进行混合检索...", OutputType.INFO)
             candidates = self._get_retriever().retrieve(
                 q, n_results=n_results * 2, use_bm25=self.use_bm25
             )
@@ -273,9 +277,9 @@ class JarvisRAGPipeline:
             )
         )
         if sources:
-            PrettyOutput.print("根据以下文档回答:", OutputType.INFO)
-            for source in sources:
-                PrettyOutput.print(f"  - {source}", OutputType.INFO)
+            # 合并来源列表后一次性打印，避免多次加框
+            lines = ["根据以下文档回答:"] + [f"  - {source}" for source in sources]
+            PrettyOutput.print("\n".join(lines), OutputType.INFO)
 
         # 4. 创建最终提示并生成答案
         # 我们使用原始的query_text作为给LLM的最终提示
@@ -303,9 +307,12 @@ class JarvisRAGPipeline:
         rewritten_queries = self._get_query_rewriter().rewrite(query_text)
 
         # 2. 检索候选文档
+        PrettyOutput.print(
+            "将为以下查询变体进行混合检索:\n" + "\n".join([f"  - {q}" for q in rewritten_queries]),
+            OutputType.INFO,
+        )
         all_candidate_docs = []
         for q in rewritten_queries:
-            PrettyOutput.print(f"正在为查询变体 '{q}' 进行混合检索...", OutputType.INFO)
             candidates = self._get_retriever().retrieve(
                 q, n_results=n_results * 2, use_bm25=self.use_bm25
             )

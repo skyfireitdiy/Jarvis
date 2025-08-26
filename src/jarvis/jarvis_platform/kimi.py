@@ -194,9 +194,7 @@ class KimiModel(BasePlatform):
         uploaded_files = []
         for index, file_path in enumerate(file_list, 1):
             file_name = os.path.basename(file_path)
-            PrettyOutput.print(
-                f"处理文件 [{index}/{len(file_list)}]: {file_name}", OutputType.INFO
-            )
+            log_lines: list[str] = [f"处理文件 [{index}/{len(file_list)}]: {file_name}"]
             try:
                 mime_type, _ = mimetypes.guess_type(file_path)
                 action = (
@@ -204,44 +202,40 @@ class KimiModel(BasePlatform):
                 )
 
                 # 获取预签名URL
-                PrettyOutput.print(f"获取上传URL: {file_name}", OutputType.INFO)
+                log_lines.append(f"获取上传URL: {file_name}")
                 presigned_data = self._get_presigned_url(file_path, action)
 
                 # 上传文件
-                PrettyOutput.print(f"上传文件: {file_name}", OutputType.INFO)
+                log_lines.append(f"上传文件: {file_name}")
                 if self._upload_file(file_path, presigned_data["url"]):
                     # 获取文件信息
-                    PrettyOutput.print(f"获取文件信息: {file_name}", OutputType.INFO)
+                    log_lines.append(f"获取文件信息: {file_name}")
                     file_info = self._get_file_info(presigned_data, file_name, action)
 
                     # 只有文件需要解析
                     if action == "file":
-                        PrettyOutput.print(
-                            f"等待文件解析: {file_name}", OutputType.INFO
-                        )
+                        log_lines.append(f"等待文件解析: {file_name}")
                         if self._wait_for_parse(file_info["id"]):
                             uploaded_files.append(file_info)
-                            PrettyOutput.print(
-                                f"文件处理完成: {file_name}", OutputType.SUCCESS
-                            )
+                            log_lines.append(f"文件处理完成: {file_name}")
                         else:
-                            PrettyOutput.print(
-                                f"文件解析失败: {file_name}", OutputType.ERROR
-                            )
+                            log_lines.append(f"文件解析失败: {file_name}")
+                            PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
                             return False
                     else:
                         uploaded_files.append(file_info)
-                        PrettyOutput.print(
-                            f"图片处理完成: {file_name}", OutputType.SUCCESS
-                        )
+                        log_lines.append(f"图片处理完成: {file_name}")
                 else:
-                    PrettyOutput.print(f"文件上传失败: {file_name}", OutputType.ERROR)
+                    log_lines.append(f"文件上传失败: {file_name}")
+                    PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
                     return False
 
+                # 成功路径统一输出本文件的处理日志
+                PrettyOutput.print("\n".join(log_lines), OutputType.INFO)
+
             except Exception as e:
-                PrettyOutput.print(
-                    f"处理文件出错 {file_path}: {str(e)}", OutputType.ERROR
-                )
+                log_lines.append(f"处理文件出错 {file_path}: {str(e)}")
+                PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
                 return False
 
         self.uploaded_files = uploaded_files

@@ -72,6 +72,7 @@ class MemoryOrganizer:
         """加载指定类型的所有记忆"""
         memories = []
         memory_files = self._get_memory_files(memory_type)
+        error_lines: list[str] = []
 
         for memory_file in memory_files:
             try:
@@ -80,9 +81,10 @@ class MemoryOrganizer:
                     memory_data["file_path"] = str(memory_file)
                     memories.append(memory_data)
             except Exception as e:
-                PrettyOutput.print(
-                    f"读取记忆文件 {memory_file} 失败: {str(e)}", OutputType.WARNING
-                )
+                error_lines.append(f"读取记忆文件 {memory_file} 失败: {str(e)}")
+
+        if error_lines:
+            PrettyOutput.print("\n".join(error_lines), OutputType.WARNING)
 
         return memories
 
@@ -314,16 +316,14 @@ tags:
 
                     group_memories = [memories[i] for i in original_indices]
 
-                    # 显示将要合并的记忆
-                    PrettyOutput.print(
-                        f"\n准备合并 {len(group_memories)} 个记忆:", OutputType.INFO
-                    )
+                    # 显示将要合并的记忆（先拼接后统一打印，避免循环逐条输出）
+                    lines = [f"", f"准备合并 {len(group_memories)} 个记忆:"]
                     for mem in group_memories:
-                        PrettyOutput.print(
+                        lines.append(
                             f"  - ID: {mem.get('id', '未知')}, "
-                            f"标签: {', '.join(mem.get('tags', []))[:50]}...",
-                            OutputType.INFO,
+                            f"标签: {', '.join(mem.get('tags', []))[:50]}..."
                         )
+                    PrettyOutput.print("\n".join(lines), OutputType.INFO)
 
                     if not dry_run:
                         # 合并记忆
@@ -396,27 +396,28 @@ tags:
             OutputType.SUCCESS,
         )
 
-        # 删除原始记忆文件
+        # 删除原始记忆文件（先汇总日志，最后统一打印）
+        info_lines: list[str] = []
+        warn_lines: list[str] = []
         for orig_memory in original_memories:
             if "file_path" in orig_memory:
                 try:
                     file_path = Path(orig_memory["file_path"])
                     if file_path.exists():
                         file_path.unlink()
-                        PrettyOutput.print(
-                            f"删除原始记忆: {orig_memory.get('id', '未知')}",
-                            OutputType.INFO,
-                        )
+                        info_lines.append(f"删除原始记忆: {orig_memory.get('id', '未知')}")
                     else:
-                        PrettyOutput.print(
-                            f"原始记忆文件已不存在，跳过删除: {orig_memory.get('id', '未知')}",
-                            OutputType.INFO,
+                        info_lines.append(
+                            f"原始记忆文件已不存在，跳过删除: {orig_memory.get('id', '未知')}"
                         )
                 except Exception as e:
-                    PrettyOutput.print(
-                        f"删除记忆文件失败 {orig_memory['file_path']}: {str(e)}",
-                        OutputType.WARNING,
+                    warn_lines.append(
+                        f"删除记忆文件失败 {orig_memory.get('file_path', '')}: {str(e)}"
                     )
+        if info_lines:
+            PrettyOutput.print("\n".join(info_lines), OutputType.INFO)
+        if warn_lines:
+            PrettyOutput.print("\n".join(warn_lines), OutputType.WARNING)
 
     def export_memories(
         self,
@@ -436,9 +437,10 @@ tags:
             导出的记忆数量
         """
         all_memories = []
+        progress_lines: list[str] = []
 
         for memory_type in memory_types:
-            PrettyOutput.print(f"正在导出 {memory_type} 类型的记忆...", OutputType.INFO)
+            progress_lines.append(f"正在导出 {memory_type} 类型的记忆...")
             memories = self._load_memories(memory_type)
 
             # 如果指定了标签，进行过滤
@@ -456,9 +458,11 @@ tags:
                 memory.pop("file_path", None)
 
             all_memories.extend(memories)
-            PrettyOutput.print(
-                f"从 {memory_type} 导出了 {len(memories)} 个记忆", OutputType.INFO
-            )
+            progress_lines.append(f"从 {memory_type} 导出了 {len(memories)} 个记忆")
+
+        # 统一展示导出进度日志
+        if progress_lines:
+            PrettyOutput.print("\n".join(progress_lines), OutputType.INFO)
 
         # 保存到文件
         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -505,10 +509,6 @@ tags:
         for memory in memories:
             memory_type = memory.get("memory_type", memory.get("type"))
             if not memory_type:
-                PrettyOutput.print(
-                    f"跳过没有类型的记忆: {memory.get('id', '未知')}",
-                    OutputType.WARNING,
-                )
                 skipped_count += 1
                 continue
 
@@ -560,8 +560,9 @@ tags:
 
         # 显示导入结果
         PrettyOutput.print("\n导入完成！", OutputType.SUCCESS)
-        for memory_type, count in import_stats.items():
-            PrettyOutput.print(f"{memory_type}: 导入了 {count} 个记忆", OutputType.INFO)
+        if import_stats:
+            lines = [f"{memory_type}: 导入了 {count} 个记忆" for memory_type, count in import_stats.items()]
+            PrettyOutput.print("\n".join(lines), OutputType.INFO)
 
         if skipped_count > 0:
             PrettyOutput.print(f"跳过了 {skipped_count} 个记忆", OutputType.WARNING)
@@ -681,12 +682,15 @@ def export(
     try:
         organizer = MemoryOrganizer()
 
-        # 验证记忆类型
+        # 验证记忆类型（先收集无效类型，统一打印一次）
         valid_types = ["project_long_term", "global_long_term"]
-        for mt in memory_types:
-            if mt not in valid_types:
-                PrettyOutput.print(f"错误：不支持的记忆类型 '{mt}'", OutputType.ERROR)
-                raise typer.Exit(1)
+        invalid_types = [mt for mt in memory_types if mt not in valid_types]
+        if invalid_types:
+            PrettyOutput.print(
+                "错误：不支持的记忆类型: " + ", ".join(f"'{mt}'" for mt in invalid_types),
+                OutputType.ERROR,
+            )
+            raise typer.Exit(1)
 
         count = organizer.export_memories(
             memory_types=memory_types,

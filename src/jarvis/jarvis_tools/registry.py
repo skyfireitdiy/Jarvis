@@ -73,7 +73,7 @@ arguments:
 
 <string_format>
 # 📝 字符串参数格式
-始终使用 |2 语法表示字符串参数，防止多行字符串行首空格引起歧义：
+使用 |2 语法表示字符串参数，防止多行字符串行首空格引起歧义。
 
 {ot("TOOL_CALL")}
 want: 当前的git状态，期望获取xxx的提交记录
@@ -81,7 +81,7 @@ name: execute_script
 
 arguments:
   interpreter: bash
-  script_content: |2
+  script_content: |
     git status --porcelain
 {ct("TOOL_CALL")}
 </string_format>
@@ -98,7 +98,6 @@ arguments:
 <common_errors>
 # ⚠️ 常见错误
 - 同时调用多个工具
-- 字符串参数缺少 |2
 - 假设工具结果
 - 创建虚构对话
 - 在没有所需信息的情况下继续
@@ -276,14 +275,17 @@ class ToolRegistry(OutputHandlerProtocol):
         # 如果配置了 use 列表，只保留列表中的工具
         if use_list:
             filtered_tools = {}
+            missing = []
             for tool_name in use_list:
                 if tool_name in self.tools:
                     filtered_tools[tool_name] = self.tools[tool_name]
                 else:
-                    PrettyOutput.print(
-                        f"警告: 配置的工具 '{tool_name}' 不存在",
-                        OutputType.WARNING,
-                    )
+                    missing.append(tool_name)
+            if missing:
+                PrettyOutput.print(
+                    "警告: 配置的工具不存在: " + ", ".join(f"'{name}'" for name in missing),
+                    OutputType.WARNING,
+                )
             self.tools = filtered_tools
 
         # 如果配置了 dont_use 列表，排除列表中的工具
@@ -315,14 +317,15 @@ class ToolRegistry(OutputHandlerProtocol):
         )
 
         # 遍历目录中的所有.yaml文件
+        error_lines = []
         for file_path in mcp_tools_dir.glob("*.yaml"):
             try:
                 config = yaml.safe_load(open(file_path, "r", encoding="utf-8"))
                 self.register_mcp_tool_by_config(config)
             except Exception as e:
-                PrettyOutput.print(
-                    f"文件 {file_path} 加载失败: {str(e)}", OutputType.WARNING
-                )
+                error_lines.append(f"文件 {file_path} 加载失败: {str(e)}")
+        if error_lines:
+            PrettyOutput.print("\n".join(error_lines), OutputType.WARNING)
 
     def _load_builtin_tools(self) -> None:
         """从内置工具目录加载工具"""
