@@ -38,6 +38,7 @@ from jarvis.jarvis_utils.config import (
     is_force_save_memory,
     is_use_analysis,
     is_use_methodology,
+    get_tool_filter_threshold,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
@@ -884,7 +885,8 @@ class Agent:
             return
 
         all_tools = tool_registry.get_all_tools()
-        if len(all_tools) <= 30:
+        threshold = get_tool_filter_threshold()
+        if len(all_tools) <= threshold:
             return
 
         # 为工具选择构建提示
@@ -908,7 +910,9 @@ class Agent:
 请根据用户任务，从列表中选择最相关的工具。
 请仅返回所选工具的编号，以逗号分隔。例如：1, 5, 12
 """
-        PrettyOutput.print("工具数量超过30个，正在使用AI筛选相关工具...", OutputType.INFO)
+        PrettyOutput.print(
+            f"工具数量超过{threshold}个，正在使用AI筛选相关工具...", OutputType.INFO
+        )
 
         # 使用临时模型实例调用模型，以避免污染历史记录
         try:
