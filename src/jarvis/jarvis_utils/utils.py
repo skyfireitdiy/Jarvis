@@ -1476,20 +1476,16 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
     返回：
     函数执行结果
     """
-    logs: List[str] = []
     result: Any = None
-    success = False
     while True:
         try:
             result = func()
             success = True
             break
         except Exception:
-            logs.append(f"重试中，等待 {sleep_time}s...")
+            PrettyOutput.print(f"重试中，等待 {sleep_time}s...", OutputType.WARNING)
             time.sleep(sleep_time)
             continue
-    if logs:
-        PrettyOutput.print("\n".join(logs), OutputType.WARNING)
     return result
 
 
@@ -1507,16 +1503,13 @@ def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
         与while_success不同，此函数只检查返回是否为True，
         不捕获异常，异常会直接抛出
     """
-    logs: List[str] = []
     ret: bool = False
     while True:
         ret = func()
         if ret:
             break
-        logs.append(f"重试中，等待 {sleep_time}s...")
+        PrettyOutput.print(f"重试中，等待 {sleep_time}s...", OutputType.WARNING)
         time.sleep(sleep_time)
-    if logs:
-        PrettyOutput.print("\n".join(logs), OutputType.WARNING)
     return ret
 
 
