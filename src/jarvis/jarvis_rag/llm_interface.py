@@ -47,13 +47,11 @@ class ToolAgent_LLM(LLMInterface):
         # 为代理提供一个通用的系统提示
         self.system_prompt = "You are a helpful assistant. Please answer the user's question based on the provided context. You can use tools to find more information if needed."
         self.summary_prompt = """
-<report>
 请为本次问答任务生成一个总结报告，包含以下内容：
 
 1. **原始问题**: 重述用户最开始提出的问题。
 2. **关键信息来源**: 总结你是基于哪些关键信息或文件得出的结论。
 3. **最终答案**: 给出最终的、精炼的回答。
-</report>
 """
 
     def generate(self, prompt: str, **kwargs) -> str:

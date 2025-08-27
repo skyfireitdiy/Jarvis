@@ -449,11 +449,7 @@ def query(
         PrettyOutput.print(f"正在查询: '{question}'", OutputType.INFO)
         answer = pipeline.query(question)
 
-        PrettyOutput.print("答案:", OutputType.INFO)
-        # 我们仍然可以使用 rich.markdown.Markdown，因为 PrettyOutput 底层使用了 rich
-        from jarvis.jarvis_utils.globals import console
-
-        console.print(Markdown(answer))
+        PrettyOutput.print(answer, OutputType.SUCCESS)
 
     except Exception as e:
         PrettyOutput.print(f"发生错误: {e}", OutputType.ERROR)
