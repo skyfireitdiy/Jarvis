@@ -102,22 +102,3 @@ jst = "jarvis.jarvis_stats.cli:main"
 
 
 
-[tool.uv]
-index-strategy = "unsafe-first-match"
-
-[[tool.uv.index]]
-url = "https://pypi.org/simple"
-default = true
-
-[[tool.uv.index]]
-name = "tencent"
-url = "https://mirrors.cloud.tencent.com/pypi/simple"
-
-[[tool.uv.index]]
-name = "aliyun"
-url = "https://mirrors.aliyun.com/pypi/simple/"
-
-[[tool.uv.index]]
-name = "ustc"
-url = "https://pypi.mirrors.ustc.edu.cn/simple/"
-
