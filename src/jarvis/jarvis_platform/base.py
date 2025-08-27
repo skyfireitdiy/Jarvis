@@ -120,13 +120,15 @@ class BasePlatform(ABC):
         else:
             response = ""
 
-            text_content = Text()
+            text_content = Text(overflow="fold")  # 添加文本溢出处理
             panel = Panel(
                 text_content,
                 title=f"[bold cyan]{self.name()}[/bold cyan]",
                 subtitle="[dim]思考中... (按 Ctrl+C 中断)[/dim]",
                 border_style="bright_blue",
                 box=box.ROUNDED,
+                height=30,  # 设置固定高度
+                expand=True  # 允许面板扩展
             )
 
             if not self.suppress_output:
