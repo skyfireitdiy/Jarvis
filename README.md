@@ -210,8 +210,7 @@ JARVIS_PLATFORM: yuanbao
 JARVIS_MODEL: deep_seek_v3
 
 # 用于“思考”步骤的模型，通常选择能力更强的模型
-JARVIS_THINKING_PLATFORM: yuanbao
-JARVIS_THINKING_MODEL: deep_seek
+
 
 # 平台所需的环境变量
 ENV:

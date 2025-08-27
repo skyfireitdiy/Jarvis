@@ -591,24 +591,17 @@ class CodeReviewTool:
                 tool_registry = ToolRegistry()
                 tool_registry.dont_use_tools(["code_review"])
 
-                # Get llm_type and model_group from args
-                llm_type = args.get("llm_type", "normal")
+                # Get model_group from args (thinking mode removed)
                 model_group = args.get("model_group")
 
-                # Get platform and model based on llm_type and model_group
+                # Get platform and model from model_group
                 from jarvis.jarvis_utils.config import (
                     get_normal_platform_name,
                     get_normal_model_name,
-                    get_thinking_platform_name,
-                    get_thinking_model_name,
                 )
 
-                if llm_type == "thinking":
-                    platform_name = get_thinking_platform_name(model_group)
-                    model_name = get_thinking_model_name(model_group)
-                else:
-                    platform_name = get_normal_platform_name(model_group)
-                    model_name = get_normal_model_name(model_group)
+                platform_name = get_normal_platform_name(model_group)
+                model_name = get_normal_model_name(model_group)
 
                 # If no explicit parameters, try to get from existing agent
                 calling_agent = agent or get_agent(current_agent_name)
@@ -698,7 +691,6 @@ class CodeReviewTool:
 [在此处插入完整MARKDOWN格式的审查报告]
 {ct("REPORT")}""",
                     output_handler=[tool_registry],  # type: ignore
-                    llm_type="thinking",
                     auto_complete=False,
                 )
 
@@ -821,12 +813,7 @@ def extract_code_report(result: str) -> str:
 def review_commit(
     commit: str = typer.Argument(..., help="要审查的提交SHA"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
-    llm_type: str = typer.Option(
-        "normal",
-        "-t",
-        "--llm-type",
-        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
-    ),
+
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -837,7 +824,7 @@ def review_commit(
         "review_type": "commit",
         "commit_sha": commit,
         "root_dir": root_dir,
-        "llm_type": llm_type,
+
         "model_group": model_group,
     }
     result = tool.execute(tool_args)
@@ -852,12 +839,7 @@ def review_commit(
 @app.command("current")
 def review_current(
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
-    llm_type: str = typer.Option(
-        "normal",
-        "-t",
-        "--llm-type",
-        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
-    ),
+
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -867,7 +849,7 @@ def review_current(
     tool_args = {
         "review_type": "current",
         "root_dir": root_dir,
-        "llm_type": llm_type,
+
         "model_group": model_group,
     }
     result = tool.execute(tool_args)
@@ -884,12 +866,7 @@ def review_range(
     start_commit: str = typer.Argument(..., help="起始提交SHA"),
     end_commit: str = typer.Argument(..., help="结束提交SHA"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
-    llm_type: str = typer.Option(
-        "normal",
-        "-t",
-        "--llm-type",
-        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
-    ),
+
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -901,7 +878,7 @@ def review_range(
         "start_commit": start_commit,
         "end_commit": end_commit,
         "root_dir": root_dir,
-        "llm_type": llm_type,
+
         "model_group": model_group,
     }
     result = tool.execute(tool_args)
@@ -917,12 +894,7 @@ def review_range(
 def review_file(
     file: str = typer.Argument(..., help="要审查的文件路径"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
-    llm_type: str = typer.Option(
-        "normal",
-        "-t",
-        "--llm-type",
-        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
-    ),
+
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -933,7 +905,7 @@ def review_file(
         "review_type": "file",
         "file_path": file,
         "root_dir": root_dir,
-        "llm_type": llm_type,
+
         "model_group": model_group,
     }
     result = tool.execute(tool_args)

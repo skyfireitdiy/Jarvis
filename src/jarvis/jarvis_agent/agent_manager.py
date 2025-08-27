@@ -22,12 +22,10 @@ class AgentManager:
 
     def __init__(
         self,
-        llm_type: str,
         model_group: Optional[str] = None,
         tool_group: Optional[str] = None,
         restore_session: bool = False,
     ):
-        self.llm_type = llm_type
         self.model_group = model_group
         self.tool_group = tool_group
         self.restore_session = restore_session
@@ -43,7 +41,6 @@ class AgentManager:
 
         self.agent = Agent(
             system_prompt=origin_agent_system_prompt,
-            llm_type=self.llm_type,
             model_group=self.model_group,
             input_handler=[shell_input_handler, builtin_input_handler],
             output_handler=[ToolRegistry()],  # type: ignore

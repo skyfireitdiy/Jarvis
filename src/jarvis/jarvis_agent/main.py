@@ -46,12 +46,7 @@ def cli(
         None, "-c", "--agent-definition", help="代理定义文件路径"
     ),
     task: Optional[str] = typer.Option(None, "-T", "--task", help="初始任务内容"),
-    llm_type: str = typer.Option(
-        "normal",
-        "-t",
-        "--llm-type",
-        help="使用的LLM类型，覆盖配置文件中的设置",
-    ),
+
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -66,8 +61,7 @@ def cli(
     config = load_config(agent_definition) if agent_definition else {}
 
     # Override config with command-line arguments if provided
-    if llm_type:
-        config["llm_type"] = llm_type
+
     if model_group:
         config["model_group"] = model_group
 

@@ -10,8 +10,6 @@ from jarvis.jarvis_utils.config import (
     get_data_dir,
     get_normal_model_name,
     get_normal_platform_name,
-    get_thinking_model_name,
-    get_thinking_platform_name,
 )
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
@@ -187,12 +185,7 @@ class PlatformRegistry:
         platform.set_model_name(model_name)  # type: ignore
         return platform  # type: ignore
 
-    def get_thinking_platform(self) -> BasePlatform:
-        platform_name = get_thinking_platform_name()
-        model_name = get_thinking_model_name()
-        platform = self.create_platform(platform_name)
-        platform.set_model_name(model_name)  # type: ignore
-        return platform  # type: ignore
+
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]) -> None:
         """Register platform class

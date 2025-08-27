@@ -162,24 +162,17 @@ commit信息
 {ct("COMMIT_MESSAGE")}
                 """
 
-                # Get llm_type and model_group from args
-                llm_type = args.get("llm_type", "normal")
+                # Get model_group from args
                 model_group = args.get("model_group")
 
-                # Get platform and model based on llm_type and model_group
+                # Get platform and model based on model_group (thinking mode removed)
                 from jarvis.jarvis_utils.config import (
                     get_normal_platform_name,
                     get_normal_model_name,
-                    get_thinking_platform_name,
-                    get_thinking_model_name,
                 )
 
-                if llm_type == "thinking":
-                    platform_name = get_thinking_platform_name(model_group)
-                    model_name = get_thinking_model_name(model_group)
-                else:
-                    platform_name = get_normal_platform_name(model_group)
-                    model_name = get_normal_model_name(model_group)
+                platform_name = get_normal_platform_name(model_group)
+                model_name = get_normal_model_name(model_group)
 
                 # If no explicit parameters, try to get from existing agent
                 agent = get_agent(current_agent_name)
@@ -202,10 +195,7 @@ commit信息
                         if model_group:
                             platform.model_group = model_group
                 else:
-                    if llm_type == "thinking":
-                        platform = PlatformRegistry().get_thinking_platform()
-                    else:
-                        platform = PlatformRegistry().get_normal_platform()
+                    platform = PlatformRegistry().get_normal_platform()
 
                 # Ensure platform is not None
                 if not platform:
@@ -382,12 +372,7 @@ def cli(
         "--suffix",
         help="提交信息后缀（用换行分隔）",
     ),
-    llm_type: str = typer.Option(
-        "normal",
-        "-t",
-        "--llm-type",
-        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
-    ),
+
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -399,7 +384,7 @@ def cli(
             "root_dir": root_dir,
             "prefix": prefix,
             "suffix": suffix,
-            "llm_type": llm_type,
+
             "model_group": model_group,
         }
     )

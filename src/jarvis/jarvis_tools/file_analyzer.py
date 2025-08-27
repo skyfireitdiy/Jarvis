@@ -30,7 +30,7 @@ class FileAnalyzerTool:
 
     @staticmethod
     def check() -> bool:
-        return PlatformRegistry().get_thinking_platform().support_upload_files()
+        return PlatformRegistry().get_normal_platform().support_upload_files()
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行文件分析操作
@@ -62,14 +62,14 @@ class FileAnalyzerTool:
             if not valid_files:
                 return {"success": False, "stdout": "", "stderr": "没有找到有效的文件"}
 
-            # 创建thinking平台实例
-            platform = PlatformRegistry().get_thinking_platform()
+            # 创建平台实例
+            platform = PlatformRegistry().get_normal_platform()
 
             if not platform:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "无法创建thinking平台实例",
+                    "stderr": "无法创建平台实例",
                 }
 
             # 设置系统消息

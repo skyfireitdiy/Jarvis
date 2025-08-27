@@ -103,12 +103,10 @@ class SubCodeAgentTool:
                 pass
 
             # 创建 CodeAgent：参数优先使用父Agent的配置（若可获取），否则使用默认
-            # 推断/继承 llm_type、need_summary、tool_group
-            llm_type = "normal"
+            # 推断/继承 tool_group
             tool_group = None
             try:
                 if parent_agent is not None:
-                    llm_type = getattr(parent_agent, "llm_type", llm_type)
                     tool_group = getattr(parent_agent, "tool_group", tool_group)
             except Exception:
                 pass
@@ -135,7 +133,6 @@ class SubCodeAgentTool:
 
             try:
                 code_agent = CodeAgent(
-                    llm_type=llm_type,
                     model_group=model_group,
                     need_summary=True,
                     append_tools=append_tools,
