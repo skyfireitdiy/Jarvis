@@ -131,21 +131,31 @@ class BasePlatform(ABC):
 
             if not self.suppress_output:
                 if get_pretty_output():
-                    with Live(panel, refresh_per_second=10, transient=False) as live:
+                    # 优化Live输出，减少闪烁
+                    buffer = []
+                    buffer_count = 0
+                    with Live(panel, refresh_per_second=4, transient=False) as live:
                         for s in self.chat(message):
                             response += s
-                            text_content.append(s, style="bright_white")
-                            panel.subtitle = (
-                                "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
-                            )
-                            live.update(panel)
+                            buffer.append(s)
+                            buffer_count += 1
+                            
+                            # 积累一定量或达到最后再更新，减少闪烁
+                            if buffer_count >= 5 or s == "":
+                                text_content.append("".join(buffer), style="bright_white")
+                                buffer.clear()
+                                buffer_count = 0
+                                panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                                live.update(panel)
+                            
                             if is_immediate_abort() and get_interrupt():
                                 return response
+                        # 确保最后剩余内容被刷新
+                        if buffer:
+                            text_content.append("".join(buffer), style="bright_white")
                         end_time = time.time()
                         duration = end_time - start_time
-                        panel.subtitle = (
-                            f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
-                        )
+                        panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
                         live.update(panel)
                 else:
                     # Print a clear prefix line before streaming model output (non-pretty mode)
