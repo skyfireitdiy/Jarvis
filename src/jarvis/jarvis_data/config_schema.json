@@ -165,6 +165,13 @@
             "JARVIS_MAX_INPUT_TOKEN_COUNT": {
               "type": "number",
               "default": 32000
+            },
+            "ENV": {
+              "type": "object",
+              "description": "该模型组特定的环境变量，会覆盖全局 ENV 配置",
+              "additionalProperties": {
+                "type": "string"
+              }
             }
           },
           "required": [
