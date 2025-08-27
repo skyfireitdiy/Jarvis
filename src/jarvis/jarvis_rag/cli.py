@@ -240,6 +240,7 @@ def add_documents(
 
         sorted_files = sorted(list(files_to_process))
         total_files = len(sorted_files)
+        loaded_msgs: List[str] = []
 
         for i, file_path in enumerate(sorted_files):
             try:
@@ -249,14 +250,15 @@ def add_documents(
                     loader = TextLoader(str(file_path), encoding="utf-8")
 
                 docs_batch.extend(loader.load())
-                PrettyOutput.print(
-                    f"已加载: {file_path} (文件 {i + 1}/{total_files})", OutputType.INFO
-                )
+                loaded_msgs.append(f"已加载: {file_path} (文件 {i + 1}/{total_files})")
             except Exception as e:
                 PrettyOutput.print(f"加载失败 {file_path}: {e}", OutputType.WARNING)
 
             # 当批处理已满或是最后一个文件时处理批处理
             if docs_batch and (len(docs_batch) >= batch_size or (i + 1) == total_files):
+                if loaded_msgs:
+                    PrettyOutput.print("\n".join(loaded_msgs), OutputType.INFO)
+                    loaded_msgs = []
                 PrettyOutput.print(
                     f"正在处理批次，包含 {len(docs_batch)} 个文档...", OutputType.INFO
                 )
@@ -267,6 +269,10 @@ def add_documents(
                 )
                 docs_batch = []  # 清空批处理
 
+        # 最后统一打印可能残留的“已加载”信息
+        if loaded_msgs:
+            PrettyOutput.print("\n".join(loaded_msgs), OutputType.INFO)
+            loaded_msgs = []
         if total_docs_added == 0:
             PrettyOutput.print("未能成功加载任何文档。", OutputType.ERROR)
             raise typer.Exit(code=1)
