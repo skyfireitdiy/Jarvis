@@ -115,6 +115,14 @@ def get_shell_name() -> str:
     return os.path.basename(shell_path).lower()
 
 
+def _apply_llm_group_env_override(group_config: Dict[str, Any]) -> None:
+    """如果模型组配置中包含ENV，则应用环境变量覆盖"""
+    if "ENV" in group_config and isinstance(group_config["ENV"], dict):
+        os.environ.update(
+            {str(k): str(v) for k, v in group_config["ENV"].items() if v is not None}
+        )
+
+
 def _get_resolved_model_config(
     model_group_override: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -141,6 +149,8 @@ def _get_resolved_model_config(
             if isinstance(group_item, dict) and model_group_name in group_item:
                 group_config = group_item[model_group_name]
                 break
+    
+    _apply_llm_group_env_override(group_config)
 
     # Start with group config
     resolved_config = group_config.copy()
