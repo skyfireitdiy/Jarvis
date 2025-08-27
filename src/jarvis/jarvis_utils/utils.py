@@ -1480,7 +1480,6 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
     while True:
         try:
             result = func()
-            success = True
             break
         except Exception:
             PrettyOutput.print(f"重试中，等待 {sleep_time}s...", OutputType.WARNING)
