@@ -1085,6 +1085,14 @@ def _collect_optional_config_interactively(
         )
         or changed
     )
+    changed = (
+        _ask_and_set_int(
+            "JARVIS_TOOL_FILTER_THRESHOLD",
+            "设置AI工具筛选阈值 (当可用工具数超过此值时触发AI筛选, 默认30)",
+            30,
+        )
+        or changed
+    )
 
     # 目录类配置（逗号分隔）
     changed = (
