@@ -127,8 +127,7 @@ class BasePlatform(ABC):
                 subtitle="[dim]思考中... (按 Ctrl+C 中断)[/dim]",
                 border_style="bright_blue",
                 box=box.ROUNDED,
-                height=30,  # 设置固定高度
-                expand=True  # 允许面板扩展
+                expand=True  # 允许面板自动调整大小
             )
 
             if not self.suppress_output:
