@@ -38,12 +38,24 @@ class EmbeddingManager:
         encode_kwargs = {"normalize_embeddings": True}
 
         try:
-            return HuggingFaceEmbeddings(
-                model_name=self.model_name,
-                model_kwargs=model_kwargs,
-                encode_kwargs=encode_kwargs,
-                show_progress=True,
-            )
+            # First try to load model locally
+            try:
+                from sentence_transformers import SentenceTransformer
+                local_model = SentenceTransformer(self.model_name, device=model_kwargs["device"])
+                return HuggingFaceEmbeddings(
+                    client=local_model,
+                    model_name=self.model_name,
+                    model_kwargs=model_kwargs,
+                    encode_kwargs=encode_kwargs,
+                )
+            except Exception:
+                # Fall back to remote download if local loading fails
+                return HuggingFaceEmbeddings(
+                    model_name=self.model_name,
+                    model_kwargs=model_kwargs,
+                    encode_kwargs=encode_kwargs,
+                    show_progress=True,
+                )
         except Exception as e:
             PrettyOutput.print(
                 f"加载嵌入模型 '{self.model_name}' 时出错: {e}", OutputType.ERROR
