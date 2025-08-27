@@ -744,9 +744,7 @@ def _interactive_config_setup(config_file_path: Path):
     config_data = {
         "ENV": env_vars,
         "JARVIS_PLATFORM": platform_name,
-        "JARVIS_THINKING_PLATFORM": platform_name,
         "JARVIS_MODEL": model_name,
-        "JARVIS_THINKING_MODEL": model_name,
     }
 
     if not test_passed:

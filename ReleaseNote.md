@@ -810,7 +810,7 @@
     -   在 `example/roles/roles.yaml` 中，为“技术教练”角色在问题定义、根因分析、方案评估等阶段，补充了大量业界标准方法论，如 `5W1H`、`帕累托分析`、`SWOT分析`、`成本效益分析(CBA)` 和
 `多标准决策分析(MCDA)` 等。
 -   **命令行工具功能增强**:
-    -   **统一模型选择**: 为 `jarvis` 和 `jarvis-code-agent` 引入 `--llm_type` 参数，以简化大语言模型的选择。
+
     -   **会话管理**: 为 `jarvis` 和 `jarvis-code-agent` 新增 `--restore-session` 功能；为 `jarvis-platform-manager` 聊天模式增加了 `/save_session` 和 `/load_session` 命令。
     -   **知识库(RAG)增强**: `jarvis-rag` 新增 `list-docs` 子命令，并为常用选项增加了简写形式和 `--batch-size` 选项。
 -   **模型更新**:
@@ -845,7 +845,7 @@
 - (无)
 
 #### **优化与重构 (Refactors & Improvements)**
-- 重构了Agent的模型配置逻辑，使用 `llm_type` (`normal`/`thinking`)替代硬编码的 `platform` 和 `model_name`，增强了灵活性和可维护性。
+
 - 优化了PDF导出样式 (`style.css`)，改善了字体、边距和布局，并增加了页码。
 - 改进了会话恢复逻辑，确保恢复后能正确识别为非首次运行。
 - 简化了Agent示例配置文件，移除了冗余的模型定义。

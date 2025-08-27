@@ -48,7 +48,6 @@ class CodeAgent:
 
     def __init__(
         self,
-        llm_type: str = "normal",
         model_group: Optional[str] = None,
         need_summary: bool = True,
         append_tools: Optional[str] = None,
@@ -87,7 +86,6 @@ class CodeAgent:
             name="CodeAgent",
             auto_complete=False,
             output_handler=[tool_registry, EditFileHandler()],  # type: ignore
-            llm_type=llm_type,
             model_group=model_group,
             input_handler=[shell_input_handler, builtin_input_handler],
             need_summary=need_summary,
@@ -674,12 +672,7 @@ class CodeAgent:
 
 @app.command()
 def cli(
-    llm_type: str = typer.Option(
-        "normal",
-        "-t",
-        "--llm-type",
-        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
-    ),
+
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -755,7 +748,6 @@ def cli(
     find_git_root_and_cd(curr_dir)
     try:
         agent = CodeAgent(
-            llm_type=llm_type,
             model_group=model_group,
             need_summary=False,
             append_tools=append_tools,

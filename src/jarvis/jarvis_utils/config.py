@@ -149,8 +149,6 @@ def _get_resolved_model_config(
     for key in [
         "JARVIS_PLATFORM",
         "JARVIS_MODEL",
-        "JARVIS_THINKING_PLATFORM",
-        "JARVIS_THINKING_MODEL",
         "JARVIS_MAX_INPUT_TOKEN_COUNT",
     ]:
         if key in GLOBAL_CONFIG_DATA:
@@ -181,7 +179,7 @@ def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
     return config.get("JARVIS_MODEL", "deep_seek_v3")
 
 
-def get_thinking_platform_name(model_group_override: Optional[str] = None) -> str:
+def _deprecated_platform_name_v1(model_group_override: Optional[str] = None) -> str:
     """
     获取思考操作的平台名称。
 
@@ -190,12 +188,10 @@ def get_thinking_platform_name(model_group_override: Optional[str] = None) -> st
     """
     config = _get_resolved_model_config(model_group_override)
     # Fallback to normal platform if thinking platform is not specified
-    return config.get(
-        "JARVIS_THINKING_PLATFORM", get_normal_platform_name(model_group_override)
-    )
+    return get_normal_platform_name(model_group_override)
 
 
-def get_thinking_model_name(model_group_override: Optional[str] = None) -> str:
+def _deprecated_model_name_v1(model_group_override: Optional[str] = None) -> str:
     """
     获取思考操作的模型名称。
 
@@ -204,9 +200,7 @@ def get_thinking_model_name(model_group_override: Optional[str] = None) -> str:
     """
     config = _get_resolved_model_config(model_group_override)
     # Fallback to normal model if thinking model is not specified
-    return config.get(
-        "JARVIS_THINKING_MODEL", get_normal_model_name(model_group_override)
-    )
+    return get_normal_model_name(model_group_override)
 
 
 def is_execute_tool_confirm() -> bool:

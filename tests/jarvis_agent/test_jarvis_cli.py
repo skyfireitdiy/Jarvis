@@ -58,8 +58,7 @@ class TestJarvisCLI:
         captured = {}
 
         class DummyAgentManager:
-            def __init__(self, llm_type, model_group, tool_group, restore_session):
-                captured["llm_type"] = llm_type
+            def __init__(self, model_group, tool_group, restore_session):
                 captured["model_group"] = model_group
                 captured["tool_group"] = tool_group
                 captured["restore_session"] = restore_session
@@ -89,7 +88,7 @@ class TestJarvisCLI:
         assert result.exit_code == 0
 
         # 校验构造参数与任务传递
-        assert captured["llm_type"] == "thinking"
+
         assert captured["model_group"] == "mygroup"
         assert captured["tool_group"] == "tools"
         assert captured["restore_session"] is True

@@ -195,7 +195,6 @@ def preload_config_for_flags(config_file: Optional[str]) -> None:
 
 
 def try_switch_to_jca_if_git_repo(
-    llm_type: str,
     model_group: Optional[str],
     tool_group: Optional[str],
     config_file: Optional[str],
@@ -221,8 +220,6 @@ def try_switch_to_jca_if_git_repo(
                     ):
                         # 构建并切换到 jarvis-code-agent 命令，传递兼容参数
                         args = ["jarvis-code-agent"]
-                        if llm_type:
-                            args += ["-t", llm_type]
                         if model_group:
                             args += ["-g", model_group]
                         if tool_group:
@@ -244,7 +241,6 @@ def try_switch_to_jca_if_git_repo(
 
 
 def handle_builtin_config_selector(
-    llm_type: str,
     model_group: Optional[str],
     tool_group: Optional[str],
     config_file: Optional[str],
@@ -421,8 +417,6 @@ def handle_builtin_config_selector(
                             if sel["category"] == "agent":
                                 # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
                                 args = [sel["cmd"], "-c", sel["file"]]
-                                if llm_type:
-                                    args += ["--llm-type", llm_type]
                                 if model_group:
                                     args += ["-g", model_group]
                                 if config_file:
@@ -439,8 +433,6 @@ def handle_builtin_config_selector(
                             elif sel["category"] == "roles":
                                 # jarvis-platform-manager role 子命令，支持 -c/-t/-g
                                 args = [sel["cmd"], "role", "-c", sel["file"]]
-                                if llm_type:
-                                    args += ["-t", llm_type]
                                 if model_group:
                                     args += ["-g", model_group]
 
@@ -460,12 +452,6 @@ def handle_builtin_config_selector(
 @app.callback(invoke_without_command=True)
 def run_cli(
     ctx: typer.Context,
-    llm_type: str = typer.Option(
-        "normal",
-        "-t",
-        "--llm-type",
-        help="使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）",
-    ),
     task: Optional[str] = typer.Option(
         None, "-T", "--task", help="从命令行直接输入任务内容"
     ),
@@ -525,11 +511,11 @@ def run_cli(
 
     # 在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）
     try_switch_to_jca_if_git_repo(
-        llm_type, model_group, tool_group, config_file, restore_session, task
+        model_group, tool_group, config_file, restore_session, task
     )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
-    handle_builtin_config_selector(llm_type, model_group, tool_group, config_file, task)
+    handle_builtin_config_selector(model_group, tool_group, config_file, task)
 
     # 初始化环境
     init_env(
@@ -539,7 +525,6 @@ def run_cli(
     # 运行主流程
     try:
         agent_manager = AgentManager(
-            llm_type=llm_type,
             model_group=model_group,
             tool_group=tool_group,
             restore_session=restore_session,

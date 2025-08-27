@@ -67,7 +67,7 @@ agents:
       ## 4. 投资建议
       *明确给出“投资”、“不投资”或“需要进一步观察”的结论，并阐述核心理由。*
       ```
-    llm_type: "thinking"
+
     auto_complete: false
 
   - name: ProjectOwner
@@ -108,5 +108,4 @@ agents:
 
       ## 输出格式
       你的所有输出都应该是直接的对话内容，通过 `SEND_MESSAGE` 发送给 `VentureCapitalist`。你不需要撰写任何最终报告。
-    llm_type: "normal"
     auto_complete: false

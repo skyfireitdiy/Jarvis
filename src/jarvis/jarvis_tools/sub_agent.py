@@ -133,7 +133,7 @@ class SubAgentTool:
                 system_prompt=system_prompt,
                 name="SubAgent",
                 description="Temporary sub agent for executing a subtask",
-                llm_type="normal",  # 使用默认模型类型
+
                 model_group=model_group,  # 继承父Agent模型组（如可用）
                 summary_prompt=summary_prompt,  # 继承父Agent总结提示词（如可用）
                 auto_complete=auto_complete,

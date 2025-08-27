@@ -126,16 +126,8 @@
       "description": "常规操作模型名称",
       "default": "deep_seek_v3"
     },
-    "JARVIS_THINKING_PLATFORM": {
-      "type": "string",
-      "description": "思考操作平台名称",
-      "default": "yuanbao"
-    },
-    "JARVIS_THINKING_MODEL": {
-      "type": "string",
-      "description": "思考操作模型名称",
-      "default": "deep_seek_v3"
-    },
+
+
     "JARVIS_WEB_SEARCH_PLATFORM": {
       "type": "string",
       "description": "Web搜索使用的平台名称",
@@ -168,14 +160,8 @@
               "type": "string",
               "default": "deep_seek_v3"
             },
-            "JARVIS_THINKING_PLATFORM": {
-              "type": "string",
-              "default": "yuanbao"
-            },
-            "JARVIS_THINKING_MODEL": {
-              "type": "string",
-              "default": "deep_seek_v3"
-            },
+
+
             "JARVIS_MAX_INPUT_TOKEN_COUNT": {
               "type": "number",
               "default": 32000

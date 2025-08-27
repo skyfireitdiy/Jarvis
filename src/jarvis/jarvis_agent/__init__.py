@@ -34,8 +34,6 @@ from jarvis.jarvis_utils.config import (
     get_max_token_count,
     get_normal_model_name,
     get_normal_platform_name,
-    get_thinking_model_name,
-    get_thinking_platform_name,
     is_execute_tool_confirm,
     is_force_save_memory,
     is_use_analysis,
@@ -224,7 +222,6 @@ class Agent:
         system_prompt: str,
         name: str = "Jarvis",
         description: str = "",
-        llm_type: str = "normal",
         model_group: Optional[str] = None,
         summary_prompt: Optional[str] = None,
         auto_complete: bool = False,
@@ -246,7 +243,7 @@ class Agent:
             system_prompt: 系统提示词，定义Agent的行为准则
             name: Agent名称，默认为"Jarvis"
             description: Agent描述信息
-            llm_type: LLM类型，可以是 'normal' 或 'thinking'
+
             summary_prompt: 任务总结提示模板
             auto_complete: 是否自动完成任务
             output_handler: 输出处理器列表
@@ -277,7 +274,7 @@ class Agent:
         )
 
         # 初始化模型和会话
-        self._init_model(llm_type, model_group)
+        self._init_model(model_group)
         self._init_session()
 
         # 初始化处理器
@@ -312,14 +309,10 @@ class Agent:
         # 输出统计信息（包含欢迎信息）
         show_agent_startup_stats(name, self.model.name(), self.get_tool_registry())  # type: ignore
 
-    def _init_model(self, llm_type: str, model_group: Optional[str]):
-        """初始化模型平台"""
-        if llm_type == "thinking":
-            platform_name = get_thinking_platform_name(model_group)
-            model_name = get_thinking_model_name(model_group)
-        else:  # 默认为 normal
-            platform_name = get_normal_platform_name(model_group)
-            model_name = get_normal_model_name(model_group)
+    def _init_model(self, model_group: Optional[str]):
+        """初始化模型平台（统一使用 normal 平台/模型）"""
+        platform_name = get_normal_platform_name(model_group)
+        model_name = get_normal_model_name(model_group)
 
         self.model = PlatformRegistry().create_platform(platform_name)
         if self.model is None:
