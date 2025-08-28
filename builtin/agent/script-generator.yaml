@@ -74,3 +74,4 @@ need_summary: true
 use_methodology: false
 use_analysis: false
 auto_complete: false
+force_save_memory: false

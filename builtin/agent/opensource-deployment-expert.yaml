@@ -77,3 +77,4 @@ use_tools:
   - rewrite_file
   - ask_user
 auto_complete: false
+force_save_memory: false
