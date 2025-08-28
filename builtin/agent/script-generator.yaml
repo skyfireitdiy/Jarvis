@@ -73,4 +73,4 @@ use_tools:
 need_summary: true
 use_methodology: false
 use_analysis: false
-auto_complete: true
+auto_complete: false

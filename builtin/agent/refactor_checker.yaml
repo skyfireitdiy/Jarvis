@@ -22,4 +22,4 @@ use_analysis: false
 use_tools:
   - execute_script
   - read_code
-auto_complete: true
+auto_complete: false

@@ -76,4 +76,4 @@ use_tools:
   - execute_script
   - rewrite_file
   - ask_user
-auto_complete: true
+auto_complete: false
