@@ -115,3 +115,4 @@ use_tools:
   - search_web
   - rewrite_file
   - ask_user
+force_save_memory: false

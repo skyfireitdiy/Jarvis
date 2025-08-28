@@ -9,6 +9,7 @@ from typing_extensions import Self
 from rich import box  # type: ignore
 from rich.live import Live  # type: ignore
 from rich.panel import Panel  # type: ignore
+from rich.status import Status  # type: ignore
 from rich.text import Text  # type: ignore
 
 from jarvis.jarvis_utils.config import (
@@ -120,23 +121,42 @@ class BasePlatform(ABC):
         else:
             response = ""
 
-            text_content = Text(overflow="fold")  # 添加文本溢出处理
-            panel = Panel(
-                text_content,
-                title=f"[bold cyan]{self.name()}[/bold cyan]",
-                subtitle="[dim]思考中... (按 Ctrl+C 中断)[/dim]",
-                border_style="bright_blue",
-                box=box.ROUNDED,
-                expand=True  # 允许面板自动调整大小
-            )
-
             if not self.suppress_output:
                 if get_pretty_output():
-                    # 优化Live输出，减少闪烁
+                    chat_iterator = self.chat(message)
+                    first_chunk = None
+
+                    with Status(
+                        f"🤔 {self.name()} 正在思考中...", spinner="dots", console=console
+                    ):
+                        try:
+                            while True:
+                                first_chunk = next(chat_iterator)
+                                if first_chunk:
+                                    break
+                        except StopIteration:
+                            return ""
+
+                    text_content = Text(overflow="fold")
+                    panel = Panel(
+                        text_content,
+                        title=f"[bold cyan]{self.name()}[/bold cyan]",
+                        subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
+                        border_style="bright_blue",
+                        box=box.ROUNDED,
+                        expand=True,  # 允许面板自动调整大小
+                    )
+
                     buffer = []
                     buffer_count = 0
                     with Live(panel, refresh_per_second=4, transient=False) as live:
-                        for s in self.chat(message):
+                        # Process first chunk
+                        response += first_chunk
+                        buffer.append(first_chunk)
+                        buffer_count += 1
+
+                        # Process rest of the chunks
+                        for s in chat_iterator:
                             if not s:
                                 continue
                             response += s  # Accumulate the full response string
@@ -146,13 +166,17 @@ class BasePlatform(ABC):
                             # 积累一定量或达到最后再更新，减少闪烁
                             if buffer_count >= 5 or s == "":
                                 # Append buffered content to the Text object
-                                text_content.append("".join(buffer), style="bright_white")
+                                text_content.append(
+                                    "".join(buffer), style="bright_white"
+                                )
                                 buffer.clear()
                                 buffer_count = 0
 
                                 # --- Scrolling Logic ---
                                 # Calculate available height in the panel
-                                max_text_height = console.height - 5  # Leave space for borders/titles
+                                max_text_height = (
+                                    console.height - 5
+                                )  # Leave space for borders/titles
                                 if max_text_height <= 0:
                                     max_text_height = 1
 
@@ -165,11 +189,15 @@ class BasePlatform(ABC):
                                 # If content overflows, truncate to show only the last few lines
                                 if len(lines) > max_text_height:
                                     new_text = "\n".join(
-                                        text_content.plain.splitlines()[-max_text_height:]
+                                        text_content.plain.splitlines()[
+                                            -max_text_height:
+                                        ]
                                     )
                                     text_content.plain = new_text
 
-                                panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                                panel.subtitle = (
+                                    "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                                )
                                 live.update(panel)
 
                             if is_immediate_abort() and get_interrupt():
@@ -177,7 +205,9 @@ class BasePlatform(ABC):
 
                         # Ensure any remaining content in the buffer is displayed
                         if buffer:
-                            text_content.append("".join(buffer), style="bright_white")
+                            text_content.append(
+                                "".join(buffer), style="bright_white"
+                            )
 
                         # At the end, display the entire response
                         text_content.plain = response
