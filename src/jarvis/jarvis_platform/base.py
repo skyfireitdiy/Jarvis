@@ -137,6 +137,8 @@ class BasePlatform(ABC):
                     buffer_count = 0
                     with Live(panel, refresh_per_second=4, transient=False) as live:
                         for s in self.chat(message):
+                            if not s:
+                                continue
                             response += s  # Accumulate the full response string
                             buffer.append(s)
                             buffer_count += 1
