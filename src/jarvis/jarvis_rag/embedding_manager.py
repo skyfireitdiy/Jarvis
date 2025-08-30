@@ -3,25 +3,7 @@ import os
 from typing import List, cast
 from langchain_huggingface import HuggingFaceEmbeddings
 from huggingface_hub import snapshot_download
-from contextlib import contextmanager
 
-@contextmanager
-def _enforce_hf_offline():
-    old_hf = os.environ.get("HF_HUB_OFFLINE")
-    old_tf = os.environ.get("TRANSFORMERS_OFFLINE")
-    os.environ["HF_HUB_OFFLINE"] = "1"
-    os.environ["TRANSFORMERS_OFFLINE"] = "1"
-    try:
-        yield
-    finally:
-        if old_hf is None:
-            os.environ.pop("HF_HUB_OFFLINE", None)
-        else:
-            os.environ["HF_HUB_OFFLINE"] = old_hf
-        if old_tf is None:
-            os.environ.pop("TRANSFORMERS_OFFLINE", None)
-        else:
-            os.environ["TRANSFORMERS_OFFLINE"] = old_tf
 
 from .cache import EmbeddingCache
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -64,31 +46,19 @@ class EmbeddingManager:
                 from sentence_transformers import SentenceTransformer
                 local_dir = None
                 # Prefer explicit local dir via env or direct path
-                explicit_local = os.environ.get("JARVIS_RAG_EMBEDDING_LOCAL_DIR", "").strip()
-                if explicit_local and os.path.isdir(explicit_local):
-                    with _enforce_hf_offline():
-                        return HuggingFaceEmbeddings(
-                            model_name=explicit_local,
-                            model_kwargs=model_kwargs,
-                            encode_kwargs=encode_kwargs,
-                            show_progress=False,
-                        )
+
                 if os.path.isdir(self.model_name):
-                    with _enforce_hf_offline():
-                        return HuggingFaceEmbeddings(
-                            model_name=self.model_name,
-                            model_kwargs=model_kwargs,
-                            encode_kwargs=encode_kwargs,
-                            show_progress=False,
-                        )
+                    return HuggingFaceEmbeddings(
+                        model_name=self.model_name,
+                        model_kwargs=model_kwargs,
+                        encode_kwargs=encode_kwargs,
+                        show_progress=False,
+                    )
 
                 # Try common local cache directories for sentence-transformers and HF hub
                 try:
                     home = os.path.expanduser("~")
-                    st_home = os.environ.get(
-                        "SENTENCE_TRANSFORMERS_HOME",
-                        os.path.join(home, ".cache", "sentence_transformers"),
-                    )
+                    st_home = os.path.join(home, ".cache", "sentence_transformers")
                     torch_st_home = os.path.join(home, ".cache", "torch", "sentence_transformers")
                     # Build common name variants found in local caches
                     org, name = (
@@ -123,10 +93,7 @@ class EmbeddingManager:
                             pass
 
                     # Hugging Face Hub cache snapshots
-                    hf_cache = os.environ.get("HUGGINGFACE_HUB_CACHE", "")
-                    if not hf_cache:
-                        hf_home = os.environ.get("HF_HOME", os.path.join(home, ".cache", "huggingface"))
-                        hf_cache = os.path.join(hf_home, "hub")
+                    hf_cache = os.path.join(home, ".cache", "huggingface", "hub")
                     if "/" in self.model_name:
                         org, name = self.model_name.split("/", 1)
                         models_dir = os.path.join(hf_cache, f"models--{org}--{name}", "snapshots")
@@ -146,13 +113,12 @@ class EmbeddingManager:
 
                     for cand in candidates:
                         try:
-                            with _enforce_hf_offline():
-                                return HuggingFaceEmbeddings(
-                                    model_name=cand,
-                                    model_kwargs=model_kwargs,
-                                    encode_kwargs=encode_kwargs,
-                                    show_progress=False,
-                                )
+                            return HuggingFaceEmbeddings(
+                                model_name=cand,
+                                model_kwargs=model_kwargs,
+                                encode_kwargs=encode_kwargs,
+                                show_progress=False,
+                            )
                         except Exception:
                             continue
                 except Exception:
@@ -165,23 +131,14 @@ class EmbeddingManager:
                     local_dir = None
 
                 if local_dir:
-                    with _enforce_hf_offline():
-                        return HuggingFaceEmbeddings(
-                            model_name=local_dir,
-                            model_kwargs=model_kwargs,
-                            encode_kwargs=encode_kwargs,
-                            show_progress=False,
-                        )
-
-                # Determine offline mode from env; if offline, do not attempt remote
-                offline = (
-                    os.environ.get("HF_HUB_OFFLINE", "").lower() in {"1", "true", "yes"}
-                    or os.environ.get("JARVIS_OFFLINE", "").lower() in {"1", "true", "yes"}
-                )
-                if offline:
-                    raise RuntimeError(
-                        "离线模式已启用，但未在本地缓存中找到模型。请预先下载模型或设置 HF_HOME/HUGGINGFACE_HUB_CACHE 指向包含该模型缓存的目录。"
+                    return HuggingFaceEmbeddings(
+                        model_name=local_dir,
+                        model_kwargs=model_kwargs,
+                        encode_kwargs=encode_kwargs,
+                        show_progress=False,
                     )
+
+
 
                 # Fall back to remote download if local cache not found and not offline
                 return HuggingFaceEmbeddings(
@@ -191,17 +148,12 @@ class EmbeddingManager:
                     show_progress=True,
                 )
             except Exception as _e:
-                # 如果已检测到本地候选路径（explicit_local / 直接目录 / 本地缓存快照），则视为本地加载失败，
+                # 如果已检测到本地候选路径（直接目录 / 本地缓存快照），则视为本地加载失败，
                 # 为避免在用户期望“本地优先不联网”的情况下触发联网，直接抛错并给出修复建议。
                 had_local_candidate = False
                 try:
-                    explicit_local = os.environ.get("JARVIS_RAG_EMBEDDING_LOCAL_DIR", "").strip()
-                except Exception:
-                    explicit_local = ""
-                try:
                     had_local_candidate = (
-                        (explicit_local and os.path.isdir(explicit_local))
-                        or os.path.isdir(self.model_name)
+                        os.path.isdir(self.model_name)
                         # 如果上面 snapshot_download 命中了本地缓存，会将 local_dir 设为非 None
                         or (locals().get("local_dir") is not None)
                     )
@@ -212,8 +164,7 @@ class EmbeddingManager:
                     PrettyOutput.print(
                         "检测到本地模型路径但加载失败。为避免触发网络访问，已中止远程回退。\n"
                         "请确认本地目录包含完整的 Transformers/Tokenizer 文件（如 config.json、model.safetensors、tokenizer.json/merges.txt 等），\n"
-                        "或设置 JARVIS_RAG_EMBEDDING_LOCAL_DIR 指向可用的本地模型目录，"
-                        "也可设置 HF_HOME/HUGGINGFACE_HUB_CACHE 使缓存可被正确发现。",
+                        "或在配置中将 embedding_model 设置为该本地目录，或将模型放置到默认的 Hugging Face 缓存目录（例如 ~/.cache/huggingface/hub）。",
                         OutputType.ERROR,
                     )
                     raise
