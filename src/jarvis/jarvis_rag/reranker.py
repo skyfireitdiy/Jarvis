@@ -1,4 +1,5 @@
 from typing import List
+import os
 
 from langchain.docstore.document import Document
 from sentence_transformers.cross_encoder import (  # type: ignore
@@ -6,6 +7,25 @@ from sentence_transformers.cross_encoder import (  # type: ignore
 )
 from huggingface_hub import snapshot_download
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from contextlib import contextmanager
+
+@contextmanager
+def _enforce_hf_offline():
+    old_hf = os.environ.get("HF_HUB_OFFLINE")
+    old_tf = os.environ.get("TRANSFORMERS_OFFLINE")
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    try:
+        yield
+    finally:
+        if old_hf is None:
+            os.environ.pop("HF_HUB_OFFLINE", None)
+        else:
+            os.environ["HF_HUB_OFFLINE"] = old_hf
+        if old_tf is None:
+            os.environ.pop("TRANSFORMERS_OFFLINE", None)
+        else:
+            os.environ["TRANSFORMERS_OFFLINE"] = old_tf
 
 
 class Reranker:
@@ -24,6 +44,18 @@ class Reranker:
         PrettyOutput.print(f"正在初始化重排模型: {model_name}...", OutputType.INFO)
         try:
             local_dir = None
+            # Prefer explicit local dir via env or direct path
+            explicit_local = os.environ.get("JARVIS_RAG_RERANK_LOCAL_DIR", "").strip()
+            if explicit_local and os.path.isdir(explicit_local):
+                with _enforce_hf_offline():
+                    self.model = CrossEncoder(explicit_local)
+                PrettyOutput.print("重排模型初始化成功。", OutputType.SUCCESS)
+                return
+            if os.path.isdir(model_name):
+                with _enforce_hf_offline():
+                    self.model = CrossEncoder(model_name)
+                PrettyOutput.print("重排模型初始化成功。", OutputType.SUCCESS)
+                return
             try:
                 # Prefer local cache; avoid any network access
                 local_dir = snapshot_download(repo_id=model_name, local_files_only=True)
@@ -31,9 +63,19 @@ class Reranker:
                 local_dir = None
 
             if local_dir:
-                self.model = CrossEncoder(local_dir)
+                with _enforce_hf_offline():
+                    self.model = CrossEncoder(local_dir)
             else:
-                # Fallback to remote if local cache not found
+                # Determine offline mode; if offline, do not attempt remote
+                offline = (
+                    os.environ.get("HF_HUB_OFFLINE", "").lower() in {"1", "true", "yes"}
+                    or os.environ.get("JARVIS_OFFLINE", "").lower() in {"1", "true", "yes"}
+                )
+                if offline:
+                    raise RuntimeError(
+                        "离线模式已启用，但未在本地缓存中找到重排模型。请预先下载模型或设置 HF_HOME/HUGGINGFACE_HUB_CACHE 指向包含该模型缓存的目录。"
+                    )
+                # Fallback to remote if not offline
                 self.model = CrossEncoder(model_name)
 
             PrettyOutput.print("重排模型初始化成功。", OutputType.SUCCESS)
