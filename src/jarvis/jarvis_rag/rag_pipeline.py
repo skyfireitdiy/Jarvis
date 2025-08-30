@@ -34,6 +34,7 @@ class JarvisRAGPipeline:
         collection_name: str = "jarvis_rag_collection",
         use_bm25: bool = True,
         use_rerank: bool = True,
+        use_query_rewrite: bool = True,
     ):
         """
         初始化RAG管道。
@@ -69,6 +70,8 @@ class JarvisRAGPipeline:
         self.collection_name = collection_name
         self.use_bm25 = use_bm25
         self.use_rerank = use_rerank
+        # 查询重写开关（默认开启，可由CLI控制）
+        self.use_query_rewrite = use_query_rewrite
 
         # 延迟加载的组件
         self._embedding_manager: Optional[EmbeddingManager] = None
@@ -229,8 +232,15 @@ class JarvisRAGPipeline:
         """
         # 0. 检测索引变更并可选更新（在重写query之前）
         self._pre_search_update_index_if_needed()
-        # 1. 将原始查询重写为多个查询
-        rewritten_queries = self._get_query_rewriter().rewrite(query_text)
+        # 1. 将原始查询重写为多个查询（可配置）
+        if self.use_query_rewrite:
+            rewritten_queries = self._get_query_rewriter().rewrite(query_text)
+        else:
+            PrettyOutput.print(
+                "已关闭查询重写，将直接使用原始查询进行检索。",
+                OutputType.INFO,
+            )
+            rewritten_queries = [query_text]
 
         # 2. 为每个重写的查询检索初始候选文档
         PrettyOutput.print(
@@ -303,8 +313,15 @@ class JarvisRAGPipeline:
         """
         # 0. 检测索引变更并可选更新（在重写query之前）
         self._pre_search_update_index_if_needed()
-        # 1. 重写查询
-        rewritten_queries = self._get_query_rewriter().rewrite(query_text)
+        # 1. 重写查询（可配置）
+        if self.use_query_rewrite:
+            rewritten_queries = self._get_query_rewriter().rewrite(query_text)
+        else:
+            PrettyOutput.print(
+                "已关闭查询重写，将直接使用原始查询进行检索。",
+                OutputType.INFO,
+            )
+            rewritten_queries = [query_text]
 
         # 2. 检索候选文档
         PrettyOutput.print(
