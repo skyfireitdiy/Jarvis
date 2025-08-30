@@ -122,8 +122,8 @@ class FileSearchReplaceTool:
 
         from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
-        stdout_messages = []
-        stderr_messages = []
+        stdout_messages: list[str] = []
+        stderr_messages: list[str] = []
         overall_success = False
         file_results = []
 
@@ -168,10 +168,10 @@ class FileSearchReplaceTool:
                 )
 
         # 整合所有错误信息到stderr
-        all_stderr = []
-        for result in file_results:
-            if not result["success"]:
-                all_stderr.append(f"文件 {result['file']} 处理失败: {result['stderr']}")
+        all_stderr: list[str] = []
+        for file_result in file_results:
+            if not file_result["success"]:
+                all_stderr.append(f"文件 {file_result['file']} 处理失败: {file_result['stderr']}")
 
         return {
             "success": overall_success,

@@ -702,7 +702,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         "未检测到 fzf，无法打开文件选择器。", OutputType.WARNING
                     )
                 else:
-                    files: list[str] = []
+                    files = []
                     try:
                         r = subprocess.run(
                             ["git", "ls-files"],
@@ -835,7 +835,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         "未检测到 fzf，无法打开文件选择器。", OutputType.WARNING
                     )
                 else:
-                    files: list[str] = []
+                    files = []
                     try:
                         import os as _os
 

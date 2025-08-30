@@ -4,6 +4,7 @@ from langchain.docstore.document import Document
 from sentence_transformers.cross_encoder import (  # type: ignore
     CrossEncoder,
 )
+from huggingface_hub import snapshot_download
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -21,8 +22,24 @@ class Reranker:
             model_name (str): 要使用的Cross-Encoder模型的名称。
         """
         PrettyOutput.print(f"正在初始化重排模型: {model_name}...", OutputType.INFO)
-        self.model = CrossEncoder(model_name)
-        PrettyOutput.print("重排模型初始化成功。", OutputType.SUCCESS)
+        try:
+            local_dir = None
+            try:
+                # Prefer local cache; avoid any network access
+                local_dir = snapshot_download(repo_id=model_name, local_files_only=True)
+            except Exception:
+                local_dir = None
+
+            if local_dir:
+                self.model = CrossEncoder(local_dir)
+            else:
+                # Fallback to remote if local cache not found
+                self.model = CrossEncoder(model_name)
+
+            PrettyOutput.print("重排模型初始化成功。", OutputType.SUCCESS)
+        except Exception as e:
+            PrettyOutput.print(f"初始化重排模型失败: {e}", OutputType.ERROR)
+            raise
 
     def rerank(
         self, query: str, documents: List[Document], top_n: int = 5

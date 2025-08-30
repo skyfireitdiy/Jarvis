@@ -384,21 +384,21 @@ def handle_builtin_config_selector(
                 table.add_column("描述", style="white")
 
                 for idx, opt in enumerate(options, 1):
-                    category = opt.get("category", "")
-                    name = opt.get("name", "")
-                    file_path = opt.get("file", "")
+                    category = str(opt.get("category", ""))
+                    name = str(opt.get("name", ""))
+                    file_path = str(opt.get("file", ""))
                     # 描述列显示配置描述；若为 roles 同时显示角色数量与列表
                     if category == "roles":
                         count = opt.get("roles_count")
-                        details = opt.get("details", "")
-                        parts = []
+                        details_val = opt.get("details", "")
+                        parts: list[str] = []
                         if isinstance(count, int) and count > 0:
                             parts.append(f"{count} 个角色")
-                        if details:
-                            parts.append(details)
+                        if isinstance(details_val, str) and details_val:
+                            parts.append(details_val)
                         desc_display = "\n".join(parts) if parts else ""
                     else:
-                        desc_display = opt.get("desc", "")
+                        desc_display = str(opt.get("desc", ""))
                     table.add_row(str(idx), category, name, file_path, desc_display)
 
                 Console().print(table)
@@ -412,29 +412,29 @@ def handle_builtin_config_selector(
                         index = int(choice.strip())
                         if 1 <= index <= len(options):
                             sel = options[index - 1]
-                            args = []
+                            args: list[str] = []
 
                             if sel["category"] == "agent":
                                 # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
-                                args = [sel["cmd"], "-c", sel["file"]]
+                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
                                 if model_group:
-                                    args += ["-g", model_group]
+                                    args += ["-g", str(model_group)]
                                 if config_file:
-                                    args += ["-f", config_file]
+                                    args += ["-f", str(config_file)]
                                 if task:
-                                    args += ["--task", task]
+                                    args += ["--task", str(task)]
 
                             elif sel["category"] == "multi_agent":
                                 # jarvis-multi-agent 需要 -c/--config，用户输入通过 -i/--input 传递
-                                args = [sel["cmd"], "-c", sel["file"]]
+                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
                                 if task:
-                                    args += ["-i", task]
+                                    args += ["-i", str(task)]
 
                             elif sel["category"] == "roles":
                                 # jarvis-platform-manager role 子命令，支持 -c/-t/-g
-                                args = [sel["cmd"], "role", "-c", sel["file"]]
+                                args = [str(sel["cmd"]), "role", "-c", str(sel["file"])]
                                 if model_group:
-                                    args += ["-g", model_group]
+                                    args += ["-g", str(model_group)]
 
                             if args:
                                 PrettyOutput.print(

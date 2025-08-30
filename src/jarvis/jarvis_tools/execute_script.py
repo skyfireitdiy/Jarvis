@@ -74,8 +74,7 @@ class ScriptTool:
         stream.feed(data)
 
         # 清理每行右侧空格，并过滤空行
-        cleaned = []
-        cleaned = []
+        cleaned: list[str] = []
         for y in range(screen.lines):
             line = screen.buffer[y]
             stripped = "".join(char.data for char in line.values()).rstrip()
