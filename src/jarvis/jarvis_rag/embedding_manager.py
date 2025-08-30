@@ -1,6 +1,7 @@
 import torch
 from typing import List, cast
 from langchain_huggingface import HuggingFaceEmbeddings
+from huggingface_hub import snapshot_download
 
 from .cache import EmbeddingCache
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -38,18 +39,33 @@ class EmbeddingManager:
         encode_kwargs = {"normalize_embeddings": True}
 
         try:
-            # First try to load model locally
+            # First try to load model from local cache without any network access
             try:
                 from sentence_transformers import SentenceTransformer
-                local_model = SentenceTransformer(self.model_name, device=model_kwargs["device"])
+                local_dir = None
+                try:
+                    # Try resolve local cached directory; do not hit network
+                    local_dir = snapshot_download(repo_id=self.model_name, local_files_only=True)
+                except Exception:
+                    local_dir = None
+
+                if local_dir:
+                    local_model = SentenceTransformer(local_dir, device=model_kwargs["device"])
+                    return HuggingFaceEmbeddings(
+                        client=local_model,
+                        model_name=self.model_name,
+                        model_kwargs=model_kwargs,
+                        encode_kwargs=encode_kwargs,
+                    )
+                # Fall back to remote download if local cache not found
                 return HuggingFaceEmbeddings(
-                    client=local_model,
                     model_name=self.model_name,
                     model_kwargs=model_kwargs,
                     encode_kwargs=encode_kwargs,
+                    show_progress=True,
                 )
             except Exception:
-                # Fall back to remote download if local loading fails
+                # Import failure or other errors: fallback to remote
                 return HuggingFaceEmbeddings(
                     model_name=self.model_name,
                     model_kwargs=model_kwargs,

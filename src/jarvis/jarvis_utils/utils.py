@@ -1172,7 +1172,7 @@ def _collect_optional_config_interactively(
     try:
         if "JARVIS_RAG" not in config_data:
             if get_yes_no("是否配置 RAG 检索增强参数？", default=False):
-                rag_conf = {}
+                rag_conf: Dict[str, Any] = {}
                 emb = get_single_line_input(
                     f"RAG 嵌入模型（留空使用默认: {rag_default_embed}）：",
                     default="",

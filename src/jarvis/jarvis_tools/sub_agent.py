@@ -64,12 +64,6 @@ class SubAgentTool:
                 f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
             )
 
-            # 读取背景信息并组合任务
-            background: str = str(args.get("background", "")).strip()
-            enhanced_task = (
-                f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
-            )
-
             # 继承父Agent的运行参数（用于覆盖默认值）；若无父Agent则使用默认/全局配置
             parent_agent = args.get("agent")
             # 如未注入父Agent，尝试从全局获取当前或任一已注册Agent
@@ -160,7 +154,10 @@ class SubAgentTool:
                     try:
                         model_name = parent_agent.model.name()  # type: ignore[attr-defined]
                         if model_name:
-                            agent.model.set_model_name(model_name)  # type: ignore[attr-defined]
+                            from typing import Any
+                            model_obj: Any = getattr(agent, "model", None)
+                            if model_obj is not None:
+                                model_obj.set_model_name(model_name)
                     except Exception:
                         pass
                 if use_tools:

@@ -161,7 +161,10 @@ class SubCodeAgentTool:
                     try:
                         parent_model_name = parent_agent.model.name()  # type: ignore[attr-defined]
                         if parent_model_name:
-                            code_agent.agent.model.set_model_name(parent_model_name)  # type: ignore[attr-defined]
+                            from typing import Any
+                            model_obj: Any = getattr(code_agent.agent, "model", None)
+                            if model_obj is not None:
+                                model_obj.set_model_name(parent_model_name)
                     except Exception:
                         pass
             except Exception:

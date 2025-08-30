@@ -113,9 +113,9 @@ class GitCommitTool:
             # 获取文件列表
             files_cmd = ["git", "diff", "--cached", "--name-only"]
             process = subprocess.Popen(
-                files_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                files_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
-            files_output = process.communicate()[0].decode()
+            files_output = process.communicate()[0]
             files = [f.strip() for f in files_output.split("\n") if f.strip()]
             file_count = len(files)
 
@@ -124,8 +124,9 @@ class GitCommitTool:
                 ["git", "diff", "--cached", "--exit-code"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                text=True,
             )
-            diff = process.communicate()[0].decode(errors="ignore")
+            diff = process.communicate()[0]
 
             try:
                 temp_diff_file_path = None
