@@ -24,7 +24,7 @@ Example:
 
 def execute_command(command: str, should_run: bool) -> None:
     """Print command without execution"""
-    PrettyOutput.print(command, OutputType.CODE, lang="bash")
+    print(command)
     if should_run:
         os.system(command)
 
