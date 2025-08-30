@@ -29,15 +29,6 @@ def execute_command(command: str, should_run: bool) -> None:
         os.system(command)
 
 
-def _check_fish_shell() -> bool:
-    """Check if current shell is fish
-
-    Returns:
-        bool: True if fish shell, False otherwise
-    """
-    return get_shell_name() == "fish"
-
-
 def _get_config_file() -> str:
     """Get fish config file path
 
