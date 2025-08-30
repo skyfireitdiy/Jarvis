@@ -357,6 +357,12 @@ def retrieve(
         None, "--db-path", help="向量数据库的路径。覆盖全局配置。"
     ),
     n_results: int = typer.Option(5, "--top-n", help="要检索的文档数量。"),
+    rewrite: bool = typer.Option(
+        True,
+        "--rewrite/--no-rewrite",
+        help="是否对查询进行LLM重写以提升召回，默认开启。",
+        show_default=True,
+    ),
 ):
     """仅从RAG知识库检索文档并打印结果。"""
     try:
@@ -371,6 +377,7 @@ def retrieve(
             collection_name=collection_name,
             use_bm25=use_bm25,
             use_rerank=use_rerank,
+            use_query_rewrite=rewrite,
         )
 
         PrettyOutput.print(f"正在为问题检索文档: '{question}'", OutputType.INFO)
