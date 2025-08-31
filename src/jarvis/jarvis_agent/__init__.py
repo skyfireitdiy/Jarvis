@@ -662,6 +662,10 @@ class Agent:
         if self.use_analysis:
             self.task_analyzer.analysis_task(satisfaction_feedback)
 
+        # 当开启强制保存记忆时，在分析步骤之后触发一次记忆保存
+        if self.force_save_memory:
+            self.memory_manager.prompt_memory_save()
+
         self._check_and_organize_memory()
 
         if self.need_summary:
