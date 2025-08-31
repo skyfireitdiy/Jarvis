@@ -1,3 +1,23 @@
+### Release Note - v0.3.25 2025-08-31
+
+#### **新功能 (Features)**  
+- 新增儿童心理学专家智能体(ChildPsychologyExpertAgent)，为家长提供专业育儿指导
+- 新增人生顾问智能体(LifeConsultantAgent)，持续建立用户性格画像并提供个性化决策建议
+- 新增心理学分析专家智能体(PsychologyExpertAgent)，从心理学角度提供问题解决方案
+- 新增PUA专家智能体(PuaExpertAgent)，提供基于尊重的沟通策略和心理分析
+- RAG知识库新增`retrieve`子命令，支持仅检索文档而不生成答案
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 增强RAG依赖检测机制，提供更精确的模块缺失提示
+- 优化智能体记忆管理，支持强制保存记忆功能
+- 改进RAG安装检测逻辑，使用更准确的依赖检查方法
+
+#### **文档更新 (Documentation)**  
+- 更新使用指南文档，新增RAG `retrieve`命令的详细使用说明
+- 补充新智能体的功能描述和使用场景
+
+本次更新主要引入了多个专业领域的心理学智能体，为用户提供更精准的个性化建议和支持，同时增强了RAG系统的稳定性和用户体验。
+
 ### Release Note - v0.3.25 2025-08-30
 
 #### **新功能 (Features)**
