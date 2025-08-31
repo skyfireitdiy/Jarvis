@@ -1,4 +1,4 @@
-### Release Note - v0.3.25 2025-08-31
+### Release Note - v0.3.26 2025-08-31
 
 #### **新功能 (Features)**  
 - 新增儿童心理学专家智能体(ChildPsychologyExpertAgent)，为家长提供专业育儿指导
