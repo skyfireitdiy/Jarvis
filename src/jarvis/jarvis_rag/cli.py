@@ -14,7 +14,7 @@ from langchain_community.document_loaders import (
 from langchain_core.document_loaders.base import BaseLoader
 from rich.markdown import Markdown
 
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import init_env, is_rag_installed, get_missing_rag_modules
 from jarvis.jarvis_utils.config import (
     get_rag_embedding_model,
     get_rag_use_bm25,
@@ -469,19 +469,15 @@ def query(
         raise typer.Exit(code=1)
 
 
-_RAG_INSTALLED = False
-try:
-    import langchain  # noqa
 
-    _RAG_INSTALLED = True
-except ImportError:
-    pass
 
 
 def _check_rag_dependencies():
-    if not _RAG_INSTALLED:
+    if not is_rag_installed():
+        missing = get_missing_rag_modules()
+        missing_str = f"缺少依赖: {', '.join(missing)}。" if missing else ""
         PrettyOutput.print(
-            "RAG依赖项未安装。请运行 'pip install \"jarvis-ai-assistant[rag]\"' 来使用此命令。",
+            f"RAG依赖项未安装或不完整。{missing_str}请运行 'pip install \"jarvis-ai-assistant[rag]\"' 后重试。",
             OutputType.ERROR,
         )
         raise typer.Exit(code=1)

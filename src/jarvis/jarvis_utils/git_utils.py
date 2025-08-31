@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Set, Tuple
 from jarvis.jarvis_utils.config import get_data_dir, is_confirm_before_apply_patch
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.utils import is_rag_installed
 
 
 def find_git_root_and_cd(start_dir: str = ".") -> str:
@@ -427,14 +428,8 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                         is_uv_env = True
 
                 # 根据环境选择安装命令
-                # 检测是否安装了 RAG 特性
-                rag_installed = False
-                try:
-                    import langchain  # noqa
-
-                    rag_installed = True
-                except ImportError:
-                    pass
+                # 检测是否安装了 RAG 特性（更精确）
+                rag_installed = is_rag_installed()
 
                 # 根据环境和 RAG 特性选择安装命令
                 if rag_installed:
