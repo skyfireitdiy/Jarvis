@@ -48,7 +48,7 @@ dependencies = [
 requires-python = ">=3.9,<3.13"
 
 [project.optional-dependencies]
-dev = ["pytest", "black", "isort", "mypy", "build", "twine"]
+dev = ["pytest", "ruff", "mypy", "build", "twine"]
 rag = [
     "langchain",
     "langchain-community",
@@ -63,9 +63,6 @@ rag = [
 
 [project.urls]
 Homepage = "https://github.com/skyfireitdiy/Jarvis"
-
-[tool.isort]
-profile = "black"
 
 [tool.mypy]
 ignore_missing_imports = true
