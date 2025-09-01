@@ -40,7 +40,7 @@ setup(
         "packaging",
     ],
     extras_require={
-        "dev": ["pytest", "black", "isort", "mypy", "build", "twine"],
+        "dev": ["pytest", "ruff", "mypy", "build", "twine"],
         "rag": [
             "langchain",
             "langchain-community",
