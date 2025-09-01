@@ -1498,34 +1498,39 @@ def _read_old_config_file(config_file):
     )
 
 
-def while_success(func: Callable[[], Any], sleep_time: float = 0.1) -> Any:
+def while_success(func: Callable[[], Any], sleep_time: float = 0.1, max_retries: int = 5) -> Any:
     """循环执行函数直到成功（累计日志后统一打印，避免逐次加框）
 
     参数：
     func -- 要执行的函数
     sleep_time -- 每次失败后的等待时间（秒）
+    max_retries -- 最大重试次数，默认5次
 
     返回：
     函数执行结果
     """
     result: Any = None
-    while True:
+    retry_count = 0
+    while retry_count < max_retries:
         try:
             result = func()
             break
         except Exception:
-            PrettyOutput.print(f"重试中，等待 {sleep_time}s...", OutputType.WARNING)
-            time.sleep(sleep_time)
+            retry_count += 1
+            if retry_count < max_retries:
+                PrettyOutput.print(f"重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...", OutputType.WARNING)
+                time.sleep(sleep_time)
             continue
     return result
 
 
-def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
+def while_true(func: Callable[[], bool], sleep_time: float = 0.1, max_retries: int = 5) -> Any:
     """循环执行函数直到返回True（累计日志后统一打印，避免逐次加框）
 
     参数:
         func: 要执行的函数，必须返回布尔值
         sleep_time: 每次失败后的等待时间(秒)
+        max_retries: 最大重试次数，默认5次
 
     返回:
         函数最终返回的True值
@@ -1535,12 +1540,15 @@ def while_true(func: Callable[[], bool], sleep_time: float = 0.1) -> Any:
         不捕获异常，异常会直接抛出
     """
     ret: bool = False
-    while True:
+    retry_count = 0
+    while retry_count < max_retries:
         ret = func()
         if ret:
             break
-        PrettyOutput.print(f"重试中，等待 {sleep_time}s...", OutputType.WARNING)
-        time.sleep(sleep_time)
+        retry_count += 1
+        if retry_count < max_retries:
+            PrettyOutput.print(f"重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...", OutputType.WARNING)
+            time.sleep(sleep_time)
     return ret
 
 
