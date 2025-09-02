@@ -59,11 +59,6 @@ class SubCodeAgentTool:
                     "stderr": "task 不能为空",
                 }
 
-            # 在模块级别打补丁，仅自动确认交互（允许用户输入）
-            def _auto_confirm(tip: str, default: bool = True) -> bool:
-                return default
-
-            code_agent_module.user_confirm = _auto_confirm
 
             # 读取背景信息并组合任务
             background: str = str(args.get("background", "")).strip()

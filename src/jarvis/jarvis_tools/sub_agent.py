@@ -4,15 +4,14 @@ sub_agent 工具
 将子任务交给通用 Agent 执行，并返回执行结果。
 
 约定：
-- 必填参数：task
-- 可选参数：background, system_prompt, summary_prompt, use_tools
-- 不依赖父 Agent，所有配置使用系统默认与全局变量（如提供父Agent则尝试继承）
+- 必填参数：task, background, system_prompt, summary_prompt, use_tools
+- 不继承父 Agent 的任何配置，所有参数必须显式提供
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
 from typing import Any, Dict, Optional
 import json
 
-from jarvis.jarvis_agent import Agent, origin_agent_system_prompt
+from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.globals import delete_agent
 from jarvis.jarvis_tools.registry import ToolRegistry
 
@@ -27,7 +26,7 @@ class SubAgentTool:
 
     # 必须与文件名一致，供 ToolRegistry 自动注册
     name = "sub_agent"
-    description = "将子任务交给通用 Agent 执行，并返回执行结果（使用系统默认配置，自动完成并生成总结）。"
+    description = "将子任务交给通用 Agent 执行，并返回执行结果（不继承父Agent配置，参数需显式提供，自动完成并生成总结）。"
     parameters = {
         "type": "object",
         "properties": {
@@ -37,20 +36,20 @@ class SubAgentTool:
             },
             "background": {
                 "type": "string",
-                "description": "任务背景与已知信息（可选，将与任务一并提供给子Agent）",
+                "description": "任务背景与已知信息（必填，将与任务一并提供给子Agent）",
             },
             "system_prompt": {
                 "type": "string",
-                "description": "覆盖子Agent的系统提示词（可选，默认使用 origin_agent_system_prompt）",
+                "description": "覆盖子Agent的系统提示词（必填）",
             },
             "summary_prompt": {
                 "type": "string",
-                "description": "覆盖子Agent的总结提示词（可选，默认继承父Agent或使用全局默认）",
+                "description": "覆盖子Agent的总结提示词（必填）",
             },
             "use_tools": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "限制子Agent可用的工具名称列表（可选）。兼容以逗号分隔的字符串输入。可用的工具列表："
+                "description": "限制子Agent可用的工具名称列表（必填）。兼容以逗号分隔的字符串输入。可用的工具列表："
                 + "\n".join(
                     [
                         t["name"] + ": " + t["description"]
@@ -59,7 +58,13 @@ class SubAgentTool:
                 ),
             },
         },
-        "required": ["task"],
+        "required": [
+            "task",
+            "background",
+            "system_prompt",
+            "summary_prompt",
+            "use_tools",
+        ],
     }
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -85,127 +90,64 @@ class SubAgentTool:
                 f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
             )
 
-            # 继承父Agent的运行参数（用于覆盖默认值）；若无父Agent则使用默认/全局配置
-            parent_agent = args.get("agent")
-            # 如未注入父Agent，尝试从全局获取当前或任一已注册Agent
-            if parent_agent is None:
-                try:
-                    from jarvis.jarvis_utils import globals as G  # 延迟导入避免循环
-
-                    curr = getattr(G, "current_agent_name", "")
-                    if curr:
-                        parent_agent = getattr(G, "global_agents", {}).get(curr)
-                    if parent_agent is None and getattr(G, "global_agents", {}):
-                        try:
-                            parent_agent = next(iter(G.global_agents.values()))
-                        except Exception:
-                            parent_agent = None
-                except Exception:
-                    parent_agent = None
-            # 默认/全局
-            system_prompt = origin_agent_system_prompt
+            # 不继承父Agent，所有关键参数必须由调用方显式提供
             need_summary = True
             auto_complete = True
 
-            # 可继承参数
-            model_group = None
-            summary_prompt = None
-            execute_tool_confirm = None
-            use_methodology = None
-            use_analysis = None
-            force_save_memory = None
+            # 读取并校验必填参数
+            system_prompt = str(args.get("system_prompt", "")).strip()
+            summary_prompt = str(args.get("summary_prompt", "")).strip()
+
+            # 解析可用工具列表（支持数组或以逗号分隔的字符串）
+            _use_tools = args.get("use_tools", None)
             use_tools: list[str] = []
+            if isinstance(_use_tools, list):
+                use_tools = [str(x).strip() for x in _use_tools if str(x).strip()]
+            elif isinstance(_use_tools, str):
+                use_tools = [s.strip() for s in _use_tools.split(",") if s.strip()]
+            else:
+                use_tools = []
 
-            try:
-                if parent_agent is not None:
-                    # 继承模型组
-                    if getattr(parent_agent, "model", None):
-                        model_group = getattr(parent_agent.model, "model_group", None)
-                    # 继承开关类参数
-                    summary_prompt = getattr(parent_agent, "summary_prompt", None)
-                    execute_tool_confirm = getattr(
-                        parent_agent, "execute_tool_confirm", None
-                    )
-                    use_methodology = getattr(parent_agent, "use_methodology", None)
-                    use_analysis = getattr(parent_agent, "use_analysis", None)
-                    force_save_memory = getattr(parent_agent, "force_save_memory", None)
-                    # 继承工具使用集（名称列表）
-                    parent_registry = parent_agent.get_tool_registry()
-                    if parent_registry:
-                        for t in parent_registry.get_all_tools():
-                            if isinstance(t, dict) and t.get("name"):
-                                use_tools.append(str(t["name"]))
-            except Exception:
-                # 忽略继承失败，退回默认配置
-                pass
+            errors = []
+            if not system_prompt:
+                errors.append("system_prompt 不能为空")
+            if not summary_prompt:
+                errors.append("summary_prompt 不能为空")
+            if not use_tools:
+                errors.append("use_tools 不能为空")
+            if not background:
+                errors.append("background 不能为空")
 
-            # 参数覆盖（优先级：用户提供 > 继承父Agent > 默认）
-            try:
-                # 覆盖系统提示词
-                _sp = str(args.get("system_prompt", "")).strip()
-                if _sp:
-                    system_prompt = _sp
-                # 覆盖总结提示词
-                _sum_p = str(args.get("summary_prompt", "")).strip()
-                if _sum_p:
-                    summary_prompt = _sum_p
-                # 覆盖可用工具列表（支持数组或以逗号分隔的字符串）
-                _use_tools = args.get("use_tools", None)
-                parsed_tools: list[str] = []
-                if isinstance(_use_tools, list):
-                    parsed_tools = [str(x).strip() for x in _use_tools if str(x).strip()]
-                elif isinstance(_use_tools, str):
-                    parsed_tools = [s.strip() for s in _use_tools.split(",") if s.strip()]
-                if parsed_tools:
-                    use_tools = parsed_tools
-            except Exception:
-                # 忽略覆盖失败，采用继承/默认
-                pass
+            if errors:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "; ".join(errors),
+                }
 
-            # 为避免交互阻塞：提供自动确认与空输入处理器
-            def _auto_confirm(tip: str, default: bool = True) -> bool:
-                return default
-
-            # 创建子Agent（其余配置使用默认/全局）
+            # 创建子Agent（不继承父Agent配置）
             agent = Agent(
                 system_prompt=system_prompt,
                 name="SubAgent",
                 description="Temporary sub agent for executing a subtask",
-
-                model_group=model_group,  # 继承父Agent模型组（如可用）
-                summary_prompt=summary_prompt,  # 继承父Agent总结提示词（如可用）
+                model_group=None,
+                summary_prompt=summary_prompt,
                 auto_complete=auto_complete,
-                output_handler=None,  # 默认 ToolRegistry
-                use_tools=None,  # 初始不限定，稍后同步父Agent工具集
-                input_handler=None,  # 允许使用系统默认输入链
-                execute_tool_confirm=execute_tool_confirm,  # 继承父Agent（如可用）
+                output_handler=None,
+                use_tools=None,
+                input_handler=None,
+                execute_tool_confirm=None,
                 need_summary=need_summary,
-                multiline_inputer=None,  # 使用系统默认输入器（允许用户输入）
-                use_methodology=use_methodology,  # 继承父Agent（如可用）
-                use_analysis=use_analysis,  # 继承父Agent（如可用）
-                force_save_memory=force_save_memory,  # 继承父Agent（如可用）
+                multiline_inputer=None,
+                use_methodology=None,
+                use_analysis=None,
+                force_save_memory=None,
                 files=None,
-                confirm_callback=_auto_confirm,  # 自动确认
             )
 
-            # 同步父Agent的模型名称与工具使用集（若可用）
+            # 设置可用工具列表
             try:
-                if (
-                    parent_agent is not None
-                    and getattr(parent_agent, "model", None)
-                    and getattr(agent, "model", None)
-                ):
-                    try:
-                        model_name = parent_agent.model.name()  # type: ignore[attr-defined]
-                        if model_name:
-                            from typing import Any
-                            model_obj: Any = getattr(agent, "model", None)
-                            if model_obj is not None:
-                                model_obj.set_model_name(model_name)
-                    except Exception:
-                        pass
-                if use_tools:
-                    agent.set_use_tools(use_tools)
+                agent.set_use_tools(use_tools)
             except Exception:
                 pass
 
