@@ -4,7 +4,7 @@ sub_agent 工具
 将子任务交给通用 Agent 执行，并返回执行结果。
 
 约定：
-- 必填参数：task, background, system_prompt, summary_prompt, use_tools
+- 必填参数：task, name, background, system_prompt, summary_prompt, use_tools
 - 继承父 Agent 的部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer；其他参数需显式提供
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
@@ -34,6 +34,10 @@ class SubAgentTool:
                 "type": "string",
                 "description": "要执行的子任务内容（必填）",
             },
+            "name": {
+                "type": "string",
+                "description": "子Agent名称（必填）",
+            },
             "background": {
                 "type": "string",
                 "description": "任务背景与已知信息（必填，将与任务一并提供给子Agent）",
@@ -60,6 +64,7 @@ class SubAgentTool:
         },
         "required": [
             "task",
+            "name",
             "background",
             "system_prompt",
             "summary_prompt",
@@ -97,6 +102,7 @@ class SubAgentTool:
             # 读取并校验必填参数
             system_prompt = str(args.get("system_prompt", "")).strip()
             summary_prompt = str(args.get("summary_prompt", "")).strip()
+            agent_name = str(args.get("name", "")).strip()
 
             # 解析可用工具列表（支持数组或以逗号分隔的字符串）
             _use_tools = args.get("use_tools", None)
@@ -113,6 +119,8 @@ class SubAgentTool:
                 errors.append("system_prompt 不能为空")
             if not summary_prompt:
                 errors.append("summary_prompt 不能为空")
+            if not agent_name:
+                errors.append("name 不能为空")
             if not use_tools:
                 errors.append("use_tools 不能为空")
             if not background:
@@ -144,7 +152,7 @@ class SubAgentTool:
 
             agent = Agent(
                 system_prompt=system_prompt,
-                name="SubAgent",
+                name=agent_name,
                 description="Temporary sub agent for executing a subtask",
                 model_group=parent_model_group,
                 summary_prompt=summary_prompt,
