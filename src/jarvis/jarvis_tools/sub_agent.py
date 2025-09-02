@@ -5,7 +5,7 @@ sub_agent 工具
 
 约定：
 - 必填参数：task, background, system_prompt, summary_prompt, use_tools
-- 不继承父 Agent 的任何配置，所有参数必须显式提供
+- 继承父 Agent 的部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer；其他参数需显式提供
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
 from typing import Any, Dict, Optional
@@ -26,7 +26,7 @@ class SubAgentTool:
 
     # 必须与文件名一致，供 ToolRegistry 自动注册
     name = "sub_agent"
-    description = "将子任务交给通用 Agent 执行，并返回执行结果（不继承父Agent配置，参数需显式提供，自动完成并生成总结）。"
+    description = "将子任务交给通用 Agent 执行，并返回执行结果（继承父Agent部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer；其他参数需显式提供，自动完成并生成总结）。"
     parameters = {
         "type": "object",
         "properties": {
@@ -125,20 +125,36 @@ class SubAgentTool:
                     "stderr": "; ".join(errors),
                 }
 
-            # 创建子Agent（不继承父Agent配置）
+            # 基于父Agent（如有）继承部分配置后创建子Agent
+            parent_agent = args.get("agent", None)
+            parent_model_group = None
+            parent_input_handler = None
+            parent_execute_tool_confirm = None
+            parent_multiline_inputer = None
+            try:
+                if parent_agent is not None:
+                    if getattr(parent_agent, "model", None):
+                        parent_model_group = getattr(parent_agent.model, "model_group", None)
+                    parent_input_handler = getattr(parent_agent, "input_handler", None)
+                    parent_execute_tool_confirm = getattr(parent_agent, "execute_tool_confirm", None)
+                    parent_multiline_inputer = getattr(parent_agent, "multiline_inputer", None)
+            except Exception:
+                # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
+                pass
+
             agent = Agent(
                 system_prompt=system_prompt,
                 name="SubAgent",
                 description="Temporary sub agent for executing a subtask",
-                model_group=None,
+                model_group=parent_model_group,
                 summary_prompt=summary_prompt,
                 auto_complete=auto_complete,
                 output_handler=None,
                 use_tools=None,
-                input_handler=None,
-                execute_tool_confirm=None,
+                input_handler=parent_input_handler,
+                execute_tool_confirm=parent_execute_tool_confirm,
                 need_summary=need_summary,
-                multiline_inputer=None,
+                multiline_inputer=parent_multiline_inputer,
                 use_methodology=None,
                 use_analysis=None,
                 force_save_memory=None,
