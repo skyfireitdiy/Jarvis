@@ -4,8 +4,9 @@ sub_agent 工具
 将子任务交给通用 Agent 执行，并返回执行结果。
 
 约定：
-- 仅接收一个参数：task
-- 不依赖父 Agent，所有配置使用系统默认与全局变量
+- 必填参数：task
+- 可选参数：background, system_prompt, summary_prompt, use_tools
+- 不依赖父 Agent，所有配置使用系统默认与全局变量（如提供父Agent则尝试继承）
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
 from typing import Any, Dict, Optional
@@ -13,6 +14,7 @@ import json
 
 from jarvis.jarvis_agent import Agent, origin_agent_system_prompt
 from jarvis.jarvis_utils.globals import delete_agent
+from jarvis.jarvis_tools.registry import ToolRegistry
 
 
 class SubAgentTool:
@@ -36,6 +38,25 @@ class SubAgentTool:
             "background": {
                 "type": "string",
                 "description": "任务背景与已知信息（可选，将与任务一并提供给子Agent）",
+            },
+            "system_prompt": {
+                "type": "string",
+                "description": "覆盖子Agent的系统提示词（可选，默认使用 origin_agent_system_prompt）",
+            },
+            "summary_prompt": {
+                "type": "string",
+                "description": "覆盖子Agent的总结提示词（可选，默认继承父Agent或使用全局默认）",
+            },
+            "use_tools": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "限制子Agent可用的工具名称列表（可选）。兼容以逗号分隔的字符串输入。可用的工具列表："
+                + "\n".join(
+                    [
+                        t["name"] + ": " + t["description"]
+                        for t in ToolRegistry().get_all_tools()
+                    ]
+                ),
             },
         },
         "required": ["task"],
@@ -116,6 +137,29 @@ class SubAgentTool:
                                 use_tools.append(str(t["name"]))
             except Exception:
                 # 忽略继承失败，退回默认配置
+                pass
+
+            # 参数覆盖（优先级：用户提供 > 继承父Agent > 默认）
+            try:
+                # 覆盖系统提示词
+                _sp = str(args.get("system_prompt", "")).strip()
+                if _sp:
+                    system_prompt = _sp
+                # 覆盖总结提示词
+                _sum_p = str(args.get("summary_prompt", "")).strip()
+                if _sum_p:
+                    summary_prompt = _sum_p
+                # 覆盖可用工具列表（支持数组或以逗号分隔的字符串）
+                _use_tools = args.get("use_tools", None)
+                parsed_tools: list[str] = []
+                if isinstance(_use_tools, list):
+                    parsed_tools = [str(x).strip() for x in _use_tools if str(x).strip()]
+                elif isinstance(_use_tools, str):
+                    parsed_tools = [s.strip() for s in _use_tools.split(",") if s.strip()]
+                if parsed_tools:
+                    use_tools = parsed_tools
+            except Exception:
+                # 忽略覆盖失败，采用继承/默认
                 pass
 
             # 为避免交互阻塞：提供自动确认与空输入处理器
