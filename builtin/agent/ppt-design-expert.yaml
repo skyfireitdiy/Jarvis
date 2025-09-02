@@ -86,3 +86,5 @@ use_tools:
   - search_web
   - read_code
 force_save_memory: false
+use_analysis: false
+use_methodology: false
