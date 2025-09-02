@@ -84,4 +84,5 @@ need_summary: false
 use_tools:
   - ask_user
   - search_web
+  - read_code
 force_save_memory: false
