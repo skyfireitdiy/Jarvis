@@ -163,6 +163,9 @@ commit信息
 {ct("COMMIT_MESSAGE")}
                 """
 
+                # 优先从调用方传入的 agent 获取平台与模型
+                agent_from_args = args.get("agent")
+
                 # Get model_group from args
                 model_group = args.get("model_group")
 
@@ -172,21 +175,44 @@ commit信息
                     get_normal_model_name,
                 )
 
-                platform_name = get_normal_platform_name(model_group)
-                model_name = get_normal_model_name(model_group)
+                platform_name = None
+                model_name = None
 
-                # If no explicit parameters, try to get from existing agent
-                agent = get_agent(current_agent_name)
                 if (
-                    not platform_name
-                    and agent
-                    and hasattr(agent, "model")
-                    and agent.model
+                    agent_from_args
+                    and hasattr(agent_from_args, "model")
+                    and getattr(agent_from_args, "model", None)
                 ):
-                    platform_name = agent.model.platform_name()
-                    model_name = agent.model.name()
-                    if not model_group:
-                        model_group = agent.model.model_group
+                    try:
+                        platform_name = agent_from_args.model.platform_name()
+                        model_name = agent_from_args.model.name()
+                        if not model_group and hasattr(
+                            agent_from_args.model, "model_group"
+                        ):
+                            model_group = agent_from_args.model.model_group
+                    except Exception:
+                        # 安全回退到后续逻辑
+                        platform_name = None
+                        model_name = None
+
+                # 如果未能从agent获取到，再根据 model_group 获取
+                if not platform_name:
+                    platform_name = get_normal_platform_name(model_group)
+                if not model_name:
+                    model_name = get_normal_model_name(model_group)
+
+                # If no explicit parameters, try to get from existing global agent
+                if not platform_name:
+                    agent = get_agent(current_agent_name)
+                    if (
+                        agent
+                        and hasattr(agent, "model")
+                        and getattr(agent, "model", None)
+                    ):
+                        platform_name = agent.model.platform_name()
+                        model_name = agent.model.name()
+                        if not model_group and hasattr(agent.model, "model_group"):
+                            model_group = agent.model.model_group
 
                 # Create a new platform instance
                 if platform_name:

@@ -8,6 +8,7 @@ from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.globals import get_agent, current_agent_name
 
 app = typer.Typer(help="Git压缩工具")
 
@@ -46,7 +47,11 @@ class GitSquashTool:
 
             # Use existing GitCommitTool for new commit
             commit_tool = GitCommitTool()
-            commit_tool.execute({"lang": args.get("lang", "Chinese")})
+            agent = get_agent(current_agent_name)
+            exec_args = {"lang": args.get("lang", "Chinese")}
+            if agent:
+                exec_args["agent"] = agent
+            commit_tool.execute(exec_args)
         except Exception as e:
             PrettyOutput.print(f"压缩提交失败: {str(e)}", OutputType.WARNING)
 
