@@ -587,13 +587,7 @@ class CodeAgent:
                 PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
                 return str(e)
 
-            # 如果在工具回调中已完成提交处理，则避免重复的提交/统计流程
-            try:
-                if self.agent.get_user_data("__commit_handled__"):
-                    self.agent.set_user_data("__commit_handled__", False)
-                    return None
-            except Exception:
-                pass
+
 
             self._handle_uncommitted_changes()
             end_commit = get_latest_commit_hash()
@@ -634,11 +628,7 @@ class CodeAgent:
                 from jarvis.jarvis_stats.stats import StatsManager
 
                 StatsManager.increment("code_modifications", group="code_agent")
-                # 标记本轮提交已在回调中处理，避免后续 run() 中重复处理
-                try:
-                    agent.set_user_data("__commit_handled__", True)
-                except Exception:
-                    pass
+
 
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()

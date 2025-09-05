@@ -1192,9 +1192,13 @@ def _collect_optional_config_interactively(
             current_mode = config_data.get(_key, get_git_check_mode())
             choices = ["strict", "warn"]
             tip = (
-                "请选择 Git 校验模式 (JARVIS_GIT_CHECK_MODE):\n"
-                "  - strict: 如果 Git 仓库有未提交的更改，则中断操作\n"
-                "  - warn:   如果 Git 仓库有未提交的更改，则显示警告并继续"
+                "请选择 Git 仓库检查模式 (JARVIS_GIT_CHECK_MODE):\n"
+                "此设置决定了当在 Git 仓库中检测到未提交的更改时，Jarvis应如何处理。\n"
+                "这对于确保代码修改和提交操作在干净的工作区上进行至关重要。\n"
+                "  - strict: (推荐) 如果存在未提交的更改，则中断相关操作（如代码修改、自动提交）。\n"
+                "            这可以防止意外覆盖或丢失本地工作。\n"
+                "  - warn:   如果存在未提交的更改，仅显示警告信息，然后继续执行操作。\n"
+                "            适用于您希望绕过检查并自行管理仓库状态的场景。"
             )
 
             try:
