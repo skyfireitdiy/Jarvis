@@ -427,7 +427,7 @@ class StatsManager:
 
         # 计算时间范围列标题
         if start_time is None or end_time is None:
-            period_label = "全部数据点"
+            period_label = "值"
         else:
             delta = end_time - start_time
             if delta.days >= 1:
@@ -484,8 +484,14 @@ class StatsManager:
                     except:
                         pass
 
-            count = len(records)
-            table.add_row(metric, unit, last_updated, str(count))
+            total_value = sum(r.get("value", 0) for r in records)
+            # 智能格式化，如果是整数则不显示小数点
+            if total_value == int(total_value):
+                value_to_display = str(int(total_value))
+            else:
+                value_to_display = f"{total_value:.2f}"
+
+            table.add_row(metric, unit, last_updated, value_to_display)
             displayed_count += 1
 
         if displayed_count == 0:
