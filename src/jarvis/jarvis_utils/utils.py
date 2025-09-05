@@ -1179,6 +1179,42 @@ def _collect_optional_config_interactively(
         or changed
     )
 
+    # Git 校验模式
+    def _ask_git_check_mode() -> bool:
+        try:
+            _key = "JARVIS_GIT_CHECK_MODE"
+            if not ask_all and _key in config_data:
+                return False
+
+            from jarvis.jarvis_utils.input import get_choice
+            from jarvis.jarvis_utils.config import get_git_check_mode
+
+            current_mode = config_data.get(_key, get_git_check_mode())
+            choices = ["strict", "warn"]
+            tip = (
+                "请选择 Git 校验模式 (JARVIS_GIT_CHECK_MODE):\n"
+                "  - strict: 如果 Git 仓库有未提交的更改，则中断操作\n"
+                "  - warn:   如果 Git 仓库有未提交的更改，则显示警告并继续"
+            )
+
+            try:
+                # 查找当前模式在选项中的索引
+                default_index = choices.index(current_mode)
+            except ValueError:
+                default_index = 0  # 默认为第一个选项
+
+            new_mode = get_choice(tip, choices, default_index)
+
+            if new_mode == current_mode:
+                return False
+
+            config_data[_key] = new_mode
+            return True
+        except Exception:
+            return False
+
+    changed = _ask_git_check_mode() or changed
+
     # Git 提交提示词（可选）
     changed = (
         _ask_and_set_optional_str(
