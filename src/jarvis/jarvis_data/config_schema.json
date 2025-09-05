@@ -126,8 +126,6 @@
       "description": "常规操作模型名称",
       "default": "deep_seek_v3"
     },
-
-
     "JARVIS_WEB_SEARCH_PLATFORM": {
       "type": "string",
       "description": "Web搜索使用的平台名称",
@@ -160,8 +158,6 @@
               "type": "string",
               "default": "deep_seek_v3"
             },
-
-
             "JARVIS_MAX_INPUT_TOKEN_COUNT": {
               "type": "number",
               "default": 32000
@@ -196,7 +192,6 @@
       "description": "Jarvis数据存储目录路径",
       "default": "~/.jarvis"
     },
-
     "JARVIS_PRETTY_OUTPUT": {
       "type": "boolean",
       "description": "是否启用美化输出",
@@ -291,6 +286,12 @@
       "type": "boolean",
       "description": "是否启用立即中断：在对话迭代中检测到中断信号时立即返回",
       "default": false
+    },
+    "JARVIS_GIT_CHECK_MODE": {
+      "type": "string",
+      "enum": ["strict", "warn"],
+      "description": "Git 配置校验模式：strict 表示严格模式（默认），缺失配置时直接退出；warn 表示警告模式，仅提示并继续运行",
+      "default": "strict"
     },
     "JARVIS_TOOL_GROUP": {
       "type": "string",
