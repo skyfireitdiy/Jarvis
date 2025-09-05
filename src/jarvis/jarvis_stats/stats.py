@@ -166,32 +166,58 @@ class StatsManager:
             >>> StatsManager.show("response_time", last_days=7, format="chart")  # 图表显示
         """
         # 处理时间范围
-        if end_time is None:
-            end_time = datetime.now()
-
-        if start_time is None:
-            if last_hours:
-                start_time = end_time - timedelta(hours=last_hours)
-            elif last_days:
-                start_time = end_time - timedelta(days=last_days)
-            else:
-                start_time = end_time - timedelta(days=7)  # 默认7天
+        # 当未提供时间过滤参数时，默认显示全历史数据
+        all_time = False
+        if last_hours or last_days:
+            if end_time is None:
+                end_time = datetime.now()
+            if start_time is None:
+                if last_hours:
+                    start_time = end_time - timedelta(hours=last_hours)
+                elif last_days:
+                    start_time = end_time - timedelta(days=last_days)
+        else:
+            all_time = True
 
         if metric_name is None:
             # 显示所有指标摘要
             StatsManager._show_metrics_summary(start_time, end_time, tags)
         else:
+            # 基于元数据的 created_at / last_updated 推断全历史时间范围
+            storage = StatsManager._get_storage()
+            if start_time is None or end_time is None:
+                info = storage.get_metric_info(metric_name)
+                if info:
+                    try:
+                        created_at = info.get("created_at")
+                        last_updated = info.get("last_updated")
+                        start_dt = start_time or (
+                            datetime.fromisoformat(created_at) if created_at else datetime.now()
+                        )
+                        end_dt = end_time or (
+                            datetime.fromisoformat(last_updated) if last_updated else datetime.now()
+                        )
+                    except Exception:
+                        start_dt = start_time or (datetime.now() - timedelta(days=7))
+                        end_dt = end_time or datetime.now()
+                else:
+                    start_dt = start_time or (datetime.now() - timedelta(days=7))
+                    end_dt = end_time or datetime.now()
+            else:
+                start_dt = start_time
+                end_dt = end_time
+
             # 根据格式显示数据
             if format == "chart":
                 StatsManager._show_chart(
-                    metric_name, start_time, end_time, aggregation, tags
+                    metric_name, start_dt, end_dt, aggregation, tags
                 )
             elif format == "summary":
                 StatsManager._show_summary(
-                    metric_name, start_time, end_time, aggregation, tags
+                    metric_name, start_dt, end_dt, aggregation, tags
                 )
             else:
-                StatsManager._show_table(metric_name, start_time, end_time, tags)
+                StatsManager._show_table(metric_name, start_dt, end_dt, tags)
 
     @staticmethod
     def plot(
@@ -224,21 +250,44 @@ class StatsManager:
             >>> StatsManager.plot(tags={"service": "api"}, last_days=7)
         """
         # 处理时间范围
-        if end_time is None:
-            end_time = datetime.now()
-
-        if start_time is None:
-            if last_hours:
-                start_time = end_time - timedelta(hours=last_hours)
-            elif last_days:
-                start_time = end_time - timedelta(days=last_days)
-            else:
-                start_time = end_time - timedelta(days=7)
+        # 当未提供时间过滤参数时，默认使用全历史数据
+        if last_hours or last_days:
+            if end_time is None:
+                end_time = datetime.now()
+            if start_time is None:
+                if last_hours:
+                    start_time = end_time - timedelta(hours=last_hours)
+                elif last_days:
+                    start_time = end_time - timedelta(days=last_days)
 
         # 如果指定了metric_name，显示单个图表
         if metric_name:
+            # 基于元数据的 created_at / last_updated 推断全历史时间范围
+            storage = StatsManager._get_storage()
+            if start_time is None or end_time is None:
+                info = storage.get_metric_info(metric_name)
+                if info:
+                    try:
+                        created_at = info.get("created_at")
+                        last_updated = info.get("last_updated")
+                        start_dt = start_time or (
+                            datetime.fromisoformat(created_at) if created_at else datetime.now()
+                        )
+                        end_dt = end_time or (
+                            datetime.fromisoformat(last_updated) if last_updated else datetime.now()
+                        )
+                    except Exception:
+                        start_dt = start_time or (datetime.now() - timedelta(days=7))
+                        end_dt = end_time or datetime.now()
+                else:
+                    start_dt = start_time or (datetime.now() - timedelta(days=7))
+                    end_dt = end_time or datetime.now()
+            else:
+                start_dt = start_time
+                end_dt = end_time
+
             StatsManager._show_chart(
-                metric_name, start_time, end_time, aggregation, tags, width, height
+                metric_name, start_dt, end_dt, aggregation, tags, width, height
             )
         else:
             # 如果没有指定metric_name，根据标签过滤获取所有匹配的指标
@@ -272,32 +321,53 @@ class StatsManager:
             统计数据字典
         """
         # 处理时间范围
-        if end_time is None:
-            end_time = datetime.now()
-
-        if start_time is None:
-            if last_hours:
-                start_time = end_time - timedelta(hours=last_hours)
-            elif last_days:
-                start_time = end_time - timedelta(days=last_days)
-            else:
-                start_time = end_time - timedelta(days=7)
+        # 当未提供时间过滤参数时，返回全历史数据
+        if last_hours or last_days or start_time is not None:
+            if end_time is None:
+                end_time = datetime.now()
+            if start_time is None:
+                if last_hours:
+                    start_time = end_time - timedelta(hours=last_hours)
+                elif last_days:
+                    start_time = end_time - timedelta(days=last_days)
 
         storage = StatsManager._get_storage()
+
+        # 基于元数据推断全历史范围（当未提供时间过滤参数时）
+        start_dt = start_time
+        end_dt = end_time
+        if start_dt is None or end_dt is None:
+            info = storage.get_metric_info(metric_name)
+            if info:
+                try:
+                    created_at = info.get("created_at")
+                    last_updated = info.get("last_updated")
+                    if start_dt is None and created_at:
+                        start_dt = datetime.fromisoformat(created_at)
+                    if end_dt is None and last_updated:
+                        end_dt = datetime.fromisoformat(last_updated)
+                except Exception:
+                    pass
+        if start_dt is None:
+            start_dt = datetime.now() - timedelta(days=7)
+        if end_dt is None:
+            end_dt = datetime.now()
+
         if aggregation:
-            # 返回聚合数据
+            # 返回聚合数据（按推断的全历史时间范围）
             return storage.aggregate_metrics(
-                metric_name, start_time, end_time, aggregation, tags
+                metric_name, start_dt, end_dt, aggregation, tags
             )
         else:
-            # 返回原始数据
-            records = storage.get_metrics(metric_name, start_time, end_time, tags)
+            # 返回原始数据（全历史或指定范围）
+            records = storage.get_metrics(metric_name, start_dt, end_dt, tags)
+
             return {
                 "metric": metric_name,
                 "records": records,
                 "count": len(records),
-                "start_time": start_time.isoformat(),
-                "end_time": end_time.isoformat(),
+                "start_time": start_dt.isoformat(),
+                "end_time": end_dt.isoformat(),
             }
 
     @staticmethod
@@ -343,24 +413,56 @@ class StatsManager:
             console.print("[yellow]没有找到任何统计指标[/yellow]")
             return
 
-        # 如果没有指定时间范围，使用默认值
-        if end_time is None:
-            end_time = datetime.now()
-        if start_time is None:
-            start_time = end_time - timedelta(days=7)
+        # 如果未指定时间范围且两者皆为 None，则表示使用全历史数据
+        all_time = False
+        if start_time is None and end_time is None:
+            all_time = True
+        else:
+            if end_time is None:
+                end_time = datetime.now()
+            if start_time is None:
+                start_time = end_time - timedelta(days=7)
+
+
+
+        # 计算时间范围列标题
+        if start_time is None or end_time is None:
+            period_label = "全部数据点"
+        else:
+            delta = end_time - start_time
+            if delta.days >= 1:
+                period_label = f"{delta.days}天数据点"
+            else:
+                hours = max(1, int(delta.total_seconds() // 3600))
+                period_label = f"{hours}小时数据点"
 
         # 创建表格
         table = Table(title="统计指标摘要")
         table.add_column("指标名称", style="cyan")
         table.add_column("单位", style="green")
         table.add_column("最后更新", style="yellow")
-        table.add_column("7天数据点", style="magenta")
+        table.add_column(period_label, style="magenta")
 
         # 过滤满足标签条件的指标
         displayed_count = 0
         for metric in metrics:
-            # 获取该指标的记录
-            records = storage.get_metrics(metric, start_time, end_time, tags)
+            # 获取该指标的记录（全历史或指定范围）
+            if 'all_time' in locals() and all_time:
+                _start = None
+                _end = None
+                try:
+                    info = storage.get_metric_info(metric)
+                    if info:
+                        ca = info.get("created_at")
+                        lu = info.get("last_updated")
+                        _start = datetime.fromisoformat(ca) if ca else None
+                        _end = datetime.fromisoformat(lu) if lu else None
+                except Exception:
+                    _start = None
+                    _end = None
+                records = storage.get_metrics(metric, _start, _end, tags)
+            else:
+                records = storage.get_metrics(metric, start_time, end_time, tags)
 
             # 如果指定了标签过滤，但没有匹配的记录，跳过该指标
             if tags and len(records) == 0:
@@ -532,8 +634,28 @@ class StatsManager:
             if i > 0:
                 console.print("\n" + "=" * 80 + "\n")  # 分隔符
 
+            # 计算该指标的有效时间范围（基于元数据推断全历史）
+            _start = start_time
+            _end = end_time
+            if _start is None or _end is None:
+                info = storage.get_metric_info(metric)
+                if info:
+                    try:
+                        ca = info.get("created_at")
+                        lu = info.get("last_updated")
+                        if _start is None and ca:
+                            _start = datetime.fromisoformat(ca)
+                        if _end is None and lu:
+                            _end = datetime.fromisoformat(lu)
+                    except Exception:
+                        pass
+                if _start is None:
+                    _start = datetime.now() - timedelta(days=7)
+                if _end is None:
+                    _end = datetime.now()
+
             StatsManager._show_chart(
-                metric, start_time, end_time, aggregation, tags, width, height
+                metric, _start, _end, aggregation, tags, width, height
             )
 
     @staticmethod
