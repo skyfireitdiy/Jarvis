@@ -98,11 +98,6 @@ def inc(
 @app.command()
 def show(
     metric: Optional[str] = typer.Argument(None, help="指标名称，不指定则显示所有"),
-    last_hours: Optional[int] = typer.Option(None, "--hours", "-h", help="最近N小时"),
-    last_days: Optional[int] = typer.Option(None, "--days", "-d", help="最近N天"),
-    format: str = typer.Option(
-        "table", "--format", "-f", help="显示格式: table/chart/summary"
-    ),
     aggregation: str = typer.Option(
         "hourly", "--agg", "-a", help="聚合方式: hourly/daily"
     ),
@@ -123,9 +118,7 @@ def show(
 
     stats.show(
         metric_name=metric,
-        last_hours=last_hours,
-        last_days=last_days,
-        format=format,
+
         aggregation=aggregation,
         tags=tag_dict if tag_dict else None,
     )
@@ -136,8 +129,6 @@ def plot(
     metric: Optional[str] = typer.Argument(
         None, help="指标名称（可选，不指定则根据标签过滤所有匹配的指标）"
     ),
-    last_hours: Optional[int] = typer.Option(None, "--hours", "-h", help="最近N小时"),
-    last_days: Optional[int] = typer.Option(None, "--days", "-d", help="最近N天"),
     aggregation: str = typer.Option(
         "hourly", "--agg", "-a", help="聚合方式: hourly/daily"
     ),
@@ -160,8 +151,6 @@ def plot(
 
     stats.plot(
         metric_name=metric,
-        last_hours=last_hours,
-        last_days=last_days,
         aggregation=aggregation,
         width=width,
         height=height,
@@ -260,9 +249,9 @@ def clean(
 @app.command()
 def export(
     metric: str = typer.Argument(..., help="指标名称"),
-    output: str = typer.Option("csv", "--format", "-f", help="输出格式: csv/json"),
-    last_hours: Optional[int] = typer.Option(None, "--hours", "-h", help="最近N小时"),
-    last_days: Optional[int] = typer.Option(None, "--days", "-d", help="最近N天"),
+
+
+
     tags: Optional[List[str]] = typer.Option(
         None, "--tag", "-t", help="标签过滤，格式: key=value"
     ),
@@ -285,27 +274,19 @@ def export(
     # 获取数据
     data = stats.get_stats(
         metric_name=metric,
-        last_hours=last_hours,
-        last_days=last_days,
         tags=tag_dict if tag_dict else None,
     )
 
-    if output == "json":
-        # JSON格式输出
-        PrettyOutput.print(
-            json.dumps(data, indent=2, ensure_ascii=False), OutputType.CODE, lang="json"
-        )
+    # CSV格式输出（默认）
+    records = data.get("records", [])
+    if records:
+        writer = csv.writer(sys.stdout)
+        writer.writerow(["timestamp", "value", "tags"])
+        for record in records:
+            tags_str = json.dumps(record.get("tags", {}))
+            writer.writerow([record["timestamp"], record["value"], tags_str])
     else:
-        # CSV格式输出
-        records = data.get("records", [])
-        if records:
-            writer = csv.writer(sys.stdout)
-            writer.writerow(["timestamp", "value", "tags"])
-            for record in records:
-                tags_str = json.dumps(record.get("tags", {}))
-                writer.writerow([record["timestamp"], record["value"], tags_str])
-        else:
-            rprint("[yellow]没有找到数据[/yellow]", file=sys.stderr)
+        rprint("[yellow]没有找到数据[/yellow]", file=sys.stderr)
 
 
 @app.command()
