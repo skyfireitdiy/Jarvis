@@ -423,6 +423,20 @@ def is_enable_static_analysis() -> bool:
     return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STATIC_ANALYSIS", True) is True
 
 
+def get_git_check_mode() -> str:
+    """
+    获取Git校验模式。
+
+    返回:
+        str: "strict" 或 "warn"，默认为 "strict"
+    """
+    mode = GLOBAL_CONFIG_DATA.get("JARVIS_GIT_CHECK_MODE", "strict")
+    try:
+        return str(mode)
+    except Exception:
+        return "strict"
+
+
 def get_mcp_config() -> List[Dict[str, Any]]:
     """
     获取MCP配置列表。

@@ -88,13 +88,27 @@ class MemoryManager:
 
         # 处理记忆保存
         try:
+            # 清空本轮执行标记，便于准确判断是否调用了 save_memory
+            try:
+                self.agent.set_user_data("__last_executed_tool__", "")
+                self.agent.set_user_data("__executed_tools__", [])
+            except Exception:
+                pass
+
             response = self.agent.model.chat_until_success(prompt)  # type: ignore
 
             # 执行工具调用（如果有）
             need_return, result = self.agent._call_tools(response)
 
-            # 根据响应判断是否保存了记忆
-            if "save_memory" in response:
+            # 根据实际执行的工具判断是否保存了记忆
+            saved = False
+            try:
+                last_tool = self.agent.get_user_data("__last_executed_tool__")
+                saved = last_tool == "save_memory"
+            except Exception:
+                saved = False
+
+            if saved:
                 PrettyOutput.print(
                     "已自动保存有价值的信息到记忆系统", OutputType.SUCCESS
                 )
