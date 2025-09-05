@@ -21,6 +21,7 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
     is_enable_static_analysis,
+    get_git_check_mode,
 )
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
@@ -197,6 +198,17 @@ class CodeAgent:
                     missing_configs
                 )
                 PrettyOutput.print(message, OutputType.WARNING)
+                # 通过配置控制严格校验模式（JARVIS_GIT_CHECK_MODE）：
+                # - warn: 仅告警并继续，后续提交可能失败
+                # - strict: 严格模式（默认），直接退出
+                mode = get_git_check_mode().lower()
+                if mode == "warn":
+                    PrettyOutput.print(
+                        "已启用 Git 校验警告模式（JARVIS_GIT_CHECK_MODE=warn），将继续运行。"
+                        "注意：后续提交可能失败，请尽快配置 git user.name 与 user.email。",
+                        OutputType.INFO,
+                    )
+                    return
                 sys.exit(1)
 
         except FileNotFoundError:
@@ -544,7 +556,7 @@ class CodeAgent:
                     f"提交 {i+1}: {commit['hash'][:7]} - {commit['message']} ({len(commit['files'])}个文件)\n"
                     + "\n".join(f"    - {file}" for file in commit["files"][:5])
                     + ("\n    ..." if len(commit["files"]) > 5 else "")
-                    for i, commit in enumerate(commits_info)
+                    for i, commit in enumerate(commits_info[:5])
                 )
                 project_info.append(f"最近提交:\n{commits_str}")
 
@@ -574,6 +586,14 @@ class CodeAgent:
             except RuntimeError as e:
                 PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
                 return str(e)
+
+            # 如果在工具回调中已完成提交处理，则避免重复的提交/统计流程
+            try:
+                if self.agent.get_user_data("__commit_handled__"):
+                    self.agent.set_user_data("__commit_handled__", False)
+                    return None
+            except Exception:
+                pass
 
             self._handle_uncommitted_changes()
             end_commit = get_latest_commit_hash()
@@ -614,6 +634,11 @@ class CodeAgent:
                 from jarvis.jarvis_stats.stats import StatsManager
 
                 StatsManager.increment("code_modifications", group="code_agent")
+                # 标记本轮提交已在回调中处理，避免后续 run() 中重复处理
+                try:
+                    agent.set_user_data("__commit_handled__", True)
+                except Exception:
+                    pass
 
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()

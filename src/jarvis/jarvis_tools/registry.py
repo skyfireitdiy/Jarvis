@@ -839,6 +839,21 @@ class ToolRegistry(OutputHandlerProtocol):
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
             result = self.execute_tool(name, args, agent)
 
+            # 记录本轮实际执行的工具，供上层逻辑（如记忆保存判定）使用
+            try:
+                from jarvis.jarvis_agent import Agent  # 延迟导入避免循环依赖
+                agent_instance_for_record: Agent = agent_instance
+                # 记录最后一次执行的工具
+                agent_instance_for_record.set_user_data("__last_executed_tool__", name)  # type: ignore
+                # 记录本轮累计执行的工具列表
+                executed_list = agent_instance_for_record.get_user_data("__executed_tools__")  # type: ignore
+                if not isinstance(executed_list, list):
+                    executed_list = []
+                executed_list.append(name)
+                agent_instance_for_record.set_user_data("__executed_tools__", executed_list)  # type: ignore
+            except Exception:
+                pass
+
             # 格式化输出
             output = self._format_tool_output(
                 result["stdout"], result.get("stderr", "")
