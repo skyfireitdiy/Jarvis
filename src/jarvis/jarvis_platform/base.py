@@ -188,12 +188,11 @@ class BasePlatform(ABC):
 
                                 # If content overflows, truncate to show only the last few lines
                                 if len(lines) > max_text_height:
-                                    new_text = "\n".join(
-                                        text_content.plain.splitlines()[
-                                            -max_text_height:
-                                        ]
+                                    # Rebuild the text from the wrapped lines to ensure visual consistency
+                                    # This correctly handles both wrapped long lines and explicit newlines
+                                    text_content.plain = "\n".join(
+                                        [line.plain for line in lines[-max_text_height:]]
                                     )
-                                    text_content.plain = new_text
 
                                 panel.subtitle = (
                                     "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
