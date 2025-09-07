@@ -20,8 +20,7 @@ class TestLintTools:
         """测试默认的lint工具配置"""
         # 验证一些常见文件类型的配置
         assert ".py" in LINT_TOOLS
-        assert "black" in LINT_TOOLS[".py"]
-        assert "pylint" in LINT_TOOLS[".py"]
+        assert "ruff" in LINT_TOOLS[".py"]
         assert "mypy" in LINT_TOOLS[".py"]
         
         assert ".js" in LINT_TOOLS
@@ -77,9 +76,9 @@ class TestLintTools:
     def test_get_lint_tools_by_extension(self):
         """测试通过文件扩展名获取lint工具"""
         # Python文件
-        assert get_lint_tools("test.py") == ["black", "pylint", "mypy"]
-        assert get_lint_tools("/path/to/file.py") == ["black", "pylint", "mypy"]
-        assert get_lint_tools("file.PY") == ["black", "pylint", "mypy"]  # 测试大写扩展名
+        assert get_lint_tools("test.py") == ["ruff", "mypy"]
+        assert get_lint_tools("/path/to/file.py") == ["ruff", "mypy"]
+        assert get_lint_tools("file.PY") == ["ruff", "mypy"]  # 测试大写扩展名
         
         # JavaScript文件
         assert get_lint_tools("app.js") == ["eslint"]
@@ -116,7 +115,7 @@ class TestLintTools:
     def test_get_lint_tools_with_path(self):
         """测试带路径的文件名"""
         # 应该只使用基础文件名进行匹配
-        assert get_lint_tools("/home/user/project/test.py") == ["black", "pylint", "mypy"]
+        assert get_lint_tools("/home/user/project/test.py") == ["ruff", "mypy"]
         assert get_lint_tools("../src/main.go") == ["go vet"]
         assert get_lint_tools("/var/lib/docker/dockerfile") == ["hadolint"]
     
@@ -127,7 +126,7 @@ class TestLintTools:
         
         # 多个点的文件名
         assert get_lint_tools("test.spec.js") == ["eslint"]
-        assert get_lint_tools("app.test.py") == ["black", "pylint", "mypy"]
+        assert get_lint_tools("app.test.py") == ["ruff", "mypy"]
         
         # 隐藏文件
         assert get_lint_tools(".bashrc") == ["shellcheck"]
