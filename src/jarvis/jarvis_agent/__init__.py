@@ -3,10 +3,15 @@
 import datetime
 import os
 import platform
+import re
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
 # 第三方库导入
+from rich.align import Align
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 # 本地库导入
 # jarvis_agent 相关
@@ -23,6 +28,8 @@ from jarvis.jarvis_agent.prompts import (
     SUMMARY_REQUEST_PROMPT,
     TASK_ANALYSIS_PROMPT,
 )
+from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_utils.methodology import _load_all_methodologies
 
 # jarvis_platform 相关
 from jarvis.jarvis_platform.base import BasePlatform
@@ -63,16 +70,6 @@ def show_agent_startup_stats(
         model_name: 使用的模型名称
     """
     try:
-        from jarvis.jarvis_utils.methodology import _load_all_methodologies
-        from jarvis.jarvis_tools.registry import ToolRegistry
-        from jarvis.jarvis_utils.config import get_data_dir
-        from pathlib import Path
-        from rich.console import Console
-        from rich.panel import Panel
-        from rich.text import Text
-        from rich.align import Align
-        import os
-
         methodologies = _load_all_methodologies()
         methodology_count = len(methodologies)
 
@@ -279,14 +276,11 @@ class Agent:
         self._init_session()
 
         # 初始化处理器
-        safe_output_handlers: List[OutputHandlerProtocol] = []
-        if output_handler:
-            safe_output_handlers = output_handler
-        safe_use_tools: List[str] = []
-        if use_tools:
-            safe_use_tools = use_tools
         self._init_handlers(
-            safe_output_handlers, input_handler, multiline_inputer, safe_use_tools
+            output_handler or [],
+            input_handler,
+            multiline_inputer,
+            use_tools or [],
         )
 
         # 初始化配置
@@ -340,16 +334,10 @@ class Agent:
         use_tools: List[str],
     ):
         """初始化各种处理器"""
-        from jarvis.jarvis_tools.registry import ToolRegistry
-
-        self.output_handler = output_handler if output_handler else [ToolRegistry()]
+        self.output_handler = output_handler or [ToolRegistry()]
         self.set_use_tools(use_tools)
-
-        self.input_handler = input_handler if input_handler is not None else []
-
-        self.multiline_inputer = (
-            multiline_inputer if multiline_inputer else get_multiline_input
-        )
+        self.input_handler = input_handler or []
+        self.multiline_inputer = multiline_inputer or get_multiline_input
 
     def _init_config(
         self,
@@ -362,35 +350,37 @@ class Agent:
     ):
         """初始化配置选项"""
         # 如果有上传文件，自动禁用方法论
-        self.use_methodology = (
-            False
-            if self.files
-            else (
-                use_methodology if use_methodology is not None else is_use_methodology()
-            )
-        )
+        # -- use_methodology --
+        if self.files:
+            self.use_methodology = False
+        elif use_methodology is not None:
+            self.use_methodology = use_methodology
+        else:
+            self.use_methodology = is_use_methodology()
 
-        self.use_analysis = (
-            use_analysis if use_analysis is not None else is_use_analysis()
-        )
+        # -- use_analysis --
+        if use_analysis is not None:
+            self.use_analysis = use_analysis
+        else:
+            self.use_analysis = is_use_analysis()
 
-        self.execute_tool_confirm = (
-            execute_tool_confirm
-            if execute_tool_confirm is not None
-            else is_execute_tool_confirm()
-        )
+        # -- execute_tool_confirm --
+        if execute_tool_confirm is not None:
+            self.execute_tool_confirm = execute_tool_confirm
+        else:
+            self.execute_tool_confirm = is_execute_tool_confirm()
 
-        self.summary_prompt = (
-            summary_prompt if summary_prompt else DEFAULT_SUMMARY_PROMPT
-        )
+        # -- summary_prompt --
+        self.summary_prompt = summary_prompt or DEFAULT_SUMMARY_PROMPT
 
+        # -- max_token_count --
         self.max_token_count = get_max_token_count(model_group)
 
-        self.force_save_memory = (
-            force_save_memory
-            if force_save_memory is not None
-            else is_force_save_memory()
-        )
+        # -- force_save_memory --
+        if force_save_memory is not None:
+            self.force_save_memory = force_save_memory
+        else:
+            self.force_save_memory = is_force_save_memory()
 
     def _setup_system_prompt(self):
         """设置系统提示词"""
@@ -413,8 +403,6 @@ class Agent:
 
     def set_use_tools(self, use_tools):
         """设置要使用的工具列表"""
-        from jarvis.jarvis_tools.registry import ToolRegistry
-
         for handler in self.output_handler:
             if isinstance(handler, ToolRegistry):
                 if use_tools:
@@ -463,8 +451,6 @@ class Agent:
 
     def get_tool_registry(self) -> Optional[Any]:
         """获取工具注册表实例"""
-        from jarvis.jarvis_tools.registry import ToolRegistry
-
         for handler in self.output_handler:
             if isinstance(handler, ToolRegistry):
                 return handler
@@ -767,21 +753,23 @@ class Agent:
 
                 # 处理中断
                 interrupt_result = self._handle_run_interrupt(current_response)
-                if interrupt_result:
-                    if isinstance(interrupt_result, tuple):
-                        run_input_handlers, should_continue = interrupt_result
-                        if should_continue:
-                            self.run_input_handlers_next_turn = True
-                            continue
-                    else:
-                        return interrupt_result
+                if interrupt_result is True:
+                    # 中断处理器请求跳过本轮剩余部分，直接开始下一次循环
+                    continue
+                elif interrupt_result is not None:
+                    # 中断处理器返回了最终结果，任务结束
+                    return interrupt_result
 
                 # 处理工具调用
-                need_return, prompt = self._call_tools(current_response)
-                if self.session.prompt and prompt:
-                    self.session.prompt += "\n\n" + prompt
-                else:
-                    self.session.prompt = prompt
+                need_return, tool_prompt = self._call_tools(current_response)
+
+                # 将上一个提示和工具提示安全地拼接起来
+                prompt_parts = []
+                if self.session.prompt:
+                    prompt_parts.append(self.session.prompt)
+                if tool_prompt:
+                    prompt_parts.append(tool_prompt)
+                self.session.prompt = "\n\n".join(prompt_parts)
 
                 if need_return:
                     return self.session.prompt
@@ -810,15 +798,13 @@ class Agent:
                 PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
                 return f"Task failed: {str(e)}"
 
-    def _handle_run_interrupt(
-        self, current_response: str
-    ) -> Optional[Union[Any, Tuple[bool, bool]]]:
+    def _handle_run_interrupt(self, current_response: str) -> Optional[Union[Any, bool]]:
         """处理运行中的中断
 
         返回:
-            None: 无中断，继续执行
-            Any: 需要返回的结果
-            Tuple[bool, bool]: (run_input_handlers, should_continue)
+            None: 无中断，或中断后允许继续执行当前响应
+            Any: 需要返回的最终结果
+            True: 中断后需要跳过当前响应，并立即开始下一次循环
         """
         if not get_interrupt():
             return None
@@ -840,10 +826,10 @@ class Agent:
                 return None  # 继续执行工具调用
             else:
                 self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
-                return (True, True)  # run_input_handlers=True, should_continue=True
+                return True  # 请求主循环 continue
         else:
             self.session.prompt = f"被用户中断，用户补充信息为：{user_input}"
-            return (True, True)  # run_input_handlers=True, should_continue=True
+            return True  # 请求主循环 continue
 
     def _get_next_user_action(self) -> str:
         """获取用户下一步操作
@@ -879,11 +865,20 @@ class Agent:
 
         self.first = False
 
+    def _create_temp_model(self, system_prompt: str) -> BasePlatform:
+        """创建一个用于执行一次性任务的临时模型实例，以避免污染主会话。"""
+        temp_model = PlatformRegistry().create_platform(
+            self.model.platform_name()  # type: ignore
+        )
+        if not temp_model:
+            raise RuntimeError("创建临时模型失败。")
+
+        temp_model.set_model_name(self.model.name())  # type: ignore
+        temp_model.set_system_prompt(system_prompt)
+        return temp_model
+
     def _filter_tools_if_needed(self, task: str):
         """如果工具数量超过阈值，使用大模型筛选相关工具"""
-        import re
-        from jarvis.jarvis_tools.registry import ToolRegistry
-
         tool_registry = self.get_tool_registry()
         if not isinstance(tool_registry, ToolRegistry):
             return
@@ -920,16 +915,7 @@ class Agent:
 
         # 使用临时模型实例调用模型，以避免污染历史记录
         try:
-            from jarvis.jarvis_platform.registry import PlatformRegistry
-
-            temp_model = PlatformRegistry().create_platform(
-                self.model.platform_name()  # type: ignore
-            )
-            if not temp_model:
-                raise RuntimeError("为工具选择创建临时模型失败。")
-
-            temp_model.set_model_name(self.model.name())  # type: ignore
-            temp_model.set_system_prompt("你是一个帮助筛选工具的助手。")
+            temp_model = self._create_temp_model("你是一个帮助筛选工具的助手。")
             selected_tools_str = temp_model.chat_until_success(
                 selection_prompt
             )  # type: ignore
