@@ -15,6 +15,7 @@ from jarvis.jarvis_agent import (
     user_confirm,
 )
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.fzf import fzf_select
 
 
 class TaskManager:
@@ -88,6 +89,31 @@ class TaskManager:
             table.add_row(str(i), name)
         Console().print(table)
         PrettyOutput.print("[0] 跳过预定义任务", OutputType.INFO)
+
+        # Try fzf selection first (with numbered options and a skip option)
+        fzf_list = [f"{0:>3} | 跳过预定义任务"] + [
+            f"{i:>3} | {name}" for i, name in enumerate(task_names, 1)
+        ]
+        selected_str = fzf_select(fzf_list, prompt="选择一个任务编号 (Enter跳过) > ")
+        if selected_str:
+            try:
+                num_part = selected_str.split("|", 1)[0].strip()
+                idx = int(num_part)
+                if idx == 0:
+                    return ""
+                if 1 <= idx <= len(task_names):
+                    selected_task = tasks[task_names[idx - 1]]
+                    PrettyOutput.print(f"将要执行任务:\n {selected_task}", OutputType.INFO)
+                    # 询问是否需要补充信息
+                    need_additional = user_confirm("需要为此任务添加补充信息吗？", default=False)
+                    if need_additional:
+                        additional_input = get_multiline_input("请输入补充信息：")
+                        if additional_input:
+                            selected_task = f"{selected_task}\n\n补充信息:\n{additional_input}"
+                    return selected_task
+            except Exception:
+                # 如果解析失败，则回退到手动输入
+                pass
 
         while True:
             try:

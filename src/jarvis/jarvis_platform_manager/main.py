@@ -18,6 +18,7 @@ from jarvis.jarvis_utils.input import get_multiline_input, get_single_line_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_platform_manager.service import start_service
+from jarvis.jarvis_utils.fzf import fzf_select
 
 app = typer.Typer(help="Jarvis AI 平台")
 
@@ -451,17 +452,33 @@ def role_command(
     )
     PrettyOutput.print(output_str, OutputType.INFO)
 
-    # 让用户选择角色
-    raw_choice = get_single_line_input("请选择角色(输入编号，直接回车退出): ")
-    if not raw_choice.strip():
-        PrettyOutput.print("已取消，退出程序", OutputType.INFO)
-        raise typer.Exit(code=0)
-    try:
-        choice = int(raw_choice)
-        selected_role = config["roles"][choice - 1]
-    except (ValueError, IndexError):
-        PrettyOutput.print("无效的选择", OutputType.ERROR)
-        return
+    # 让用户选择角色（优先 fzf，回退编号输入）
+    selected_role = None  # type: ignore[var-annotated]
+    fzf_options = [
+        f"{i:>3} | {role['name']} - {role.get('description', '')}"
+        for i, role in enumerate(config["roles"], 1)
+    ]
+    selected_str = fzf_select(fzf_options, prompt="选择角色编号 (Enter退出) > ")
+    if selected_str:
+        try:
+            num_part = selected_str.split("|", 1)[0].strip()
+            idx = int(num_part)
+            if 1 <= idx <= len(config["roles"]):
+                selected_role = config["roles"][idx - 1]
+        except Exception:
+            selected_role = None
+
+    if selected_role is None:
+        raw_choice = get_single_line_input("请选择角色(输入编号，直接回车退出): ")
+        if not raw_choice.strip():
+            PrettyOutput.print("已取消，退出程序", OutputType.INFO)
+            raise typer.Exit(code=0)
+        try:
+            choice = int(raw_choice)
+            selected_role = config["roles"][choice - 1]
+        except (ValueError, IndexError):
+            PrettyOutput.print("无效的选择", OutputType.ERROR)
+            return
 
 
 

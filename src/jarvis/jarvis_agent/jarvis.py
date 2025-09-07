@@ -404,22 +404,29 @@ def handle_builtin_config_selector(
 
                 Console().print(table)
 
-                # Try to use fzf for selection if available
+                # Try to use fzf for selection if available (include No. to support number-based filtering)
                 fzf_options = [
-                    f"{opt['category']:<12} | {opt['name']:<30} | {opt['desc']}"
-                    for opt in options
+                    f"{idx:>3} | {opt['category']:<12} | {opt['name']:<30} | {opt.get('desc', '')}"
+                    for idx, opt in enumerate(options, 1)
                 ]
                 selected_str = fzf_select(
-                    fzf_options, prompt="选择要启动的配置 (Enter) > "
+                    fzf_options, prompt="选择要启动的配置编号 (Enter跳过) > "
                 )
 
                 choice_index = -1
                 if selected_str:
-                    # Find the index from the selected string
-                    for i, fzf_opt in enumerate(fzf_options):
-                        if fzf_opt == selected_str:
-                            choice_index = i
-                            break
+                    # Try to parse leading number before first '|'
+                    try:
+                        num_part = selected_str.split("|", 1)[0].strip()
+                        selected_index = int(num_part)
+                        if 1 <= selected_index <= len(options):
+                            choice_index = selected_index - 1
+                    except Exception:
+                        # Fallback to equality matching if parsing fails
+                        for i, fzf_opt in enumerate(fzf_options):
+                            if fzf_opt == selected_str:
+                                choice_index = i
+                                break
                 else:
                     # Fallback to manual input if fzf is not used or available
                     choice = get_single_line_input(
