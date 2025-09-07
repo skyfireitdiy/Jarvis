@@ -410,7 +410,7 @@ def handle_builtin_config_selector(
                     for idx, opt in enumerate(options, 1)
                 ]
                 selected_str = fzf_select(
-                    fzf_options, prompt="选择要启动的配置编号 (Enter跳过) > "
+                    fzf_options, prompt="选择要启动的配置编号 (ESC跳过) > "
                 )
 
                 choice_index = -1

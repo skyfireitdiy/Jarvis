@@ -94,7 +94,7 @@ class TaskManager:
         fzf_list = [f"{0:>3} | 跳过预定义任务"] + [
             f"{i:>3} | {name}" for i, name in enumerate(task_names, 1)
         ]
-        selected_str = fzf_select(fzf_list, prompt="选择一个任务编号 (Enter跳过) > ")
+        selected_str = fzf_select(fzf_list, prompt="选择一个任务编号 (ESC跳过) > ")
         if selected_str:
             try:
                 num_part = selected_str.split("|", 1)[0].strip()
