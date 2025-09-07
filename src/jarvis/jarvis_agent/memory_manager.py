@@ -20,6 +20,13 @@ class MemoryManager:
             agent: Agent实例
         """
         self.agent = agent
+        # 本轮任务是否已进行过记忆保存提示/处理的标记，用于事件去重
+        self._memory_prompted = False
+        # 订阅 Agent 事件（旁路集成，失败不影响主流程）
+        try:
+            self._subscribe_events()
+        except Exception:
+            pass
 
     def prepare_memory_tags_prompt(self) -> str:
         """准备记忆标签提示"""
@@ -117,6 +124,13 @@ class MemoryManager:
 
         except Exception as e:
             PrettyOutput.print(f"记忆分析失败: {str(e)}", OutputType.ERROR)
+        finally:
+            # 设置记忆提示完成标记，避免事件触发造成重复处理
+            self._memory_prompted = True
+            try:
+                self.agent.set_user_data("__memory_save_prompted__", True)
+            except Exception:
+                pass
 
     def add_memory_prompts_to_addon(self, addon_prompt: str, tool_registry) -> str:
         """在附加提示中添加记忆相关提示"""
@@ -139,3 +153,43 @@ class MemoryManager:
                 memory_prompts += "\n    - 如果需要获取上下文或寻找解决方案，请调用retrieve_memory工具检索相关记忆"
 
         return memory_prompts
+
+    # -----------------------
+    # 事件订阅与处理（旁路）
+    # -----------------------
+    def _subscribe_events(self) -> None:
+        bus = self.agent.get_event_bus()  # type: ignore[attr-defined]
+        # 任务开始时重置去重标记
+        bus.subscribe("task_started", self._on_task_started)
+        # 在清理历史前尝试保存记忆（若开启强制保存且尚未处理）
+        bus.subscribe("before_history_clear", self._ensure_memory_prompt)
+        # 任务完成时作为兜底再尝试一次
+        bus.subscribe("task_completed", self._ensure_memory_prompt)
+
+    def _on_task_started(self, **payload) -> None:
+        self._memory_prompted = False
+        try:
+            self.agent.set_user_data("__memory_save_prompted__", False)
+        except Exception:
+            pass
+
+    def _ensure_memory_prompt(self, **payload) -> None:
+        # 仅在开启强制保存记忆时启用
+        if not getattr(self.agent, "force_save_memory", False):
+            return
+        # 避免在同一任务内重复提示/处理
+        if self._memory_prompted:
+            return
+        try:
+            already = bool(self.agent.get_user_data("__memory_save_prompted__"))
+            if already:
+                self._memory_prompted = True
+                return
+        except Exception:
+            pass
+        # 静默执行保存逻辑，失败不影响主流程
+        try:
+            self.prompt_memory_save()
+        except Exception:
+            # 忽略异常，保持主流程稳定
+            self._memory_prompted = True

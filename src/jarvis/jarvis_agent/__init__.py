@@ -5,6 +5,7 @@ import os
 import platform
 import re
 from pathlib import Path
+from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
 # 第三方库导入
@@ -29,6 +30,11 @@ from jarvis.jarvis_agent.prompts import (
     TASK_ANALYSIS_PROMPT,
 )
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_agent.prompt_manager import PromptManager
+from jarvis.jarvis_agent.event_bus import EventBus
+from jarvis.jarvis_agent.config import AgentConfig
+from jarvis.jarvis_agent.run_loop import AgentRunLoop
+from jarvis.jarvis_agent.user_interaction import UserInteractionHandler
 from jarvis.jarvis_utils.methodology import _load_all_methodologies
 
 # jarvis_platform 相关
@@ -195,12 +201,23 @@ origin_agent_system_prompt = f"""
 """
 
 
+class LoopAction(Enum):
+    SKIP_TURN = "skip_turn"
+    CONTINUE = "continue"
+    COMPLETE = "complete"
+
+
 class Agent:
     def clear_history(self):
         """
         Clears the current conversation history by delegating to the session manager.
         """
         self.session.clear_history()
+        # 广播清理历史后的事件
+        try:
+            self.event_bus.emit("after_history_clear", agent=self)
+        except Exception:
+            pass
 
     def __del__(self):
         # 只有在记录启动时才停止记录
@@ -282,6 +299,10 @@ class Agent:
             multiline_inputer,
             use_tools or [],
         )
+        # 初始化用户交互封装，保持向后兼容
+        self.user_interaction = UserInteractionHandler(self.multiline_inputer, self.user_confirm)
+        # 将确认函数指向封装后的 confirm，保持既有调用不变
+        self.user_confirm = self.user_interaction.confirm  # type: ignore[assignment]
 
         # 初始化配置
         self._init_config(
@@ -293,10 +314,13 @@ class Agent:
             force_save_memory,
         )
 
+        # 初始化事件总线需先于管理器，以便管理器在构造中安全订阅事件
+        self.event_bus = EventBus()
         # 初始化管理器
         self.memory_manager = MemoryManager(self)
         self.task_analyzer = TaskAnalyzer(self)
         self.file_methodology_manager = FileMethodologyManager(self)
+        self.prompt_manager = PromptManager(self)
 
         # 设置系统提示词
         self._setup_system_prompt()
@@ -349,49 +373,57 @@ class Agent:
         force_save_memory: Optional[bool],
     ):
         """初始化配置选项"""
-        # 如果有上传文件，自动禁用方法论
-        # -- use_methodology --
-        if self.files:
-            self.use_methodology = False
-        elif use_methodology is not None:
-            self.use_methodology = use_methodology
-        else:
-            self.use_methodology = is_use_methodology()
+        # 使用集中配置解析，保持与原逻辑一致
+        cfg = AgentConfig(
+            system_prompt=self.system_prompt,
+            name=self.name,
+            description=self.description,
+            model_group=model_group,
+            auto_complete=self.auto_complete,
+            need_summary=self.need_summary,
+            summary_prompt=summary_prompt,
+            execute_tool_confirm=execute_tool_confirm,
+            use_methodology=use_methodology,
+            use_analysis=use_analysis,
+            force_save_memory=force_save_memory,
+            files=self.files,
+            max_token_count=None,
+        ).resolve_defaults()
 
-        # -- use_analysis --
-        if use_analysis is not None:
-            self.use_analysis = use_analysis
-        else:
-            self.use_analysis = is_use_analysis()
+        # 将解析结果回填到 Agent 实例属性，保持向后兼容
+        self.use_methodology = bool(cfg.use_methodology)
+        self.use_analysis = bool(cfg.use_analysis)
+        self.execute_tool_confirm = bool(cfg.execute_tool_confirm)
+        self.summary_prompt = cfg.summary_prompt or DEFAULT_SUMMARY_PROMPT
+        self.max_token_count = int(cfg.max_token_count or get_max_token_count(model_group))
+        self.force_save_memory = bool(cfg.force_save_memory)
 
-        # -- execute_tool_confirm --
-        if execute_tool_confirm is not None:
-            self.execute_tool_confirm = execute_tool_confirm
-        else:
-            self.execute_tool_confirm = is_execute_tool_confirm()
-
-        # -- summary_prompt --
-        self.summary_prompt = summary_prompt or DEFAULT_SUMMARY_PROMPT
-
-        # -- max_token_count --
-        self.max_token_count = get_max_token_count(model_group)
-
-        # -- force_save_memory --
-        if force_save_memory is not None:
-            self.force_save_memory = force_save_memory
-        else:
-            self.force_save_memory = is_force_save_memory()
+        # 聚合配置到 AgentConfig，作为后续单一事实来源（保持兼容，不改变既有属性使用）
+        self.config = cfg
 
     def _setup_system_prompt(self):
         """设置系统提示词"""
-        action_prompt = self.get_tool_usage_prompt()
-        self.model.set_system_prompt(  # type: ignore
-            f"""
+        try:
+            if hasattr(self, "prompt_manager"):
+                prompt_text = self.prompt_manager.build_system_prompt()
+            else:
+                action_prompt = self.get_tool_usage_prompt()
+                prompt_text = f"""
 {self.system_prompt}
 
 {action_prompt}
 """
-        )
+            self.model.set_system_prompt(prompt_text)  # type: ignore
+        except Exception:
+            # 回退到原始行为，确保兼容性
+            action_prompt = self.get_tool_usage_prompt()
+            self.model.set_system_prompt(  # type: ignore
+                f"""
+{self.system_prompt}
+
+{action_prompt}
+"""
+            )
 
     def set_user_data(self, key: str, value: Any):
         """Sets user data in the session."""
@@ -423,6 +455,9 @@ class Agent:
         If the configured multiline_inputer supports 'print_on_empty' keyword, pass it;
         otherwise, fall back to calling with a single argument for compatibility.
         """
+        # 优先通过用户交互封装，便于未来替换 UI
+        if hasattr(self, "user_interaction"):
+            return self.user_interaction.multiline_input(tip, print_on_empty)
         try:
             # Try to pass the keyword for enhanced input handler
             return self.multiline_inputer(tip, print_on_empty=print_on_empty)  # type: ignore
@@ -455,6 +490,10 @@ class Agent:
             if isinstance(handler, ToolRegistry):
                 return handler
         return None
+
+    def get_event_bus(self) -> EventBus:
+        """获取事件总线实例"""
+        return self.event_bus
 
     def _call_model(
         self, message: str, need_complete: bool = False, run_input_handlers: bool = True
@@ -504,11 +543,38 @@ class Agent:
 
     def _add_addon_prompt(self, message: str, need_complete: bool) -> str:
         """添加附加提示到消息"""
+        # 广播添加附加提示前事件（不影响主流程）
+        try:
+            self.event_bus.emit(
+                "before_addon_prompt",
+                agent=self,
+                need_complete=need_complete,
+                current_message=message,
+                has_session_addon=bool(self.session.addon_prompt),
+            )
+        except Exception:
+            pass
+
+        addon_text = ""
         if self.session.addon_prompt:
-            message += f"\n\n{self.session.addon_prompt}"
+            addon_text = self.session.addon_prompt
+            message += f"\n\n{addon_text}"
             self.session.addon_prompt = ""
         else:
-            message += f"\n\n{self.make_default_addon_prompt(need_complete)}"
+            addon_text = self.make_default_addon_prompt(need_complete)
+            message += f"\n\n{addon_text}"
+
+        # 广播添加附加提示后事件（不影响主流程）
+        try:
+            self.event_bus.emit(
+                "after_addon_prompt",
+                agent=self,
+                need_complete=need_complete,
+                addon_text=addon_text,
+                final_message=message,
+            )
+        except Exception:
+            pass
         return message
 
     def _manage_conversation_length(self, message: str) -> str:
@@ -528,7 +594,29 @@ class Agent:
         if not self.model:
             raise RuntimeError("Model not initialized")
 
+        # 事件：模型调用前
+        try:
+            self.event_bus.emit(
+                "before_model_call",
+                agent=self,
+                message=message,
+            )
+        except Exception:
+            pass
+
         response = self.model.chat_until_success(message)  # type: ignore
+
+        # 事件：模型调用后
+        try:
+            self.event_bus.emit(
+                "after_model_call",
+                agent=self,
+                message=message,
+                response=response,
+            )
+        except Exception:
+            pass
+
         self.session.conversation_length += get_context_token_count(response)
 
         return response
@@ -572,12 +660,11 @@ class Agent:
         注意:
             当上下文长度超过最大值时使用
         """
-        # 在清理历史之前，提示用户保存重要记忆
+        # 在清理历史之前，提示用户保存重要记忆（事件驱动触发实际保存）
         if self.force_save_memory:
             PrettyOutput.print(
                 "对话历史即将被总结和清理，请先保存重要信息...", OutputType.INFO
             )
-            self.memory_manager.prompt_memory_save()
 
         if self._should_use_file_upload():
             return self._handle_history_with_file_upload()
@@ -599,17 +686,38 @@ class Agent:
 
         # 清理历史（但不清理prompt，因为prompt会在builtin_input_handler中设置）
         if self.model:
+            # 广播清理历史前事件
+            try:
+                self.event_bus.emit("before_history_clear", agent=self)
+            except Exception:
+                pass
             self.model.reset()
             # 重置后重新设置系统提示词，确保系统约束仍然生效
             self._setup_system_prompt()
         # 重置会话
         self.session.clear_history()
+        # 广播清理历史后的事件
+        try:
+            self.event_bus.emit("after_history_clear", agent=self)
+        except Exception:
+            pass
 
         return formatted_summary
 
     def _handle_history_with_file_upload(self) -> str:
         """使用文件上传方式处理历史"""
-        return self.file_methodology_manager.handle_history_with_file_upload()
+        # 广播清理历史前事件
+        try:
+            self.event_bus.emit("before_history_clear", agent=self)
+        except Exception:
+            pass
+        result = self.file_methodology_manager.handle_history_with_file_upload()
+        # 广播清理历史后的事件
+        try:
+            self.event_bus.emit("after_history_clear", agent=self)
+        except Exception:
+            pass
+        return result
 
     def _format_summary_message(self, summary: str) -> str:
         """格式化摘要消息"""
@@ -640,30 +748,56 @@ class Agent:
             2. 对于子Agent: 可能会生成总结(如果启用)
             3. 使用spinner显示生成状态
         """
-        # 收集满意度反馈
-        satisfaction_feedback = self.task_analyzer.collect_satisfaction_feedback(
-            auto_completed
-        )
-
-        if self.use_analysis:
-            self.task_analyzer.analysis_task(satisfaction_feedback)
-
-        # 当开启强制保存记忆时，在分析步骤之后触发一次记忆保存
-        if self.force_save_memory:
-            self.memory_manager.prompt_memory_save()
-
+        # 事件驱动方式：
+        # - TaskAnalyzer 通过订阅 before_summary/task_completed 事件执行分析与满意度收集
+        # - MemoryManager 通过订阅 before_history_clear/task_completed 事件执行记忆保存（受 force_save_memory 控制）
+        # 为减少耦合，这里不再直接调用上述组件，保持行为由事件触发
         self._check_and_organize_memory()
+
+        result = "任务完成"
 
         if self.need_summary:
 
             self.session.prompt = self.summary_prompt
+            # 广播将要生成总结事件
+            try:
+                self.event_bus.emit(
+                    "before_summary",
+                    agent=self,
+                    prompt=self.session.prompt,
+                    auto_completed=auto_completed,
+                    need_summary=self.need_summary,
+                )
+            except Exception:
+                pass
+
             if not self.model:
                 raise RuntimeError("Model not initialized")
             ret = self.model.chat_until_success(self.session.prompt)  # type: ignore
+            result = ret
 
-            return ret
+            # 广播完成总结事件
+            try:
+                self.event_bus.emit(
+                    "after_summary",
+                    agent=self,
+                    summary=result,
+                )
+            except Exception:
+                pass
 
-        return "任务完成"
+        # 广播任务完成事件（不影响主流程）
+        try:
+            self.event_bus.emit(
+                "task_completed",
+                agent=self,
+                auto_completed=auto_completed,
+                need_summary=self.need_summary,
+            )
+        except Exception:
+            pass
+
+        return result
 
     def make_default_addon_prompt(self, need_complete: bool) -> str:
         """生成附加提示。
@@ -672,6 +806,10 @@ class Agent:
             need_complete: 是否需要完成任务
 
         """
+        # 优先使用 PromptManager 以保持逻辑集中
+        if hasattr(self, "prompt_manager"):
+            return self.prompt_manager.build_default_addon_prompt(need_complete)
+
         # 结构化系统指令
         action_handlers = ", ".join([handler.name() for handler in self.output_handler])
 
@@ -723,6 +861,17 @@ class Agent:
         self.session.prompt = f"{user_input}"
         try:
             set_agent(self.name, self)
+            # 广播任务开始事件（不影响主流程）
+            try:
+                self.event_bus.emit(
+                    "task_started",
+                    agent=self,
+                    name=self.name,
+                    description=self.description,
+                    user_input=self.session.prompt,
+                )
+            except Exception:
+                pass
             return self._main_loop()
         except Exception as e:
             PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
@@ -730,81 +879,17 @@ class Agent:
 
     def _main_loop(self) -> Any:
         """主运行循环"""
-        run_input_handlers = True
+        # 委派至独立的运行循环类，保持行为一致
+        loop = AgentRunLoop(self)
+        return loop.run()
 
-        while True:
-            try:
-                # 更新输入处理器标志
-                if self.run_input_handlers_next_turn:
-                    run_input_handlers = True
-                    self.run_input_handlers_next_turn = False
-
-                # 首次运行初始化
-                if self.first:
-                    self._first_run()
-
-                # 调用模型获取响应
-                current_response = self._call_model(
-                    self.session.prompt, True, run_input_handlers
-                )
-
-                self.session.prompt = ""
-                run_input_handlers = False
-
-                # 处理中断
-                interrupt_result = self._handle_run_interrupt(current_response)
-                if interrupt_result is True:
-                    # 中断处理器请求跳过本轮剩余部分，直接开始下一次循环
-                    continue
-                elif interrupt_result is not None:
-                    # 中断处理器返回了最终结果，任务结束
-                    return interrupt_result
-
-                # 处理工具调用
-                need_return, tool_prompt = self._call_tools(current_response)
-
-                # 将上一个提示和工具提示安全地拼接起来
-                prompt_parts = []
-                if self.session.prompt:
-                    prompt_parts.append(self.session.prompt)
-                if tool_prompt:
-                    prompt_parts.append(tool_prompt)
-                self.session.prompt = "\n\n".join(prompt_parts)
-
-                if need_return:
-                    return self.session.prompt
-
-                # 执行回调
-                if self.after_tool_call_cb:
-                    self.after_tool_call_cb(self)
-
-                # 检查是否需要继续
-                if self.session.prompt or self.session.addon_prompt:
-                    continue
-
-                # 检查自动完成
-                if self.auto_complete and ot("!!!COMPLETE!!!") in current_response:
-                    return self._complete_task(auto_completed=True)
-
-                # 获取下一步用户输入
-                next_action = self._get_next_user_action()
-                if next_action == "continue":
-                    run_input_handlers = True
-                    continue
-                elif next_action == "complete":
-                    return self._complete_task(auto_completed=False)
-
-            except Exception as e:
-                PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
-                return f"Task failed: {str(e)}"
-
-    def _handle_run_interrupt(self, current_response: str) -> Optional[Union[Any, bool]]:
+    def _handle_run_interrupt(self, current_response: str) -> Optional[Union[Any, "LoopAction"]]:
         """处理运行中的中断
 
         返回:
             None: 无中断，或中断后允许继续执行当前响应
             Any: 需要返回的最终结果
-            True: 中断后需要跳过当前响应，并立即开始下一次循环
+            LoopAction.SKIP_TURN: 中断后需要跳过当前响应，并立即开始下一次循环
         """
         if not get_interrupt():
             return None
@@ -813,6 +898,16 @@ class Agent:
         user_input = self._multiline_input(
             "模型交互期间被中断，请输入用户干预信息：", False
         )
+        # 广播中断事件（包含用户输入，可能为空字符串）
+        try:
+            self.event_bus.emit(
+                "interrupt_triggered",
+                agent=self,
+                current_response=current_response,
+                user_input=user_input,
+            )
+        except Exception:
+            pass
 
         self.run_input_handlers_next_turn = True
 
@@ -826,16 +921,16 @@ class Agent:
                 return None  # 继续执行工具调用
             else:
                 self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
-                return True  # 请求主循环 continue
+                return LoopAction.SKIP_TURN  # 请求主循环 continue
         else:
             self.session.prompt = f"被用户中断，用户补充信息为：{user_input}"
-            return True  # 请求主循环 continue
+            return LoopAction.SKIP_TURN  # 请求主循环 continue
 
-    def _get_next_user_action(self) -> str:
+    def _get_next_user_action(self) -> Union[str, "LoopAction"]:
         """获取用户下一步操作
 
         返回:
-            str: "continue" 或 "complete"
+            LoopAction.CONTINUE 或 LoopAction.COMPLETE（兼容旧字符串值 "continue"/"complete"）
         """
         user_input = self._multiline_input(
             f"{self.name}: 请输入，或输入空行来结束当前任务：", False
@@ -843,9 +938,10 @@ class Agent:
 
         if user_input:
             self.session.prompt = user_input
-            return "continue"
+            # 使用显式动作信号，保留返回类型注释以保持兼容
+            return LoopAction.CONTINUE  # type: ignore[return-value]
         else:
-            return "complete"
+            return LoopAction.COMPLETE  # type: ignore[return-value]
 
     def _first_run(self):
         """首次运行初始化"""
@@ -912,6 +1008,17 @@ class Agent:
         PrettyOutput.print(
             f"工具数量超过{threshold}个，正在使用AI筛选相关工具...", OutputType.INFO
         )
+        # 广播工具筛选开始事件
+        try:
+            self.event_bus.emit(
+                "before_tool_filter",
+                agent=self,
+                task=task,
+                total_tools=len(all_tools),
+                threshold=threshold,
+            )
+        except Exception:
+            pass
 
         # 使用临时模型实例调用模型，以避免污染历史记录
         try:
@@ -940,10 +1047,34 @@ class Agent:
                     f"已筛选出 {len(selected_tool_names)} 个相关工具: {', '.join(selected_tool_names)}",
                     OutputType.SUCCESS,
                 )
+                # 广播工具筛选事件
+                try:
+                    self.event_bus.emit(
+                        "tool_filtered",
+                        agent=self,
+                        task=task,
+                        selected_tools=selected_tool_names,
+                        total_tools=len(all_tools),
+                        threshold=threshold,
+                    )
+                except Exception:
+                    pass
             else:
                 PrettyOutput.print(
                     "AI 未能筛选出任何相关工具，将使用所有工具。", OutputType.WARNING
                 )
+                # 广播工具筛选事件（无筛选结果）
+                try:
+                    self.event_bus.emit(
+                        "tool_filtered",
+                        agent=self,
+                        task=task,
+                        selected_tools=[],
+                        total_tools=len(all_tools),
+                        threshold=threshold,
+                    )
+                except Exception:
+                    pass
 
         except Exception as e:
             PrettyOutput.print(
