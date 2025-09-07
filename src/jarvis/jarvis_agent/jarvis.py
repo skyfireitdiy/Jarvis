@@ -19,6 +19,7 @@ from jarvis.jarvis_utils.config import (
 )
 import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_utils.input import user_confirm, get_single_line_input
+from jarvis.jarvis_utils.fzf import fzf_select
 import os
 import sys
 import subprocess
@@ -403,47 +404,73 @@ def handle_builtin_config_selector(
 
                 Console().print(table)
 
-                choice = get_single_line_input(
-                    "选择要启动的配置编号，直接回车使用默认通用代理(jvs): ", default=""
+                # Try to use fzf for selection if available
+                fzf_options = [
+                    f"{opt['category']:<12} | {opt['name']:<30} | {opt['desc']}"
+                    for opt in options
+                ]
+                selected_str = fzf_select(
+                    fzf_options, prompt="选择要启动的配置 (Enter) > "
                 )
 
-                if choice.strip():
+                choice_index = -1
+                if selected_str:
+                    # Find the index from the selected string
+                    for i, fzf_opt in enumerate(fzf_options):
+                        if fzf_opt == selected_str:
+                            choice_index = i
+                            break
+                else:
+                    # Fallback to manual input if fzf is not used or available
+                    choice = get_single_line_input(
+                        "选择要启动的配置编号，直接回车使用默认通用代理(jvs): ", default=""
+                    )
+                    if choice.strip():
+                        try:
+                            selected_index = int(choice.strip())
+                            if 1 <= selected_index <= len(options):
+                                choice_index = selected_index - 1
+                        except ValueError:
+                            pass  # Invalid input
+
+                if choice_index != -1:
                     try:
-                        index = int(choice.strip())
-                        if 1 <= index <= len(options):
-                            sel = options[index - 1]
-                            args: list[str] = []
+                        sel = options[choice_index]
+                        args: list[str] = []
 
-                            if sel["category"] == "agent":
-                                # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
-                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
-                                if model_group:
-                                    args += ["-g", str(model_group)]
-                                if config_file:
-                                    args += ["-f", str(config_file)]
-                                if task:
-                                    args += ["--task", str(task)]
+                        if sel["category"] == "agent":
+                            # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
+                            args = [str(sel["cmd"]), "-c", str(sel["file"])]
+                            if model_group:
+                                args += ["-g", str(model_group)]
+                            if config_file:
+                                args += ["-f", str(config_file)]
+                            if task:
+                                args += ["--task", str(task)]
 
-                            elif sel["category"] == "multi_agent":
-                                # jarvis-multi-agent 需要 -c/--config，用户输入通过 -i/--input 传递
-                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
-                                if task:
-                                    args += ["-i", str(task)]
+                        elif sel["category"] == "multi_agent":
+                            # jarvis-multi-agent 需要 -c/--config，用户输入通过 -i/--input 传递
+                            args = [str(sel["cmd"]), "-c", str(sel["file"])]
+                            if task:
+                                args += ["-i", str(task)]
 
-                            elif sel["category"] == "roles":
-                                # jarvis-platform-manager role 子命令，支持 -c/-t/-g
-                                args = [str(sel["cmd"]), "role", "-c", str(sel["file"])]
-                                if model_group:
-                                    args += ["-g", str(model_group)]
+                        elif sel["category"] == "roles":
+                            # jarvis-platform-manager role 子命令，支持 -c/-t/-g
+                            args = [str(sel["cmd"]), "role", "-c", str(sel["file"])]
+                            if model_group:
+                                args += ["-g", str(model_group)]
 
-                            if args:
-                                PrettyOutput.print(
-                                    f"正在启动: {' '.join(args)}", OutputType.INFO
-                                )
-                                os.execvp(args[0], args)
+                        if args:
+                            PrettyOutput.print(
+                                f"正在启动: {' '.join(args)}", OutputType.INFO
+                            )
+                            os.execvp(args[0], args)
                     except Exception:
                         # 任何异常都不影响默认流程
                         pass
+                else:
+                    # User pressed Enter or provided invalid input
+                    pass
         except Exception:
             # 静默忽略内置配置扫描错误，不影响主流程
             pass
