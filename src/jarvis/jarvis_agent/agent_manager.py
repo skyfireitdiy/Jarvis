@@ -25,10 +25,14 @@ class AgentManager:
         model_group: Optional[str] = None,
         tool_group: Optional[str] = None,
         restore_session: bool = False,
+        use_methodology: Optional[bool] = None,
+        use_analysis: Optional[bool] = None,
     ):
         self.model_group = model_group
         self.tool_group = tool_group
         self.restore_session = restore_session
+        self.use_methodology = use_methodology
+        self.use_analysis = use_analysis
         self.agent: Optional[Agent] = None
 
     def initialize(self) -> Agent:
@@ -45,6 +49,8 @@ class AgentManager:
             input_handler=[shell_input_handler, builtin_input_handler],
             output_handler=[ToolRegistry()],  # type: ignore
             need_summary=False,
+            use_methodology=self.use_methodology,
+            use_analysis=self.use_analysis,
         )
 
         # 尝试恢复会话

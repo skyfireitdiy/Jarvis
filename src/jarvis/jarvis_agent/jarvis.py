@@ -516,6 +516,12 @@ def run_cli(
         "--interactive-config",
         help="启动交互式配置向导（基于当前配置补充设置）",
     ),
+    disable_methodology_analysis: bool = typer.Option(
+        False,
+        "-D",
+        "--disable-methodology-analysis",
+        help="禁用方法论和任务分析（覆盖配置文件设置）",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -562,6 +568,8 @@ def run_cli(
             model_group=model_group,
             tool_group=tool_group,
             restore_session=restore_session,
+            use_methodology=False if disable_methodology_analysis else None,
+            use_analysis=False if disable_methodology_analysis else None,
         )
         agent_manager.initialize()
         agent_manager.run_task(task)
