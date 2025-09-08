@@ -121,7 +121,7 @@ def _check_pip_updates() -> bool:
     """检查pip安装的Jarvis是否有更新
 
     返回:
-        bool: 是否执行了更新（总是返回False，因为pip更新需要用户手动执行）
+        bool: 是否执行了更新（成功更新返回True以触发重启）
     """
     import urllib.request
     import urllib.error
@@ -146,7 +146,7 @@ def _check_pip_updates() -> bool:
             with urllib.request.urlopen(url, timeout=5) as response:
                 data = json.loads(response.read().decode())
                 latest_version = data["info"]["version"]
-        except (urllib.error.URLError, KeyError, json.JSONDecodeError) as e:
+        except (urllib.error.URLError, KeyError, json.JSONDecodeError):
             return False
 
         # 比较版本
@@ -166,6 +166,7 @@ def _check_pip_updates() -> bool:
 
             # 检测是否使用uv
             is_uv_env = False
+            uv_executable: Optional[str] = None
             if in_venv:
                 if sys.platform == "win32":
                     uv_path = Path(sys.prefix) / "Scripts" / "uv.exe"
@@ -173,6 +174,7 @@ def _check_pip_updates() -> bool:
                     uv_path = Path(sys.prefix) / "bin" / "uv"
                 if uv_path.exists():
                     is_uv_env = True
+                    uv_executable = str(uv_path)
 
             # 检测是否安装了 RAG 特性（更精确）
             from jarvis.jarvis_utils.utils import (
@@ -180,21 +182,60 @@ def _check_pip_updates() -> bool:
             )  # 延迟导入避免潜在循环依赖
             rag_installed = _is_rag_installed()
 
-            # 提供更新命令
+            # 更新命令
             package_spec = (
                 "jarvis-ai-assistant[rag]" if rag_installed else "jarvis-ai-assistant"
             )
-            if is_uv_env:
+            if is_uv_env and uv_executable:
+                cmd_list = [uv_executable, "pip", "install", "--upgrade", package_spec]
                 update_cmd = f"uv pip install --upgrade {package_spec}"
             else:
+                cmd_list = [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    package_spec,
+                ]
                 update_cmd = f"{sys.executable} -m pip install --upgrade {package_spec}"
 
-            PrettyOutput.print(f"请手动执行以下命令更新: {update_cmd}", OutputType.INFO)
+            # 自动尝试升级（失败时提供手动命令）
+            try:
+                PrettyOutput.print("正在自动更新 Jarvis，请稍候...", OutputType.INFO)
+                result = subprocess.run(
+                    cmd_list,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=600,
+                )
+                if result.returncode == 0:
+                    PrettyOutput.print("更新成功，正在重启以应用新版本...", OutputType.SUCCESS)
+                    # 更新检查日期，避免重复触发
+                    last_check_file.write_text(today_str)
+                    return True
+                else:
+                    err = (result.stderr or result.stdout or "").strip()
+                    if err:
+                        PrettyOutput.print(
+                            f"自动更新失败，错误信息（已截断）: {err[:500]}",
+                            OutputType.WARNING,
+                        )
+                    PrettyOutput.print(
+                        f"请手动执行以下命令更新: {update_cmd}", OutputType.INFO
+                    )
+            except Exception:
+                PrettyOutput.print("自动更新出现异常，已切换为手动更新方式。", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"请手动执行以下命令更新: {update_cmd}", OutputType.INFO
+                )
 
         # 更新检查日期
         last_check_file.write_text(today_str)
 
-    except Exception as e:
+    except Exception:
         # 静默处理错误，不影响正常使用
         pass
 
