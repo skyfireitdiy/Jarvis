@@ -8,6 +8,8 @@ from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
 
 from jarvis.jarvis_agent.prompts import TASK_ANALYSIS_PROMPT
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_agent.utils import join_prompts
+from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL, BEFORE_SUMMARY, TASK_COMPLETED
 
 
 class TaskAnalyzer:
@@ -55,10 +57,7 @@ class TaskAnalyzer:
 
     def _prepare_analysis_prompt(self, satisfaction_feedback: str) -> str:
         """准备分析提示"""
-        analysis_prompt = TASK_ANALYSIS_PROMPT
-        if satisfaction_feedback:
-            analysis_prompt += satisfaction_feedback
-        return analysis_prompt
+        return join_prompts([TASK_ANALYSIS_PROMPT, satisfaction_feedback])
 
     def _process_analysis_loop(self):
         """处理分析循环"""
@@ -74,7 +73,7 @@ class TaskAnalyzer:
             # 执行工具调用（补充事件：before_tool_call/after_tool_call）
             try:
                 self.agent.event_bus.emit(
-                    "before_tool_call",
+                    BEFORE_TOOL_CALL,
                     agent=self.agent,
                     current_response=response,
                 )
@@ -84,7 +83,7 @@ class TaskAnalyzer:
             self.agent.session.prompt = tool_prompt
             try:
                 self.agent.event_bus.emit(
-                    "after_tool_call",
+                    AFTER_TOOL_CALL,
                     agent=self.agent,
                     current_response=response,
                     need_return=need_return,
@@ -130,9 +129,15 @@ class TaskAnalyzer:
     def _handle_interrupt_with_tool_calls(self, user_input: str) -> str:
         """处理有工具调用时的中断"""
         if self.agent.user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
-            return f"被用户中断，用户补充信息为：{user_input}\n\n用户同意继续工具调用。"
+            return join_prompts([
+                f"被用户中断，用户补充信息为：{user_input}",
+                "用户同意继续工具调用。"
+            ])
         else:
-            return f"被用户中断，用户补充信息为：{user_input}\n\n检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
+            return join_prompts([
+                f"被用户中断，用户补充信息为：{user_input}",
+                "检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
+            ])
 
     def collect_satisfaction_feedback(self, auto_completed: bool) -> str:
         """收集满意度反馈"""
@@ -140,18 +145,18 @@ class TaskAnalyzer:
 
         if not auto_completed and self.agent.use_analysis:
             if self.agent.user_confirm("您对本次任务的完成是否满意？", True):
-                satisfaction_feedback = "\n\n用户对本次任务的完成表示满意。"
+                satisfaction_feedback = "用户对本次任务的完成表示满意。"
             else:
                 feedback = self.agent._multiline_input(
                     "请提供您的反馈意见（可留空直接回车）:", False
                 )
                 if feedback:
                     satisfaction_feedback = (
-                        f"\n\n用户对本次任务的完成不满意，反馈意见如下：\n{feedback}"
+                        f"用户对本次任务的完成不满意，反馈意见如下：\n{feedback}"
                     )
                 else:
                     satisfaction_feedback = (
-                        "\n\n用户对本次任务的完成不满意，未提供具体反馈意见。"
+                        "用户对本次任务的完成不满意，未提供具体反馈意见。"
                     )
 
         return satisfaction_feedback
@@ -162,9 +167,9 @@ class TaskAnalyzer:
     def _subscribe_events(self) -> None:
         bus = self.agent.get_event_bus()  # type: ignore[attr-defined]
         # 在生成总结前触发（保持与原顺序一致）
-        bus.subscribe("before_summary", self._on_before_summary)
+        bus.subscribe(BEFORE_SUMMARY, self._on_before_summary)
         # 当无需总结时，作为兜底触发分析
-        bus.subscribe("task_completed", self._on_task_completed)
+        bus.subscribe(TASK_COMPLETED, self._on_task_completed)
 
     def _on_before_summary(self, **payload) -> None:
         if self._analysis_done:

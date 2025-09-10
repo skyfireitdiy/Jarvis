@@ -34,7 +34,23 @@ from jarvis.jarvis_agent.prompt_manager import PromptManager
 from jarvis.jarvis_agent.event_bus import EventBus
 from jarvis.jarvis_agent.config import AgentConfig
 from jarvis.jarvis_agent.run_loop import AgentRunLoop
+from jarvis.jarvis_agent.events import (
+    BEFORE_SUMMARY,
+    AFTER_SUMMARY,
+    TASK_COMPLETED,
+    TASK_STARTED,
+    BEFORE_ADDON_PROMPT,
+    AFTER_ADDON_PROMPT,
+    BEFORE_HISTORY_CLEAR,
+    AFTER_HISTORY_CLEAR,
+    BEFORE_MODEL_CALL,
+    AFTER_MODEL_CALL,
+    INTERRUPT_TRIGGERED,
+    BEFORE_TOOL_FILTER,
+    TOOL_FILTERED,
+)
 from jarvis.jarvis_agent.user_interaction import UserInteractionHandler
+from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.methodology import _load_all_methodologies
 
 # jarvis_platform 相关
@@ -219,7 +235,7 @@ class Agent:
         self.session.clear_history()
         # 广播清理历史后的事件
         try:
-            self.event_bus.emit("after_history_clear", agent=self)
+            self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
         except Exception:
             pass
 
@@ -555,7 +571,7 @@ class Agent:
         # 广播添加附加提示前事件（不影响主流程）
         try:
             self.event_bus.emit(
-                "before_addon_prompt",
+                BEFORE_ADDON_PROMPT,
                 agent=self,
                 need_complete=need_complete,
                 current_message=message,
@@ -567,16 +583,16 @@ class Agent:
         addon_text = ""
         if self.session.addon_prompt:
             addon_text = self.session.addon_prompt
-            message += f"\n\n{addon_text}"
+            message = join_prompts([message, addon_text])
             self.session.addon_prompt = ""
         else:
             addon_text = self.make_default_addon_prompt(need_complete)
-            message += f"\n\n{addon_text}"
+            message = join_prompts([message, addon_text])
 
         # 广播添加附加提示后事件（不影响主流程）
         try:
             self.event_bus.emit(
-                "after_addon_prompt",
+                AFTER_ADDON_PROMPT,
                 agent=self,
                 need_complete=need_complete,
                 addon_text=addon_text,
@@ -593,7 +609,7 @@ class Agent:
         if self.session.conversation_length > self.max_token_count:
             summary = self._summarize_and_clear_history()
             if summary:
-                message = summary + "\n\n" + message
+                message = join_prompts([summary, message])
             self.session.conversation_length = get_context_token_count(message)
 
         return message
@@ -606,7 +622,7 @@ class Agent:
         # 事件：模型调用前
         try:
             self.event_bus.emit(
-                "before_model_call",
+                BEFORE_MODEL_CALL,
                 agent=self,
                 message=message,
             )
@@ -618,7 +634,7 @@ class Agent:
         # 事件：模型调用后
         try:
             self.event_bus.emit(
-                "after_model_call",
+                AFTER_MODEL_CALL,
                 agent=self,
                 message=message,
                 response=response,
@@ -697,7 +713,7 @@ class Agent:
         if self.model:
             # 广播清理历史前事件
             try:
-                self.event_bus.emit("before_history_clear", agent=self)
+                self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
             except Exception:
                 pass
             self.model.reset()
@@ -707,7 +723,7 @@ class Agent:
         self.session.clear_history()
         # 广播清理历史后的事件
         try:
-            self.event_bus.emit("after_history_clear", agent=self)
+            self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
         except Exception:
             pass
 
@@ -717,13 +733,13 @@ class Agent:
         """使用文件上传方式处理历史"""
         # 广播清理历史前事件
         try:
-            self.event_bus.emit("before_history_clear", agent=self)
+            self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
         except Exception:
             pass
         result = self.file_methodology_manager.handle_history_with_file_upload()
         # 广播清理历史后的事件
         try:
-            self.event_bus.emit("after_history_clear", agent=self)
+            self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
         except Exception:
             pass
         return result
@@ -771,7 +787,7 @@ class Agent:
             # 广播将要生成总结事件
             try:
                 self.event_bus.emit(
-                    "before_summary",
+                    BEFORE_SUMMARY,
                     agent=self,
                     prompt=self.session.prompt,
                     auto_completed=auto_completed,
@@ -788,7 +804,7 @@ class Agent:
             # 广播完成总结事件
             try:
                 self.event_bus.emit(
-                    "after_summary",
+                    AFTER_SUMMARY,
                     agent=self,
                     summary=result,
                 )
@@ -798,7 +814,7 @@ class Agent:
         # 广播任务完成事件（不影响主流程）
         try:
             self.event_bus.emit(
-                "task_completed",
+                TASK_COMPLETED,
                 agent=self,
                 auto_completed=auto_completed,
                 need_summary=self.need_summary,
@@ -873,7 +889,7 @@ class Agent:
             # 广播任务开始事件（不影响主流程）
             try:
                 self.event_bus.emit(
-                    "task_started",
+                    TASK_STARTED,
                     agent=self,
                     name=self.name,
                     description=self.description,
@@ -910,7 +926,7 @@ class Agent:
         # 广播中断事件（包含用户输入，可能为空字符串）
         try:
             self.event_bus.emit(
-                "interrupt_triggered",
+                INTERRUPT_TRIGGERED,
                 agent=self,
                 current_response=current_response,
                 user_input=user_input,
@@ -926,10 +942,16 @@ class Agent:
 
         if any(handler.can_handle(current_response) for handler in self.output_handler):
             if self.user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
-                self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n用户同意继续工具调用。"
+                self.session.prompt = join_prompts([
+                    f"被用户中断，用户补充信息为：{user_input}",
+                    "用户同意继续工具调用。"
+                ])
                 return None  # 继续执行工具调用
             else:
-                self.session.prompt = f"被用户中断，用户补充信息为：{user_input}\n\n检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
+                self.session.prompt = join_prompts([
+                    f"被用户中断，用户补充信息为：{user_input}",
+                    "检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
+                ])
                 return LoopAction.SKIP_TURN  # 请求主循环 continue
         else:
             self.session.prompt = f"被用户中断，用户补充信息为：{user_input}"
@@ -1020,7 +1042,7 @@ class Agent:
         # 广播工具筛选开始事件
         try:
             self.event_bus.emit(
-                "before_tool_filter",
+                BEFORE_TOOL_FILTER,
                 agent=self,
                 task=task,
                 total_tools=len(all_tools),
@@ -1059,7 +1081,7 @@ class Agent:
                 # 广播工具筛选事件
                 try:
                     self.event_bus.emit(
-                        "tool_filtered",
+                        TOOL_FILTERED,
                         agent=self,
                         task=task,
                         selected_tools=selected_tool_names,
@@ -1075,7 +1097,7 @@ class Agent:
                 # 广播工具筛选事件（无筛选结果）
                 try:
                     self.event_bus.emit(
-                        "tool_filtered",
+                        TOOL_FILTERED,
                         agent=self,
                         task=task,
                         selected_tools=[],

@@ -3,6 +3,7 @@ from typing import Any, Tuple
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_agent.utils import join_prompts
 
 
 def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
@@ -41,7 +42,11 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             )
             if user_confirm("是否将执行结果反馈给Agent？", default=True):
                 return (
-                    f"{user_input}\n\n用户执行以下脚本：\n{script}\n\n执行结果：\n{output}",
+                    join_prompts([
+                        user_input,
+                        f"用户执行以下脚本：\n{script}",
+                        f"执行结果：\n{output}",
+                    ]),
                     False,
                 )
             return "", True
