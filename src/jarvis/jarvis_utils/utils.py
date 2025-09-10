@@ -1599,7 +1599,10 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1, max_retries:
         except Exception:
             retry_count += 1
             if retry_count < max_retries:
-                PrettyOutput.print(f"重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...", OutputType.WARNING)
+                PrettyOutput.print(
+                    f"发生异常，重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...",
+                    OutputType.WARNING,
+                )
                 time.sleep(sleep_time)
             continue
     return result
@@ -1628,7 +1631,10 @@ def while_true(func: Callable[[], bool], sleep_time: float = 0.1, max_retries: i
             break
         retry_count += 1
         if retry_count < max_retries:
-            PrettyOutput.print(f"重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...", OutputType.WARNING)
+            PrettyOutput.print(
+                f"返回空值，重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...",
+                OutputType.WARNING,
+            )
             time.sleep(sleep_time)
     return ret
 
