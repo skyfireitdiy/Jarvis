@@ -262,7 +262,7 @@ class CodeAgent:
         if has_uncommitted_changes():
 
             git_commiter = GitCommitTool()
-            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self.agent})
+            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self.agent, "model_group": getattr(self.agent.model, "model_group", None)})
 
     def _init_env(self, prefix: str, suffix: str) -> None:
         """初始化环境，组合以下功能：
@@ -522,7 +522,7 @@ class CodeAgent:
                 check=True,
             )
             git_commiter = GitCommitTool()
-            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self.agent})
+            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self.agent, "model_group": getattr(self.agent.model, "model_group", None)})
 
             # 在用户接受commit后，根据配置决定是否保存记忆
             if self.agent.force_save_memory:
