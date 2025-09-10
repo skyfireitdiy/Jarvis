@@ -69,7 +69,6 @@ class YuanbaoPlatform(BasePlatform):
             "X-Requested-With": "XMLHttpRequest",
             "chat_version": "v1",
             "X-Instance-ID": "5",
-            "X-Requested-With": "XMLHttpRequest",
             "Accept": "application/json, text/plain, */*",
             "Content-Type": "application/json",
             "sec-ch-ua-mobile": "?0",

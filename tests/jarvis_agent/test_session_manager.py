@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """SessionManager 单元测试"""
-import os
-import tempfile
-import shutil
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import pytest
 
 from jarvis.jarvis_agent.session_manager import SessionManager

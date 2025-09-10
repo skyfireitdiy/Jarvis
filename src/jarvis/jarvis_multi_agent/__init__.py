@@ -73,7 +73,7 @@ content: |2
         if len(send_messages) > 1:
             return (
                 False,
-                f"Send multiple messages, please only send one message at a time.",
+                "Send multiple messages, please only send one message at a time.",
             )
         if len(send_messages) == 0:
             return False, ""
@@ -100,7 +100,7 @@ content: |2
                 msg = yaml.safe_load(item)
                 if "to" in msg and "content" in msg:
                     ret.append(msg)
-            except Exception as e:
+            except Exception:
                 continue
         return ret
 
@@ -161,7 +161,7 @@ content: {msg['content']}
 """
             to_agent_name = msg.get("to")
             if not to_agent_name:
-                return f"消息中未指定 `to` 字段"
+                return "消息中未指定 `to` 字段"
 
             if to_agent_name not in self.agents_config_map:
                 PrettyOutput.print(

@@ -123,7 +123,6 @@ class FileSearchReplaceTool:
         from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
         stdout_messages: list[str] = []
-        stderr_messages: list[str] = []
         overall_success = False
         file_results = []
 

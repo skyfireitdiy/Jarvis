@@ -31,25 +31,25 @@ arguments:
     },
     "FindRelatedFiles": {
         "append": False,
-        "template": f"""
+        "template": """
 请使用工具在当前目录下查找与以下功能相关的文件：
 """,
     },
     "Dev": {
         "append": False,
-        "template": f"""
+        "template": """
 请调用create_code_agent开发以下需求：
 """,
     },
     "Fix": {
         "append": False,
-        "template": f"""
+        "template": """
 请修复以下问题：
 """,
     },
     "Check": {
         "append": True,
-        "template": f"""
+        "template": """
 请使用静态检查工具检查当前代码，必须严格遵守工具调用格式。
 
 检查要求：

@@ -3,7 +3,7 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -157,8 +157,8 @@ class SaveMemoryTool:
                     success_count += 1
 
                     # 打印单条记忆保存信息
-                    memory_type = memory_data["memory_type"]
-                    tags = memory_data.get("tags", [])
+                    memory_data["memory_type"]
+                    memory_data.get("tags", [])
 
                 except Exception as e:
                     failed_count += 1

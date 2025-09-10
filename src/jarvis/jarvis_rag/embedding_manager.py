@@ -43,7 +43,6 @@ class EmbeddingManager:
         try:
             # First try to load model from local cache without any network access
             try:
-                from sentence_transformers import SentenceTransformer
                 local_dir = None
                 # Prefer explicit local dir via env or direct path
 

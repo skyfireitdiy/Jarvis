@@ -5,7 +5,7 @@ import os
 import tempfile
 import shutil
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 import pytest
 
 from jarvis.jarvis_stats.stats import StatsManager
@@ -152,7 +152,7 @@ class TestStatsManager:
     def test_get_stats_with_aggregation(self, stats_manager):
         """测试聚合统计数据"""
         # 添加数据
-        now = datetime.now()
+        datetime.now()
         for i in range(5):
             StatsManager.increment("requests", amount=i + 1)
 

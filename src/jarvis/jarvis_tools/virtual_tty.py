@@ -7,25 +7,14 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 # 为了类型检查，总是导入这些模块
 if TYPE_CHECKING:
-    import fcntl
-    import pty
-    import select
-    import signal
-    import subprocess
-    import threading
-    import queue
+    pass
 
 # 平台相关的导入
 if sys.platform != "win32":
-    import fcntl
-    import pty
-    import select
-    import signal
+    pass
 else:
     # Windows平台的导入
-    import subprocess
-    import threading
-    import queue
+    pass
 
 
 class VirtualTTYTool:

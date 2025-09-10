@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_stats 模块集成测试"""
 
-import os
 import tempfile
 import shutil
 from datetime import datetime, timedelta
@@ -85,7 +84,7 @@ class TestJarvisStatsIntegration:
     def test_data_persistence(self, temp_storage_dir):
         """测试数据持久化"""
         # 第一个会话：添加数据
-        manager1 = StatsManager(storage_dir=temp_storage_dir)
+        StatsManager(storage_dir=temp_storage_dir)
         StatsManager.increment("persistent_metric", amount=100)
         
         # 重置类级别的存储实例，模拟新会话
@@ -93,7 +92,7 @@ class TestJarvisStatsIntegration:
         StatsManager._visualizer = None
         
         # 第二个会话：读取数据
-        manager2 = StatsManager(storage_dir=temp_storage_dir)
+        StatsManager(storage_dir=temp_storage_dir)
         stats = StatsManager.get_stats("persistent_metric", last_days=1)
         
         # 验证记录中的值
@@ -127,7 +126,7 @@ class TestJarvisStatsIntegration:
     def test_export_import_workflow(self, temp_storage_dir):
         """测试导出导入工作流"""
         # 添加测试数据
-        manager = StatsManager(storage_dir=temp_storage_dir)
+        StatsManager(storage_dir=temp_storage_dir)
         
         # 添加不同类型的数据
         StatsManager.increment("export_metric1", amount=50)
@@ -177,10 +176,10 @@ class TestJarvisStatsIntegration:
 
     def test_performance_with_large_dataset(self, temp_storage_dir):
         """测试大数据集的性能"""
-        manager = StatsManager(storage_dir=temp_storage_dir)
+        StatsManager(storage_dir=temp_storage_dir)
         
         # 添加大量数据点
-        start_time = datetime.now()
+        datetime.now()
         for i in range(1000):
             StatsManager.increment("performance_test", amount=i)
         
@@ -201,7 +200,6 @@ class TestJarvisStatsIntegration:
     def test_concurrent_operations(self, setup_integration):
         """测试并发操作的正确性"""
         import threading
-        import time
         
         manager, storage, visualizer = setup_integration
         results = []

@@ -39,7 +39,7 @@ class PlatformRegistry:
                 # 创建 __init__.py 使其成为 Python 包
                 with open(
                     os.path.join(user_platform_dir, "__init__.py"), "w", errors="ignore"
-                ) as f:
+                ):
                     pass
             except Exception as e:
                 PrettyOutput.print(f"创建平台目录失败: {str(e)}", OutputType.ERROR)

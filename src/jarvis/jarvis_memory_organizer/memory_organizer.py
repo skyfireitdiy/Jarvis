@@ -7,14 +7,11 @@
 """
 
 import json
-import sys
 from collections import defaultdict
-from itertools import combinations
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Any, Optional
+from typing import Dict, List, Set, Any, Optional
 
 import typer
-import yaml
 
 from jarvis.jarvis_utils.config import (
     get_data_dir,
@@ -311,7 +308,7 @@ tags:
                     group_memories = [memories[i] for i in original_indices]
 
                     # 显示将要合并的记忆（先拼接后统一打印，避免循环逐条输出）
-                    lines = [f"", f"准备合并 {len(group_memories)} 个记忆:"]
+                    lines = ["", f"准备合并 {len(group_memories)} 个记忆:"]
                     for mem in group_memories:
                         lines.append(
                             f"  - ID: {mem.get('id', '未知')}, "

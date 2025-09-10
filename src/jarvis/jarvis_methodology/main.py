@@ -11,8 +11,6 @@
 import hashlib
 import json
 import os
-import sys
-from typing import Optional
 
 import typer
 import yaml  # type: ignore

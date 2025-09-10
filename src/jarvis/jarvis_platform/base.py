@@ -88,7 +88,7 @@ class BasePlatform(ABC):
             PrettyOutput.print(
                 f"长上下文，分批提交，共{len(inputs)}部分...", OutputType.INFO
             )
-            prefix_prompt = f"""
+            prefix_prompt = """
             我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
             """
             while_true(lambda: while_success(lambda: self._chat(prefix_prompt), 5), 5)

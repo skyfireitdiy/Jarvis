@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """share_manager 单元测试（主要测试 parse_selection）"""
-import pytest
 
 from jarvis.jarvis_agent.share_manager import parse_selection
 

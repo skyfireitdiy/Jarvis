@@ -8,7 +8,7 @@ sub_agent 工具
 - 继承父 Agent 的部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer；其他参数需显式提供
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 import json
 
 from jarvis.jarvis_agent import Agent

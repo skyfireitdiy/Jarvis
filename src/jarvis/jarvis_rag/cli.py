@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional, List, Literal, cast, Tuple
+from typing import Optional, List, Tuple
 import mimetypes
 
 import pathspec  # type: ignore

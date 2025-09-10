@@ -3,7 +3,6 @@
 任务分析器模块
 负责处理任务分析和方法论生成功能
 """
-from typing import Optional
 
 from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
 
@@ -44,7 +43,7 @@ class TaskAnalyzer:
             # 循环处理工具调用，直到没有工具调用为止
             self._process_analysis_loop()
 
-        except Exception as e:
+        except Exception:
             PrettyOutput.print("分析失败", OutputType.ERROR)
         finally:
             # 标记已完成一次分析，避免事件回调重复执行

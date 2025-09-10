@@ -73,7 +73,7 @@ class StdioMcpClient(McpClient):
                     f"初始化失败: {response.get('error', 'Unknown error')}"
                 )
 
-            result = response["result"]
+            response["result"]
 
             # 发送initialized通知 - 使用正确的方法名格式
             self._send_notification("notifications/initialized", {})

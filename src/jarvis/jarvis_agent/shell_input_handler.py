@@ -28,7 +28,7 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         # If any line contains the no-confirm marker, skip the pre-execution confirmation
         no_confirm = any(marker in c for c in cmdline)
 
-        if no_confirm or user_confirm(f"是否要执行以上shell脚本？", default=True):
+        if no_confirm or user_confirm("是否要执行以上shell脚本？", default=True):
             from jarvis.jarvis_tools.registry import ToolRegistry
 
             output = ToolRegistry().handle_tool_calls(
