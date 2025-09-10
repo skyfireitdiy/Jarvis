@@ -130,9 +130,14 @@ def _get_resolved_model_config(
     解析并合并模型配置，处理模型组。
 
     优先级顺序:
-    1. 单独的环境变量 (JARVIS_PLATFORM, JARVIS_MODEL, etc.)
-    2. JARVIS_LLM_GROUP 中定义的组配置
-    3. 代码中的默认值
+    - 当通过 model_group_override（例如命令行 -g/--llm-group）指定组时：
+        1. JARVIS_LLM_GROUP 中定义的组配置
+        2. 仅当组未提供对应键时，回退到顶层环境变量 (JARVIS_PLATFORM, JARVIS_MODEL, JARVIS_MAX_INPUT_TOKEN_COUNT)
+        3. 代码中的默认值
+    - 当未显式指定组时（使用默认组或未设置）：
+        1. 顶层环境变量 (JARVIS_PLATFORM, JARVIS_MODEL, JARVIS_MAX_INPUT_TOKEN_COUNT)
+        2. JARVIS_LLM_GROUP 中定义的组配置
+        3. 代码中的默认值
 
     返回:
         Dict[str, Any]: 解析后的模型配置字典
@@ -155,14 +160,24 @@ def _get_resolved_model_config(
     # Start with group config
     resolved_config = group_config.copy()
 
-    # Override with specific settings from GLOBAL_CONFIG_DATA
-    for key in [
+    # 覆盖策略：
+    # - 若通过 CLI 传入了 model_group_override，则优先使用组内配置；
+    #   仅当组未提供对应键时，才回落到顶层 GLOBAL_CONFIG_DATA。
+    # - 若未传入 override（即使用默认组），保持原有行为：由顶层键覆盖组配置。
+    override_keys = [
         "JARVIS_PLATFORM",
         "JARVIS_MODEL",
         "JARVIS_MAX_INPUT_TOKEN_COUNT",
-    ]:
+    ]
+    for key in override_keys:
         if key in GLOBAL_CONFIG_DATA:
-            resolved_config[key] = GLOBAL_CONFIG_DATA[key]
+            if model_group_override is None:
+                # 未显式指定组：顶层覆盖组
+                resolved_config[key] = GLOBAL_CONFIG_DATA[key]
+            else:
+                # 显式指定组：仅在组未定义该键时回退到顶层
+                if key not in resolved_config:
+                    resolved_config[key] = GLOBAL_CONFIG_DATA[key]
 
     return resolved_config
 
