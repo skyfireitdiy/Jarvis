@@ -15,7 +15,6 @@ from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_data_dir, get_tool_load_dirs
-from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
@@ -128,7 +127,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """加载工具"""
         tools = self.get_all_tools()
         if tools:
-            tools_prompt = f"<tools_section>\n"
+            tools_prompt = "<tools_section>\n"
             tools_prompt += "  <header>## 可用工具:</header>\n"
             tools_prompt += "  <tools_list>\n"
             for tool in tools:
@@ -202,7 +201,7 @@ class ToolRegistry(OutputHandlerProtocol):
     def _get_tool_stats(self) -> Dict[str, int]:
         """从数据目录获取工具调用统计"""
         from jarvis.jarvis_stats.stats import StatsManager
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         # 获取所有工具的统计数据
         tool_stats = {}

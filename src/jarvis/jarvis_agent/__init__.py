@@ -648,7 +648,7 @@ class Agent:
             )  # type: ignore
 
             return summary
-        except Exception as e:
+        except Exception:
             PrettyOutput.print("总结对话历史失败", OutputType.ERROR)
             return ""
 

@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """StatsVisualizer 单元测试"""
 
-import os
 import sys
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import patch
 import pytest
 
 from jarvis.jarvis_stats.visualizer import StatsVisualizer

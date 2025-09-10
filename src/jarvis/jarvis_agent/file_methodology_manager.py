@@ -5,7 +5,6 @@
 """
 import os
 import tempfile
-from typing import List, Optional
 
 from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -46,7 +45,6 @@ class FileMethodologyManager:
             self._load_local_methodology()
         else:
             # 上传成功
-            from jarvis.jarvis_agent.memory_manager import MemoryManager
 
             if self.agent.files:
                 self.agent.session.prompt = f"{self.agent.session.prompt}\n\n上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
@@ -75,7 +73,7 @@ class FileMethodologyManager:
 
         from jarvis.jarvis_agent.memory_manager import MemoryManager
 
-        memory_manager = MemoryManager(self.agent)
+        MemoryManager(self.agent)
         methodology = load_methodology(
             msg,
             self.agent.get_tool_registry(),

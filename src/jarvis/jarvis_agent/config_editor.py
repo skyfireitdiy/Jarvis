@@ -51,7 +51,7 @@ class ConfigEditor:
                 raise typer.Exit(code=1)
         else:
             PrettyOutput.print(
-                f"No suitable editor found. Please install one of: vim, nano, emacs, code",
+                "No suitable editor found. Please install one of: vim, nano, emacs, code",
                 OutputType.ERROR,
             )
             raise typer.Exit(code=1)

@@ -10,7 +10,6 @@
 import json
 import os
 import tempfile
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_platform.base import BasePlatform
@@ -21,9 +20,8 @@ from jarvis.jarvis_utils.config import (
     get_central_methodology_repo,
     get_max_input_token_count,
 )
-from jarvis.jarvis_utils.globals import get_agent, current_agent_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
+from jarvis.jarvis_utils.utils import daily_check_git_updates
 from jarvis.jarvis_utils.embedding import get_context_token_count
 
 
@@ -234,7 +232,7 @@ def load_methodology(
         methodology_titles = list(methodologies.keys())
 
         # 步骤2：让大模型选择相关性高的方法论
-        selection_prompt = f"""以下是所有可用的方法论标题：
+        selection_prompt = """以下是所有可用的方法论标题：
 
 """
         for i, title in enumerate(methodology_titles, 1):
@@ -305,7 +303,7 @@ def load_methodology(
 
         # 步骤3：将选择出来的方法论内容提供给大模型生成步骤
         # 首先构建基础提示词部分
-        base_prompt = f"""以下是与用户需求相关的方法论内容：
+        base_prompt = """以下是与用户需求相关的方法论内容：
 
 """
         suffix_prompt = f"""以下是所有可用的工具内容：

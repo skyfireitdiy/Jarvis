@@ -21,7 +21,6 @@ import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_utils.input import user_confirm, get_single_line_input
 from jarvis.jarvis_utils.fzf import fzf_select
 import os
-import sys
 import subprocess
 from pathlib import Path
 import yaml  # type: ignore

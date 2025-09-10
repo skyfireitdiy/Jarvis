@@ -193,7 +193,7 @@ class ConsoleOutputSink(OutputSink):
             ),
         }
 
-        header = Text(
+        Text(
             PrettyOutput._format(event.output_type, event.timestamp),
             style=header_styles[event.output_type],
         )

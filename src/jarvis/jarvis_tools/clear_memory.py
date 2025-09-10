@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import json
-import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -8,7 +7,6 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.globals import (
     clear_short_term_memories,
-    get_short_term_memories,
     short_term_memories,
 )
 
@@ -212,7 +210,7 @@ class ClearMemoryTool:
             # 生成结果报告
 
             # 详细报告
-            report = f"# 记忆清除报告\n\n"
+            report = "# 记忆清除报告\n\n"
             report += f"**总计清除**: {total_removed} 条记忆\n\n"
 
             if tags:

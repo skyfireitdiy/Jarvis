@@ -2,7 +2,6 @@
 import hashlib
 import json
 import os
-import platform
 import signal
 import subprocess
 import sys
@@ -13,10 +12,7 @@ from datetime import datetime, date
 
 import yaml  # type: ignore
 from rich.align import Align
-from rich.console import Group, RenderableType
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
+from rich.console import RenderableType
 
 from jarvis import __version__
 from jarvis.jarvis_utils.config import (
@@ -266,7 +262,6 @@ def _show_usage_stats(welcome_str: str) -> None:
     from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
     try:
-        from datetime import datetime
 
         from rich.console import Console, Group
         from rich.panel import Panel
@@ -750,7 +745,7 @@ def _interactive_config_setup(config_file_path: Path):
             guide_lines = ["", "配置获取方法:"]
             for key in required_keys:
                 if key in config_guide and config_guide[key]:
-                    guide_lines.append(f"")
+                    guide_lines.append("")
                     guide_lines.append(f"{key} 获取方法:")
                     guide_lines.append(str(config_guide[key]))
             PrettyOutput.print("\n".join(guide_lines), OutputType.INFO)
@@ -874,7 +869,6 @@ def load_config():
 
 from typing import Tuple
 
-from typing import Tuple
 
 
 def _load_config_file(config_file: str) -> Tuple[str, dict]:
@@ -1370,7 +1364,6 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         config_file: 配置文件路径
     """
     from jarvis.jarvis_utils.input import user_confirm as get_yes_no
-    from jarvis.jarvis_utils.input import get_single_line_input
 
     try:
         content, config_data = _load_config_file(config_file)
@@ -1574,7 +1567,7 @@ def _read_old_config_file(config_file):
         )
         set_global_env_data(config_data)
     PrettyOutput.print(
-        f"检测到旧格式配置文件，旧格式以后将不再支持，请尽快迁移到新格式",
+        "检测到旧格式配置文件，旧格式以后将不再支持，请尽快迁移到新格式",
         OutputType.WARNING,
     )
 
@@ -1662,7 +1655,7 @@ def get_file_line_count(filename: str) -> int:
     """
     try:
         return len(open(filename, "r", encoding="utf-8", errors="ignore").readlines())
-    except Exception as e:
+    except Exception:
         return 0
 
 
@@ -1803,7 +1796,7 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
             return
 
         # 执行 git pull
-        pull_result = subprocess.run(
+        subprocess.run(
             ["git", "pull"],
             cwd=repo_path,
             capture_output=True,

@@ -2,7 +2,6 @@
 """jarvis CLI 回调测试（run_cli）"""
 from typer.testing import CliRunner
 from unittest.mock import Mock
-import pytest
 
 import jarvis.jarvis_agent.jarvis as jarvis_mod
 

@@ -211,7 +211,7 @@ def _deprecated_platform_name_v1(model_group_override: Optional[str] = None) -> 
     返回：
         str: 平台名称，默认为正常操作平台
     """
-    config = _get_resolved_model_config(model_group_override)
+    _get_resolved_model_config(model_group_override)
     # Fallback to normal platform if thinking platform is not specified
     return get_normal_platform_name(model_group_override)
 
@@ -223,7 +223,7 @@ def _deprecated_model_name_v1(model_group_override: Optional[str] = None) -> str
     返回：
         str: 模型名称，默认为正常操作模型
     """
-    config = _get_resolved_model_config(model_group_override)
+    _get_resolved_model_config(model_group_override)
     # Fallback to normal model if thinking model is not specified
     return get_normal_model_name(model_group_override)
 
@@ -235,7 +235,7 @@ def is_execute_tool_confirm() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_EXECUTE_TOOL_CONFIRM", False) == True
+    return GLOBAL_CONFIG_DATA.get("JARVIS_EXECUTE_TOOL_CONFIRM", False)
 
 
 def is_confirm_before_apply_patch() -> bool:
@@ -245,7 +245,7 @@ def is_confirm_before_apply_patch() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_CONFIRM_BEFORE_APPLY_PATCH", False) == True
+    return GLOBAL_CONFIG_DATA.get("JARVIS_CONFIRM_BEFORE_APPLY_PATCH", False)
 
 
 def get_data_dir() -> str:
@@ -285,7 +285,7 @@ def get_pretty_output() -> bool:
     if platform.system() == "Windows":
         return False
 
-    return GLOBAL_CONFIG_DATA.get("JARVIS_PRETTY_OUTPUT", False) == True
+    return GLOBAL_CONFIG_DATA.get("JARVIS_PRETTY_OUTPUT", False)
 
 
 def is_use_methodology() -> bool:
@@ -295,7 +295,7 @@ def is_use_methodology() -> bool:
     返回：
         bool: 如果启用方法论则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_USE_METHODOLOGY", True) == True
+    return GLOBAL_CONFIG_DATA.get("JARVIS_USE_METHODOLOGY", True)
 
 
 def is_use_analysis() -> bool:
@@ -305,7 +305,7 @@ def is_use_analysis() -> bool:
     返回：
         bool: 如果启用任务分析则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_USE_ANALYSIS", True) == True
+    return GLOBAL_CONFIG_DATA.get("JARVIS_USE_ANALYSIS", True)
 
 
 def get_tool_load_dirs() -> List[str]:
@@ -405,7 +405,7 @@ def is_print_prompt() -> bool:
     返回：
         bool: 如果打印提示则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_PROMPT", False) == True
+    return GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_PROMPT", False)
 
 
 def is_print_error_traceback() -> bool:

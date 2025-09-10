@@ -2,7 +2,6 @@
 import os
 import re
 import subprocess
-import sys
 import tempfile
 from typing import Any, Dict, Optional
 
@@ -138,7 +137,7 @@ class GitCommitTool:
                 base_prompt = (
                     custom_prompt
                     if custom_prompt
-                    else f"""根据代码差异生成提交信息：
+                    else """根据代码差异生成提交信息：
                 提交信息应使用中文书写
 # 格式模板
 必须使用以下格式：

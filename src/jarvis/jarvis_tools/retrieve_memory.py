@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import json
-import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -170,7 +169,7 @@ class RetrieveMemoryTool:
                 pass
 
             # 格式化为Markdown输出
-            markdown_output = f"# 记忆检索结果\n\n"
+            markdown_output = "# 记忆检索结果\n\n"
             markdown_output += f"**检索到 {len(all_memories)} 条记忆**\n\n"
 
             if tags:
@@ -201,7 +200,7 @@ class RetrieveMemoryTool:
                     if k not in ["id", "type", "tags", "created_at", "content"]
                 }
                 if metadata:
-                    markdown_output += f"**其他信息**:\n"
+                    markdown_output += "**其他信息**:\n"
                     for key, value in metadata.items():
                         markdown_output += f"- {key}: {value}\n"
                     markdown_output += "\n"

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """TaskManager 单元测试（load_tasks 与 select_task）"""
 import os
-from unittest.mock import Mock
-import pytest
 
 from jarvis.jarvis_agent.task_manager import TaskManager
 

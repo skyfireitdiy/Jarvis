@@ -54,7 +54,7 @@ class SearchWebTool:
                     break
 
                 url = r["href"]
-                title = r.get("title", url)
+                r.get("title", url)
 
                 try:
 
@@ -79,7 +79,7 @@ class SearchWebTool:
                     "success": False,
                 }
 
-            url_list_str = "\n".join(f"  - {u}" for u in visited_urls)
+            "\n".join(f"  - {u}" for u in visited_urls)
 
             summary_prompt = f"请为查询“{query}”总结以下内容：\n\n{full_content}"
 

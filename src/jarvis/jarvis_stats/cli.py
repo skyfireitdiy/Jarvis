@@ -16,7 +16,6 @@ from pathlib import Path
 from .stats import StatsManager
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 app = typer.Typer(help="Jarvis 统计模块命令行工具")
 console = Console()
@@ -310,7 +309,7 @@ def remove(
             unit = info.get("unit", "-")
             last_updated = info.get("last_updated", "-")
 
-            rprint(f"\n[yellow]准备删除指标:[/yellow]")
+            rprint("\n[yellow]准备删除指标:[/yellow]")
             rprint(f"  名称: {metric}")
             rprint(f"  单位: {unit}")
             rprint(f"  最后更新: {last_updated}")
@@ -340,7 +339,7 @@ def demo():
     stats = StatsManager(_get_stats_dir())
 
     # 添加演示数据
-    with console.status("[bold green]正在生成演示数据...") as status:
+    with console.status("[bold green]正在生成演示数据..."):
         # API响应时间
         for i in range(20):
             response_time = random.uniform(0.1, 2.0)

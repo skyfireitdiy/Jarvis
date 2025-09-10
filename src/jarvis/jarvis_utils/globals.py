@@ -10,8 +10,7 @@
 import os
 
 # 全局变量：保存消息历史
-from typing import Any, Dict, Set, List, Optional
-from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 message_history: List[str] = []
 MAX_HISTORY_SIZE = 50

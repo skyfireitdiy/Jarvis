@@ -246,7 +246,7 @@ def handle_commit_workflow() -> bool:
             ["git", "commit", "-m", f"CheckPoint #{commit_count + 1}"], check=True
         )
         return True
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         return False
 
 

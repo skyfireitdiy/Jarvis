@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 """lint.py 单元测试"""
-import os
-import tempfile
-from unittest.mock import patch, mock_open, MagicMock
-import pytest
-import yaml
+from unittest.mock import patch, mock_open
 
 from jarvis.jarvis_code_agent.lint import (
     load_lint_tools_config,

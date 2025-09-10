@@ -3,7 +3,6 @@ import os
 import re
 import subprocess
 import tempfile
-import sys
 from typing import Any, Dict, List, Optional
 
 import typer

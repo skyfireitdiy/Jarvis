@@ -167,7 +167,6 @@ class StatsManager:
         """
         # 处理时间范围
         # 当未提供时间过滤参数时，默认显示全历史数据
-        all_time = False
         if last_hours or last_days:
             if end_time is None:
                 end_time = datetime.now()
@@ -177,7 +176,7 @@ class StatsManager:
                 elif last_days:
                     start_time = end_time - timedelta(days=last_days)
         else:
-            all_time = True
+            pass
 
         if metric_name is None:
             # 显示所有指标摘要
