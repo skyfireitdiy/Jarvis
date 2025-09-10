@@ -14,6 +14,7 @@ from jarvis.jarvis_agent import (
     get_multiline_input,
     user_confirm,
 )
+from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.fzf import fzf_select
 
@@ -109,7 +110,7 @@ class TaskManager:
                     if need_additional:
                         additional_input = get_multiline_input("请输入补充信息：")
                         if additional_input:
-                            selected_task = f"{selected_task}\n\n补充信息:\n{additional_input}"
+                            selected_task = join_prompts([selected_task, f"补充信息:\n{additional_input}"])
                     return selected_task
             except Exception:
                 # 如果解析失败，则回退到手动输入
@@ -138,9 +139,10 @@ class TaskManager:
                     if need_additional:
                         additional_input = get_multiline_input("请输入补充信息：")
                         if additional_input:
-                            selected_task = (
-                                f"{selected_task}\n\n补充信息:\n{additional_input}"
-                            )
+                            selected_task = join_prompts([
+                                selected_task,
+                                f"补充信息:\n{additional_input}"
+                            ])
                     return selected_task
                 PrettyOutput.print(
                     "无效的选择。请选择列表中的一个号码。", OutputType.WARNING

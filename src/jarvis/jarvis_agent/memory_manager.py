@@ -6,6 +6,7 @@
 
 from jarvis.jarvis_utils.globals import get_all_memory_tags
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_agent.events import TASK_STARTED, BEFORE_HISTORY_CLEAR, TASK_COMPLETED
 
 
 class MemoryManager:
@@ -159,11 +160,11 @@ class MemoryManager:
     def _subscribe_events(self) -> None:
         bus = self.agent.get_event_bus()  # type: ignore[attr-defined]
         # 任务开始时重置去重标记
-        bus.subscribe("task_started", self._on_task_started)
+        bus.subscribe(TASK_STARTED, self._on_task_started)
         # 在清理历史前尝试保存记忆（若开启强制保存且尚未处理）
-        bus.subscribe("before_history_clear", self._ensure_memory_prompt)
+        bus.subscribe(BEFORE_HISTORY_CLEAR, self._ensure_memory_prompt)
         # 任务完成时作为兜底再尝试一次
-        bus.subscribe("task_completed", self._ensure_memory_prompt)
+        bus.subscribe(TASK_COMPLETED, self._ensure_memory_prompt)
 
     def _on_task_started(self, **payload) -> None:
         self._memory_prompted = False

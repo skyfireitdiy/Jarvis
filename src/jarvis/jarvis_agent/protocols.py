@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-from typing import Any, Protocol, Tuple
+from typing import Any, Protocol, Tuple, runtime_checkable
 
 
+@runtime_checkable
 class OutputHandlerProtocol(Protocol):
     """
     Defines the interface for an output handler, which is responsible for
@@ -28,3 +29,5 @@ class OutputHandlerProtocol(Protocol):
             A tuple containing a boolean (whether to return) and the result.
         """
         ...
+        
+__all__ = ["OutputHandlerProtocol"]

@@ -11,7 +11,8 @@ from enum import Enum
 from typing import Any, TYPE_CHECKING
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
+from jarvis.jarvis_agent.utils import join_prompts, is_auto_complete, normalize_next_action
 
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
@@ -63,7 +64,7 @@ class AgentRunLoop:
                 # 广播工具调用前事件（不影响主流程）
                 try:
                     ag.event_bus.emit(
-                        "before_tool_call",
+                        BEFORE_TOOL_CALL,
                         agent=ag,
                         current_response=current_response,
                     )
@@ -72,12 +73,7 @@ class AgentRunLoop:
                 need_return, tool_prompt = ag._call_tools(current_response)
 
                 # 将上一个提示和工具提示安全地拼接起来
-                prompt_parts = []
-                if ag.session.prompt:
-                    prompt_parts.append(ag.session.prompt)
-                if tool_prompt:
-                    prompt_parts.append(tool_prompt)
-                ag.session.prompt = "\n\n".join(prompt_parts)
+                ag.session.prompt = join_prompts([ag.session.prompt, tool_prompt])
 
                 if need_return:
                     return ag.session.prompt
@@ -88,7 +84,7 @@ class AgentRunLoop:
                 # 广播工具调用后的事件（不影响主流程）
                 try:
                     ag.event_bus.emit(
-                        "after_tool_call",
+                        AFTER_TOOL_CALL,
                         agent=ag,
                         current_response=current_response,
                         need_return=need_return,
@@ -102,27 +98,16 @@ class AgentRunLoop:
                     continue
 
                 # 检查自动完成
-                if ag.auto_complete and ot("!!!COMPLETE!!!") in current_response:
+                if ag.auto_complete and is_auto_complete(current_response):
                     return ag._complete_task(auto_completed=True)
 
                 # 获取下一步用户输入
                 next_action = ag._get_next_user_action()
-                if (
-                    next_action == "continue"
-                    or (
-                        isinstance(next_action, Enum)
-                        and getattr(next_action, "value", None) == "continue"
-                    )
-                ):
+                action = normalize_next_action(next_action)
+                if action == "continue":
                     run_input_handlers = True
                     continue
-                elif (
-                    next_action == "complete"
-                    or (
-                        isinstance(next_action, Enum)
-                        and getattr(next_action, "value", None) == "complete"
-                    )
-                ):
+                elif action == "complete":
                     return ag._complete_task(auto_completed=False)
 
             except Exception as e:
