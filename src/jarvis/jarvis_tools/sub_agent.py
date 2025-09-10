@@ -14,6 +14,7 @@ import json
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.globals import delete_agent
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class SubAgentTool:
@@ -173,6 +174,24 @@ class SubAgentTool:
             try:
                 agent.set_use_tools(use_tools)
             except Exception:
+                pass
+
+            # 校验子Agent所用模型是否有效，必要时回退到平台可用模型
+            try:
+                platform = getattr(agent, "model", None)
+                if platform:
+                    available_models = platform.get_model_list()
+                    if available_models:
+                        available_names = [m for m, _ in available_models]
+                        current_model_name = platform.name()
+                        if current_model_name not in available_names:
+                            PrettyOutput.print(
+                                f"检测到子Agent模型 {current_model_name} 不存在于平台 {platform.platform_name()} 的可用模型列表，将回退到 {available_names[0]}",
+                                OutputType.WARNING,
+                            )
+                            platform.set_model_name(available_names[0])
+            except Exception:
+                # 获取模型列表或设置模型失败时，保持原设置并继续，交由底层报错处理
                 pass
 
             # 执行任务

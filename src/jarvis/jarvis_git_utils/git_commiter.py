@@ -219,10 +219,31 @@ commit信息
                     platform = PlatformRegistry().create_platform(platform_name)
                     if platform and model_name:
                         platform.set_model_name(model_name)
-                        if model_group:
-                            platform.model_group = model_group
+                    if platform and model_group:
+                        try:
+                            platform.set_model_group(model_group)
+                        except Exception:
+                            # 兼容早期实现
+                            platform.model_group = model_group  # type: ignore
                 else:
                     platform = PlatformRegistry().get_normal_platform()
+
+                # 校验模型是否存在于平台可用列表，不存在则回退到第一个可用模型
+                if platform:
+                    try:
+                        available_models = platform.get_model_list()
+                        if available_models:
+                            available_names = [m for m, _ in available_models]
+                            current_model_name = platform.name()
+                            if current_model_name not in available_names:
+                                PrettyOutput.print(
+                                    f"检测到模型 {current_model_name} 不存在于平台 {platform.platform_name()} 的可用模型列表，将回退到 {available_names[0]}",
+                                    OutputType.WARNING,
+                                )
+                                platform.set_model_name(available_names[0])
+                    except Exception:
+                        # 获取模型列表失败时，保持原设置并继续，交由底层报错处理
+                        pass
 
                 # Ensure platform is not None
                 if not platform:
