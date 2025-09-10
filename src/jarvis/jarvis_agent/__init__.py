@@ -67,7 +67,10 @@ from jarvis.jarvis_utils.tag import ot
 
 
 def show_agent_startup_stats(
-    agent_name: str, model_name: str, tool_registry_instance: Optional[Any] = None
+    agent_name: str,
+    model_name: str,
+    tool_registry_instance: Optional[Any] = None,
+    platform_name: Optional[str] = None,
 ) -> None:
     """输出启动时的统计信息
 
@@ -112,8 +115,8 @@ def show_agent_startup_stats(
         current_dir = os.getcwd()
 
         # 构建欢迎信息
-        platform_name = get_normal_platform_name()
-        welcome_message = f"{agent_name} 初始化完成 - 使用 {platform_name} 平台 {model_name} 模型"
+        platform = platform_name or get_normal_platform_name()
+        welcome_message = f"{agent_name} 初始化完成 - 使用 {platform} 平台 {model_name} 模型"
 
         stats_parts = [
             f"📚  本地方法论: [bold cyan]{methodology_count}[/bold cyan]",
@@ -327,7 +330,12 @@ class Agent:
         self._setup_system_prompt()
 
         # 输出统计信息（包含欢迎信息）
-        show_agent_startup_stats(name, self.model.name(), self.get_tool_registry())  # type: ignore
+        show_agent_startup_stats(
+            name,
+            self.model.name(),
+            self.get_tool_registry(),  # type: ignore
+            platform_name=self.model.platform_name(),  # type: ignore
+        )
 
     def _init_model(self, model_group: Optional[str]):
         """初始化模型平台（统一使用 normal 平台/模型）"""
