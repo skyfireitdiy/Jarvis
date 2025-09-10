@@ -112,7 +112,8 @@ def show_agent_startup_stats(
         current_dir = os.getcwd()
 
         # 构建欢迎信息
-        welcome_message = f"{agent_name} 初始化完成 - 使用 {model_name} 模型"
+        platform_name = get_normal_platform_name()
+        welcome_message = f"{agent_name} 初始化完成 - 使用 {platform_name} 平台 {model_name} 模型"
 
         stats_parts = [
             f"📚  本地方法论: [bold cyan]{methodology_count}[/bold cyan]",
