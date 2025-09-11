@@ -227,22 +227,11 @@ commit信息
                 else:
                     platform = PlatformRegistry().get_normal_platform()
 
-                # 校验模型是否存在于平台可用列表，不存在则回退到第一个可用模型
-                if platform:
-                    try:
-                        available_models = platform.get_model_list()
-                        if available_models:
-                            available_names = [m for m, _ in available_models]
-                            current_model_name = platform.name()
-                            if current_model_name not in available_names:
-                                PrettyOutput.print(
-                                    f"检测到模型 {current_model_name} 不存在于平台 {platform.platform_name()} 的可用模型列表，将回退到 {available_names[0]}",
-                                    OutputType.WARNING,
-                                )
-                                platform.set_model_name(available_names[0])
-                    except Exception:
-                        # 获取模型列表失败时，保持原设置并继续，交由底层报错处理
-                        pass
+                # 跳过模型可用性校验：
+                # 为避免某些平台/代理不支持 get_model_list 接口导致的噪音日志（如 404），
+                # 这里默认不调用 platform.get_model_list() 进行模型可用性校验。
+                # 如果未来需要恢复校验，可参考被移除的逻辑。
+                # no-op
 
                 # Ensure platform is not None
                 if not platform:
