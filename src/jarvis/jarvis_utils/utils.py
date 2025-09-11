@@ -870,7 +870,6 @@ def load_config():
 from typing import Tuple
 
 
-
 def _load_config_file(config_file: str) -> Tuple[str, dict]:
     """读取并解析YAML格式的配置文件
 
@@ -1242,7 +1241,10 @@ def _collect_optional_config_interactively(
             except ValueError:
                 default_index = 0  # 默认为第一个选项
 
-            new_mode = get_choice(tip, choices, default_index)
+            new_mode = get_choice(
+                tip,
+                choices,
+            )
 
             if new_mode == current_mode:
                 return False
