@@ -276,7 +276,7 @@ class TongyiPlatform(BasePlatform):
 
             for file_path in file_list:
                 file_name = os.path.basename(file_path)
-                log_lines: list[str] = []
+                log_lines: List[str] = []
                 log_lines.append(f"上传文件 {file_name}")
                 try:
                     if not os.path.exists(file_path):

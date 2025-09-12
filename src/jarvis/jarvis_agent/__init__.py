@@ -228,6 +228,15 @@ class LoopAction(Enum):
 
 
 class Agent:
+    # Attribute type annotations to satisfy static type checkers
+    event_bus: EventBus
+    memory_manager: MemoryManager
+    task_analyzer: TaskAnalyzer
+    file_methodology_manager: FileMethodologyManager
+    prompt_manager: PromptManager
+    model: BasePlatform
+    session: SessionManager
+
     def clear_history(self):
         """
         Clears the current conversation history by delegating to the session manager.
@@ -358,12 +367,15 @@ class Agent:
         platform_name = get_normal_platform_name(model_group)
         model_name = get_normal_model_name(model_group)
 
-        self.model = PlatformRegistry().create_platform(platform_name)
-        if self.model is None:
+        maybe_model = PlatformRegistry().create_platform(platform_name)
+        if maybe_model is None:
             PrettyOutput.print(
                 f"平台 {platform_name} 不存在，将使用普通模型", OutputType.WARNING
             )
-            self.model = PlatformRegistry().get_normal_platform()
+            maybe_model = PlatformRegistry().get_normal_platform()
+
+        # 在此处收敛为非可选类型，确保后续赋值满足类型检查
+        self.model = maybe_model
 
         if model_name:
             self.model.set_model_name(model_name)

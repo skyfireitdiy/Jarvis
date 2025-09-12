@@ -210,7 +210,7 @@ class SSEMcpClient(McpClient):
 
                 # 调用已注册的处理器
                 if method in self.notification_handlers:
-                    error_lines: list[str] = []
+                    error_lines: List[str] = []
                     for handler in self.notification_handlers[method]:
                         try:
                             handler(params)

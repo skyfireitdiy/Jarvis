@@ -8,7 +8,7 @@
 - 不引入额外依赖，便于在 Agent 中渐进集成
 """
 from collections import defaultdict
-from typing import Callable, DefaultDict, Dict, List
+from typing import Callable, DefaultDict, Dict, List, Any
 
 
 
@@ -36,7 +36,7 @@ class EventBus:
         except ValueError:
             pass
 
-    def emit(self, event: str, **payload: Dict) -> None:
+    def emit(self, event: str, **payload: Any) -> None:
         """
         广播事件。回调中的异常将被捕获并忽略，以保证主流程稳定。
         """

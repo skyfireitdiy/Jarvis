@@ -8,7 +8,7 @@ sub_code_agent 工具
 - 不依赖父 Agent，所有配置使用系统默认与全局变量
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
-from typing import Any, Dict
+from typing import Any, Dict, List
 import json
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
@@ -85,7 +85,7 @@ class SubCodeAgentTool:
                 except Exception:
                     parent_agent = None
             model_group = None
-            use_tools: list[str] = []
+            use_tools: List[str] = []
             try:
                 if parent_agent is not None:
                     if getattr(parent_agent, "model", None):

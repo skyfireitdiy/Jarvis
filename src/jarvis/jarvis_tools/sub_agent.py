@@ -8,7 +8,7 @@ sub_agent 工具
 - 继承父 Agent 的部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer；其他参数需显式提供
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
-from typing import Any, Dict
+from typing import Any, Dict, List
 import json
 
 from jarvis.jarvis_agent import Agent
@@ -107,7 +107,7 @@ class SubAgentTool:
 
             # 解析可用工具列表（支持数组或以逗号分隔的字符串）
             _use_tools = args.get("use_tools", None)
-            use_tools: list[str] = []
+            use_tools: List[str] = []
             if isinstance(_use_tools, list):
                 use_tools = [str(x).strip() for x in _use_tools if str(x).strip()]
             elif isinstance(_use_tools, str):

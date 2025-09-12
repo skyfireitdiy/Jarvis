@@ -185,7 +185,7 @@ class ChromaRetriever:
         if not changed and not deleted:
             return
         # 为避免在循环中逐条打印，先拼接后统一打印
-        lines: list[str] = []
+        lines: List[str] = []
         if changed:
             lines.append(
                 f"检测到 {len(changed)} 个已索引文件发生变化，建议重新索引以保证检索准确性。"
@@ -247,7 +247,7 @@ class ChromaRetriever:
             return
 
         # 先处理删除
-        delete_errors: list[str] = []
+        delete_errors: List[str] = []
         for src in deleted:
             try:
                 self.collection.delete(where={"source": src})  # type: ignore[arg-type]
@@ -258,7 +258,7 @@ class ChromaRetriever:
 
         # 再处理变更（重建）
         docs_to_add: List[Document] = []
-        rebuild_errors: list[str] = []
+        rebuild_errors: List[str] = []
         for src in changed:
             try:
                 # 删除旧条目

@@ -2,10 +2,10 @@
 """FZF selector utility."""
 import shutil
 import subprocess
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any, cast
 
 def fzf_select(
-    options: Union[List[str], List[dict]],
+    options: Union[List[str], List[Dict[str, Any]]],
     prompt: str = "SELECT> ",
     key: Optional[str] = None,
 ) -> Optional[str]:
@@ -29,7 +29,8 @@ def fzf_select(
     if isinstance(options[0], dict):
         if key is None:
             raise ValueError("A key must be provided for a list of dicts.")
-        input_lines = [str(item.get(key, "")) for item in options]
+        options_dict = cast(List[Dict[str, Any]], options)
+        input_lines = [str(item.get(key, "")) for item in options_dict]
     else:
         input_lines = [str(item) for item in options]
 
