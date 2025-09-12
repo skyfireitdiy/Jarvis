@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Jarvis AI 助手主入口模块"""
-from typing import Optional
+from typing import Optional, List
 
 import typer
 
@@ -391,7 +391,7 @@ def handle_builtin_config_selector(
                     if category == "roles":
                         count = opt.get("roles_count")
                         details_val = opt.get("details", "")
-                        parts: list[str] = []
+                        parts: List[str] = []
                         if isinstance(count, int) and count > 0:
                             parts.append(f"{count} 个角色")
                         if isinstance(details_val, str) and details_val:
@@ -442,7 +442,7 @@ def handle_builtin_config_selector(
                 if choice_index != -1:
                     try:
                         sel = options[choice_index]
-                        args: list[str] = []
+                        args: List[str] = []
 
                         if sel["category"] == "agent":
                             # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition

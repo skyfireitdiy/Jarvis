@@ -604,8 +604,8 @@ class StatsManager:
 
     @staticmethod
     def _show_multiple_charts(
-        start_time: datetime,
-        end_time: datetime,
+        start_time: Optional[datetime],
+        end_time: Optional[datetime],
         aggregation: str,
         tags: Optional[Dict[str, str]],
         width: Optional[int] = None,

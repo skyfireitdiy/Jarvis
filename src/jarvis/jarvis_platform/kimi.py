@@ -194,7 +194,7 @@ class KimiModel(BasePlatform):
         uploaded_files = []
         for index, file_path in enumerate(file_list, 1):
             file_name = os.path.basename(file_path)
-            log_lines: list[str] = [f"处理文件 [{index}/{len(file_list)}]: {file_name}"]
+            log_lines: List[str] = [f"处理文件 [{index}/{len(file_list)}]: {file_name}"]
             try:
                 mime_type, _ = mimetypes.guess_type(file_path)
                 action = (

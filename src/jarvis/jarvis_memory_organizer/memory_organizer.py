@@ -63,7 +63,7 @@ class MemoryOrganizer:
         """加载指定类型的所有记忆"""
         memories = []
         memory_files = self._get_memory_files(memory_type)
-        error_lines: list[str] = []
+        error_lines: List[str] = []
 
         for memory_file in memory_files:
             try:
@@ -388,8 +388,8 @@ tags:
         )
 
         # 删除原始记忆文件（先汇总日志，最后统一打印）
-        info_lines: list[str] = []
-        warn_lines: list[str] = []
+        info_lines: List[str] = []
+        warn_lines: List[str] = []
         for orig_memory in original_memories:
             if "file_path" in orig_memory:
                 try:
@@ -428,7 +428,7 @@ tags:
             导出的记忆数量
         """
         all_memories = []
-        progress_lines: list[str] = []
+        progress_lines: List[str] = []
 
         for memory_type in memory_types:
             progress_lines.append(f"正在导出 {memory_type} 类型的记忆...")

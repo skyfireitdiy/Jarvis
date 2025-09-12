@@ -8,7 +8,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Set
 from collections import defaultdict
 import sys
 import time
@@ -457,7 +457,7 @@ class StatsStorage:
         metrics_from_meta = set(meta.get("metrics", {}).keys())
 
         # 扫描所有数据文件获取实际存在的指标
-        metrics_from_data: set[str] = set()
+        metrics_from_data: Set[str] = set()
         for data_file in self.data_dir.glob("stats_*.json"):
             try:
                 data = self._load_json(data_file)
@@ -467,7 +467,7 @@ class StatsStorage:
                 continue
 
         # 扫描总量缓存目录中已有的指标文件
-        metrics_from_totals: set[str] = set()
+        metrics_from_totals: Set[str] = set()
         try:
             for f in self.totals_dir.glob("*"):
                 if f.is_file():

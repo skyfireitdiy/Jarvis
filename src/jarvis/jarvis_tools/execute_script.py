@@ -2,7 +2,7 @@
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
@@ -74,7 +74,7 @@ class ScriptTool:
         stream.feed(data)
 
         # 清理每行右侧空格，并过滤空行
-        cleaned: list[str] = []
+        cleaned: List[str] = []
         for y in range(screen.lines):
             line = screen.buffer[y]
             stripped = "".join(char.data for char in line.values()).rstrip()

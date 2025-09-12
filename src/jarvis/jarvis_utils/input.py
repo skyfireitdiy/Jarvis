@@ -11,7 +11,7 @@
 import os
 import sys
 import base64
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 import wcwidth
 
 from colorama import Fore
@@ -308,7 +308,7 @@ class FileCompleter(Completer):
                 import os as _os
 
                 if self._all_files_cache is None:
-                    files: list[str] = []
+                    files: List[str] = []
                     for root, dirs, fnames in _os.walk(".", followlinks=False):
                         # Exclude .git directory
                         dirs[:] = [d for d in dirs if d != ".git"]
@@ -429,7 +429,7 @@ def _show_history_and_copy():
 
 
 def _get_multiline_input_internal(
-    tip: str, preset: str | None = None, preset_cursor: int | None = None
+    tip: str, preset: Optional[str] = None, preset_cursor: Optional[int] = None
 ) -> str:
     """
     Internal function to get multiline input using prompt_toolkit.
@@ -660,8 +660,8 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
         tip: 提示文本，将显示在底部工具栏中
         print_on_empty: 当输入为空字符串时，是否打印“输入已取消”提示。默认打印。
     """
-    preset: str | None = None
-    preset_cursor: int | None = None
+    preset: Optional[str] = None
+    preset_cursor: Optional[int] = None
     while True:
         user_input = _get_multiline_input_internal(
             tip, preset=preset, preset_cursor=preset_cursor
