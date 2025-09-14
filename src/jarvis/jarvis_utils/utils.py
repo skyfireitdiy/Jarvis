@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from datetime import datetime, date
 
 import yaml  # type: ignore
@@ -97,6 +97,98 @@ def is_rag_installed() -> bool:
     return len(get_missing_rag_modules()) == 0
 
 
+def is_editable_install() -> bool:
+    """
+    检测当前 Jarvis 是否以可编辑模式安装（pip/uv install -e .）。
+
+    判断顺序：
+    1. 读取 PEP 610 的 direct_url.json（dir_info.editable）
+    2. 兼容旧式 .egg-link 安装
+    3. 启发式回退：源码路径上游存在 .git 且不在 site-packages/dist-packages
+    """
+    # 优先使用 importlib.metadata 读取 distribution 的 direct_url.json
+    try:
+        import importlib.metadata as metadata  # Python 3.8+
+    except Exception:
+        metadata = None  # type: ignore
+
+    def _check_direct_url() -> Optional[bool]:
+        if metadata is None:
+            return None
+        candidates = ["jarvis-ai-assistant", "jarvis_ai_assistant"]
+        for name in candidates:
+            try:
+                dist = metadata.distribution(name)
+            except Exception:
+                continue
+            try:
+                files = dist.files or []
+                for f in files:
+                    try:
+                        if f.name == "direct_url.json":
+                            p = Path(str(dist.locate_file(f)))
+                            if p.exists():
+                                with open(p, "r", encoding="utf-8", errors="ignore") as fp:
+                                    info = json.load(fp)
+                                dir_info = info.get("dir_info") or {}
+                                if isinstance(dir_info, dict) and bool(dir_info.get("editable")):
+                                    return True
+                                # 兼容部分工具可能写入顶层 editable 字段
+                                if bool(info.get("editable")):
+                                    return True
+                                return False  # 找到了 direct_url.json 但未标记 editable
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+        return None
+
+    res = _check_direct_url()
+    if res is True:
+        return True
+    if res is False:
+        # 明确不是可编辑安装
+        return False
+
+    # 兼容旧式 .egg-link 可编辑安装
+    try:
+        module_path = Path(__file__).resolve()
+        pkg_root = module_path.parent.parent  # jarvis 包根目录
+        for entry in sys.path:
+            try:
+                p = Path(entry)
+                if not p.exists() or not p.is_dir():
+                    continue
+                for egg in p.glob("*.egg-link"):
+                    try:
+                        text = egg.read_text(encoding="utf-8", errors="ignore")
+                        first_line = (text.strip().splitlines() or [""])[0]
+                        if not first_line:
+                            continue
+                        src_path = Path(first_line).resolve()
+                        # 当前包根目录在 egg-link 指向的源码路径下，视为可编辑安装
+                        if str(pkg_root).startswith(str(src_path)):
+                            return True
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    # 启发式回退：源码仓库路径
+    try:
+        parents = list(Path(__file__).resolve().parents)
+        has_git = any((d / ".git").exists() for d in parents)
+        in_site = any(("site-packages" in str(d)) or ("dist-packages" in str(d)) for d in parents)
+        if has_git and not in_site:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
 def _setup_signal_handler() -> None:
     """设置SIGINT信号处理函数"""
     original_sigint = signal.getsignal(signal.SIGINT)
@@ -124,7 +216,7 @@ def _check_pip_updates() -> bool:
     from packaging import version
 
     # 检查上次检查日期
-    last_check_file = Path(get_data_dir()) / "last_pip_check"
+    last_check_file = Path(str(get_data_dir())) / "last_pip_check"
     today_str = date.today().strftime("%Y-%m-%d")
 
     if last_check_file.exists():
@@ -867,7 +959,6 @@ def load_config():
         _load_and_process_config(str(config_file_path.parent), str(config_file_path))
 
 
-from typing import Tuple
 
 
 def _load_config_file(config_file: str) -> Tuple[str, dict]:
@@ -1235,11 +1326,7 @@ def _collect_optional_config_interactively(
                 "            适用于您希望绕过检查并自行管理仓库状态的场景。"
             )
 
-            try:
-                # 查找当前模式在选项中的索引
-                default_index = choices.index(current_mode)
-            except ValueError:
-                default_index = 0  # 默认为第一个选项
+
 
             new_mode = get_choice(
                 tip,
@@ -1848,7 +1935,7 @@ def daily_check_git_updates(repo_dirs: List[str], repo_type: str):
         repo_dirs (List[str]): 需要检查的git仓库目录列表。
         repo_type (str): 仓库的类型名称，例如 "工具" 或 "方法论"，用于日志输出。
     """
-    data_dir = Path(get_data_dir())
+    data_dir = Path(str(get_data_dir()))
     last_check_file = data_dir / f"{repo_type}_updates_last_check.txt"
     should_check_for_updates = True
 
