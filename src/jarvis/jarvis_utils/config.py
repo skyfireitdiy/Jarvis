@@ -285,7 +285,7 @@ def get_pretty_output() -> bool:
     if platform.system() == "Windows":
         return False
 
-    return GLOBAL_CONFIG_DATA.get("JARVIS_PRETTY_OUTPUT", False)
+    return GLOBAL_CONFIG_DATA.get("JARVIS_PRETTY_OUTPUT", True)
 
 
 def is_use_methodology() -> bool:
@@ -423,9 +423,9 @@ def is_force_save_memory() -> bool:
     获取是否强制保存记忆。
 
     返回：
-        bool: 如果强制保存记忆则返回True，默认为True
+        bool: 如果强制保存记忆则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_FORCE_SAVE_MEMORY", True) is True
+    return GLOBAL_CONFIG_DATA.get("JARVIS_FORCE_SAVE_MEMORY", False) is True
 
 
 def is_enable_static_analysis() -> bool:
