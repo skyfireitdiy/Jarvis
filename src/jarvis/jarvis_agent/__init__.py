@@ -870,6 +870,7 @@ class Agent:
     {complete_prompt}
     如果没有完成，请进行下一步操作：
     - 仅包含一个操作
+    - 不要询问用户是否继续，直接继续执行直至完成
     - 如果信息不明确，请请求用户补充
     - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
     - 操作列表：{action_handlers}{memory_prompts}
