@@ -417,25 +417,32 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                     hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
                 )
 
-                is_uv_env = False
-                if in_venv:
-                    # 检查是否在uv创建的虚拟环境内
-                    if sys.platform == "win32":
-                        uv_path = os.path.join(sys.prefix, "Scripts", "uv.exe")
-                    else:
-                        uv_path = os.path.join(sys.prefix, "bin", "uv")
-                    if os.path.exists(uv_path):
-                        is_uv_env = True
+                # 检测 uv 可用性：优先虚拟环境内的 uv，其次 PATH 中的 uv
+                from shutil import which as _which
+                uv_executable = None
+                if sys.platform == "win32":
+                    venv_uv = os.path.join(sys.prefix, "Scripts", "uv.exe")
+                else:
+                    venv_uv = os.path.join(sys.prefix, "bin", "uv")
+                if os.path.exists(venv_uv):
+                    uv_executable = venv_uv
+                else:
+                    path_uv = _which("uv")
+                    if path_uv:
+                        uv_executable = path_uv
 
                 # 根据环境选择安装命令
                 # 检测是否安装了 RAG 特性（更精确）
                 rag_installed = is_rag_installed()
 
-                # 根据环境和 RAG 特性选择安装命令
-                if rag_installed:
-                    if is_uv_env:
-                        install_cmd = ["uv", "pip", "install", "-e", ".[rag]"]
+                # 根据 uv 可用性与 RAG 特性选择安装命令（优先使用 uv）
+                if uv_executable:
+                    if rag_installed:
+                        install_cmd = [uv_executable, "pip", "install", "-e", ".[rag]"]
                     else:
+                        install_cmd = [uv_executable, "pip", "install", "-e", "."]
+                else:
+                    if rag_installed:
                         install_cmd = [
                             sys.executable,
                             "-m",
@@ -444,9 +451,6 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                             "-e",
                             ".[rag]",
                         ]
-                else:
-                    if is_uv_env:
-                        install_cmd = ["uv", "pip", "install", "-e", "."]
                     else:
                         install_cmd = [
                             sys.executable,
