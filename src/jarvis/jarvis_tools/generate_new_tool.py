@@ -173,9 +173,20 @@ class generate_new_tool:
                         __import__(pkg)
                     except ImportError:
 
-                        import subprocess
+                        import subprocess, sys, os
+                        from shutil import which as _which
+                        # 优先使用 uv 安装（先查 venv 内 uv，再查 PATH 中 uv），否则回退到 python -m pip
+                        if sys.platform == "win32":
+                            venv_uv = os.path.join(sys.prefix, "Scripts", "uv.exe")
+                        else:
+                            venv_uv = os.path.join(sys.prefix, "bin", "uv")
+                        uv_executable = venv_uv if os.path.exists(venv_uv) else (_which("uv") or None)
+                        if uv_executable:
+                            install_cmd = [uv_executable, "pip", "install", pkg]
+                        else:
+                            install_cmd = [sys.executable, "-m", "pip", "install", pkg]
+                        subprocess.run(install_cmd, check=True)
 
-                        subprocess.run(["pip", "install", pkg], check=True)
 
             except Exception as e:
                 PrettyOutput.print(f"依赖检查/安装失败: {str(e)}", OutputType.WARNING)

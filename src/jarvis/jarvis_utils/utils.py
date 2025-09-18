@@ -252,17 +252,19 @@ def _check_pip_updates() -> bool:
                 hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
             )
 
-            # 检测是否使用uv
-            is_uv_env = False
+            # 检测是否可用 uv（优先使用虚拟环境内的uv，其次PATH中的uv）
+            from shutil import which as _which
             uv_executable: Optional[str] = None
-            if in_venv:
-                if sys.platform == "win32":
-                    uv_path = Path(sys.prefix) / "Scripts" / "uv.exe"
-                else:
-                    uv_path = Path(sys.prefix) / "bin" / "uv"
-                if uv_path.exists():
-                    is_uv_env = True
-                    uv_executable = str(uv_path)
+            if sys.platform == "win32":
+                venv_uv = Path(sys.prefix) / "Scripts" / "uv.exe"
+            else:
+                venv_uv = Path(sys.prefix) / "bin" / "uv"
+            if venv_uv.exists():
+                uv_executable = str(venv_uv)
+            else:
+                path_uv = _which("uv")
+                if path_uv:
+                    uv_executable = path_uv
 
             # 检测是否安装了 RAG 特性（更精确）
             from jarvis.jarvis_utils.utils import (
@@ -274,7 +276,7 @@ def _check_pip_updates() -> bool:
             package_spec = (
                 "jarvis-ai-assistant[rag]" if rag_installed else "jarvis-ai-assistant"
             )
-            if is_uv_env and uv_executable:
+            if uv_executable:
                 cmd_list = [uv_executable, "pip", "install", "--upgrade", package_spec]
                 update_cmd = f"uv pip install --upgrade {package_spec}"
             else:
