@@ -247,6 +247,14 @@
       },
       "default": []
     },
+    "JARVIS_AFTER_TOOL_CALL_CB_DIRS": {
+      "type": "array",
+      "description": "工具调用后回调函数实现目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "JARVIS_CENTRAL_METHODOLOGY_REPO": {
       "type": "string",
       "description": "中心方法论Git仓库地址，该仓库会自动添加到方法论加载路径中",

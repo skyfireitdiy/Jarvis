@@ -378,6 +378,20 @@ def get_roles_dirs() -> List[str]:
     ]
 
 
+def get_after_tool_call_cb_dirs() -> List[str]:
+    """
+    获取工具调用后回调函数实现目录。
+
+    返回:
+        List[str]: 工具调用后回调函数实现目录列表
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("JARVIS_AFTER_TOOL_CALL_CB_DIRS", [])
+        if p
+    ]
+
+
 def get_central_methodology_repo() -> str:
     """
     获取中心方法论Git仓库地址。
