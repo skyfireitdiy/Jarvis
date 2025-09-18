@@ -4,6 +4,7 @@ import datetime
 import os
 import platform
 import re
+import sys
 from pathlib import Path
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
@@ -68,6 +69,7 @@ from jarvis.jarvis_utils.config import (
     is_use_analysis,
     is_use_methodology,
     get_tool_filter_threshold,
+    get_after_tool_call_cb_dirs,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
@@ -310,7 +312,8 @@ class Agent:
         self.first = True
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
-        self.after_tool_call_cb: Optional[Callable[[Agent], None]] = None
+        # 支持多个工具调用后的回调函数
+        self.after_tool_call_cb: List[Callable[[Any], None]] = []
 
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
         self.user_confirm: Callable[[str, bool], bool] = (
@@ -361,6 +364,8 @@ class Agent:
             self.get_tool_registry(),  # type: ignore
             platform_name=self.model.platform_name(),  # type: ignore
         )
+        # 动态加载工具调用后回调
+        self._load_after_tool_callbacks()
 
     def _init_model(self, model_group: Optional[str]):
         """初始化模型平台（统一使用 normal 平台/模型）"""
@@ -502,13 +507,97 @@ class Agent:
             # Fallback for custom handlers that only accept one argument
             return self.multiline_inputer(tip)  # type: ignore
 
-    def set_after_tool_call_cb(self, cb: Callable[[Any], None]):  # type: ignore
-        """设置工具调用后回调函数。
+    def set_after_tool_call_cb(self, cb: Callable[[Any], None]) -> None:  # type: ignore
+        """添加一个工具调用后回调函数（支持多个）。
 
         参数:
-            cb: 回调函数
+            cb: 回调函数，签名为 (agent: Agent) -> None
         """
-        self.after_tool_call_cb = cb
+        # 避免重复添加相同回调
+        if cb not in self.after_tool_call_cb:
+            self.after_tool_call_cb.append(cb)
+
+    def _load_after_tool_callbacks(self) -> None:
+        """
+        扫描 JARVIS_AFTER_TOOL_CALL_CB_DIRS 中的 Python 文件并动态注册回调。
+        约定优先级（任一命中即注册）：
+        - 模块级可调用对象: after_tool_call_cb
+        - 工厂方法返回单个或多个可调用对象: get_after_tool_call_cb(), register_after_tool_call_cb()
+        """
+        try:
+            dirs = get_after_tool_call_cb_dirs()
+            if not dirs:
+                return
+            for d in dirs:
+                p_dir = Path(d)
+                if not p_dir.exists() or not p_dir.is_dir():
+                    continue
+                for file_path in p_dir.glob("*.py"):
+                    if file_path.name == "__init__.py":
+                        continue
+                    parent_dir = str(file_path.parent)
+                    added_path = False
+                    try:
+                        if parent_dir not in sys.path:
+                            sys.path.insert(0, parent_dir)
+                            added_path = True
+                        module_name = file_path.stem
+                        module = __import__(module_name)
+
+                        candidates: List[Callable[[Any], None]] = []
+
+                        # 1) 直接导出的回调
+                        if hasattr(module, "after_tool_call_cb"):
+                            obj = getattr(module, "after_tool_call_cb")
+                            if callable(obj):
+                                candidates.append(obj)  # type: ignore[arg-type]
+
+                        # 2) 工厂方法：get_after_tool_call_cb()
+                        if hasattr(module, "get_after_tool_call_cb"):
+                            factory = getattr(module, "get_after_tool_call_cb")
+                            if callable(factory):
+                                try:
+                                    ret = factory()
+                                    if callable(ret):
+                                        candidates.append(ret)
+                                    elif isinstance(ret, (list, tuple)):
+                                        for c in ret:
+                                            if callable(c):
+                                                candidates.append(c)
+                                except Exception:
+                                    pass
+
+                        # 3) 工厂方法：register_after_tool_call_cb()
+                        if hasattr(module, "register_after_tool_call_cb"):
+                            factory2 = getattr(module, "register_after_tool_call_cb")
+                            if callable(factory2):
+                                try:
+                                    ret2 = factory2()
+                                    if callable(ret2):
+                                        candidates.append(ret2)
+                                    elif isinstance(ret2, (list, tuple)):
+                                        for c in ret2:
+                                            if callable(c):
+                                                candidates.append(c)
+                                except Exception:
+                                    pass
+
+                        for cb in candidates:
+                            try:
+                                self.set_after_tool_call_cb(cb)
+                            except Exception:
+                                pass
+
+                    except Exception as e:
+                        PrettyOutput.print(f"从 {file_path} 加载回调失败: {e}", OutputType.WARNING)
+                    finally:
+                        if added_path:
+                            try:
+                                sys.path.remove(parent_dir)
+                            except ValueError:
+                                pass
+        except Exception as e:
+            PrettyOutput.print(f"加载回调目录时发生错误: {e}", OutputType.WARNING)
 
     def save_session(self) -> bool:
         """Saves the current session state by delegating to the session manager."""
