@@ -12,6 +12,7 @@ from typing import List, Optional, Tuple
 import typer
 
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
@@ -94,7 +95,7 @@ class CodeAgent:
             use_analysis=False,  # 禁用分析
         )
 
-        self.agent.set_after_tool_call_cb(self.after_tool_call_cb)
+        self.agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
     def _get_system_prompt(self) -> str:
         """获取代码工程师的系统提示词"""
@@ -598,7 +599,7 @@ class CodeAgent:
         except RuntimeError as e:
             return f"Error during execution: {str(e)}"
 
-    def after_tool_call_cb(self, agent: Agent) -> None:
+    def _on_after_tool_call(self, agent: Agent, current_response=None, need_return=None, tool_prompt=None, **kwargs) -> None:
         """工具调用后回调函数。"""
         final_ret = ""
         diff = get_diff()

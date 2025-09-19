@@ -49,6 +49,7 @@ from jarvis.jarvis_agent.events import (
     INTERRUPT_TRIGGERED,
     BEFORE_TOOL_FILTER,
     TOOL_FILTERED,
+    AFTER_TOOL_CALL,
 )
 from jarvis.jarvis_agent.user_interaction import UserInteractionHandler
 from jarvis.jarvis_agent.utils import join_prompts
@@ -312,8 +313,7 @@ class Agent:
         self.first = True
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
-        # 支持多个工具调用后的回调函数
-        self.after_tool_call_cb: List[Callable[[Any], None]] = []
+
 
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
         self.user_confirm: Callable[[str, bool], bool] = (
@@ -507,16 +507,6 @@ class Agent:
             # Fallback for custom handlers that only accept one argument
             return self.multiline_inputer(tip)  # type: ignore
 
-    def set_after_tool_call_cb(self, cb: Callable[[Any], None]) -> None:  # type: ignore
-        """添加一个工具调用后回调函数（支持多个）。
-
-        参数:
-            cb: 回调函数，签名为 (agent: Agent) -> None
-        """
-        # 避免重复添加相同回调
-        if cb not in self.after_tool_call_cb:
-            self.after_tool_call_cb.append(cb)
-
     def _load_after_tool_callbacks(self) -> None:
         """
         扫描 JARVIS_AFTER_TOOL_CALL_CB_DIRS 中的 Python 文件并动态注册回调。
@@ -584,7 +574,15 @@ class Agent:
 
                         for cb in candidates:
                             try:
-                                self.set_after_tool_call_cb(cb)
+                                def _make_wrapper(callback):
+                                    def _wrapper(**kwargs: Any) -> None:
+                                        try:
+                                            agent = kwargs.get("agent")
+                                            callback(agent)
+                                        except Exception:
+                                            pass
+                                    return _wrapper
+                                self.event_bus.subscribe(AFTER_TOOL_CALL, _make_wrapper(cb))
                             except Exception:
                                 pass
 

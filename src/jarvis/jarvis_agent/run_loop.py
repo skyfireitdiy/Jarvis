@@ -78,10 +78,7 @@ class AgentRunLoop:
                 if need_return:
                     return ag.session.prompt
 
-                # 执行回调（支持多个）
-                if ag.after_tool_call_cb:
-                    for cb in ag.after_tool_call_cb:
-                        cb(ag)
+
                 # 广播工具调用后的事件（不影响主流程）
                 try:
                     ag.event_bus.emit(
