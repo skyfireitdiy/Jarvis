@@ -161,9 +161,9 @@ system_prompt: |
   ## 输出要求
   - 输出到markdown文件中
 
-need_summary: true
-use_methodology: true
-use_analysis: true
+need_summary: false
+use_methodology: false
+use_analysis: false
 use_tools:
   - read_code
   - ask_user
@@ -173,4 +173,4 @@ use_tools:
   - rewrite_file
   - edit_file
 auto_complete: false
-force_save_memory: true
+force_save_memory: false
