@@ -160,6 +160,7 @@ system_prompt: |
 
   ## 输出要求
   - 输出到markdown文件中
+  - 不同的功能可以拆分到不同的文件中
 
 need_summary: false
 use_methodology: false
