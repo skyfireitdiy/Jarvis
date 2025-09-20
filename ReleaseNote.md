@@ -1,3 +1,30 @@
+### Release Note - v0.3.30 2025-09-20
+
+#### **新功能 (Features)**  
+- 新增工具调用后回调扩展（after_tool_call_cb），支持动态加载多个回调函数
+- 支持通过配置文件指定回调目录（JARVIS_AFTER_TOOL_CALL_CB_DIRS），自动扫描并注册回调
+- 新增回调注册约定：模块级可调用对象、工厂函数get_after_tool_call_cb()和register_after_tool_call_cb()
+- 新增事件总线集成，回调在AFTER_TOOL_CALL事件广播前后依次触发
+- 新增配置项JARVIS_AFTER_TOOL_CALL_CB_DIRS，支持~和环境变量展开
+
+#### **优化与重构 (Refactors & Improvements)**  
+- 重构Agent初始化逻辑，支持动态加载工具调用后回调
+- 优化代码代理工具执行记录机制，使用事件总线替代直接回调
+- 优化依赖安装逻辑，优先使用虚拟环境内的uv，其次PATH中的uv
+- 优化更新检测逻辑，优先检测虚拟环境内的uv可用性
+- 优化git仓库更新逻辑，增强uv环境检测准确性
+
+#### **文档更新 (Documentation)**  
+- 更新高级主题文档，新增工具调用后回调扩展详细说明
+- 更新配置文件附录，新增JARVIS_AFTER_TOOL_CALL_CB_DIRS配置项说明
+
+#### **其他 (Miscellaneous)**  
+- 修复generate_new_tool工具中依赖安装命令，支持uv和pip双路径
+- 修复git_utils中uv环境检测逻辑，优先检测虚拟环境内的uv
+- 修复utils.py中uv可用性检测，增强uv路径识别准确性
+
+本次更新主要增强了工具调用后的扩展能力，支持动态加载回调函数，同时优化了uv环境检测和依赖安装逻辑，提升了系统的灵活性和稳定性。
+
 ### Release Note - v0.3.29 2025-09-17
 
 #### **新功能 (Features)**  
