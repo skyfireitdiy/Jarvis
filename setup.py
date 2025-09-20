@@ -3,7 +3,7 @@ from setuptools import setup, find_packages  # type: ignore
 
 setup(
     name="jarvis-ai-assistant",
-    version="0.3.29",
+    version="0.3.30",
     author="skyfire",
     author_email="skyfireitdiy@hotmail.com",
     description="An AI assistant that uses various tools to interact with the system",
