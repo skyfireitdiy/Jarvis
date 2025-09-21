@@ -44,6 +44,7 @@ arguments:
 ### 1. 每次只使用一个工具
 - 一次只执行一个工具
 - 等待结果后再进行下一步
+- {ot("TOOL_CALL")} 必须出现在行首
 </rule>
 
 <rule>
@@ -101,6 +102,7 @@ arguments:
 - 创建虚构对话
 - 在没有所需信息的情况下继续
 - yaml 格式错误
+- {ot("TOOL_CALL")} 没有出现在行首
 </common_errors>
 </tool_system_guide>
 """
