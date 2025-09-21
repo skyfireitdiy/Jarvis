@@ -10,7 +10,7 @@ from jarvis.jarvis_utils.tag import ct, ot
 class EditFileHandler(OutputHandler):
     def __init__(self):
         self.patch_pattern = re.compile(
-            ot("PATCH file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))") + r"\s*"
+            r"^" + ot("PATCH file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))") + r"\s*"
             r"(?:"
             + ot("DIFF")
             + r"\s*"
@@ -24,8 +24,8 @@ class EditFileHandler(OutputHandler):
             + r"\s*"
             + ct("DIFF")
             + r"\s*)+"
-            + ct("PATCH"),
-            re.DOTALL,
+            + r"^" + ct("PATCH"),
+            re.DOTALL | re.MULTILINE,
         )
         self.diff_pattern = re.compile(
             ot("DIFF")
@@ -103,6 +103,9 @@ class EditFileHandler(OutputHandler):
 {ot("REPLACE")}新代码{ct("REPLACE")}
 {ct("DIFF")}
 {ct("PATCH")}
+
+注意：
+- {ot("PATCH")} 和 {ct("PATCH")} 必须出现在行首，否则不生效（会被忽略）
 
 可以返回多个PATCH块用于同时修改多个文件
 每个PATCH块可以包含多个DIFF块，每个DIFF块包含一组搜索和替换内容。
