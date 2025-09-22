@@ -115,4 +115,6 @@ use_tools:
   - search_web
   - rewrite_file
   - ask_user
+  - read_code
+  - execute_script
 force_save_memory: false
