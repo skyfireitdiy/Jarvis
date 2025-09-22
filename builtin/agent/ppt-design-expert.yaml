@@ -84,6 +84,7 @@ need_summary: false
 use_tools:
   - ask_user
   - search_web
+  - execute_script
   - read_code
 force_save_memory: false
 use_analysis: false
