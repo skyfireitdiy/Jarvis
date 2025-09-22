@@ -1142,11 +1142,17 @@ def _collect_optional_config_interactively(
     )
 
     # 新增的配置项交互（通用体验相关）
+    # 根据平台统一默认值：Windows下为False，其它平台为True（与config.get_pretty_output一致）
+    try:
+        import platform as _platform_mod
+        _default_pretty = False if _platform_mod.system() == "Windows" else True
+    except Exception:
+        _default_pretty = True
     changed = (
         _ask_and_set(
             "JARVIS_PRETTY_OUTPUT",
             "是否启用更美观的终端输出（Pretty Output）？",
-            False,
+            _default_pretty,
             "bool",
         )
         or changed
@@ -1200,7 +1206,7 @@ def _collect_optional_config_interactively(
         _ask_and_set(
             "JARVIS_FORCE_SAVE_MEMORY",
             "是否强制保存会话记忆？",
-            True,
+            False,
             "bool",
         )
         or changed

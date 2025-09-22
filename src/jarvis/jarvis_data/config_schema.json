@@ -7,6 +7,7 @@
     "JARVIS_MCP": {
       "type": "array",
       "description": "MCP工具配置列表",
+      "default": [],
       "items": {
         "type": "object",
         "oneOf": [
@@ -182,6 +183,11 @@
       "description": "执行工具前是否需要确认",
       "default": false
     },
+    "JARVIS_TOOL_FILTER_THRESHOLD": {
+      "type": "number",
+      "description": "AI工具筛选阈值：当可用工具数量超过此值时触发AI筛选",
+      "default": 30
+    },
     "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
       "type": "boolean",
       "description": "应用补丁前是否需要确认",
@@ -195,7 +201,7 @@
     "JARVIS_PRETTY_OUTPUT": {
       "type": "boolean",
       "description": "是否启用美化输出",
-      "default": false
+      "default": true
     },
     "JARVIS_USE_METHODOLOGY": {
       "type": "boolean",
@@ -270,6 +276,11 @@
       "description": "是否打印提示",
       "default": false
     },
+    "JARVIS_PRINT_ERROR_TRACEBACK": {
+      "type": "boolean",
+      "description": "是否在错误输出时打印回溯调用链",
+      "default": false
+    },
     "JARVIS_ENABLE_STATIC_ANALYSIS": {
       "type": "boolean",
       "description": "是否启用静态代码分析",
@@ -278,7 +289,7 @@
     "JARVIS_FORCE_SAVE_MEMORY": {
       "type": "boolean",
       "description": "是否强制保存记忆",
-      "default": true
+      "default": false
     },
     "JARVIS_ENABLE_GIT_JCA_SWITCH": {
       "type": "boolean",
@@ -341,7 +352,23 @@
     "JARVIS_RAG_GROUPS": {
       "type": "array",
       "description": "预定义的RAG配置组",
-      "default": [],
+      "default": [
+        {
+          "text": {
+            "embedding_model": "BAAI/bge-m3",
+            "rerank_model": "BAAI/bge-reranker-v2-m3",
+            "use_bm25": true,
+            "use_rerank": true
+          }
+        },
+        {
+          "code": {
+            "embedding_model": "Qodo/Qodo-Embed-1-1.5B",
+            "use_bm25": false,
+            "use_rerank": false
+          }
+        }
+      ],
       "items": {
         "type": "object",
         "additionalProperties": {
@@ -421,7 +448,8 @@
         "required": [
           "template"
         ]
-      }
+      },
+      "default": {}
     },
     "OPENAI_API_KEY": {
       "type": "string",
