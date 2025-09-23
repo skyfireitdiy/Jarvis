@@ -27,15 +27,23 @@ class FileSearchReplaceTool:
 
 ## 基本使用
 1. 指定需要修改的文件路径（单个或多个）
-2. 提供一组或多组修改，每个修改包含:
-   - reason: 修改原因描述
-   - SEARCH: 需要查找的原始代码(必须包含足够上下文)
-   - REPLACE: 替换后的新代码
+2. 提供一组或多组修改，每个修改支持两种格式:
+   - 单点替换：
+     - reason: 修改原因描述
+     - SEARCH: 需要查找的原始代码(必须包含足够上下文)
+     - REPLACE: 替换后的新代码
+   - 区间替换：
+     - reason: 修改原因描述
+     - SEARCH_START: 起始标记（包含在替换范围内）
+     - SEARCH_END: 结束标记（包含在替换范围内）
+     - REPLACE: 替换后的新代码
 
 ## 核心原则
 1. **精准修改**: 只修改必要的代码部分，保持其他部分不变
 2. **最小补丁原则**: 生成最小范围的补丁，包含必要的上下文
-3. **唯一匹配**: 确保搜索文本在文件中唯一匹配
+3. **唯一匹配**:
+   - 单点替换：确保 SEARCH 在文件中唯一匹配
+   - 区间替换：确保 SEARCH_START 在文件中唯一匹配，且在其后 SEARCH_END 也唯一匹配
 4. **格式保持**: 严格保持原始代码的格式风格
 5. **部分成功**: 支持多个文件编辑，允许部分文件编辑成功
 
@@ -62,7 +70,15 @@ class FileSearchReplaceTool:
                                     },
                                     "SEARCH": {
                                         "type": "string",
-                                        "description": "需要查找的原始代码",
+                                        "description": "需要查找的原始代码（单点替换模式）",
+                                    },
+                                    "SEARCH_START": {
+                                        "type": "string",
+                                        "description": "区间替换的起始标记（包含在替换范围内）",
+                                    },
+                                    "SEARCH_END": {
+                                        "type": "string",
+                                        "description": "区间替换的结束标记（包含在替换范围内）",
                                     },
                                     "REPLACE": {
                                         "type": "string",
@@ -93,10 +109,16 @@ class FileSearchReplaceTool:
             args: 包含以下键的字典:
                 - files: 文件列表，每个文件包含(必填):
                     - path: 要修改的文件路径
-                    - changes: 修改列表，每个修改包含:
-                        - reason: 修改原因描述
-                        - SEARCH: 需要查找的原始代码(必须包含足够上下文)
-                        - REPLACE: 替换后的新代码
+                    - changes: 修改列表，每个修改支持两种格式:
+                        1) 单点替换：
+                            - reason: 修改原因描述
+                            - SEARCH: 需要查找的原始代码(必须包含足够上下文)
+                            - REPLACE: 替换后的新代码
+                        2) 区间替换：
+                            - reason: 修改原因描述
+                            - SEARCH_START: 起始标记（包含在替换范围内）
+                            - SEARCH_END: 结束标记（包含在替换范围内）
+                            - REPLACE: 替换后的新代码
 
         返回:
             Dict[str, Any] 包含:
