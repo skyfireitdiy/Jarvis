@@ -603,10 +603,92 @@ class CodeAgent:
         """工具调用后回调函数。"""
         final_ret = ""
         diff = get_diff()
+
+        # 构造按文件的状态映射与差异文本，删除文件不展示diff，仅提示删除
+        def _build_name_status_map() -> dict:
+            status_map = {}
+            try:
+                head_exists = bool(get_latest_commit_hash())
+                # 临时 -N 以包含未跟踪文件的差异检测
+                subprocess.run(["git", "add", "-N", "."], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                cmd = ["git", "diff", "--name-status"] + (["HEAD"] if head_exists else [])
+                res = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    check=False,
+                )
+            finally:
+                subprocess.run(["git", "reset"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            if res.returncode == 0 and res.stdout:
+                for line in res.stdout.splitlines():
+                    if not line.strip():
+                        continue
+                    parts = line.split("\t")
+                    if not parts:
+                        continue
+                    status = parts[0]
+                    if status.startswith("R") or status.startswith("C"):
+                        # 重命名/复制：使用新路径作为键
+                        if len(parts) >= 3:
+                            old_path, new_path = parts[1], parts[2]
+                            status_map[new_path] = status
+                            # 也记录旧路径，便于匹配 name-only 的结果
+                            status_map[old_path] = status
+                        elif len(parts) >= 2:
+                            status_map[parts[-1]] = status
+                    else:
+                        if len(parts) >= 2:
+                            status_map[parts[1]] = status
+            return status_map
+
+        def _get_file_diff(file_path: str) -> str:
+            """获取单文件的diff，包含新增文件内容；失败时返回空字符串"""
+            head_exists = bool(get_latest_commit_hash())
+            try:
+                # 为了让未跟踪文件也能展示diff，临时 -N 该文件
+                subprocess.run(["git", "add", "-N", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                cmd = ["git", "diff"] + (["HEAD"] if head_exists else []) + ["--", file_path]
+                res = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    check=False,
+                )
+                if res.returncode == 0:
+                    return res.stdout or ""
+                return ""
+            finally:
+                subprocess.run(["git", "reset", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        def _build_per_file_patch_preview(modified_files: List[str]) -> str:
+            status_map = _build_name_status_map()
+            lines: List[str] = []
+            for f in modified_files:
+                status = status_map.get(f, "")
+                # 删除文件：不展示diff，仅提示
+                if (status.startswith("D")) or (not os.path.exists(f)):
+                    lines.append(f"- {f} 文件被删除")
+                    continue
+                # 其它情况：展示该文件的diff
+                file_diff = _get_file_diff(f)
+                if file_diff.strip():
+                    lines.append(f"文件: {f}\n```diff\n{file_diff}\n```")
+                else:
+                    # 当无法获取到diff（例如重命名或特殊状态），避免空输出
+                    lines.append(f"- {f} 变更已记录（无可展示的文本差异）")
+            return "\n".join(lines)
+
         if diff:
             start_hash = get_latest_commit_hash()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             modified_files = get_diff_file_list()
+            per_file_preview = _build_per_file_patch_preview(modified_files)
             commited = handle_commit_workflow()
             if commited:
                 # 统计代码行数变化
@@ -630,15 +712,14 @@ class CodeAgent:
 
                 StatsManager.increment("code_modifications", group="code_agent")
 
-
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()
                 commits = get_commits_between(start_hash, end_hash)
 
-                # 添加提交信息到final_ret
+                # 添加提交信息到final_ret（按文件展示diff；删除文件仅提示）
                 if commits:
                     final_ret += (
-                        f"\n\n代码已修改完成\n补丁内容:\n```diff\n{diff}\n```\n"
+                        f"\n\n代码已修改完成\n补丁内容（按文件）:\n{per_file_preview}\n"
                     )
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
@@ -665,7 +746,7 @@ class CodeAgent:
                     final_ret += "\n\n修改没有生效\n"
             else:
                 final_ret += "\n修改被拒绝\n"
-                final_ret += f"# 补丁预览:\n```diff\n{diff}\n```"
+                final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
         else:
             return
         # 用户确认最终结果
