@@ -1736,9 +1736,22 @@ def get_file_md5(filepath: str) -> str:
         filepath: 要计算哈希的文件路径
 
     返回:
-        str: 文件内容的MD5哈希值
+        str: 文件内容的MD5哈希值（为降低内存占用，仅读取前100MB进行计算）
     """
-    return hashlib.md5(open(filepath, "rb").read(100 * 1024 * 1024)).hexdigest()
+    # 采用流式读取，避免一次性加载100MB到内存
+    h = hashlib.md5()
+    max_bytes = 100 * 1024 * 1024  # 与原实现保持一致：仅读取前100MB
+    buf_size = 8 * 1024 * 1024     # 8MB缓冲
+    read_bytes = 0
+    with open(filepath, "rb") as f:
+        while read_bytes < max_bytes:
+            to_read = min(buf_size, max_bytes - read_bytes)
+            chunk = f.read(to_read)
+            if not chunk:
+                break
+            h.update(chunk)
+            read_bytes += len(chunk)
+    return h.hexdigest()
 
 
 def get_file_line_count(filename: str) -> int:
@@ -1751,7 +1764,9 @@ def get_file_line_count(filename: str) -> int:
         int: 文件中的行数，如果文件无法读取则返回0
     """
     try:
-        return len(open(filename, "r", encoding="utf-8", errors="ignore").readlines())
+        # 使用流式逐行计数，避免将整个文件读入内存
+        with open(filename, "r", encoding="utf-8", errors="ignore") as f:
+            return sum(1 for _ in f)
     except Exception:
         return 0
 

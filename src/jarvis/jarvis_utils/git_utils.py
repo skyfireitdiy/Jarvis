@@ -34,7 +34,13 @@ def find_git_root_and_cd(start_dir: str = ".") -> str:
     """
     os.chdir(start_dir)
     try:
-        git_root = os.popen("git rev-parse --show-toplevel").read().strip()
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        git_root = result.stdout.strip()
         if not git_root:
             subprocess.run(["git", "init"], check=True)
             git_root = os.path.abspath(".")
@@ -291,7 +297,13 @@ def get_modified_line_ranges() -> Dict[str, List[Tuple[int, int]]]:
         行号从1开始。
     """
     # 获取所有文件的Git差异
-    diff_output = os.popen("git show").read()
+    # 仅用于解析修改行范围，减少上下文以降低输出体积和解析成本
+    result = subprocess.run(
+        ["git", "show", "-U0", "--no-color"],
+        capture_output=True,
+        text=True,
+    )
+    diff_output = result.stdout
 
     # 解析差异以获取修改的文件及其行范围
     result: Dict[str, List[Tuple[int, int]]] = {}

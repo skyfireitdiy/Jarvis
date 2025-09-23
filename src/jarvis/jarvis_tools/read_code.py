@@ -62,10 +62,9 @@ class ReadCodeTool:
                 }
 
             # 读取文件内容
+            # 第一遍流式读取，仅统计总行数，避免一次性读入内存
             with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-                lines = f.readlines()
-
-            total_lines = len(lines)
+                total_lines = sum(1 for _ in f)
 
             # 处理空文件情况
             if total_lines == 0:
@@ -99,14 +98,16 @@ class ReadCodeTool:
                     "stderr": f"无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})",
                 }
 
-            # 添加行号并构建输出内容
-            selected_lines = lines[start_line - 1 : end_line]
-            numbered_content = "".join(
-                [
-                    f"{i:4d}:{line}"
-                    for i, line in enumerate(selected_lines, start=start_line)
-                ]
-            )
+            # 添加行号并构建输出内容（第二遍流式读取，仅提取范围行）
+            selected_items = []
+            with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                for i, line in enumerate(f, start=1):
+                    if i < start_line:
+                        continue
+                    if i > end_line:
+                        break
+                    selected_items.append((i, line))
+            numbered_content = "".join(f"{i:4d}:{line}" for i, line in selected_items)
 
             # 构建输出格式
             output = (
