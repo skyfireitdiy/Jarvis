@@ -13,7 +13,7 @@ class EditFileHandler(OutputHandler):
             r"^" + ot("PATCH file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))") + r"\s*"
             r"(?:"
             + ot("DIFF")
-            + r"\s*"
+            + r"\s*(?:"
             + ot("SEARCH")
             + r"(.*?)"
             + ct("SEARCH")
@@ -21,7 +21,19 @@ class EditFileHandler(OutputHandler):
             + ot("REPLACE")
             + r"(.*?)"
             + ct("REPLACE")
+            + r"|"
+            + ot("SEARCH_START")
+            + r"(.*?)"
+            + ct("SEARCH_START")
             + r"\s*"
+            + ot("SEARCH_END")
+            + r"(.*?)"
+            + ct("SEARCH_END")
+            + r"\s*"
+            + ot("REPLACE")
+            + r"(.*?)"
+            + ct("REPLACE")
+            + r")\s*"
             + ct("DIFF")
             + r"\s*)+"
             + r"^" + ct("PATCH"),
@@ -33,6 +45,24 @@ class EditFileHandler(OutputHandler):
             + ot("SEARCH")
             + r"(.*?)"
             + ct("SEARCH")
+            + r"\s*"
+            + ot("REPLACE")
+            + r"(.*?)"
+            + ct("REPLACE")
+            + r"\s*"
+            + ct("DIFF"),
+            re.DOTALL,
+        )
+        self.diff_range_pattern = re.compile(
+            ot("DIFF")
+            + r"\s*"
+            + ot("SEARCH_START")
+            + r"(.*?)"
+            + ct("SEARCH_START")
+            + r"\s*"
+            + ot("SEARCH_END")
+            + r"(.*?)"
+            + ct("SEARCH_END")
             + r"\s*"
             + ot("REPLACE")
             + r"(.*?)"
@@ -65,9 +95,7 @@ class EditFileHandler(OutputHandler):
 
         for file_path, diffs in patches.items():
             file_path = os.path.abspath(file_path)
-            file_patches = [
-                {"SEARCH": diff["SEARCH"], "REPLACE": diff["REPLACE"]} for diff in diffs
-            ]
+            file_patches = diffs
 
             success, result = self._fast_edit(file_path, file_patches)
 
@@ -102,14 +130,23 @@ class EditFileHandler(OutputHandler):
 {ot("SEARCH")}原始代码{ct("SEARCH")}
 {ot("REPLACE")}新代码{ct("REPLACE")}
 {ct("DIFF")}
+或
+{ot("DIFF")}
+{ot("SEARCH_START")}起始标记{ct("SEARCH_START")}
+{ot("SEARCH_END")}结束标记{ct("SEARCH_END")}
+{ot("REPLACE")}替换内容{ct("REPLACE")}
+{ct("DIFF")}
 {ct("PATCH")}
 
 注意：
 - {ot("PATCH")} 和 {ct("PATCH")} 必须出现在行首，否则不生效（会被忽略）
+- 支持两种DIFF块：单点替换（SEARCH/REPLACE）与区间替换（SEARCH_START/SEARCH_END/REPLACE）
 
 可以返回多个PATCH块用于同时修改多个文件
 每个PATCH块可以包含多个DIFF块，每个DIFF块包含一组搜索和替换内容。
-搜索文本必须能在文件中唯一匹配，否则编辑将失败。"""
+- 单点替换要求 SEARCH 在文件中唯一匹配
+- 区间替换要求 SEARCH_START 在文件中唯一匹配，且在其后的 SEARCH_END 也唯一匹配
+否则编辑将失败。"""
 
     def name(self) -> str:
         """获取处理器的名称
@@ -145,15 +182,59 @@ class EditFileHandler(OutputHandler):
         for match in self.patch_pattern.finditer(response):
             # Get the file path from the appropriate capture group
             file_path = match.group(1) or match.group(2) or match.group(3)
-            diffs = []
-            for diff_match in self.diff_pattern.finditer(match.group(0)):
-                # 完全保留原始格式（包括所有空白和换行）
-                diffs.append(
-                    {
-                        "SEARCH": diff_match.group(1),  # 原始SEARCH内容
-                        "REPLACE": diff_match.group(2),  # 原始REPLACE内容
-                    }
+            diffs: List[Dict[str, str]] = []
+
+            # 逐块解析，保持 DIFF 顺序
+            diff_block_pattern = re.compile(ot("DIFF") + r"(.*?)" + ct("DIFF"), re.DOTALL)
+            for block_match in diff_block_pattern.finditer(match.group(0)):
+                block_text = block_match.group(1)
+
+                # 优先解析区间替换
+                range_match = re.search(
+                    ot("SEARCH_START")
+                    + r"(.*?)"
+                    + ct("SEARCH_START")
+                    + r"\s*"
+                    + ot("SEARCH_END")
+                    + r"(.*?)"
+                    + ct("SEARCH_END")
+                    + r"\s*"
+                    + ot("REPLACE")
+                    + r"(.*?)"
+                    + ct("REPLACE"),
+                    block_text,
+                    re.DOTALL,
                 )
+                if range_match:
+                    diffs.append(
+                        {
+                            "SEARCH_START": range_match.group(1),  # 原始SEARCH_START内容
+                            "SEARCH_END": range_match.group(2),  # 原始SEARCH_END内容
+                            "REPLACE": range_match.group(3),  # 原始REPLACE内容
+                        }
+                    )
+                    continue
+
+                # 解析单点替换
+                single_match = re.search(
+                    ot("SEARCH")
+                    + r"(.*?)"
+                    + ct("SEARCH")
+                    + r"\s*"
+                    + ot("REPLACE")
+                    + r"(.*?)"
+                    + ct("REPLACE"),
+                    block_text,
+                    re.DOTALL,
+                )
+                if single_match:
+                    diffs.append(
+                        {
+                            "SEARCH": single_match.group(1),  # 原始SEARCH内容
+                            "REPLACE": single_match.group(2),  # 原始REPLACE内容
+                        }
+                    )
+
             if diffs:
                 if file_path in patches:
                     patches[file_path].extend(diffs)
@@ -199,83 +280,120 @@ class EditFileHandler(OutputHandler):
 
             for patch in patches:
                 patch_count += 1
-                search_text = patch["SEARCH"]
-                replace_text = patch["REPLACE"]
-
-                # 精确匹配搜索文本（保留原始换行和空格）
-                exact_search = search_text
                 found = False
 
-                if exact_search in modified_content:
-                    # 直接执行替换（保留所有原始格式），只替换第一个匹配
-                    modified_content = modified_content.replace(
-                        exact_search, replace_text, 1
-                    )
+                # 单点替换
+                if "SEARCH" in patch:
+                    search_text = patch["SEARCH"]
+                    replace_text = patch["REPLACE"]
 
-                    found = True
-                else:
-                    # 如果匹配不到，并且search与replace块的首尾都是换行，尝试去掉第一个和最后一个换行
-                    if (
-                        search_text.startswith("\n")
-                        and search_text.endswith("\n")
-                        and replace_text.startswith("\n")
-                        and replace_text.endswith("\n")
-                    ):
-                        stripped_search = search_text[1:-1]
-                        stripped_replace = replace_text[1:-1]
-                        if stripped_search in modified_content:
-                            modified_content = modified_content.replace(
-                                stripped_search, stripped_replace, 1
+                    # 精确匹配搜索文本（保留原始换行和空格）
+                    exact_search = search_text
+
+                    if exact_search in modified_content:
+                        # 直接执行替换（保留所有原始格式），只替换第一个匹配
+                        modified_content = modified_content.replace(
+                            exact_search, replace_text, 1
+                        )
+                        found = True
+                    else:
+                        # 如果匹配不到，并且search与replace块的首尾都是换行，尝试去掉第一个和最后一个换行
+                        if (
+                            search_text.startswith("\n")
+                            and search_text.endswith("\n")
+                            and replace_text.startswith("\n")
+                            and replace_text.endswith("\n")
+                        ):
+                            stripped_search = search_text[1:-1]
+                            stripped_replace = replace_text[1:-1]
+                            if stripped_search in modified_content:
+                                modified_content = modified_content.replace(
+                                    stripped_search, stripped_replace, 1
+                                )
+                                found = True
+
+                        if not found:
+                            # 尝试增加缩进重试
+                            current_search = search_text
+                            current_replace = replace_text
+                            if (
+                                current_search.startswith("\n")
+                                and current_search.endswith("\n")
+                                and current_replace.startswith("\n")
+                                and current_replace.endswith("\n")
+                            ):
+                                current_search = current_search[1:-1]
+                                current_replace = current_replace[1:-1]
+
+                            for space_count in range(1, 17):
+                                indented_search = "\n".join(
+                                    " " * space_count + line if line.strip() else line
+                                    for line in current_search.split("\n")
+                                )
+                                indented_replace = "\n".join(
+                                    " " * space_count + line if line.strip() else line
+                                    for line in current_replace.split("\n")
+                                )
+                                if indented_search in modified_content:
+                                    modified_content = modified_content.replace(
+                                        indented_search, indented_replace, 1
+                                    )
+                                    found = True
+                                    break
+
+                # 区间替换
+                elif "SEARCH_START" in patch and "SEARCH_END" in patch:
+                    search_start = patch["SEARCH_START"]
+                    search_end = patch["SEARCH_END"]
+                    replace_text = patch["REPLACE"]
+
+                    # 唯一性校验与范围替换（包含边界）
+                    start_count = modified_content.count(search_start)
+                    if start_count != 1:
+                        error_msg = "SEARCH_START需在文件中唯一匹配"
+                        failed_patches.append({"patch": patch, "error": error_msg})
+                    else:
+                        start_idx = modified_content.find(search_start)
+                        after = modified_content[start_idx + len(search_start) :]
+                        end_count_after = after.count(search_end)
+                        if end_count_after != 1:
+                            error_msg = "SEARCH_END在SEARCH_START之后需唯一匹配或未找到"
+                            failed_patches.append({"patch": patch, "error": error_msg})
+                        else:
+                            end_rel = after.find(search_end)
+                            end_idx = start_idx + len(search_start) + end_rel
+                            modified_content = (
+                                modified_content[:start_idx]
+                                + replace_text
+                                + modified_content[end_idx + len(search_end) :]
                             )
-
                             found = True
 
-                    if not found:
-                        # 尝试增加缩进重试
-                        current_search = search_text
-                        current_replace = replace_text
-                        if (
-                            current_search.startswith("\n")
-                            and current_search.endswith("\n")
-                            and current_replace.startswith("\n")
-                            and current_replace.endswith("\n")
-                        ):
-                            current_search = current_search[1:-1]
-                            current_replace = current_replace[1:-1]
-
-                        for space_count in range(1, 17):
-                            indented_search = "\n".join(
-                                " " * space_count + line if line.strip() else line
-                                for line in current_search.split("\n")
-                            )
-                            indented_replace = "\n".join(
-                                " " * space_count + line if line.strip() else line
-                                for line in current_replace.split("\n")
-                            )
-                            if indented_search in modified_content:
-                                modified_content = modified_content.replace(
-                                    indented_search, indented_replace, 1
-                                )
-
-                                found = True
-                                break
+                else:
+                    error_msg = "不支持的补丁格式"
+                    failed_patches.append({"patch": patch, "error": error_msg})
 
                 if found:
                     successful_patches += 1
-                else:
-                    error_msg = "搜索文本在文件中不存在"
-
-                    failed_patches.append({"patch": patch, "error": error_msg})
 
             # 写入修改后的内容
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(modified_content)
 
             if failed_patches:
-                error_details = [
-                    f"  - 失败的补丁: \n{p['patch']['SEARCH']}\n    错误: {p['error']}"
-                    for p in failed_patches
-                ]
+                error_details = []
+                for p in failed_patches:
+                    patch = p["patch"]
+                    if "SEARCH" in patch:
+                        patch_desc = patch["SEARCH"]
+                    else:
+                        patch_desc = (
+                            "SEARCH_START:\n"
+                            + (patch.get("SEARCH_START", ""))
+                            + "\nSEARCH_END:\n"
+                            + (patch.get("SEARCH_END", ""))
+                        )
+                    error_details.append(f"  - 失败的补丁: \n{patch_desc}\n    错误: {p['error']}")
                 if successful_patches == 0:
                     summary = (
                         f"文件 {file_path} 修改失败（全部失败）。\n"
