@@ -217,20 +217,15 @@ class EditFileHandler(OutputHandler):
 
                 # 提取可选的行号范围
                 range_scope = None
-                range_scope_match = re.search(
-                    ot("RANGE") + r"(.*?)" + ct("RANGE"), block_text, re.DOTALL
+                range_scope_match = re.match(
+                    r"^\s*" + ot("RANGE") + r"(.*?)" + ct("RANGE") + r"\s*",
+                    block_text,
+                    re.DOTALL,
                 )
                 if range_scope_match:
                     range_scope = range_scope_match.group(1).strip()
-                    # 去掉RANGE块，便于后续解析
-                    block_text = re.sub(
-                        ot("RANGE") + r".*?" + ct("RANGE"),
-                        "",
-                        block_text,
-                        flags=re.DOTALL,
-                    )
-
-                # 优先解析区间替换
+                    # 仅移除块首部的RANGE标签，避免误删内容中的同名标记
+                    block_text = block_text[range_scope_match.end():]# 优先解析区间替换
                 if patch_format in ["all", "search_range"]:
                     range_match = re.search(
                         ot("SEARCH_START")
@@ -337,8 +332,6 @@ class EditFileHandler(OutputHandler):
                         error_msg = "RANGE格式无效，应为 'start-end' 的行号范围（1-based, 闭区间）"
                         failed_patches.append({"patch": patch, "error": error_msg})
                         # 不进行本补丁其它处理
-                        if found:
-                            successful_patches += 1
                         continue
                     start_line = int(m.group(1))
                     end_line = int(m.group(2))
@@ -354,8 +347,6 @@ class EditFileHandler(OutputHandler):
                     ):
                         error_msg = f"RANGE行号无效（文件共有{total_lines}行）"
                         failed_patches.append({"patch": patch, "error": error_msg})
-                        if found:
-                            successful_patches += 1
                         continue
                     # 截断end_line不超过总行数
                     end_line = min(end_line, total_lines)
@@ -373,12 +364,23 @@ class EditFileHandler(OutputHandler):
                     # 精确匹配搜索文本（保留原始换行和空格）
                     exact_search = search_text
 
-                    if exact_search in base_content:
-                        # 直接执行替换（保留所有原始格式），只替换第一个匹配
+                    def _count_occurrences(haystack: str, needle: str) -> int:
+                        if not needle:
+                            return 0
+                        return haystack.count(needle)
+
+                    # 1) 精确匹配，要求唯一
+                    cnt = _count_occurrences(base_content, exact_search)
+                    if cnt == 1:
                         base_content = base_content.replace(exact_search, replace_text, 1)
                         found = True
+                    elif cnt > 1:
+                        error_msg = "SEARCH 在指定范围内出现多次，要求唯一匹配"
+                        failed_patches.append({"patch": patch, "error": error_msg})
+                        # 不继续尝试其它变体
+                        continue
                     else:
-                        # 如果匹配不到，并且search与replace块的首尾都是换行，尝试去掉第一个和最后一个换行
+                        # 2) 若首尾均为换行，尝试去掉首尾换行后匹配，要求唯一
                         if (
                             search_text.startswith("\n")
                             and search_text.endswith("\n")
@@ -387,14 +389,19 @@ class EditFileHandler(OutputHandler):
                         ):
                             stripped_search = search_text[1:-1]
                             stripped_replace = replace_text[1:-1]
-                            if stripped_search in base_content:
+                            cnt2 = _count_occurrences(base_content, stripped_search)
+                            if cnt2 == 1:
                                 base_content = base_content.replace(
                                     stripped_search, stripped_replace, 1
                                 )
                                 found = True
+                            elif cnt2 > 1:
+                                error_msg = "SEARCH 在指定范围内出现多次（去掉首尾换行后），要求唯一匹配"
+                                failed_patches.append({"patch": patch, "error": error_msg})
+                                continue
 
+                        # 3) 尝试缩进适配（1..16个空格），要求唯一
                         if not found:
-                            # 尝试增加缩进重试
                             current_search = search_text
                             current_replace = replace_text
                             if (
@@ -415,12 +422,23 @@ class EditFileHandler(OutputHandler):
                                     " " * space_count + line if line.strip() else line
                                     for line in current_replace.split("\n")
                                 )
-                                if indented_search in base_content:
+                                cnt3 = _count_occurrences(base_content, indented_search)
+                                if cnt3 == 1:
                                     base_content = base_content.replace(
                                         indented_search, indented_replace, 1
                                     )
                                     found = True
                                     break
+                                elif cnt3 > 1:
+                                    error_msg = "SEARCH 在指定范围内出现多次（缩进适配后），要求唯一匹配"
+                                    failed_patches.append({"patch": patch, "error": error_msg})
+                                    # 多匹配直接失败，不再继续尝试其它缩进
+                                    found = False
+                                    break
+
+                        if not found:
+                            # 未找到任何可用的唯一匹配
+                            failed_patches.append({"patch": patch, "error": "未找到唯一匹配的SEARCH"})
 
                 # 区间替换
                 elif "SEARCH_START" in patch and "SEARCH_END" in patch:
