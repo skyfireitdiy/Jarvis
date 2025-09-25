@@ -124,23 +124,39 @@ class EditFileHandler(OutputHandler):
         Returns:
             str: 返回处理器的提示字符串
         """
-        return f"""文件编辑指令格式：
-{ot("PATCH file=文件路径")}
-{ot("DIFF")}
+        from jarvis.jarvis_utils.config import get_patch_format
+
+        patch_format = get_patch_format()
+
+        search_prompt = f"""{ot("DIFF")}
 {ot("SEARCH")}原始代码{ct("SEARCH")}
 {ot("REPLACE")}新代码{ct("REPLACE")}
-{ct("DIFF")}
-或
-{ot("DIFF")}
+{ct("DIFF")}"""
+
+        search_range_prompt = f"""{ot("DIFF")}
 {ot("SEARCH_START")}起始标记{ct("SEARCH_START")}
 {ot("SEARCH_END")}结束标记{ct("SEARCH_END")}
 {ot("REPLACE")}替换内容{ct("REPLACE")}
-{ct("DIFF")}
+{ct("DIFF")}"""
+
+        if patch_format == "search":
+            formats = search_prompt
+            supported_formats = "仅支持单点替换（SEARCH/REPLACE）"
+        elif patch_format == "search_range":
+            formats = search_range_prompt
+            supported_formats = "仅支持区间替换（SEARCH_START/SEARCH_END/REPLACE）"
+        else:  # all
+            formats = f"{search_prompt}\n或\n{search_range_prompt}"
+            supported_formats = "支持两种DIFF块：单点替换（SEARCH/REPLACE）与区间替换（SEARCH_START/SEARCH_END/REPLACE）"
+
+        return f"""文件编辑指令格式：
+{ot("PATCH file=文件路径")}
+{formats}
 {ct("PATCH")}
 
 注意：
 - {ot("PATCH")} 和 {ct("PATCH")} 必须出现在行首，否则不生效（会被忽略）
-- 支持两种DIFF块：单点替换（SEARCH/REPLACE）与区间替换（SEARCH_START/SEARCH_END/REPLACE）
+- {supported_formats}
 
 可以返回多个PATCH块用于同时修改多个文件
 每个PATCH块可以包含多个DIFF块，每个DIFF块包含一组搜索和替换内容。
@@ -178,7 +194,11 @@ class EditFileHandler(OutputHandler):
                     "文件路径2": [...]
                 }
         """
+        from jarvis.jarvis_utils.config import get_patch_format
+
+        patch_format = get_patch_format()
         patches: Dict[str, List[Dict[str, str]]] = {}
+
         for match in self.patch_pattern.finditer(response):
             # Get the file path from the appropriate capture group
             file_path = match.group(1) or match.group(2) or match.group(3)
@@ -190,50 +210,52 @@ class EditFileHandler(OutputHandler):
                 block_text = block_match.group(1)
 
                 # 优先解析区间替换
-                range_match = re.search(
-                    ot("SEARCH_START")
-                    + r"(.*?)"
-                    + ct("SEARCH_START")
-                    + r"\s*"
-                    + ot("SEARCH_END")
-                    + r"(.*?)"
-                    + ct("SEARCH_END")
-                    + r"\s*"
-                    + ot("REPLACE")
-                    + r"(.*?)"
-                    + ct("REPLACE"),
-                    block_text,
-                    re.DOTALL,
-                )
-                if range_match:
-                    diffs.append(
-                        {
-                            "SEARCH_START": range_match.group(1),  # 原始SEARCH_START内容
-                            "SEARCH_END": range_match.group(2),  # 原始SEARCH_END内容
-                            "REPLACE": range_match.group(3),  # 原始REPLACE内容
-                        }
+                if patch_format in ["all", "search_range"]:
+                    range_match = re.search(
+                        ot("SEARCH_START")
+                        + r"(.*?)"
+                        + ct("SEARCH_START")
+                        + r"\s*"
+                        + ot("SEARCH_END")
+                        + r"(.*?)"
+                        + ct("SEARCH_END")
+                        + r"\s*"
+                        + ot("REPLACE")
+                        + r"(.*?)"
+                        + ct("REPLACE"),
+                        block_text,
+                        re.DOTALL,
                     )
-                    continue
+                    if range_match:
+                        diffs.append(
+                            {
+                                "SEARCH_START": range_match.group(1),  # 原始SEARCH_START内容
+                                "SEARCH_END": range_match.group(2),  # 原始SEARCH_END内容
+                                "REPLACE": range_match.group(3),  # 原始REPLACE内容
+                            }
+                        )
+                        continue
 
                 # 解析单点替换
-                single_match = re.search(
-                    ot("SEARCH")
-                    + r"(.*?)"
-                    + ct("SEARCH")
-                    + r"\s*"
-                    + ot("REPLACE")
-                    + r"(.*?)"
-                    + ct("REPLACE"),
-                    block_text,
-                    re.DOTALL,
-                )
-                if single_match:
-                    diffs.append(
-                        {
-                            "SEARCH": single_match.group(1),  # 原始SEARCH内容
-                            "REPLACE": single_match.group(2),  # 原始REPLACE内容
-                        }
+                if patch_format in ["all", "search"]:
+                    single_match = re.search(
+                        ot("SEARCH")
+                        + r"(.*?)"
+                        + ct("SEARCH")
+                        + r"\s*"
+                        + ot("REPLACE")
+                        + r"(.*?)"
+                        + ct("REPLACE"),
+                        block_text,
+                        re.DOTALL,
                     )
+                    if single_match:
+                        diffs.append(
+                            {
+                                "SEARCH": single_match.group(1),  # 原始SEARCH内容
+                                "REPLACE": single_match.group(2),  # 原始REPLACE内容
+                            }
+                        )
 
             if diffs:
                 if file_path in patches:
