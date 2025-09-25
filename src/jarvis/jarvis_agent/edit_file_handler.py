@@ -200,9 +200,6 @@ class EditFileHandler(OutputHandler):
                     "文件路径2": [...]
                 }
         """
-        from jarvis.jarvis_utils.config import get_patch_format
-
-        patch_format = get_patch_format()
         patches: Dict[str, List[Dict[str, str]]] = {}
 
         for match in self.patch_pattern.finditer(response):
@@ -226,54 +223,53 @@ class EditFileHandler(OutputHandler):
                     range_scope = range_scope_match.group(1).strip()
                     # 仅移除块首部的RANGE标签，避免误删内容中的同名标记
                     block_text = block_text[range_scope_match.end():]# 优先解析区间替换
-                if patch_format in ["all", "search_range"]:
-                    range_match = re.search(
-                        ot("SEARCH_START")
-                        + r"(.*?)"
-                        + ct("SEARCH_START")
-                        + r"\s*"
-                        + ot("SEARCH_END")
-                        + r"(.*?)"
-                        + ct("SEARCH_END")
-                        + r"\s*"
-                        + ot("REPLACE")
-                        + r"(.*?)"
-                        + ct("REPLACE"),
-                        block_text,
-                        re.DOTALL,
-                    )
-                    if range_match:
-                        diff_item: Dict[str, str] = {
-                            "SEARCH_START": range_match.group(1),  # 原始SEARCH_START内容
-                            "SEARCH_END": range_match.group(2),  # 原始SEARCH_END内容
-                            "REPLACE": range_match.group(3),  # 原始REPLACE内容
-                        }
-                        if range_scope:
-                            diff_item["RANGE"] = range_scope
-                        diffs.append(diff_item)
-                        continue
+                # 统一按 all 解析：无视配置，始终尝试区间替换
+                range_match = re.search(
+                    ot("SEARCH_START")
+                    + r"(.*?)"
+                    + ct("SEARCH_START")
+                    + r"\s*"
+                    + ot("SEARCH_END")
+                    + r"(.*?)"
+                    + ct("SEARCH_END")
+                    + r"\s*"
+                    + ot("REPLACE")
+                    + r"(.*?)"
+                    + ct("REPLACE"),
+                    block_text,
+                    re.DOTALL,
+                )
+                if range_match:
+                    diff_item: Dict[str, str] = {
+                        "SEARCH_START": range_match.group(1),  # 原始SEARCH_START内容
+                        "SEARCH_END": range_match.group(2),  # 原始SEARCH_END内容
+                        "REPLACE": range_match.group(3),  # 原始REPLACE内容
+                    }
+                    if range_scope:
+                        diff_item["RANGE"] = range_scope
+                    diffs.append(diff_item)
+                    continue
 
-                # 解析单点替换
-                if patch_format in ["all", "search"]:
-                    single_match = re.search(
-                        ot("SEARCH")
-                        + r"(.*?)"
-                        + ct("SEARCH")
-                        + r"\s*"
-                        + ot("REPLACE")
-                        + r"(.*?)"
-                        + ct("REPLACE"),
-                        block_text,
-                        re.DOTALL,
-                    )
-                    if single_match:
-                        diff_item = {
-                            "SEARCH": single_match.group(1),  # 原始SEARCH内容
-                            "REPLACE": single_match.group(2),  # 原始REPLACE内容
-                        }
-                        if range_scope:
-                            diff_item["RANGE"] = range_scope
-                        diffs.append(diff_item)
+                # 解析单点替换（统一按 all 解析：无视配置，始终尝试单点替换）
+                single_match = re.search(
+                    ot("SEARCH")
+                    + r"(.*?)"
+                    + ct("SEARCH")
+                    + r"\s*"
+                    + ot("REPLACE")
+                    + r"(.*?)"
+                    + ct("REPLACE"),
+                    block_text,
+                    re.DOTALL,
+                )
+                if single_match:
+                    diff_item = {
+                        "SEARCH": single_match.group(1),  # 原始SEARCH内容
+                        "REPLACE": single_match.group(2),  # 原始REPLACE内容
+                    }
+                    if range_scope:
+                        diff_item["RANGE"] = range_scope
+                    diffs.append(diff_item)
 
             if diffs:
                 if file_path in patches:
