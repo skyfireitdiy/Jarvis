@@ -14,6 +14,10 @@ class EditFileHandler(OutputHandler):
             r"(?:"
             + ot("DIFF")
             + r"\s*(?:"
+            # 可选的RANGE标签，限制替换行号范围
+            + r"(?:" + ot("RANGE") + r"(.*?)" + ct("RANGE") + r"\s*)?"
+            + r"(?:"
+            # 单点替换（SEARCH/REPLACE）
             + ot("SEARCH")
             + r"(.*?)"
             + ct("SEARCH")
@@ -22,6 +26,7 @@ class EditFileHandler(OutputHandler):
             + r"(.*?)"
             + ct("REPLACE")
             + r"|"
+            # 区间替换（SEARCH_START/SEARCH_END/REPLACE）
             + ot("SEARCH_START")
             + r"(.*?)"
             + ct("SEARCH_START")
@@ -33,6 +38,7 @@ class EditFileHandler(OutputHandler):
             + ot("REPLACE")
             + r"(.*?)"
             + ct("REPLACE")
+            + r")"
             + r")\s*"
             + ct("DIFF")
             + r"\s*)+"
@@ -41,7 +47,7 @@ class EditFileHandler(OutputHandler):
         )
         self.diff_pattern = re.compile(
             ot("DIFF")
-            + r"\s*"
+            + r"\s*(?:" + ot("RANGE") + r"(.*?)" + ct("RANGE") + r"\s*)?"
             + ot("SEARCH")
             + r"(.*?)"
             + ct("SEARCH")
@@ -55,7 +61,7 @@ class EditFileHandler(OutputHandler):
         )
         self.diff_range_pattern = re.compile(
             ot("DIFF")
-            + r"\s*"
+            + r"\s*(?:" + ot("RANGE") + r"(.*?)" + ct("RANGE") + r"\s*)?"
             + ot("SEARCH_START")
             + r"(.*?)"
             + ct("SEARCH_START")
@@ -129,11 +135,13 @@ class EditFileHandler(OutputHandler):
         patch_format = get_patch_format()
 
         search_prompt = f"""{ot("DIFF")}
+{ot("RANGE")}起止行号(如: 10-50)，可选{ct("RANGE")}
 {ot("SEARCH")}原始代码{ct("SEARCH")}
 {ot("REPLACE")}新代码{ct("REPLACE")}
 {ct("DIFF")}"""
 
         search_range_prompt = f"""{ot("DIFF")}
+{ot("RANGE")}起止行号(如: 10-50)，可选{ct("RANGE")}
 {ot("SEARCH_START")}起始标记{ct("SEARCH_START")}
 {ot("SEARCH_END")}结束标记{ct("SEARCH_END")}
 {ot("REPLACE")}替换内容{ct("REPLACE")}
@@ -141,13 +149,13 @@ class EditFileHandler(OutputHandler):
 
         if patch_format == "search":
             formats = search_prompt
-            supported_formats = "仅支持单点替换（SEARCH/REPLACE）"
+            supported_formats = "仅支持单点替换（SEARCH/REPLACE），可选RANGE限定行号范围"
         elif patch_format == "search_range":
             formats = search_range_prompt
-            supported_formats = "仅支持区间替换（SEARCH_START/SEARCH_END/REPLACE）"
+            supported_formats = "仅支持区间替换（SEARCH_START/SEARCH_END/REPLACE），可选RANGE限定行号范围"
         else:  # all
             formats = f"{search_prompt}\n或\n{search_range_prompt}"
-            supported_formats = "支持两种DIFF块：单点替换（SEARCH/REPLACE）与区间替换（SEARCH_START/SEARCH_END/REPLACE）"
+            supported_formats = "支持两种DIFF块：单点替换（SEARCH/REPLACE）与区间替换（SEARCH_START/SEARCH_END/REPLACE），均可选RANGE限定行号范围"
 
         return f"""文件编辑指令格式：
 {ot("PATCH file=文件路径")}
@@ -157,11 +165,9 @@ class EditFileHandler(OutputHandler):
 注意：
 - {ot("PATCH")} 和 {ct("PATCH")} 必须出现在行首，否则不生效（会被忽略）
 - {supported_formats}
-
-可以返回多个PATCH块用于同时修改多个文件
-每个PATCH块可以包含多个DIFF块，每个DIFF块包含一组搜索和替换内容。
-- 单点替换要求 SEARCH 在文件中唯一匹配
-- 区间替换要求 SEARCH_START 在文件中唯一匹配，且在其后的 SEARCH_END 也唯一匹配
+- 可选 {ot("RANGE")}start-end{ct("RANGE")} 表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
+- 单点替换要求 SEARCH 在有效范围内唯一匹配（仅替换第一个匹配）
+- 区间替换命中有效范围内的第一个 {ot("SEARCH_START")} 及其后的第一个 {ot("SEARCH_END")}
 否则编辑将失败。"""
 
     def name(self) -> str:
@@ -209,6 +215,21 @@ class EditFileHandler(OutputHandler):
             for block_match in diff_block_pattern.finditer(match.group(0)):
                 block_text = block_match.group(1)
 
+                # 提取可选的行号范围
+                range_scope = None
+                range_scope_match = re.search(
+                    ot("RANGE") + r"(.*?)" + ct("RANGE"), block_text, re.DOTALL
+                )
+                if range_scope_match:
+                    range_scope = range_scope_match.group(1).strip()
+                    # 去掉RANGE块，便于后续解析
+                    block_text = re.sub(
+                        ot("RANGE") + r".*?" + ct("RANGE"),
+                        "",
+                        block_text,
+                        flags=re.DOTALL,
+                    )
+
                 # 优先解析区间替换
                 if patch_format in ["all", "search_range"]:
                     range_match = re.search(
@@ -227,13 +248,14 @@ class EditFileHandler(OutputHandler):
                         re.DOTALL,
                     )
                     if range_match:
-                        diffs.append(
-                            {
-                                "SEARCH_START": range_match.group(1),  # 原始SEARCH_START内容
-                                "SEARCH_END": range_match.group(2),  # 原始SEARCH_END内容
-                                "REPLACE": range_match.group(3),  # 原始REPLACE内容
-                            }
-                        )
+                        diff_item: Dict[str, str] = {
+                            "SEARCH_START": range_match.group(1),  # 原始SEARCH_START内容
+                            "SEARCH_END": range_match.group(2),  # 原始SEARCH_END内容
+                            "REPLACE": range_match.group(3),  # 原始REPLACE内容
+                        }
+                        if range_scope:
+                            diff_item["RANGE"] = range_scope
+                        diffs.append(diff_item)
                         continue
 
                 # 解析单点替换
@@ -250,12 +272,13 @@ class EditFileHandler(OutputHandler):
                         re.DOTALL,
                     )
                     if single_match:
-                        diffs.append(
-                            {
-                                "SEARCH": single_match.group(1),  # 原始SEARCH内容
-                                "REPLACE": single_match.group(2),  # 原始REPLACE内容
-                            }
-                        )
+                        diff_item = {
+                            "SEARCH": single_match.group(1),  # 原始SEARCH内容
+                            "REPLACE": single_match.group(2),  # 原始REPLACE内容
+                        }
+                        if range_scope:
+                            diff_item["RANGE"] = range_scope
+                        diffs.append(diff_item)
 
             if diffs:
                 if file_path in patches:
@@ -304,6 +327,44 @@ class EditFileHandler(OutputHandler):
                 patch_count += 1
                 found = False
 
+                # 处理可选的RANGE范围：格式 "start-end"（1-based, 闭区间）
+                scoped = False
+                prefix = suffix = ""
+                base_content = modified_content
+                if "RANGE" in patch and str(patch["RANGE"]).strip():
+                    m = re.match(r"\s*(\d+)\s*-\s*(\d+)\s*$", str(patch["RANGE"]))
+                    if not m:
+                        error_msg = "RANGE格式无效，应为 'start-end' 的行号范围（1-based, 闭区间）"
+                        failed_patches.append({"patch": patch, "error": error_msg})
+                        # 不进行本补丁其它处理
+                        if found:
+                            successful_patches += 1
+                        continue
+                    start_line = int(m.group(1))
+                    end_line = int(m.group(2))
+
+                    # 拆分为三段
+                    lines = modified_content.splitlines(keepends=True)
+                    total_lines = len(lines)
+                    if (
+                        start_line < 1
+                        or end_line < 1
+                        or start_line > end_line
+                        or start_line > total_lines
+                    ):
+                        error_msg = f"RANGE行号无效（文件共有{total_lines}行）"
+                        failed_patches.append({"patch": patch, "error": error_msg})
+                        if found:
+                            successful_patches += 1
+                        continue
+                    # 截断end_line不超过总行数
+                    end_line = min(end_line, total_lines)
+
+                    prefix = "".join(lines[: start_line - 1])
+                    base_content = "".join(lines[start_line - 1 : end_line])
+                    suffix = "".join(lines[end_line:])
+                    scoped = True
+
                 # 单点替换
                 if "SEARCH" in patch:
                     search_text = patch["SEARCH"]
@@ -312,11 +373,9 @@ class EditFileHandler(OutputHandler):
                     # 精确匹配搜索文本（保留原始换行和空格）
                     exact_search = search_text
 
-                    if exact_search in modified_content:
+                    if exact_search in base_content:
                         # 直接执行替换（保留所有原始格式），只替换第一个匹配
-                        modified_content = modified_content.replace(
-                            exact_search, replace_text, 1
-                        )
+                        base_content = base_content.replace(exact_search, replace_text, 1)
                         found = True
                     else:
                         # 如果匹配不到，并且search与replace块的首尾都是换行，尝试去掉第一个和最后一个换行
@@ -328,8 +387,8 @@ class EditFileHandler(OutputHandler):
                         ):
                             stripped_search = search_text[1:-1]
                             stripped_replace = replace_text[1:-1]
-                            if stripped_search in modified_content:
-                                modified_content = modified_content.replace(
+                            if stripped_search in base_content:
+                                base_content = base_content.replace(
                                     stripped_search, stripped_replace, 1
                                 )
                                 found = True
@@ -356,8 +415,8 @@ class EditFileHandler(OutputHandler):
                                     " " * space_count + line if line.strip() else line
                                     for line in current_replace.split("\n")
                                 )
-                                if indented_search in modified_content:
-                                    modified_content = modified_content.replace(
+                                if indented_search in base_content:
+                                    base_content = base_content.replace(
                                         indented_search, indented_replace, 1
                                     )
                                     found = True
@@ -369,21 +428,21 @@ class EditFileHandler(OutputHandler):
                     search_end = patch["SEARCH_END"]
                     replace_text = patch["REPLACE"]
 
-                    # 范围替换（包含边界），不再校验唯一性，命中第一个起始标记及其后的第一个结束标记
-                    start_idx = modified_content.find(search_start)
+                    # 范围替换（包含边界），命中第一个起始标记及其后的第一个结束标记
+                    start_idx = base_content.find(search_start)
                     if start_idx == -1:
                         error_msg = "未找到SEARCH_START"
                         failed_patches.append({"patch": patch, "error": error_msg})
                     else:
-                        end_idx = modified_content.find(search_end, start_idx + len(search_start))
+                        end_idx = base_content.find(search_end, start_idx + len(search_start))
                         if end_idx == -1:
                             error_msg = "在SEARCH_START之后未找到SEARCH_END"
                             failed_patches.append({"patch": patch, "error": error_msg})
                         else:
-                            modified_content = (
-                                modified_content[:start_idx]
+                            base_content = (
+                                base_content[:start_idx]
                                 + replace_text
-                                + modified_content[end_idx + len(search_end) :]
+                                + base_content[end_idx + len(search_end) :]
                             )
                             found = True
 
@@ -391,7 +450,12 @@ class EditFileHandler(OutputHandler):
                     error_msg = "不支持的补丁格式"
                     failed_patches.append({"patch": patch, "error": error_msg})
 
+                # 若使用了RANGE，则将局部修改写回整体内容
                 if found:
+                    if scoped:
+                        modified_content = prefix + base_content + suffix
+                    else:
+                        modified_content = base_content
                     successful_patches += 1
 
             # 写入修改后的内容
