@@ -369,21 +369,17 @@ class EditFileHandler(OutputHandler):
                     search_end = patch["SEARCH_END"]
                     replace_text = patch["REPLACE"]
 
-                    # 唯一性校验与范围替换（包含边界）
-                    start_count = modified_content.count(search_start)
-                    if start_count != 1:
-                        error_msg = "SEARCH_START需在文件中唯一匹配"
+                    # 范围替换（包含边界），不再校验唯一性，命中第一个起始标记及其后的第一个结束标记
+                    start_idx = modified_content.find(search_start)
+                    if start_idx == -1:
+                        error_msg = "未找到SEARCH_START"
                         failed_patches.append({"patch": patch, "error": error_msg})
                     else:
-                        start_idx = modified_content.find(search_start)
-                        after = modified_content[start_idx + len(search_start) :]
-                        end_count_after = after.count(search_end)
-                        if end_count_after != 1:
-                            error_msg = "SEARCH_END在SEARCH_START之后需唯一匹配或未找到"
+                        end_idx = modified_content.find(search_end, start_idx + len(search_start))
+                        if end_idx == -1:
+                            error_msg = "在SEARCH_START之后未找到SEARCH_END"
                             failed_patches.append({"patch": patch, "error": error_msg})
                         else:
-                            end_rel = after.find(search_end)
-                            end_idx = start_idx + len(search_start) + end_rel
                             modified_content = (
                                 modified_content[:start_idx]
                                 + replace_text
