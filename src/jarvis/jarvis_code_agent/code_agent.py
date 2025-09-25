@@ -529,8 +529,9 @@ class CodeAgent:
             if self.agent.force_save_memory:
                 self.agent.memory_manager.prompt_memory_save()
         elif start_commit:
-            os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
-            PrettyOutput.print("已重置到初始提交", OutputType.INFO)
+            if user_confirm("是否要重置到初始提交？", True):
+                os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
+                PrettyOutput.print("已重置到初始提交", OutputType.INFO)
 
     def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
         """使用给定的用户输入运行代码代理。
