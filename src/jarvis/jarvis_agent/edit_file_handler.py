@@ -457,10 +457,20 @@ class EditFileHandler(OutputHandler):
                             error_msg = "在SEARCH_START之后未找到SEARCH_END"
                             failed_patches.append({"patch": patch, "error": error_msg})
                         else:
+                            # 避免额外空行:
+                            # 若 REPLACE 以换行结尾且 SEARCH_END 后紧跟换行符，
+                            # 则将该换行并入替换范围，防止出现双重换行导致“多一行”
+                            end_of_range = end_idx + len(search_end)
+                            if (
+                                end_of_range < len(base_content)
+                                and base_content[end_of_range] == "\n"
+                                and replace_text.endswith("\n")
+                            ):
+                                end_of_range += 1
                             base_content = (
                                 base_content[:start_idx]
                                 + replace_text
-                                + base_content[end_idx + len(search_end) :]
+                                + base_content[end_of_range:]
                             )
                             found = True
 
