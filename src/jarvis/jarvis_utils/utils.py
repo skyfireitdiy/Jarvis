@@ -679,7 +679,7 @@ def _show_usage_stats(welcome_str: str) -> None:
 
             # 愿景 Panel
             vision_text = Text(
-                "重新定义开发者体验，打破人与工具的界限，构建开发者与AI之间真正的共生伙伴关系。",
+                "让开发者与AI成为共生伙伴",
                 justify="center",
                 style="italic",
             )
@@ -694,7 +694,7 @@ def _show_usage_stats(welcome_str: str) -> None:
 
             # 使命 Panel
             mission_text = Text(
-                "通过深度人机协作，将开发者的灵感（Vibe）高效落地为代码与行动，释放创造之力。",
+                "让灵感高效落地为代码与行动",
                 justify="center",
                 style="italic",
             )
