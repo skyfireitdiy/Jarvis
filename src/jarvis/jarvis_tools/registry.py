@@ -124,7 +124,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def can_handle(self, response: str) -> bool:
         # 仅当 {ot("TOOL_CALL")} 出现在行首时才认为可以处理
-        return re.search(rf'(?m)^{re.escape(ot("TOOL_CALL"))}', response) is not None
+        return re.search(rf'(?m){re.escape(ot("TOOL_CALL"))}', response) is not None
 
     def prompt(self) -> str:
         """加载工具"""
@@ -612,7 +612,7 @@ class ToolRegistry(OutputHandlerProtocol):
     @staticmethod
     def _has_tool_calls_block(content: str) -> bool:
         """从内容中提取工具调用块（仅匹配行首标签）"""
-        pattern = rf'(?ms)^{re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
+        pattern = rf'(?ms){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
         return re.search(pattern, content) is not None
 
     @staticmethod
@@ -634,13 +634,13 @@ class ToolRegistry(OutputHandlerProtocol):
             Exception: 如果工具调用缺少必要字段
         """
         # 将内容拆分为行
-        pattern = rf'(?ms)^{re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
+        pattern = rf'(?ms){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
         data = re.findall(pattern, content)
         auto_completed = False
         if not data:
             # can_handle 确保 ot("TOOL_CALL") 在内容中（行首）。
             # 如果数据为空，则表示行首的 ct("TOOL_CALL") 可能丢失。
-            has_open_at_bol = re.search(rf'(?m)^{re.escape(ot("TOOL_CALL"))}', content) is not None
+            has_open_at_bol = re.search(rf'(?m){re.escape(ot("TOOL_CALL"))}', content) is not None
             has_close_at_bol = re.search(rf'(?m)^{re.escape(ct("TOOL_CALL"))}', content) is not None
             if has_open_at_bol and not has_close_at_bol:
                 # 尝试通过附加结束标签来修复它（确保结束标签位于行首）

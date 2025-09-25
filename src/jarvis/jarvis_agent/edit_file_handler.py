@@ -10,7 +10,7 @@ from jarvis.jarvis_utils.tag import ct, ot
 class EditFileHandler(OutputHandler):
     def __init__(self):
         self.patch_pattern = re.compile(
-            r"^" + ot("PATCH file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))") + r"\s*"
+            ot("PATCH file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))") + r"\s*"
             r"(?:"
             + ot("DIFF")
             + r"\s*(?:"
