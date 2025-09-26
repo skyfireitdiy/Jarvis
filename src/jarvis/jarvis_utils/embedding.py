@@ -21,6 +21,9 @@ def get_context_token_count(text: str) -> int:
     返回：
         int: 文本中的token数量
     """
+    # 防御性检查：入参为 None 或空字符串时直接返回 0
+    if text is None or text == "":
+        return 0
     try:
         import tiktoken
 

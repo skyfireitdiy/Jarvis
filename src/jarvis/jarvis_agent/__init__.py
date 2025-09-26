@@ -729,7 +729,14 @@ class Agent:
             pass
 
         response = self.model.chat_until_success(message)  # type: ignore
-
+        # 防御: 模型可能返回空响应(None或空字符串)，统一为空字符串并告警
+        if not response:
+            try:
+                PrettyOutput.print("模型返回空响应，已使用空字符串回退。", OutputType.WARNING)
+            except Exception:
+                pass
+            response = ""
+        
         # 事件：模型调用后
         try:
             self.event_bus.emit(
@@ -761,7 +768,13 @@ class Agent:
             summary = self.model.chat_until_success(
                 self.session.prompt + "\n" + SUMMARY_REQUEST_PROMPT
             )  # type: ignore
-
+            # 防御: 可能返回空响应(None或空字符串)，统一为空字符串并告警
+            if not summary:
+                try:
+                    PrettyOutput.print("总结模型返回空响应，已使用空字符串回退。", OutputType.WARNING)
+                except Exception:
+                    pass
+                summary = ""
             return summary
         except Exception:
             PrettyOutput.print("总结对话历史失败", OutputType.ERROR)
@@ -898,6 +911,13 @@ class Agent:
             if not self.model:
                 raise RuntimeError("Model not initialized")
             ret = self.model.chat_until_success(self.session.prompt)  # type: ignore
+            # 防御: 总结阶段模型可能返回空响应(None或空字符串)，统一为空字符串并告警
+            if not ret:
+                try:
+                    PrettyOutput.print("总结阶段模型返回空响应，已使用空字符串回退。", OutputType.WARNING)
+                except Exception:
+                    pass
+                ret = ""
             result = ret
 
             # 广播完成总结事件
