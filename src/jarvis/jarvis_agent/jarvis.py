@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Jarvis AI 助手主入口模块"""
 from typing import Optional, List
+import shutil
+from datetime import datetime
 
 import typer
 
@@ -16,6 +18,7 @@ from jarvis.jarvis_utils.config import (
     get_agent_definition_dirs,
     get_multi_agent_dirs,
     get_roles_dirs,
+    get_data_dir,
 )
 import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_utils.input import user_confirm, get_single_line_input
@@ -182,6 +185,72 @@ def handle_interactive_config_option(
     except Exception as e:
         PrettyOutput.print(f"交互式配置失败: {e}", OutputType.ERROR)
         return True
+
+
+def handle_backup_option(backup: bool) -> bool:
+    """处理数据备份选项，返回是否已处理并需提前结束。"""
+    if not backup:
+        return False
+
+    init_env("", config_file=None)
+    data_dir = Path(get_data_dir())
+    if not data_dir.is_dir():
+        PrettyOutput.print(f"数据目录不存在: {data_dir}", OutputType.ERROR)
+        return True
+
+    backup_dir = Path(os.path.expanduser("~/jarvis_backups"))
+    backup_dir.mkdir(exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file_base = backup_dir / f"jarvis_data_{timestamp}"
+
+    try:
+        archive_path = shutil.make_archive(
+            str(backup_file_base), "zip", root_dir=str(data_dir)
+        )
+        PrettyOutput.print(f"数据已成功备份到: {archive_path}", OutputType.SUCCESS)
+    except Exception as e:
+        PrettyOutput.print(f"数据备份失败: {e}", OutputType.ERROR)
+
+    return True
+
+
+def handle_restore_option(restore_path: Optional[str]) -> bool:
+    """处理数据恢复选项，返回是否已处理并需提前结束。"""
+    if not restore_path:
+        return False
+
+    restore_file = Path(restore_path)
+    if not restore_file.is_file():
+        PrettyOutput.print(f"指定的恢复文件不存在: {restore_path}", OutputType.ERROR)
+        return True
+
+    init_env("", config_file=None)
+    data_dir = Path(get_data_dir())
+
+    if data_dir.exists():
+        if not user_confirm(
+            f"数据目录 '{data_dir}' 已存在，恢复操作将覆盖它。是否继续？", default=False
+        ):
+            PrettyOutput.print("恢复操作已取消。", OutputType.INFO)
+            return True
+        try:
+            shutil.rmtree(data_dir)
+        except Exception as e:
+            PrettyOutput.print(f"无法移除现有数据目录: {e}", OutputType.ERROR)
+            return True
+
+    try:
+        data_dir.mkdir(parents=True)
+        shutil.unpack_archive(str(restore_file), str(data_dir), "zip")
+        PrettyOutput.print(
+            f"数据已从 '{restore_path}' 成功恢复到 '{data_dir}'", OutputType.SUCCESS
+        )
+
+    except Exception as e:
+        PrettyOutput.print(f"数据恢复失败: {e}", OutputType.ERROR)
+
+    return True
 
 
 def preload_config_for_flags(config_file: Optional[str]) -> None:
@@ -521,6 +590,12 @@ def run_cli(
         "--disable-methodology-analysis",
         help="禁用方法论和任务分析（覆盖配置文件设置）",
     ),
+    backup_data: bool = typer.Option(
+        False, "--backup-data", help="备份 Jarvis 数据目录 (~/.jarvis)"
+    ),
+    restore_data: Optional[str] = typer.Option(
+        None, "--restore-data", help="从指定的压缩包恢复 Jarvis 数据"
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -528,6 +603,14 @@ def run_cli(
 
     # 使用 rich 输出命令与快捷方式总览
     print_commands_overview()
+
+    # 处理数据备份
+    if handle_backup_option(backup_data):
+        return
+
+    # 处理数据恢复
+    if handle_restore_option(restore_data):
+        return
 
     # 处理配置文件编辑
     if handle_edit_option(edit, config_file):
