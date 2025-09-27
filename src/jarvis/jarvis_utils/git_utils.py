@@ -299,7 +299,7 @@ def get_modified_line_ranges() -> Dict[str, List[Tuple[int, int]]]:
     # 获取所有文件的Git差异
     # 仅用于解析修改行范围，减少上下文以降低输出体积和解析成本
     result = subprocess.run(
-        ["git", "show", "-U0", "--no-color"],
+        ["git", "show", "--no-color"],
         capture_output=True,
         text=True,
     )
