@@ -164,7 +164,7 @@ class EditFileHandler(OutputHandler):
 注意：
 - {ot("PATCH")} 和 {ct("PATCH")} 必须出现在行首，否则不生效（会被忽略）
 - {supported_formats}
-- {ot("RANGE")}start-end{ct("RANGE")} 仅用于区间替换模式，表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
+- {ot("RANGE")}start-end{ct("RANGE")} 仅用于区间替换模式（SEARCH_START/SEARCH_END），表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
 - 单点替换要求 SEARCH 在有效范围内唯一匹配（仅替换第一个匹配）
 - 区间替换命中有效范围内的第一个 {ot("SEARCH_START")} 及其后的第一个 {ot("SEARCH_END")}
 否则编辑将失败。"""

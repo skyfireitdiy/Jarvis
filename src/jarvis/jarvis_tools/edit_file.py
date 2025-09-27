@@ -37,6 +37,7 @@ class FileSearchReplaceTool:
      - SEARCH_START: 起始标记（包含在替换范围内）
      - SEARCH_END: 结束标记（包含在替换范围内）
      - REPLACE: 替换后的新代码
+     - RANGE: 可选的行号范围 'start-end' (1-based, 闭区间), 用于限定匹配范围
 
 ## 核心原则
 1. **精准修改**: 只修改必要的代码部分，保持其他部分不变
@@ -86,7 +87,7 @@ class FileSearchReplaceTool:
                                     },
                                     "RANGE": {
                                         "type": "string",
-                                        "description": "行号范围 'start-end'（1-based，闭区间），可选，用于限定匹配与替换的行号范围",
+                                        "description": "行号范围 'start-end'（1-based，闭区间），可选，仅用于区间替换模式，用于限定匹配与替换的行号范围",
                                     },
                                 },
                             },
@@ -124,7 +125,7 @@ class FileSearchReplaceTool:
                             - SEARCH_END: 结束标记（包含在替换范围内）
                             - REPLACE: 替换后的新代码
                         通用可选项：
-                            - RANGE: 形如 'start-end'（1-based，闭区间），当提供时仅在该行号范围内执行匹配与替换；省略则在整个文件范围内处理
+                            - RANGE: 形如 'start-end'（1-based，闭区间），仅用于区间替换模式。当提供时仅在该行号范围内执行匹配与替换；省略则在整个文件范围内处理
 
         返回:
             Dict[str, Any] 包含:
