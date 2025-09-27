@@ -314,8 +314,30 @@ class EditFileHandler(OutputHandler):
             failed_patches: List[Dict[str, Any]] = []
             successful_patches = 0
 
-            for patch in patches:
-                patch_count += 1
+            # 当存在RANGE时，确保按行号从后往前应用补丁，避免前面补丁影响后续RANGE的行号
+            ordered_patches: List[Dict[str, str]] = []
+            range_items: List[Tuple[int, int, int, Dict[str, str]]] = []
+            non_range_items: List[Tuple[int, Dict[str, str]]] = []
+            for idx, p in enumerate(patches):
+                r = p.get("RANGE")
+                if r and str(r).strip():
+                    m = re.match(r"\s*(\d+)\s*-\s*(\d+)\s*$", str(r))
+                    if m:
+                        start_line = int(m.group(1))
+                        end_line = int(m.group(2))
+                        range_items.append((start_line, end_line, idx, p))
+                    else:
+                        # RANGE格式无效的补丁保持原有顺序
+                        non_range_items.append((idx, p))
+                else:
+                    # 无RANGE的补丁保持原有顺序
+                    non_range_items.append((idx, p))
+            # 先应用RANGE补丁：按start_line、end_line、原始索引逆序
+            range_items.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
+            ordered_patches = [item[3] for item in range_items] + [item[1] for item in non_range_items]
+
+            patch_count = len(ordered_patches)
+            for patch in ordered_patches:
                 found = False
 
                 # 处理可选的RANGE范围：格式 "start-end"（1-based, 闭区间）
