@@ -135,7 +135,6 @@ class EditFileHandler(OutputHandler):
         patch_format = get_patch_format()
 
         search_prompt = f"""{ot("DIFF")}
-{ot("RANGE")}起止行号(如: 10-50)，可选{ct("RANGE")}
 {ot("SEARCH")}原始代码{ct("SEARCH")}
 {ot("REPLACE")}新代码{ct("REPLACE")}
 {ct("DIFF")}"""
@@ -149,13 +148,13 @@ class EditFileHandler(OutputHandler):
 
         if patch_format == "search":
             formats = search_prompt
-            supported_formats = "仅支持单点替换（SEARCH/REPLACE），可选RANGE限定行号范围"
+            supported_formats = "仅支持单点替换（SEARCH/REPLACE）"
         elif patch_format == "search_range":
             formats = search_range_prompt
             supported_formats = "仅支持区间替换（SEARCH_START/SEARCH_END/REPLACE），可选RANGE限定行号范围"
         else:  # all
             formats = f"{search_prompt}\n或\n{search_range_prompt}"
-            supported_formats = "支持两种DIFF块：单点替换（SEARCH/REPLACE）与区间替换（SEARCH_START/SEARCH_END/REPLACE），均可选RANGE限定行号范围"
+            supported_formats = "支持两种DIFF块：单点替换（SEARCH/REPLACE）与区间替换（SEARCH_START/SEARCH_END/REPLACE）"
 
         return f"""文件编辑指令格式：
 {ot("PATCH file=文件路径")}
@@ -165,7 +164,7 @@ class EditFileHandler(OutputHandler):
 注意：
 - {ot("PATCH")} 和 {ct("PATCH")} 必须出现在行首，否则不生效（会被忽略）
 - {supported_formats}
-- 可选 {ot("RANGE")}start-end{ct("RANGE")} 表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
+- {ot("RANGE")}start-end{ct("RANGE")} 仅用于区间替换模式，表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
 - 单点替换要求 SEARCH 在有效范围内唯一匹配（仅替换第一个匹配）
 - 区间替换命中有效范围内的第一个 {ot("SEARCH_START")} 及其后的第一个 {ot("SEARCH_END")}
 否则编辑将失败。"""
@@ -222,7 +221,7 @@ class EditFileHandler(OutputHandler):
                 if range_scope_match:
                     range_scope = range_scope_match.group(1).strip()
                     # 仅移除块首部的RANGE标签，避免误删内容中的同名标记
-                    block_text = block_text[range_scope_match.end():]# 优先解析区间替换
+                    block_text = block_text[range_scope_match.end():]
                 # 统一按 all 解析：无视配置，始终尝试区间替换
                 range_match = re.search(
                     ot("SEARCH_START")
@@ -267,8 +266,7 @@ class EditFileHandler(OutputHandler):
                         "SEARCH": single_match.group(1),  # 原始SEARCH内容
                         "REPLACE": single_match.group(2),  # 原始REPLACE内容
                     }
-                    if range_scope:
-                        diff_item["RANGE"] = range_scope
+                    # SEARCH 模式不支持 RANGE，直接忽略
                     diffs.append(diff_item)
 
             if diffs:
