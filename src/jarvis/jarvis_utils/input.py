@@ -482,7 +482,7 @@ def _get_multiline_input_internal(
         """Handle Ctrl+O by exiting the prompt and returning the sentinel value."""
         event.app.exit(result=CTRL_O_SENTINEL)
 
-    @bindings.add("c-t", filter=has_focus(DEFAULT_BUFFER))
+    @bindings.add("c-t", filter=has_focus(DEFAULT_BUFFER), eager=True)
     def _(event):
         """Return a shell command like '!bash' for upper input_handler to execute."""
 
