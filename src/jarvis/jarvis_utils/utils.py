@@ -1719,11 +1719,11 @@ def while_success(func: Callable[[], Any], sleep_time: float = 0.1, max_retries:
         try:
             result = func()
             break
-        except Exception:
+        except Exception as e:
             retry_count += 1
             if retry_count < max_retries:
                 PrettyOutput.print(
-                    f"发生异常，重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...",
+                    f"发生异常:\n{e}\n重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...",
                     OutputType.WARNING,
                 )
                 time.sleep(sleep_time)
