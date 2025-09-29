@@ -166,7 +166,7 @@ class EditFileHandler(OutputHandler):
 - {supported_formats}
 - {ot("RANGE")}start-end{ct("RANGE")} 仅用于区间替换模式（SEARCH_START/SEARCH_END），表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
 - 单点替换要求 SEARCH 在有效范围内唯一匹配（仅替换第一个匹配）
-- 区间替换命中有效范围内的第一个 {ot("SEARCH_START")} 及其后的第一个 {ot("SEARCH_END")}
+- 区间替换会从包含 {ot("SEARCH_START")} 的行首开始，到包含 {ot("SEARCH_END")} 的行尾结束，替换整个区域
 否则编辑将失败。"""
 
     def name(self) -> str:
@@ -468,24 +468,42 @@ class EditFileHandler(OutputHandler):
                         error_msg = "未找到SEARCH_START"
                         failed_patches.append({"patch": patch, "error": error_msg})
                     else:
-                        end_idx = base_content.find(search_end, start_idx)
+                        # 从 search_start 之后开始查找 search_end
+                        end_idx = base_content.find(search_end, start_idx + len(search_start))
                         if end_idx == -1:
                             error_msg = "在SEARCH_START之后未找到SEARCH_END"
                             failed_patches.append({"patch": patch, "error": error_msg})
                         else:
-                            # 避免额外空行:
-                            # 若 REPLACE 以换行结尾且 SEARCH_END 后紧跟换行符，
-                            # 则将该换行并入替换范围，防止出现双重换行导致“多一行”
-                            end_of_range = end_idx + len(search_end)
+                            # 将替换范围扩展到整行
+                            # 找到 start_idx 所在行的行首
+                            line_start_idx = base_content.rfind("\n", 0, start_idx) + 1
+
+                            # 找到 end_idx 所在行的行尾
+                            match_end_pos = end_idx + len(search_end)
+                            line_end_idx = base_content.find("\n", match_end_pos)
+
+                            if line_end_idx == -1:
+                                # 如果没有找到换行符，说明是最后一行
+                                end_of_range = len(base_content)
+                            else:
+                                # 包含换行符
+                                end_of_range = line_end_idx + 1
+
+                            final_replace_text = replace_text
+                            original_slice = base_content[line_start_idx:end_of_range]
+
+                            # 如果原始片段以换行符结尾，且替换内容不为空且不以换行符结尾，
+                            # 则为替换内容添加换行符以保持格式
                             if (
-                                end_of_range < len(base_content)
-                                and base_content[end_of_range] == "\n"
-                                and replace_text.endswith("\n")
+                                final_replace_text
+                                and original_slice.endswith("\n")
+                                and not final_replace_text.endswith("\n")
                             ):
-                                end_of_range += 1
+                                final_replace_text += "\n"
+
                             base_content = (
-                                base_content[:start_idx]
-                                + replace_text
+                                base_content[:line_start_idx]
+                                + final_replace_text
                                 + base_content[end_of_range:]
                             )
                             found = True

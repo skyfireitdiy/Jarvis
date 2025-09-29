@@ -34,17 +34,18 @@ class FileSearchReplaceTool:
      - REPLACE: 替换后的新代码
    - 区间替换：
      - reason: 修改原因描述
-     - SEARCH_START: 起始标记（包含在替换范围内）
-     - SEARCH_END: 结束标记（包含在替换范围内）
+     - SEARCH_START: 起始标记
+     - SEARCH_END: 结束标记
      - REPLACE: 替换后的新代码
      - RANGE: 可选的行号范围 'start-end' (1-based, 闭区间), 用于限定匹配范围
+   - **说明**: 区间替换会从包含 SEARCH_START 的行首开始，到包含 SEARCH_END 的行尾结束，替换整个区域
 
 ## 核心原则
 1. **精准修改**: 只修改必要的代码部分，保持其他部分不变
 2. **最小补丁原则**: 生成最小范围的补丁，包含必要的上下文
 3. **唯一匹配**:
    - 单点替换：确保 SEARCH 在文件中唯一匹配
-   - 区间替换：确保 SEARCH_START 在文件中唯一匹配，且在其后 SEARCH_END 也唯一匹配
+   - 区间替换：确保在指定范围内，第一个 SEARCH_START 之后能找到 SEARCH_END
 4. **格式保持**: 严格保持原始代码的格式风格
 5. **部分成功**: 支持多个文件编辑，允许部分文件编辑成功
 
@@ -121,11 +122,10 @@ class FileSearchReplaceTool:
                             - REPLACE: 替换后的新代码
                         2) 区间替换：
                             - reason: 修改原因描述
-                            - SEARCH_START: 起始标记（包含在替换范围内）
-                            - SEARCH_END: 结束标记（包含在替换范围内）
+                            - SEARCH_START: 起始标记
+                            - SEARCH_END: 结束标记
                             - REPLACE: 替换后的新代码
-                        通用可选项：
-                            - RANGE: 形如 'start-end'（1-based，闭区间），仅用于区间替换模式。当提供时仅在该行号范围内执行匹配与替换；省略则在整个文件范围内处理
+                        - **说明**: 区间替换会从包含 SEARCH_START 的行首开始，到包含 SEARCH_END 的行尾结束，替换整个区域
 
         返回:
             Dict[str, Any] 包含:
