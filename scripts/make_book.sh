@@ -1,7 +1,12 @@
 #!/bin/bash
 
+# Get the absolute path of the script's directory
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &amp;&amp; pwd)
+# Get the project root directory
+PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
+
 # 合并markdown文件
-awk 'FNR==1 && NR>1 {print "\n\n---\n"} {print}' /home/wangmaobin/code/Jarvis/docs/jarvis_book/*.md > /tmp/combined_book.md
+awk 'FNR==1 && NR>1 {print "\n\n---\n"} {print}' "$PROJECT_ROOT/docs/jarvis_book/*.md" > /tmp/combined_book.md
 # 统一将连续换行后紧跟标题的情况替换为两个换行，形如 "\n+^#" -> "\n\n#"
 perl -0777 -i -pe 's/\n+(?=^#)/\n\n/mg' /tmp/combined_book.md
 # 仅在代码块外执行列表空行修正规则，避免影响代码中的行首 '-' 或数字列表
@@ -35,4 +40,4 @@ perl -0777 -i -pe '
 perl -0777 -i -pe 's/(?m)(^.+\S.*\n)(?=(?:[ \t]*\|.*\|\s*\n[ \t]*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$))/$1\n/g' /tmp/combined_book.md
 
 # 调用build_pdf.sh生成PDF，并指定输出文件名为当前目录下的Jarvis_Book.pdf
-/home/wangmaobin/code/Jarvis/scripts/build_pdf.sh /tmp/combined_book.md ./Jarvis_Book.pdf
+"$SCRIPT_DIR/build_pdf.sh" /tmp/combined_book.md ./Jarvis_Book.pdf
