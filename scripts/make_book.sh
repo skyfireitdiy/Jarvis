@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Get the absolute path of the script's directory
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &amp;&amp; pwd)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Get the project root directory
 PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
 
 # 合并markdown文件
-awk 'FNR==1 && NR>1 {print "\n\n---\n"} {print}' "$PROJECT_ROOT/docs/jarvis_book/*.md" > /tmp/combined_book.md
+awk 'FNR==1 && NR>1 {print "\n\n---\n"} {print}' $PROJECT_ROOT/docs/jarvis_book/*.md > /tmp/combined_book.md
 # 统一将连续换行后紧跟标题的情况替换为两个换行，形如 "\n+^#" -> "\n\n#"
 perl -0777 -i -pe 's/\n+(?=^#)/\n\n/mg' /tmp/combined_book.md
 # 仅在代码块外执行列表空行修正规则，避免影响代码中的行首 '-' 或数字列表

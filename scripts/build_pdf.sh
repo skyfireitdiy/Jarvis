@@ -13,7 +13,6 @@
 #   - pandoc
 #   - pandoc-plantuml filter (pip install pandoc-plantuml)
 #   - java (for PlantUML)
-#   - graphviz (for PlantUML)
 #   - PrinceXML (https://www.princexml.com/download/)
 #
 # Usage:
@@ -25,7 +24,7 @@ set -u # Treat unset variables as an error.
 # --- Dependency Check ---
 check_deps() {
   local missing=0
-  for cmd in pandoc java dot prince; do
+  for cmd in pandoc java prince; do
     if ! command -v "$cmd" &> /dev/null; then
       echo "Error: Required command '$cmd' not found."
       missing=1
@@ -33,7 +32,7 @@ check_deps() {
   done
   if [ $missing -ne 0 ]; then
     echo "Please install the missing dependencies and try again."
-    echo "  - pandoc, java, graphviz can usually be installed via your package manager."
+    echo "  - pandoc, java can usually be installed via your package manager."
     echo "  - PrinceXML must be downloaded from https://www.princexml.com/download/"
     exit 1
   fi
@@ -89,6 +88,7 @@ echo "---------------------------------------------"
 
 # Set PLANTUML_JAR and _JAVA_OPTIONS for pandoc-plantuml
 export PLANTUML_JAR="$SCRIPT_DIR/plantuml.jar"
+export PLANTUML_BIN="java -jar $PLANTUML_JAR"
 export _JAVA_OPTIONS="-Djava.awt.headless=true"
 
 # --- Stage 1: Pandoc Markdown -> HTML ---
