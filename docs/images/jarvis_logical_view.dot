@@ -1,0 +1,138 @@
+digraph G {
+  // --- Global Settings ---
+  graph [rankdir="TB", splines=ortho, fontname="Sans-serif", label="图表标题：[逻辑视图] Jarvis总体架构（核心组件与职责关系）", labelloc="t", newrank=true, nodesep=0.6, ranksep=1.0, overlap=false];
+  node [shape=box, style="rounded,filled", fillcolor="#EFEFEF", fontname="Sans-serif"];
+  edge [fontname="Sans-serif"];
+
+  // 顶层入口（CLI）
+  node [group=interface, shape=cds, fillcolor="#FFE6CC", color="#D79B00"];
+  cli_entry [label="CLI入口（命令行界面）"];
+
+  // Agent核心层
+  subgraph cluster_agent_core {
+    label = "Agent核心层";
+    style = "filled";
+    color = "#dddddd";
+    node [group=core, fillcolor="#DAE8FC", color="#6C8EBF"];
+    agent [label="Agent（会话编排）"];
+    run_loop [label="运行循环（AgentRunLoop）"];
+    session_mgr [label="会话管理（SessionManager）"];
+    prompt_mgr [label="提示管理（PromptManager）"];
+    memory_mgr [label="记忆管理（MemoryManager）"];
+    task_analyzer [label="任务分析（TaskAnalyzer）"];
+    event_bus [label="事件总线（EventBus）"];
+  }
+
+  // 输入处理层
+  subgraph cluster_input {
+    label = "输入处理层";
+    style = "filled";
+    color = "#e8e8e8";
+    node [group=input, fillcolor="#FFF2CC", color="#B57800"];
+    shell_handler [label="Shell输入处理（!脚本执行桥）"];
+    builtin_handler [label="内置输入处理（标记解析/会话控制）"];
+  }
+
+  // 工具注册与工具层
+  subgraph cluster_tools {
+    label = "工具注册与工具层";
+    style = "filled";
+    color = "#e8e8e8";
+    node [group=tools, fillcolor="#F8CECC", color="#B85450"];
+    tool_registry [label="工具注册表（ToolRegistry）"];
+    // 代表性工具（抽象）
+    t_read_code [label="读代码"];
+    t_execute_script [label="执行脚本"];
+    t_edit_file [label="精确编辑文件"];
+    t_rewrite_file [label="重写文件"];
+    t_save_memory [label="保存记忆"];
+    t_retrieve_memory [label="检索记忆"];
+    t_search_web [label="网络搜索"];
+    t_sub_agent [label="子Agent（通用）"];
+    t_sub_code_agent [label="子Agent（代码）"];
+    t_virtual_tty [label="虚拟终端"];
+    t_file_analyzer [label="文件分析"];
+    t_methodology [label="方法论管理"];
+    { rank=same; t_read_code; t_execute_script; t_edit_file; t_rewrite_file; t_save_memory; t_retrieve_memory; t_search_web; t_sub_agent; t_sub_code_agent; t_virtual_tty; t_file_analyzer; t_methodology; }
+  }
+
+  // 平台与模型层
+  subgraph cluster_platforms {
+    label = "模型平台层";
+    style = "filled";
+    color = "#e8e8e8";
+    node [group=platform, fillcolor="#D5E8D4", color="#82B366"];
+    platform_registry [label="平台注册表（PlatformRegistry）"];
+    p_yuanbao [label="平台：Yuanbao（支持Web/文件）"];
+    p_tongyi [label="平台：Tongyi（支持Web/文件）"];
+    p_openai [label="平台：OpenAI（基础对话）"];
+    { rank=same; p_yuanbao; p_tongyi; p_openai; }
+  }
+
+  // 数据与外部资源层
+  subgraph cluster_data_external {
+    label = "数据与外部资源";
+    style = "filled";
+    color = "#f0f0f0";
+    node [group=data, shape=cylinder, fillcolor="#E1D5E7", color="#9673A6"];
+    memory_store [label="记忆库\n(~/.jarvis / 项目.memory)"];
+    tools_repo [label="工具与方法论仓库\n(中心Git/本地目录)"];
+    rag_cache [label="RAG缓存/向量库\n(.jarvis/rag)"];
+    node [group=external, shape=box, fillcolor="#F5F5F5", color="#888888"];
+    web_internet [label="互联网/HTTP资源"];
+    mcp_servers [label="MCP服务（外部工具提供者）"];
+  }
+
+  // 关系
+  // 入口到Agent核心
+  cli_entry -> agent [label="用户任务"];
+  // Agent核心内部
+  agent -> run_loop [label="委派运行"];
+  agent -> session_mgr [label="会话状态"];
+  agent -> prompt_mgr [label="系统与附加提示构建"];
+  agent -> memory_mgr [label="记忆提示/保存策略"];
+  agent -> task_analyzer [label="任务分析/总结阶段"];
+  agent -> event_bus [label="事件广播"];
+  // 输入处理
+  agent -> shell_handler [label="输入链"];
+  agent -> builtin_handler [label="输入链"];
+  // 工具调用
+  agent -> tool_registry [label="工具列表/调用"];
+  tool_registry -> t_read_code;
+  tool_registry -> t_execute_script;
+  tool_registry -> t_edit_file;
+  tool_registry -> t_rewrite_file;
+  tool_registry -> t_save_memory;
+  tool_registry -> t_retrieve_memory;
+  tool_registry -> t_search_web;
+  tool_registry -> t_sub_agent;
+  tool_registry -> t_sub_code_agent;
+  tool_registry -> t_virtual_tty;
+  tool_registry -> t_file_analyzer;
+  tool_registry -> t_methodology;
+  // 平台交互
+  agent -> platform_registry [label="创建平台实例"];
+  platform_registry -> p_yuanbao;
+  platform_registry -> p_tongyi;
+  platform_registry -> p_openai;
+  run_loop -> p_yuanbao [label="对话/流式输出"];
+  run_loop -> p_tongyi [label="对话/流式输出"];
+  run_loop -> p_openai [label="对话/流式输出"];
+  // 数据与外部资源交互
+  memory_mgr -> memory_store [label="读/写记忆"];
+  t_save_memory -> memory_store [label="写入"];
+  t_retrieve_memory -> memory_store [label="读取"];
+  t_methodology -> tools_repo [label="方法论文件"];
+  tool_registry -> tools_repo [label="加载工具/方法论"];
+  t_search_web -> web_internet [label="抓取/总结"];
+  t_file_analyzer -> p_yuanbao [label="文件上传/分析"];
+  t_file_analyzer -> p_tongyi [label="文件上传/分析"];
+  t_execute_script -> web_internet [label="外部命令/网络"];
+  tool_registry -> mcp_servers [label="加载MCP工具"];
+  t_sub_agent -> agent [label="子任务编排", style=dashed];
+  t_sub_code_agent -> agent [label="代码任务编排", style=dashed];
+
+  // 层内对齐
+  { rank=same; shell_handler; builtin_handler; }
+  { rank=same; agent; run_loop; }
+}

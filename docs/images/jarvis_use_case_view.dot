@@ -1,0 +1,99 @@
+digraph G {
+  // --- Global Settings ---
+  graph [rankdir="LR", splines=polyline, fontname="Sans-serif", label="图表标题：[用例视图] 参与者与系统交互用例", labelloc="t", newrank=true, nodesep=0.9, ranksep=1.2, overlap=false];
+  node [shape=ellipse, style="filled", fillcolor="#EFEFEF", fontname="Sans-serif"];
+  edge [fontname="Sans-serif"];
+
+  // 参与者（Actors）
+  subgraph cluster_actors {
+    label = "参与者";
+    style = "filled";
+    color = "#dddddd";
+    node [shape=box, fillcolor="#FFE6CC", color="#D79B00"];
+    actor_user [label="CLI用户（终端使用者）"];
+    actor_llm [label="LLM平台（Yuanbao/Tongyi/OpenAI）"];
+    actor_mcp [label="MCP服务提供者（外部工具）"];
+    actor_git [label="Git仓库/本地项目"];
+    actor_web [label="互联网/Web资源"];
+  }
+
+  // 用例（系统功能）
+  subgraph cluster_usecases {
+    label = "Jarvis系统用例";
+    style = "filled";
+    color = "#e8e8e8";
+    node [shape=ellipse, fillcolor="#DAE8FC", color="#6C8EBF"];
+
+    // 会话与任务
+    uc_start [label="启动Jarvis助手并初始化环境"];
+    uc_input_task [label="输入多行任务/补充信息"];
+    uc_select_task [label="选择预定义任务并添加补充信息"];
+    uc_interrupt [label="中断运行并提供补充说明"];
+    uc_save_session [label="保存会话"];
+    uc_restore_session [label="恢复会话"];
+
+    // 工具调用与执行
+    uc_confirm_tool [label="确认工具执行"];
+    uc_shell_script [label="运行Shell脚本（!前缀）并反馈结果"];
+    uc_edit_file [label="编辑/重写文件内容（PATCH工具）"];
+    uc_memory_ops [label="保存/检索记忆（save/retrieve_memory）"];
+    uc_search_web [label="搜索网络信息并总结"];
+    uc_sub_agent [label="委派子Agent/子CodeAgent执行子任务"];
+    uc_mcp_tools [label="调用外部MCP工具"];
+    uc_tool_usage [label="查看工具使用说明（ToolUsage）"];
+
+    // 配置与数据管理
+    uc_edit_config [label="编辑配置文件（自动选择编辑器）"];
+    uc_interactive_config [label="交互式配置向导（补充设置）"];
+    uc_backup_data [label="备份数据目录（~/.jarvis）"];
+    uc_restore_data [label="恢复数据目录（~/.jarvis）"];
+    uc_builtin_configs [label="选择内置配置（agent/multi_agent/roles）"];
+    uc_switch_jca [label="检测Git仓库并切换到代码开发模式（jca）"];
+
+    // 方法论与工具分享
+    uc_share_method [label="分享本地方法论到中心仓库"];
+    uc_share_tool [label="分享本地工具到中心仓库"];
+  }
+
+  // 参与者到用例的关系
+  actor_user -> uc_start;
+  actor_user -> uc_input_task;
+  actor_user -> uc_select_task;
+  actor_user -> uc_interrupt;
+  actor_user -> uc_save_session;
+  actor_user -> uc_restore_session;
+  actor_user -> uc_confirm_tool;
+  actor_user -> uc_shell_script;
+  actor_user -> uc_edit_file;
+  actor_user -> uc_memory_ops;
+  actor_user -> uc_search_web;
+  actor_user -> uc_sub_agent;
+  actor_user -> uc_mcp_tools;
+  actor_user -> uc_tool_usage;
+  actor_user -> uc_edit_config;
+  actor_user -> uc_interactive_config;
+  actor_user -> uc_backup_data;
+  actor_user -> uc_restore_data;
+  actor_user -> uc_builtin_configs;
+  actor_user -> uc_switch_jca;
+  actor_user -> uc_share_method;
+  actor_user -> uc_share_tool;
+
+  // 支持参与者到相关用例的关系（辅助/外部系统）
+  actor_llm -> uc_input_task [xlabel="模型对话/流式输出"];
+  actor_llm -> uc_search_web [xlabel="模型总结与web模式"];
+  actor_llm -> uc_edit_file [xlabel="上下文超限时摘要/上传文件"];
+  actor_llm -> uc_sub_agent [xlabel="子任务模型调用"];
+  actor_llm -> uc_mcp_tools [xlabel="模型协作（必要时）"];
+
+  actor_mcp -> uc_mcp_tools [xlabel="提供外部工具能力"];
+  actor_web -> uc_search_web [xlabel="抓取页面内容"];
+  actor_git -> uc_switch_jca [xlabel="检测Git根目录"];
+  actor_git -> uc_share_tool [xlabel="仓库同步/提交"];
+  actor_git -> uc_share_method [xlabel="仓库同步/提交"];
+  actor_git -> uc_backup_data [xlabel="归档/压缩"];
+  actor_git -> uc_restore_data [xlabel="解压/覆盖"];
+
+  // 对齐
+  { rank=same; actor_user; actor_llm; actor_mcp; actor_git; actor_web; }
+}
