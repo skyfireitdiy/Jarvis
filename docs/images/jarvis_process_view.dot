@@ -1,0 +1,122 @@
+digraph G {
+  // --- Global Settings ---
+  graph [rankdir="LR", splines=polyline, fontname="Sans-serif", label="图表标题：[进程视图] 运行时行为与通信流程", labelloc="t", newrank=true, nodesep=0.7, ranksep=1.1, overlap=false];
+  node [shape=box, style="rounded,filled", fillcolor="#EFEFEF", fontname="Sans-serif"];
+  edge [fontname="Sans-serif"];
+
+  // 主进程与核心循环
+  subgraph cluster_main {
+    label = "主进程与核心循环";
+    style = "filled";
+    color = "#dddddd";
+    node [fillcolor="#DAE8FC", color="#6C8EBF"];
+    cli_proc [label="CLI主进程"];
+    agent_loop [label="AgentRunLoop（循环）"];
+    session_mgr [label="SessionManager（会话状态）"];
+    interrupt_handler [label="中断处理（Ctrl+C/用户干预）"];
+  }
+
+  // 模型调用与流式输出（线程/连接）
+  subgraph cluster_model {
+    label = "模型调用与流式输出";
+    style = "filled";
+    color = "#e8e8e8";
+    node [fillcolor="#D5E8D4", color="#82B366"];
+    model_yuanbao [label="Yuanbao平台\nHTTP流（stream_post）"];
+    model_tongyi [label="Tongyi平台\nSSE流（stream_post）"];
+    model_openai [label="OpenAI平台\nAPI流（client.stream）"];
+    system_prompt [label="系统提示注入"];
+    file_upload [label="文件上传（支持平台）"];
+  }
+
+  // 工具执行与子进程/会话
+  subgraph cluster_tools_runtime {
+    label = "工具执行与外部进程";
+    style = "filled";
+    color = "#f8f8f8";
+    node [fillcolor="#F8CECC", color="#B85450"];
+    tool_registry [label="ToolRegistry（工具选择/调用）"];
+    execute_script_proc [label="execute_script\n子进程（script包装）"];
+    virtual_tty_sess [label="virtual_tty\n持久TTY会话/子进程"];
+    mcp_stdio [label="MCP stdio\n子进程"];
+    mcp_sse [label="MCP SSE\n事件线程+HTTP"];
+    mcp_stream [label="MCP Streamable\nHTTP流请求"];
+  }
+
+  // 事件驱动与记忆/分析
+  subgraph cluster_events {
+    label = "事件驱动与记忆/分析";
+    style = "filled";
+    color = "#f0f0f0";
+    node [fillcolor="#FFF2CC", color="#B57800"];
+    event_bus [label="EventBus（同步发布/订阅）"];
+    memory_mgr [label="MemoryManager（记忆提示/保存）"];
+    task_analyzer [label="TaskAnalyzer（任务分析循环）"];
+    stats_mgr [label="StatsManager（指标计数/展示）"];
+  }
+
+  // 数据存储交互（运行期）
+  subgraph cluster_data {
+    label = "运行期数据交互";
+    style = "filled";
+    color = "#f7f7f7";
+    node [shape=cylinder, fillcolor="#E1D5E7", color="#9673A6"];
+    mem_store [label="记忆库\n(~/.jarvis / 项目.memory)"];
+    tools_repo [label="工具/方法论目录\n(本地/中心仓库)"];
+  }
+
+  // --- 运行时流程关系 ---
+  // 主流程启动
+  cli_proc -> agent_loop [xlabel="启动/派发循环"];
+
+  // 每轮：组装提示 -> 模型调用（流式）
+  agent_loop -> system_prompt [xlabel="构建系统/附加提示"];
+  system_prompt -> model_yuanbao [xlabel="chat_until_success"];
+  system_prompt -> model_tongyi [xlabel="chat_until_success"];
+  system_prompt -> model_openai [xlabel="chat_until_success"];
+
+  // 文件上传（上下文超限或方法论/文件分析）
+  agent_loop -> file_upload [xlabel="需要上传时"];
+  file_upload -> model_yuanbao [xlabel="上传附件"];
+  file_upload -> model_tongyi [xlabel="上传附件"];
+
+  // 流式响应返回到主循环
+  model_yuanbao -> agent_loop [xlabel="流式响应"];
+  model_tongyi -> agent_loop [xlabel="流式响应"];
+  model_openai -> agent_loop [xlabel="流式响应"];
+
+  // 工具调用路径
+  agent_loop -> tool_registry [xlabel="检测/解析工具块"];
+  tool_registry -> execute_script_proc [xlabel="脚本执行（临时子进程）"];
+  tool_registry -> virtual_tty_sess [xlabel="交互会话（持久TTY）"];
+  tool_registry -> mcp_stdio [xlabel="外部MCP（本地进程）"];
+  tool_registry -> mcp_sse [xlabel="外部MCP（SSE远端）"];
+  tool_registry -> mcp_stream [xlabel="外部MCP（HTTP流）"];
+
+  // 工具结果返回合并
+  execute_script_proc -> agent_loop [xlabel="stdout/stderr整合"];
+  virtual_tty_sess -> agent_loop [xlabel="屏幕/输出轮询"];
+  mcp_stdio -> agent_loop [xlabel="工具结果"];
+  mcp_sse -> agent_loop [xlabel="工具结果"];
+  mcp_stream -> agent_loop [xlabel="工具结果"];
+
+  // 事件驱动钩子
+  agent_loop -> event_bus [xlabel="before/after_tool_call\nbefore/after_summary\nbefore/after_model_call\nhistory_clear"];
+  event_bus -> memory_mgr [xlabel="触发记忆保存/标签提示"];
+  event_bus -> task_analyzer [xlabel="触发分析/满意度收集"];
+  tool_registry -> stats_mgr [xlabel="工具调用计数"];
+  execute_script_proc -> stats_mgr [xlabel="调用计数", style=dashed];
+  virtual_tty_sess -> stats_mgr [xlabel="调用计数", style=dashed];
+
+  // 会话与中断
+  agent_loop -> session_mgr [xlabel="prompt/长度/保存/恢复"];
+  interrupt_handler -> agent_loop [xlabel="skip/continue/complete"];
+
+  // 记忆与数据流
+  memory_mgr -> mem_store [xlabel="写入/读取记忆"];
+  tool_registry -> tools_repo [xlabel="扫描加载工具/方法论", style=dashed];
+
+  // 对齐
+  { rank=same; model_yuanbao; model_tongyi; model_openai; }
+  { rank=same; execute_script_proc; virtual_tty_sess; mcp_stdio; mcp_sse; mcp_stream; }
+}

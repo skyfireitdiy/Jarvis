@@ -1,0 +1,162 @@
+digraph G {
+  // --- Global Settings ---
+  graph [rankdir="TB", splines=ortho, fontname="Sans-serif", label="图表标题：[实现视图] 代码物理组织与关键依赖", labelloc="t", newrank=true, nodesep=0.6, ranksep=1.0, overlap=false];
+  node [shape=box, style="rounded,filled", fillcolor="#EFEFEF", fontname="Sans-serif"];
+  edge [fontname="Sans-serif"];
+
+  // 包结构分组
+  subgraph cluster_agent {
+    label = "jarvis_agent（核心Agent）";
+    style = "filled";
+    color = "#dddddd";
+    node [fillcolor="#DAE8FC", color="#6C8EBF"];
+    ag_agent [label="Agent核心模块"];
+    ag_runloop [label="运行循环"];
+    ag_session [label="会话管理"];
+    ag_prompt_mgr [label="提示管理"];
+    ag_memory_mgr [label="记忆管理"];
+    ag_task_analyzer [label="任务分析"];
+    ag_event_bus [label="事件总线/事件定义"];
+    ag_tool_exec [label="工具调用桥"];
+    ag_input_shell [label="Shell输入处理"];
+    ag_input_builtin [label="内置输入处理"];
+    ag_edit_handler [label="编辑补丁解析器"];
+    ag_manager_cli [label="CLI与入口（jarvis/jarvis_agent/jarvis.py, main.py, agent_manager.py）"];
+  }
+
+  subgraph cluster_tools {
+    label = "jarvis_tools（内置工具与注册表）";
+    style = "filled";
+    color = "#e8e8e8";
+    node [fillcolor="#F8CECC", color="#B85450"];
+    tr_registry [label="工具注册表（ToolRegistry）"];
+    t_read_code [label="读代码"];
+    t_execute_script [label="执行脚本"];
+    t_edit_file [label="精确编辑文件"];
+    t_rewrite_file [label="重写文件"];
+    t_save_memory [label="保存记忆"];
+    t_retrieve_memory [label="检索记忆"];
+    t_search_web [label="网络搜索"];
+    t_sub_agent [label="子Agent（通用）"];
+    t_sub_code_agent [label="子Agent（代码）"];
+    t_virtual_tty [label="虚拟终端"];
+    t_file_analyzer [label="文件分析"];
+    t_methodology [label="方法论管理"];
+    { rank=same; t_read_code; t_execute_script; t_edit_file; t_rewrite_file; t_save_memory; t_retrieve_memory; t_search_web; t_sub_agent; t_sub_code_agent; t_virtual_tty; t_file_analyzer; t_methodology; }
+  }
+
+  subgraph cluster_platform {
+    label = "jarvis_platform（大模型平台与注册表）";
+    style = "filled";
+    color = "#e8e8e8";
+    node [fillcolor="#D5E8D4", color="#82B366"];
+    pf_base [label="平台基类（BasePlatform）"];
+    pf_registry [label="平台注册表（PlatformRegistry）"];
+    pf_yuanbao [label="平台实现：Yuanbao"];
+    pf_tongyi [label="平台实现：Tongyi"];
+    pf_openai [label="平台实现：OpenAI"];
+    { rank=same; pf_yuanbao; pf_tongyi; pf_openai; }
+  }
+
+  subgraph cluster_utils {
+    label = "jarvis_utils（通用工具集）";
+    style = "filled";
+    color = "#f0f0f0";
+    node [fillcolor="#FFF2CC", color="#B57800"];
+    u_config [label="配置解析（config）"];
+    u_output [label="输出与美化（output）"];
+    u_input [label="输入与交互（input）"];
+    u_globals [label="全局状态（globals）"];
+    u_embedding [label="token与切分（embedding）"];
+    u_tag [label="标签封装（tag）"];
+  }
+
+  subgraph cluster_mcp {
+    label = "jarvis_mcp（外部工具客户端）";
+    style = "filled";
+    color = "#f7f7f7";
+    node [fillcolor="#E1D5E7", color="#9673A6"];
+    mcp_stdio [label="MCP客户端：stdio"];
+    mcp_sse [label="MCP客户端：sse"];
+    mcp_stream [label="MCP客户端：streamable"];
+  }
+
+  subgraph cluster_stats {
+    label = "jarvis_stats（统计）";
+    style = "filled";
+    color = "#f7f7f7";
+    node [fillcolor="#E6E6E6", color="#7D7D7D"];
+    st_stats [label="统计管理（StatsManager）"];
+    st_storage [label="存储（StatsStorage）"];
+    st_visual [label="可视化（StatsVisualizer）"];
+  }
+
+  // 关键依赖关系（抽象到模块级）
+  // Agent核心依赖
+  ag_agent -> ag_runloop [label="委派运行"];
+  ag_agent -> ag_session [label="会话"];
+  ag_agent -> ag_prompt_mgr [label="提示"];
+  ag_agent -> ag_memory_mgr [label="记忆"];
+  ag_agent -> ag_task_analyzer [label="分析"];
+  ag_agent -> ag_event_bus [label="事件"];
+  ag_agent -> ag_tool_exec [label="执行工具"];
+  ag_agent -> tr_registry [label="获取工具"];
+  ag_agent -> pf_registry [label="创建平台"];
+
+  // 运行时与平台
+  ag_runloop -> pf_yuanbao [label="对话"];
+  ag_runloop -> pf_tongyi [label="对话"];
+  ag_runloop -> pf_openai [label="对话"];
+  pf_registry -> pf_base [label="基类依赖", style=dashed];
+  pf_registry -> pf_yuanbao;
+  pf_registry -> pf_tongyi;
+  pf_registry -> pf_openai;
+
+  // 输入处理挂载
+  ag_agent -> ag_input_shell [label="输入链"];
+  ag_agent -> ag_input_builtin [label="输入链"];
+
+  // 编辑补丁与工具桥
+  ag_edit_handler -> st_stats [label="记录工具使用"];
+  ag_tool_exec -> tr_registry [label="定位/执行工具"];
+
+  // 工具注册表与工具实现
+  tr_registry -> t_read_code;
+  tr_registry -> t_execute_script;
+  tr_registry -> t_edit_file;
+  tr_registry -> t_rewrite_file;
+  tr_registry -> t_save_memory;
+  tr_registry -> t_retrieve_memory;
+  tr_registry -> t_search_web;
+  tr_registry -> t_sub_agent;
+  tr_registry -> t_sub_code_agent;
+  tr_registry -> t_virtual_tty;
+  tr_registry -> t_file_analyzer;
+  tr_registry -> t_methodology;
+
+  // 工具与通用工具集
+  { t_read_code; t_execute_script; t_edit_file; t_rewrite_file; t_save_memory; t_retrieve_memory; t_search_web; t_sub_agent; t_sub_code_agent; t_virtual_tty; t_file_analyzer; t_methodology } -> u_output [label="显示/日志", style=dashed];
+  { t_read_code; t_edit_file; t_rewrite_file } -> u_embedding [label="行号/切分", style=dashed];
+  { t_save_memory; t_retrieve_memory } -> u_globals [label="短期记忆", style=dashed];
+  t_search_web -> pf_registry [label="总结子模型", style=dashed];
+
+  // 注册表对MCP的使用
+  tr_registry -> mcp_stdio [label="加载工具"];
+  tr_registry -> mcp_sse [label="加载工具"];
+  tr_registry -> mcp_stream [label="加载工具"];
+
+  // 通用工具集为核心赋能
+  ag_agent -> u_config [label="阈值/特性开关", style=dashed];
+  ag_agent -> u_output [label="富输出", style=dashed];
+  ag_agent -> u_input [label="输入框架", style=dashed];
+  ag_agent -> u_globals [label="全局状态", style=dashed];
+
+  // 统计使用点
+  tr_registry -> st_stats [label="工具调用计数"];
+  ag_manager_cli -> ag_agent [label="初始化/运行"];
+  ag_manager_cli -> u_config [label="预加载配置", style=dashed];
+
+  // 对齐
+  { rank=same; pf_yuanbao; pf_tongyi; pf_openai; }
+  { rank=same; t_read_code; t_execute_script; t_edit_file; t_rewrite_file; t_save_memory; t_retrieve_memory; t_search_web; t_sub_agent; t_sub_code_agent; t_virtual_tty; t_file_analyzer; t_methodology; }
+}

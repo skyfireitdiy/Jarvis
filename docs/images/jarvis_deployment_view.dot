@@ -1,0 +1,107 @@
+digraph G {
+  // --- Global Settings ---
+  graph [rankdir="LR", splines=polyline, fontname="Sans-serif", label="图表标题：[部署视图] 物理节点与网络交互", labelloc="t", newrank=true, nodesep=0.8, ranksep=1.1, overlap=false];
+  node [shape=box, style="rounded,filled", fillcolor="#EFEFEF", fontname="Sans-serif"];
+  edge [fontname="Sans-serif"];
+
+  // 本地节点
+  subgraph cluster_local {
+    label = "本地主机（开发者工作站）";
+    style = "filled";
+    color = "#dddddd";
+    node [fillcolor="#DAE8FC", color="#6C8EBF"];
+
+    tty [label="终端/CLI\n(jarvis, jarvis-agent, ...)", shape=cds, fillcolor="#FFE6CC", color="#D79B00"];
+    agent_proc [label="Jarvis Agent 进程\n(Agent + AgentRunLoop)"];
+    tool_registry [label="工具注册表\n(ToolRegistry)"];
+    event_bus [label="事件总线\n(EventBus)"];
+    session_mgr [label="会话管理\n(SessionManager)"];
+
+    // 本地子进程/会话
+    node [fillcolor="#F8CECC", color="#B85450"];
+    exec_script [label="execute_script 子进程\n(script包装执行)"];
+    vtty_proc [label="virtual_tty 持久TTY会话\n(子进程)"];
+    mcp_stdio_proc [label="MCP stdio 客户端进程"];
+
+    // 本地数据目录
+    node [shape=cylinder, fillcolor="#E1D5E7", color="#9673A6"];
+    data_home [label="~/.jarvis\n数据/记忆/统计/缓存"];
+    data_project [label="./.jarvis\n项目记忆/会话"];
+  }
+
+  // 外部LLM平台
+  subgraph cluster_llm {
+    label = "外部LLM平台";
+    style = "filled";
+    color = "#e8e8e8";
+    node [fillcolor="#D5E8D4", color="#82B366"];
+    llm_yuanbao [label="Yuanbao 平台\n(HTTPS + 流式API)"];
+    llm_tongyi [label="Tongyi 平台\n(HTTPS + SSE/流式)"];
+    llm_openai [label="OpenAI 平台\n(HTTPS + 流式)"];
+    { rank=same; llm_yuanbao; llm_tongyi; llm_openai; }
+  }
+
+  // 远端MCP服务
+  subgraph cluster_mcp_remote {
+    label = "MCP 远端服务";
+    style = "filled";
+    color = "#f7f7f7";
+    node [fillcolor="#E1D5E7", color="#9673A6"];
+    mcp_sse_srv [label="MCP SSE 服务\n(/sse + /messages)"];
+    mcp_stream_srv [label="MCP Streamable 服务\n(/mcp 流式HTTP)"];
+  }
+
+  // 中心仓库与互联网资源
+  subgraph cluster_repos {
+    label = "中心仓库 / 互联网资源";
+    style = "filled";
+    color = "#f0f0f0";
+    node [fillcolor="#FFF2CC", color="#B57800"];
+    central_tool_repo [label="中心工具仓库(Git)\n(~/.jarvis/central_tool_repo)"];
+    central_method_repo [label="中心方法论仓库(Git)\n(~/.jarvis/central_methodology_repo)"];
+    internet [label="互联网/Web 资源\n(HTTP/HTTPS)", shape=component];
+  }
+
+  // --- 部署连线与协议标注 ---
+  // 本地交互
+  tty -> agent_proc [xlabel="命令/任务输入"];
+  agent_proc -> session_mgr [xlabel="保存/恢复会话", style=dashed];
+  agent_proc -> event_bus [xlabel="事件发布", style=dashed];
+  agent_proc -> tool_registry [xlabel="加载/调用工具"];
+
+  // 本地子进程/会话
+  tool_registry -> exec_script [xlabel="fork/exec 子进程"];
+  tool_registry -> vtty_proc [xlabel="创建PTY会话"];
+  tool_registry -> mcp_stdio_proc [xlabel="启动MCP本地进程"];
+
+  // 本地数据挂载
+  agent_proc -> data_home [xlabel="读写配置/统计/记忆"];
+  agent_proc -> data_project [xlabel="项目记忆/.jarvis"];
+
+  // LLM平台通信（HTTPS/流式）
+  agent_proc -> llm_yuanbao [xlabel="HTTPS (stream_post)"];
+  agent_proc -> llm_tongyi [xlabel="HTTPS + SSE"];
+  agent_proc -> llm_openai [xlabel="HTTPS (OpenAI API)"];
+
+  // 文件上传（受平台支持）
+  {agent_proc; tool_registry} -> llm_yuanbao [xlabel="文件上传(支持)"];
+  {agent_proc; tool_registry} -> llm_tongyi [xlabel="文件上传(支持)"];
+
+  // MCP远端通信
+  tool_registry -> mcp_sse_srv [xlabel="HTTPS SSE 通道"];
+  tool_registry -> mcp_stream_srv [xlabel="HTTPS 流式调用"];
+
+  // 中心仓库同步（Git）
+  tool_registry -> central_tool_repo [xlabel="克隆/更新/加载工具"];
+  agent_proc -> central_method_repo [xlabel="分享/拉取方法论"];
+
+  // 互联网访问（工具/抓取）
+  exec_script -> internet [xlabel="外部命令访问网络", style=dashed];
+  vtty_proc -> internet [xlabel="交互式会话联网", style=dashed];
+  tool_registry -> internet [xlabel="search_web 抓取/访问", style=dashed];
+
+  // 对齐
+  { rank=same; llm_yuanbao; llm_tongyi; llm_openai; }
+  { rank=same; mcp_sse_srv; mcp_stream_srv; }
+  { rank=same; central_tool_repo; central_method_repo; internet; }
+}
