@@ -24,7 +24,32 @@ class OpenAIModel(BasePlatform):
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
         self.model_name = os.getenv("JARVIS_MODEL") or "gpt-4o"
 
-        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+                # Optional: Inject extra HTTP headers via environment variable
+        # Expected format: OPENAI_EXTRA_HEADERS='{"Header-Name": "value", "X-Trace": "abc"}'
+        headers_str = os.getenv("OPENAI_EXTRA_HEADERS")
+        self.extra_headers: Dict[str, str] = {}
+        if headers_str:
+            try:
+                parsed = json.loads(headers_str)
+                if isinstance(parsed, dict):
+                    # Ensure all header keys/values are strings
+                    self.extra_headers = {str(k): str(v) for k, v in parsed.items()}
+                else:
+                    PrettyOutput.print("OPENAI_EXTRA_HEADERS 应为 JSON 对象，如 {'X-Source':'jarvis'}", OutputType.WARNING)
+            except Exception as e:
+                PrettyOutput.print(f"解析 OPENAI_EXTRA_HEADERS 失败: {e}", OutputType.WARNING)
+
+        # Initialize OpenAI client, try to pass default headers if SDK supports it
+        try:
+            if self.extra_headers:
+                self.client = OpenAI(api_key=self.api_key, base_url=self.base_url, default_headers=self.extra_headers)
+            else:
+                self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        except TypeError:
+            # Fallback: SDK version may not support default_headers
+            self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            if self.extra_headers:
+                PrettyOutput.print("当前 OpenAI SDK 不支持 default_headers，未能注入额外 HTTP 头", OutputType.WARNING)
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
 
