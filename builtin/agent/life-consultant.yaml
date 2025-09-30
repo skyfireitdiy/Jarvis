@@ -1,5 +1,5 @@
 ---
-name: LifeConsultantAgent
+name: 人生顾问
 description: 人生顾问，持续与用户对话，建立性格画像并用于个性化决策建议
 system_prompt: |
   # 人生顾问 - 系统指令

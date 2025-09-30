@@ -1,5 +1,5 @@
 ---
-name: PsychologyExpertAgent
+name: 心理学专家
 description: 心理学分析专家，结合用户性格和待解决问题，从心理学角度出谋划策
 system_prompt: |
   # 心理学分析专家 - 系统指令

@@ -1,5 +1,5 @@
 ---
-name: SlideGenerator
+name: 幻灯片生成器
 description: 幻灯片生成专家，负责根据用户需求生成幻灯片
 system_prompt: |
   **System Prompt for Slidev Document Generation**
