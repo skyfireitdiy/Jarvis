@@ -312,6 +312,11 @@
       "description": "是否启用立即中断：在对话迭代中检测到中断信号时立即返回",
       "default": false
     },
+    "JARVIS_SAVE_SESSION_HISTORY": {
+      "type": "boolean",
+      "description": "是否保存会话记录",
+      "default": false
+    },
     "JARVIS_GIT_CHECK_MODE": {
       "type": "string",
       "enum": ["strict", "warn"],

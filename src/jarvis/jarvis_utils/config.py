@@ -730,6 +730,16 @@ def is_enable_builtin_config_selector() -> bool:
     )
 
 
+def is_save_session_history() -> bool:
+    """
+    是否保存会话记录。
+
+    返回:
+        bool: 如果要保存会话记录则返回True, 默认为False
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_SAVE_SESSION_HISTORY", False) is True
+
+
 def is_immediate_abort() -> bool:
     """
     是否启用立即中断：当在对话过程中检测到用户中断信号时，立即停止输出并返回。
