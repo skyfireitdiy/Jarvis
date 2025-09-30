@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 class AgentRunLoop:
     def __init__(self, agent: "Agent") -> None:
         self.agent = agent
+        self.conversation_rounds = 0
 
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
@@ -29,6 +30,12 @@ class AgentRunLoop:
 
         while True:
             try:
+                self.conversation_rounds += 1
+                if self.conversation_rounds % 20 == 0:
+                    self.agent.session.addon_prompt = join_prompts(
+                        [self.agent.session.addon_prompt, self.agent.get_tool_usage_prompt()]
+                    )
+
                 ag = self.agent
 
                 # 更新输入处理器标志
