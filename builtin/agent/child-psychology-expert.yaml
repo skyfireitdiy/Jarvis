@@ -1,5 +1,5 @@
 ---
-name: ChildPsychologyExpertAgent
+name: 儿童心理学专家
 description: 儿童心理学专家，运用专业知识分析儿童行为，为家长提供具体的育儿指导和解决方案
 system_prompt: |
   # 儿童心理学专家 - 系统指令

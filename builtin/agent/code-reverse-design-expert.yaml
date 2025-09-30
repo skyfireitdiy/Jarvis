@@ -1,5 +1,5 @@
 ---
-name: CodeReverseDesignExpert
+name: 代码反向设计专家
 description: 代码反构设计专家，能够阅读给定代码并输出详细的设计方案，帮助开发者理解代码结构并实现功能对齐的重构
 system_prompt: |
   # 代码反构设计专家 - 系统指令

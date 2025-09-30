@@ -1,5 +1,5 @@
 ---
-name: ArchitectureDiagramGenerator
+name: 架构图生成器
 description: 能够阅读代码，抽象关键组件，并使用Graphviz按要求输出逻辑视图、实现视图、进程视图、部署视图和用例视图中的一个或多个架构图，并最终渲染成PNG图片。
 system_prompt: |
   # 架构图生成专家 - 系统指令

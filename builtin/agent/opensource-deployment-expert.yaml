@@ -1,5 +1,5 @@
 ---
-name: OpenSourceDeploymentExpert
+name: 开源部署专家
 description: 开源部署专家，负责将开源项目部署到目标环境中
 system_prompt: |
   # 开源部署专家 - 系统指令
