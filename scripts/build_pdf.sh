@@ -21,23 +21,61 @@
 set -e # Exit immediately if a command exits with a non-zero status.
 set -u # Treat unset variables as an error.
 
-# --- Dependency Check ---
-check_deps() {
-  local missing=0
-  for cmd in pandoc java prince; do
-    if ! command -v "$cmd" &> /dev/null; then
-      echo "Error: Required command '$cmd' not found."
-      missing=1
+# --- Dependency Management ---
+ensure_deps() {
+    echo "Checking and installing dependencies..."
+
+    # Install system dependencies (pandoc, java) for Ubuntu if missing
+    if [ -f /etc/os-release ] && grep -q "ID=ubuntu" /etc/os-release; then
+        local missing_pkgs=""
+        if ! command -v pandoc &> /dev/null; then
+            missing_pkgs+=" pandoc"
+        fi
+        if ! command -v java &> /dev/null; then
+            missing_pkgs+=" default-jre" # For PlantUML
+        fi
+
+        if [ -n "$missing_pkgs" ]; then
+            echo "The following system packages are missing and will be installed:$missing_pkgs"
+            echo "This requires sudo privileges."
+            sudo apt-get update
+            sudo apt-get install -y $missing_pkgs
+        fi
+    else
+        echo "Warning: Not an Ubuntu system. Please ensure pandoc and java are installed manually."
+        # Simple check for non-ubuntu systems
+          for cmd in pandoc java; do
+            if ! command -v "$cmd" &> /dev/null; then
+              echo "Error: Required command '$cmd' not found."
+              exit 1
+            fi
+          done
     fi
-  done
-  if [ $missing -ne 0 ]; then
-    echo "Please install the missing dependencies and try again."
-    echo "  - pandoc, java can usually be installed via your package manager."
-    echo "  - PrinceXML must be downloaded from https://www.princexml.com/download/"
-    exit 1
-  fi
+
+    # Install Python dependency (pandoc-plantuml-filter) using uv
+    echo "Ensuring Python dependency 'pandoc-plantuml-filter' is installed..."
+    if command -v uv &> /dev/null; then
+        uv pip install pandoc-plantuml-filter
+    else
+        echo "Warning: 'uv' command not found. Trying with 'pip'."
+        if command -v pip &> /dev/null; then
+            pip install pandoc-plantuml-filter
+        else
+            echo "Error: Neither 'uv' nor 'pip' found. Cannot install 'pandoc-plantuml'."
+            exit 1
+        fi
+    fi
+
+    # Check for PrinceXML (manual installation required)
+    if ! command -v prince &> /dev/null; then
+        echo "Error: Required command 'prince' not found."
+        echo "PrinceXML must be downloaded and installed manually from https://www.princexml.com/download/"
+        exit 1
+    fi
+
+    echo "All dependencies are satisfied."
 }
-check_deps
+ensure_deps
 
 # --- Configuration ---
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
