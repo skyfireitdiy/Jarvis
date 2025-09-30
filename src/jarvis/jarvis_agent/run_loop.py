@@ -7,6 +7,7 @@ AgentRunLoop: 承载 Agent 的主运行循环逻辑。
 - 暂不变更外部调用入口，后续在 Agent._main_loop 中委派到该类
 - 保持与现有异常处理、工具调用、用户交互完全一致
 """
+import os
 from enum import Enum
 from typing import Any, TYPE_CHECKING
 
@@ -23,6 +24,7 @@ class AgentRunLoop:
     def __init__(self, agent: "Agent") -> None:
         self.agent = agent
         self.conversation_rounds = 0
+        self.tool_reminder_rounds = int(os.environ.get("JARVIS_TOOL_REMINDER_ROUNDS", 20))
 
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
@@ -31,7 +33,7 @@ class AgentRunLoop:
         while True:
             try:
                 self.conversation_rounds += 1
-                if self.conversation_rounds % 20 == 0:
+                if self.conversation_rounds % self.tool_reminder_rounds == 0:
                     self.agent.session.addon_prompt = join_prompts(
                         [self.agent.session.addon_prompt, self.agent.get_tool_usage_prompt()]
                     )
