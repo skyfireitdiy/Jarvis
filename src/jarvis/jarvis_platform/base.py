@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
+import os
+from datetime import datetime
 from abc import ABC, abstractmethod
 from types import TracebackType
 from typing import Dict, Generator, List, Optional, Tuple, Type
@@ -17,6 +19,8 @@ from jarvis.jarvis_utils.config import (
     get_pretty_output,
     is_print_prompt,
     is_immediate_abort,
+    is_save_session_history,
+    get_data_dir,
 )
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console
@@ -34,6 +38,7 @@ class BasePlatform(ABC):
         self.web = False  # 添加web属性，默认false
         self._saved = False
         self.model_group: Optional[str] = None
+        self._session_history_file: Optional[str] = None
 
     def __enter__(self) -> Self:
         """Enter context manager"""
@@ -57,6 +62,7 @@ class BasePlatform(ABC):
     def reset(self):
         """Reset model"""
         self.delete_chat()
+        self._session_history_file = None
 
     @abstractmethod
     def chat(self, message: str) -> Generator[str, None, None]:
@@ -135,6 +141,7 @@ class BasePlatform(ABC):
                                 if first_chunk:
                                     break
                         except StopIteration:
+                            self._append_session_history(message, "")
                             return ""
 
                     text_content = Text(overflow="fold")
@@ -200,6 +207,7 @@ class BasePlatform(ABC):
                                 live.update(panel)
 
                             if is_immediate_abort() and get_interrupt():
+                                self._append_session_history(message, response)
                                 return response  # Return the partial response immediately
 
                         # Ensure any remaining content in the buffer is displayed
@@ -225,6 +233,7 @@ class BasePlatform(ABC):
                         console.print(s, end="")
                         response += s
                         if is_immediate_abort() and get_interrupt():
+                            self._append_session_history(message, response)
                             return response
                     console.print()
                     end_time = time.time()
@@ -234,6 +243,7 @@ class BasePlatform(ABC):
                 for s in self.chat(message):
                     response += s
                     if is_immediate_abort() and get_interrupt():
+                        self._append_session_history(message, response)
                         return response
         # Keep original think tag handling
         response = re.sub(
@@ -242,6 +252,8 @@ class BasePlatform(ABC):
         response = re.sub(
             ot("thinking") + r".*?" + ct("thinking"), "", response, flags=re.DOTALL
         )
+        # Save session history (input and full response)
+        self._append_session_history(message, response)
         return response
 
     def chat_until_success(self, message: str) -> str:
@@ -345,6 +357,51 @@ class BasePlatform(ABC):
     def set_web(self, web: bool):
         """Set web flag"""
         self.web = web
+
+    def _append_session_history(self, user_input: str, model_output: str) -> None:
+        """
+        Append the user input and model output to a session history file if enabled.
+        The file name is generated on first save and reused until reset.
+        """
+        try:
+            if not is_save_session_history():
+                return
+
+            if self._session_history_file is None:
+                # Ensure data directory exists
+                data_dir = get_data_dir()
+                os.makedirs(data_dir, exist_ok=True)
+
+                # Build a safe filename including platform, model and timestamp
+                try:
+                    platform_name = type(self).platform_name()
+                except Exception:
+                    platform_name = "unknown_platform"
+
+                try:
+                    model_name = self.name()
+                except Exception:
+                    model_name = "unknown_model"
+
+                safe_platform = re.sub(r"[^\w\-\.]+", "_", str(platform_name))
+                safe_model = re.sub(r"[^\w\-\.]+", "_", str(model_name))
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+                self._session_history_file = os.path.join(
+                    data_dir, f"session_history_{safe_platform}_{safe_model}_{ts}.log"
+                )
+
+            # Append record
+            with open(self._session_history_file, "a", encoding="utf-8", errors="ignore") as f:
+                ts_line = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"===== {ts_line} =====\n")
+                f.write("USER:\n")
+                f.write(f"{user_input}\n")
+                f.write("\nASSISTANT:\n")
+                f.write(f"{model_output}\n\n")
+        except Exception:
+            # Do not break chat flow if writing history fails
+            pass
 
     @abstractmethod
     def support_web(self) -> bool:
