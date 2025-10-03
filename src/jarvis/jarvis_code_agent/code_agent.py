@@ -14,6 +14,7 @@ import typer
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.file_context_handler import file_context_handler
 from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_code_agent.lint import get_lint_tools
@@ -89,7 +90,11 @@ class CodeAgent:
             auto_complete=False,
             output_handler=[tool_registry, EditFileHandler()],  # type: ignore
             model_group=model_group,
-            input_handler=[shell_input_handler, builtin_input_handler],
+            input_handler=[
+                shell_input_handler,
+                file_context_handler,
+                builtin_input_handler,
+            ],
             need_summary=need_summary,
             use_methodology=False,  # 禁用方法论
             use_analysis=False,  # 禁用分析

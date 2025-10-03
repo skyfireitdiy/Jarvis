@@ -12,6 +12,7 @@ from jarvis.jarvis_agent import (
     origin_agent_system_prompt,
 )
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.file_context_handler import file_context_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.task_manager import TaskManager
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -46,7 +47,11 @@ class AgentManager:
         self.agent = Agent(
             system_prompt=origin_agent_system_prompt,
             model_group=self.model_group,
-            input_handler=[shell_input_handler, builtin_input_handler],
+            input_handler=[
+                shell_input_handler,
+                file_context_handler,
+                builtin_input_handler,
+            ],
             output_handler=[ToolRegistry()],  # type: ignore
             need_summary=False,
             use_methodology=self.use_methodology,
