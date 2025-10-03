@@ -215,18 +215,37 @@ def handle_backup_option(backup: bool) -> bool:
     return True
 
 
-def handle_restore_option(restore_path: Optional[str]) -> bool:
+def handle_restore_option(restore_path: Optional[str], config_file: Optional[str]) -> bool:
     """处理数据恢复选项，返回是否已处理并需提前结束。"""
     if not restore_path:
         return False
 
-    restore_file = Path(restore_path)
+    restore_file = Path(os.path.expanduser(os.path.expandvars(restore_path)))
+    # 兼容 ~ 与环境变量，避免用户输入未展开路径导致找不到文件
     if not restore_file.is_file():
-        PrettyOutput.print(f"指定的恢复文件不存在: {restore_path}", OutputType.ERROR)
+        PrettyOutput.print(f"指定的恢复文件不存在: {restore_file}", OutputType.ERROR)
         return True
 
-    init_env("", config_file=None)
-    data_dir = Path(get_data_dir())
+    # 在恢复数据时不要触发完整环境初始化，避免引导流程或网络请求
+    # 优先从配置文件解析 JARVIS_DATA_PATH，否则回退到默认数据目录
+    data_dir_str: Optional[str] = None
+    try:
+        if config_file:
+            cfg_path = Path(os.path.expanduser(os.path.expandvars(config_file)))
+            if cfg_path.is_file():
+                with open(cfg_path, "r", encoding="utf-8", errors="ignore") as cf:
+                    cfg_data = yaml.safe_load(cf) or {}
+                if isinstance(cfg_data, dict):
+                    val = cfg_data.get("JARVIS_DATA_PATH")
+                    if isinstance(val, str) and val.strip():
+                        data_dir_str = val.strip()
+    except Exception:
+        data_dir_str = None
+
+    if not data_dir_str:
+        data_dir_str = get_data_dir()
+
+    data_dir = Path(os.path.expanduser(os.path.expandvars(str(data_dir_str))))
 
     if data_dir.exists():
         if not user_confirm(
@@ -609,7 +628,7 @@ def run_cli(
         return
 
     # 处理数据恢复
-    if handle_restore_option(restore_data):
+    if handle_restore_option(restore_data, config_file):
         return
 
     # 处理配置文件编辑
