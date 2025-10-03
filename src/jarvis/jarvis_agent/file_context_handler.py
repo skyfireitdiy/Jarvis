@@ -32,7 +32,7 @@ def count_lines(filepath: str) -> int:
 def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     """
     Extracts file paths from the input, reads their content if they are valid text files
-    with less than 500 lines, and appends the content to the input.
+    and appends the content to the input.
 
     Args:
         user_input: The user's input string.
@@ -54,7 +54,7 @@ def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     for path in file_paths:
         if os.path.isfile(path) and is_text_file(path):
             line_count = count_lines(path)
-            if line_count > 0 and line_count < 500:
+            if line_count > 0:
                 # Use ReadCodeTool to get formatted content
                 result = read_code_tool._handle_single_file(path)
                 if result["success"]:
