@@ -462,6 +462,20 @@ def handle_builtin_config_selector(
                         )
 
             if options:
+                # Add a default option to skip selection
+                options.insert(
+                    0,
+                    {
+                        "category": "skip",
+                        "cmd": "",
+                        "file": "",
+                        "name": "跳过选择 (使用默认通用代理)",
+                        "desc": "直接按回车或ESC也可跳过",
+                        "details": "",
+                        "roles_count": 0,
+                    },
+                )
+
                 PrettyOutput.section("可用的内置配置", OutputType.SUCCESS)
                 # 使用 rich Table 呈现
                 table = Table(show_header=True, header_style="bold magenta")
@@ -530,35 +544,44 @@ def handle_builtin_config_selector(
                 if choice_index != -1:
                     try:
                         sel = options[choice_index]
-                        args: List[str] = []
+                        # If the "skip" option is chosen, do nothing and proceed to default agent
+                        if sel["category"] == "skip":
+                            pass
+                        else:
+                            args: List[str] = []
 
-                        if sel["category"] == "agent":
-                            # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
-                            args = [str(sel["cmd"]), "-c", str(sel["file"])]
-                            if model_group:
-                                args += ["-g", str(model_group)]
-                            if config_file:
-                                args += ["-f", str(config_file)]
-                            if task:
-                                args += ["--task", str(task)]
+                            if sel["category"] == "agent":
+                                # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
+                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
+                                if model_group:
+                                    args += ["-g", str(model_group)]
+                                if config_file:
+                                    args += ["-f", str(config_file)]
+                                if task:
+                                    args += ["--task", str(task)]
 
-                        elif sel["category"] == "multi_agent":
-                            # jarvis-multi-agent 需要 -c/--config，用户输入通过 -i/--input 传递
-                            args = [str(sel["cmd"]), "-c", str(sel["file"])]
-                            if task:
-                                args += ["-i", str(task)]
+                            elif sel["category"] == "multi_agent":
+                                # jarvis-multi-agent 需要 -c/--config，用户输入通过 -i/--input 传递
+                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
+                                if task:
+                                    args += ["-i", str(task)]
 
-                        elif sel["category"] == "roles":
-                            # jarvis-platform-manager role 子命令，支持 -c/-t/-g
-                            args = [str(sel["cmd"]), "role", "-c", str(sel["file"])]
-                            if model_group:
-                                args += ["-g", str(model_group)]
+                            elif sel["category"] == "roles":
+                                # jarvis-platform-manager role 子命令，支持 -c/-t/-g
+                                args = [
+                                    str(sel["cmd"]),
+                                    "role",
+                                    "-c",
+                                    str(sel["file"]),
+                                ]
+                                if model_group:
+                                    args += ["-g", str(model_group)]
 
-                        if args:
-                            PrettyOutput.print(
-                                f"正在启动: {' '.join(args)}", OutputType.INFO
-                            )
-                            os.execvp(args[0], args)
+                            if args:
+                                PrettyOutput.print(
+                                    f"正在启动: {' '.join(args)}", OutputType.INFO
+                                )
+                                os.execvp(args[0], args)
                     except Exception:
                         # 任何异常都不影响默认流程
                         pass
