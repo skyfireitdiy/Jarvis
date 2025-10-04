@@ -147,11 +147,13 @@ class SearchWebTool:
                 if model.support_web():
                     model.set_web(True)
                     model.set_suppress_output(False)
-                    return {
-                        "stdout": model.chat_until_success(query),
-                        "stderr": "",
-                        "success": True,
-                    }
+                    response = model.chat_until_success(query)
+                    if response and response.strip():
+                        return {
+                            "stdout": response,
+                            "stderr": "",
+                            "success": True,
+                        }
 
         # 否则使用现有的模型选择流程
         if agent.model.support_web():
@@ -161,11 +163,13 @@ class SearchWebTool:
             model.set_model_name(agent.model.name())
             model.set_web(True)
             model.set_suppress_output(False)
-            return {
-                "stdout": model.chat_until_success(query),
-                "stderr": "",
-                "success": True,
-            }
+            response = model.chat_until_success(query)
+            if response and response.strip():
+                return {
+                    "stdout": response,
+                    "stderr": "",
+                    "success": True,
+                }
 
         return self._search_with_ddgs(query, agent)
 
