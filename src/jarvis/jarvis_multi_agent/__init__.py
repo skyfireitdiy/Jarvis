@@ -154,9 +154,30 @@ content: |2
                 PrettyOutput.print(f"未知消息类型: {type(msg)}", OutputType.WARNING)
                 break
 
+            # Generate a brief summary via direct model call to avoid run-loop recursion
+            try:
+                # 参照 Agent.generate_summary 的实现思路：基于当前 session.prompt 追加请求提示，直接调用底层模型
+                multi_agent_summary_prompt = """
+请基于当前会话，为即将发送给其他智能体的协作交接写一段摘要，包含：
+- 已完成的主要工作与产出
+- 关键决策及其理由
+- 已知的约束/风险/边界条件
+- 未解决的问题与待澄清点
+- 下一步建议与对目标智能体的具体请求
+要求：
+- 仅输出纯文本，不包含任何指令或工具调用
+- 使用简洁的要点式表述
+""".strip()
+                summary_any: Any = agent.model.chat_until_success(  # type: ignore[attr-defined]
+                    f"{agent.session.prompt}\n{multi_agent_summary_prompt}"
+                )
+                summary_text = summary_any.strip() if isinstance(summary_any, str) else ""
+            except Exception:
+                summary_text = ""
             prompt = f"""
 Please handle this message:
 from: {last_agent_name}
+summary_of_sender_work: {summary_text}
 content: {msg['content']}
 """
             to_agent_name = msg.get("to")
