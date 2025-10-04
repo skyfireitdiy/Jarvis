@@ -13,7 +13,6 @@ agents:
       - ask_user
       - rewrite_file
       - edit_file
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
@@ -62,7 +61,6 @@ agents:
       - edit_file
       - execute_script
       - search_web
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
@@ -112,7 +110,6 @@ agents:
       - edit_file
       - execute_script
       - search_web
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
@@ -150,7 +147,6 @@ agents:
       - edit_file
       - execute_script
       - search_web
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
