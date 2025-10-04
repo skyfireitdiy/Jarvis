@@ -184,7 +184,6 @@ agents:
       - edit_file
       - execute_script
       - search_web
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
@@ -221,7 +220,6 @@ agents:
       - rewrite_file
       - edit_file
       - search_web
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
@@ -268,7 +266,6 @@ agents:
       - rewrite_file
       - edit_file
       - search_web
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
@@ -316,7 +313,6 @@ agents:
       - edit_file
       - execute_script
       - search_web
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
@@ -362,7 +358,6 @@ agents:
       - rewrite_file
       - edit_file
       - search_web
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
@@ -407,7 +402,6 @@ agents:
       - read_code
       - rewrite_file
       - edit_file
-      - SEND_MESSAGE
       - save_memory
       - retrieve_memory
     system_prompt: |
