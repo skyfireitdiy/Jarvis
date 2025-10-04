@@ -58,7 +58,8 @@ class WebpageTool:
 2. 包含网页标题
 3. 根据用户需求提供准确、完整的信息"""
                         response = model.chat_until_success(prompt)  # type: ignore
-                        return {"success": True, "stdout": response, "stderr": ""}
+                        if response and response.strip():
+                            return {"success": True, "stdout": response, "stderr": ""}
 
             # 2) 然后尝试使用默认平台（normal）的 web 能力
             model = PlatformRegistry().get_normal_platform()
@@ -73,7 +74,8 @@ class WebpageTool:
 2. 包含网页标题
 3. 根据用户需求提供准确、完整的信息"""
                 response = model.chat_until_success(prompt)  # type: ignore
-                return {"success": True, "stdout": response, "stderr": ""}
+                if response and response.strip():
+                    return {"success": True, "stdout": response, "stderr": ""}
 
             # 3) 回退：使用 requests 抓取网页，再用模型分析
 
