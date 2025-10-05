@@ -30,6 +30,32 @@ import yaml  # type: ignore
 from rich.table import Table
 from rich.console import Console
 
+import sys
+
+
+def _normalize_backup_data_argv(argv: List[str]) -> None:
+    """
+    兼容旧版 Click/Typer 对可选参数的解析差异：
+    若用户仅提供 --backup-data 而不跟参数，则在解析前注入默认目录。
+    """
+    try:
+        i = 0
+        while i < len(argv):
+            tok = argv[i]
+            if tok == "--backup-data":
+                # 情况1：位于末尾，无参数
+                # 情况2：后续是下一个选项（以 '-' 开头），表示未提供参数
+                if i == len(argv) - 1 or (i + 1 < len(argv) and argv[i + 1].startswith("-")):
+                    argv.insert(i + 1, "~/jarvis_backups")
+                    i += 1  # 跳过我们插入的默认值，避免重复插入
+            i += 1
+    except Exception:
+        # 静默忽略任何异常，避免影响主流程
+        pass
+
+
+_normalize_backup_data_argv(sys.argv)
+
 app = typer.Typer(help="Jarvis AI 助手")
 
 
@@ -638,7 +664,7 @@ def run_cli(
         "--backup-data",
         help="备份 Jarvis 数据目录. 可选地传入备份目录. 默认为 '~/jarvis_backups'",
         show_default=False,
-        flag_value="",
+        flag_value="~/jarvis_backups",
     ),
     restore_data: Optional[str] = typer.Option(
         None, "--restore-data", help="从指定的压缩包恢复 Jarvis 数据"
