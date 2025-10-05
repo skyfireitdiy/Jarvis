@@ -187,9 +187,9 @@ def handle_interactive_config_option(
         return True
 
 
-def handle_backup_option(backup: bool) -> bool:
+def handle_backup_option(backup_dir_path: Optional[str]) -> bool:
     """处理数据备份选项，返回是否已处理并需提前结束。"""
-    if not backup:
+    if backup_dir_path is None:
         return False
 
     init_env("", config_file=None)
@@ -198,7 +198,8 @@ def handle_backup_option(backup: bool) -> bool:
         PrettyOutput.print(f"数据目录不存在: {data_dir}", OutputType.ERROR)
         return True
 
-    backup_dir = Path(os.path.expanduser("~/jarvis_backups"))
+    backup_dir_str = backup_dir_path if backup_dir_path.strip() else "~/jarvis_backups"
+    backup_dir = Path(os.path.expanduser(backup_dir_str))
     backup_dir.mkdir(exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -632,8 +633,11 @@ def run_cli(
         "--disable-methodology-analysis",
         help="禁用方法论和任务分析（覆盖配置文件设置）",
     ),
-    backup_data: bool = typer.Option(
-        False, "--backup-data", help="备份 Jarvis 数据目录 (~/.jarvis)"
+    backup_data: Optional[str] = typer.Option(
+        None,
+        "--backup-data",
+        help="备份 Jarvis 数据目录. 可选地传入备份目录. 默认为 '~/jarvis_backups'",
+        show_default=False,
     ),
     restore_data: Optional[str] = typer.Option(
         None, "--restore-data", help="从指定的压缩包恢复 Jarvis 数据"
