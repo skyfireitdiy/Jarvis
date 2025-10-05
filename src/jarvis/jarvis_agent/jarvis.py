@@ -638,6 +638,7 @@ def run_cli(
         "--backup-data",
         help="备份 Jarvis 数据目录. 可选地传入备份目录. 默认为 '~/jarvis_backups'",
         show_default=False,
+        flag_value="",
     ),
     restore_data: Optional[str] = typer.Option(
         None, "--restore-data", help="从指定的压缩包恢复 Jarvis 数据"
