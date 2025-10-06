@@ -746,3 +746,13 @@ def is_immediate_abort() -> bool:
     默认关闭
     """
     return GLOBAL_CONFIG_DATA.get("JARVIS_IMMEDIATE_ABORT", False) is True
+
+
+def is_non_interactive() -> bool:
+    """
+    获取是否启用非交互模式。
+
+    返回：
+        bool: 如果启用非交互模式则返回True，默认为False
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_NON_INTERACTIVE", False) is True

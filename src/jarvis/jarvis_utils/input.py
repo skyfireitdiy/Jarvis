@@ -366,6 +366,9 @@ class FileCompleter(Completer):
 def user_confirm(tip: str, default: bool = True) -> bool:
     """提示用户确认是/否问题"""
     try:
+        from jarvis.jarvis_utils.config import is_non_interactive
+        if is_non_interactive():
+            return default
         suffix = "[Y/n]" if default else "[y/N]"
         ret = get_single_line_input(f"{tip} {suffix}: ")
         return default if ret == "" else ret.lower() == "y"
@@ -663,6 +666,9 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     preset: Optional[str] = None
     preset_cursor: Optional[int] = None
     while True:
+        from jarvis.jarvis_utils.config import is_non_interactive
+        if is_non_interactive():
+            return "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务"
         user_input = _get_multiline_input_internal(
             tip, preset=preset, preset_cursor=preset_cursor
         )

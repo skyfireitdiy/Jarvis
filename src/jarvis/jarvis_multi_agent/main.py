@@ -3,10 +3,12 @@ from typing import Optional
 
 import typer
 import yaml  # type: ignore[import-untyped]
+import os
 
 from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 app = typer.Typer(help="多智能体系统启动器")
@@ -18,8 +20,29 @@ def cli(
     user_input: Optional[str] = typer.Option(
         None, "--input", "-i", help="用户输入（可选）"
     ),
+    non_interactive: bool = typer.Option(
+        False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
+    ),
+    ),
 ):
     """从YAML配置文件初始化并运行多智能体系统"""
+    # CLI 标志：非交互模式（不依赖配置文件）
+    if non_interactive:
+        try:
+            os.environ["JARVIS_NON_INTERACTIVE"] = "true"
+        except Exception:
+            pass
+        try:
+            set_config("JARVIS_NON_INTERACTIVE", True)
+        except Exception:
+            pass
+    # 非交互模式要求从命令行传入任务
+    if non_interactive and not (user_input and str(user_input).strip()):
+        PrettyOutput.print(
+            "非交互模式已启用：必须使用 --input 传入任务内容，因多行输入不可用。",
+            OutputType.ERROR,
+        )
+        raise typer.Exit(code=2)
     init_env("欢迎使用 Jarvis-MultiAgent，您的多智能体系统已准备就绪！")
 
     try:
