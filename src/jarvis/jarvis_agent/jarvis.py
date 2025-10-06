@@ -319,6 +319,9 @@ def try_switch_to_jca_if_git_repo(
     task: Optional[str],
 ) -> None:
     """在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）。"""
+    # 非交互模式下跳过代码模式切换提示与相关输出
+    if is_non_interactive():
+        return
     if is_enable_git_repo_jca_switch():
         try:
             res = subprocess.run(
@@ -729,13 +732,14 @@ def run_cli(
     preload_config_for_flags(config_file)
 
     # 在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）
-    try_switch_to_jca_if_git_repo(
-        model_group, tool_group, config_file, restore_session, task
-    )
+    if not non_interactive:
+        try_switch_to_jca_if_git_repo(
+            model_group, tool_group, config_file, restore_session, task
+        )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
     # 非交互模式下跳过内置角色/配置选择
-    if not is_non_interactive():
+    if not non_interactive:
         handle_builtin_config_selector(model_group, tool_group, config_file, task)
 
     # 初始化环境

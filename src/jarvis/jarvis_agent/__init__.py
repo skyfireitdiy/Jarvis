@@ -439,6 +439,8 @@ class Agent:
         self.summary_prompt = cfg.summary_prompt or DEFAULT_SUMMARY_PROMPT
         self.max_token_count = int(cfg.max_token_count or get_max_token_count(model_group))
         self.force_save_memory = bool(cfg.force_save_memory)
+        # 非交互模式下自动完成标志需要同步到 Agent 实例，避免循环
+        self.auto_complete = bool(cfg.auto_complete)
 
         # 聚合配置到 AgentConfig，作为后续单一事实来源（保持兼容，不改变既有属性使用）
         self.config = cfg
