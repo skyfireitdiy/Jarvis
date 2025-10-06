@@ -19,6 +19,8 @@ from jarvis.jarvis_utils.config import (
     get_multi_agent_dirs,
     get_roles_dirs,
     get_data_dir,
+    set_config,
+    is_non_interactive,
 )
 import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_utils.input import user_confirm, get_single_line_input
@@ -669,6 +671,9 @@ def run_cli(
     restore_data: Optional[str] = typer.Option(
         None, "--restore-data", help="从指定的压缩包恢复 Jarvis 数据"
     ),
+    non_interactive: bool = typer.Option(
+        False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -676,6 +681,25 @@ def run_cli(
 
     # 使用 rich 输出命令与快捷方式总览
     print_commands_overview()
+
+    # CLI 标志：非交互模式（不依赖配置文件）
+    if non_interactive:
+        try:
+            os.environ["JARVIS_NON_INTERACTIVE"] = "true"
+        except Exception:
+            pass
+        try:
+            set_config("JARVIS_NON_INTERACTIVE", True)
+        except Exception:
+            pass
+
+    # 非交互模式要求从命令行传入任务
+    if non_interactive and not (task and str(task).strip()):
+        PrettyOutput.print(
+            "非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。",
+            OutputType.ERROR,
+        )
+        raise typer.Exit(code=2)
 
     # 处理数据备份
     if handle_backup_option(backup_data):
@@ -710,7 +734,9 @@ def run_cli(
     )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
-    handle_builtin_config_selector(model_group, tool_group, config_file, task)
+    # 非交互模式下跳过内置角色/配置选择
+    if not is_non_interactive():
+        handle_builtin_config_selector(model_group, tool_group, config_file, task)
 
     # 初始化环境
     init_env(

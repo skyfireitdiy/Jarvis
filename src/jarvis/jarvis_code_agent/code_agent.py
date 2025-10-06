@@ -24,6 +24,7 @@ from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
     is_enable_static_analysis,
     get_git_check_mode,
+    set_config,
 )
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
@@ -775,7 +776,6 @@ class CodeAgent:
 
 @app.command()
 def cli(
-
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -806,8 +806,28 @@ def cli(
         "--suffix",
         help="提交信息后缀（用换行分隔）",
     ),
+    non_interactive: bool = typer.Option(
+        False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
+    ),
 ) -> None:
     """Jarvis主入口点。"""
+    # CLI 标志：非交互模式（不依赖配置文件）
+    if non_interactive:
+        try:
+            os.environ["JARVIS_NON_INTERACTIVE"] = "true"
+        except Exception:
+            pass
+        try:
+            set_config("JARVIS_NON_INTERACTIVE", True)
+        except Exception:
+            pass
+    # 非交互模式要求从命令行传入任务
+    if non_interactive and not (requirement and str(requirement).strip()):
+        PrettyOutput.print(
+            "非交互模式已启用：必须使用 --requirement 传入任务内容，因多行输入不可用。",
+            OutputType.ERROR,
+        )
+        raise typer.Exit(code=2)
     init_env(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
         config_file=config_file,

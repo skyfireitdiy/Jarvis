@@ -9,6 +9,7 @@ from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.config import set_config
 
 app = typer.Typer(help="Jarvis AI 助手")
 
@@ -46,13 +47,33 @@ def cli(
         None, "-c", "--agent-definition", help="代理定义文件路径"
     ),
     task: Optional[str] = typer.Option(None, "-T", "--task", help="初始任务内容"),
-
+    
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
+    non_interactive: bool = typer.Option(
+        False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
+    ),
 ):
     """Main entry point for Jarvis agent"""
-    # Initialize environment
+    # CLI 标志：非交互模式（不依赖配置文件）
+    if non_interactive:
+        try:
+            os.environ["JARVIS_NON_INTERACTIVE"] = "true"
+        except Exception:
+            pass
+        try:
+            set_config("JARVIS_NON_INTERACTIVE", True)
+        except Exception:
+            pass
+    # 非交互模式要求从命令行传入任务
+    if non_interactive and not (task and str(task).strip()):
+        PrettyOutput.print(
+            "非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。",
+            OutputType.ERROR,
+        )
+        raise typer.Exit(code=2)
+    # Initialize环境
     init_env(
         "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file
     )

@@ -19,6 +19,7 @@ class ScriptTool:
         + "注意：由于模型上下文长度限制，请避免在脚本中输出大量信息，应该使用rg过滤输出。"
         + "与virtual_tty不同，此工具会创建一个临时的脚本文件，并使用脚本命令执行脚本，不具备交互式操作的能力，"
         + "适用于需要执行脚本并获取结果的场景。不适合需要交互式操作的场景（如：ssh连接、sftp传输、gdb/dlv调试等）。"
+        + "在非交互模式（JARVIS_NON_INTERACTIVE=true）下：脚本执行时间限制为5分钟，超时将被终止并返回超时信息；用户无法与命令交互，请不要执行需要交互的命令。"
     )
     parameters = {
         "type": "object",
@@ -115,8 +116,37 @@ class ScriptTool:
                     f"script -q -c '{interpreter} {script_path}' {output_file}"
                 )
 
-                # Execute command and capture return code
-                os.system(tee_command)
+                # Execute command with optional timeout in non-interactive mode
+                from jarvis.jarvis_utils.config import is_non_interactive
+                import subprocess
+
+                timed_out = False
+                if is_non_interactive():
+                    try:
+                        proc = subprocess.Popen(tee_command, shell=True)
+                        try:
+                            proc.wait(timeout=300)  # 5 minutes
+                        except subprocess.TimeoutExpired:
+                            timed_out = True
+                            try:
+                                proc.kill()
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        PrettyOutput.print(str(e), OutputType.ERROR)
+                        # Attempt to read any partial output if available
+                        try:
+                            output = self.get_display_output(output_file)
+                        except Exception as ee:
+                            output = f"读取输出文件失败: {str(ee)}"
+                        return {
+                            "success": False,
+                            "stdout": output,
+                            "stderr": f"执行脚本失败: {str(e)}",
+                        }
+                else:
+                    # Execute command and capture return code
+                    os.system(tee_command)
 
                 # Read and process output file
                 try:
@@ -125,12 +155,19 @@ class ScriptTool:
                 except Exception as e:
                     output = f"读取输出文件失败: {str(e)}"
 
-                # Return successful result
-                return {
-                    "success": True,
-                    "stdout": output,
-                    "stderr": "",
-                }
+                # Return result (handle timeout in non-interactive mode)
+                if is_non_interactive() and timed_out:
+                    return {
+                        "success": False,
+                        "stdout": output,
+                        "stderr": "执行超时（超过5分钟），进程已被终止（非交互模式）。",
+                    }
+                else:
+                    return {
+                        "success": True,
+                        "stdout": output,
+                        "stderr": "",
+                    }
 
             finally:
                 # Clean up temporary files
