@@ -77,6 +77,15 @@ def cli(
     init_env(
         "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file
     )
+    # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
+    try:
+        if model_group:
+            set_config("JARVIS_LLM_GROUP", str(model_group))
+        if non_interactive:
+            set_config("JARVIS_NON_INTERACTIVE", True)
+    except Exception:
+        # 静默忽略同步异常，不影响主流程
+        pass
 
     # Load configuration
     config = load_config(agent_definition) if agent_definition else {}

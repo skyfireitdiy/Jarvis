@@ -691,10 +691,22 @@ def run_cli(
             os.environ["JARVIS_NON_INTERACTIVE"] = "true"
         except Exception:
             pass
-        try:
-            set_config("JARVIS_NON_INTERACTIVE", True)
-        except Exception:
-            pass
+        # 注意：全局配置同步在 init_env 之后执行，避免被覆盖
+
+    # 同步其他 CLI 选项到全局配置，确保后续模块读取一致
+    try:
+        if model_group:
+            set_config("JARVIS_LLM_GROUP", str(model_group))
+        if tool_group:
+            set_config("JARVIS_TOOL_GROUP", str(tool_group))
+        if disable_methodology_analysis:
+            set_config("JARVIS_USE_METHODOLOGY", False)
+            set_config("JARVIS_USE_ANALYSIS", False)
+        if restore_session:
+            set_config("JARVIS_RESTORE_SESSION", True)
+    except Exception:
+        # 静默忽略同步异常，不影响主流程
+        pass
 
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (task and str(task).strip()):
@@ -746,6 +758,24 @@ def run_cli(
     init_env(
         "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file
     )
+
+    # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
+    try:
+        if model_group:
+            set_config("JARVIS_LLM_GROUP", str(model_group))
+        if tool_group:
+            set_config("JARVIS_TOOL_GROUP", str(tool_group))
+        if disable_methodology_analysis:
+            set_config("JARVIS_USE_METHODOLOGY", False)
+            set_config("JARVIS_USE_ANALYSIS", False)
+        if restore_session:
+            set_config("JARVIS_RESTORE_SESSION", True)
+        if non_interactive:
+            # 保持运行期非交互标志
+            set_config("JARVIS_NON_INTERACTIVE", True)
+    except Exception:
+        # 静默忽略同步异常，不影响主流程
+        pass
 
     # 运行主流程
     try:

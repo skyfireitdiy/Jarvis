@@ -817,10 +817,7 @@ def cli(
             os.environ["JARVIS_NON_INTERACTIVE"] = "true"
         except Exception:
             pass
-        try:
-            set_config("JARVIS_NON_INTERACTIVE", True)
-        except Exception:
-            pass
+        # 注意：全局配置同步放在 init_env 之后执行，避免被 init_env 覆盖
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (requirement and str(requirement).strip()):
         PrettyOutput.print(
@@ -832,6 +829,20 @@ def cli(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
         config_file=config_file,
     )
+
+    # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
+    try:
+        if model_group:
+            set_config("JARVIS_LLM_GROUP", str(model_group))
+        if tool_group:
+            set_config("JARVIS_TOOL_GROUP", str(tool_group))
+        if restore_session:
+            set_config("JARVIS_RESTORE_SESSION", True)
+        if non_interactive:
+            set_config("JARVIS_NON_INTERACTIVE", True)
+    except Exception:
+        # 静默忽略同步异常，不影响主流程
+        pass
 
     try:
         subprocess.run(

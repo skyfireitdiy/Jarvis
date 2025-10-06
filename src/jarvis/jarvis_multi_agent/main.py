@@ -32,10 +32,7 @@ def cli(
             os.environ["JARVIS_NON_INTERACTIVE"] = "true"
         except Exception:
             pass
-        try:
-            set_config("JARVIS_NON_INTERACTIVE", True)
-        except Exception:
-            pass
+        # 注意：全局配置同步在 init_env 之后执行，避免被覆盖
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (user_input and str(user_input).strip()):
         PrettyOutput.print(
@@ -44,6 +41,14 @@ def cli(
         )
         raise typer.Exit(code=2)
     init_env("欢迎使用 Jarvis-MultiAgent，您的多智能体系统已准备就绪！")
+    
+    # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
+    try:
+        if non_interactive:
+            set_config("JARVIS_NON_INTERACTIVE", True)
+    except Exception:
+        # 静默忽略同步异常，不影响主流程
+        pass
 
     try:
         with open(config, "r", errors="ignore") as f:
