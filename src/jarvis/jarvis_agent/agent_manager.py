@@ -48,11 +48,6 @@ class AgentManager:
         self.agent = Agent(
             system_prompt=origin_agent_system_prompt,
             model_group=self.model_group,
-            input_handler=[
-                shell_input_handler,
-                file_context_handler,
-                builtin_input_handler,
-            ],
             output_handler=[ToolRegistry()],  # type: ignore
             need_summary=False,
             use_methodology=self.use_methodology,

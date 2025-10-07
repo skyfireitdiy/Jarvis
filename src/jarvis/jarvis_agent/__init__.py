@@ -54,6 +54,9 @@ from jarvis.jarvis_agent.events import (
 from jarvis.jarvis_agent.user_interaction import UserInteractionHandler
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.methodology import _load_all_methodologies
+from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
+from jarvis.jarvis_agent.file_context_handler import file_context_handler
+from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 
 # jarvis_platform 相关
 from jarvis.jarvis_platform.base import BasePlatform
@@ -274,7 +277,6 @@ class Agent:
         auto_complete: bool = False,
         output_handler: Optional[List[OutputHandlerProtocol]] = None,
         use_tools: Optional[List[str]] = None,
-        input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]] = None,
         execute_tool_confirm: Optional[bool] = None,
         need_summary: bool = True,
         multiline_inputer: Optional[Callable[[str], str]] = None,
@@ -294,7 +296,6 @@ class Agent:
             summary_prompt: 任务总结提示模板
             auto_complete: 是否自动完成任务
             output_handler: 输出处理器列表
-            input_handler: 输入处理器列表
             execute_tool_confirm: 执行工具前是否需要确认
             need_summary: 是否需要生成总结
             multiline_inputer: 多行输入处理器
@@ -327,7 +328,6 @@ class Agent:
         # 初始化处理器
         self._init_handlers(
             output_handler or [],
-            input_handler,
             multiline_inputer,
             use_tools or [],
         )
@@ -395,14 +395,17 @@ class Agent:
     def _init_handlers(
         self,
         output_handler: List[OutputHandlerProtocol],
-        input_handler: Optional[List[Callable[[str, Any], Tuple[str, bool]]]],
         multiline_inputer: Optional[Callable[[str], str]],
         use_tools: List[str],
     ):
         """初始化各种处理器"""
         self.output_handler = output_handler or [ToolRegistry()]
         self.set_use_tools(use_tools)
-        self.input_handler = input_handler or []
+        self.input_handler = [
+            builtin_input_handler,
+            shell_input_handler,
+            file_context_handler,
+        ]
         self.multiline_inputer = multiline_inputer or get_multiline_input
 
     def _init_config(
