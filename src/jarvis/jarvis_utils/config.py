@@ -81,10 +81,10 @@ def get_max_token_count(model_group_override: Optional[str] = None) -> int:
     获取模型允许的最大token数量。
 
     返回:
-        int: 模型能处理的最大token数量，为最大输入token数量的100倍。
+        int: 模型能处理的最大token数量，为最大输入token数量的30倍。
     """
     max_input_tokens = get_max_input_token_count(model_group_override)
-    return max_input_tokens * 100
+    return max_input_tokens * 30
 
 
 def get_max_input_token_count(model_group_override: Optional[str] = None) -> int:
