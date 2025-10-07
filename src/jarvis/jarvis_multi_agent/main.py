@@ -23,7 +23,6 @@ def cli(
     non_interactive: bool = typer.Option(
         False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
     ),
-    ),
 ):
     """从YAML配置文件初始化并运行多智能体系统"""
     # CLI 标志：非交互模式（不依赖配置文件）
