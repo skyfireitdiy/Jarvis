@@ -117,7 +117,7 @@ class ScriptTool:
                 )
 
                 # Execute command with optional timeout in non-interactive mode
-                from jarvis.jarvis_utils.config import is_non_interactive
+                from jarvis.jarvis_utils.config import get_script_execution_timeout, is_non_interactive
                 import subprocess
 
                 timed_out = False
@@ -125,7 +125,7 @@ class ScriptTool:
                     try:
                         proc = subprocess.Popen(tee_command, shell=True)
                         try:
-                            proc.wait(timeout=300)  # 5 minutes
+                            proc.wait(timeout=get_script_execution_timeout())
                         except subprocess.TimeoutExpired:
                             timed_out = True
                             try:
@@ -160,7 +160,7 @@ class ScriptTool:
                     return {
                         "success": False,
                         "stdout": output,
-                        "stderr": "执行超时（超过5分钟），进程已被终止（非交互模式）。",
+                        "stderr": f"执行超时（超过{get_script_execution_timeout()}秒），进程已被终止（非交互模式）。",
                     }
                 else:
                     return {
