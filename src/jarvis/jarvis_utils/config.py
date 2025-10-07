@@ -712,6 +712,16 @@ def get_tool_filter_threshold() -> int:
     return int(GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_FILTER_THRESHOLD", 30))
 
 
+def get_script_execution_timeout() -> int:
+    """
+    获取脚本执行的超时时间（秒）。
+
+    返回:
+        int: 超时时间，默认为300秒（5分钟）
+    """
+    return int(GLOBAL_CONFIG_DATA.get("JARVIS_SCRIPT_EXECUTION_TIMEOUT", 300))
+
+
 def is_enable_git_repo_jca_switch() -> bool:
     """
     是否启用：在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）

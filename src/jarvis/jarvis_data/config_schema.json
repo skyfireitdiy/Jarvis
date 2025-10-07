@@ -188,6 +188,11 @@
       "description": "AI工具筛选阈值：当可用工具数量超过此值时触发AI筛选",
       "default": 30
     },
+    "JARVIS_SCRIPT_EXECUTION_TIMEOUT": {
+      "type": "number",
+      "description": "脚本执行的超时时间（秒），仅在非交互模式下生效。",
+      "default": 300
+    },
     "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
       "type": "boolean",
       "description": "应用补丁前是否需要确认",
