@@ -130,9 +130,6 @@ content: |2
                 output_handler.append(self)
         config["output_handler"] = output_handler
 
-        # 移除 input_handler，因为它已由 Agent 内部处理
-        config.pop("input_handler", None)
-
         agent = Agent(**config)
         self.agents[name] = agent
         return agent

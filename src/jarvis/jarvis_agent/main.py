@@ -97,8 +97,6 @@ def cli(
 
     # Create and run agent
     try:
-        # 移除 input_handler，因为它已由 Agent 内部处理
-        config.pop("input_handler", None)
         agent = Agent(**config)
 
         # Run agent with initial task if specified
