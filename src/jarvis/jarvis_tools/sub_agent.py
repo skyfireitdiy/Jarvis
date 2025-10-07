@@ -137,14 +137,12 @@ class SubAgentTool:
             # 基于父Agent（如有）继承部分配置后创建子Agent
             parent_agent = args.get("agent", None)
             parent_model_group = None
-            parent_input_handler = None
             parent_execute_tool_confirm = None
             parent_multiline_inputer = None
             try:
                 if parent_agent is not None:
                     if getattr(parent_agent, "model", None):
                         parent_model_group = getattr(parent_agent.model, "model_group", None)
-                    parent_input_handler = getattr(parent_agent, "input_handler", None)
                     parent_execute_tool_confirm = getattr(parent_agent, "execute_tool_confirm", None)
                     parent_multiline_inputer = getattr(parent_agent, "multiline_inputer", None)
             except Exception:
@@ -160,7 +158,6 @@ class SubAgentTool:
                 auto_complete=auto_complete,
                 output_handler=None,
                 use_tools=None,
-                input_handler=parent_input_handler,
                 execute_tool_confirm=parent_execute_tool_confirm,
                 need_summary=need_summary,
                 multiline_inputer=parent_multiline_inputer,
