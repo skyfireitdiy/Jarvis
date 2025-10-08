@@ -15,6 +15,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import signal
+import atexit
+from pathlib import Path
 from typing import Any, Dict, Callable, Optional
 
 import uvicorn
@@ -426,6 +429,13 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
     """
     app = _build_app()
     app.state.agent = agent  # 供 WS 端点调用
+    # 兼容传入 Agent 或 AgentManager：
+    # - 若传入的是 AgentManager，则在每个任务开始前通过 initialize() 创建全新 Agent
+    # - 若传入的是 Agent 实例，则复用该 Agent（旧行为）
+    try:
+        app.state.agent_manager = agent if hasattr(agent, "initialize") else None
+    except Exception:
+        app.state.agent_manager = None
 
     @app.websocket("/ws")
     async def websocket_endpoint(ws: WebSocket) -> None:
@@ -468,7 +478,19 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                     text = data.get("text", "")
                     # 在后台线程运行，以避免阻塞事件循环
                     loop = asyncio.get_running_loop()
-                    loop.run_in_executor(None, _run_and_notify, app.state.agent, text)
+                    # 若提供了 AgentManager，则为每个任务创建新的 Agent 实例；否则复用现有 Agent
+                    try:
+                        if getattr(app.state, "agent_manager", None) and hasattr(app.state.agent_manager, "initialize"):
+                            new_agent = app.state.agent_manager.initialize()
+                            loop.run_in_executor(None, _run_and_notify, new_agent, text)
+                        else:
+                            loop.run_in_executor(None, _run_and_notify, app.state.agent, text)
+                    except Exception:
+                        # 回退到旧行为，避免因异常导致无法执行任务
+                        try:
+                            loop.run_in_executor(None, _run_and_notify, app.state.agent, text)
+                        except Exception:
+                            pass
                 else:
                     # 兼容未知消息类型
                     pass
@@ -582,4 +604,44 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                 pass
 
     PrettyOutput.print(f"启动 Jarvis Web 服务: http://{host}:{port}", OutputType.SUCCESS)
+    # 在服务端进程内也写入并维护 PID 文件，增强可检测性与可清理性
+    try:
+        pidfile = Path(os.path.expanduser("~/.jarvis")) / f"jarvis_web_{port}.pid"
+        try:
+            pidfile.parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            pidfile.write_text(str(os.getpid()), encoding="utf-8")
+        except Exception:
+            pass
+        # 退出时清理 PID 文件
+        def _cleanup_pidfile() -> None:
+            try:
+                pidfile.unlink(missing_ok=True)  # type: ignore[call-arg]
+            except Exception:
+                pass
+        try:
+            atexit.register(_cleanup_pidfile)
+        except Exception:
+            pass
+        # 处理 SIGTERM/SIGINT，清理后退出
+        def _signal_handler(signum, frame):  # type: ignore[no-untyped-def]
+            try:
+                _cleanup_pidfile()
+            finally:
+                try:
+                    os._exit(0)
+                except Exception:
+                    pass
+        try:
+            signal.signal(signal.SIGTERM, _signal_handler)
+        except Exception:
+            pass
+        try:
+            signal.signal(signal.SIGINT, _signal_handler)
+        except Exception:
+            pass
+    except Exception:
+        pass
     uvicorn.run(app, host=host, port=port)
