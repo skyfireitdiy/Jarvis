@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Agent管理器模块，负责Agent的初始化和任务执行"""
-from typing import Optional
+from typing import Optional, Callable
 
 import typer
 
@@ -29,6 +29,8 @@ class AgentManager:
         restore_session: bool = False,
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
+        multiline_inputer: Optional[Callable[[str], str]] = None,
+        confirm_callback: Optional[Callable[[str, bool], bool]] = None,
     ):
         self.model_group = model_group
         self.tool_group = tool_group
@@ -36,6 +38,9 @@ class AgentManager:
         self.use_methodology = use_methodology
         self.use_analysis = use_analysis
         self.agent: Optional[Agent] = None
+        # 可选：注入输入与确认回调，用于Web模式等前端替代交互
+        self.multiline_inputer = multiline_inputer
+        self.confirm_callback = confirm_callback
 
     def initialize(self) -> Agent:
         """初始化Agent"""
@@ -52,6 +57,8 @@ class AgentManager:
             need_summary=False,
             use_methodology=self.use_methodology,
             use_analysis=self.use_analysis,
+            multiline_inputer=self.multiline_inputer,
+            confirm_callback=self.confirm_callback,
         )
 
         # 尝试恢复会话

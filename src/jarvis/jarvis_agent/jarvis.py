@@ -677,6 +677,9 @@ def run_cli(
     non_interactive: bool = typer.Option(
         False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
     ),
+    web: bool = typer.Option(False, "--web", help="以 Web 模式启动，通过浏览器 WebSocket 交互"),
+    web_host: str = typer.Option("127.0.0.1", "--web-host", help="Web 服务主机"),
+    web_port: int = typer.Option(8765, "--web-port", help="Web 服务端口"),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -744,14 +747,14 @@ def run_cli(
     preload_config_for_flags(config_file)
 
     # 在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）
-    if not non_interactive:
+    if not non_interactive and not web:
         try_switch_to_jca_if_git_repo(
             model_group, tool_group, config_file, restore_session, task
         )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
     # 非交互模式下跳过内置角色/配置选择
-    if not non_interactive:
+    if not non_interactive and not web:
         handle_builtin_config_selector(model_group, tool_group, config_file, task)
 
     # 初始化环境
@@ -779,14 +782,45 @@ def run_cli(
 
     # 运行主流程
     try:
+        # 在 Web 模式下注入基于 WebSocket 的输入/确认回调
+        extra_kwargs = {}
+        if web:
+            try:
+                from jarvis.jarvis_agent.web_bridge import web_multiline_input, web_user_confirm
+                extra_kwargs["multiline_inputer"] = web_multiline_input
+                extra_kwargs["confirm_callback"] = web_user_confirm
+            except Exception as e:
+                PrettyOutput.print(f"Web 模式初始化失败（加载 Web 桥接模块）: {e}", OutputType.ERROR)
+                raise typer.Exit(code=1)
+
         agent_manager = AgentManager(
             model_group=model_group,
             tool_group=tool_group,
             restore_session=restore_session,
             use_methodology=False if disable_methodology_analysis else None,
             use_analysis=False if disable_methodology_analysis else None,
+            **extra_kwargs,
         )
-        agent_manager.initialize()
+        agent = agent_manager.initialize()
+
+        if web:
+            try:
+                from jarvis.jarvis_agent.web_output_sink import WebSocketOutputSink
+                from jarvis.jarvis_agent.web_server import start_web_server
+                from jarvis.jarvis_agent.stdio_redirect import enable_web_stdio_redirect
+                # 将 PrettyOutput 同步广播到浏览器端
+                PrettyOutput.add_sink(WebSocketOutputSink())
+                # 启用标准输出/错误的WebSocket重定向（捕获工具直接打印的输出）
+                enable_web_stdio_redirect()
+                PrettyOutput.print("以 Web 模式启动，请在浏览器中打开提供的地址进行交互。", OutputType.INFO)
+                # 启动 Web 服务（阻塞调用）
+                start_web_server(agent, host=web_host, port=web_port)
+                return
+            except Exception as e:
+                PrettyOutput.print(f"Web 模式启动失败: {e}", OutputType.ERROR)
+                raise typer.Exit(code=1)
+
+        # 默认 CLI 模式：运行任务（可能来自 --task 或交互输入）
         agent_manager.run_task(task)
     except typer.Exit:
         raise
