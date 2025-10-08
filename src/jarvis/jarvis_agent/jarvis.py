@@ -28,6 +28,7 @@ from jarvis.jarvis_utils.fzf import fzf_select
 import os
 import subprocess
 from pathlib import Path
+import signal
 import yaml  # type: ignore
 from rich.table import Table
 from rich.console import Console
@@ -680,6 +681,7 @@ def run_cli(
     web: bool = typer.Option(False, "--web", help="以 Web 模式启动，通过浏览器 WebSocket 交互"),
     web_host: str = typer.Option("127.0.0.1", "--web-host", help="Web 服务主机"),
     web_port: int = typer.Option(8765, "--web-port", help="Web 服务端口"),
+    stop: bool = typer.Option(False, "--stop", help="停止后台 Web 服务（需与 --web 一起使用）"),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -745,6 +747,224 @@ def run_cli(
 
     # 预加载配置（仅用于读取功能开关），不会显示欢迎信息或影响后续 init_env
     preload_config_for_flags(config_file)
+    # Web 模式后台管理：支持 --web 后台启动与 --web --stop 停止
+    if web:
+        # PID 文件路径（按端口区分，便于多实例）
+        pidfile = Path(os.path.expanduser("~/.jarvis")) / f"jarvis_web_{web_port}.pid"
+        # 停止后台服务
+        if stop:
+            try:
+                pf = pidfile
+                if not pf.exists():
+                    # 兼容旧版本：回退检查数据目录中的旧 PID 文件位置
+                    try:
+                        pf_alt = Path(os.path.expanduser(os.path.expandvars(get_data_dir()))) / f"jarvis_web_{web_port}.pid"
+                    except Exception:
+                        pf_alt = None  # type: ignore[assignment]
+                    if pf_alt and pf_alt.exists():  # type: ignore[truthy-bool]
+                        pf = pf_alt
+                if not pf.exists():
+                    # 进一步回退：尝试按端口查找并停止（无 PID 文件）
+                    killed_any = False
+                    try:
+                        res = subprocess.run(
+                            ["lsof", "-iTCP:%d" % web_port, "-sTCP:LISTEN", "-t"],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if res.returncode == 0 and res.stdout.strip():
+                            for ln in res.stdout.strip().splitlines():
+                                try:
+                                    candidate_pid = int(ln.strip())
+                                    try:
+                                        os.kill(candidate_pid, signal.SIGTERM)
+                                        PrettyOutput.print(f"已按端口停止后台 Web 服务 (PID {candidate_pid})。", OutputType.SUCCESS)
+                                        killed_any = True
+                                    except Exception as e:
+                                        PrettyOutput.print(f"按端口停止失败: {e}", OutputType.WARNING)
+                                except Exception:
+                                    continue
+                    except Exception:
+                        pass
+                    if not killed_any:
+                        try:
+                            res2 = subprocess.run(["ss", "-ltpn"], capture_output=True, text=True)
+                            if res2.returncode == 0 and res2.stdout:
+                                for ln in res2.stdout.splitlines():
+                                    if f":{web_port} " in ln or f":{web_port}\n" in ln:
+                                        try:
+                                            idx = ln.find("pid=")
+                                            if idx != -1:
+                                                end = ln.find(",", idx)
+                                                pid_str2 = ln[idx+4:end if end != -1 else None]
+                                                candidate_pid = int(pid_str2)
+                                                try:
+                                                    os.kill(candidate_pid, signal.SIGTERM)
+                                                    PrettyOutput.print(f"已按端口停止后台 Web 服务 (PID {candidate_pid})。", OutputType.SUCCESS)
+                                                    killed_any = True
+                                                except Exception as e:
+                                                    PrettyOutput.print(f"按端口停止失败: {e}", OutputType.WARNING)
+                                                break
+                                        except Exception:
+                                            continue
+                        except Exception:
+                            pass
+                    # 若仍未找到，扫描家目录下所有 Web PID 文件，尽力停止所有实例
+                    if not killed_any:
+                        try:
+                            pid_dir = Path(os.path.expanduser("~/.jarvis"))
+                            if pid_dir.is_dir():
+                                for f in pid_dir.glob("jarvis_web_*.pid"):
+                                    try:
+                                        ptxt = f.read_text(encoding="utf-8").strip()
+                                        p = int(ptxt)
+                                        try:
+                                            os.kill(p, signal.SIGTERM)
+                                            PrettyOutput.print(f"已停止后台 Web 服务 (PID {p})。", OutputType.SUCCESS)
+                                            killed_any = True
+                                        except Exception as e:
+                                            PrettyOutput.print(f"停止 PID {p} 失败: {e}", OutputType.WARNING)
+                                    except Exception:
+                                        pass
+                                    try:
+                                        f.unlink(missing_ok=True)
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            pass
+                    if not killed_any:
+                        PrettyOutput.print("未找到后台 Web 服务的 PID 文件，可能未启动或已停止。", OutputType.WARNING)
+                    return
+                # 优先使用 PID 文件中的 PID
+                try:
+                    pid_str = pf.read_text(encoding="utf-8").strip()
+                    pid = int(pid_str)
+                except Exception:
+                    pid = 0
+                killed = False
+                if pid > 0:
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                        PrettyOutput.print(f"已向后台 Web 服务发送停止信号 (PID {pid})。", OutputType.SUCCESS)
+                        killed = True
+                    except Exception as e:
+                        PrettyOutput.print(f"发送停止信号失败或进程不存在: {e}", OutputType.WARNING)
+                if not killed:
+                    # 无 PID 文件或停止失败时，尝试按端口查找进程
+                    candidate_pid = 0
+                    try:
+                        res = subprocess.run(
+                            ["lsof", "-iTCP:%d" % web_port, "-sTCP:LISTEN", "-t"],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if res.returncode == 0 and res.stdout.strip():
+                            for ln in res.stdout.strip().splitlines():
+                                try:
+                                    candidate_pid = int(ln.strip())
+                                    break
+                                except Exception:
+                                    continue
+                    except Exception:
+                        pass
+                    if not candidate_pid:
+                        try:
+                            res2 = subprocess.run(["ss", "-ltpn"], capture_output=True, text=True)
+                            if res2.returncode == 0 and res2.stdout:
+                                for ln in res2.stdout.splitlines():
+                                    if f":{web_port} " in ln or f":{web_port}\n" in ln:
+                                        # 格式示例: LISTEN ... users:(("uvicorn",pid=12345,fd=7))
+                                        try:
+                                            idx = ln.find("pid=")
+                                            if idx != -1:
+                                                end = ln.find(",", idx)
+                                                pid_str2 = ln[idx+4:end if end != -1 else None]
+                                                candidate_pid = int(pid_str2)
+                                                break
+                                        except Exception:
+                                            continue
+                        except Exception:
+                            pass
+                    if candidate_pid:
+                        try:
+                            os.kill(candidate_pid, signal.SIGTERM)
+                            PrettyOutput.print(f"已按端口停止后台 Web 服务 (PID {candidate_pid})。", OutputType.SUCCESS)
+                            killed = True
+                        except Exception as e:
+                            PrettyOutput.print(f"按端口停止失败: {e}", OutputType.WARNING)
+                # 清理可能存在的 PID 文件（两个位置）
+                try:
+                    pidfile.unlink(missing_ok=True)  # 家目录位置
+                except Exception:
+                    pass
+                try:
+                    alt_pf = Path(os.path.expanduser(os.path.expandvars(get_data_dir()))) / f"jarvis_web_{web_port}.pid"
+                    alt_pf.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            except Exception as e:
+                PrettyOutput.print(f"停止后台 Web 服务失败: {e}", OutputType.ERROR)
+            finally:
+                return
+        # 后台启动：父进程拉起子进程并记录 PID
+        is_daemon = False
+        try:
+            is_daemon = os.environ.get("JARVIS_WEB_DAEMON") == "1"
+        except Exception:
+            is_daemon = False
+        if not is_daemon:
+            try:
+                # 构建子进程参数，传递关键配置
+                args = [
+                    sys.executable,
+                    "-m",
+                    "jarvis.jarvis_agent.jarvis",
+                    "--web",
+                    "--web-host",
+                    str(web_host),
+                    "--web-port",
+                    str(web_port),
+                ]
+                if model_group:
+                    args += ["-g", str(model_group)]
+                if tool_group:
+                    args += ["-G", str(tool_group)]
+                if config_file:
+                    args += ["-f", str(config_file)]
+                if restore_session:
+                    args += ["--restore-session"]
+                if disable_methodology_analysis:
+                    args += ["-D"]
+                if non_interactive:
+                    args += ["-n"]
+                env = os.environ.copy()
+                env["JARVIS_WEB_DAEMON"] = "1"
+                # 启动子进程（后台运行）
+                proc = subprocess.Popen(
+                    args,
+                    env=env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    close_fds=True,
+                )
+                # 记录 PID 到文件
+                try:
+                    pidfile.parent.mkdir(parents=True, exist_ok=True)
+                except Exception:
+                    pass
+                try:
+                    pidfile.write_text(str(proc.pid), encoding="utf-8")
+                except Exception:
+                    pass
+                PrettyOutput.print(
+                    f"Web 服务已在后台启动 (PID {proc.pid})，地址: http://{web_host}:{web_port}",
+                    OutputType.SUCCESS,
+                )
+            except Exception as e:
+                PrettyOutput.print(f"后台启动 Web 服务失败: {e}", OutputType.ERROR)
+                raise typer.Exit(code=1)
+            return
 
     # 在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）
     if not non_interactive and not web:
@@ -833,7 +1053,7 @@ def run_cli(
                     pass
                 PrettyOutput.print("以 Web 模式启动，请在浏览器中打开提供的地址进行交互。", OutputType.INFO)
                 # 启动 Web 服务（阻塞调用）
-                start_web_server(agent, host=web_host, port=web_port)
+                start_web_server(agent_manager, host=web_host, port=web_port)
                 return
             except Exception as e:
                 PrettyOutput.print(f"Web 模式启动失败: {e}", OutputType.ERROR)
