@@ -3,6 +3,7 @@
 基于 FastAPI 的 Web 服务：
 - GET /         返回简易网页（含JS，连接 WebSocket，展示输出，处理输入/确认）
 - WS  /ws       建立双向通信：服务端通过 WebBridge 广播输出与输入请求；客户端上行提交 user_input/confirm_response 或 run_task
+- WS  /stdio    独立通道：专门接收标准输出/错误（sys.stdout/sys.stderr）重定向的流式文本
 
 集成方式（在 --web 模式下）：
 - 注册 WebSocketOutputSink，将 PrettyOutput 事件广播到前端
@@ -21,6 +22,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from jarvis.jarvis_agent.web_bridge import WebBridge
+from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 
 # ---------------------------
@@ -40,150 +42,259 @@ def _build_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> str:
-        # 简单HTML：左侧输出区，右侧输入区；WS连接与事件处理
+        # 上下布局 + xterm.js 终端显示输出；底部输入面板
         return """
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Jarvis Web</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css" />
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; }
-    #left { flex: 2; background: #111; color: #eee; padding: 10px; overflow-y: auto; }
-    #right { flex: 1; display: flex; flex-direction: column; padding: 10px; gap: 8px; }
-    .msg { white-space: pre-wrap; border-bottom: 1px solid #333; padding: 6px 0; }
-    .system { color: #83c5be; }
-    .error { color: #ef4444; }
-    .info { color: #60a5fa; }
-    .user { color: #34d399; }
-    .tool { color: #f59e0b; }
-    .success { color: #22c55e; }
-    .warning { color: #fbbf24; }
-    textarea { width: 100%; height: 160px; }
-    button { padding: 8px 12px; }
-    #tip { color: #999; }
+    html, body { height: 100%; }
+    body {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column; /* 上下布局：上输出，下输入 */
+      background: #000;
+      color: #eee;
+    }
+    /* 顶部：终端输出区域（占满剩余空间） */
+    #terminal {
+      flex: 1;
+      background: #000; /* 终端背景 */
+      overflow: hidden;
+    }
+    /* 底部：输入区域（固定高度） */
+    #input-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      background: #0b0b0b;
+      border-top: 1px solid #222;
+    }
+    #tip { color: #9aa0a6; font-size: 13px; }
+    textarea#input {
+      width: 100%;
+      height: 140px;
+      background: #0f0f0f;
+      color: #e5e7eb;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 8px;
+      resize: vertical;
+      outline: none;
+    }
+    #actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    button {
+      padding: 8px 12px;
+      background: #1f2937;
+      color: #e5e7eb;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background: #374151; }
   </style>
 </head>
 <body>
-  <div id="left"></div>
-  <div id="right">
-    <div id="tip">输入任务或在请求时回复</div>
-    <textarea id="input"></textarea>
-    <div>
+  <div id="terminal"></div>
+
+  <div id="input-panel">
+    <div id="tip">输入任务或在请求时回复（Ctrl+Enter 提交）</div>
+    <textarea id="input" placeholder="在此输入..."></textarea>
+    <div id="actions">
       <button id="send">发送为新任务</button>
       <button id="clear">清空输出</button>
+      <button id="interrupt">干预</button>
     </div>
   </div>
 
+  <!-- xterm.js 与 fit 插件 -->
+  <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://unpkg.com/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+
   <script>
-    const left = document.getElementById('left');
+    // 初始化 xterm 终端
+    const term = new Terminal({
+      convertEol: true,
+      fontSize: 13,
+      theme: {
+        background: '#000000',
+        foreground: '#e5e7eb',
+        cursor: '#e5e7eb',
+      }
+    });
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal'));
+
+    function fitTerminal() {
+      try { fitAddon.fit(); } catch (e) {}
+    }
+    fitTerminal();
+    window.addEventListener('resize', fitTerminal);
+
+    // 输出辅助
+    function writeLine(text) {
+      const lines = (text ?? '').toString().split('\\n');
+      for (const ln of lines) term.writeln(ln);
+    }
+    function write(text) {
+      term.write((text ?? '').toString());
+    }
+
+    // 元素引用
     const tip = document.getElementById('tip');
     const input = document.getElementById('input');
     const btnSend = document.getElementById('send');
     const btnClear = document.getElementById('clear');
-
-    function appendMsg(text, cls='') {
-      const div = document.createElement('div');
-      div.className = 'msg ' + cls;
-      div.textContent = text;
-      left.appendChild(div);
-      left.scrollTop = left.scrollHeight;
+    const btnInterrupt = document.getElementById('interrupt');
+    // 输入可用性开关：Agent 未请求输入时禁用输入框（但允许通过按钮发送空任务）
+    let inputEnabled = false;
+    function setInputEnabled(flag) {
+      inputEnabled = !!flag;
+      try {
+        input.disabled = !inputEnabled;
+        // 根据可用状态更新占位提示
+        input.placeholder = inputEnabled ? '在此输入...' : 'Agent正在运行';
+      } catch (e) {}
     }
+    // 初始化（未请求输入时禁用输入框）
+    setInputEnabled(false);
+    try { btnSend.textContent = '发送为新任务'; } catch (e) {}
+
+    // WebSocket 通道：主通道与 STDIO 通道
+    const wsProto = (location.protocol === 'https:') ? 'wss' : 'ws';
+    const ws = new WebSocket(wsProto + '://' + location.host + '/ws');
+    const wsStd = new WebSocket(wsProto + '://' + location.host + '/stdio');
+    const wsCtl = new WebSocket(wsProto + '://' + location.host + '/control');
+
+    ws.onopen = () => {
+      writeLine('WebSocket 已连接');
+      // 连接成功后，允许直接输入首条任务
+      try { setInputEnabled(true); input.focus(); } catch (e) {}
+      fitTerminal();
+    };
+    ws.onclose = () => { writeLine('WebSocket 已关闭'); };
+    ws.onerror = (e) => { writeLine('WebSocket 错误: ' + e); };
+
+    wsStd.onopen = () => { writeLine('STDIO 通道已连接'); };
+    wsStd.onclose = () => { writeLine('STDIO 通道已关闭'); };
+    wsStd.onerror = (e) => { writeLine('STDIO 通道错误: ' + e); };
+    wsCtl.onopen = () => { writeLine('控制通道已连接'); };
+    wsCtl.onclose = () => { writeLine('控制通道已关闭'); };
+    wsCtl.onerror = (e) => { writeLine('控制通道错误: ' + e); };
 
     let pendingInputRequest = null; // {request_id, tip, print_on_empty}
     let pendingConfirmRequest = null; // {request_id, tip, default}
 
-    const wsProto = (location.protocol === 'https:') ? 'wss' : 'ws';
-    const ws = new WebSocket(wsProto + '://' + location.host + '/ws');
-    const wsStd = new WebSocket(wsProto + '://' + location.host + '/stdio');
-
-    ws.onopen = () => {
-      appendMsg('WebSocket 已连接', 'info');
-    };
-    ws.onclose = () => {
-      appendMsg('WebSocket 已关闭', 'warning');
-    };
-    ws.onerror = (e) => {
-      appendMsg('WebSocket 错误: ' + e, 'error');
-    };
-    wsStd.onopen = () => {
-      appendMsg('STDIO 通道已连接', 'info');
-    };
-    wsStd.onclose = () => {
-      appendMsg('STDIO 通道已关闭', 'warning');
-    };
-    wsStd.onerror = (e) => {
-      appendMsg('STDIO 通道错误: ' + e, 'error');
-    };
-
+    // 主通道消息
     ws.onmessage = (evt) => {
       try {
-        const data = JSON.parse(evt.data);
+        const data = JSON.parse(evt.data || '{}');
         if (data.type === 'output') {
-          const p = data.payload || {};
-          const ot = (p.output_type || '').toLowerCase();
-          let cls = '';
-          if (ot === 'error') cls = 'error';
-          else if (ot === 'info') cls = 'info';
-          else if (ot === 'user') cls = 'user';
-          else if (ot === 'tool') cls = 'tool';
-          else if (ot === 'success') cls = 'success';
-          else if (ot === 'warning') cls = 'warning';
-          else cls = 'system';
-          const header = `[${p.output_type||'SYSTEM'}]`;
-          const section = p.section ? ('[SECTION] ' + p.section + '\\n') : '';
-          appendMsg(section + header + ' ' + (p.text || ''), cls);
+          // 忽略通过 Sink 推送的output事件，避免与STDIO通道的输出重复显示
         } else if (data.type === 'input_request') {
           pendingInputRequest = data;
           tip.textContent = '请求输入: ' + (data.tip || '');
-          // 聚焦输入框
+          setInputEnabled(true);
+          try { btnSend.textContent = '提交输入'; } catch (e) {}
           input.focus();
         } else if (data.type === 'confirm_request') {
           pendingConfirmRequest = data;
-          const ok = window.confirm(data.tip + (data.default ? " [Y/n]" : " [y/N]"));
+          // 确认请求期间不需要文本输入，禁用输入框并更新按钮文字
+          setInputEnabled(false);
+          try { btnSend.textContent = '确认中…'; } catch (e) {}
+          const ok = window.confirm((data.tip || '') + (data.default ? " [Y/n]" : " [y/N]"));
           ws.send(JSON.stringify({
             type: 'confirm_response',
             request_id: data.request_id,
             value: !!ok
           }));
+          // 确认已提交，恢复按钮文字为“发送为新任务”
+          try { btnSend.textContent = '发送为新任务'; } catch (e) {}
           pendingConfirmRequest = null;
+        } else if (data.type === 'agent_idle') {
+          // 任务结束提示，并恢复输入状态
+          try { writeLine('当前任务已结束'); } catch (e) {}
+          try { setInputEnabled(true); btnSend.textContent = '发送为新任务'; input.focus(); } catch (e) {}
         } else if (data.type === 'stdio') {
-          const stream = (data.stream || '').toLowerCase();
-          const text = data.text || '';
-          const cls = stream === 'stderr' ? 'error' : 'info';
-          appendMsg(`[STDIO:${stream||'stdout'}] ` + text, cls);
+          // 忽略主通道的 stdio 以避免与独立 STDIO 通道重复显示
         }
       } catch (e) {
-        appendMsg('消息解析失败: ' + e, 'error');
-      }
-    };
-    wsStd.onmessage = (evt) => {
-      try {
-        const data = JSON.parse(evt.data);
-        if (data.type === 'stdio') {
-          const stream = (data.stream || '').toLowerCase();
-          const text = data.text || '';
-          const cls = stream === 'stderr' ? 'error' : 'info';
-          appendMsg(`[STDIO:${stream||'stdout'}] ` + text, cls);
-        }
-      } catch (e) {
-        appendMsg('消息解析失败: ' + e, 'error');
+writeLine('消息解析失败: ' + e);
       }
     };
 
+    // STDIO 通道消息（原样写入，保留流式体验）
+    wsStd.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data || '{}');
+        if (data.type === 'stdio') {
+          const text = data.text || '';
+          write(text);
+        }
+      } catch (e) {
+writeLine('消息解析失败: ' + e);
+      }
+    };
+
+    // 操作区
     btnSend.onclick = () => {
       const text = input.value || '';
-      if (!text) return;
-      // 发送为新任务
+      // 若当前处于输入请求阶段，则按钮行为为“提交输入”（允许空输入）
+      if (pendingInputRequest) {
+        ws.send(JSON.stringify({
+          type: 'user_input',
+          request_id: pendingInputRequest.request_id,
+          text
+        }));
+        tip.textContent = '输入已提交';
+        pendingInputRequest = null;
+        input.value = '';
+        // 提交输入后禁用输入区，等待下一次请求或任务结束通知
+        setInputEnabled(false);
+        try { btnSend.textContent = '发送为新任务'; } catch (e) {}
+        fitTerminal();
+        return;
+      }
+      // 否则行为为“发送为新任务”（允许空输入）
       ws.send(JSON.stringify({ type: 'run_task', text }));
       input.value = '';
+      // 发送新任务后，直到Agent请求输入前禁用输入区
+      setInputEnabled(false);
+      try { btnSend.textContent = '发送为新任务'; } catch (e) {}
+      fitTerminal();
     };
 
     btnClear.onclick = () => {
-      left.innerHTML = '';
+      try {
+        if (typeof term.clear === 'function') term.clear();
+        else term.write('\\x1bc'); // 清屏/重置
+      } catch (e) {
+        term.write('\\x1bc');
+      }
+    };
+    // 干预（发送中断信号）
+    btnInterrupt.onclick = () => {
+      try {
+        wsCtl.send(JSON.stringify({ type: 'interrupt' }));
+        writeLine('已发送干预（中断）信号');
+      } catch (e) {
+        writeLine('发送干预失败: ' + e);
+      }
     };
 
-    // 回车+Ctrl 直接作为用户输入响应（当处于等待输入状态）
+    // Ctrl+Enter 提交输入或作为新任务
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && e.ctrlKey) {
         e.preventDefault();
@@ -197,11 +308,19 @@ def _build_app() -> FastAPI:
           tip.textContent = '输入已提交';
           pendingInputRequest = null;
           input.value = '';
+          // 提交输入后，直到下一次请求前禁用输入区
+          setInputEnabled(false);
+          try { btnSend.textContent = '发送为新任务'; } catch (e) {}
         } else {
-          // 未处于输入请求时，作为新任务发送
-          ws.send(JSON.stringify({ type: 'run_task', text }));
-          input.value = '';
+          // 仅在输入区启用时允许通过 Ctrl+Enter 发送新任务
+          if (inputEnabled) {
+            ws.send(JSON.stringify({ type: 'run_task', text }));
+            input.value = '';
+            setInputEnabled(false);
+            try { btnSend.textContent = '发送为新任务'; } catch (e) {}
+          }
         }
+        fitTerminal();
       }
     });
   </script>
@@ -246,6 +365,15 @@ def _make_sender_filtered(queue: "asyncio.Queue[Dict[str, Any]]", allowed_types:
             pass
     return _sender
 
+def _run_and_notify(agent: Any, text: str) -> None:
+    try:
+        agent.run(text)
+    finally:
+        try:
+            WebBridge.instance().broadcast({"type": "agent_idle"})
+        except Exception:
+            pass
+
 def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> None:
     """
     启动Web服务，并将Agent绑定到应用上下文。
@@ -258,7 +386,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
     async def websocket_endpoint(ws: WebSocket) -> None:
         await ws.accept()
         queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
-        sender = _make_sender(queue)
+        sender = _make_sender_filtered(queue, allowed_types=["input_request", "confirm_request", "agent_idle"])
         bridge = WebBridge.instance()
         bridge.add_client(sender)
 
@@ -291,11 +419,11 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                     if isinstance(req_id, str):
                         bridge.post_confirm(req_id, val)
                 elif mtype == "run_task":
-                    text = data.get("text", "") or ""
-                    if text.strip():
-                        # 在后台线程运行，以避免阻塞事件循环
-                        loop = asyncio.get_running_loop()
-                        loop.run_in_executor(None, app.state.agent.run, text)
+                    # 允许空输入（空输入也具有语义）
+                    text = data.get("text", "")
+                    # 在后台线程运行，以避免阻塞事件循环
+                    loop = asyncio.get_running_loop()
+                    loop.run_in_executor(None, _run_and_notify, app.state.agent, text)
                 else:
                     # 兼容未知消息类型
                     pass
@@ -339,6 +467,34 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                 pass
             try:
                 send_task.cancel()
+            except Exception:
+                pass
+
+    @app.websocket("/control")
+    async def websocket_control(ws: WebSocket) -> None:
+        await ws.accept()
+        try:
+            while True:
+                msg = await ws.receive_text()
+                try:
+                    data = json.loads(msg)
+                except Exception:
+                    continue
+                mtype = data.get("type")
+                if mtype == "interrupt":
+                    try:
+                        set_interrupt(True)
+                        # 可选：发送回执
+                        await ws.send_text(json.dumps({"type": "ack", "cmd": "interrupt"}))
+                    except Exception:
+                        pass
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+        finally:
+            try:
+                await ws.close()
             except Exception:
                 pass
 

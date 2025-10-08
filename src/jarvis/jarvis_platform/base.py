@@ -223,6 +223,7 @@ class BasePlatform(ABC):
                         duration = end_time - start_time
                         panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
                         live.update(panel)
+                        console.print()
                 else:
                     # Print a clear prefix line before streaming model output (non-pretty mode)
                     console.print(

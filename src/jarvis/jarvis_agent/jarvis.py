@@ -805,11 +805,10 @@ def run_cli(
 
         if web:
             try:
-                from jarvis.jarvis_agent.web_output_sink import WebSocketOutputSink
+
                 from jarvis.jarvis_agent.web_server import start_web_server
                 from jarvis.jarvis_agent.stdio_redirect import enable_web_stdio_redirect
-                # 将 PrettyOutput 同步广播到浏览器端
-                PrettyOutput.add_sink(WebSocketOutputSink())
+                # 使用 STDIO 重定向，取消 Sink 广播以避免重复输出
                 # 启用标准输出/错误的WebSocket重定向（捕获工具直接打印的输出）
                 enable_web_stdio_redirect()
                 PrettyOutput.print("以 Web 模式启动，请在浏览器中打开提供的地址进行交互。", OutputType.INFO)
