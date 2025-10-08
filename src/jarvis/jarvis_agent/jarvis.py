@@ -808,6 +808,21 @@ def run_cli(
 
                 from jarvis.jarvis_agent.web_server import start_web_server
                 from jarvis.jarvis_agent.stdio_redirect import enable_web_stdio_redirect
+                # 在 Web 模式下固定TTY宽度为200，改善前端显示效果
+                try:
+                    import os as _os
+                    _os.environ["COLUMNS"] = "200"
+                    # 尝试固定全局 Console 的宽度（PrettyOutput 使用该 Console 实例）
+                    try:
+                        from jarvis.jarvis_utils.globals import console as _console
+                        try:
+                            _console._width = 200  # rich Console的固定宽度参数
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
                 # 使用 STDIO 重定向，取消 Sink 广播以避免重复输出
                 # 启用标准输出/错误的WebSocket重定向（捕获工具直接打印的输出）
                 enable_web_stdio_redirect()

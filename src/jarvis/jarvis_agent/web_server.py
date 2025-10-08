@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from typing import Any, Dict, Callable, Optional
 
 import uvicorn
@@ -22,7 +23,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from jarvis.jarvis_agent.web_bridge import WebBridge
-from jarvis.jarvis_utils.globals import set_interrupt
+from jarvis.jarvis_utils.globals import set_interrupt, console
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 
 # ---------------------------
@@ -139,7 +140,15 @@ def _build_app() -> FastAPI:
     term.open(document.getElementById('terminal'));
 
     function fitTerminal() {
-      try { fitAddon.fit(); } catch (e) {}
+      try { 
+        fitAddon.fit();
+        // 将终端尺寸通知后端（用于动态调整TTY宽度/高度）
+        if (typeof wsCtl !== 'undefined' && wsCtl && wsCtl.readyState === WebSocket.OPEN) {
+          try {
+            wsCtl.send(JSON.stringify({ type: 'resize', cols: term.cols || 200, rows: term.rows || 24 }));
+          } catch (e) {}
+        }
+      } catch (e) {}
     }
     fitTerminal();
     window.addEventListener('resize', fitTerminal);
@@ -178,6 +187,7 @@ def _build_app() -> FastAPI:
     const ws = new WebSocket(wsProto + '://' + location.host + '/ws');
     const wsStd = new WebSocket(wsProto + '://' + location.host + '/stdio');
     const wsCtl = new WebSocket(wsProto + '://' + location.host + '/control');
+    let ctlReady = false;
 
     ws.onopen = () => {
       writeLine('WebSocket 已连接');
@@ -191,8 +201,18 @@ def _build_app() -> FastAPI:
     wsStd.onopen = () => { writeLine('STDIO 通道已连接'); };
     wsStd.onclose = () => { writeLine('STDIO 通道已关闭'); };
     wsStd.onerror = (e) => { writeLine('STDIO 通道错误: ' + e); };
-    wsCtl.onopen = () => { writeLine('控制通道已连接'); };
-    wsCtl.onclose = () => { writeLine('控制通道已关闭'); };
+    wsCtl.onopen = () => { 
+      writeLine('控制通道已连接'); 
+      ctlReady = true;
+      // 初次连接时立即上报当前终端尺寸
+      try {
+        wsCtl.send(JSON.stringify({ type: 'resize', cols: term.cols || 200, rows: term.rows || 24 }));
+      } catch (e) {}
+    };
+    wsCtl.onclose = () => { 
+      writeLine('控制通道已关闭'); 
+      ctlReady = false;
+    };
     wsCtl.onerror = (e) => { writeLine('控制通道错误: ' + e); };
 
     let pendingInputRequest = null; // {request_id, tip, print_on_empty}
@@ -254,6 +274,8 @@ writeLine('消息解析失败: ' + e);
       const text = input.value || '';
       // 若当前处于输入请求阶段，则按钮行为为“提交输入”（允许空输入）
       if (pendingInputRequest) {
+        // 发送前在终端回显用户输入
+        try { writeLine('> ' + text); } catch (e) {}
         ws.send(JSON.stringify({
           type: 'user_input',
           request_id: pendingInputRequest.request_id,
@@ -269,6 +291,8 @@ writeLine('消息解析失败: ' + e);
         return;
       }
       // 否则行为为“发送为新任务”（允许空输入）
+      // 发送前在终端回显用户输入
+      try { writeLine('> ' + text); } catch (e) {}
       ws.send(JSON.stringify({ type: 'run_task', text }));
       input.value = '';
       // 发送新任务后，直到Agent请求输入前禁用输入区
@@ -301,6 +325,8 @@ writeLine('消息解析失败: ' + e);
         e.preventDefault();
         const text = input.value || '';
         if (pendingInputRequest) {
+          // 发送前在终端回显用户输入
+          try { writeLine('> ' + text); } catch (e) {}
           ws.send(JSON.stringify({
             type: 'user_input',
             request_id: pendingInputRequest.request_id,
@@ -315,6 +341,8 @@ writeLine('消息解析失败: ' + e);
         } else {
           // 仅在输入区启用时允许通过 Ctrl+Enter 发送新任务
           if (inputEnabled) {
+            // 发送前在终端回显用户输入
+            try { writeLine('> ' + text); } catch (e) {}
             ws.send(JSON.stringify({ type: 'run_task', text }));
             input.value = '';
             setInputEnabled(false);
@@ -487,6 +515,26 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                         set_interrupt(True)
                         # 可选：发送回执
                         await ws.send_text(json.dumps({"type": "ack", "cmd": "interrupt"}))
+                    except Exception:
+                        pass
+                elif mtype == "resize":
+                    # 动态调整后端TTY宽度（影响 PrettyOutput 和基于终端宽度的逻辑）
+                    try:
+                        cols = int(data.get("cols") or 0)
+                        rows = int(data.get("rows") or 0)
+                    except Exception:
+                        cols = 0
+                        rows = 0
+                    try:
+                        if cols > 0:
+                            os.environ["COLUMNS"] = str(cols)
+                            try:
+                                # 覆盖全局 rich Console 的宽度，便于 PrettyOutput 按照前端列数换行
+                                console._width = cols  # type: ignore[attr-defined]
+                            except Exception:
+                                pass
+                        if rows > 0:
+                            os.environ["LINES"] = str(rows)
                     except Exception:
                         pass
         except WebSocketDisconnect:
