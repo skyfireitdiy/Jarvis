@@ -807,7 +807,7 @@ def run_cli(
             try:
 
                 from jarvis.jarvis_agent.web_server import start_web_server
-                from jarvis.jarvis_agent.stdio_redirect import enable_web_stdio_redirect
+                from jarvis.jarvis_agent.stdio_redirect import enable_web_stdio_redirect, enable_web_stdin_redirect
                 # 在 Web 模式下固定TTY宽度为200，改善前端显示效果
                 try:
                     import os as _os
@@ -826,6 +826,11 @@ def run_cli(
                 # 使用 STDIO 重定向，取消 Sink 广播以避免重复输出
                 # 启用标准输出/错误的WebSocket重定向（捕获工具直接打印的输出）
                 enable_web_stdio_redirect()
+                # 启用来自前端 xterm 的 STDIN 重定向，使交互式命令可从浏览器获取输入
+                try:
+                    enable_web_stdin_redirect()
+                except Exception:
+                    pass
                 PrettyOutput.print("以 Web 模式启动，请在浏览器中打开提供的地址进行交互。", OutputType.INFO)
                 # 启动 Web 服务（阻塞调用）
                 start_web_server(agent, host=web_host, port=web_port)
