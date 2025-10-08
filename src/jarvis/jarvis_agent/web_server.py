@@ -138,6 +138,16 @@ def _build_app() -> FastAPI:
     const fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
     term.open(document.getElementById('terminal'));
+    // 捕获前端键入并透传到后端作为 STDIN（与后端 sys.stdin 对接）
+    try {
+      term.onData((data) => {
+        try {
+          if (wsStd && wsStd.readyState === WebSocket.OPEN) {
+            wsStd.send(JSON.stringify({ type: 'stdin', data }));
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
 
     function fitTerminal() {
       try { 
@@ -192,7 +202,13 @@ def _build_app() -> FastAPI:
     ws.onopen = () => {
       writeLine('WebSocket 已连接');
       // 连接成功后，允许直接输入首条任务
-      try { setInputEnabled(true); input.focus(); } catch (e) {}
+      try { 
+        setInputEnabled(true); 
+        // 连接成功后，优先聚焦终端以便直接通过 xterm 进行交互
+        if (typeof term !== 'undefined' && term) {
+          try { term.focus(); } catch (e) {}
+        }
+      } catch (e) {}
       fitTerminal();
     };
     ws.onclose = () => { writeLine('WebSocket 已关闭'); };
@@ -484,10 +500,28 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
             pass
         try:
             while True:
-                await asyncio.sleep(60)
+                # 接收来自前端 STDIN 数据并注入到后端
+                msg = await ws.receive_text()
+                try:
+                    data = json.loads(msg)
+                except Exception:
+                    continue
+                mtype = data.get("type")
+                if mtype == "stdin":
+                    try:
+                        from jarvis.jarvis_agent.stdio_redirect import feed_web_stdin
+                        text = data.get("data", "")
+                        if isinstance(text, str) and text:
+                            feed_web_stdin(text)
+                    except Exception:
+                        pass
+                else:
+                    # 忽略未知类型
+                    pass
         except WebSocketDisconnect:
             pass
         except Exception:
+            pass
             pass
         finally:
             try:

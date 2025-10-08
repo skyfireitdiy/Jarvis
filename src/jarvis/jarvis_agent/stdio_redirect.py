@@ -112,3 +112,185 @@ def disable_web_stdio_redirect() -> None:
         except Exception:
             pass
         _redirect_enabled = False
+
+
+# ---------------------------
+# Web STDIN 重定向（浏览器 -> 后端）
+# ---------------------------
+# 目的：
+# - 将前端 xterm 的按键数据通过 WS 送回服务端，并作为 sys.stdin 的数据源
+# - 使得 Python 层的 input()/sys.stdin.readline() 等可以从浏览器获得输入
+# - 仅适用于部分交互式场景（非真正 PTY 行为），可满足基础行缓冲输入
+from queue import Queue, Empty
+
+
+_original_stdin = sys.stdin
+_stdin_enabled = False
+_stdin_wrapper = None  # type: ignore[assignment]
+
+
+class _WebInputWrapper:
+    """文件类兼容包装器：作为 sys.stdin 的替身，从队列中读取浏览器送来的数据。"""
+
+    def __init__(self) -> None:
+        self._queue: "Queue[str]" = Queue()
+        self._buffer: str = ""
+        self._lock = threading.Lock()
+        try:
+            self._encoding = getattr(_original_stdin, "encoding", "utf-8")  # type: ignore[name-defined]
+        except Exception:
+            self._encoding = "utf-8"
+
+    # 外部注入：由 WebSocket 端点调用
+    def feed(self, data: str) -> None:
+        try:
+            s = data if isinstance(data, str) else str(data)
+        except Exception:
+            s = repr(data)
+        # 将回车转换为换行，方便基于 readline 的读取
+        s = s.replace("\r", "\n")
+        self._queue.put_nowait(s)
+
+    # 基础读取：尽可能兼容常用调用
+    def read(self, size: int = -1) -> str:
+        # size < 0 表示尽可能多地读取（直到当前缓冲区内容）
+        if size == 0:
+            return ""
+
+        while True:
+            with self._lock:
+                if size > 0 and len(self._buffer) >= size:
+                    out = self._buffer[:size]
+                    self._buffer = self._buffer[size:]
+                    return out
+                if size < 0 and self._buffer:
+                    out = self._buffer
+                    self._buffer = ""
+                    return out
+            # 需要更多数据，阻塞等待
+            try:
+                chunk = self._queue.get(timeout=None)
+            except Exception:
+                chunk = ""
+            if not isinstance(chunk, str):
+                try:
+                    chunk = str(chunk)
+                except Exception:
+                    chunk = ""
+            with self._lock:
+                self._buffer += chunk
+
+    def readline(self, size: int = -1) -> str:
+        # 读取到换行符为止（包含换行），可选 size 限制
+        while True:
+            with self._lock:
+                idx = self._buffer.find("\n")
+                if idx != -1:
+                    # 找到换行
+                    end_index = idx + 1
+                    if size > 0:
+                        end_index = min(end_index, size)
+                    out = self._buffer[:end_index]
+                    self._buffer = self._buffer[end_index:]
+                    return out
+                # 未找到换行，但如果指定了 size 且缓冲已有足够数据，则返回
+                if size > 0 and len(self._buffer) >= size:
+                    out = self._buffer[:size]
+                    self._buffer = self._buffer[size:]
+                    return out
+            # 更多数据
+            try:
+                chunk = self._queue.get(timeout=None)
+            except Exception:
+                chunk = ""
+            if not isinstance(chunk, str):
+                try:
+                    chunk = str(chunk)
+                except Exception:
+                    chunk = ""
+            with self._lock:
+                self._buffer += chunk
+
+    def readlines(self, hint: int = -1):
+        lines = []
+        total = 0
+        while True:
+            ln = self.readline()
+            if not ln:
+                break
+            lines.append(ln)
+            total += len(ln)
+            if hint > 0 and total >= hint:
+                break
+        return lines
+
+    def writable(self) -> bool:
+        return False
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return False
+
+    def flush(self) -> None:
+        pass
+
+    def isatty(self) -> bool:
+        # 伪装为 TTY，可改善部分库的行为（注意并非真正 PTY）
+        return True
+
+    @property
+    def encoding(self) -> str:
+        return self._encoding
+
+    def __getattr__(self, name: str):
+        # 尽量代理到原始 stdin 的属性以增强兼容性
+        try:
+            return getattr(_original_stdin, name)
+        except Exception:
+            raise AttributeError(name)
+
+
+def enable_web_stdin_redirect() -> None:
+    """启用 Web STDIN 重定向：将 sys.stdin 替换为浏览器数据源。"""
+    global _stdin_enabled, _stdin_wrapper, _original_stdin
+    with _lock:
+        if _stdin_enabled:
+            return
+        try:
+            # 记录原始 stdin（若尚未记录）
+            if "_original_stdin" not in globals() or _original_stdin is None:
+                _original_stdin = sys.stdin  # type: ignore[assignment]
+            _stdin_wrapper = _WebInputWrapper()
+            sys.stdin = _stdin_wrapper  # type: ignore[assignment]
+            _stdin_enabled = True
+        except Exception:
+            # 回退：保持原始输入
+            try:
+                sys.stdin = _original_stdin  # type: ignore[assignment]
+            except Exception:
+                pass
+            _stdin_enabled = False
+
+
+def disable_web_stdin_redirect() -> None:
+    """禁用 Web STDIN 重定向，恢复原始输入。"""
+    global _stdin_enabled, _stdin_wrapper
+    with _lock:
+        try:
+            sys.stdin = _original_stdin  # type: ignore[assignment]
+        except Exception:
+            pass
+        _stdin_wrapper = None
+        _stdin_enabled = False
+
+
+def feed_web_stdin(data: str) -> None:
+    """向 Web STDIN 注入数据（由 WebSocket /stdio 端点调用）。"""
+    try:
+        if _stdin_enabled and _stdin_wrapper is not None:
+            _stdin_wrapper.feed(data)  # type: ignore[attr-defined]
+    except Exception:
+        # 注入失败不影响主流程
+        pass
