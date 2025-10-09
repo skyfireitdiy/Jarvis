@@ -369,9 +369,10 @@ class BasePlatform(ABC):
                 return
 
             if self._session_history_file is None:
-                # Ensure data directory exists
+                # Ensure session history directory exists under data directory
                 data_dir = get_data_dir()
-                os.makedirs(data_dir, exist_ok=True)
+                session_dir = os.path.join(data_dir, "session_history")
+                os.makedirs(session_dir, exist_ok=True)
 
                 # Build a safe filename including platform, model and timestamp
                 try:
@@ -389,7 +390,7 @@ class BasePlatform(ABC):
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
                 self._session_history_file = os.path.join(
-                    data_dir, f"session_history_{safe_platform}_{safe_model}_{ts}.log"
+                    session_dir, f"session_history_{safe_platform}_{safe_model}_{ts}.log"
                 )
 
             # Append record
