@@ -967,14 +967,14 @@ def run_cli(
             return
 
     # 在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）
-    if not non_interactive and not web:
+    if not non_interactive:
         try_switch_to_jca_if_git_repo(
             model_group, tool_group, config_file, restore_session, task
         )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
     # 非交互模式下跳过内置角色/配置选择
-    if not non_interactive and not web:
+    if not non_interactive:
         handle_builtin_config_selector(model_group, tool_group, config_file, task)
 
     # 初始化环境

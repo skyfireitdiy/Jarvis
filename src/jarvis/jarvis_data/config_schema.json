@@ -322,6 +322,11 @@
       "description": "是否保存会话记录",
       "default": false
     },
+    "JARVIS_SKIP_PREDEFINED_TASKS": {
+      "type": "boolean",
+      "description": "是否跳过预定义任务加载（不读取 pre-command 列表）",
+      "default": false
+    },
     "JARVIS_GIT_CHECK_MODE": {
       "type": "string",
       "enum": ["strict", "warn"],
