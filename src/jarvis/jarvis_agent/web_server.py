@@ -112,16 +112,6 @@ def _build_app() -> FastAPI:
 <body>
   <div id="terminal"></div>
 
-  <div id="input-panel">
-    <div id="tip">输入任务或在请求时回复（Ctrl+Enter 提交）</div>
-    <textarea id="input" placeholder="在此输入..."></textarea>
-    <div id="actions">
-      <button id="send">发送为新任务</button>
-      <button id="clear">清空输出</button>
-      <button id="interrupt">干预</button>
-    </div>
-  </div>
-
   <!-- xterm.js 与 fit 插件 -->
   <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://unpkg.com/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
@@ -145,7 +135,10 @@ def _build_app() -> FastAPI:
     try {
       term.onData((data) => {
         try {
-          if (wsStd && wsStd.readyState === WebSocket.OPEN) {
+          // 优先将键入数据发送到交互式终端（PTY）通道；若未就绪则回退到 STDIN 重定向通道
+          if (typeof wsTerm !== 'undefined' && wsTerm && wsTerm.readyState === WebSocket.OPEN) {
+            wsTerm.send(JSON.stringify({ type: 'stdin', data }));
+          } else if (wsStd && wsStd.readyState === WebSocket.OPEN) {
             wsStd.send(JSON.stringify({ type: 'stdin', data }));
           }
         } catch (e) {}
@@ -159,6 +152,12 @@ def _build_app() -> FastAPI:
         if (typeof wsCtl !== 'undefined' && wsCtl && wsCtl.readyState === WebSocket.OPEN) {
           try {
             wsCtl.send(JSON.stringify({ type: 'resize', cols: term.cols || 200, rows: term.rows || 24 }));
+          } catch (e) {}
+        }
+        // 同步调整交互式终端（PTY）窗口大小
+        if (typeof wsTerm !== 'undefined' && wsTerm && wsTerm.readyState === WebSocket.OPEN) {
+          try {
+            wsTerm.send(JSON.stringify({ type: 'resize', cols: term.cols || 200, rows: term.rows || 24 }));
           } catch (e) {}
         }
       } catch (e) {}
@@ -175,47 +174,14 @@ def _build_app() -> FastAPI:
       term.write((text ?? '').toString());
     }
 
-    // 元素引用
-    const tip = document.getElementById('tip');
-    const input = document.getElementById('input');
-    const btnSend = document.getElementById('send');
-    const btnClear = document.getElementById('clear');
-    const btnInterrupt = document.getElementById('interrupt');
-    // 输入可用性开关：Agent 未请求输入时禁用输入框（但允许通过按钮发送空任务）
-    let inputEnabled = false;
-    function setInputEnabled(flag) {
-      inputEnabled = !!flag;
-      try {
-        input.disabled = !inputEnabled;
-        // 根据可用状态更新占位提示
-        input.placeholder = inputEnabled ? '在此输入...' : 'Agent正在运行';
-      } catch (e) {}
-    }
-    // 初始化（未请求输入时禁用输入框）
-    setInputEnabled(false);
-    try { btnSend.textContent = '发送为新任务'; } catch (e) {}
-
-    // WebSocket 通道：主通道与 STDIO 通道
+    // WebSocket 通道：STDIO、控制与交互式终端
     const wsProto = (location.protocol === 'https:') ? 'wss' : 'ws';
-    const ws = new WebSocket(wsProto + '://' + location.host + '/ws');
     const wsStd = new WebSocket(wsProto + '://' + location.host + '/stdio');
     const wsCtl = new WebSocket(wsProto + '://' + location.host + '/control');
+    // 交互式终端（PTY）通道：用于真正的交互式命令
+    const wsTerm = new WebSocket(wsProto + '://' + location.host + '/terminal');
     let ctlReady = false;
 
-    ws.onopen = () => {
-      writeLine('WebSocket 已连接');
-      // 连接成功后，允许直接输入首条任务
-      try { 
-        setInputEnabled(true); 
-        // 连接成功后，优先聚焦终端以便直接通过 xterm 进行交互
-        if (typeof term !== 'undefined' && term) {
-          try { term.focus(); } catch (e) {}
-        }
-      } catch (e) {}
-      fitTerminal();
-    };
-    ws.onclose = () => { writeLine('WebSocket 已关闭'); };
-    ws.onerror = (e) => { writeLine('WebSocket 错误: ' + e); };
 
     wsStd.onopen = () => { writeLine('STDIO 通道已连接'); };
     wsStd.onclose = () => { writeLine('STDIO 通道已关闭'); };
@@ -233,47 +199,30 @@ def _build_app() -> FastAPI:
       ctlReady = false;
     };
     wsCtl.onerror = (e) => { writeLine('控制通道错误: ' + e); };
-
-    let pendingInputRequest = null; // {request_id, tip, print_on_empty}
-    let pendingConfirmRequest = null; // {request_id, tip, default}
-
-    // 主通道消息
-    ws.onmessage = (evt) => {
+    
+    // 终端（PTY）通道
+    wsTerm.onopen = () => { 
+      writeLine('终端通道已连接'); 
+      // 初次连接时上报当前终端尺寸
+      try {
+        wsTerm.send(JSON.stringify({ type: 'resize', cols: term.cols || 200, rows: term.rows || 24 }));
+      } catch (e) {}
+    };
+    wsTerm.onclose = () => { writeLine('终端通道已关闭'); };
+    wsTerm.onerror = (e) => { writeLine('终端通道错误: ' + e); };
+    wsTerm.onmessage = (evt) => {
       try {
         const data = JSON.parse(evt.data || '{}');
-        if (data.type === 'output') {
-          // 忽略通过 Sink 推送的output事件，避免与STDIO通道的输出重复显示
-        } else if (data.type === 'input_request') {
-          pendingInputRequest = data;
-          tip.textContent = '请求输入: ' + (data.tip || '');
-          setInputEnabled(true);
-          try { btnSend.textContent = '提交输入'; } catch (e) {}
-          input.focus();
-        } else if (data.type === 'confirm_request') {
-          pendingConfirmRequest = data;
-          // 确认请求期间不需要文本输入，禁用输入框并更新按钮文字
-          setInputEnabled(false);
-          try { btnSend.textContent = '确认中…'; } catch (e) {}
-          const ok = window.confirm((data.tip || '') + (data.default ? " [Y/n]" : " [y/N]"));
-          ws.send(JSON.stringify({
-            type: 'confirm_response',
-            request_id: data.request_id,
-            value: !!ok
-          }));
-          // 确认已提交，恢复按钮文字为“发送为新任务”
-          try { btnSend.textContent = '发送为新任务'; } catch (e) {}
-          pendingConfirmRequest = null;
-        } else if (data.type === 'agent_idle') {
-          // 任务结束提示，并恢复输入状态
-          try { writeLine('当前任务已结束'); } catch (e) {}
-          try { setInputEnabled(true); btnSend.textContent = '发送为新任务'; input.focus(); } catch (e) {}
-        } else if (data.type === 'stdio') {
-          // 忽略主通道的 stdio 以避免与独立 STDIO 通道重复显示
+        if (data.type === 'stdio') {
+          const text = data.text || '';
+          write(text);
         }
       } catch (e) {
-writeLine('消息解析失败: ' + e);
+        writeLine('消息解析失败: ' + e);
       }
     };
+
+
 
     // STDIO 通道消息（原样写入，保留流式体验）
     wsStd.onmessage = (evt) => {
@@ -288,89 +237,8 @@ writeLine('消息解析失败: ' + e);
       }
     };
 
-    // 操作区
-    btnSend.onclick = () => {
-      const text = input.value || '';
-      // 若当前处于输入请求阶段，则按钮行为为“提交输入”（允许空输入）
-      if (pendingInputRequest) {
-        // 发送前在终端回显用户输入
-        try { writeLine('> ' + text); } catch (e) {}
-        ws.send(JSON.stringify({
-          type: 'user_input',
-          request_id: pendingInputRequest.request_id,
-          text
-        }));
-        tip.textContent = '输入已提交';
-        pendingInputRequest = null;
-        input.value = '';
-        // 提交输入后禁用输入区，等待下一次请求或任务结束通知
-        setInputEnabled(false);
-        try { btnSend.textContent = '发送为新任务'; } catch (e) {}
-        fitTerminal();
-        return;
-      }
-      // 否则行为为“发送为新任务”（允许空输入）
-      // 发送前在终端回显用户输入
-      try { writeLine('> ' + text); } catch (e) {}
-      ws.send(JSON.stringify({ type: 'run_task', text }));
-      input.value = '';
-      // 发送新任务后，直到Agent请求输入前禁用输入区
-      setInputEnabled(false);
-      try { btnSend.textContent = '发送为新任务'; } catch (e) {}
-      fitTerminal();
-    };
 
-    btnClear.onclick = () => {
-      try {
-        if (typeof term.clear === 'function') term.clear();
-        else term.write('\\x1bc'); // 清屏/重置
-      } catch (e) {
-        term.write('\\x1bc');
-      }
-    };
-    // 干预（发送中断信号）
-    btnInterrupt.onclick = () => {
-      try {
-        wsCtl.send(JSON.stringify({ type: 'interrupt' }));
-        writeLine('已发送干预（中断）信号');
-      } catch (e) {
-        writeLine('发送干预失败: ' + e);
-      }
-    };
 
-    // Ctrl+Enter 提交输入或作为新任务
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.ctrlKey) {
-        e.preventDefault();
-        const text = input.value || '';
-        if (pendingInputRequest) {
-          // 发送前在终端回显用户输入
-          try { writeLine('> ' + text); } catch (e) {}
-          ws.send(JSON.stringify({
-            type: 'user_input',
-            request_id: pendingInputRequest.request_id,
-            text
-          }));
-          tip.textContent = '输入已提交';
-          pendingInputRequest = null;
-          input.value = '';
-          // 提交输入后，直到下一次请求前禁用输入区
-          setInputEnabled(false);
-          try { btnSend.textContent = '发送为新任务'; } catch (e) {}
-        } else {
-          // 仅在输入区启用时允许通过 Ctrl+Enter 发送新任务
-          if (inputEnabled) {
-            // 发送前在终端回显用户输入
-            try { writeLine('> ' + text); } catch (e) {}
-            ws.send(JSON.stringify({ type: 'run_task', text }));
-            input.value = '';
-            setInputEnabled(false);
-            try { btnSend.textContent = '发送为新任务'; } catch (e) {}
-          }
-        }
-        fitTerminal();
-      }
-    });
   </script>
 </body>
 </html>
@@ -436,77 +304,6 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
         app.state.agent_manager = agent if hasattr(agent, "initialize") else None
     except Exception:
         app.state.agent_manager = None
-
-    @app.websocket("/ws")
-    async def websocket_endpoint(ws: WebSocket) -> None:
-        await ws.accept()
-        queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
-        sender = _make_sender_filtered(queue, allowed_types=["input_request", "confirm_request", "agent_idle"])
-        bridge = WebBridge.instance()
-        bridge.add_client(sender)
-
-        # 后台发送任务
-        send_task = asyncio.create_task(_ws_sender_loop(ws, queue))
-
-        # 初始欢迎
-        try:
-            await ws.send_text(json.dumps({"type": "output", "payload": {"text": "欢迎使用 Jarvis Web", "output_type": "INFO"}}))
-        except Exception:
-            pass
-
-        try:
-            while True:
-                msg = await ws.receive_text()
-                try:
-                    data = json.loads(msg)
-                except Exception:
-                    continue
-
-                mtype = data.get("type")
-                if mtype == "user_input":
-                    req_id = data.get("request_id")
-                    text = data.get("text", "") or ""
-                    if isinstance(req_id, str):
-                        bridge.post_user_input(req_id, str(text))
-                elif mtype == "confirm_response":
-                    req_id = data.get("request_id")
-                    val = bool(data.get("value", False))
-                    if isinstance(req_id, str):
-                        bridge.post_confirm(req_id, val)
-                elif mtype == "run_task":
-                    # 允许空输入（空输入也具有语义）
-                    text = data.get("text", "")
-                    # 在后台线程运行，以避免阻塞事件循环
-                    loop = asyncio.get_running_loop()
-                    # 若提供了 AgentManager，则为每个任务创建新的 Agent 实例；否则复用现有 Agent
-                    try:
-                        if getattr(app.state, "agent_manager", None) and hasattr(app.state.agent_manager, "initialize"):
-                            new_agent = app.state.agent_manager.initialize()
-                            loop.run_in_executor(None, _run_and_notify, new_agent, text)
-                        else:
-                            loop.run_in_executor(None, _run_and_notify, app.state.agent, text)
-                    except Exception:
-                        # 回退到旧行为，避免因异常导致无法执行任务
-                        try:
-                            loop.run_in_executor(None, _run_and_notify, app.state.agent, text)
-                        except Exception:
-                            pass
-                else:
-                    # 兼容未知消息类型
-                    pass
-        except WebSocketDisconnect:
-            pass
-        except Exception:
-            pass
-        finally:
-            try:
-                bridge.remove_client(sender)
-            except Exception:
-                pass
-            try:
-                send_task.cancel()
-            except Exception:
-                pass
 
     @app.websocket("/stdio")
     async def websocket_stdio(ws: WebSocket) -> None:
@@ -598,6 +395,269 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
         except Exception:
             pass
         finally:
+            try:
+                await ws.close()
+            except Exception:
+                pass
+
+    # 交互式终端通道：为前端 xterm 提供真实的 PTY 会话，以支持交互式命令
+    @app.websocket("/terminal")
+    async def websocket_terminal(ws: WebSocket) -> None:
+        await ws.accept()
+        # 仅在非 Windows 平台提供 PTY 功能
+        import sys as _sys
+        if _sys.platform == "win32":
+            try:
+                await ws.send_text(json.dumps({"type": "output", "payload": {"text": "当前平台不支持交互式终端（PTY）", "output_type": "ERROR"}}))
+            except Exception:
+                pass
+            try:
+                await ws.close()
+            except Exception:
+                pass
+            return
+
+        import os as _os
+        try:
+            import pty as _pty  # type: ignore
+            import fcntl as _fcntl  # type: ignore
+            import select as _select  # type: ignore
+            import termios as _termios  # type: ignore
+            import struct as _struct  # type: ignore
+        except Exception:
+            try:
+                await ws.send_text(json.dumps({"type": "output", "payload": {"text": "服务端缺少 PTY 相关依赖，无法启动交互式终端", "output_type": "ERROR"}}))
+            except Exception:
+                pass
+            try:
+                await ws.close()
+            except Exception:
+                pass
+            return
+
+        def _set_winsize(fd: int, cols: int, rows: int) -> None:
+            try:
+                if cols > 0 and rows > 0:
+                    winsz = _struct.pack("HHHH", rows, cols, 0, 0)
+                    _fcntl.ioctl(fd, _termios.TIOCSWINSZ, winsz)
+            except Exception:
+                # 调整失败不影响主流程
+                pass
+
+        # 交互式会话状态与启动函数（优先执行 jvs 命令，失败回退到系统 shell）
+        session = {"pid": None, "master_fd": None}
+        last_cols = 0
+        last_rows = 0
+
+        def _spawn_jvs_session() -> bool:
+            nonlocal session
+            try:
+                pid, master_fd = _pty.fork()
+                if pid == 0:
+                    # 子进程：执行 jvs 启动命令（移除 web 相关参数），失败时回退到系统 shell
+                    try:
+                        import json as _json
+                        _cmd_json = _os.environ.get("JARVIS_WEB_LAUNCH_JSON", "")
+                        if _cmd_json:
+                            try:
+                                _argv = _json.loads(_cmd_json)
+                            except Exception:
+                                _argv = []
+                            if isinstance(_argv, list) and len(_argv) > 0 and isinstance(_argv[0], str):
+                                _os.execvp(_argv[0], _argv)
+                    except Exception:
+                        pass
+                    # 若未配置或执行失败，回退到 /bin/bash 或 /bin/sh
+                    try:
+                        _os.execvp("/bin/bash", ["/bin/bash"])
+                    except Exception:
+                        try:
+                            _os.execvp("/bin/sh", ["/bin/sh"])
+                        except Exception:
+                            _os._exit(1)
+                else:
+                    # 父进程：设置非阻塞模式并记录状态
+                    try:
+                        _fcntl.fcntl(master_fd, _fcntl.F_SETFL, _os.O_NONBLOCK)
+                    except Exception:
+                        pass
+                    session["pid"] = pid
+                    session["master_fd"] = master_fd
+                    # 如果已有窗口大小设置，应用到新会话
+                    try:
+                        if last_cols > 0 and last_rows > 0:
+                            winsz = _struct.pack("HHHH", last_rows, last_cols, 0, 0)
+                            _fcntl.ioctl(master_fd, _termios.TIOCSWINSZ, winsz)
+                    except Exception:
+                        pass
+                    return True
+            except Exception:
+                return False
+            return False
+
+        # 启动首个会话
+        ok = _spawn_jvs_session()
+        if not ok:
+            try:
+                await ws.send_text(json.dumps({"type": "output", "payload": {"text": "启动交互式终端失败", "output_type": "ERROR"}}))
+            except Exception:
+                pass
+            try:
+                await ws.close()
+            except Exception:
+                pass
+            return
+
+        async def _tty_read_loop() -> None:
+            try:
+                while True:
+                    fd = session.get("master_fd")
+                    if fd is None:
+                        # 会话丢失，尝试重启
+                        if _spawn_jvs_session():
+                            try:
+                                await ws.send_text(json.dumps({"type": "output", "payload": {"text": "jvs 会话已重启", "output_type": "INFO"}}))
+                            except Exception:
+                                pass
+                            fd = session.get("master_fd")
+                        else:
+                            # 重启失败，稍后重试
+                            await asyncio.sleep(0.5)
+                            continue
+                    try:
+                        r, _, _ = _select.select([fd], [], [], 0.1)
+                    except Exception:
+                        r = []
+                    if r:
+                        try:
+                            data = _os.read(fd, 4096)
+                        except BlockingIOError:
+                            data = b""
+                        except Exception:
+                            data = b""
+                        if data:
+                            try:
+                                await ws.send_text(json.dumps({"type": "stdio", "text": data.decode(errors="ignore")}))
+                            except Exception:
+                                break
+                        else:
+                            # 读取到 EOF，说明子进程已退出，尝试重启 jvs 会话
+                            try:
+                                # 关闭旧 master
+                                try:
+                                    if session.get("master_fd") is not None:
+                                        _os.close(session["master_fd"])  # type: ignore[index]
+                                except Exception:
+                                    pass
+                                session["master_fd"] = None
+                                session["pid"] = None
+                                if _spawn_jvs_session():
+                                    try:
+                                        await ws.send_text(json.dumps({"type": "output", "payload": {"text": "jvs 会话已重启", "output_type": "INFO"}}))
+                                    except Exception:
+                                        pass
+                                else:
+                                    # 重启失败，稍后重试
+                                    await asyncio.sleep(0.5)
+                            except Exception:
+                                pass
+                    # 让出事件循环
+                    try:
+                        await asyncio.sleep(0)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        # 后台读取任务
+        read_task = asyncio.create_task(_tty_read_loop())
+
+        # 初次连接：尝试根据控制通道设定的列数调整终端大小
+        try:
+            cols = int(_os.environ.get("COLUMNS", "0"))
+        except Exception:
+            cols = 0
+        try:
+            rows = int(_os.environ.get("LINES", "0"))
+        except Exception:
+            rows = 0
+        try:
+            if cols > 0 and rows > 0:
+                _set_winsize(session["master_fd"], cols, rows)
+                last_cols = cols
+                last_rows = rows
+        except Exception:
+            pass
+        # 发送就绪提示
+        try:
+            await ws.send_text(json.dumps({"type": "output", "payload": {"text": "交互式终端已就绪（PTY）", "output_type": "INFO"}}))
+        except Exception:
+            pass
+
+        try:
+            while True:
+                msg = await ws.receive_text()
+                try:
+                    data = json.loads(msg)
+                except Exception:
+                    continue
+                mtype = data.get("type")
+                if mtype == "stdin":
+                    # 前端键入数据透传到 PTY
+                    try:
+                        text = data.get("data", "")
+                        if isinstance(text, str) and text:
+                            # 原样写入（保留控制字符）；前端可按需发送回车
+                            _os.write(session.get("master_fd") or -1, text.encode(errors="ignore"))
+                    except Exception:
+                        pass
+                elif mtype == "resize":
+                    # 终端窗口大小调整（与控制通道一致，但作用于 PTY）
+                    try:
+                        cols = int(data.get("cols") or 0)
+                    except Exception:
+                        cols = 0
+                    try:
+                        rows = int(data.get("rows") or 0)
+                    except Exception:
+                        rows = 0
+                    try:
+                        if cols > 0 and rows > 0:
+                            _set_winsize(session.get("master_fd") or -1, cols, rows)
+                            last_cols = cols
+                            last_rows = rows
+                    except Exception:
+                        pass
+                else:
+                    # 忽略未知类型
+                    pass
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+        finally:
+            # 清理资源
+            try:
+                read_task.cancel()
+            except Exception:
+                pass
+            try:
+                if session.get("master_fd") is not None:
+                    try:
+                        _os.close(session["master_fd"])  # type: ignore[index]
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            try:
+                if session.get("pid"):
+                    import signal as _signal  # type: ignore
+                    try:
+                        _os.kill(session["pid"], _signal.SIGTERM)  # type: ignore[index]
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             try:
                 await ws.close()
             except Exception:

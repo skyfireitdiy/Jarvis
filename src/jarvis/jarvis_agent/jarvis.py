@@ -1005,13 +1005,9 @@ def run_cli(
         # 在 Web 模式下注入基于 WebSocket 的输入/确认回调
         extra_kwargs = {}
         if web:
-            try:
-                from jarvis.jarvis_agent.web_bridge import web_multiline_input, web_user_confirm
-                extra_kwargs["multiline_inputer"] = web_multiline_input
-                extra_kwargs["confirm_callback"] = web_user_confirm
-            except Exception as e:
-                PrettyOutput.print(f"Web 模式初始化失败（加载 Web 桥接模块）: {e}", OutputType.ERROR)
-                raise typer.Exit(code=1)
+            # 纯 xterm 交互模式：不注入 WebBridge 的输入/确认回调，避免阻塞等待浏览器响应
+            #（交互由 /terminal PTY 会话中的 jvs 进程处理）
+            pass
 
         agent_manager = AgentManager(
             model_group=model_group,
@@ -1049,6 +1045,37 @@ def run_cli(
                 # 启用来自前端 xterm 的 STDIN 重定向，使交互式命令可从浏览器获取输入
                 try:
                     enable_web_stdin_redirect()
+                except Exception:
+                    pass
+                # 记录用于交互式终端（PTY）重启的 jvs 启动命令（移除 web 相关参数）
+                try:
+                    import sys as _sys, os as _os, json as _json
+                    _argv = list(_sys.argv)
+                    # 去掉程序名（argv[0]），并过滤 --web 相关参数
+                    filtered = []
+                    i = 1
+                    while i < len(_argv):
+                        a = _argv[i]
+                        if a == "--web" or a.startswith("--web="):
+                            i += 1
+                            continue
+                        if a == "--web-host":
+                            i += 2
+                            continue
+                        if a.startswith("--web-host="):
+                            i += 1
+                            continue
+                        if a == "--web-port":
+                            i += 2
+                            continue
+                        if a.startswith("--web-port="):
+                            i += 1
+                            continue
+                        filtered.append(a)
+                        i += 1
+                    # 使用 jvs 命令作为可执行文件，保留其余业务参数
+                    cmd = ["jvs"] + filtered
+                    _os.environ["JARVIS_WEB_LAUNCH_JSON"] = _json.dumps(cmd, ensure_ascii=False)
                 except Exception:
                     pass
                 PrettyOutput.print("以 Web 模式启动，请在浏览器中打开提供的地址进行交互。", OutputType.INFO)
