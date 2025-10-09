@@ -448,6 +448,9 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
         session = {"pid": None, "master_fd": None}
         last_cols = 0
         last_rows = 0
+        # 会话结束后等待用户按回车再重启
+        waiting_for_ack = False
+        ack_event = asyncio.Event()
 
 
         def _spawn_jvs_session() -> bool:
@@ -510,11 +513,32 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
             return
 
         async def _tty_read_loop() -> None:
+            nonlocal waiting_for_ack
             try:
                 while True:
                     fd = session.get("master_fd")
                     if fd is None:
-                        # 会话丢失，自动重启
+                        # 若正在等待用户按回车确认，则暂不重启
+                        if waiting_for_ack:
+                            if ack_event.is_set():
+                                try:
+                                    ack_event.clear()
+                                except Exception:
+                                    pass
+                                waiting_for_ack = False
+                                if _spawn_jvs_session():
+                                    try:
+                                        await ws.send_text(json.dumps({"type": "stdio", "text": "\r\njvs 会话已重启\r\n"}))
+                                    except Exception:
+                                        pass
+                                    fd = session.get("master_fd")
+                                else:
+                                    await asyncio.sleep(0.5)
+                                    continue
+                            # 等待用户按回车
+                            await asyncio.sleep(0.1)
+                            continue
+                        # 非确认流程：自动重启
                         if _spawn_jvs_session():
                             try:
                                 await ws.send_text(json.dumps({"type": "stdio", "text": "\r\njvs 会话已重启\r\n"}))
@@ -541,7 +565,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                             except Exception:
                                 break
                         else:
-                            # 读取到 EOF，说明子进程已退出，提示后自动重启 jvs 会话
+                            # 读取到 EOF，说明子进程已退出；提示后等待用户按回车再重启
                             try:
                                 # 关闭旧 master
                                 try:
@@ -551,20 +575,14 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                                     pass
                                 session["master_fd"] = None
                                 session["pid"] = None
-                                # 提示用户即将重启
+                                # 标记等待用户回车，并提示
+                                waiting_for_ack = True
                                 try:
-                                    await ws.send_text(json.dumps({"type": "stdio", "text": "\r\nAgent 已结束，正在重启新的 Agent...\r\n"}))
+                                    await ws.send_text(json.dumps({"type": "stdio", "text": "\r\nAgent 已结束。按回车继续，系统将重启新的 Agent。\r\n> "}))
                                 except Exception:
                                     pass
-                                # 立即重启
-                                if _spawn_jvs_session():
-                                    try:
-                                        await ws.send_text(json.dumps({"type": "stdio", "text": "jvs 会话已重启\r\n"}))
-                                    except Exception:
-                                        pass
-                                else:
-                                    # 重启失败，稍后重试
-                                    await asyncio.sleep(0.5)
+                                # 不立即重启，等待顶部 fd None 分支在收到回车后处理
+                                await asyncio.sleep(0.1)
                             except Exception:
                                 pass
                     # 让出事件循环
@@ -609,12 +627,26 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                     continue
                 mtype = data.get("type")
                 if mtype == "stdin":
-                    # 前端键入数据透传到 PTY
+                    # 前端键入数据：若等待回车，则捕获回车；否则透传到 PTY
                     try:
                         text = data.get("data", "")
                         if isinstance(text, str) and text:
-                            # 原样写入（保留控制字符）；前端可按需发送回车
-                            _os.write(session.get("master_fd") or -1, text.encode(errors="ignore"))
+                            if waiting_for_ack:
+                                # Enter 键触发继续
+                                if "\r" in text or "\n" in text:
+                                    try:
+                                        ack_event.set()
+                                    except Exception:
+                                        pass
+                                else:
+                                    # 非回车输入时轻提示
+                                    try:
+                                        await ws.send_text(json.dumps({"type": "stdio", "text": "\r\n按回车继续。\r\n> "}))
+                                    except Exception:
+                                        pass
+                            else:
+                                # 原样写入（保留控制字符）；前端可按需发送回车
+                                _os.write(session.get("master_fd") or -1, text.encode(errors="ignore"))
                     except Exception:
                         pass
                 elif mtype == "resize":
