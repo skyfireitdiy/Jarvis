@@ -449,6 +449,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
         last_cols = 0
         last_rows = 0
 
+
         def _spawn_jvs_session() -> bool:
             nonlocal session
             try:
@@ -513,15 +514,14 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                 while True:
                     fd = session.get("master_fd")
                     if fd is None:
-                        # 会话丢失，尝试重启
+                        # 会话丢失，自动重启
                         if _spawn_jvs_session():
                             try:
-                                await ws.send_text(json.dumps({"type": "output", "payload": {"text": "jvs 会话已重启", "output_type": "INFO"}}))
+                                await ws.send_text(json.dumps({"type": "stdio", "text": "\r\njvs 会话已重启\r\n"}))
                             except Exception:
                                 pass
                             fd = session.get("master_fd")
                         else:
-                            # 重启失败，稍后重试
                             await asyncio.sleep(0.5)
                             continue
                     try:
@@ -541,7 +541,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                             except Exception:
                                 break
                         else:
-                            # 读取到 EOF，说明子进程已退出，尝试重启 jvs 会话
+                            # 读取到 EOF，说明子进程已退出，提示后自动重启 jvs 会话
                             try:
                                 # 关闭旧 master
                                 try:
@@ -551,9 +551,15 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                                     pass
                                 session["master_fd"] = None
                                 session["pid"] = None
+                                # 提示用户即将重启
+                                try:
+                                    await ws.send_text(json.dumps({"type": "stdio", "text": "\r\nAgent 已结束，正在重启新的 Agent...\r\n"}))
+                                except Exception:
+                                    pass
+                                # 立即重启
                                 if _spawn_jvs_session():
                                     try:
-                                        await ws.send_text(json.dumps({"type": "output", "payload": {"text": "jvs 会话已重启", "output_type": "INFO"}}))
+                                        await ws.send_text(json.dumps({"type": "stdio", "text": "jvs 会话已重启\r\n"}))
                                     except Exception:
                                         pass
                                 else:
