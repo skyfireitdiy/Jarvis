@@ -779,3 +779,13 @@ def is_non_interactive() -> bool:
         # 忽略环境变量解析异常，回退到配置
         pass
     return GLOBAL_CONFIG_DATA.get("JARVIS_NON_INTERACTIVE", False) is True
+
+
+def is_skip_predefined_tasks() -> bool:
+    """
+    是否跳过预定义任务加载。
+    
+    返回：
+        bool: 如果跳过预定义任务加载则返回True，默认为False
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_SKIP_PREDEFINED_TASKS", False) is True

@@ -16,7 +16,7 @@ from jarvis.jarvis_agent.file_context_handler import file_context_handler
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.task_manager import TaskManager
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils.config import is_non_interactive
+from jarvis.jarvis_utils.config import is_non_interactive, is_skip_predefined_tasks
 
 
 class AgentManager:
@@ -80,8 +80,8 @@ class AgentManager:
             self.agent.run(task_content)
             raise typer.Exit(code=0)
 
-        # 处理预定义任务（非交互模式下跳过）
-        if not is_non_interactive() and self.agent.first:
+        # 处理预定义任务（非交互模式下跳过；支持配置跳过加载）
+        if not is_non_interactive() and not is_skip_predefined_tasks() and self.agent.first:
             task_manager = TaskManager()
             tasks = task_manager.load_tasks()
             if tasks and (selected_task := task_manager.select_task(tasks)):
