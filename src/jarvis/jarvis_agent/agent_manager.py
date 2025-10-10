@@ -53,7 +53,6 @@ class AgentManager:
         self.agent = Agent(
             system_prompt=origin_agent_system_prompt,
             model_group=self.model_group,
-            output_handler=[ToolRegistry()],  # type: ignore
             need_summary=False,
             use_methodology=self.use_methodology,
             use_analysis=self.use_analysis,

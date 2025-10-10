@@ -689,7 +689,6 @@ class CodeReviewTool:
 {ot("REPORT")}
 [在此处插入完整MARKDOWN格式的审查报告]
 {ct("REPORT")}""",
-                    output_handler=[tool_registry],  # type: ignore
                     auto_complete=False,
                 )
 
