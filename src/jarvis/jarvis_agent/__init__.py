@@ -277,6 +277,7 @@ class Agent:
         model_group: Optional[str] = None,
         summary_prompt: Optional[str] = None,
         auto_complete: bool = False,
+        output_handler: Optional[List[OutputHandlerProtocol]] = None,
         use_tools: Optional[List[str]] = None,
         execute_tool_confirm: Optional[bool] = None,
         need_summary: bool = True,
@@ -328,6 +329,7 @@ class Agent:
         # 初始化处理器
         self._init_handlers(
             multiline_inputer,
+            output_handler,
             use_tools or [],
         )
         # 初始化用户交互封装，保持向后兼容
@@ -394,10 +396,11 @@ class Agent:
     def _init_handlers(
         self,
         multiline_inputer: Optional[Callable[[str], str]],
+        output_handler: Optional[List[OutputHandlerProtocol]],
         use_tools: List[str],
     ):
         """初始化各种处理器"""
-        self.output_handler = [ToolRegistry(),  EditFileHandler(), RewriteFileHandler()]
+        self.output_handler = output_handler or [ToolRegistry(),  EditFileHandler(), RewriteFileHandler()]
         self.set_use_tools(use_tools)
         self.input_handler = [
             builtin_input_handler,

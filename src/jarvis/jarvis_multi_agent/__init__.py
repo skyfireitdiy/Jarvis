@@ -119,7 +119,7 @@ content: |2
                 f"{system_prompt}\n\n# 原始问题\n{self.original_question}"
             )
 
-        agent = Agent(**config)
+        agent = Agent(output_handler=[ToolRegistry(),  EditFileHandler(), RewriteFileHandler(), self],**config)
         self.agents[name] = agent
         return agent
 
