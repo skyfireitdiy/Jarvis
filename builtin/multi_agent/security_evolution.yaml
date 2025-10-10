@@ -28,7 +28,7 @@ agents:
 
       ## 工具使用
       - ask_user: 在启动时获取必要信息或在关键节点寻求确认。
-      - REWRITE_FILE 操作: 保存最终的综合报告。
+      - REWRITE 操作: 保存最终的综合报告。
       - save_memory / retrieve_memory: 记录各阶段的报告路径和关键结论。
 
       ## 工作流程
@@ -90,7 +90,7 @@ agents:
       ```
       
       ## 消息发送指令
-      - 在发送消息给 SecurityEvolutionLead 前，必须先使用 REWRITE_FILE 操作保存 01_code_understanding_report.md
+      - 在发送消息给 SecurityEvolutionLead 前，必须先使用 REWRITE 操作保存 01_code_understanding_report.md
       - 然后使用 SEND_MESSAGE 将报告摘要与下一步需求发送给 SecurityEvolutionLead
 
     auto_complete: false
@@ -115,7 +115,7 @@ agents:
       ## 工具使用
       - read_code: 读取代码以审查可疑模式。
       - execute_script: 运行脚本以搜索特定的不安全函数调用或模式。
-      - REWRITE_FILE 操作: 保存安全问题发现报告。
+      - REWRITE 操作: 保存安全问题发现报告。
       - search_web: 查找关于特定CVE或安全最佳实践的信息。
       - save_memory / retrieve_memory: 记录发现的问题和相关证据。。
       ## 工作流程
@@ -150,7 +150,7 @@ agents:
       ## 工具使用
       - read_code: 读取代码以审查可疑模式。
       - execute_script: 运行脚本以搜索特定的不安全函数调用或模式。
-      - REWRITE_FILE 操作: 保存安全问题发现报告。
+      - REWRITE 操作: 保存安全问题发现报告。
       - search_web: 查找关于特定CVE或安全最佳实践的信息。
       - save_memory / retrieve_memory: 记录发现的问题和相关证据。。
       ## 工作流程
@@ -185,7 +185,7 @@ agents:
       ## 工具使用
       - read_code: 读取代码以审查可疑模式。
       - execute_script: 运行脚本以搜索特定的不安全函数调用或模式。
-      - REWRITE_FILE 操作: 保存安全问题发现报告。
+      - REWRITE 操作: 保存安全问题发现报告。
       - search_web: 查找关于特定CVE或安全最佳实践的信息。
       - save_memory / retrieve_memory: 记录发现的问题和相关证据。。
       ## 工作流程
@@ -219,7 +219,7 @@ agents:
 
       ## 工具使用
       - read_code: 读取多个安全专家的分析报告。
-      - REWRITE_FILE 操作: 保存整合后的风险评估报告。
+      - REWRITE 操作: 保存整合后的风险评估报告。
       - search_web: 查询通用的风险评估模型（如CVSS）或类似漏洞的行业影响。
       - save_memory / retrieve_memory: 记录评估过程中的权重和中间结论。
 
@@ -263,7 +263,7 @@ agents:
 
       ## 工具使用
       - read_code: 读取风险评估报告以理解问题优先级。
-      - REWRITE_FILE 操作: 保存演进策略和路线图。
+      - REWRITE 操作: 保存演进策略和路线图。
       - search_web: 研究不同修复、加固或重写策略的成本与收益。
       - save_memory / retrieve_memory: 记录决策过程和策略细节。
 
@@ -311,7 +311,7 @@ agents:
       ## 工具使用
       - ask_user: 确认关键实现约束（如编译器、构建系统）。
       - read_code: 读取与核对需要变更的代码点。
-      - REWRITE_FILE 操作: 保存补丁与代码样例。
+      - REWRITE 操作: 保存补丁与代码样例。
       - execute_script: 运行辅助脚本或代码格式化工具。
       - search_web: 查找最佳实践或API用法。
       - save_memory / retrieve_memory: 记录复杂的变更逻辑或上下文。
@@ -351,7 +351,7 @@ agents:
 
       ## 工具使用
       - read_code: 阅读代码变更方案以设计测试用例。
-      - REWRITE_FILE 操作: 保存验证计划。
+      - REWRITE 操作: 保存验证计划。
       - search_web: 查找关于性能基准测试或安全测试的最佳实践。
       - save_memory / retrieve_memory: 记录测试指标和验证结果。
 
