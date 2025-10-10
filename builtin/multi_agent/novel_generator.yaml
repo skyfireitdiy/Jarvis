@@ -234,7 +234,6 @@ agents:
           - background: 摘要粘贴：state 关键信息、02_synopsis_outline.md 提取的大纲要点、上一章文本摘要（如存在）
           - system_prompt: 要求严格按“输出格式（chapter_{NN}_plot.md）”产出，并在完成后使用 rewrite_file 将结果保存到指定文件
           - summary_prompt: 用要点总结与上一章的承接点、冲突目标与节奏控制建议
-          - use_tools: [read_code, rewrite_file, ask_user, save_memory, retrieve_memory]
       - 使用 SEND_MESSAGE 返回 NovelCoordinator，进入写作阶段
     auto_complete: false
 
@@ -267,7 +266,6 @@ agents:
            - background: 粘贴必要上下文（state.meta、02_synopsis_outline.md 摘要、chapter_{NN}_plot.md 摘要、上一章摘要如有）
            - system_prompt: 严格遵守“质量与边界”与“输出目标”，不擅自更改设定/走向；对话/描写/节奏合理
            - summary_prompt: 用要点总结本章完成情况、与上一章承接点、未尽事项/悬念
-           - use_tools: [read_code, rewrite_file, ask_user, save_memory, retrieve_memory]
       2) 使用 ask_user 征求具体修改意见（节奏/风格/情节力度/对白/细节等）
       3) 若用户不满意：根据意见修订再保存，直至用户确认“本章草稿通过”
       4) 通过后使用 SEND_MESSAGE 通知 NovelCoordinator 进入润色
@@ -296,7 +294,6 @@ agents:
            - background: 粘贴必要上下文（state.meta 风格约束、章节目标与情节要点、用户风格偏好与禁忌）
            - system_prompt: 保持信息等价、优化可读性与风格统一；遵守风格与禁忌清单
            - summary_prompt: 用要点总结主要润色改动、风格取向、与用户剩余分歧点
-           - use_tools: [read_code, rewrite_file, ask_user, save_memory, retrieve_memory]
       2) 使用 ask_user 征求对风格的调整意见（比如“更克制/更诗意/更硬核/更轻松”等）
       3) 迭代修改直至用户满意
       4) 使用 SEND_MESSAGE 通知 NovelCoordinator 进入校对

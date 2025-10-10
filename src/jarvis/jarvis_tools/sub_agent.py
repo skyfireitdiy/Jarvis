@@ -157,7 +157,7 @@ class SubAgentTool:
                 summary_prompt=summary_prompt,
                 auto_complete=auto_complete,
                 output_handler=None,
-                use_tools=None,
+                use_tools=use_tools,
                 execute_tool_confirm=parent_execute_tool_confirm,
                 need_summary=need_summary,
                 multiline_inputer=parent_multiline_inputer,

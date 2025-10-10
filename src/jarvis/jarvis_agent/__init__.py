@@ -31,6 +31,7 @@ from jarvis.jarvis_agent.prompts import (
     TASK_ANALYSIS_PROMPT,
 )
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
 from jarvis.jarvis_agent.prompt_manager import PromptManager
 from jarvis.jarvis_agent.event_bus import EventBus
 from jarvis.jarvis_agent.config import AgentConfig
@@ -399,7 +400,7 @@ class Agent:
         use_tools: List[str],
     ):
         """初始化各种处理器"""
-        self.output_handler = output_handler or [ToolRegistry()]
+        self.output_handler = output_handler or [ToolRegistry(),  EditFileHandler()]
         self.set_use_tools(use_tools)
         self.input_handler = [
             builtin_input_handler,
