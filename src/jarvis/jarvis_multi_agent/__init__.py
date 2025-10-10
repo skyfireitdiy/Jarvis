@@ -68,18 +68,168 @@ content: |2
 """
 
     def can_handle(self, response: str) -> bool:
-        return len(self._extract_send_msg(response)) > 0
+        # 只要检测到 SEND_MESSAGE 起始标签即认为可处理，
+        # 即便内容有误也由 handle 返回明确错误与修复指导
+        return ot("SEND_MESSAGE") in response
 
     def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
-        send_messages = self._extract_send_msg(response)
-        if len(send_messages) > 1:
+        """
+        处理 SEND_MESSAGE。若存在格式/解析/字段/目标等问题，返回明确错误原因与修复指导。
+        """
+        # 优先使用解析器获取“正确路径”结果
+        parsed = self._extract_send_msg(response)
+        if len(parsed) == 1:
+            msg = parsed[0]
+            # 字段校验
+            to_val = msg.get("to")
+            content_val = msg.get("content")
+            missing = []
+            if not to_val:
+                missing.append("to")
+            if content_val is None or (isinstance(content_val, str) and content_val.strip() == ""):
+                # 允许空格/空行被视为缺失
+                missing.append("content")
+            if missing:
+                guidance = (
+                    "SEND_MESSAGE 字段缺失或为空："
+                    + ", ".join(missing)
+                    + "\n修复建议：\n"
+                    "- 必须包含 to 和 content 字段\n"
+                    "- to: 目标智能体名称（字符串）\n"
+                    "- content: 发送内容，建议使用多行块 |2 保持格式\n"
+                    "示例：\n"
+                    f"{ot('SEND_MESSAGE')}\n"
+                    "to: 目标Agent名称\n"
+                    "content: |2\n"
+                    "  这里填写要发送的消息内容\n"
+                    f"{ct('SEND_MESSAGE')}"
+                )
+                return False, guidance
+            # 类型校验
+            if not isinstance(to_val, str):
+                return False, "SEND_MESSAGE 字段类型错误：to 必须为字符串。修复建议：将 to 改为字符串，如 to: ChapterPolisher"
+            if not isinstance(content_val, str):
+                return False, "SEND_MESSAGE 字段类型错误：content 必须为字符串。修复建议：将 content 改为字符串或使用多行块 content: |2"
+            # 目标校验
+            if to_val not in self.agents_config_map:
+                available = ", ".join(self.agents_config_map.keys())
+                return (
+                    False,
+                    f"目标智能体不存在：'{to_val}' 不在可用列表中。\n"
+                    f"可用智能体：[{available}]\n"
+                    "修复建议：\n"
+                    "- 将 to 修改为上述可用智能体之一\n"
+                    "- 或检查配置中是否遗漏了该智能体的定义"
+                )
+            # 通过校验，交给上层发送
+            return True, {"to": to_val, "content": content_val}
+        elif len(parsed) > 1:
             return (
                 False,
-                "Send multiple messages, please only send one message at a time.",
+                "检测到多个 SEND_MESSAGE 块。一次只能发送一个消息。\n修复建议：合并消息或分多轮发送，每轮仅保留一个 SEND_MESSAGE 块。"
             )
-        if len(send_messages) == 0:
-            return False, ""
-        return True, send_messages[0]
+        # 未成功解析，进行诊断并返回可操作指导
+        try:
+            normalized = response.replace("\r\n", "\n").replace("\r", "\n")
+        except Exception:
+            normalized = response
+        ot_tag = ot("SEND_MESSAGE")
+        ct_tag = ct("SEND_MESSAGE")
+        has_open = ot_tag in normalized
+        has_close = ct_tag in normalized
+        if has_open and not has_close:
+            return (
+                False,
+                f"检测到 {ot_tag} 但缺少结束标签 {ct_tag}。\n"
+                "修复建议：在消息末尾补充结束标签，并确认标签各自独占一行。\n"
+                "示例：\n"
+                f"{ot_tag}\n"
+                "to: 目标Agent名称\n"
+                "content: |2\n"
+                "  这里填写要发送的消息内容\n"
+                f"{ct_tag}"
+            )
+        # 尝试提取原始块并指出 YAML 问题
+        import re as _re
+        pattern = _re.compile(
+            rf"{_re.escape(ot_tag)}[ \t]*\n(.*?)(?:\n)?[ \t]*{_re.escape(ct_tag)}",
+            _re.DOTALL,
+        )
+        blocks = pattern.findall(normalized)
+        if not blocks:
+            alt_pattern = _re.compile(
+                rf"{_re.escape(ot_tag)}[ \t]*(.*?)[ \t]*{_re.escape(ct_tag)}",
+                _re.DOTALL,
+            )
+            blocks = alt_pattern.findall(normalized)
+        if not blocks:
+            return (
+                False,
+                "SEND_MESSAGE 格式错误：未能识别完整的消息块。\n"
+                "修复建议：确保起止标签在单独行上，且中间内容为合法的 YAML，包含 to 与 content 字段。"
+            )
+        raw = blocks[0]
+        try:
+            msg_obj = yaml.safe_load(raw)
+            if not isinstance(msg_obj, dict):
+                return (
+                    False,
+                    "SEND_MESSAGE 内容必须为 YAML 对象（键值对）。\n"
+                    "修复建议：使用 to 与 content 字段构成的对象。\n"
+                    "示例：\n"
+                    f"{ot('SEND_MESSAGE')}\n"
+                    "to: 目标Agent名称\n"
+                    "content: |2\n"
+                    "  这里填写要发送的消息内容\n"
+                    f"{ct('SEND_MESSAGE')}"
+                )
+            missing_keys = [k for k in ("to", "content") if k not in msg_obj]
+            if missing_keys:
+                return (
+                    False,
+                    "SEND_MESSAGE 缺少必要字段：" + ", ".join(missing_keys) + "\n"
+                    "修复建议：补充缺失字段。\n"
+                    "示例：\n"
+                    f"{ot('SEND_MESSAGE')}\n"
+                    "to: 目标Agent名称\n"
+                    "content: |2\n"
+                    "  这里填写要发送的消息内容\n"
+                    f"{ct('SEND_MESSAGE')}"
+                )
+            # 针对值类型的提示（更细）
+            if not isinstance(msg_obj.get("to"), str):
+                return False, "SEND_MESSAGE 字段类型错误：to 必须为字符串。"
+            if not isinstance(msg_obj.get("content"), str):
+                return False, "SEND_MESSAGE 字段类型错误：content 必须为字符串，建议使用多行块 |2。"
+            # 若到此仍未返回，说明结构基本正确，但 _extract_send_msg 未命中，给出泛化建议
+            return (
+                False,
+                "SEND_MESSAGE 格式可能存在缩进或空白字符问题，导致未被系统识别。\n"
+                "修复建议：\n"
+                "- 确保起止标签各占一行\n"
+                "- 标签与内容之间保留换行\n"
+                "- 使用 content: |2 并保证 YAML 缩进一致\n"
+                "示例：\n"
+                f"{ot('SEND_MESSAGE')}\n"
+                "to: 目标Agent名称\n"
+                "content: |2\n"
+                "  这里填写要发送的消息内容\n"
+                f"{ct('SEND_MESSAGE')}"
+            )
+        except Exception as e:
+            return (
+                False,
+                f"SEND_MESSAGE YAML 解析失败：{str(e)}\n"
+                "修复建议：\n"
+                "- 检查冒号、缩进与引号是否正确\n"
+                "- 使用 content: |2 多行块以避免缩进歧义\n"
+                "示例：\n"
+                f"{ot('SEND_MESSAGE')}\n"
+                "to: 目标Agent名称\n"
+                "content: |2\n"
+                "  这里填写要发送的消息内容\n"
+                f"{ct('SEND_MESSAGE')}"
+            )
 
     def name(self) -> str:
         return "SEND_MESSAGE"
@@ -91,16 +241,38 @@ content: |2
         Args:
             content: The content containing send message
         """
-        if ot("SEND_MESSAGE") in content and ct("SEND_MESSAGE") not in content:
-            content += "\n" + ct("SEND_MESSAGE")
-        data = re.findall(
-            ot("SEND_MESSAGE") + r"\n(.*?)\n" + ct("SEND_MESSAGE"), content, re.DOTALL
+        # Normalize line endings to handle CRLF/CR cases to ensure robust matching
+        try:
+            normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+        except Exception:
+            normalized = content
+
+        ot_tag = ot("SEND_MESSAGE")
+        ct_tag = ct("SEND_MESSAGE")
+
+        # Auto-append closing tag if missing
+        if ot_tag in normalized and ct_tag not in normalized:
+            normalized += "\n" + ct_tag
+
+        # Use robust regex with DOTALL; escape tags to avoid regex meta issues
+        pattern = re.compile(
+            rf"{re.escape(ot_tag)}[ \t]*\n(.*?)(?:\n)?[ \t]*{re.escape(ct_tag)}",
+            re.DOTALL,
         )
+        data = pattern.findall(normalized)
+        # Fallback: handle cases without explicit newlines around closing tag
+        if not data:
+            alt_pattern = re.compile(
+                rf"{re.escape(ot_tag)}[ \t]*(.*?)[ \t]*{re.escape(ct_tag)}",
+                re.DOTALL,
+            )
+            data = alt_pattern.findall(normalized)
+
         ret = []
         for item in data:
             try:
                 msg = yaml.safe_load(item)
-                if "to" in msg and "content" in msg:
+                if isinstance(msg, dict) and "to" in msg and "content" in msg:
                     ret.append(msg)
             except Exception:
                 continue
