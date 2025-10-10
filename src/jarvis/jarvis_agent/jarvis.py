@@ -595,7 +595,10 @@ def handle_builtin_config_selector(
 
                             elif sel["category"] == "multi_agent":
                                 # jarvis-multi-agent 需要 -c/--config，用户输入通过 -i/--input 传递
+                                # 同时传递 -g/--llm-group 以继承 jvs 的模型组选择
                                 args = [str(sel["cmd"]), "-c", str(sel["file"])]
+                                if model_group:
+                                    args += ["-g", str(model_group)]
                                 if task:
                                     args += ["-i", str(task)]
 
