@@ -901,13 +901,17 @@ class Agent:
 
         if self.need_summary:
 
-            self.session.prompt = self.summary_prompt
+            # 确保总结提示词非空：若为None或仅空白，则回退到默认提示词
+            safe_summary_prompt = self.summary_prompt or ""
+            if isinstance(safe_summary_prompt, str) and safe_summary_prompt.strip() == "":
+                safe_summary_prompt = DEFAULT_SUMMARY_PROMPT
+            # 注意：不要写回 session.prompt，避免 BEFORE_SUMMARY 事件回调修改/清空后导致使用空prompt
             # 广播将要生成总结事件
             try:
                 self.event_bus.emit(
                     BEFORE_SUMMARY,
                     agent=self,
-                    prompt=self.session.prompt,
+                    prompt=safe_summary_prompt,
                     auto_completed=auto_completed,
                     need_summary=self.need_summary,
                 )
@@ -916,7 +920,8 @@ class Agent:
 
             if not self.model:
                 raise RuntimeError("Model not initialized")
-            ret = self.model.chat_until_success(self.session.prompt)  # type: ignore
+            # 直接使用本地变量，避免受事件回调影响
+            ret = self.model.chat_until_success(safe_summary_prompt)  # type: ignore
             # 防御: 总结阶段模型可能返回空响应(None或空字符串)，统一为空字符串并告警
             if not ret:
                 try:

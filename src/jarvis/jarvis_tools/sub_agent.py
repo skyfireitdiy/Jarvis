@@ -51,17 +51,6 @@ class SubAgentTool:
                 "type": "string",
                 "description": "覆盖子Agent的总结提示词（必填）",
             },
-            "use_tools": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "限制子Agent可用的工具名称列表（必填）。兼容以逗号分隔的字符串输入。可用的工具列表："
-                + "\n".join(
-                    [
-                        t["name"] + ": " + t["description"]
-                        for t in ToolRegistry().get_all_tools()
-                    ]
-                ),
-            },
         },
         "required": [
             "task",
@@ -69,7 +58,6 @@ class SubAgentTool:
             "background",
             "system_prompt",
             "summary_prompt",
-            "use_tools",
         ],
     }
 
@@ -105,16 +93,6 @@ class SubAgentTool:
             summary_prompt = str(args.get("summary_prompt", "")).strip()
             agent_name = str(args.get("name", "")).strip()
 
-            # 解析可用工具列表（支持数组或以逗号分隔的字符串）
-            _use_tools = args.get("use_tools", None)
-            use_tools: List[str] = []
-            if isinstance(_use_tools, list):
-                use_tools = [str(x).strip() for x in _use_tools if str(x).strip()]
-            elif isinstance(_use_tools, str):
-                use_tools = [s.strip() for s in _use_tools.split(",") if s.strip()]
-            else:
-                use_tools = []
-
             errors = []
             if not system_prompt:
                 errors.append("system_prompt 不能为空")
@@ -122,8 +100,6 @@ class SubAgentTool:
                 errors.append("summary_prompt 不能为空")
             if not agent_name:
                 errors.append("name 不能为空")
-            if not use_tools:
-                errors.append("use_tools 不能为空")
             if not background:
                 errors.append("background 不能为空")
 
@@ -156,7 +132,7 @@ class SubAgentTool:
                 model_group=parent_model_group,
                 summary_prompt=summary_prompt,
                 auto_complete=auto_complete,
-                use_tools=use_tools,
+                use_tools=None,
                 execute_tool_confirm=parent_execute_tool_confirm,
                 need_summary=need_summary,
                 multiline_inputer=parent_multiline_inputer,
@@ -165,12 +141,6 @@ class SubAgentTool:
                 force_save_memory=None,
                 files=None,
             )
-
-            # 设置可用工具列表
-            try:
-                agent.set_use_tools(use_tools)
-            except Exception:
-                pass
 
             # 校验子Agent所用模型是否有效，必要时回退到平台可用模型
             try:

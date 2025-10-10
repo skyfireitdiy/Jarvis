@@ -81,7 +81,8 @@ class AgentConfig:
             cfg.execute_tool_confirm = is_execute_tool_confirm()
 
         # summary_prompt
-        if cfg.summary_prompt is None:
+        # Treat None or whitespace-only string as unset, fallback to default
+        if cfg.summary_prompt is None or (isinstance(cfg.summary_prompt, str) and cfg.summary_prompt.strip() == ""):
             cfg.summary_prompt = DEFAULT_SUMMARY_PROMPT
 
         # max_token_count
