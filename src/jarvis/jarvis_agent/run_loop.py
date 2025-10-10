@@ -81,12 +81,13 @@ class AgentRunLoop:
                     pass
                 need_return, tool_prompt = ag._call_tools(current_response)
 
-                # 将上一个提示和工具提示安全地拼接起来
-                ag.session.prompt = join_prompts([ag.session.prompt, tool_prompt])
-
+                # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
                 if need_return:
-                    return ag.session.prompt
+                    return tool_prompt
 
+                # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
+                safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
+                ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
 
                 # 广播工具调用后的事件（不影响主流程）
                 try:
