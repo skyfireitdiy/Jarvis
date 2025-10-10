@@ -7,6 +7,8 @@ import yaml
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
+from jarvis.jarvis_agent.rewrite_file_handler import RewriteFileHandler
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 
