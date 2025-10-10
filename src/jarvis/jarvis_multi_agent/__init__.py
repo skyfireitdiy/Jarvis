@@ -119,17 +119,6 @@ content: |2
                 f"{system_prompt}\n\n# 原始问题\n{self.original_question}"
             )
 
-        output_handler = config.get("output_handler", [])
-        if len(output_handler) == 0:
-            output_handler = [
-                ToolRegistry(),
-                self,
-            ]
-        else:
-            if not any(isinstance(h, MultiAgent) for h in output_handler):
-                output_handler.append(self)
-        config["output_handler"] = output_handler
-
         agent = Agent(**config)
         self.agents[name] = agent
         return agent

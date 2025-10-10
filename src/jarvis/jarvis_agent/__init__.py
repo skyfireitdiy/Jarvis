@@ -276,7 +276,6 @@ class Agent:
         model_group: Optional[str] = None,
         summary_prompt: Optional[str] = None,
         auto_complete: bool = False,
-        output_handler: Optional[List[OutputHandlerProtocol]] = None,
         use_tools: Optional[List[str]] = None,
         execute_tool_confirm: Optional[bool] = None,
         need_summary: bool = True,
@@ -296,7 +295,6 @@ class Agent:
 
             summary_prompt: 任务总结提示模板
             auto_complete: 是否自动完成任务
-            output_handler: 输出处理器列表
             execute_tool_confirm: 执行工具前是否需要确认
             need_summary: 是否需要生成总结
             multiline_inputer: 多行输入处理器
@@ -328,7 +326,6 @@ class Agent:
 
         # 初始化处理器
         self._init_handlers(
-            output_handler or [],
             multiline_inputer,
             use_tools or [],
         )
@@ -395,12 +392,11 @@ class Agent:
 
     def _init_handlers(
         self,
-        output_handler: List[OutputHandlerProtocol],
         multiline_inputer: Optional[Callable[[str], str]],
         use_tools: List[str],
     ):
         """初始化各种处理器"""
-        self.output_handler = output_handler or [ToolRegistry(),  EditFileHandler()]
+        self.output_handler = [ToolRegistry(),  EditFileHandler()]
         self.set_use_tools(use_tools)
         self.input_handler = [
             builtin_input_handler,
