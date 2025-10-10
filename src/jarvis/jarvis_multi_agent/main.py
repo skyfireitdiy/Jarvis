@@ -20,6 +20,9 @@ def cli(
     user_input: Optional[str] = typer.Option(
         None, "--input", "-i", help="用户输入（可选）"
     ),
+    model_group: Optional[str] = typer.Option(
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
     non_interactive: bool = typer.Option(
         False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
     ),
@@ -45,6 +48,8 @@ def cli(
     try:
         if non_interactive:
             set_config("JARVIS_NON_INTERACTIVE", True)
+        if model_group:
+            set_config("JARVIS_LLM_GROUP", str(model_group))
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
