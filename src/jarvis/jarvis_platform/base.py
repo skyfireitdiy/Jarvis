@@ -83,6 +83,11 @@ class BasePlatform(ABC):
 
         start_time = time.time()
 
+        # 当输入为空白字符串时，打印警告并直接返回空字符串
+        if message.strip() == "":
+            PrettyOutput.print("输入为空白字符串，已忽略本次请求", OutputType.WARNING)
+            return ""
+
         input_token_count = get_context_token_count(message)
 
         if input_token_count > get_max_input_token_count(self.model_group):
