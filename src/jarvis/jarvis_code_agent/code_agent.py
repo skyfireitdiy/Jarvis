@@ -89,7 +89,7 @@ class CodeAgent:
             system_prompt=code_system_prompt,
             name="CodeAgent",
             auto_complete=False,
-            output_handler=[tool_registry, EditFileHandler()],  # type: ignore
+            output_handler=[],  # type: ignore
             model_group=model_group,
             need_summary=need_summary,
             use_methodology=False,  # 禁用方法论
