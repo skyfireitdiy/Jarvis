@@ -74,7 +74,7 @@ use_analysis: false
 use_tools:
   - search_web
   - execute_script
-  - rewrite_file
+
   - ask_user
 auto_complete: false
 force_save_memory: false

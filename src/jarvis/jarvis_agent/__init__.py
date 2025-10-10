@@ -32,6 +32,7 @@ from jarvis.jarvis_agent.prompts import (
 )
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
+from jarvis.jarvis_agent.rewrite_file_handler import RewriteFileHandler
 from jarvis.jarvis_agent.prompt_manager import PromptManager
 from jarvis.jarvis_agent.event_bus import EventBus
 from jarvis.jarvis_agent.config import AgentConfig
@@ -396,7 +397,7 @@ class Agent:
         use_tools: List[str],
     ):
         """初始化各种处理器"""
-        self.output_handler = [ToolRegistry(),  EditFileHandler()]
+        self.output_handler = [ToolRegistry(),  EditFileHandler(), RewriteFileHandler()]
         self.set_use_tools(use_tools)
         self.input_handler = [
             builtin_input_handler,

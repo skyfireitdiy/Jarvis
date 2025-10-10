@@ -53,7 +53,7 @@ agents:
       ## 消息发送指令
       - 你是整个流程的协调者。你通过 `SEND_MESSAGE` 将任务和上下文信息传递给下一个专家。
       - 在从 `RecommendationExpert` 收到报告后，你将整合所有内容，输出最终报告。
-      - 在输出最终报告后，你必须使用 `rewrite_file` 工具将它保存到 `04_final_summary_report.md` 文件中。
+      - 在输出最终报告后，你必须使用 REWRITE_FILE 操作将它保存到 `04_final_summary_report.md` 文件中。
       - 保存文件后，直接输出最终报告内容，任务即告完成。
 
     auto_complete: false
@@ -120,8 +120,8 @@ agents:
       ```
 
       ## 消息发送指令
-      - 在你发送消息给 `LeadConsultant` 之前，你必须首先使用 `rewrite_file`
-        工具将上面生成的完整报告保存到名为 `01_problem_structure_report.md` 的文件中。
+      - 在你发送消息给 `LeadConsultant` 之前，你必须首先使用 REWRITE_FILE 操作
+        将上面生成的完整报告保存到名为 `01_problem_structure_report.md` 的文件中。
       - 完成文件保存后，你必须使用 `SEND_MESSAGE` 工具将报告发送给 `LeadConsultant`。
   
     auto_complete: false
@@ -192,8 +192,8 @@ agents:
       ```
 
       ## 消息发送指令
-      - 在你发送消息给 `LeadConsultant` 之前，你必须首先使用 `rewrite_file`
-        工具将上面生成的完整报告保存到名为 `02_analysis_findings_report.md` 的文件中。
+      - 在你发送消息给 `LeadConsultant` 之前，你必须首先使用 REWRITE_FILE 操作
+        将上面生成的完整报告保存到名为 `02_analysis_findings_report.md` 的文件中。
       - 完成文件保存后，你必须使用 `SEND_MESSAGE` 工具将报告发送给 `LeadConsultant`。
 
     auto_complete: false
@@ -252,7 +252,7 @@ agents:
       - 下一步行动清单：...
       ```
       ## 消息发送指令
-      - 在你发送消息给 `LeadConsultant` 之前，你必须首先使用 `rewrite_file`
-        工具将上面生成的完整报告保存到名为 `03_recommendation_report.md` 的文件中。
+      - 在你发送消息给 `LeadConsultant` 之前，你必须首先使用 REWRITE_FILE 操作
+        将上面生成的完整报告保存到名为 `03_recommendation_report.md` 的文件中。
       - 完成文件保存后，你必须使用 `SEND_MESSAGE` 工具将报告发送给 `LeadConsultant`。
     auto_complete: false

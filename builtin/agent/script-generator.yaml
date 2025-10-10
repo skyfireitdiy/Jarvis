@@ -64,8 +64,6 @@ system_prompt: |
 summary_prompt: |
   总结以上对话，生成一份详细的脚本说明文档，包括脚本功能、使用方法、参数说明和注意事项。
 use_tools:
-  - rewrite_file
-  - edit_file
   - ask_user
   - execute_script
   - read_code

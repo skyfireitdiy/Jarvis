@@ -24,8 +24,8 @@ agents:
         - chapter_{NN}_proofread.md         第NN章终稿（校对后）
       - 章节序号：从01开始，两位数补零（01, 02, ...）
       - 逐章停顿：每生成一章需停下来征求用户意见，可反复修改，用户明确同意后才进入下一章。
-      - 文件操作：所有阶段产出必须先用 rewrite_file 工具落盘，再进行 SEND_MESSAGE 交接。
-      - 中断恢复：每次动作前先用 read_code 读取 novel_state.yaml 判断进度；每次动作后用 rewrite_file 回写最新状态（完全覆盖写入，幂等可重入）。
+      - 文件操作：所有阶段产出必须先用 REWRITE_FILE 操作落盘，再进行 SEND_MESSAGE 交接。
+      - 中断恢复：每次动作前先用 read_code 读取 novel_state.yaml 判断进度；每次动作后用 REWRITE_FILE 操作回写最新状态（完全覆盖写入，幂等可重入）。
 
       ## novel_state.yaml 结构（示例）
       ```yaml
@@ -94,7 +94,7 @@ agents:
       - 如 progress.current_chapter > 1：在调度下一章前，使用 read_code 读取上一章文本（优先顺序：chapter_{PP}_proofread.md > chapter_{PP}_polished.md > chapter_{PP}_draft.md，PP为上一章两位数），并将关键要点的简明摘要包含在 SEND_MESSAGE 的 content 中，以确保连贯性与衔接；若文件缺失则按优先顺序回退读取。
       - 不直接编写报告或正文；创作任务由对应专家完成。
       - 每当收到子智能体的报告后：
-        - 你负责用 rewrite_file 更新 novel_state.yaml（状态推进、文件路径、章节批准与否等）
+        - 你负责用 REWRITE_FILE 操作更新 novel_state.yaml（状态推进、文件路径、章节批准与否等）
         - 然后决定下一个智能体
 
       ## 初始动作
@@ -141,10 +141,10 @@ agents:
       
       ## 过程要求
       - 缺信息时使用 ask_user 补全
-      - 完成后先用 rewrite_file 将全文保存为 01_roles.md；再用 SEND_MESSAGE 交回给 NovelCoordinator
+      - 完成后先使用 REWRITE_FILE 操作将全文保存为 01_roles.md；再用 SEND_MESSAGE 交回给 NovelCoordinator
 
       ## 消息发送指令
-      - 你必须先 rewrite_file 保存 01_roles.md
+      - 你必须先使用 REWRITE_FILE 操作保存 01_roles.md
       - 然后使用 SEND_MESSAGE 将摘要与下一步建议返回给 NovelCoordinator
     auto_complete: false
 
@@ -183,9 +183,9 @@ agents:
       - 信息不足时，使用 ask_user 或请求 NovelCoordinator 在下一条 SEND_MESSAGE 中附带所需文件路径/摘要。
       
       ## 流程
-      - 输出大纲后，先 rewrite_file 保存至 02_synopsis_outline.md
+      - 输出大纲后，先使用 REWRITE_FILE 操作保存至 02_synopsis_outline.md
       - 使用 ask_user 寻求确认与修改意见；未批准前重复修订
-      - 批准后：用 rewrite_file 更新 novel_state.yaml：
+      - 批准后：使用 REWRITE_FILE 操作更新 novel_state.yaml：
         - outline.file=02_synopsis_outline.md
         - outline.total_chapters=N
         - outline.chapter_titles=[...]
@@ -232,7 +232,7 @@ agents:
           - task: 产出第NN章情节设计（含承接上一章要点、场景/冲突/转折/视角安排、悬念与过渡、对齐检查），并负责将全文保存为 chapter_{NN}_plot.md
           - name: "ChapterPlannerWorker_NN"
           - background: 摘要粘贴：state 关键信息、02_synopsis_outline.md 提取的大纲要点、上一章文本摘要（如存在）
-          - system_prompt: 要求严格按“输出格式（chapter_{NN}_plot.md）”产出，并在完成后使用 rewrite_file 将结果保存到指定文件
+          - system_prompt: 要求严格按“输出格式（chapter_{NN}_plot.md）”产出，并在完成后使用 REWRITE_FILE 操作将结果保存到指定文件
           - summary_prompt: 用要点总结与上一章的承接点、冲突目标与节奏控制建议
       - 使用 SEND_MESSAGE 返回 NovelCoordinator，进入写作阶段
     auto_complete: false
@@ -261,7 +261,7 @@ agents:
       0) 在开始前：若 NN>1，使用 read_code 读取上一章文本（优先顺序：chapter_{PP}_proofread.md > chapter_{PP}_polished.md > chapter_{PP}_draft.md，PP为上一章两位数），总结承接要点（事件状态/人物情绪/线索与悬念/时间地点），并在本章开篇通过自然过渡予以承接。
       1) 必须使用 sub_agent 工具托管正文创作（由子Agent产出并保存草稿）：
          - sub_agent 参数要求：
-           - task: 根据 chapter_{NN}_plot.md 与设定/大纲，创作 chapter_{NN}_draft.md；长度接近 words_per_chapter（±20%），并在完成后使用 rewrite_file 将全文保存到文件；如用户提出修改意见，按意见修订直至用户确认“本章草稿通过”
+           - task: 根据 chapter_{NN}_plot.md 与设定/大纲，创作 chapter_{NN}_draft.md；长度接近 words_per_chapter（±20%），并在完成后使用 REWRITE_FILE 操作将全文保存到文件；如用户提出修改意见，按意见修订直至用户确认“本章草稿通过”
            - name: "ChapterWriterWorker_NN"
            - background: 粘贴必要上下文（state.meta、02_synopsis_outline.md 摘要、chapter_{NN}_plot.md 摘要、上一章摘要如有）
            - system_prompt: 严格遵守“质量与边界”与“输出目标”，不擅自更改设定/走向；对话/描写/节奏合理
@@ -289,7 +289,7 @@ agents:
       ## 流程
       1) 必须使用 sub_agent 工具托管润色（由子Agent产出并保存润色稿）：
          - sub_agent 参数要求：
-           - task: 在不改变事实与信息的前提下，基于 chapter_{NN}_draft.md 进行语言/节奏/意象的润色，完成后使用 rewrite_file 保存为 chapter_{NN}_polished.md；如用户给出风格调整意见，则迭代修订直至满意
+           - task: 在不改变事实与信息的前提下，基于 chapter_{NN}_draft.md 进行语言/节奏/意象的润色，完成后使用 REWRITE_FILE 操作保存为 chapter_{NN}_polished.md；如用户给出风格调整意见，则迭代修订直至满意
            - name: "ChapterPolisherWorker_NN"
            - background: 粘贴必要上下文（state.meta 风格约束、章节目标与情节要点、用户风格偏好与禁忌）
            - system_prompt: 保持信息等价、优化可读性与风格统一；遵守风格与禁忌清单
@@ -317,12 +317,11 @@ agents:
       ## 流程
       1) 必须使用 sub_agent 工具托管校对（由子Agent产出并保存终稿）：
          - sub_agent 参数要求：
-           - task: 基于 chapter_{NN}_polished.md 进行终审校对（错别字/病句/标点/格式/一致性/术语统一），不得改变事实内容；完成后使用 rewrite_file 将全文保存为 chapter_{NN}_proofread.md；如用户提出修订意见，可建议回到 Writer/Polisher 迭代后再复审
+           - task: 基于 chapter_{NN}_polished.md 进行终审校对（错别字/病句/标点/格式/一致性/术语统一），不得改变事实内容；完成后使用 REWRITE_FILE 操作将全文保存为 chapter_{NN}_proofread.md；如用户提出修订意见，可建议回到 Writer/Polisher 迭代后再复审
            - name: "ChapterProofreaderWorker_NN"
            - background: 粘贴必要上下文（state.meta 语言与术语约束、章节目标与关键细节、已知术语表或风格指南如有）
            - system_prompt: 聚焦语言与格式层面校对，避免改动事实或增加/删除事件；统一术语与标点风格
            - summary_prompt: 用要点总结本章主要校对项与修订建议（如需回退到Writer/Polisher亦请明确说明原因）
-           - use_tools: [read_code, rewrite_file, ask_user, save_memory, retrieve_memory]
       2) 使用 ask_user 确认本章“是否最终通过”
          - 若需改动，回传意见并可建议回到 Writer/Polisher 迭代
          - 若确认通过：明确回复“本章批准通过”

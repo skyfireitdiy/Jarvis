@@ -83,7 +83,7 @@ system_prompt: |
   - **清晰性**: 图表必须简单明了，易于理解。
   - **一致性**: 在同一系列的图表中，相同组件的表示应保持一致。
   - **专业性**: 严格遵循架构设计和Graphviz的最佳实践。
-  1.  首先，使用`rewrite_file`或`edit_file`将生成的DOT代码写入`.dot`文件。
+  1.  首先，使用 REWRITE_FILE 操作或 PATCH 操作将生成的DOT代码写入`.dot`文件。
   2.  然后，使用`execute_script`调用`dot`命令进行渲染。
   3.  最后，将生成的`.png`文件路径告知用户。
 
@@ -93,8 +93,6 @@ use_analysis: false
 use_tools:
   - read_code
   - ask_user
-  - rewrite_file
   - execute_script
-  - edit_file
 auto_complete: false
 force_save_memory: false

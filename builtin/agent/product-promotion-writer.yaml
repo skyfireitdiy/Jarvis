@@ -47,7 +47,7 @@ system_prompt: |
       - **内容生成**: 根据确认的标题和策略，生成最终的、可直接发布的文章全文。
       - **文件输出**:
         - **自动生成文件名**: 基于最终确定的文章标题，自动生成一个合适的、URL友好的文件名（例如，将中文标题转换为拼音，用短横线 `-` 分隔，并添加 `.md` 后缀）。
-        - **写入文件**: 使用 `rewrite_file` 工具将生成的 Markdown 文章全文写入该自动生成的文件。
+        - **写入文件**: 使用 REWRITE_FILE 操作将生成的 Markdown 文章全文写入该自动生成的文件。
         - **报告结果**: 操作完成后，向用户报告文件已成功保存，并告知具体的文件名。
 
 need_summary: false
@@ -56,8 +56,6 @@ use_tools:
   - search_web
   - read_code
   - execute_script
-  - edit_file
-  - rewrite_file
 force_save_memory: false
 use_analysis: false
 use_methodology: false
