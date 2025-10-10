@@ -141,6 +141,7 @@ agents:
       ## 信息边界与交互
       - 仅依赖 NovelCoordinator 的 SEND_MESSAGE 提供的信息与 read_code 读取的文件内容；不得访问其他智能体的会话历史或隐式内存。
       - 若信息不足，优先 ask_user；或请求 Coordinator 在下一次消息中附带所需文件/摘要。
+      - 严格限制消息负载：在 SEND_MESSAGE 与 sub_agent 的 background/system_prompt 中不要附带大段文件内容；如需引用文件，请仅传递文件路径，接收方必须使用 read_code 自行读取。
       
       ## 过程要求
       - 缺信息时使用 ask_user 补全
@@ -184,6 +185,7 @@ agents:
       ## 信息边界与交互
       - 仅可使用 SEND_MESSAGE 中提供的内容与 read_code 读取的文件；禁止假设可访问其他智能体的会话历史或隐式内存。
       - 信息不足时，使用 ask_user 或请求 NovelCoordinator 在下一条 SEND_MESSAGE 中附带所需文件路径/摘要。
+      - 严格限制消息负载：在 SEND_MESSAGE 与 sub_agent 的 background/system_prompt 中不要附带大段文件内容；仅传递文件路径，接收方必须使用 read_code 自行读取并生成所需摘要。
       
       ## 流程
       - 输出大纲后，先使用 REWRITE_FILE 操作保存至 02_synopsis_outline.md
@@ -226,6 +228,7 @@ agents:
       ## 信息边界与交互
       - 仅依赖 SEND_MESSAGE 提供的内容与 read_code 显式读取的文件；不得访问其他智能体的会话历史或隐式内存。
       - 如需更多信息，使用 ask_user 或请求 NovelCoordinator 在下一次消息中提供必要文件/摘要。
+      - 严格限制消息负载：在 SEND_MESSAGE 与 sub_agent 的 background/system_prompt 中不要附带大段文件内容；仅传递文件路径，接收方必须使用 read_code 自行读取并生成所需摘要。
       
       ## 流程
       - 在开始前：若 NN>1，使用 read_code 读取上一章文本（优先顺序：chapter_{PP}_proofread.md > chapter_{PP}_polished.md > chapter_{PP}_draft.md，PP为上一章两位数），阅读并总结与本章衔接的关键点（未竟线索/人物状态与情绪/悬念/时空/登场人物），并在本章情节设计中显式承接。
@@ -259,6 +262,7 @@ agents:
       ## 信息边界与交互
       - 仅依赖 SEND_MESSAGE 背景/内容与 read_code 文件；不得访问其他智能体的会话历史或隐式内存。
       - 信息不足时，使用 ask_user 或请求 NovelCoordinator 在下一条消息中附带所需文件/摘要。
+      - 严格限制消息负载：在 SEND_MESSAGE 与 sub_agent 的 background/system_prompt 中不要附带大段文件内容；仅传递文件路径，接收方必须使用 read_code 自行读取并生成所需摘要。
       
       ## 流程
       0) 在开始前：若 NN>1，使用 read_code 读取上一章文本（优先顺序：chapter_{PP}_proofread.md > chapter_{PP}_polished.md > chapter_{PP}_draft.md，PP为上一章两位数），总结承接要点（事件状态/人物情绪/线索与悬念/时间地点），并在本章开篇通过自然过渡予以承接。
@@ -288,6 +292,7 @@ agents:
       ## 信息边界与交互
       - 仅依赖 SEND_MESSAGE 与 read_code 文件；不得访问其他智能体的会话历史或隐式内存。
       - 如需更多上下文，ask_user 或请求 NovelCoordinator 在下一次消息中附带文件/摘要。
+      - 严格限制消息负载：在 SEND_MESSAGE 与 sub_agent 的 background/system_prompt 中不要附带大段文件内容；仅传递文件路径，接收方必须使用 read_code 自行读取并生成所需摘要。
       
       ## 流程
       1) 必须使用 sub_agent 工具托管润色（由子Agent产出并保存润色稿）：
@@ -316,6 +321,7 @@ agents:
       ## 信息边界与交互
       - 仅依赖 SEND_MESSAGE 与 read_code 文件；不得访问其他智能体的会话历史或隐式内存。
       - 如需更多上下文，ask_user 或请求 NovelCoordinator 在下一次消息中附带文件/摘要。
+      - 严格限制消息负载：在 SEND_MESSAGE 与 sub_agent 的 background/system_prompt 中不要附带大段文件内容；仅传递文件路径，接收方必须使用 read_code 自行读取并生成所需摘要。
       
       ## 流程
       1) 必须使用 sub_agent 工具托管校对（由子Agent产出并保存终稿）：
