@@ -18,20 +18,19 @@ class RewriteFileHandler(OutputHandler):
     </REWRITE>
 
     等价支持以下写法：
-    <REWRITE_FILE file=文件路径>
+    <REWRITE file=文件路径>
     新的文件完整内容
-    </REWRITE_FILE>
+    </REWRITE>
 
     说明：
     - 该处理器用于完全重写文件内容，适用于新增文件或大范围改写
     - 内部直接执行写入，提供失败回滚能力
-    - 支持同一响应中包含多个 REWRITE/REWRITE_FILE 块
+    - 支持同一响应中包含多个 REWRITE/REWRITE 块
     """
 
     def __init__(self) -> None:
         # 允许 file 参数为单引号、双引号或无引号
-        # 兼容两种标签名称：<REWRITE ...> 和 <REWRITE_FILE ...>
-        self.rewrite_pattern = re.compile(
+        self.rewrite_pattern_file = re.compile(
             ot("REWRITE file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))")
             + r"\s*"
             + r"(.*?)"
@@ -40,20 +39,10 @@ class RewriteFileHandler(OutputHandler):
             + ct("REWRITE"),
             re.DOTALL | re.MULTILINE,
         )
-        # 兼容别名格式：<REWRITE_FILE ...> ... </REWRITE_FILE>
-        self.rewrite_pattern_file = re.compile(
-            ot("REWRITE_FILE file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))")
-            + r"\s*"
-            + r"(.*?)"
-            + r"\s*"
-            + r"^"
-            + ct("REWRITE_FILE"),
-            re.DOTALL | re.MULTILINE,
-        )
 
     def name(self) -> str:
         """获取处理器名称，用于操作列表展示"""
-        return "REWRITE_FILE"
+        return "REWRITE"
 
     def prompt(self) -> str:
         """返回用户提示，描述使用方法与格式"""
@@ -62,19 +51,14 @@ class RewriteFileHandler(OutputHandler):
 新的文件完整内容
 {ct("REWRITE")}
 
-等价支持以下写法：
-{ot("REWRITE_FILE file=文件路径")}
-新的文件完整内容
-{ct("REWRITE_FILE")}
-
 注意：
-- {ot("REWRITE")}、{ct("REWRITE")} 或 {ot("REWRITE_FILE")}、{ct("REWRITE_FILE")} 必须出现在行首，否则不生效（会被忽略）
+- {ot("REWRITE")}、{ct("REWRITE")} 必须出现在行首，否则不生效（会被忽略）
 - 整文件重写会完全替换文件内容，如需局部修改请使用 PATCH 操作
 - 该操作由处理器直接执行，具备失败回滚能力"""
 
     def can_handle(self, response: str) -> bool:
-        """判断响应中是否包含 REWRITE/REWRITE_FILE 指令"""
-        return bool(self.rewrite_pattern.search(response) or self.rewrite_pattern_file.search(response))
+        """判断响应中是否包含 REWRITE/REWRITE 指令"""
+        return bool(self.rewrite_pattern_file.search(response))
 
     def handle(self, response: str, agent: Any) -> Tuple[bool, str]:
         """解析并执行整文件重写指令"""
@@ -82,11 +66,11 @@ class RewriteFileHandler(OutputHandler):
         if not rewrites:
             return False, "未找到有效的文件重写指令"
 
-        # 记录 REWRITE_FILE 操作调用统计
+        # 记录 REWRITE 操作调用统计
         try:
             from jarvis.jarvis_stats.stats import StatsManager
 
-            StatsManager.increment("rewrite_file_handler", group="tool")
+            StatsManager.increment("rewrite_file", group="tool")
         except Exception:
             # 统计失败不影响主流程
             pass
@@ -139,15 +123,11 @@ class RewriteFileHandler(OutputHandler):
 
     def _parse_rewrites(self, response: str) -> List[Tuple[str, str]]:
         """
-        解析响应中的 REWRITE/REWRITE_FILE 指令块。
+        解析响应中的 REWRITE/REWRITE 指令块。
         返回列表 [(file_path, content), ...]，按在响应中的出现顺序排序
         """
         items: List[Tuple[str, str]] = []
         matches: List[Tuple[int, Any]] = []
-
-        # 收集两种写法的匹配结果
-        for m in self.rewrite_pattern.finditer(response):
-            matches.append((m.start(), m))
         for m in self.rewrite_pattern_file.finditer(response):
             matches.append((m.start(), m))
 
