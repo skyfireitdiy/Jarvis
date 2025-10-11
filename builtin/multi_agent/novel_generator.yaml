@@ -23,7 +23,7 @@ agents:
         - chapter_{NN}_polished.md          第NN章润色稿
         - chapter_{NN}_proofread.md         第NN章终稿（校对后）
       - 章节序号：从01开始，两位数补零（01, 02, ...）
-      - 逐章停顿：每生成一章需停下来征求用户意见，可反复修改，用户明确同意后才进入下一章。
+      - 逐章停顿：从章节正文到润色阶段无需询问用户；在校对完成后征求用户最终确认，确认通过后才进入下一章。
       - 文件操作：所有阶段产出必须先用 REWRITE 操作落盘，再进行 SEND_MESSAGE 交接。
       - 中断恢复：每次动作前先用 read_code 读取 novel_state.yaml 判断进度；每次动作后用 REWRITE 操作回写最新状态（完全覆盖写入，幂等可重入）。
 
@@ -79,9 +79,9 @@ agents:
       3) 梗概与大纲：委托 SynopsisOutliner，产出 02_synopsis_outline.md，征求用户确认（反复修改），确认后 state.outline.approved=true，progress.status=outline_done。
       4) 章节循环（从 state.progress.current_chapter 到 outline.total_chapters）：
          - 章节情节：委托 ChapterPlanner，产出 chapter_{NN}_plot.md（可反复问询/修改）。
-         - 章节正文：委托 ChapterWriter，产出 chapter_{NN}_draft.md，必须 ask_user 征求反馈，不满意则修订循环。
-         - 章节润色：委托 ChapterPolisher，产出 chapter_{NN}_polished.md，同样支持反馈迭代。
-         - 章节校对：委托 ChapterProofreader，产出 chapter_{NN}_proofread.md，最终 ask_user 确认本章“通过/批准”。
+        - 章节正文：委托 ChapterWriter，产出 chapter_{NN}_draft.md，直接进入润色（无需询问用户）。
+        - 章节润色：委托 ChapterPolisher，产出 chapter_{NN}_polished.md，直接进入校对（无需询问用户）。
+        - 章节校对：委托 ChapterProofreader，产出 chapter_{NN}_proofread.md，随后 ask_user 确认本章“通过/批准”。
          - 若用户批准：将 chapters[N].approved=true，progress.current_chapter += 1；若已是最后一章，progress.status=completed，并在最后输出总结说明。
       5) 任何时刻：若被中断，恢复后你必须：
          - read_code 读取 novel_state.yaml 和最新相关文件
@@ -272,22 +272,20 @@ agents:
 
       ## 信息边界与交互
       - 仅依赖 SEND_MESSAGE 背景/内容与 read_code 文件；不得访问其他智能体的会话历史或隐式内存。
-      - 信息不足时，使用 ask_user 或请求 NovelCoordinator 在下一条消息中附带所需文件/摘要。
+      - 信息不足时，请求 NovelCoordinator 在下一条消息中附带所需文件/摘要；不要直接向用户提问。
       - 严格限制消息负载：在 SEND_MESSAGE 与 sub_agent 的 background/system_prompt 中不要附带大段文件内容；仅传递文件路径，接收方必须使用 read_code 自行读取。
       
       ## 流程
-      - 在开始前：使用 read_code 读取 chapter_{NN}_plot.md、02_synopsis_outline.md 与 01_roles.md（如需）以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一条消息中提供路径/摘要
+      - 在开始前：使用 read_code 读取 chapter_{NN}_plot.md、02_synopsis_outline.md 与 01_roles.md（如需）以校验输入；若缺失则请求 NovelCoordinator 在下一条消息中提供路径/摘要
       0) 在开始前：若 NN>1，使用 read_code 读取上一章文本（优先顺序：chapter_{PP}_proofread.md > chapter_{PP}_polished.md > chapter_{PP}_draft.md，PP为上一章两位数），总结承接要点（事件状态/人物情绪/线索与悬念/时间地点），并在本章开篇通过自然过渡予以承接。
       1) 必须使用 sub_agent 工具托管正文创作（由子Agent产出并保存草稿）：
          - sub_agent 参数要求：
-           - task: 根据 chapter_{NN}_plot.md 与设定/大纲，创作 chapter_{NN}_draft.md；长度接近 words_per_chapter（±20%），并在完成后使用 REWRITE 操作将全文保存到文件；如用户提出修改意见，按意见修订直至用户确认“本章草稿通过”
+           - task: 根据 chapter_{NN}_plot.md 与设定/大纲，创作 chapter_{NN}_draft.md；长度接近 words_per_chapter（±20%），并在完成后使用 REWRITE 操作将全文保存到文件；无需征求用户意见
            - name: "ChapterWriterWorker_NN"
            - background: 粘贴必要上下文（state.meta、02_synopsis_outline.md 摘要、chapter_{NN}_plot.md 摘要、上一章摘要如有）
            - system_prompt: 严格遵守“质量与边界”与“输出目标”，不擅自更改设定/走向；对话/描写/节奏合理
            - summary_prompt: 用要点总结本章完成情况、与上一章承接点、未尽事项/悬念
-      2) 使用 ask_user 征求具体修改意见（节奏/风格/情节力度/对白/细节等）
-      3) 若用户不满意：根据意见修订再保存，直至用户确认“本章草稿通过”
-      4) 通过后使用 SEND_MESSAGE 通知 NovelCoordinator 进入润色
+      2) 完成后使用 SEND_MESSAGE 通知 NovelCoordinator 进入润色
     auto_complete: false
 
   - name: ChapterPolisher
@@ -309,17 +307,15 @@ agents:
       - 严格限制消息负载：在 SEND_MESSAGE 与 sub_agent 的 background/system_prompt 中不要附带大段文件内容；仅传递文件路径，接收方必须使用 read_code 自行读取。
       
       ## 流程
-      - 在开始前：使用 read_code 读取 chapter_{NN}_draft.md 以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一条消息中提供路径/摘要
+      - 在开始前：使用 read_code 读取 chapter_{NN}_draft.md 以校验输入；若缺失则请求 NovelCoordinator 在下一条消息中提供路径/摘要
       1) 必须使用 sub_agent 工具托管润色（由子Agent产出并保存润色稿）：
          - sub_agent 参数要求：
-           - task: 在不改变事实与信息的前提下，基于 chapter_{NN}_draft.md 进行语言/节奏/意象的润色，完成后使用 REWRITE 操作保存为 chapter_{NN}_polished.md；如用户给出风格调整意见，则迭代修订直至满意
+           - task: 在不改变事实与信息的前提下，基于 chapter_{NN}_draft.md 进行语言/节奏/意象的润色，完成后使用 REWRITE 操作保存为 chapter_{NN}_polished.md；无需向用户征求意见
            - name: "ChapterPolisherWorker_NN"
            - background: 粘贴必要上下文（state.meta 风格约束、章节目标与情节要点、用户风格偏好与禁忌）
            - system_prompt: 保持信息等价、优化可读性与风格统一；遵守风格与禁忌清单
            - summary_prompt: 用要点总结主要润色改动、风格取向、与用户剩余分歧点
-      2) 使用 ask_user 征求对风格的调整意见（比如“更克制/更诗意/更硬核/更轻松”等）
-      3) 迭代修改直至用户满意
-      4) 使用 SEND_MESSAGE 通知 NovelCoordinator 进入校对
+      2) 完成后使用 SEND_MESSAGE 通知 NovelCoordinator 进入校对
     auto_complete: false
 
   - name: ChapterProofreader
@@ -337,11 +333,11 @@ agents:
 
       ## 信息边界与交互
       - 仅依赖 SEND_MESSAGE 与 read_code 文件；不得访问其他智能体的会话历史或隐式内存。
-      - 如需更多上下文，ask_user 或请求 NovelCoordinator 在下一次消息中附带文件/摘要。
+      - 如需更多上下文，请请求 NovelCoordinator 在下一次消息中附带文件/摘要；不要直接向用户提问。
       - 严格限制消息负载：在 SEND_MESSAGE 与 sub_agent 的 background/system_prompt 中不要附带大段文件内容；仅传递文件路径，接收方必须使用 read_code 自行读取。
       
       ## 流程
-      - 在开始前：使用 read_code 读取 chapter_{NN}_polished.md 以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一条消息中提供路径/摘要
+      - 在开始前：使用 read_code 读取 chapter_{NN}_polished.md 以校验输入；若缺失则请求 NovelCoordinator 在下一条消息中提供路径/摘要
       1) 必须使用 sub_agent 工具托管校对（由子Agent产出并保存终稿）：
          - sub_agent 参数要求：
            - task: 基于 chapter_{NN}_polished.md 进行终审校对（错别字/病句/标点/格式/一致性/术语统一），不得改变事实内容；完成后使用 REWRITE 操作将全文保存为 chapter_{NN}_proofread.md；如用户提出修订意见，可建议回到 Writer/Polisher 迭代后再复审
