@@ -99,7 +99,7 @@ agents:
       子Agent调用模板（示例，粘贴到下一轮对话作为操作参考，不要直接执行）：
       - 通用子Agent（sub_agent）
         ```
-        &lt;TOOL_CALL&gt;
+        <TOOL_CALL>
         want: 获取子Agent的结构化总结结果
         name: sub_agent
 
@@ -118,12 +118,12 @@ agents:
             你是Security Evolution的辅助撰写Agent，遵循项目风格与度量要求，输出可落地的内容。
           summary_prompt: |2
             请用要点总结关键结论与下一步建议，便于上游集成。
-        &lt;/TOOL_CALL&gt;
+        </TOOL_CALL>
         ```
 
       - 代码子Agent（sub_code_agent）
         ```
-        &lt;TOOL_CALL&gt;
+        <TOOL_CALL>
         want: 获取子CodeAgent执行的结果摘要
         name: sub_code_agent
 
@@ -138,7 +138,7 @@ agents:
             - 04_evolution_strategy.md
             - 代码路径：……
             - FFI/ABI边界与性能约束：……
-        &lt;/TOOL_CALL&gt;
+        </TOOL_CALL>
         ```
 
       ## 完成条件
@@ -586,7 +586,7 @@ agents:
       调用模板（示例，粘贴到下一轮对话作为操作参考，不要直接执行）：
       - 代码子Agent（推荐）
         ```
-        &lt;TOOL_CALL&gt;
+        <TOOL_CALL>
         want: 获取子CodeAgent执行的结果摘要
         name: sub_code_agent
 
@@ -600,12 +600,12 @@ agents:
             参考资料：
             - 04_evolution_strategy.md
             - 现有实现路径与FFI边界：……
-        &lt;/TOOL_CALL&gt;
+        </TOOL_CALL>
         ```
 
       - 通用子Agent（可选）
         ```
-        &lt;TOOL_CALL&gt;
+        <TOOL_CALL>
         want: 获取结构化步骤与注意事项清单
         name: sub_agent
 
@@ -619,7 +619,7 @@ agents:
             你是代码变更的辅助规划Agent，请输出可直接执行的步骤与风险清单。
           summary_prompt: |2
             总结关键步骤与回滚点，便于追踪。
-        &lt;/TOOL_CALL&gt;
+        </TOOL_CALL>
         ```
 
       ## 工作流程
