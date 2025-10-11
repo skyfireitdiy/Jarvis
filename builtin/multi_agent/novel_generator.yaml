@@ -154,6 +154,7 @@ agents:
       - 你必须先使用 REWRITE 操作保存 01_roles.md
       - 然后使用 SEND_MESSAGE 将摘要与下一步建议返回给 NovelCoordinator
     auto_complete: false
+    clear_after_send_message: true
 
   - name: SynopsisOutliner
     description: "梗概与大纲专家：形成整书叙事蓝图与章节级主线/支线节奏，得到用户确认。"
@@ -206,6 +207,7 @@ agents:
         - progress.current_stage=""
       - 然后用 SEND_MESSAGE 通知 NovelCoordinator 进入章节循环
     auto_complete: false
+    clear_after_send_message: true
 
   - name: ChapterPlanner
     description: "章节情节设计师：把某一章拆解为场景/冲突/转折/视角安排的可写作蓝图。"
@@ -251,9 +253,10 @@ agents:
           - summary_prompt: 用要点总结与上一章的承接点、冲突目标与节奏控制建议
       - 使用 SEND_MESSAGE 返回 NovelCoordinator，进入写作阶段
     auto_complete: false
+    clear_after_send_message: true
 
   - name: ChapterWriter
-    description: "章节正文作者：根据情节蓝图输出该章的可读长篇正文草稿，必须征求用户意见直至满意。"
+    description: "章节正文作者：根据情节蓝图输出该章的可读长篇正文草稿"
     use_methodology: false
     use_analysis: false
     system_prompt: |
@@ -287,9 +290,10 @@ agents:
            - summary_prompt: 用要点总结本章完成情况、与上一章承接点、未尽事项/悬念
       2) 完成后使用 SEND_MESSAGE 通知 NovelCoordinator 进入润色
     auto_complete: false
+    clear_after_send_message: true
 
   - name: ChapterPolisher
-    description: "章节润色师：在不改变情节信息的前提下优化文风与可读性，可多轮与用户调风格。"
+    description: "章节润色师：在不改变情节信息的前提下优化文风与可读性"
     use_methodology: false
     use_analysis: false
     system_prompt: |
@@ -317,6 +321,7 @@ agents:
            - summary_prompt: 用要点总结主要润色改动、风格取向、与用户剩余分歧点
       2) 完成后使用 SEND_MESSAGE 通知 NovelCoordinator 进入校对
     auto_complete: false
+    clear_after_send_message: true
 
   - name: ChapterProofreader
     description: "章节校对师：修正错别字/病句/标点/格式，统一术语；不得改变事实内容。"
@@ -350,3 +355,4 @@ agents:
          - 若确认通过：明确回复“本章批准通过”
       3) 使用 SEND_MESSAGE 通知 NovelCoordinator 更新进度（chapters[N].approved=true；current_chapter+1）
     auto_complete: false
+    clear_after_send_message: true
