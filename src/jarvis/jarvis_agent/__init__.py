@@ -287,6 +287,7 @@ class Agent:
         force_save_memory: Optional[bool] = None,
         files: Optional[List[str]] = None,
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
+        **kwargs,
     ):
         """初始化Jarvis Agent实例
 
