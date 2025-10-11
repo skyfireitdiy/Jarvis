@@ -76,6 +76,7 @@ from jarvis.jarvis_utils.config import (
     is_use_methodology,
     get_tool_filter_threshold,
     get_after_tool_call_cb_dirs,
+    set_config,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
@@ -287,6 +288,7 @@ class Agent:
         force_save_memory: Optional[bool] = None,
         files: Optional[List[str]] = None,
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
+        non_interactive: Optional[bool] = None,
         **kwargs,
     ):
         """初始化Jarvis Agent实例
@@ -305,6 +307,7 @@ class Agent:
             use_analysis: 是否使用任务分析
             force_save_memory: 是否强制保存记忆
             confirm_callback: 用户确认回调函数，签名为 (tip: str, default: bool) -> bool；默认使用CLI的user_confirm
+            non_interactive: 是否以非交互模式运行（优先级最高，覆盖环境变量与配置）
         """
         # 基础属性初始化
         self.files = files or []
@@ -337,6 +340,25 @@ class Agent:
         self.user_interaction = UserInteractionHandler(self.multiline_inputer, self.user_confirm)
         # 将确认函数指向封装后的 confirm，保持既有调用不变
         self.user_confirm = self.user_interaction.confirm  # type: ignore[assignment]
+        # 非交互模式参数支持：允许通过构造参数显式控制，便于其他Agent调用时设置
+        try:
+            # 优先使用构造参数，其次回退到环境变量
+            self.non_interactive = (
+                bool(non_interactive)
+                if non_interactive is not None
+                else str(os.environ.get("JARVIS_NON_INTERACTIVE", "")).lower() in ("1", "true", "yes")
+            )
+            # 如果构造参数显式提供，则同步到环境变量与全局配置，供下游组件读取
+            if non_interactive is not None:
+                os.environ["JARVIS_NON_INTERACTIVE"] = "true" if self.non_interactive else "false"
+                try:
+                    set_config("JARVIS_NON_INTERACTIVE", self.non_interactive)
+                except Exception:
+                    # 配置同步失败不影响主流程
+                    pass
+        except Exception:
+            # 防御式回退
+            self.non_interactive = False
 
         # 初始化配置
         self._init_config(

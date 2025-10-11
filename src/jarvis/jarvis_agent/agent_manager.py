@@ -31,6 +31,7 @@ class AgentManager:
         use_analysis: Optional[bool] = None,
         multiline_inputer: Optional[Callable[[str], str]] = None,
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
+        non_interactive: Optional[bool] = None,
     ):
         self.model_group = model_group
         self.tool_group = tool_group
@@ -41,6 +42,7 @@ class AgentManager:
         # 可选：注入输入与确认回调，用于Web模式等前端替代交互
         self.multiline_inputer = multiline_inputer
         self.confirm_callback = confirm_callback
+        self.non_interactive = non_interactive
 
     def initialize(self) -> Agent:
         """初始化Agent"""
@@ -58,6 +60,7 @@ class AgentManager:
             use_analysis=self.use_analysis,
             multiline_inputer=self.multiline_inputer,
             confirm_callback=self.confirm_callback,
+            non_interactive=self.non_interactive,
         )
 
         # 尝试恢复会话

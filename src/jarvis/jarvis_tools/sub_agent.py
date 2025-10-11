@@ -5,7 +5,7 @@ sub_agent 工具
 
 约定：
 - 必填参数：task, name, background, system_prompt, summary_prompt, use_tools
-- 继承父 Agent 的部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer；其他参数需显式提供
+- 继承父 Agent 的部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer、non_interactive；其他参数需显式提供
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
 from typing import Any, Dict, List
@@ -27,7 +27,7 @@ class SubAgentTool:
 
     # 必须与文件名一致，供 ToolRegistry 自动注册
     name = "sub_agent"
-    description = "将子任务交给通用 Agent 执行，并返回执行结果（继承父Agent部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer；其他参数需显式提供，自动完成并生成总结）。"
+    description = "将子任务交给通用 Agent 执行，并返回执行结果（继承父Agent部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer、non_interactive；其他参数需显式提供，自动完成并生成总结）。"
     parameters = {
         "type": "object",
         "properties": {
@@ -115,12 +115,14 @@ class SubAgentTool:
             parent_model_group = None
             parent_execute_tool_confirm = None
             parent_multiline_inputer = None
+            parent_non_interactive = None
             try:
                 if parent_agent is not None:
                     if getattr(parent_agent, "model", None):
                         parent_model_group = getattr(parent_agent.model, "model_group", None)
                     parent_execute_tool_confirm = getattr(parent_agent, "execute_tool_confirm", None)
                     parent_multiline_inputer = getattr(parent_agent, "multiline_inputer", None)
+                    parent_non_interactive = getattr(parent_agent, "non_interactive", None)
             except Exception:
                 # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
                 pass
@@ -140,6 +142,7 @@ class SubAgentTool:
                 use_analysis=None,
                 force_save_memory=None,
                 files=None,
+                non_interactive=parent_non_interactive,
             )
 
             # 校验子Agent所用模型是否有效，必要时回退到平台可用模型
