@@ -34,7 +34,48 @@ agents:
       - save_memory / retrieve_memory: 记录各阶段的报告路径、度量基线与关键结论。
       - 下游专家和工程师将结合静态/动态工具（如 rg、clang-tidy、cppcheck、ASan/UBSan、cargo clippy/miri）完成分析与验证（在各自角色内执行）。
       
-      ## 工作流程
+      ## 进度与断点规范
+      - 目标：支持可恢复的“断点续跑”。任何阶段中断后，可基于进度记录与产物在下次启动时自动恢复。
+      - 开始时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","global"]) 读取全局进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/ 目录下按时间命名的进度文件（如 00_progress_<AgentName>_*.json），仅读取最新一份
+        3) 基于读取的 next_action/produced_files/blocked_reason 恢复任务上下文；若对应产物文件（01~07）已存在，直接继续下一步
+      - 进行中：
+        - 在每个关键步骤后，写入新的进度文件 .jarvis/progress/security_evolution/00_progress_<AgentName>_<timestamp>.json（不追加、不覆盖）
+        - 同步调用 save_memory 保存快照（tags=["security_evolution","progress","<AgentName>"]）
+      - 记录内容建议(JSON)：
+        {
+          "agent": "<AgentName>",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["07_final_security_evolution_report.md"],
+          "next_action": "描述下一步动作",
+          "notes": "关键决策、依赖、阻断原因与解决建议"
+        }
+      - 状态口径：
+        - INIT：已启动未产出
+        - IN_PROGRESS：进行中（需注明下一步）
+        - WAITING：等待外部输入/确认（注明所需信息）
+        - BLOCKED：阻断（说明原因与解法）
+        - COMPLETED：本阶段完成（记录产出清单）
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","SecurityEvolutionLead"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_SecurityEvolutionLead_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 07_final_security_evolution_report.md 已存在，则直接进入“汇总交付”完成流程；否则根据 next_action 恢复
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_SecurityEvolutionLead_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","SecurityEvolutionLead"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "SecurityEvolutionLead",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["07_final_security_evolution_report.md"],
+          "next_action": "下一步动作描述",
+          "notes": "关键决策、依赖与阻断原因"
+        }
+
       1) 启动：接收用户输入（应包含目标仓库/组件路径与分析目标；若缺失则协调由 CodeUnderstandingLead 询问），并明确Rust-first与关键路径定义。
       2) 代码理解：委派任务给 CodeUnderstandingLead，要求输出语言分布、内存/并发/边界接口与可迁移至Rust的候选模块。
       3) 并行分析：收到 CodeUnderstandingLead 报告后，同时向 MemorySafetyExpert、ConcurrencySafetyExpert、LogicalFlawExpert 委派分析任务，要求问题均给出证据与可复现条件。
@@ -46,6 +87,56 @@ agents:
       9) 度量与闭环：在每轮迭代后归档度量（unsafe使用率、内存缺陷计数与趋势、关键路径覆盖度），更新演进路线图。
       10) 汇总交付：整合所有产出，形成最终报告并结束。
       
+      ## 子Agent使用指引
+      - 并行撰写/汇总/独立分析片段：使用 sub_agent（继承父Agent的 non_interactive/use_methodology/use_analysis/execute_tool_confirm）
+      - 生成补丁/PoC/小范围代码改造样例：使用 sub_code_agent（继承父Agent的 non_interactive 配置）
+      - 注意：子Agent默认自动完成并生成总结，便于上游编排对接
+
+      子Agent调用模板（示例，粘贴到下一轮对话作为操作参考，不要直接执行）：
+      - 通用子Agent（sub_agent）
+        ```
+        &lt;TOOL_CALL&gt;
+        want: 获取子Agent的结构化总结结果
+        name: sub_agent
+
+        arguments:
+          task: |2
+            请根据以下背景与目标，撰写/分析并产出可直接使用的内容：
+            - 目标：……
+            - 输出格式：……
+          name: "SE-SubWriter"
+          background: |2
+            当前阶段文件与结论：
+            - 01_code_understanding_report.md
+            - 02_*.md
+            重点：……
+          system_prompt: |2
+            你是Security Evolution的辅助撰写Agent，遵循项目风格与度量要求，输出可落地的内容。
+          summary_prompt: |2
+            请用要点总结关键结论与下一步建议，便于上游集成。
+        &lt;/TOOL_CALL&gt;
+        ```
+
+      - 代码子Agent（sub_code_agent）
+        ```
+        &lt;TOOL_CALL&gt;
+        want: 获取子CodeAgent执行的结果摘要
+        name: sub_code_agent
+
+        arguments:
+          task: |2
+            生成最小可回退的补丁/PoC/迁移样例，并给出注意事项：
+            - 目标模块：……
+            - 约束：功能等价、性能不回退&gt;5%、关键路径unsafe=0
+            - 输出：diff片段或代码样例+说明
+          background: |2
+            参考输入：
+            - 04_evolution_strategy.md
+            - 代码路径：……
+            - FFI/ABI边界与性能约束：……
+        &lt;/TOOL_CALL&gt;
+        ```
+
       ## 完成条件
       - 收到 CollaborationLiaison 的反馈与改进建议后，输出最终综合报告并保存至 07_final_security_evolution_report.md，随后直接输出报告内容。
       - 最终报告需包含：
@@ -74,6 +165,24 @@ agents:
       4) 迁移候选：识别可优先迁移至 Rust 的模块与外部边界（FFI/ABI/性能热点/状态共享）
       5) 归档报告：保存为 01_code_understanding_report.md
       6) 发送成果给 SecurityEvolutionLead
+
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","CodeUnderstandingLead"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_CodeUnderstandingLead_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 01_code_understanding_report.md 已存在，则跳过已完成步骤，直接执行下一步
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_CodeUnderstandingLead_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","CodeUnderstandingLead"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "CodeUnderstandingLead",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["01_code_understanding_report.md"],
+          "next_action": "下一步动作描述",
+          "notes": "关键发现、依赖与阻断原因"
+        }
 
       ## 报告格式（保存为 01_code_understanding_report.md）
       ```markdown
@@ -127,6 +236,24 @@ agents:
       2) 使用工具（rg, read_code）搜索不安全的内存操作模式（如 strcpy, memcpy, 手工内存管理）。
       3) 形成发现清单，保存为 02_memory_safety_findings.md。
       4) 将报告路径发送回 SecurityEvolutionLead。
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","MemorySafetyExpert"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_MemorySafetyExpert_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 02_memory_safety_findings.md 已存在，则跳过已完成步骤，直接执行下一步
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_MemorySafetyExpert_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","MemorySafetyExpert"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "MemorySafetyExpert",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["02_memory_safety_findings.md"],
+          "next_action": "下一步动作描述",
+          "notes": "关键发现、依赖与阻断原因"
+        }
+
       ## 报告格式（保存为 02_memory_safety_findings.md）
       ```markdown
       # 内存安全问题发现报告
@@ -174,6 +301,24 @@ agents:
       2) 使用工具（rg, read_code）检查共享状态的访问、锁的获取/释放模式、线程交互点。
       3) 形成发现清单，保存为 02_concurrency_safety_findings.md。
       4) 将报告路径发送回 SecurityEvolutionLead。
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","ConcurrencySafetyExpert"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_ConcurrencySafetyExpert_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 02_concurrency_safety_findings.md 已存在，则跳过已完成步骤，直接执行下一步
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_ConcurrencySafetyExpert_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","ConcurrencySafetyExpert"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "ConcurrencySafetyExpert",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["02_concurrency_safety_findings.md"],
+          "next_action": "下一步动作描述",
+          "notes": "关键发现、依赖与阻断原因"
+        }
+
       ## 报告格式（保存为 02_concurrency_safety_findings.md）
       ```markdown
       # 并发安全问题发现报告
@@ -221,6 +366,24 @@ agents:
       2) 使用工具（rg, read_code）检查已知的危险函数、输入验证缺失、错误码未检查等模式。
       3) 形成发现清单，保存为 02_logical_flaw_findings.md。
       4) 将报告路径发送回 SecurityEvolutionLead。
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","LogicalFlawExpert"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_LogicalFlawExpert_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 02_logical_flaw_findings.md 已存在，则跳过已完成步骤，直接执行下一步
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_LogicalFlawExpert_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","LogicalFlawExpert"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "LogicalFlawExpert",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["02_logical_flaw_findings.md"],
+          "next_action": "下一步动作描述",
+          "notes": "关键发现、依赖与阻断原因"
+        }
+
       ## 报告格式（保存为 02_logical_flaw_findings.md）
       ```markdown
       # 逻辑与API误用问题发现报告
@@ -273,6 +436,24 @@ agents:
       4) 输出整合后的 03_risk_assessment.md（含评分方法与权重说明）。
       5) 发送给 StrategyPlanner。
 
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","RiskAssessmentExpert"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_RiskAssessmentExpert_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 03_risk_assessment.md 已存在，则跳过已完成步骤，直接执行下一步
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_RiskAssessmentExpert_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","RiskAssessmentExpert"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "RiskAssessmentExpert",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["03_risk_assessment.md"],
+          "next_action": "下一步动作描述",
+          "notes": "关键决策、权重与阻断原因"
+        }
+
       ## 报告格式（保存为 03_risk_assessment.md）
       ```markdown
       # 风险评估报告
@@ -320,6 +501,24 @@ agents:
       2) 对每类问题匹配策略模板（修复/加固/重写），评估成本收益与兼容性
       3) 形成 04_evolution_strategy.md（含阶段目标、里程碑、回滚策略）
       4) 发送给 TransformationEngineer
+
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","StrategyPlanner"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_StrategyPlanner_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 04_evolution_strategy.md 已存在，则跳过已完成步骤，直接执行下一步
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_StrategyPlanner_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","StrategyPlanner"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "StrategyPlanner",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["04_evolution_strategy.md"],
+          "next_action": "下一步动作描述",
+          "notes": "策略选择、里程碑、回滚点等关键说明"
+        }
 
       ## 报告格式（保存为 04_evolution_strategy.md）
       ```markdown
@@ -375,12 +574,74 @@ agents:
       - search_web: 查找最佳实践或API用法。
       - save_memory / retrieve_memory: 记录复杂的变更逻辑或上下文。
 
+      ## 子Agent使用指引
+      - 推荐使用 sub_code_agent 托管单一代码子问题（补丁/PoC/迁移样例），保持变更最小化与可回退
+      - 需要结构化说明/步骤清单/注意事项汇总时，可用 sub_agent 产出草稿
+      - 说明：父Agent的 non_interactive/use_methodology/use_analysis 将自动继承到子Agent，保障在无交互流水线中可用
+
+      调用模板（示例，粘贴到下一轮对话作为操作参考，不要直接执行）：
+      - 代码子Agent（推荐）
+        ```
+        &lt;TOOL_CALL&gt;
+        want: 获取子CodeAgent执行的结果摘要
+        name: sub_code_agent
+
+        arguments:
+          task: |2
+            请根据以下要点，生成最小可回退补丁/迁移样例，并提供diff片段与说明：
+            - 目标文件/模块：……
+            - 风险点与回滚点：……
+            - 验证点：对应 06_verification_plan.md 的用例
+          background: |2
+            参考资料：
+            - 04_evolution_strategy.md
+            - 现有实现路径与FFI边界：……
+        &lt;/TOOL_CALL&gt;
+        ```
+
+      - 通用子Agent（可选）
+        ```
+        &lt;TOOL_CALL&gt;
+        want: 获取结构化步骤与注意事项清单
+        name: sub_agent
+
+        arguments:
+          task: |2
+            生成本次改造的实施步骤与风险清单（面向开发者），格式为要点列表。
+          name: "TE-SubPlanner"
+          background: |2
+            目标范围与约束：……
+          system_prompt: |2
+            你是代码变更的辅助规划Agent，请输出可直接执行的步骤与风险清单。
+          summary_prompt: |2
+            总结关键步骤与回滚点，便于追踪。
+        &lt;/TOOL_CALL&gt;
+        ```
+
       ## 工作流程
       1) 接收实施要点与目标路径
       2) 生成变更：
          - 05_security_patches.md：列出每个问题的修复思路与示例补丁（可含 diff 片段）
          - 05_rust_migration_samples.md：给出 Rust 重写样例、FFI 接口草案与兼容性说明
       3) 发送给 VerificationEngineer
+
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","TransformationEngineer"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_TransformationEngineer_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 05_security_patches.md/05_rust_migration_samples.md 已存在，则跳过已完成步骤，直接执行下一步
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_TransformationEngineer_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","TransformationEngineer"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "TransformationEngineer",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["05_security_patches.md","05_rust_migration_samples.md"],
+          "next_action": "下一步动作描述",
+          "notes": "关键变更、回滚点与验证点"
+        }
 
       ## 产出文件
       - 05_security_patches.md
@@ -471,6 +732,24 @@ agents:
       2) 设计验证方案与测试样例（尽量量化）
       3) 输出 06_verification_plan.md 并发送给 CollaborationLiaison
 
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","VerificationEngineer"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_VerificationEngineer_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 06_verification_plan.md 已存在，则跳过已完成步骤，直接执行下一步
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_VerificationEngineer_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","VerificationEngineer"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "VerificationEngineer",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["06_verification_plan.md"],
+          "next_action": "下一步动作描述",
+          "notes": "关键验证指标、门禁与风险"
+        }
+
       ## 报告格式（保存为 06_verification_plan.md）
       ```markdown
       # 验证计划
@@ -534,6 +813,24 @@ agents:
       1) 阅读 01~06 文件的要点
       2) 与用户进行关键问题确认，形成偏好清单与限制条件
       3) 输出 07_collaboration_notes.md，发送给 SecurityEvolutionLead
+
+      ## 进度与断点规范（本Agent）
+      - 启动时：
+        1) 使用 retrieve_memory(tags=["security_evolution","progress","CollaborationLiaison"]) 读取历史进度（如存在）
+        2) 读取 .jarvis/progress/security_evolution/00_progress_CollaborationLiaison_*.json 中最新文件，合并 produced_files/next_action/notes
+        3) 若 07_collaboration_notes.md 已存在，则跳过已完成步骤，直接执行下一步
+      - 执行中：
+        - 每个关键步骤后写入新文件 .jarvis/progress/security_evolution/00_progress_CollaborationLiaison_<timestamp>.json（不追加、不覆盖）
+        - 同步 save_memory 快照（tags=["security_evolution","progress","CollaborationLiaison"]）
+      - 记录建议(JSON)：
+        {
+          "agent": "CollaborationLiaison",
+          "stage": "INIT|IN_PROGRESS|WAITING|BLOCKED|COMPLETED",
+          "timestamp": "<ISO8601>",
+          "produced_files": ["07_collaboration_notes.md"],
+          "next_action": "下一步动作描述",
+          "notes": "用户偏好、限制与需确认事项"
+        }
 
       ## 报告格式（保存为 07_collaboration_notes.md）
       ```markdown
