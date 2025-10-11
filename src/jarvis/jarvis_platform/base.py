@@ -23,7 +23,7 @@ from jarvis.jarvis_utils.config import (
     get_data_dir,
 )
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
-from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console
+from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console, current_agent_name
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
@@ -138,7 +138,9 @@ class BasePlatform(ABC):
                     first_chunk = None
 
                     with Status(
-                        f"🤔 {self.name()} 正在思考中...", spinner="dots", console=console
+                        f"🤔 {(current_agent_name + ' · ') if current_agent_name else ''}{self.name()} 正在思考中...",
+                        spinner="dots",
+                        console=console,
                     ):
                         try:
                             while True:
@@ -152,7 +154,7 @@ class BasePlatform(ABC):
                     text_content = Text(overflow="fold")
                     panel = Panel(
                         text_content,
-                        title=f"[bold cyan]{self.name()}[/bold cyan]",
+                        title=f"[bold cyan]{(current_agent_name + ' · ') if current_agent_name else ''}{self.name()}[/bold cyan]",
                         subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
                         border_style="bright_blue",
                         box=box.ROUNDED,
@@ -232,7 +234,7 @@ class BasePlatform(ABC):
                 else:
                     # Print a clear prefix line before streaming model output (non-pretty mode)
                     console.print(
-                        f"🤖 模型输出 - {self.name()}  (按 Ctrl+C 中断)",
+                        f"🤖 模型输出 - {(current_agent_name + ' · ') if current_agent_name else ''}{self.name()}  (按 Ctrl+C 中断)",
                         soft_wrap=False,
                     )
                     for s in self.chat(message):
