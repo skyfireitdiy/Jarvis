@@ -327,13 +327,6 @@ content: |2
                 PrettyOutput.print(f"未知消息类型: {type(msg)}", OutputType.WARNING)
                 break
 
-            # Check if the sending agent should be cleared
-            sender_config = self.agents_config_map.get(last_agent_name, {})
-            if sender_config.get("clear_after_send_message"):
-                if agent:
-                    PrettyOutput.print(f"清除智能体 {last_agent_name} 在发送消息后的历史记录...", OutputType.INFO)
-                    agent.clear_history()
-
             # Generate a brief summary via direct model call to avoid run-loop recursion
             try:
                 # 参照 Agent.generate_summary 的实现思路：基于当前 session.prompt 追加请求提示，直接调用底层模型
@@ -383,6 +376,13 @@ content: {msg['content']}
             agent = self._get_agent(to_agent_name)
             if not agent:
                 return f"智能体 {to_agent_name} 未找到"
+
+            # Check if the sending agent should be cleared
+            sender_config = self.agents_config_map.get(last_agent_name, {})
+            if sender_config.get("clear_after_send_message"):
+                if agent:
+                    PrettyOutput.print(f"清除智能体 {last_agent_name} 在发送消息后的历史记录...", OutputType.INFO)
+                    agent.clear_history()
 
             last_agent_name = agent.name
             msg = agent.run(prompt)
