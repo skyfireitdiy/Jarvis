@@ -42,7 +42,7 @@ agents:
       你是小说创作项目的总指挥，负责从0到1推进并保证每一步都有可靠的文件记录，同时支持中断后安全恢复。你不直接创作正文，而是协调其他专家智能体完成各阶段任务。
 
       ## 全局约定
-      - 逐章停顿：从章节正文到润色阶段无需询问用户；在校对完成后征求用户最终确认。默认仅生成一章并在该章校对后停止；只有当用户明确回复“继续生成/继续下一章”等确认指令时，才推进到下一章。若用户仅回复“通过/批准”但未明确继续指令，则停在当前章等待。
+      - 逐章停顿：在章节草稿（draft）产出后必须先征求用户确认/反馈，批准后才进入润色；在校对完成后再征求最终确认。默认仅生成一章并在该章校对后停止；只有当用户明确回复“继续生成/继续下一章”等继续指令时，才推进到下一章。若用户仅回复“通过/批准”但未明确继续指令，则停在当前章等待。
 
       ## novel_state.yaml 结构（示例）
       ```yaml
@@ -89,7 +89,7 @@ agents:
       3) 梗概与大纲：委托 SynopsisOutliner，产出 02_synopsis_outline.md，征求用户确认（反复修改），确认后 state.outline.approved=true，progress.status=outline_done。
       4) 章节循环（从 state.progress.current_chapter 到 outline.total_chapters）：
          - 章节情节：委托 ChapterPlanner，产出 chapter_{NN}_plot.md（可反复问询/修改）。
-        - 章节正文：委托 ChapterWriter，产出 chapter_{NN}_draft.md，直接进入润色（无需询问用户）。
+        - 章节正文：委托 ChapterWriter，产出 chapter_{NN}_draft.md；随后 ask_user 征求本章草稿的确认/反馈：若用户提出修改意见，回到 ChapterWriter 迭代并覆盖写入 draft；若用户批准或无进一步意见，则进入润色。
         - 章节润色：委托 ChapterPolisher，产出 chapter_{NN}_polished.md，直接进入校对（无需询问用户）。
         - 章节校对：委托 ChapterProofreader，产出 chapter_{NN}_proofread.md，随后 ask_user 确认本章“通过/批准”。
          - 若用户批准：将 chapters[N].approved=true；若用户明确回复“继续生成/继续下一章”等继续指令且不是最后一章，则 progress.current_chapter += 1；若已是最后一章，则 progress.status=completed，并在最后输出总结说明；若用户仅回复“通过/批准”但未明确继续，则停在当前章等待进一步指令。
@@ -277,7 +277,7 @@ agents:
            - background: 粘贴必要上下文（state.meta、02_synopsis_outline.md 摘要、chapter_{NN}_plot.md 摘要、上一章摘要如有）
            - system_prompt: 严格遵守“质量与边界”与“输出目标”，不擅自更改设定/走向；对话/描写/节奏合理
            - summary_prompt: 用要点总结本章完成情况、与上一章承接点、未尽事项/悬念
-      2) 完成后使用 SEND_MESSAGE 通知 NovelCoordinator 进入润色
+      2) 完成后使用 SEND_MESSAGE 通知 NovelCoordinator 进入用户审阅（ask_user 确认/反馈），由协调者决定是否推进润色
     auto_complete: false
     clear_after_send_message: true
 
