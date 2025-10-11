@@ -56,9 +56,11 @@ class CodeAgent:
         need_summary: bool = True,
         append_tools: Optional[str] = None,
         tool_group: Optional[str] = None,
+        non_interactive: Optional[bool] = None,
     ):
         self.root_dir = os.getcwd()
         self.tool_group = tool_group
+        self.non_interactive = non_interactive
 
         # 检测 git username 和 email 是否已设置
         self._check_git_config()
@@ -92,6 +94,7 @@ class CodeAgent:
             need_summary=need_summary,
             use_methodology=False,  # 禁用方法论
             use_analysis=False,  # 禁用分析
+            non_interactive=self.non_interactive,
         )
 
         self.agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
@@ -849,9 +852,10 @@ def cli(
         PrettyOutput.print(
             f"警告：当前目录 '{curr_dir_path}' 不是一个git仓库。", OutputType.WARNING
         )
-        if user_confirm(
+        init_git = True if non_interactive else user_confirm(
             f"是否要在 '{curr_dir_path}' 中初始化一个新的git仓库？", default=True
-        ):
+        )
+        if init_git:
             try:
                 subprocess.run(
                     ["git", "init"],
@@ -879,6 +883,7 @@ def cli(
             need_summary=False,
             append_tools=append_tools,
             tool_group=tool_group,
+            non_interactive=non_interactive,
         )
 
         # 尝试恢复会话

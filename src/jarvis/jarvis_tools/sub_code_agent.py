@@ -84,6 +84,7 @@ class SubCodeAgentTool:
                             parent_agent = None
                 except Exception:
                     parent_agent = None
+            parent_non_interactive = getattr(parent_agent, "non_interactive", None) if parent_agent is not None else None
             model_group = None
             use_tools: List[str] = []
             try:
@@ -138,6 +139,7 @@ class SubCodeAgentTool:
                     need_summary=True,
                     append_tools=append_tools,
                     tool_group=tool_group,
+                    non_interactive=parent_non_interactive,
                 )
             except SystemExit as se:
                 # 将底层 sys.exit 转换为工具错误，避免终止进程
