@@ -66,7 +66,11 @@ def cli(
             raise ValueError("必须指定main_agent作为主智能体")
 
         # 创建并运行多智能体系统
-        multi_agent = MultiAgent(agents_config, main_agent_name)
+        multi_agent = MultiAgent(
+            agents_config,
+            main_agent_name,
+            common_system_prompt=str(config_data.get("common_system_prompt", "") or "")
+        )
         final_input = (
             user_input
             if user_input is not None

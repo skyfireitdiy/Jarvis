@@ -14,12 +14,13 @@ from jarvis.jarvis_utils.tag import ct, ot
 
 
 class MultiAgent(OutputHandler):
-    def __init__(self, agents_config: List[Dict], main_agent_name: str):
+    def __init__(self, agents_config: List[Dict], main_agent_name: str, common_system_prompt: str = ""):
         self.agents_config = agents_config
         self.agents_config_map = {c["name"]: c for c in agents_config}
         self.agents: Dict[str, Agent] = {}
         self.main_agent_name = main_agent_name
         self.original_question: Optional[str] = None
+        self.common_system_prompt: str = common_system_prompt
 
     def prompt(self) -> str:
         return f"""
@@ -286,6 +287,15 @@ content: |2
             return None
 
         config = self.agents_config_map[name].copy()
+
+        # Prepend common system prompt if configured
+        common_sp = getattr(self, "common_system_prompt", "")
+        if common_sp:
+            existing_sp = config.get("system_prompt", "")
+            if existing_sp:
+                config["system_prompt"] = f"{common_sp}\n\n{existing_sp}"
+            else:
+                config["system_prompt"] = common_sp
 
         if name != self.main_agent_name and self.original_question:
             system_prompt = config.get("system_prompt", "")
