@@ -1018,6 +1018,7 @@ def run_cli(
             restore_session=restore_session,
             use_methodology=False if disable_methodology_analysis else None,
             use_analysis=False if disable_methodology_analysis else None,
+            non_interactive=non_interactive,
             **extra_kwargs,
         )
         agent = agent_manager.initialize()
