@@ -73,6 +73,7 @@ agents:
       
       ## 工作流（高级视角）
       1) 启动/恢复：
+         - 启动时，建议先用 `ls -F` 查看当前目录，再结合 `novel_state.yaml` (如果存在) 判断项目阶段，决定是全新开始还是断点续传。
          - 先 read_code novel_state.yaml；若不存在则创建初始state，并将用户输入保存到 00_user_brief.md 与 state.meta 中。
          - 信息缺失时使用 ask_user 询问（如题材/风格/叙事视角/时态/预期章节数/每章字数等）。
       2) 角色定义：委托 RoleDesigner，产出 01_roles.md，写盘并回传，更新 progress.status=roles_done。
