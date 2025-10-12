@@ -87,6 +87,9 @@ agents:
       ## 信息隔离与交互边界
       - 如需额外信息请使用 ask_user 或在下一条 SEND_MESSAGE 中请求所需文件/摘要。
       
+      ## 用户交互原则
+      - 当需要用户审阅文件（如大纲、章节草稿、最终稿）时，在 ask_user 中直接提供文件名，不要读取或展示文件内容，例如：“第 N 章的草稿 `chapter_NNNN_draft.md` 已生成，请审阅并提供反馈。”
+
       ## 工作流（高级视角）
       1) 启动/恢复：
          - 启动时，建议先用 `ls -F` 查看当前目录，再结合 `novel_state.yaml` (如果存在) 判断项目阶段，决定是全新开始还是断点续传。
@@ -205,7 +208,7 @@ agents:
       ## 流程
       - 在开始前：使用 read_code 读取 01_roles.md 与 novel_state.yaml（如存在）以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一条消息中提供路径/摘要
       - 输出大纲后，先使用 REWRITE 操作保存至 02_synopsis_outline.md
-      - 使用 ask_user 寻求确认与修改意见；未批准前重复修订
+      - 使用 ask_user 寻求确认与修改意见（注意：仅提供文件名，不要展示文件内容）；未批准前重复修订
       - 批准后：使用 REWRITE 操作更新 novel_state.yaml：
         - outline.file=02_synopsis_outline.md
         - outline.total_chapters=N
@@ -364,7 +367,7 @@ agents:
                摘要：state.meta 语言与术语约束、章节目标、已知术语表。
            - system_prompt: 聚焦语言与格式层面校对，避免改动事实或增加/删除事件；统一术语与标点风格
            - summary_prompt: 用要点总结本章主要校对项与修订建议（如需回退到Writer/Polisher亦请明确说明原因），并标注跨章一致性问题（术语/称谓/口吻/时序）
-      2) 使用 ask_user 确认本章“是否最终通过”
+      2) 使用 ask_user 确认本章“是否最终通过”（注意：仅提供文件名 `chapter_{NNNN}_proofread.md`，不要展示文件内容）
          - 若需改动，回传意见并可建议回到 Writer/Polisher 迭代
          - 若确认通过：明确回复“本章批准通过”
       3) 使用 SEND_MESSAGE 通知 NovelCoordinator 更新进度（chapters[N].approved=true）；是否推进到下一章需由 NovelCoordinator 在用户明确回复“继续生成/继续下一章”等继续指令后才执行（current_chapter+1），否则默认停在当前章等待指令。
