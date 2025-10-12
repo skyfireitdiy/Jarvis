@@ -67,7 +67,6 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 # jarvis_utils 相关
 from jarvis.jarvis_utils.config import (
     get_data_dir,
-    get_max_token_count,
     get_normal_model_name,
     get_normal_platform_name,
     is_execute_tool_confirm,
@@ -457,7 +456,6 @@ class Agent:
             use_analysis=use_analysis,
             force_save_memory=force_save_memory,
             files=self.files,
-            max_token_count=None,
         ).resolve_defaults()
 
         # 将解析结果回填到 Agent 实例属性，保持向后兼容
@@ -465,7 +463,6 @@ class Agent:
         self.use_analysis = bool(cfg.use_analysis)
         self.execute_tool_confirm = bool(cfg.execute_tool_confirm)
         self.summary_prompt = cfg.summary_prompt or DEFAULT_SUMMARY_PROMPT
-        self.max_token_count = int(cfg.max_token_count or get_max_token_count(model_group))
         self.force_save_memory = bool(cfg.force_save_memory)
         # 非交互模式下自动完成标志需要同步到 Agent 实例，避免循环
         self.auto_complete = bool(cfg.auto_complete)

@@ -12,7 +12,6 @@ from typing import List, Optional
 
 from jarvis.jarvis_agent.prompts import DEFAULT_SUMMARY_PROMPT
 from jarvis.jarvis_utils.config import (
-    get_max_token_count,
     is_execute_tool_confirm,
     is_force_save_memory,
     is_use_analysis,
@@ -84,10 +83,6 @@ class AgentConfig:
         # Treat None or whitespace-only string as unset, fallback to default
         if cfg.summary_prompt is None or (isinstance(cfg.summary_prompt, str) and cfg.summary_prompt.strip() == ""):
             cfg.summary_prompt = DEFAULT_SUMMARY_PROMPT
-
-        # max_token_count
-        if cfg.max_token_count is None:
-            cfg.max_token_count = get_max_token_count(cfg.model_group)
 
         # force_save_memory
         if cfg.force_save_memory is None:
