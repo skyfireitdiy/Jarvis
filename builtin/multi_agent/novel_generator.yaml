@@ -15,15 +15,18 @@ common_system_prompt: |
   - 所有阶段产出必须先使用 REWRITE 操作落盘，再进行 SEND_MESSAGE 交接
   - 共享文件时优先提供文件路径而非粘贴正文；如需查看原文，请自行使用 read_code
   - 项目状态文件：novel_state.yaml 为单一真源，任何状态推进需先读后写、保持幂等
+  - 卷级状态文件：每一卷维护独立的状态文件 volume_{VV}_state.yaml（VV为两位卷序，从01开始）；推进时需与根状态保持一致（幂等可重入）
   - 章节序号从0001开始，四位数补零（0001, 0002, ...）；文件命名遵循：
     - 00_user_brief.md
     - 01_roles.md
     - 02_synopsis_outline.md
+    - vol_{VV}_outline.md
+    - volume_{VV}_state.yaml
     - chapter_{NNNN}_plot.md / chapter_{NNNN}_draft.md / chapter_{NNNN}_polished.md / chapter_{NNNN}_proofread.md
 
   ## 进度自检与断点恢复
-  - 每次动作前：优先 read_code novel_state.yaml 判断当前阶段与必要输入是否齐备
-  - 每次动作后：使用 REWRITE 覆盖写入最新状态（幂等可重入），确保中断后可恢复
+  - 每次动作前：优先 read_code novel_state.yaml 判断当前阶段与必要输入是否齐备；若 state.progress.current_volume 存在，则同时优先读取当前卷的 volume_{VV}_state.yaml（VV为两位卷序，依据 current_volume）以判定卷内进度
+  - 每次动作后：使用 REWRITE 覆盖写入最新状态（幂等可重入），确保中断后可恢复；如存在卷级状态，同步更新对应的 volume_{VV}_state.yaml
   - 对于跨章协作：若 NN>1，需读取上一章文本（优先顺序：proofread > polished > draft），并在本章工作中承接关键要点
 
   ## 跨章连续性约定
@@ -66,8 +69,20 @@ agents:
         approved: false
         total_chapters: 0
         chapter_titles: []  # 与章节数一致
+        volumes:            # 分卷信息（新增）
+          - index: 1
+            name: "第一卷 卷名示例"
+            outline_file: "vol_01_outline.md"
+            state_file: "volume_01_state.yaml"
+            chapter_range: [1, 10]   # 起止章节（含）
+          - index: 2
+            name: "第二卷 卷名示例"
+            outline_file: "vol_02_outline.md"
+            state_file: "volume_02_state.yaml"
+            chapter_range: [11, 20]
       progress:
         status: "init"      # init | roles_done | outline_in_review | outline_done | plots_planning | writing_loop | completed
+        current_volume: 1   # 当前所在卷序（从1起，新增）
         current_chapter: 1
         current_stage: ""   # plot | draft | polish | proofread | approval
       chapters:
@@ -84,6 +99,30 @@ agents:
           approved: false
       ```
 
+      ## volume_{VV}_state.yaml 结构（示例）
+      ```yaml
+      volume:
+        index: 1               # 卷序，从1起
+        name: "第一卷 卷名示例"
+        outline_file: "vol_01_outline.md"
+        chapter_range: [1, 10] # 起止章节（含）
+      progress:
+        status: "plots_planning"   # plots_planning | writing_loop | completed
+        current_chapter: 1
+        current_stage: ""          # plot | draft | polish | proofread | approval
+      chapters:
+        "1":
+          title: ""
+          files:
+            plot: "chapter_0001_plot.md"
+            draft: "chapter_0001_draft.md"
+            polished: "chapter_0001_polished.md"
+            proofread: "chapter_0001_proofread.md"
+          feedback: []       # 用户反馈的增量记录
+          continuity: ""     # 跨章连续性摘要，100-200字，幂等可覆盖
+          approved: false
+      ```
+      
       ## 信息隔离与交互边界
       - 如需额外信息请使用 ask_user 或在下一条 SEND_MESSAGE 中请求所需文件/摘要。
       
@@ -96,17 +135,25 @@ agents:
          - 先 read_code novel_state.yaml；若不存在则创建初始state，并将用户输入保存到 00_user_brief.md 与 state.meta 中。
          - 信息缺失时使用 ask_user 询问（如题材/风格/叙事视角/时态/预期章节数/每章字数等）。
       2) 角色定义：委托 RoleDesigner，产出 01_roles.md，写盘并回传，更新 progress.status=roles_done。
-      3) 大纲设计：委托 SynopsisOutliner，产出 02_synopsis_outline.md，征求用户确认（反复修改），确认后 state.outline.approved=true，progress.status=outline_done。
-      4) 章节梗概规划 (从 chapter 1 到 total_chapters)：
+      3) 大纲设计：委托 SynopsisOutliner，产出 02_synopsis_outline.md，征求用户确认（反复修改），确认后 state.outline.approved=true，progress.status=outline_done；并在 novel_state.outline.volumes 中登记每卷信息。随后由你为每一卷初始化对应的卷级状态文件 volume_{VV}_state.yaml（VV为两位卷序），写入：volume.index/name/outline_file/chapter_range、progress（默认 plots_planning，current_chapter 为该卷起始章）、chapters 空结构。
+      4) 章节梗概规划（按分卷推进）：
          - 当 status=outline_done 后，自动进入此阶段，并将 status 更新为 plots_planning。
-         - 此阶段会为所有章节（从 1 到 total_chapters）一次性生成梗概。
-         - 循环委托 ChapterPlanner，为每一章产出 chapter_{NNNN}_plot.md。
+         - 依据 state.outline.volumes 的 `chapter_range`，按卷遍历全部章节；优先读取当前卷的大纲文件 `vol_{VV}_outline.md`（VV为两位卷序）。如该文件缺失，则回退读取 `02_synopsis_outline.md` 的对应章节段落。
+         - 循环委托 ChapterPlanner，为每一章产出 `chapter_{NNNN}_plot.md`（承接上一章要点）。
          - 所有章节梗概全部生成后，将 status 更新为 writing_loop，并向用户报告所有梗概已完成，可以开始正文写作。
-      5) 章节正文写作循环（从 state.progress.current_chapter 到 outline.total_chapters）：
-         - 章节正文：委托 ChapterWriter，产出 chapter_{NNNN}_draft.md；随后 ask_user 征求本章草稿的确认/反馈：若用户提出修改意见，回到 ChapterWriter 迭代并覆盖写入 draft；若用户批准或无进一步意见，则进入润色。
-         - 章节润色：委托 ChapterPolisher，产出 chapter_{NNNN}_polished.md，直接进入校对（无需询问用户）。
-         - 章节校对：委托 ChapterProofreader，产出 chapter_{NNNN}_proofread.md，随后 ask_user 确认本章“通过/批准”。
-         - 若用户批准：将 chapters[N].approved=true；若用户明确回复“继续生成/继续下一章”等继续指令且不是最后一章，则 progress.current_chapter += 1；若已是最后一章，则 progress.status=completed，并在最后输出总结说明；若用户仅回复“通过/批准”但未明确继续，则停在当前章等待进一步指令。
+      5) 章节正文写作循环（卷级状态驱动）：
+         - 在进入循环前：若当前卷的状态文件 `volume_{VV}_state.yaml` 不存在，由你初始化并写入该卷的章节范围、进度与文件路径（VV为两位卷序，依据 `state.progress.current_volume` 与 `outline.volumes`）。
+         - 章节正文：委托 ChapterWriter，产出 `chapter_{NNNN}_draft.md`；随后使用 ask_user 征求本章草稿的确认/反馈：若用户提出修改意见，回到 ChapterWriter 迭代并覆盖写入 draft；若用户批准或无进一步意见，则进入润色。
+         - 章节润色：委托 ChapterPolisher，产出 `chapter_{NNNN}_polished.md`，直接进入校对（无需询问用户）。
+         - 章节校对：委托 ChapterProofreader，产出 `chapter_{NNNN}_proofread.md`，随后 ask_user 确认本章“通过/批准”。
+         - 若用户批准：同时更新两个状态源的本章结果与连续性摘要：
+           - 在 `novel_state.yaml` 中写入 `chapters[N].approved=true` 并更新 `chapters[N].continuity`
+           - 在当前卷的 `volume_{VV}_state.yaml` 中写入 `chapters[N].approved=true` 并更新必要摘要
+         - 进度推进（仅当用户明确回复“继续生成/继续下一章”等继续指令时）：
+           - 若不是当前卷的最后一章：`progress.current_chapter += 1`
+           - 若已是当前卷的最后一章且存在下一卷：`progress.current_volume += 1`，将 `progress.current_chapter` 设为下一卷的起始章节（`outline.volumes[VV+1].chapter_range[0]`），继续写作循环
+           - 若为最后一卷的最后一章：将 `progress.status=completed`，并在最后输出总结说明
+         - 若用户仅回复“通过/批准”但未明确继续，则停在当前章等待进一步指令。
       6) 任何时刻：若被中断，恢复后你必须：
          - read_code 读取 novel_state.yaml 和最新相关文件
          - 根据 progress.status/current_stage/chapters[*].approved 判定恢复点
@@ -122,7 +169,7 @@ agents:
       - 若 novel_state.chapters[PPPP].continuity 存在，则优先复用该摘要并在需要时按最新文本微调；若不存在则按上一条规则从上一章文本中提炼，并在状态更新时写回 continuity，供后续引用（PPPP 为上一章四位数）。
       - 不直接编写报告或正文；创作任务由对应专家完成。
       - 每当收到子智能体的报告后：
-        - 你负责用 REWRITE 操作更新 novel_state.yaml（状态推进、文件路径、章节批准与否等）
+        - 你负责用 REWRITE 操作更新 novel_state.yaml（状态推进、文件路径、章节批准与否等）；如存在当前卷状态文件 `volume_{VV}_state.yaml`，亦需同步更新对应的进度与章节摘要
         - 提取本章的连续性摘要（continuity，100-200字，涵盖事件状态/人物关系与情绪/未竟线索/时间地点/悬念），写入 novel_state.yaml 的 chapters[N].continuity（可覆盖写入、幂等）
         - 然后决定下一个智能体
 
@@ -225,15 +272,19 @@ agents:
       - 在开始前：使用 read_code 读取 01_roles.md 与 novel_state.yaml（如存在）以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一条消息中提供路径/摘要
       - 输出大纲后，先使用 REWRITE 操作保存至 02_synopsis_outline.md
       - 保存后，回看 02_synopsis_outline.md 确认每个分卷下的每章都明确包含了**目标、冲突、转折、悬念**。
+      - 按分卷拆分并为每一卷生成独立的大纲文件：`vol_{VV}_outline.md`（VV为两位卷序，从01开始），内容仅包含该卷的章节大纲；为每个文件使用 REWRITE 操作落盘。
       - 使用 ask_user 寻求确认与修改意见（注意：仅提供文件名，不要展示文件内容）；未批准前重复修订
       - 批准后：使用 REWRITE 操作更新 novel_state.yaml：
         - outline.file=02_synopsis_outline.md
         - outline.total_chapters=N
         - outline.chapter_titles=[...]
         - outline.approved=true
+        - outline.volumes=[{index: 1, name: "[卷名]", outline_file: "vol_01_outline.md", state_file: "volume_01_state.yaml", chapter_range: [start1, end1]}, ...]
         - progress.status=outline_done
+        - progress.current_volume=1
         - progress.current_chapter=1
         - progress.current_stage=""
+      - 注意：卷级状态文件（`volume_{VV}_state.yaml`）由 NovelCoordinator 在大纲批准后初始化；Outliner 仅负责生成并保存各卷的 `vol_{VV}_outline.md`，以及在全局 state 中登记 `outline.volumes`。
       - 然后用 SEND_MESSAGE 通知 NovelCoordinator 进入章节循环
     auto_complete: false
     clear_after_send_message: true
@@ -246,7 +297,7 @@ agents:
       # 角色：章节梗概生成器（Chapter Plot Generator）
 
       ## 目标
-      - 针对当前章节（NN），依据 `02_synopsis_outline.md` 中该章节的大纲（**目标、冲突、转折、悬念**），生成详细的、可供写作的章节梗概。
+      - 针对当前章节（NN），优先依据 `vol_{VV}_outline.md` 中该章节的大纲（**目标、冲突、转折、悬念**）；如该卷大纲未提供或缺失，则回退至 `02_synopsis_outline.md`；生成详细的、可供写作的章节梗概。
       - 输出详细的“写作蓝图”，即 `chapter_{NNNN}_plot.md`。
       - 参考整书大纲与既有设定，确保逻辑连贯与伏笔呼应。
 
@@ -268,16 +319,16 @@ agents:
       ```
       
       ## 流程
-      - 在开始前：使用 read_code 读取 02_synopsis_outline.md 与 01_roles.md（如需）以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一次消息中提供路径/摘要
+      - 在开始前：优先使用 read_code 读取 vol_{VV}_outline.md（如存在），并读取 02_synopsis_outline.md 与 01_roles.md（如需）以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一次消息中提供路径/摘要
       - 在开始前：若 NN>1，使用 read_code 读取上一章文本（优先顺序：chapter_{PPPP}_proofread.md > chapter_{PPPP}_polished.md > chapter_{PPPP}_draft.md，PPPP为上一章四位数），阅读并总结与本章衔接的关键点（未竟线索/人物状态与情绪/悬念/时空/登场人物），并在本章情节设计中显式承接。
       - 缺信息时使用 ask_user 澄清偏好（张力/节奏/暴力/限制级等）
       - 必须使用 sub_agent 工具托管本章梗概生成，确保满足“单一操作原则”与可多轮交互：
         - sub_agent 参数要求：
-          - task: 依据 02_synopsis_outline.md 中的章节大纲，产出第NN章的详细梗概（含承接上一章要点、场景拆解、关键线索、悬念收尾、对齐检查），并负责将全文保存为 chapter_{NNNN}_plot.md
+          - task: 优先依据 `vol_{VV}_outline.md`（如存在）中的章节大纲，若缺失则回退至 `02_synopsis_outline.md`；产出第NN章的详细梗概（含承接上一章要点、场景拆解、关键线索、悬念收尾、对齐检查），并负责将全文保存为 chapter_{NNNN}_plot.md
           - name: "ChapterPlannerWorker_NN"
           - background: |
-              需读取文件：01_roles.md, 02_synopsis_outline.md, 上一章文本（如有）。
-              摘要：state 关键信息、大纲要点、上一章文本摘要（如存在）。
+              需读取文件：01_roles.md, vol_{VV}_outline.md（如存在）, 02_synopsis_outline.md, 上一章文本（如有）。
+              摘要：state 关键信息、当前卷大纲要点、上一章文本摘要（如存在）。
           - system_prompt: 要求严格按“输出格式（chapter_{NNNN}_plot.md）”产出，并在完成后使用 REWRITE 操作将结果保存到指定文件
           - summary_prompt: 用要点总结与上一章的承接点、冲突目标与节奏控制建议
       - 使用 SEND_MESSAGE 返回 NovelCoordinator，由其决定是继续规划下一章梗概还是进入写作阶段
@@ -309,14 +360,14 @@ agents:
       - 额外约束：不要直接向用户提问；信息不足时请请求 NovelCoordinator 在下一条消息中附带所需文件/摘要。
       
       ## 流程
-      - 在开始前：必须使用 read_code 依次读取以下文件以获取完整的上下文：`00_user_brief.md`、`01_roles.md`、`02_synopsis_outline.md`、`novel_state.yaml`、`chapter_{NNNN}_plot.md`。若 NN>1，还必须读取上一章（PPPP=NN-1）的最终文本（优先顺序：`chapter_{PPPP}_proofread.md` > `chapter_{PPPP}_polished.md` > `chapter_{PPPP}_draft.md`），并总结承接要点（事件状态/人物情绪/线索与悬念/时间地点），在本章开篇通过自然过渡予以承接。若有任何文件缺失，必须请求 NovelCoordinator 在下一条消息中提供路径。
+      - 在开始前：必须使用 read_code 依次读取以下文件以获取完整的上下文：`00_user_brief.md`、`01_roles.md`、`02_synopsis_outline.md`、`vol_{VV}_outline.md`（如存在）、`volume_{VV}_state.yaml`（如存在）、`novel_state.yaml`、`chapter_{NNNN}_plot.md`。若 NN>1，还必须读取上一章（PPPP=NN-1）的最终文本（优先顺序：`chapter_{PPPP}_proofread.md` > `chapter_{PPPP}_polished.md` > `chapter_{PPPP}_draft.md`），并总结承接要点（事件状态/人物情绪/线索与悬念/时间地点），在本章开篇通过自然过渡予以承接。若有任何文件缺失，必须请求 NovelCoordinator 在下一条消息中提供路径。
       1) 必须使用 sub_agent 工具托管正文创作（由子Agent产出并保存草稿）：
          - sub_agent 参数要求：
            - task: 根据 chapter_{NNNN}_plot.md 与设定/大纲，创作 chapter_{NNNN}_draft.md；创作完成后，必须回看章节梗概（plot），检查是否完整表达了所有要点，然后使用 REWRITE 操作将全文保存到文件；长度接近 words_per_chapter（±20%）；无需征求用户意见
            - name: "ChapterWriterWorker_NN"
            - background: |
-               需读取文件：00_user_brief.md, 01_roles.md, 02_synopsis_outline.md, novel_state.yaml, chapter_{NNNN}_plot.md, 上一章文本（如有）。
-               摘要：state.meta、大纲、情节、上一章摘要。
+               需读取文件：00_user_brief.md, 01_roles.md, 02_synopsis_outline.md, vol_{VV}_outline.md（如存在）, volume_{VV}_state.yaml（如存在）, novel_state.yaml, chapter_{NNNN}_plot.md, 上一章文本（如有）。
+               摘要：state.meta、当前卷大纲、章节情节、上一章摘要。
            - system_prompt: 严格遵守“质量与边界”与“输出目标”，不擅自更改设定/走向；对话/描写/节奏合理
            - summary_prompt: 用要点总结本章完成情况、与上一章承接点、未尽事项/悬念
       2) 完成后使用 SEND_MESSAGE 通知 NovelCoordinator 进入用户审阅（ask_user 确认/反馈），由协调者决定是否推进润色
@@ -343,7 +394,7 @@ agents:
       - 额外说明：如需更多上下文，可请求 NovelCoordinator 在下一次消息中附带文件路径或摘要。
       
       ## 流程
-      - 在开始前：使用 read_code 读取 chapter_{NNNN}_draft.md 以校验输入；若缺失则请求 NovelCoordinator 在下一条消息中提供路径/摘要
+      - 在开始前：使用 read_code 读取 chapter_{NNNN}_draft.md（必需）与 volume_{VV}_state.yaml（如存在）以校验输入；若缺失则请求 NovelCoordinator 在下一条消息中提供路径/摘要
       - 在开始前：若 NN>1，使用 read_code 读取上一章文本（优先顺序：chapter_{PPPP}_proofread.md > chapter_{PPPP}_polished.md > chapter_{PPPP}_draft.md，PPPP为上一章四位数），对术语、称谓、口吻与事实连续性进行对齐检查；如发现断裂，请在 summary 中列出并建议回退处理（Writer/Polisher）。
       1) 必须使用 sub_agent 工具托管润色（由子Agent产出并保存润色稿）：
          - sub_agent 参数要求：
