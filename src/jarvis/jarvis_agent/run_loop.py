@@ -14,6 +14,7 @@ from typing import Any, TYPE_CHECKING
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
 from jarvis.jarvis_agent.utils import join_prompts, is_auto_complete, normalize_next_action
+from jarvis.jarvis_utils.config import get_auto_summary_rounds
 
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
@@ -25,6 +26,8 @@ class AgentRunLoop:
         self.agent = agent
         self.conversation_rounds = 0
         self.tool_reminder_rounds = int(os.environ.get("JARVIS_TOOL_REMINDER_ROUNDS", 20))
+        # 基于轮次的自动总结阈值，来源于全局配置（默认30轮），可通过 GLOBAL_CONFIG_DATA['JARVIS_AUTO_SUMMARY_ROUNDS'] 配置
+        self.auto_summary_rounds = get_auto_summary_rounds()
 
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
@@ -37,6 +40,17 @@ class AgentRunLoop:
                     self.agent.session.addon_prompt = join_prompts(
                         [self.agent.session.addon_prompt, self.agent.get_tool_usage_prompt()]
                     )
+                # 基于轮次的自动总结判断：达到阈值后执行一次总结与历史清理
+                if self.conversation_rounds >= self.auto_summary_rounds:
+                    summary_text = self.agent._summarize_and_clear_history()
+                    if summary_text:
+                        # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
+                        self.agent.session.addon_prompt = join_prompts(
+                            [self.agent.session.addon_prompt, summary_text]
+                        )
+                    # 重置轮次计数与对话长度计数器，开始新一轮周期
+                    self.conversation_rounds = 0
+                    self.agent.session.conversation_length = 0
 
                 ag = self.agent
 
