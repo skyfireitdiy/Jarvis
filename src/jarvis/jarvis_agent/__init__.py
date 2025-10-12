@@ -77,6 +77,7 @@ from jarvis.jarvis_utils.config import (
     get_tool_filter_threshold,
     get_after_tool_call_cb_dirs,
     set_config,
+
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
@@ -731,14 +732,9 @@ class Agent:
         return message
 
     def _manage_conversation_length(self, message: str) -> str:
-        """管理对话长度，必要时进行摘要"""
+        """管理对话长度计数；摘要触发由轮次在 AgentRunLoop 中统一处理。"""
         self.session.conversation_length += get_context_token_count(message)
 
-        if self.session.conversation_length > self.max_token_count:
-            summary = self._summarize_and_clear_history()
-            if summary:
-                message = join_prompts([summary, message])
-            self.session.conversation_length = get_context_token_count(message)
 
         return message
 
