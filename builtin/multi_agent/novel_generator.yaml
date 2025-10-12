@@ -375,7 +375,7 @@ agents:
 
       ## 流程
       - 在开始前：必须使用 read_code 依次读取以下文件以获取完整上下文：`00_user_brief.md`、`01_roles.md`、`02_synopsis_outline.md`（参考）、`vol_{VV}_outline.md`（必需）、`chapter_{NNNN}_plot.md`；如对应卷大纲缺失或未获批准，必须请求 NovelCoordinator 先补齐后再开始。若 NN>1，还必须读取上一章（PPPP=NN-1）的最终文本（优先顺序：`chapter_{PPPP}_proofread.md` > `chapter_{PPPP}_polished.md` > `chapter_{PPPP}_draft.md`），并总结承接要点（事件状态/人物情绪/线索与悬念/时间地点），在本章开篇通过自然过渡予以承接。若有任何文件缺失，必须请求 NovelCoordinator 在下一条消息中提供路径。
-      - 在开始前：无需集中式状态检查（例如 novel_state.yaml 或写作阶段标记）；遵循“文件即状态”原则：当本章已存在 `chapter_{NNNN}_plot.md` 即可启动正文写作。
+      - 在开始前：不得单章启动写作。必须确认按各卷 `vol_{VV}_outline.md` 列出的全部章节均已存在 `chapter_{NNNN}_plot.md`（即全部章节梗概齐备）；仅在全部梗概齐备后才可启动正文写作。若未齐备，使用 SEND_MESSAGE 请求 NovelCoordinator 继续章节梗概规划，并暂停当前写作。遵循“文件即状态”原则，无需集中式状态文件（例如 novel_state.yaml 或写作阶段标记）。
       1) 必须使用 sub_agent 工具托管正文创作（由子Agent产出并保存草稿）：
          - sub_agent 参数要求：
            - task: 根据 chapter_{NNNN}_plot.md 与设定/大纲，创作 chapter_{NNNN}_draft.md；创作完成后回看章节梗概（plot），检查是否完整表达所有要点，然后使用 REWRITE 操作将全文保存到文件；长度接近 words_per_chapter（±20%）；无需征求用户意见；随后更新项目根目录 clues_registry.yaml（不存在则创建）：若本章明确解决既有线索，则从 open_clues 中移除该条目；若正文新增未竟线索，则分配递增ID（CLUE-0001起），introduced_in=当前draft文件路径，occurrences含当前文件路径；若仅提及既有线索，则向 occurrences 追加当前文件路径；所有更新以 REWRITE 覆盖方式写入
