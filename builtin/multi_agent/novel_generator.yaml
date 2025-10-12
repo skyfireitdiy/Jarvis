@@ -31,6 +31,7 @@ common_system_prompt: |
     - 02_synopsis_outline.md
     - vol_{VV}_outline.md
     - chapter_{NNNN}_plot.md / chapter_{NNNN}_draft.md / chapter_{NNNN}_polished.md / chapter_{NNNN}_proofread.md
+    - clues_registry.yaml（线索登记索引：记录坑点与线索及其出现文件路径；非进度状态文件）
 
   ## 进度自检与断点恢复
   - 每次动作前：通过列出与读取现有文件推断阶段与缺口；按以下顺序判断：
@@ -337,10 +338,10 @@ agents:
       - 缺信息时使用 ask_user 澄清偏好（张力/节奏/暴力/限制级等）
       - 必须使用 sub_agent 工具托管本章梗概生成，确保满足“单一操作原则”与可多轮交互：
         - sub_agent 参数要求：
-          - task: 严格依据对应卷的 `vol_{VV}_outline.md` 中该章节大纲产出第NN章的详细梗概（含承接上一章要点、场景拆解、关键线索、悬念收尾、对齐检查）；如卷级大纲缺失或未获批准，应先请求补齐而非回退至 `02_synopsis_outline.md`；完成后使用 REWRITE 将全文保存为 chapter_{NNNN}_plot.md
+          - task: 严格依据对应卷的 `vol_{VV}_outline.md` 中该章节大纲产出第NN章的详细梗概（含承接上一章要点、场景拆解、关键线索、悬念收尾、对齐检查）；如卷级大纲缺失或未获批准，应先请求补齐而非回退至 `02_synopsis_outline.md`；完成后使用 REWRITE 将全文保存为 chapter_{NNNN}_plot.md；随后基于“关键线索与道具”“悬念与收尾”提取坑点与线索，更新项目根目录 clues_registry.yaml（不存在则创建）；若为新线索则分配递增ID（CLUE-0001起），introduced_in=当前plot文件路径，occurrences含当前文件路径；若为既有线索则仅向 occurrences 追加当前文件路径，不进行删除
           - name: "ChapterPlannerWorker_NN"
           - background: |
-              需读取文件：01_roles.md, vol_{VV}_outline.md（必需）, 02_synopsis_outline.md（参考）, 上一章文本（如有）。
+              需读取文件：01_roles.md, vol_{VV}_outline.md（必需）, 02_synopsis_outline.md（参考）, 上一章文本（如有）, clues_registry.yaml（如有）。
               摘要：大纲要点、人物设定、上一章摘要与衔接约束。
           - system_prompt: 严格按“输出格式（chapter_{NNNN}_plot.md）”产出，并在完成后使用 REWRITE 操作将结果保存到指定文件
           - summary_prompt: 用要点总结与上一章的承接点、冲突目标与节奏控制建议
@@ -377,10 +378,10 @@ agents:
       - 在开始前：无需集中式状态检查（例如 novel_state.yaml 或写作阶段标记）；遵循“文件即状态”原则：当本章已存在 `chapter_{NNNN}_plot.md` 即可启动正文写作。
       1) 必须使用 sub_agent 工具托管正文创作（由子Agent产出并保存草稿）：
          - sub_agent 参数要求：
-           - task: 根据 chapter_{NNNN}_plot.md 与设定/大纲，创作 chapter_{NNNN}_draft.md；创作完成后回看章节梗概（plot），检查是否完整表达所有要点，然后使用 REWRITE 操作将全文保存到文件；长度接近 words_per_chapter（±20%）；无需征求用户意见
+           - task: 根据 chapter_{NNNN}_plot.md 与设定/大纲，创作 chapter_{NNNN}_draft.md；创作完成后回看章节梗概（plot），检查是否完整表达所有要点，然后使用 REWRITE 操作将全文保存到文件；长度接近 words_per_chapter（±20%）；无需征求用户意见；随后更新项目根目录 clues_registry.yaml（不存在则创建）：若本章明确解决既有线索，则从 open_clues 中移除该条目；若正文新增未竟线索，则分配递增ID（CLUE-0001起），introduced_in=当前draft文件路径，occurrences含当前文件路径；若仅提及既有线索，则向 occurrences 追加当前文件路径；所有更新以 REWRITE 覆盖方式写入
            - name: "ChapterWriterWorker_NN"
            - background: |
-               需读取文件：00_user_brief.md, 01_roles.md, 02_synopsis_outline.md（参考）, vol_{VV}_outline.md（必需）, chapter_{NNNN}_plot.md, 上一章文本（如有）。
+               需读取文件：00_user_brief.md, 01_roles.md, 02_synopsis_outline.md（参考）, vol_{VV}_outline.md（必需）, chapter_{NNNN}_plot.md, 上一章文本（如有）, clues_registry.yaml（如有）。
                摘要：风格与约束、当前卷大纲要点、章节情节、上一章摘要。
            - system_prompt: 严格遵守“质量与边界”与“输出目标”，不擅自更改设定/走向；对话/描写/节奏合理
            - summary_prompt: 用要点总结本章完成情况、与上一章承接点、未尽事项/悬念
