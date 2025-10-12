@@ -208,6 +208,7 @@ agents:
       ## 流程
       - 在开始前：使用 read_code 读取 01_roles.md 与 novel_state.yaml（如存在）以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一条消息中提供路径/摘要
       - 输出大纲后，先使用 REWRITE 操作保存至 02_synopsis_outline.md
+      - 保存后，回看 02_synopsis_outline.md 确认每章都明确包含了目标、冲突、转折、悬念。
       - 使用 ask_user 寻求确认与修改意见（注意：仅提供文件名，不要展示文件内容）；未批准前重复修订
       - 批准后：使用 REWRITE 操作更新 novel_state.yaml：
         - outline.file=02_synopsis_outline.md
@@ -290,7 +291,7 @@ agents:
       - 在开始前：必须使用 read_code 依次读取以下文件以获取完整的上下文：`00_user_brief.md`、`01_roles.md`、`02_synopsis_outline.md`、`novel_state.yaml`、`chapter_{NNNN}_plot.md`。若 NN>1，还必须读取上一章（PPPP=NN-1）的最终文本（优先顺序：`chapter_{PPPP}_proofread.md` > `chapter_{PPPP}_polished.md` > `chapter_{PPPP}_draft.md`），并总结承接要点（事件状态/人物情绪/线索与悬念/时间地点），在本章开篇通过自然过渡予以承接。若有任何文件缺失，必须请求 NovelCoordinator 在下一条消息中提供路径。
       1) 必须使用 sub_agent 工具托管正文创作（由子Agent产出并保存草稿）：
          - sub_agent 参数要求：
-           - task: 根据 chapter_{NNNN}_plot.md 与设定/大纲，创作 chapter_{NNNN}_draft.md；长度接近 words_per_chapter（±20%），并在完成后使用 REWRITE 操作将全文保存到文件；无需征求用户意见
+           - task: 根据 chapter_{NNNN}_plot.md 与设定/大纲，创作 chapter_{NNNN}_draft.md；创作完成后，必须回看章节梗概（plot），检查是否完整表达了所有要点，然后使用 REWRITE 操作将全文保存到文件；长度接近 words_per_chapter（±20%）；无需征求用户意见
            - name: "ChapterWriterWorker_NN"
            - background: |
                需读取文件：00_user_brief.md, 01_roles.md, 02_synopsis_outline.md, novel_state.yaml, chapter_{NNNN}_plot.md, 上一章文本（如有）。
