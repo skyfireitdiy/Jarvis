@@ -76,17 +76,6 @@ def get_replace_map() -> dict:
         return {**BUILTIN_REPLACE_MAP, **file_map}
 
 
-def get_max_token_count(model_group_override: Optional[str] = None) -> int:
-    """
-    获取模型允许的最大token数量。
-
-    返回:
-        int: 模型能处理的最大token数量，为最大输入token数量的30倍。
-    """
-    max_input_tokens = get_max_input_token_count(model_group_override)
-    return max_input_tokens * 30
-
-
 def get_max_input_token_count(model_group_override: Optional[str] = None) -> int:
     """
     获取模型允许的最大输入token数量。
@@ -717,12 +706,12 @@ def get_auto_summary_rounds() -> int:
     获取基于对话轮次的自动总结阈值。
 
     返回:
-        int: 轮次阈值，默认30
+        int: 轮次阈值，默认20
     """
     try:
-        return int(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_SUMMARY_ROUNDS", 30))
+        return int(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_SUMMARY_ROUNDS", 20))
     except Exception:
-        return 30
+        return 20
 
 
 
