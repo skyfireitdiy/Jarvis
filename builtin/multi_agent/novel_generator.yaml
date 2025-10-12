@@ -19,11 +19,11 @@ common_system_prompt: |
     - 若 01_roles.md 不存在：进入角色定义阶段
     - 若 02_synopsis_outline.md 不存在：进入梗概与大纲生成；若已存在但未获得用户明确“批准”回复，则处于大纲审阅阶段
     - 分卷大纲 vol_{VV}_outline.md 为章节循环的唯一来源；若任一卷的大纲缺失，则仍处于大纲阶段，不得进入章节梗概规划或写作阶段
-    - 对于章节 N（四位编号 NNNN），按以下顺序补齐缺失产出：
-      1) 缺 chapter_{NNNN}_plot.md：先生成章节梗概（ChapterPlanner）
-      2) 缺 chapter_{NNNN}_draft.md：生成正文草稿并进入用户审阅（ChapterWriter）
-      3) 缺 chapter_{NNNN}_polished.md：进行润色（ChapterPolisher）
-      4) 缺 chapter_{NNNN}_proofread.md：进行校对并请求用户“本章批准通过”（ChapterProofreader）
+- 对于章节 N（四位编号 NNNN），按以下顺序补齐缺失产出（写作阶段前置门槛：仅当按各卷 vol_{VV}_outline.md 列出的全部章节均已存在 chapter_{NNNN}_plot.md 后，方可进入任何章节的正文写作）：
+  1) 缺 chapter_{NNNN}_plot.md：先生成章节梗概（ChapterPlanner）
+  2) 若“全部章节梗概已齐备”且缺 chapter_{NNNN}_draft.md：生成正文草稿并进入用户审阅（ChapterWriter）；若梗概未齐备，则继续进行章节梗概规划
+  3) 缺 chapter_{NNNN}_polished.md：进行润色（ChapterPolisher）
+  4) 缺 chapter_{NNNN}_proofread.md：进行校对并请求用户“本章批准通过”（ChapterProofreader）
   - 共享文件时优先提供文件路径而非粘贴正文；如需查看原文，请自行使用 read_code
   - 章节序号从0001开始，四位数补零（0001, 0002, ...）；文件命名遵循：
     - 00_user_brief.md
@@ -38,7 +38,7 @@ common_system_prompt: |
     1) 若 01_roles.md 缺失：进入角色定义阶段
     2) 若 02_synopsis_outline.md 缺失：进入梗概与大纲阶段；若已存在但未获得用户明确“批准”回复：处于大纲审阅阶段
     3) 若各卷 `vol_{VV}_outline.md` 已存在并获用户批准，但章节梗概未齐全（缺任意 `chapter_{NNNN}_plot.md`）：进入章节梗概规划；若任一卷的大纲缺失或未获批准，则保持在大纲阶段
-    4) 若某章缺 chapter_{NNNN}_draft.md：进入正文写作；缺 chapter_{NNNN}_polished.md：进入润色；缺 chapter_{NNNN}_proofread.md：进入校对
+    4) 仅当按各卷 `vol_{VV}_outline.md` 列出的全部章节均已存在 `chapter_{NNNN}_plot.md` 时，若某章缺 `chapter_{NNNN}_draft.md`：进入正文写作；否则保持在章节梗概规划阶段。缺 `chapter_{NNNN}_polished.md`：进行润色；缺 `chapter_{NNNN}_proofread.md`：进入校对
   - 每次动作后：仅落盘当前产出文件（文件即状态，幂等可重入），不维护集中式状态文件
   - 对于跨章协作：若存在上一章文本（优先顺序：chapter_{PPPP}_proofread.md > chapter_{PPPP}_polished.md > chapter_{PPPP}_draft.md，PPPP为上一章四位数），在本章工作中承接关键要点
 
@@ -81,7 +81,7 @@ agents:
         1) 若 01_roles.md 缺失：进入角色定义阶段
         2) 若 02_synopsis_outline.md 缺失：进入梗概与大纲阶段；若已存在但未获得用户明确“批准”回复：处于大纲审阅阶段（需 ask_user 确认）
         3) 章节循环必须以各卷 vol_{VV}_outline.md 列出的章节为目标集合；若任一卷的大纲缺失或未获批准，则保持在大纲阶段，不进入章节梗概或写作
-        4) 对于章节 N（四位编号 NNNN），按缺失的产出依序补齐：plot -> draft -> polish -> proofread
+        4) 仅当按各卷 `vol_{VV}_outline.md` 列出的全部章节均已存在 `chapter_{NNNN}_plot.md` 时，再对章节 N 按缺失的产出依序补齐：plot -> draft -> polish -> proofread；若梗概未齐备，则保持在章节梗概规划阶段
       - 连续性摘要：无需单独状态文件；在推进下一章前，从上一章最终文本（优先顺序：proofread > polished > draft）中提炼 100-200 字承接要点，并在 SEND_MESSAGE 摘要中携带，后续阶段可再次按需提取。
       
       ## 信息隔离与交互边界
