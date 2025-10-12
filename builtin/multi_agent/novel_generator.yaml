@@ -17,7 +17,7 @@ common_system_prompt: |
   - 不使用集中式状态文件；采用“文件即状态”的约定进行进度管理与断点恢复
   - 状态推断规则（概要）：
     - 若 01_roles.md 不存在：进入角色定义阶段
-    - 若 02_synopsis_outline.md 不存在：进入梗概与大纲生成；若已存在但未获得用户明确“批准”回复，则处于大纲审阅阶段
+    - 若 02_synopsis_outline.md 不存在：进入梗概与大纲生成；若已存在则进入按卷生成与校验流程，待各卷 vol_{VV}_outline.md 经 OutlineValidator 校验并逐卷获得用户批准后，方可离开大纲阶段（不对 02_synopsis_outline.md 单独发起审阅）
     - 分卷大纲 vol_{VV}_outline.md 为章节循环的唯一来源；若任一卷的大纲缺失，则仍处于大纲阶段，不得进入章节梗概规划或写作阶段
   - 对于章节 N（四位编号 NNNN），按以下顺序补齐缺失产出（写作阶段前置门槛：仅当按各卷 vol_{VV}_outline.md 列出的全部章节均已存在 chapter_{NNNN}_plot.md 后，方可进入任何章节的正文写作）：
   1) 缺 chapter_{NNNN}_plot.md：先生成章节梗概（ChapterPlanner）
@@ -36,7 +36,7 @@ common_system_prompt: |
   ## 进度自检与断点恢复
   - 每次动作前：通过列出与读取现有文件推断阶段与缺口；按以下顺序判断：
     1) 若 01_roles.md 缺失：进入角色定义阶段
-    2) 若 02_synopsis_outline.md 缺失：进入梗概与大纲阶段；若已存在但未获得用户明确“批准”回复：处于大纲审阅阶段
+    2) 若 02_synopsis_outline.md 缺失：进入梗概与大纲阶段；若已存在则直接进入按卷生成与校验流程，等待各卷 `vol_{VV}_outline.md` 经 OutlineValidator 校验通过后的逐卷用户批准（不对 02_synopsis_outline.md 单独发起审阅）
     3) 若各卷 `vol_{VV}_outline.md` 已存在并获用户批准，但章节梗概未齐全（缺任意 `chapter_{NNNN}_plot.md`）：进入章节梗概规划；若任一卷的大纲缺失或未获批准，则保持在大纲阶段
     4) 仅当按各卷 `vol_{VV}_outline.md` 列出的全部章节均已存在 `chapter_{NNNN}_plot.md` 时，若某章缺 `chapter_{NNNN}_draft.md`：进入正文写作；否则保持在章节梗概规划阶段。缺 `chapter_{NNNN}_polished.md`：进行润色；缺 `chapter_{NNNN}_proofread.md`：进入校对
   - 每次动作后：仅落盘当前产出文件（文件即状态，幂等可重入），不维护集中式状态文件
@@ -80,7 +80,7 @@ agents:
         - chapter_{NNNN}_plot.md / chapter_{NNNN}_draft.md / chapter_{NNNN}_polished.md / chapter_{NNNN}_proofread.md：章节产出（NNNN 为四位章序）
       - 阶段与进度的推断（概要）：
         1) 若 01_roles.md 缺失：进入角色定义阶段
-        2) 若 02_synopsis_outline.md 缺失：进入梗概与大纲阶段；若已存在但未获得用户明确“批准”回复：处于大纲审阅阶段（需 ask_user 确认）
+        2) 若 02_synopsis_outline.md 缺失：进入梗概与大纲阶段；若已存在则直接进入按卷生成与校验流程，等待各卷 `vol_{VV}_outline.md` 经 OutlineValidator 校验通过后的逐卷用户批准（不对 02_synopsis_outline.md 单独发起审阅）
         3) 章节循环必须以各卷 vol_{VV}_outline.md 列出的章节为目标集合；若任一卷的大纲缺失或未获批准，则保持在大纲阶段，不进入章节梗概或写作
         4) 仅当按各卷 `vol_{VV}_outline.md` 列出的全部章节均已存在 `chapter_{NNNN}_plot.md` 时，再对章节 N 按缺失的产出依序补齐：plot -> draft -> polish -> proofread；若梗概未齐备，则保持在章节梗概规划阶段
       - 连续性摘要：无需单独状态文件；在推进下一章前，从上一章最终文本（优先顺序：proofread > polished > draft）中提炼 100-200 字承接要点，并在 SEND_MESSAGE 摘要中携带，后续阶段可再次按需提取。
@@ -100,7 +100,7 @@ agents:
          - 若 01_roles.md 不存在：委托 RoleDesigner 产出 01_roles.md（先 REWRITE 落盘，再交回）。
       3) 大纲设计（如需）：
          - 若 02_synopsis_outline.md 不存在：委托 SynopsisOutliner 产出整书梗概与分卷大纲总览（仅卷级信息），使用 REWRITE 保存为 02_synopsis_outline.md，并按分卷生成 vol_{VV}_outline.md（VV为两位卷序，从01起）。
-         - 使用 ask_user 寻求确认与修改意见（注意：仅提供文件名，不展示内容）；未批准前可多轮修订；批准后进入章节梗概规划。
+         - 大纲生成与校验阶段完全自主决策，不向用户提问；按分卷生成 vol_{VV}_outline.md 并委托 OutlineValidator 校验。仅当某卷通过校验后，才使用 ask_user 针对该卷单独寻求确认与修改意见（仅提供文件名）；不对 02_synopsis_outline.md 单独发起用户审阅。
       4) 章节梗概规划：
          - 章节目标集合仅来源于各卷 vol_{VV}_outline.md；任一卷的大纲缺失或未获用户批准时，保持在大纲阶段，暂不进入章节梗概或写作。
          - 循环委托 ChapterPlanner，为每一章产出 `chapter_{NNNN}_plot.md`（如存在上一章文本，需显式承接其要点）；所有章节梗概齐备后进入正文写作。
@@ -188,7 +188,7 @@ agents:
       - 依据 01_roles.md 与用户brief，产出故事梗概、主题陈述、叙事视角与时态建议。
       - 生成分卷大纲总览（02_synopsis_outline.md，仅卷级信息：卷名/章节范围/卷概述），不在该文件枚举逐章细节。
       - 随后按分卷生成 vol_{VV}_outline.md（VV为两位卷序，从01起），内容必须逐章覆盖该卷的全部章节（每章含“目标/冲突/转折/悬念”）。
-      - 确认章节总数与每章大致字数；与用户沟通直至批准。
+      - 确认章节总数与每章大致字数；在生成与校验阶段完全自主决策，不向用户提问；仅当各卷经 OutlineValidator 校验通过后，再进入用户审阅与批准。
 
       ## 输出格式（02_synopsis_outline.md）
       ```markdown
@@ -212,7 +212,7 @@ agents:
       ```
       
       ## 流程
-      - 在开始前：使用 read_code 读取 01_roles.md 与 00_user_brief.md（如存在）以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一条消息中提供路径/摘要。
+      - 在开始前：使用 read_code 读取 01_roles.md 与 00_user_brief.md（如存在）以校验输入；若缺失则请求 NovelCoordinator 在下一条消息中提供路径/摘要；不要使用 ask_user。
       - 生成整书大纲（02_synopsis_outline.md）可选择使用 sub_agent 工具托管：
         - sub_agent 参数要求：
           - task: 依据 01_roles.md 与 00_user_brief.md 产出符合“输出格式（02_synopsis_outline.md）”的整书梗概与分卷大纲总览（仅卷级信息，不枚举逐章细节）；完成后使用 REWRITE 将全文保存为 02_synopsis_outline.md，并自检分卷范围与总章节数的一致性
