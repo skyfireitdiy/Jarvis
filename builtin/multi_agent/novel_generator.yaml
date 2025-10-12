@@ -222,11 +222,30 @@ agents:
       
       ## 流程
       - 在开始前：使用 read_code 读取 01_roles.md 与 00_user_brief.md（如存在）以校验输入；若缺失则 ask_user 或请求 NovelCoordinator 在下一条消息中提供路径/摘要。
-      - 输出大纲后，先使用 REWRITE 操作保存至 02_synopsis_outline.md。
+      - 生成整书大纲（02_synopsis_outline.md）可选择使用 sub_agent 工具托管：
+        - sub_agent 参数要求：
+          - task: 依据 01_roles.md 与 00_user_brief.md 产出符合“输出格式（02_synopsis_outline.md）”的整书梗概与分卷/章节总览；完成后使用 REWRITE 将全文保存为 02_synopsis_outline.md，并自检每卷每章是否均包含“目标/冲突/转折/悬念”
+          - name: "SynopsisOutlinerWorker"
+          - background: |
+              需读取文件：01_roles.md, 00_user_brief.md（如有）
+              摘要：题材/风格/视角/时态/预期章节数/每章字数等关键偏好
+          - system_prompt: 严格按“输出格式（02_synopsis_outline.md）”生成，保持结构清晰、分卷合理、章节要素齐备
+          - summary_prompt: 用要点总结整体结构、卷划分与节奏建议，并列出需要用户确认的关键点
+        - 若不使用 sub_agent，则由本体直接生成；无论哪种方式，完成后都必须使用 REWRITE 将全文保存至 02_synopsis_outline.md。
       - 保存后，回看 02_synopsis_outline.md，确认每个分卷下每章均包含“目标、冲突、转折、悬念”。
       - 先规划分卷信息：确定每一卷名称与章节范围（chapter_range），作为后续每卷大纲拆分依据。
       - 按分卷生成独立大纲：为每卷创建 `vol_{VV}_outline.md`（VV为两位卷序，从01开始），内容必须逐章覆盖该卷的全部章节（不允许缺失任何一章，且每章均含“目标/冲突/转折/悬念”）；使用 REWRITE 落盘。
-      - 使用 ask_user 寻求确认与修改意见（仅提供文件名，不展示内容）；未批准前可多轮修订；批准后进入章节梗概规划。
+        - 可选择使用 sub_agent 托管每一卷的 `vol_{VV}_outline.md` 生成：
+          - task: 基于 02_synopsis_outline.md 中的分卷信息与章节范围，为卷 VV 产出完整的卷级章节大纲（覆盖该卷全部章节，逐章包含目标/冲突/转折/悬念），完成后使用 REWRITE 保存为 vol_{VV}_outline.md
+          - name: "VolumeOutlinerWorker_VV"
+          - background: |
+              需读取文件：02_synopsis_outline.md, 01_roles.md, 00_user_brief.md（如有）
+              摘要：该卷名称、章节范围（chapter_range）、风格与约束、每章字数目标
+          - system_prompt: 严格对齐整书大纲与风格约束，逐章补全四要素，不得留空或占位；结构清晰、编号规范（0001 起）
+          - summary_prompt: 用要点总结该卷结构、主要冲突与节奏分布，并列出需要用户确认的重点
+        - 无论是否使用 sub_agent，完成后都必须使用 REWRITE 保存 `vol_{VV}_outline.md` 并进入该卷的 ask_user 审阅流程。
+      - 对每一卷：每创建完一个 `vol_{VV}_outline.md` 即使用 ask_user 单独寻求该卷的确认与修改意见（仅提供该卷文件名，不展示内容）；未获明确“批准”前可多轮修订
+      - 仅当所有卷的 `vol_{VV}_outline.md` 均获得用户明确“批准”后，才进入章节梗概规划。
       - 批准后：无需集中式状态更新；保留 02_synopsis_outline.md 与各卷 `vol_{VV}_outline.md` 即视为大纲已定稿。
       - 然后用 SEND_MESSAGE 通知 NovelCoordinator 进入章节循环
     auto_complete: false
