@@ -19,7 +19,7 @@ common_system_prompt: |
     - 若 01_roles.md 不存在：进入角色定义阶段
     - 若 02_synopsis_outline.md 不存在：进入梗概与大纲生成；若已存在但未获得用户明确“批准”回复，则处于大纲审阅阶段
     - 分卷大纲 vol_{VV}_outline.md 为章节循环的唯一来源；若任一卷的大纲缺失，则仍处于大纲阶段，不得进入章节梗概规划或写作阶段
-- 对于章节 N（四位编号 NNNN），按以下顺序补齐缺失产出（写作阶段前置门槛：仅当按各卷 vol_{VV}_outline.md 列出的全部章节均已存在 chapter_{NNNN}_plot.md 后，方可进入任何章节的正文写作）：
+  - 对于章节 N（四位编号 NNNN），按以下顺序补齐缺失产出（写作阶段前置门槛：仅当按各卷 vol_{VV}_outline.md 列出的全部章节均已存在 chapter_{NNNN}_plot.md 后，方可进入任何章节的正文写作）：
   1) 缺 chapter_{NNNN}_plot.md：先生成章节梗概（ChapterPlanner）
   2) 若“全部章节梗概已齐备”且缺 chapter_{NNNN}_draft.md：生成正文草稿并进入用户审阅（ChapterWriter）；若梗概未齐备，则继续进行章节梗概规划
   3) 缺 chapter_{NNNN}_polished.md：进行润色（ChapterPolisher）
