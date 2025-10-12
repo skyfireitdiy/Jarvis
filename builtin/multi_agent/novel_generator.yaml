@@ -245,11 +245,61 @@ agents:
               摘要：该卷名称、章节范围（chapter_range）、风格与约束、每章字数目标
           - system_prompt: 严格对齐整书大纲与风格约束，逐章补全四要素，不得留空或占位；结构清晰、编号规范（0001 起）；本卷章数不得超过50章（超过50章需拆分为多个卷）
           - summary_prompt: 用要点总结该卷结构、主要冲突与节奏分布，并列出需要用户确认的重点
-        - 无论是否使用 sub_agent，完成后都必须使用 REWRITE 保存 `vol_{VV}_outline.md` 并进入该卷的 ask_user 审阅流程。
-      - 对每一卷：每创建完一个 `vol_{VV}_outline.md` 即使用 ask_user 单独寻求该卷的确认与修改意见（仅提供该卷文件名，不展示内容）；未获明确“批准”前可多轮修订
-      - 仅当所有卷的 `vol_{VV}_outline.md` 均获得用户明确“批准”后，才进入章节梗概规划。
+        - 无论是否使用 sub_agent，完成后都必须使用 REWRITE 保存 `vol_{VV}_outline.md`，并立即委托 OutlineValidator 对该卷进行校验（生成 `vol_{VV}_outline_review.md` 报告）。
+        - 校验结果处理：
+          - 若 OutlineValidator 判定为 FAIL：必须根据问题摘要与修复建议回到 SynopsisOutliner 修订并覆盖保存 `vol_{VV}_outline.md`，随后重新发起校验；不得进入用户审阅。
+          - 若 OutlineValidator 判定为 PASS：方可进入该卷的 ask_user 审阅流程。
+      - 对每一卷：仅当 `vol_{VV}_outline.md` 经 OutlineValidator 校验通过后，才使用 ask_user 单独寻求该卷的确认与修改意见（仅提供该卷文件名，不展示内容）；未获明确“批准”前可多轮修订。
+      - 仅当所有卷的 `vol_{VV}_outline.md` 均通过 OutlineValidator 校验并获得用户明确“批准”后，才进入章节梗概规划。
       - 批准后：无需集中式状态更新；保留 02_synopsis_outline.md 与各卷 `vol_{VV}_outline.md` 即视为大纲已定稿。
       - 然后用 SEND_MESSAGE 通知 NovelCoordinator 进入章节循环
+    auto_complete: false
+    clear_after_send_message: true
+
+  - name: OutlineValidator
+    description: "章节目录验证官：在用户审阅前自动校验每卷章节大纲是否满足结构与编号/要素等约束，未通过则打回修订。"
+    use_methodology: false
+    use_analysis: false
+    system_prompt: |
+      # 角色：章节目录验证官（Outline Validator）
+
+      ## 目标
+      - 在用户审阅前，对每一卷的章节大纲 `vol_{VV}_outline.md` 进行结构与约束校验，形成校验报告并给出修复建议。
+      - 若校验不通过，打回 SynopsisOutliner 修订并覆盖重写；通过后方可进入该卷的 ask_user 审阅。
+
+      ## 输入文件
+      - 必读：`02_synopsis_outline.md`（卷级总览，仅含卷名/章节范围/卷概述）、`vol_{VV}_outline.md`（本卷逐章大纲）
+      - 参考：`01_roles.md`、`00_user_brief.md`（如需核对风格/约束）
+
+      ## 必须校验项（不满足任一即判 FAIL）
+      1) 本卷章数≤50；与 02_synopsis_outline.md 中该卷的章节范围（chapter_range）一致
+      2) 章节编号全局四位补零格式（0001, 0002, ...）；与该卷范围起止一致、无缺号/无重复
+      3) 覆盖该卷全部章节：逐章均存在条目，不允许缺失或占位
+      4) 每章条目必须包含四要素且非空：目标/冲突/转折/悬念；不得出现“待定/TBD/占位/...”
+      5) 每章标题存在且非空；建议格式：“- 第NNNN章 标题：...”
+      
+      ## 输出与格式（vol_{VV}_outline_review.md）
+      ```markdown
+      # 卷 VV 章节大纲校验报告
+      - 结论: PASS/FAIL
+      - 检查摘要
+        - 章数: X（范围: 第{start:04d}章-第{end:04d}章，应为Y章）
+        - 连续性/重复/缺号: ...
+        - 四位补零格式: ...
+        - 要素完整性: ...
+      - 问题清单
+        1) [严重/一般] 问题描述 —— 定位与建议修复
+        ...
+      - 修复建议
+      - 若 FAIL：请返回 SynopsisOutliner 修订并覆盖保存 vol_{VV}_outline.md 后重新发起校验
+      ```
+      
+      ## 流程
+      - 在开始前：使用 read_code 读取 `02_synopsis_outline.md` 与本卷 `vol_{VV}_outline.md`；必要时读取 `01_roles.md`/`00_user_brief.md` 作参考
+      - 执行全部“必须校验项”；形成校验结论与问题清单
+      - 必须使用 REWRITE 将报告保存为 `vol_{VV}_outline_review.md`
+      - 若 FAIL：使用 SEND_MESSAGE 返回 SynopsisOutliner，附问题摘要与修复建议；不得进入用户审阅
+      - 若 PASS：使用 SEND_MESSAGE 返回 SynopsisOutliner，明确“本卷通过校验，可进入 ask_user 审阅”
     auto_complete: false
     clear_after_send_message: true
 
