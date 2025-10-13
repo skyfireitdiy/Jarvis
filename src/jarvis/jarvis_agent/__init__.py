@@ -309,25 +309,28 @@ class Agent:
             confirm_callback: 用户确认回调函数，签名为 (tip: str, default: bool) -> bool；默认使用CLI的user_confirm
             non_interactive: 是否以非交互模式运行（优先级最高，覆盖环境变量与配置）
         """
-        # 基础属性初始化
-        self.files = files or []
+        # 基础属性初始化（仅根据入参设置原始值；实际生效的默认回退在 _init_config 中统一解析）
+        # 标识与描述
         self.name = make_agent_name(name)
         self.description = description
         self.system_prompt = system_prompt
-        self.need_summary = need_summary
-        self.auto_complete = auto_complete
-        self.first = True
-        self.run_input_handlers_next_turn = False
-        self.user_data: Dict[str, Any] = {}
-        self.non_interactive = non_interactive
-        self.model_group = model_group
+        # 行为控制开关（原始入参值）
+        self.auto_complete = bool(auto_complete)
+        self.need_summary = bool(need_summary)
         self.use_methodology = use_methodology
         self.use_analysis = use_analysis
         self.execute_tool_confirm = execute_tool_confirm
         self.summary_prompt = summary_prompt
         self.force_save_memory = force_save_memory
+        # 资源与环境
+        self.model_group = model_group
+        self.files = files or []
         self.use_tools = use_tools
-        
+        self.non_interactive = non_interactive
+        # 运行时状态
+        self.first = True
+        self.run_input_handlers_next_turn = False
+        self.user_data: Dict[str, Any] = {}
 
 
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
