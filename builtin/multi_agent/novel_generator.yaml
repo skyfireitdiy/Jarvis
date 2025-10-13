@@ -375,14 +375,14 @@ agents:
       - 额外说明：如需更多上下文，可请求 NovelCoordinator 在下一次消息中附带文件路径或摘要。
       
       ## 流程
-      - 在开始前：使用 read_code 读取 chapter_{NNNN}_draft.md（必需）以校验输入；若缺失则请求 NovelCoordinator 在下一条消息中提供路径/摘要
+      - 在开始前：使用 read_code 读取 00_user_brief.md（参考）与 chapter_{NNNN}_draft.md（必需）以校验输入与风格约束；若缺失则请求 NovelCoordinator 在下一条消息中提供路径/摘要
       - 在开始前：若 NN>1，使用 read_code 读取上一章文本（优先顺序：chapter_{PPPP}_proofread.md > chapter_{PPPP}_polished.md > chapter_{PPPP}_draft.md，PPPP为上一章四位数），对术语、称谓、口吻与事实连续性进行对齐检查；如发现断裂，请在 summary 中列出并建议回退处理（Writer/Polisher）。
       1) 必须使用 sub_agent 工具托管润色（由子Agent产出并保存润色稿）：
          - sub_agent 参数要求：
            - task: 首先将 chapter_{NNNN}_draft.md 复制为 chapter_{NNNN}_polished.md，然后基于 chapter_{NNNN}_draft.md 的内容，对 chapter_{NNNN}_polished.md 文件进行语言/节奏/意象的润色（使用 PATCH 操作）；润色过程不改变事实与信息；无需向用户征求意见
            - name: "ChapterPolisherWorker_NN"
            - background: |
-               需读取文件：chapter_{NNNN}_draft.md, 上一章文本（如有）。
+               需读取文件：00_user_brief.md, chapter_{NNNN}_draft.md, 上一章文本（如有）。
                摘要：风格约束、章节目标、用户偏好与禁忌。
            - system_prompt: 保持信息等价、优化可读性与风格统一；遵守风格与禁忌清单
            - summary_prompt: 用要点总结主要润色改动、风格取向、与用户剩余分歧点、跨章一致性检查结果（术语/称谓/口吻/时序）
