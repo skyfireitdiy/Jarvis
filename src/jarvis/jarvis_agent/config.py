@@ -31,6 +31,7 @@ class AgentConfig:
     # 运行行为
     auto_complete: bool = False
     non_interactive: bool = False
+    in_multi_agent: bool = False
     need_summary: bool = True
 
     # 可选配置（None 表示使用默认策略解析）
@@ -55,6 +56,7 @@ class AgentConfig:
             model_group=self.model_group,
             auto_complete=self.auto_complete,
             non_interactive=self.non_interactive,
+            in_multi_agent=self.in_multi_agent,
             need_summary=self.need_summary,
             summary_prompt=self.summary_prompt,
             execute_tool_confirm=self.execute_tool_confirm,
@@ -88,8 +90,8 @@ class AgentConfig:
         if cfg.force_save_memory is None:
             cfg.force_save_memory = is_force_save_memory()
 
-        # 非交互模式下默认开启自动完成
-        if is_non_interactive():
+        # 非交互模式下默认开启自动完成，但在多智能体场景下不自动开启
+        if is_non_interactive() and not cfg.in_multi_agent:
             cfg.auto_complete = True
 
         return cfg
