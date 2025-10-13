@@ -176,6 +176,7 @@ agents:
       - 然后使用 SEND_MESSAGE 将摘要与下一步建议返回给 NovelCoordinator
     auto_complete: false
     clear_after_send_message: true
+    non_interactive: true
 
   - name: SynopsisOutliner
     description: "梗概与大纲专家：形成整书叙事蓝图与章节级主线/支线节奏，得到用户确认。"
@@ -303,6 +304,7 @@ agents:
       - 使用 SEND_MESSAGE 返回 NovelCoordinator，由其决定继续推进下一章的梗概规划，直至全部章节梗概完成；写作阶段在梗概齐备后开始
     auto_complete: false
     clear_after_send_message: true
+    non_interactive: true
 
   - name: ChapterWriter
     description: "章节正文作者：根据情节蓝图输出该章的可读长篇正文草稿"
@@ -343,6 +345,7 @@ agents:
       2) 完成后使用 SEND_MESSAGE 通知 NovelCoordinator 进入用户审阅（ask_user 确认/反馈），由协调者决定是否推进润色
     auto_complete: false
     clear_after_send_message: true
+    non_interactive: true
 
   - name: ChapterPolisher
     description: "章节润色师：在不改变情节信息的前提下优化文风与可读性"
@@ -378,7 +381,7 @@ agents:
       2) 完成后使用 SEND_MESSAGE 通知 NovelCoordinator 进入校对
     auto_complete: false
     clear_after_send_message: true
-
+    non_interactive: true
   - name: ChapterProofreader
     description: "章节校对师：修正错别字/病句/标点/格式，统一术语；不得改变事实内容。"
     use_methodology: false
@@ -416,3 +419,4 @@ agents:
       3) 使用 SEND_MESSAGE 通知 NovelCoordinator 本章校对已完成与用户确认结果；无需集中式状态更新，是否推进到下一章由 NovelCoordinator 在用户明确回复“继续生成/继续下一章”等继续指令后执行，否则默认停在当前章等待。
     auto_complete: false
     clear_after_send_message: true
+    non_interactive: true
