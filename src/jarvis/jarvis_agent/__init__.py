@@ -75,7 +75,7 @@ from jarvis.jarvis_utils.config import (
     is_use_methodology,
     get_tool_filter_threshold,
     get_after_tool_call_cb_dirs,
-    set_config,
+
 
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
@@ -366,11 +366,7 @@ class Agent:
             # 如果构造参数显式提供，则同步到环境变量与全局配置，供下游组件读取
             if non_interactive is not None:
                 os.environ["JARVIS_NON_INTERACTIVE"] = "true" if self.non_interactive else "false"
-                try:
-                    set_config("JARVIS_NON_INTERACTIVE", self.non_interactive)
-                except Exception:
-                    # 配置同步失败不影响主流程
-                    pass
+
         except Exception:
             # 防御式回退
             self.non_interactive = False
@@ -487,10 +483,7 @@ class Agent:
         # 聚合配置到 AgentConfig，作为后续单一事实来源（保持兼容，不改变既有属性使用）
         self.config = cfg
         # 同步 auto_complete 到全局配置，供输入层在非交互模式下判断是否提示自动完成
-        try:
-            set_config("JARVIS_AUTO_COMPLETE", self.auto_complete)
-        except Exception:
-            pass
+
 
     def _setup_system_prompt(self):
         """设置系统提示词"""
