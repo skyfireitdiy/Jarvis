@@ -51,6 +51,10 @@ class SubAgentTool:
                 "type": "string",
                 "description": "覆盖子Agent的总结提示词（必填）",
             },
+            "non_interactive": {
+                "type": "boolean",
+                "description": "是否启用无交互模式（可选，默认继承父Agent或系统默认）",
+            },
         },
         "required": [
             "task",
@@ -130,6 +134,11 @@ class SubAgentTool:
             except Exception:
                 # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
                 pass
+
+            # 可选参数：允许显式覆盖无交互模式
+            explicit_non_interactive = args.get("non_interactive", None)
+            if explicit_non_interactive is not None:
+                parent_non_interactive = bool(explicit_non_interactive)
 
             agent = Agent(
                 system_prompt=system_prompt,
