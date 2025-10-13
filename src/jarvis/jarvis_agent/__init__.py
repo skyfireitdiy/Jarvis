@@ -319,10 +319,19 @@ class Agent:
         self.first = True
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
+        self.non_interactive = non_interactive
+        self.model_group = model_group
+        self.use_methodology = use_methodology
+        self.use_analysis = use_analysis
+        self.execute_tool_confirm = execute_tool_confirm
+        self.summary_prompt = summary_prompt
+        self.force_save_memory = force_save_memory
+        self.use_tools = use_tools
+        
 
 
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
-        self.user_confirm: Callable[[str, bool], bool] = (
+        self.confirm_callback: Callable[[str, bool], bool] = (
             confirm_callback or user_confirm  # type: ignore[assignment]
         )
 
@@ -337,9 +346,9 @@ class Agent:
             use_tools or [],
         )
         # 初始化用户交互封装，保持向后兼容
-        self.user_interaction = UserInteractionHandler(self.multiline_inputer, self.user_confirm)
+        self.user_interaction = UserInteractionHandler(self.multiline_inputer, self.confirm_callback)
         # 将确认函数指向封装后的 confirm，保持既有调用不变
-        self.user_confirm = self.user_interaction.confirm  # type: ignore[assignment]
+        self.confirm_callback = self.user_interaction.confirm  # type: ignore[assignment]
         # 非交互模式参数支持：允许通过构造参数显式控制，便于其他Agent调用时设置
         try:
             # 优先使用构造参数，其次回退到环境变量
@@ -1088,7 +1097,7 @@ class Agent:
             return self._complete_task(auto_completed=False)
 
         if any(handler.can_handle(current_response) for handler in self.output_handler):
-            if self.user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
+            if self.confirm_callback("检测到有工具调用，是否继续处理工具调用？", True):
                 self.session.prompt = join_prompts([
                     f"被用户中断，用户补充信息为：{user_input}",
                     "用户同意继续工具调用。"
@@ -1315,7 +1324,7 @@ class Agent:
             f"并且存在3个以上标签重叠的记忆。\n"
             f"是否立即整理记忆库以优化性能和相关性？"
         )
-        if self.user_confirm(prompt, True):
+        if self.confirm_callback(prompt, True):
             PrettyOutput.print(
                 f"正在开始整理 '{scope_name}' ({memory_type}) 记忆库...",
                 OutputType.INFO,
