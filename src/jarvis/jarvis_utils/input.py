@@ -363,11 +363,50 @@ class FileCompleter(Completer):
         return tag
 
 
-def user_confirm(tip: str, default: bool = True) -> bool:
-    """提示用户确认是/否问题"""
+# ---------------------
+# 公共判定辅助函数（按当前Agent优先）
+# ---------------------
+def _get_current_agent_for_input():
+    try:
+        import jarvis.jarvis_utils.globals as g
+        current_name = getattr(g, "current_agent_name", "")
+        if current_name:
+            return g.get_agent(current_name)
+    except Exception:
+        pass
+    return None
+
+def _is_non_interactive_for_current_agent() -> bool:
     try:
         from jarvis.jarvis_utils.config import is_non_interactive
-        if is_non_interactive():
+        ag = _get_current_agent_for_input()
+        try:
+            return bool(getattr(ag, "non_interactive", False)) if ag else bool(is_non_interactive())
+        except Exception:
+            return bool(is_non_interactive())
+    except Exception:
+        return False
+
+def _is_auto_complete_for_current_agent() -> bool:
+    try:
+        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+        ag = _get_current_agent_for_input()
+        if ag is not None and hasattr(ag, "auto_complete"):
+            try:
+                return bool(getattr(ag, "auto_complete", False))
+            except Exception:
+                pass
+        env_v = os.getenv("JARVIS_AUTO_COMPLETE")
+        if env_v is not None:
+            return str(env_v).strip().lower() in ("1", "true", "yes", "on")
+        return bool(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_COMPLETE", False))
+    except Exception:
+        return False
+
+def user_confirm(tip: str, default: bool = True) -> bool:
+    """提示用户确认是/否问题（按当前Agent优先判断非交互）"""
+    try:
+        if _is_non_interactive_for_current_agent():
             return default
         suffix = "[Y/n]" if default else "[y/N]"
         ret = get_single_line_input(f"{tip} {suffix}: ")
@@ -667,17 +706,9 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     preset_cursor: Optional[int] = None
     while True:
         from jarvis.jarvis_utils.config import is_non_interactive, GLOBAL_CONFIG_DATA
-        if is_non_interactive():
-            # 当非交互模式时，仅在开启 auto_complete 时才提示自动完成；否则直接返回空串让上层走 complete 分支
-            try:
-                env_v = os.getenv("JARVIS_AUTO_COMPLETE")
-                if env_v is not None:
-                    auto_complete_enabled = str(env_v).strip().lower() in ("1", "true", "yes", "on")
-                else:
-                    auto_complete_enabled = bool(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_COMPLETE", False))
-            except Exception:
-                auto_complete_enabled = False
-            if auto_complete_enabled:
+        # 基于“当前Agent”精确判断非交互与自动完成，避免多Agent相互干扰
+        if _is_non_interactive_for_current_agent():
+            if _is_auto_complete_for_current_agent():
                 return "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务。输出" + ot("!!!COMPLETE!!!")
             else:
                 return "我无法与你交互，所有的事情你都自我决策"
