@@ -709,7 +709,35 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
         # 基于“当前Agent”精确判断非交互与自动完成，避免多Agent相互干扰
         if _is_non_interactive_for_current_agent():
             if _is_auto_complete_for_current_agent():
-                return "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务。输出" + ot("!!!COMPLETE!!!")
+                # 在多Agent系统中，自动输入时提示可用智能体，并建议使用 SEND_MESSAGE 转移控制权
+                base_msg = "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务。输出" + ot("!!!COMPLETE!!!")
+                hint = ""
+                try:
+                    ag = _get_current_agent_for_input()
+                    ohs = getattr(ag, "output_handler", [])
+                    available_agents: List[str] = []
+                    for oh in (ohs or []):
+                        cfgs = getattr(oh, "agents_config", None)
+                        if isinstance(cfgs, list):
+                            for c in cfgs:
+                                try:
+                                    name = c.get("name")
+                                except Exception:
+                                    name = None
+                                if isinstance(name, str) and name.strip():
+                                    available_agents.append(name.strip())
+                    if available_agents:
+                        # 去重但保留顺序
+                        seen = set()
+                        ordered = []
+                        for n in available_agents:
+                            if n not in seen:
+                                seen.add(n)
+                                ordered.append(n)
+                        hint = "\n当前可用智能体: " + ", ".join(ordered) + f"\n如需将任务交给其他智能体，请使用 {ot('SEND_MESSAGE')} 块。"
+                except Exception:
+                    hint = ""
+                return base_msg + hint
             else:
                 return "我无法与你交互，所有的事情你都自我决策"
         user_input = _get_multiline_input_internal(
