@@ -289,6 +289,7 @@ class Agent:
         files: Optional[List[str]] = None,
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
         non_interactive: Optional[bool] = None,
+        in_multi_agent: Optional[bool] = None,
         **kwargs,
     ):
         """初始化Jarvis Agent实例
@@ -327,6 +328,8 @@ class Agent:
         self.files = files or []
         self.use_tools = use_tools
         self.non_interactive = non_interactive
+        # 多智能体运行标志：用于控制非交互模式下的自动完成行为
+        self.in_multi_agent = bool(in_multi_agent)
         # 运行时状态
         self.first = True
         self.run_input_handlers_next_turn = False
@@ -461,6 +464,8 @@ class Agent:
             description=self.description,
             model_group=model_group,
             auto_complete=self.auto_complete,
+            non_interactive=self.non_interactive or False,
+            in_multi_agent=self.in_multi_agent or False,
             need_summary=self.need_summary,
             summary_prompt=summary_prompt,
             execute_tool_confirm=execute_tool_confirm,
@@ -481,6 +486,11 @@ class Agent:
 
         # 聚合配置到 AgentConfig，作为后续单一事实来源（保持兼容，不改变既有属性使用）
         self.config = cfg
+        # 同步 auto_complete 到全局配置，供输入层在非交互模式下判断是否提示自动完成
+        try:
+            set_config("JARVIS_AUTO_COMPLETE", self.auto_complete)
+        except Exception:
+            pass
 
     def _setup_system_prompt(self):
         """设置系统提示词"""

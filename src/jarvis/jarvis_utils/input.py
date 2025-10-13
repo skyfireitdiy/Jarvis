@@ -666,9 +666,21 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     preset: Optional[str] = None
     preset_cursor: Optional[int] = None
     while True:
-        from jarvis.jarvis_utils.config import is_non_interactive
+        from jarvis.jarvis_utils.config import is_non_interactive, GLOBAL_CONFIG_DATA
         if is_non_interactive():
-            return "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务。输出" + ot("!!!COMPLETE!!!")
+            # 当非交互模式时，仅在开启 auto_complete 时才提示自动完成；否则直接返回空串让上层走 complete 分支
+            try:
+                env_v = os.getenv("JARVIS_AUTO_COMPLETE")
+                if env_v is not None:
+                    auto_complete_enabled = str(env_v).strip().lower() in ("1", "true", "yes", "on")
+                else:
+                    auto_complete_enabled = bool(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_COMPLETE", False))
+            except Exception:
+                auto_complete_enabled = False
+            if auto_complete_enabled:
+                return "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务。输出" + ot("!!!COMPLETE!!!")
+            else:
+                return "我无法与你交互，所有的事情你都自我决策"
         user_input = _get_multiline_input_internal(
             tip, preset=preset, preset_cursor=preset_cursor
         )

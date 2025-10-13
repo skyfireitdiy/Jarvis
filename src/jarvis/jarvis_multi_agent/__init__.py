@@ -287,6 +287,8 @@ content: |2
             return None
 
         config = self.agents_config_map[name].copy()
+        # 标记为多智能体运行，避免在非交互模式下自动开启 auto_complete
+        config.setdefault("in_multi_agent", True)
 
         # Prepend common system prompt if configured
         common_sp = getattr(self, "common_system_prompt", "")
