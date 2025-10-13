@@ -668,7 +668,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     while True:
         from jarvis.jarvis_utils.config import is_non_interactive
         if is_non_interactive():
-            return "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务"
+            return "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务。输出" + ot("!!!COMPLETE!!!")
         user_input = _get_multiline_input_internal(
             tip, preset=preset, preset_cursor=preset_cursor
         )
