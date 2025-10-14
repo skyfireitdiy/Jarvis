@@ -26,8 +26,12 @@ class AgentRunLoop:
         self.agent = agent
         self.conversation_rounds = 0
         self.tool_reminder_rounds = int(os.environ.get("JARVIS_TOOL_REMINDER_ROUNDS", 20))
-        # 基于轮次的自动总结阈值，来源于全局配置（默认20轮），可通过 GLOBAL_CONFIG_DATA['JARVIS_AUTO_SUMMARY_ROUNDS'] 配置
-        self.auto_summary_rounds = get_auto_summary_rounds()
+        # 基于轮次的自动总结阈值：优先使用 Agent 入参，否则回落到全局配置（默认20轮）
+        self.auto_summary_rounds = (
+            self.agent.auto_summary_rounds
+            if getattr(self.agent, "auto_summary_rounds", None) is not None
+            else get_auto_summary_rounds()
+        )
 
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
