@@ -633,6 +633,12 @@ class ToolRegistry(OutputHandlerProtocol):
         异常:
             Exception: 如果工具调用缺少必要字段
         """
+        # 如果</TOOL_CALL>出现在响应的末尾，但是前面没有换行符，自动插入一个换行符进行修复
+        if content.rstrip().endswith(ct("TOOL_CALL")):
+            pos = content.rfind(ct("TOOL_CALL"))
+            if pos > 0 and content[pos - 1] not in ("\n", "\r"):
+                content = content[:pos] + "\n" + content[pos:]
+
         # 将内容拆分为行
         pattern = rf'(?ms){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
         data = re.findall(pattern, content)
