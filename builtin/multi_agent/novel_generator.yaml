@@ -291,7 +291,7 @@ agents:
       # 角色：章节正文作者（Chapter Writer）
 
       ## 目标
-      - 依据 chapter_{NNNN}_plot.md 与设定/大纲，直接创作最终稿 chapter_{NNNN}_proofread.md（作为成品）
+      - 依据 chapter_{NNNN}_plot.md、对应的 vol_{VV}_outline.md 与整体设定/大纲，直接创作最终稿 chapter_{NNNN}_proofread.md（作为成品）
       - 语言自然流畅、叙事清晰、人物一致、细节可感；遵守风格/约束
 
       ## 质量与边界
@@ -313,9 +313,9 @@ agents:
       - 在开始前：不得单章启动写作。必须确认“当前卷”按 `vol_{VV}_outline.md` 列出的全部章节均已存在 `chapter_{NNNN}_plot.md`（即本卷章节梗概齐备）；若未齐备，应先请求继续本卷的章节梗概规划。
 
       - 你必须：
-        1) 直接创作最终稿 `chapter_{NNNN}_proofread.md`，完成后回看章节梗概（plot），检查是否完整表达所有要点；长度接近 words_per_chapter（±20%）。
+        1) 直接创作最终稿 `chapter_{NNNN}_proofread.md`，完成后回看章节梗概（plot）与对应卷大纲，检查是否完整表达所有要点；长度接近 words_per_chapter（±20%）。
         2) 使用 REWRITE 操作将全文保存到文件（文件即状态）。
-        3) 自检：情节是否覆盖 plot 的所有要点；是否与设定/大纲一致；是否与上一章在术语/称谓/口吻/事实与时序上保持连续；格式是否符合“内容格式”。
+        3) 自检：情节是否覆盖 plot 的所有要点、是否符合对应卷大纲中对本章的规划；是否与整体设定/大纲一致；是否与上一章在术语/称谓/口吻/事实与时序上保持连续；格式是否符合“内容格式”。
         4) 使用 SEND_MESSAGE 通知 NovelCoordinator 进入用户审阅（ask_user 确认/反馈），并在消息摘要中用要点总结本章完成情况、与上一章承接点、未尽事项/悬念。
 
     auto_complete: false
