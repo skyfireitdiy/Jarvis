@@ -62,6 +62,7 @@ agents:
     use_methodology: false
     use_analysis: false
     need_summary: false
+    auto_summary_rounds: 10
     system_prompt: |
       # 角色：小说项目总体协调者（Novel Coordinator）
 

@@ -9,6 +9,7 @@ from pathlib import Path
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
+
 # 第三方库导入
 from rich.align import Align
 from rich.console import Console
@@ -35,7 +36,6 @@ from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
 from jarvis.jarvis_agent.rewrite_file_handler import RewriteFileHandler
 from jarvis.jarvis_agent.prompt_manager import PromptManager
 from jarvis.jarvis_agent.event_bus import EventBus
-from jarvis.jarvis_agent.config import AgentConfig
 from jarvis.jarvis_agent.run_loop import AgentRunLoop
 from jarvis.jarvis_agent.events import (
     BEFORE_SUMMARY,
@@ -282,6 +282,7 @@ class Agent:
         use_tools: Optional[List[str]] = None,
         execute_tool_confirm: Optional[bool] = None,
         need_summary: bool = True,
+        auto_summary_rounds: Optional[int] = None,
         multiline_inputer: Optional[Callable[[str], str]] = None,
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
@@ -318,6 +319,8 @@ class Agent:
         # 行为控制开关（原始入参值）
         self.auto_complete = bool(auto_complete)
         self.need_summary = bool(need_summary)
+        # 自动摘要轮次：None 表示使用配置文件中的默认值，由 AgentRunLoop 决定最终取值
+        self.auto_summary_rounds = auto_summary_rounds
         self.use_methodology = use_methodology
         self.use_analysis = use_analysis
         self.execute_tool_confirm = execute_tool_confirm
@@ -371,15 +374,34 @@ class Agent:
             # 防御式回退
             self.non_interactive = False
 
-        # 初始化配置
-        self._init_config(
-            use_methodology,
-            use_analysis,
-            execute_tool_confirm,
-            summary_prompt,
-            model_group,
-            force_save_memory,
-        )
+        # 初始化配置（直接解析，不再依赖 _init_config）
+        try:
+            resolved_use_methodology = bool(use_methodology if use_methodology is not None else is_use_methodology())
+        except Exception:
+            resolved_use_methodology = bool(use_methodology) if use_methodology is not None else True
+
+        try:
+            resolved_use_analysis = bool(use_analysis if use_analysis is not None else is_use_analysis())
+        except Exception:
+            resolved_use_analysis = bool(use_analysis) if use_analysis is not None else True
+
+        try:
+            resolved_execute_tool_confirm = bool(execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm())
+        except Exception:
+            resolved_execute_tool_confirm = bool(execute_tool_confirm) if execute_tool_confirm is not None else False
+
+        try:
+            resolved_force_save_memory = bool(force_save_memory if force_save_memory is not None else is_force_save_memory())
+        except Exception:
+            resolved_force_save_memory = bool(force_save_memory) if force_save_memory is not None else False
+
+        self.use_methodology = resolved_use_methodology
+        self.use_analysis = resolved_use_analysis
+        self.execute_tool_confirm = resolved_execute_tool_confirm
+        self.summary_prompt = (summary_prompt or DEFAULT_SUMMARY_PROMPT)
+        self.force_save_memory = resolved_force_save_memory
+        # 非交互模式下默认自动完成；否则保持传入的 auto_complete 值
+        self.auto_complete = bool(self.auto_complete or (self.non_interactive or False))
 
         # 初始化事件总线需先于管理器，以便管理器在构造中安全订阅事件
         self.event_bus = EventBus()
@@ -442,48 +464,6 @@ class Agent:
             file_context_handler,
         ]
         self.multiline_inputer = multiline_inputer or get_multiline_input
-
-    def _init_config(
-        self,
-        use_methodology: Optional[bool],
-        use_analysis: Optional[bool],
-        execute_tool_confirm: Optional[bool],
-        summary_prompt: Optional[str],
-        model_group: Optional[str],
-        force_save_memory: Optional[bool],
-    ):
-        """初始化配置选项"""
-        # 使用集中配置解析，保持与原逻辑一致
-        cfg = AgentConfig(
-            system_prompt=self.system_prompt,
-            name=self.name,
-            description=self.description,
-            model_group=model_group,
-            auto_complete=self.auto_complete,
-            non_interactive=self.non_interactive or False,
-            in_multi_agent=self.in_multi_agent or False,
-            need_summary=self.need_summary,
-            summary_prompt=summary_prompt,
-            execute_tool_confirm=execute_tool_confirm,
-            use_methodology=use_methodology,
-            use_analysis=use_analysis,
-            force_save_memory=force_save_memory,
-            files=self.files,
-        ).resolve_defaults()
-
-        # 将解析结果回填到 Agent 实例属性，保持向后兼容
-        self.use_methodology = bool(cfg.use_methodology)
-        self.use_analysis = bool(cfg.use_analysis)
-        self.execute_tool_confirm = bool(cfg.execute_tool_confirm)
-        self.summary_prompt = cfg.summary_prompt or DEFAULT_SUMMARY_PROMPT
-        self.force_save_memory = bool(cfg.force_save_memory)
-        # 非交互模式下自动完成标志需要同步到 Agent 实例，避免循环
-        self.auto_complete = bool(cfg.auto_complete)
-
-        # 聚合配置到 AgentConfig，作为后续单一事实来源（保持兼容，不改变既有属性使用）
-        self.config = cfg
-        # 同步 auto_complete 到全局配置，供输入层在非交互模式下判断是否提示自动完成
-
 
     def _setup_system_prompt(self):
         """设置系统提示词"""
