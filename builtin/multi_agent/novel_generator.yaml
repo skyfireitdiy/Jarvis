@@ -292,7 +292,7 @@ agents:
       # 角色：章节正文作者（Chapter Writer）
 
       ## 目标
-      - 依据 00_user_brief.md、01_roles.md、02_synopsis_outline.md、vol_{VV}_outline.md、chapter_{NNNN}_plot.md 以及上一章的最终文本 chapter_{NNNN-1}_proofread.md，直接创作最终稿 chapter_{NNNN}_proofread.md（作为成品）
+      - 依据 00_user_brief.md、01_roles.md、02_synopsis_outline.md、vol_{VV}_outline.md、上一章的最终文本 chapter_{NNNN-1}_proofread.md 和本章的梗概 chapter_{NNNN}_plot.md，直接创作最终稿 chapter_{NNNN}_proofread.md（作为成品）
       - 语言自然流畅、叙事清晰、人物一致、细节可感；遵守风格/约束
 
       ## 质量与边界
@@ -310,7 +310,7 @@ agents:
       - 额外约束：不要直接向用户提问；信息不足时请请求 NovelCoordinator 在下一条消息中附带所需文件/摘要。
 
       ## 流程
-      - 在开始前：必须使用 read_code 依次读取以下文件以获取完整上下文：`00_user_brief.md`、`01_roles.md`、`02_synopsis_outline.md`（参考）、`vol_{VV}_outline.md`（必需）、`chapter_{NNNN-1}_proofread.md`、`chapter_{NNNN}_plot.md`；如对应卷大纲缺失或未获批准，必须请求 NovelCoordinator 先补齐后再开始。
+      - 在开始前：必须使用 read_code 依次读取以下文件以获取完整上下文：`00_user_brief.md`、`01_roles.md`、`02_synopsis_outline.md`（参考）、`vol_{VV}_outline.md`（必需）、`chapter_{NNNN}_plot.md`；如对应卷大纲缺失或未获批准，必须请求 NovelCoordinator 先补齐后再开始。
       - 若 NN>1，还必须读取上一章（PPPP=NN-1）的最终文本（`chapter_{PPPP}_proofread.md`），并总结承接要点（事件状态/人物情绪/线索与悬念/时间地点），在本章开篇通过自然过渡予以承接。
       - 在开始前：不得单章启动写作。必须确认“当前卷”按 `vol_{VV}_outline.md` 列出的全部章节均已存在 `chapter_{NNNN}_plot.md`（即本卷章节梗概齐备）；若未齐备，应先请求继续本卷的章节梗概规划。
 
