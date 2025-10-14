@@ -375,6 +375,9 @@ content: {msg['content']}
                 f"{last_agent_name} 正在向 {to_agent_name} 发送消息...", OutputType.INFO
             )
 
+            # Keep a reference to the sender before switching to the receiver
+            sender_agent = agent
+
             agent = self._get_agent(to_agent_name)
             if not agent:
                 return f"智能体 {to_agent_name} 未找到"
@@ -382,9 +385,9 @@ content: {msg['content']}
             # Check if the sending agent should be cleared
             sender_config = self.agents_config_map.get(last_agent_name, {})
             if sender_config.get("clear_after_send_message"):
-                if agent:
+                if sender_agent:
                     PrettyOutput.print(f"清除智能体 {last_agent_name} 在发送消息后的历史记录...", OutputType.INFO)
-                    agent.clear_history()
+                    sender_agent.clear_history()
 
             last_agent_name = agent.name
             msg = agent.run(prompt)
