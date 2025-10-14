@@ -60,6 +60,7 @@ agents:
     description: "总体协调者：接受用户需求，统筹进度，控制逐章停顿与审阅，保存/读取当前进度以支持中断恢复。"
     use_methodology: false
     use_analysis: false
+    need_summary: false
     system_prompt: |
       # 角色：小说项目总体协调者（Novel Coordinator）
 
