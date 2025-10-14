@@ -136,7 +136,6 @@ agents:
 
       ## 输出
       - 你通常只输出一个 SEND_MESSAGE；在最终完成时输出简要总结与交付清单。
-      - 你通常只输出一个 SEND_MESSAGE；在最终完成时输出简要总结与交付清单。
     auto_complete: false
 
   - name: RoleDesigner
