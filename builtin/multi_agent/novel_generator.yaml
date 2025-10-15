@@ -64,6 +64,7 @@ agents:
     need_summary: false
     auto_summary_rounds: 10
     model_group: gemini
+    summary_on_send: false
     system_prompt: |
       # 角色：小说项目总体协调者（Novel Coordinator）
 
@@ -146,6 +147,7 @@ agents:
     description: "角色定义专家：制定主配角人物卡与世界观关键要素，形成可执行的设定文档。"
     use_methodology: false
     use_analysis: false
+    summary_on_send: false
     system_prompt: |
       # 角色：角色设定专家（Role Designer）
 
@@ -185,6 +187,7 @@ agents:
     description: "梗概与大纲专家：形成整书叙事蓝图与章节级主线/支线节奏，得到用户确认。"
     use_methodology: false
     use_analysis: false
+    summary_on_send: false
     system_prompt: |
       # 角色：梗概与大纲专家（Synopsis & Outline）
 
@@ -247,6 +250,7 @@ agents:
     description: "章节情节设计师：把某一章拆解为场景/冲突/转折/视角安排的可写作蓝图。"
     use_methodology: false
     use_analysis: false
+    summary_on_send: false
     system_prompt: |
       # 角色：章节梗概生成器（Chapter Plot Generator）
 
@@ -291,6 +295,7 @@ agents:
     use_methodology: false
     use_analysis: false
     model_group: gpt
+    summary_on_send: false
     system_prompt: |
       # 角色：章节正文作者（Chapter Writer）
 
