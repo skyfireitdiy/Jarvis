@@ -330,9 +330,14 @@ content: |2
                 break
 
             # Generate a brief summary via direct model call to avoid run-loop recursion
-            try:
-                # 参照 Agent.generate_summary 的实现思路：基于当前 session.prompt 追加请求提示，直接调用底层模型
-                multi_agent_summary_prompt = """
+            # 如果在配置中显式设置了 summary_on_send=False，则不生成摘要
+            sender_config = self.agents_config_map.get(last_agent_name, {}) if hasattr(self, "agents_config_map") else {}
+            summary_on_send = sender_config.get("summary_on_send", True)
+            summary_text = ""
+            if summary_on_send:
+                try:
+                    # 参照 Agent.generate_summary 的实现思路：基于当前 session.prompt 追加请求提示，直接调用底层模型
+                    multi_agent_summary_prompt = """
 请基于当前会话，为即将发送给其他智能体的协作交接写一段摘要，包含：
 - 已完成的主要工作与产出
 - 关键决策及其理由
@@ -343,12 +348,12 @@ content: |2
 - 仅输出纯文本，不包含任何指令或工具调用
 - 使用简洁的要点式表述
 """.strip()
-                summary_any: Any = agent.model.chat_until_success(  # type: ignore[attr-defined]
-                    f"{agent.session.prompt}\n{multi_agent_summary_prompt}"
-                )
-                summary_text = summary_any.strip() if isinstance(summary_any, str) else ""
-            except Exception:
-                summary_text = ""
+                    summary_any: Any = agent.model.chat_until_success(  # type: ignore[attr-defined]
+                        f"{agent.session.prompt}\n{multi_agent_summary_prompt}"
+                    )
+                    summary_text = summary_any.strip() if isinstance(summary_any, str) else ""
+                except Exception:
+                    summary_text = ""
             prompt = f"""
 Please handle this message:
 from: {last_agent_name}
