@@ -400,8 +400,12 @@ class Agent:
         self.execute_tool_confirm = resolved_execute_tool_confirm
         self.summary_prompt = (summary_prompt or DEFAULT_SUMMARY_PROMPT)
         self.force_save_memory = resolved_force_save_memory
-        # 非交互模式下默认自动完成；否则保持传入的 auto_complete 值
-        self.auto_complete = bool(self.auto_complete or (self.non_interactive or False))
+        # 多智能体模式下，默认不自动完成（即使是非交互），仅在明确传入 auto_complete=True 时开启
+        if self.in_multi_agent:
+            self.auto_complete = bool(self.auto_complete)
+        else:
+            # 非交互模式下默认自动完成；否则保持传入的 auto_complete 值
+            self.auto_complete = bool(self.auto_complete or (self.non_interactive or False))
 
         # 初始化事件总线需先于管理器，以便管理器在构造中安全订阅事件
         self.event_bus = EventBus()
