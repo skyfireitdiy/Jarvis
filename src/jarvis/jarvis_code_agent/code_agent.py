@@ -672,12 +672,58 @@ class CodeAgent:
         def _build_per_file_patch_preview(modified_files: List[str]) -> str:
             status_map = _build_name_status_map()
             lines: List[str] = []
+
+            def _get_file_numstat(file_path: str) -> Tuple[int, int]:
+                """获取单文件的新增/删除行数，失败时返回(0,0)"""
+                head_exists = bool(get_latest_commit_hash())
+                try:
+                    # 让未跟踪文件也能统计到新增行数
+                    subprocess.run(["git", "add", "-N", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    cmd = ["git", "diff", "--numstat"] + (["HEAD"] if head_exists else []) + ["--", file_path]
+                    res = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        check=False,
+                    )
+                    if res.returncode == 0 and res.stdout:
+                        for line in res.stdout.splitlines():
+                            parts = line.strip().split("\t")
+                            if len(parts) >= 3:
+                                add_s, del_s = parts[0], parts[1]
+
+                                def to_int(x: str) -> int:
+                                    try:
+                                        return int(x)
+                                    except Exception:
+                                        # 二进制或无法解析时显示为0
+                                        return 0
+
+                                return to_int(add_s), to_int(del_s)
+                finally:
+                    subprocess.run(["git", "reset", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return (0, 0)
+
             for f in modified_files:
                 status = status_map.get(f, "")
-                # 删除文件：不展示diff，仅提示
+                adds, dels = _get_file_numstat(f)
+                total_changes = adds + dels
+
+                # 删除文件：不展示diff，仅提示（附带删除行数信息如果可用）
                 if (status.startswith("D")) or (not os.path.exists(f)):
-                    lines.append(f"- {f} 文件被删除")
+                    if dels > 0:
+                        lines.append(f"- {f} 文件被删除（删除{dels}行）")
+                    else:
+                        lines.append(f"- {f} 文件被删除")
                     continue
+
+                # 变更过大：仅提示新增/删除行数，避免输出超长diff
+                if total_changes > 300:
+                    lines.append(f"- {f} 新增{adds}行/删除{dels}行（变更过大，预览已省略）")
+                    continue
+
                 # 其它情况：展示该文件的diff
                 file_diff = _get_file_diff(f)
                 if file_diff.strip():
