@@ -17,49 +17,13 @@
 - 脚本生成与执行
   - 代理：脚本生成专家（script-generator）
   - 工具/命令：execute_script（非交互脚本运行）、virtual_tty（交互式终端）、jarvis-smart-shell（jss）自然语言转 Shell
-- 架构与设计辅助
-  - 代理：架构图生成器（architecture-diagram-generator）
-  - 能力：阅读代码抽象组件，自动生成逻辑/实现/进程/部署/用例视图并渲染为图片
-  - 代理：代码反向设计专家（code-reverse-design-expert），帮助从现有代码抽取设计与重构蓝图
 - 安全分析与演进
   - 代理：安全漏洞分析师（security_vulnerability_analyst）定位逻辑/安全问题
   - 多智能体：security_evolution 安全演进流水线（理解/分析/评估/规划/生成/验证/协作），支持多语言代码安全与演进路径输出
-- 文档与知识管理
-  - 命令：jarvis-rag（jrg）构建/查询本地知识库（代码/文档），支持混合检索与重排
-  - 记忆系统：short_term / project_long_term / global_long_term 三层记忆，实现知识沉淀与复用（save_memory/retrieve_memory/clear_memory）
-  - 方法论系统：jarvis-methodology（jm）提炼与管理可复用的解决方案流程，支持团队共享
 - 多智能体协作
   - 命令：jarvis-multi-agent（jma）通过 YAML 定义角色协作，消息驱动路由，实现复杂任务分工协作
 
-### SDLC（软件研发生命周期）映射能力
-- 需求分析
-  - jvs 通用代理进行问题理解与任务分解；问题结构化可借助 multi_agent/problem_solver；可加载角色（jpm role）
-  - 方法论驱动——在任务前加载相关方法论，提升稳定性与成功率（jm 管理、共享）
-- 架构与设计
-  - 架构图生成器自动从代码和描述生成多视图架构图
-  - 反向设计专家从代码抽象设计，形成重构蓝图和接口/模块关系
-- 编码与重构
-  - jca：生成精确补丁（PATCH/REWRITE），小步迭代；必要时调用 lint/测试；支持非交互模式与工具组切换
-  - 辅助工具：read_code、execute_script（结合 rg/fd 等）、sub_code_agent（隔离大范围改造）
-- 测试与质量
-  - jcr：对提交/范围/文件进行系统化审查（SCRIPPPS），输出问题分类与修复建议
-  - execute_script + 测试框架（pytest 等）运行测试与报告结果；jst 记录统计指标
-- 提交与审阅
-  - jgc：分析 diff 自动生成符合规范的提交信息，支持前/后缀与自定义模板
-  - jgs：按基础提交执行 reset 并重新生成汇总提交，利于合并小步变更
-- 文档与知识
-  - jrg：将项目 docs/README/代码片段构建为知识库，支撑“代码-文档融合”的问答与检索
-  - icenter_* 工具（如企业环境）用于页面读取/创建，输出开发说明与使用指南
-- 运维与部署
-  - 开源部署专家：部署开源项目到目标环境
-  - execute_script/virtual_tty：执行运维脚本与交互式程序；jpm service 可将模型封装为 OpenAI 兼容 API
-  - jss：将自然语言转为可执行命令，辅助环境操作
-
 ### 与软件开发密切相关的部分内置 Agent
-- 架构图生成器（architecture-diagram-generator）
-  - 阅读代码，抽象组件，生成并渲染多视图架构图（Graphviz）
-- 代码反向设计专家（code-reverse-design-expert）
-  - 从现有代码提取设计与实现方案，帮助理解与重构
 - 开源部署专家（opensource-deployment-expert）
   - 将开源项目部署到目标环境
 - 重构检查专家（refactor_checker）
@@ -79,17 +43,13 @@
 - thinker
   - 批判-推理双人协作，强化推理与审辩，适合高风险技术决策的严谨性提升
 
-### 典型工作流示例
+### 典型工作场景示例
 - 场景1：新增功能从需求到提交
   - jca 描述需求 -> 自动定位相关模块与文件 -> 生成补丁/代码 -> 运行基础测试 -> jcr 自查审查 -> jgc 规范提交
 - 场景2：Bug 修复与回归
   - jvs/jca 定位错误栈与文件 -> 生成修复补丁（保守最小改动） -> execute_script 运行回归测试 -> jcr 审查边界与接口影响 -> jgc 提交
 - 场景3：安全演进专项
   - jma -c builtin/multi_agent/security_evolution.yaml 启动 -> 分角色协作输出缺陷归档、风险评估、演进路线与补丁建议 -> 人机审定与验证
-- 场景4：自动生成架构图
-  - 架构图生成器读取代码 -> 输出逻辑/实现/部署视图 -> 渲染 PNG，用于评审与文档
-- 场景5：项目文档知识库
-  - jrg add src docs README.md -> jrg query 针对代码/文档问答 -> 将答案与参考片段用于评审/培训/迁移
 
 ### 人机协作与安全控制
 - 执行前确认与中断
@@ -103,12 +63,6 @@
 - 记忆与方法论沉淀
   - 关键节点提示保存记忆（short/project/global），方法论可共享到中心库，团队复用最佳实践
 
-### 扩展与团队化使用
-- 自定义工具与平台（功能扩展）
-  - Python 工具：~/.jarvis/tools；MCP 工具：JARVIS_MCP；平台扩展：~/.jarvis/models
-  - 中心工具库/方法论库：通过 Git 仓库共享与每日自动更新，提升团队协作一致性
-- 多角色/多代理
-  - jpm role 快速加载角色进行对话；jma 以 YAML 定义团队并路由消息，实现跨角色协作
 
 ### 边界与注意事项
 - Jarvis 更适合一次性与探索式开发任务；对高度固定的流水线，建议编写专用脚本或使用 CI 系统
@@ -128,4 +82,4 @@
 
 ## 为什么没有使用Cursor，而是使用Jarvis
 
-项目创建与24年，当时的 Cursor 工具还比较初级，没有现在这么强大，而随着 Jarvis 不断迭代与完善，不断补充项目开发实际的场景支持，且不断优化人机协作与安全控制，使得 Jarvis 更加适合软件开发方面的需求。因此后续对 Cursor 的使用较少，而更多使用 Jarvis 进行软件开发。
+Jarvis 使用命令行界面，并且是完全自主开发，定制与修改方便，其他工具固然强大，但其实现为黑盒，难以定制优化。并且 Cursor 无法使用公司自研模型，敏感代码存在信息安全风险。
