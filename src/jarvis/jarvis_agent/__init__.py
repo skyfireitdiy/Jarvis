@@ -249,8 +249,23 @@ class Agent:
     def clear_history(self):
         """
         Clears the current conversation history by delegating to the session manager.
+        Emits BEFORE_HISTORY_CLEAR/AFTER_HISTORY_CLEAR and reapplies system prompt to preserve constraints.
         """
+        # 广播清理历史前事件（不影响主流程）
+        try:
+            self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
+        except Exception:
+            pass
+
+        # 清理会话历史并重置模型状态
         self.session.clear_history()
+
+        # 重置后重新设置系统提示词，确保系统约束仍然生效
+        try:
+            self._setup_system_prompt()
+        except Exception:
+            pass
+
         # 广播清理历史后的事件
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
@@ -1003,7 +1018,6 @@ class Agent:
     {complete_prompt}
     如果没有完成，请进行下一步操作：
     - 仅包含一个操作
-    - 不要询问用户是否继续，直接继续执行直至完成
     - 如果信息不明确，请请求用户补充
     - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
     - 操作列表：{action_handlers}{memory_prompts}
