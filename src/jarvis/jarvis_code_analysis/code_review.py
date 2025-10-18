@@ -53,6 +53,11 @@ class CodeReviewTool:
                 "description": "代码库根目录路径（可选）",
                 "default": ".",
             },
+            "auto_complete": {
+                "type": "boolean",
+                "description": "是否自动完成",
+                "default": False,
+            },
         },
         "required": [],
     }
@@ -689,7 +694,7 @@ class CodeReviewTool:
 {ot("REPORT")}
 [在此处插入完整MARKDOWN格式的审查报告]
 {ct("REPORT")}""",
-                    auto_complete=False,
+                    auto_complete=args.get("auto_complete", False),
                 )
 
                 # Replace the agent's model with our custom platform instance
@@ -815,6 +820,7 @@ def review_commit(
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
+    auto_complete: bool = typer.Option(False, "--auto-complete/--no-auto-complete", help="是否自动完成"),
 ):
     """审查指定的提交"""
     tool = CodeReviewTool()
@@ -824,6 +830,7 @@ def review_commit(
         "root_dir": root_dir,
 
         "model_group": model_group,
+        "auto_complete": auto_complete,
     }
     result = tool.execute(tool_args)
     if result["success"]:
@@ -841,6 +848,7 @@ def review_current(
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
+    auto_complete: bool = typer.Option(False, "--auto-complete/--no-auto-complete", help="是否自动完成"),
 ):
     """审查当前的变更"""
     tool = CodeReviewTool()
@@ -849,6 +857,7 @@ def review_current(
         "root_dir": root_dir,
 
         "model_group": model_group,
+        "auto_complete": auto_complete,
     }
     result = tool.execute(tool_args)
     if result["success"]:
@@ -868,6 +877,7 @@ def review_range(
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
+    auto_complete: bool = typer.Option(False, "--auto-complete/--no-auto-complete", help="是否自动完成"),
 ):
     """审查提交范围"""
     tool = CodeReviewTool()
@@ -878,6 +888,7 @@ def review_range(
         "root_dir": root_dir,
 
         "model_group": model_group,
+        "auto_complete": auto_complete,
     }
     result = tool.execute(tool_args)
     if result["success"]:
@@ -896,6 +907,7 @@ def review_file(
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
+    auto_complete: bool = typer.Option(False, "--auto-complete/--no-auto-complete", help="是否自动完成"),
 ):
     """审查指定的文件"""
     tool = CodeReviewTool()
@@ -905,6 +917,7 @@ def review_file(
         "root_dir": root_dir,
 
         "model_group": model_group,
+        "auto_complete": auto_complete,
     }
     result = tool.execute(tool_args)
     if result["success"]:
