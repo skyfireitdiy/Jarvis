@@ -58,6 +58,34 @@ common_system_prompt: |
   - 最小侵入：优先新增脚本与桥接目录，“不直接改动原构建文件”。确需修改时，产出补丁文件至 c2rust_migration/patches/ 并在说明中列出应用方式。
   - 回退友好：Rust 引入以静态库链接方式进行，默认可通过切换链接/宏开关回退到C实现。
   - 安全渐进：Rust 迁移初期允许必要的 unsafe FFI；通过 SafetyRefiner 阶段逐步消减。
+  - 脚本自验证：生成或更新任何脚本后，必须立即运行相应入口进行最小验证；若不正确，必须修改并重试直至通过。
+    - 典型入口：scripts/build.sh、scripts/test.sh、scripts/run_tests_with_rust.sh（均委托到 c2rust_migration 下的脚本）
+    - 验证方式：使用 execute_script 调用并限制输出；将失败原因、修复措施与最后一次成功日志摘要写入 c2rust_migration/05_progress.md 与 c2rust_migration/diagnostics/
+  - 变更必测：每次对代码、脚本或配置的修改后，必须运行测试用例验证无回归；不通过必须立刻修复并重试，直到通过为止。
+    - 默认执行 scripts/test.sh；若启用 Rust 桥接则执行 scripts/run_tests_with_rust.sh
+    - 最小验证优先：可按需过滤受影响模块或用例（例如 gtest_filter、ctest -R 等）
+  - 失败回退：若脚本在短期内无法修复，应回退到上一步已知可用状态，并在 00_project_info.md 标注风险与待办
+  - 文件拆分：迁移与桥接过程中，避免产生过大的单个源文件（C/C++ 与 Rust 均适用）；对职责过多或体量过大的文件，按功能边界拆分为多个模块/文件（如 util、core、ffi 等），并通过聚合接口保持对外 API/ABI 不变。拆分后必须运行测试验证无回归，并在 00_project_info.md 与 05_progress.md 记录拆分方案与影响范围
+  - 脚本职责定义：
+    - c2rust_migration/01_build_script.sh：负责构建项目，不运行测试；要求：
+      - set -euo pipefail；所有输出记录到 c2rust_migration/diagnostics/build.log
+      - 幂等性：重复执行不破坏构建缓存；支持透传参数（并行度、编译选项等）
+      - 集成钩子：识别 USE_RUST_BRIDGE=1 时尝试链接 rust_bridge 静态库（不破坏原构建）；否则按原构建执行
+      - 失败返回非零退出码，并打印“BUILD_FAILED”标识行以便日志检索
+    - scripts/build.sh：薄封装，仅定位到仓库根后委托执行 ../c2rust_migration/01_build_script.sh "$@"
+    - c2rust_migration/02_test_script.sh：负责执行测试，不做完整编译（除非必要的最小构建）；要求：
+      - set -euo pipefail；输出记录到 c2rust_migration/diagnostics/test.log
+      - 若无用例应返回 0 并打印“无测试用例（占位框架）”
+      - 支持选择性运行（透传过滤参数，如 gtest_filter、ctest -R、meson test -C build -t ...）
+      - 当 USE_RUST_BRIDGE=1 时：执行必要的最小构建与链接流程
+        - 先构建 rust_bridge（cargo build 或进入 rust_bridge/ 执行 cargo build）
+        - 在测试目标的链接阶段将生成的静态库与 C 工程链接：自动发现 target/debug 或 target/release 下的 librust_bridge.a，或通过 RUST_BRIDGE_STATICLIB/LDFLAGS 显式指定
+        - 通过 LDFLAGS/LD_LIBRARY_PATH 或构建系统参数注入链接路径与库；如链接失败，需给出清晰错误并返回非零退出码
+    - scripts/test.sh：薄封装，仅委托执行 ../c2rust_migration/02_test_script.sh "$@"
+    - scripts/run_tests_with_rust.sh：在开启 Rust 桥接的情况下运行测试；要求：
+      - 先构建 rust_bridge（cargo build -p rust_bridge 或进入 rust_bridge/ 执行 cargo build），输出记录到 c2rust_migration/diagnostics/rust_bridge.log
+      - 设置 USE_RUST_BRIDGE=1 调用 scripts/test.sh，将参数透传
+      - 若 rust_bridge 缺失或编译失败，需清晰提示并返回非零退出码
 
 agents:
   - name: MigrationCoordinator
@@ -138,6 +166,7 @@ agents:
         - 日志目录：c2rust_migration/diagnostics/
         - 复用已有构建缓存（如 CMake build/、Bazel cache 等）
         - 预留 RUST 静态库链接注入的条件分支（例如 USE_RUST_BRIDGE=1）
+      - 生成后必须立即运行 scripts/build.sh 执行最小构建验证（使用 execute_script 并限制输出）；若失败需迭代修复并重试，并将失败原因与修复摘要写入 c2rust_migration/05_progress.md 与 c2rust_migration/diagnostics/build.log
       
       ## 子任务委托（sub_agent/sub_code_agent）
       - 若需要并行推进较大且相对独立的代码改造、跨多文件/多模块修改或需要较长的工具调用链，请使用 sub_code_agent 托管子任务，并在完成后将产出路径与结论写入 00_project_info.md/05_progress.md
@@ -168,7 +197,7 @@ agents:
 
       ## 要求
       - 不直接重写原构建文件；必要修改以补齐测试时，优先输出补丁至 c2rust_migration/patches/
-      - 使用 execute_script 验证测试脚本可运行（输出限制）
+      - 脚本生成后必须立即运行 scripts/test.sh 执行最小验证（使用 execute_script 并限制输出）；若失败需迭代修复并重试，并将失败原因与修复摘要写入 c2rust_migration/05_progress.md 与 c2rust_migration/diagnostics/test.log
       - 把测试框架与入口命令清晰记录在 00_project_info.md
       
       ## 子任务委托（sub_agent/sub_code_agent）
@@ -203,6 +232,7 @@ agents:
       - 绝不在未确认的情况下直接修改原构建文件
       - 输出最小可行的桥接示例（如导出 add_i32(a,b) 以验证链接）
       - 记录构建与链接步骤于 00_project_info.md 并在 05_progress.md 追加日志
+      - 脚本生成后必须立即运行 scripts/run_tests_with_rust.sh 执行最小验证（先构建 rust_bridge，再以 USE_RUST_BRIDGE=1 调用 scripts/test.sh；使用 execute_script 并限制输出）；若失败需迭代修复并重试，并将失败原因与修复摘要写入 c2rust_migration/05_progress.md 与 c2rust_migration/diagnostics/rust_bridge.log、c2rust_migration/diagnostics/test.log
       
       ## 子任务委托（sub_agent/sub_code_agent）
       - 当需要尝试多种桥接集成方式（如CMake/Bazel/Meson多套补丁实验）或进行探针验证（PoC）时，使用 sub_code_agent 隔离上下文，避免污染主会话
@@ -224,7 +254,9 @@ agents:
       1. 扫描 TARGET_ROOT 下的源码目录（默认 src/、include/、lib/、core/ 等；不足时 ask_user）
       2. 发现候选单元（函数/模块）：
          - 优先策略：无外部副作用、输入输出纯粹、依赖少、体量小
-         - 可使用 ctags 或基于 grep 的简易识别（记录于 00_project_info.md）
+         - 优先使用 ctags 命令（通过 execute_script 调用）获取“翻译单元/函数”符号；若不可用再回退到基于 grep 的简易识别
+        - ctags 示例：ctags -R --languages=C,C++ --c-kinds=f --fields=+n --output-format=json .
+        - 建议结合 jq/rg/head 对输出进行过滤与提取，并将所用命令与识别依据记录于 00_project_info.md
       3. 生成/更新 c2rust_migration/04_unit_queue.json：
          - 数组条目示例：
            {
@@ -285,12 +317,12 @@ agents:
 
       ## 任务
       1. 读取队列中第一个 status == "ready_to_migrate" 的单元
-      2. 在 rust_bridge/src/lib.rs 中实现等价功能：
-         - 导出 C ABI（#[no_mangle] extern "C"）符号
-         - 对尚未迁移的依赖通过 extern 声明 + unsafe 调用 C/C++ 实现
+      2. 在 rust_bridge/src/lib.rs 中实现等价功能（保持与原 C 符号同名）：
+         - 使用 #[no_mangle] extern "C" 导出 C ABI 符号，函数名与原 C 函数保持一致，确保 ABI 稳定
+         - 对仍依赖原 C 实现的调用，使用 extern "C" 进行函数声明，并通过 unsafe 调用原实现
       3. 更新链接切换逻辑（优先通过环境变量/宏控制、或生成补丁供用户选择应用）
-      4. 运行 scripts/run_tests_with_rust.sh，确保测试通过
-      5. 更新该单元状态为 "migrated_needs_refine" 并写回队列；在 05_progress.md 记录
+      4. 运行 scripts/run_tests_with_rust.sh 执行测试；若失败，基于日志迭代修改直至全部通过（必要时调整桥接、边界处理或类型转换）
+      5. 通过后，将该单元状态更新为 "migrated_needs_refine" 并写回队列；在 05_progress.md 记录迭代次数、失败原因与修复点
 
       ## 要求
       - 仅在必要之处使用 unsafe，并在注释中给出理由
