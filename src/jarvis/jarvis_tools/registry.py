@@ -350,22 +350,28 @@ class ToolRegistry(OutputHandlerProtocol):
         # 如果配置了中心工具仓库，将其添加到加载路径
         central_repo = get_central_tool_repo()
         if central_repo:
-            # 中心工具仓库存储在数据目录下的特定位置
-            central_repo_path = os.path.join(get_data_dir(), "central_tool_repo")
-            tool_dirs.append(central_repo_path)
+            # 支持本地目录路径或Git仓库URL
+            expanded = os.path.expanduser(os.path.expandvars(central_repo))
+            if os.path.isdir(expanded):
+                # 直接使用本地目录（支持Git仓库的子目录）
+                tool_dirs.append(expanded)
+            else:
+                # 中心工具仓库存储在数据目录下的特定位置
+                central_repo_path = os.path.join(get_data_dir(), "central_tool_repo")
+                tool_dirs.append(central_repo_path)
 
-            # 确保中心工具仓库被克隆/更新
-            if not os.path.exists(central_repo_path):
-                try:
-                    import subprocess
+                # 确保中心工具仓库被克隆/更新
+                if not os.path.exists(central_repo_path):
+                    try:
+                        import subprocess
 
-                    subprocess.run(
-                        ["git", "clone", central_repo, central_repo_path], check=True
-                    )
-                except Exception as e:
-                    PrettyOutput.print(
-                        f"克隆中心工具仓库失败: {str(e)}", OutputType.ERROR
-                    )
+                        subprocess.run(
+                            ["git", "clone", central_repo, central_repo_path], check=True
+                        )
+                    except Exception as e:
+                        PrettyOutput.print(
+                            f"克隆中心工具仓库失败: {str(e)}", OutputType.ERROR
+                        )
 
         # --- 全局每日更新检查 ---
         daily_check_git_updates(tool_dirs, "tools")

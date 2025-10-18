@@ -279,12 +279,12 @@
     },
     "JARVIS_CENTRAL_METHODOLOGY_REPO": {
       "type": "string",
-      "description": "中心方法论Git仓库地址，该仓库会自动添加到方法论加载路径中",
+      "description": "中心方法论仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加入方法论加载路径；若为Git URL则会克隆到数据目录后加载。",
       "default": ""
     },
     "JARVIS_CENTRAL_TOOL_REPO": {
       "type": "string",
-      "description": "中心工具库Git仓库地址，该仓库会自动克隆到数据目录并加载其中的工具",
+      "description": "中心工具仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加载其中的工具；若为Git URL则会克隆到数据目录并加载。",
       "default": ""
     },
     "JARVIS_PRINT_PROMPT": {

@@ -49,7 +49,14 @@ class ShareManager(ABC):
     def __init__(self, central_repo_url: str, repo_name: str):
         self.central_repo_url = central_repo_url
         self.repo_name = repo_name
-        self.repo_path = os.path.join(get_data_dir(), repo_name)
+        # 支持将中心仓库配置为本地目录（含git子路径）
+        expanded = os.path.expanduser(os.path.expandvars(central_repo_url))
+        if os.path.isdir(expanded):
+            # 直接使用本地目录作为中心仓库路径（支持git仓库子目录）
+            self.repo_path = expanded
+        else:
+            # 仍按原逻辑使用数据目录中的克隆路径
+            self.repo_path = os.path.join(get_data_dir(), repo_name)
 
     def update_central_repo(self) -> None:
         """克隆或更新中心仓库"""
