@@ -25,6 +25,7 @@ from jarvis.jarvis_utils.config import (
     is_enable_static_analysis,
     get_git_check_mode,
     set_config,
+    get_data_dir,
 )
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
@@ -86,7 +87,14 @@ class CodeAgent:
 
         tool_registry.use_tools(base_tools)
         code_system_prompt = self._get_system_prompt()
-        # 如果存在 .jarvis/rules，则将其内容追加到系统提示词中
+        # 先加载全局规则（数据目录 rules），再加载项目规则（.jarvis/rules）
+        global_rules = self._read_global_rules()
+        if global_rules:
+            code_system_prompt = (
+                f"{code_system_prompt}\n\n"
+                f"<global_rules>\n{global_rules}\n</global_rules>"
+            )
+
         project_rules = self._read_project_rules()
         if project_rules:
             code_system_prompt = (
@@ -175,6 +183,19 @@ class CodeAgent:
         """读取 .jarvis/rules 内容，如果存在则返回字符串，否则返回 None"""
         try:
             rules_path = os.path.join(self.root_dir, ".jarvis", "rules")
+            if os.path.exists(rules_path) and os.path.isfile(rules_path):
+                with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read().strip()
+                return content if content else None
+        except Exception:
+            # 读取规则失败时忽略，不影响主流程
+            pass
+        return None
+
+    def _read_global_rules(self) -> Optional[str]:
+        """读取数据目录 rules 内容，如果存在则返回字符串，否则返回 None"""
+        try:
+            rules_path = os.path.join(get_data_dir(), "rules")
             if os.path.exists(rules_path) and os.path.isfile(rules_path):
                 with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
