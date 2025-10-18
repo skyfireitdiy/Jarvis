@@ -1212,6 +1212,37 @@ def _collect_optional_config_interactively(
         or changed
     )
 
+    # 新增：会话与调试相关配置
+    changed = (
+        _ask_and_set(
+            "JARVIS_SAVE_SESSION_HISTORY",
+            "是否保存会话记录？",
+            False,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
+            "JARVIS_PRINT_ERROR_TRACEBACK",
+            "是否在错误输出时打印回溯调用链？",
+            False,
+            "bool",
+        )
+        or changed
+    )
+
+    # 其它可选开关
+    changed = (
+        _ask_and_set(
+            "JARVIS_SKIP_PREDEFINED_TASKS",
+            "是否跳过预定义任务加载（不读取 pre-command 列表）？",
+            False,
+            "bool",
+        )
+        or changed
+    )
+
     # 代码与工具操作安全提示
     changed = (
         _ask_and_set(
@@ -1258,6 +1289,23 @@ def _collect_optional_config_interactively(
         )
         or changed
     )
+    # 新增：自动总结轮次与脚本超时
+    changed = (
+        _ask_and_set_int(
+            "JARVIS_AUTO_SUMMARY_ROUNDS",
+            "基于对话轮次的自动总结阈值（达到该轮次后自动总结并清理历史，默认20）",
+            20,
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set_int(
+            "JARVIS_SCRIPT_EXECUTION_TIMEOUT",
+            "脚本执行超时时间（秒，默认300，仅非交互模式生效）",
+            300,
+        )
+        or changed
+    )
 
     # 目录类配置（逗号分隔）
     changed = (
@@ -1292,6 +1340,14 @@ def _collect_optional_config_interactively(
         _ask_and_set_list(
             "JARVIS_ROLES_DIRS",
             "指定 roles 加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    # 新增：工具调用后回调实现目录
+    changed = (
+        _ask_and_set_list(
+            "JARVIS_AFTER_TOOL_CALL_CB_DIRS",
+            "指定工具调用后回调实现目录（逗号分隔，留空跳过）：",
         )
         or changed
     )
@@ -1439,7 +1495,7 @@ def _collect_optional_config_interactively(
     changed = (
         _ask_and_set(
             "JARVIS_CENTRAL_METHODOLOGY_REPO",
-            "请输入中心方法论仓库地址（可留空跳过）：",
+            "请输入中心方法论仓库路径或Git地址（可留空跳过）：",
             "",
             "str",
         )
@@ -1448,7 +1504,7 @@ def _collect_optional_config_interactively(
     changed = (
         _ask_and_set(
             "JARVIS_CENTRAL_TOOL_REPO",
-            "请输入中心工具仓库地址（可留空跳过）：",
+            "请输入中心工具仓库路径或Git地址（可留空跳过）：",
             "",
             "str",
         )
