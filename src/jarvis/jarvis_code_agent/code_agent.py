@@ -86,6 +86,13 @@ class CodeAgent:
 
         tool_registry.use_tools(base_tools)
         code_system_prompt = self._get_system_prompt()
+        # 如果存在 .jarvis/rules，则将其内容追加到系统提示词中
+        project_rules = self._read_project_rules()
+        if project_rules:
+            code_system_prompt = (
+                f"{code_system_prompt}\n\n"
+                f"<project_rules>\n{project_rules}\n</project_rules>"
+            )
         self.agent = Agent(
             system_prompt=code_system_prompt,
             name="CodeAgent",
@@ -163,6 +170,19 @@ class CodeAgent:
 10. 持续改进：沉淀经验为可复用清单，下一次做得更快更稳
 </say_to_llm>
 """
+
+    def _read_project_rules(self) -> Optional[str]:
+        """读取 .jarvis/rules 内容，如果存在则返回字符串，否则返回 None"""
+        try:
+            rules_path = os.path.join(self.root_dir, ".jarvis", "rules")
+            if os.path.exists(rules_path) and os.path.isfile(rules_path):
+                with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read().strip()
+                return content if content else None
+        except Exception:
+            # 读取规则失败时忽略，不影响主流程
+            pass
+        return None
 
     def _check_git_config(self) -> None:
         """检查 git username 和 email 是否已设置，如果没有则提示并退出"""
