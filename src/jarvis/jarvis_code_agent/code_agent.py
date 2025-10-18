@@ -87,19 +87,21 @@ class CodeAgent:
 
         tool_registry.use_tools(base_tools)
         code_system_prompt = self._get_system_prompt()
-        # 先加载全局规则（数据目录 rules），再加载项目规则（.jarvis/rules）
+        # 先加载全局规则（数据目录 rules），再加载项目规则（.jarvis/rules），并拼接为单一规则块注入
         global_rules = self._read_global_rules()
-        if global_rules:
-            code_system_prompt = (
-                f"{code_system_prompt}\n\n"
-                f"<global_rules>\n{global_rules}\n</global_rules>"
-            )
-
         project_rules = self._read_project_rules()
+
+        combined_parts: List[str] = []
+        if global_rules:
+            combined_parts.append(global_rules)
         if project_rules:
+            combined_parts.append(project_rules)
+
+        if combined_parts:
+            merged_rules = "\n\n".join(combined_parts)
             code_system_prompt = (
                 f"{code_system_prompt}\n\n"
-                f"<project_rules>\n{project_rules}\n</project_rules>"
+                f"<rules>\n{merged_rules}\n</rules>"
             )
         self.agent = Agent(
             system_prompt=code_system_prompt,
