@@ -186,10 +186,10 @@ agents:
 
       ## 任务
       1. 识别现有测试：优先 CTest（CMake）、GoogleTest、Catch2、doctest、Bazel test、Meson test、make test
-      2. 若缺失，则为项目创建最小测试框架（可零用例）：
-         - 若使用 CMake：启用 enable_testing() + add_test() 结构，并建立 tests/ 目录与占位用例
-         - 若使用 Make：创建 tests/ 与一个最小 C 测试可执行 + make test 目标
-         - 其他构建：给出最小可行方案并在 00_project_info.md 记录决策
+      2. 若缺失，则为项目创建最小测试框架（可零用例），默认采用 GoogleTest + mockcpp：
+         - CMake：使用 FetchContent 引入 GoogleTest（gtest/gmock），并集成 mockcpp；启用 enable_testing() 与 add_test()，在 tests/ 下创建占位示例（sample_test.cc）
+         - Make：在 tests/ 下创建最小 gtest 可执行与 mockcpp 链接目标，提供 make test 规则；优先使用系统包或子模块（优先 pkg-config；若不可用则在 .jarvis/c2rust/c2rust_migration/00_project_info.md 说明拉取方式）
+         - 其他构建：给出最小可行的 gtest+mockcpp 集成方案并在 00_project_info.md 记录决策与依赖
       3. 生成/更新：
          - .jarvis/c2rust/c2rust_migration/02_test_script.sh
          - .jarvis/c2rust/scripts/test.sh（委托到上面的脚本）
