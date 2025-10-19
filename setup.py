@@ -84,6 +84,8 @@ setup(
             "jrg=jarvis.jarvis_rag.cli:main",
             "jarvis-stats=jarvis.jarvis_stats.cli:main",
             "jst=jarvis.jarvis_stats.cli:main",
+            "jarvis-sec=jarvis.jarvis_sec.cli:main",
+            "jsec=jarvis.jarvis_sec.cli:main",
         ],
     },
     python_requires=">=3.9,<3.13",
