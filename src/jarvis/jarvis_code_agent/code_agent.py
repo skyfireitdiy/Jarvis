@@ -58,6 +58,7 @@ class CodeAgent:
         append_tools: Optional[str] = None,
         tool_group: Optional[str] = None,
         non_interactive: Optional[bool] = None,
+        **kwargs,
     ):
         self.root_dir = os.getcwd()
         self.tool_group = tool_group

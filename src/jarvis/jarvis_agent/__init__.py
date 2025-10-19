@@ -285,6 +285,21 @@ class Agent:
         """获取工具使用提示"""
         return build_action_prompt(self.output_handler)  # type: ignore
 
+    def __new__(cls, *args, **kwargs):
+        if kwargs.get("agent_type") == "code":
+            try:
+                from jarvis.jarvis_code_agent.code_agent import CodeAgent
+            except ImportError as e:
+                raise RuntimeError(
+                    "CodeAgent could not be imported. Please ensure jarvis_code_agent is installed correctly."
+                ) from e
+
+            # 移除 agent_type 避免无限循环，并传递所有其他参数
+            kwargs.pop("agent_type", None)
+            return CodeAgent(**kwargs)
+        else:
+            return super().__new__(cls)
+
     def __init__(
         self,
         system_prompt: str,
@@ -306,6 +321,7 @@ class Agent:
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
         non_interactive: Optional[bool] = None,
         in_multi_agent: Optional[bool] = None,
+        agent_type: str = "normal",
         **kwargs,
     ):
         """初始化Jarvis Agent实例
@@ -801,9 +817,14 @@ class Agent:
         try:
             if not self.model:
                 raise RuntimeError("Model not initialized")
-            summary = self.model.chat_until_success(
-                self.session.prompt + "\n" + SUMMARY_REQUEST_PROMPT
-            )  # type: ignore
+            # 优先使用外部传入的 summary_prompt；如为空则回退到默认的会话摘要请求
+            safe_summary_prompt = self.summary_prompt or ""
+            if isinstance(safe_summary_prompt, str) and safe_summary_prompt.strip() != "":
+                prompt_to_use = safe_summary_prompt
+            else:
+                prompt_to_use = self.session.prompt + "\n" + SUMMARY_REQUEST_PROMPT
+
+            summary = self.model.chat_until_success(prompt_to_use)  # type: ignore
             # 防御: 可能返回空响应(None或空字符串)，统一为空字符串并告警
             if not summary:
                 try:
