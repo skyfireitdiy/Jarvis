@@ -66,8 +66,8 @@ common_system_prompt: |
     - 最小验证优先：可按需过滤受影响模块或用例（例如 gtest_filter、ctest -R 等）
   - 路径规范：所有生成的脚本必须仅使用绝对路径，不依赖当前工作目录。脚本开头应解析“脚本所在目录”与“仓库根目录”为绝对路径，并以此构造所有引用路径，例如：
     - Bash 示例：
-      script_dir="$(cd &quot;$(dirname &quot;$0&quot;)&quot; &amp;&amp; pwd)"
-      repo_root="$(cd &quot;$script_dir/../..&quot; &amp;&amp; pwd)"
+      script_dir="$(cd "$(dirname "$0")" && pwd)"
+      repo_root="$(cd "$script_dir/../.." && pwd)"
     - 所有对 .jarvis/c2rust/c2rust_migration、.jarvis/c2rust/rust_bridge、diagnostics 日志目录等的引用，均应以 "$repo_root" 前缀或通过 realpath 解析为绝对路径，确保在任意工作目录下可幂等执行
   - 失败回退：若脚本在短期内无法修复，应回退到上一步已知可用状态，并在 00_project_info.md 标注风险与待办
   - 文件拆分：迁移与桥接过程中，避免产生过大的单个源文件（C/C++ 与 Rust 均适用）；对职责过多或体量过大的文件，按功能边界拆分为多个模块/文件（如 util、core、ffi 等），并通过聚合接口保持对外 API/ABI 不变。拆分后必须运行测试验证无回归，并在 00_project_info.md 与 05_progress.md 记录拆分方案与影响范围
