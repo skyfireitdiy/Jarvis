@@ -1293,8 +1293,8 @@ def _collect_optional_config_interactively(
     changed = (
         _ask_and_set_int(
             "JARVIS_AUTO_SUMMARY_ROUNDS",
-            "基于对话轮次的自动总结阈值（达到该轮次后自动总结并清理历史，默认20）",
-            20,
+            "基于对话轮次的自动总结阈值（达到该轮次后自动总结并清理历史，默认50）",
+            50,
         )
         or changed
     )

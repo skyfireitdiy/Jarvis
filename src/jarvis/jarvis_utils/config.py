@@ -709,9 +709,9 @@ def get_auto_summary_rounds() -> int:
         int: 轮次阈值，默认20
     """
     try:
-        return int(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_SUMMARY_ROUNDS", 20))
+        return int(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_SUMMARY_ROUNDS", 50))
     except Exception:
-        return 20
+        return 50
 
 
 
