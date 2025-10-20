@@ -197,7 +197,6 @@ class SubCodeAgentTool:
 
             # 执行子任务（无提交信息前后缀）
             ret = code_agent.run(enhanced_task, prefix="", suffix="")
-            stdout = ret if isinstance(ret, str) and ret else "任务执行完成"
 
             # 主动清理内部 Agent，避免污染父Agent的全局状态
             try:
@@ -208,7 +207,7 @@ class SubCodeAgentTool:
 
             return {
                 "success": True,
-                "stdout": json.dumps({"result": stdout}, ensure_ascii=False, indent=2),
+                "stdout": ret,
                 "stderr": "",
             }
         except Exception as e:
