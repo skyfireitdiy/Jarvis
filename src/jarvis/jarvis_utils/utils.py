@@ -1419,7 +1419,7 @@ def _collect_optional_config_interactively(
     changed = (
         _ask_and_set_int(
             "JARVIS_PLAN_MAX_DEPTH",
-            "任务规划的最大层数（限制递归拆分深度，默认3；仅在启用规划时生效）",
+            "任务规划的最大层数（限制递归拆分深度，默认2；仅在启用规划时生效）",
             3,
         )
         or changed
