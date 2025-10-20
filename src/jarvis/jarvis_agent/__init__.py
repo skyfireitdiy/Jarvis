@@ -25,6 +25,7 @@ from jarvis.jarvis_agent.tool_executor import execute_tool_call
 from jarvis.jarvis_agent.memory_manager import MemoryManager
 from jarvis.jarvis_memory_organizer.memory_organizer import MemoryOrganizer
 from jarvis.jarvis_agent.task_analyzer import TaskAnalyzer
+from jarvis.jarvis_agent.task_planner import TaskPlanner
 from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
 from jarvis.jarvis_agent.prompts import (
     DEFAULT_SUMMARY_PROMPT,
@@ -462,6 +463,8 @@ class Agent:
         self.task_analyzer = TaskAnalyzer(self)
         self.file_methodology_manager = FileMethodologyManager(self)
         self.prompt_manager = PromptManager(self)
+        # 任务规划器：封装规划与子任务调度逻辑
+        self.task_planner = TaskPlanner(self)
 
         # 设置系统提示词
         self._setup_system_prompt()
@@ -1245,101 +1248,18 @@ class Agent:
         }
 
     def _maybe_plan_and_dispatch(self, task_text: str) -> None:
-        """
-        当启用 self.plan 时，调用临时模型评估是否需要拆分任务并执行子任务。
-        - 若模型返回 <DONT_NEED/>，则直接返回不做任何修改；
-        - 若返回 <SUB_TASK> 块，则解析每行以“- ”开头的子任务，逐个创建子Agent执行；
-        - 将子任务与结果以结构化块写回到 self.session.prompt，随后由主循环继续处理。
-        """
+        """委托给 TaskPlanner 执行任务规划与子任务调度，保持向后兼容。"""
         try:
-            planning_sys = (
-                "你是一个任务规划助手。请判断是否需要拆分任务。\n"
-                "当需要拆分时，仅按以下结构输出：\n"
-                "<SUB_TASK>\n- 子任务1\n- 子任务2\n</SUB_TASK>\n"
-                "当不需要拆分时，仅输出：\n<DONT_NEED/>\n"
-                "禁止输出任何额外解释。"
-            )
-            temp_model = self._create_temp_model(planning_sys)
-            plan_prompt = f"任务：\n{task_text}\n\n请严格按要求只输出结构化标签块。"
-            plan_resp = temp_model.chat_until_success(plan_prompt)  # type: ignore
-            if not plan_resp:
-                return
+            if hasattr(self, "task_planner") and self.task_planner:
+                # 优先使用初始化时注入的规划器
+                self.task_planner.maybe_plan_and_dispatch(task_text)  # type: ignore[attr-defined]
+            else:
+                # 防御式回退：临时创建规划器以避免因未初始化导致的崩溃
+                from jarvis.jarvis_agent.task_planner import TaskPlanner
+                TaskPlanner(self).maybe_plan_and_dispatch(task_text)
         except Exception:
             # 规划失败不影响主流程
-            return
-
-        text = str(plan_resp).strip()
-        # 不需要拆分
-        if re.search(r"<\s*DONT_NEED\s*/\s*>", text, re.IGNORECASE):
-            return
-
-        # 解析 <SUB_TASK> 块
-        m = re.search(
-            r"<\s*SUB_TASK\s*>\s*(.*?)\s*<\s*/\s*SUB_TASK\s*>",
-            text,
-            re.IGNORECASE | re.DOTALL,
-        )
-        subtasks: List[str] = []
-        if m:
-            block = m.group(1)
-            for line in block.splitlines():
-                s = line.strip()
-                if s.startswith("-"):
-                    item = s[1:].strip()
-                    if item:
-                        subtasks.append(item)
-        else:
-            # 回退解析：无标签时，尝试解析所有以“- ”开头的行
-            for line in text.splitlines():
-                s = line.strip()
-                if s.startswith("-"):
-                    item = s[1:].strip()
-                    if item:
-                        subtasks.append(item)
-
-        if not subtasks:
-            # 无有效子任务，直接返回
-            return
-
-        # 执行子任务
-        executed_subtask_block_lines: List[str] = ["<SUB_TASK>"]
-        executed_subtask_block_lines += [f"- {t}" for t in subtasks]
-        executed_subtask_block_lines.append("</SUB_TASK>")
-
-        results_lines: List[str] = []
-        for i, st in enumerate(subtasks, 1):
-            try:
-                child_kwargs = self._build_child_agent_params(
-                    name=f"{self.name}-child-{i}",
-                    description=f"子任务执行器: {st}",
-                )
-                child = Agent(**child_kwargs)
-                child_result = child.run(st)
-                result_text = "" if child_result is None else str(child_result)
-                # 防止极端长输出导致污染，这里不做截断，交由上层摘要策略控制
-                results_lines.append(f"- 子任务{i}: {st}\n  结果: {result_text}")
-            except Exception as e:
-                results_lines.append(f"- 子任务{i}: {st}\n  结果: 执行失败，原因: {e}")
-
-        subtask_block = "\n".join(executed_subtask_block_lines)
-        results_block = "<SUB_TASK_RESULTS>\n" + "\n".join(results_lines) + "\n</SUB_TASK_RESULTS>"
-
-        # 合并回父Agent的 prompt
-        try:
-            self.session.prompt = join_prompts(
-                [
-                    f"原始任务：\n{task_text}",
-                    f"子任务规划：\n{subtask_block}",
-                    f"子任务执行结果：\n{results_block}",
-                    "请基于上述子任务结果整合并完成最终输出。",
-                ]
-            )
-        except Exception:
-            # 回退拼接
-            self.session.prompt = (
-                f"{task_text}\n\n{subtask_block}\n\n{results_block}\n\n"
-                "请基于上述子任务结果整合并完成最终输出。"
-            )
+            pass
 
     def _filter_tools_if_needed(self, task: str):
         """如果工具数量超过阈值，使用大模型筛选相关工具"""

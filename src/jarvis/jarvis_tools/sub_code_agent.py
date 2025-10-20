@@ -4,7 +4,8 @@ sub_code_agent 工具
 将子任务交给 CodeAgent 执行，并返回执行结果。
 
 约定：
-- 仅接收一个参数：task
+- 必填参数：task
+- 可选参数：background
 - 不依赖父 Agent，所有配置使用系统默认与全局变量
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
