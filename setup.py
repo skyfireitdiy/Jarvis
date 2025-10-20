@@ -86,6 +86,8 @@ setup(
             "jst=jarvis.jarvis_stats.cli:main",
             "jarvis-sec=jarvis.jarvis_sec.cli:main",
             "jsec=jarvis.jarvis_sec.cli:main",
+            "jarvis-c2rust=jarvis.jarvis_c2rust.cli:main",
+            "jc2r=jarvis.jarvis_c2rust.cli:main",
         ],
     },
     python_requires=">=3.9,<3.13",
