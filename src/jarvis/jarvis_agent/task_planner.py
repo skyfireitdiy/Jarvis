@@ -12,6 +12,8 @@ TaskPlanner: 任务规划与子任务调度器
 from typing import Any, List
 import re
 
+import yaml  # type: ignore
+
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
@@ -44,7 +46,8 @@ class TaskPlanner:
             planning_sys = (
                 "你是一个任务规划助手。请判断是否需要拆分任务。\n"
                 "当需要拆分时，仅按以下结构输出：\n"
-                "<SUB_TASK>\n- 子任务1\n- 子任务2\n</SUB_TASK>\n"
+                "<PLAN>\n- 子任务1\n- 子任务2\n</PLAN>\n"
+                "要求：<PLAN> 内必须是有效 YAML 列表，仅包含字符串项；禁止输出任何额外解释。\n"
                 "当不需要拆分时，仅输出：\n<DONT_NEED/>\n"
                 "禁止输出任何额外解释。"
             )
@@ -67,27 +70,27 @@ class TaskPlanner:
 
         # 解析 <SUB_TASK> 块
         m = re.search(
-            r"<\s*SUB_TASK\s*>\s*(.*?)\s*<\s*/\s*SUB_TASK\s*>",
+            r"<\s*PLAN\s*>\s*(.*?)\s*<\s*/\s*PLAN\s*>",
             text,
             re.IGNORECASE | re.DOTALL,
         )
         subtasks: List[str] = []
         if m:
             block = m.group(1)
-            for line in block.splitlines():
-                s = line.strip()
-                if s.startswith("-"):
-                    item = s[1:].strip()
-                    if item:
-                        subtasks.append(item)
+            try:
+                data = yaml.safe_load(block)
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, str):
+                            s = item.strip()
+                            if s:
+                                subtasks.append(s)
+                else:
+                    PrettyOutput.print("任务规划警告：<PLAN> 内内容不是 YAML 列表，已忽略。", OutputType.WARNING)
+            except Exception as e:
+                PrettyOutput.print(f"任务规划警告：解析 <PLAN> YAML 失败：{e}", OutputType.WARNING)
         else:
-            # 回退解析：无标签时，尝试解析所有以“- ”开头的行
-            for line in text.splitlines():
-                s = line.strip()
-                if s.startswith("-"):
-                    item = s[1:].strip()
-                    if item:
-                        subtasks.append(item)
+            PrettyOutput.print("任务规划提示：未检测到 <PLAN> 块，视为无需拆分。", OutputType.INFO)
 
         if not subtasks:
             # 无有效子任务，直接返回
@@ -99,9 +102,9 @@ class TaskPlanner:
             PrettyOutput.print(f"  {i}. {st}", OutputType.INFO)
 
         # 执行子任务
-        executed_subtask_block_lines: List[str] = ["<SUB_TASK>"]
+        executed_subtask_block_lines: List[str] = ["<PLAN>"]
         executed_subtask_block_lines += [f"- {t}" for t in subtasks]
-        executed_subtask_block_lines.append("</SUB_TASK>")
+        executed_subtask_block_lines.append("</PLAN>")
 
         results_lines: List[str] = []
         for i, st in enumerate(subtasks, 1):
