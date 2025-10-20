@@ -4,7 +4,9 @@ sub_agent 工具
 将子任务交给通用 Agent 执行，并返回执行结果。
 
 约定：
-- 必填参数：task, name, background, system_prompt, summary_prompt, use_tools
+- 必填参数：task, name, system_prompt, summary_prompt
+- 可选参数：background
+- 工具集：默认使用系统工具集（无需传入 use_tools）
 - 继承父 Agent 的部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer、non_interactive、use_methodology、use_analysis；其他参数需显式提供
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
@@ -41,7 +43,7 @@ class SubAgentTool:
             },
             "background": {
                 "type": "string",
-                "description": "任务背景与已知信息（必填，将与任务一并提供给子Agent）",
+                "description": "任务背景与已知信息（可选，将与任务一并提供给子Agent）",
             },
             "system_prompt": {
                 "type": "string",
@@ -59,7 +61,6 @@ class SubAgentTool:
         "required": [
             "task",
             "name",
-            "background",
             "system_prompt",
             "summary_prompt",
         ],
