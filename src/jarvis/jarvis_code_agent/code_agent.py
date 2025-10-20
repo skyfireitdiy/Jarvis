@@ -40,7 +40,7 @@ from jarvis.jarvis_utils.git_utils import (
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import get_loc_stats, init_env
+from jarvis.jarvis_utils.utils import get_loc_stats, init_env, _acquire_single_instance_lock
 
 app = typer.Typer(help="Jarvis 代码助手")
 
@@ -898,6 +898,7 @@ def cli(
         False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
     ),
     plan: bool = typer.Option(False, "--plan/--no-plan", help="启用或禁用任务规划（子任务拆分与汇总执行）"),
+    lock_name: str = typer.Option("code_agent.lock", "--lock-name", help="实例锁文件名（用于进程互斥控制）"),
 ) -> None:
     """Jarvis主入口点。"""
     # CLI 标志：非交互模式（不依赖配置文件）
@@ -918,6 +919,8 @@ def cli(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
         config_file=config_file,
     )
+    # CodeAgent 单实例互斥：仅代码助手入口加锁，其他入口不受影响
+    _acquire_single_instance_lock(lock_name=lock_name)
 
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
