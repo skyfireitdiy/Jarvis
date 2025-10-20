@@ -75,8 +75,7 @@ from jarvis.jarvis_utils.config import (
     is_use_methodology,
     get_tool_filter_threshold,
     get_after_tool_call_cb_dirs,
-
-
+    get_plan_max_depth,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
@@ -321,6 +320,9 @@ class Agent:
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
         non_interactive: Optional[bool] = None,
         in_multi_agent: Optional[bool] = None,
+        plan: bool = False,
+        plan_max_depth: Optional[int] = None,
+        plan_depth: int = 0,
         agent_type: str = "normal",
         **kwargs,
     ):
@@ -341,6 +343,9 @@ class Agent:
             force_save_memory: 是否强制保存记忆
             confirm_callback: 用户确认回调函数，签名为 (tip: str, default: bool) -> bool；默认使用CLI的user_confirm
             non_interactive: 是否以非交互模式运行（优先级最高，覆盖环境变量与配置）
+            plan: 是否启用任务规划与子任务拆分（默认 False；启用后在进入主循环前评估是否需要将任务拆分为 <SUB_TASK> 列表，逐一由子Agent执行并汇总结果）
+            plan_max_depth: 任务规划的最大层数（默认3，可通过配置 JARVIS_PLAN_MAX_DEPTH 或入参覆盖）
+            plan_depth: 当前规划层数（内部用于递归控制，子Agent会在父基础上+1）
         """
         # 基础属性初始化（仅根据入参设置原始值；实际生效的默认回退在 _init_config 中统一解析）
         # 标识与描述
@@ -364,6 +369,18 @@ class Agent:
         self.non_interactive = non_interactive
         # 多智能体运行标志：用于控制非交互模式下的自动完成行为
         self.in_multi_agent = bool(in_multi_agent)
+        self.plan = bool(plan)
+        # 规划深度与上限
+        try:
+            self.plan_max_depth = (
+                int(plan_max_depth) if plan_max_depth is not None else int(get_plan_max_depth())
+            )
+        except Exception:
+            self.plan_max_depth = 3
+        try:
+            self.plan_depth = int(plan_depth)
+        except Exception:
+            self.plan_depth = 0
         # 运行时状态
         self.first = True
         self.run_input_handlers_next_turn = False
@@ -1078,6 +1095,13 @@ class Agent:
                 )
             except Exception:
                 pass
+            # 如启用规划模式，先判断是否需要拆分并调度子任务
+            if self.plan:
+                try:
+                    self._maybe_plan_and_dispatch(self.session.prompt)
+                except Exception:
+                    # 防御式处理，规划失败不影响主流程
+                    pass
             return self._main_loop()
         except Exception as e:
             PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
@@ -1184,6 +1208,138 @@ class Agent:
         temp_model.set_model_name(self.model.name())  # type: ignore
         temp_model.set_system_prompt(system_prompt)
         return temp_model
+
+    def _build_child_agent_params(self, name: str, description: str) -> Dict[str, Any]:
+        """构建子Agent参数，尽量继承父Agent配置，并确保子Agent非交互自动完成。"""
+        use_tools_param: Optional[List[str]] = None
+        try:
+            tr = self.get_tool_registry()
+            if isinstance(tr, ToolRegistry):
+                selected_tools = tr.get_all_tools()
+                use_tools_param = [t["name"] for t in selected_tools]
+        except Exception:
+            use_tools_param = None
+
+        return {
+            "system_prompt": origin_agent_system_prompt,
+            "name": name,
+            "description": description,
+            "model_group": self.model_group,
+            "summary_prompt": self.summary_prompt,
+            "auto_complete": True,
+            "use_tools": use_tools_param,
+            "execute_tool_confirm": self.execute_tool_confirm,
+            "need_summary": self.need_summary,
+            "auto_summary_rounds": self.auto_summary_rounds,
+            "multiline_inputer": self.multiline_inputer,
+            "use_methodology": self.use_methodology,
+            "use_analysis": self.use_analysis,
+            "force_save_memory": self.force_save_memory,
+            "files": self.files,
+            "confirm_callback": self.confirm_callback,
+            "non_interactive": True,
+            "in_multi_agent": True,
+            "plan": self.plan,  # 继承父Agent的规划开关
+            "plan_depth": self.plan_depth + 1,  # 子Agent层数+1
+            "plan_max_depth": self.plan_max_depth,  # 继承上限
+        }
+
+    def _maybe_plan_and_dispatch(self, task_text: str) -> None:
+        """
+        当启用 self.plan 时，调用临时模型评估是否需要拆分任务并执行子任务。
+        - 若模型返回 <DONT_NEED/>，则直接返回不做任何修改；
+        - 若返回 <SUB_TASK> 块，则解析每行以“- ”开头的子任务，逐个创建子Agent执行；
+        - 将子任务与结果以结构化块写回到 self.session.prompt，随后由主循环继续处理。
+        """
+        try:
+            planning_sys = (
+                "你是一个任务规划助手。请判断是否需要拆分任务。\n"
+                "当需要拆分时，仅按以下结构输出：\n"
+                "<SUB_TASK>\n- 子任务1\n- 子任务2\n</SUB_TASK>\n"
+                "当不需要拆分时，仅输出：\n<DONT_NEED/>\n"
+                "禁止输出任何额外解释。"
+            )
+            temp_model = self._create_temp_model(planning_sys)
+            plan_prompt = f"任务：\n{task_text}\n\n请严格按要求只输出结构化标签块。"
+            plan_resp = temp_model.chat_until_success(plan_prompt)  # type: ignore
+            if not plan_resp:
+                return
+        except Exception:
+            # 规划失败不影响主流程
+            return
+
+        text = str(plan_resp).strip()
+        # 不需要拆分
+        if re.search(r"<\s*DONT_NEED\s*/\s*>", text, re.IGNORECASE):
+            return
+
+        # 解析 <SUB_TASK> 块
+        m = re.search(
+            r"<\s*SUB_TASK\s*>\s*(.*?)\s*<\s*/\s*SUB_TASK\s*>",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        subtasks: List[str] = []
+        if m:
+            block = m.group(1)
+            for line in block.splitlines():
+                s = line.strip()
+                if s.startswith("-"):
+                    item = s[1:].strip()
+                    if item:
+                        subtasks.append(item)
+        else:
+            # 回退解析：无标签时，尝试解析所有以“- ”开头的行
+            for line in text.splitlines():
+                s = line.strip()
+                if s.startswith("-"):
+                    item = s[1:].strip()
+                    if item:
+                        subtasks.append(item)
+
+        if not subtasks:
+            # 无有效子任务，直接返回
+            return
+
+        # 执行子任务
+        executed_subtask_block_lines: List[str] = ["<SUB_TASK>"]
+        executed_subtask_block_lines += [f"- {t}" for t in subtasks]
+        executed_subtask_block_lines.append("</SUB_TASK>")
+
+        results_lines: List[str] = []
+        for i, st in enumerate(subtasks, 1):
+            try:
+                child_kwargs = self._build_child_agent_params(
+                    name=f"{self.name}-child-{i}",
+                    description=f"子任务执行器: {st}",
+                )
+                child = Agent(**child_kwargs)
+                child_result = child.run(st)
+                result_text = "" if child_result is None else str(child_result)
+                # 防止极端长输出导致污染，这里不做截断，交由上层摘要策略控制
+                results_lines.append(f"- 子任务{i}: {st}\n  结果: {result_text}")
+            except Exception as e:
+                results_lines.append(f"- 子任务{i}: {st}\n  结果: 执行失败，原因: {e}")
+
+        subtask_block = "\n".join(executed_subtask_block_lines)
+        results_block = "<SUB_TASK_RESULTS>\n" + "\n".join(results_lines) + "\n</SUB_TASK_RESULTS>"
+
+        # 合并回父Agent的 prompt
+        try:
+            self.session.prompt = join_prompts(
+                [
+                    f"原始任务：\n{task_text}",
+                    f"子任务规划：\n{subtask_block}",
+                    f"子任务执行结果：\n{results_block}",
+                    "请基于上述子任务结果整合并完成最终输出。",
+                ]
+            )
+        except Exception:
+            # 回退拼接
+            self.session.prompt = (
+                f"{task_text}\n\n{subtask_block}\n\n{results_block}\n\n"
+                "请基于上述子任务结果整合并完成最终输出。"
+            )
 
     def _filter_tools_if_needed(self, task: str):
         """如果工具数量超过阈值，使用大模型筛选相关工具"""

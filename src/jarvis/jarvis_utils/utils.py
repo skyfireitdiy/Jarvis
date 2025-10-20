@@ -1289,6 +1289,15 @@ def _collect_optional_config_interactively(
         )
         or changed
     )
+    # 规划相关：最大递归层数（仅在启用规划时生效，CLI --plan/--no-plan 控制启用）
+    changed = (
+        _ask_and_set_int(
+            "JARVIS_PLAN_MAX_DEPTH",
+            "任务规划的最大层数（限制递归拆分深度，默认3；仅在启用规划时生效）",
+            3,
+        )
+        or changed
+    )
     # 新增：自动总结轮次与脚本超时
     changed = (
         _ask_and_set_int(
