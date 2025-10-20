@@ -700,6 +700,18 @@ def get_tool_filter_threshold() -> int:
     """
     return int(GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_FILTER_THRESHOLD", 30))
 
+def get_plan_max_depth() -> int:
+    """
+    获取任务规划的最大层数。
+    
+    返回:
+        int: 最大规划层数，默认为3（可通过 GLOBAL_CONFIG_DATA['JARVIS_PLAN_MAX_DEPTH'] 配置）
+    """
+    try:
+        return int(GLOBAL_CONFIG_DATA.get("JARVIS_PLAN_MAX_DEPTH", 3))
+    except Exception:
+        return 3
+
 
 def get_auto_summary_rounds() -> int:
     """

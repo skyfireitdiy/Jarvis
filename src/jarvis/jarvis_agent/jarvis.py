@@ -681,6 +681,7 @@ def run_cli(
     non_interactive: bool = typer.Option(
         False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
     ),
+    plan: bool = typer.Option(False, "--plan/--no-plan", help="启用或禁用任务规划（拆分子任务并汇总执行结果）"),
     web: bool = typer.Option(False, "--web", help="以 Web 模式启动，通过浏览器 WebSocket 交互"),
     web_host: str = typer.Option("127.0.0.1", "--web-host", help="Web 服务主机"),
     web_port: int = typer.Option(8765, "--web-port", help="Web 服务端口"),
@@ -1022,6 +1023,11 @@ def run_cli(
             **extra_kwargs,
         )
         agent = agent_manager.initialize()
+        # CLI 开关：启用/禁用规划（不依赖 AgentManager 支持，直接设置 Agent 属性）
+        try:
+            agent.plan = bool(plan)
+        except Exception:
+            pass
 
         if web:
             try:

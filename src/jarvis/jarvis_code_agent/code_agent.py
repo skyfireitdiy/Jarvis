@@ -58,6 +58,7 @@ class CodeAgent:
         append_tools: Optional[str] = None,
         tool_group: Optional[str] = None,
         non_interactive: Optional[bool] = None,
+        plan: Optional[bool] = None,
         **kwargs,
     ):
         self.root_dir = os.getcwd()
@@ -113,6 +114,7 @@ class CodeAgent:
             use_methodology=False,  # 禁用方法论
             use_analysis=False,  # 禁用分析
             non_interactive=self.non_interactive,
+            plan=bool(plan) if plan is not None else False,
         )
 
         self.agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
@@ -895,6 +897,7 @@ def cli(
     non_interactive: bool = typer.Option(
         False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
     ),
+    plan: bool = typer.Option(False, "--plan/--no-plan", help="启用或禁用任务规划（子任务拆分与汇总执行）"),
 ) -> None:
     """Jarvis主入口点。"""
     # CLI 标志：非交互模式（不依赖配置文件）
@@ -974,6 +977,7 @@ def cli(
             append_tools=append_tools,
             tool_group=tool_group,
             non_interactive=non_interactive,
+            plan=plan,
         )
 
         # 尝试恢复会话
