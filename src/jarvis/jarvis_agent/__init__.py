@@ -377,7 +377,7 @@ class Agent:
                 int(plan_max_depth) if plan_max_depth is not None else int(get_plan_max_depth())
             )
         except Exception:
-            self.plan_max_depth = 3
+            self.plan_max_depth = 2
         try:
             self.plan_depth = int(plan_depth)
         except Exception:

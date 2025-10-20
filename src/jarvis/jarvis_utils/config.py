@@ -705,12 +705,12 @@ def get_plan_max_depth() -> int:
     获取任务规划的最大层数。
     
     返回:
-        int: 最大规划层数，默认为3（可通过 GLOBAL_CONFIG_DATA['JARVIS_PLAN_MAX_DEPTH'] 配置）
+        int: 最大规划层数，默认为2（可通过 GLOBAL_CONFIG_DATA['JARVIS_PLAN_MAX_DEPTH'] 配置）
     """
     try:
-        return int(GLOBAL_CONFIG_DATA.get("JARVIS_PLAN_MAX_DEPTH", 3))
+        return int(GLOBAL_CONFIG_DATA.get("JARVIS_PLAN_MAX_DEPTH", 2))
     except Exception:
-        return 3
+        return 2
 
 
 def get_auto_summary_rounds() -> int:

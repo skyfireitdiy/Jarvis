@@ -191,7 +191,7 @@
     "JARVIS_PLAN_MAX_DEPTH": {
       "type": "number",
       "description": "任务规划的最大层数。用于限制 plan 模式的递归拆分深度。仅在启用规划时生效（通过 CLI --plan/--no-plan 控制），默认 3。",
-      "default": 3
+      "default": 2
     },
     "JARVIS_SCRIPT_EXECUTION_TIMEOUT": {
       "type": "number",
