@@ -464,7 +464,7 @@ class Agent:
         self.file_methodology_manager = FileMethodologyManager(self)
         self.prompt_manager = PromptManager(self)
         # 任务规划器：封装规划与子任务调度逻辑
-        self.task_planner = TaskPlanner(self)
+        self.task_planner = TaskPlanner(self, plan_depth=self.plan_depth, plan_max_depth=self.plan_max_depth)
 
         # 设置系统提示词
         self._setup_system_prompt()
@@ -1256,7 +1256,7 @@ class Agent:
             else:
                 # 防御式回退：临时创建规划器以避免因未初始化导致的崩溃
                 from jarvis.jarvis_agent.task_planner import TaskPlanner
-                TaskPlanner(self).maybe_plan_and_dispatch(task_text)
+                TaskPlanner(self, plan_depth=self.plan_depth, plan_max_depth=self.plan_max_depth).maybe_plan_and_dispatch(task_text)
         except Exception:
             # 规划失败不影响主流程
             pass

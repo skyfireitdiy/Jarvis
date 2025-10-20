@@ -21,15 +21,25 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class TaskPlanner:
     """将 Agent 的任务规划逻辑封装为独立类，便于维护与复用。"""
 
-    def __init__(self, agent: Any) -> None:
+    def __init__(self, agent: Any, plan_depth: int = 0, plan_max_depth: int = 2) -> None:
         """
         参数:
             agent: 父Agent实例（须提供以下能力）
               - _create_temp_model(system_prompt: str) -> BasePlatform
               - _build_child_agent_params(name: str, description: str) -> dict
-              - name, session, plan, plan_depth, plan_max_depth 等属性
+              - name, session, plan 等属性
+            plan_depth: 当前规划深度（由外部在构造时传入）
+            plan_max_depth: 规划最大深度（由外部在构造时传入）
         """
         self.agent = agent
+        try:
+            self.plan_depth = int(plan_depth)
+        except Exception:
+            self.plan_depth = 0
+        try:
+            self.plan_max_depth = int(plan_max_depth)
+        except Exception:
+            self.plan_max_depth = 2
 
     def maybe_plan_and_dispatch(self, task_text: str) -> None:
         """
@@ -39,6 +49,22 @@ class TaskPlanner:
         - 将子任务与结果以结构化块写回到 agent.session.prompt，随后由主循环继续处理。
         """
         if not getattr(self.agent, "plan", False):
+            return
+
+        # 深度限制检查：当当前规划深度已达到或超过上限时，禁止继续规划
+        try:
+            current_depth = int(self.plan_depth)
+        except Exception:
+            current_depth = 0
+        try:
+            max_depth = int(self.plan_max_depth)
+        except Exception:
+            max_depth = 2
+
+        if current_depth >= max_depth:
+            PrettyOutput.print(
+                f"已达到任务规划最大深度({max_depth})，本层不再进行规划。", OutputType.INFO
+            )
             return
 
         try:
