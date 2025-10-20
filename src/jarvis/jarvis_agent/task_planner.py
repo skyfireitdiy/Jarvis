@@ -4,9 +4,9 @@ TaskPlanner: 任务规划与子任务调度器
 
 职责：
 - 判断是否需要拆分任务
-- 解析 <SUB_TASK> 列表
+- 解析 <PLAN> YAML 列表
 - 为每个子任务创建子Agent并执行
-- 汇总所有子任务执行结果并写回父Agent上下文
+- 汇总所有子任务执行结果并写回父Agent上下文（包含 <PLAN>/<SUB_TASK_RESULTS>/<RESULT_SUMMARY>）
 """
 
 from typing import Any, List
