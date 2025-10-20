@@ -6,6 +6,8 @@ import signal
 import subprocess
 import sys
 import time
+import atexit
+import errno
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from datetime import datetime, date
@@ -203,6 +205,130 @@ def _setup_signal_handler() -> None:
                 original_sigint(signum, frame)
 
     signal.signal(signal.SIGINT, sigint_handler)
+
+
+# ----------------------------
+# 单实例文件锁（放置于初始化早期使用）
+# ----------------------------
+_INSTANCE_LOCK_PATH: Optional[Path] = None
+
+
+def _get_instance_lock_path(lock_name: str = "instance.lock") -> Path:
+    try:
+        data_dir = Path(str(get_data_dir()))
+    except Exception:
+        data_dir = Path(os.path.expanduser("~/.jarvis"))
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir / lock_name
+
+
+def _read_lock_owner_pid(lock_path: Path) -> Optional[int]:
+    try:
+        txt = lock_path.read_text(encoding="utf-8", errors="ignore").strip()
+        if not txt:
+            return None
+        try:
+            info = json.loads(txt)
+            pid = info.get("pid")
+            return int(pid) if pid is not None else None
+        except Exception:
+            # 兼容纯数字PID
+            return int(txt)
+    except Exception:
+        return None
+
+
+def _is_process_alive(pid: int) -> bool:
+    if pid is None or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # 无权限但进程存在
+        return True
+    except OSError as e:
+        # 某些平台上，EPERM 表示进程存在但无权限
+        if getattr(e, "errno", None) == errno.EPERM:
+            return True
+        return False
+    else:
+        return True
+
+
+def _release_instance_lock() -> None:
+    global _INSTANCE_LOCK_PATH
+    try:
+        if _INSTANCE_LOCK_PATH and _INSTANCE_LOCK_PATH.exists():
+            _INSTANCE_LOCK_PATH.unlink()
+    except Exception:
+        # 清理失败不影响退出
+        pass
+    _INSTANCE_LOCK_PATH = None
+
+
+def _acquire_single_instance_lock(lock_name: str = "instance.lock") -> None:
+    """
+    在数据目录(~/.jarvis 或配置的数据目录)下创建实例锁，防止重复启动。
+    如果检测到已有存活实例，提示后退出。
+    """
+    global _INSTANCE_LOCK_PATH
+    lock_path = _get_instance_lock_path(lock_name)
+
+    # 已存在锁：检查是否为有效存活实例
+    if lock_path.exists():
+        pid = _read_lock_owner_pid(lock_path)
+        if pid and _is_process_alive(pid):
+            PrettyOutput.print(
+                f"检测到已有一个 Jarvis 实例正在运行 (PID: {pid})。\n"
+                f"如果确认不存在正在运行的实例，请删除锁文件后重试：{lock_path}",
+                OutputType.WARNING,
+            )
+            sys.exit(0)
+        # 尝试移除陈旧锁
+        try:
+            lock_path.unlink()
+        except Exception:
+            PrettyOutput.print(
+                f"无法删除旧锁文件：{lock_path}，请手动清理后重试。",
+                OutputType.ERROR,
+            )
+            sys.exit(1)
+
+    # 原子创建锁文件，避免并发竞争
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    try:
+        fd = os.open(str(lock_path), flags)
+        with os.fdopen(fd, "w", encoding="utf-8") as fp:
+            payload = {
+                "pid": os.getpid(),
+                "time": int(time.time()),
+                "argv": sys.argv[:10],
+            }
+            try:
+                fp.write(json.dumps(payload, ensure_ascii=False))
+            except Exception:
+                fp.write(str(os.getpid()))
+        _INSTANCE_LOCK_PATH = lock_path
+        atexit.register(_release_instance_lock)
+    except FileExistsError:
+        # 极端并发下再次校验
+        pid = _read_lock_owner_pid(lock_path)
+        if pid and _is_process_alive(pid):
+            PrettyOutput.print(
+                f"检测到已有一个 Jarvis 实例正在运行 (PID: {pid})。",
+                OutputType.WARNING,
+            )
+            sys.exit(0)
+        PrettyOutput.print(
+            f"锁文件已存在但可能为陈旧状态：{lock_path}，请手动删除后重试。",
+            OutputType.ERROR,
+        )
+        sys.exit(1)
+    except Exception as e:
+        PrettyOutput.print(f"创建实例锁失败: {e}", OutputType.ERROR)
+        sys.exit(1)
 
 
 def _check_pip_updates() -> bool:
