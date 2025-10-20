@@ -88,15 +88,15 @@ class TaskPlanner:
                             if s:
                                 subtasks.append(s)
                 else:
-                    PrettyOutput.print("任务规划警告：<PLAN> 内内容不是 YAML 列表，已忽略。", OutputType.WARNING)
+                    PrettyOutput.print("任务规划提示：无需拆分。", OutputType.INFO)
             except Exception as e:
-                PrettyOutput.print(f"任务规划警告：解析 <PLAN> YAML 失败：{e}", OutputType.WARNING)
+                PrettyOutput.print("任务规划提示：无需拆分。", OutputType.INFO)
         else:
-            PrettyOutput.print("任务规划提示：未检测到 <PLAN> 块，视为无需拆分。", OutputType.INFO)
+            PrettyOutput.print("任务规划提示：无需拆分。", OutputType.INFO)
 
         if not subtasks:
             # 无有效子任务，直接返回
-            PrettyOutput.print("任务规划警告：模型响应中未找到有效子任务。", OutputType.WARNING)
+            PrettyOutput.print("任务规划提示：无需拆分。", OutputType.INFO)
             return
 
         PrettyOutput.print(f"任务已拆分为 {len(subtasks)} 个子任务:", OutputType.SUCCESS)
