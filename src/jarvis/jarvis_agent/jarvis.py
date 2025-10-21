@@ -1053,10 +1053,11 @@ def run_cli(
         )
         agent = agent_manager.initialize()
         # CLI 开关：启用/禁用规划（不依赖 AgentManager 支持，直接设置 Agent 属性）
-        try:
-            agent.plan = bool(plan)
-        except Exception:
-            pass
+        if plan is not None:
+            try:
+                agent.plan = bool(plan)
+            except Exception:
+                pass
 
         if web:
             try:
