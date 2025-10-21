@@ -210,7 +210,7 @@ class ScriptTool:
 if __name__ == "__main__":
     script_tool = ScriptTool()
     PrettyOutput.print(
-        script_tool.get_display_output("/home/wangmaobin/code/Jarvis/a.txt"),
+        script_tool.get_display_output("/path/to/a.txt"),
         OutputType.CODE,
         lang="text",
     )

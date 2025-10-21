@@ -370,10 +370,30 @@ def handle_builtin_config_selector(
     """在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）。"""
     if is_enable_builtin_config_selector():
         try:
-            # 优先使用项目内置目录，若不存在则回退到指定的绝对路径
-            builtin_root = Path(__file__).resolve().parents[3] / "builtin"
-            if not builtin_root.exists():
-                builtin_root = Path("/home/skyfire/code/Jarvis/builtin")
+            # 查找可用的 builtin 目录（支持多候选）
+            builtin_dirs: List[Path] = []
+            try:
+                ancestors = list(Path(__file__).resolve().parents)
+                for anc in ancestors[:8]:
+                    p = anc / "builtin"
+                    if p.exists():
+                        builtin_dirs.append(p)
+            except Exception:
+                pass
+            # 去重，保留顺序
+            _seen = set()
+            _unique: List[Path] = []
+            for d in builtin_dirs:
+                try:
+                    key = str(d.resolve())
+                except Exception:
+                    key = str(d)
+                if key not in _seen:
+                    _seen.add(key)
+                    _unique.append(d)
+            builtin_dirs = _unique
+            # 向后兼容：保留第一个候选作为 builtin_root
+            builtin_root = builtin_dirs[0] if builtin_dirs else None  # type: ignore[assignment]
 
             categories = [
                 ("agent", "jarvis-agent", "*.yaml"),
@@ -414,8 +434,14 @@ def handle_builtin_config_selector(
                     # 忽略配置读取异常
                     pass
 
-                # 追加内置目录
-                search_dirs.append(builtin_root / cat)
+                # 追加内置目录（支持多个候选）
+                try:
+                    candidates = builtin_dirs if isinstance(builtin_dirs, list) and builtin_dirs else ([builtin_root] if builtin_root else [])
+                except Exception:
+                    candidates = ([builtin_root] if builtin_root else [])
+                for _bd in candidates:
+                    if _bd:
+                        search_dirs.append(Path(_bd) / cat)
 
                 # 去重并保留顺序
                 unique_dirs = []
@@ -429,11 +455,14 @@ def handle_builtin_config_selector(
                         seen.add(key)
                         unique_dirs.append(Path(d))
 
-                # 每日自动更新配置目录（如目录为Git仓库则执行git pull，每日仅一次）
+                # 可选调试输出：查看每类的搜索目录
                 try:
-                    jutils.daily_check_git_updates([str(p) for p in unique_dirs], cat)
+                    if os.environ.get("JARVIS_DEBUG_BUILTIN_SELECTOR") == "1":
+                        PrettyOutput.print(
+                            f"DEBUG: category={cat} search_dirs=" + ", ".join(str(p) for p in unique_dirs),
+                            OutputType.INFO,
+                        )
                 except Exception:
-                    # 忽略更新过程中的所有异常，避免影响主流程
                     pass
 
                 for dir_path in unique_dirs:
