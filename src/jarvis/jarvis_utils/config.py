@@ -742,18 +742,18 @@ def get_script_execution_timeout() -> int:
 def is_enable_git_repo_jca_switch() -> bool:
     """
     是否启用：在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）
-    默认关闭
+    默认开启
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_GIT_JCA_SWITCH", False) is True
+    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_GIT_JCA_SWITCH", True) is True
 
 
 def is_enable_builtin_config_selector() -> bool:
     """
     是否启用：在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择
-    默认关闭
+    默认开启
     """
     return (
-        GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR", False) is True
+        GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR", True) is True
     )
 
 
