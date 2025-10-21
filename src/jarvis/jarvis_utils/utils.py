@@ -464,14 +464,22 @@ def _check_jarvis_updates() -> bool:
     返回:
         bool: 是否需要重启进程
     """
-    script_dir = Path(os.path.dirname(os.path.dirname(__file__)))
+    # 从当前文件目录向上查找包含 .git 的仓库根目录，修复原先只检查 src/jarvis 的问题
+    try:
+        script_path = Path(__file__).resolve()
+        repo_root: Optional[Path] = None
+        for d in [script_path.parent] + list(script_path.parents):
+            if (d / ".git").exists():
+                repo_root = d
+                break
+    except Exception:
+        repo_root = None
 
-    # 先检查是否是git源码安装
-    git_dir = script_dir / ".git"
-    if git_dir.exists():
+    # 先检查是否是git源码安装（找到仓库根目录即认为是源码安装）
+    if repo_root and (repo_root / ".git").exists():
         from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
 
-        return check_and_update_git_repo(str(script_dir))
+        return check_and_update_git_repo(str(repo_root))
 
     # 检查是否是pip/uv pip安装的版本
     return _check_pip_updates()
