@@ -26,6 +26,7 @@ from jarvis.jarvis_utils.config import (
     get_git_check_mode,
     set_config,
     get_data_dir,
+    is_plan_enabled,
 )
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
