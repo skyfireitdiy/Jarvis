@@ -115,7 +115,7 @@ class CodeAgent:
             use_methodology=False,  # 禁用方法论
             use_analysis=False,  # 禁用分析
             non_interactive=self.non_interactive,
-            plan=bool(plan) if plan is not None else False,
+            plan=bool(plan) if plan is not None else is_plan_enabled(),
         )
 
         self.agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
