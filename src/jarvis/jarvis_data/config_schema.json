@@ -315,12 +315,12 @@
     "JARVIS_ENABLE_GIT_JCA_SWITCH": {
       "type": "boolean",
       "description": "在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）",
-      "default": false
+      "default": true
     },
     "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR": {
       "type": "boolean",
       "description": "在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择",
-      "default": false
+      "default": true
     },
     "JARVIS_IMMEDIATE_ABORT": {
       "type": "boolean",
