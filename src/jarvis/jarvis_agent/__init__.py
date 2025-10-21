@@ -77,6 +77,7 @@ from jarvis.jarvis_utils.config import (
     get_tool_filter_threshold,
     get_after_tool_call_cb_dirs,
     get_plan_max_depth,
+    is_plan_enabled,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
@@ -321,7 +322,7 @@ class Agent:
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
         non_interactive: Optional[bool] = None,
         in_multi_agent: Optional[bool] = None,
-        plan: bool = False,
+        plan: Optional[bool] = None,
         plan_max_depth: Optional[int] = None,
         plan_depth: int = 0,
         agent_type: str = "normal",
@@ -344,7 +345,7 @@ class Agent:
             force_save_memory: 是否强制保存记忆
             confirm_callback: 用户确认回调函数，签名为 (tip: str, default: bool) -> bool；默认使用CLI的user_confirm
             non_interactive: 是否以非交互模式运行（优先级最高，覆盖环境变量与配置）
-            plan: 是否启用任务规划与子任务拆分（默认 False；启用后在进入主循环前评估是否需要将任务拆分为 <SUB_TASK> 列表，逐一由子Agent执行并汇总结果）
+            plan: 是否启用任务规划与子任务拆分（默认从配置加载；启用后在进入主循环前评估是否需要将任务拆分为 <SUB_TASK> 列表，逐一由子Agent执行并汇总结果）
             plan_max_depth: 任务规划的最大层数（默认3，可通过配置 JARVIS_PLAN_MAX_DEPTH 或入参覆盖）
             plan_depth: 当前规划层数（内部用于递归控制，子Agent会在父基础上+1）
         """
@@ -370,7 +371,8 @@ class Agent:
         self.non_interactive = non_interactive
         # 多智能体运行标志：用于控制非交互模式下的自动完成行为
         self.in_multi_agent = bool(in_multi_agent)
-        self.plan = bool(plan)
+        # 任务规划：优先使用入参，否则回退到配置
+        self.plan = bool(plan) if plan is not None else is_plan_enabled()
         # 规划深度与上限
         try:
             self.plan_max_depth = (

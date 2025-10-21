@@ -713,6 +713,16 @@ def get_plan_max_depth() -> int:
         return 2
 
 
+def is_plan_enabled() -> bool:
+    """
+    获取是否默认启用任务规划。
+
+    返回:
+        bool: 如果启用任务规划则返回True，默认为False
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_PLAN_ENABLED", False) is True
+
+
 def get_auto_summary_rounds() -> int:
     """
     获取基于对话轮次的自动总结阈值。
