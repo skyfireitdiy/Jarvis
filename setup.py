@@ -38,6 +38,7 @@ setup(
         "typer",
         "plotext==5.2.8",
         "packaging",
+        "clang",
     ],
     extras_require={
         "dev": ["pytest", "ruff", "mypy", "build", "twine"],
@@ -86,6 +87,8 @@ setup(
             "jst=jarvis.jarvis_stats.cli:main",
             "jarvis-sec=jarvis.jarvis_sec.cli:main",
             "jsec=jarvis.jarvis_sec.cli:main",
+            "jarvis-c2rust-scan=jarvis.jarvis_c2rust.scanner:main",
+            "jcs=jarvis.jarvis_c2rust.scanner:main",
         ],
     },
     python_requires=">=3.9,<3.13",
