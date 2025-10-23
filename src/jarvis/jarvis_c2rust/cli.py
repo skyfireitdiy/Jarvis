@@ -3,7 +3,7 @@
 C2Rust 独立命令行入口。
 
 提供分组式 CLI，将扫描能力作为子命令 scan 暴露：
-  - jarvis-c2rust scan --root <path> [--db ...] [--dot ...] [--only-dot] [--subgraphs-dir ...] [--only-subgraphs] [--png]
+  - jarvis-c2rust scan --root <path> [--dot ...] [--only-dot] [--subgraphs-dir ...] [--only-subgraphs] [--png]
 
 实现策略：
 - 复用 scanner.cli 的核心逻辑，避免重复代码。
@@ -46,7 +46,7 @@ def scan(
     only_dot: bool = typer.Option(
         False,
         "--only-dot",
-        help="Do not rescan. Read existing DB and only generate DOT (requires --dot)",
+        help="Do not rescan. Read existing data (JSONL) and only generate DOT (requires --dot)",
     ),
     subgraphs_dir: Optional[Path] = typer.Option(
         None,
@@ -89,8 +89,8 @@ def llm_plan(
 ) -> None:
     """
     使用 LLM Agent 基于根函数子图规划 Rust crate 模块结构，输出 YAML
-    需先执行: jarvis-c2rust scan 以生成数据库
-    默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.db 读取数据库
+    需先执行: jarvis-c2rust scan 以生成数据文件（functions.jsonl 与 types.jsonl）
+    默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.jsonl 读取数据
     """
     try:
         entries = _execute_llm_plan(out=out, apply=apply, crate_name=crate_name)
