@@ -32,13 +32,6 @@ def _root():
 
 @app.command("scan")
 def scan(
-    root: Path = typer.Option(..., "--root", "-r", help="Directory to scan"),
-    db: Optional[Path] = typer.Option(
-        None,
-        "--db",
-        "-d",
-        help="Output sqlite db path (default: <root>/.jarvis/c2rust/functions.db)",
-    ),
     dot: Optional[Path] = typer.Option(
         None,
         "--dot",
@@ -69,8 +62,6 @@ def scan(
     进行 C/C++ 函数扫描并可选生成调用关系 DOT 图
     """
     _run_scan(
-        root=root,
-        db=db,
         dot=dot,
         only_dot=only_dot,
         subgraphs_dir=subgraphs_dir,
