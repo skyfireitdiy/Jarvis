@@ -11,6 +11,7 @@ from jarvis.jarvis_utils.utils import init_env
 app = typer.Typer(help="Jarvis 工具系统命令行界面")
 
 
+
 @app.command("list")
 def list_tools(
     as_json: bool = typer.Option(False, "--json", help="以JSON格式输出"),
