@@ -78,7 +78,7 @@ def _try_import_libclang() -> "clang.cindex":
     try:
         import clang as _clang  # type: ignore
         import re as _re
-        v = getattr(_clang, "__version__", "")
+        v = getattr(_clang, "__version__", None)
         if v:
             m = _re.match(r"(\d+)", str(v))
             if m:
@@ -86,7 +86,8 @@ def _try_import_libclang() -> "clang.cindex":
     except Exception:
         py_major = None
 
-    if py_major is None or py_major != 18:
+    # If version is known and not 18, fail; if unknown (None), proceed and rely on libclang probing
+    if py_major is not None and py_major != 18:
         raise RuntimeError(
             "Python 'clang' bindings must be version 18.x for this tool.\n"
             "Fix:\n"
@@ -946,34 +947,230 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
     conn.close()
 
 
-def cli(
-    root: Path = typer.Option(..., "--root", "-r", help="Directory to scan"),
-    db: Optional[Path] = typer.Option(
-        None,
-        "--db",
-        "-d",
-        help="Output sqlite db path (default: <root>/.jarvis/c2rust/functions.db)",
-    ),
-    dot: Optional[Path] = typer.Option(
-        None,
-        "--dot",
-        help="Write call dependency graph to DOT file after scanning (or with --only-dot)",
-    ),
-    only_dot: bool = typer.Option(
-        False,
-        "--only-dot",
-        help="Do not rescan. Read existing DB and only generate DOT (requires --dot)",
-    ),
+def find_root_function_ids(db_path: Path) -> List[int]:
+    """
+    Find all 'root' functions in the database: functions that have no callers within the DB.
+    A function is considered internal if it appears in the 'functions' table. To match calls,
+    both qualified_name and name are considered.
+    Returns a sorted list of function IDs.
+    """
+    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+    rows = cur.execute("SELECT id, name, qualified_name, calls_json FROM functions").fetchall()
+
+    name_to_id: Dict[str, int] = {}
+    all_ids: Set[int] = set()
+    for fid, name, qname, _ in rows:
+        fid = int(fid)
+        all_ids.add(fid)
+        if isinstance(name, str) and name:
+            name_to_id.setdefault(name, fid)
+        if isinstance(qname, str) and qname:
+            name_to_id.setdefault(qname, fid)
+
+    non_roots: Set[int] = set()
+    for fid, _name, _qname, calls_json in rows:
+        fid = int(fid)
+        try:
+            calls = json.loads(calls_json or "[]")
+            if not isinstance(calls, list):
+                calls = []
+        except Exception:
+            calls = []
+        for callee in calls:
+            if not isinstance(callee, str) or not callee:
+                continue
+            callee_id = name_to_id.get(callee)
+            if callee_id is not None and callee_id != fid:
+                non_roots.add(callee_id)
+
+    conn.close()
+    root_ids = sorted(list(all_ids - non_roots))
+    return root_ids
+
+
+def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
+    """
+    Generate a DOT subgraph file for each root function (no callers) into 'out_dir'.
+
+    Behavior:
+    - For each root function R, traverse outbound call edges to collect reachable internal functions.
+    - External callees (not present in DB) are rendered as dashed gray ellipse nodes.
+    - Internal functions are rendered as boxes with label "qualified_name\\nsignature" when available.
+
+    Returns:
+    - A list of generated dot file paths.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+    rows = cur.execute(
+        "SELECT id, name, qualified_name, signature, calls_json FROM functions"
+    ).fetchall()
+
+    # Build indices
+    by_id: Dict[int, Dict[str, str]] = {}
+    name_to_id: Dict[str, int] = {}
+    adj: Dict[int, List[str]] = {}
+
+    for fid, name, qname, signature, calls_json in rows:
+        fid = int(fid)
+        nm = name or ""
+        qn = qname or ""
+        sig = signature or ""
+        by_id[fid] = {"name": nm, "qname": qn, "sig": sig}
+
+        if nm:
+            name_to_id.setdefault(nm, fid)
+        if qn:
+            name_to_id.setdefault(qn, fid)
+
+        try:
+            calls = json.loads(calls_json or "[]")
+            if not isinstance(calls, list):
+                calls = []
+        except Exception:
+            calls = []
+        # Keep only string callees
+        adj[fid] = [c for c in calls if isinstance(c, str) and c]
+
+    def base_label(fid: int) -> str:
+        meta = by_id.get(fid, {})
+        base = meta.get("qname") or meta.get("name") or f"fn_{fid}"
+        sig = meta.get("sig") or ""
+        if sig and sig != base:
+            return f"{base}\\n{sig}"
+        return base
+
+    def sanitize_filename(s: str) -> str:
+        if not s:
+            return "root"
+        s = s.replace("::", "__")
+        return "".join(ch if ch.isalnum() or ch in ("_", "-") else "_" for ch in s)[:120]
+
+    generated: List[Path] = []
+    root_ids = find_root_function_ids(db_path)
+
+    for rid in root_ids:
+        # BFS/DFS over internal calls from the root
+        visited: Set[int] = set()
+        stack: List[int] = [rid]
+        visited.add(rid)
+        while stack:
+            src = stack.pop()
+            for callee in adj.get(src, []):
+                cid = name_to_id.get(callee)
+                if cid is not None and cid not in visited:
+                    visited.add(cid)
+                    stack.append(cid)
+
+        # Build nodes and edges for this subgraph
+        node_labels: Dict[str, str] = {}
+        external_nodes: Dict[str, str] = {}
+        ext_count = 0
+        edges = set()
+
+        id_to_node = {fid: f"f{fid}" for fid in visited}
+
+        # Internal nodes
+        for fid in visited:
+            node_labels[id_to_node[fid]] = base_label(fid)
+
+        # Edges (internal -> internal/external)
+        for src in visited:
+            src_node = id_to_node[src]
+            for callee in adj.get(src, []):
+                cid = name_to_id.get(callee)
+                if cid is not None and cid in visited:
+                    edges.add((src_node, id_to_node[cid]))
+                else:
+                    dst = external_nodes.get(callee)
+                    if dst is None:
+                        dst = f"ext{ext_count}"
+                        ext_count += 1
+                        external_nodes[callee] = dst
+                        node_labels[dst] = callee
+                    edges.add((src_node, dst))
+
+        # Write DOT
+        root_base = by_id.get(rid, {}).get("qname") or by_id.get(rid, {}).get("name") or f"fn_{rid}"
+        fname = f"subgraph_root_{rid}_{sanitize_filename(root_base)}.dot"
+        out_path = out_dir / fname
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write("digraph callgraph_sub {\n")
+            f.write("  rankdir=LR;\n")
+            f.write("  graph [fontsize=10];\n")
+            f.write("  node  [fontsize=10];\n")
+            f.write("  edge  [fontsize=9];\n")
+
+            # Emit nodes
+            for nid, lbl in node_labels.items():
+                safe_label = lbl.replace("\\", "\\\\").replace('"', '\\"')
+                if nid.startswith("ext"):
+                    f.write(f'  {nid} [label="{safe_label}", shape=ellipse, style=dashed, color=gray50, fontcolor=gray30];\n')
+                else:
+                    f.write(f'  {nid} [label="{safe_label}", shape=box];\n')
+
+            # Emit edges
+            for s, d in sorted(edges):
+                f.write(f"  {s} -> {d};\n")
+
+            f.write("}\n")
+
+        generated.append(out_path)
+
+    conn.close()
+    return generated
+
+
+def run_scan(
+    root: Path,
+    db: Optional[Path] = None,
+    dot: Optional[Path] = None,
+    only_dot: bool = False,
+    subgraphs_dir: Optional[Path] = None,
+    only_subgraphs: bool = False,
+    png: bool = False,
 ) -> None:
     """
     Scan a directory for C/C++ functions and store results into SQLite.
-    Optionally, generate a DOT call graph from the database.
+    Optionally, generate:
+    - a global DOT call graph (--dot)
+    - per-root subgraphs as individual DOT files (--subgraphs-dir)
+    Use --only-dot / --only-subgraphs to skip scanning and generate from existing DB.
     """
     # Determine effective DB path
     default_db = Path(root) / ".jarvis" / "c2rust" / "functions.db"
     db_path = db if db else default_db
 
-    if not only_dot:
+    # Helper: render a DOT file to PNG using Graphviz 'dot'
+    def _render_dot_to_png(dot_file: Path, png_out: Optional[Path] = None) -> Path:
+        try:
+            from shutil import which
+            import subprocess
+        except Exception as _e:
+            raise RuntimeError(f"Environment issue while preparing PNG rendering: {_e}")
+        exe = which("dot")
+        if not exe:
+            raise RuntimeError("Graphviz 'dot' not found in PATH. Please install graphviz and ensure 'dot' is available.")
+        dot_file = Path(dot_file)
+        if png_out is None:
+            png_out = dot_file.with_suffix(".png")
+        else:
+            png_out = Path(png_out)
+        png_out.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            subprocess.run([exe, "-Tpng", str(dot_file), "-o", str(png_out)], check=True)
+        except FileNotFoundError:
+            raise RuntimeError("Graphviz 'dot' executable not found.")
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"'dot' failed to render PNG for {dot_file}: {e}")
+        return png_out
+
+    if not (only_dot or only_subgraphs):
+        # Scan mode
         if not root.exists():
             typer.secho(f"Root path does not exist: {root}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
@@ -983,21 +1180,53 @@ def cli(
             typer.secho(f"[c2rust-scanner] Error: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
     else:
-        # Only generate DOT from existing DB
-        if dot is None:
-            typer.secho("[c2rust-scanner] --only-dot requires --dot to specify output file", fg=typer.colors.RED, err=True)
-            raise typer.Exit(code=2)
+        # Only-generate mode (no rescan)
         if not db_path.exists():
             typer.secho(f"[c2rust-scanner] Database not found: {db_path}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
+        if only_dot and dot is None:
+            typer.secho("[c2rust-scanner] --only-dot requires --dot to specify output file", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=2)
+        if only_subgraphs and subgraphs_dir is None:
+            typer.secho("[c2rust-scanner] --only-subgraphs requires --subgraphs-dir to specify output directory", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=2)
 
-    # Generate DOT if requested
+    # Generate DOT (global) if requested
     if dot is not None:
         try:
             generate_dot_from_db(db_path, dot)
             typer.secho(f"[c2rust-scanner] DOT written: {dot}", fg=typer.colors.GREEN)
+            if png:
+                png_path = _render_dot_to_png(dot)
+                typer.secho(f"[c2rust-scanner] PNG written: {png_path}", fg=typer.colors.GREEN)
         except Exception as e:
-            typer.secho(f"[c2rust-scanner] Failed to write DOT: {e}", fg=typer.colors.RED, err=True)
+            typer.secho(f"[c2rust-scanner] Failed to write DOT/PNG: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1)
+
+    # Generate per-root subgraphs if requested
+    if subgraphs_dir is not None:
+        try:
+            files = export_root_subgraphs_to_dir(db_path, subgraphs_dir)
+            if png:
+                png_count = 0
+                for dp in files:
+                    try:
+                        _render_dot_to_png(dp)
+                        png_count += 1
+                    except Exception as _e:
+                        # Fail fast on PNG generation error for subgraphs to make issues visible
+                        raise
+                typer.secho(
+                    f"[c2rust-scanner] Root subgraphs written: {len(files)} DOTs and {png_count} PNGs -> {subgraphs_dir}",
+                    fg=typer.colors.GREEN,
+                )
+            else:
+                typer.secho(
+                    f"[c2rust-scanner] Root subgraphs written: {len(files)} files -> {subgraphs_dir}",
+                    fg=typer.colors.GREEN,
+                )
+        except Exception as e:
+            typer.secho(f"[c2rust-scanner] Failed to write subgraph DOTs/PNGs: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
 
 

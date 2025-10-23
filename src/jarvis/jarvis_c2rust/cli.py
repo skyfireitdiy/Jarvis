@@ -3,7 +3,7 @@
 C2Rust 独立命令行入口。
 
 提供分组式 CLI，将扫描能力作为子命令 scan 暴露：
-  - jarvis-c2rust scan --root <path> [--db ...] [--dot ...] [--only-dot]
+  - jarvis-c2rust scan --root <path> [--db ...] [--dot ...] [--only-dot] [--subgraphs-dir ...] [--only-subgraphs] [--png]
 
 实现策略：
 - 复用 scanner.cli 的核心逻辑，避免重复代码。
@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 import typer
-from jarvis.jarvis_c2rust.scanner import cli as _scan_cli
+from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
 
 app = typer.Typer(help="C2Rust 命令行工具")
 
@@ -49,11 +49,34 @@ def scan(
         "--only-dot",
         help="Do not rescan. Read existing DB and only generate DOT (requires --dot)",
     ),
+    subgraphs_dir: Optional[Path] = typer.Option(
+        None,
+        "--subgraphs-dir",
+        help="Directory to write per-root subgraph DOT files (one file per root function)",
+    ),
+    only_subgraphs: bool = typer.Option(
+        False,
+        "--only-subgraphs",
+        help="Do not rescan. Only generate per-root subgraph DOT files (requires --subgraphs-dir)",
+    ),
+    png: bool = typer.Option(
+        False,
+        "--png",
+        help="Also render PNG images for generated DOT files using Graphviz 'dot'",
+    ),
 ) -> None:
     """
     进行 C/C++ 函数扫描并可选生成调用关系 DOT 图
     """
-    _scan_cli(root=root, db=db, dot=dot, only_dot=only_dot)
+    _run_scan(
+        root=root,
+        db=db,
+        dot=dot,
+        only_dot=only_dot,
+        subgraphs_dir=subgraphs_dir,
+        only_subgraphs=only_subgraphs,
+        png=png,
+    )
 
 
 def main() -> None:
