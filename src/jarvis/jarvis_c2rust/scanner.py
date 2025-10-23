@@ -1126,8 +1126,6 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
 
 
 def run_scan(
-    root: Path,
-    db: Optional[Path] = None,
     dot: Optional[Path] = None,
     only_dot: bool = False,
     subgraphs_dir: Optional[Path] = None,
@@ -1142,7 +1140,8 @@ def run_scan(
     Use --only-dot / --only-subgraphs to skip scanning and generate from existing DB.
     """
     # Determine effective DB path
-    default_db = Path(root) / ".jarvis" / "c2rust" / "functions.db"
+    root = Path('.')
+    default_db = Path('.') / ".jarvis" / "c2rust" / "functions.db"
     db_path = db if db else default_db
 
     # Helper: render a DOT file to PNG using Graphviz 'dot'
@@ -1170,10 +1169,6 @@ def run_scan(
         return png_out
 
     if not (only_dot or only_subgraphs):
-        # Scan mode
-        if not root.exists():
-            typer.secho(f"Root path does not exist: {root}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(code=2)
         try:
             scan_directory(root, db_path)
         except Exception as e:
