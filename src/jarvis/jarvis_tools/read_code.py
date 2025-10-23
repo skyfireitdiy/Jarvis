@@ -150,6 +150,7 @@ class ReadCodeTool:
 
             all_outputs = []
             overall_success = True
+            status_lines = []
 
             for file_info in args["files"]:
                 if not isinstance(file_info, dict) or "path" not in file_info:
@@ -164,16 +165,17 @@ class ReadCodeTool:
 
                 if result["success"]:
                     all_outputs.append(result["stdout"])
+                    status_lines.append(f"✅ {file_info['path']} 文件读取成功")
                 else:
                     all_outputs.append(f"❌ {file_info['path']}: {result['stderr']}")
+                    status_lines.append(f"❌ {file_info['path']} 文件读取失败")
                     overall_success = False
 
             stdout_text = "\n".join(all_outputs)
-            # 打印读取内容，以及单行状态提示（成功/失败），使用emoji前缀
+            # 仅打印每个文件的读取状态，不打印具体内容
             try:
-                if stdout_text:
-                    print(stdout_text, end="" if stdout_text.endswith("\n") else "\n")
-                print("✅ 读取成功" if overall_success else "❌ 读取失败")
+                if status_lines:
+                    print("\n".join(status_lines), end="\n")
             except Exception:
                 pass
             return {
