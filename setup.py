@@ -58,6 +58,7 @@ setup(
         "clang18": ["clang==18.*"],
         "clang19": ["clang==19.*"],
         "clang20": ["clang==20.*"],
+        "clang21": ["clang==21.*"],
     },
     entry_points={
         "console_scripts": [
