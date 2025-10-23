@@ -17,7 +17,7 @@ from typing import Optional
 
 import typer
 from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
-
+from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_c2rust.llm_module_agent import plan_crate_yaml_llm as _plan_crate_yaml_llm
 
 app = typer.Typer(help="C2Rust 命令行工具")
@@ -29,6 +29,7 @@ def _root():
     C2Rust 命令行工具
     """
     # 不做任何处理，仅作为命令组的占位，使 'scan' 作为子命令出现
+    init_env("欢迎使用 Jarvis C2Rust 工具")
     pass
 
 
@@ -76,19 +77,14 @@ def llm_plan(
     out: Optional[Path] = typer.Option(
         None, "--out", help="Write LLM-generated Rust crate plan (YAML) to file (default: stdout)"
     ),
-    db: Optional[Path] = typer.Option(
-        None, "--db", help="Path to functions.db (default: <root>/.jarvis/c2rust/functions.db)"
-    ),
-    root: Path = typer.Option(
-        Path("."), "--root", "-r", help="Project root directory (default: current directory)"
-    ),
 ) -> None:
     """
     使用 LLM Agent 基于根函数子图规划 Rust crate 模块结构，输出 YAML
     需先执行: jarvis-c2rust scan 以生成数据库
+    默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.db 读取数据库
     """
     try:
-        yaml_text = _plan_crate_yaml_llm(project_root=root, db_path=db)
+        yaml_text = _plan_crate_yaml_llm()
         if out is None:
             typer.echo(yaml_text)
         else:
