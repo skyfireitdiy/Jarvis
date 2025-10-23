@@ -280,15 +280,18 @@ class LLMRustCratePlannerAgent:
 输出规范：
 - 只输出一个 <PROJECT> 块
 - 块外不得有任何字符（包括空行、注释、Markdown 等）
-- 块内必须是 YAML 列表，目录项使用 '<name>/' 键，值为其子项列表；文件为字符串
-- 示例（仅供理解，实际请输出项目真实结构）：
+- 块内必须是 YAML 列表：
+  - 目录项使用 '<name>/' 作为键，并在后面加冒号 ':'，其值为子项列表
+  - 文件为字符串项（例如 'lib.rs'）
+- 正确示例（标准 YAML，带冒号）：
   <PROJECT>
   - Cargo.toml
-  - src/
+  - src/:
     - lib.rs
-    - cli/
+    - cli/:
+      - mod.rs
       - main.rs
-    - database/
+    - database/:
       - mod.rs
       - connect.rs
   </PROJECT>
@@ -361,10 +364,14 @@ def _parse_project_yaml_entries(yaml_text: str) -> List[Any]:
     """
     使用 PyYAML 解析 <PROJECT> 块中的目录结构 YAML 为列表结构:
     - 文件项: 字符串，如 "lib.rs"
-    - 目录项: 字典，形如 {"src": [ ... ]}
+    - 目录项: 字典，形如 {"src/": [ ... ]} 或 {"src": [ ... ]}
+    仅支持标准 YAML（目录为映射，带冒号），不再支持非 YAML 的无冒号格式。
     """
     import yaml  # type: ignore
-    data = yaml.safe_load(yaml_text)
+    try:
+        data = yaml.safe_load(yaml_text)
+    except Exception:
+        return []
     return data if isinstance(data, list) else []
 
 
@@ -494,7 +501,7 @@ def _ensure_cargo_toml(base_dir: Path, package_name: str) -> None:
     content = f"""[package]
 name = "{package_name}"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 """
