@@ -43,8 +43,7 @@ dependencies = [
     "typer",
     "pathspec",
     "plotext==5.2.8",
-    "packaging>=24.2",
-    "clang==18.*",
+    "packaging>=24.2"
 ]
 requires-python = ">=3.9,<3.13"
 
@@ -61,6 +60,11 @@ rag = [
     "unstructured[md]",
     "rank-bm25",
 ]
+clang16 = ["clang==16.*"]
+clang17 = ["clang==17.*"]
+clang18 = ["clang==18.*"]
+clang19 = ["clang==19.*"]
+clang20 = ["clang==20.*"]
 
 [project.urls]
 Homepage = "https://github.com/skyfireitdiy/Jarvis"
