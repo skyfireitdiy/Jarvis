@@ -839,9 +839,45 @@ def execute_llm_plan(
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(created_dir))
+            # 先运行一次 CodeAgent（初始化与基本配置）
             agent = CodeAgent(need_summary=False, non_interactive=True, plan=False)
             agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
-            print("[c2rust-llm-planner] Cargo.toml updated by CodeAgent.")
+            print("[c2rust-llm-planner] Initial CodeAgent run completed.")
+
+            # 进入构建与修复循环：构建失败则生成新的 CodeAgent，携带错误上下文进行最小修复
+            iter_count = 0
+            while True:
+                iter_count += 1
+                build_res = subprocess.run(
+                    ["cargo", "build"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                stdout = build_res.stdout or ""
+                stderr = build_res.stderr or ""
+                output = (stdout + "\n" + stderr).strip()
+
+                if build_res.returncode == 0:
+                    print("[c2rust-llm-planner] Cargo build succeeded.")
+                    break
+
+                print(f"[c2rust-llm-planner] Cargo build failed (iter={iter_count}).")
+                # 打印编译错误输出，便于可视化与调试
+                print("[c2rust-llm-planner] Build error output:")
+                print(output)
+                # 将错误信息作为上下文，附加修复原则，生成新的 CodeAgent 进行最小修复
+                repair_prompt = "\n".join([
+                    requirement_text,
+                    "",
+                    "请根据以下构建错误进行最小化修复，然后再次执行 `cargo build` 验证：",
+                    "<BUILD_ERROR>",
+                    output,
+                    "</BUILD_ERROR>",
+                ])
+
+                repair_agent = CodeAgent(need_summary=False, non_interactive=True, plan=False)
+                repair_agent.run(repair_prompt, prefix=f"[c2rust-llm-planner][iter={iter_count}]", suffix="")
         finally:
             os.chdir(prev_cwd)
 
