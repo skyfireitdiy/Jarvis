@@ -18,6 +18,8 @@ from typing import Optional
 import typer
 from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
 
+from jarvis.jarvis_c2rust.llm_module_agent import plan_crate_yaml_llm as _plan_crate_yaml_llm
+
 app = typer.Typer(help="C2Rust 命令行工具")
 
 # 显式定义根回调，确保为命令组而非单函数入口
@@ -69,6 +71,33 @@ def scan(
         png=png,
     )
 
+@app.command("plan")
+def llm_plan(
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write LLM-generated Rust crate plan (YAML) to file (default: stdout)"
+    ),
+    db: Optional[Path] = typer.Option(
+        None, "--db", help="Path to functions.db (default: <root>/.jarvis/c2rust/functions.db)"
+    ),
+    root: Path = typer.Option(
+        Path("."), "--root", "-r", help="Project root directory (default: current directory)"
+    ),
+) -> None:
+    """
+    使用 LLM Agent 基于根函数子图规划 Rust crate 模块结构，输出 YAML
+    需先执行: jarvis-c2rust scan 以生成数据库
+    """
+    try:
+        yaml_text = _plan_crate_yaml_llm(project_root=root, db_path=db)
+        if out is None:
+            typer.echo(yaml_text)
+        else:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(yaml_text, encoding="utf-8")
+            typer.secho(f"[c2rust-llm-planner] YAML written: {out}", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"[c2rust-llm-planner] Error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
 
 def main() -> None:
     """主入口"""
