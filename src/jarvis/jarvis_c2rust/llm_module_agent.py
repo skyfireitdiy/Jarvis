@@ -264,6 +264,11 @@ class LLMRustCratePlannerAgent:
             "- 命名规范：目录/文件采用小写下划线；模块名简洁可读，避免特殊字符与过长名称。\n"
             "- 可演进性：模块粒度适中，保留扩展点，便于后续重构与逐步替换遗留代码。\n"
             "- 模块组织：每个目录的 mod.rs 声明其子目录与 .rs 子模块；顶层 lib.rs 汇聚导出主要模块与公共能力。\n"
+            "- 入口约定：按需生成可执行与库入口：\n"
+            "  * 仅库：包含 src/lib.rs，不要生成 main.rs；\n"
+            "  * 单一可执行：包含 src/main.rs，公共逻辑抽到 src/lib.rs（如需要复用）；\n"
+            "  * 多可执行：使用 src/bin/<name>.rs 为每个二进制入口；共享代码放在 src/lib.rs；\n"
+            "- 二进制命名：<name> 使用小写下划线，体现入口意图，避免与模块/文件重名。\n"
         )
 
     def _build_summary_prompt(self, roots_context: List[Dict[str, Any]]) -> str:
@@ -283,19 +288,23 @@ class LLMRustCratePlannerAgent:
 - 块内必须是 YAML 列表：
   - 目录项使用 '<name>/' 作为键，并在后面加冒号 ':'，其值为子项列表
   - 文件为字符串项（例如 'lib.rs'）
+- 入口约定（按需）：
+  - 仅库：必须包含 src/lib.rs，不要包含 src/main.rs
+  - 单一可执行：包含 src/main.rs；可选包含 src/lib.rs 以沉淀共享逻辑
+  - 多可执行：使用 src/bin/<name>.rs 为多个二进制入口；共享代码放在 src/lib.rs
+  - 不要创建与入口无关的占位 main.rs 或冗余文件
 - 正确示例（标准 YAML，带冒号）：
   <PROJECT>
   - Cargo.toml
   - src/:
     - lib.rs
-    - cli/:
-      - mod.rs
-      - main.rs
+    - bin/:
+      - cli.rs
     - database/:
       - mod.rs
       - connect.rs
   </PROJECT>
-""".strip()
+        """.strip()
         return f"""
 请基于之前对话中已提供的<context>信息，生成总结输出（项目目录结构的 YAML）。严格遵循以下要求：
 
@@ -353,6 +362,35 @@ class LLMRustCratePlannerAgent:
         yaml_entries = _parse_project_yaml_entries(yaml_text)
         return yaml_entries
 
+    def plan_crate_yaml_text(self) -> str:
+        """
+        执行主流程但返回原始 <PROJECT> YAML 文本，不进行解析。
+        便于后续按原样应用目录结构，避免早期解析失败导致信息丢失。
+        """
+        roots = find_root_function_ids(self.db_path)
+        roots_ctx = self.loader.build_roots_context(roots)
+
+        system_prompt = self._build_system_prompt()
+        user_prompt = self._build_user_prompt(roots_ctx)
+        summary_prompt = self._build_summary_prompt(roots_ctx)
+
+        agent = Agent(
+            system_prompt=system_prompt,
+            name="C2Rust-LLM-Module-Planner",
+            summary_prompt=summary_prompt,
+            need_summary=True,
+            auto_complete=True,
+            use_tools=[],        # 禁用工具，避免干扰
+            plan=False,          # 关闭内置任务规划
+            non_interactive=True, # 非交互
+            use_methodology=False,
+            use_analysis=False,
+        )
+        summary_output = agent.run(user_prompt)  # type: ignore
+        project_text = str(summary_output) if summary_output is not None else ""
+        yaml_text = self._extract_yaml_from_project(project_text)
+        return yaml_text
+
     def plan_crate_yaml(self) -> List[Any]:
         """
         返回解析后的 YAML 对象（列表）
@@ -360,19 +398,77 @@ class LLMRustCratePlannerAgent:
         return self.plan_crate_yaml_with_project()
 
 
+def _parse_project_yaml_entries_fallback(yaml_text: str) -> List[Any]:
+    """
+    Fallback 解析器：当 PyYAML 不可用或解析失败时，按约定的缩进/列表语法解析 <PROJECT> 块。
+    支持的子集：
+    - 列表项以 "- " 开头
+    - 目录项以 "- <name>/:", 其子项为下一层缩进（+2 空格）的列表
+    - 文件项为 "- <filename>"
+    """
+    def leading_spaces(s: str) -> int:
+        return len(s) - len(s.lstrip(" "))
+
+    lines = [ln.rstrip() for ln in str(yaml_text or "").splitlines()]
+    idx = 0
+    n = len(lines)
+
+    # 跳过非列表起始行
+    while idx < n and not lines[idx].lstrip().startswith("- "):
+        idx += 1
+
+    def parse_list(expected_indent: int) -> List[Any]:
+        nonlocal idx
+        items: List[Any] = []
+        while idx < n:
+            line = lines[idx]
+            if not line.strip():
+                idx += 1
+                continue
+            indent = leading_spaces(line)
+            if indent < expected_indent:
+                break
+            if not line.lstrip().startswith("- "):
+                break
+
+            # 去掉 "- "
+            content = line[indent + 2 :].strip()
+
+            # 目录项：以 ":" 结尾（形如 "src/:"）
+            if content.endswith(":"):
+                key = content[:-1].strip()
+                idx += 1  # 消费当前目录行
+                children = parse_list(expected_indent + 2)
+                # 规范化目录键为以 "/" 结尾（apply 时会 rstrip("/")，二者均可）
+                if not str(key).endswith("/"):
+                    key = f"{str(key).rstrip('/')}/"
+                items.append({key: children})
+            else:
+                # 文件项
+                items.append(content)
+                idx += 1
+        return items
+
+    base_indent = leading_spaces(lines[idx]) if idx < n else 0
+    return parse_list(base_indent)
+
+
 def _parse_project_yaml_entries(yaml_text: str) -> List[Any]:
     """
     使用 PyYAML 解析 <PROJECT> 块中的目录结构 YAML 为列表结构:
     - 文件项: 字符串，如 "lib.rs"
     - 目录项: 字典，形如 {"src/": [ ... ]} 或 {"src": [ ... ]}
-    仅支持标准 YAML（目录为映射，带冒号），不再支持非 YAML 的无冒号格式。
+    优先使用 PyYAML；若不可用或解析失败，则回退到轻量解析器以最大化兼容性。
     """
-    import yaml  # type: ignore
     try:
+        import yaml  # type: ignore
         data = yaml.safe_load(yaml_text)
+        if isinstance(data, list):
+            return data
     except Exception:
-        return []
-    return data if isinstance(data, list) else []
+        pass
+    # Fallback
+    return _parse_project_yaml_entries_fallback(yaml_text)
 
 
 def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
@@ -516,6 +612,9 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     - project_root: 目标应用路径；当为 "."（默认）时，将使用“父目录/当前目录名-rs”作为crate根目录
     """
     entries = _parse_project_yaml_entries(yaml_text)
+    if not entries:
+        # 严格模式：解析失败直接报错并退出，由上层 CLI 捕获打印错误
+        raise ValueError("[c2rust-llm-planner] Failed to parse directory structure from LLM output. Aborting.")
     requested_root = Path(project_root).resolve()
     try:
         cwd = Path(".").resolve()
@@ -533,6 +632,18 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     # 确保 Cargo.toml 存在并设置包名
     _ensure_cargo_toml(base_dir, crate_pkg_name)
 
+def plan_crate_yaml_text(
+    project_root: Union[Path, str] = ".",
+    db_path: Optional[Union[Path, str]] = None,
+) -> str:
+    """
+    返回 LLM 生成的目录结构原始 YAML 文本（来自 <PROJECT> 块）。
+    不进行解析，便于后续按原样应用并在需要时使用更健壮的解析器处理。
+    """
+    agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
+    return agent.plan_crate_yaml_text()
+
+
 def plan_crate_yaml_llm(
     project_root: Union[Path, str] = ".",
     db_path: Optional[Union[Path, str]] = None,
@@ -543,3 +654,156 @@ def plan_crate_yaml_llm(
     """
     agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
     return agent.plan_crate_yaml_with_project()
+
+
+def entries_to_yaml(entries: List[Any]) -> str:
+    """
+    将解析后的 entries 列表序列化为 YAML 文本（目录使用 'name/:' 形式，文件为字符串）
+    """
+    def _entries_to_yaml(items, indent=0):
+        lines: List[str] = []
+        for it in (items or []):
+            if isinstance(it, str):
+                lines.append("  " * indent + f"- {it}")
+            elif isinstance(it, dict) and len(it) == 1:
+                name, children = next(iter(it.items()))
+                name = str(name).rstrip("/")
+                lines.append("  " * indent + f"- {name}/:")
+                lines.extend(_entries_to_yaml(children or [], indent + 1))
+        return lines
+
+    return "\n".join(_entries_to_yaml(entries))
+
+
+def execute_llm_plan(
+    out: Optional[Union[Path, str]] = None,
+    apply: bool = False,
+    crate_name: Optional[str] = None,
+) -> List[Any]:
+    """
+    一站式执行 LLM 规划并可选应用到磁盘结构：
+    - 生成目录结构 YAML（来自 <PROJECT> 块）
+    - 解析为 entries 列表
+    - 如 apply=True：在目标目录创建结构、生成 mod.rs/lib.rs，并确保 Cargo.toml；随后使用 CodeAgent 更新 Cargo.toml
+    - 如 out 指定：将 YAML 写入文件；否则由调用方决定是否输出
+
+    返回值：
+    - 解析后的 entries 列表（若解析失败将直接抛出异常）
+    """
+    # 1) 获取 LLM 生成的原始 YAML，并立即解析；若解析失败则直接报错退出
+    yaml_text = plan_crate_yaml_text()
+    entries = _parse_project_yaml_entries(yaml_text)
+    if not entries:
+        raise ValueError("[c2rust-llm-planner] Failed to parse directory structure from LLM output. Aborting.")
+
+    # 2) 如需应用到磁盘
+    if apply:
+        target_root = crate_name if crate_name else "."
+        try:
+            apply_project_structure_from_yaml(yaml_text, project_root=target_root)
+            print("[c2rust-llm-planner] Project structure applied.")
+        except Exception as e:
+            print(f"[c2rust-llm-planner] Apply project structure failed: {e}")
+            raise
+
+        # Post-apply: 检查生成的目录结构，使用 CodeAgent 更新 Cargo.toml
+        from jarvis.jarvis_code_agent.code_agent import CodeAgent  # 延迟导入以避免全局耦合
+        import os
+        import subprocess
+
+        # 解析 crate 目录路径（与 apply 逻辑保持一致）
+        try:
+            cwd = Path(".").resolve()
+            created_dir = (cwd / f"{cwd.name}-rs") if (target_root == ".") else Path(target_root).resolve()
+        except Exception:
+            created_dir = Path(target_root)
+
+        # 初始化并提交一次目录结构（尽力而为）
+        prev_cwd_commit = os.getcwd()
+        try:
+            os.chdir(str(created_dir))
+            # ensure git repo
+            res = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if res.returncode != 0:
+                init_res = subprocess.run(
+                    ["git", "init"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if init_res.returncode == 0:
+                    print("[c2rust-llm-planner] Initialized git repository in crate directory.")
+            # add and commit
+            subprocess.run(["git", "add", "."], check=False)
+            commit_res = subprocess.run(
+                ["git", "commit", "-m", "[c2rust-llm-planner] Initialize crate structure"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if commit_res.returncode == 0:
+                print("[c2rust-llm-planner] Initial structure committed.")
+            else:
+                # 常见原因：无变更、未配置 user.name/email 等
+                print("[c2rust-llm-planner] Initial commit skipped or failed (no changes or git config missing).")
+        finally:
+            os.chdir(prev_cwd_commit)
+
+        # 构建用于 CodeAgent 的目录上下文（简化版树形）
+        def _format_tree(root: Path) -> str:
+            lines: List[str] = []
+            exclude = {".git", "target", ".jarvis"}
+            if not root.exists():
+                return ""
+            for p in sorted(root.rglob("*")):
+                if any(part in exclude for part in p.parts):
+                    continue
+                rel = p.relative_to(root)
+                depth = len(rel.parts) - 1
+                indent = "  " * depth
+                name = rel.name + ("/" if p.is_dir() else "")
+                lines.append(f"{indent}- {name}")
+            return "\n".join(lines)
+
+        dir_ctx = _format_tree(created_dir)
+        crate_pkg_name = created_dir.name
+
+        requirement_lines = [
+            "请在该crate目录下编辑 Cargo.toml，配置入口并限制Rust版本：",
+            f"- crate_dir: {created_dir}",
+            f"- crate_name: {crate_pkg_name}",
+            "目录结构（部分）：",
+            dir_ctx,
+            "",
+            "修改要求：",
+            '- 在 [package] 中将 edition 设置为 "2024"（如已存在则覆盖）。',
+            "- 请根据上述目录结构，自动补充或修正 [lib] 与 [[bin]] 的入口配置（如存在对应文件）；若不存在则不要新增。",
+            "- 对于被配置为二进制入口的源文件（src/main.rs 或 src/bin/<name>.rs），若不存在 fn main() 则添加最小可用的 main 函数；不要修改已存在的 main 实现。",
+            "- 保留其他已有字段与依赖不变。",
+            "- 仅修改 Cargo.toml 一个文件并提交补丁。",
+        ]
+        requirement_text = "\n".join(requirement_lines)
+
+        prev_cwd = os.getcwd()
+        try:
+            os.chdir(str(created_dir))
+            agent = CodeAgent(need_summary=False, non_interactive=False, plan=False)
+            agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
+            print("[c2rust-llm-planner] Cargo.toml updated by CodeAgent.")
+        finally:
+            os.chdir(prev_cwd)
+
+    # 3) 输出 YAML 到文件（如指定），并返回解析后的 entries
+    if out is not None:
+        out_path = Path(out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        # 使用原始文本写出，便于可读
+        out_path.write_text(yaml_text, encoding="utf-8")
+        print(f"[c2rust-llm-planner] YAML written: {out_path}")
+
+    return entries
