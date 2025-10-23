@@ -230,6 +230,7 @@ class LLMRustCratePlannerAgent:
         self,
         project_root: Union[Path, str] = ".",
         db_path: Optional[Union[Path, str]] = None,
+        llm_group: Optional[str] = None,
     ):
         self.project_root = Path(project_root).resolve()
         self.db_path = (
@@ -237,6 +238,7 @@ class LLMRustCratePlannerAgent:
             if db_path is not None
             else (self.project_root / ".jarvis" / "c2rust" / "functions.jsonl")
         )
+        self.llm_group = llm_group
         self.loader = _GraphLoader(self.db_path, self.project_root)
 
     def _crate_name(self) -> str:
@@ -373,6 +375,7 @@ class LLMRustCratePlannerAgent:
         agent = Agent(
             system_prompt=system_prompt,
             name="C2Rust-LLM-Module-Planner",
+            model_group=self.llm_group,
             summary_prompt=summary_prompt,
             need_summary=True,
             auto_complete=True,
@@ -405,6 +408,7 @@ class LLMRustCratePlannerAgent:
         agent = Agent(
             system_prompt=system_prompt,
             name="C2Rust-LLM-Module-Planner",
+            model_group=self.llm_group,
             summary_prompt=summary_prompt,
             need_summary=True,
             auto_complete=True,
@@ -663,12 +667,13 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
 def plan_crate_yaml_text(
     project_root: Union[Path, str] = ".",
     db_path: Optional[Union[Path, str]] = None,
+    llm_group: Optional[str] = None,
 ) -> str:
     """
     返回 LLM 生成的目录结构原始 YAML 文本（来自 <PROJECT> 块）。
     不进行解析，便于后续按原样应用并在需要时使用更健壮的解析器处理。
     """
-    agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
+    agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path, llm_group=llm_group)
     return agent.plan_crate_yaml_text()
 
 
@@ -707,6 +712,7 @@ def execute_llm_plan(
     out: Optional[Union[Path, str]] = None,
     apply: bool = False,
     crate_name: Optional[str] = None,
+    llm_group: Optional[str] = None,
 ) -> List[Any]:
     """
     一站式执行 LLM 规划并可选应用到磁盘结构：
@@ -719,7 +725,7 @@ def execute_llm_plan(
     - 解析后的 entries 列表（若解析失败将直接抛出异常）
     """
     # 1) 获取 LLM 生成的原始 YAML，并立即解析；若解析失败则直接报错退出
-    yaml_text = plan_crate_yaml_text()
+    yaml_text = plan_crate_yaml_text(llm_group=llm_group)
     entries = _parse_project_yaml_entries(yaml_text)
     if not entries:
         raise ValueError("[c2rust-llm-planner] Failed to parse directory structure from LLM output. Aborting.")
@@ -767,7 +773,28 @@ def execute_llm_plan(
                 text=True,
                 check=False,
             )
+            need_init_local = False
             if res.returncode != 0:
+                # 未检测到git仓库，需初始化
+                need_init_local = True
+            else:
+                # 可能检测到的是上层仓库，这里确保当前目录自身是一个仓库根
+                top_res = subprocess.run(
+                    ["git", "rev-parse", "--show-toplevel"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                toplevel = (top_res.stdout or "").strip()
+                if toplevel and Path(toplevel).resolve() != Path(os.getcwd()).resolve():
+                    # 当前目录不是仓库根，初始化一个本地仓库以避免后续切回上层目录
+                    need_init_local = True
+                else:
+                    # 还可通过检查 .git 目录进一步确认
+                    git_dir_here = Path(os.getcwd()) / ".git"
+                    if not git_dir_here.exists():
+                        need_init_local = True
+            if need_init_local:
                 init_res = subprocess.run(
                     ["git", "init"],
                     capture_output=True,
@@ -851,9 +878,11 @@ def execute_llm_plan(
             os.chdir(str(created_dir))
             print(f"[c2rust-llm-planner] 在 {os.getcwd()} 目录下执行命令: CodeAgent 初始化")
             # 先运行一次 CodeAgent（初始化与基本配置）
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False)
+            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
             agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
             print("[c2rust-llm-planner] Initial CodeAgent run completed.")
+            # 由于 CodeAgent 可能切换到上层 Git 根目录，这里强制回到 crate 目录
+            os.chdir(str(created_dir))
 
             # 进入构建与修复循环：构建失败则生成新的 CodeAgent，携带错误上下文进行最小修复
             iter_count = 0
@@ -888,8 +917,10 @@ def execute_llm_plan(
                     "</BUILD_ERROR>",
                 ])
 
-                repair_agent = CodeAgent(need_summary=False, non_interactive=True, plan=False)
+                repair_agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
                 repair_agent.run(repair_prompt, prefix=f"[c2rust-llm-planner][iter={iter_count}]", suffix="")
+                # CodeAgent may change directory to git root; ensure we return to the crate directory
+                os.chdir(str(created_dir))
         finally:
             os.chdir(prev_cwd)
 

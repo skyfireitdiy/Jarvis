@@ -710,6 +710,7 @@ class CodeAgent:
         返回:
             str: 描述执行结果的输出，成功时返回None
         """
+        prev_dir = os.getcwd()
         try:
             self._init_env(prefix, suffix)
             start_commit = get_latest_commit_hash()
@@ -767,6 +768,12 @@ class CodeAgent:
 
         except RuntimeError as e:
             return f"Error during execution: {str(e)}"
+        finally:
+            # Ensure switching back to the original working directory after CodeAgent completes
+            try:
+                os.chdir(prev_dir)
+            except Exception:
+                pass
 
     def _on_after_tool_call(self, agent: Agent, current_response=None, need_return=None, tool_prompt=None, **kwargs) -> None:
         """工具调用后回调函数。"""
