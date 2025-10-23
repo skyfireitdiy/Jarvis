@@ -168,9 +168,17 @@ class ReadCodeTool:
                     all_outputs.append(f"❌ {file_info['path']}: {result['stderr']}")
                     overall_success = False
 
+            stdout_text = "\n".join(all_outputs)
+            # 打印读取内容，以及单行状态提示（成功/失败），使用emoji前缀
+            try:
+                if stdout_text:
+                    print(stdout_text, end="" if stdout_text.endswith("\n") else "\n")
+                print("✅ 读取成功" if overall_success else "❌ 读取失败")
+            except Exception:
+                pass
             return {
                 "success": overall_success,
-                "stdout": "\n".join(all_outputs),
+                "stdout": stdout_text,
                 "stderr": "",
             }
 
