@@ -18,7 +18,10 @@ from typing import Optional
 import typer
 from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
 from jarvis.jarvis_utils.utils import init_env
-from jarvis.jarvis_c2rust.llm_module_agent import plan_crate_yaml_llm as _plan_crate_yaml_llm
+from jarvis.jarvis_c2rust.llm_module_agent import (
+    plan_crate_yaml_llm as _plan_crate_yaml_llm,
+    apply_project_structure_from_yaml as _apply_project_structure_from_yaml,
+)
 
 app = typer.Typer(help="C2Rust 命令行工具")
 
@@ -77,6 +80,9 @@ def llm_plan(
     out: Optional[Path] = typer.Option(
         None, "--out", help="Write LLM-generated Rust crate plan (YAML) to file (default: stdout)"
     ),
+    apply: bool = typer.Option(
+        False, "--apply", help="Create directories and add submodule declarations to mod.rs based on Agent output"
+    ),
 ) -> None:
     """
     使用 LLM Agent 基于根函数子图规划 Rust crate 模块结构，输出 YAML
@@ -85,6 +91,9 @@ def llm_plan(
     """
     try:
         yaml_text = _plan_crate_yaml_llm()
+        if apply:
+            _apply_project_structure_from_yaml(yaml_text, project_root=".")
+            typer.secho("[c2rust-llm-planner] Project structure applied.", fg=typer.colors.GREEN)
         if out is None:
             typer.echo(yaml_text)
         else:
