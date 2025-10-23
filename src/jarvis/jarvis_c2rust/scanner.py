@@ -5,28 +5,40 @@ C/C++ function scanner and call graph extractor using libclang.
 
 Design decisions:
 - Parser: clang.cindex (libclang) for robust C/C++ AST with precise types and locations.
-- Output: SQLite database at <scan_root>/.jarvis/c2rust/functions.db
-- Schema: Single 'functions' table meeting current requirement, storing calls as JSON.
-  Future: can add 'call_relations' table if needed.
+- Output: JSONL files at <scan_root>/.jarvis/c2rust/functions.jsonl and types.jsonl
+- Schema: JSONL records for functions/types; calls stored as arrays of strings.
+  Future: schema evolves via meta.json 'schema_version' if needed.
 
-Table: functions
-- id INTEGER PRIMARY KEY AUTOINCREMENT
-- name TEXT NOT NULL
-- qualified_name TEXT
-- signature TEXT
-- return_type TEXT
-- params_json TEXT            -- JSON array: [{"name": "...", "type": "..."}]
-- calls_json TEXT             -- JSON array: ["callee1", "ns::Class::method", ...]
-- file TEXT NOT NULL
-- start_line INTEGER
-- start_col INTEGER
-- end_line INTEGER
-- end_col INTEGER
-- language TEXT
-- created_at TEXT
-- updated_at TEXT
-UNIQUE(name, file, start_line, start_col) ON CONFLICT IGNORE
-
+JSONL files
+- functions.jsonl
+  Fields per line (JSON object):
+  - id (int, sequential within one scan)
+  - name (str)
+  - qualified_name (str)
+  - signature (str)
+  - return_type (str)
+  - params (list[{name, type}])
+  - calls (list[str])
+  - file (str)
+  - start_line (int), start_col (int), end_line (int), end_col (int)
+  - language (str)
+  - created_at (str, ISO-like), updated_at (str, ISO-like)
+- types.jsonl
+  Fields per line (JSON object):
+  - id (int)
+  - name (str)
+  - qualified_name (str)
+  - kind (str: struct/class/union/enum/typedef/type_alias)
+  - underlying_type (str, for typedef/alias)
+  - file/loc/language, created_at/updated_at (same as above)
+- meta.json
+  {
+    "functions": N,
+    "types": M,
+    "generated_at": "...",
+    "schema_version": 1,
+    "source_root": "<abs path>"
+  }
 Usage:
   python -m jarvis.jarvis_c2rust.scanner --root /path/to/scan
 
@@ -42,17 +54,18 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
+
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set
+import typer
 
 # ---------------------------
 # libclang loader
 # ---------------------------
-def _try_import_libclang() -> "clang.cindex":
+def _try_import_libclang() -> Any:
     """
     Load clang.cindex and force libclang 18. This project only supports clang 18.
     Resolution order:
@@ -97,7 +110,8 @@ def _try_import_libclang() -> "clang.cindex":
     # Helper to probe libclang major version
     def _probe_major_from_lib(path: str) -> Optional[int]:
         try:
-            import ctypes, re as _re
+            import ctypes
+            import re as _re
             class CXString(ctypes.Structure):
                 _fields_ = [("data", ctypes.c_void_p), ("private_flags", ctypes.c_uint)]
             lib = ctypes.CDLL(path)
@@ -173,7 +187,7 @@ def _try_import_libclang() -> "clang.cindex":
     # 4) Common locations for version 18 only
     import platform as _platform
     sys_name = _platform.system()
-    candidates: List[Path] = []
+    path_candidates: List[Path] = []
     if sys_name == "Linux":
         candidates = [
             Path("/usr/lib/llvm-18/lib/libclang.so.18"),
@@ -231,104 +245,9 @@ class FunctionInfo:
     language: str
 
 
-# ---------------------------
-# SQLite helpers
-# ---------------------------
-def ensure_output_db(db_path: Path) -> sqlite3.Connection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS functions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            qualified_name TEXT,
-            signature TEXT,
-            return_type TEXT,
-            params_json TEXT,
-            calls_json TEXT,
-            file TEXT NOT NULL,
-            start_line INTEGER,
-            start_col INTEGER,
-            end_line INTEGER,
-            end_col INTEGER,
-            language TEXT,
-            created_at TEXT,
-            updated_at TEXT,
-            UNIQUE(name, file, start_line, start_col) ON CONFLICT IGNORE
-        )
-        """
-    )
-    # Conversion status table (track C/C++ -> Rust conversion progress per function)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS function_conversion (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            function_id INTEGER NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pending'
-                CHECK (status IN ('pending','in_progress','converted','failed','ignored')),
-            rust_name TEXT,
-            rust_module TEXT,
-            rust_signature TEXT,
-            notes TEXT,
-            created_at TEXT,
-            updated_at TEXT,
-            FOREIGN KEY(function_id) REFERENCES functions(id) ON DELETE CASCADE,
-            UNIQUE(function_id)
-        )
-        """
-    )
-    # Types table: store type definitions and their source locations
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS types (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            qualified_name TEXT,
-            kind TEXT NOT NULL,            -- struct/class/union/enum/typedef/type_alias
-            underlying_type TEXT,          -- for typedef/alias
-            file TEXT NOT NULL,
-            start_line INTEGER,
-            start_col INTEGER,
-            end_line INTEGER,
-            end_col INTEGER,
-            language TEXT,
-            created_at TEXT,
-            updated_at TEXT,
-            UNIQUE(name, file, start_line, start_col) ON CONFLICT IGNORE
-        )
-        """
-    )
-    conn.commit()
-    return conn
 
 
-def insert_function(conn: sqlite3.Connection, fn: FunctionInfo) -> None:
-    now = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
-    conn.execute(
-        """
-        INSERT OR IGNORE INTO functions
-        (name, qualified_name, signature, return_type, params_json, calls_json, file,
-         start_line, start_col, end_line, end_col, language, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            fn.name,
-            fn.qualified_name,
-            fn.signature,
-            fn.return_type,
-            json.dumps(fn.params, ensure_ascii=False),
-            json.dumps(fn.calls, ensure_ascii=False),
-            fn.file,
-            fn.start_line,
-            fn.start_col,
-            fn.end_line,
-            fn.end_col,
-            fn.language,
-            now,
-            now,
-        ),
-    )
+
 
 # ---------------------------
 # Compile commands loader
@@ -555,16 +474,23 @@ def scan_file(cindex, file_path: Path, args: List[str]) -> List[FunctionInfo]:
 
 def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     """
-    Scan a directory for C/C++ functions and store results into SQLite.
+    Scan a directory for C/C++ functions and store results into JSONL/JSON.
 
-    Returns the path to the database.
+    Returns the path to functions.jsonl.
+      - functions.jsonl: one JSON object per function
+      - types.jsonl:     one JSON object per type
+      - meta.json:       summary counts and timestamp
     """
     scan_root = scan_root.resolve()
     out_dir = scan_root / ".jarvis" / "c2rust"
     out_dir.mkdir(parents=True, exist_ok=True)
-    if db_path is None:
-        db_path = out_dir / "functions.db"
 
+    # JSONL/JSON outputs
+    functions_jsonl = out_dir / "functions.jsonl"
+    types_jsonl = out_dir / "types.jsonl"
+    meta_json = out_dir / "meta.json"
+
+    # Prepare libclang
     cindex = _try_import_libclang()
     # Fallback safeguard: if loader returned None, try importing directly
     if cindex is None:
@@ -609,7 +535,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                     "/usr/local/opt/llvm/lib/libclang.dylib",
                 ]
 
-            good = [p for p in candidates if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")]
+            good = [p for p in lib_candidates if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")]
             hint = ""
             if good:
                 hint = f"\nSuggested library with required symbol:\n  export CLANG_LIBRARY_FILE={good[0]}\nThen rerun: jarvis-c2rust scan -r {scan_root}"
@@ -641,98 +567,172 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     # default args: at least include root dir to help header resolution
     default_args = ["-I", str(scan_root)]
 
-    # Open DB
-    conn = ensure_output_db(db_path)
-
     files = list(iter_source_files(scan_root))
     total_files = len(files)
     print(f"[c2rust-scanner] Scanning {total_files} files under {scan_root}")
 
     scanned = 0
     total_functions = 0
+    total_types = 0
 
-    for p in files:
-        # prefer compile_commands args if available
-        args = cc_args_map.get(str(p), default_args)
-        try:
-            funcs = scan_file(cindex, p, args)
-        except Exception as e:
-            # If we hit undefined symbol, it's a libclang/python bindings mismatch; abort with guidance
-            msg = str(e)
-            if "undefined symbol" in msg:
-                def _has_symbol(lib_path: str, symbol: str) -> bool:
-                    try:
-                        import ctypes
-                        lib = ctypes.CDLL(lib_path)
-                        getattr(lib, symbol)
-                        return True
-                    except Exception:
-                        return False
+    # JSONL writers
+    now_ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+    fn_id_seq = 1
+    tp_id_seq = 1
 
-                import platform as _platform
-                sys_name = _platform.system()
-                candidates: List[str] = []
-                if sys_name == "Linux":
-                    candidates = [
-                        "/usr/lib/llvm-20/lib/libclang.so",
-                        "/usr/lib/llvm-19/lib/libclang.so",
-                        "/usr/lib/llvm-18/lib/libclang.so",
-                        "/usr/lib/libclang.so",
-                        "/usr/local/lib/libclang.so",
-                    ]
-                elif sys_name == "Darwin":
-                    candidates = [
-                        "/opt/homebrew/opt/llvm/lib/libclang.dylib",
-                        "/usr/local/opt/llvm/lib/libclang.dylib",
-                    ]
+    def _fn_record(fn: FunctionInfo, id_val: int) -> Dict[str, Any]:
+        return {
+            "id": id_val,
+            "name": fn.name,
+            "qualified_name": fn.qualified_name,
+            "signature": fn.signature,
+            "return_type": fn.return_type,
+            "params": fn.params,
+            "calls": fn.calls,
+            "file": fn.file,
+            "start_line": fn.start_line,
+            "start_col": fn.start_col,
+            "end_line": fn.end_line,
+            "end_col": fn.end_col,
+            "language": fn.language,
+            "created_at": now_ts,
+            "updated_at": now_ts,
+        }
 
-                good = [lp for lp in candidates if Path(lp).exists() and _has_symbol(lp, "clang_getOffsetOfBase")]
-                hint = ""
-                if good:
-                    hint = f"\nSuggested library with required symbol:\n  export CLANG_LIBRARY_FILE={good[0]}\nThen rerun: jarvis-c2rust scan -r {scan_root}"
+    def _tp_record(tp: TypeInfo, id_val: int) -> Dict[str, Any]:
+        return {
+            "id": id_val,
+            "name": tp.name,
+            "qualified_name": tp.qualified_name,
+            "kind": tp.kind,
+            "underlying_type": tp.underlying_type,
+            "file": tp.file,
+            "start_line": tp.start_line,
+            "start_col": tp.start_col,
+            "end_line": tp.end_line,
+            "end_col": tp.end_col,
+            "language": tp.language,
+            "created_at": now_ts,
+            "updated_at": now_ts,
+        }
 
-                typer.secho(
-                    "[c2rust-scanner] Detected libclang/python bindings mismatch during parsing (undefined symbol)."
-                    f"\nDetail: {msg}"
-                    "\nThis usually means your Python 'clang' bindings are newer than the installed libclang."
-                    "\nFix options:\n"
-                    "- Install/update libclang to match your Python 'clang' major version (e.g., 19/20).\n"
-                    "- Or pin Python 'clang' to match your system libclang (e.g., pip install 'clang==18.*').\n"
-                    "- Or set CLANG_LIBRARY_FILE to a matching libclang shared library.\n"
-                    f"{hint}",
-                    fg=typer.colors.RED,
-                    err=True,
-                )
-                raise typer.Exit(code=2)
-
-            # Try without args as fallback for regular parse errors
+    # Open JSONL files
+    f_fn = functions_jsonl.open("w", encoding="utf-8")
+    f_tp = types_jsonl.open("w", encoding="utf-8")
+    try:
+        for p in files:
+            # prefer compile_commands args if available
+            args = cc_args_map.get(str(p), default_args)
             try:
-                funcs = scan_file(cindex, p, [])
+                funcs = scan_file(cindex, p, args)
+            except Exception as e:
+                # If we hit undefined symbol, it's a libclang/python bindings mismatch; abort with guidance
+                msg = str(e)
+                if "undefined symbol" in msg:
+                    def _has_symbol(lib_path: str, symbol: str) -> bool:
+                        try:
+                            import ctypes
+                            lib = ctypes.CDLL(lib_path)
+                            getattr(lib, symbol)
+                            return True
+                        except Exception:
+                            return False
+
+                    import platform as _platform
+                    sys_name = _platform.system()
+                    candidates: List[str] = []
+                    if sys_name == "Linux":
+                        candidates = [
+                            "/usr/lib/llvm-20/lib/libclang.so",
+                            "/usr/lib/llvm-19/lib/libclang.so",
+                            "/usr/lib/llvm-18/lib/libclang.so",
+                            "/usr/lib/libclang.so",
+                            "/usr/local/lib/libclang.so",
+                        ]
+                    elif sys_name == "Darwin":
+                        candidates = [
+                            "/opt/homebrew/opt/llvm/lib/libclang.dylib",
+                            "/usr/local/opt/llvm/lib/libclang.dylib",
+                        ]
+
+                    good = [lp for lp in lib_candidates if Path(lp).exists() and _has_symbol(lp, "clang_getOffsetOfBase")]
+                    hint = ""
+                    if good:
+                        hint = f"\nSuggested library with required symbol:\n  export CLANG_LIBRARY_FILE={good[0]}\nThen rerun: jarvis-c2rust scan -r {scan_root}"
+
+                    typer.secho(
+                        "[c2rust-scanner] Detected libclang/python bindings mismatch during parsing (undefined symbol)."
+                        f"\nDetail: {msg}"
+                        "\nThis usually means your Python 'clang' bindings are newer than the installed libclang."
+                        "\nFix options:\n"
+                        "- Install/update libclang to match your Python 'clang' major version (e.g., 19/20).\n"
+                        "- Or pin Python 'clang' to match your system libclang (e.g., pip install 'clang==18.*').\n"
+                        "- Or set CLANG_LIBRARY_FILE to a matching libclang shared library.\n"
+                        f"{hint}",
+                        fg=typer.colors.RED,
+                        err=True,
+                    )
+                    raise typer.Exit(code=2)
+
+                # Try without args as fallback for regular parse errors
+                try:
+                    funcs = scan_file(cindex, p, [])
+                except Exception:
+                    print(f"[c2rust-scanner] Failed to parse {p}: {e}", file=sys.stderr)
+                    continue
+
+            # Write JSONL
+            for fn in funcs:
+                rec = _fn_record(fn, fn_id_seq)
+                f_fn.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                fn_id_seq += 1
+            total_functions += len(funcs)
+
+            # Scan types in this file
+            try:
+                types = scan_types_file(cindex, p, args)
             except Exception:
-                print(f"[c2rust-scanner] Failed to parse {p}: {e}", file=sys.stderr)
-                continue
-        for fn in funcs:
-            insert_function(conn, fn)
-        # Scan types in this file
+                try:
+                    types = scan_types_file(cindex, p, [])
+                except Exception:
+                    types = []
+
+            for t in types:
+                trec = _tp_record(t, tp_id_seq)
+                f_tp.write(json.dumps(trec, ensure_ascii=False) + "\n")
+                tp_id_seq += 1
+            total_types += len(types)
+
+            scanned += 1
+            if scanned % 20 == 0 or scanned == total_files:
+                print(f"[c2rust-scanner] Progress: {scanned}/{total_files} files, {total_functions} functions, {total_types} types")
+    finally:
         try:
-            types = scan_types_file(cindex, p, args)
+            f_fn.close()
         except Exception:
-            try:
-                types = scan_types_file(cindex, p, [])
-            except Exception:
-                types = []
-        for t in types:
-            insert_type(conn, t)
-        conn.commit()
-        scanned += 1
-        total_functions += len(funcs)
-        if scanned % 20 == 0 or scanned == total_files:
-            print(f"[c2rust-scanner] Progress: {scanned}/{total_files} files, {total_functions} functions")
+            pass
+        try:
+            f_tp.close()
+        except Exception:
+            pass
 
-    print(f"[c2rust-scanner] Done. Functions collected: {total_functions}")
-    print(f"[c2rust-scanner] Database: {db_path}")
-    conn.close()
-    return db_path
+    # Write meta.json
+    meta = {
+        "functions": total_functions,
+        "types": total_types,
+        "generated_at": now_ts,
+        "schema_version": 1,
+        "source_root": str(scan_root),
+    }
+    try:
+        meta_json.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+    print(f"[c2rust-scanner] Done. Functions collected: {total_functions}, Types collected: {total_types}")
+    print(f"[c2rust-scanner] JSONL written: {functions_jsonl} (functions), {types_jsonl} (types)")
+    print(f"[c2rust-scanner] Meta written: {meta_json}")
+    return functions_jsonl
 
 # ---------------------------
 # Type scanning
@@ -751,30 +751,6 @@ class TypeInfo:
     language: str
 
 
-def insert_type(conn: sqlite3.Connection, tp: TypeInfo) -> None:
-    now = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
-    conn.execute(
-        """
-        INSERT OR IGNORE INTO types
-        (name, qualified_name, kind, underlying_type, file,
-         start_line, start_col, end_line, end_col, language, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            tp.name,
-            tp.qualified_name,
-            tp.kind,
-            tp.underlying_type,
-            tp.file,
-            tp.start_line,
-            tp.start_col,
-            tp.end_line,
-            tp.end_col,
-            tp.language,
-            now,
-            now,
-        ),
-    )
 
 
 TYPE_KINDS: Set[str] = {
@@ -850,25 +826,55 @@ def scan_types_file(cindex, file_path: Path, args: List[str]) -> List[TypeInfo]:
 # ---------------------------
 # CLI and DOT export
 # ---------------------------
-import typer
+
 
 def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
-    """
-    Generate a call dependency graph in DOT format from the SQLite database.
-    - Internal nodes (functions found in DB): box shape
-    - External callees not found in DB: dashed gray ellipse
-    """
-    conn = sqlite3.connect(str(db_path))
-    cur = conn.cursor()
-    rows = cur.execute(
-        "SELECT id, name, qualified_name, signature, calls_json FROM functions"
-    ).fetchall()
+    # Generate a call dependency graph (DOT) from JSONL data.
+    def _resolve_functions_jsonl_path(hint: Path) -> Path:
+        p = Path(hint)
+        if p.is_file():
+            if p.suffix.lower() == ".jsonl":
+                return p
+            # old db path: use sibling functions.jsonl
+            if p.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
+                cand = p.parent / "functions.jsonl"
+                if cand.exists():
+                    return cand
+        if p.is_dir():
+            cand = p / "functions.jsonl"
+            if cand.exists():
+                return cand
+        # fallback
+        return Path(".") / ".jarvis" / "c2rust" / "functions.jsonl"
+
+    fjsonl = _resolve_functions_jsonl_path(db_path)
+    if not fjsonl.exists():
+        raise FileNotFoundError(f"functions.jsonl not found: {fjsonl}")
+
+    # Load function records from JSONL
+    rows: List[Any] = []
+    with open(fjsonl, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                rows.append((
+                    int(obj.get("id") or len(rows) + 1),
+                    obj.get("name") or "",
+                    obj.get("qualified_name") or "",
+                    obj.get("signature") or "",
+                    obj.get("calls") or [],
+                ))
+            except Exception:
+                continue
 
     # Build node map
     node_id_map: Dict[int, str] = {}      # function id -> dot node id
     name_to_node: Dict[str, str] = {}     # name/qualified_name -> dot node id
     node_labels: Dict[str, str] = {}      # dot node id -> label
-    edges: Set[Tuple[str, str]] = set()
+    edges = set()
 
     for row in rows:
         fid = int(row[0])
@@ -879,7 +885,6 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
         node_id_map[fid] = dot_id
         label_base = qname or name or f"fn_{fid}"
         label = label_base
-        # Prefer shorter label; append signature if helpful
         if signature and signature != label_base:
             label = f"{label_base}\\n{signature}"
         node_labels[dot_id] = label
@@ -897,21 +902,18 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
     # Build edges
     for row in rows:
         fid = int(row[0])
-        dot_src = node_id_map[fid]
-        try:
-            calls = json.loads(row[4] or "[]")
-            if not isinstance(calls, list):
-                calls = []
-        except Exception:
-            calls = []
+        dot_src = node_id_map.get(fid)
+        if not dot_src:
+            continue
+        calls = row[4] or []
+        if not isinstance(calls, list):
+            continue
         for callee in calls:
             if not isinstance(callee, str) or not callee:
                 continue
-            # Find internal target
             if callee in name_to_node:
                 dot_dst = name_to_node[callee]
             else:
-                # create external node
                 dot_dst = external_nodes.get(callee)
                 if dot_dst is None:
                     dot_dst = f"ext{ext_count}"
@@ -944,23 +946,48 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
 
         f.write("}\n")
 
-    conn.close()
-
 
 def find_root_function_ids(db_path: Path) -> List[int]:
-    """
-    Find all 'root' functions in the database: functions that have no callers within the DB.
-    A function is considered internal if it appears in the 'functions' table. To match calls,
-    both qualified_name and name are considered.
-    Returns a sorted list of function IDs.
-    """
-    conn = sqlite3.connect(str(db_path))
-    cur = conn.cursor()
-    rows = cur.execute("SELECT id, name, qualified_name, calls_json FROM functions").fetchall()
+    # Return IDs of functions with no callers (roots) by reading functions.jsonl.
+    def _resolve_functions_jsonl_path(hint: Path) -> Path:
+        p = Path(hint)
+        if p.is_file():
+            if p.suffix.lower() == ".jsonl":
+                return p
+            if p.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
+                cand = p.parent / "functions.jsonl"
+                if cand.exists():
+                    return cand
+        if p.is_dir():
+            cand = p / "functions.jsonl"
+            if cand.exists():
+                return cand
+        return Path(".") / ".jarvis" / "c2rust" / "functions.jsonl"
+
+    fjsonl = _resolve_functions_jsonl_path(db_path)
+    if not fjsonl.exists():
+        raise FileNotFoundError(f"functions.jsonl not found: {fjsonl}")
+
+    # Load functions
+    records: List[Any] = []
+    with open(fjsonl, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                fid = int(obj.get("id") or len(records) + 1)
+                name = obj.get("name") or ""
+                qname = obj.get("qualified_name") or ""
+                calls = obj.get("calls") or []
+                records.append((fid, name, qname, calls))
+            except Exception:
+                continue
 
     name_to_id: Dict[str, int] = {}
     all_ids: Set[int] = set()
-    for fid, name, qname, _ in rows:
+    for fid, name, qname, _ in records:
         fid = int(fid)
         all_ids.add(fid)
         if isinstance(name, str) and name:
@@ -969,14 +996,10 @@ def find_root_function_ids(db_path: Path) -> List[int]:
             name_to_id.setdefault(qname, fid)
 
     non_roots: Set[int] = set()
-    for fid, _name, _qname, calls_json in rows:
+    for fid, _name, _qname, calls in records:
         fid = int(fid)
-        try:
-            calls = json.loads(calls_json or "[]")
-            if not isinstance(calls, list):
-                calls = []
-        except Exception:
-            calls = []
+        if not isinstance(calls, list):
+            continue
         for callee in calls:
             if not isinstance(callee, str) or not callee:
                 continue
@@ -984,57 +1007,65 @@ def find_root_function_ids(db_path: Path) -> List[int]:
             if callee_id is not None and callee_id != fid:
                 non_roots.add(callee_id)
 
-    conn.close()
     root_ids = sorted(list(all_ids - non_roots))
     return root_ids
 
 
 def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
-    """
-    Generate a DOT subgraph file for each root function (no callers) into 'out_dir'.
+    # Generate per-root subgraph DOT files from functions.jsonl into out_dir.
+    def _resolve_functions_jsonl_path(hint: Path) -> Path:
+        p = Path(hint)
+        if p.is_file():
+            if p.suffix.lower() == ".jsonl":
+                return p
+            if p.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
+                cand = p.parent / "functions.jsonl"
+                if cand.exists():
+                    return cand
+        if p.is_dir():
+            cand = p / "functions.jsonl"
+            if cand.exists():
+                return cand
+        return Path(".") / ".jarvis" / "c2rust" / "functions.jsonl"
 
-    Behavior:
-    - For each root function R, traverse outbound call edges to collect reachable internal functions.
-    - External callees (not present in DB) are rendered as dashed gray ellipse nodes.
-    - Internal functions are rendered as boxes with label "qualified_name\\nsignature" when available.
+    fjsonl = _resolve_functions_jsonl_path(db_path)
+    if not fjsonl.exists():
+        raise FileNotFoundError(f"functions.jsonl not found: {fjsonl}")
 
-    Returns:
-    - A list of generated dot file paths.
-    """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    conn = sqlite3.connect(str(db_path))
-    cur = conn.cursor()
-    rows = cur.execute(
-        "SELECT id, name, qualified_name, signature, calls_json FROM functions"
-    ).fetchall()
-
-    # Build indices
+    # Load functions
     by_id: Dict[int, Dict[str, str]] = {}
     name_to_id: Dict[str, int] = {}
     adj: Dict[int, List[str]] = {}
 
-    for fid, name, qname, signature, calls_json in rows:
-        fid = int(fid)
-        nm = name or ""
-        qn = qname or ""
-        sig = signature or ""
-        by_id[fid] = {"name": nm, "qname": qn, "sig": sig}
-
-        if nm:
-            name_to_id.setdefault(nm, fid)
-        if qn:
-            name_to_id.setdefault(qn, fid)
-
-        try:
-            calls = json.loads(calls_json or "[]")
+    with open(fjsonl, "r", encoding="utf-8") as f:
+        idx = 0
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            idx += 1
+            fid = int(obj.get("id") or idx)
+            nm = obj.get("name") or ""
+            qn = obj.get("qualified_name") or ""
+            sig = obj.get("signature") or ""
+            calls = obj.get("calls") or []
             if not isinstance(calls, list):
                 calls = []
-        except Exception:
-            calls = []
-        # Keep only string callees
-        adj[fid] = [c for c in calls if isinstance(c, str) and c]
+            calls = [c for c in calls if isinstance(c, str) and c]
+
+            by_id[fid] = {"name": nm, "qname": qn, "sig": sig}
+            if nm:
+                name_to_id.setdefault(nm, fid)
+            if qn:
+                name_to_id.setdefault(qn, fid)
+            adj[fid] = calls
 
     def base_label(fid: int) -> str:
         meta = by_id.get(fid, {})
@@ -1121,7 +1152,6 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
 
         generated.append(out_path)
 
-    conn.close()
     return generated
 
 
@@ -1132,16 +1162,10 @@ def run_scan(
     only_subgraphs: bool = False,
     png: bool = False,
 ) -> None:
-    """
-    Scan a directory for C/C++ functions and store results into SQLite.
-    Optionally, generate:
-    - a global DOT call graph (--dot)
-    - per-root subgraphs as individual DOT files (--subgraphs-dir)
-    Use --only-dot / --only-subgraphs to skip scanning and generate from existing DB.
-    """
-    # Determine effective DB path
+    # Scan for C/C++ functions and persist results to JSONL; optionally generate DOT.
+    # Determine data path
     root = Path('.')
-    db_path = Path('.') / ".jarvis" / "c2rust" / "functions.db"
+    data_path = Path('.') / ".jarvis" / "c2rust" / "functions.jsonl"
 
     # Helper: render a DOT file to PNG using Graphviz 'dot'
     def _render_dot_to_png(dot_file: Path, png_out: Optional[Path] = None) -> Path:
@@ -1169,14 +1193,14 @@ def run_scan(
 
     if not (only_dot or only_subgraphs):
         try:
-            scan_directory(root, db_path)
+            scan_directory(root)
         except Exception as e:
             typer.secho(f"[c2rust-scanner] Error: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
     else:
         # Only-generate mode (no rescan)
-        if not db_path.exists():
-            typer.secho(f"[c2rust-scanner] Database not found: {db_path}", fg=typer.colors.RED, err=True)
+        if not data_path.exists():
+            typer.secho(f"[c2rust-scanner] Data not found: {data_path}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
         if only_dot and dot is None:
             typer.secho("[c2rust-scanner] --only-dot requires --dot to specify output file", fg=typer.colors.RED, err=True)
@@ -1188,7 +1212,7 @@ def run_scan(
     # Generate DOT (global) if requested
     if dot is not None:
         try:
-            generate_dot_from_db(db_path, dot)
+            generate_dot_from_db(data_path, dot)
             typer.secho(f"[c2rust-scanner] DOT written: {dot}", fg=typer.colors.GREEN)
             if png:
                 png_path = _render_dot_to_png(dot)
@@ -1200,7 +1224,7 @@ def run_scan(
     # Generate per-root subgraphs if requested
     if subgraphs_dir is not None:
         try:
-            files = export_root_subgraphs_to_dir(db_path, subgraphs_dir)
+            files = export_root_subgraphs_to_dir(data_path, subgraphs_dir)
             if png:
                 png_count = 0
                 for dp in files:

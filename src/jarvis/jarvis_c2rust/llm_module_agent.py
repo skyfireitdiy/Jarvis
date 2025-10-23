@@ -22,7 +22,7 @@ CLI 集成建议:
 from __future__ import annotations
 
 import json
-import sqlite3
+# removed sqlite3 (migrated to JSONL/JSON)
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -74,14 +74,32 @@ def _sanitize_mod_name(s: str) -> str:
 
 class _GraphLoader:
     """
-    从 functions.db 读取函数与调用关系，提供子图遍历能力
+    从 functions.jsonl 读取函数与调用关系，提供子图遍历能力
     """
 
     def __init__(self, db_path: Path, project_root: Path):
-        self.db_path = Path(db_path)
         self.project_root = Path(project_root).resolve()
-        if not self.db_path.exists():
-            raise FileNotFoundError(f"Database not found: {self.db_path}")
+
+        def _resolve_functions_jsonl_path(hint: Path) -> Path:
+            p = Path(hint)
+            if p.is_file():
+                if p.suffix.lower() == ".jsonl":
+                    return p
+                # backward compat: old sqlite path -> sibling functions.jsonl
+                if p.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
+                    cand = p.parent / "functions.jsonl"
+                    if cand.exists():
+                        return cand
+            if p.is_dir():
+                cand = p / "functions.jsonl"
+                if cand.exists():
+                    return cand
+            # default to project .jarvis/c2rust
+            return self.project_root / ".jarvis" / "c2rust" / "functions.jsonl"
+
+        self.data_path = _resolve_functions_jsonl_path(Path(db_path))
+        if not self.data_path.exists():
+            raise FileNotFoundError(f"functions.jsonl not found: {self.data_path}")
 
         self.fn_by_id: Dict[int, _FnMeta] = {}
         self.name_to_id: Dict[str, int] = {}
@@ -89,39 +107,49 @@ class _GraphLoader:
         self._load_db()
 
     def _load_db(self) -> None:
-        conn = sqlite3.connect(str(self.db_path))
-        cur = conn.cursor()
-        rows = cur.execute(
-            "SELECT id, name, qualified_name, signature, file, calls_json FROM functions"
-        ).fetchall()
-        for fid, name, qname, sig, file_path, calls_json in rows:
-            fid = int(fid)
-            nm = name or ""
-            qn = qname or ""
-            sg = sig or ""
-            fp = file_path or ""
-            try:
-                calls = json.loads(calls_json or "[]")
-                if not isinstance(calls, list):
-                    calls = []
-                calls = [c for c in calls if isinstance(c, str) and c]
-            except Exception:
-                calls = []
-            meta = _FnMeta(
-                id=fid,
-                name=nm,
-                qname=qn,
-                signature=sg,
-                file=fp,
-                calls=calls,
-            )
-            self.fn_by_id[fid] = meta
-            if nm:
-                self.name_to_id.setdefault(nm, fid)
-            if qn:
-                self.name_to_id.setdefault(qn, fid)
-            self.adj[fid] = calls
-        conn.close()
+        """
+        Load function metadata and adjacency from functions.jsonl
+        """
+        rows_loaded = 0
+        try:
+            with open(self.data_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except Exception:
+                        continue
+                    rows_loaded += 1
+                    fid = int(obj.get("id") or rows_loaded)
+                    nm = obj.get("name") or ""
+                    qn = obj.get("qualified_name") or ""
+                    sg = obj.get("signature") or ""
+                    fp = obj.get("file") or ""
+                    calls = obj.get("calls") or []
+                    if not isinstance(calls, list):
+                        calls = []
+                    calls = [c for c in calls if isinstance(c, str) and c]
+                    meta = _FnMeta(
+                        id=fid,
+                        name=nm,
+                        qname=qn,
+                        signature=sg,
+                        file=fp,
+                        calls=calls,
+                    )
+                    self.fn_by_id[fid] = meta
+                    if nm:
+                        self.name_to_id.setdefault(nm, fid)
+                    if qn:
+                        self.name_to_id.setdefault(qn, fid)
+                    self.adj[fid] = calls
+        except FileNotFoundError:
+            raise
+        except Exception:
+            # keep robust: leave loader empty on error
+            pass
 
     def _rel_path(self, abs_path: str) -> str:
         try:
@@ -207,7 +235,7 @@ class LLMRustCratePlannerAgent:
         self.db_path = (
             Path(db_path).resolve()
             if db_path is not None
-            else (self.project_root / ".jarvis" / "c2rust" / "functions.db")
+            else (self.project_root / ".jarvis" / "c2rust" / "functions.jsonl")
         )
         self.loader = _GraphLoader(self.db_path, self.project_root)
 
