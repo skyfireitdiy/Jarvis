@@ -86,6 +86,9 @@ def llm_plan(
     crate_name: Optional[str] = typer.Option(
         None, "--crate-name", help="Override the crate name (and directory). When used with --apply, structure is created under this name"
     ),
+    llm_group: Optional[str] = typer.Option(
+        None, "-g", "--llm-group", help="Specify LLM model group for planning (only affects this run)"
+    ),
 ) -> None:
     """
     使用 LLM Agent 基于根函数子图规划 Rust crate 模块结构，输出 YAML
@@ -93,7 +96,7 @@ def llm_plan(
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.jsonl 读取数据
     """
     try:
-        entries = _execute_llm_plan(out=out, apply=apply, crate_name=crate_name)
+        entries = _execute_llm_plan(out=out, apply=apply, crate_name=crate_name, llm_group=llm_group)
         if out is None:
             typer.echo(_entries_to_yaml(entries))
     except Exception as e:
