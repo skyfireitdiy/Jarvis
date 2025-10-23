@@ -19,8 +19,8 @@ import typer
 from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_c2rust.llm_module_agent import (
-    plan_crate_yaml_llm as _plan_crate_yaml_llm,
-    apply_project_structure_from_yaml as _apply_project_structure_from_yaml,
+    execute_llm_plan as _execute_llm_plan,
+    entries_to_yaml as _entries_to_yaml,
 )
 
 app = typer.Typer(help="C2Rust 命令行工具")
@@ -93,124 +93,9 @@ def llm_plan(
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.db 读取数据库
     """
     try:
-        entries = _plan_crate_yaml_llm()
-        # 将对象 entries 序列化为 YAML 文本（目录使用 'name/:' 形式，文件为字符串）
-        def _entries_to_yaml(items, indent=0):
-            lines = []
-            for it in (items or []):
-                if isinstance(it, str):
-                    lines.append("  " * indent + f"- {it}")
-                elif isinstance(it, dict) and len(it) == 1:
-                    name, children = next(iter(it.items()))
-                    name = str(name).rstrip("/")
-                    lines.append("  " * indent + f"- {name}/:")
-                    lines.extend(_entries_to_yaml(children or [], indent + 1))
-            return lines
-        yaml_text = "\n".join(_entries_to_yaml(entries))
-        if apply:
-            target_root = crate_name if crate_name else "."
-            _apply_project_structure_from_yaml(yaml_text, project_root=target_root)
-            typer.secho("[c2rust-llm-planner] Project structure applied.", fg=typer.colors.GREEN)
-
-            # Post-apply: inspect actual structure and configure Cargo.toml via CodeAgent
-            from jarvis.jarvis_code_agent.code_agent import CodeAgent  # local import to avoid global coupling
-            import os
-
-            # Resolve the created crate directory path (align with apply logic)
-            try:
-                cwd = Path(".").resolve()
-                created_dir = (cwd / f"{cwd.name}-rs") if (target_root == ".") else Path(target_root).resolve()
-            except Exception:
-                created_dir = Path(target_root)
-
-            # Commit once after creating directory structure
-            import subprocess
-            prev_cwd_commit = os.getcwd()
-            try:
-                os.chdir(str(created_dir))
-                # ensure git repo
-                res = subprocess.run(
-                    ["git", "rev-parse", "--git-dir"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                if res.returncode != 0:
-                    init_res = subprocess.run(
-                        ["git", "init"],
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
-                    if init_res.returncode == 0:
-                        typer.secho("[c2rust-llm-planner] Initialized git repository in crate directory.", fg=typer.colors.YELLOW)
-                # add and commit
-                subprocess.run(["git", "add", "."], check=False)
-                commit_res = subprocess.run(
-                    ["git", "commit", "-m", "[c2rust-llm-planner] Initialize crate structure"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                if commit_res.returncode == 0:
-                    typer.secho("[c2rust-llm-planner] Initial structure committed.", fg=typer.colors.GREEN)
-                else:
-                    # 常见原因：无变更、未配置 user.name/email 等
-                    typer.secho("[c2rust-llm-planner] Initial commit skipped or failed (no changes or git config missing).", fg=typer.colors.YELLOW)
-            finally:
-                os.chdir(prev_cwd_commit)
-
-            # Build a concise directory structure context
-            def _format_tree(root: Path) -> str:
-                lines = []
-                exclude = {".git", "target", ".jarvis"}
-                if not root.exists():
-                    return ""
-                for p in sorted(root.rglob("*")):
-                    if any(part in exclude for part in p.parts):
-                        continue
-                    rel = p.relative_to(root)
-                    depth = len(rel.parts) - 1
-                    indent = "  " * depth
-                    name = rel.name + ("/" if p.is_dir() else "")
-                    lines.append(f"{indent}- {name}")
-                return "\n".join(lines)
-
-            dir_ctx = _format_tree(created_dir)
-            crate_pkg_name = created_dir.name
-
-            # Prepare CodeAgent requirement
-            requirement_lines = [
-                "请在该crate目录下编辑 Cargo.toml，配置入口并限制Rust版本：",
-                f"- crate_dir: {created_dir}",
-                f"- crate_name: {crate_pkg_name}",
-                "目录结构（部分）：",
-                dir_ctx,
-                "",
-                "修改要求：",
-                '- 在 [package] 中将 edition 设置为 "2024"（如已存在则覆盖）。',
-                "- 请根据上述目录结构，自动补充或修正 [lib] 与 [[bin]] 的入口配置（如存在对应文件）；若不存在则不要新增。",
-            ]
-            requirement_lines.extend([
-                "- 保留其他已有字段与依赖不变。",
-                "- 仅修改 Cargo.toml 一个文件并提交补丁。",
-            ])
-            requirement_text = "\n".join(requirement_lines)
-
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(created_dir))
-                agent = CodeAgent(need_summary=False, non_interactive=False, plan=False)
-                agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
-                typer.secho("[c2rust-llm-planner] Cargo.toml updated by CodeAgent.", fg=typer.colors.GREEN)
-            finally:
-                os.chdir(prev_cwd)
+        entries = _execute_llm_plan(out=out, apply=apply, crate_name=crate_name)
         if out is None:
-            typer.echo(yaml_text)
-        else:
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(yaml_text, encoding="utf-8")
-            typer.secho(f"[c2rust-llm-planner] YAML written: {out}", fg=typer.colors.GREEN)
+            typer.echo(_entries_to_yaml(entries))
     except Exception as e:
         typer.secho(f"[c2rust-llm-planner] Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
