@@ -67,44 +67,46 @@ import typer
 # ---------------------------
 def _try_import_libclang() -> Any:
     """
-    Load clang.cindex and force libclang 18. This project only supports clang 18.
+    Load clang.cindex and support libclang 16-21 (inclusive).
     Resolution order:
-    1) Respect CLANG_LIBRARY_FILE (must be clang 18)
-    2) Respect LIBCLANG_PATH (pick libclang.so.18 / libclang.dylib in that dir)
+    1) Respect CLANG_LIBRARY_FILE (must be one of 16-21)
+    2) Respect LIBCLANG_PATH (pick libclang from that dir and verify major 16-21)
     3) Respect LLVM_HOME/lib/libclang.*
-    4) Probe common locations for version 18 only
-    If Python bindings are not 18 or libclang is not 18, raise with actionable hints.
+    4) Probe common locations for versions 16-21
+    If Python bindings or libclang are outside 16-21, raise with actionable hints.
     """
+    SUPPORTED_MAJORS = {16, 17, 18, 19, 20, 21}
+
     try:
         from clang import cindex  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "Failed to import clang.cindex. This tool only supports clang 18.\n"
+            "Failed to import clang.cindex. This tool supports clang 16-21.\n"
             "Fix:\n"
-            "- pip install 'clang==18.*'\n"
-            "- Ensure libclang 18 is installed (e.g., apt install llvm-18 clang-18 libclang-18-dev)\n"
-            "- Set env CLANG_LIBRARY_FILE to the 18.x shared library, or LIBCLANG_PATH to its directory."
+            "- pip install 'clang>=16,<22'\n"
+            "- Ensure libclang (16-21) is installed (e.g., apt install llvm-21 clang-21 libclang-21-dev)\n"
+            "- Set env CLANG_LIBRARY_FILE to the matching shared library, or LIBCLANG_PATH to its directory."
         ) from e
 
-    # Verify Python clang bindings are 18.x
+    # Verify Python clang bindings major version (if available)
     py_major: Optional[int] = None
     try:
         import clang as _clang  # type: ignore
         import re as _re
         v = getattr(_clang, "__version__", None)
         if v:
-            m = _re.match(r"(\d+)", str(v))
+            m = _re.match(r"(\\d+)", str(v))
             if m:
                 py_major = int(m.group(1))
     except Exception:
         py_major = None
 
-    # If version is known and not 18, fail; if unknown (None), proceed and rely on libclang probing
-    if py_major is not None and py_major != 18:
+    # If version is known and not in supported set, fail; if unknown (None), proceed and rely on libclang probing
+    if py_major is not None and py_major not in SUPPORTED_MAJORS:
         raise RuntimeError(
-            "Python 'clang' bindings must be version 18.x for this tool.\n"
+            f"Python 'clang' bindings major version must be one of {sorted(SUPPORTED_MAJORS)}.\n"
             "Fix:\n"
-            "- pip install --upgrade 'clang==18.*'"
+            "- pip install --upgrade 'clang>=16,<22'"
         )
 
     # Helper to probe libclang major version
@@ -115,25 +117,30 @@ def _try_import_libclang() -> Any:
             class CXString(ctypes.Structure):
                 _fields_ = [("data", ctypes.c_void_p), ("private_flags", ctypes.c_uint)]
             lib = ctypes.CDLL(path)
+            # Ensure correct ctypes signatures to avoid mis-parsing strings
             lib.clang_getClangVersion.restype = CXString
             lib.clang_getCString.argtypes = [CXString]
+            lib.clang_getCString.restype = ctypes.c_char_p
             lib.clang_disposeString.argtypes = [CXString]
             s = lib.clang_getClangVersion()
-            cstr = lib.clang_getCString(s)
-            ver = ctypes.cast(cstr, ctypes.c_char_p).value
+            cstr = lib.clang_getCString(s)  # returns const char*
+            try:
+                ver = cstr.decode("utf-8", "ignore") if cstr else ""
+            except Exception:
+                # Fallback if restype not honored by platform
+                ver = ctypes.cast(cstr, ctypes.c_char_p).value.decode("utf-8", "ignore") if cstr else ""
             lib.clang_disposeString(s)
             if ver:
-                v = ver.decode("utf-8", "ignore")
-                m = _re.search(r"clang version (\d+)", v)
+                m = _re.search(r"clang version (\d+)", ver)
                 if m:
                     return int(m.group(1))
         except Exception:
             return None
         return None
 
-    def _ensure_v18_and_set(lib_path: str) -> bool:
+    def _ensure_supported_and_set(lib_path: str) -> bool:
         major = _probe_major_from_lib(lib_path)
-        if major == 18:
+        if major in SUPPORTED_MAJORS:
             try:
                 cindex.Config.set_library_file(lib_path)
                 return True
@@ -144,88 +151,147 @@ def _try_import_libclang() -> Any:
     # 1) CLANG_LIBRARY_FILE
     lib_file = os.environ.get("CLANG_LIBRARY_FILE")
     if lib_file and Path(lib_file).exists():
-        if _ensure_v18_and_set(lib_file):
+        if _ensure_supported_and_set(lib_file):
             return cindex
         else:
             raise RuntimeError(
-                f"CLANG_LIBRARY_FILE points to '{lib_file}', which is not libclang 18.x.\n"
-                "Please set it to the clang-18 library (e.g., /usr/lib/llvm-18/lib/libclang.so)."
+                f"CLANG_LIBRARY_FILE points to '{lib_file}', which is not libclang 16-21.\n"
+                "Please set it to a supported libclang (e.g., /usr/lib/llvm-21/lib/libclang.so or matching version)."
             )
 
     # 2) LIBCLANG_PATH
     lib_dir = os.environ.get("LIBCLANG_PATH")
     if lib_dir and Path(lib_dir).exists():
         base = Path(lib_dir)
-        candidates = [
-            base / "libclang.so.18",
-            base / "libclang.so",
+        candidates: List[Path] = []
+
+        # Versioned shared libraries
+        for maj in (21, 20, 19, 18, 17, 16):
+            candidates.append(base / f"libclang.so.{maj}")
+        # Generic names
+        candidates.extend([
+            base / "libclang.so",      # Linux
             base / "libclang.dylib",   # macOS
             base / "libclang.dll",     # Windows
-        ]
+        ])
         for cand in candidates:
-            if cand.exists() and _ensure_v18_and_set(str(cand)):
+            if cand.exists() and _ensure_supported_and_set(str(cand)):
                 return cindex
-        # If a directory is given but no valid 18 found, error out explicitly
+        # If a directory is given but no valid supported version found, error out explicitly
         raise RuntimeError(
-            f"LIBCLANG_PATH={lib_dir} does not contain libclang 18.x.\n"
-            "Expected libclang.so.18 (Linux) or libclang.dylib from llvm@18 (macOS)."
+            f"LIBCLANG_PATH={lib_dir} does not contain libclang 16-21.\n"
+            "Expected libclang.so.[16-21] (Linux) or libclang.dylib from llvm@16..@21 (macOS)."
         )
 
     # 3) LLVM_HOME
     llvm_home = os.environ.get("LLVM_HOME")
     if llvm_home:
         p = Path(llvm_home) / "lib"
-        for cand in [
-            p / "libclang.so.18",
+        candidates: List[Path] = []
+        for maj in (21, 20, 19, 18, 17, 16):
+            candidates.append(p / f"libclang.so.{maj}")
+        candidates.extend([
             p / "libclang.so",
             p / "libclang.dylib",
             p / "libclang.dll",
-        ]:
-            if cand.exists() and _ensure_v18_and_set(str(cand)):
+        ])
+        for cand in candidates:
+            if cand.exists() and _ensure_supported_and_set(str(cand)):
                 return cindex
 
-    # 4) Common locations for version 18 only
+    # 4) Common locations for versions 16-21
     import platform as _platform
     sys_name = _platform.system()
     path_candidates: List[Path] = []
     if sys_name == "Linux":
-        candidates = [
-            Path("/usr/lib/llvm-18/lib/libclang.so.18"),
-            Path("/usr/lib/llvm-18/lib/libclang.so"),
+        for maj in (21, 20, 19, 18, 17, 16):
+            path_candidates.extend([
+                Path(f"/usr/lib/llvm-{maj}/lib/libclang.so.{maj}"),
+                Path(f"/usr/lib/llvm-{maj}/lib/libclang.so"),
+            ])
+        # Generic fallbacks
+        path_candidates.extend([
+            Path("/usr/local/lib/libclang.so.21"),
+            Path("/usr/local/lib/libclang.so.20"),
+            Path("/usr/local/lib/libclang.so.19"),
             Path("/usr/local/lib/libclang.so.18"),
+            Path("/usr/local/lib/libclang.so.17"),
+            Path("/usr/local/lib/libclang.so.16"),
             Path("/usr/local/lib/libclang.so"),
+            Path("/usr/lib/libclang.so.21"),
+            Path("/usr/lib/libclang.so.20"),
+            Path("/usr/lib/libclang.so.19"),
             Path("/usr/lib/libclang.so.18"),
-        ]
+            Path("/usr/lib/libclang.so.17"),
+            Path("/usr/lib/libclang.so.16"),
+            Path("/usr/lib/libclang.so"),
+        ])
     elif sys_name == "Darwin":
-        # Homebrew llvm@18
-        candidates = [
-            Path("/opt/homebrew/opt/llvm@18/lib/libclang.dylib"),
-            Path("/usr/local/opt/llvm@18/lib/libclang.dylib"),
-            # Some systems may symlink without @18, still verify major=18
+        # Homebrew llvm@N formulas
+        for maj in (21, 20, 19, 18, 17, 16):
+            path_candidates.append(Path(f"/opt/homebrew/opt/llvm@{maj}/lib/libclang.dylib"))
+            path_candidates.append(Path(f"/usr/local/opt/llvm@{maj}/lib/libclang.dylib"))
+        # Generic llvm formula path (may be symlinked to a specific version)
+        path_candidates.extend([
             Path("/opt/homebrew/opt/llvm/lib/libclang.dylib"),
             Path("/usr/local/opt/llvm/lib/libclang.dylib"),
-        ]
+        ])
     else:
-        # Best-effort on other systems
-        candidates = [
+        # Best-effort on other systems (Windows)
+        path_candidates = [
             Path("C:/Program Files/LLVM/bin/libclang.dll"),
         ]
 
-    for cand in candidates:
-        if cand.exists() and _ensure_v18_and_set(str(cand)):
+    # Include additional globbed candidates for distributions that install versioned sonames like libclang.so.21.1.4
+    try:
+        extra_glob_dirs = [
+            Path("/usr/lib"),
+            Path("/usr/local/lib"),
+            Path("/lib"),
+            Path("/usr/lib64"),
+            Path("/lib64"),
+            Path("/usr/lib/x86_64-linux-gnu"),
+        ]
+        extra_globs: List[Path] = []
+        for d in extra_glob_dirs:
+            try:
+                extra_globs.extend(d.glob("libclang.so.*"))
+            except Exception:
+                pass
+        # Deduplicate while preserving order (Path is hashable)
+        seen = set()
+        merged_candidates: List[Path] = []
+        for p in list(path_candidates) + extra_globs:
+            if p not in seen:
+                merged_candidates.append(p)
+                seen.add(p)
+    except Exception:
+        merged_candidates = list(path_candidates)
+
+    for cand in merged_candidates:
+        if cand.exists() and _ensure_supported_and_set(str(cand)):
             return cindex
 
-    # If we got here, we failed to locate a valid libclang 18
-    raise RuntimeError(
-        "Failed to locate libclang 18.x. This tool only supports clang 18.\n"
-        "Fix options:\n"
-        "- On Ubuntu/Debian: sudo apt-get install -y llvm-18 clang-18 libclang-18-dev\n"
-        "- On macOS (Homebrew): brew install llvm@18\n"
-        "- Then set env (if not auto-detected):\n"
-        "    export CLANG_LIBRARY_FILE=/usr/lib/llvm-18/lib/libclang.so   # Linux\n"
-        "    export CLANG_LIBRARY_FILE=/opt/homebrew/opt/llvm@18/lib/libclang.dylib  # macOS\n"
-    )
+    # Final fallback: try using system default resolution without explicitly setting the library file.
+    # Some distributions (e.g., Arch) place libclang in standard linker paths (/usr/lib/libclang.so),
+    # which clang.cindex can locate without Config.set_library_file.
+    try:
+        _ = cindex.Index.create()
+        return cindex
+    except Exception:
+        pass
 
+    # If we got here, we failed to locate a supported libclang 16-21
+    raise RuntimeError(
+        "Failed to locate libclang 16-21. This tool supports clang 16-21.\n"
+        "Fix options:\n"
+        "- On Ubuntu/Debian: sudo apt-get install -y llvm-21 clang-21 libclang-21-dev (or 20/19/18/17/16).\n"
+        "- On macOS (Homebrew): brew install llvm@21 (or @20/@19/@18/@17/@16).\n"
+        "- On Arch Linux: ensure clang provides /usr/lib/libclang.so (it usually does) or set CLANG_LIBRARY_FILE explicitly.\n"
+        "- Then set env (if not auto-detected):\n"
+        "    export CLANG_LIBRARY_FILE=/usr/lib/llvm-21/lib/libclang.so   # Linux (adjust version)\n"
+        "    export CLANG_LIBRARY_FILE=/opt/homebrew/opt/llvm@21/lib/libclang.dylib  # macOS (adjust version)\n"
+    )
 # ---------------------------
 # Data structures
 # ---------------------------
@@ -522,9 +588,12 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             candidates: List[str] = []
             if sys_name == "Linux":
                 candidates = [
+                    "/usr/lib/llvm-21/lib/libclang.so",
                     "/usr/lib/llvm-20/lib/libclang.so",
                     "/usr/lib/llvm-19/lib/libclang.so",
                     "/usr/lib/llvm-18/lib/libclang.so",
+                    "/usr/lib/llvm-17/lib/libclang.so",
+                    "/usr/lib/llvm-16/lib/libclang.so",
                     "/usr/lib/libclang.so",
                     "/usr/local/lib/libclang.so",
                 ]
@@ -535,7 +604,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                     "/usr/local/opt/llvm/lib/libclang.dylib",
                 ]
 
-            good = [p for p in lib_candidates if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")]
+            good = [p for p in candidates if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")]
             hint = ""
             if good:
                 hint = f"\nSuggested library with required symbol:\n  export CLANG_LIBRARY_FILE={good[0]}\nThen rerun: jarvis-c2rust scan -r {scan_root}"
@@ -545,8 +614,8 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 f"\nDetail: {msg}"
                 "\nThis usually means your Python 'clang' bindings are newer than the installed libclang."
                 "\nFix options:\n"
-                "- Install/update libclang to match your Python 'clang' major version (e.g., 19/20).\n"
-                "- Or pin Python 'clang' to match your system libclang (e.g., pip install 'clang==18.*').\n"
+                "- Install/update libclang to match your Python 'clang' major version (e.g., 16-21).\n"
+                "- Or pin Python 'clang' to match your system libclang (e.g., pip install 'clang>=16,<22').\n"
                 "- Or set CLANG_LIBRARY_FILE to a matching libclang shared library.\n"
                 f"{hint}",
                 fg=typer.colors.RED,
@@ -655,7 +724,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                             "/usr/local/opt/llvm/lib/libclang.dylib",
                         ]
 
-                    good = [lp for lp in lib_candidates if Path(lp).exists() and _has_symbol(lp, "clang_getOffsetOfBase")]
+                    good = [lp for lp in candidates if Path(lp).exists() and _has_symbol(lp, "clang_getOffsetOfBase")]
                     hint = ""
                     if good:
                         hint = f"\nSuggested library with required symbol:\n  export CLANG_LIBRARY_FILE={good[0]}\nThen rerun: jarvis-c2rust scan -r {scan_root}"
