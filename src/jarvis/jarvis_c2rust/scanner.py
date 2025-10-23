@@ -53,68 +53,163 @@ from typing import Dict, Iterable, List, Optional, Set
 # libclang loader
 # ---------------------------
 def _try_import_libclang() -> "clang.cindex":
+    """
+    Load clang.cindex and force libclang 18. This project only supports clang 18.
+    Resolution order:
+    1) Respect CLANG_LIBRARY_FILE (must be clang 18)
+    2) Respect LIBCLANG_PATH (pick libclang.so.18 / libclang.dylib in that dir)
+    3) Respect LLVM_HOME/lib/libclang.*
+    4) Probe common locations for version 18 only
+    If Python bindings are not 18 or libclang is not 18, raise with actionable hints.
+    """
     try:
         from clang import cindex  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "Failed to import clang.cindex. Please install libclang and the python bindings.\n"
-            "Hints:\n"
-            "- pip install clang\n"
-            "- Ensure libclang is installed (e.g., apt install libclang-14 or newer)\n"
-            "- Set env LIBCLANG_PATH to the directory containing libclang.so, or CLANG_LIBRARY_FILE to full path.\n"
-            "- Alternatively set LLVM_HOME to LLVM installation prefix."
+            "Failed to import clang.cindex. This tool only supports clang 18.\n"
+            "Fix:\n"
+            "- pip install 'clang==18.*'\n"
+            "- Ensure libclang 18 is installed (e.g., apt install llvm-18 clang-18 libclang-18-dev)\n"
+            "- Set env CLANG_LIBRARY_FILE to the 18.x shared library, or LIBCLANG_PATH to its directory."
         ) from e
 
-    # Try to set library path/file from environment or common locations
+    # Verify Python clang bindings are 18.x
+    py_major: Optional[int] = None
+    try:
+        import clang as _clang  # type: ignore
+        import re as _re
+        v = getattr(_clang, "__version__", "")
+        if v:
+            m = _re.match(r"(\d+)", str(v))
+            if m:
+                py_major = int(m.group(1))
+    except Exception:
+        py_major = None
+
+    if py_major is None or py_major != 18:
+        raise RuntimeError(
+            "Python 'clang' bindings must be version 18.x for this tool.\n"
+            "Fix:\n"
+            "- pip install --upgrade 'clang==18.*'"
+        )
+
+    # Helper to probe libclang major version
+    def _probe_major_from_lib(path: str) -> Optional[int]:
+        try:
+            import ctypes, re as _re
+            class CXString(ctypes.Structure):
+                _fields_ = [("data", ctypes.c_void_p), ("private_flags", ctypes.c_uint)]
+            lib = ctypes.CDLL(path)
+            lib.clang_getClangVersion.restype = CXString
+            lib.clang_getCString.argtypes = [CXString]
+            lib.clang_disposeString.argtypes = [CXString]
+            s = lib.clang_getClangVersion()
+            cstr = lib.clang_getCString(s)
+            ver = ctypes.cast(cstr, ctypes.c_char_p).value
+            lib.clang_disposeString(s)
+            if ver:
+                v = ver.decode("utf-8", "ignore")
+                m = _re.search(r"clang version (\d+)", v)
+                if m:
+                    return int(m.group(1))
+        except Exception:
+            return None
+        return None
+
+    def _ensure_v18_and_set(lib_path: str) -> bool:
+        major = _probe_major_from_lib(lib_path)
+        if major == 18:
+            try:
+                cindex.Config.set_library_file(lib_path)
+                return True
+            except Exception:
+                return False
+        return False
+
+    # 1) CLANG_LIBRARY_FILE
     lib_file = os.environ.get("CLANG_LIBRARY_FILE")
-    lib_dir = os.environ.get("LIBCLANG_PATH")
-    llvm_home = os.environ.get("LLVM_HOME")
-
-    set_ok = False
     if lib_file and Path(lib_file).exists():
-        try:
-            cindex.Config.set_library_file(lib_file)
-            set_ok = True
-        except Exception:
-            set_ok = False
+        if _ensure_v18_and_set(lib_file):
+            return cindex
+        else:
+            raise RuntimeError(
+                f"CLANG_LIBRARY_FILE points to '{lib_file}', which is not libclang 18.x.\n"
+                "Please set it to the clang-18 library (e.g., /usr/lib/llvm-18/lib/libclang.so)."
+            )
 
-    if not set_ok and lib_dir and Path(lib_dir).exists():
-        try:
-            cindex.Config.set_library_path(lib_dir)
-            set_ok = True
-        except Exception:
-            set_ok = False
+    # 2) LIBCLANG_PATH
+    lib_dir = os.environ.get("LIBCLANG_PATH")
+    if lib_dir and Path(lib_dir).exists():
+        base = Path(lib_dir)
+        candidates = [
+            base / "libclang.so.18",
+            base / "libclang.so",
+            base / "libclang.dylib",   # macOS
+            base / "libclang.dll",     # Windows
+        ]
+        for cand in candidates:
+            if cand.exists() and _ensure_v18_and_set(str(cand)):
+                return cindex
+        # If a directory is given but no valid 18 found, error out explicitly
+        raise RuntimeError(
+            f"LIBCLANG_PATH={lib_dir} does not contain libclang 18.x.\n"
+            "Expected libclang.so.18 (Linux) or libclang.dylib from llvm@18 (macOS)."
+        )
 
-    if not set_ok and llvm_home:
-        cand = Path(llvm_home) / "lib" / "libclang.so"
-        if cand.exists():
-            try:
-                cindex.Config.set_library_file(str(cand))
-                set_ok = True
-            except Exception:
-                set_ok = False
-
-    if not set_ok:
-        # Try some common paths heuristically; ignore errors
-        for p in [
-            "/usr/lib/llvm-18/lib",
-            "/usr/lib/llvm-17/lib",
-            "/usr/lib/llvm-16/lib",
-            "/usr/lib/llvm-15/lib",
-            "/usr/lib/llvm-14/lib",
-            "/usr/lib",
-            "/usr/local/lib",
+    # 3) LLVM_HOME
+    llvm_home = os.environ.get("LLVM_HOME")
+    if llvm_home:
+        p = Path(llvm_home) / "lib"
+        for cand in [
+            p / "libclang.so.18",
+            p / "libclang.so",
+            p / "libclang.dylib",
+            p / "libclang.dll",
         ]:
-            try:
-                if (Path(p) / "libclang.so").exists():
-                    cindex.Config.set_library_file(str(Path(p) / "libclang.so"))
-                    set_ok = True
-                    break
-            except Exception:
-                continue
+            if cand.exists() and _ensure_v18_and_set(str(cand)):
+                return cindex
 
-    return cindex
+    # 4) Common locations for version 18 only
+    import platform as _platform
+    sys_name = _platform.system()
+    candidates: List[Path] = []
+    if sys_name == "Linux":
+        candidates = [
+            Path("/usr/lib/llvm-18/lib/libclang.so.18"),
+            Path("/usr/lib/llvm-18/lib/libclang.so"),
+            Path("/usr/local/lib/libclang.so.18"),
+            Path("/usr/local/lib/libclang.so"),
+            Path("/usr/lib/libclang.so.18"),
+        ]
+    elif sys_name == "Darwin":
+        # Homebrew llvm@18
+        candidates = [
+            Path("/opt/homebrew/opt/llvm@18/lib/libclang.dylib"),
+            Path("/usr/local/opt/llvm@18/lib/libclang.dylib"),
+            # Some systems may symlink without @18, still verify major=18
+            Path("/opt/homebrew/opt/llvm/lib/libclang.dylib"),
+            Path("/usr/local/opt/llvm/lib/libclang.dylib"),
+        ]
+    else:
+        # Best-effort on other systems
+        candidates = [
+            Path("C:/Program Files/LLVM/bin/libclang.dll"),
+        ]
 
+    for cand in candidates:
+        if cand.exists() and _ensure_v18_and_set(str(cand)):
+            return cindex
+
+    # If we got here, we failed to locate a valid libclang 18
+    raise RuntimeError(
+        "Failed to locate libclang 18.x. This tool only supports clang 18.\n"
+        "Fix options:\n"
+        "- On Ubuntu/Debian: sudo apt-get install -y llvm-18 clang-18 libclang-18-dev\n"
+        "- On macOS (Homebrew): brew install llvm@18\n"
+        "- Then set env (if not auto-detected):\n"
+        "    export CLANG_LIBRARY_FILE=/usr/lib/llvm-18/lib/libclang.so   # Linux\n"
+        "    export CLANG_LIBRARY_FILE=/opt/homebrew/opt/llvm@18/lib/libclang.dylib  # macOS\n"
+    )
 
 # ---------------------------
 # Data structures
@@ -234,12 +329,13 @@ def insert_function(conn: sqlite3.Connection, fn: FunctionInfo) -> None:
         ),
     )
 
-
 # ---------------------------
 # Compile commands loader
 # ---------------------------
 def find_compile_commands(start: Path) -> Optional[Path]:
-    # Search upward for compile_commands.json
+    """
+    Search upward from 'start' for compile_commands.json
+    """
     cur = start.resolve()
     root = cur.anchor
     while True:
@@ -254,7 +350,8 @@ def find_compile_commands(start: Path) -> Optional[Path]:
 
 def load_compile_commands(cc_path: Path) -> Dict[str, List[str]]:
     """
-    Returns: mapping file -> compile args (excluding the compiler executable)
+    Load compile_commands.json and return a mapping:
+      file(abs path str) -> compile args (list[str], without compiler executable)
     """
     try:
         data = json.loads(cc_path.read_text(encoding="utf-8"))
@@ -267,17 +364,17 @@ def load_compile_commands(cc_path: Path) -> Dict[str, List[str]]:
         if not file_path:
             continue
         if "arguments" in entry and isinstance(entry["arguments"], list):
+            # arguments usually includes the compiler as argv[0]
             args = entry["arguments"][1:] if entry["arguments"] else []
         else:
             # fallback to split command string
             cmd = entry.get("command", "")
-            # naive split; a robust split would need shlex
             import shlex
-
             parts = shlex.split(cmd) if cmd else []
             args = parts[1:] if parts else []
-        # Remove output flags and compile-only flags that confuse libclang parse
-        cleaned = []
+
+        # Clean args: drop compile-only/output flags that confuse libclang
+        cleaned: List[str] = []
         skip_next = False
         for a in args:
             if skip_next:
@@ -293,7 +390,6 @@ def load_compile_commands(cc_path: Path) -> Dict[str, List[str]]:
             cleaned.append(a)
         mapping[str(file_path)] = cleaned
     return mapping
-
 
 # ---------------------------
 # File discovery
@@ -469,6 +565,71 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
         db_path = out_dir / "functions.db"
 
     cindex = _try_import_libclang()
+    # Fallback safeguard: if loader returned None, try importing directly
+    if cindex is None:
+        try:
+            from clang import cindex as _ci  # type: ignore
+            cindex = _ci
+        except Exception as e:
+            raise RuntimeError(f"Failed to load libclang bindings: {e}")
+
+    # Preflight check: verify libclang/python bindings compatibility before scanning
+    try:
+        _ = cindex.Index.create()
+    except Exception as e:
+        msg = str(e)
+        if "undefined symbol" in msg:
+            # Try to suggest a better libclang candidate that contains the missing symbol
+            def _has_symbol(lib_path: str, symbol: str) -> bool:
+                try:
+                    import ctypes
+                    lib = ctypes.CDLL(lib_path)
+                    getattr(lib, symbol)
+                    return True
+                except Exception:
+                    return False
+
+            # Build candidate search dirs (Linux/macOS)
+            import platform as _platform
+            sys_name = _platform.system()
+            candidates: List[str] = []
+            if sys_name == "Linux":
+                candidates = [
+                    "/usr/lib/llvm-20/lib/libclang.so",
+                    "/usr/lib/llvm-19/lib/libclang.so",
+                    "/usr/lib/llvm-18/lib/libclang.so",
+                    "/usr/lib/libclang.so",
+                    "/usr/local/lib/libclang.so",
+                ]
+            elif sys_name == "Darwin":
+                # Homebrew locations
+                candidates = [
+                    "/opt/homebrew/opt/llvm/lib/libclang.dylib",
+                    "/usr/local/opt/llvm/lib/libclang.dylib",
+                ]
+
+            good = [p for p in candidates if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")]
+            hint = ""
+            if good:
+                hint = f"\nSuggested library with required symbol:\n  export CLANG_LIBRARY_FILE={good[0]}\nThen rerun: jarvis-c2rust scan -r {scan_root}"
+
+            typer.secho(
+                "[c2rust-scanner] Detected libclang/python bindings mismatch (undefined symbol)."
+                f"\nDetail: {msg}"
+                "\nThis usually means your Python 'clang' bindings are newer than the installed libclang."
+                "\nFix options:\n"
+                "- Install/update libclang to match your Python 'clang' major version (e.g., 19/20).\n"
+                "- Or pin Python 'clang' to match your system libclang (e.g., pip install 'clang==18.*').\n"
+                "- Or set CLANG_LIBRARY_FILE to a matching libclang shared library.\n"
+                f"{hint}",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        else:
+            # Other initialization errors: surface and exit
+            typer.secho(f"[c2rust-scanner] libclang init failed: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=2)
 
     # compile_commands
     cc_file = find_compile_commands(scan_root)
@@ -495,7 +656,55 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
         try:
             funcs = scan_file(cindex, p, args)
         except Exception as e:
-            # Try without args as fallback
+            # If we hit undefined symbol, it's a libclang/python bindings mismatch; abort with guidance
+            msg = str(e)
+            if "undefined symbol" in msg:
+                def _has_symbol(lib_path: str, symbol: str) -> bool:
+                    try:
+                        import ctypes
+                        lib = ctypes.CDLL(lib_path)
+                        getattr(lib, symbol)
+                        return True
+                    except Exception:
+                        return False
+
+                import platform as _platform
+                sys_name = _platform.system()
+                candidates: List[str] = []
+                if sys_name == "Linux":
+                    candidates = [
+                        "/usr/lib/llvm-20/lib/libclang.so",
+                        "/usr/lib/llvm-19/lib/libclang.so",
+                        "/usr/lib/llvm-18/lib/libclang.so",
+                        "/usr/lib/libclang.so",
+                        "/usr/local/lib/libclang.so",
+                    ]
+                elif sys_name == "Darwin":
+                    candidates = [
+                        "/opt/homebrew/opt/llvm/lib/libclang.dylib",
+                        "/usr/local/opt/llvm/lib/libclang.dylib",
+                    ]
+
+                good = [lp for lp in candidates if Path(lp).exists() and _has_symbol(lp, "clang_getOffsetOfBase")]
+                hint = ""
+                if good:
+                    hint = f"\nSuggested library with required symbol:\n  export CLANG_LIBRARY_FILE={good[0]}\nThen rerun: jarvis-c2rust scan -r {scan_root}"
+
+                typer.secho(
+                    "[c2rust-scanner] Detected libclang/python bindings mismatch during parsing (undefined symbol)."
+                    f"\nDetail: {msg}"
+                    "\nThis usually means your Python 'clang' bindings are newer than the installed libclang."
+                    "\nFix options:\n"
+                    "- Install/update libclang to match your Python 'clang' major version (e.g., 19/20).\n"
+                    "- Or pin Python 'clang' to match your system libclang (e.g., pip install 'clang==18.*').\n"
+                    "- Or set CLANG_LIBRARY_FILE to a matching libclang shared library.\n"
+                    f"{hint}",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(code=2)
+
+            # Try without args as fallback for regular parse errors
             try:
                 funcs = scan_file(cindex, p, [])
             except Exception:
@@ -792,10 +1001,3 @@ def cli(
             raise typer.Exit(code=1)
 
 
-def main() -> None:
-    # Entry point used by console_scripts
-    typer.run(cli)
-
-
-if __name__ == "__main__":
-    main()
