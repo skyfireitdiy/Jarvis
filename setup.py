@@ -38,7 +38,6 @@ setup(
         "typer",
         "plotext==5.2.8",
         "packaging",
-        "clang==18.*",
     ],
     extras_require={
         "dev": ["pytest", "ruff", "mypy", "build", "twine"],
@@ -54,6 +53,11 @@ setup(
             "rank-bm25",
             "pathspec",
         ],
+        "clang16": ["clang==16.*"],
+        "clang17": ["clang==17.*"],
+        "clang18": ["clang==18.*"],
+        "clang19": ["clang==19.*"],
+        "clang20": ["clang==20.*"],
     },
     entry_points={
         "console_scripts": [
