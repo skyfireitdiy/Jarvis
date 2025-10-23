@@ -83,6 +83,9 @@ def llm_plan(
     apply: bool = typer.Option(
         False, "--apply", help="Create directories and add submodule declarations to mod.rs based on Agent output"
     ),
+    crate_name: Optional[str] = typer.Option(
+        None, "--crate-name", help="Override the crate name (and directory). When used with --apply, structure is created under this name"
+    ),
 ) -> None:
     """
     使用 LLM Agent 基于根函数子图规划 Rust crate 模块结构，输出 YAML
@@ -92,7 +95,8 @@ def llm_plan(
     try:
         yaml_text = _plan_crate_yaml_llm()
         if apply:
-            _apply_project_structure_from_yaml(yaml_text, project_root=".")
+            target_root = crate_name if crate_name else "."
+            _apply_project_structure_from_yaml(yaml_text, project_root=target_root)
             typer.secho("[c2rust-llm-planner] Project structure applied.", fg=typer.colors.GREEN)
         if out is None:
             typer.echo(yaml_text)
