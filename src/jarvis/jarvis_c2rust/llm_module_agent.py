@@ -742,8 +742,18 @@ def execute_llm_plan(
         # 解析 crate 目录路径（与 apply 逻辑保持一致）
         try:
             cwd = Path(".").resolve()
-            created_dir = (cwd / f"{cwd.name}-rs") if (target_root == ".") else Path(target_root).resolve()
+            try:
+                resolved_target = Path(target_root).resolve()
+            except Exception:
+                resolved_target = Path(target_root)
+
+            # 若目标根目录为当前目录（无论是 "." 还是绝对路径等价于 cwd），则在当前目录下创建 "<cwd.name>-rs"
+            if target_root == "." or resolved_target == cwd:
+                created_dir = cwd / f"{cwd.name}-rs"
+            else:
+                created_dir = resolved_target
         except Exception:
+            # 兜底：无法解析时直接使用传入的 target_root
             created_dir = Path(target_root)
 
         # 初始化并提交一次目录结构（尽力而为）
@@ -839,6 +849,7 @@ def execute_llm_plan(
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(created_dir))
+            print(f"[c2rust-llm-planner] 在 {os.getcwd()} 目录下执行命令: CodeAgent 初始化")
             # 先运行一次 CodeAgent（初始化与基本配置）
             agent = CodeAgent(need_summary=False, non_interactive=True, plan=False)
             agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
@@ -848,6 +859,7 @@ def execute_llm_plan(
             iter_count = 0
             while True:
                 iter_count += 1
+                print(f"[c2rust-llm-planner] 在 {os.getcwd()} 目录下执行命令: cargo build")
                 build_res = subprocess.run(
                     ["cargo", "build"],
                     capture_output=True,

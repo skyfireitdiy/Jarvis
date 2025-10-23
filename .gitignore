@@ -25,3 +25,95 @@ package-lock.json
 package.json
 node_modules
 *.pyc
+# General
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+.venv/
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+.ipynb_checkpoints
+.pyre/
+.pytype/
+
+# Rust
+target/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+dist/
+coverage/
+.turbo/
+.next/
+.nuxt/
+out/
+
+# Go
+bin/
+vendor/
+coverage.out
+
+# Java
+target/
+*.class
+.gradle/
+build/
+out/
+
+# C/C++
+build/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.obj
+*.dll
+*.dylib
+*.exe
+*.pdb
+
+# .NET
+bin/
+obj/
