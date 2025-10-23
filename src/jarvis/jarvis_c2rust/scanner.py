@@ -1141,8 +1141,7 @@ def run_scan(
     """
     # Determine effective DB path
     root = Path('.')
-    default_db = Path('.') / ".jarvis" / "c2rust" / "functions.db"
-    db_path = db if db else default_db
+    db_path = Path('.') / ".jarvis" / "c2rust" / "functions.db"
 
     # Helper: render a DOT file to PNG using Graphviz 'dot'
     def _render_dot_to_png(dot_file: Path, png_out: Optional[Path] = None) -> Path:
