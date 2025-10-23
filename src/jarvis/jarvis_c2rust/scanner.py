@@ -1011,6 +1011,238 @@ def find_root_function_ids(db_path: Path) -> List[int]:
     return root_ids
 
 
+def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = None) -> Path:
+    """
+    Compute translation order considering multi-roots and recursive cycles, then write order to JSONL.
+    Steps:
+    - Load functions.jsonl and build internal call graph (ID-based).
+    - Find root functions (no callers), sort roots by the size of their reachable subgraph (desc).
+    - Compute SCCs to collapse cycles; perform topological ordering on the condensed DAG from leaves to roots
+      (i.e., nodes/components with no dependencies/callees first) using reversed edges.
+    - Merge components order per root priority: for each root in sorted roots, emit components' nodes in leaves-first order,
+      only those reachable from that root and not yet emitted; finally emit remaining nodes.
+    - Write each emitted step as one JSON object line:
+      {
+        "step": int,
+        "ids": [function_id, ...],    # a group if multiple nodes in SCC or multiple nodes selected
+        "group": bool,
+        "roots": [root_id],           # the root this step is attributed to (empty if residual)
+        "created_at": "YYYY-MM-DDTHH:MM:SS"
+      }
+    """
+    def _resolve_functions_jsonl_path(hint: Path) -> Path:
+        p = Path(hint)
+        if p.is_file():
+            if p.suffix.lower() == ".jsonl":
+                return p
+            if p.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
+                cand = p.parent / "functions.jsonl"
+                if cand.exists():
+                    return cand
+        if p.is_dir():
+            cand = p / "functions.jsonl"
+            if cand.exists():
+                return cand
+        return Path(".") / ".jarvis" / "c2rust" / "functions.jsonl"
+
+    fjsonl = _resolve_functions_jsonl_path(db_path)
+    if not fjsonl.exists():
+        raise FileNotFoundError(f"functions.jsonl not found: {fjsonl}")
+
+    # Load functions and build internal adjacency
+    by_id: Dict[int, Dict[str, Any]] = {}
+    name_to_id: Dict[str, int] = {}
+    adj_names: Dict[int, List[str]] = {}
+    with open(fjsonl, "r", encoding="utf-8") as f:
+        idx = 0
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            idx += 1
+            fid = int(obj.get("id") or idx)
+            nm = obj.get("name") or ""
+            qn = obj.get("qualified_name") or ""
+            calls = obj.get("calls") or []
+            if not isinstance(calls, list):
+                calls = []
+            calls = [c for c in calls if isinstance(c, str) and c]
+            by_id[fid] = {"name": nm, "qname": qn}
+            if nm:
+                name_to_id.setdefault(nm, fid)
+            if qn:
+                name_to_id.setdefault(qn, fid)
+            adj_names[fid] = calls
+
+    # Convert name-based adjacency to id-based adjacency (internal edges only)
+    adj_ids: Dict[int, List[int]] = {}
+    all_ids: List[int] = sorted(by_id.keys())
+    for src in all_ids:
+        internal: List[int] = []
+        for callee in adj_names.get(src, []):
+            cid = name_to_id.get(callee)
+            if cid is not None and cid != src:
+                internal.append(cid)
+        # dedupe
+        try:
+            internal = list(dict.fromkeys(internal))
+        except Exception:
+            internal = sorted(list(set(internal)))
+        adj_ids[src] = internal
+
+    # Root detection and sorting by reachable size (desc)
+    try:
+        roots = find_root_function_ids(db_path)
+    except Exception:
+        roots = []
+
+    def _reachable(start_id: int) -> Set[int]:
+        visited: Set[int] = set()
+        stack: List[int] = [start_id]
+        visited.add(start_id)
+        while stack:
+            s = stack.pop()
+            for v in adj_ids.get(s, []):
+                if v not in visited:
+                    visited.add(v)
+                    stack.append(v)
+        return visited
+
+    root_reach: Dict[int, Set[int]] = {rid: _reachable(rid) for rid in roots}
+    roots_sorted: List[int] = sorted(roots, key=lambda r: len(root_reach.get(r, set())), reverse=True)
+
+    # Tarjan SCC to handle cycles
+    index_counter = 0
+    stack: List[int] = []
+    onstack: Set[int] = set()
+    indices: Dict[int, int] = {}
+    lowlinks: Dict[int, int] = {}
+    sccs: List[List[int]] = []
+
+    def strongconnect(v: int) -> None:
+        nonlocal index_counter, stack
+        indices[v] = index_counter
+        lowlinks[v] = index_counter
+        index_counter += 1
+        stack.append(v)
+        onstack.add(v)
+
+        for w in adj_ids.get(v, []):
+            if w not in indices:
+                strongconnect(w)
+                lowlinks[v] = min(lowlinks[v], lowlinks[w])
+            elif w in onstack:
+                lowlinks[v] = min(lowlinks[v], indices[w])
+
+        # If v is a root node, pop the stack and output an SCC
+        if lowlinks[v] == indices[v]:
+            comp: List[int] = []
+            while True:
+                w = stack.pop()
+                onstack.discard(w)
+                comp.append(w)
+                if w == v:
+                    break
+            sccs.append(sorted(comp))
+
+    for node in all_ids:
+        if node not in indices:
+            strongconnect(node)
+
+    # Map id -> component index
+    id2comp: Dict[int, int] = {}
+    for i, comp in enumerate(sccs):
+        for nid in comp:
+            id2comp[nid] = i
+
+    # Build reversed component DAG (callee -> caller as edges), for leaves-first topo
+    comp_count = len(sccs)
+    comp_rev_adj: Dict[int, Set[int]] = {i: set() for i in range(comp_count)}  # comp_v -> set(comp_u) where u calls v
+    indeg: Dict[int, int] = {i: 0 for i in range(comp_count)}
+
+    for u in all_ids:
+        cu = id2comp[u]
+        for v in adj_ids.get(u, []):
+            cv = id2comp[v]
+            if cu != cv:
+                # reversed: cv -> cu (v dependency to u)
+                if cu not in comp_rev_adj[cv]:
+                    comp_rev_adj[cv].add(cu)
+
+    # indegree on reversed DAG
+    for cv, succs in comp_rev_adj.items():
+        for cu in succs:
+            indeg[cu] += 1
+
+    # Kahn's algorithm on reversed DAG -> leaves-first component order
+    from collections import deque
+    q = deque(sorted([i for i in range(comp_count) if indeg[i] == 0]))
+    comp_order: List[int] = []
+    while q:
+        c = q.popleft()
+        comp_order.append(c)
+        for nxt in sorted(comp_rev_adj.get(c, set())):
+            indeg[nxt] -= 1
+            if indeg[nxt] == 0:
+                q.append(nxt)
+
+    # If not all components are ordered (shouldn't happen), append remaining to stabilize
+    if len(comp_order) < comp_count:
+        remaining = [i for i in range(comp_count) if i not in comp_order]
+        comp_order.extend(sorted(remaining))
+
+    # Emit steps per root priority
+    emitted: Set[int] = set()
+    steps: List[Dict[str, Any]] = []
+    now_ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+
+    def _emit_for_root(root_id: Optional[int]) -> None:
+        reach = root_reach.get(root_id, set()) if root_id is not None else None
+        for comp_idx in comp_order:
+            comp_nodes = sccs[comp_idx]
+            # Select nodes in this component that are both reachable (if root given) and not yet emitted
+            selected: List[int] = []
+            for nid in comp_nodes:
+                if nid in emitted:
+                    continue
+                if reach is None or nid in reach:
+                    selected.append(nid)
+            if selected:
+                # Mark emitted
+                for nid in selected:
+                    emitted.add(nid)
+                steps.append({
+                    "step": len(steps) + 1,
+                    "ids": sorted(selected),
+                    "group": len(selected) > 1,
+                    "roots": [root_id] if root_id is not None else [],
+                    "created_at": now_ts,
+                })
+
+    # Per-root emission in priority order
+    for rid in roots_sorted:
+        _emit_for_root(rid)
+    # Residual nodes not covered by any root (e.g., cycles not reachable from any root or orphan constructs)
+    _emit_for_root(None)
+
+    # Prepare output path
+    if out_path is None:
+        out_path = fjsonl.parent / "translation_order.jsonl"
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Write JSONL
+    with open(out_path, "w", encoding="utf-8") as fo:
+        for st in steps:
+            fo.write(json.dumps(st, ensure_ascii=False) + "\n")
+
+    return out_path
+
+
 def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
     # Generate per-root subgraph DOT files from functions.jsonl into out_dir.
     def _resolve_functions_jsonl_path(hint: Path) -> Path:
@@ -1194,6 +1426,12 @@ def run_scan(
     if not (only_dot or only_subgraphs):
         try:
             scan_directory(root)
+            # After data generated, compute translation order JSONL
+            try:
+                order_path = compute_translation_order_jsonl(data_path)
+                typer.secho(f"[c2rust-scanner] Translation order written: {order_path}", fg=typer.colors.GREEN)
+            except Exception as e2:
+                typer.secho(f"[c2rust-scanner] Failed to compute translation order: {e2}", fg=typer.colors.RED, err=True)
         except Exception as e:
             typer.secho(f"[c2rust-scanner] Error: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
@@ -1208,6 +1446,12 @@ def run_scan(
         if only_subgraphs and subgraphs_dir is None:
             typer.secho("[c2rust-scanner] --only-subgraphs requires --subgraphs-dir to specify output directory", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
+        # Data exists: compute translation order based on current JSONL
+        try:
+            order_path = compute_translation_order_jsonl(data_path)
+            typer.secho(f"[c2rust-scanner] Translation order written: {order_path}", fg=typer.colors.GREEN)
+        except Exception as e2:
+            typer.secho(f"[c2rust-scanner] Failed to compute translation order: {e2}", fg=typer.colors.RED, err=True)
 
     # Generate DOT (global) if requested
     if dot is not None:
