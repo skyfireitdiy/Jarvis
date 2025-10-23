@@ -554,6 +554,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     # JSONL/JSON outputs
     functions_jsonl = out_dir / "functions.jsonl"
     types_jsonl = out_dir / "types.jsonl"
+    symbols_jsonl = out_dir / "symbols.jsonl"
     meta_json = out_dir / "meta.json"
 
     # Prepare libclang
@@ -648,6 +649,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     now_ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
     fn_id_seq = 1
     tp_id_seq = 1
+    sym_id_seq = 1
 
     def _fn_record(fn: FunctionInfo, id_val: int) -> Dict[str, Any]:
         return {
@@ -657,7 +659,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             "signature": fn.signature,
             "return_type": fn.return_type,
             "params": fn.params,
-            "calls": fn.calls,
+            "ref": fn.calls,  # unified field: referenced functions/types
             "file": fn.file,
             "start_line": fn.start_line,
             "start_col": fn.start_col,
@@ -669,12 +671,70 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
         }
 
     def _tp_record(tp: TypeInfo, id_val: int) -> Dict[str, Any]:
+        # For types, 'ref' 表示引用到的类型集合；当前最小实现：若为typedef/alias则包含 underlying_type
+        refs: List[str] = []
+        if tp.underlying_type:
+            try:
+                s = str(tp.underlying_type).strip()
+                if s:
+                    refs.append(s)
+            except Exception:
+                pass
         return {
             "id": id_val,
             "name": tp.name,
             "qualified_name": tp.qualified_name,
             "kind": tp.kind,
             "underlying_type": tp.underlying_type,
+            "ref": refs,
+            "file": tp.file,
+            "start_line": tp.start_line,
+            "start_col": tp.start_col,
+            "end_line": tp.end_line,
+            "end_col": tp.end_col,
+            "language": tp.language,
+            "created_at": now_ts,
+            "updated_at": now_ts,
+        }
+
+    # Unified symbol records (functions and types)
+    def _sym_record_from_function(fn: FunctionInfo, id_val: int) -> Dict[str, Any]:
+        return {
+            "id": id_val,
+            "category": "function",
+            "name": fn.name,
+            "qualified_name": fn.qualified_name,
+            "signature": fn.signature,
+            "return_type": fn.return_type,
+            "params": fn.params,
+            "ref": fn.calls,
+            "file": fn.file,
+            "start_line": fn.start_line,
+            "start_col": fn.start_col,
+            "end_line": fn.end_line,
+            "end_col": fn.end_col,
+            "language": fn.language,
+            "created_at": now_ts,
+            "updated_at": now_ts,
+        }
+
+    def _sym_record_from_type(tp: TypeInfo, id_val: int) -> Dict[str, Any]:
+        refs_t: List[str] = []
+        if tp.underlying_type:
+            try:
+                s = str(tp.underlying_type).strip()
+                if s:
+                    refs_t.append(s)
+            except Exception:
+                pass
+        return {
+            "id": id_val,
+            "category": "type",
+            "name": tp.name,
+            "qualified_name": tp.qualified_name,
+            "kind": tp.kind,
+            "underlying_type": tp.underlying_type,
+            "ref": refs_t,
             "file": tp.file,
             "start_line": tp.start_line,
             "start_col": tp.start_col,
@@ -688,6 +748,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     # Open JSONL files
     f_fn = functions_jsonl.open("w", encoding="utf-8")
     f_tp = types_jsonl.open("w", encoding="utf-8")
+    f_sym = symbols_jsonl.open("w", encoding="utf-8")
     try:
         for p in files:
             # prefer compile_commands args if available
@@ -754,7 +815,12 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             for fn in funcs:
                 rec = _fn_record(fn, fn_id_seq)
                 f_fn.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                # write unified symbol record
+                srec = _sym_record_from_function(fn, sym_id_seq)
+                f_sym.write(json.dumps(srec, ensure_ascii=False) + "\n")
+                # increase sequences
                 fn_id_seq += 1
+                sym_id_seq += 1
             total_functions += len(funcs)
 
             # Scan types in this file
@@ -769,7 +835,12 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             for t in types:
                 trec = _tp_record(t, tp_id_seq)
                 f_tp.write(json.dumps(trec, ensure_ascii=False) + "\n")
+                # write unified symbol record
+                srec_t = _sym_record_from_type(t, sym_id_seq)
+                f_sym.write(json.dumps(srec_t, ensure_ascii=False) + "\n")
+                # increase sequences
                 tp_id_seq += 1
+                sym_id_seq += 1
             total_types += len(types)
 
             scanned += 1
@@ -784,11 +855,16 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             f_tp.close()
         except Exception:
             pass
+        try:
+            f_sym.close()
+        except Exception:
+            pass
 
     # Write meta.json
     meta = {
         "functions": total_functions,
         "types": total_types,
+        "symbols": total_functions + total_types,
         "generated_at": now_ts,
         "schema_version": 1,
         "source_root": str(scan_root),
@@ -798,8 +874,8 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     except Exception:
         pass
 
-    print(f"[c2rust-scanner] Done. Functions collected: {total_functions}, Types collected: {total_types}")
-    print(f"[c2rust-scanner] JSONL written: {functions_jsonl} (functions), {types_jsonl} (types)")
+    print(f"[c2rust-scanner] Done. Functions collected: {total_functions}, Types collected: {total_types}, Symbols: {total_functions + total_types}")
+    print(f"[c2rust-scanner] JSONL written: {functions_jsonl} (functions), {types_jsonl} (types), {symbols_jsonl} (symbols)")
     print(f"[c2rust-scanner] Meta written: {meta_json}")
     return functions_jsonl
 
@@ -898,7 +974,7 @@ def scan_types_file(cindex, file_path: Path, args: List[str]) -> List[TypeInfo]:
 
 
 def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
-    # Generate a call dependency graph (DOT) from JSONL data.
+    # Generate a reference dependency graph (DOT) from JSONL data.
     def _resolve_functions_jsonl_path(hint: Path) -> Path:
         p = Path(hint)
         if p.is_file():
@@ -923,206 +999,6 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
     # Load function records from JSONL
     rows: List[Any] = []
     with open(fjsonl, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-                rows.append((
-                    int(obj.get("id") or len(rows) + 1),
-                    obj.get("name") or "",
-                    obj.get("qualified_name") or "",
-                    obj.get("signature") or "",
-                    obj.get("calls") or [],
-                ))
-            except Exception:
-                continue
-
-    # Build node map
-    node_id_map: Dict[int, str] = {}      # function id -> dot node id
-    name_to_node: Dict[str, str] = {}     # name/qualified_name -> dot node id
-    node_labels: Dict[str, str] = {}      # dot node id -> label
-    edges = set()
-
-    for row in rows:
-        fid = int(row[0])
-        name = row[1] or ""
-        qname = row[2] or ""
-        signature = row[3] or ""
-        dot_id = f"f{fid}"
-        node_id_map[fid] = dot_id
-        label_base = qname or name or f"fn_{fid}"
-        label = label_base
-        if signature and signature != label_base:
-            label = f"{label_base}\\n{signature}"
-        node_labels[dot_id] = label
-        if label_base:
-            name_to_node[label_base] = dot_id
-        if name:
-            name_to_node.setdefault(name, dot_id)
-        if qname:
-            name_to_node.setdefault(qname, dot_id)
-
-    # External nodes cache
-    external_nodes: Dict[str, str] = {}  # callee name -> dot node id
-    ext_count = 0
-
-    # Build edges
-    for row in rows:
-        fid = int(row[0])
-        dot_src = node_id_map.get(fid)
-        if not dot_src:
-            continue
-        calls = row[4] or []
-        if not isinstance(calls, list):
-            continue
-        for callee in calls:
-            if not isinstance(callee, str) or not callee:
-                continue
-            if callee in name_to_node:
-                dot_dst = name_to_node[callee]
-            else:
-                dot_dst = external_nodes.get(callee)
-                if dot_dst is None:
-                    dot_dst = f"ext{ext_count}"
-                    ext_count += 1
-                    external_nodes[callee] = dot_dst
-                    node_labels[dot_dst] = callee
-            edges.add((dot_src, dot_dst))
-
-    # Write DOT
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write("digraph callgraph {\n")
-        f.write("  rankdir=LR;\n")
-        f.write("  graph [fontsize=10];\n")
-        f.write("  node  [fontsize=10];\n")
-        f.write("  edge  [fontsize=9];\n")
-
-        # Emit nodes: internal (box), external (ellipse dashed gray)
-        for dot_id, label in node_labels.items():
-            is_external = dot_id.startswith("ext")
-            safe_label = label.replace("\\", "\\\\").replace('"', '\\"')
-            if is_external:
-                f.write(f'  {dot_id} [label="{safe_label}", shape=ellipse, style=dashed, color=gray50, fontcolor=gray30];\n')
-            else:
-                f.write(f'  {dot_id} [label="{safe_label}", shape=box];\n')
-
-        # Emit edges
-        for src, dst in sorted(edges):
-            f.write(f"  {src} -> {dst};\n")
-
-        f.write("}\n")
-
-
-def find_root_function_ids(db_path: Path) -> List[int]:
-    # Return IDs of functions with no callers (roots) by reading functions.jsonl.
-    def _resolve_functions_jsonl_path(hint: Path) -> Path:
-        p = Path(hint)
-        if p.is_file():
-            if p.suffix.lower() == ".jsonl":
-                return p
-            if p.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
-                cand = p.parent / "functions.jsonl"
-                if cand.exists():
-                    return cand
-        if p.is_dir():
-            cand = p / "functions.jsonl"
-            if cand.exists():
-                return cand
-        return Path(".") / ".jarvis" / "c2rust" / "functions.jsonl"
-
-    fjsonl = _resolve_functions_jsonl_path(db_path)
-    if not fjsonl.exists():
-        raise FileNotFoundError(f"functions.jsonl not found: {fjsonl}")
-
-    # Load functions
-    records: List[Any] = []
-    with open(fjsonl, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-                fid = int(obj.get("id") or len(records) + 1)
-                name = obj.get("name") or ""
-                qname = obj.get("qualified_name") or ""
-                calls = obj.get("calls") or []
-                records.append((fid, name, qname, calls))
-            except Exception:
-                continue
-
-    name_to_id: Dict[str, int] = {}
-    all_ids: Set[int] = set()
-    for fid, name, qname, _ in records:
-        fid = int(fid)
-        all_ids.add(fid)
-        if isinstance(name, str) and name:
-            name_to_id.setdefault(name, fid)
-        if isinstance(qname, str) and qname:
-            name_to_id.setdefault(qname, fid)
-
-    non_roots: Set[int] = set()
-    for fid, _name, _qname, calls in records:
-        fid = int(fid)
-        if not isinstance(calls, list):
-            continue
-        for callee in calls:
-            if not isinstance(callee, str) or not callee:
-                continue
-            callee_id = name_to_id.get(callee)
-            if callee_id is not None and callee_id != fid:
-                non_roots.add(callee_id)
-
-    root_ids = sorted(list(all_ids - non_roots))
-    return root_ids
-
-
-def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = None) -> Path:
-    """
-    Compute translation order considering multi-roots and recursive cycles, then write order to JSONL.
-    Steps:
-    - Load functions.jsonl and build internal call graph (ID-based).
-    - Find root functions (no callers), sort roots by the size of their reachable subgraph (desc).
-    - Compute SCCs to collapse cycles; perform topological ordering on the condensed DAG from leaves to roots
-      (i.e., nodes/components with no dependencies/callees first) using reversed edges.
-    - Merge components order per root priority: for each root in sorted roots, emit components' nodes in leaves-first order,
-      only those reachable from that root and not yet emitted; finally emit remaining nodes.
-    - Write each emitted step as one JSON object line:
-      {
-        "step": int,
-        "ids": [function_id, ...],    # a group if multiple nodes in SCC or multiple nodes selected
-        "group": bool,
-        "roots": [root_id],           # the root this step is attributed to (empty if residual)
-        "created_at": "YYYY-MM-DDTHH:MM:SS"
-      }
-    """
-    def _resolve_functions_jsonl_path(hint: Path) -> Path:
-        p = Path(hint)
-        if p.is_file():
-            if p.suffix.lower() == ".jsonl":
-                return p
-            if p.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
-                cand = p.parent / "functions.jsonl"
-                if cand.exists():
-                    return cand
-        if p.is_dir():
-            cand = p / "functions.jsonl"
-            if cand.exists():
-                return cand
-        return Path(".") / ".jarvis" / "c2rust" / "functions.jsonl"
-
-    fjsonl = _resolve_functions_jsonl_path(db_path)
-    if not fjsonl.exists():
-        raise FileNotFoundError(f"functions.jsonl not found: {fjsonl}")
-
-    # Load functions and build internal adjacency
-    by_id: Dict[int, Dict[str, Any]] = {}
-    name_to_id: Dict[str, int] = {}
-    adj_names: Dict[int, List[str]] = {}
-    with open(fjsonl, "r", encoding="utf-8") as f:
         idx = 0
         for line in f:
             line = line.strip()
@@ -1136,17 +1012,17 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
             fid = int(obj.get("id") or idx)
             nm = obj.get("name") or ""
             qn = obj.get("qualified_name") or ""
-            calls = obj.get("calls") or []
-            if not isinstance(calls, list):
-                calls = []
-            calls = [c for c in calls if isinstance(c, str) and c]
+            refs = obj.get("ref")
+            # 严格使用 ref 字段；缺失或类型不符时视为空
+            if not isinstance(refs, list):
+                refs = []
+            refs = [c for c in refs if isinstance(c, str) and c]
             by_id[fid] = {"name": nm, "qname": qn}
             if nm:
                 name_to_id.setdefault(nm, fid)
             if qn:
                 name_to_id.setdefault(qn, fid)
-            adj_names[fid] = calls
-
+            adj_names[fid] = refs
     # Convert name-based adjacency to id-based adjacency (internal edges only)
     adj_ids: Dict[int, List[int]] = {}
     all_ids: List[int] = sorted(by_id.keys())
@@ -1312,8 +1188,280 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
     return out_path
 
 
+def find_root_function_ids(db_path: Path) -> List[int]:
+    """
+    Return IDs of root functions (no incoming references) by reading symbols.jsonl (or given .jsonl path).
+    - 严格使用 ref 字段
+    - 仅统计 category == "function" 的记录
+    """
+    def _resolve_symbols_jsonl_path(hint: Path) -> Path:
+        p = Path(hint)
+        if p.is_file() and p.suffix.lower() == ".jsonl":
+            return p
+        if p.is_dir():
+            return p / "symbols.jsonl"
+        # 默认：项目 .jarvis/c2rust/symbols.jsonl
+        return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
+
+    fjsonl = _resolve_symbols_jsonl_path(db_path)
+    if not fjsonl.exists():
+        raise FileNotFoundError(f"symbols.jsonl not found: {fjsonl}")
+
+    records: List[Any] = []
+    with open(fjsonl, "r", encoding="utf-8") as f:
+        idx = 0
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            idx += 1
+            cat = (obj.get("category") or "").strip().lower()
+            if cat and cat != "function":
+                continue
+            fid = int(obj.get("id") or idx)
+            name = obj.get("name") or ""
+            qname = obj.get("qualified_name") or ""
+            refs = obj.get("ref")
+            if not isinstance(refs, list):
+                refs = []
+            refs = [r for r in refs if isinstance(r, str) and r]
+            records.append((fid, name, qname, refs))
+
+    name_to_id: Dict[str, int] = {}
+    all_ids: Set[int] = set()
+    for fid, name, qname, _ in records:
+        fid = int(fid)
+        all_ids.add(fid)
+        if isinstance(name, str) and name:
+            name_to_id.setdefault(name, fid)
+        if isinstance(qname, str) and qname:
+            name_to_id.setdefault(qname, fid)
+
+    non_roots: Set[int] = set()
+    for fid, _name, _qname, refs in records:
+        for target in refs:
+            tid = name_to_id.get(target)
+            if tid is not None and tid != fid:
+                non_roots.add(tid)
+
+    root_ids = sorted(list(all_ids - non_roots))
+    return root_ids
+
+
+def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = None) -> Path:
+    """
+    Compute translation order on reference graph and write order to JSONL.
+    Data source: symbols.jsonl (or provided .jsonl path), strictly using ref field and including both functions and types (symbols).
+    Output:
+      Each line is a JSON object:
+        {
+          "step": int,
+          "ids": [function_id, ...],
+          "group": bool,
+          "roots": [root_id],      # root this step is attributed to (empty if residual)
+          "created_at": "YYYY-MM-DDTHH:MM:SS"
+        }
+    """
+    def _resolve_symbols_jsonl_path(hint: Path) -> Path:
+        p = Path(hint)
+        if p.is_file() and p.suffix.lower() == ".jsonl":
+            return p
+        if p.is_dir():
+            return p / "symbols.jsonl"
+        return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
+
+    fjsonl = _resolve_symbols_jsonl_path(db_path)
+    if not fjsonl.exists():
+        raise FileNotFoundError(f"symbols.jsonl not found: {fjsonl}")
+
+    # Load functions and build name-based adjacency from ref
+    by_id: Dict[int, Dict[str, Any]] = {}
+    name_to_id: Dict[str, int] = {}
+    adj_names: Dict[int, List[str]] = {}
+    with open(fjsonl, "r", encoding="utf-8") as f:
+        idx = 0
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            idx += 1
+            cat = (obj.get("category") or "").strip().lower()
+            # 仅接收 function 与 type 两类符号，其他类别忽略
+            if cat not in ("function", "type"):
+                continue
+            fid = int(obj.get("id") or idx)
+            nm = obj.get("name") or ""
+            qn = obj.get("qualified_name") or ""
+            refs = obj.get("ref")
+            if not isinstance(refs, list):
+                refs = []
+            refs = [r for r in refs if isinstance(r, str) and r]
+            by_id[fid] = {"name": nm, "qname": qn}
+            if nm:
+                name_to_id.setdefault(nm, fid)
+            if qn:
+                name_to_id.setdefault(qn, fid)
+            adj_names[fid] = refs
+
+    # Convert to id-based adjacency (internal edges only)
+    adj_ids: Dict[int, List[int]] = {}
+    all_ids: List[int] = sorted(by_id.keys())
+    for src in all_ids:
+        internal: List[int] = []
+        for target in adj_names.get(src, []):
+            tid = name_to_id.get(target)
+            if tid is not None and tid != src:
+                internal.append(tid)
+        try:
+            internal = list(dict.fromkeys(internal))
+        except Exception:
+            internal = sorted(list(set(internal)))
+        adj_ids[src] = internal
+
+    # Roots by incoming degree (no incoming)
+    try:
+        roots = find_root_function_ids(fjsonl)
+    except Exception:
+        roots = []
+
+    # Tarjan SCC
+    index_counter = 0
+    stack: List[int] = []
+    onstack: Set[int] = set()
+    indices: Dict[int, int] = {}
+    lowlinks: Dict[int, int] = {}
+    sccs: List[List[int]] = []
+
+    def strongconnect(v: int) -> None:
+        nonlocal index_counter, stack
+        indices[v] = index_counter
+        lowlinks[v] = index_counter
+        index_counter += 1
+        stack.append(v)
+        onstack.add(v)
+
+        for w in adj_ids.get(v, []):
+            if w not in indices:
+                strongconnect(w)
+                lowlinks[v] = min(lowlinks[v], lowlinks[w])
+            elif w in onstack:
+                lowlinks[v] = min(lowlinks[v], indices[w])
+
+        if lowlinks[v] == indices[v]:
+            comp: List[int] = []
+            while True:
+                w = stack.pop()
+                onstack.discard(w)
+                comp.append(w)
+                if w == v:
+                    break
+            sccs.append(sorted(comp))
+
+    for node in all_ids:
+        if node not in indices:
+            strongconnect(node)
+
+    # Component DAG (reversed: dependency -> dependent) for leaves-first order
+    id2comp: Dict[int, int] = {}
+    for i, comp in enumerate(sccs):
+        for nid in comp:
+            id2comp[nid] = i
+
+    comp_count = len(sccs)
+    comp_rev_adj: Dict[int, Set[int]] = {i: set() for i in range(comp_count)}
+    indeg: Dict[int, int] = {i: 0 for i in range(comp_count)}
+    for u in all_ids:
+        cu = id2comp[u]
+        for v in adj_ids.get(u, []):
+            cv = id2comp[v]
+            if cu != cv:
+                if cu not in comp_rev_adj[cv]:
+                    comp_rev_adj[cv].add(cu)
+    for cv, succs in comp_rev_adj.items():
+        for cu in succs:
+            indeg[cu] += 1
+
+    # Kahn on reversed DAG
+    from collections import deque
+    q = deque(sorted([i for i in range(comp_count) if indeg[i] == 0]))
+    comp_order: List[int] = []
+    while q:
+        c = q.popleft()
+        comp_order.append(c)
+        for nxt in sorted(comp_rev_adj.get(c, set())):
+            indeg[nxt] -= 1
+            if indeg[nxt] == 0:
+                q.append(nxt)
+
+    if len(comp_order) < comp_count:
+        remaining = [i for i in range(comp_count) if i not in comp_order]
+        comp_order.extend(sorted(remaining))
+
+    # Emit steps by root priority (roots sorted by reachable size desc in generate_dot_from_db)
+    emitted: Set[int] = set()
+    steps: List[Dict[str, Any]] = []
+    now_ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+
+    # precompute reachability per root
+    def _reachable(start_id: int) -> Set[int]:
+        visited: Set[int] = set()
+        stack2: List[int] = [start_id]
+        visited.add(start_id)
+        while stack2:
+            s = stack2.pop()
+            for v in adj_ids.get(s, []):
+                if v not in visited:
+                    visited.add(v)
+                    stack2.append(v)
+        return visited
+
+    root_reach: Dict[int, Set[int]] = {rid: _reachable(rid) for rid in roots}
+
+    def _emit_for_root(root_id: Optional[int]) -> None:
+        reach = root_reach.get(root_id, set()) if root_id is not None else None
+        for comp_idx in comp_order:
+            comp_nodes = sccs[comp_idx]
+            selected: List[int] = []
+            for nid in comp_nodes:
+                if nid in emitted:
+                    continue
+                if reach is None or nid in reach:
+                    selected.append(nid)
+            if selected:
+                for nid in selected:
+                    emitted.add(nid)
+                steps.append({
+                    "step": len(steps) + 1,
+                    "ids": sorted(selected),
+                    "group": len(selected) > 1,
+                    "roots": [root_id] if root_id is not None else [],
+                    "created_at": now_ts,
+                })
+
+    for rid in sorted(roots, key=lambda r: len(root_reach.get(r, set())), reverse=True):
+        _emit_for_root(rid)
+    _emit_for_root(None)
+
+    if out_path is None:
+        out_path = fjsonl.parent / "translation_order.jsonl"
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as fo:
+        for st in steps:
+            fo.write(json.dumps(st, ensure_ascii=False) + "\n")
+    return out_path
+
+
 def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
-    # Generate per-root subgraph DOT files from functions.jsonl into out_dir.
+    # Generate per-root reference subgraph DOT files from functions.jsonl into out_dir.
     def _resolve_functions_jsonl_path(hint: Path) -> Path:
         p = Path(hint)
         if p.is_file():
@@ -1366,7 +1514,7 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
                 name_to_id.setdefault(nm, fid)
             if qn:
                 name_to_id.setdefault(qn, fid)
-            adj[fid] = calls
+            adj[fid] = refs
 
     def base_label(fid: int) -> str:
         meta = by_id.get(fid, {})
@@ -1431,7 +1579,7 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
         fname = f"subgraph_root_{rid}_{sanitize_filename(root_base)}.dot"
         out_path = out_dir / fname
         with open(out_path, "w", encoding="utf-8") as f:
-            f.write("digraph callgraph_sub {\n")
+            f.write("digraph refgraph_sub {\n")
             f.write("  rankdir=LR;\n")
             f.write("  graph [fontsize=10];\n")
             f.write("  node  [fontsize=10];\n")
@@ -1466,7 +1614,7 @@ def run_scan(
     # Scan for C/C++ functions and persist results to JSONL; optionally generate DOT.
     # Determine data path
     root = Path('.')
-    data_path = Path('.') / ".jarvis" / "c2rust" / "functions.jsonl"
+    data_path = Path('.') / ".jarvis" / "c2rust" / "symbols.jsonl"
 
     # Helper: render a DOT file to PNG using Graphviz 'dot'
     def _render_dot_to_png(dot_file: Path, png_out: Optional[Path] = None) -> Path:
