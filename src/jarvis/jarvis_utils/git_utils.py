@@ -719,6 +719,45 @@ def confirm_add_new_files() -> None:
             "是否要添加这些变更（如果不需要请修改.gitignore文件以忽略不需要的文件）？",
             False,
         ):
+            # 用户选择 N：自动将未跟踪文件列表添加到仓库根目录的 .gitignore
+            try:
+                repo_root_result = subprocess.run(
+                    ["git", "rev-parse", "--show-toplevel"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                repo_root = repo_root_result.stdout.strip() or "."
+            except Exception:
+                repo_root = "."
+            gitignore_path = os.path.join(repo_root, ".gitignore")
+
+            # 仅对未跟踪的新文件进行忽略（已跟踪文件无法通过 .gitignore 忽略）
+            files_to_ignore = sorted(set(new_files))
+
+            # 读取已存在的 .gitignore 以避免重复添加
+            existing_lines: Set[str] = set()
+            try:
+                if os.path.exists(gitignore_path):
+                    with open(gitignore_path, "r", encoding="utf-8") as f:
+                        existing_lines = set(line.strip() for line in f if line.strip())
+            except Exception:
+                existing_lines = set()
+
+            # 追加未存在的文件路径到 .gitignore（使用相对于仓库根目录的路径）
+            try:
+                with open(gitignore_path, "a", encoding="utf-8") as f:
+                    for file in files_to_ignore:
+                        abs_path = os.path.abspath(file)
+                        rel_path = os.path.relpath(abs_path, repo_root)
+                        # 避免无效的相对路径（不应出现 .. 前缀），有则回退用原始值
+                        entry = rel_path if not rel_path.startswith("..") else file
+                        if entry not in existing_lines:
+                            f.write(entry + "\n")
+                PrettyOutput.print("已将未跟踪文件添加到 .gitignore，正在重新检测...", OutputType.INFO)
+            except Exception as e:
+                PrettyOutput.print(f"更新 .gitignore 失败: {str(e)}", OutputType.WARNING)
+
             continue
 
         break
