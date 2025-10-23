@@ -74,41 +74,33 @@ def _sanitize_mod_name(s: str) -> str:
 
 class _GraphLoader:
     """
-    从 functions.jsonl 读取函数与调用关系，提供子图遍历能力
+    从统一的 symbols.jsonl 或回退的 functions.jsonl 读取函数与调用关系，提供子图遍历能力
+    - 优先使用 symbols.jsonl（包含函数与类型，按 category 过滤出函数）
+    - 回退到 functions.jsonl（仅函数）
     """
 
     def __init__(self, db_path: Path, project_root: Path):
         self.project_root = Path(project_root).resolve()
 
-        def _resolve_functions_jsonl_path(hint: Path) -> Path:
+        def _resolve_data_path(hint: Path) -> Path:
             p = Path(hint)
-            if p.is_file():
-                if p.suffix.lower() == ".jsonl":
-                    return p
-                # backward compat: old sqlite path -> sibling functions.jsonl
-                if p.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
-                    cand = p.parent / "functions.jsonl"
-                    if cand.exists():
-                        return cand
+            # 仅支持 symbols.jsonl，不再兼容 functions.jsonl 或 calls 字段
+            # 若直接传入文件路径且为 .jsonl，则直接使用（要求内部包含 category/ref 字段）
+            if p.is_file() and p.suffix.lower() == ".jsonl":
+                return p
+            # 目录：必须存在 symbols.jsonl
             if p.is_dir():
-                cand = p / "functions.jsonl"
-                if cand.exists():
-                    return cand
-            # default to project .jarvis/c2rust
-            return self.project_root / ".jarvis" / "c2rust" / "functions.jsonl"
+                return p / "symbols.jsonl"
+            # 默认：项目 .jarvis/c2rust/symbols.jsonl
+            return self.project_root / ".jarvis" / "c2rust" / "symbols.jsonl"
 
-        self.data_path = _resolve_functions_jsonl_path(Path(db_path))
+        self.data_path = _resolve_data_path(Path(db_path))
         if not self.data_path.exists():
-            raise FileNotFoundError(f"functions.jsonl not found: {self.data_path}")
-
-        self.fn_by_id: Dict[int, _FnMeta] = {}
-        self.name_to_id: Dict[str, int] = {}
-        self.adj: Dict[int, List[str]] = {}
+            raise FileNotFoundError(f"symbols.jsonl not found: {self.data_path}")
         self._load_db()
-
-    def _load_db(self) -> None:
         """
-        Load function metadata and adjacency from functions.jsonl
+        Load function metadata and adjacency from symbols.jsonl (preferred) or functions.jsonl (fallback).
+        当 data_path 指向 symbols.jsonl 时，仅加载 category == "function" 的记录。
         """
         rows_loaded = 0
         try:
@@ -121,30 +113,22 @@ class _GraphLoader:
                         obj = json.loads(line)
                     except Exception:
                         continue
+                    # 当为 symbols.jsonl 时，按 category 过滤
+                    cat = (obj.get("category") or "").strip().lower()
+                    if cat and cat != "function":
+                        continue
                     rows_loaded += 1
                     fid = int(obj.get("id") or rows_loaded)
                     nm = obj.get("name") or ""
                     qn = obj.get("qualified_name") or ""
                     sg = obj.get("signature") or ""
                     fp = obj.get("file") or ""
-                    calls = obj.get("calls") or []
-                    if not isinstance(calls, list):
-                        calls = []
-                    calls = [c for c in calls if isinstance(c, str) and c]
-                    meta = _FnMeta(
-                        id=fid,
-                        name=nm,
-                        qname=qn,
-                        signature=sg,
-                        file=fp,
-                        calls=calls,
-                    )
-                    self.fn_by_id[fid] = meta
-                    if nm:
-                        self.name_to_id.setdefault(nm, fid)
-                    if qn:
-                        self.name_to_id.setdefault(qn, fid)
-                    self.adj[fid] = calls
+                    refs = obj.get("ref")
+                    # 不兼容旧数据：严格要求为列表类型，缺失则视为空
+                    if not isinstance(refs, list):
+                        refs = []
+                    refs = [c for c in refs if isinstance(c, str) and c]
+                    self.adj[fid] = refs
         except FileNotFoundError:
             raise
         except Exception:

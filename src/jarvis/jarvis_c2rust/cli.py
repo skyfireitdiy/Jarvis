@@ -41,7 +41,7 @@ def scan(
     dot: Optional[Path] = typer.Option(
         None,
         "--dot",
-        help="Write call dependency graph to DOT file after scanning (or with --only-dot)",
+        help="Write reference dependency graph to DOT file after scanning (or with --only-dot)",
     ),
     only_dot: bool = typer.Option(
         False,
@@ -51,12 +51,12 @@ def scan(
     subgraphs_dir: Optional[Path] = typer.Option(
         None,
         "--subgraphs-dir",
-        help="Directory to write per-root subgraph DOT files (one file per root function)",
+        help="Directory to write per-root reference subgraph DOT files (one file per root function)",
     ),
     only_subgraphs: bool = typer.Option(
         False,
         "--only-subgraphs",
-        help="Do not rescan. Only generate per-root subgraph DOT files (requires --subgraphs-dir)",
+        help="Do not rescan. Only generate per-root reference subgraph DOT files (requires --subgraphs-dir)",
     ),
     png: bool = typer.Option(
         False,
@@ -65,7 +65,7 @@ def scan(
     ),
 ) -> None:
     """
-    进行 C/C++ 函数扫描并可选生成调用关系 DOT 图
+    进行 C/C++ 函数扫描并可选生成引用关系 DOT 图
     """
     _run_scan(
         dot=dot,
@@ -102,6 +102,40 @@ def llm_plan(
     except Exception as e:
         typer.secho(f"[c2rust-llm-planner] Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
+
+@app.command("transpile")
+def transpile(
+    crate_name: Optional[str] = typer.Option(
+        None, "--crate-name", help="Target Rust crate name (directory). If provided, translations will be written under this crate"
+    ),
+    llm_group: Optional[str] = typer.Option(
+        None, "-g", "--llm-group", help="Specify LLM model group for translation"
+    ),
+    only: Optional[str] = typer.Option(
+        None, "--only", help="Only translate specified functions (name or qualified name), comma-separated"
+    ),
+) -> None:
+    """
+    使用转译器按扫描顺序逐个函数转译并构建修复。
+    需先执行: jarvis-c2rust scan 以生成数据文件（functions.jsonl 与 translation_order.jsonl）
+    默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.jsonl 读取数据。
+    crate_name：用于指定目标crate目录名称（与llm规划中的参数一致）。未指定时使用默认 <cwd>/<cwd.name>-rs。
+    """
+    try:
+        # Lazy import to avoid hard dependency if not used
+        from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
+        only_list = [s.strip() for s in str(only).split(",") if s.strip()] if only else None
+        crate_dir_path = Path(crate_name) if crate_name else None
+        _run_transpile(
+            project_root=Path("."),
+            crate_dir=crate_dir_path,
+            llm_group=llm_group,
+            only=only_list,
+        )
+    except Exception as e:
+        typer.secho(f"[c2rust-transpiler] Error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
 
 def main() -> None:
     """主入口"""
