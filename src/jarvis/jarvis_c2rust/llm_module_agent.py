@@ -839,7 +839,7 @@ def execute_llm_plan(
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(created_dir))
-            agent = CodeAgent(need_summary=False, non_interactive=False, plan=False)
+            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False)
             agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
             print("[c2rust-llm-planner] Cargo.toml updated by CodeAgent.")
         finally:
