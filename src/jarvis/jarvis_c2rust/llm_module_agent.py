@@ -272,7 +272,7 @@ class LLMRustCratePlannerAgent:
         要求：
         - 仅输出一个 <PROJECT> 块
         - <PROJECT> 与 </PROJECT> 之间必须是可解析的 YAML 列表，使用两空格缩进
-        - 目录以 '目录名/:' 表示，子项为列表；文件为纯字符串
+        - 目录以 '目录名/' 表示，子项为列表；文件为纯字符串
         - 块外不得有任何字符（包括空行、注释、Markdown、解释文字、schema等）
         - 不要输出 crate 名称或其他多余字段
         """
@@ -280,15 +280,15 @@ class LLMRustCratePlannerAgent:
 输出规范：
 - 只输出一个 <PROJECT> 块
 - 块外不得有任何字符（包括空行、注释、Markdown 等）
-- 块内必须是 YAML 列表，目录项使用 '<name>/:' 键，值为其子项列表；文件为字符串
+- 块内必须是 YAML 列表，目录项使用 '<name>/' 键，值为其子项列表；文件为字符串
 - 示例（仅供理解，实际请输出项目真实结构）：
   <PROJECT>
   - Cargo.toml
-  - src/:
+  - src/
     - lib.rs
-    - cli/:
+    - cli/
       - main.rs
-    - database/:
+    - database/
       - mod.rs
       - connect.rs
   </PROJECT>
@@ -315,11 +315,12 @@ class LLMRustCratePlannerAgent:
             return m_proj.group(1).strip()
         return text.strip()
 
-    def plan_crate_yaml_with_project(self) -> Tuple[str, str]:
+    def plan_crate_yaml_with_project(self) -> List[Any]:
         """
-        执行主流程并返回：
-        - project_text: 总结阶段输出的 <PROJECT> 块（仅含 YAML）
-        - yaml_text: 从 <PROJECT> 中提取出的 YAML 文本
+        执行主流程并返回解析后的 YAML 对象（列表）：
+        - 列表项：
+          * 字符串：文件，如 "lib.rs"
+          * 字典：目录及其子项，如 {"src": [ ... ]}
         """
         roots = find_root_function_ids(self.db_path)
         roots_ctx = self.loader.build_roots_context(roots)
@@ -346,65 +347,26 @@ class LLMRustCratePlannerAgent:
         summary_output = agent.run(user_prompt)  # type: ignore
         project_text = str(summary_output) if summary_output is not None else ""
         yaml_text = self._extract_yaml_from_project(project_text)
-        return project_text, yaml_text
+        yaml_entries = _parse_project_yaml_entries(yaml_text)
+        return yaml_entries
 
-    def plan_crate_yaml(self) -> str:
+    def plan_crate_yaml(self) -> List[Any]:
         """
-        兼容旧接口：仅返回解析出的 YAML 文本
+        返回解析后的 YAML 对象（列表）
         """
-        project_text, yaml_text = self.plan_crate_yaml_with_project()
-        # 仅返回 YAML，<PROJECT> 由上层（如CLI）按需打印
-        return yaml_text
+        return self.plan_crate_yaml_with_project()
 
 
 def _parse_project_yaml_entries(yaml_text: str) -> List[Any]:
     """
-    将 <PROJECT> 块中的目录结构 YAML 解析为列表结构:
+    使用 PyYAML 解析 <PROJECT> 块中的目录结构 YAML 为列表结构:
     - 文件项: 字符串，如 "lib.rs"
-    - 目录项: 字典，形如 {"src": [ ... ]} 或 {"src/": [ ... ]}
-    优先使用 PyYAML；如不可用则回退到简易缩进解析器（两空格缩进）。
+    - 目录项: 字典，形如 {"src": [ ... ]}
     """
-    try:
-        import yaml  # type: ignore
-        data = yaml.safe_load(yaml_text)
-        if isinstance(data, list):
-            return data
-        return []
-    except Exception:
-        return _parse_project_yaml_by_indent(yaml_text)
+    import yaml  # type: ignore
+    data = yaml.safe_load(yaml_text)
+    return data if isinstance(data, list) else []
 
-def _parse_project_yaml_by_indent(yaml_text: str) -> List[Any]:
-    """
-    简易缩进解析器（两空格缩进）：
-    - 行格式: "<indent>- <item>"
-    - 目录项以 "/:" 结尾，后续更深缩进的项归属该目录
-    """
-    lines = [ln.rstrip() for ln in yaml_text.splitlines() if ln.strip()]
-    root: List[Any] = []
-    # 栈帧: (期待子项缩进, 子项列表)
-    stack: List[Tuple[int, List[Any]]] = [(0, root)]
-    for ln in lines:
-        m = re.match(r'^(\s*)-\s+(.*)$', ln)
-        if not m:
-            continue
-        indent = len(m.group(1))
-        content = m.group(2)
-
-        # 根据当前行缩进调整栈
-        while stack and indent < stack[-1][0]:
-            stack.pop()
-        current_list = stack[-1][1] if stack else root
-
-        if content.endswith('/:'):
-            dir_name = content[:-2]
-            if dir_name.endswith('/'):
-                dir_name = dir_name[:-1]
-            entry: Dict[str, Any] = {dir_name: []}
-            current_list.append(entry)
-            stack.append((indent + 2, entry[dir_name]))
-        else:
-            current_list.append(content)
-    return root
 
 def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
     """
@@ -413,6 +375,9 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
       * 对子目录: mod <dir_name>;
       * 对子文件 *.rs（排除 mod.rs）: mod <file_stem>;
     - 对于文件项: 若不存在则创建空文件
+    特殊规则：
+    - 对 crate 根的 src 目录：不生成 src/mod.rs，而是将子模块声明写入 src/lib.rs；
+      同时忽略对 lib.rs/main.rs 的自引用
     """
     def apply_item(item: Any, dir_path: Path) -> None:
         if isinstance(item, str):
@@ -434,6 +399,8 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
 
             child_mods: List[str] = []
             mod_rs_present = False
+            # 是否为 crate 根下的 src 目录
+            is_src_root_dir = (new_dir == base_path / "src")
 
             # 先创建子项
             for child in (children or []):
@@ -441,7 +408,12 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
                     apply_item(child, new_dir)
                     # 收集 .rs 文件作为子模块
                     if child.endswith(".rs") and child != "mod.rs":
-                        child_mods.append(Path(child).stem)
+                        stem = Path(child).stem
+                        # 在 src 根目录下，忽略 lib.rs 与 main.rs 的自引用
+                        if is_src_root_dir and stem in ("lib", "main"):
+                            pass
+                        else:
+                            child_mods.append(stem)
                     if child == "mod.rs":
                         mod_rs_present = True
                 elif isinstance(child, dict):
@@ -451,7 +423,35 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
                     child_mods.append(sub_mod_name)
                     apply_item(child, new_dir)
 
-            # 确保存在 mod.rs
+            # 对 crate 根的 src 目录，使用 lib.rs 聚合子模块，不创建/更新 src/mod.rs
+            if is_src_root_dir:
+                lib_rs_path = new_dir / "lib.rs"
+                if not lib_rs_path.exists():
+                    try:
+                        lib_rs_path.write_text("", encoding="utf-8")
+                    except Exception:
+                        pass
+                try:
+                    existing = lib_rs_path.read_text(encoding="utf-8") if lib_rs_path.exists() else ""
+                except Exception:
+                    existing = ""
+                existing_lines = existing.splitlines()
+                existing_decls = set(
+                    ln.strip() for ln in existing_lines if ln.strip().startswith("mod ") and ln.strip().endswith(";")
+                )
+                for mod_name in sorted(set(child_mods)):
+                    decl = f"mod {mod_name};"
+                    if decl not in existing_decls:
+                        existing_lines.append(decl)
+                        existing_decls.add(decl)
+                # 写回 lib.rs
+                try:
+                    lib_rs_path.write_text("\n".join(existing_lines).rstrip() + ("\n" if existing_lines else ""), encoding="utf-8")
+                except Exception:
+                    pass
+                return  # 不再为 src 目录处理 mod.rs
+
+            # 非 src 目录：确保存在 mod.rs
             mod_rs_path = new_dir / "mod.rs"
             if not mod_rs_present and not mod_rs_path.exists():
                 try:
@@ -513,8 +513,8 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     try:
         cwd = Path(".").resolve()
         if requested_root == cwd:
-            # 默认crate不能设置为 .，设置为 父目录/当前目录名-rs
-            base_dir = cwd.parent / f"{cwd.name}-rs"
+            # 默认crate不能设置为 .，设置为 当前目录/当前目录名-rs
+            base_dir = cwd / f"{cwd.name}-rs"
         else:
             base_dir = requested_root
     except Exception:
@@ -529,12 +529,10 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
 def plan_crate_yaml_llm(
     project_root: Union[Path, str] = ".",
     db_path: Optional[Union[Path, str]] = None,
-) -> str:
+) -> List[Any]:
     """
-    便捷函数：使用 LLM 生成 Rust crate 模块规划（YAML）
-    - 主对话阶段仅传入上下文并输出 <!!!COMPLETE!!!> 以触发自动完成
-    - 总结阶段输出 <PROJECT> 块（仅含 YAML）
-    - 本函数最终解析并返回 <PROJECT> 中的 YAML
+    便捷函数：使用 LLM 生成 Rust crate 模块规划（解析后的对象）
+    返回值为解析后的 YAML 列表对象（entries），便于后续直接应用
     """
     agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
-    return agent.plan_crate_yaml()
+    return agent.plan_crate_yaml_with_project()
