@@ -179,16 +179,6 @@ def llm_plan(
             dir_ctx = _format_tree(created_dir)
             crate_pkg_name = created_dir.name
 
-            # Detect lib/bin entry files
-            lib_exists = (created_dir / "src" / "lib.rs").exists()
-            cli_main_path = created_dir / "src" / "cli" / "main.rs"
-            root_main_path = created_dir / "src" / "main.rs"
-            bin_path = ""
-            if cli_main_path.exists():
-                bin_path = "src/cli/main.rs"
-            elif root_main_path.exists():
-                bin_path = "src/main.rs"
-
             # Prepare CodeAgent requirement
             requirement_lines = [
                 "请在该crate目录下编辑 Cargo.toml，配置入口并限制Rust版本：",
@@ -199,11 +189,8 @@ def llm_plan(
                 "",
                 "修改要求：",
                 '- 在 [package] 中将 edition 设置为 "2024"（如已存在则覆盖）。',
+                "- 请根据上述目录结构，自动补充或修正 [lib] 与 [[bin]] 的入口配置（如存在对应文件）；若不存在则不要新增。",
             ]
-            if lib_exists:
-                requirement_lines.append('- 添加或更新 [lib]：path = "src/lib.rs"。')
-            if bin_path:
-                requirement_lines.append(f'- 添加或更新 [[bin]]：name = "{crate_pkg_name}", path = "{bin_path}"。')
             requirement_lines.extend([
                 "- 保留其他已有字段与依赖不变。",
                 "- 仅修改 Cargo.toml 一个文件并提交补丁。",
