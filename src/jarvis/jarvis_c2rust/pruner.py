@@ -24,12 +24,15 @@ def evaluate_third_party_replacements(
     out_mapping_path: Optional[Path] = None,
     llm_group: Optional[str] = None,
     max_funcs: Optional[int] = None,
+    mode: str = "lib",
 ) -> Dict[str, Path]:
     """
-    自顶向下使用 Agent 评估函数是否可由 Rust 标准库（std）或开源第三方库的单个函数调用直接替代：
-    - 若可替代：消除该函数以及其“子引用”（沿 ref 有向边可达的后继函数），这些子引用无需再评估
+    自顶向下使用 Agent 评估函数是否可由 Rust 标准库（std）或开源第三方库的单个函数调用直接替代。
+    剪枝行为由参数 mode 控制：
+    - lib（保守）：仅移除被替代的当前函数本身（其子函数仍参与后续评估/转译）
+    - bin（激进）：移除被替代函数，并采用不动点算法递归删除所有“其父级均位于已删除集合中的后继函数”；这些被删除的后继不再评估
     - 仅对函数（category == "function"）生效，类型记录不受影响
-    - 生成新的符号表（剔除被替代函数及其子引用）与替代映射清单
+    - 生成新的符号表与替代映射清单
 
     输入:
       - db_path: 指向 symbols.jsonl 的路径或其所在目录
@@ -37,6 +40,7 @@ def evaluate_third_party_replacements(
       - out_mapping_path: 替代映射路径（默认: <data_dir>/third_party_replacements.jsonl，兼容命名，实际包含 std/crate 两类替代）
       - llm_group: 可选，传给 CodeAgent 的 model_group，用于平台/模型选择
       - max_funcs: 可选，最多评估的函数数量（调试/限流用）
+      - mode: 剪枝模式，"lib"（保守）或 "bin"（激进，按唯一父级不动点删除）
 
     返回:
       Dict[str, Path]: {"symbols": 新符号表路径, "mapping": 替代映射路径}
@@ -129,6 +133,35 @@ def evaluate_third_party_replacements(
         except Exception:
             internal = sorted(list(set(internal)))
         adj_func[fid] = internal
+
+    # 2.1) 构造入边（父引用）映射，仅限函数内部图
+    parents_map: Dict[int, Set[int]] = {}
+    for _u, _vs in adj_func.items():
+        for _v in _vs:
+            parents_map.setdefault(_v, set()).add(_u)
+
+    def _collect_exclusive_descendants(start: int) -> Set[int]:
+        """
+        bin 模式：仅移除 start 以及那些“其所有父级都在已移除集合（含 start 与之前已剪枝集合）中的后继”。
+        采用不动点法逐层扩展。
+        """
+        removed: Set[int] = set([start])
+        # 基于当前已剪枝集合，允许与其组合判断“父集合是否完全位于已移除集合中”
+        base_removed: Set[int] = set(pruned)  # type: ignore[name-defined]
+        changed = True
+        while changed:
+            changed = False
+            frontier = list(removed)  # 仅从当前已移除集合的边界向外检查
+            for u in frontier:
+                for v in adj_func.get(u, []):
+                    if v in removed or v in base_removed:
+                        continue
+                    parents = parents_map.get(v, set())
+                    # 允许父集合为空的情况不触发移除（但在此图中若 v 为 u 的子节点则 parents 至少包含 u）
+                    if parents and parents.issubset(base_removed.union(removed)):
+                        removed.add(v)
+                        changed = True
+        return removed
 
     # 3) 根（无入边）函数集合（从全量符号根中过滤出函数）
     try:
@@ -442,8 +475,12 @@ def evaluate_third_party_replacements(
                     }
                 )
                 repl_ids.add(fid)
-            # 剪枝：该函数及其可达子节点全部剔除，同时这些子节点不再评估
-            desc = _collect_descendants(fid)
+            # 剪枝：依据模式删除当前函数及可能的后继；在 bin 模式中，被删除的后继不再评估
+            # 剪枝策略：bin 模式激进（不动点扩展删除依赖于已移除集合的子符号）；lib 模式保守（仅删除当前函数本身）
+            if (mode or "lib").lower() == "bin":
+                desc = _collect_exclusive_descendants(fid)
+            else:
+                desc = set([fid])
             lib = res.get("library")
             fun = res.get("function")
             typer.secho(
