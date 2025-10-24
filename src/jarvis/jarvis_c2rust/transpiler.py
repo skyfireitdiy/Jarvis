@@ -5,7 +5,7 @@ C2Rust 转译器模块
 目标：
 - 基于 scanner 生成的 translation_order.jsonl 顺序，逐个函数进行转译
 - 为每个函数：
-  1) 准备上下文：C 源码片段+位置信息、被调用函数（若已转译则提供Rust模块与符号，否则提供原C位置信息）、crate目录结构
+  1) 准备上下文：C 源码片段+位置信息、被调用符号（若已转译则提供Rust模块与符号，否则提供原C位置信息）、crate目录结构
   2) 创建“模块选择与签名Agent”：让其选择合适的Rust模块路径，并在summary输出函数签名
   3) 记录当前进度到 progress.json
   4) 基于上述信息与落盘位置，创建 CodeAgent 生成转译后的Rust函数
@@ -17,7 +17,6 @@ C2Rust 转译器模块
 - 本模块提供 run_transpile(...) 作为对外入口，后续在 cli.py 中挂载为子命令
 - 尽量复用现有 Agent/CodeAgent 能力，保持最小侵入与稳定性
 """
-
 from __future__ import annotations
 
 import json
@@ -43,7 +42,6 @@ SYMBOLS_JSONL = "symbols.jsonl"
 ORDER_JSONL = "translation_order.jsonl"
 PROGRESS_JSON = "progress.json"
 SYMBOL_MAP_JSON = "symbol_map.json"
-TODOS_JSON = "todos.json"
 
 
 @dataclass
@@ -79,8 +77,8 @@ class _DbLoader:
 
     def _load(self) -> None:
         """
-        优先读取统一的 symbols.jsonl；若不存在则回退到 functions.jsonl
-        仅将 category == "function" 的记录加载为 FnRecord（类型将由后续统一流程扩展处理）
+        读取统一的 symbols.jsonl。
+        不区分函数与类型定义，均加载为通用记录（位置与引用信息）。
         """
         def _iter_records_from_file(path: Path):
             try:
@@ -99,18 +97,14 @@ class _DbLoader:
             except FileNotFoundError:
                 return
 
-        # 仅 symbols.jsonl
+        # 加载所有符号记录（函数、类型等）
         for idx, obj in _iter_records_from_file(self.symbols_path):
-            cat = str(obj.get("category") or "").lower()
-            if cat != "function":
-                # 暂时只加载函数，类型在统一流程的后续步骤中处理
-                continue
             fid = int(obj.get("id") or idx)
             nm = obj.get("name") or ""
             qn = obj.get("qualified_name") or ""
             fp = obj.get("file") or ""
             refs = obj.get("ref")
-            # 不兼容旧数据：严格要求为列表类型
+            # 统一使用列表类型的引用字段
             if not isinstance(refs, list):
                 refs = []
             refs = [c for c in refs if isinstance(c, str) and c]
@@ -285,7 +279,6 @@ class Transpiler:
         self.data_dir = self.project_root / C2RUST_DIRNAME
         self.progress_path = self.data_dir / PROGRESS_JSON
         self.symbol_map_path = self.data_dir / SYMBOL_MAP_JSON
-        self.todos_path = self.data_dir / TODOS_JSON
         self.llm_group = llm_group
         self.max_retries = max_retries
         self.resume = resume
@@ -296,8 +289,6 @@ class Transpiler:
 
         self.progress: Dict[str, Any] = _read_json(self.progress_path, {"current": None, "converted": []})
         self.symbol_map: Dict[str, Dict[str, str]] = _read_json(self.symbol_map_path, {})
-        # 待消除的 TODO 记录：键为 C 符号（可能是name或qualified_name），值为列表[{rust_module, rust_fn}]
-        self.todos: Dict[str, List[Dict[str, str]]] = _read_json(self.todos_path, {})
 
         # 尝试确保 crate 目录存在（不负责生成结构，假设 plan/apply 已完成）
         self.crate_dir.mkdir(parents=True, exist_ok=True)
@@ -307,9 +298,6 @@ class Transpiler:
 
     def _save_symbol_map(self) -> None:
         _write_json(self.symbol_map_path, self.symbol_map)
-
-    def _save_todos(self) -> None:
-        _write_json(self.todos_path, self.todos)
 
     def _should_skip(self, rec: FnRecord) -> bool:
         # 如果 only 列表非空，则仅处理匹配者
@@ -327,7 +315,7 @@ class Transpiler:
 
     def _collect_callees_context(self, rec: FnRecord) -> List[Dict[str, Any]]:
         """
-        生成被调用函数上下文列表：
+        生成被引用符号上下文列表（不区分函数与类型）：
         - 若已转译：提供 {name, qname, translated: true, rust_module, rust_symbol}
         - 若未转译但存在扫描记录：提供 {name, qname, translated: false, file, start_line, end_line}
         - 若仅名称：提供 {name, qname, translated: false}
@@ -345,7 +333,7 @@ class Transpiler:
                 })
                 ctx.append(entry)
                 continue
-            # 尝试按名称解析ID
+            # 尝试按名称解析ID（函数或类型）
             cid = self.db.get_id_by_name(callee)
             if cid:
                 crec = self.db.get(cid)
@@ -533,7 +521,7 @@ class Transpiler:
             "",
             "注意：所有修改均以补丁方式进行。",
             "",
-            "尚未转换的被调函数如下（请在调用位置使用 todo!(\"<符号>\") 作为占位，以便后续自动消除）：",
+            "尚未转换的被调符号如下（请在调用位置使用 todo!(\"<符号>\") 作为占位，以便后续自动消除）：",
             *[f"- {s}" for s in (unresolved or [])],
         ]
         prompt = "\n".join(requirement_lines)
@@ -551,24 +539,6 @@ class Transpiler:
         """
         m = re.search(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", rust_sig or "")
         return m.group(1) if m else ""
-
-    def _record_todos_for_untranslated(self, rec: FnRecord, module: str, rust_sig: str) -> None:
-        """
-        记录当前函数中因未转换的被调函数而放置的 todo!(\"<symbol>\") 占位信息。
-        - 记录键：未转换的 C 符号（可能为 name 或 qualified_name）
-        - 记录值：列表[{rust_module, rust_fn}]，标记哪个 Rust 函数中存在该占位
-        """
-        rust_fn = self._extract_rust_fn_name_from_sig(rust_sig)
-        if not rust_fn:
-            return
-        holder = {"rust_module": module, "rust_fn": rust_fn}
-        for sym in self._untranslated_callee_symbols(rec):
-            lst = self.todos.get(sym, [])
-            # 去重
-            if not any(it.get("rust_module") == holder["rust_module"] and it.get("rust_fn") == holder["rust_fn"] for it in lst):
-                lst.append(dict(holder))
-            self.todos[sym] = lst
-        self._save_todos()
 
     def _module_file_to_crate_path(self, module: str) -> str:
         """
@@ -595,6 +565,8 @@ class Transpiler:
         - 扫描整个 crate（优先 src/ 目录）中所有 .rs 文件，查找 todo!("符号名") 占位
         - 对每个命中的文件，创建 CodeAgent 将占位替换为对已转换函数的真实调用（可使用 crate::... 完全限定路径或 use 引入）
         - 最小化修改，避免无关重构
+
+        说明：不再使用 todos.json，本方法直接搜索源码中的 todo!("xxxx")。
         """
         if not symbol:
             return
@@ -745,7 +717,6 @@ class Transpiler:
             finally:
                 os.chdir(prev)
 
-
     def _mark_converted(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """记录映射：C 符号 -> Rust 符号与模块路径"""
         rust_symbol = ""
@@ -820,7 +791,7 @@ class Transpiler:
             # 5) 标记已转换与映射记录
             self._mark_converted(rec, module, rust_sig)
 
-            # 6) 若此前有其它函数因依赖当前符号而记录了 todo!(\"<symbol>\")，则立即回头消除
+            # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除
             current_rust_fn = self._extract_rust_fn_name_from_sig(rust_sig)
             # 优先使用限定名匹配，其次使用简单名匹配
             for sym in [rec.qname, rec.name]:
