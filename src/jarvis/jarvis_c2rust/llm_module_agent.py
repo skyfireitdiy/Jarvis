@@ -818,7 +818,7 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
             file_path.parent.mkdir(parents=True, exist_ok=True)
             if not file_path.exists():
                 try:
-                    file_path.write_text("", encoding="utf-8")
+                    file_path.touch(exist_ok=True)
                 except Exception:
                     pass
             return
@@ -857,31 +857,12 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
 
             # 对 crate 根的 src 目录，使用 lib.rs 聚合子模块，不创建/更新 src/mod.rs
             if is_src_root_dir:
-                lib_rs_path = new_dir / "lib.rs"
-                if not lib_rs_path.exists():
-                    try:
-                        lib_rs_path.write_text("", encoding="utf-8")
-                    except Exception:
-                        pass
-                try:
-                    lib_existing = lib_rs_path.read_text(encoding="utf-8") if lib_rs_path.exists() else ""
-                except Exception:
-                    lib_existing = ""
-                # 使用公共逻辑确保/升级子模块声明为 pub mod
-                new_lib_content = _ensure_pub_mod_declarations(lib_existing, child_mods)
-                try:
-                    lib_rs_path.write_text(new_lib_content, encoding="utf-8")
-                except Exception:
-                    pass
-                return  # 不再为 src 目录处理 mod.rs
+                # 不在 src 根目录写入任何文件内容；仅由子项创建对应空文件（如有）
+                return
 
             # 非 src 目录：确保存在 mod.rs
-            mod_rs_path = new_dir / "mod.rs"
-            if not mod_rs_present and not mod_rs_path.exists():
-                try:
-                    mod_rs_path.write_text("", encoding="utf-8")
-                except Exception:
-                    pass
+            # 非 src 目录：不自动创建或更新 mod.rs，避免写入文件内容
+            # 如需创建 mod.rs，应在 YAML 中显式指定为文件项
 
             # 更新 mod.rs 的子模块声明（统一使用 pub mod，已有非 pub 的声明就地升级）
             try:
@@ -908,15 +889,8 @@ def _ensure_cargo_toml(base_dir: Path, package_name: str) -> None:
     cargo_path = base_dir / "Cargo.toml"
     if cargo_path.exists():
         return
-    content = f"""[package]
-name = "{package_name}"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-"""
     try:
-        cargo_path.write_text(content, encoding="utf-8")
+        cargo_path.touch(exist_ok=True)
     except Exception:
         pass
 
