@@ -244,25 +244,31 @@ def _write_json(path: Path, obj: Any) -> None:
 
 def _extract_json_from_summary(text: str) -> Dict[str, Any]:
     """
-    从 Agent summary 中提取 JSON：
-    - 支持 <SUMMARY>... </SUMMARY> 包裹的 JSON
-    - 或者直接是 JSON 文本
+    从 Agent summary 中提取结构化数据（仅支持 YAML）：
+    - 仅在 <SUMMARY>...</SUMMARY> 块内查找；
+    - 只接受 <yaml>...</yaml> 标签包裹的 YAML 对象；
+    - 若未找到或解析失败，返回 {}。
     """
     if not isinstance(text, str) or not text.strip():
         return {}
+
+    # 提取 <SUMMARY> 块
     m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=re.IGNORECASE)
-    raw = m.group(1).strip() if m else text.strip()
+    block = (m.group(1) if m else text).strip()
+
+    # 仅解析 <yaml>...</yaml>
+    mm = re.search(r"<yaml>([\s\S]*?)</yaml>", block, flags=re.IGNORECASE)
+    raw_yaml = mm.group(1).strip() if mm else None
+    if not raw_yaml:
+        return {}
+
     try:
-        return json.loads(raw)
+        import yaml  # type: ignore
+        obj = yaml.safe_load(raw_yaml)
+        return obj if isinstance(obj, dict) else {}
     except Exception:
-        # 尝试提取花括号块
-        m2 = re.search(r"(\{[\s\S]*\})", raw)
-        if m2:
-            try:
-                return json.loads(m2.group(1))
-            except Exception:
-                return {}
-    return {}
+        return {}
+
 
 
 class Transpiler:
@@ -407,7 +413,7 @@ class Transpiler:
     ) -> Tuple[str, str, str]:
         """
         返回 (system_prompt, user_prompt, summary_prompt)
-        要求 summary 输出 JSON：
+        要求 summary 输出 YAML：
         {
           "module": "src/<path>.rs or module path (e.g., src/foo/mod.rs or src/foo/bar.rs)",
           "rust_signature": "pub fn ...",
@@ -433,7 +439,7 @@ class Transpiler:
             c_code,
             "</C_SOURCE>",
             "",
-            "被调用函数上下文（如已转译则包含Rust模块信息）：",
+            "被引用符号上下文（如已转译则包含Rust模块信息）：",
             json.dumps(callees_ctx, ensure_ascii=False, indent=2),
             "",
             "当前crate目录结构（部分）：",
@@ -444,13 +450,16 @@ class Transpiler:
             "如果理解完毕，请进入总结阶段。",
         ])
         summary_prompt = (
-            "请仅输出一个 <SUMMARY> 块，内容必须是JSON对象，字段：\n"
-            '{ "module": "src/xxx.rs 或 src/xxx/mod.rs", "rust_signature": "pub fn xxx(...)->...", "notes":"可选说明" }\n'
+            "请仅输出一个 <SUMMARY> 块，块内必须且只包含一个 <yaml>...</yaml>，不得包含其它内容。\n"
+            "允许字段（YAML 对象）：\n"
+            '- module: "src/xxx.rs 或 src/xxx/mod.rs"\n'
+            '- rust_signature: "pub fn xxx(...)->..."\n'
+            '- notes: "可选说明（若有上下文缺失或风险点，请在此列出）"\n'
             "注意：\n"
-            "- module 必须位于 crate 的 src/ 目录下；\n"
-            "- 尽量选择已有文件；如需新建文件，给出合理的文件路径；\n"
+            "- module 必须位于 crate 的 src/ 目录下；尽量选择已有文件；如需新建文件，给出合理路径；\n"
             "- rust_signature 请包含可见性修饰与函数名（可先用占位类型）。\n"
-            "<SUMMARY>{...}</SUMMARY>"
+            "请严格按以下格式输出：\n"
+            "<SUMMARY><yaml>\\nmodule: \"...\"\\nrust_signature: \"...\"\\nnotes: \"...\"\\n</yaml></SUMMARY>"
         )
         return system_prompt, user_prompt, summary_prompt
 
@@ -511,8 +520,21 @@ class Transpiler:
             f"- 函数签名（建议）：{rust_sig}",
             "- 若 module 文件不存在则新建；为所在模块添加必要的 mod 声明（若需要）；",
             "- 若已有函数占位/实现，尽量最小修改，不要破坏现有代码；",
-            "- 允许使用简单占位类型与 unimplemented!()/todo!()，但尽量保证 cargo build 可通过；",
+            "- 禁止在函数实现中使用 todo!/unimplemented! 作为占位；仅当调用的函数尚未实现时，才在调用位置使用 todo!(\"符号名\") 占位；",
+            "- 为保证 cargo build 通过，如需返回占位值，请使用合理默认值或 Result/Option 等，而非 panic!/todo!/unimplemented!；",
             "- 不要删除或移动其他无关文件。",
+            "",
+            "编码原则与规范：",
+            "- 保持最小变更，避免无关重构与格式化；禁止批量重排/重命名/移动文件；",
+            "- 命名遵循Rust惯例（函数/模块蛇形命名），公共API使用pub；",
+            "- 优先使用安全Rust；如需unsafe，将范围最小化并添加注释说明原因与SAFETY保证；",
+            "- 错误处理：可暂用 Result<_, anyhow::Error> 或 Option 作占位，避免 panic!/unwrap()；",
+            "- 实现中禁止使用 todo!/unimplemented! 占位；仅允许为尚未实现的被调符号在调用位置使用 todo!(\"符号名\")；",
+            "- 如需占位返回，使用合理默认值或 Result/Option 等而非 panic!/todo!/unimplemented!；",
+            "- 依赖未实现符号时，务必使用 todo!(\"符号名\") 明确标记，便于后续自动替换；",
+            "- 文档：为新增函数添加简要文档注释，注明来源C函数与意图；",
+            "- 风格：遵循 rustfmt 默认风格，避免引入与本次改动无关的大范围格式变化；",
+            "- 输出限制：仅以补丁形式修改目标文件，不要输出解释或多余文本。",
             "",
             "C 源码片段（供参考，不要原样粘贴）：",
             "<C_SOURCE>",
@@ -610,6 +632,7 @@ class Transpiler:
                     "- 如果参数列表暂不明确，可使用合理占位变量，确保编译通过。",
                     "",
                     f"仅修改 {rel_file} 中与 todo!(\"{symbol}\") 相关的代码，其他位置不要改动。",
+                    "请仅输出补丁，不要输出解释或多余文本。",
                 ])
                 agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
@@ -641,6 +664,8 @@ class Transpiler:
                 repair_prompt = "\n".join([
                     "目标：最小化修复以通过 cargo build。",
                     "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；避免大范围改动。",
+                    "- 保持最小改动，避免与错误无关的重构或格式化；",
+                    "- 请仅输出补丁，不要输出解释或多余文本。",
                     "请阅读以下构建错误并进行必要修复：",
                     "<BUILD_ERROR>",
                     output,
@@ -675,7 +700,8 @@ class Transpiler:
                 "请仅输出一个 <SUMMARY> 块，内容为纯文本：\n"
                 "- 若通过请输出：OK\n"
                 "- 否则以简要列表形式指出问题点（避免长文）。\n"
-                "<SUMMARY>...</SUMMARY>"
+                "<SUMMARY>...</SUMMARY>\n"
+                "不要在 <SUMMARY> 块外输出任何内容。"
             )
             return sys_p, usr_p, sum_p
 
