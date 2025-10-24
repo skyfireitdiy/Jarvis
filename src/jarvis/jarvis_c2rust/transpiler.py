@@ -56,7 +56,7 @@ class FnRecord:
     start_col: int
     end_line: int
     end_col: int
-    calls: List[str]
+    refs: List[str]
 
 
 class _DbLoader:
@@ -123,7 +123,7 @@ class _DbLoader:
                 start_col=sc,
                 end_line=er,
                 end_col=ec,
-                calls=refs,
+                refs=refs,
             )
             self.fn_by_id[fid] = rec
             if nm:
@@ -552,7 +552,7 @@ members = ["{rel_member}"]
         注：若存在同名映射多条记录（重载/同名符号），此处标记 ambiguous=true，并选择最近一条作为提示。
         """
         ctx: List[Dict[str, Any]] = []
-        for callee in rec.calls or []:
+        for callee in rec.refs or []:
             entry: Dict[str, Any] = {"name": callee, "qname": callee}
             # 已转映射
             if self.symbol_map.has_symbol(callee):
@@ -588,7 +588,7 @@ members = ["{rel_member}"]
         返回尚未转换的被调函数符号（使用扫描记录中的名称/限定名作为键）
         """
         syms: List[str] = []
-        for callee in rec.calls or []:
+        for callee in rec.refs or []:
             if not self.symbol_map.has_symbol(callee):
                 syms.append(callee)
         # 去重
