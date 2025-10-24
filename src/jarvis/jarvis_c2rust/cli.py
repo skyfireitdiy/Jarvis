@@ -17,8 +17,10 @@ from typing import Optional
 
 import typer
 from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
-from jarvis.jarvis_c2rust.scanner import (
+from jarvis.jarvis_c2rust.pruner import (
     evaluate_third_party_replacements as _eval_third_party_replacements,
+)
+from jarvis.jarvis_c2rust.scanner import (
     compute_translation_order_jsonl as _compute_order,
 )
 from jarvis.jarvis_utils.utils import init_env
