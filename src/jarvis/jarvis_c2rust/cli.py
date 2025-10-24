@@ -132,10 +132,18 @@ def prune(
         "--llm-group",
         help="指定用于评估的 LLM 模型组（传递给 CodeAgent）",
     ),
+    mode: str = typer.Option(
+        "lib",
+        "-m",
+        "--mode",
+        help="剪枝模式: lib 或 bin（lib 更保守：仅删除当前函数本身；bin 更激进：仅当子符号的所有父级均在已删除集合中时递归删除）",
+    ),
 ) -> None:
     """
     使用 Agent 评估函数是否可由开源第三方库单函数替代：
-    - 若可替代：移除该函数及其子引用（子引用不再评估）
+    - 剪枝行为取决于 --mode：
+      - lib：保守，仅删除当前被替代函数本身
+      - bin：激进，删除该函数以及所有父级均在已删除集合中的后继（不动点扩展；这些子引用不再评估）
     - 生成新的符号表与替代映射
 
     默认约定:
@@ -161,6 +169,7 @@ def prune(
             out_mapping_path=None,        # 使用默认输出路径
             llm_group=llm_group,
             max_funcs=None,               # 默认不限制
+            mode=mode,                    # 剪枝模式：lib/bin
         )
 
         # 覆盖默认 symbols.jsonl，使后续流程“直接使用新的符号表”
