@@ -161,7 +161,7 @@ def evaluate_third_party_replacements(
                 model_group=llm_group,
                 need_summary=False,
                 auto_complete=True,
-                use_tools=[],
+                use_tools=["execute_script", "retrieve_memory", "save_memory", "search_web"],
                 plan=False,
                 non_interactive=True,
                 use_methodology=False,
@@ -282,7 +282,7 @@ def evaluate_third_party_replacements(
         src = _read_source_snippet(rec)
 
         prompt = (
-            "你是资深C/C++生态专家。请根据给定的函数信息，判断其是否可以被 Rust 标准库（std）或成熟的第三方 crate 中的单个函数调用直接替代。\n"
+            "请根据给定的函数信息，判断其是否可以被 Rust 标准库（std）或成熟的第三方 crate 中的单个函数调用直接替代。\n"
             "要求：\n"
             "1) 仅当标准库/第三方库函数在功能与语义上能够完全覆盖当前函数（等价或更强）时，返回 replaceable=true；否则为 false。\n"
             "2) 优先考虑 Rust 标准库（std），其次考虑来自 crates.io 的常见、稳定的 crate。library 字段请填 'std' 或 crate 名称；function 字段请填可调用的 Rust API 名称/路径。\n"
