@@ -140,6 +140,19 @@ def evaluate_third_party_replacements(
     if not root_funcs:
         root_funcs = sorted(list(func_ids))
 
+    # Determine the total set of functions that could potentially be processed by traversing from roots
+    q = list(root_funcs)
+    potential_funcs_to_process = set(q)
+    head = 0
+    while head < len(q):
+        fid = q[head]
+        head += 1
+        for child in adj_func.get(fid, []):
+            if child not in potential_funcs_to_process:
+                potential_funcs_to_process.add(child)
+                q.append(child)
+    total_potential_count = len(potential_funcs_to_process)
+
     # 4) Agent 评估（可替代 -> 当前函数及其子引用全部剔除；子引用无需再评估）
     try:
         from jarvis.jarvis_agent import Agent  # 使用通用 Agent 进行评估
@@ -403,7 +416,12 @@ def evaluate_third_party_replacements(
                     _process(child)
             return
 
-        typer.secho(f"[c2rust-pruner] 正在评估函数: {func_name} (ID: {fid})", fg=typer.colors.CYAN, err=True)
+        remaining_to_eval = total_potential_count - len(visited)
+        typer.secho(
+            f"[c2rust-pruner] 正在评估函数: {func_name} (ID: {fid}) (剩余约 {remaining_to_eval} 个)",
+            fg=typer.colors.CYAN,
+            err=True,
+        )
 
         if max_funcs is not None and eval_count >= max_funcs:
             return
