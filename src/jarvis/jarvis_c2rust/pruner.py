@@ -239,6 +239,19 @@ def evaluate_third_party_replacements(
             # 回退到默认平台
             if model is None:
                 model = registry.get_normal_platform()
+            # 应用模型组与模型名称（当提供 llm_group 时）
+            try:
+                # 将模型组传入，影响上下文长度等配置解析（如最大token）
+                model.set_model_group(llm_group)  # type: ignore
+            except Exception:
+                pass
+            if llm_group:
+                try:
+                    mn = get_normal_model_name(llm_group)  # type: ignore
+                    if mn:
+                        model.set_model_name(mn)  # type: ignore
+                except Exception:
+                    pass
             # 设置系统提示词
             model.set_system_prompt(  # type: ignore
                 "你是资深 C→Rust 迁移专家。任务：根据给定的 C/C++ 函数信息，判断其是否可由 Rust 标准库（std）或 Rust 生态中的成熟第三方 crate 的单个 API 直接替代（用于 C 转译为 Rust 的场景）。"
@@ -278,24 +291,87 @@ def evaluate_third_party_replacements(
 
     def _parse_agent_yaml_summary(text: str) -> Optional[Dict[str, Any]]:
         """
-        解析带有 <yaml>...</yaml> 标签的 YAML 对象为字典（可存在于 <SUMMARY> 内或直接在文本中）。
-        仅当检测到 <yaml> 标签时进行解析；否则返回 None。
+        解析模型输出中的结构化结果为字典，尽量兼容多种格式：
+        - 优先解析 <SUMMARY> 包裹内的 <yaml>...</yaml> 块
+        - 其次解析 ```yaml ... ``` 或 ```yml ... ``` 代码块
+        - 再次尝试解析首个 JSON 对象
+        - 最后回退到宽松的键值提取（replaceable/library/function/confidence）
         """
         if not isinstance(text, str) or not text.strip():
             return None
         import re as _re
-        m_sum = _re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=_re.IGNORECASE)
-        block = (m_sum.group(1) if m_sum else text).strip()
-        m_yaml = _re.search(r"<yaml>([\s\S]*?)</yaml>", block, flags=_re.IGNORECASE)
-        raw = (m_yaml.group(1).strip() if m_yaml else "").strip()
-        if not raw:
-            return None
+        import json as _json
         try:
             import yaml  # type: ignore
-            data = yaml.safe_load(raw)
-            return data if isinstance(data, dict) else None
         except Exception:
-            return None
+            yaml = None  # type: ignore
+
+        # 1) 提取 <SUMMARY> 内文本（若存在）
+        m_sum = _re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=_re.IGNORECASE)
+        block = (m_sum.group(1) if m_sum else text).strip()
+
+        # 2) 优先解析 <yaml>...</yaml>
+        m_yaml = _re.search(r"<yaml>([\s\S]*?)</yaml>", block, flags=_re.IGNORECASE)
+        if m_yaml:
+            raw = m_yaml.group(1).strip()
+            if raw and yaml:
+                try:
+                    data = yaml.safe_load(raw)
+                    if isinstance(data, dict):
+                        return data
+                except Exception:
+                    pass
+
+        # 3) 回退到 ```yaml ... ``` 或 ```yml ... ``` 代码块
+        m_code = _re.search(r"```(?:yaml|yml)\s*([\s\S]*?)```", block, flags=_re.IGNORECASE)
+        if m_code:
+            raw = m_code.group(1).strip()
+            if raw and yaml:
+                try:
+                    data = yaml.safe_load(raw)
+                    if isinstance(data, dict):
+                        return data
+                except Exception:
+                    pass
+
+        # 4) 尝试解析首个 JSON 对象
+        m_json = _re.search(r"\{[\s\S]*\}", block)
+        if m_json:
+            raw = m_json.group(0).strip()
+            try:
+                data = _json.loads(raw)
+                if isinstance(data, dict):
+                    return data
+            except Exception:
+                pass
+
+        # 5) 宽松键值提取（兼容不带标签的纯文本）
+        def _kv(pattern: str) -> Optional[str]:
+            m = _re.search(pattern, block, flags=_re.IGNORECASE)
+            return m.group(1).strip() if m else None
+
+        rep_raw = _kv(r"replaceable\s*:\s*(.+)")
+        lib_raw = _kv(r"library\s*:\s*(.+)")
+        fun_raw = _kv(r"function\s*:\s*(.+)")
+        conf_raw = _kv(r"confidence\s*:\s*([0-9\.\-eE]+)")
+
+        if any([rep_raw, lib_raw, fun_raw, conf_raw]):
+            result: Dict[str, Any] = {}
+            if rep_raw is not None:
+                rep_s = rep_raw.strip().strip("\"'")
+                result["replaceable"] = rep_s.lower() in ("true", "yes", "y", "1")
+            if lib_raw is not None:
+                result["library"] = lib_raw.strip().strip("\"'")
+            if fun_raw is not None:
+                result["function"] = fun_raw.strip().strip("\"'")
+            if conf_raw is not None:
+                try:
+                    result["confidence"] = float(conf_raw)
+                except Exception:
+                    pass
+            return result if result else None
+
+        return None
 
     # 断点续跑：状态读写
     def _load_checkpoint(state_p: Path, symbols_path: Path) -> Optional[Dict[str, Any]]:
