@@ -643,6 +643,7 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     """
     基于 Agent 返回的 <PROJECT> 中的目录结构 YAML，创建实际目录与文件，并在每个目录的 mod.rs 中增加子 mod 声明。
     - project_root: 目标应用路径；当为 "."（默认）时，将使用“父目录/当前目录名-rs”作为crate根目录
+    同时：在当前工作目录下建立/更新 Cargo.toml，将生成的 crate 目录设置为 workspace 的 member，以便在本地当前目录下直接构建。
     """
     entries = _parse_project_yaml_entries(yaml_text)
     if not entries:
@@ -664,6 +665,98 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     _apply_entries_with_mods(entries, base_dir)
     # 确保 Cargo.toml 存在并设置包名
     _ensure_cargo_toml(base_dir, crate_pkg_name)
+
+    # 在当前工作目录创建/更新 workspace，使该 crate 作为成员
+    def _ensure_workspace_member(root_dir: Path, member_path: Path) -> None:
+        """
+        在 root_dir 下的 Cargo.toml 中确保 [workspace] 成员包含 member_path（相对于 root_dir 的路径）。
+        - 若 Cargo.toml 不存在：创建最小可用的 workspace 文件；
+        - 若存在但无 [workspace]：追加 [workspace] 与 members；
+        - 若存在且有 [workspace]：将成员路径加入 members（若不存在）。
+        尽量保留原有内容与格式，最小修改。
+        """
+        cargo_path = root_dir / "Cargo.toml"
+        # 计算成员的相对路径
+        try:
+            rel_member = str(member_path.resolve().relative_to(root_dir.resolve()))
+        except Exception:
+            rel_member = member_path.name
+
+        if not cargo_path.exists():
+            content = f"""[workspace]
+members = ["{rel_member}"]
+"""
+            try:
+                cargo_path.write_text(content, encoding="utf-8")
+            except Exception:
+                pass
+            return
+
+        try:
+            txt = cargo_path.read_text(encoding="utf-8")
+        except Exception:
+            return
+
+        if "[workspace]" not in txt:
+            new_txt = txt.rstrip() + f"\n\n[workspace]\nmembers = [\"{rel_member}\"]\n"
+            try:
+                cargo_path.write_text(new_txt, encoding="utf-8")
+            except Exception:
+                pass
+            return
+
+        # 提取 workspace 区块（直到下一个表头或文件末尾）
+        m_ws = re.search(r"(?s)(\[workspace\].*?)(?:\n\[|\Z)", txt)
+        if not m_ws:
+            new_txt = txt.rstrip() + f"\n\n[workspace]\nmembers = [\"{rel_member}\"]\n"
+            try:
+                cargo_path.write_text(new_txt, encoding="utf-8")
+            except Exception:
+                pass
+            return
+
+        ws_block = m_ws.group(1)
+
+        # 查找 members 数组
+        m_members = re.search(r"members\s*=\s*\[(.*?)\]", ws_block, flags=re.S)
+        if not m_members:
+            # 在 [workspace] 行后插入 members
+            new_ws_block = re.sub(r"(\[workspace\]\s*)", r"\1\nmembers = [\"" + rel_member + "\"]\n", ws_block, count=1)
+        else:
+            inner = m_members.group(1)
+            # 解析已有成员
+            existing_vals = []
+            for v in inner.split(","):
+                vv = v.strip()
+                if not vv:
+                    continue
+                if vv.startswith('"') or vv.startswith("'"):
+                    vv = vv.strip('"').strip("'")
+                existing_vals.append(vv)
+            if rel_member in existing_vals:
+                new_ws_block = ws_block  # 已存在，不改动
+            else:
+                # 根据原格式选择分隔符
+                sep = ", " if "\n" not in inner else ",\n"
+                new_inner = inner.strip()
+                if new_inner:
+                    new_inner = new_inner + f"{sep}\"{rel_member}\""
+                else:
+                    new_inner = f"\"{rel_member}\""
+                new_ws_block = ws_block[: m_members.start(1)] + new_inner + ws_block[m_members.end(1) :]
+
+        # 写回更新后的 workspace 区块
+        new_txt = txt[: m_ws.start(1)] + new_ws_block + txt[m_ws.end(1) :]
+        try:
+            cargo_path.write_text(new_txt, encoding="utf-8")
+        except Exception:
+            pass
+
+    try:
+        _ensure_workspace_member(Path(".").resolve(), base_dir)
+    except Exception:
+        # 忽略 workspace 写入失败，不影响后续流程
+        pass
 
 def plan_crate_yaml_text(
     project_root: Union[Path, str] = ".",
@@ -891,10 +984,11 @@ def execute_llm_plan(
                 iter_count += 1
                 print(f"[c2rust-llm-planner] 在 {os.getcwd()} 目录下执行命令: cargo build")
                 build_res = subprocess.run(
-                    ["cargo", "build"],
+                    ["cargo", "build", "-p", crate_pkg_name],
                     capture_output=True,
                     text=True,
                     check=False,
+                    cwd=prev_cwd,
                 )
                 stdout = build_res.stdout or ""
                 stderr = build_res.stderr or ""

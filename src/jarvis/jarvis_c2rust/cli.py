@@ -83,9 +83,6 @@ def llm_plan(
     apply: bool = typer.Option(
         False, "--apply", help="Create directories and add submodule declarations to mod.rs based on Agent output"
     ),
-    crate_name: Optional[str] = typer.Option(
-        None, "--crate-name", help="Override the crate name (and directory). When used with --apply, structure is created under this name"
-    ),
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="Specify LLM model group for planning (only affects this run)"
     ),
@@ -96,7 +93,7 @@ def llm_plan(
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.jsonl 读取数据
     """
     try:
-        entries = _execute_llm_plan(out=out, apply=apply, crate_name=crate_name, llm_group=llm_group)
+        entries = _execute_llm_plan(out=out, apply=apply, llm_group=llm_group)
         if out is None:
             typer.echo(_entries_to_yaml(entries))
     except Exception as e:
@@ -105,9 +102,6 @@ def llm_plan(
 
 @app.command("transpile")
 def transpile(
-    crate_name: Optional[str] = typer.Option(
-        None, "--crate-name", help="Target Rust crate name (directory). If provided, translations will be written under this crate"
-    ),
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="Specify LLM model group for translation"
     ),
@@ -119,22 +113,22 @@ def transpile(
     使用转译器按扫描顺序逐个函数转译并构建修复。
     需先执行: jarvis-c2rust scan 以生成数据文件（functions.jsonl 与 translation_order.jsonl）
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.jsonl 读取数据。
-    crate_name：用于指定目标crate目录名称（与llm规划中的参数一致）。未指定时使用默认 <cwd>/<cwd.name>-rs。
+    未指定目标 crate 时，使用默认 <cwd>/<cwd.name>-rs。
     """
     try:
         # Lazy import to avoid hard dependency if not used
         from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
         only_list = [s.strip() for s in str(only).split(",") if s.strip()] if only else None
-        crate_dir_path = Path(crate_name) if crate_name else None
         _run_transpile(
             project_root=Path("."),
-            crate_dir=crate_dir_path,
+            crate_dir=None,
             llm_group=llm_group,
             only=only_list,
         )
     except Exception as e:
         typer.secho(f"[c2rust-transpiler] Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
+
 
 
 def main() -> None:
