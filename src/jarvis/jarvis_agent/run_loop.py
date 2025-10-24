@@ -125,7 +125,12 @@ class AgentRunLoop:
 
                 # 检查自动完成
                 if ag.auto_complete and is_auto_complete(current_response):
-                    return ag._complete_task(auto_completed=True)
+                    # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
+                    result = ag._complete_task(auto_completed=True)
+                    # 若不需要summary，则将最后一条LLM输出作为返回值
+                    if not getattr(ag, "need_summary", True):
+                        return current_response
+                    return result
 
                 # 获取下一步用户输入
                 next_action = ag._get_next_user_action()
