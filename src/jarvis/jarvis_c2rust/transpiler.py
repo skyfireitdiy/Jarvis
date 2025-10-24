@@ -271,28 +271,42 @@ class _SymbolMapJsonl:
 
 
 def _ensure_order_file(project_root: Path) -> Path:
-    """确保 translation_order.jsonl 存在，不存在则基于项目数据目录生成（使用统一引用图）"""
+    """确保 translation_order.jsonl 存在且包含有效步骤；仅基于 symbols.jsonl 生成，不使用任何回退。"""
     data_dir = project_root / C2RUST_DIRNAME
     order_path = data_dir / ORDER_JSONL
+
+    def _has_steps(p: Path) -> bool:
+        try:
+            steps = _iter_order_steps(p)
+            return bool(steps)
+        except Exception:
+            return False
+
+    # 已存在则校验是否有步骤
     if order_path.exists():
+        if _has_steps(order_path):
+            return order_path
+        # 为空或不可读：基于标准路径重新计算（仅 symbols.jsonl）
+        try:
+            compute_translation_order_jsonl(data_dir, out_path=order_path)
+        except Exception as e:
+            raise RuntimeError(f"重新计算翻译顺序失败: {e}")
         return order_path
-    # 生成
+
+    # 不存在：按标准路径生成到固定文件名（仅 symbols.jsonl）
     try:
         compute_translation_order_jsonl(data_dir, out_path=order_path)
-    except Exception:
-        # 尝试不传出参，由compute内部推断路径
-        try:
-            compute_translation_order_jsonl(data_dir)
-        except Exception as e:
-            raise RuntimeError(f"计算翻译顺序失败: {e}")
-    if not order_path.exists():
-        # compute默认路径：同目录下 translation_order.jsonl
-        guessed = data_dir / ORDER_JSONL
-        if guessed.exists():
-            return guessed
-        raise FileNotFoundError(f"计算后未找到 translation_order.jsonl: {guessed}")
-    return order_path
+    except Exception as e:
+        raise RuntimeError(f"计算翻译顺序失败: {e}")
 
+    if not order_path.exists():
+        raise FileNotFoundError(f"计算后未找到 translation_order.jsonl: {order_path}")
+
+    # 最终校验：若仍无有效步骤，直接报错并提示先执行 scan 或检查 symbols.jsonl
+    if not _has_steps(order_path):
+        raise RuntimeError("translation_order.jsonl 无有效步骤。请先执行 'jarvis-c2rust scan' 生成 symbols.jsonl 并重试。")
+
+    return order_path
 
 def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
     """读取翻译顺序，返回按步骤的函数id序列列表（扁平化为单个列表时，仍保持顺序）"""
