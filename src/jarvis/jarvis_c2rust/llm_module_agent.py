@@ -350,8 +350,9 @@ class LLMRustCratePlannerAgent:
         """
         crate_name = self._crate_name()
         has_main = self._has_original_main()
+        created_dir = _resolve_created_dir(self.project_root)
         context_json = json.dumps(
-            {"meta": {"crate_name": crate_name, "main_present": has_main}, "roots": roots_context},
+            {"meta": {"crate_name": crate_name, "main_present": has_main, "crate_dir": str(created_dir)}, "roots": roots_context},
             ensure_ascii=False,
             indent=2,
         )

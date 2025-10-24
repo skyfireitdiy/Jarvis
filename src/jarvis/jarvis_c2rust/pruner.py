@@ -80,6 +80,27 @@ def evaluate_third_party_replacements(
         out_mapping_path = Path(out_mapping_path)
     # 断点续跑：状态文件路径
     state_path = data_dir / "third_party_pruner_state.json"
+    # 计算 crate 根目录路径（用于在 Agent 上下文中明确路径）
+    def _compute_project_root_from_data_dir(d: Path) -> Path:
+        try:
+            # data_dir 期望形如 <project_root>/.jarvis/c2rust
+            return d.parent.parent
+        except Exception:
+            return d.parent
+
+    def _default_crate_dir(prj_root: Path) -> Path:
+        try:
+            from pathlib import Path as _Path
+            cwd = _Path(".").resolve()
+            if prj_root.resolve() == cwd:
+                return cwd / f"{cwd.name}_rs"
+            else:
+                return prj_root
+        except Exception:
+            return prj_root
+
+    project_root = _compute_project_root_from_data_dir(data_dir)
+    crate_dir = _default_crate_dir(project_root)
 
     # 1) 读取所有符号
     all_records: List[Dict[str, Any]] = []
@@ -345,6 +366,7 @@ def evaluate_third_party_replacements(
             f"语言: {lang}\n"
             f"函数: {name}\n"
             f"签名: {sig}\n"
+            f"crate 根目录路径（推断）: {crate_dir}\n"
             "源码片段如下（可能截断，仅用于辅助理解）:\n"
             "-----BEGIN_SNIPPET-----\n"
             f"{src}\n"
