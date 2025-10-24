@@ -194,11 +194,14 @@ def evaluate_third_party_replacements(
         _agent_available = False
         Agent = None  # type: ignore
 
-    agent = None
-    if _agent_available:
+    def _new_agent() -> Optional[Any]:
+        """
+        每次调用都创建一个全新的 Agent 实例，避免跨函数评估时复用带来的上下文污染。
+        """
+        if not _agent_available:
+            return None
         try:
-            # 使用通用 Agent，禁用工具与规划，非交互，只需返回一段JSON/YAML文本
-            agent = Agent(
+            return Agent(
                 system_prompt=(
                     "你是资深 C→Rust 迁移专家。任务：根据给定的 C/C++ 函数信息，判断其是否可由 Rust 标准库（std）或 Rust 生态中的成熟第三方 crate 的单个 API 直接替代（用于 C 转译为 Rust 的场景）。"
                     "请先输出一个 <yaml> 块，且块内是一个 YAML 对象，包含字段：replaceable, library, function, confidence；随后在单独一行输出 <!!!COMPLETE!!!>；不要输出其它说明文字。"
@@ -214,8 +217,12 @@ def evaluate_third_party_replacements(
                 use_analysis=False,
             )
         except Exception as e:
-            typer.secho(f"[c2rust-scanner] 初始化 Agent 失败，将回退为保守策略（不替代）。原因: {e}", fg=typer.colors.YELLOW, err=True)
-            agent = None
+            typer.secho(
+                f"[c2rust-scanner] 初始化 Agent 失败，将回退为保守策略（不替代）。原因: {e}",
+                fg=typer.colors.YELLOW,
+                err=True,
+            )
+            return None
 
     def _read_source_snippet(rec: Dict[str, Any], max_lines: int = 400) -> str:
         path = rec.get("file") or ""
@@ -320,7 +327,7 @@ def evaluate_third_party_replacements(
 
     def _evaluate_fn_replaceable(fid: int) -> Dict[str, Any]:
         rec = by_id.get(fid, {})
-        if not agent:
+        if not _agent_available:
             return {"replaceable": False}
         name = rec.get("qualified_name") or rec.get("name") or f"sym_{fid}"
         sig = rec.get("signature") or ""
@@ -344,10 +351,14 @@ def evaluate_third_party_replacements(
             "-----END_SNIPPET-----\n"
         )
         try:
+            # 每次评估均创建全新 Agent，避免复用
+            _agent = _new_agent()
+            if not _agent:
+                return {"replaceable": False}
             attempt = 0
             while True:
                 attempt += 1
-                result = agent.run(prompt)
+                result = _agent.run(prompt)
                 parsed = _parse_agent_yaml_summary(result or "")
                 if isinstance(parsed, dict):
                     # 归一化
