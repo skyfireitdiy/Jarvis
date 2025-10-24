@@ -309,7 +309,38 @@ def _ensure_order_file(project_root: Path) -> Path:
     return order_path
 
 def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
-    """读取翻译顺序，返回按步骤的函数id序列列表（扁平化为单个列表时，仍保持顺序）"""
+    """读取翻译顺序，返回按步骤的函数id序列列表（仅支持新格式）
+    新格式要求：每行包含 "symbols": [str, ...]，其中元素为函数的 qualified_name 或 name。
+    本函数会基于同目录下 symbols.jsonl 将名称/限定名解析为 id。
+    """
+    # 构建 name -> id 映射（基于同目录 symbols.jsonl）
+    name_to_id: Dict[str, int] = {}
+    try:
+        data_dir = order_jsonl.parent
+        symbols_path = data_dir / "symbols.jsonl"
+        if symbols_path.exists():
+            with symbols_path.open("r", encoding="utf-8") as sf:
+                idx = 0
+                for line in sf:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except Exception:
+                        continue
+                    idx += 1
+                    fid = int(obj.get("id") or idx)
+                    nm = obj.get("name") or ""
+                    qn = obj.get("qualified_name") or ""
+                    if nm:
+                        name_to_id.setdefault(nm, fid)
+                    if qn:
+                        name_to_id.setdefault(qn, fid)
+    except Exception:
+        # 若映射构建失败，steps 将为空（严格新格式，不回退旧格式）
+        name_to_id = {}
+
     steps: List[List[int]] = []
     with order_jsonl.open("r", encoding="utf-8") as f:
         for ln in f:
@@ -320,9 +351,21 @@ def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
                 obj = json.loads(ln)
             except Exception:
                 continue
-            ids = obj.get("ids") or []
-            if isinstance(ids, list) and ids:
-                steps.append([int(x) for x in ids if isinstance(x, int) or (isinstance(x, str) and x.isdigit())])
+
+            syms = obj.get("symbols")
+            if not (isinstance(syms, list) and syms):
+                # 严格新格式：无 symbols 则跳过该行
+                continue
+
+            ids: List[int] = []
+            for s in syms:
+                if not isinstance(s, str) or not s:
+                    continue
+                tid = name_to_id.get(s)
+                if isinstance(tid, int):
+                    ids.append(tid)
+            if ids:
+                steps.append(ids)
     return steps
 
 

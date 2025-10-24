@@ -1305,11 +1305,21 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
             if selected:
                 for nid in selected:
                     emitted.add(nid)
+                syms: List[str] = []
+                for nid in sorted(selected):
+                    meta = by_id.get(nid, {})
+                    label = meta.get("qname") or meta.get("name") or f"sym_{nid}"
+                    syms.append(label)
+                roots_labels: List[str] = []
+                if root_id is not None:
+                    meta_r = by_id.get(root_id, {})
+                    rlabel = meta_r.get("qname") or meta_r.get("name") or f"sym_{root_id}"
+                    roots_labels = [rlabel]
                 steps.append({
                     "step": len(steps) + 1,
-                    "ids": sorted(selected),
-                    "group": len(selected) > 1,
-                    "roots": [root_id] if root_id is not None else [],
+                    "symbols": syms,
+                    "group": len(syms) > 1,
+                    "roots": roots_labels,
                     "created_at": now_ts,
                 })
 
