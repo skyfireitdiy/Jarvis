@@ -72,25 +72,17 @@ def scan(
 
 @app.command("plan")
 def llm_plan(
-    out: Optional[Path] = typer.Option(
-        None, "--out", help="Write LLM-generated Rust crate plan (YAML) to file (default: stdout)"
-    ),
-    apply: bool = typer.Option(
-        False, "--apply", help="Create directories and add submodule declarations to mod.rs based on Agent output"
-    ),
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="Specify LLM model group for planning (only affects this run)"
     ),
 ) -> None:
     """
-    使用 LLM Agent 基于根函数子图规划 Rust crate 模块结构，输出 YAML
-    需先执行: jarvis-c2rust scan 以生成数据文件（functions.jsonl 与 types.jsonl）
-    默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.jsonl 读取数据
+    使用 LLM Agent 基于根函数子图规划 Rust crate 模块结构并直接应用到磁盘。
+    需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl）
+    默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/symbols.jsonl 读取数据
     """
     try:
-        entries = _execute_llm_plan(out=out, apply=apply, llm_group=llm_group)
-        if out is None:
-            typer.echo(_entries_to_yaml(entries))
+        _execute_llm_plan(apply=True, llm_group=llm_group)
     except Exception as e:
         typer.secho(f"[c2rust-llm-planner] Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
