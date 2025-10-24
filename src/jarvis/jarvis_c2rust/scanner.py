@@ -1487,7 +1487,7 @@ def evaluate_third_party_replacements(
     max_funcs: Optional[int] = None,
 ) -> Dict[str, Path]:
     """
-    自顶向下使用 Agent 评估函数是否可由开源第三方库的单个函数调用替代：
+    自顶向下使用 Agent 评估函数是否可由 Rust 标准库（std）或开源第三方库的单个函数调用直接替代：
     - 若可替代：消除该函数以及其“子引用”（沿 ref 有向边可达的后继函数），这些子引用无需再评估
     - 仅对函数（category == "function"）生效，类型记录不受影响
     - 生成新的符号表（剔除被替代函数及其子引用）与替代映射清单
@@ -1495,7 +1495,7 @@ def evaluate_third_party_replacements(
     输入:
       - db_path: 指向 symbols.jsonl 的路径或其所在目录
       - out_symbols_path: 输出新符号表路径（默认: <data_dir>/symbols_third_party_pruned.jsonl）
-      - out_mapping_path: 替代映射路径（默认: <data_dir>/third_party_replacements.jsonl）
+      - out_mapping_path: 替代映射路径（默认: <data_dir>/third_party_replacements.jsonl，兼容命名，实际包含 std/crate 两类替代）
       - llm_group: 可选，传给 CodeAgent 的 model_group，用于平台/模型选择
       - max_funcs: 可选，最多评估的函数数量（调试/限流用）
 
@@ -1507,8 +1507,8 @@ def evaluate_third_party_replacements(
       - Agent 输出需为带标签包围的 YAML（在总结阶段输出），格式：
           <SUMMARY><yaml>
           replaceable: true|false
-          library: "<库名或组织名>"
-          function: "<库的函数全名>"
+          library: "<crate 名称或 'std'>"
+          function: "<库/标准库的函数完整路径或名称>"
           confidence: <0.0-1.0浮点>
           </yaml></SUMMARY>
     """
@@ -1612,10 +1612,10 @@ def evaluate_third_party_replacements(
     agent = None
     if _agent_available:
         try:
-            # 使用通用 Agent，禁用工具与规划，非交互，只需返回一段JSON文本
+            # 使用通用 Agent，禁用工具与规划，非交互，只需返回一段JSON/YAML文本
             agent = Agent(
                 system_prompt=(
-                    "你是资深 C→Rust 迁移专家。任务：根据给定的 C/C++ 函数信息，判断其是否可由 Rust 生态中的成熟第三方 crate 的单个 API 直接替代（用于 C 转译为 Rust 的场景）。"
+                    "你是资深 C→Rust 迁移专家。任务：根据给定的 C/C++ 函数信息，判断其是否可由 Rust 标准库（std）或 Rust 生态中的成熟第三方 crate 的单个 API 直接替代（用于 C 转译为 Rust 的场景）。"
                     "注意：最终输出必须在总结阶段，且严格遵循总结提示中的格式要求。"
                 ),
                 name="C2Rust-ThirdParty-Evaluator",
@@ -1623,9 +1623,9 @@ def evaluate_third_party_replacements(
                 summary_prompt=(
                     "请仅输出一个 <SUMMARY> 块，块内必须且只包含一个 <yaml>...</yaml>，不得包含其它内容。\n"
                     "YAML 对象字段要求：\n"
-                    "replaceable: true|false  # 是否可由单个 Rust 第三方 crate 的 API 直接替代（等价/更强）\n"
-                    'library: "<crate 名称>"    # 例如: "regex", "serde", "serde_json", "reqwest", "hyper", "tokio", "rayon", "itertools", "chrono", "flate2", "zstd", "prost"\n'
-                    'function: "<Rust API 完整路径或名称>"  # 例如: regex::Regex::is_match, reqwest::blocking::get, flate2::read::GzDecoder::new\n'
+                    "replaceable: true|false  # 是否可由单个 Rust 标准库（std）或第三方 crate 的 API 直接替代（等价/更强）\n"
+                    'library: "<crate 名称或 ''std''>"    # 例如: \"std\", \"regex\", \"serde\", \"serde_json\", \"reqwest\", \"hyper\", \"tokio\", \"rayon\", \"itertools\", \"chrono\", \"flate2\", \"zstd\", \"prost\"\n'
+                    'function: "<Rust API 完整路径或名称>"  # 例如: std::fs::read_to_string, regex::Regex::is_match, reqwest::blocking::get, flate2::read::GzDecoder::new\n'
                     "confidence: <0.0-1.0浮点> # 置信度，0.0~1.0\n"
                     "格式示例：\n"
                     "<SUMMARY><yaml>\n"
@@ -1713,10 +1713,10 @@ def evaluate_third_party_replacements(
         src = _read_source_snippet(rec)
 
         prompt = (
-            "你是资深C/C++生态专家。请根据给定的函数信息，判断其是否可以被成熟的开源第三方库中的单个函数调用直接替代。\n"
+            "你是资深C/C++生态专家。请根据给定的函数信息，判断其是否可以被 Rust 标准库（std）或成熟的第三方 crate 中的单个函数调用直接替代。\n"
             "要求：\n"
-            "1) 仅当第三方库函数在功能与语义上能够完全覆盖当前函数（等价或更强）时，返回 replaceable=true；否则为 false。\n"
-            "2) 第三方库必须来自 Rust 生态（crates.io），优先选择常见、稳定的 crate（示例：regex、serde/serde_json、reqwest/hyper、tokio、rayon、itertools、chrono、flate2/zstd、prost（protobuf）、ring/sha2、image、nalgebra 等）。library 字段请填 crate 名称；function 字段请填可调用的 Rust API 名称/路径。\n"
+            "1) 仅当标准库/第三方库函数在功能与语义上能够完全覆盖当前函数（等价或更强）时，返回 replaceable=true；否则为 false。\n"
+            "2) 优先考虑 Rust 标准库（std），其次考虑来自 crates.io 的常见、稳定的 crate。library 字段请填 'std' 或 crate 名称；function 字段请填可调用的 Rust API 名称/路径。\n"
             "3) 若无法判断或需要组合多个库/多步调用才能实现，不视为可替代（replaceable=false）。\n"
             "4) 最终输出请在总结阶段给出，且严格遵循格式要求（见总结提示）。\n\n"
             f"语言: {lang}\n"
@@ -1751,7 +1751,7 @@ def evaluate_third_party_replacements(
                     return {"replaceable": rep, "library": lib, "function": fun, "confidence": conf}
                 # 仅解析失败时重试（不设上限）
                 if attempt % 5 == 0:
-                    typer.secho(f"[c2rust-scanner] 第三方替代评估解析失败，正在重试 (attempt={attempt}) ...", fg=typer.colors.YELLOW, err=True)
+                    typer.secho(f"[c2rust-scanner] 标准库/第三方替代评估解析失败，正在重试 (attempt={attempt}) ...", fg=typer.colors.YELLOW, err=True)
         except Exception as e:
             typer.secho(f"[c2rust-scanner] Agent 评估失败，已回退为不可替代: {e}", fg=typer.colors.YELLOW, err=True)
             return {"replaceable": False}
@@ -1835,12 +1835,11 @@ def evaluate_third_party_replacements(
             fm.write(json.dumps(m, ensure_ascii=False) + "\n")
 
     typer.secho(
-        f"[c2rust-scanner] 第三方替代评估完成: 评估 {eval_count} 个函数，剔除 {len(pruned)} 个函数（含子引用）。\n"
+        f"[c2rust-scanner] 第三方/标准库替代评估完成: 评估 {eval_count} 个函数，剔除 {len(pruned)} 个函数（含子引用）。\n"
         f"新符号表: {out_symbols_path}\n替代映射: {out_mapping_path}",
         fg=typer.colors.GREEN,
     )
     return {"symbols": Path(out_symbols_path), "mapping": Path(out_mapping_path)}
-
 
 def run_scan(
     dot: Optional[Path] = None,
