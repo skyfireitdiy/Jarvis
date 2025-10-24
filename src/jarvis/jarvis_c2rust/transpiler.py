@@ -344,11 +344,11 @@ def _dir_tree(root: Path) -> str:
 
 
 def _default_crate_dir(project_root: Path) -> Path:
-    """遵循 llm_module_agent 的默认crate目录选择：<cwd>/<cwd.name>-rs 当传入为 '.' 时"""
+    """遵循 llm_module_agent 的默认crate目录选择：<cwd>/<cwd.name>_rs 当传入为 '.' 时"""
     try:
         cwd = Path(".").resolve()
         if project_root.resolve() == cwd:
-            return cwd / f"{cwd.name}-rs"
+            return cwd / f"{cwd.name}_rs"
         else:
             return project_root
     except Exception:
@@ -1052,7 +1052,7 @@ def run_transpile(
     """
     入口函数：执行转译流程
     - project_root: 项目根目录（包含 .jarvis/c2rust/symbols.jsonl）
-    - crate_dir: Rust crate 根目录；默认遵循 "<cwd>/<cwd.name>-rs"（若 project_root 为 ".")
+    - crate_dir: Rust crate 根目录；默认遵循 "<cwd>/<cwd.name>_rs"（若 project_root 为 ".")
     - llm_group: 指定 LLM 模型组
     - max_retries: 构建与审查迭代的最大次数
     - resume: 是否启用断点续跑

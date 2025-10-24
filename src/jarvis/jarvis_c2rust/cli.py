@@ -107,7 +107,7 @@ def transpile(
     使用转译器按扫描顺序逐个函数转译并构建修复。
     需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl 与 translation_order.jsonl）
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/symbols.jsonl 读取数据。
-    未指定目标 crate 时，使用默认 <cwd>/<cwd.name>-rs。
+    未指定目标 crate 时，使用默认 <cwd>/<cwd.name>_rs。
     """
     try:
         # Lazy import to avoid hard dependency if not used
