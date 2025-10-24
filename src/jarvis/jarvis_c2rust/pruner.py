@@ -239,20 +239,10 @@ def evaluate_third_party_replacements(
             # 回退到默认平台
             if model is None:
                 model = registry.get_normal_platform()
-            # 在平台上设置模型组与模型名称（若提供）
-            try:
-                if llm_group and hasattr(model, "set_model_group"):
-                    model.set_model_group(llm_group)  # type: ignore
-                if llm_group:
-                    model_name = get_normal_model_name(llm_group)  # type: ignore
-                    if model_name and hasattr(model, "set_model_name"):
-                        model.set_model_name(model_name)  # type: ignore
-            except Exception:
-                pass
             # 设置系统提示词
             model.set_system_prompt(  # type: ignore
                 "你是资深 C→Rust 迁移专家。任务：根据给定的 C/C++ 函数信息，判断其是否可由 Rust 标准库（std）或 Rust 生态中的成熟第三方 crate 的单个 API 直接替代（用于 C 转译为 Rust 的场景）。"
-                "请先输出一个 <yaml> 块，且块内是一个 YAML 对象，包含字段：replaceable, library, function, confidence；随后在单独一行输出 <!!!COMPLETE!!!>；不要输出其它说明文字。"
+                "请先输出一个 <yaml> 块，且块内是一个 YAML 对象，包含字段：replaceable, library, function, confidence；不要输出其它说明文字。"
             )
             return model
         except Exception as e:
@@ -285,19 +275,6 @@ def evaluate_third_party_replacements(
             return "\n".join(snippet_lines)
         except Exception:
             return ""
-
-    def _parse_agent_json(text: str) -> Optional[Dict[str, Any]]:
-        # 尝试从返回文本中提取第一个 JSON 对象（回退用）
-        import re as _re
-        candidates = _re.findall(r"\{.*\}", text or "", flags=_re.S)
-        for c in candidates:
-            try:
-                obj = json.loads(c)
-                if isinstance(obj, dict):
-                    return obj
-            except Exception:
-                continue
-        return None
 
     def _parse_agent_yaml_summary(text: str) -> Optional[Dict[str, Any]]:
         """
@@ -394,7 +371,7 @@ def evaluate_third_party_replacements(
             _model = _new_model()
             if not _model:
                 return {"replaceable": False}
-            result = _model.chat(prompt)  # type: ignore
+            result = _model.chat_until_success(prompt)  # type: ignore
             parsed = _parse_agent_yaml_summary(result or "")
             if isinstance(parsed, dict):
                 # 归一化
