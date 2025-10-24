@@ -17,6 +17,10 @@ from typing import Optional
 
 import typer
 from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
+from jarvis.jarvis_c2rust.scanner import (
+    evaluate_third_party_replacements as _eval_third_party_replacements,
+    compute_translation_order_jsonl as _compute_order,
+)
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_c2rust.llm_module_agent import (
     execute_llm_plan as _execute_llm_plan,
@@ -87,6 +91,7 @@ def prepare(
         typer.secho(f"[c2rust-llm-planner] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+
 @app.command("transpile")
 def transpile(
     llm_group: Optional[str] = typer.Option(
@@ -98,8 +103,8 @@ def transpile(
 ) -> None:
     """
     使用转译器按扫描顺序逐个函数转译并构建修复。
-    需先执行: jarvis-c2rust scan 以生成数据文件（functions.jsonl 与 translation_order.jsonl）
-    默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/functions.jsonl 读取数据。
+    需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl 与 translation_order.jsonl）
+    默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/symbols.jsonl 读取数据。
     未指定目标 crate 时，使用默认 <cwd>/<cwd.name>-rs。
     """
     try:
@@ -117,6 +122,74 @@ def transpile(
         raise typer.Exit(code=1)
 
 
+@app.command("prune")
+def prune(
+    llm_group: Optional[str] = typer.Option(
+        None,
+        "-g",
+        "--llm-group",
+        help="指定用于评估的 LLM 模型组（传递给 CodeAgent）",
+    ),
+) -> None:
+    """
+    使用 Agent 评估函数是否可由开源第三方库单函数替代：
+    - 若可替代：移除该函数及其子引用（子引用不再评估）
+    - 生成新的符号表与替代映射
+
+    默认约定:
+    - 数据源: <cwd>/.jarvis/c2rust/symbols.jsonl（若不存在将尝试自动扫描生成）
+    - 新符号表输出: <cwd>/.jarvis/c2rust/symbols_third_party_pruned.jsonl
+    - 替代映射输出: <cwd>/.jarvis/c2rust/third_party_replacements.jsonl
+    """
+    try:
+        # 若未找到符号数据，则先执行一次扫描生成 symbols_raw.jsonl（保留中间产物）
+        data_dir = Path(".") / ".jarvis" / "c2rust"
+        curated_symbols = data_dir / "symbols.jsonl"
+        raw_symbols = data_dir / "symbols_raw.jsonl"
+        if not curated_symbols.exists() and not raw_symbols.exists():
+            typer.secho("[c2rust-prune] 未找到符号数据（symbols.jsonl 或 symbols_raw.jsonl），正在执行扫描以生成数据...", fg=typer.colors.YELLOW)
+            _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False)
+            if not curated_symbols.exists() and not raw_symbols.exists():
+                raise FileNotFoundError(f"未找到符号数据: {curated_symbols} 或 {raw_symbols}")
+
+        # 使用默认位置 (<cwd>/.jarvis/c2rust/symbols.jsonl) 与默认输出文件名
+        ret = _eval_third_party_replacements(
+            db_path=Path("."),            # 函数内部会解析到默认 JSONL 路径（优先 <cwd>/.jarvis/c2rust/symbols.jsonl）
+            out_symbols_path=None,        # 使用默认输出路径
+            out_mapping_path=None,        # 使用默认输出路径
+            llm_group=llm_group,
+            max_funcs=None,               # 默认不限制
+        )
+
+        # 覆盖默认 symbols.jsonl，使后续流程“直接使用新的符号表”
+        data_dir.mkdir(parents=True, exist_ok=True)
+        default_symbols = data_dir / "symbols.jsonl"
+        pruned_symbols = Path(ret["symbols"])
+        try:
+            import shutil
+            shutil.copy2(pruned_symbols, default_symbols)
+        except Exception as _e:
+            typer.secho(f"[c2rust-prune] 覆盖默认符号表失败: {default_symbols} <- {pruned_symbols}: {_e}", fg=typer.colors.RED, err=True)
+            raise
+
+        # 基于已覆盖的默认符号表，重新计算转译顺序（translation_order.jsonl）
+        try:
+            order_path = _compute_order(default_symbols)
+        except Exception as _e2:
+            typer.secho(f"[c2rust-prune] 计算转译顺序失败: {_e2}", fg=typer.colors.RED, err=True)
+            raise
+
+        typer.secho(
+            (
+                f"[c2rust-prune] 替代映射: {ret['mapping']}\n"
+                f"[c2rust-prune] 新符号表(已覆盖默认): {default_symbols}\n"
+                f"[c2rust-prune] 转译顺序已基于新符号表生成: {order_path}"
+            ),
+            fg=typer.colors.GREEN,
+        )
+    except Exception as e:
+        typer.secho(f"[c2rust-prune] 错误: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
 
 def main() -> None:
     """主入口"""

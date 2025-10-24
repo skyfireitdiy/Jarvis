@@ -75,9 +75,9 @@ def _sanitize_mod_name(s: str) -> str:
 
 class _GraphLoader:
     """
-    从统一的 symbols.jsonl 或回退的 functions.jsonl 读取函数与调用关系，提供子图遍历能力
-    - 优先使用 symbols.jsonl（包含函数与类型，按 category 过滤出函数）
-    - 回退到 functions.jsonl（仅函数）
+    仅从 symbols.jsonl 读取符号与调用关系，提供子图遍历能力：
+    - 数据源：<project_root>/.jarvis/c2rust/symbols.jsonl 或显式传入的 .jsonl 文件
+    - 不再支持任何回退策略（不考虑 symbols_raw.jsonl、functions.jsonl 等）
     """
 
     def __init__(self, db_path: Path, project_root: Path):
@@ -85,13 +85,13 @@ class _GraphLoader:
 
         def _resolve_data_path(hint: Path) -> Path:
             p = Path(hint)
-            # 仅支持 symbols.jsonl，不再兼容 functions.jsonl 或 calls 字段
+            # 仅支持 symbols.jsonl；不再兼容 functions.jsonl 或其他旧格式
             # 若直接传入文件路径且为 .jsonl，则直接使用（要求内部包含 category/ref 字段）
             if p.is_file() and p.suffix.lower() == ".jsonl":
                 return p
-            # 目录：必须存在 symbols.jsonl
+            # 目录：仅支持 <dir>/.jarvis/c2rust/symbols.jsonl
             if p.is_dir():
-                return p / "symbols.jsonl"
+                return p / ".jarvis" / "c2rust" / "symbols.jsonl"
             # 默认：项目 .jarvis/c2rust/symbols.jsonl
             return self.project_root / ".jarvis" / "c2rust" / "symbols.jsonl"
 
@@ -103,8 +103,7 @@ class _GraphLoader:
         self.name_to_id: Dict[str, int] = {}
         self.fn_by_id: Dict[int, _FnMeta] = {}
         """
-        从 symbols.jsonl (首选) 或 functions.jsonl (备用) 加载函数元数据和邻接关系。
-        当 data_path 指向 symbols.jsonl 时，仅加载 category == "function" 的记录。
+        从 symbols.jsonl 加载符号元数据与邻接关系（统一处理函数与类型，按 ref 构建名称邻接）。
         """
         rows_loaded = 0
         try:

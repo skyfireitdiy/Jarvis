@@ -7,8 +7,8 @@
 - 解析器: clang.cindex (libclang)，用于生成包含精确类型和位置的健壮 C/C++ AST。
 
 JSONL 文件
-- symbols.jsonl
-  每个符号（函数或类型）一个 JSON 对象，统一模式：
+- symbols_raw.jsonl
+  原始扫描产物：每个符号（函数或类型）一个 JSON 对象，统一模式：
   字段:
   - id (int)
   - category (str): "function" | "type"
@@ -24,6 +24,8 @@ JSONL 文件
   - start_line (int), start_col (int), end_line (int), end_col (int)
   - language (str)
   - created_at (str, ISO-like), updated_at (str, ISO-like)
+- symbols.jsonl
+  经过裁剪/评估后的符号表（由 prune 子命令或人工整理生成），用于后续转译与规划
 - meta.json
   {
     "functions": N,
@@ -55,6 +57,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set
 import typer
+import shutil
 
 # ---------------------------
 # libclang loader
@@ -536,16 +539,18 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     """
     Scan a directory for C/C++ symbols and store results into JSONL/JSON.
 
-    Returns the path to symbols.jsonl.
-      - symbols.jsonl: one JSON object per symbol (category: function/type)
-      - meta.json:       summary counts and timestamp
+    Returns the path to symbols_raw.jsonl.
+      - symbols_raw.jsonl: one JSON object per symbol (category: function/type),原始扫描产物
+      - symbols.jsonl:     与原始产物等价的初始基线（便于未执行 prune 时直接进入后续流程）
+      - meta.json:         summary counts and timestamp
     """
     scan_root = scan_root.resolve()
     out_dir = scan_root / ".jarvis" / "c2rust"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # JSONL/JSON outputs (symbols only)
-    symbols_jsonl = out_dir / "symbols.jsonl"
+    symbols_raw_jsonl = out_dir / "symbols_raw.jsonl"
+    symbols_curated_jsonl = out_dir / "symbols.jsonl"
     meta_json = out_dir / "meta.json"
 
     # Prepare libclang
@@ -735,7 +740,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
         }
 
     # Open JSONL file (symbols only)
-    f_sym = symbols_jsonl.open("w", encoding="utf-8")
+    f_sym = symbols_raw_jsonl.open("w", encoding="utf-8")
     try:
         for p in files:
             # prefer compile_commands args if available
@@ -848,9 +853,16 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
         pass
 
     print(f"[c2rust-scanner] 完成。收集到的函数: {total_functions}, 类型: {total_types}, 符号: {total_functions + total_types}")
-    print(f"[c2rust-scanner] JSONL 已写入: {symbols_jsonl} (符号)")
+    print(f"[c2rust-scanner] JSONL 已写入: {symbols_raw_jsonl} (原始符号)")
+    # 同步生成基线 symbols.jsonl（与 raw 等价），便于后续流程仅基于 symbols.jsonl 运行
+    try:
+        shutil.copy2(symbols_raw_jsonl, symbols_curated_jsonl)
+        print(f"[c2rust-scanner] JSONL 基线已写入: {symbols_curated_jsonl} (用于后续流程)")
+    except Exception as _e:
+        typer.secho(f"[c2rust-scanner] 生成 symbols.jsonl 失败: {_e}", fg=typer.colors.RED, err=True)
+        raise
     print(f"[c2rust-scanner] 元数据已写入: {meta_json}")
-    return symbols_jsonl
+    return symbols_raw_jsonl
 
 # ---------------------------
 # Type scanning
@@ -950,11 +962,14 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
     # Generate a global reference dependency graph (DOT) from symbols.jsonl.
     def _resolve_symbols_jsonl_path(hint: Path) -> Path:
         p = Path(hint)
+        # 允许直接传入 .jsonl 文件
         if p.is_file() and p.suffix.lower() == ".jsonl":
             return p
+        # 仅支持目录下的标准路径：<dir>/.jarvis/c2rust/symbols.jsonl
         if p.is_dir():
-            return p / "symbols.jsonl"
-        # fallback
+            prefer = p / ".jarvis" / "c2rust" / "symbols.jsonl"
+            return prefer
+        # 默认：项目 <cwd>/.jarvis/c2rust/symbols.jsonl
         return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
 
     sjsonl = _resolve_symbols_jsonl_path(db_path)
@@ -1056,7 +1071,8 @@ def find_root_function_ids(db_path: Path) -> List[int]:
         if p.is_file() and p.suffix.lower() == ".jsonl":
             return p
         if p.is_dir():
-            return p / "symbols.jsonl"
+            prefer = p / ".jarvis" / "c2rust" / "symbols.jsonl"
+            return prefer
         # 默认：项目 .jarvis/c2rust/symbols.jsonl
         return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
 
@@ -1125,7 +1141,8 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
         if p.is_file() and p.suffix.lower() == ".jsonl":
             return p
         if p.is_dir():
-            return p / "symbols.jsonl"
+            prefer = p / ".jarvis" / "c2rust" / "symbols.jsonl"
+            return prefer
         return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
 
     fjsonl = _resolve_symbols_jsonl_path(db_path)
@@ -1301,7 +1318,17 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
     _emit_for_root(None)
 
     if out_path is None:
-        out_path = fjsonl.parent / "translation_order.jsonl"
+        # 根据输入符号表选择输出文件名：
+        # - symbols.jsonl -> translation_order.jsonl（裁剪后用作正式顺序）
+        # - symbols_raw.jsonl -> translation_order_raw.jsonl（原始扫描产物对应的顺序，作为中间文件保留）
+        base = "translation_order.jsonl"
+        try:
+            name = Path(fjsonl).name.lower()
+            if "symbols_raw.jsonl" in name:
+                base = "translation_order_raw.jsonl"
+        except Exception:
+            pass
+        out_path = fjsonl.parent / base
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as fo:
@@ -1317,7 +1344,8 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
         if p.is_file() and p.suffix.lower() == ".jsonl":
             return p
         if p.is_dir():
-            return p / "symbols.jsonl"
+            prefer = p / ".jarvis" / "c2rust" / "symbols.jsonl"
+            return prefer
         return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
 
     sjsonl = _resolve_symbols_jsonl_path(db_path)
@@ -1448,6 +1476,372 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
     return generated
 
 
+# ---------------------------
+# Third-party replacement evaluation
+# ---------------------------
+def evaluate_third_party_replacements(
+    db_path: Path,
+    out_symbols_path: Optional[Path] = None,
+    out_mapping_path: Optional[Path] = None,
+    llm_group: Optional[str] = None,
+    max_funcs: Optional[int] = None,
+) -> Dict[str, Path]:
+    """
+    自顶向下使用 Agent 评估函数是否可由开源第三方库的单个函数调用替代：
+    - 若可替代：消除该函数以及其“子引用”（沿 ref 有向边可达的后继函数），这些子引用无需再评估
+    - 仅对函数（category == "function"）生效，类型记录不受影响
+    - 生成新的符号表（剔除被替代函数及其子引用）与替代映射清单
+
+    输入:
+      - db_path: 指向 symbols.jsonl 的路径或其所在目录
+      - out_symbols_path: 输出新符号表路径（默认: <data_dir>/symbols_third_party_pruned.jsonl）
+      - out_mapping_path: 替代映射路径（默认: <data_dir>/third_party_replacements.jsonl）
+      - llm_group: 可选，传给 CodeAgent 的 model_group，用于平台/模型选择
+      - max_funcs: 可选，最多评估的函数数量（调试/限流用）
+
+    返回:
+      Dict[str, Path]: {"symbols": 新符号表路径, "mapping": 替代映射路径}
+
+    说明:
+      - 评估基于 Agent（如不可用或调用失败，则保守返回不可替代）
+      - Agent 输出需为带标签包围的 YAML（在总结阶段输出），格式：
+          <SUMMARY><yaml>
+          replaceable: true|false
+          library: "<库名或组织名>"
+          function: "<库的函数全名>"
+          confidence: <0.0-1.0浮点>
+          </yaml></SUMMARY>
+    """
+    def _resolve_symbols_jsonl_path(hint: Path) -> Path:
+        p = Path(hint)
+        # 若直接传入文件路径且为 .jsonl，则直接使用
+        if p.is_file() and p.suffix.lower() == ".jsonl":
+            return p
+        # 仅支持目录下的标准路径
+        if p.is_dir():
+            prefer = p / ".jarvis" / "c2rust" / "symbols.jsonl"
+            return prefer
+        # 默认：项目 <cwd>/.jarvis/c2rust/symbols.jsonl
+        return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
+
+    sjsonl = _resolve_symbols_jsonl_path(db_path)
+    if not sjsonl.exists():
+        raise FileNotFoundError(f"未找到 symbols.jsonl: {sjsonl}")
+
+    data_dir = sjsonl.parent
+    if out_symbols_path is None:
+        out_symbols_path = data_dir / "symbols_third_party_pruned.jsonl"
+    else:
+        out_symbols_path = Path(out_symbols_path)
+    if out_mapping_path is None:
+        out_mapping_path = data_dir / "third_party_replacements.jsonl"
+    else:
+        out_mapping_path = Path(out_mapping_path)
+
+    # 1) 读取所有符号
+    all_records: List[Dict[str, Any]] = []
+    by_id: Dict[int, Dict[str, Any]] = {}
+    name_to_id: Dict[str, int] = {}
+    func_ids: Set[int] = set()
+    id_refs_names: Dict[int, List[str]] = {}
+
+    with open(sjsonl, "r", encoding="utf-8") as f:
+        idx = 0
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            idx += 1
+            fid = int(obj.get("id") or idx)
+            obj["id"] = fid
+            nm = obj.get("name") or ""
+            qn = obj.get("qualified_name") or ""
+            cat = obj.get("category") or ""  # "function" | "type"
+            refs = obj.get("ref")
+            if not isinstance(refs, list):
+                refs = []
+            refs = [r for r in refs if isinstance(r, str) and r]
+
+            all_records.append(obj)
+            by_id[fid] = obj
+            id_refs_names[fid] = refs
+            if nm:
+                name_to_id.setdefault(nm, fid)
+            if qn:
+                name_to_id.setdefault(qn, fid)
+            if cat == "function":
+                func_ids.add(fid)
+
+    # 2) 构造仅函数内部的 id 引用邻接
+    adj_func: Dict[int, List[int]] = {}
+    for fid in func_ids:
+        internal: List[int] = []
+        for target in id_refs_names.get(fid, []):
+            tid = name_to_id.get(target)
+            if tid is not None and tid in func_ids and tid != fid:
+                internal.append(tid)
+        # 去重保持顺序
+        try:
+            internal = list(dict.fromkeys(internal))
+        except Exception:
+            internal = sorted(list(set(internal)))
+        adj_func[fid] = internal
+
+    # 3) 根（无入边）函数集合（从全量符号根中过滤出函数）
+    try:
+        roots_all = find_root_function_ids(sjsonl)
+    except Exception:
+        roots_all = []
+    root_funcs = [rid for rid in roots_all if rid in func_ids]
+    # 如果未识别到根，则退化为全部函数（避免卡死）
+    if not root_funcs:
+        root_funcs = sorted(list(func_ids))
+
+    # 4) Agent 评估（可替代 -> 当前函数及其子引用全部剔除；子引用无需再评估）
+    try:
+        from jarvis.jarvis_agent import Agent  # 使用通用 Agent 进行评估
+        _agent_available = True
+    except Exception:
+        _agent_available = False
+        Agent = None  # type: ignore
+
+    agent = None
+    if _agent_available:
+        try:
+            # 使用通用 Agent，禁用工具与规划，非交互，只需返回一段JSON文本
+            agent = Agent(
+                system_prompt=(
+                    "你是资深 C→Rust 迁移专家。任务：根据给定的 C/C++ 函数信息，判断其是否可由 Rust 生态中的成熟第三方 crate 的单个 API 直接替代（用于 C 转译为 Rust 的场景）。"
+                    "注意：最终输出必须在总结阶段，且严格遵循总结提示中的格式要求。"
+                ),
+                name="C2Rust-ThirdParty-Evaluator",
+                model_group=llm_group,
+                summary_prompt=(
+                    "请仅输出一个 <SUMMARY> 块，块内必须且只包含一个 <yaml>...</yaml>，不得包含其它内容。\n"
+                    "YAML 对象字段要求：\n"
+                    "replaceable: true|false  # 是否可由单个 Rust 第三方 crate 的 API 直接替代（等价/更强）\n"
+                    'library: "<crate 名称>"    # 例如: "regex", "serde", "serde_json", "reqwest", "hyper", "tokio", "rayon", "itertools", "chrono", "flate2", "zstd", "prost"\n'
+                    'function: "<Rust API 完整路径或名称>"  # 例如: regex::Regex::is_match, reqwest::blocking::get, flate2::read::GzDecoder::new\n'
+                    "confidence: <0.0-1.0浮点> # 置信度，0.0~1.0\n"
+                    "格式示例：\n"
+                    "<SUMMARY><yaml>\n"
+                    "replaceable: false\n"
+                    'library: ""\n'
+                    'function: ""\n'
+                    "confidence: 0.35\n"
+                    "</yaml></SUMMARY>"
+                ),
+                need_summary=True,
+                auto_complete=True,
+                use_tools=[],
+                plan=False,
+                non_interactive=True,
+                use_methodology=False,
+                use_analysis=False,
+            )
+        except Exception as e:
+            typer.secho(f"[c2rust-scanner] 初始化 Agent 失败，将回退为保守策略（不替代）。原因: {e}", fg=typer.colors.YELLOW, err=True)
+            agent = None
+
+    def _read_source_snippet(rec: Dict[str, Any], max_lines: int = 400) -> str:
+        path = rec.get("file") or ""
+        try:
+            if not path:
+                return ""
+            p = Path(path)
+            if not p.exists():
+                return ""
+            sl = int(rec.get("start_line") or 1)
+            el = int(rec.get("end_line") or sl)
+            if el < sl:
+                el = sl
+            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+            # 1-based to 0-based
+            start_idx = max(sl - 1, 0)
+            end_idx = min(el, len(lines))
+            snippet_lines = lines[start_idx:end_idx]
+            if len(snippet_lines) > max_lines:
+                snippet_lines = snippet_lines[:max_lines]
+            return "\n".join(snippet_lines)
+        except Exception:
+            return ""
+
+    def _parse_agent_json(text: str) -> Optional[Dict[str, Any]]:
+        # 尝试从返回文本中提取第一个 JSON 对象（回退用）
+        import re as _re
+        candidates = _re.findall(r"\{.*\}", text or "", flags=_re.S)
+        for c in candidates:
+            try:
+                obj = json.loads(c)
+                if isinstance(obj, dict):
+                    return obj
+            except Exception:
+                continue
+        return None
+
+    def _parse_agent_yaml_summary(text: str) -> Optional[Dict[str, Any]]:
+        """
+        解析 <SUMMARY><yaml>...</yaml></SUMMARY> 中的 YAML 对象为字典。
+        """
+        if not isinstance(text, str) or not text.strip():
+            return None
+        import re as _re
+        m_sum = _re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=_re.IGNORECASE)
+        block = (m_sum.group(1) if m_sum else text).strip()
+        m_yaml = _re.search(r"<yaml>([\s\S]*?)</yaml>", block, flags=_re.IGNORECASE)
+        raw = (m_yaml.group(1).strip() if m_yaml else "").strip()
+        if not raw:
+            return None
+        try:
+            import yaml  # type: ignore
+            data = yaml.safe_load(raw)
+            return data if isinstance(data, dict) else None
+        except Exception:
+            return None
+
+    def _evaluate_fn_replaceable(fid: int) -> Dict[str, Any]:
+        rec = by_id.get(fid, {})
+        if not agent:
+            return {"replaceable": False}
+        name = rec.get("qualified_name") or rec.get("name") or f"sym_{fid}"
+        sig = rec.get("signature") or ""
+        lang = rec.get("language") or ""
+        src = _read_source_snippet(rec)
+
+        prompt = (
+            "你是资深C/C++生态专家。请根据给定的函数信息，判断其是否可以被成熟的开源第三方库中的单个函数调用直接替代。\n"
+            "要求：\n"
+            "1) 仅当第三方库函数在功能与语义上能够完全覆盖当前函数（等价或更强）时，返回 replaceable=true；否则为 false。\n"
+            "2) 第三方库必须来自 Rust 生态（crates.io），优先选择常见、稳定的 crate（示例：regex、serde/serde_json、reqwest/hyper、tokio、rayon、itertools、chrono、flate2/zstd、prost（protobuf）、ring/sha2、image、nalgebra 等）。library 字段请填 crate 名称；function 字段请填可调用的 Rust API 名称/路径。\n"
+            "3) 若无法判断或需要组合多个库/多步调用才能实现，不视为可替代（replaceable=false）。\n"
+            "4) 最终输出请在总结阶段给出，且严格遵循格式要求（见总结提示）。\n\n"
+            f"语言: {lang}\n"
+            f"函数: {name}\n"
+            f"签名: {sig}\n"
+            "源码片段如下（可能截断，仅用于辅助理解）:\n"
+            "-----BEGIN_SNIPPET-----\n"
+            f"{src}\n"
+            "-----END_SNIPPET-----\n"
+        )
+        try:
+            attempt = 0
+            while True:
+                attempt += 1
+                result = agent.run(prompt)
+                parsed = _parse_agent_yaml_summary(result or "")
+                if not isinstance(parsed, dict):
+                    parsed = _parse_agent_json(result or "")
+                if isinstance(parsed, dict):
+                    # 归一化
+                    rep = bool(parsed.get("replaceable") is True)
+                    lib = str(parsed.get("library") or "").strip()
+                    fun = str(parsed.get("function") or "").strip()
+                    conf = parsed.get("confidence")
+                    try:
+                        conf = float(conf)
+                    except Exception:
+                        conf = 0.0
+                    if rep and (not lib or not fun):
+                        # 不完整信息视为不可替代
+                        rep = False
+                    return {"replaceable": rep, "library": lib, "function": fun, "confidence": conf}
+                # 仅解析失败时重试（不设上限）
+                if attempt % 5 == 0:
+                    typer.secho(f"[c2rust-scanner] 第三方替代评估解析失败，正在重试 (attempt={attempt}) ...", fg=typer.colors.YELLOW, err=True)
+        except Exception as e:
+            typer.secho(f"[c2rust-scanner] Agent 评估失败，已回退为不可替代: {e}", fg=typer.colors.YELLOW, err=True)
+            return {"replaceable": False}
+
+    # 5) 遍历与裁剪
+    visited: Set[int] = set()
+    pruned: Set[int] = set()          # 被剔除的函数（替代根及其可达子节点）
+    replacements: List[Dict[str, Any]] = []
+
+    def _collect_descendants(start: int) -> Set[int]:
+        """收集从 start 沿函数内部边可达的所有后继（含自身）。"""
+        res: Set[int] = set()
+        stack: List[int] = [start]
+        res.add(start)
+        while stack:
+            s = stack.pop()
+            for v in adj_func.get(s, []):
+                if v not in res:
+                    res.add(v)
+                    stack.append(v)
+        return res
+
+    eval_count = 0
+
+    def _process(fid: int):
+        nonlocal eval_count
+        if fid in visited or fid in pruned:
+            return
+        visited.add(fid)
+        if max_funcs is not None and eval_count >= max_funcs:
+            return
+        # 仅当未被上层裁剪时，进行评估
+        res = _evaluate_fn_replaceable(fid)
+        eval_count += 1
+        if res.get("replaceable") is True:
+            # 记录替代映射
+            rec = by_id.get(fid, {})
+            replacements.append({
+                "id": fid,
+                "name": rec.get("name") or "",
+                "qualified_name": rec.get("qualified_name") or "",
+                "library": res.get("library") or "",
+                "function": res.get("function") or "",
+                "confidence": res.get("confidence") or 0.0,
+            })
+            # 剪枝：该函数及其可达子节点全部剔除，同时这些子节点不再评估
+            desc = _collect_descendants(fid)
+            pruned.update(desc)
+            return
+        # 不可替代：继续向子节点传播
+        for child in adj_func.get(fid, []):
+            if child not in visited and child not in pruned:
+                _process(child)
+
+    for rid in root_funcs:
+        if rid in pruned:
+            continue
+        _process(rid)
+
+    # 6) 生成新符号表（移除 pruned 中的函数；类型保留）
+    kept_ids: Set[int] = set()
+    for rec in all_records:
+        fid = int(rec.get("id"))
+        cat = rec.get("category") or ""
+        if cat == "function":
+            if fid not in pruned:
+                kept_ids.add(fid)
+        else:
+            kept_ids.add(fid)
+
+    # 写出新 symbols.jsonl
+    with open(out_symbols_path, "w", encoding="utf-8") as fo:
+        for rec in all_records:
+            fid = int(rec.get("id"))
+            if fid in kept_ids:
+                fo.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    # 写出替代映射（JSONL）
+    with open(out_mapping_path, "w", encoding="utf-8") as fm:
+        for m in replacements:
+            fm.write(json.dumps(m, ensure_ascii=False) + "\n")
+
+    typer.secho(
+        f"[c2rust-scanner] 第三方替代评估完成: 评估 {eval_count} 个函数，剔除 {len(pruned)} 个函数（含子引用）。\n"
+        f"新符号表: {out_symbols_path}\n替代映射: {out_mapping_path}",
+        fg=typer.colors.GREEN,
+    )
+    return {"symbols": Path(out_symbols_path), "mapping": Path(out_mapping_path)}
+
+
 def run_scan(
     dot: Optional[Path] = None,
     only_dot: bool = False,
@@ -1458,7 +1852,8 @@ def run_scan(
     # Scan for C/C++ functions and persist results to JSONL; optionally generate DOT.
     # Determine data path
     root = Path('.')
-    data_path = Path('.') / ".jarvis" / "c2rust" / "symbols.jsonl"
+    data_path_raw = Path('.') / ".jarvis" / "c2rust" / "symbols_raw.jsonl"
+    data_path_curated = Path('.') / ".jarvis" / "c2rust" / "symbols.jsonl"
 
     # Helper: render a DOT file to PNG using Graphviz 'dot'
     def _render_dot_to_png(dot_file: Path, png_out: Optional[Path] = None) -> Path:
@@ -1487,19 +1882,24 @@ def run_scan(
     if not (only_dot or only_subgraphs):
         try:
             scan_directory(root)
-            # After data generated, compute translation order JSONL
+            # After data generated, compute translation order JSONL for curated and raw
             try:
-                order_path = compute_translation_order_jsonl(data_path)
-                typer.secho(f"[c2rust-scanner] 翻译顺序已写入: {order_path}", fg=typer.colors.GREEN)
+                order_cur = compute_translation_order_jsonl(data_path_curated)
+                typer.secho(f"[c2rust-scanner] 翻译顺序(正式)已写入: {order_cur}", fg=typer.colors.GREEN)
             except Exception as e2:
-                typer.secho(f"[c2rust-scanner] 计算翻译顺序失败: {e2}", fg=typer.colors.RED, err=True)
+                typer.secho(f"[c2rust-scanner] 计算正式翻译顺序失败: {e2}", fg=typer.colors.RED, err=True)
+            try:
+                order_raw = compute_translation_order_jsonl(data_path_raw)
+                typer.secho(f"[c2rust-scanner] 翻译顺序(原始)已写入: {order_raw}", fg=typer.colors.GREEN)
+            except Exception as e3:
+                typer.secho(f"[c2rust-scanner] 计算原始翻译顺序失败: {e3}", fg=typer.colors.YELLOW, err=True)
         except Exception as e:
             typer.secho(f"[c2rust-scanner] 错误: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
     else:
         # Only-generate mode (no rescan)
-        if not data_path.exists():
-            typer.secho(f"[c2rust-scanner] 未找到数据: {data_path}", fg=typer.colors.RED, err=True)
+        if not data_path_curated.exists():
+            typer.secho(f"[c2rust-scanner] 未找到数据: {data_path_curated}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
         if only_dot and dot is None:
             typer.secho("[c2rust-scanner] --only-dot 需要 --dot 来指定输出文件", fg=typer.colors.RED, err=True)
@@ -1507,17 +1907,18 @@ def run_scan(
         if only_subgraphs and subgraphs_dir is None:
             typer.secho("[c2rust-scanner] --only-subgraphs 需要 --subgraphs-dir 来指定输出目录", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
-        # Data exists: compute translation order based on current JSONL
+        # Data exists: compute translation order based on curated JSONL
         try:
-            order_path = compute_translation_order_jsonl(data_path)
-            typer.secho(f"[c2rust-scanner] 翻译顺序已写入: {order_path}", fg=typer.colors.GREEN)
+            order_cur = compute_translation_order_jsonl(data_path_curated)
+            typer.secho(f"[c2rust-scanner] 翻译顺序(正式)已写入: {order_cur}", fg=typer.colors.GREEN)
         except Exception as e2:
-            typer.secho(f"[c2rust-scanner] 计算翻译顺序失败: {e2}", fg=typer.colors.RED, err=True)
+            typer.secho(f"[c2rust-scanner] 计算正式翻译顺序失败: {e2}", fg=typer.colors.RED, err=True)
 
     # Generate DOT (global) if requested
     if dot is not None:
         try:
-            generate_dot_from_db(data_path, dot)
+            # 使用正式符号表生成可视化
+            generate_dot_from_db(data_path_curated, dot)
             typer.secho(f"[c2rust-scanner] DOT 文件已写入: {dot}", fg=typer.colors.GREEN)
             if png:
                 png_path = _render_dot_to_png(dot)
@@ -1529,7 +1930,8 @@ def run_scan(
     # Generate per-root subgraphs if requested
     if subgraphs_dir is not None:
         try:
-            files = export_root_subgraphs_to_dir(data_path, subgraphs_dir)
+            # 使用正式符号表生成根节点子图
+            files = export_root_subgraphs_to_dir(data_path_curated, subgraphs_dir)
             if png:
                 png_count = 0
                 for dp in files:
