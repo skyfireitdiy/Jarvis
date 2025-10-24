@@ -207,39 +207,57 @@ def evaluate_third_party_replacements(
                 q.append(child)
     total_potential_count = len(potential_funcs_to_process)
 
-    # 4) Agent 评估（可替代 -> 当前函数及其子引用全部剔除；子引用无需再评估）
+    # 4) Model 评估（每个函数一轮对话，快速分析；可替代 -> 当前函数及其子引用全部剔除；子引用无需再评估）
     try:
-        from jarvis.jarvis_agent import Agent  # 使用通用 Agent 进行评估
-        _agent_available = True
+        from jarvis.jarvis_platform.registry import PlatformRegistry  # 使用平台模型进行评估
+        from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
+        _model_available = True
     except Exception:
-        _agent_available = False
-        Agent = None  # type: ignore
+        _model_available = False
+        PlatformRegistry = None  # type: ignore
+        get_normal_platform_name = None  # type: ignore
+        get_normal_model_name = None  # type: ignore
 
-    def _new_agent() -> Optional[Any]:
+    def _new_model() -> Optional[Any]:
         """
-        每次调用都创建一个全新的 Agent 实例，避免跨函数评估时复用带来的上下文污染。
+        每次调用都创建一个全新的 Model 实例（Platform），避免跨函数评估时复用带来的上下文污染。
+        支持 llm_group：按传入组选择平台与模型，并在平台上设置 model_group。
         """
-        if not _agent_available:
+        if not _model_available:
             return None
         try:
-            return Agent(
-                system_prompt=(
-                    "你是资深 C→Rust 迁移专家。任务：根据给定的 C/C++ 函数信息，判断其是否可由 Rust 标准库（std）或 Rust 生态中的成熟第三方 crate 的单个 API 直接替代（用于 C 转译为 Rust 的场景）。"
-                    "请先输出一个 <yaml> 块，且块内是一个 YAML 对象，包含字段：replaceable, library, function, confidence；随后在单独一行输出 <!!!COMPLETE!!!>；不要输出其它说明文字。"
-                ),
-                name="C2Rust-ThirdParty-Evaluator",
-                model_group=llm_group,
-                need_summary=False,
-                auto_complete=True,
-                use_tools=["execute_script"],
-                plan=False,
-                non_interactive=True,
-                use_methodology=False,
-                use_analysis=False,
+            registry = PlatformRegistry.get_global_platform_registry()
+            model = None
+            # 如果提供了 llm_group，则根据组解析平台与模型
+            if llm_group:
+                try:
+                    platform_name = get_normal_platform_name(llm_group)  # type: ignore
+                    if platform_name:
+                        model = registry.create_platform(platform_name)
+                except Exception:
+                    model = None
+            # 回退到默认平台
+            if model is None:
+                model = registry.get_normal_platform()
+            # 在平台上设置模型组与模型名称（若提供）
+            try:
+                if llm_group and hasattr(model, "set_model_group"):
+                    model.set_model_group(llm_group)  # type: ignore
+                if llm_group:
+                    model_name = get_normal_model_name(llm_group)  # type: ignore
+                    if model_name and hasattr(model, "set_model_name"):
+                        model.set_model_name(model_name)  # type: ignore
+            except Exception:
+                pass
+            # 设置系统提示词
+            model.set_system_prompt(  # type: ignore
+                "你是资深 C→Rust 迁移专家。任务：根据给定的 C/C++ 函数信息，判断其是否可由 Rust 标准库（std）或 Rust 生态中的成熟第三方 crate 的单个 API 直接替代（用于 C 转译为 Rust 的场景）。"
+                "请先输出一个 <yaml> 块，且块内是一个 YAML 对象，包含字段：replaceable, library, function, confidence；随后在单独一行输出 <!!!COMPLETE!!!>；不要输出其它说明文字。"
             )
+            return model
         except Exception as e:
             typer.secho(
-                f"[c2rust-scanner] 初始化 Agent 失败，将回退为保守策略（不替代）。原因: {e}",
+                f"[c2rust-scanner] 初始化 Model 失败，将回退为保守策略（不替代）。原因: {e}",
                 fg=typer.colors.YELLOW,
                 err=True,
             )
@@ -348,7 +366,7 @@ def evaluate_third_party_replacements(
 
     def _evaluate_fn_replaceable(fid: int) -> Dict[str, Any]:
         rec = by_id.get(fid, {})
-        if not _agent_available:
+        if not _model_available:
             return {"replaceable": False}
         name = rec.get("qualified_name") or rec.get("name") or f"sym_{fid}"
         sig = rec.get("signature") or ""
@@ -372,34 +390,31 @@ def evaluate_third_party_replacements(
             "-----END_SNIPPET-----\n"
         )
         try:
-            # 每次评估均创建全新 Agent，避免复用
-            _agent = _new_agent()
-            if not _agent:
+            # 每次评估均创建全新 Model，单轮对话，快速分析
+            _model = _new_model()
+            if not _model:
                 return {"replaceable": False}
-            attempt = 0
-            while True:
-                attempt += 1
-                result = _agent.run(prompt)
-                parsed = _parse_agent_yaml_summary(result or "")
-                if isinstance(parsed, dict):
-                    # 归一化
-                    rep = bool(parsed.get("replaceable") is True)
-                    lib = str(parsed.get("library") or "").strip()
-                    fun = str(parsed.get("function") or "").strip()
-                    conf = parsed.get("confidence")
-                    try:
-                        conf = float(conf)
-                    except Exception:
-                        conf = 0.0
-                    if rep and (not lib or not fun):
-                        # 不完整信息视为不可替代
-                        rep = False
-                    return {"replaceable": rep, "library": lib, "function": fun, "confidence": conf}
-                # 仅解析失败时重试（不设上限）
-                if attempt % 5 == 0:
-                    typer.secho(f"[c2rust-scanner] 标准库/第三方替代评估解析失败，正在重试 (attempt={attempt}) ...", fg=typer.colors.YELLOW, err=True)
+            result = _model.chat(prompt)  # type: ignore
+            parsed = _parse_agent_yaml_summary(result or "")
+            if isinstance(parsed, dict):
+                # 归一化
+                rep = bool(parsed.get("replaceable") is True)
+                lib = str(parsed.get("library") or "").strip()
+                fun = str(parsed.get("function") or "").strip()
+                conf = parsed.get("confidence")
+                try:
+                    conf = float(conf)
+                except Exception:
+                    conf = 0.0
+                if rep and (not lib or not fun):
+                    # 不完整信息视为不可替代
+                    rep = False
+                return {"replaceable": rep, "library": lib, "function": fun, "confidence": conf}
+            # 解析失败则视为不可替代（单轮对话，无重试）
+            typer.secho("[c2rust-scanner] 替代评估结果解析失败，已视为不可替代（单轮对话）。", fg=typer.colors.YELLOW, err=True)
+            return {"replaceable": False}
         except Exception as e:
-            typer.secho(f"[c2rust-scanner] Agent 评估失败，已回退为不可替代: {e}", fg=typer.colors.YELLOW, err=True)
+            typer.secho(f"[c2rust-scanner] Model 评估失败，已回退为不可替代: {e}", fg=typer.colors.YELLOW, err=True)
             return {"replaceable": False}
 
     # 5) 遍历与裁剪
