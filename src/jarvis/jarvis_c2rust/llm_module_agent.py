@@ -236,7 +236,7 @@ def _perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
             requested_root = Path(project_root).resolve()
         except Exception:
             requested_root = Path(project_root)
-        created_dir = cwd / f"{cwd.name}-rs" if requested_root == cwd else requested_root
+        created_dir = cwd / f"{cwd.name}_rs" if requested_root == cwd else requested_root
 
         cargo_path = cwd / "Cargo.toml"
         data_dir = requested_root / ".jarvis" / "c2rust"
@@ -275,7 +275,7 @@ def _perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
 def _resolve_created_dir(target_root: Union[Path, str]) -> Path:
     """
     解析 crate 目录路径：
-    - 若 target_root 为 "." 或解析后等于当前工作目录，则返回 "<cwd.name>-rs" 目录；
+    - 若 target_root 为 "." 或解析后等于当前工作目录，则返回 "<cwd.name>_rs" 目录；
     - 否则返回解析后的目标路径；
     - 解析失败则回退到 Path(target_root)。
     """
@@ -286,7 +286,7 @@ def _resolve_created_dir(target_root: Union[Path, str]) -> Path:
         except Exception:
             resolved_target = Path(target_root)
         if target_root == "." or resolved_target == cwd:
-            return cwd / f"{cwd.name}-rs"
+            return cwd / f"{cwd.name}_rs"
         return resolved_target
     except Exception:
         return Path(target_root)
@@ -314,14 +314,14 @@ class LLMRustCratePlannerAgent:
     def _crate_name(self) -> str:
         """
         计算crate名称：
-        - 当 project_root 为当前目录时，返回 "<当前目录名>-rs"
+        - 当 project_root 为当前目录时，返回 "<当前目录名>_rs"
         - 否则返回 project_root 的目录名
         - 输出用于命名/提示，保持下划线风格（不影响 Cargo 包名）
         """
         try:
             cwd = Path(".").resolve()
             if self.project_root.resolve() == cwd:
-                base = f"{cwd.name}-rs"
+                base = f"{cwd.name}_rs"
             else:
                 base = self.project_root.name or "c2rust_crate"
         except Exception:
@@ -923,7 +923,7 @@ edition = "2024"
 def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, str] = ".") -> None:
     """
     基于 Agent 返回的 <PROJECT> 中的目录结构 YAML，创建实际目录与文件，并在每个目录的 mod.rs 中增加子 mod 声明。
-    - project_root: 目标应用路径；当为 "."（默认）时，将使用“父目录/当前目录名-rs”作为crate根目录
+    - project_root: 目标应用路径；当为 "."（默认）时，将使用“父目录/当前目录名_rs”作为crate根目录
     同时：在当前工作目录下建立/更新 Cargo.toml，将生成的 crate 目录设置为 workspace 的 member，以便在本地当前目录下直接构建。
     """
     entries = _parse_project_yaml_entries(yaml_text)
@@ -934,8 +934,8 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     try:
         cwd = Path(".").resolve()
         if requested_root == cwd:
-            # 默认crate不能设置为 .，设置为 当前目录/当前目录名-rs
-            base_dir = cwd / f"{cwd.name}-rs"
+            # 默认crate不能设置为 .，设置为 当前目录/当前目录名_rs
+            base_dir = cwd / f"{cwd.name}_rs"
         else:
             base_dir = requested_root
     except Exception:
