@@ -223,6 +223,75 @@ class _GraphLoader:
         return root_contexts
 
 
+def _perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
+    """
+    预清理：如存在将删除将要生成的 crate 目录、当前目录的 workspace 文件 Cargo.toml、
+    以及 project_root/.jarvis/c2rust 下的 progress.json 与 symbol_map.jsonl。
+    用户不同意则直接退出。
+    """
+    try:
+        import sys
+        import shutil
+        cwd = Path(".").resolve()
+        try:
+            requested_root = Path(project_root).resolve()
+        except Exception:
+            requested_root = Path(project_root)
+        created_dir = cwd / f"{cwd.name}-rs" if requested_root == cwd else requested_root
+
+        cargo_path = cwd / "Cargo.toml"
+        data_dir = requested_root / ".jarvis" / "c2rust"
+        progress_path = data_dir / "progress.json"
+        symbol_map_jsonl_path = data_dir / "symbol_map.jsonl"
+
+        targets: List[str] = []
+        if created_dir.exists():
+            targets.append(f"- 删除 crate 目录（如存在）：{created_dir}")
+        if cargo_path.exists():
+            targets.append(f"- 删除工作区文件：{cargo_path}")
+        if progress_path.exists():
+            targets.append(f"- 删除进度文件：{progress_path}")
+        if symbol_map_jsonl_path.exists():
+            targets.append(f"- 删除符号映射文件：{symbol_map_jsonl_path}")
+
+        if not targets:
+            return
+
+        tip_lines = ["将执行以下清理操作："] + targets + ["", "是否继续？"]
+        if not user_confirm("\n".join(tip_lines), default=False):
+            print("[c2rust-llm-planner] 用户取消清理操作，退出。")
+            sys.exit(0)
+
+        if created_dir.exists():
+            shutil.rmtree(created_dir, ignore_errors=True)
+        if cargo_path.exists():
+            cargo_path.unlink()
+        if progress_path.exists():
+            progress_path.unlink()
+        if symbol_map_jsonl_path.exists():
+            symbol_map_jsonl_path.unlink()
+    except Exception:
+        pass
+
+def _resolve_created_dir(target_root: Union[Path, str]) -> Path:
+    """
+    解析 crate 目录路径：
+    - 若 target_root 为 "." 或解析后等于当前工作目录，则返回 "<cwd.name>-rs" 目录；
+    - 否则返回解析后的目标路径；
+    - 解析失败则回退到 Path(target_root)。
+    """
+    try:
+        cwd = Path(".").resolve()
+        try:
+            resolved_target = Path(target_root).resolve()
+        except Exception:
+            resolved_target = Path(target_root)
+        if target_root == "." or resolved_target == cwd:
+            return cwd / f"{cwd.name}-rs"
+        return resolved_target
+    except Exception:
+        return Path(target_root)
+
 class LLMRustCratePlannerAgent:
     """
     使用 jarvis_agent.Agent 调用 LLM 来生成 Rust crate 规划（YAML）。
@@ -395,12 +464,10 @@ class LLMRustCratePlannerAgent:
             return m_proj.group(1).strip()
         return text.strip()
 
-    def plan_crate_yaml_with_project(self) -> List[Any]:
+    def _get_project_yaml_text(self) -> str:
         """
-        执行主流程并返回解析后的 YAML 对象（列表）：
-        - 列表项：
-          * 字符串：文件，如 "lib.rs"
-          * 字典：目录及其子项，如 {"src": [ ... ]}
+        执行主流程并返回原始 <PROJECT> YAML 文本，不进行解析。
+        供不同入口复用，避免重复拼装 prompts 与 Agent。
         """
         roots = find_root_function_ids(self.db_path)
         roots_ctx = self.loader.build_roots_context(roots)
@@ -428,6 +495,16 @@ class LLMRustCratePlannerAgent:
         summary_output = agent.run(user_prompt)  # type: ignore
         project_text = str(summary_output) if summary_output is not None else ""
         yaml_text = self._extract_yaml_from_project(project_text)
+        return yaml_text
+
+    def plan_crate_yaml_with_project(self) -> List[Any]:
+        """
+        执行主流程并返回解析后的 YAML 对象（列表）：
+        - 列表项：
+          * 字符串：文件，如 "lib.rs"
+          * 字典：目录及其子项，如 {"src": [ ... ]}
+        """
+        yaml_text = self._get_project_yaml_text()
         yaml_entries = _parse_project_yaml_entries(yaml_text)
         return yaml_entries
 
@@ -436,30 +513,12 @@ class LLMRustCratePlannerAgent:
         执行主流程但返回原始 <PROJECT> YAML 文本，不进行解析。
         便于后续按原样应用目录结构，避免早期解析失败导致信息丢失。
         """
-        roots = find_root_function_ids(self.db_path)
-        roots_ctx = self.loader.build_roots_context(roots)
-
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(roots_ctx)
-        summary_prompt = self._build_summary_prompt(roots_ctx)
-
-        agent = Agent(
-            system_prompt=system_prompt,
-            name="C2Rust-LLM-Module-Planner",
-            model_group=self.llm_group,
-            summary_prompt=summary_prompt,
-            need_summary=True,
-            auto_complete=True,
-            use_tools=[],        # 禁用工具，避免干扰
-            plan=False,          # 关闭内置任务规划
-            non_interactive=True, # 非交互
-            use_methodology=False,
-            use_analysis=False,
-        )
-        summary_output = agent.run(user_prompt)  # type: ignore
-        project_text = str(summary_output) if summary_output is not None else ""
-        yaml_text = self._extract_yaml_from_project(project_text)
-        return yaml_text
+        return self._get_project_yaml_text()
+        """
+        执行主流程但返回原始 <PROJECT> YAML 文本，不进行解析。
+        便于后续按原样应用目录结构，避免早期解析失败导致信息丢失。
+        """
+        return self._get_project_yaml_text()
 
 
 def plan_crate_yaml_text(
@@ -479,72 +538,7 @@ def plan_crate_yaml_text(
         agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path, llm_group=llm_group)
         return agent.plan_crate_yaml_text()
 
-    # 预清理（需用户确认，仅当存在目标时才提示）
-    try:
-        import sys
-        import shutil
-        cwd = Path(".").resolve()
-        try:
-            requested_root = Path(project_root).resolve()
-        except Exception:
-            requested_root = Path(project_root)
-        created_dir = cwd / f"{cwd.name}-rs" if requested_root == cwd else requested_root
-
-        cargo_path = cwd / "Cargo.toml"
-        data_dir = requested_root / ".jarvis" / "c2rust"
-        progress_path = data_dir / "progress.json"
-        symbol_map_jsonl_path = data_dir / "symbol_map.jsonl"
-
-        # 同时检查当前目录与 project_root 下的 Cargo.toml（两者可能不同）
-        workspace_candidates: List[Path] = []
-        try:
-            cwd_cargo = cwd / "Cargo.toml"
-            workspace_candidates.append(cwd_cargo)
-        except Exception:
-            pass
-        try:
-            root_cargo = requested_root / "Cargo.toml"
-            # 避免重复添加相同路径
-            if str(root_cargo.resolve()) != str(workspace_candidates[0].resolve()):
-                workspace_candidates.append(root_cargo)
-        except Exception:
-            pass
-
-        # 仅收集存在的目标，若无则不提示
-        targets: List[str] = []
-        if created_dir.exists():
-            targets.append(f"- 删除 crate 目录（如存在）：{created_dir}")
-        # 收集存在的 workspace 文件（当前目录或 project_root）
-        for wp in workspace_candidates:
-            try:
-                if wp.exists():
-                    targets.append(f"- 删除工作区文件：{wp}")
-                else:
-                    pass
-            except Exception:
-                pass
-        if progress_path.exists():
-            targets.append(f"- 删除进度文件：{progress_path}")
-        if symbol_map_jsonl_path.exists():
-            targets.append(f"- 删除符号映射文件：{symbol_map_jsonl_path}")
-
-        if targets:
-            tip_lines = ["将执行以下清理操作："] + targets + ["", "是否继续？"]
-            if not user_confirm("\n".join(tip_lines), default=False):
-                print("[c2rust-llm-planner] 用户取消清理操作，退出。")
-                sys.exit(0)
-
-            # 用户已确认，仅删除存在的目标
-            if created_dir.exists():
-                shutil.rmtree(created_dir, ignore_errors=True)
-            if cargo_path.exists():
-                cargo_path.unlink()
-            if progress_path.exists():
-                progress_path.unlink()
-            if symbol_map_jsonl_path.exists():
-                symbol_map_jsonl_path.unlink()
-    except Exception:
-        pass
+    _perform_pre_cleanup_for_planner(project_root)
 
     agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path, llm_group=llm_group)
     return agent.plan_crate_yaml_text()
@@ -566,50 +560,7 @@ def plan_crate_yaml_llm(
         agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
         return agent.plan_crate_yaml_with_project()
 
-    # 预清理（需用户确认，仅当存在目标时才提示）
-    try:
-        import sys
-        import shutil
-        cwd = Path(".").resolve()
-        try:
-            requested_root = Path(project_root).resolve()
-        except Exception:
-            requested_root = Path(project_root)
-        created_dir = cwd / f"{cwd.name}-rs" if requested_root == cwd else requested_root
-
-        cargo_path = cwd / "Cargo.toml"
-        data_dir = requested_root / ".jarvis" / "c2rust"
-        progress_path = data_dir / "progress.json"
-        symbol_map_jsonl_path = data_dir / "symbol_map.jsonl"
-
-        # 仅收集存在的目标，若无则不提示
-        targets: List[str] = []
-        if created_dir.exists():
-            targets.append(f"- 删除 crate 目录（如存在）：{created_dir}")
-        if cargo_path.exists():
-            targets.append(f"- 删除当前目录的 workspace 文件：{cargo_path}")
-        if progress_path.exists():
-            targets.append(f"- 删除进度文件：{progress_path}")
-        if symbol_map_jsonl_path.exists():
-            targets.append(f"- 删除符号映射文件：{symbol_map_jsonl_path}")
-
-        if targets:
-            tip_lines = ["将执行以下清理操作："] + targets + ["", "是否继续？"]
-            if not user_confirm("\n".join(tip_lines), default=False):
-                print("[c2rust-llm-planner] 用户取消清理操作，退出。")
-                sys.exit(0)
-
-            # 用户已确认，仅删除存在的目标
-            if created_dir.exists():
-                shutil.rmtree(created_dir, ignore_errors=True)
-            if cargo_path.exists():
-                cargo_path.unlink()
-            if progress_path.exists():
-                progress_path.unlink()
-            if symbol_map_jsonl_path.exists():
-                symbol_map_jsonl_path.unlink()
-    except Exception:
-        pass
+    _perform_pre_cleanup_for_planner(project_root)
 
     agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
     return agent.plan_crate_yaml_with_project()
@@ -707,6 +658,40 @@ def _parse_project_yaml_entries(yaml_text: str) -> List[Any]:
     return _parse_project_yaml_entries_fallback(yaml_text)
 
 
+def _ensure_pub_mod_declarations(existing_text: str, child_mods: List[str]) -> str:
+    """
+    在给定文本中确保存在并升级子模块声明为 `pub mod <name>;`：
+    - 解析已有的 `mod`/`pub mod`/`pub(...) mod` 声明；
+    - 已存在但非 pub 的同名声明就地升级为 `pub mod`，保留原行的缩进；
+    - 不存在的模块名则在末尾追加一行 `pub mod <name>;`；
+    - 返回更新后的完整文本（保留结尾换行）。
+    """
+    try:
+        lines = (existing_text or "").splitlines()
+    except Exception:
+        lines = []
+    mod_decl_pattern = re.compile(r'^\s*(pub(?:\s*\([^)]+\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;\s*$')
+    name_to_indices: Dict[str, List[int]] = {}
+    name_has_pub: Set[str] = set()
+    for i, ln in enumerate(lines):
+        m = mod_decl_pattern.match(ln.strip())
+        if not m:
+            continue
+        mod_name = m.group(2)
+        name_to_indices.setdefault(mod_name, []).append(i)
+        if m.group(1):
+            name_has_pub.add(mod_name)
+    for mod_name in sorted(set(child_mods or [])):
+        if mod_name in name_to_indices:
+            if mod_name not in name_has_pub:
+                for idx in name_to_indices[mod_name]:
+                    ws_match = re.match(r'^(\s*)', lines[idx])
+                    leading_ws = ws_match.group(1) if ws_match else ""
+                    lines[idx] = f"{leading_ws}pub mod {mod_name};"
+        else:
+            lines.append(f"pub mod {mod_name};")
+    return "\n".join(lines).rstrip() + ("\n" if lines else "")
+
 def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
     """
     根据解析出的 entries 创建目录与文件结构，并在每个目录的 mod.rs 中添加子模块声明：
@@ -774,33 +759,10 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
                     lib_existing = lib_rs_path.read_text(encoding="utf-8") if lib_rs_path.exists() else ""
                 except Exception:
                     lib_existing = ""
-                lib_lines = lib_existing.splitlines()
-                # 解析已存在的模块声明（支持 mod / pub mod / pub(...) mod），按名称收集索引，便于升级为 pub
-                mod_decl_pattern = re.compile(r'^\s*(pub(?:\s*\([^)]+\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;\s*$')
-                name_to_indices: Dict[str, List[int]] = {}
-                name_has_pub: Set[str] = set()
-                for i, ln in enumerate(lib_lines):
-                    m = mod_decl_pattern.match(ln.strip())
-                    if not m:
-                        continue
-                    mod_name = m.group(2)
-                    name_to_indices.setdefault(mod_name, []).append(i)
-                    if m.group(1):  # 以 pub 或 pub(...) 开头
-                        name_has_pub.add(mod_name)
-
-                # 确保所有子模块以 pub mod 形式声明；若已存在非 pub 的 mod 声明则升级为 pub mod
-                for mod_name in sorted(set(child_mods)):
-                    if mod_name in name_to_indices:
-                        if mod_name not in name_has_pub:
-                            for idx in name_to_indices[mod_name]:
-                                ws_match = re.match(r'^(\s*)', lib_lines[idx])
-                                leading_ws = ws_match.group(1) if ws_match else ""
-                                lib_lines[idx] = f"{leading_ws}pub mod {mod_name};"
-                    else:
-                        lib_lines.append(f"pub mod {mod_name};")
-                # 写回 lib.rs
+                # 使用公共逻辑确保/升级子模块声明为 pub mod
+                new_lib_content = _ensure_pub_mod_declarations(lib_existing, child_mods)
                 try:
-                    lib_rs_path.write_text("\n".join(lib_lines).rstrip() + ("\n" if lib_lines else ""), encoding="utf-8")
+                    lib_rs_path.write_text(new_lib_content, encoding="utf-8")
                 except Exception:
                     pass
                 return  # 不再为 src 目录处理 mod.rs
@@ -818,33 +780,10 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
                 existing = mod_rs_path.read_text(encoding="utf-8") if mod_rs_path.exists() else ""
             except Exception:
                 existing = ""
-            existing_lines = existing.splitlines()
-            # 支持解析 mod / pub mod / pub(...) mod，并按名称收集索引以便升级为 pub
-            mod_decl_pattern = re.compile(r'^\s*(pub(?:\s*\([^)]+\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;\s*$')
-            name_to_indices: Dict[str, List[int]] = {}
-            name_has_pub: Set[str] = set()
-            for i, ln in enumerate(existing_lines):
-                m = mod_decl_pattern.match(ln.strip())
-                if not m:
-                    continue
-                mod_name = m.group(2)
-                name_to_indices.setdefault(mod_name, []).append(i)
-                if m.group(1):  # 已是 pub 或 pub(...)
-                    name_has_pub.add(mod_name)
-
-            # 确保所有子模块以 pub mod 声明；若已有非 pub 的声明则就地升级
-            for mod_name in sorted(set(child_mods)):
-                if mod_name in name_to_indices:
-                    if mod_name not in name_has_pub:
-                        for idx in name_to_indices[mod_name]:
-                            ws_match = re.match(r'^(\s*)', existing_lines[idx])
-                            leading_ws = ws_match.group(1) if ws_match else ""
-                            existing_lines[idx] = f"{leading_ws}pub mod {mod_name};"
-                else:
-                    existing_lines.append(f"pub mod {mod_name};")
-            # 写回
+            # 使用公共逻辑确保/升级子模块声明为 pub mod
+            new_mod_content = _ensure_pub_mod_declarations(existing, child_mods)
             try:
-                mod_rs_path.write_text("\n".join(existing_lines).rstrip() + ("\n" if existing_lines else ""), encoding="utf-8")
+                mod_rs_path.write_text(new_mod_content, encoding="utf-8")
             except Exception:
                 pass
 
@@ -1027,17 +966,7 @@ def execute_llm_plan(
 
         # 解析 crate 目录路径（与 apply 逻辑保持一致）
         try:
-            cwd = Path(".").resolve()
-            try:
-                resolved_target = Path(target_root).resolve()
-            except Exception:
-                resolved_target = Path(target_root)
-
-            # 若目标根目录为当前目录（无论是 "." 还是绝对路径等价于 cwd），则在当前目录下创建 "<cwd.name>-rs"
-            if target_root == "." or resolved_target == cwd:
-                created_dir = cwd / f"{cwd.name}-rs"
-            else:
-                created_dir = resolved_target
+            created_dir = _resolve_created_dir(target_root)
         except Exception:
             # 兜底：无法解析时直接使用传入的 target_root
             created_dir = Path(target_root)
