@@ -97,13 +97,13 @@ class _GraphLoader:
 
         self.data_path = _resolve_data_path(Path(db_path))
         if not self.data_path.exists():
-            raise FileNotFoundError(f"symbols.jsonl not found: {self.data_path}")
+            raise FileNotFoundError(f"未找到 symbols.jsonl: {self.data_path}")
         # Initialize in-memory graph structures
         self.adj: Dict[int, List[str]] = {}
         self.name_to_id: Dict[str, int] = {}
         self.fn_by_id: Dict[int, _FnMeta] = {}
         """
-        Load function metadata and adjacency from symbols.jsonl (preferred) or functions.jsonl (fallback).
+        从 symbols.jsonl (首选) 或 functions.jsonl (备用) 加载函数元数据和邻接关系。
         当 data_path 指向 symbols.jsonl 时，仅加载 category == "function" 的记录。
         """
         rows_loaded = 0
@@ -150,7 +150,7 @@ class _GraphLoader:
         except FileNotFoundError:
             raise
         except Exception:
-            # keep robust: leave loader empty on error
+            # 保持健壮性：出错时保持加载器为空
             pass
 
     def _rel_path(self, abs_path: str) -> str:
@@ -703,7 +703,7 @@ def _parse_project_yaml_entries(yaml_text: str) -> List[Any]:
             return data
     except Exception:
         pass
-    # Fallback
+    # 回退
     return _parse_project_yaml_entries_fallback(yaml_text)
 
 
@@ -883,7 +883,7 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     entries = _parse_project_yaml_entries(yaml_text)
     if not entries:
         # 严格模式：解析失败直接报错并退出，由上层 CLI 捕获打印错误
-        raise ValueError("[c2rust-llm-planner] Failed to parse directory structure from LLM output. Aborting.")
+        raise ValueError("[c2rust-llm-planner] 从LLM输出解析目录结构失败。正在中止。")
     requested_root = Path(project_root).resolve()
     try:
         cwd = Path(".").resolve()
@@ -1008,16 +1008,16 @@ def execute_llm_plan(
     yaml_text = plan_crate_yaml_text(llm_group=llm_group)
     entries = _parse_project_yaml_entries(yaml_text)
     if not entries:
-        raise ValueError("[c2rust-llm-planner] Failed to parse directory structure from LLM output. Aborting.")
+        raise ValueError("[c2rust-llm-planner] 从LLM输出解析目录结构失败。正在中止。")
 
     # 2) 如需应用到磁盘
     if apply:
         target_root = crate_name if crate_name else "."
         try:
             apply_project_structure_from_yaml(yaml_text, project_root=target_root)
-            print("[c2rust-llm-planner] Project structure applied.")
+            print("[c2rust-llm-planner] 项目结构已应用。")
         except Exception as e:
-            print(f"[c2rust-llm-planner] Apply project structure failed: {e}")
+            print(f"[c2rust-llm-planner] 应用项目结构失败: {e}")
             raise
 
         # Post-apply: 检查生成的目录结构，使用 CodeAgent 更新 Cargo.toml
@@ -1066,19 +1066,19 @@ def execute_llm_plan(
                 # 仅添加相关路径，避免误加其他未跟踪变更
                 subprocess.run(["git", "add", "--"] + paths_to_add, check=False, cwd=str(workspace_dir))
                 commit_res = subprocess.run(
-                    ["git", "commit", "-m", "[c2rust-llm-planner] Apply initial crate structure"],
+                    ["git", "commit", "-m", "[c2rust-llm-planner] 应用初始 crate 结构"],
                     capture_output=True,
                     text=True,
                     check=False,
                     cwd=str(workspace_dir),
                 )
                 if commit_res.returncode == 0:
-                    print("[c2rust-llm-planner] Initial commit created in current repository.")
+                    print("[c2rust-llm-planner] 已在当前仓库中创建初始提交。")
                 else:
                     # 常见原因：无变更、未配置 user.name/email 等
-                    print("[c2rust-llm-planner] Initial commit skipped or failed (no changes or git config missing).")
+                    print("[c2rust-llm-planner] 初始提交已跳过或失败（无更改或缺少 git 配置）。")
             else:
-                print("[c2rust-llm-planner] Current directory is not a git repository; skip committing.")
+                print("[c2rust-llm-planner] 当前目录不是 git 仓库；跳过提交。")
         except Exception:
             # 保持稳健，不因提交失败影响主流程
             pass
@@ -1125,7 +1125,7 @@ def execute_llm_plan(
             "   - 语言/工具链不兼容：将 edition 从 2024 调整为 2021；必要时可添加 rust-version 要求；",
             "   - 语法级/最小实现缺失：仅在入口文件中补充必要的 use/空实现/feature gate 以通过编译，避免改动非入口业务文件；",
             "   - 不要删除或移动现有文件与目录。",
-            "6) 每轮修改后必须再次运行 `cargo build -q` 验证，直到构建成功为止。",
+            "6) 每轮修改后必须运行 `cargo build -q` 验证，直到构建成功为止。",
             "",
             "修改约束：",
             "- 允许修改的文件范围：Cargo.toml、src/lib.rs、src/main.rs、src/bin/*.rs（仅最小必要变更）；除非为修复构建，不要修改其他文件。",
@@ -1143,7 +1143,7 @@ def execute_llm_plan(
             # 直接在当前工作目录运行 CodeAgent，不切换到 crate 目录
             agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
             agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
-            print("[c2rust-llm-planner] Initial CodeAgent run completed.")
+            print("[c2rust-llm-planner] 初始 CodeAgent 运行完成。")
 
             # 进入构建与修复循环：构建失败则生成新的 CodeAgent，携带错误上下文进行最小修复
             iter_count = 0
@@ -1162,12 +1162,12 @@ def execute_llm_plan(
                 output = (stdout + "\n" + stderr).strip()
 
                 if build_res.returncode == 0:
-                    print("[c2rust-llm-planner] Cargo build succeeded.")
+                    print("[c2rust-llm-planner] Cargo 构建成功。")
                     break
 
-                print(f"[c2rust-llm-planner] Cargo build failed (iter={iter_count}).")
+                print(f"[c2rust-llm-planner] Cargo 构建失败 (iter={iter_count})。")
                 # 打印编译错误输出，便于可视化与调试
-                print("[c2rust-llm-planner] Build error output:")
+                print("[c2rust-llm-planner] 构建错误输出:")
                 print(output)
                 # 将错误信息作为上下文，附加修复原则，生成新的 CodeAgent 进行最小修复
                 repair_prompt = "\n".join([
@@ -1192,6 +1192,6 @@ def execute_llm_plan(
         out_path.parent.mkdir(parents=True, exist_ok=True)
         # 使用原始文本写出，便于可读
         out_path.write_text(yaml_text, encoding="utf-8")
-        print(f"[c2rust-llm-planner] YAML written: {out_path}")
+        print(f"[c2rust-llm-planner] YAML 已写入: {out_path}")
 
     return entries
