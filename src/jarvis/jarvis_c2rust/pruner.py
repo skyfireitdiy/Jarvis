@@ -287,7 +287,8 @@ def evaluate_third_party_replacements(
             "1) 仅当标准库/第三方库函数在功能与语义上能够完全覆盖当前函数（等价或更强）时，返回 replaceable=true；否则为 false。\n"
             "2) 优先考虑 Rust 标准库（std），其次考虑来自 crates.io 的常见、稳定的 crate。library 字段请填 'std' 或 crate 名称；function 字段请填可调用的 Rust API 名称/路径。\n"
             "3) 若无法判断或需要组合多个库/多步调用才能实现，不视为可替代（replaceable=false）。\n"
-            "4) 请先输出一个 <yaml> 块（内容为 YAML 对象：replaceable, library, function, confidence），随后在单独一行输出 <!!!COMPLETE!!!>，不要输出其它文字。\n\n"
+            "4) `search_web`工具的代价较大，非必要不要用。\n"
+            "5) 请先输出一个 <yaml> 块（内容为 YAML 对象：replaceable, library, function, confidence），随后在单独一行输出 <!!!COMPLETE!!!>，不要输出其它文字。\n\n"
             f"语言: {lang}\n"
             f"函数: {name}\n"
             f"签名: {sig}\n"
@@ -389,6 +390,11 @@ def evaluate_third_party_replacements(
         if fid in visited or fid in pruned:
             return
         visited.add(fid)
+
+        rec = by_id.get(fid, {})
+        func_name = rec.get("qualified_name") or rec.get("name") or f"sym_{fid}"
+        typer.secho(f"[c2rust-pruner] 正在评估函数: {func_name} (ID: {fid})", fg=typer.colors.CYAN, err=True)
+
         if max_funcs is not None and eval_count >= max_funcs:
             return
         # 仅当未被上层裁剪时，进行评估
@@ -396,19 +402,27 @@ def evaluate_third_party_replacements(
         eval_count += 1
         if res.get("replaceable") is True:
             # 记录替代映射（去重）
-            rec = by_id.get(fid, {})
             if fid not in repl_ids:
-                replacements.append({
-                    "id": fid,
-                    "name": rec.get("name") or "",
-                    "qualified_name": rec.get("qualified_name") or "",
-                    "library": res.get("library") or "",
-                    "function": res.get("function") or "",
-                    "confidence": res.get("confidence") or 0.0,
-                })
+                replacements.append(
+                    {
+                        "id": fid,
+                        "name": rec.get("name") or "",
+                        "qualified_name": rec.get("qualified_name") or "",
+                        "library": res.get("library") or "",
+                        "function": res.get("function") or "",
+                        "confidence": res.get("confidence") or 0.0,
+                    }
+                )
                 repl_ids.add(fid)
             # 剪枝：该函数及其可达子节点全部剔除，同时这些子节点不再评估
             desc = _collect_descendants(fid)
+            lib = res.get("library")
+            fun = res.get("function")
+            typer.secho(
+                f"[c2rust-pruner] 函数 {func_name} 可由 '{lib}' 中的 '{fun}' 替代，将剔除 {len(desc)} 个符号。",
+                fg=typer.colors.GREEN,
+                err=True,
+            )
             pruned.update(desc)
             # 保存断点
             _save_checkpoint(state_path, sjsonl, visited, pruned, replacements, eval_count)
