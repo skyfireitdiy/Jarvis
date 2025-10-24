@@ -74,6 +74,8 @@ def evaluate_third_party_replacements(
         out_mapping_path = data_dir / "third_party_replacements.jsonl"
     else:
         out_mapping_path = Path(out_mapping_path)
+    # 断点续跑：状态文件路径
+    state_path = data_dir / "third_party_pruner_state.json"
 
     # 1) 读取所有符号
     all_records: List[Dict[str, Any]] = []
@@ -226,6 +228,50 @@ def evaluate_third_party_replacements(
         except Exception:
             return None
 
+    # 断点续跑：状态读写
+    def _load_checkpoint(state_p: Path, symbols_path: Path) -> Optional[Dict[str, Any]]:
+        try:
+            if not state_p.exists():
+                return None
+            meta = symbols_path.stat()
+            with open(state_p, "r", encoding="utf-8") as sf:
+                st = json.load(sf)
+            if not isinstance(st, dict):
+                return None
+            # 符号表变化则放弃断点
+            if st.get("symbols_mtime") != meta.st_mtime or st.get("symbols_size") != meta.st_size:
+                return None
+            return st
+        except Exception:
+            return None
+
+    def _save_checkpoint(
+        state_p: Path,
+        symbols_path: Path,
+        visited_ids: Set[int],
+        pruned_ids: Set[int],
+        replacements_list: List[Dict[str, Any]],
+        eval_cnt: int,
+    ) -> None:
+        try:
+            meta = symbols_path.stat()
+            st = {
+                "symbols_mtime": meta.st_mtime,
+                "symbols_size": meta.st_size,
+                "visited_ids": sorted(list(int(x) for x in visited_ids)),
+                "pruned_ids": sorted(list(int(x) for x in pruned_ids)),
+                "replacements": replacements_list,
+                "eval_count": int(eval_cnt),
+                "timestamp": time.time(),
+            }
+            tmp_p = state_p.with_suffix(".json.tmp")
+            with open(tmp_p, "w", encoding="utf-8") as of:
+                json.dump(st, of, ensure_ascii=False, indent=2)
+            tmp_p.replace(state_p)
+        except Exception:
+            # 忽略断点写入失败，不影响主流程
+            pass
+
     def _evaluate_fn_replaceable(fid: int) -> Dict[str, Any]:
         rec = by_id.get(fid, {})
         if not agent:
@@ -282,6 +328,47 @@ def evaluate_third_party_replacements(
     pruned: Set[int] = set()          # 被剔除的函数（替代根及其可达子节点）
     replacements: List[Dict[str, Any]] = []
 
+    # 尝试加载断点（与当前 symbols.jsonl 匹配时生效）
+    _checkpoint_state = _load_checkpoint(state_path, sjsonl)
+    _ckpt_eval_count = None
+    if _checkpoint_state:
+        try:
+            v_ids = _checkpoint_state.get("visited_ids", [])
+            p_ids = _checkpoint_state.get("pruned_ids", [])
+            if isinstance(v_ids, list):
+                for x in v_ids:
+                    try:
+                        visited.add(int(x))
+                    except Exception:
+                        continue
+            if isinstance(p_ids, list):
+                for x in p_ids:
+                    try:
+                        pruned.add(int(x))
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        reps = _checkpoint_state.get("replacements", [])
+        if isinstance(reps, list):
+            replacements = [r for r in reps if isinstance(r, dict)]
+        _ckpt_eval_count = _checkpoint_state.get("eval_count")
+
+    # 已有替代映射的去重索引
+    repl_ids: Set[int] = set()
+    for _m in replacements:
+        try:
+            repl_ids.add(int(_m.get("id")))
+        except Exception:
+            pass
+
+    if _checkpoint_state:
+        typer.secho(
+            f"[c2rust-pruner] 已加载断点: visited={len(visited)}, pruned={len(pruned)}, replacements={len(replacements)}, eval_count={int(_ckpt_eval_count or 0)}",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+
     def _collect_descendants(start: int) -> Set[int]:
         """收集从 start 沿函数内部边可达的所有后继（含自身）。"""
         res: Set[int] = set()
@@ -295,7 +382,7 @@ def evaluate_third_party_replacements(
                     stack.append(v)
         return res
 
-    eval_count = 0
+    eval_count = int(_ckpt_eval_count or 0)
 
     def _process(fid: int):
         nonlocal eval_count
@@ -308,21 +395,26 @@ def evaluate_third_party_replacements(
         res = _evaluate_fn_replaceable(fid)
         eval_count += 1
         if res.get("replaceable") is True:
-            # 记录替代映射
+            # 记录替代映射（去重）
             rec = by_id.get(fid, {})
-            replacements.append({
-                "id": fid,
-                "name": rec.get("name") or "",
-                "qualified_name": rec.get("qualified_name") or "",
-                "library": res.get("library") or "",
-                "function": res.get("function") or "",
-                "confidence": res.get("confidence") or 0.0,
-            })
+            if fid not in repl_ids:
+                replacements.append({
+                    "id": fid,
+                    "name": rec.get("name") or "",
+                    "qualified_name": rec.get("qualified_name") or "",
+                    "library": res.get("library") or "",
+                    "function": res.get("function") or "",
+                    "confidence": res.get("confidence") or 0.0,
+                })
+                repl_ids.add(fid)
             # 剪枝：该函数及其可达子节点全部剔除，同时这些子节点不再评估
             desc = _collect_descendants(fid)
             pruned.update(desc)
+            # 保存断点
+            _save_checkpoint(state_path, sjsonl, visited, pruned, replacements, eval_count)
             return
-        # 不可替代：继续向子节点传播
+        # 不可替代：保存进度并继续向子节点传播
+        _save_checkpoint(state_path, sjsonl, visited, pruned, replacements, eval_count)
         for child in adj_func.get(fid, []):
             if child not in visited and child not in pruned:
                 _process(child)
@@ -354,6 +446,12 @@ def evaluate_third_party_replacements(
     with open(out_mapping_path, "w", encoding="utf-8") as fm:
         for m in replacements:
             fm.write(json.dumps(m, ensure_ascii=False) + "\n")
+    # 清理断点文件（已完成）
+    try:
+        if state_path.exists():
+            state_path.unlink()
+    except Exception:
+        pass
 
     typer.secho(
         f"[c2rust-scanner] 第三方/标准库替代评估完成: 评估 {eval_count} 个函数，剔除 {len(pruned)} 个函数（含子引用）。\n"
