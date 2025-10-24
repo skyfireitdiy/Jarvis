@@ -693,8 +693,8 @@ class Transpiler:
                 f"待审查函数：{rec.qname or rec.name}",
                 f"建议签名：{rust_sig}",
                 f"目标模块：{module}",
-                "请阅读crate中该函数的当前实现（你可以自行推断并读取上下文），并准备总结。",
-                "如无明显问题，请总结为OK；否则指出问题摘要（简要）。",
+                f"crate根目录路径：{self.crate_dir}",
+                "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
             ])
             sum_p = (
                 "请仅输出一个 <SUMMARY> 块，内容为纯文本：\n"
