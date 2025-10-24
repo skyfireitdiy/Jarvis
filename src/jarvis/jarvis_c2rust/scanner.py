@@ -1504,10 +1504,11 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
             nm = obj.get("name") or ""
             qn = obj.get("qualified_name") or ""
             sig = obj.get("signature") or ""
-            calls = obj.get("calls") or []
-            if not isinstance(calls, list):
-                calls = []
-            calls = [c for c in calls if isinstance(c, str) and c]
+            # Use unified 'ref' field written by scanner (_fn_record)
+            refs = obj.get("ref")
+            if not isinstance(refs, list):
+                refs = []
+            refs = [c for c in refs if isinstance(c, str) and c]
 
             by_id[fid] = {"name": nm, "qname": qn, "sig": sig}
             if nm:
