@@ -260,7 +260,41 @@ class LLMRustCratePlannerAgent:
             base = "c2rust_crate"
         return _sanitize_mod_name(base)
 
+    def _has_original_main(self) -> bool:
+        """
+        判断原始项目是否包含 main 函数：
+        - 若 symbols 图谱中存在函数名为 'main' 或限定名以 '::main' 结尾，则认为存在
+        """
+        try:
+            for m in self.loader.fn_by_id.values():
+                n = (m.name or "").strip()
+                q = (m.qname or "").strip()
+                if n == "main" or q.endswith("::main"):
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _build_user_prompt(self, roots_context: List[Dict[str, Any]]) -> str:
+        """
+        主对话阶段：传入上下文，不给出输出要求，仅用于让模型获取信息并触发进入总结阶段。
+        请模型仅输出 <!!!COMPLETE!!!> 以进入总结（summary）阶段。
+        """
+        crate_name = self._crate_name()
+        has_main = self._has_original_main()
+        context_json = json.dumps(
+            {"meta": {"crate_name": crate_name, "main_present": has_main}, "roots": roots_context},
+            ensure_ascii=False,
+            indent=2,
+        )
+        return f"""
+下面提供了项目的调用图上下文（JSON），请先通读理解，不要输出任何规划或YAML内容：
+<context>
+{context_json}
+</context>
+
+如果已准备好进入总结阶段以生成完整输出，请仅输出：<!!!COMPLETE!!!>
+""".strip()
         """
         主对话阶段：传入上下文，不给出输出要求，仅用于让模型获取信息并触发进入总结阶段。
         请模型仅输出 <!!!COMPLETE!!!> 以进入总结（summary）阶段。
@@ -284,6 +318,7 @@ class LLMRustCratePlannerAgent:
         """
         系统提示：描述如何基于依赖关系进行 crate 规划的原则（不涉及对话流程或输出方式）
         """
+        crate_name = self._crate_name()
         return (
             "你是资深 Rust 架构师。任务：根据给定的函数级调用关系（仅包含 root_function 及其可达的函数名列表），为目标项目规划合理的 Rust crate 结构。\n"
             "\n"
@@ -296,14 +331,76 @@ class LLMRustCratePlannerAgent:
             "- 命名规范：目录/文件采用小写下划线；模块名简洁可读，避免特殊字符与过长名称。\n"
             "- 可演进性：模块粒度适中，保留扩展点，便于后续重构与逐步替换遗留代码。\n"
             "- 模块组织：每个目录的 mod.rs 声明其子目录与 .rs 子模块；顶层 lib.rs 汇聚导出主要模块与公共能力。\n"
-            "- 入口约定：按需生成可执行与库入口：\n"
-            "  * 仅库：包含 src/lib.rs，不要生成 main.rs；\n"
-            "  * 单一可执行：包含 src/main.rs，公共逻辑抽到 src/lib.rs（如需要复用）；\n"
-            "  * 多可执行：使用 src/bin/<name>.rs 为每个二进制入口；共享代码放在 src/lib.rs；\n"
-            "- 二进制命名：<name> 使用小写下划线，体现入口意图，避免与模块/文件重名。\n"
+            "- 入口策略（务必遵循，bin 仅做入口，功能尽量在 lib 中实现）：\n"
+            "  * 若原始项目包含 main 函数：不要生成 src/main.rs；使用 src/bin/"
+            + crate_name
+            + ".rs 作为唯一可执行入口，并在其中仅保留最小入口逻辑（调用库层）；共享代码放在 src/lib.rs；\n"
+            "  * 若原始项目不包含 main 函数：不要生成任何二进制入口（不创建 src/main.rs 或 src/bin/），仅生成 src/lib.rs；\n"
+            "  * 多可执行仅在确有多个清晰入口时才使用 src/bin/<name>.rs；每个 bin 文件仅做入口，尽量调用库；\n"
+            "  * 二进制命名：<name> 使用小写下划线，体现入口意图，避免与模块/文件重名。\n"
         )
 
     def _build_summary_prompt(self, roots_context: List[Dict[str, Any]]) -> str:
+        """
+        总结阶段：只输出目录结构的 YAML。
+        要求：
+        - 仅输出一个 <PROJECT> 块
+        - <PROJECT> 与 </PROJECT> 之间必须是可解析的 YAML 列表，使用两空格缩进
+        - 目录以 '目录名/' 表示，子项为列表；文件为纯字符串
+        - 块外不得有任何字符（包括空行、注释、Markdown、解释文字、schema等）
+        - 不要输出 crate 名称或其他多余字段
+        """
+        has_main = self._has_original_main()
+        crate_name = self._crate_name()
+        guidance_common = """
+输出规范：
+- 只输出一个 <PROJECT> 块
+- 块外不得有任何字符（包括空行、注释、Markdown 等）
+- 块内必须是 YAML 列表：
+  - 目录项使用 '<name>/' 作为键，并在后面加冒号 ':'，其值为子项列表
+  - 文件为字符串项（例如 'lib.rs'）
+- 不要创建与入口无关的占位文件
+""".strip()
+        if has_main:
+            entry_rule = f"""
+入口约定（基于原始项目存在 main）：
+- 必须包含 src/lib.rs；
+- 不要包含 src/main.rs；
+- 必须包含 src/bin/{crate_name}.rs，作为唯一可执行入口（仅做入口，调用库逻辑）；
+- 如无明确多个入口，不要创建额外 bin 文件。
+正确示例（标准 YAML，带冒号）：
+<PROJECT>
+- Cargo.toml
+- src/:
+  - lib.rs
+  - bin/:
+    - {crate_name}.rs
+</PROJECT>
+""".strip()
+        else:
+            entry_rule = """
+入口约定（基于原始项目不存在 main）：
+- 必须包含 src/lib.rs；
+- 不要包含 src/main.rs；
+- 不要包含 src/bin/ 目录。
+正确示例（标准 YAML，带冒号）：
+<PROJECT>
+- Cargo.toml
+- src/:
+  - lib.rs
+</PROJECT>
+""".strip()
+        guidance = f"{guidance_common}\n{entry_rule}"
+        return f"""
+请基于之前对话中已提供的<context>信息，生成总结输出（项目目录结构的 YAML）。严格遵循以下要求：
+
+{guidance}
+
+你的输出必须仅包含以下单个块（用项目的真实目录结构替换块内内容）：
+<PROJECT>
+- ...
+</PROJECT>
+""".strip()
         """
         总结阶段：只输出目录结构的 YAML。
         要求：
