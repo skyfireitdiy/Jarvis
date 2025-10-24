@@ -43,13 +43,11 @@ def evaluate_third_party_replacements(
 
     说明:
       - 评估基于 Agent（如不可用或调用失败，则保守返回不可替代）
-      - Agent 输出需为带标签包围的 YAML（在总结阶段输出），格式：
-          <SUMMARY><yaml>
+      - Agent 输出需包含一个 <yaml>...</yaml> 标签块，内容为 YAML 对象，字段：
           replaceable: true|false
           library: "<crate 名称或 'std'>"
-          function: "<库/标准库的函数完整路径或名称>"
+          function: "<Rust API 完整路径或名称>"
           confidence: <0.0-1.0浮点>
-          </yaml></SUMMARY>
     """
     def _resolve_symbols_jsonl_path(hint: Path) -> Path:
         p = Path(hint)
@@ -155,26 +153,11 @@ def evaluate_third_party_replacements(
             agent = Agent(
                 system_prompt=(
                     "你是资深 C→Rust 迁移专家。任务：根据给定的 C/C++ 函数信息，判断其是否可由 Rust 标准库（std）或 Rust 生态中的成熟第三方 crate 的单个 API 直接替代（用于 C 转译为 Rust 的场景）。"
-                    "注意：最终输出必须在总结阶段，且严格遵循总结提示中的格式要求。"
+                    "请仅输出一个 <yaml> 块，且块内是一个 YAML 对象，包含字段：replaceable, library, function, confidence；不要输出其它说明文字。"
                 ),
                 name="C2Rust-ThirdParty-Evaluator",
                 model_group=llm_group,
-                summary_prompt=(
-                    "请仅输出一个 <SUMMARY> 块，块内必须且只包含一个 <yaml>...</yaml>，不得包含其它内容。\n"
-                    "YAML 对象字段要求：\n"
-                    "replaceable: true|false  # 是否可由单个 Rust 标准库（std）或第三方 crate 的 API 直接替代（等价/更强）\n"
-                    'library: "<crate 名称或 ''std''>"    # 例如: "std", "regex", "serde", "serde_json", "reqwest", "hyper", "tokio", "rayon", "itertools", "chrono", "flate2", "zstd", "prost"\n'
-                    'function: "<Rust API 完整路径或名称>"  # 例如: std::fs::read_to_string, regex::Regex::is_match, reqwest::blocking::get, flate2::read::GzDecoder::new\n'
-                    "confidence: <0.0-1.0浮点> # 置信度，0.0~1.0\n"
-                    "格式示例：\n"
-                    "<SUMMARY><yaml>\n"
-                    "replaceable: false\n"
-                    'library: ""\n'
-                    'function: ""\n'
-                    "confidence: 0.35\n"
-                    "</yaml></SUMMARY>"
-                ),
-                need_summary=True,
+                need_summary=False,
                 auto_complete=True,
                 use_tools=[],
                 plan=False,
@@ -224,7 +207,8 @@ def evaluate_third_party_replacements(
 
     def _parse_agent_yaml_summary(text: str) -> Optional[Dict[str, Any]]:
         """
-        解析 <SUMMARY><yaml>...</yaml></SUMMARY> 中的 YAML 对象为字典。
+        解析带有 <yaml>...</yaml> 标签的 YAML 对象为字典（可存在于 <SUMMARY> 内或直接在文本中）。
+        仅当检测到 <yaml> 标签时进行解析；否则返回 None。
         """
         if not isinstance(text, str) or not text.strip():
             return None
@@ -257,7 +241,7 @@ def evaluate_third_party_replacements(
             "1) 仅当标准库/第三方库函数在功能与语义上能够完全覆盖当前函数（等价或更强）时，返回 replaceable=true；否则为 false。\n"
             "2) 优先考虑 Rust 标准库（std），其次考虑来自 crates.io 的常见、稳定的 crate。library 字段请填 'std' 或 crate 名称；function 字段请填可调用的 Rust API 名称/路径。\n"
             "3) 若无法判断或需要组合多个库/多步调用才能实现，不视为可替代（replaceable=false）。\n"
-            "4) 最终输出请在总结阶段给出，且严格遵循格式要求（见总结提示）。\n\n"
+            "4) 请仅输出一个 <yaml> 块（不要输出其它文字），内容为 YAML 对象：replaceable, library, function, confidence。\n\n"
             f"语言: {lang}\n"
             f"函数: {name}\n"
             f"签名: {sig}\n"
@@ -272,8 +256,6 @@ def evaluate_third_party_replacements(
                 attempt += 1
                 result = agent.run(prompt)
                 parsed = _parse_agent_yaml_summary(result or "")
-                if not isinstance(parsed, dict):
-                    parsed = _parse_agent_json(result or "")
                 if isinstance(parsed, dict):
                     # 归一化
                     rep = bool(parsed.get("replaceable") is True)
