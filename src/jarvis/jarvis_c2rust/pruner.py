@@ -393,6 +393,16 @@ def evaluate_third_party_replacements(
 
         rec = by_id.get(fid, {})
         func_name = rec.get("qualified_name") or rec.get("name") or f"sym_{fid}"
+        simple_name = rec.get("name") or ""
+        if simple_name == "main":
+            typer.secho(f"[c2rust-pruner] 跳过 'main' 函数的替代评估，视为不可替代 (ID: {fid})", fg=typer.colors.YELLOW, err=True)
+            # 不可替代：保存进度并继续向子节点传播
+            _save_checkpoint(state_path, sjsonl, visited, pruned, replacements, eval_count)
+            for child in adj_func.get(fid, []):
+                if child not in visited and child not in pruned:
+                    _process(child)
+            return
+
         typer.secho(f"[c2rust-pruner] 正在评估函数: {func_name} (ID: {fid})", fg=typer.colors.CYAN, err=True)
 
         if max_funcs is not None and eval_count >= max_funcs:
