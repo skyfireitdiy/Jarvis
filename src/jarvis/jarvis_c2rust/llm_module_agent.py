@@ -39,7 +39,7 @@ class _FnMeta:
     qname: str
     signature: str
     file: str
-    calls: List[str]
+    refs: List[str]
 
     @property
     def label(self) -> str:
@@ -97,7 +97,10 @@ class _GraphLoader:
         self.data_path = _resolve_data_path(Path(db_path))
         if not self.data_path.exists():
             raise FileNotFoundError(f"symbols.jsonl not found: {self.data_path}")
-        self._load_db()
+        # Initialize in-memory graph structures
+        self.adj: Dict[int, List[str]] = {}
+        self.name_to_id: Dict[str, int] = {}
+        self.fn_by_id: Dict[int, _FnMeta] = {}
         """
         Load function metadata and adjacency from symbols.jsonl (preferred) or functions.jsonl (fallback).
         当 data_path 指向 symbols.jsonl 时，仅加载 category == "function" 的记录。
@@ -113,10 +116,7 @@ class _GraphLoader:
                         obj = json.loads(line)
                     except Exception:
                         continue
-                    # 当为 symbols.jsonl 时，按 category 过滤
-                    cat = (obj.get("category") or "").strip().lower()
-                    if cat and cat != "function":
-                        continue
+                    # 不区分函数与类型，统一处理 symbols.jsonl 中的所有记录
                     rows_loaded += 1
                     fid = int(obj.get("id") or rows_loaded)
                     nm = obj.get("name") or ""
@@ -129,6 +129,23 @@ class _GraphLoader:
                         refs = []
                     refs = [c for c in refs if isinstance(c, str) and c]
                     self.adj[fid] = refs
+                    # 建立名称索引与函数元信息，供子图遍历与上下文构造使用
+                    if isinstance(nm, str) and nm:
+                        self.name_to_id.setdefault(nm, fid)
+                    if isinstance(qn, str) and qn:
+                        self.name_to_id.setdefault(qn, fid)
+                    try:
+                        rel_file = self._rel_path(fp)
+                    except Exception:
+                        rel_file = fp
+                    self.fn_by_id[fid] = _FnMeta(
+                        id=fid,
+                        name=nm,
+                        qname=qn,
+                        signature=sg,
+                        file=rel_file,
+                        refs=refs,
+                    )
         except FileNotFoundError:
             raise
         except Exception:
@@ -220,7 +237,7 @@ class LLMRustCratePlannerAgent:
         self.db_path = (
             Path(db_path).resolve()
             if db_path is not None
-            else (self.project_root / ".jarvis" / "c2rust" / "functions.jsonl")
+            else (self.project_root / ".jarvis" / "c2rust" / "symbols.jsonl")
         )
         self.llm_group = llm_group
         self.loader = _GraphLoader(self.db_path, self.project_root)
