@@ -58,21 +58,16 @@ def scan(
         "--only-subgraphs",
         help="Do not rescan. Only generate per-root reference subgraph DOT files (requires --subgraphs-dir)",
     ),
-    png: bool = typer.Option(
-        False,
-        "--png",
-        help="Also render PNG images for generated DOT files using Graphviz 'dot'",
-    ),
 ) -> None:
     """
-    进行 C/C++ 函数扫描并可选生成引用关系 DOT 图
+    进行 C/C++ 函数扫描并生成引用关系 DOT 图；PNG 渲染默认启用（无需参数）。
     """
     _run_scan(
         dot=dot,
         only_dot=only_dot,
         subgraphs_dir=subgraphs_dir,
         only_subgraphs=only_subgraphs,
-        png=png,
+        png=True,
     )
 
 @app.command("plan")
