@@ -893,13 +893,27 @@ members = ["{rel_member}"]
             if content == "OK":
                 print("[c2rust-transpiler] Review passed.")
                 return
-            # 需要优化
+            # 需要优化：提供详细上下文背景，并明确审查意见仅针对 Rust crate，不修改 C 源码
+            crate_tree = _dir_tree(self.crate_dir)
             fix_prompt = "\n".join([
                 "请根据以下审查结论对目标函数进行最小优化（保留结构与意图，不进行大范围重构）：",
                 "<REVIEW>",
                 content,
                 "</REVIEW>",
-                "仅调整必要代码以消除审查问题。"
+                "",
+                "上下文背景信息：",
+                f"- crate_dir: {self.crate_dir}",
+                f"- 目标模块文件: {module}",
+                f"- 建议/当前 Rust 签名: {rust_sig}",
+                "crate 目录结构（部分）：",
+                crate_tree,
+                "",
+                "约束与范围：",
+                "- 本次审查意见仅针对 Rust crate 的代码与配置；不要修改任何 C/C++ 源文件（*.c、*.h 等）。",
+                "- 仅允许在 crate_dir 下进行最小必要修改（Cargo.toml、src/**/*.rs）；不要改动其他目录。",
+                "- 保持最小改动，避免与问题无关的重构或格式化。",
+                "",
+                "请仅以补丁形式输出修改，避免冗余解释。",
             ])
             # 在当前工作目录运行 CodeAgent，不进入 crate 目录
             ca = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
