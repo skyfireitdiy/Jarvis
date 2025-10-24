@@ -464,38 +464,146 @@ class LLMRustCratePlannerAgent:
             return m_proj.group(1).strip()
         return text.strip()
 
+    def _validate_project_entries(self, entries: List[Any]) -> Tuple[bool, str]:
+        """
+        校验目录结构是否满足强约束：
+        - 必须存在 src/lib.rs
+        - 若原始项目包含 main：
+          * 不允许 src/main.rs
+          * 必须包含 src/bin/<crate_name>.rs
+        - 若原始项目不包含 main：
+          * 不允许 src/main.rs
+          * 不允许存在 src/bin/ 目录
+        返回 (是否通过, 错误原因)
+        """
+        if not isinstance(entries, list) or not entries:
+            return False, "YAML 不可解析或为空列表"
+
+        # 提取 src 目录子项
+        src_children: Optional[List[Any]] = None
+        for it in entries:
+            if isinstance(it, dict) and len(it) == 1:
+                k, v = next(iter(it.items()))
+                kk = str(k).rstrip("/").strip().lower()
+                if kk == "src":
+                    if isinstance(v, list):
+                        src_children = v
+                    else:
+                        src_children = []
+                    break
+        if src_children is None:
+            return False, "缺少 src 目录"
+
+        # 建立便捷索引
+        def has_file(name: str) -> bool:
+            for ch in src_children or []:
+                if isinstance(ch, str) and ch.strip().lower() == name.lower():
+                    return True
+            return False
+
+        def find_dir(name: str) -> Optional[List[Any]]:
+            for ch in src_children or []:
+                if isinstance(ch, dict) and len(ch) == 1:
+                    k, v = next(iter(ch.items()))
+                    kk = str(k).rstrip("/").strip().lower()
+                    if kk == name.lower():
+                        return v if isinstance(v, list) else []
+            return None
+
+        # 1) 必须包含 lib.rs
+        if not has_file("lib.rs"):
+            return False, "src 目录下必须包含 lib.rs"
+
+        has_main = self._has_original_main()
+        crate_name = self._crate_name()
+
+        # 2) 入口约束
+        if has_main:
+            # 不允许 src/main.rs
+            if has_file("main.rs"):
+                return False, "原始项目包含 main：不应生成 src/main.rs，请使用 src/bin/<crate>.rs"
+            # 必须包含 src/bin/<crate_name>.rs
+            bin_children = find_dir("bin")
+            if bin_children is None:
+                return False, f"原始项目包含 main：必须包含 src/bin/{crate_name}.rs"
+            expect_bin = f"{crate_name}.rs".lower()
+            if not any(isinstance(ch, str) and ch.strip().lower() == expect_bin for ch in bin_children):
+                return False, f"原始项目包含 main：必须包含 src/bin/{crate_name}.rs"
+        else:
+            # 不允许 src/main.rs
+            if has_file("main.rs"):
+                return False, "原始项目不包含 main：不应生成 src/main.rs"
+            # 不允许有 bin 目录
+            if find_dir("bin") is not None:
+                return False, "原始项目不包含 main：不应生成 src/bin/ 目录"
+
+        return True, ""
+
+    def _build_retry_summary_prompt(self, base_summary_prompt: str, error_reason: str) -> str:
+        """
+        在原始 summary_prompt 基础上，附加错误反馈，要求严格重试。
+        """
+        feedback = (
+            "\n\n[格式校验失败，必须重试]\n"
+            f"- 失败原因：{error_reason}\n"
+            "- 请严格遵循上述“输出规范”与“入口约定”，重新输出；\n"
+            "- 仅输出一个 <PROJECT> 块，块内为可解析的 YAML 列表；块外不得有任何字符。\n"
+        )
+        return base_summary_prompt + feedback
+
     def _get_project_yaml_text(self) -> str:
         """
         执行主流程并返回原始 <PROJECT> YAML 文本，不进行解析。
-        供不同入口复用，避免重复拼装 prompts 与 Agent。
+        若格式校验失败，将自动重试，直到满足为止（不设置最大重试次数）。
         """
         roots = find_root_function_ids(self.db_path)
         roots_ctx = self.loader.build_roots_context(roots)
 
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(roots_ctx)
-        summary_prompt = self._build_summary_prompt(roots_ctx)
+        base_summary_prompt = self._build_summary_prompt(roots_ctx)
 
-        # 创建 LLM Agent，启用自动完成与总结；禁用工具与规划，非交互运行
-        agent = Agent(
-            system_prompt=system_prompt,
-            name="C2Rust-LLM-Module-Planner",
-            model_group=self.llm_group,
-            summary_prompt=summary_prompt,
-            need_summary=True,
-            auto_complete=True,
-            use_tools=[],        # 禁用工具，避免干扰
-            plan=False,          # 关闭内置任务规划
-            non_interactive=True, # 非交互
-            use_methodology=False,
-            use_analysis=False,
-        )
+        last_yaml_text = ""
+        last_error = "未知错误"
+        attempt = 0
+        while True:
+            attempt += 1
+            # 首次使用基础 summary_prompt；失败后附加反馈
+            summary_prompt = (
+                base_summary_prompt if attempt == 1 else self._build_retry_summary_prompt(base_summary_prompt, last_error)
+            )
 
-        # 进入主循环：第一轮仅输出 <!!!COMPLETE!!!> 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 YAML）
-        summary_output = agent.run(user_prompt)  # type: ignore
-        project_text = str(summary_output) if summary_output is not None else ""
-        yaml_text = self._extract_yaml_from_project(project_text)
-        return yaml_text
+            agent = Agent(
+                system_prompt=system_prompt,
+                name="C2Rust-LLM-Module-Planner",
+                model_group=self.llm_group,
+                summary_prompt=summary_prompt,
+                need_summary=True,
+                auto_complete=True,
+                use_tools=[],        # 禁用工具，避免干扰
+                plan=False,          # 关闭内置任务规划
+                non_interactive=True, # 非交互
+                use_methodology=False,
+                use_analysis=False,
+            )
+
+            # 进入主循环：第一轮仅输出 <!!!COMPLETE!!!> 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 YAML）
+            summary_output = agent.run(user_prompt)  # type: ignore
+            project_text = str(summary_output) if summary_output is not None else ""
+            yaml_text = self._extract_yaml_from_project(project_text)
+            last_yaml_text = yaml_text
+
+            # 尝试解析并校验
+            try:
+                entries = _parse_project_yaml_entries(yaml_text)
+            except Exception:
+                entries = []
+
+            ok, reason = self._validate_project_entries(entries)
+            if ok:
+                return yaml_text
+            else:
+                last_error = reason
 
     def plan_crate_yaml_with_project(self) -> List[Any]:
         """

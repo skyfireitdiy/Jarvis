@@ -644,36 +644,63 @@ members = ["{rel_member}"]
         return system_prompt, user_prompt, summary_prompt
 
     def _plan_module_and_signature(self, rec: FnRecord, c_code: str) -> Tuple[str, str]:
-        """调用 Agent 选择模块与签名，返回 (module_path, rust_signature)"""
+        """调用 Agent 选择模块与签名，返回 (module_path, rust_signature)，若格式不满足将自动重试直到满足"""
         crate_tree = _dir_tree(self.crate_dir)
         callees_ctx = self._collect_callees_context(rec)
-        sys_p, usr_p, sum_p = self._build_module_selection_prompts(rec, c_code, callees_ctx, crate_tree)
+        sys_p, usr_p, base_sum_p = self._build_module_selection_prompts(rec, c_code, callees_ctx, crate_tree)
 
-        agent = Agent(
-            system_prompt=sys_p,
-            name="C2Rust-Function-Planner",
-            model_group=self.llm_group,
-            summary_prompt=sum_p,
-            need_summary=True,
-            auto_complete=True,
-            use_tools=[],
-            plan=False,
-            non_interactive=True,
-            use_methodology=False,
-            use_analysis=False,
-        )
-        summary = agent.run(usr_p)
-        meta = _extract_json_from_summary(str(summary or ""))
-        module = str(meta.get("module") or "").strip()
-        rust_sig = str(meta.get("rust_signature") or "").strip()
-        if not module:
-            # 兜底：放入 src/lib.rs
-            module = "src/lib.rs"
-        if not rust_sig:
-            # 兜底：基于C名字生成最小签名
-            fn_name = rec.name or f"fn_{rec.id}"
-            rust_sig = f"pub fn {fn_name}() {{ /* todo */ }}"
-        return module, rust_sig
+        def _validate(meta: Any) -> Tuple[bool, str]:
+            if not isinstance(meta, dict) or not meta:
+                return False, "未解析到有效的 <SUMMARY><yaml> 对象"
+            module = meta.get("module")
+            rust_sig = meta.get("rust_signature")
+            if not isinstance(module, str) or not module.strip():
+                return False, "缺少必填字段 module"
+            if not isinstance(rust_sig, str) or not rust_sig.strip():
+                return False, "缺少必填字段 rust_signature"
+            if not module.strip().startswith("src/"):
+                return False, "module 必须位于 crate 的 src/ 目录下"
+            if not re.search(r"\bfn\s+[A-Za-z_][A-Za-z0-9_]*\s*\(", rust_sig):
+                return False, "rust_signature 无效：未检测到 Rust 函数签名（fn 名称）"
+            return True, ""
+
+        def _retry_sum_prompt(reason: str) -> str:
+            return (
+                base_sum_p
+                + "\n\n[格式校验失败，必须重试]\n"
+                + f"- 失败原因：{reason}\n"
+                + "- 仅输出一个 <SUMMARY> 块；块内仅包含单个 <yaml> 对象；\n"
+                + '- YAML 对象必须包含字段：module（位于 src/ 下）、rust_signature（形如 "pub fn name(...)"）。\n'
+            )
+
+        attempt = 0
+        last_reason = "未知错误"
+        while True:
+            attempt += 1
+            sum_p = base_sum_p if attempt == 1 else _retry_sum_prompt(last_reason)
+
+            agent = Agent(
+                system_prompt=sys_p,
+                name="C2Rust-Function-Planner",
+                model_group=self.llm_group,
+                summary_prompt=sum_p,
+                need_summary=True,
+                auto_complete=True,
+                use_tools=[],
+                plan=False,
+                non_interactive=True,
+                use_methodology=False,
+                use_analysis=False,
+            )
+            summary = agent.run(usr_p)
+            meta = _extract_json_from_summary(str(summary or ""))
+            ok, reason = _validate(meta)
+            if ok:
+                module = str(meta.get("module") or "").strip()
+                rust_sig = str(meta.get("rust_signature") or "").strip()
+                return module, rust_sig
+            else:
+                last_reason = reason
 
     def _update_progress_current(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         self.progress["current"] = {
