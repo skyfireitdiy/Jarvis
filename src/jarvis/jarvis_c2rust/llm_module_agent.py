@@ -802,14 +802,13 @@ def _ensure_pub_mod_declarations(existing_text: str, child_mods: List[str]) -> s
 
 def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
     """
-    根据解析出的 entries 创建目录与文件结构，并在每个目录的 mod.rs 中添加子模块声明：
-    - 对于目录项: 创建目录，并递归处理子项；生成/更新 mod.rs，包含:
-      * 对子目录: mod <dir_name>;
-      * 对子文件 *.rs（排除 mod.rs）: mod <file_stem>;
-    - 对于文件项: 若不存在则创建空文件
-    特殊规则：
-    - 对 crate 根的 src 目录：不生成 src/mod.rs，而是将子模块声明写入 src/lib.rs；
-      同时忽略对 lib.rs/main.rs 的自引用
+    根据解析出的 entries 创建目录与文件结构（不在此阶段写入/更新任何 Rust 源文件内容）：
+    - 对于目录项：创建目录，并递归创建其子项；
+    - 对于文件项：若不存在则创建空文件；
+    约束与约定：
+    - crate 根的 src 目录：不生成 src/mod.rs，也不写入 src/lib.rs 的模块声明；
+    - 非 src 目录：不创建或更新 mod.rs；如需创建 mod.rs，请在 YAML 中显式列出；
+    - 模块声明的补齐将在后续 CodeAgent 阶段完成（扫描目录结构并最小化补齐 pub mod 声明）。
     """
     def apply_item(item: Any, dir_path: Path) -> None:
         if isinstance(item, str):
@@ -860,21 +859,11 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
                 # 不在 src 根目录写入任何文件内容；仅由子项创建对应空文件（如有）
                 return
 
-            # 非 src 目录：确保存在 mod.rs
-            # 非 src 目录：不自动创建或更新 mod.rs，避免写入文件内容
-            # 如需创建 mod.rs，应在 YAML 中显式指定为文件项
-
-            # 更新 mod.rs 的子模块声明（统一使用 pub mod，已有非 pub 的声明就地升级）
-            try:
-                existing = mod_rs_path.read_text(encoding="utf-8") if mod_rs_path.exists() else ""
-            except Exception:
-                existing = ""
-            # 使用公共逻辑确保/升级子模块声明为 pub mod
-            new_mod_content = _ensure_pub_mod_declarations(existing, child_mods)
-            try:
-                mod_rs_path.write_text(new_mod_content, encoding="utf-8")
-            except Exception:
-                pass
+            # 非 src 目录：
+            # 为避免覆盖现有实现，当前阶段不创建或更新 mod.rs 内容。
+            # 如需创建 mod.rs，应在 YAML 中显式指定为文件项；
+            # 如需补齐模块声明，将由后续的 CodeAgent 阶段根据目录结构自动补齐。
+            return
 
     for entry in entries:
         apply_item(entry, base_path)
@@ -897,9 +886,10 @@ def _ensure_cargo_toml(base_dir: Path, package_name: str) -> None:
 
 def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, str] = ".") -> None:
     """
-    基于 Agent 返回的 <PROJECT> 中的目录结构 YAML，创建实际目录与文件，并在每个目录的 mod.rs 中增加子 mod 声明。
+    基于 Agent 返回的 <PROJECT> 中的目录结构 YAML，创建实际目录与文件（不在此阶段写入或更新任何 Rust 源文件内容）。
     - project_root: 目标应用路径；当为 "."（默认）时，将使用“父目录/当前目录名_rs”作为crate根目录
     同时：在当前工作目录下建立/更新 Cargo.toml，将生成的 crate 目录设置为 workspace 的 member，以便在本地当前目录下直接构建。
+    注意：模块声明（mod/pub mod）补齐将在后续的 CodeAgent 步骤中完成。
     """
     entries = _parse_project_yaml_entries(yaml_text)
     if not entries:
@@ -1121,25 +1111,31 @@ def execute_llm_plan(
             dir_ctx,
             "",
             "执行与修复流程（务必按序执行，可多轮迭代）：",
-            '1) 在 Cargo.toml 的 [package] 中设置 edition："2024"；若本地工具链不支持 2024，请降级为 "2021" 并在说明中记录原因；保留其他已有字段与依赖不变。',
-            "2) 根据当前源代码实际情况配置入口：",
+            "1) 先补齐 Rust 模块声明（仅最小化追加/升级，不覆盖业务实现）：",
+            "   - 扫描 src 目录：",
+            "     * 在每个子目录下（除 src 根）创建或更新 mod.rs，仅追加缺失的 `pub mod <child>;` 声明；",
+            "     * 在 src/lib.rs 中为顶级子模块追加 `pub mod <name>;`；不要创建 src/mod.rs；忽略 lib.rs 与 main.rs 的自引用；",
+            "   - 若存在 `mod <name>;` 但非 pub，则就地升级为 `pub mod <name>;`，保留原缩进与其他内容；",
+            "   - 严禁删除现有声明或修改非声明代码；",
+            '2) 在 Cargo.toml 的 [package] 中设置 edition："2024"；若本地工具链不支持 2024，请降级为 "2021" 并在说明中记录原因；保留其他已有字段与依赖不变。',
+            "3) 根据当前源代码实际情况配置入口：",
             "   - 仅库：仅配置 [lib]（path=src/lib.rs），不要生成 main.rs；",
             "   - 单一可执行：存在 src/main.rs 时配置 [[bin]] 或默认二进制；可选保留 [lib] 以沉淀共享逻辑；",
             "   - 多可执行：为每个 src/bin/<name>.rs 配置 [[bin]]；共享代码放在 src/lib.rs；",
             "   - 不要创建与目录结构不一致的占位入口。",
-            "3) 对被作为入口的源文件：若不存在 fn main() 则仅添加最小可用实现（不要改动已存在的实现）：",
+            "4) 对被作为入口的源文件：若不存在 fn main() 则仅添加最小可用实现（不要改动已存在的实现）：",
             '   fn main() { println!("ok"); }',
-            "4) 执行一次构建验证：`cargo build -q`（或 `cargo check -q`）。",
-            "5) 若构建失败，读取错误并进行最小化修复，然后再次构建；重复直至成功。仅允许的修复类型：",
+            "5) 执行一次构建验证：`cargo build -q`（或 `cargo check -q`）。",
+            "6) 若构建失败，读取错误并进行最小化修复，然后再次构建；重复直至成功。仅允许的修复类型：",
             "   - 依赖缺失：在 [dependencies] 中添加必要且稳定版本的依赖（优先无特性），避免新增未使用依赖；",
             "   - 入口/crate-type 配置错误：修正 [lib] 或 [[bin]] 的 name/path/crate-type 使之与目录与入口文件一致；",
             "   - 语言/工具链不兼容：将 edition 从 2024 调整为 2021；必要时可添加 rust-version 要求；",
             "   - 语法级/最小实现缺失：仅在入口文件中补充必要的 use/空实现/feature gate 以通过编译，避免改动非入口业务文件；",
             "   - 不要删除或移动现有文件与目录。",
-            "6) 每轮修改后必须运行 `cargo build -q` 验证，直到构建成功为止。",
+            "7) 每轮修改后必须运行 `cargo build -q` 验证，直到构建成功为止。",
             "",
             "修改约束：",
-            "- 允许修改的文件范围：Cargo.toml、src/lib.rs、src/main.rs、src/bin/*.rs（仅最小必要变更）；除非为修复构建，不要修改其他文件。",
+            "- 允许修改的文件范围：Cargo.toml、src/lib.rs、src/main.rs、src/bin/*.rs、src/**/mod.rs（仅最小必要变更）；除非为修复构建与模块声明补齐，不要修改其他文件。",
             "- 尽量保持现有内容与结构不变，不要引入与构建无关的改动或格式化。",
             "",
             "交付要求：",
