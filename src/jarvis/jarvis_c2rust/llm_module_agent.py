@@ -1042,62 +1042,46 @@ def execute_llm_plan(
             # 兜底：无法解析时直接使用传入的 target_root
             created_dir = Path(target_root)
 
-        # 初始化并提交一次目录结构（尽力而为）
-        prev_cwd_commit = os.getcwd()
+        # 不在 crate 目录执行 git 初始化；但在当前目录（workspace 根）创建一次提交
         try:
-            os.chdir(str(created_dir))
-            # ensure git repo
-            res = subprocess.run(
-                ["git", "rev-parse", "--git-dir"],
+            workspace_dir = Path(".").resolve()
+            # 仅当当前目录已是 git 工作树时才提交（不执行 git init）
+            repo_check = subprocess.run(
+                ["git", "rev-parse", "--is-inside-work-tree"],
                 capture_output=True,
                 text=True,
                 check=False,
+                cwd=str(workspace_dir),
             )
-            need_init_local = False
-            if res.returncode != 0:
-                # 未检测到git仓库，需初始化
-                need_init_local = True
-            else:
-                # 可能检测到的是上层仓库，这里确保当前目录自身是一个仓库根
-                top_res = subprocess.run(
-                    ["git", "rev-parse", "--show-toplevel"],
+            if repo_check.returncode == 0 and (repo_check.stdout or "").strip().lower() == "true":
+                # 尝试以相对路径添加 crate 目录与工作区 Cargo.toml
+                try:
+                    rel_created = str(created_dir.resolve().relative_to(workspace_dir))
+                except Exception:
+                    rel_created = str(created_dir)
+                paths_to_add = [rel_created]
+                cargo_path_ws = workspace_dir / "Cargo.toml"
+                if cargo_path_ws.exists():
+                    paths_to_add.append(str(cargo_path_ws))
+                # 仅添加相关路径，避免误加其他未跟踪变更
+                subprocess.run(["git", "add", "--"] + paths_to_add, check=False, cwd=str(workspace_dir))
+                commit_res = subprocess.run(
+                    ["git", "commit", "-m", "[c2rust-llm-planner] Apply initial crate structure"],
                     capture_output=True,
                     text=True,
                     check=False,
+                    cwd=str(workspace_dir),
                 )
-                toplevel = (top_res.stdout or "").strip()
-                if toplevel and Path(toplevel).resolve() != Path(os.getcwd()).resolve():
-                    # 当前目录不是仓库根，初始化一个本地仓库以避免后续切回上层目录
-                    need_init_local = True
+                if commit_res.returncode == 0:
+                    print("[c2rust-llm-planner] Initial commit created in current repository.")
                 else:
-                    # 还可通过检查 .git 目录进一步确认
-                    git_dir_here = Path(os.getcwd()) / ".git"
-                    if not git_dir_here.exists():
-                        need_init_local = True
-            if need_init_local:
-                init_res = subprocess.run(
-                    ["git", "init"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                if init_res.returncode == 0:
-                    print("[c2rust-llm-planner] Initialized git repository in crate directory.")
-            # add and commit
-            subprocess.run(["git", "add", "."], check=False)
-            commit_res = subprocess.run(
-                ["git", "commit", "-m", "[c2rust-llm-planner] Initialize crate structure"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if commit_res.returncode == 0:
-                print("[c2rust-llm-planner] Initial structure committed.")
+                    # 常见原因：无变更、未配置 user.name/email 等
+                    print("[c2rust-llm-planner] Initial commit skipped or failed (no changes or git config missing).")
             else:
-                # 常见原因：无变更、未配置 user.name/email 等
-                print("[c2rust-llm-planner] Initial commit skipped or failed (no changes or git config missing).")
-        finally:
-            os.chdir(prev_cwd_commit)
+                print("[c2rust-llm-planner] Current directory is not a git repository; skip committing.")
+        except Exception:
+            # 保持稳健，不因提交失败影响主流程
+            pass
 
         # 构建用于 CodeAgent 的目录上下文（简化版树形）
         def _format_tree(root: Path) -> str:
@@ -1155,14 +1139,11 @@ def execute_llm_plan(
 
         prev_cwd = os.getcwd()
         try:
-            os.chdir(str(created_dir))
-            print(f"[c2rust-llm-planner] 在 {os.getcwd()} 目录下执行命令: CodeAgent 初始化")
-            # 先运行一次 CodeAgent（初始化与基本配置）
+            print(f"[c2rust-llm-planner] 在 {os.getcwd()} 目录下执行命令: CodeAgent 初始化（不进入 crate 目录）")
+            # 直接在当前工作目录运行 CodeAgent，不切换到 crate 目录
             agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
             agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
             print("[c2rust-llm-planner] Initial CodeAgent run completed.")
-            # 由于 CodeAgent 可能切换到上层 Git 根目录，这里强制回到 crate 目录
-            os.chdir(str(created_dir))
 
             # 进入构建与修复循环：构建失败则生成新的 CodeAgent，携带错误上下文进行最小修复
             iter_count = 0
@@ -1200,9 +1181,9 @@ def execute_llm_plan(
 
                 repair_agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
                 repair_agent.run(repair_prompt, prefix=f"[c2rust-llm-planner][iter={iter_count}]", suffix="")
-                # CodeAgent may change directory to git root; ensure we return to the crate directory
-                os.chdir(str(created_dir))
+                # 不切换目录，保持在原始工作目录
         finally:
+            # 未变更工作目录，仍显式恢复以确保安全
             os.chdir(prev_cwd)
 
     # 3) 输出 YAML 到文件（如指定），并返回解析后的 entries

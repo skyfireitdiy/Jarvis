@@ -727,13 +727,9 @@ members = ["{rel_member}"]
             *[f"- {s}" for s in (unresolved or [])],
         ]
         prompt = "\n".join(requirement_lines)
-        prev = os.getcwd()
-        try:
-            os.chdir(str(self.crate_dir))
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-            agent.run(prompt, prefix="[c2rust-transpiler][gen]", suffix="")
-        finally:
-            os.chdir(prev)
+        # 在当前工作目录运行 CodeAgent，避免进入 crate 目录
+        agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+        agent.run(prompt, prefix="[c2rust-transpiler][gen]", suffix="")
 
     def _extract_rust_fn_name_from_sig(self, rust_sig: str) -> str:
         """
@@ -788,77 +784,66 @@ members = ["{rel_member}"]
                 needle = f'todo!("{symbol}")'
                 if needle in text:
                     try:
-                        # 记录相对 crate 根路径，便于在提示中引用
-                        rel = str(p.resolve().relative_to(self.crate_dir.resolve()))
+                        # 记录绝对路径，避免依赖当前工作目录
+                        abs_path = str(p.resolve())
                     except Exception:
-                        rel = str(p)
-                    matches.append(rel)
+                        abs_path = str(p)
+                    matches.append(abs_path)
 
         if not matches:
             return
 
-        prev = os.getcwd()
-        try:
-            os.chdir(str(self.crate_dir))
-            for rel_file in matches:
-                prompt = "\n".join([
-                    f"请在文件 {rel_file} 中，定位所有 todo!(\"{symbol}\") 占位并替换为对已转换函数的真实调用。",
-                    "要求：",
-                    f"- 已转换的目标函数名：{callee_rust_fn}",
-                    f"- 其所在模块（crate路径提示）：{callee_path}",
-                    f"- 函数签名提示：{callee_rust_sig}",
-                    "- 你可以使用完全限定路径（如 crate::...::函数(...)），或在文件顶部添加合适的 use；",
-                    "- 保持最小改动，不要进行与本次修复无关的重构或格式化；",
-                    "- 如果参数列表暂不明确，可使用合理占位变量，确保编译通过。",
-                    "",
-                    f"仅修改 {rel_file} 中与 todo!(\"{symbol}\") 相关的代码，其他位置不要改动。",
-                    "请仅输出补丁，不要输出解释或多余文本。",
-                ])
-                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-                agent.run(prompt, prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
-                # CodeAgent 可能切换目录，切回 crate
-                os.chdir(str(self.crate_dir))
-        finally:
-            os.chdir(prev)
+        # 在当前工作目录运行 CodeAgent，不进入 crate 目录
+        for target_file in matches:
+            prompt = "\n".join([
+                f"请在文件 {target_file} 中，定位所有 todo!(\"{symbol}\") 占位并替换为对已转换函数的真实调用。",
+                "要求：",
+                f"- 已转换的目标函数名：{callee_rust_fn}",
+                f"- 其所在模块（crate路径提示）：{callee_path}",
+                f"- 函数签名提示：{callee_rust_sig}",
+                "- 你可以使用完全限定路径（如 crate::...::函数(...)），或在文件顶部添加合适的 use；",
+                "- 保持最小改动，不要进行与本次修复无关的重构或格式化；",
+                "- 如果参数列表暂不明确，可使用合理占位变量，确保编译通过。",
+                "",
+                f"仅修改 {target_file} 中与 todo!(\"{symbol}\") 相关的代码，其他位置不要改动。",
+                "请仅输出补丁，不要输出解释或多余文本。",
+            ])
+            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+            agent.run(prompt, prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
 
     def _cargo_build_loop(self) -> bool:
         """在 crate 目录执行 cargo build，失败则使用 CodeAgent 最小化修复，直到通过或达到上限"""
-        prev = os.getcwd()
-        try:
-            os.chdir(str(self.crate_dir))
-            i = 0
-            while True:
-                i += 1
-                res = subprocess.run(
-                    ["cargo", "build", "-p", self.crate_dir.name],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    cwd=prev,
-                )
-                if res.returncode == 0:
-                    print("[c2rust-transpiler] Cargo build succeeded.")
-                    return True
-                output = (res.stdout or "") + "\n" + (res.stderr or "")
-                print(f"[c2rust-transpiler] Cargo build failed (iter={i}).")
-                print(output)
-                repair_prompt = "\n".join([
-                    "目标：最小化修复以通过 cargo build。",
-                    "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；避免大范围改动。",
-                    "- 保持最小改动，避免与错误无关的重构或格式化；",
-                    "- 请仅输出补丁，不要输出解释或多余文本。",
-                    "请阅读以下构建错误并进行必要修复：",
-                    "<BUILD_ERROR>",
-                    output,
-                    "</BUILD_ERROR>",
-                    "修复后请再次执行 cargo build 验证。",
-                ])
-                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-                agent.run(repair_prompt, prefix=f"[c2rust-transpiler][build-fix iter={i}]", suffix="")
-                # CodeAgent 可能切换目录，切回 crate
-                os.chdir(str(self.crate_dir))
-        finally:
-            os.chdir(prev)
+        # 在当前工作目录进行构建与修复循环，不进入 crate 目录
+        workspace_root = os.getcwd()
+        i = 0
+        while True:
+            i += 1
+            res = subprocess.run(
+                ["cargo", "build", "-p", self.crate_dir.name],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=workspace_root,
+            )
+            if res.returncode == 0:
+                print("[c2rust-transpiler] Cargo build succeeded.")
+                return True
+            output = (res.stdout or "") + "\n" + (res.stderr or "")
+            print(f"[c2rust-transpiler] Cargo build failed (iter={i}).")
+            print(output)
+            repair_prompt = "\n".join([
+                "目标：最小化修复以通过 cargo build。",
+                "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；避免大范围改动。",
+                "- 保持最小改动，避免与错误无关的重构或格式化；",
+                "- 请仅输出补丁，不要输出解释或多余文本。",
+                "请阅读以下构建错误并进行必要修复：",
+                "<BUILD_ERROR>",
+                output,
+                "</BUILD_ERROR>",
+                "修复后请再次执行 cargo build 验证。",
+            ])
+            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+            agent.run(repair_prompt, prefix=f"[c2rust-transpiler][build-fix iter={i}]", suffix="")
 
     def _review_and_optimize(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """
@@ -916,13 +901,9 @@ members = ["{rel_member}"]
                 "</REVIEW>",
                 "仅调整必要代码以消除审查问题。"
             ])
-            prev = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                ca = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-                ca.run(fix_prompt, prefix=f"[c2rust-transpiler][review-fix iter={i}]", suffix="")
-            finally:
-                os.chdir(prev)
+            # 在当前工作目录运行 CodeAgent，不进入 crate 目录
+            ca = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+            ca.run(fix_prompt, prefix=f"[c2rust-transpiler][review-fix iter={i}]", suffix="")
 
     def _mark_converted(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """记录映射：C 符号 -> Rust 符号与模块路径（JSONL，每行一条，支持重载/同名）"""
