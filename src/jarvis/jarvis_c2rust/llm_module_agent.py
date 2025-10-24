@@ -295,24 +295,6 @@ class LLMRustCratePlannerAgent:
 
 如果已准备好进入总结阶段以生成完整输出，请仅输出：<!!!COMPLETE!!!>
 """.strip()
-        """
-        主对话阶段：传入上下文，不给出输出要求，仅用于让模型获取信息并触发进入总结阶段。
-        请模型仅输出 <!!!COMPLETE!!!> 以进入总结（summary）阶段。
-        """
-        crate_name = self._crate_name()
-        context_json = json.dumps(
-            {"roots": roots_context},
-            ensure_ascii=False,
-            indent=2,
-        )
-        return f"""
-下面提供了项目的调用图上下文（JSON），请先通读理解，不要输出任何规划或YAML内容：
-<context>
-{context_json}
-</context>
-
-如果已准备好进入总结阶段以生成完整输出，请仅输出：<!!!COMPLETE!!!>
-""".strip()
 
     def _build_system_prompt(self) -> str:
         """
@@ -401,49 +383,6 @@ class LLMRustCratePlannerAgent:
 - ...
 </PROJECT>
 """.strip()
-        """
-        总结阶段：只输出目录结构的 YAML。
-        要求：
-        - 仅输出一个 <PROJECT> 块
-        - <PROJECT> 与 </PROJECT> 之间必须是可解析的 YAML 列表，使用两空格缩进
-        - 目录以 '目录名/' 表示，子项为列表；文件为纯字符串
-        - 块外不得有任何字符（包括空行、注释、Markdown、解释文字、schema等）
-        - 不要输出 crate 名称或其他多余字段
-        """
-        guidance = """
-输出规范：
-- 只输出一个 <PROJECT> 块
-- 块外不得有任何字符（包括空行、注释、Markdown 等）
-- 块内必须是 YAML 列表：
-  - 目录项使用 '<name>/' 作为键，并在后面加冒号 ':'，其值为子项列表
-  - 文件为字符串项（例如 'lib.rs'）
-- 入口约定（按需）：
-  - 仅库：必须包含 src/lib.rs，不要包含 src/main.rs
-  - 单一可执行：包含 src/main.rs；可选包含 src/lib.rs 以沉淀共享逻辑
-  - 多可执行：使用 src/bin/<name>.rs 为多个二进制入口；共享代码放在 src/lib.rs
-  - 不要创建与入口无关的占位 main.rs 或冗余文件
-- 正确示例（标准 YAML，带冒号）：
-  <PROJECT>
-  - Cargo.toml
-  - src/:
-    - lib.rs
-    - bin/:
-      - cli.rs
-    - database/:
-      - mod.rs
-      - connect.rs
-  </PROJECT>
-        """.strip()
-        return f"""
-请基于之前对话中已提供的<context>信息，生成总结输出（项目目录结构的 YAML）。严格遵循以下要求：
-
-{guidance}
-
-你的输出必须仅包含以下单个块（用项目的真实目录结构替换块内内容）：
-<PROJECT>
-- ...
-</PROJECT>
-""".strip()
 
     def _extract_yaml_from_project(self, text: str) -> str:
         """
@@ -451,7 +390,7 @@ class LLMRustCratePlannerAgent:
         """
         if not isinstance(text, str) or not text:
             return ""
-        m_proj = re.search(r"<PROJECT>([\\s\\S]*?)</PROJECT>", text, flags=re.IGNORECASE)
+        m_proj = re.search(r"<PROJECT>([\s\S]*?)</PROJECT>", text, flags=re.IGNORECASE)
         if m_proj:
             return m_proj.group(1).strip()
         return text.strip()
@@ -522,6 +461,7 @@ class LLMRustCratePlannerAgent:
         yaml_text = self._extract_yaml_from_project(project_text)
         return yaml_text
 
+
 def plan_crate_yaml_text(
     project_root: Union[Path, str] = ".",
     db_path: Optional[Union[Path, str]] = None,
@@ -530,7 +470,7 @@ def plan_crate_yaml_text(
 ) -> str:
     """
     返回 LLM 生成的目录结构原始 YAML 文本（来自 <PROJECT> 块）。
-    在规划前执行预清理并征询用户确认：删除将要生成的 crate 目录、当前目录的 Cargo.toml 工作区文件，以及 .jarvis/c2rust 下的 progress.json 与 symbol_map.json。
+    在规划前执行预清理并征询用户确认：删除将要生成的 crate 目录、当前目录的 Cargo.toml 工作区文件，以及 .jarvis/c2rust 下的 progress.json 与 symbol_map.jsonl。
     用户不同意则退出程序。
     当 skip_cleanup=True 时，跳过清理与确认（用于外层已处理的场景）。
     """
@@ -553,7 +493,7 @@ def plan_crate_yaml_text(
         cargo_path = cwd / "Cargo.toml"
         data_dir = requested_root / ".jarvis" / "c2rust"
         progress_path = data_dir / "progress.json"
-        symbol_map_path = data_dir / "symbol_map.json"
+        symbol_map_jsonl_path = data_dir / "symbol_map.jsonl"
 
         # 同时检查当前目录与 project_root 下的 Cargo.toml（两者可能不同）
         workspace_candidates: List[Path] = []
@@ -585,8 +525,8 @@ def plan_crate_yaml_text(
                 pass
         if progress_path.exists():
             targets.append(f"- 删除进度文件：{progress_path}")
-        if symbol_map_path.exists():
-            targets.append(f"- 删除符号映射文件：{symbol_map_path}")
+        if symbol_map_jsonl_path.exists():
+            targets.append(f"- 删除符号映射文件：{symbol_map_jsonl_path}")
 
         if targets:
             tip_lines = ["将执行以下清理操作："] + targets + ["", "是否继续？"]
@@ -601,50 +541,8 @@ def plan_crate_yaml_text(
                 cargo_path.unlink()
             if progress_path.exists():
                 progress_path.unlink()
-            if symbol_map_path.exists():
-                symbol_map_path.unlink()
-    except Exception:
-        pass
-
-    agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path, llm_group=llm_group)
-    return agent.plan_crate_yaml_text()
-
-    # 预清理（需用户确认）
-    try:
-        import sys
-        import shutil
-        cwd = Path(".").resolve()
-        try:
-            requested_root = Path(project_root).resolve()
-        except Exception:
-            requested_root = Path(project_root)
-        created_dir = cwd / f"{cwd.name}-rs" if requested_root == cwd else requested_root
-
-        cargo_path = cwd / "Cargo.toml"
-        data_dir = requested_root / ".jarvis" / "c2rust"
-        progress_path = data_dir / "progress.json"
-        symbol_map_path = data_dir / "symbol_map.json"
-
-        tip_lines = [
-            "将执行以下清理操作：",
-            f"- 删除 crate 目录（如存在）：{created_dir}",
-            f"- 删除当前目录的 workspace 文件：{cargo_path}",
-            f"- 删除进度文件：{progress_path}",
-            f"- 删除符号映射文件：{symbol_map_path}",
-            "",
-            "是否继续？"
-        ]
-        if not user_confirm("\n".join(tip_lines), default=False):
-            print("[c2rust-llm-planner] 用户取消清理操作，退出。")
-            sys.exit(0)
-
-        if created_dir.exists():
-            shutil.rmtree(created_dir, ignore_errors=True)
-        if cargo_path.exists():
-            cargo_path.unlink()
-        for p in (progress_path, symbol_map_path):
-            if p.exists():
-                p.unlink()
+            if symbol_map_jsonl_path.exists():
+                symbol_map_jsonl_path.unlink()
     except Exception:
         pass
 
@@ -659,7 +557,7 @@ def plan_crate_yaml_llm(
 ) -> List[Any]:
     """
     便捷函数：使用 LLM 生成 Rust crate 模块规划（解析后的对象）。
-    在规划前执行预清理并征询用户确认：删除将要生成的 crate 目录、当前目录的 Cargo.toml 工作区文件，以及 .jarvis/c2rust 下的 progress.json 与 symbol_map.json。
+    在规划前执行预清理并征询用户确认：删除将要生成的 crate 目录、当前目录的 Cargo.toml 工作区文件，以及 .jarvis/c2rust 下的 progress.json 与 symbol_map.jsonl。
     用户不同意则退出程序。
     当 skip_cleanup=True 时，跳过清理与确认（用于外层已处理的场景）。
     """
@@ -682,7 +580,7 @@ def plan_crate_yaml_llm(
         cargo_path = cwd / "Cargo.toml"
         data_dir = requested_root / ".jarvis" / "c2rust"
         progress_path = data_dir / "progress.json"
-        symbol_map_path = data_dir / "symbol_map.json"
+        symbol_map_jsonl_path = data_dir / "symbol_map.jsonl"
 
         # 仅收集存在的目标，若无则不提示
         targets: List[str] = []
@@ -692,8 +590,8 @@ def plan_crate_yaml_llm(
             targets.append(f"- 删除当前目录的 workspace 文件：{cargo_path}")
         if progress_path.exists():
             targets.append(f"- 删除进度文件：{progress_path}")
-        if symbol_map_path.exists():
-            targets.append(f"- 删除符号映射文件：{symbol_map_path}")
+        if symbol_map_jsonl_path.exists():
+            targets.append(f"- 删除符号映射文件：{symbol_map_jsonl_path}")
 
         if targets:
             tip_lines = ["将执行以下清理操作："] + targets + ["", "是否继续？"]
@@ -708,55 +606,14 @@ def plan_crate_yaml_llm(
                 cargo_path.unlink()
             if progress_path.exists():
                 progress_path.unlink()
-            if symbol_map_path.exists():
-                symbol_map_path.unlink()
+            if symbol_map_jsonl_path.exists():
+                symbol_map_jsonl_path.unlink()
     except Exception:
         pass
 
     agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
     return agent.plan_crate_yaml_with_project()
 
-    # 预清理（需用户确认）
-    try:
-        import sys
-        import shutil
-        cwd = Path(".").resolve()
-        try:
-            requested_root = Path(project_root).resolve()
-        except Exception:
-            requested_root = Path(project_root)
-        created_dir = cwd / f"{cwd.name}-rs" if requested_root == cwd else requested_root
-
-        cargo_path = cwd / "Cargo.toml"
-        data_dir = requested_root / ".jarvis" / "c2rust"
-        progress_path = data_dir / "progress.json"
-        symbol_map_path = data_dir / "symbol_map.json"
-
-        tip_lines = [
-            "将执行以下清理操作：",
-            f"- 删除 crate 目录（如存在）：{created_dir}",
-            f"- 删除当前目录的 workspace 文件：{cargo_path}",
-            f"- 删除进度文件：{progress_path}",
-            f"- 删除符号映射文件：{symbol_map_path}",
-            "",
-            "是否继续？"
-        ]
-        if not user_confirm("\n".join(tip_lines), default=False):
-            print("[c2rust-llm-planner] 用户取消清理操作，退出。")
-            sys.exit(0)
-
-        if created_dir.exists():
-            shutil.rmtree(created_dir, ignore_errors=True)
-        if cargo_path.exists():
-            cargo_path.unlink()
-        for p in (progress_path, symbol_map_path):
-            if p.exists():
-                p.unlink()
-    except Exception:
-        pass
-
-    agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
-    return agent.plan_crate_yaml_with_project()
 
 def entries_to_yaml(entries: List[Any]) -> str:
     """
@@ -813,7 +670,7 @@ def _parse_project_yaml_entries_fallback(yaml_text: str) -> List[Any]:
             # 去掉 "- "
             content = line[indent + 2 :].strip()
 
-            # 目录项：以 ":" 结尾（形如 "src/:"）
+            # 目录项：以 ":" 结尾（形如 "src/:")
             if content.endswith(":"):
                 key = content[:-1].strip()
                 idx += 1  # 消费当前目录行
@@ -994,6 +851,7 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
     for entry in entries:
         apply_item(entry, base_path)
 
+
 def _ensure_cargo_toml(base_dir: Path, package_name: str) -> None:
     """
     确保在 base_dir 下存在合理的 Cargo.toml：
@@ -1014,6 +872,7 @@ edition = "2024"
         cargo_path.write_text(content, encoding="utf-8")
     except Exception:
         pass
+
 
 def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, str] = ".") -> None:
     """
@@ -1133,6 +992,7 @@ members = ["{rel_member}"]
     except Exception:
         # 忽略 workspace 写入失败，不影响后续流程
         pass
+
 
 def execute_llm_plan(
     out: Optional[Union[Path, str]] = None,

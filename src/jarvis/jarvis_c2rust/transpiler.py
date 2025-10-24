@@ -11,7 +11,7 @@ C2Rust 转译器模块
   4) 基于上述信息与落盘位置，创建 CodeAgent 生成转译后的Rust函数
   5) 尝试 cargo build，如失败则携带错误上下文创建 CodeAgent 修复，直到构建通过或达到上限
   6) 创建代码审查Agent；若 summary 指出问题，则 CodeAgent 优化，直到 summary 表示无问题
-  7) 标记函数已转译，并记录 C 符号 -> Rust 符号/模块映射到 symbol_map.json
+  7) 标记函数已转译，并记录 C 符号 -> Rust 符号/模块映射到 symbol_map.jsonl（JSONL，每行一条映射，支持重复与重载）
 
 说明：
 - 本模块提供 run_transpile(...) 作为对外入口，后续在 cli.py 中挂载为子命令
@@ -41,7 +41,9 @@ C2RUST_DIRNAME = ".jarvis/c2rust"
 SYMBOLS_JSONL = "symbols.jsonl"
 ORDER_JSONL = "translation_order.jsonl"
 PROGRESS_JSON = "progress.json"
-SYMBOL_MAP_JSON = "symbol_map.json"
+SYMBOL_MAP_JSONL = "symbol_map.jsonl"
+# 兼容旧版：若存在 symbol_map.json 也尝试加载（只读）
+LEGACY_SYMBOL_MAP_JSON = "symbol_map.json"
 
 
 @dataclass
@@ -152,6 +154,120 @@ class _DbLoader:
             return chunk
         except Exception:
             return ""
+
+
+class _SymbolMapJsonl:
+    """
+    JSONL 形式的符号映射管理：
+    - 每行一条记录，支持同名函数的多条映射（用于处理重载/同名符号）
+    - 记录字段：
+      {
+        "c_name": "<简单名>",
+        "c_qname": "<限定名，可为空字符串>",
+        "c_file": "<源文件路径>",
+        "start_line": <int>,
+        "end_line": <int>,
+        "module": "src/xxx.rs 或 src/xxx/mod.rs",
+        "rust_symbol": "<Rust函数名>",
+        "updated_at": "YYYY-MM-DDTHH:MM:SS"
+      }
+    - 提供按名称（c_name/c_qname）查询、按源位置判断是否已记录等能力
+    """
+
+    def __init__(self, jsonl_path: Path, legacy_json_path: Optional[Path] = None) -> None:
+        self.jsonl_path = jsonl_path
+        self.legacy_json_path = legacy_json_path
+        self.records: List[Dict[str, Any]] = []
+        # 索引：名称 -> 记录列表索引
+        self.by_key: Dict[str, List[int]] = {}
+        # 唯一定位（避免同名冲突）：(c_file, start_line, end_line, c_qname or c_name) -> 记录索引列表
+        self.by_pos: Dict[Tuple[str, int, int, str], List[int]] = {}
+        self._load()
+
+    def _load(self) -> None:
+        self.records = []
+        self.by_key = {}
+        self.by_pos = {}
+        # 读取 JSONL
+        if self.jsonl_path.exists():
+            try:
+                with self.jsonl_path.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            obj = json.loads(line)
+                        except Exception:
+                            continue
+                        self._add_record_in_memory(obj)
+            except Exception:
+                pass
+        # 兼容旧版 symbol_map.json（若存在则读入为“最后一条”）
+        elif self.legacy_json_path and self.legacy_json_path.exists():
+            try:
+                legacy = json.loads(self.legacy_json_path.read_text(encoding="utf-8"))
+                if isinstance(legacy, dict):
+                    for k, v in legacy.items():
+                        rec = {
+                            "c_name": k,
+                            "c_qname": k,
+                            "c_file": "",
+                            "start_line": 0,
+                            "end_line": 0,
+                            "module": v.get("module"),
+                            "rust_symbol": v.get("rust_symbol"),
+                            "updated_at": v.get("updated_at"),
+                        }
+                        self._add_record_in_memory(rec)
+            except Exception:
+                pass
+
+    def _add_record_in_memory(self, rec: Dict[str, Any]) -> None:
+        idx = len(self.records)
+        self.records.append(rec)
+        for key in [rec.get("c_name") or "", rec.get("c_qname") or ""]:
+            k = str(key or "").strip()
+            if not k:
+                continue
+            self.by_key.setdefault(k, []).append(idx)
+        pos_key = (str(rec.get("c_file") or ""), int(rec.get("start_line") or 0), int(rec.get("end_line") or 0), str(rec.get("c_qname") or rec.get("c_name") or ""))
+        self.by_pos.setdefault(pos_key, []).append(idx)
+
+    def has_symbol(self, sym: str) -> bool:
+        return bool(self.by_key.get(sym))
+
+    def get(self, sym: str) -> List[Dict[str, Any]]:
+        idxs = self.by_key.get(sym) or []
+        return [self.records[i] for i in idxs]
+
+    def get_any(self, sym: str) -> Optional[Dict[str, Any]]:
+        recs = self.get(sym)
+        return recs[-1] if recs else None
+
+    def has_rec(self, rec: FnRecord) -> bool:
+        key = (str(rec.file or ""), int(rec.start_line or 0), int(rec.end_line or 0), str(rec.qname or rec.name or ""))
+        return bool(self.by_pos.get(key))
+
+    def add(self, rec: FnRecord, module: str, rust_symbol: str) -> None:
+        obj = {
+            "c_name": rec.name or "",
+            "c_qname": rec.qname or "",
+            "c_file": rec.file or "",
+            "start_line": int(rec.start_line or 0),
+            "end_line": int(rec.end_line or 0),
+            "module": str(module or ""),
+            "rust_symbol": str(rust_symbol or (rec.name or f"fn_{rec.id}")),
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()),
+        }
+        # 先写盘，再更新内存索引
+        try:
+            self.jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.jsonl_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+        self._add_record_in_memory(obj)
 
 
 def _ensure_order_file(project_root: Path) -> Path:
@@ -270,7 +386,6 @@ def _extract_json_from_summary(text: str) -> Dict[str, Any]:
         return {}
 
 
-
 class Transpiler:
     def __init__(
         self,
@@ -284,7 +399,10 @@ class Transpiler:
         self.project_root = Path(project_root).resolve()
         self.data_dir = self.project_root / C2RUST_DIRNAME
         self.progress_path = self.data_dir / PROGRESS_JSON
-        self.symbol_map_path = self.data_dir / SYMBOL_MAP_JSON
+        # JSONL 路径
+        self.symbol_map_path = self.data_dir / SYMBOL_MAP_JSONL
+        # 兼容旧版 JSON 字典格式
+        self.legacy_symbol_map_path = self.data_dir / LEGACY_SYMBOL_MAP_JSON
         self.llm_group = llm_group
         self.max_retries = max_retries
         self.resume = resume
@@ -294,7 +412,8 @@ class Transpiler:
         self.db = _DbLoader(self.project_root)
 
         self.progress: Dict[str, Any] = _read_json(self.progress_path, {"current": None, "converted": []})
-        self.symbol_map: Dict[str, Dict[str, str]] = _read_json(self.symbol_map_path, {})
+        # 使用 JSONL 存储的符号映射
+        self.symbol_map = _SymbolMapJsonl(self.symbol_map_path, legacy_json_path=self.legacy_symbol_map_path)
 
         # 在当前工作目录创建/更新 workspace，使该 crate 作为成员，便于在本地当前目录直接构建
         def _ensure_workspace_member(root_dir: Path, member_path: Path) -> None:
@@ -336,7 +455,7 @@ members = ["{rel_member}"]
                 return
 
             # 提取 workspace 区块（直到下一个表头或文件末尾）
-            m_ws = re.search(r"(?s)(\\[workspace\\].*?)(?:\\n\\[|\\Z)", txt)
+            m_ws = re.search(r"(?s)(\[workspace\].*?)(?:\n\[|\Z)", txt)
             if not m_ws:
                 new_txt = txt.rstrip() + f"\n\n[workspace]\nmembers = [\"{rel_member}\"]\n"
                 try:
@@ -348,10 +467,10 @@ members = ["{rel_member}"]
             ws_block = m_ws.group(1)
 
             # 查找 members 数组
-            m_members = re.search(r"members\\s*=\\s*\\[(.*?)\\]", ws_block, flags=re.S)
+            m_members = re.search(r"members\s*=\s*\[(.*?)\]", ws_block, flags=re.S)
             if not m_members:
                 # 在 [workspace] 行后插入 members
-                new_ws_block = re.sub(r"(\\[workspace\\]\\s*)", r"\\1\nmembers = [\"" + rel_member + "\"]\n", ws_block, count=1)
+                new_ws_block = re.sub(r"(\[workspace\]\s*)", r"\1\nmembers = [\"" + rel_member + "\"]\n", ws_block, count=1)
             else:
                 inner = m_members.group(1)
                 # 解析已有成员
@@ -394,8 +513,9 @@ members = ["{rel_member}"]
     def _save_progress(self) -> None:
         _write_json(self.progress_path, self.progress)
 
+    # JSONL 模式下不再整体写回 symbol_map；此方法保留占位（兼容旧调用），无操作
     def _save_symbol_map(self) -> None:
-        _write_json(self.symbol_map_path, self.symbol_map)
+        return
 
     def _should_skip(self, rec: FnRecord) -> bool:
         # 如果 only 列表非空，则仅处理匹配者
@@ -404,31 +524,33 @@ members = ["{rel_member}"]
                 pass
             else:
                 return True
-        # 已转译的跳过
-        if rec.qname and rec.qname in self.symbol_map:
-            return True
-        if rec.name and rec.name in self.symbol_map:
+        # 已转译的跳过（按源位置与名称唯一性判断，避免同名不同位置的误判）
+        if self.symbol_map.has_rec(rec):
             return True
         return False
 
     def _collect_callees_context(self, rec: FnRecord) -> List[Dict[str, Any]]:
         """
         生成被引用符号上下文列表（不区分函数与类型）：
-        - 若已转译：提供 {name, qname, translated: true, rust_module, rust_symbol}
+        - 若已转译：提供 {name, qname, translated: true, rust_module, rust_symbol, ambiguous?}
         - 若未转译但存在扫描记录：提供 {name, qname, translated: false, file, start_line, end_line}
         - 若仅名称：提供 {name, qname, translated: false}
+        注：若存在同名映射多条记录（重载/同名符号），此处标记 ambiguous=true，并选择最近一条作为提示。
         """
         ctx: List[Dict[str, Any]] = []
         for callee in rec.calls or []:
             entry: Dict[str, Any] = {"name": callee, "qname": callee}
             # 已转映射
-            if callee in self.symbol_map:
-                m = self.symbol_map[callee]
+            if self.symbol_map.has_symbol(callee):
+                recs = self.symbol_map.get(callee)
+                m = recs[-1] if recs else None
                 entry.update({
                     "translated": True,
-                    "rust_module": m.get("module"),
-                    "rust_symbol": m.get("rust_symbol"),
+                    "rust_module": (m or {}).get("module"),
+                    "rust_symbol": (m or {}).get("rust_symbol"),
                 })
+                if len(recs) > 1:
+                    entry["ambiguous"] = True
                 ctx.append(entry)
                 continue
             # 尝试按名称解析ID（函数或类型）
@@ -453,7 +575,7 @@ members = ["{rel_member}"]
         """
         syms: List[str] = []
         for callee in rec.calls or []:
-            if callee not in self.symbol_map:
+            if not self.symbol_map.has_symbol(callee):
                 syms.append(callee)
         # 去重
         try:
@@ -461,40 +583,6 @@ members = ["{rel_member}"]
         except Exception:
             syms = sorted(list(set(syms)))
         return syms
-        """
-        生成被调用函数上下文列表：
-        - 若已转译：提供 {name, qname, translated: true, rust_module, rust_symbol}
-        - 若未转译但存在扫描记录：提供 {name, qname, translated: false, file, start_line, end_line}
-        - 若仅名称：提供 {name, qname, translated: false}
-        """
-        ctx: List[Dict[str, Any]] = []
-        for callee in rec.calls or []:
-            entry: Dict[str, Any] = {"name": callee, "qname": callee}
-            # 已转映射
-            if callee in self.symbol_map:
-                m = self.symbol_map[callee]
-                entry.update({
-                    "translated": True,
-                    "rust_module": m.get("module"),
-                    "rust_symbol": m.get("rust_symbol"),
-                })
-                ctx.append(entry)
-                continue
-            # 尝试按名称解析ID
-            cid = self.db.get_id_by_name(callee)
-            if cid:
-                crec = self.db.get(cid)
-                if crec:
-                    entry.update({
-                        "translated": False,
-                        "file": crec.file,
-                        "start_line": crec.start_line,
-                        "end_line": crec.end_line,
-                    })
-            else:
-                entry.update({"translated": False})
-            ctx.append(entry)
-        return ctx
 
     def _build_module_selection_prompts(
         self,
@@ -551,7 +639,7 @@ members = ["{rel_member}"]
             "- module 必须位于 crate 的 src/ 目录下；尽量选择已有文件；如需新建文件，给出合理路径；\n"
             "- rust_signature 请包含可见性修饰与函数名（可先用占位类型）。\n"
             "请严格按以下格式输出：\n"
-            "<SUMMARY><yaml>\\nmodule: \"...\"\\nrust_signature: \"...\"\\nnotes: \"...\"\\n</yaml></SUMMARY>"
+            "<SUMMARY><yaml>\nmodule: \"...\"\nrust_signature: \"...\"\nnotes: \"...\"\n</yaml></SUMMARY>"
         )
         return system_prompt, user_prompt, summary_prompt
 
@@ -837,20 +925,15 @@ members = ["{rel_member}"]
                 os.chdir(prev)
 
     def _mark_converted(self, rec: FnRecord, module: str, rust_sig: str) -> None:
-        """记录映射：C 符号 -> Rust 符号与模块路径"""
+        """记录映射：C 符号 -> Rust 符号与模块路径（JSONL，每行一条，支持重载/同名）"""
         rust_symbol = ""
         # 从签名中提取函数名（简单启发：pub fn name(...)
         m = re.search(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", rust_sig)
         if m:
             rust_symbol = m.group(1)
-        key = rec.qname or rec.name
-        if key:
-            self.symbol_map[key] = {
-                "module": module,
-                "rust_symbol": rust_symbol or (rec.name or f"fn_{rec.id}"),
-                "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()),
-            }
-            self._save_symbol_map()
+        # 写入 JSONL 映射（带源位置，用于区分同名符号）
+        self.symbol_map.add(rec, module, rust_symbol or (rec.name or f"fn_{rec.id}"))
+
         # 更新进度：已转换集合
         converted = self.progress.get("converted") or []
         if rec.id not in converted:
@@ -907,7 +990,7 @@ members = ["{rel_member}"]
             # 4) 审查与优化
             self._review_and_optimize(rec, module, rust_sig)
 
-            # 5) 标记已转换与映射记录
+            # 5) 标记已转换与映射记录（JSONL）
             self._mark_converted(rec, module, rust_sig)
 
             # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除
