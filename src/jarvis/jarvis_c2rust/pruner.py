@@ -231,7 +231,7 @@ def evaluate_third_party_replacements(
                 model_group=llm_group,
                 need_summary=False,
                 auto_complete=True,
-                use_tools=["execute_script", "retrieve_memory", "save_memory"],
+                use_tools=["execute_script"],
                 plan=False,
                 non_interactive=True,
                 use_methodology=False,
