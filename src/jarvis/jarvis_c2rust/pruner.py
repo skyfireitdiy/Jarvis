@@ -231,7 +231,7 @@ def evaluate_third_party_replacements(
                 model_group=llm_group,
                 need_summary=False,
                 auto_complete=True,
-                use_tools=["execute_script", "retrieve_memory", "save_memory", "search_web"],
+                use_tools=["execute_script", "retrieve_memory", "save_memory"],
                 plan=False,
                 non_interactive=True,
                 use_methodology=False,
@@ -361,8 +361,7 @@ def evaluate_third_party_replacements(
             "1) 仅当标准库/第三方库函数在功能与语义上能够完全覆盖当前函数（等价或更强）时，返回 replaceable=true；否则为 false。\n"
             "2) 优先考虑 Rust 标准库（std），其次考虑来自 crates.io 的常见、稳定的 crate。library 字段请填 'std' 或 crate 名称；function 字段请填可调用的 Rust API 名称/路径。\n"
             "3) 若无法判断或需要组合多个库/多步调用才能实现，不视为可替代（replaceable=false）。\n"
-            "4) `search_web`工具的代价较大，非必要不要用。\n"
-            "5) 请先输出一个 <yaml> 块（内容为 YAML 对象：replaceable, library, function, confidence），随后在单独一行输出 <!!!COMPLETE!!!>，不要输出其它文字。\n\n"
+            "4) 请先输出一个 <yaml> 块（内容为 YAML 对象：replaceable, library, function, confidence），随后在单独一行输出 <!!!COMPLETE!!!>，不要输出其它文字。\n\n"
             f"语言: {lang}\n"
             f"函数: {name}\n"
             f"签名: {sig}\n"
