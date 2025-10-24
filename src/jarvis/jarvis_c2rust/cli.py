@@ -41,22 +41,22 @@ def scan(
     dot: Optional[Path] = typer.Option(
         None,
         "--dot",
-        help="Write reference dependency graph to DOT file after scanning (or with --only-dot)",
+        help="扫描后将引用依赖图写入 DOT 文件（或与 --only-dot 一起使用）",
     ),
     only_dot: bool = typer.Option(
         False,
         "--only-dot",
-        help="Do not rescan. Read existing data (JSONL) and only generate DOT (requires --dot)",
+        help="不重新扫描。读取现有数据 (JSONL) 并仅生成 DOT（需要 --dot）",
     ),
     subgraphs_dir: Optional[Path] = typer.Option(
         None,
         "--subgraphs-dir",
-        help="Directory to write per-root reference subgraph DOT files (one file per root function)",
+        help="用于写入每个根函数引用子图 DOT 文件的目录（每个根函数一个文件）",
     ),
     only_subgraphs: bool = typer.Option(
         False,
         "--only-subgraphs",
-        help="Do not rescan. Only generate per-root reference subgraph DOT files (requires --subgraphs-dir)",
+        help="不重新扫描。仅生成每个根函数的引用子图 DOT 文件（需要 --subgraphs-dir）",
     ),
 ) -> None:
     """
@@ -70,10 +70,10 @@ def scan(
         png=True,
     )
 
-@app.command("plan")
-def llm_plan(
+@app.command("prepare")
+def prepare(
     llm_group: Optional[str] = typer.Option(
-        None, "-g", "--llm-group", help="Specify LLM model group for planning (only affects this run)"
+        None, "-g", "--llm-group", help="指定用于规划的 LLM 模型组（仅影响本次运行）"
     ),
 ) -> None:
     """
@@ -84,16 +84,16 @@ def llm_plan(
     try:
         _execute_llm_plan(apply=True, llm_group=llm_group)
     except Exception as e:
-        typer.secho(f"[c2rust-llm-planner] Error: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(f"[c2rust-llm-planner] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
 @app.command("transpile")
 def transpile(
     llm_group: Optional[str] = typer.Option(
-        None, "-g", "--llm-group", help="Specify LLM model group for translation"
+        None, "-g", "--llm-group", help="指定用于翻译的 LLM 模型组"
     ),
     only: Optional[str] = typer.Option(
-        None, "--only", help="Only translate specified functions (name or qualified name), comma-separated"
+        None, "--only", help="仅翻译指定的函数（名称或限定名称），以逗号分隔"
     ),
 ) -> None:
     """
@@ -113,7 +113,7 @@ def transpile(
             only=only_list,
         )
     except Exception as e:
-        typer.secho(f"[c2rust-transpiler] Error: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(f"[c2rust-transpiler] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
 

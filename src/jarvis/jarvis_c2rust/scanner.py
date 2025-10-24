@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-C/C++ function scanner and call graph extractor using libclang.
+使用 libclang 的 C/C++ 函数扫描器和调用图提取器。
 
-Design decisions:
-- Parser: clang.cindex (libclang) for robust C/C++ AST with precise types and locations.
-JSONL files
+设计决策:
+- 解析器: clang.cindex (libclang)，用于生成包含精确类型和位置的健壮 C/C++ AST。
+
+JSONL 文件
 - symbols.jsonl
-  One JSON object per symbol (function or type), unified schema:
-  Fields:
+  每个符号（函数或类型）一个 JSON 对象，统一模式：
+  字段:
   - id (int)
   - category (str): "function" | "type"
   - name (str)
   - qualified_name (str)
-  - signature (str)           # for functions; optional/empty for types
-  - return_type (str)         # for functions; optional/empty for types
-  - params (list[{name, type}])  # for functions; optional/empty for types
-  - kind (str)                # for types: struct/class/union/enum/typedef/type_alias
-  - underlying_type (str)     # for typedef/type_alias; empty otherwise
-  - ref (list[str])           # unified references: called functions or referenced types
+  - signature (str)           # 函数签名；类型则可选或为空
+  - return_type (str)         # 函数返回类型；类型则可选或为空
+  - params (list[{name, type}])  # 函数参数；类型则可选或为空
+  - kind (str)                # 类型种类: struct/class/union/enum/typedef/type_alias
+  - underlying_type (str)     # 针对 typedef/type_alias；其他为空
+  - ref (list[str])           # 统一的引用：被调用的函数或引用的类型
   - file (str)
   - start_line (int), start_col (int), end_line (int), end_col (int)
   - language (str)
@@ -32,14 +33,14 @@ JSONL files
     "schema_version": 1,
     "source_root": "<abs path>"
   }
-Usage:
+用法:
   python -m jarvis.jarvis_c2rust.scanner --root /path/to/scan
 
-Notes:
-- If compile_commands.json is present, it will be used to improve parsing accuracy.
-- If libclang is not found, an informative error will be raised with hints to set env:
-  - LIBCLANG_PATH (directory) or CLANG_LIBRARY_FILE (full path)
-  - LLVM_HOME (prefix containing lib/libclang.so)
+注意:
+- 如果存在 compile_commands.json 文件，将会用它来提高解析准确性。
+- 如果找不到 libclang，将引发一个信息丰富的错误，并提示设置环境变量：
+  - LIBCLANG_PATH (目录) 或 CLANG_LIBRARY_FILE (完整路径)
+  - LLVM_HOME (包含 lib/libclang.so 的前缀)
 """
 
 from __future__ import annotations
@@ -74,11 +75,11 @@ def _try_import_libclang() -> Any:
         from clang import cindex  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "Failed to import clang.cindex. This tool supports clang 16-21.\n"
-            "Fix:\n"
+            "导入 clang.cindex 失败。本工具支持 clang 16-21。\n"
+            "修复方法：\n"
             "- pip install 'clang>=16,<22'\n"
-            "- Ensure libclang (16-21) is installed (e.g., apt install llvm-21 clang-21 libclang-21-dev)\n"
-            "- Set env CLANG_LIBRARY_FILE to the matching shared library, or LIBCLANG_PATH to its directory."
+            "- 确保已安装 libclang (16-21) (例如，apt install llvm-21 clang-21 libclang-21-dev)\n"
+            "- 设置环境变量 CLANG_LIBRARY_FILE 指向匹配的共享库，或 LIBCLANG_PATH 指向其目录。"
         ) from e
 
     # Verify Python clang bindings major version (if available)
@@ -97,8 +98,8 @@ def _try_import_libclang() -> Any:
     # If version is known and not in supported set, fail; if unknown (None), proceed and rely on libclang probing
     if py_major is not None and py_major not in SUPPORTED_MAJORS:
         raise RuntimeError(
-            f"Python 'clang' bindings major version must be one of {sorted(SUPPORTED_MAJORS)}.\n"
-            "Fix:\n"
+            f"Python 'clang' 绑定的主版本必须是 {sorted(SUPPORTED_MAJORS)} 中的一个。\n"
+            "修复方法：\n"
             "- pip install --upgrade 'clang>=16,<22'"
         )
 
@@ -148,8 +149,8 @@ def _try_import_libclang() -> Any:
             return cindex
         else:
             raise RuntimeError(
-                f"CLANG_LIBRARY_FILE points to '{lib_file}', which is not libclang 16-21.\n"
-                "Please set it to a supported libclang (e.g., /usr/lib/llvm-21/lib/libclang.so or matching version)."
+                f"环境变量 CLANG_LIBRARY_FILE 指向 '{lib_file}', 但它不是 libclang 16-21 版本。\n"
+                "请将其设置为受支持的 libclang (例如 /usr/lib/llvm-21/lib/libclang.so 或匹配的版本)。"
             )
 
     # 2) LIBCLANG_PATH
@@ -172,8 +173,8 @@ def _try_import_libclang() -> Any:
                 return cindex
         # If a directory is given but no valid supported version found, error out explicitly
         raise RuntimeError(
-            f"LIBCLANG_PATH={lib_dir} does not contain libclang 16-21.\n"
-            "Expected libclang.so.[16-21] (Linux) or libclang.dylib from llvm@16..@21 (macOS)."
+            f"环境变量 LIBCLANG_PATH={lib_dir} 不包含 libclang 16-21。\n"
+            "期望找到 libclang.so.[16-21] (Linux) 或来自 llvm@16..@21 的 libclang.dylib (macOS)。"
         )
 
     # 3) LLVM_HOME
@@ -276,14 +277,14 @@ def _try_import_libclang() -> Any:
 
     # If we got here, we failed to locate a supported libclang 16-21
     raise RuntimeError(
-        "Failed to locate libclang 16-21. This tool supports clang 16-21.\n"
-        "Fix options:\n"
-        "- On Ubuntu/Debian: sudo apt-get install -y llvm-21 clang-21 libclang-21-dev (or 20/19/18/17/16).\n"
-        "- On macOS (Homebrew): brew install llvm@21 (or @20/@19/@18/@17/@16).\n"
-        "- On Arch Linux: ensure clang provides /usr/lib/libclang.so (it usually does) or set CLANG_LIBRARY_FILE explicitly.\n"
-        "- Then set env (if not auto-detected):\n"
-        "    export CLANG_LIBRARY_FILE=/usr/lib/llvm-21/lib/libclang.so   # Linux (adjust version)\n"
-        "    export CLANG_LIBRARY_FILE=/opt/homebrew/opt/llvm@21/lib/libclang.dylib  # macOS (adjust version)\n"
+        "未能定位到 libclang 16-21。本工具支持 clang 16-21 版本。\n"
+        "修复选项:\n"
+        "- 在 Ubuntu/Debian 上: sudo apt-get install -y llvm-21 clang-21 libclang-21-dev (或 20/19/18/17/16)。\n"
+        "- 在 macOS (Homebrew) 上: brew install llvm@21 (或 @20/@19/@18/@17/@16)。\n"
+        "- 在 Arch Linux 上: 确保 clang 提供了 /usr/lib/libclang.so (通常是这样) 或显式设置 CLANG_LIBRARY_FILE。\n"
+        "- 然后设置环境变量 (如果未自动检测到):\n"
+        "    export CLANG_LIBRARY_FILE=/usr/lib/llvm-21/lib/libclang.so   # Linux (请调整版本)\n"
+        "    export CLANG_LIBRARY_FILE=/opt/homebrew/opt/llvm@21/lib/libclang.dylib  # macOS (请调整版本)\n"
     )
 # ---------------------------
 # Data structures
@@ -598,16 +599,16 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             good = [p for p in candidates if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")]
             hint = ""
             if good:
-                hint = f"\nSuggested library with required symbol:\n  export CLANG_LIBRARY_FILE={good[0]}\nThen rerun: jarvis-c2rust scan -r {scan_root}"
+                hint = f"\n建议的包含所需符号的库:\n  export CLANG_LIBRARY_FILE={good[0]}\n然后重新运行: jarvis-c2rust scan -r {scan_root}"
 
             typer.secho(
-                "[c2rust-scanner] Detected libclang/python bindings mismatch (undefined symbol)."
-                f"\nDetail: {msg}"
-                "\nThis usually means your Python 'clang' bindings are newer than the installed libclang."
-                "\nFix options:\n"
-                "- Install/update libclang to match your Python 'clang' major version (e.g., 16-21).\n"
-                "- Or pin Python 'clang' to match your system libclang (e.g., pip install 'clang>=16,<22').\n"
-                "- Or set CLANG_LIBRARY_FILE to a matching libclang shared library.\n"
+                "[c2rust-scanner] 检测到 libclang/python 绑定不匹配 (未定义符号)。"
+                f"\n详情: {msg}"
+                "\n这通常意味着您的 Python 'clang' 绑定版本高于已安装的 libclang。"
+                "\n修复选项:\n"
+                "- 安装/更新 libclang 以匹配您 Python 'clang' 的主版本 (例如 16-21)。\n"
+                "- 或将 Python 'clang' 版本固定为与系统 libclang 匹配 (例如 pip install 'clang>=16,<22')。\n"
+                "- 或设置 CLANG_LIBRARY_FILE 指向匹配的 libclang 共享库。\n"
                 f"{hint}",
                 fg=typer.colors.RED,
                 err=True,
@@ -615,7 +616,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             raise typer.Exit(code=2)
         else:
             # Other initialization errors: surface and exit
-            typer.secho(f"[c2rust-scanner] libclang init failed: {e}", fg=typer.colors.RED, err=True)
+            typer.secho(f"[c2rust-scanner] libclang 初始化失败: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
 
     # compile_commands
@@ -629,7 +630,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
 
     files = list(iter_source_files(scan_root))
     total_files = len(files)
-    print(f"[c2rust-scanner] Scanning {total_files} files under {scan_root}")
+    print(f"[c2rust-scanner] 正在扫描 {scan_root} 目录下的 {total_files} 个文件")
 
     scanned = 0
     total_functions = 0
@@ -774,16 +775,16 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                     good = [lp for lp in candidates if Path(lp).exists() and _has_symbol(lp, "clang_getOffsetOfBase")]
                     hint = ""
                     if good:
-                        hint = f"\nSuggested library with required symbol:\n  export CLANG_LIBRARY_FILE={good[0]}\nThen rerun: jarvis-c2rust scan -r {scan_root}"
+                        hint = f"\n建议的包含所需符号的库:\n  export CLANG_LIBRARY_FILE={good[0]}\n然后重新运行: jarvis-c2rust scan -r {scan_root}"
 
                     typer.secho(
-                        "[c2rust-scanner] Detected libclang/python bindings mismatch during parsing (undefined symbol)."
-                        f"\nDetail: {msg}"
-                        "\nThis usually means your Python 'clang' bindings are newer than the installed libclang."
-                        "\nFix options:\n"
-                        "- Install/update libclang to match your Python 'clang' major version (e.g., 19/20).\n"
-                        "- Or pin Python 'clang' to match your system libclang (e.g., pip install 'clang==18.*').\n"
-                        "- Or set CLANG_LIBRARY_FILE to a matching libclang shared library.\n"
+                        "[c2rust-scanner] 解析期间检测到 libclang/python 绑定不匹配 (未定义符号)。"
+                        f"\n详情: {msg}"
+                        "\n这通常意味着您的 Python 'clang' 绑定版本高于已安装的 libclang。"
+                        "\n修复选项:\n"
+                        "- 安装/更新 libclang 以匹配您 Python 'clang' 的主版本 (例如 19/20)。\n"
+                        "- 或将 Python 'clang' 版本固定为与系统 libclang 匹配 (例如 pip install 'clang==18.*')。\n"
+                        "- 或设置 CLANG_LIBRARY_FILE 指向匹配的 libclang 共享库。\n"
                         f"{hint}",
                         fg=typer.colors.RED,
                         err=True,
@@ -794,7 +795,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 try:
                     funcs = scan_file(cindex, p, [])
                 except Exception:
-                    print(f"[c2rust-scanner] Failed to parse {p}: {e}", file=sys.stderr)
+                    print(f"[c2rust-scanner] 解析 {p} 失败: {e}", file=sys.stderr)
                     continue
 
             # Write JSONL
@@ -825,7 +826,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
 
             scanned += 1
             if scanned % 20 == 0 or scanned == total_files:
-                print(f"[c2rust-scanner] Progress: {scanned}/{total_files} files, {total_functions} functions, {total_types} types")
+                print(f"[c2rust-scanner] 进度: {scanned}/{total_files} 个文件, {total_functions} 个函数, {total_types} 个类型")
     finally:
         try:
             f_sym.close()
@@ -846,9 +847,9 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     except Exception:
         pass
 
-    print(f"[c2rust-scanner] Done. Functions collected: {total_functions}, Types collected: {total_types}, Symbols: {total_functions + total_types}")
-    print(f"[c2rust-scanner] JSONL written: {symbols_jsonl} (symbols)")
-    print(f"[c2rust-scanner] Meta written: {meta_json}")
+    print(f"[c2rust-scanner] 完成。收集到的函数: {total_functions}, 类型: {total_types}, 符号: {total_functions + total_types}")
+    print(f"[c2rust-scanner] JSONL 已写入: {symbols_jsonl} (符号)")
+    print(f"[c2rust-scanner] 元数据已写入: {meta_json}")
     return symbols_jsonl
 
 # ---------------------------
@@ -958,7 +959,7 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
 
     sjsonl = _resolve_symbols_jsonl_path(db_path)
     if not sjsonl.exists():
-        raise FileNotFoundError(f"symbols.jsonl not found: {sjsonl}")
+        raise FileNotFoundError(f"未找到 symbols.jsonl: {sjsonl}")
 
     # Load symbols (functions and types), unified handling (no category filtering)
     by_id: Dict[int, Dict[str, Any]] = {}
@@ -1061,7 +1062,7 @@ def find_root_function_ids(db_path: Path) -> List[int]:
 
     fjsonl = _resolve_symbols_jsonl_path(db_path)
     if not fjsonl.exists():
-        raise FileNotFoundError(f"symbols.jsonl not found: {fjsonl}")
+        raise FileNotFoundError(f"未找到 symbols.jsonl: {fjsonl}")
 
     records: List[Any] = []
     with open(fjsonl, "r", encoding="utf-8") as f:
@@ -1129,7 +1130,7 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
 
     fjsonl = _resolve_symbols_jsonl_path(db_path)
     if not fjsonl.exists():
-        raise FileNotFoundError(f"symbols.jsonl not found: {fjsonl}")
+        raise FileNotFoundError(f"未找到 symbols.jsonl: {fjsonl}")
 
     # Load symbols and build name-based adjacency from ref
     by_id: Dict[int, Dict[str, Any]] = {}
@@ -1321,7 +1322,7 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
 
     sjsonl = _resolve_symbols_jsonl_path(db_path)
     if not sjsonl.exists():
-        raise FileNotFoundError(f"symbols.jsonl not found: {sjsonl}")
+        raise FileNotFoundError(f"未找到 symbols.jsonl: {sjsonl}")
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1465,10 +1466,10 @@ def run_scan(
             from shutil import which
             import subprocess
         except Exception as _e:
-            raise RuntimeError(f"Environment issue while preparing PNG rendering: {_e}")
+            raise RuntimeError(f"准备 PNG 渲染时出现环境问题: {_e}")
         exe = which("dot")
         if not exe:
-            raise RuntimeError("Graphviz 'dot' not found in PATH. Please install graphviz and ensure 'dot' is available.")
+            raise RuntimeError("在 PATH 中未找到 Graphviz 'dot'。请安装 graphviz 并确保 'dot' 可用。")
         dot_file = Path(dot_file)
         if png_out is None:
             png_out = dot_file.with_suffix(".png")
@@ -1478,9 +1479,9 @@ def run_scan(
         try:
             subprocess.run([exe, "-Tpng", str(dot_file), "-o", str(png_out)], check=True)
         except FileNotFoundError:
-            raise RuntimeError("Graphviz 'dot' executable not found.")
+            raise RuntimeError("未找到 Graphviz 'dot' 可执行文件。")
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"'dot' failed to render PNG for {dot_file}: {e}")
+            raise RuntimeError(f"'dot' 渲染 {dot_file} 为 PNG 失败: {e}")
         return png_out
 
     if not (only_dot or only_subgraphs):
@@ -1489,40 +1490,40 @@ def run_scan(
             # After data generated, compute translation order JSONL
             try:
                 order_path = compute_translation_order_jsonl(data_path)
-                typer.secho(f"[c2rust-scanner] Translation order written: {order_path}", fg=typer.colors.GREEN)
+                typer.secho(f"[c2rust-scanner] 翻译顺序已写入: {order_path}", fg=typer.colors.GREEN)
             except Exception as e2:
-                typer.secho(f"[c2rust-scanner] Failed to compute translation order: {e2}", fg=typer.colors.RED, err=True)
+                typer.secho(f"[c2rust-scanner] 计算翻译顺序失败: {e2}", fg=typer.colors.RED, err=True)
         except Exception as e:
-            typer.secho(f"[c2rust-scanner] Error: {e}", fg=typer.colors.RED, err=True)
+            typer.secho(f"[c2rust-scanner] 错误: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
     else:
         # Only-generate mode (no rescan)
         if not data_path.exists():
-            typer.secho(f"[c2rust-scanner] Data not found: {data_path}", fg=typer.colors.RED, err=True)
+            typer.secho(f"[c2rust-scanner] 未找到数据: {data_path}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
         if only_dot and dot is None:
-            typer.secho("[c2rust-scanner] --only-dot requires --dot to specify output file", fg=typer.colors.RED, err=True)
+            typer.secho("[c2rust-scanner] --only-dot 需要 --dot 来指定输出文件", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
         if only_subgraphs and subgraphs_dir is None:
-            typer.secho("[c2rust-scanner] --only-subgraphs requires --subgraphs-dir to specify output directory", fg=typer.colors.RED, err=True)
+            typer.secho("[c2rust-scanner] --only-subgraphs 需要 --subgraphs-dir 来指定输出目录", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
         # Data exists: compute translation order based on current JSONL
         try:
             order_path = compute_translation_order_jsonl(data_path)
-            typer.secho(f"[c2rust-scanner] Translation order written: {order_path}", fg=typer.colors.GREEN)
+            typer.secho(f"[c2rust-scanner] 翻译顺序已写入: {order_path}", fg=typer.colors.GREEN)
         except Exception as e2:
-            typer.secho(f"[c2rust-scanner] Failed to compute translation order: {e2}", fg=typer.colors.RED, err=True)
+            typer.secho(f"[c2rust-scanner] 计算翻译顺序失败: {e2}", fg=typer.colors.RED, err=True)
 
     # Generate DOT (global) if requested
     if dot is not None:
         try:
             generate_dot_from_db(data_path, dot)
-            typer.secho(f"[c2rust-scanner] DOT written: {dot}", fg=typer.colors.GREEN)
+            typer.secho(f"[c2rust-scanner] DOT 文件已写入: {dot}", fg=typer.colors.GREEN)
             if png:
                 png_path = _render_dot_to_png(dot)
-                typer.secho(f"[c2rust-scanner] PNG written: {png_path}", fg=typer.colors.GREEN)
+                typer.secho(f"[c2rust-scanner] PNG 文件已写入: {png_path}", fg=typer.colors.GREEN)
         except Exception as e:
-            typer.secho(f"[c2rust-scanner] Failed to write DOT/PNG: {e}", fg=typer.colors.RED, err=True)
+            typer.secho(f"[c2rust-scanner] 写入 DOT/PNG 失败: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
 
     # Generate per-root subgraphs if requested
@@ -1539,16 +1540,16 @@ def run_scan(
                         # Fail fast on PNG generation error for subgraphs to make issues visible
                         raise
                 typer.secho(
-                    f"[c2rust-scanner] Root subgraphs written: {len(files)} DOTs and {png_count} PNGs -> {subgraphs_dir}",
+                    f"[c2rust-scanner] 根节点子图已写入: {len(files)} 个 DOT 文件和 {png_count} 个 PNG 文件 -> {subgraphs_dir}",
                     fg=typer.colors.GREEN,
                 )
             else:
                 typer.secho(
-                    f"[c2rust-scanner] Root subgraphs written: {len(files)} files -> {subgraphs_dir}",
+                    f"[c2rust-scanner] 根节点子图已写入: {len(files)} 个文件 -> {subgraphs_dir}",
                     fg=typer.colors.GREEN,
                 )
         except Exception as e:
-            typer.secho(f"[c2rust-scanner] Failed to write subgraph DOTs/PNGs: {e}", fg=typer.colors.RED, err=True)
+            typer.secho(f"[c2rust-scanner] 写入子图 DOT/PNG 失败: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
 
 

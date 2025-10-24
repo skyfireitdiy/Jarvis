@@ -70,7 +70,7 @@ class _DbLoader:
         # 统一流程：仅使用 symbols.jsonl，不再兼容 functions.jsonl
         if not self.symbols_path.exists():
             raise FileNotFoundError(
-                f"symbols.jsonl not found under: {self.data_dir}"
+                f"在目录下未找到 symbols.jsonl: {self.data_dir}"
             )
 
         self.fn_by_id: Dict[int, FnRecord] = {}
@@ -284,13 +284,13 @@ def _ensure_order_file(project_root: Path) -> Path:
         try:
             compute_translation_order_jsonl(data_dir)
         except Exception as e:
-            raise RuntimeError(f"Failed to compute translation order: {e}")
+            raise RuntimeError(f"计算翻译顺序失败: {e}")
     if not order_path.exists():
         # compute默认路径：同目录下 translation_order.jsonl
         guessed = data_dir / ORDER_JSONL
         if guessed.exists():
             return guessed
-        raise FileNotFoundError(f"translation_order.jsonl not found after compute: {guessed}")
+        raise FileNotFoundError(f"计算后未找到 translation_order.jsonl: {guessed}")
     return order_path
 
 
@@ -826,13 +826,13 @@ members = ["{rel_member}"]
                 cwd=workspace_root,
             )
             if res.returncode == 0:
-                print("[c2rust-transpiler] Cargo build succeeded.")
+                print("[c2rust-transpiler] Cargo 构建成功。")
                 return True
             output = (res.stdout or "") + "\n" + (res.stderr or "")
-            print(f"[c2rust-transpiler] Cargo build failed (iter={i}).")
+            print(f"[c2rust-transpiler] Cargo 构建失败 (第 {i} 次尝试)。")
             print(output)
             repair_prompt = "\n".join([
-                "目标：最小化修复以通过 cargo build。",
+                "目标：以最小的改动修复问题，使 `cargo build` 命令可以通过。",
                 "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；避免大范围改动。",
                 "- 保持最小改动，避免与错误无关的重构或格式化；",
                 "- 请仅输出补丁，不要输出解释或多余文本。",
@@ -840,7 +840,7 @@ members = ["{rel_member}"]
                 "<BUILD_ERROR>",
                 output,
                 "</BUILD_ERROR>",
-                "修复后请再次执行 cargo build 验证。",
+                "修复后请再次执行 `cargo build` 进行验证。",
             ])
             agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
             agent.run(repair_prompt, prefix=f"[c2rust-transpiler][build-fix iter={i}]", suffix="")
@@ -891,7 +891,7 @@ members = ["{rel_member}"]
             m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
             content = (m.group(1).strip() if m else summary.strip()).upper()
             if content == "OK":
-                print("[c2rust-transpiler] Review passed.")
+                print("[c2rust-transpiler] 代码审查通过。")
                 return
             # 需要优化：提供详细上下文背景，并明确审查意见仅针对 Rust crate，不修改 C 源码
             crate_tree = _dir_tree(self.crate_dir)
@@ -942,7 +942,7 @@ members = ["{rel_member}"]
         order_path = _ensure_order_file(self.project_root)
         steps = _iter_order_steps(order_path)
         if not steps:
-            typer.secho("[c2rust-transpiler] No translation steps found.", fg=typer.colors.YELLOW)
+            typer.secho("[c2rust-transpiler] 未找到翻译步骤。", fg=typer.colors.YELLOW)
             return
 
         # 扁平化顺序，按单个函数处理（保持原有顺序）
@@ -978,7 +978,7 @@ members = ["{rel_member}"]
             # 3) 构建与修复
             ok = self._cargo_build_loop()
             if not ok:
-                typer.secho("[c2rust-transpiler] Build not passed within retry limit; stop.", fg=typer.colors.RED)
+                typer.secho("[c2rust-transpiler] 在重试次数限制内未能成功构建，已停止。", fg=typer.colors.RED)
                 # 保留当前状态，便于下次 resume
                 return
 
@@ -997,7 +997,7 @@ members = ["{rel_member}"]
                     # 尝试一次构建以验证修复
                     self._cargo_build_loop()
 
-        typer.secho("[c2rust-transpiler] All eligible functions processed.", fg=typer.colors.GREEN)
+        typer.secho("[c2rust-transpiler] 所有符合条件的函数均已处理完毕。", fg=typer.colors.GREEN)
 
 
 def run_transpile(
