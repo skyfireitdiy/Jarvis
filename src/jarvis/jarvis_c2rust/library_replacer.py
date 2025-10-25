@@ -179,6 +179,7 @@ def apply_library_replacement(
     # 评估顺序：包含根节点与所有子节点（广度优先近似的父先子后），被覆盖/剪枝的节点将自动跳过
     root_funcs = order
 
+
     # 如果传入 candidates，则仅评估这些节点（按上面的顺序过滤），并限定作用域：
     # - 仅保留从这些根可达的函数；对不可达函数直接删除（类型记录保留）
     scope_unreachable_funcs: Set[int] = set()
