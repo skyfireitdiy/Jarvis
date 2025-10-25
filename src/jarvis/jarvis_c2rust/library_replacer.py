@@ -646,8 +646,7 @@ def apply_library_replacement(
     replacements: List[Dict[str, Any]] = []
 
     with open(out_symbols_path, "w", encoding="utf-8") as fo, \
-         open(out_symbols_prune_path, "w", encoding="utf-8") as fo2, \
-         open(alias_symbols_path, "w", encoding="utf-8") as fo_alias:
+         open(out_symbols_prune_path, "w", encoding="utf-8") as fo2:
 
         for rec in all_records:
             fid = int(rec.get("id"))
@@ -727,7 +726,7 @@ def apply_library_replacement(
             line = json.dumps(rec_out, ensure_ascii=False) + "\n"
             fo.write(line)
             fo2.write(line)
-            fo_alias.write(line)
+            # 不覆写 symbols.jsonl（保留原始扫描/整理结果作为基线）
 
     # 写出替代映射
     with open(out_mapping_path, "w", encoding="utf-8") as fm:
