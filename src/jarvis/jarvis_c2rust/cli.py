@@ -13,13 +13,10 @@ C2Rust 独立命令行入口。
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import typer
 from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
-from jarvis.jarvis_c2rust.pruner import (
-    evaluate_third_party_replacements as _eval_third_party_replacements,
-)
 from jarvis.jarvis_c2rust.scanner import (
     compute_translation_order_jsonl as _compute_order,
 )
@@ -132,21 +129,20 @@ def lib_replace(
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="用于评估的 LLM 模型组"
     ),
-    keep_list_file: Optional[Path] = typer.Option(
-        None, "--keep-list-file", help="保留列表文件：按行列出必须保留的符号名称或限定名（忽略空行与以#开头的注释）"
+    root_list_file: Optional[Path] = typer.Option(
+        None, "--root-list-file", help="根列表文件：按行列出要参与评估的根符号名称或限定名（忽略空行与以#开头的注释）"
     ),
-    keep_list_syms: Optional[str] = typer.Option(
-        None, "--keep-list-syms", help="保留列表内联：以逗号分隔的符号名称或限定名"
+    root_list_syms: Optional[str] = typer.Option(
+        None, "--root-list-syms", help="根列表内联：以逗号分隔的符号名称或限定名（仅评估这些根）"
     ),
 ) -> None:
     """
-    Keep-list 强制剪枝模式：
-    - 必须提供保留列表（--keep-list-file 或 --keep-list-syms，至少一种）
-    - 基于依赖图，从保留列表中的每个符号作为根构造子树
-    - 保留每棵子树的根节点，不进行替代；剪除其所有子孙函数节点（类型记录保留）
-    - 跳过 LLM 评估流程，直接基于 keep-list 执行剪枝
+    Root-list 评估模式（必须走 LLM 评估）：
+    - 必须提供根列表（--root-list-file 或 --root-list-syms，至少一种）
+    - 仅对根列表中的符号作为评估根执行 LLM 子树评估
+    - 若可替代：替换该根的 ref 为库占位，并剪除其所有子孙函数（根本身保留）
     - 需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl）
-    - 默认库: std（仅用于对后续流程保持一致的默认上下文，不影响剪枝）
+    - 默认库: std（仅用于对后续流程保持一致的默认上下文）
     """
     try:
         data_dir = Path(".") / ".jarvis" / "c2rust"
@@ -161,149 +157,55 @@ def lib_replace(
         # 使用默认库: std
         library = "std"
 
-        # 读取保留列表（必填，至少提供一种来源）
-        keep_names: List[str] = []
+        # 读取根列表（必填，至少提供一种来源）
+        root_names: List[str] = []
         # 文件来源
-        if keep_list_file is not None:
+        if root_list_file is not None:
             try:
-                txt = keep_list_file.read_text(encoding="utf-8")
-                keep_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
+                txt = root_list_file.read_text(encoding="utf-8")
+                root_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
             except Exception as _e:
-                typer.secho(f"[c2rust-lib-replace] 读取保留列表失败: {keep_list_file}: {_e}", fg=typer.colors.RED, err=True)
+                typer.secho(f"[c2rust-lib-replace] 读取根列表失败: {root_list_file}: {_e}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(code=1)
         # 内联来源
-        if isinstance(keep_list_syms, str) and keep_list_syms.strip():
-            parts = [s.strip() for s in keep_list_syms.replace("\n", ",").split(",") if s.strip()]
-            keep_names.extend(parts)
+        if isinstance(root_list_syms, str) and root_list_syms.strip():
+            parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
+            root_names.extend(parts)
         # 去重
         try:
-            keep_names = list(dict.fromkeys(keep_names))
+            root_names = list(dict.fromkeys(root_names))
         except Exception:
-            keep_names = sorted(list(set(keep_names)))
-        if not keep_names:
-            typer.secho("[c2rust-lib-replace] 错误：必须提供保留列表（--keep-list-file 或 --keep-list-syms）。", fg=typer.colors.RED, err=True)
+            root_names = sorted(list(set(root_names)))
+        if not root_names:
+            typer.secho("[c2rust-lib-replace] 错误：必须提供根列表（--root-list-file 或 --root-list-syms）。", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
 
-        # 基于 keep 列表构造子树并剪枝（保留根，剪除其子节点），跳过 LLM 评估
+        # 必须走 LLM 评估：仅评估提供的根（candidates），不启用强制剪枝模式
         ret = _apply_library_replacement(
             db_path=Path("."),
             library_name=library,
             llm_group=llm_group,
-            candidates=None,
+            candidates=root_names,          # 仅评估这些根
             out_symbols_path=None,
             out_mapping_path=None,
             max_funcs=None,
-            keep_names=keep_names,
-            prune_under_keep=True,
         )
-
-        # 覆盖默认 symbols.jsonl
-        data_dir.mkdir(parents=True, exist_ok=True)
-        default_symbols = data_dir / "symbols.jsonl"
-        pruned_symbols = Path(ret["symbols"])
+        # 输出简要结果摘要（底层已写出新的符号表与可选转译顺序）
         try:
-            import shutil as _sh
-            _sh.copy2(pruned_symbols, default_symbols)
-        except Exception as _e:
-            typer.secho(f"[c2rust-lib-replace] 覆盖默认符号表失败: {default_symbols} <- {pruned_symbols}: {_e}", fg=typer.colors.RED, err=True)
-            raise
-
-        # 基于已覆盖的默认符号表，重新计算转译顺序
-        try:
-            order_path = _compute_order(default_symbols)
-        except Exception as _e2:
-            typer.secho(f"[c2rust-lib-replace] 计算转译顺序失败: {_e2}", fg=typer.colors.RED, err=True)
-            raise
-
-        typer.secho(
-            (
+            order_msg = f"\n[c2rust-lib-replace] 转译顺序: {ret['order']}" if 'order' in ret else ""
+            typer.secho(
                 f"[c2rust-lib-replace] 替代映射: {ret['mapping']}\n"
-                f"[c2rust-lib-replace] 新符号表(已覆盖默认): {default_symbols}\n"
-                f"[c2rust-lib-replace] 转译顺序已基于新符号表生成: {order_path}"
-            ),
-            fg=typer.colors.GREEN,
-        )
+                f"[c2rust-lib-replace] 新符号表: {ret['symbols']}"
+                + order_msg,
+                fg=typer.colors.GREEN,
+            )
+        except Exception as _e:
+            typer.secho(f"[c2rust-lib-replace] 结果输出时发生非致命错误: {_e}", fg=typer.colors.YELLOW, err=True)
     except Exception as e:
         typer.secho(f"[c2rust-lib-replace] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
-@app.command("prune")
-def prune(
-    llm_group: Optional[str] = typer.Option(
-        None,
-        "-g",
-        "--llm-group",
-        help="指定用于评估的 LLM 模型组（传递给 CodeAgent）",
-    ),
-    mode: str = typer.Option(
-        "lib",
-        "-m",
-        "--mode",
-        help="剪枝模式: lib 或 bin（lib 更保守：仅删除当前函数本身；bin 更激进：仅当子符号的所有父级均在已删除集合中时递归删除）",
-    ),
-) -> None:
-    """
-    使用 Agent 评估函数是否可由开源第三方库单函数替代：
-    - 剪枝行为取决于 --mode：
-      - lib：保守，仅删除当前被替代函数本身
-      - bin：激进，删除该函数以及所有父级均在已删除集合中的后继（不动点扩展；这些子引用不再评估）
-    - 生成新的符号表与替代映射
 
-    默认约定:
-    - 数据源: <cwd>/.jarvis/c2rust/symbols.jsonl（若不存在将尝试自动扫描生成）
-    - 新符号表输出: <cwd>/.jarvis/c2rust/symbols_third_party_pruned.jsonl
-    - 替代映射输出: <cwd>/.jarvis/c2rust/third_party_replacements.jsonl
-    """
-    try:
-        # 若未找到符号数据，则先执行一次扫描生成 symbols_raw.jsonl（保留中间产物）
-        data_dir = Path(".") / ".jarvis" / "c2rust"
-        curated_symbols = data_dir / "symbols.jsonl"
-        raw_symbols = data_dir / "symbols_raw.jsonl"
-        if not curated_symbols.exists() and not raw_symbols.exists():
-            typer.secho("[c2rust-prune] 未找到符号数据（symbols.jsonl 或 symbols_raw.jsonl），正在执行扫描以生成数据...", fg=typer.colors.YELLOW)
-            _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False)
-            if not curated_symbols.exists() and not raw_symbols.exists():
-                raise FileNotFoundError(f"未找到符号数据: {curated_symbols} 或 {raw_symbols}")
-
-        # 使用默认位置 (<cwd>/.jarvis/c2rust/symbols.jsonl) 与默认输出文件名
-        ret = _eval_third_party_replacements(
-            db_path=Path("."),            # 函数内部会解析到默认 JSONL 路径（优先 <cwd>/.jarvis/c2rust/symbols.jsonl）
-            out_symbols_path=None,        # 使用默认输出路径
-            out_mapping_path=None,        # 使用默认输出路径
-            llm_group=llm_group,
-            max_funcs=None,               # 默认不限制
-            mode=mode,                    # 剪枝模式：lib/bin
-        )
-
-        # 覆盖默认 symbols.jsonl，使后续流程“直接使用新的符号表”
-        data_dir.mkdir(parents=True, exist_ok=True)
-        default_symbols = data_dir / "symbols.jsonl"
-        pruned_symbols = Path(ret["symbols"])
-        try:
-            import shutil
-            shutil.copy2(pruned_symbols, default_symbols)
-        except Exception as _e:
-            typer.secho(f"[c2rust-prune] 覆盖默认符号表失败: {default_symbols} <- {pruned_symbols}: {_e}", fg=typer.colors.RED, err=True)
-            raise
-
-        # 基于已覆盖的默认符号表，重新计算转译顺序（translation_order.jsonl）
-        try:
-            order_path = _compute_order(default_symbols)
-        except Exception as _e2:
-            typer.secho(f"[c2rust-prune] 计算转译顺序失败: {_e2}", fg=typer.colors.RED, err=True)
-            raise
-
-        typer.secho(
-            (
-                f"[c2rust-prune] 替代映射: {ret['mapping']}\n"
-                f"[c2rust-prune] 新符号表(已覆盖默认): {default_symbols}\n"
-                f"[c2rust-prune] 转译顺序已基于新符号表生成: {order_path}"
-            ),
-            fg=typer.colors.GREEN,
-        )
-    except Exception as e:
-        typer.secho(f"[c2rust-prune] 错误: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1)
 
 def main() -> None:
     """主入口"""
