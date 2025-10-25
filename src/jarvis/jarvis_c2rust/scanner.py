@@ -1608,22 +1608,11 @@ def run_scan(
     if not (only_dot or only_subgraphs):
         try:
             scan_directory(root)
-            # After data generated, compute translation order JSONL for curated and raw
-            try:
-                order_cur = compute_translation_order_jsonl(data_path_curated)
-                typer.secho(f"[c2rust-scanner] 翻译顺序(正式)已写入: {order_cur}", fg=typer.colors.GREEN)
-            except Exception as e2:
-                typer.secho(f"[c2rust-scanner] 计算正式翻译顺序失败: {e2}", fg=typer.colors.RED, err=True)
-            try:
-                order_raw = compute_translation_order_jsonl(data_path_raw)
-                typer.secho(f"[c2rust-scanner] 翻译顺序(原始)已写入: {order_raw}", fg=typer.colors.GREEN)
-            except Exception as e3:
-                typer.secho(f"[c2rust-scanner] 计算原始翻译顺序失败: {e3}", fg=typer.colors.YELLOW, err=True)
         except Exception as e:
             typer.secho(f"[c2rust-scanner] 错误: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
     else:
-        # Only-generate mode (no rescan)
+        # Only-generate mode (no rescan). 验证输入，仅基于既有 symbols.jsonl 进行可选的 DOT/子图输出；此处不计算翻译顺序。
         if not data_path_curated.exists():
             typer.secho(f"[c2rust-scanner] 未找到数据: {data_path_curated}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
@@ -1633,12 +1622,6 @@ def run_scan(
         if only_subgraphs and subgraphs_dir is None:
             typer.secho("[c2rust-scanner] --only-subgraphs 需要 --subgraphs-dir 来指定输出目录", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
-        # Data exists: compute translation order based on curated JSONL
-        try:
-            order_cur = compute_translation_order_jsonl(data_path_curated)
-            typer.secho(f"[c2rust-scanner] 翻译顺序(正式)已写入: {order_cur}", fg=typer.colors.GREEN)
-        except Exception as e2:
-            typer.secho(f"[c2rust-scanner] 计算正式翻译顺序失败: {e2}", fg=typer.colors.RED, err=True)
 
     # Generate DOT (global) if requested
     if dot is not None:
