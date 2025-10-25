@@ -1171,7 +1171,18 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
             if not isinstance(refs, list):
                 refs = []
             refs = [r for r in refs if isinstance(r, str) and r]
-            by_id[fid] = {"name": nm, "qname": qn}
+            by_id[fid] = {
+                "name": nm,
+                "qname": qn,
+                "cat": (obj.get("category") or ""),
+                "file": obj.get("file") or "",
+                "start_line": obj.get("start_line"),
+                "end_line": obj.get("end_line"),
+                "start_col": obj.get("start_col"),
+                "end_col": obj.get("end_col"),
+                "language": obj.get("language") or "",
+                "record": obj,  # embed full symbol record for order file self-containment
+            }
             if nm:
                 name_to_id.setdefault(nm, fid)
             if qn:
@@ -1293,15 +1304,55 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
     root_reach: Dict[int, Set[int]] = {rid: _reachable(rid) for rid in roots}
 
     def _emit_for_root(root_id: Optional[int]) -> None:
+        # Emit order per root follows leaves-first (on reversed component DAG),
+        # but delay entry functions (e.g., main) to the end if they are singleton components.
         reach = root_reach.get(root_id, set()) if root_id is not None else None
+
+        def _is_entry(nid: int) -> bool:
+            meta = by_id.get(nid, {})
+            nm = str(meta.get("name") or "").lower()
+            qn = str(meta.get("qname") or "").lower()
+            # Configurable delayed entry symbols via env:
+            # - JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS
+            # - JARVIS_C2RUST_DELAY_ENTRIES
+            # - C2RUST_DELAY_ENTRIES
+            entries_env = os.environ.get("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS") or \
+                          os.environ.get("JARVIS_C2RUST_DELAY_ENTRIES") or \
+                          os.environ.get("C2RUST_DELAY_ENTRIES") or ""
+            entries_set = set()
+            if entries_env:
+                try:
+                    import re as _re
+                    parts = _re.split(r"[,\s;]+", entries_env.strip())
+                except Exception:
+                    parts = [p.strip() for p in entries_env.replace(";", ",").split(",")]
+                entries_set = {p.strip().lower() for p in parts if p and p.strip()}
+            # If configured, use the provided entries; otherwise fallback to default 'main'
+            if entries_set:
+                return (nm in entries_set) or (qn in entries_set)
+            return nm == "main" or qn == "main" or qn.endswith("::main")
+
+        delayed_entries: List[int] = []
+
         for comp_idx in comp_order:
             comp_nodes = sccs[comp_idx]
             selected: List[int] = []
+            # Select nodes for this component, deferring entry (main) if safe to do so
             for nid in comp_nodes:
                 if nid in emitted:
                     continue
-                if reach is None or nid in reach:
+                if reach is not None and nid not in reach:
+                    continue
+                # Skip type symbols in order emission (types don't require translation steps)
+                meta_n = by_id.get(nid, {})
+                if str(meta_n.get("cat") or "") == "type":
+                    continue
+                # Only delay entry when the SCC is a singleton to avoid breaking intra-SCC semantics
+                if _is_entry(nid) and len(comp_nodes) == 1:
+                    delayed_entries.append(nid)
+                else:
                     selected.append(nid)
+
             if selected:
                 for nid in selected:
                     emitted.add(nid)
@@ -1323,6 +1374,28 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
                     "created_at": now_ts,
                 })
 
+        # Emit delayed entry functions as the final step for this root
+        if delayed_entries:
+            for nid in delayed_entries:
+                emitted.add(nid)
+            syms: List[str] = []
+            for nid in sorted(delayed_entries):
+                meta = by_id.get(nid, {})
+                label = meta.get("qname") or meta.get("name") or f"sym_{nid}"
+                syms.append(label)
+            roots_labels: List[str] = []
+            if root_id is not None:
+                meta_r = by_id.get(root_id, {})
+                rlabel = meta_r.get("qname") or meta_r.get("name") or f"sym_{root_id}"
+                roots_labels = [rlabel]
+            steps.append({
+                "step": len(steps) + 1,
+                "symbols": syms,
+                "group": len(syms) > 1,
+                "roots": roots_labels,
+                "created_at": now_ts,
+            })
+
     for rid in sorted(roots, key=lambda r: len(root_reach.get(r, set())), reverse=True):
         _emit_for_root(rid)
     _emit_for_root(None)
@@ -1341,6 +1414,11 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
         out_path = fjsonl.parent / base
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    # Purge redundant fields before writing (keep ids and records; drop symbols/items)
+    try:
+        steps = [dict((k, v) for k, v in st.items() if k not in ("symbols", "items")) for st in steps]
+    except Exception:
+        pass
     with open(out_path, "w", encoding="utf-8") as fo:
         for st in steps:
             fo.write(json.dumps(st, ensure_ascii=False) + "\n")
