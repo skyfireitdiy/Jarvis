@@ -207,6 +207,26 @@ def lib_replace(
 
 
 
+@app.command("collect")
+def collect(
+    files: List[Path] = typer.Argument(..., help="一个或多个 C/C++ 头文件路径（.h/.hh/.hpp/.hxx）"),
+    out: Path = typer.Option(..., "-o", "--out", help="输出文件路径（写入唯一函数名，每行一个）"),
+) -> None:
+    """
+    收集指定头文件中的函数名（使用 libclang 解析），并写入指定输出文件（每行一个）。
+    示例:
+      jarvis-c2rust collect a.h b.hpp -o funcs.txt
+    说明:
+      非头文件会被跳过（仅支持 .h/.hh/.hpp/.hxx）。
+    """
+    try:
+        from jarvis.jarvis_c2rust.collector import collect_function_names as _collect_fn_names
+        _collect_fn_names(files=files, out_path=out)
+        typer.secho(f"[c2rust-collect] 函数名已写入: {out}", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"[c2rust-collect] 错误: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
 def main() -> None:
     """主入口"""
     app()
