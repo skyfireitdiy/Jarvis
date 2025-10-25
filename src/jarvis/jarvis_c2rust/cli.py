@@ -135,6 +135,9 @@ def lib_replace(
     root_list_syms: Optional[str] = typer.Option(
         None, "--root-list-syms", help="根列表内联：以逗号分隔的符号名称或限定名（仅评估这些根）"
     ),
+    disabled_libs: Optional[str] = typer.Option(
+        None, "--disabled-libs", help="禁用库列表：逗号分隔的库名（评估时禁止使用这些库）"
+    ),
 ) -> None:
     """
     Root-list 评估模式（必须走 LLM 评估）：
@@ -143,6 +146,7 @@ def lib_replace(
     - 若可替代：替换该根的 ref 为库占位，并剪除其所有子孙函数（根本身保留）
     - 需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl）
     - 默认库: std（仅用于对后续流程保持一致的默认上下文）
+    - 可选：--disabled-libs 指定评估时禁止使用的库列表（逗号分隔）
     """
     try:
         data_dir = Path(".") / ".jarvis" / "c2rust"
@@ -180,6 +184,13 @@ def lib_replace(
             typer.secho("[c2rust-lib-replace] 错误：必须提供根列表（--root-list-file 或 --root-list-syms）。", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
 
+        # 解析禁用库列表（可选）
+        disabled_list: Optional[List[str]] = None
+        if isinstance(disabled_libs, str) and disabled_libs.strip():
+            disabled_list = [s.strip() for s in disabled_libs.replace("\n", ",").split(",") if s.strip()]
+            if disabled_list:
+                typer.secho(f"[c2rust-lib-replace] 禁用库: {', '.join(disabled_list)}", fg=typer.colors.YELLOW)
+
         # 必须走 LLM 评估：仅评估提供的根（candidates），不启用强制剪枝模式
         ret = _apply_library_replacement(
             db_path=Path("."),
@@ -189,6 +200,7 @@ def lib_replace(
             out_symbols_path=None,
             out_mapping_path=None,
             max_funcs=None,
+            disabled_libraries=disabled_list,
         )
         # 输出简要结果摘要（底层已写出新的符号表与可选转译顺序）
         try:
