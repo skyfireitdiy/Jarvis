@@ -315,35 +315,10 @@ def _ensure_order_file(project_root: Path) -> Path:
 def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
     """
     读取翻译顺序（兼容新旧格式），返回按步骤的函数id序列列表。
-    新格式（首选）：每行包含 "ids": [int, ...] 以及 "records": [完整符号对象,...]。
-    旧格式（降级）：每行包含 "symbols": [str,...]，需通过 symbols.jsonl 解析为 id（不再推荐）。
+    新格式：每行包含 "ids": [int, ...] 以及 "items": [完整符号对象,...]。
+    不再兼容旧格式（不支持 "records"/"symbols" 键）。
     """
-    # 构建 name -> id 映射（仅当旧格式需要时）
-    name_to_id: Dict[str, int] = {}
-    try:
-        data_dir = order_jsonl.parent
-        symbols_path = data_dir / "symbols.jsonl"
-        if symbols_path.exists():
-            with symbols_path.open("r", encoding="utf-8") as sf:
-                idx = 0
-                for line in sf:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = json.loads(line)
-                    except Exception:
-                        continue
-                    idx += 1
-                    fid = int(obj.get("id") or idx)
-                    nm = obj.get("name") or ""
-                    qn = obj.get("qualified_name") or ""
-                    if nm:
-                        name_to_id.setdefault(nm, fid)
-                    if qn:
-                        name_to_id.setdefault(qn, fid)
-    except Exception:
-        name_to_id = {}
+    # 旧格式已移除：不再需要基于 symbols.jsonl 的 name->id 映射
 
     steps: List[List[int]] = []
     with order_jsonl.open("r", encoding="utf-8") as f:
@@ -358,7 +333,7 @@ def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
 
             ids = obj.get("ids")
             if isinstance(ids, list) and ids:
-                # 新格式：直接使用 ids
+                # 新格式：仅支持 ids
                 try:
                     ids_int = [int(x) for x in ids if isinstance(x, (int, str)) and str(x).strip()]
                 except Exception:
@@ -366,19 +341,7 @@ def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
                 if ids_int:
                     steps.append(ids_int)
                 continue
-
-            # 旧格式回退解析
-            syms = obj.get("symbols")
-            if isinstance(syms, list) and syms:
-                id_list: List[int] = []
-                for s in syms:
-                    if not isinstance(s, str) or not s:
-                        continue
-                    tid = name_to_id.get(s)
-                    if isinstance(tid, int):
-                        id_list.append(tid)
-                if id_list:
-                    steps.append(id_list)
+            # 不支持旧格式（无 ids 则跳过该行）
     return steps
 
 
@@ -629,7 +592,8 @@ members = ["{rel_member}"]
                         obj = json.loads(ln)
                     except Exception:
                         continue
-                    recs = obj.get("records")
+                    # 仅支持新格式：items
+                    recs = obj.get("items")
                     if not isinstance(recs, list):
                         continue
                     for r in recs:
@@ -1094,11 +1058,35 @@ members = ["{rel_member}"]
                 "你是严谨的Rust代码审查专家，目标是对给定函数的实现进行快速审查，指出明显问题并给出简要建议。"
                 "仅在总结阶段输出审查结论。"
             )
+            # 附加原始C函数源码片段，供审查作为只读参考
+            c_code = self._read_source_span(rec) or ""
+            # 附加被引用符号上下文与库替代上下文，以及crate目录结构，提供更完整审查背景
+            callees_ctx = self._collect_callees_context(rec)
+            librep_ctx = rec.lib_replacement if isinstance(rec.lib_replacement, dict) else None
+            crate_tree = _dir_tree(self.crate_dir)
             usr_p = "\n".join([
                 f"待审查函数：{rec.qname or rec.name}",
                 f"建议签名：{rust_sig}",
                 f"目标模块：{module}",
                 f"crate根目录路径：{self.crate_dir.resolve()}",
+                f"源文件位置：{rec.file}:{rec.start_line}-{rec.end_line}",
+                "",
+                "原始C函数源码片段（只读参考，不要修改C代码）：",
+                "<C_SOURCE>",
+                c_code,
+                "</C_SOURCE>",
+                "",
+                "被引用符号上下文（如已转译则包含Rust模块信息）：",
+                json.dumps(callees_ctx, ensure_ascii=False, indent=2),
+                "",
+                "库替代上下文（若存在）：",
+                json.dumps(librep_ctx, ensure_ascii=False, indent=2),
+                "",
+                "当前crate目录结构（部分）：",
+                "<CRATE_TREE>",
+                crate_tree,
+                "</CRATE_TREE>",
+                "",
                 "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
             ])
             sum_p = (
