@@ -513,40 +513,28 @@ def apply_library_replacement(
             typer.secho(f"[c2rust-library] LLM 评估失败，视为不可替代: {e}", fg=typer.colors.YELLOW, err=True)
             return {"replaceable": False}
 
-    # 评估阶段：对每个候选根进行 LLM 判断（边评估边剪枝，后续候选根若已被覆盖则直接跳过）
+    # 评估阶段：若某节点评估不可替代，则继续评估其子节点（递归/深度优先）
     eval_counter = 0
     total_roots = len(root_funcs)
     pruned_dynamic: Set[int] = set()  # 动态累计的“将被剪除”的函数集合（不含选中根）
     selected_roots: List[Tuple[int, Dict[str, Any]]] = []  # 实时选中的可替代根（fid, LLM结果）
     processed_roots: Set[int] = set()  # 已处理（评估或跳过）的根集合
-    for fid in root_funcs:
+
+    def _evaluate_node(fid: int) -> None:
+        nonlocal eval_counter
+        # 限流
         if max_funcs is not None and eval_counter >= max_funcs:
-            break
-        # 若该根已在此前被其它根覆盖（作为其子孙），则直接跳过评估
-        if fid in pruned_dynamic:
-            rec_meta = by_id.get(fid, {})
-            label_skipped = rec_meta.get("qualified_name") or rec_meta.get("name") or f"sym_{fid}"
-            typer.secho(
-                f"[c2rust-library] 跳过评估(已被覆盖): {label_skipped} (ID: {fid})",
-                fg=typer.colors.YELLOW,
-                err=True,
-            )
-            processed_roots.add(fid)
-            continue
-
-
+            return
+        # 若该节点已被标记剪除或已处理，跳过
+        if fid in pruned_dynamic or fid in processed_roots or fid not in func_ids:
+            return
 
         # 构造子树并打印进度
         desc = _collect_descendants(fid)
         rec_meta = by_id.get(fid, {})
         label = rec_meta.get("qualified_name") or rec_meta.get("name") or f"sym_{fid}"
-        remaining_candidates = [
-            rid for rid in root_funcs
-            if rid not in pruned_dynamic and rid not in processed_roots
-        ]
-        planned_total = min(len(remaining_candidates), (max_funcs - eval_counter)) if max_funcs is not None else len(remaining_candidates)
         typer.secho(
-            f"[c2rust-library] 正在评估 {eval_counter + 1}/{planned_total}: {label} (ID: {fid}), 子树函数数={len(desc)}",
+            f"[c2rust-library] 正在评估: {label} (ID: {fid}), 子树函数数={len(desc)}",
             fg=typer.colors.CYAN,
             err=True,
         )
@@ -580,20 +568,58 @@ def apply_library_replacement(
                     msg += f"; 备注: {notes[:200]}"
                 typer.secho(msg, fg=typer.colors.GREEN, err=True)
 
-                # 即时剪枝（不含根）
-                to_prune = set(desc)
-                to_prune.discard(fid)
+                # 入口函数保护：不替代 main（保留进行转译），改为深入评估其子节点
+                nm = str(rec_meta.get("name") or "")
+                qn = str(rec_meta.get("qualified_name") or "")
+                # Configurable entry detection (avoid hard-coding 'main'):
+                # Honor env vars: JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS / JARVIS_C2RUST_DELAY_ENTRIES / C2RUST_DELAY_ENTRIES
+                import os
+                entries_env = os.environ.get("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS") or \
+                              os.environ.get("JARVIS_C2RUST_DELAY_ENTRIES") or \
+                              os.environ.get("C2RUST_DELAY_ENTRIES") or ""
+                entries_set = set()
+                if entries_env:
+                    try:
+                        import re as _re
+                        parts = _re.split(r"[,\s;]+", entries_env.strip())
+                    except Exception:
+                        parts = [p.strip() for p in entries_env.replace(";", ",").split(",")]
+                    entries_set = {p.strip().lower() for p in parts if p and p.strip()}
+                if entries_set:
+                    is_entry = (nm.lower() in entries_set) or (qn.lower() in entries_set) or any(qn.lower().endswith(f"::{e}") for e in entries_set)
+                else:
+                    is_entry = (nm.lower() == "main") or (qn.lower() == "main") or qn.lower().endswith("::main")
+                if is_entry:
+                    typer.secho(
+                        "[c2rust-library] 入口函数保护：跳过对 main 的库替代，继续评估其子节点。",
+                        fg=typer.colors.YELLOW,
+                        err=True,
+                    )
+                    for ch in adj_func.get(fid, []):
+                        _evaluate_node(ch)
+                else:
+                    # 即时剪枝（不含根）
+                    to_prune = set(desc)
+                    to_prune.discard(fid)
 
-                newly = len(to_prune - pruned_dynamic)
-                pruned_dynamic.update(to_prune)
-                selected_roots.append((fid, res))
-                typer.secho(
-                    f"[c2rust-library] 即时标记剪除子节点: +{newly} 个 (累计={len(pruned_dynamic)})",
-                    fg=typer.colors.MAGENTA,
-                    err=True,
-                )
+                    newly = len(to_prune - pruned_dynamic)
+                    pruned_dynamic.update(to_prune)
+                    selected_roots.append((fid, res))
+                    typer.secho(
+                        f"[c2rust-library] 即时标记剪除子节点(本次新增): +{newly} 个 (累计={len(pruned_dynamic)})",
+                        fg=typer.colors.MAGENTA,
+                        err=True,
+                    )
+            else:
+                # 若不可替代，继续评估其子节点（深度优先）
+                for ch in adj_func.get(fid, []):
+                    _evaluate_node(ch)
         except Exception:
             pass
+
+    # 对每个候选根进行评估；若根不可替代将递归评估其子节点
+    for fid in root_funcs:
+        _evaluate_node(fid)
 
     # 剪枝集合来自动态评估阶段的累计结果
     pruned_funcs: Set[int] = set(pruned_dynamic)

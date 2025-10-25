@@ -313,11 +313,12 @@ def _ensure_order_file(project_root: Path) -> Path:
     return order_path
 
 def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
-    """读取翻译顺序，返回按步骤的函数id序列列表（仅支持新格式）
-    新格式要求：每行包含 "symbols": [str, ...]，其中元素为函数的 qualified_name 或 name。
-    本函数会基于同目录下 symbols.jsonl 将名称/限定名解析为 id。
     """
-    # 构建 name -> id 映射（基于同目录 symbols.jsonl）
+    读取翻译顺序（兼容新旧格式），返回按步骤的函数id序列列表。
+    新格式（首选）：每行包含 "ids": [int, ...] 以及 "records": [完整符号对象,...]。
+    旧格式（降级）：每行包含 "symbols": [str,...]，需通过 symbols.jsonl 解析为 id（不再推荐）。
+    """
+    # 构建 name -> id 映射（仅当旧格式需要时）
     name_to_id: Dict[str, int] = {}
     try:
         data_dir = order_jsonl.parent
@@ -342,7 +343,6 @@ def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
                     if qn:
                         name_to_id.setdefault(qn, fid)
     except Exception:
-        # 若映射构建失败，steps 将为空（严格新格式，不回退旧格式）
         name_to_id = {}
 
     steps: List[List[int]] = []
@@ -356,20 +356,29 @@ def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
             except Exception:
                 continue
 
-            syms = obj.get("symbols")
-            if not (isinstance(syms, list) and syms):
-                # 严格新格式：无 symbols 则跳过该行
+            ids = obj.get("ids")
+            if isinstance(ids, list) and ids:
+                # 新格式：直接使用 ids
+                try:
+                    ids_int = [int(x) for x in ids if isinstance(x, (int, str)) and str(x).strip()]
+                except Exception:
+                    ids_int = []
+                if ids_int:
+                    steps.append(ids_int)
                 continue
 
-            ids: List[int] = []
-            for s in syms:
-                if not isinstance(s, str) or not s:
-                    continue
-                tid = name_to_id.get(s)
-                if isinstance(tid, int):
-                    ids.append(tid)
-            if ids:
-                steps.append(ids)
+            # 旧格式回退解析
+            syms = obj.get("symbols")
+            if isinstance(syms, list) and syms:
+                id_list: List[int] = []
+                for s in syms:
+                    if not isinstance(s, str) or not s:
+                        continue
+                    tid = name_to_id.get(s)
+                    if isinstance(tid, int):
+                        id_list.append(tid)
+                if id_list:
+                    steps.append(id_list)
     return steps
 
 
@@ -470,7 +479,9 @@ class Transpiler:
         self.only = set(only or [])
 
         self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
-        self.db = _DbLoader(self.project_root)
+        # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
+        self.fn_index_by_id: Dict[int, FnRecord] = {}
+        self.fn_name_to_id: Dict[str, int] = {}
 
         self.progress: Dict[str, Any] = _read_json(self.progress_path, {"current": None, "converted": []})
         # 使用 JSONL 存储的符号映射
@@ -583,6 +594,88 @@ members = ["{rel_member}"]
     def _save_symbol_map(self) -> None:
         return
 
+    def _read_source_span(self, rec: FnRecord) -> str:
+        """按起止行读取源码片段（忽略列边界，尽量完整）"""
+        try:
+            p = Path(rec.file)
+            if not p.is_absolute():
+                p = (self.project_root / p).resolve()
+            if not p.exists():
+                return ""
+            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+            s = max(1, int(rec.start_line or 1))
+            e = min(len(lines), max(int(rec.end_line or s), s))
+            chunk = "\n".join(lines[s - 1 : e])
+            return chunk
+        except Exception:
+            return ""
+
+    def _load_order_index(self, order_jsonl: Path) -> None:
+        """
+        从自包含的 order.jsonl 中加载所有 records，建立：
+        - fn_index_by_id: id -> FnRecord
+        - fn_name_to_id: name/qname -> id
+        若同一 id 多次出现，首次记录为准。
+        """
+        self.fn_index_by_id.clear()
+        self.fn_name_to_id.clear()
+        try:
+            with order_jsonl.open("r", encoding="utf-8") as f:
+                for ln in f:
+                    ln = ln.strip()
+                    if not ln:
+                        continue
+                    try:
+                        obj = json.loads(ln)
+                    except Exception:
+                        continue
+                    recs = obj.get("records")
+                    if not isinstance(recs, list):
+                        continue
+                    for r in recs:
+                        if not isinstance(r, dict):
+                            continue
+                        # 构建 FnRecord
+                        try:
+                            fid = int(r.get("id"))
+                        except Exception:
+                            continue
+                        if fid in self.fn_index_by_id:
+                            # 已收录
+                            continue
+                        nm = r.get("name") or ""
+                        qn = r.get("qualified_name") or ""
+                        fp = r.get("file") or ""
+                        refs = r.get("ref")
+                        if not isinstance(refs, list):
+                            refs = []
+                        refs = [c for c in refs if isinstance(c, str) and c]
+                        sr = int(r.get("start_line") or 0)
+                        sc = int(r.get("start_col") or 0)
+                        er = int(r.get("end_line") or 0)
+                        ec = int(r.get("end_col") or 0)
+                        lr = r.get("lib_replacement") if isinstance(r.get("lib_replacement"), dict) else None
+                        rec = FnRecord(
+                            id=fid,
+                            name=nm,
+                            qname=qn,
+                            file=fp,
+                            start_line=sr,
+                            start_col=sc,
+                            end_line=er,
+                            end_col=ec,
+                            refs=refs,
+                            lib_replacement=lr,
+                        )
+                        self.fn_index_by_id[fid] = rec
+                        if nm:
+                            self.fn_name_to_id.setdefault(nm, fid)
+                        if qn:
+                            self.fn_name_to_id.setdefault(qn, fid)
+        except Exception:
+            # 若索引构建失败，保持为空，后续流程将跳过
+            pass
+
     def _should_skip(self, rec: FnRecord) -> bool:
         # 如果 only 列表非空，则仅处理匹配者
         if self.only:
@@ -606,7 +699,7 @@ members = ["{rel_member}"]
         ctx: List[Dict[str, Any]] = []
         for callee in rec.refs or []:
             entry: Dict[str, Any] = {"name": callee, "qname": callee}
-            # 已转映射
+            # 已转译映射
             if self.symbol_map.has_symbol(callee):
                 recs = self.symbol_map.get(callee)
                 m = recs[-1] if recs else None
@@ -619,10 +712,10 @@ members = ["{rel_member}"]
                     entry["ambiguous"] = True
                 ctx.append(entry)
                 continue
-            # 尝试按名称解析ID（函数或类型）
-            cid = self.db.get_id_by_name(callee)
+            # 使用 order 索引按名称解析ID（函数或类型）
+            cid = self.fn_name_to_id.get(callee)
             if cid:
-                crec = self.db.get(cid)
+                crec = self.fn_index_by_id.get(cid)
                 if crec:
                     entry.update({
                         "translated": False,
@@ -1101,6 +1194,9 @@ members = ["{rel_member}"]
             typer.secho("[c2rust-transpiler] 未找到翻译步骤。", fg=typer.colors.YELLOW)
             return
 
+        # 构建自包含 order 索引（id -> FnRecord，name/qname -> id）
+        self._load_order_index(order_path)
+
         # 扁平化顺序，按单个函数处理（保持原有顺序）
         seq: List[int] = []
         for grp in steps:
@@ -1112,14 +1208,14 @@ members = ["{rel_member}"]
         for fid in seq:
             if fid in done:
                 continue
-            rec = self.db.get(fid)
+            rec = self.fn_index_by_id.get(fid)
             if not rec:
                 continue
             if self._should_skip(rec):
                 continue
 
             # 读取C函数源码
-            c_code = self.db.read_source_span(rec)
+            c_code = self._read_source_span(rec)
 
             # 1) 规划：模块路径与Rust签名
             module, rust_sig = self._plan_module_and_signature(rec, c_code)
