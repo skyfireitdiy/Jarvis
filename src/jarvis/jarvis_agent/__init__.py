@@ -318,6 +318,7 @@ class Agent:
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
         force_save_memory: Optional[bool] = None,
+        disable_file_edit: bool = False,
         files: Optional[List[str]] = None,
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
         non_interactive: Optional[bool] = None,
@@ -364,6 +365,7 @@ class Agent:
         self.execute_tool_confirm = execute_tool_confirm
         self.summary_prompt = summary_prompt
         self.force_save_memory = force_save_memory
+        self.disable_file_edit = bool(disable_file_edit)
         # 资源与环境
         self.model_group = model_group
         self.files = files or []
@@ -513,7 +515,13 @@ class Agent:
         use_tools: List[str],
     ):
         """初始化各种处理器"""
-        self.output_handler = output_handler or [ToolRegistry(),  EditFileHandler(), RewriteFileHandler()]
+        default_handlers = [ToolRegistry()]
+        if not getattr(self, "disable_file_edit", False):
+            default_handlers.extend([EditFileHandler(), RewriteFileHandler()])
+        handlers = output_handler or default_handlers
+        if getattr(self, "disable_file_edit", False):
+            handlers = [h for h in handlers if not isinstance(h, (EditFileHandler, RewriteFileHandler))]
+        self.output_handler = handlers
         self.set_use_tools(use_tools)
         self.input_handler = [
             builtin_input_handler,
@@ -1240,6 +1248,7 @@ class Agent:
             "use_methodology": self.use_methodology,
             "use_analysis": self.use_analysis,
             "force_save_memory": self.force_save_memory,
+            "disable_file_edit": self.disable_file_edit,
             "files": self.files,
             "confirm_callback": self.confirm_callback,
             "non_interactive": True,
