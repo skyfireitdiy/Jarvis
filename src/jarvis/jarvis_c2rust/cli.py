@@ -132,11 +132,21 @@ def lib_replace(
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="用于评估的 LLM 模型组"
     ),
+    keep_list_file: Optional[Path] = typer.Option(
+        None, "--keep-list-file", help="保留列表文件：按行列出必须保留的符号名称或限定名（忽略空行与以#开头的注释）"
+    ),
+    keep_list_syms: Optional[str] = typer.Option(
+        None, "--keep-list-syms", help="保留列表内联：以逗号分隔的符号名称或限定名"
+    ),
 ) -> None:
     """
-    基于依赖图由 LLM 评估“整子树能否由指定库单个 API 替代”；若可替代，则替换根函数依赖为库 API 并删除其子孙节点。
-    需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl）
-    默认库: std
+    Keep-list 强制剪枝模式：
+    - 必须提供保留列表（--keep-list-file 或 --keep-list-syms，至少一种）
+    - 基于依赖图，从保留列表中的每个符号作为根构造子树
+    - 保留每棵子树的根节点，不进行替代；剪除其所有子孙函数节点（类型记录保留）
+    - 跳过 LLM 评估流程，直接基于 keep-list 执行剪枝
+    - 需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl）
+    - 默认库: std（仅用于对后续流程保持一致的默认上下文，不影响剪枝）
     """
     try:
         data_dir = Path(".") / ".jarvis" / "c2rust"
@@ -151,6 +161,30 @@ def lib_replace(
         # 使用默认库: std
         library = "std"
 
+        # 读取保留列表（必填，至少提供一种来源）
+        keep_names: List[str] = []
+        # 文件来源
+        if keep_list_file is not None:
+            try:
+                txt = keep_list_file.read_text(encoding="utf-8")
+                keep_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
+            except Exception as _e:
+                typer.secho(f"[c2rust-lib-replace] 读取保留列表失败: {keep_list_file}: {_e}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(code=1)
+        # 内联来源
+        if isinstance(keep_list_syms, str) and keep_list_syms.strip():
+            parts = [s.strip() for s in keep_list_syms.replace("\n", ",").split(",") if s.strip()]
+            keep_names.extend(parts)
+        # 去重
+        try:
+            keep_names = list(dict.fromkeys(keep_names))
+        except Exception:
+            keep_names = sorted(list(set(keep_names)))
+        if not keep_names:
+            typer.secho("[c2rust-lib-replace] 错误：必须提供保留列表（--keep-list-file 或 --keep-list-syms）。", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=2)
+
+        # 基于 keep 列表构造子树并剪枝（保留根，剪除其子节点），跳过 LLM 评估
         ret = _apply_library_replacement(
             db_path=Path("."),
             library_name=library,
@@ -159,6 +193,8 @@ def lib_replace(
             out_symbols_path=None,
             out_mapping_path=None,
             max_funcs=None,
+            keep_names=keep_names,
+            prune_under_keep=True,
         )
 
         # 覆盖默认 symbols.jsonl
