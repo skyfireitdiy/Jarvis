@@ -1368,6 +1368,8 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
                     roots_labels = [rlabel]
                 steps.append({
                     "step": len(steps) + 1,
+                    "ids": sorted(selected),
+                    "items": [by_id.get(nid, {}).get("record") for nid in sorted(selected) if isinstance(by_id.get(nid, {}).get("record"), dict)],
                     "symbols": syms,
                     "group": len(syms) > 1,
                     "roots": roots_labels,
@@ -1390,6 +1392,8 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
                 roots_labels = [rlabel]
             steps.append({
                 "step": len(steps) + 1,
+                "ids": sorted(delayed_entries),
+                "items": [by_id.get(nid, {}).get("record") for nid in sorted(delayed_entries) if isinstance(by_id.get(nid, {}).get("record"), dict)],
                 "symbols": syms,
                 "group": len(syms) > 1,
                 "roots": roots_labels,
@@ -1416,7 +1420,8 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # Purge redundant fields before writing (keep ids and records; drop symbols/items)
     try:
-        steps = [dict((k, v) for k, v in st.items() if k not in ("symbols", "items")) for st in steps]
+        # 保留 items（包含完整符号记录及替换信息），仅移除冗余的 symbols 文本标签
+        steps = [dict((k, v) for k, v in st.items() if k not in ("symbols",)) for st in steps]
     except Exception:
         pass
     with open(out_path, "w", encoding="utf-8") as fo:

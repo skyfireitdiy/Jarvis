@@ -343,6 +343,96 @@ class LLMRustCratePlannerAgent:
             pass
         return False
 
+    def _order_path(self) -> Path:
+        """
+        返回 translation_order.jsonl 的标准路径：<project_root>/.jarvis/c2rust/translation_order.jsonl
+        """
+        return self.project_root / ".jarvis" / "c2rust" / "translation_order.jsonl"
+
+    def _build_roots_context_from_order(self) -> List[Dict[str, Any]]:
+        """
+        基于 translation_order.jsonl 生成用于规划的上下文：
+        - 以每个 step 的 roots 标签为分组键（通常每步一个 root 标签）
+        - 函数列表来自每步的 items 中的符号 'name' 字段，按 root 聚合去重
+        - 跳过无 roots 标签的 residual 步骤（仅保留明确 root 的上下文）
+        - 若最终未收集到任何 root 组，则回退为单组 'project'，包含所有 items 的函数名集合
+        """
+        import json
+        order_path = self._order_path()
+        if not order_path.exists():
+            raise FileNotFoundError(f"未找到 translation_order.jsonl: {order_path}")
+
+        groups: Dict[str, List[str]] = {}
+        with order_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                roots = obj.get("roots") or []
+                items = obj.get("items") or []
+                if not isinstance(items, list) or not items:
+                    continue
+                root_labels = [str(r).strip() for r in roots if isinstance(r, str) and str(r).strip()]
+                if not root_labels:
+                    continue
+                step_names: List[str] = []
+                for it in items:
+                    if isinstance(it, dict):
+                        nm = it.get("name") or ""
+                        if isinstance(nm, str) and nm.strip():
+                            step_names.append(str(nm).strip())
+                if not step_names:
+                    continue
+                try:
+                    step_names = list(dict.fromkeys(step_names))
+                except Exception:
+                    step_names = sorted(list(set(step_names)))
+                for r in root_labels:
+                    groups.setdefault(r, []).extend(step_names)
+
+        contexts: List[Dict[str, Any]] = []
+        for root_label, names in groups.items():
+            try:
+                names = list(dict.fromkeys(names))
+            except Exception:
+                names = sorted(list(set(names)))
+            contexts.append({"root_function": root_label, "functions": sorted(names)})
+
+        if not contexts:
+            all_names: List[str] = []
+            try:
+                with order_path.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            obj = json.loads(line)
+                        except Exception:
+                            continue
+                        items = obj.get("items") or []
+                        if not isinstance(items, list):
+                            continue
+                        for it in items:
+                            if isinstance(it, dict):
+                                nm = it.get("name") or ""
+                                if isinstance(nm, str) and nm.strip():
+                                    all_names.append(str(nm).strip())
+                try:
+                    all_names = list(dict.fromkeys(all_names))
+                except Exception:
+                    all_names = sorted(list(set(all_names)))
+                if all_names:
+                    contexts.append({"root_function": "project", "functions": sorted(all_names)})
+            except Exception:
+                pass
+
+        return contexts
+
     def _build_user_prompt(self, roots_context: List[Dict[str, Any]]) -> str:
         """
         主对话阶段：传入上下文，不给出输出要求，仅用于让模型获取信息并触发进入总结阶段。
@@ -556,8 +646,8 @@ class LLMRustCratePlannerAgent:
         执行主流程并返回原始 <PROJECT> YAML 文本，不进行解析。
         若格式校验失败，将自动重试，直到满足为止（不设置最大重试次数）。
         """
-        roots = find_root_function_ids(self.db_path)
-        roots_ctx = self.loader.build_roots_context(roots)
+        # 从 translation_order.jsonl 生成上下文，不再基于 symbols.jsonl 的调用图遍历
+        roots_ctx = self._build_roots_context_from_order()
 
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(roots_ctx)
