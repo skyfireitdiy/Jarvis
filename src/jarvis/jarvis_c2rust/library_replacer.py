@@ -235,23 +235,7 @@ def apply_library_replacement(
                     err=True,
                 )
 
-    # 可达缓存
-    desc_cache: Dict[int, Set[int]] = {}
 
-    def _collect_descendants(start: int) -> Set[int]:
-        if start in desc_cache:
-            return desc_cache[start]
-        visited: Set[int] = set()
-        stack: List[int] = [start]
-        visited.add(start)
-        while stack:
-            u = stack.pop()
-            for v in adj_func.get(u, []):
-                if v not in visited:
-                    visited.add(v)
-                    stack.append(v)
-        desc_cache[start] = visited
-        return visited
 
     # 读取源码片段（辅助 LLM）
     def _read_source_snippet(rec: Dict[str, Any], max_lines: int = 200) -> str:
