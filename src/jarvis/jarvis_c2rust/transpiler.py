@@ -828,6 +828,7 @@ members = ["{rel_member}"]
                 non_interactive=True,
                 use_methodology=False,
                 use_analysis=False,
+                disable_file_edit=True,
             )
             prev_cwd = os.getcwd()
             try:
@@ -1166,6 +1167,7 @@ members = ["{rel_member}"]
                 non_interactive=True,
                 use_methodology=False,
                 use_analysis=False,
+                disable_file_edit=True,
             )
             prev_cwd = os.getcwd()
             try:
