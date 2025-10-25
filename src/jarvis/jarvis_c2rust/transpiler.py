@@ -675,7 +675,7 @@ members = ["{rel_member}"]
             "请阅读以下上下文并准备总结：",
             f"- 函数标识: id={rec.id}, name={rec.name}, qualified={rec.qname}",
             f"- 源文件位置: {rec.file}:{rec.start_line}-{rec.end_line}",
-            f"- crate 根目录路径: {self.crate_dir}",
+            f"- crate 根目录路径: {self.crate_dir.resolve()}",
             "",
             "C函数源码片段：",
             "<C_SOURCE>",
@@ -695,11 +695,11 @@ members = ["{rel_member}"]
         summary_prompt = (
             "请仅输出一个 <SUMMARY> 块，块内必须且只包含一个 <yaml>...</yaml>，不得包含其它内容。\n"
             "允许字段（YAML 对象）：\n"
-            '- module: "src/xxx.rs 或 src/xxx/mod.rs"\n'
+            '- module: "<绝对路径>/src/xxx.rs 或 <绝对路径>/src/xxx/mod.rs"\n'
             '- rust_signature: "pub fn xxx(...)->..."\n'
             '- notes: "可选说明（若有上下文缺失或风险点，请在此列出）"\n'
             "注意：\n"
-            "- module 必须位于 crate 的 src/ 目录下；尽量选择已有文件；如需新建文件，给出合理路径；\n"
+            "- module 必须位于 crate 的 src/ 目录下且使用绝对路径；尽量选择已有文件；如需新建文件，给出合理路径；\n"
             "- rust_signature 请包含可见性修饰与函数名（可先用占位类型）。\n"
             "请严格按以下格式输出：\n"
             "<SUMMARY><yaml>\nmodule: \"...\"\nrust_signature: \"...\"\nnotes: \"...\"\n</yaml></SUMMARY>"
@@ -721,8 +721,18 @@ members = ["{rel_member}"]
                 return False, "缺少必填字段 module"
             if not isinstance(rust_sig, str) or not rust_sig.strip():
                 return False, "缺少必填字段 rust_signature"
-            if not module.strip().startswith("src/"):
-                return False, "module 必须位于 crate 的 src/ 目录下"
+            try:
+                mp = Path(str(module).strip()).resolve()
+                if not mp.is_absolute():
+                    return False, "module 必须为绝对路径"
+                crate_root = self.crate_dir.resolve()
+                # 必须位于 crate/src 下
+                rel = mp.relative_to(crate_root)
+                parts = rel.parts
+                if not parts or parts[0] != "src":
+                    return False, "module 必须位于 crate 的 src/ 目录下（绝对路径）"
+            except Exception:
+                return False, "module 路径不可解析或不在 crate/src 下"
             if not re.search(r"\bfn\s+[A-Za-z_][A-Za-z0-9_]*\s*\(", rust_sig):
                 return False, "rust_signature 无效：未检测到 Rust 函数签名（fn 名称）"
             return True, ""
@@ -790,7 +800,7 @@ members = ["{rel_member}"]
         约束：最小变更，生成可编译的占位实现，尽可能保留后续细化空间。
         """
         requirement_lines = [
-            f"目标：在 crate 目录 {self.crate_dir} 的 {module} 中，为 C 函数 {rec.qname or rec.name} 生成对应的 Rust 实现。",
+            f"目标：在 crate 目录 {self.crate_dir.resolve()} 的 {module} 中，为 C 函数 {rec.qname or rec.name} 生成对应的 Rust 实现。",
             "要求：",
             f"- 函数签名（建议）：{rust_sig}",
             "- 若 module 文件不存在则新建；为所在模块添加必要的 mod 声明（若需要）；",
@@ -902,7 +912,7 @@ members = ["{rel_member}"]
                 f"- 已转换的目标函数名：{callee_rust_fn}",
                 f"- 其所在模块（crate路径提示）：{callee_path}",
                 f"- 函数签名提示：{callee_rust_sig}",
-                f"- 当前 crate 根目录路径：{self.crate_dir}",
+                f"- 当前 crate 根目录路径：{self.crate_dir.resolve()}",
                 "- 你可以使用完全限定路径（如 crate::...::函数(...)），或在文件顶部添加合适的 use；",
                 "- 保持最小改动，不要进行与本次修复无关的重构或格式化；",
                 "- 如果参数列表暂不明确，可使用合理占位变量，确保编译通过。",
@@ -944,7 +954,7 @@ members = ["{rel_member}"]
                 "- 保持最小改动，避免与错误无关的重构或格式化；",
                 "- 请仅输出补丁，不要输出解释或多余文本。",
                 "上下文：",
-                f"- crate 根目录路径: {self.crate_dir}",
+                f"- crate 根目录路径: {self.crate_dir.resolve()}",
                 f"- 包名称（用于 cargo build -p）: {self.crate_dir.name}",
                 "",
                 "请阅读以下构建错误并进行必要修复：",
@@ -975,7 +985,7 @@ members = ["{rel_member}"]
                 f"待审查函数：{rec.qname or rec.name}",
                 f"建议签名：{rust_sig}",
                 f"目标模块：{module}",
-                f"crate根目录路径：{self.crate_dir}",
+                f"crate根目录路径：{self.crate_dir.resolve()}",
                 "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
             ])
             sum_p = (
@@ -1023,7 +1033,7 @@ members = ["{rel_member}"]
                 "</REVIEW>",
                 "",
                 "上下文背景信息：",
-                f"- crate_dir: {self.crate_dir}",
+                f"- crate_dir: {self.crate_dir.resolve()}",
                 f"- 目标模块文件: {module}",
                 f"- 建议/当前 Rust 签名: {rust_sig}",
                 "crate 目录结构（部分）：",
