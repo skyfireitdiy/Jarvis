@@ -142,23 +142,6 @@ def apply_library_replacement(
             internal = sorted(list(set(internal)))
         adj_func[fid] = internal
 
-        # 可达缓存（上移，供 candidates 与后续使用，避免前向引用导致 UnboundLocalError）
-        desc_cache: Dict[int, Set[int]] = {}
-
-        def _collect_descendants(start: int) -> Set[int]:
-            if start in desc_cache:
-                return desc_cache[start]
-            visited: Set[int] = set()
-            stack: List[int] = [start]
-            visited.add(start)
-            while stack:
-                u = stack.pop()
-                for v in adj_func.get(u, []):
-                    if v not in visited:
-                        visited.add(v)
-                        stack.append(v)
-            desc_cache[start] = visited
-            return visited
 
 
 
