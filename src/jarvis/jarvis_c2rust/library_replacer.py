@@ -183,6 +183,7 @@ def apply_library_replacement(
 
 
 
+
     # 如果传入 candidates，则仅评估这些节点（按上面的顺序过滤），并限定作用域：
     # - 仅保留从这些根可达的函数；对不可达函数直接删除（类型记录保留）
     scope_unreachable_funcs: Set[int] = set()
