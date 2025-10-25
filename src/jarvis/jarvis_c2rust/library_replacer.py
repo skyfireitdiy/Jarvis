@@ -179,6 +179,24 @@ def apply_library_replacement(
     # 评估顺序：包含根节点与所有子节点（广度优先近似的父先子后），被覆盖/剪枝的节点将自动跳过
     root_funcs = order
 
+    # 可达缓存（需在 candidates 使用前定义，避免前向引用）
+    desc_cache: Dict[int, Set[int]] = {}
+
+    def _collect_descendants(start: int) -> Set[int]:
+        if start in desc_cache:
+            return desc_cache[start]
+        visited: Set[int] = set()
+        stack: List[int] = [start]
+        visited.add(start)
+        while stack:
+            u = stack.pop()
+            for v in adj_func.get(u, []):
+                if v not in visited:
+                    visited.add(v)
+                    stack.append(v)
+        desc_cache[start] = visited
+        return visited
+
 
 
 
