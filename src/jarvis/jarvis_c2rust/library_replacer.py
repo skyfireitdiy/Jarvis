@@ -784,7 +784,6 @@ def apply_library_replacement(
     if order_prune_path:
         result["order_prune"] = Path(order_prune_path)
     return result
-        return None
 
     def _llm_evaluate_subtree(fid: int, desc: Set[int]) -> Dict[str, Any]:
         if not _model_available:
