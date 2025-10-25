@@ -863,6 +863,7 @@ members = ["{rel_member}"]
         使用 CodeAgent 生成/更新目标模块中的函数实现。
         约束：最小变更，生成可编译的占位实现，尽可能保留后续细化空间。
         """
+        symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
         requirement_lines = [
             f"目标：在 crate 目录 {self.crate_dir.resolve()} 的 {module} 中，为 C 函数 {rec.qname or rec.name} 生成对应的 Rust 实现。",
             "要求：",
@@ -892,6 +893,10 @@ members = ["{rel_member}"]
             "</C_SOURCE>",
             "",
             "注意：所有修改均以补丁方式进行。",
+            "",
+            "如对实现细节不确定：可在以下文件中使用 grep 查询符号位置以获取准确的 C 源位置信息（name 或 qualified_name 均可）：",
+            f"- 符号索引文件: {symbols_path}",
+            f"- 示例命令: grep -n '\\\"name\\\": \\\"{rec.qname or rec.name}\\\"' '{symbols_path}' || grep -n '\\\"qualified_name\\\": \\\"{rec.qname or rec.name}\\\"' '{symbols_path}'",
             "",
             "尚未转换的被调符号如下（请在调用位置使用 todo!(\"<符号>\") 作为占位，以便后续自动消除）：",
             *[f"- {s}" for s in (unresolved or [])],
@@ -1055,8 +1060,9 @@ members = ["{rel_member}"]
         """
         def build_review_prompts() -> Tuple[str, str, str]:
             sys_p = (
-                "你是严谨的Rust代码审查专家，目标是对给定函数的实现进行快速审查，指出明显问题并给出简要建议。"
-                "仅在总结阶段输出审查结论。"
+                "你是严谨的Rust代码审查专家。验收标准：仅当代码逻辑正确且不存在安全漏洞时判定为合格。"
+                "关注点优先级：1) 逻辑正确性（含边界条件、异常路径与返回值语义）；2) 安全性（内存/并发/越界/未处理的 panic 或 unwrap/unsafe 使用/输入校验/资源泄露等）。"
+                "不关注代码风格或微小性能问题。仅在总结阶段输出审查结论。"
             )
             # 附加原始C函数源码片段，供审查作为只读参考
             c_code = self._read_source_span(rec) or ""
@@ -1091,8 +1097,8 @@ members = ["{rel_member}"]
             ])
             sum_p = (
                 "请仅输出一个 <SUMMARY> 块，内容为纯文本：\n"
-                "- 若通过请输出：OK\n"
-                "- 否则以简要列表形式指出问题点（避免长文）。\n"
+                "- 若满足“逻辑正确 且 无安全漏洞”，请输出：OK\n"
+                "- 否则以简要列表形式指出问题点（每行以 [logic] 或 [security] 开头，避免长文）。\n"
                 "<SUMMARY>...</SUMMARY>\n"
                 "不要在 <SUMMARY> 块外输出任何内容。"
             )
