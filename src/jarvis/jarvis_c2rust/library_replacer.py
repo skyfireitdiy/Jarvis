@@ -46,8 +46,6 @@ def apply_library_replacement(
     out_symbols_path: Optional[Path] = None,
     out_mapping_path: Optional[Path] = None,
     max_funcs: Optional[int] = None,
-    keep_names: Optional[List[str]] = None,
-    prune_under_keep: bool = False,
 ) -> Dict[str, Path]:
     """
     基于依赖图由 LLM 判定，对满足“整子树可由指定库单个 API 替代”的函数根进行替换并剪枝。
@@ -144,113 +142,44 @@ def apply_library_replacement(
             internal = sorted(list(set(internal)))
         adj_func[fid] = internal
 
-    # 保留根集合：由 keep_names 指定的节点本身将被保留（该节点跳过评估与剪枝；其子节点仍可评估）
-    protected_roots: Set[int] = set()
-    if keep_names:
-        for nm in keep_names:
-            if not isinstance(nm, str) or not nm.strip():
-                continue
-            tid = name_to_id.get(nm.strip())
-            if tid is not None and tid in func_ids:
-                protected_roots.add(tid)
 
-    # 若启用“按 keep 列表强制剪枝”模式：对 keep_roots 的子树全部剪除（不含根本身），跳过 LLM 评估
-    if prune_under_keep and keep_names:
-        # 计算保留根ID集合
-        protected_roots: Set[int] = set()
-        for nm in keep_names:
-            if not isinstance(nm, str) or not nm.strip():
-                continue
-            tid = name_to_id.get(nm.strip())
-            if tid is not None and tid in func_ids:
-                protected_roots.add(tid)
-        # 聚合子树并剪枝（不含根）
-        pruned_funcs: Set[int] = set()
-        for rid in protected_roots:
-            desc = set()
-            # 收集子树
-            stack = [rid]
-            seen = {rid}
-            while stack:
-                u = stack.pop()
-                for v in adj_func.get(u, []):
-                    if v not in seen:
-                        seen.add(v)
-                        stack.append(v)
-            desc = seen
-            if rid in desc:
-                desc.remove(rid)
-            pruned_funcs.update(desc)
-        # 写出新符号表（类型保留，函数仅剪除 pruned_funcs；保留根不改动）
-        kept_ids: Set[int] = set()
-        for rec in all_records:
-            fid = int(rec.get("id"))
-            cat = rec.get("category") or ""
-            if cat == "function":
-                if fid not in pruned_funcs:
-                    kept_ids.add(fid)
-            else:
-                kept_ids.add(fid)
-        replacements: List[Dict[str, Any]] = []
-        with open(out_symbols_path, "w", encoding="utf-8") as fo, \
-             open(out_symbols_prune_path, "w", encoding="utf-8") as fo2, \
-             open(alias_symbols_path, "w", encoding="utf-8") as fo_alias:
-            for rec in all_records:
-                fid = int(rec.get("id"))
-                if fid not in kept_ids:
-                    continue
-                rec_out = dict(rec)
-                try:
-                    rec_out["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
-                except Exception:
-                    pass
-                line = json.dumps(rec_out, ensure_ascii=False) + "\n"
-                fo.write(line)
-                fo2.write(line)
-                fo_alias.write(line)
-        with open(out_mapping_path, "w", encoding="utf-8") as fm:
-            for m in replacements:
-                fm.write(json.dumps(m, ensure_ascii=False) + "\n")
-        # 生成转译顺序
-        order_path = None
-        try:
-            compute_translation_order_jsonl(Path(out_symbols_path), out_path=order_prune_path)
-            shutil.copy2(order_prune_path, alias_order_path)
-            order_path = alias_order_path
-        except Exception as e:
-            typer.secho(f"[c2rust-library] 基于剪枝符号表生成翻译顺序失败: {e}", fg=typer.colors.YELLOW, err=True)
-        typer.secho(
-            "[c2rust-library] keep-list 强制剪枝完成：\n"
-            f"- 保留根: {len(protected_roots)} 个\n"
-            f"- 剪除函数: {len(pruned_funcs)} 个\n"
-            f"- 新符号表: {out_symbols_path}\n"
-            f"- 替代映射: {out_mapping_path}\n"
-            f"- 兼容符号表输出: {out_symbols_prune_path}\n"
-            + (f"- 转译顺序: {order_path}\n" if order_path else "")
-            + f"- 兼容顺序输出: {order_prune_path}",
-            fg=typer.colors.GREEN,
-        )
-        result: Dict[str, Path] = {
-            "symbols": Path(out_symbols_path),
-            "mapping": Path(out_mapping_path),
-            "symbols_prune": Path(out_symbols_prune_path),
-        }
-        if order_path:
-            result["order"] = Path(order_path)
-        if order_prune_path:
-            result["order_prune"] = Path(order_prune_path)
-        return result
 
-    # 可选候选根（默认使用“无入边”的根函数）
+
+    # 评估队列：从所有无入边函数作为种子开始，按层次遍历整个图，使“父先于子”被评估；
+    # 若不存在无入边节点（如强连通环），则回退为全量函数集合。
     try:
         roots_all = find_root_function_ids(sjsonl)
     except Exception:
         roots_all = []
-    root_funcs = [rid for rid in roots_all if rid in func_ids]
-    if not root_funcs:
-        root_funcs = sorted(list(func_ids))
+    seeds = [rid for rid in roots_all if rid in func_ids]
+    if not seeds:
+        seeds = sorted(list(func_ids))
 
-    # 如果传入 candidates，则将其解析为 ID 并与 root_funcs 交集（保证合理性）
+    visited: Set[int] = set()
+    order: List[int] = []
+    q: List[int] = list(seeds)
+    qi = 0
+    while qi < len(q):
+        u = q[qi]
+        qi += 1
+        if u in visited or u not in func_ids:
+            continue
+        visited.add(u)
+        order.append(u)
+        for v in adj_func.get(u, []):
+            if v not in visited and v in func_ids:
+                q.append(v)
+    # 若存在未覆盖的孤立/循环组件，补充其节点（确保每个函数节点都将被作为“候选根”参与评估）
+    if len(visited) < len(func_ids):
+        leftovers = [fid for fid in sorted(func_ids) if fid not in visited]
+        order.extend(leftovers)
+
+    # 评估顺序：包含根节点与所有子节点（广度优先近似的父先子后），被覆盖/剪枝的节点将自动跳过
+    root_funcs = order
+
+    # 如果传入 candidates，则仅评估这些节点（按上面的顺序过滤），并限定作用域：
+    # - 仅保留从这些根可达的函数；对不可达函数直接删除（类型记录保留）
+    scope_unreachable_funcs: Set[int] = set()
     if candidates:
         cand_ids: Set[int] = set()
         for key in candidates:
@@ -258,6 +187,18 @@ def apply_library_replacement(
                 cand_ids.add(name_to_id[key])
         if cand_ids:
             root_funcs = [rid for rid in root_funcs if rid in cand_ids]
+            # 计算从候选根出发的可达函数集合（含根）
+            reachable_all: Set[int] = set()
+            for rid in root_funcs:
+                reachable_all.update(_collect_descendants(rid))
+            # 不可达函数（仅限函数类别）将被直接删除
+            scope_unreachable_funcs = {fid for fid in func_ids if fid not in reachable_all}
+            if scope_unreachable_funcs:
+                typer.secho(
+                    f"[c2rust-library] 根据根列表，标记不可达函数删除: {len(scope_unreachable_funcs)} 个",
+                    fg=typer.colors.YELLOW,
+                    err=True,
+                )
 
     # 可达缓存
     desc_cache: Dict[int, Set[int]] = {}
@@ -574,17 +515,7 @@ def apply_library_replacement(
             processed_roots.add(fid)
             continue
 
-        # 若该根位于保留集合（或其子树）中，则跳过评估（强制保留）
-        if fid in protected_roots:
-            rec_meta = by_id.get(fid, {})
-            label_skipped2 = rec_meta.get("qualified_name") or rec_meta.get("name") or f"sym_{fid}"
-            typer.secho(
-                f"[c2rust-library] 跳过评估(保留列表，仅跳过该节点): {label_skipped2} (ID: {fid})",
-                fg=typer.colors.YELLOW,
-                err=True,
-            )
-            processed_roots.add(fid)
-            continue
+
 
         # 构造子树并打印进度
         desc = _collect_descendants(fid)
@@ -592,7 +523,7 @@ def apply_library_replacement(
         label = rec_meta.get("qualified_name") or rec_meta.get("name") or f"sym_{fid}"
         remaining_candidates = [
             rid for rid in root_funcs
-            if rid not in pruned_dynamic and rid not in processed_roots and rid not in protected_roots
+            if rid not in pruned_dynamic and rid not in processed_roots
         ]
         planned_total = min(len(remaining_candidates), (max_funcs - eval_counter)) if max_funcs is not None else len(remaining_candidates)
         typer.secho(
@@ -633,8 +564,7 @@ def apply_library_replacement(
                 # 即时剪枝（不含根）
                 to_prune = set(desc)
                 to_prune.discard(fid)
-                # 不允许剪除保留集合中的节点
-                to_prune -= protected_roots
+
                 newly = len(to_prune - pruned_dynamic)
                 pruned_dynamic.update(to_prune)
                 selected_roots.append((fid, res))
@@ -646,8 +576,13 @@ def apply_library_replacement(
         except Exception:
             pass
 
-    # 剪枝集合来自动态评估阶段的累计结果（去除保留根本身；其子节点仍可能被剪除）
-    pruned_funcs: Set[int] = set(pruned_dynamic - protected_roots)
+    # 剪枝集合来自动态评估阶段的累计结果
+    pruned_funcs: Set[int] = set(pruned_dynamic)
+    # 若限定候选根（candidates）已指定，则将不可达函数一并删除
+    try:
+        pruned_funcs.update(scope_unreachable_funcs)
+    except Exception:
+        pass
 
     # 写出新符号表
     now_ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
