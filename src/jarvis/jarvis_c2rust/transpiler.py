@@ -387,11 +387,11 @@ def _dir_tree(root: Path) -> str:
 
 
 def _default_crate_dir(project_root: Path) -> Path:
-    """遵循 llm_module_agent 的默认crate目录选择：<cwd>/<cwd.name>_rs 当传入为 '.' 时"""
+    """遵循 llm_module_agent 的默认crate目录选择：<parent>/<cwd.name>_rs（与当前目录同级）当传入为 '.' 时"""
     try:
         cwd = Path(".").resolve()
         if project_root.resolve() == cwd:
-            return cwd / f"{cwd.name}_rs"
+            return cwd.parent / f"{cwd.name}_rs"
         else:
             return project_root
     except Exception:
@@ -560,11 +560,16 @@ members = ["{rel_member}"]
 
         # 尝试确保 crate 目录存在（不负责生成结构，假设 plan/apply 已完成）
         self.crate_dir.mkdir(parents=True, exist_ok=True)
-        # 将该 crate 目录加入当前目录的 workspace
+        # 按新策略：不再将 crate 添加到 workspace（构建在 crate 目录内进行）
         try:
-            _ensure_workspace_member(Path(".").resolve(), self.crate_dir.resolve())
+            # 在 crate 目录内进行 Git 初始化（若未初始化），并尝试创建初始提交
+            git_dir = self.crate_dir / ".git"
+            if not git_dir.exists():
+                subprocess.run(["git", "init"], check=False, cwd=str(self.crate_dir))
+                subprocess.run(["git", "add", "-A"], check=False, cwd=str(self.crate_dir))
+                subprocess.run(["git", "commit", "-m", "[c2rust-transpiler] init crate"], check=False, cwd=str(self.crate_dir))
         except Exception:
-            # 忽略 workspace 写入失败，不影响转译流程
+            # 忽略 git 初始化失败，不影响主流程
             pass
 
     def _save_progress(self) -> None:
@@ -750,7 +755,12 @@ members = ["{rel_member}"]
                 use_methodology=False,
                 use_analysis=False,
             )
-            summary = agent.run(usr_p)
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                summary = agent.run(usr_p)
+            finally:
+                os.chdir(prev_cwd)
             meta = _extract_json_from_summary(str(summary or ""))
             ok, reason = _validate(meta)
             if ok:
@@ -813,9 +823,14 @@ members = ["{rel_member}"]
             *[f"- {s}" for s in (unresolved or [])],
         ]
         prompt = "\n".join(requirement_lines)
-        # 在当前工作目录运行 CodeAgent，避免进入 crate 目录
-        agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-        agent.run(prompt, prefix="[c2rust-transpiler][gen]", suffix="")
+        # 切换到 crate 目录运行 CodeAgent，运行完毕后恢复
+        prev_cwd = os.getcwd()
+        try:
+            os.chdir(str(self.crate_dir))
+            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+            agent.run(prompt, prefix="[c2rust-transpiler][gen]", suffix="")
+        finally:
+            os.chdir(prev_cwd)
 
     def _extract_rust_fn_name_from_sig(self, rust_sig: str) -> str:
         """
@@ -895,18 +910,23 @@ members = ["{rel_member}"]
                 f"仅修改 {target_file} 中与 todo!(\"{symbol}\") 相关的代码，其他位置不要改动。",
                 "请仅输出补丁，不要输出解释或多余文本。",
             ])
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-            agent.run(prompt, prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+                agent.run(prompt, prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
+            finally:
+                os.chdir(prev_cwd)
 
     def _cargo_build_loop(self) -> bool:
         """在 crate 目录执行 cargo build，失败则使用 CodeAgent 最小化修复，直到通过或达到上限"""
-        # 在当前工作目录进行构建与修复循环，不进入 crate 目录
-        workspace_root = os.getcwd()
+        # 在 crate 目录进行构建与修复循环（切换到 crate 目录执行构建命令）
+        workspace_root = str(self.crate_dir)
         i = 0
         while True:
             i += 1
             res = subprocess.run(
-                ["cargo", "build", "-p", self.crate_dir.name],
+                ["cargo", "build", "-q"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -933,8 +953,13 @@ members = ["{rel_member}"]
                 "</BUILD_ERROR>",
                 "修复后请再次执行 `cargo build` 进行验证。",
             ])
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-            agent.run(repair_prompt, prefix=f"[c2rust-transpiler][build-fix iter={i}]", suffix="")
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+                agent.run(repair_prompt, prefix=f"[c2rust-transpiler][build-fix iter={i}]", suffix="")
+            finally:
+                os.chdir(prev_cwd)
 
     def _review_and_optimize(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """
@@ -978,7 +1003,12 @@ members = ["{rel_member}"]
                 use_methodology=False,
                 use_analysis=False,
             )
-            summary = str(agent.run(usr_p) or "")
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                summary = str(agent.run(usr_p) or "")
+            finally:
+                os.chdir(prev_cwd)
             m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
             content = (m.group(1).strip() if m else summary.strip()).upper()
             if content == "OK":
@@ -1008,7 +1038,12 @@ members = ["{rel_member}"]
             ])
             # 在当前工作目录运行 CodeAgent，不进入 crate 目录
             ca = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-            ca.run(fix_prompt, prefix=f"[c2rust-transpiler][review-fix iter={i}]", suffix="")
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                ca.run(fix_prompt, prefix=f"[c2rust-transpiler][review-fix iter={i}]", suffix="")
+            finally:
+                os.chdir(prev_cwd)
 
     def _mark_converted(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """记录映射：C 符号 -> Rust 符号与模块路径（JSONL，每行一条，支持重载/同名）"""
@@ -1102,7 +1137,7 @@ def run_transpile(
     """
     入口函数：执行转译流程
     - project_root: 项目根目录（包含 .jarvis/c2rust/symbols.jsonl）
-    - crate_dir: Rust crate 根目录；默认遵循 "<cwd>/<cwd.name>_rs"（若 project_root 为 ".")
+    - crate_dir: Rust crate 根目录；默认遵循 "<parent>/<cwd_name>_rs"（与当前目录同级，若 project_root 为 ".")
     - llm_group: 指定 LLM 模型组
     - max_retries: 构建与审查迭代的最大次数
     - resume: 是否启用断点续跑

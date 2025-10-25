@@ -236,7 +236,7 @@ def _perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
             requested_root = Path(project_root).resolve()
         except Exception:
             requested_root = Path(project_root)
-        created_dir = cwd / f"{cwd.name}_rs" if requested_root == cwd else requested_root
+        created_dir = cwd.parent / f"{cwd.name}_rs" if requested_root == cwd else requested_root
 
         cargo_path = cwd / "Cargo.toml"
         data_dir = requested_root / ".jarvis" / "c2rust"
@@ -286,7 +286,7 @@ def _resolve_created_dir(target_root: Union[Path, str]) -> Path:
         except Exception:
             resolved_target = Path(target_root)
         if target_root == "." or resolved_target == cwd:
-            return cwd / f"{cwd.name}_rs"
+            return cwd.parent / f"{cwd.name}_rs"
         return resolved_target
     except Exception:
         return Path(target_root)
@@ -888,8 +888,7 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     """
     基于 Agent 返回的 <PROJECT> 中的目录结构 YAML，创建实际目录与文件（不在此阶段写入或更新任何 Rust 源文件内容）。
     - project_root: 目标应用路径；当为 "."（默认）时，将使用“父目录/当前目录名_rs”作为crate根目录
-    同时：在当前工作目录下建立/更新 Cargo.toml，将生成的 crate 目录设置为 workspace 的 member，以便在本地当前目录下直接构建。
-    注意：模块声明（mod/pub mod）补齐将在后续的 CodeAgent 步骤中完成。
+    注意：模块声明（mod/pub mod）补齐将在后续的 CodeAgent 步骤中完成。按新策略不再创建或更新 workspace（构建直接在 crate 目录内进行）。
     """
     entries = _parse_project_yaml_entries(yaml_text)
     if not entries:
@@ -899,8 +898,8 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     try:
         cwd = Path(".").resolve()
         if requested_root == cwd:
-            # 默认crate不能设置为 .，设置为 当前目录/当前目录名_rs
-            base_dir = cwd / f"{cwd.name}_rs"
+            # 默认crate不能设置为 .，设置为 父目录/当前目录名_rs（与当前目录同级）
+            base_dir = cwd.parent / f"{cwd.name}_rs"
         else:
             base_dir = requested_root
     except Exception:
@@ -998,11 +997,9 @@ members = ["{rel_member}"]
         except Exception:
             pass
 
-    try:
-        _ensure_workspace_member(Path(".").resolve(), base_dir)
-    except Exception:
-        # 忽略 workspace 写入失败，不影响后续流程
-        pass
+    # 已弃用：不再将 crate 添加到 workspace（按新策略去除 workspace）
+    # 构建与工具运行将直接在 crate 目录内进行
+    pass
 
 
 def execute_llm_plan(
@@ -1043,45 +1040,19 @@ def execute_llm_plan(
             # 兜底：无法解析时直接使用传入的 target_root
             created_dir = Path(target_root)
 
-        # 不在 crate 目录执行 git 初始化；但在当前目录（workspace 根）创建一次提交
+        # 在 crate 目录内执行 git 初始化与初始提交（按新策略）
         try:
-            workspace_dir = Path(".").resolve()
-            # 仅当当前目录已是 git 工作树时才提交（不执行 git init）
-            repo_check = subprocess.run(
-                ["git", "rev-parse", "--is-inside-work-tree"],
-                capture_output=True,
-                text=True,
+            # 初始化 git 仓库（若已存在则该命令为幂等）
+            subprocess.run(["git", "init"], check=False, cwd=str(created_dir))
+            # 添加所有文件并尝试提交
+            subprocess.run(["git", "add", "-A"], check=False, cwd=str(created_dir))
+            subprocess.run(
+                ["git", "commit", "-m", "[c2rust-llm-planner] init crate"],
                 check=False,
-                cwd=str(workspace_dir),
+                cwd=str(created_dir),
             )
-            if repo_check.returncode == 0 and (repo_check.stdout or "").strip().lower() == "true":
-                # 尝试以相对路径添加 crate 目录与工作区 Cargo.toml
-                try:
-                    rel_created = str(created_dir.resolve().relative_to(workspace_dir))
-                except Exception:
-                    rel_created = str(created_dir)
-                paths_to_add = [rel_created]
-                cargo_path_ws = workspace_dir / "Cargo.toml"
-                if cargo_path_ws.exists():
-                    paths_to_add.append(str(cargo_path_ws))
-                # 仅添加相关路径，避免误加其他未跟踪变更
-                subprocess.run(["git", "add", "--"] + paths_to_add, check=False, cwd=str(workspace_dir))
-                commit_res = subprocess.run(
-                    ["git", "commit", "-m", "[c2rust-llm-planner] 应用初始 crate 结构"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    cwd=str(workspace_dir),
-                )
-                if commit_res.returncode == 0:
-                    print("[c2rust-llm-planner] 已在当前仓库中创建初始提交。")
-                else:
-                    # 常见原因：无变更、未配置 user.name/email 等
-                    print("[c2rust-llm-planner] 初始提交已跳过或失败（无更改或缺少 git 配置）。")
-            else:
-                print("[c2rust-llm-planner] 当前目录不是 git 仓库；跳过提交。")
         except Exception:
-            # 保持稳健，不因提交失败影响主流程
+            # 保持稳健，不因 git 失败影响主流程
             pass
 
         # 构建用于 CodeAgent 的目录上下文（简化版树形）
@@ -1146,8 +1117,9 @@ def execute_llm_plan(
 
         prev_cwd = os.getcwd()
         try:
-            print(f"[c2rust-llm-planner] 在 {os.getcwd()} 目录下执行命令: CodeAgent 初始化（不进入 crate 目录）")
-            # 直接在当前工作目录运行 CodeAgent，不切换到 crate 目录
+            # 切换到 crate 目录运行 CodeAgent 与构建
+            os.chdir(str(created_dir))
+            print(f"[c2rust-llm-planner] 已切换到 crate 目录: {os.getcwd()}，执行 CodeAgent 初始化")
             agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
             agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
             print("[c2rust-llm-planner] 初始 CodeAgent 运行完成。")
@@ -1156,13 +1128,12 @@ def execute_llm_plan(
             iter_count = 0
             while True:
                 iter_count += 1
-                print(f"[c2rust-llm-planner] 在 {os.getcwd()} 目录下执行命令: cargo build")
+                print(f"[c2rust-llm-planner] 在 {os.getcwd()} 执行: cargo build -q")
                 build_res = subprocess.run(
-                    ["cargo", "build", "-p", crate_pkg_name],
+                    ["cargo", "build", "-q"],
                     capture_output=True,
                     text=True,
                     check=False,
-                    cwd=prev_cwd,
                 )
                 stdout = build_res.stdout or ""
                 stderr = build_res.stderr or ""
@@ -1190,7 +1161,7 @@ def execute_llm_plan(
                 repair_agent.run(repair_prompt, prefix=f"[c2rust-llm-planner][iter={iter_count}]", suffix="")
                 # 不切换目录，保持在原始工作目录
         finally:
-            # 未变更工作目录，仍显式恢复以确保安全
+            # 恢复之前的工作目录
             os.chdir(prev_cwd)
 
     # 3) 输出 YAML 到文件（如指定），并返回解析后的 entries
