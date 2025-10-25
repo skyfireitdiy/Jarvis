@@ -200,9 +200,18 @@ def apply_library_replacement(
     scope_unreachable_funcs: Set[int] = set()
     if candidates:
         cand_ids: Set[int] = set()
-        for key in candidates:
-            if key in name_to_id:
-                cand_ids.add(name_to_id[key])
+        # 支持重载：同名/同限定名可能对应多个函数ID，需全部纳入候选
+        key_set = set(candidates)
+        for rec in all_records:
+            if (rec.get("category") or "") != "function":
+                continue
+            nm = rec.get("name") or ""
+            qn = rec.get("qualified_name") or ""
+            if nm in key_set or qn in key_set:
+                try:
+                    cand_ids.add(int(rec.get("id")))
+                except Exception:
+                    continue
         if cand_ids:
             root_funcs = [rid for rid in root_funcs if rid in cand_ids]
             # 计算从候选根出发的可达函数集合（含根）
