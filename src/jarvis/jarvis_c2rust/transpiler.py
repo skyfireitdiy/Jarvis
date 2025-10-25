@@ -1030,11 +1030,52 @@ members = ["{rel_member}"]
             output = (res.stdout or "") + "\n" + (res.stderr or "")
             print(f"[c2rust-transpiler] Cargo 构建失败 (第 {i} 次尝试)。")
             print(output)
+            # 为修复 Agent 提供更多上下文：symbols.jsonl 索引指引 + 最近处理的C源码片段
+            symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
+            try:
+                curr = self.progress.get("current") or {}
+            except Exception:
+                curr = {}
+            sym_name = str(curr.get("qualified_name") or curr.get("name") or "")
+            src_loc = f"{curr.get('file')}:{curr.get('start_line')}-{curr.get('end_line')}" if curr else ""
+            c_code = ""
+            try:
+                cf = curr.get("file")
+                s = int(curr.get("start_line") or 0)
+                e = int(curr.get("end_line") or 0)
+                if cf and s:
+                    p = Path(cf)
+                    if not p.is_absolute():
+                        p = (self.project_root / p).resolve()
+                    if p.exists():
+                        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+                        s0 = max(1, s)
+                        e0 = min(len(lines), max(e, s0))
+                        c_code = "\n".join(lines[s0 - 1 : e0])
+            except Exception:
+                c_code = ""
+
             repair_prompt = "\n".join([
                 "目标：以最小的改动修复问题，使 `cargo build` 命令可以通过。",
                 "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；避免大范围改动。",
                 "- 保持最小改动，避免与错误无关的重构或格式化；",
                 "- 请仅输出补丁，不要输出解释或多余文本。",
+                "",
+                "最近处理的函数上下文（供参考，优先修复构建错误）：",
+                f"- 函数：{sym_name}",
+                f"- 源位置：{src_loc}",
+                f"- 目标模块（progress）：{curr.get('module') or ''}",
+                f"- 建议签名（progress）：{curr.get('rust_signature') or ''}",
+                "",
+                "原始C函数源码片段（只读参考）：",
+                "<C_SOURCE>",
+                c_code,
+                "</C_SOURCE>",
+                "",
+                "如需定位或交叉验证 C 符号位置，可在以下索引中检索：",
+                f"- 符号索引文件: {symbols_path}",
+                f"- 示例命令: grep -n '\\\"name\\\": \\\"{sym_name}\\\"' '{symbols_path}' || grep -n '\\\"qualified_name\\\": \\\"{sym_name}\\\"' '{symbols_path}'",
+                "",
                 "上下文：",
                 f"- crate 根目录路径: {self.crate_dir.resolve()}",
                 f"- 包名称（用于 cargo build -p）: {self.crate_dir.name}",
@@ -1060,9 +1101,9 @@ members = ["{rel_member}"]
         """
         def build_review_prompts() -> Tuple[str, str, str]:
             sys_p = (
-                "你是严谨的Rust代码审查专家。验收标准：仅当代码逻辑正确且不存在安全漏洞时判定为合格。"
-                "关注点优先级：1) 逻辑正确性（含边界条件、异常路径与返回值语义）；2) 安全性（内存/并发/越界/未处理的 panic 或 unwrap/unsafe 使用/输入校验/资源泄露等）。"
-                "不关注代码风格或微小性能问题。仅在总结阶段输出审查结论。"
+                "你是严谨的Rust代码审查专家。验收标准：仅当代码逻辑正确时判定为合格。"
+                "关注点：仅检查逻辑正确性（包括边界条件、异常路径、状态机一致性、返回值语义、前置/后置条件、控制流与资源释放与生命周期的正确性）。"
+                "不考虑安全、性能、风格等其他方面。仅在总结阶段输出审查结论。"
             )
             # 附加原始C函数源码片段，供审查作为只读参考
             c_code = self._read_source_span(rec) or ""
@@ -1093,12 +1134,17 @@ members = ["{rel_member}"]
                 crate_tree,
                 "</CRATE_TREE>",
                 "",
+                "如需定位或交叉验证 C 符号位置，可在以下索引中检索：",
+                f"- 符号索引文件: {(self.data_dir / 'symbols.jsonl').resolve()}",
+                f"- 示例命令: grep -n '\\\"name\\\": \\\"{rec.qname or rec.name}\\\"' '{(self.data_dir / 'symbols.jsonl').resolve()}' || grep -n '\\\"qualified_name\\\": \\\"{rec.qname or rec.name}\\\"' '{(self.data_dir / 'symbols.jsonl').resolve()}'",
+                "",
                 "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
             ])
             sum_p = (
                 "请仅输出一个 <SUMMARY> 块，内容为纯文本：\n"
-                "- 若满足“逻辑正确 且 无安全漏洞”，请输出：OK\n"
-                "- 否则以简要列表形式指出问题点（每行以 [logic] 或 [security] 开头，避免长文）。\n"
+                "- 若满足“逻辑正确”，请输出：OK\n"
+                "- 前置条件：必须在crate中找到该函数的实现（匹配函数名或签名）。若未找到，禁止输出OK，请输出一行：[logic] function not found\n"
+                "- 否则以简要列表形式指出逻辑问题（每行以 [logic] 开头，避免长文）。\n"
                 "<SUMMARY>...</SUMMARY>\n"
                 "不要在 <SUMMARY> 块外输出任何内容。"
             )
