@@ -1329,8 +1329,8 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
 
     if out_path is None:
         # 根据输入符号表选择输出文件名：
-        # - symbols.jsonl -> translation_order.jsonl（裁剪后用作正式顺序）
-        # - symbols_raw.jsonl -> translation_order_raw.jsonl（原始扫描产物对应的顺序，作为中间文件保留）
+        # - symbols_raw.jsonl -> translation_order_raw.jsonl（扫描阶段原始顺序）
+        # - 其他（如 symbols.jsonl/curated） -> translation_order.jsonl（默认）
         base = "translation_order.jsonl"
         try:
             name = Path(fjsonl).name.lower()

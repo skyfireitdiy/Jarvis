@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import json
 import time
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 import typer
 
 # 依赖扫描器提供的根识别工具（不引入循环：本模块不被 scanner 导入）
-from jarvis.jarvis_c2rust.scanner import find_root_function_ids
+from jarvis.jarvis_c2rust.scanner import find_root_function_ids, compute_translation_order_jsonl
 
 
 def evaluate_third_party_replacements(
@@ -78,6 +79,8 @@ def evaluate_third_party_replacements(
         out_mapping_path = data_dir / "third_party_replacements.jsonl"
     else:
         out_mapping_path = Path(out_mapping_path)
+    # 兼容输出：同时生成标准名 symbols_prune.jsonl 便于后续处理
+    out_symbols_prune_path = data_dir / "symbols_prune.jsonl"
     # 断点续跑：状态文件路径
     state_path = data_dir / "third_party_pruner_state.json"
     # 计算 crate 根目录路径（用于在 Agent 上下文中明确路径）
@@ -614,12 +617,17 @@ def evaluate_third_party_replacements(
         else:
             kept_ids.add(fid)
 
-    # 写出新 symbols.jsonl
-    with open(out_symbols_path, "w", encoding="utf-8") as fo:
+    # 写出新 symbols.jsonl，同时兼容输出 symbols_prune.jsonl（内容相同）
+    # 额外生成通用名 symbols.jsonl（内容与当前阶段一致）
+    alias_symbols_path = data_dir / "symbols.jsonl"
+    with open(out_symbols_path, "w", encoding="utf-8") as fo, open(out_symbols_prune_path, "w", encoding="utf-8") as fo2, open(alias_symbols_path, "w", encoding="utf-8") as fo_alias:
         for rec in all_records:
             fid = int(rec.get("id"))
             if fid in kept_ids:
-                fo.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                line = json.dumps(rec, ensure_ascii=False) + "\n"
+                fo.write(line)
+                fo2.write(line)
+                fo_alias.write(line)
 
     # 写出替代映射（JSONL）
     with open(out_mapping_path, "w", encoding="utf-8") as fm:
@@ -632,12 +640,34 @@ def evaluate_third_party_replacements(
     except Exception:
         pass
 
+    # 基于剪枝后的符号表生成翻译顺序：
+    # - 阶段特有文件: translation_order_prune.jsonl
+    # - 通用别名:     translation_order.jsonl（内容与剪枝阶段一致）
+    order_path = None
+    alias_order_path = data_dir / "translation_order.jsonl"
+    order_prune_path = data_dir / "translation_order_prune.jsonl"
+    try:
+        # 显式指定输出路径为剪枝阶段特有文件
+        computed = compute_translation_order_jsonl(Path(out_symbols_path), out_path=order_prune_path)
+        # 写出通用别名，供后续流程统一访问
+        shutil.copy2(order_prune_path, alias_order_path)
+        order_path = alias_order_path
+    except Exception as e:
+        typer.secho(f"[c2rust-pruner] 基于剪枝符号表生成翻译顺序失败: {e}", fg=typer.colors.YELLOW, err=True)
+
     typer.secho(
         f"[c2rust-scanner] 第三方/标准库替代评估完成: 评估 {eval_count} 个函数，剔除 {len(pruned)} 个函数（含子引用）。\n"
-        f"新符号表: {out_symbols_path}\n替代映射: {out_mapping_path}",
+        f"新符号表: {out_symbols_path}\n替代映射: {out_mapping_path}\n兼容输出: {out_symbols_prune_path}\n通用符号表: {alias_symbols_path}"
+        + (f"\n转译顺序: {order_path}" if order_path else "")
+        + (f"\n兼容顺序输出: {order_prune_path}" if order_prune_path else ""),
         fg=typer.colors.GREEN,
     )
-    return {"symbols": Path(out_symbols_path), "mapping": Path(out_mapping_path)}
+    result = {"symbols": Path(out_symbols_path), "mapping": Path(out_mapping_path), "symbols_prune": Path(out_symbols_prune_path)}
+    if order_path:
+        result["order"] = Path(order_path)  # 通用别名: translation_order.jsonl
+    if order_prune_path:
+        result["order_prune"] = Path(order_prune_path)  # 阶段特有: translation_order_prune.jsonl
+    return result
 
 
 __all__ = ["evaluate_third_party_replacements"]
