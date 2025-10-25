@@ -1206,6 +1206,8 @@ members = ["{rel_member}"]
             try:
                 os.chdir(str(self.crate_dir))
                 ca.run(fix_prompt, prefix=f"[c2rust-transpiler][review-fix iter={i}]", suffix="")
+                # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
+                self._cargo_build_loop()
             finally:
                 os.chdir(prev_cwd)
 
