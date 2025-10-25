@@ -175,7 +175,15 @@ class ToolRegistry(OutputHandlerProtocol):
         try:
             tool_call, err_msg, auto_completed = self._extract_tool_calls(response)
             if err_msg:
-                return False, err_msg
+                # 只要工具解析错误，追加工具使用帮助信息（相当于一次 <ToolUsage>）
+                try:
+                    from jarvis.jarvis_agent import Agent
+                    agent: Agent = agent_
+                    tool_usage = agent.get_tool_usage_prompt()
+                    return False, f"{err_msg}\n\n{tool_usage}"
+                except Exception:
+                    # 兼容处理：无法获取Agent或ToolUsage时，至少返回工具系统帮助信息
+                    return False, f"{err_msg}\n\n{tool_call_help}"
             result = self.handle_tool_calls(tool_call, agent_)
             if auto_completed:
                 # 如果自动补全了结束标签，在结果中添加说明信息
