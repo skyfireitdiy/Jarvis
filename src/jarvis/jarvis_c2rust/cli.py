@@ -23,6 +23,9 @@ from jarvis.jarvis_c2rust.pruner import (
 from jarvis.jarvis_c2rust.scanner import (
     compute_translation_order_jsonl as _compute_order,
 )
+from jarvis.jarvis_c2rust.library_replacer import (
+    apply_library_replacement as _apply_library_replacement,
+)
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_c2rust.llm_module_agent import (
     execute_llm_plan as _execute_llm_plan,
@@ -123,6 +126,70 @@ def transpile(
         typer.secho(f"[c2rust-transpiler] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+
+@app.command("lib-replace")
+def lib_replace(
+    llm_group: Optional[str] = typer.Option(
+        None, "-g", "--llm-group", help="用于评估的 LLM 模型组"
+    ),
+) -> None:
+    """
+    基于依赖图由 LLM 评估“整子树能否由指定库单个 API 替代”；若可替代，则替换根函数依赖为库 API 并删除其子孙节点。
+    需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl）
+    默认库: std
+    """
+    try:
+        data_dir = Path(".") / ".jarvis" / "c2rust"
+        curated_symbols = data_dir / "symbols.jsonl"
+        raw_symbols = data_dir / "symbols_raw.jsonl"
+        if not curated_symbols.exists() and not raw_symbols.exists():
+            typer.secho("[c2rust-lib-replace] 未找到符号数据（symbols.jsonl 或 symbols_raw.jsonl），正在执行扫描以生成数据...", fg=typer.colors.YELLOW)
+            _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False)
+            if not curated_symbols.exists() and not raw_symbols.exists():
+                raise FileNotFoundError(f"未找到符号数据: {curated_symbols} 或 {raw_symbols}")
+
+        # 使用默认库: std
+        library = "std"
+
+        ret = _apply_library_replacement(
+            db_path=Path("."),
+            library_name=library,
+            llm_group=llm_group,
+            candidates=None,
+            out_symbols_path=None,
+            out_mapping_path=None,
+            max_funcs=None,
+        )
+
+        # 覆盖默认 symbols.jsonl
+        data_dir.mkdir(parents=True, exist_ok=True)
+        default_symbols = data_dir / "symbols.jsonl"
+        pruned_symbols = Path(ret["symbols"])
+        try:
+            import shutil as _sh
+            _sh.copy2(pruned_symbols, default_symbols)
+        except Exception as _e:
+            typer.secho(f"[c2rust-lib-replace] 覆盖默认符号表失败: {default_symbols} <- {pruned_symbols}: {_e}", fg=typer.colors.RED, err=True)
+            raise
+
+        # 基于已覆盖的默认符号表，重新计算转译顺序
+        try:
+            order_path = _compute_order(default_symbols)
+        except Exception as _e2:
+            typer.secho(f"[c2rust-lib-replace] 计算转译顺序失败: {_e2}", fg=typer.colors.RED, err=True)
+            raise
+
+        typer.secho(
+            (
+                f"[c2rust-lib-replace] 替代映射: {ret['mapping']}\n"
+                f"[c2rust-lib-replace] 新符号表(已覆盖默认): {default_symbols}\n"
+                f"[c2rust-lib-replace] 转译顺序已基于新符号表生成: {order_path}"
+            ),
+            fg=typer.colors.GREEN,
+        )
+    except Exception as e:
+        typer.secho(f"[c2rust-lib-replace] 错误: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
 
 @app.command("prune")
 def prune(

@@ -57,6 +57,8 @@ class FnRecord:
     end_line: int
     end_col: int
     refs: List[str]
+    # 来自库替代阶段的上下文元数据（若存在）
+    lib_replacement: Optional[Dict[str, Any]] = None
 
 
 class _DbLoader:
@@ -114,6 +116,7 @@ class _DbLoader:
             sc = int(obj.get("start_col") or 0)
             er = int(obj.get("end_line") or 0)
             ec = int(obj.get("end_col") or 0)
+            lr = obj.get("lib_replacement") if isinstance(obj.get("lib_replacement"), dict) else None
             rec = FnRecord(
                 id=fid,
                 name=nm,
@@ -124,6 +127,7 @@ class _DbLoader:
                 end_line=er,
                 end_col=ec,
                 refs=refs,
+                lib_replacement=lr,
             )
             self.fn_by_id[fid] = rec
             if nm:
@@ -685,6 +689,9 @@ members = ["{rel_member}"]
             "被引用符号上下文（如已转译则包含Rust模块信息）：",
             json.dumps(callees_ctx, ensure_ascii=False, indent=2),
             "",
+            "库替代上下文（若存在）：",
+            json.dumps(getattr(rec, "lib_replacement", None), ensure_ascii=False, indent=2),
+            "",
             "当前crate目录结构（部分）：",
             "<CRATE_TREE>",
             crate_tree,
@@ -832,6 +839,19 @@ members = ["{rel_member}"]
             "尚未转换的被调符号如下（请在调用位置使用 todo!(\"<符号>\") 作为占位，以便后续自动消除）：",
             *[f"- {s}" for s in (unresolved or [])],
         ]
+        # 若存在库替代上下文，则附加到实现提示中，便于生成器参考（多库组合、参考API、备注等）
+        librep_ctx = None
+        try:
+            librep_ctx = getattr(rec, "lib_replacement", None)
+        except Exception:
+            librep_ctx = None
+        if isinstance(librep_ctx, dict) and librep_ctx:
+            requirement_lines.extend([
+                "",
+                "库替代上下文（若存在）：",
+                json.dumps(librep_ctx, ensure_ascii=False, indent=2),
+                "",
+            ])
         prompt = "\n".join(requirement_lines)
         # 切换到 crate 目录运行 CodeAgent，运行完毕后恢复
         prev_cwd = os.getcwd()
