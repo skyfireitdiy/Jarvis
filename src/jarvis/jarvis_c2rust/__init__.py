@@ -2,12 +2,16 @@
 """
 Jarvis C2Rust 工具集。
 
-模块:
-- scanner: C/C++ 函数扫描器和调用图提取器，将结果存储在
-           <scan_root>/.jarvis/c2rust/functions.jsonl 和 types.jsonl 的 JSONL 文件中。
+数据产物（扫描后）:
+- 统一符号表（JSONL）：<project_root>/.jarvis/c2rust/symbols.jsonl
+- 原始符号表（JSONL）：<project_root>/.jarvis/c2rust/symbols_raw.jsonl
+- 元数据（JSON）：<project_root>/.jarvis/c2rust/meta.json
 
-用法:
-  python -m jarvis.jarvis_c2rust.scanner --root /path/to/src
+推荐用法（CLI）:
+  jarvis-c2rust scan
+
+或（模块方式）:
+  python -m jarvis.jarvis_c2rust.cli scan
 """
 
 __all__ = ["scanner"]

@@ -4,7 +4,7 @@ Library-based dependency replacer for C→Rust migration (LLM-only subtree evalu
 
 要点:
 - 不依赖 pruner，仅复用 scanner 的通用工具函数
-- 将“依赖子树（根函数及其可达的函数集合）”的摘要与局部源码片段提供给 LLM，由 LLM 评估该子树是否可由“指定标准库/第三方 crate 的单个 API”整体替代
+- 将“依赖子树（根函数及其可达的函数集合）”的摘要与局部源码片段提供给 LLM，由 LLM 评估该子树是否可由“指定标准库/第三方 crate 的一个或多个成熟 API（可组合，多库协同）”整体替代
 - 若可替代：将根函数的 ref 替换为该库 API，并删除其所有子孙函数节点（类型不受影响）
 - 生成剪枝后的符号表与替代映射，并计算新的转译顺序（兼容输出别名）
 
@@ -866,7 +866,7 @@ def apply_library_replacement(
                     "id": fid,
                     "name": rec.get("name") or "",
                     "qualified_name": rec.get("qualified_name") or "",
-                    "library": (libraries_out[0] if libraries_out else ""),
+                    "library": (libraries_out[0] if libraries_out else lib_single),
                     "libraries": libraries_out,
                     "function": api,
                     "confidence": conf,
