@@ -5,15 +5,20 @@ Library-based dependency replacer for C→Rust migration (LLM-only subtree evalu
 要点:
 - 不依赖 pruner，仅复用 scanner 的通用工具函数
 - 将“依赖子树（根函数及其可达的函数集合）”的摘要与局部源码片段提供给 LLM，由 LLM 评估该子树是否可由“指定标准库/第三方 crate 的一个或多个成熟 API（可组合，多库协同）”整体替代
-- 若可替代：将根函数的 ref 替换为该库 API，并删除其所有子孙函数节点（类型不受影响）
-- 生成剪枝后的符号表与替代映射，并计算新的转译顺序（兼容输出别名）
+- 若可替代：将根函数的 ref 替换为该库 API（以 lib::<name> 形式的占位符，支持多库组合），并删除其所有子孙函数节点（类型不受影响）
+- 支持禁用库约束：可传入 disabled_libraries（list[str]），若 LLM 建议命中禁用库，则强制判定为不可替代并记录备注
+- 断点恢复（checkpoint/resume）：可启用 resume，使用 library_replacer_checkpoint.json 记录 eval_counter/processed/pruned/selected 等信息，基于关键输入组合键进行匹配恢复；落盘采用原子写以防损坏
+- 主库字段回退策略：当存在 libraries 列表优先选择第一个作为 primary；否则回退到单一 library 字段；均为空则置空
+- 入口保护：默认跳过 main（可通过环境变量 JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS/JARVIS_C2RUST_DELAY_ENTRIES/C2RUST_DELAY_ENTRIES 配置多个入口名）
 
 输入数据:
 - symbols.jsonl（或传入的 .jsonl 路径）：由 scanner 生成的统一符号表，字段参见 scanner.py
+- 可选 candidates（名称或限定名列表）：仅评估这些符号作为根，作用域限定为其可达子树
+- 可选 disabled_libraries（list[str]）：评估时禁止使用的库名（命中则视为不可替代）
 
 输出:
 - symbols_library_pruned.jsonl：剪枝后的符号表（默认名，可通过参数自定义）
-- library_replacements.jsonl：替代根到库 API 的映射（JSONL，每行一个 {id,name,qualified_name,library,function,confidence,mode}）
+- library_replacements.jsonl：替代根到库信息的映射（JSONL，每行一个 {id,name,qualified_name,library,libraries,function,apis?,confidence,notes?,mode}）
 - 兼容输出：
   - symbols_prune.jsonl：与主输出等价
   - symbols.jsonl：通用别名（用于后续流程统一读取）

@@ -1,209 +1,204 @@
 # -*- coding: utf-8 -*-
 """
-C/C++ 头文件函数名收集器（基于 libclang）。
+Lightweight function-name collector for header files using libclang.
 
-功能:
-- 接受一个或多个头文件路径（.h/.hh/.hpp/.hxx），使用 libclang 精确解析，收集这些头文件中声明或定义的函数名。
-- 优先输出限定名（qualified_name），回退到普通名称（name）。
-- 自动逐层向上查找 compile_commands.json（直到文件系统根目录）；若未找到则跳过并使用基础 -I 参数；失败时回退为空参数。
-- 自动为头文件设置语言选项 (-x c-header 或 -x c++-header)，提升解析成功率。
+Purpose:
+- Given one or more C/C++ header files (.h/.hh/.hpp/.hxx), parse each file with libclang
+  and collect function names.
+- Prefer qualified names when available; fall back to unqualified names.
+- Write unique names (de-duplicated, preserving first-seen order) to the specified output file (one per line).
 
-输出:
-- 将唯一的函数名集合写入指定输出文件（每行一个函数名，UTF-8 编码）。
+Design:
+- Reuse scanner utilities:
+  - _try_import_libclang()
+  - find_compile_commands()
+  - load_compile_commands()
+  - scan_file()  (note: scan_file collects only definitions; inline headers are often definitions)
+- If compile_commands.json exists, use its args; otherwise, fall back to minimal include of file.parent.
+- For header parsing, ensure a language flag (-x c-header / -x c++-header) is present if args do not specify one.
 
-与现有实现的关系:
-- 复用 jarvis.jarvis_c2rust.scanner 中的能力：
-  - _try_import_libclang: 兼容多版本 libclang 的加载器
-  - find_compile_commands / load_compile_commands: compile_commands.json 解析与逐层向上搜索
-  - get_qualified_name / is_function_like: 统一限定名生成和函数节点类型判断
+Notes:
+- This module focuses on correctness/robustness over performance.
+- It does not attempt to discover transitive includes; it only assists the parser by adding -I <file.parent>.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import List, Optional, Dict
 
-# 复用 scanner 内的核心能力
-from jarvis.jarvis_c2rust.scanner import (  # type: ignore
+import typer
+
+from jarvis.jarvis_c2rust.scanner import (
     _try_import_libclang,
     find_compile_commands,
     load_compile_commands,
-    get_qualified_name,
-    is_function_like,
+    scan_file,
 )
 
 
 HEADER_EXTS = {".h", ".hh", ".hpp", ".hxx"}
 
 
-def _resolve_compile_args_map(files: List[Path]) -> Dict[str, List[str]]:
+def _guess_lang_header_flag(file: Path) -> List[str]:
     """
-    逐文件尝试向上查找 compile_commands.json（直到根目录），并合并解析为:
-      file_abs_path_str -> compile_args(list[str])
-    若未找到任何 compile_commands.json，则返回空映射。
+    Guess appropriate -x language flag for header if not specified in compile args.
     """
-    mapping: Dict[str, List[str]] = {}
-    visited_cc_paths: Set[Path] = set()
-
-    for f in files:
-        try:
-            cc_path = find_compile_commands(f.parent)
-        except Exception:
-            cc_path = None
-        if cc_path and cc_path.exists() and cc_path not in visited_cc_paths:
-            try:
-                m = load_compile_commands(cc_path)
-                if isinstance(m, dict):
-                    mapping.update(m)
-                visited_cc_paths.add(cc_path)
-            except Exception:
-                # ignore parse errors, continue searching next file's tree
-                pass
-
-    return mapping
+    ext = file.suffix.lower()
+    if ext in {".hh", ".hpp", ".hxx"}:
+        return ["-x", "c++-header"]
+    # Default to C header for .h (conservative)
+    return ["-x", "c-header"]
 
 
-def _ensure_lang_header_args(file_path: Path, base_args: List[str]) -> List[str]:
+def _ensure_parse_args_for_header(file: Path, base_args: Optional[List[str]]) -> List[str]:
     """
-    确保为头文件设置合适的语言选项：
-    - C 头文件: -x c-header
-    - C++ 头文件: -x c++-header
-    若 base_args 已包含 -x，则尊重现有设置，不再强制覆盖。
+    Ensure minimal args for header parsing:
+    - include file.parent via -I
+    - add a language flag -x c-header/c++-header if none exists
     """
     args = list(base_args or [])
-    has_x = any(a == "-x" or a.startswith("-x") for a in args)
-    if has_x:
-        return args
-    ext = file_path.suffix.lower()
-    if ext in {".hpp", ".hxx", ".hh"}:
-        args.extend(["-x", "c++-header"])
-    else:
-        args.extend(["-x", "c-header"])
+    # Detect if a language flag already exists (-x <lang>)
+    has_lang = False
+    for i, a in enumerate(args):
+        if a == "-x":
+            # If '-x' present and followed by a value, treat as language specified
+            if i + 1 < len(args):
+                has_lang = True
+                break
+        elif a.startswith("-x"):
+            has_lang = True
+            break
+
+    if not has_lang:
+        args.extend(_guess_lang_header_flag(file))
+
+    # Ensure -I <file.parent> is present
+    inc_dir = str(file.parent)
+    has_inc = False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "-I":
+            if i + 1 < len(args) and args[i + 1] == inc_dir:
+                has_inc = True
+                break
+            i += 2
+            continue
+        elif a.startswith("-I"):
+            # Could be like -I/path
+            if a[2:] == inc_dir:
+                has_inc = True
+                break
+        i += 1
+    if not has_inc:
+        args.extend(["-I", inc_dir])
+
     return args
-
-
-def _scan_header_for_names(cindex, file_path: Path, args: List[str]) -> List[str]:
-    """
-    扫描单个头文件，返回该文件中声明或定义的函数的限定名/名称列表。
-    - 不要求 is_definition()，以捕获函数原型声明
-    - 仅收集位于该文件本身的符号（根据 location.file 判断）
-    """
-    index = cindex.Index.create()
-    tu = index.parse(
-        str(file_path),
-        args=args,
-        options=0,
-    )
-    names: List[str] = []
-
-    def visit(node):
-        # 只收集属于当前文件的节点
-        loc_file = node.location.file
-        if loc_file is None or Path(loc_file.name).resolve() != file_path.resolve():
-            for ch in node.get_children():
-                visit(ch)
-            return
-
-        if is_function_like(node):
-            try:
-                qn = get_qualified_name(node)
-                nm = node.spelling or ""
-                label = (qn or nm or "").strip()
-                if label:
-                    names.append(label)
-            except Exception:
-                nm = (node.spelling or "").strip()
-                if nm:
-                    names.append(nm)
-
-        for ch in node.get_children():
-            visit(ch)
-
-    visit(tu.cursor)
-    return names
 
 
 def collect_function_names(
     files: List[Path],
     out_path: Path,
+    compile_commands_root: Optional[Path] = None,
 ) -> Path:
     """
-    收集给定头文件中的函数名并写入指定文件。
+    Collect function names from given header files and write unique names to out_path.
 
-    参数:
-    - files: 一个或多个 C/C++ 头文件路径（.h/.hh/.hpp/.hxx）
-    - out_path: 输出文件路径（将创建目录）
+    Parameters:
+    - files: list of header file paths (.h/.hh/.hpp/.hxx). Non-header files will be skipped.
+    - out_path: output file path. Will be created (parents too) and overwritten.
+    - compile_commands_root: optional root directory to search for compile_commands.json.
+      If not provided, we search upward from each file's directory.
 
-    返回:
-    - 写入的输出文件路径
+    Returns:
+    - Path to the written out_path.
     """
-    if not files:
-        raise ValueError("必须至少提供一个头文件路径")
-
-    # 归一化与存在性检查，仅保留头文件
-    file_list: List[Path] = []
-    for p in files:
-        rp = Path(p).resolve()
-        if not rp.exists():
-            print(f"[c2rust-collector] 警告: 文件不存在，已跳过: {rp}")
+    # Normalize and filter header files
+    hdrs: List[Path] = []
+    for p in files or []:
+        try:
+            fp = Path(p).resolve()
+        except Exception:
             continue
-        if not rp.is_file():
-            print(f"[c2rust-collector] 警告: 非普通文件，已跳过: {rp}")
-            continue
-        if rp.suffix.lower() not in HEADER_EXTS:
-            print(f"[c2rust-collector] 警告: 非头文件（仅支持 .h/.hh/.hpp/.hxx），已跳过: {rp}")
-            continue
-        file_list.append(rp)
+        if fp.is_file() and fp.suffix.lower() in HEADER_EXTS:
+            hdrs.append(fp)
 
-    if not file_list:
-        raise FileNotFoundError("提供的文件列表均不可用或不包含头文件（支持 .h/.hh/.hpp/.hxx）")
+    if not hdrs:
+        raise ValueError("No valid header files (.h/.hh/.hpp/.hxx) were provided.")
 
-    # 准备 libclang
+    # Prepare libclang
     cindex = _try_import_libclang()
     if cindex is None:
-        # 与 scanner 的防御式处理保持一致：尽量不让 None 向下游传播
         from clang import cindex as _ci  # type: ignore
         cindex = _ci
 
-    # 预检 Index 创建
-    try:
-        _ = cindex.Index.create()
-    except Exception as e:
-        raise RuntimeError(f"libclang 初始化失败: {e}")
+    # Prepare compile_commands args map (either once for provided root, or per-file if None)
+    cc_args_map_global: Optional[Dict[str, List[str]]] = None
+    if compile_commands_root is not None:
+        cc_file = find_compile_commands(Path(compile_commands_root))
+        if cc_file:
+            cc_args_map_global = load_compile_commands(cc_file)
 
-    # 逐层向上自动查找 compile_commands.json，构建参数映射
-    cc_args_map = _resolve_compile_args_map(file_list)
+    # Collect names (preserving order)
+    seen = set()
+    ordered_names: List[str] = []
 
-    # 收集唯一函数名（优先限定名）
-    names: Set[str] = set()
+    for hf in hdrs:
+        # Determine args for this file
+        cc_args_map = cc_args_map_global
+        if cc_args_map is None:
+            # Try to find compile_commands.json near this file
+            cc_file_local = find_compile_commands(hf.parent)
+            if cc_file_local:
+                try:
+                    cc_args_map = load_compile_commands(cc_file_local)
+                except Exception:
+                    cc_args_map = None
 
-    for f in file_list:
-        # 优先使用 compile_commands 的精确参数；若无则提供基础 -I 与头文件语言选项
-        base_args = cc_args_map.get(str(f), ["-I", str(f.parent)])
-        args = _ensure_lang_header_args(f, base_args)
+        base_args = None
+        if cc_args_map:
+            base_args = cc_args_map.get(str(hf))
+        if base_args is None:
+            base_args = ["-I", str(hf.parent)]
+
+        args = _ensure_parse_args_for_header(hf, base_args)
+
+        # Attempt to scan. If error, try a fallback with minimal args.
         try:
-            fn_names = _scan_header_for_names(cindex, f, args)
+            funcs = scan_file(cindex, hf, args)
         except Exception:
-            # 回退到无参数解析（仍添加语言选项）
             try:
-                fn_names = _scan_header_for_names(cindex, f, _ensure_lang_header_args(f, []))
-            except Exception as e2:
-                print(f"[c2rust-collector] 解析失败，已跳过 {f}: {e2}")
+                funcs = scan_file(cindex, hf, _ensure_parse_args_for_header(hf, ["-I", str(hf.parent)]))
+            except Exception:
+                funcs = []
+
+        # Extract preferred name (qualified_name or name)
+        for fn in funcs:
+            name = ""
+            try:
+                qn = getattr(fn, "qualified_name", "") or ""
+                nm = getattr(fn, "name", "") or ""
+                name = qn or nm
+                name = str(name).strip()
+            except Exception:
+                name = ""
+            if not name:
                 continue
+            if name in seen:
+                continue
+            seen.add(name)
+            ordered_names.append(name)
 
-        for label in fn_names:
-            if label:
-                names.add(label.strip())
-
-    # 写出结果
+    # Write out file (one per line)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with out_path.open("w", encoding="utf-8") as fo:
-            for nm in sorted(names):
-                fo.write(nm + "\n")
+        out_path.write_text("\n".join(ordered_names) + ("\n" if ordered_names else ""), encoding="utf-8")
     except Exception as e:
-        raise RuntimeError(f"写入输出文件失败: {out_path}: {e}")
+        raise RuntimeError(f"Failed to write output file: {out_path}: {e}")
 
-    print(f"[c2rust-collector] 已收集到 {len(names)} 个函数名（来自头文件） -> {out_path}")
     return out_path
+
+
+__all__ = ["collect_function_names"]
