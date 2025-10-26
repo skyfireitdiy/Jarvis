@@ -359,14 +359,16 @@ def run(
             parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
             root_names.extend(parts)
 
-        # 去重并校验非空
+        # 去重并校验（允许为空时回退为自动根集）
         try:
             root_names = list(dict.fromkeys(root_names))
         except Exception:
             root_names = sorted(list(set(root_names)))
-        if not root_names:
-            typer.secho("[c2rust-run] lib-replace: 根列表为空，无法继续", fg=typer.colors.RED, err=True)
-            raise typer.Exit(code=2)
+        candidates_list: Optional[List[str]] = None
+        if root_names:
+            candidates_list = root_names
+        else:
+            typer.secho("[c2rust-run] lib-replace: 根列表为空，将回退为自动检测的根集合（基于扫描结果）", fg=typer.colors.YELLOW)
 
         # 可选禁用库列表
         disabled_list: Optional[List[str]] = None
@@ -377,12 +379,13 @@ def run(
 
         # 执行 lib-replace（默认库 std）
         library = "std"
-        typer.secho(f"[c2rust-run] lib-replace: 开始（库: {library}，根数: {len(root_names)}）", fg=typer.colors.BLUE)
+        root_count_str = str(len(candidates_list)) if candidates_list is not None else "auto"
+        typer.secho(f"[c2rust-run] lib-replace: 开始（库: {library}，根数: {root_count_str}）", fg=typer.colors.BLUE)
         ret = _apply_library_replacement(
             db_path=Path("."),
             library_name=library,
             llm_group=llm_group,
-            candidates=root_names,
+            candidates=candidates_list,   # None 表示自动检测全部根
             out_symbols_path=None,
             out_mapping_path=None,
             max_funcs=None,
