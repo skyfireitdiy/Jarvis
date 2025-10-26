@@ -1,3 +1,42 @@
+### Release Note - v0.6.0 (2025-10-26)
+
+#### **🚀 新功能 (Features)**
+- 全新 C2Rust 迁移工具链上线（jarvis-c2rust/jc2r CLI）
+  - 命令分组：scan（扫描与可视化）、prepare（LLM 规划 crate 结构并落盘）、transpile（顺序转译与构建修复）、lib-replace（根列表子树的库替代评估）、collect（从头文件收集函数名）、run（一键流水线：collect→scan→lib-replace→prepare→transpile）
+  - 支持 libclang 16–21 版本自动探测与健壮加载，错误信息可操作化提示
+  - 支持根函数子图 DOT 输出与可选 PNG 渲染（需 graphviz）
+  - 支持 read_symbols 按需读取 symbols.jsonl，避免大文件整表读取
+  - 转译器支持断点续跑、按函数选择（--only）、自动消除源码中的 todo!("符号") 占位引用
+- Agent/CLI 能力增强
+  - 新增配置 JARVIS_PLAN_ENABLED：允许默认启用/禁用任务规划；CLI --plan/--no-plan 可显式覆盖
+  - 新增 Agent 参数 disable_file_edit：支持在评审/规划等场景禁用文件编辑处理器
+  - 入口命令新增 jarvis-c2rust 与 jc2r
+
+#### **📌 修复 (Fixes)**
+- 修复 CodeAgent 执行后可能未恢复工作目录的问题（确保返回原工作目录）
+- 修复自动更新检测仅在 src/jarvis 目录内定位的问题，现从仓库根可靠检测
+- Git 提交交互中选择“不添加”时，自动将未跟踪文件写入仓库 .gitignore，避免反复提示与脏工作区
+
+#### **🔧 优化与重构 (Refactors & Improvements)**
+- .gitignore 扩展为跨语言模板（General/Python/Rust/Node/Go/Java/C/C++/.NET 等），默认覆盖更多常见产物
+- 任务规划来源统一：Agent plan 优先使用入参，否则回退配置 JARVIS_PLAN_ENABLED；CLI plan 选项支持“未指定则从配置加载”
+- 内置配置选择器支持多候选 builtin 目录，增加可选调试输出
+- 工具系统体验优化：工具解析错误时提供 ToolUsage 提示；read_code 批量读取输出仅打印状态行，更加友好
+- CodeAgent/执行链路稳健性提升：修复后自动 cargo build 验证；更严格的工作目录与补丁范围控制
+
+#### **📚 文档更新 (Documentation)**
+- 更新 docs/jarvis_book/附录：新增/修订配置项（含 JARVIS_PLAN_ENABLED、默认开关调整等）
+- 更新微信二维码图片（docs/images/wechat.png）
+
+#### **🔧 其他 (Miscellaneous)**
+- Packaging 与入口
+  - pyproject.toml/setup.py 新增 clang16–clang21 extras
+  - 新增 jarvis-c2rust/jc2r console_scripts 入口
+- 可视化与数据
+  - 支持根子图 DOT/PNG 输出；translation_order.jsonl 自包含 records，便于转译阶段独立消费
+
+本次更新主要聚焦于“从扫描到转译”的端到端 C→Rust 迁移流水线能力构建与工程化打磨：提供稳健的 libclang 适配、LLM 驱动的 crate 规划与最小改动构建修复闭环；同时对 Agent 配置、工具可用性、.gitignore 模板与文档进行了系统性优化。
+
 ### Release Note - v0.5.1 (2025-10-20)
 
 #### **🚀 新功能 (Features)**
