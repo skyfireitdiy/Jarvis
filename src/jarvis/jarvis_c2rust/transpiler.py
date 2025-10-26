@@ -831,7 +831,7 @@ class Transpiler:
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(self.crate_dir))
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+            agent = CodeAgent(need_summary=False, non_interactive=True, plan=True, model_group=self.llm_group)
             agent.run(prompt, prefix="[c2rust-transpiler][gen]", suffix="")
         finally:
             os.chdir(prev_cwd)
