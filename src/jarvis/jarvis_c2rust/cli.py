@@ -237,6 +237,9 @@ def lib_replace(
 def collect(
     files: List[Path] = typer.Argument(..., help="一个或多个 C/C++ 头文件路径（.h/.hh/.hpp/.hxx）"),
     out: Path = typer.Option(..., "-o", "--out", help="输出文件路径（写入唯一函数名，每行一个）"),
+    cc_root: Optional[Path] = typer.Option(
+        None, "--cc-root", help="compile_commands.json 根目录（可选，用于提升解析准确性）"
+    ),
 ) -> None:
     """
     收集指定头文件中的函数名（使用 libclang 解析），并写入指定输出文件（每行一个）。
@@ -247,7 +250,7 @@ def collect(
     """
     try:
         from jarvis.jarvis_c2rust.collector import collect_function_names as _collect_fn_names
-        _collect_fn_names(files=files, out_path=out)
+        _collect_fn_names(files=files, out_path=out, compile_commands_root=cc_root)
         typer.secho(f"[c2rust-collect] 函数名已写入: {out}", fg=typer.colors.GREEN)
     except Exception as e:
         typer.secho(f"[c2rust-collect] 错误: {e}", fg=typer.colors.RED, err=True)
@@ -286,6 +289,12 @@ def run(
         None,
         "--disabled-libs",
         help="lib-replace 禁用库列表（逗号分隔）",
+    ),
+    max_retries: int = typer.Option(
+        0, "-m", "--max-retries", help="transpile 构建/修复与审查的最大重试次数（0 表示不限制）"
+    ),
+    resume: bool = typer.Option(
+        True, "--resume/--no-resume", help="transpile 是否启用断点续跑（默认启用）"
     ),
 ) -> None:
     """
@@ -402,6 +411,8 @@ def run(
             project_root=Path("."),
             crate_dir=None,
             llm_group=llm_group,
+            max_retries=max_retries,
+            resume=resume,
             only=None,
         )
         typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)

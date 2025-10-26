@@ -1417,6 +1417,18 @@ class Transpiler:
             )
             if res.returncode == 0:
                 print("[c2rust-transpiler] Cargo 构建成功。")
+                # 记录构建成功的度量与状态（用于准确性诊断与断点续跑）
+                try:
+                    cur = self.progress.get("current") or {}
+                    metrics = cur.get("metrics") or {}
+                    metrics["build_attempts"] = int(i)
+                    cur["metrics"] = metrics
+                    cur["impl_verified"] = True
+                    self.progress["current"] = cur
+                    self._save_progress()
+                except Exception:
+                    # 记录失败不影响主流程
+                    pass
                 return True
             output = (res.stdout or "") + "\n" + (res.stderr or "")
             print(f"[c2rust-transpiler] Cargo 构建失败 (第 {i} 次尝试)。")
@@ -1428,6 +1440,25 @@ class Transpiler:
                 maxr = 0
             if maxr > 0 and i >= maxr:
                 print(f"[c2rust-transpiler] 已达到最大重试次数上限({maxr})，停止构建修复循环。")
+                # 记录失败度量与状态，便于后续准确性诊断与续跑
+                try:
+                    cur = self.progress.get("current") or {}
+                    metrics = cur.get("metrics") or {}
+                    metrics["build_attempts"] = int(i)
+                    cur["metrics"] = metrics
+                    cur["impl_verified"] = False
+                    # 保存最近一次构建错误摘要（截断以避免超长）
+                    try:
+                        err_summary = (output or "").strip()
+                        if len(err_summary) > 2000:
+                            err_summary = err_summary[:2000] + "...(truncated)"
+                        cur["last_build_error"] = err_summary
+                    except Exception:
+                        pass
+                    self.progress["current"] = cur
+                    self._save_progress()
+                except Exception:
+                    pass
                 return False
             # 为修复 Agent 提供更多上下文：symbols.jsonl 索引指引 + 最近处理的C源码片段
             symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
@@ -1700,11 +1731,27 @@ class Transpiler:
                 try:
                     cur = self.progress.get("current") or {}
                     cur["type_boundary_review"] = {"ok": True, "issues": []}
+                    # 增加度量统计：类型/边界问题计数
+                    metrics = cur.get("metrics") or {}
+                    metrics["type_issues"] = 0
+                    cur["metrics"] = metrics
                     self.progress["current"] = cur
                     self._save_progress()
                 except Exception:
                     pass
                 return
+            # 记录类型/边界审查问题与度量后，再进行最小化修复
+            try:
+                cur = self.progress.get("current") or {}
+                cur["type_boundary_review"] = {"ok": False, "issues": list(issues)}
+                metrics = cur.get("metrics") or {}
+                metrics["type_issues"] = int(len(issues))
+                cur["metrics"] = metrics
+                self.progress["current"] = cur
+                self._save_progress()
+            except Exception:
+                pass
+
             # 最小化修复提示
             fix_lines = [
                 "请对目标函数进行最小必要的修复，仅限以下范围：",
@@ -1810,6 +1857,15 @@ class Transpiler:
                 hint = self._infer_rust_signature_hint(rec)
                 cur = self.progress.get("current") or {}
                 cur["signature_hint"] = hint or ""
+                # 初始化度量：默认将签名问题计数置为 0（若后续发现问题会覆盖）
+                try:
+                    metrics = cur.get("metrics") or {}
+                    if "sig_issues" not in metrics:
+                        metrics["sig_issues"] = 0
+                    cur["metrics"] = metrics
+                except Exception:
+                    # 记录失败不影响主流程
+                    pass
                 self.progress["current"] = cur
                 self._save_progress()
             except Exception:
@@ -1874,6 +1930,14 @@ class Transpiler:
                         tbr = cur.get("type_boundary_review") or {}
                         tbr.update({"ok": False, "issues": issues, "fixed": True})
                         cur["type_boundary_review"] = tbr
+                        # 增加度量统计：记录签名问题计数（便于后续诊断与汇总）
+                        try:
+                            metrics = cur.get("metrics") or {}
+                            metrics["sig_issues"] = int(len(issues))
+                            cur["metrics"] = metrics
+                        except Exception:
+                            # 统计失败不阻塞流程
+                            pass
                         self.progress["current"] = cur
                         self._save_progress()
                     except Exception:
@@ -1883,9 +1947,10 @@ class Transpiler:
             # 2.2b) 确保从目标模块向上的 mod.rs 声明链补齐
             try:
                 self._ensure_mod_chain_for_module(module)
-                # 标记当前函数的模块链已补齐，便于诊断与续跑
+                # 标记当前函数的模块链已补齐，便于诊断与续跑；同时记录顶层可见性修复标记
                 cur = self.progress.get("current") or {}
                 cur["mod_chain_fixed"] = True
+                cur["mod_visibility_fixed"] = True
                 self.progress["current"] = cur
                 self._save_progress()
             except Exception:
