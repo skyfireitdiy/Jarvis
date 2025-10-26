@@ -57,6 +57,10 @@ class FnRecord:
     end_line: int
     end_col: int
     refs: List[str]
+    # 额外元信息（来自 symbols/items）：函数签名、返回类型与参数（可选）
+    signature: str = ""
+    return_type: str = ""
+    params: Optional[List[Dict[str, str]]] = None
     # 来自库替代阶段的上下文元数据（若存在）
     lib_replacement: Optional[Dict[str, Any]] = None
 
@@ -519,6 +523,9 @@ class Transpiler:
                         sc = int(r.get("start_col") or 0)
                         er = int(r.get("end_line") or 0)
                         ec = int(r.get("end_col") or 0)
+                        sg = r.get("signature") or ""
+                        rt = r.get("return_type") or ""
+                        pr = r.get("params") if isinstance(r.get("params"), list) else None
                         lr = r.get("lib_replacement") if isinstance(r.get("lib_replacement"), dict) else None
                         rec = FnRecord(
                             id=fid,
@@ -530,6 +537,9 @@ class Transpiler:
                             end_line=er,
                             end_col=ec,
                             refs=refs,
+                            signature=str(sg or ""),
+                            return_type=str(rt or ""),
+                            params=pr,
                             lib_replacement=lr,
                         )
                         self.fn_index_by_id[fid] = rec
@@ -644,6 +654,9 @@ class Transpiler:
             c_code,
             "</C_SOURCE>",
             "",
+            "符号表签名与参数（只读参考）：",
+            json.dumps({"signature": getattr(rec, "signature", ""), "params": getattr(rec, "params", None)}, ensure_ascii=False, indent=2),
+            "",
             "被引用符号上下文（如已转译则包含Rust模块信息）：",
             json.dumps(callees_ctx, ensure_ascii=False, indent=2),
             "",
@@ -667,11 +680,11 @@ class Transpiler:
         summary_prompt = (
             "请仅输出一个 <SUMMARY> 块，块内必须且只包含一个 <yaml>...</yaml>，不得包含其它内容。\n"
             "允许字段（YAML 对象）：\n"
-            '- module: "<绝对路径>/src/xxx.rs 或 <绝对路径>/src/xxx/mod.rs"\n'
+            '- module: "<绝对路径>/src/xxx.rs 或 <绝对路径>/src/xxx/mod.rs；或相对路径 src/xxx.rs / src/xxx/mod.rs"\n'
             '- rust_signature: "pub fn xxx(...)->..."\n'
             '- notes: "可选说明（若有上下文缺失或风险点，请在此列出）"\n'
             "注意：\n"
-            "- module 必须位于 crate 的 src/ 目录下且使用绝对路径；尽量选择已有文件；如需新建文件，给出合理路径；\n"
+            "- module 必须位于 crate 的 src/ 目录下，接受绝对路径或以 src/ 开头的相对路径；尽量选择已有文件；如需新建文件，给出合理路径；\n"
             "- rust_signature 请包含可见性修饰与函数名（可先用占位类型）。\n"
             "请严格按以下格式输出：\n"
             "<SUMMARY><yaml>\nmodule: \"...\"\nrust_signature: \"...\"\nnotes: \"...\"\n</yaml></SUMMARY>"
@@ -693,16 +706,36 @@ class Transpiler:
                 return False, "缺少必填字段 module"
             if not isinstance(rust_sig, str) or not rust_sig.strip():
                 return False, "缺少必填字段 rust_signature"
+            # 路径归一化与校验：容忍相对/简略路径，最终归一为 crate_dir 下的绝对路径
             try:
-                mp = Path(str(module).strip()).resolve()
-                if not mp.is_absolute():
-                    return False, "module 必须为绝对路径"
+                raw = str(module).strip().replace("\\", "/")
                 crate_root = self.crate_dir.resolve()
-                # 必须位于 crate/src 下
+                mp: Path
+                p = Path(raw)
+                if p.is_absolute():
+                    mp = p.resolve()
+                else:
+                    # 规范化相对路径：若不以 src/ 开头，自动补全为 src/<raw>
+                    if raw.startswith("./"):
+                        raw = raw[2:]
+                    if not raw.startswith("src/"):
+                        raw = f"src/{raw}"
+                    mp = (crate_root / raw).resolve()
+                # 必须位于 crate 根目录下
+                _ = mp.relative_to(crate_root)
+                # 必须位于 src/ 目录层级内
                 rel = mp.relative_to(crate_root)
                 parts = rel.parts
                 if not parts or parts[0] != "src":
-                    return False, "module 必须位于 crate 的 src/ 目录下（绝对路径）"
+                    return False, "module 必须位于 crate 的 src/ 目录下"
+                # 文件名后缀校验：必须是 .rs 或 mod.rs；禁止使用 src/main.rs 作为目标模块
+                name = mp.name.lower()
+                if not (name.endswith(".rs")):
+                    return False, "module 必须指向以 .rs 结尾的文件（如 foo.rs 或 mod.rs）"
+                if name == "main.rs":
+                    return False, "禁止将 module 指向 src/main.rs，请选择库模块文件"
+                # 将归一化后的绝对路径回写到 meta，避免后续流程二次解析歧义
+                meta["module"] = str(mp)
             except Exception:
                 return False, "module 路径不可解析或不在 crate/src 下"
             if not re.search(r"\bfn\s+[A-Za-z_][A-Za-z0-9_]*\s*\(", rust_sig):
@@ -767,6 +800,240 @@ class Transpiler:
         }
         self._save_progress()
 
+    def _infer_rust_signature_hint(self, rec: FnRecord) -> str:
+        """
+        根据 C 符号信息（signature/params/return_type）启发式给出 Rust 函数签名建议（仅签名字符串）。
+        映射策略（保守、跨平台更稳）：
+        - 整型优先 core::ffi c_* 类型（如 c_int/c_uint/c_long），float/double -> f32/f64，size_t -> usize
+        - 指针：包含 '*' 视为指针；含 const 则 *const T，否则 *mut T；void* -> *mut std::ffi::c_void（const 则 *const）
+        - char*：*mut/*const core::ffi::c_char
+        - 参数名缺失则使用 argN
+        仅为建议，不强制，供 LLM 参考与事后一致性校验。
+        """
+        try:
+            def _base_ty(ct: str) -> str:
+                s = (ct or "").strip()
+                # 去掉 const/volatile 与多余空白
+                s = s.replace("volatile", " ").replace("CONST", "const").replace("  ", " ")
+                return s
+
+            def _is_ptr(ct: str) -> bool:
+                s = _base_ty(ct)
+                return "*" in s or "[]" in s
+
+            def _is_const(ct: str) -> bool:
+                s = _base_ty(ct).lower()
+                return "const" in s
+
+            def _map_prim(s: str) -> str:
+                t = s.lower().strip()
+                # C/C++ 基本整型（使用 core::ffi 以跨平台规避宽度差异）
+                if t in ("int", "signed int"):
+                    return "core::ffi::c_int"
+                if t in ("unsigned int", "uint"):
+                    return "core::ffi::c_uint"
+                if t in ("short", "short int", "signed short", "signed short int"):
+                    return "core::ffi::c_short"
+                if t in ("unsigned short", "unsigned short int"):
+                    return "core::ffi::c_ushort"
+                if t in ("long", "long int", "signed long", "signed long int"):
+                    return "core::ffi::c_long"
+                if t in ("unsigned long", "unsigned long int"):
+                    return "core::ffi::c_ulong"
+                if t in ("long long", "long long int", "signed long long"):
+                    return "core::ffi::c_longlong"
+                if t in ("unsigned long long", "unsigned long long int"):
+                    return "core::ffi::c_ulonglong"
+                # 字符类
+                if t in ("char", "signed char"):
+                    return "core::ffi::c_char"
+                if t in ("unsigned char",):
+                    return "u8"
+                # 浮点
+                if t in ("float",):
+                    return "f32"
+                if t in ("double",):
+                    return "f64"
+                # C/C++ 定宽与指针宽度类型
+                if t in ("int8_t",):
+                    return "i8"
+                if t in ("uint8_t",):
+                    return "u8"
+                if t in ("int16_t",):
+                    return "i16"
+                if t in ("uint16_t",):
+                    return "u16"
+                if t in ("int32_t",):
+                    return "i32"
+                if t in ("uint32_t",):
+                    return "u32"
+                if t in ("int64_t",):
+                    return "i64"
+                if t in ("uint64_t",):
+                    return "u64"
+                if t in ("intptr_t",):
+                    return "isize"
+                if t in ("uintptr_t",):
+                    return "usize"
+                # 其他常见别名
+                if t in ("size_t",):
+                    return "usize"
+                if t in ("ssize_t",):
+                    return "isize"
+                if t in ("bool", "_bool", "_bool_t", "boolean", "_bool32"):
+                    return "bool"
+                # 未知类型（结构体、typedef 等）原样返回，后续由指针包装逻辑处理
+                return s  # 保留原样（结构体名等）
+
+            def _map_type(ct: str, ptr: bool, is_const: bool) -> str:
+                bs = _base_ty(ct)
+                # 特例：void*
+                if "void" in bs and ptr:
+                    return "*const std::ffi::c_void" if is_const else "*mut std::ffi::c_void"
+                # 特例：char*
+                if "char" in bs and ptr:
+                    return "*const core::ffi::c_char" if is_const else "*mut core::ffi::c_char"
+                base = _map_prim(bs.replace("*", "").replace("const", "").strip())
+                if ptr:
+                    return f"*const {base}" if is_const else f"*mut {base}"
+                return base
+
+            name = rec.name or "func"
+            # 参数映射
+            params = rec.params or []
+            args_rs = []
+            for i, p in enumerate(params):
+                pn = (p.get("name") or f"arg{i}").strip() if isinstance(p, dict) else f"arg{i}"
+                ct = (p.get("type") or "").strip() if isinstance(p, dict) else ""
+                ptr = _is_ptr(ct)
+                cst = _is_const(ct)
+                ty_rs = _map_type(ct, ptr, cst)
+                args_rs.append(f"{pn}: {ty_rs}")
+            args_s = ", ".join(args_rs)
+
+            # 返回类型
+            rt = getattr(rec, "return_type", "") or ""
+            if not rt:
+                ret_rs = ""
+            else:
+                # C 的 void 返回在 Rust 中无返回类型（省略 -> ...），仅当非指针时适用
+                rts = rt.strip().lower()
+                if ("void" in rts) and (not _is_ptr(rt)):
+                    ret_rs = ""
+                else:
+                    prt = _is_ptr(rt)
+                    pc = _is_const(rt)
+                    ret_mapped = _map_type(rt, prt, pc)
+                    ret_rs = f" -> {ret_mapped}" if ret_mapped else ""
+
+            return f"pub fn {name}({args_s}){ret_rs}"
+        except Exception:
+            return ""
+
+    def _check_signature_consistency(self, rust_sig: str, rec: FnRecord) -> List[str]:
+        """
+        基于 LLM 提供的 rust_sig 与 C 符号（params/return_type）进行轻量一致性检查：
+        - 参数个数是否一致
+        - 指针可变性（const -> *const / 非 const -> *mut）是否匹配（按位置比对）
+        - 指针+长度参数组合的基本一致性（按位置对 param#i 与 param#i+1 进行启发式检查）
+        返回问题列表（空列表表示通过）。
+        """
+        issues: List[str] = []
+        try:
+            # 提取 Rust 参数串
+            m = re.search(r"\bfn\s+[A-Za-z_][A-Za-z0-9_]*\s*\((.*?)\)", rust_sig or "", flags=re.S)
+            rs_inside = m.group(1) if m else ""
+            # 朴素切分（足够用于一致性检查；复杂泛型暂不处理）
+            rs_params = [x.strip() for x in rs_inside.split(",") if x.strip()] if rs_inside else []
+            c_params = rec.params or []
+            if len(rs_params) != len(c_params):
+                issues.append(f"[sig] parameter count mismatch: rust={len(rs_params)} vs c={len(c_params)}")
+            # 指针可变性检查（对齐位置）
+            def _rust_ptr_kind(s: str) -> Optional[str]:
+                ss = s.replace(" ", "")
+                if "*const" in ss:
+                    return "const"
+                if "*mut" in ss:
+                    return "mut"
+                return None
+            for i, cp in enumerate(c_params):
+                if i >= len(rs_params):
+                    break
+                cty = (cp.get("type") or "").lower()
+                is_ptr = ("*" in cty) or ("[]" in cty)
+                if not is_ptr:
+                    continue
+                is_const = "const" in cty
+                rk = _rust_ptr_kind(rs_params[i])
+                if is_const and rk != "const":
+                    issues.append(f"[sig] param#{i} pointer mutability: expected *const (from C 'const'), got {rk or 'none'}")
+                if (not is_const) and rk != "mut":
+                    issues.append(f"[sig] param#{i} pointer mutability: expected *mut (from C non-const), got {rk or 'none'}")
+            # 指针+长度（ptr,len）组合启发式检查：当 C 形参 i 为指针且 i+1 为长度整型时
+            def _is_c_len_type(t: str) -> bool:
+                tt = (t or "").strip().lower()
+                if not tt:
+                    return False
+                # 常见长度类型
+                if any(x in tt for x in ("size_t", "ssize_t", "uint32_t", "uint64_t", "int32_t", "int64_t")):
+                    return True
+                # 宽泛匹配 int/unsigned int
+                if tt in ("int", "unsigned int", "uint", "unsigned"):
+                    return True
+                return False
+            def _rs_is_pointer_or_slice(s: str) -> bool:
+                ss = (s or "").replace(" ", "")
+                return ("*const" in ss) or ("*mut" in ss) or ("&[" in ss) or ("Vec<" in ss)
+            def _rs_is_integer_like(s: str) -> bool:
+                ss = (s or "").strip()
+                if not ss:
+                    return False
+                # 允许 usize/isize 与 i*/u* 定宽
+                if re.search(r"\b(u|i)(8|16|32|64|128)\b", ss):
+                    return True
+                if re.search(r"\b(u|i)size\b", ss):
+                    return True
+                # 允许 core::ffi::c_* 基本整型
+                if "core::ffi::c_" in ss:
+                    return True
+                return False
+            for i in range(len(c_params) - 1):
+                cty_i = (c_params[i].get("type") or "").lower() if isinstance(c_params[i], dict) else ""
+                cty_j = (c_params[i+1].get("type") or "").lower() if isinstance(c_params[i+1], dict) else ""
+                c_is_ptr = ("*" in cty_i) or ("[]" in cty_i)
+                if not c_is_ptr:
+                    continue
+                if not _is_c_len_type(cty_j):
+                    continue
+                # 对应的 Rust 参数存在性
+                if i >= len(rs_params) or (i + 1) >= len(rs_params):
+                    issues.append(f"[sig] param#{i} pointer+len mismatch: expected pointer or slice with separate len (param#{i+1})")
+                    continue
+                rs_i = rs_params[i]
+                rs_j = rs_params[i+1]
+                if not _rs_is_pointer_or_slice(rs_i):
+                    issues.append(f"[sig] param#{i} pointer+len mismatch: expected pointer or slice with separate len (param#{i+1})")
+                if not _rs_is_integer_like(rs_j):
+                    issues.append(f"[sig] param#{i+1} length param missing or non-integer")
+            # 返回类型指针可变性（若存在）
+            rt = (getattr(rec, "return_type", "") or "").lower()
+            if rt:
+                is_ptr = ("*" in rt) or ("[]" in rt)
+                if is_ptr:
+                    is_const = "const" in rt
+                    mret = re.search(r"\)\s*->\s*([^{;]+)", rust_sig or "")
+                    rty = mret.group(1).strip() if mret else ""
+                    rk = _rust_ptr_kind(rty)
+                    if is_const and rk != "const":
+                        issues.append(f"[sig] return pointer mutability: expected *const (from C 'const'), got {rk or 'none'}")
+                    if (not is_const) and rk != "mut":
+                        issues.append(f"[sig] return pointer mutability: expected *mut (from C non-const), got {rk or 'none'}")
+        except Exception:
+            # 解析失败不阻塞，仅不产生问题
+            return issues
+        return issues
+        return issues
+
     def _codeagent_generate_impl(self, rec: FnRecord, c_code: str, module: str, rust_sig: str, unresolved: List[str]) -> None:
         """
         使用 CodeAgent 生成/更新目标模块中的函数实现。
@@ -793,6 +1060,8 @@ class Transpiler:
             "- 如需占位返回，使用合理默认值或 Result/Option 等而非 panic!/todo!/unimplemented!；",
             "- 依赖未实现符号时，务必使用 todo!(\"符号名\") 明确标记，便于后续自动替换；",
             "- 文档：为新增函数添加简要文档注释，注明来源C函数与意图；",
+            "- 导入：禁止使用 use ...::* 通配；仅允许精确导入所需符号",
+            "- 指针+长度参数：如 C 存在 <ptr, len> 组合，请优先保持成对出现；若暂不清晰，至少保留长度参数占位",
             "- 风格：遵循 rustfmt 默认风格，避免引入与本次改动无关的大范围格式变化；",
             "- 输出限制：仅以补丁形式修改目标文件，不要输出解释或多余文本。",
             "",
@@ -800,6 +1069,9 @@ class Transpiler:
             "<C_SOURCE>",
             c_code,
             "</C_SOURCE>",
+            "",
+            "符号表签名与参数（只读参考）：",
+            json.dumps({"signature": getattr(rec, "signature", ""), "params": getattr(rec, "params", None)}, ensure_ascii=False, indent=2),
             "",
             "注意：所有修改均以补丁方式进行。",
             "",
@@ -826,7 +1098,32 @@ class Transpiler:
                 json.dumps(librep_ctx, ensure_ascii=False, indent=2),
                 "",
             ])
+        # 附加启发式签名建议（仅供参考）
+        try:
+            sig_hint = self._infer_rust_signature_hint(rec)
+        except Exception:
+            sig_hint = ""
+        if sig_hint:
+            requirement_lines.extend([
+                "",
+                "Rust 签名建议（启发式，仅供参考）：",
+                sig_hint,
+                "",
+            ])
         prompt = "\n".join(requirement_lines)
+        # 确保目标模块文件存在（提高补丁应用与实现落盘的确定性）
+        try:
+            mp = Path(module)
+            if not mp.is_absolute():
+                mp = (self.crate_dir / module).resolve()
+            mp.parent.mkdir(parents=True, exist_ok=True)
+            if not mp.exists():
+                try:
+                    mp.write_text("// Auto-created by c2rust transpiler\n", encoding="utf-8")
+                except Exception:
+                    pass
+        except Exception:
+            pass
         # 切换到 crate 目录运行 CodeAgent，运行完毕后恢复
         prev_cwd = os.getcwd()
         try:
@@ -843,15 +1140,197 @@ class Transpiler:
         m = re.search(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", rust_sig or "")
         return m.group(1) if m else ""
 
+    def _ensure_impl_present(self, module: str, rust_sig: str) -> bool:
+        """
+        静态校验目标模块中是否已存在目标函数的实现；若缺失，触发一次最小修复的 CodeAgent。
+        返回 True 表示存在或修复后存在；False 表示仍未找到（交由构建修复环节处理）。
+        """
+        try:
+            fn = self._extract_rust_fn_name_from_sig(rust_sig)
+            if not fn:
+                # 没有函数名无法进行可靠校验，交给构建环节
+                return True
+            mp = Path(module)
+            if not mp.is_absolute():
+                mp = (self.crate_dir / module).resolve()
+            if not mp.exists():
+                return False
+            txt = mp.read_text(encoding="utf-8", errors="replace")
+            pattern = re.compile(r'(?m)^\s*(?:pub(?:\s*\([^)]+\))?\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+"[^"]+"\s+)?fn\s+' + re.escape(fn) + r'\s*\([^)]*\)\s*(?:->\s*[^ {][^{]*)?\s*\{')
+            if pattern.search(txt):
+                return True
+            # 触发一次最小修复，确保存在该函数实现
+            prompt = "\n" .join([
+                f"请在文件 {mp} 中确保存在函数实现：{rust_sig}",
+                "要求：",
+                "- 如文件不存在该函数定义，请新增实现（使用最小必要代码，避免 todo!/unimplemented!）；",
+                "- 必须为带函数体的实现（签名后紧跟 '{'），不是仅声明或 extern 原型；",
+                "- 不要删除或大改已有代码；仅补充缺失的函数实现或最小修正签名；",
+                f"- crate 根目录：{self.crate_dir.resolve()}",
+                "仅输出补丁。"
+            ])
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+                agent.run(prompt, prefix="[c2rust-transpiler][ensure-impl]", suffix="")
+            finally:
+                os.chdir(prev_cwd)
+            # 再次检查
+            txt2 = mp.read_text(encoding="utf-8", errors="replace")
+            return bool(pattern.search(txt2))
+        except Exception:
+            return False
+
+    def _ensure_top_level_pub_mod(self, mod_name: str) -> None:
+        """
+        在 src/lib.rs 中确保存在 `pub mod <mod_name>;`
+        - 如已存在 `pub mod`，不做改动
+        - 如存在 `mod <mod_name>;`，升级为 `pub mod <mod_name>;`
+        - 如都不存在，则在文件末尾追加一行 `pub mod <mod_name>;`
+        - 最小改动，不覆盖其他内容
+        """
+        try:
+            if not mod_name or mod_name in ("lib", "main"):
+                return
+            lib_rs = (self.crate_dir / "src" / "lib.rs").resolve()
+            lib_rs.parent.mkdir(parents=True, exist_ok=True)
+            if not lib_rs.exists():
+                try:
+                    lib_rs.write_text("// Auto-generated by c2rust transpiler\n", encoding="utf-8")
+                except Exception:
+                    return
+            txt = lib_rs.read_text(encoding="utf-8", errors="replace")
+            pub_pat = re.compile(rf'(?m)^\s*pub\s+mod\s+{re.escape(mod_name)}\s*;\s*$')
+            mod_pat = re.compile(rf'(?m)^\s*mod\s+{re.escape(mod_name)}\s*;\s*$')
+            if pub_pat.search(txt):
+                return
+            if mod_pat.search(txt):
+                # 升级为 pub mod（保留原缩进）
+                def _repl(m):
+                    line = m.group(0)
+                    ws = re.match(r'^(\s*)', line).group(1) if re.match(r'^(\s*)', line) else ""
+                    return f"{ws}pub mod {mod_name};"
+                new_txt = mod_pat.sub(_repl, txt, count=1)
+            else:
+                new_txt = (txt.rstrip() + f"\npub mod {mod_name};\n")
+            lib_rs.write_text(new_txt, encoding="utf-8")
+        except Exception:
+            # 保持稳健，失败不阻塞主流程
+            pass
+
+    def _ensure_mod_rs_decl(self, dir_path: Path, child_mod: str) -> None:
+        """
+        在 dir_path/mod.rs 中确保存在 `pub mod <child_mod>;`
+        - 如存在 `mod <child_mod>;` 则升级为 `pub mod <child_mod>;`
+        - 如均不存在则在文件末尾追加 `pub mod <child_mod>;`
+        - 最小改动，不覆盖其他内容
+        """
+        try:
+            if not child_mod or child_mod in ("lib", "main"):
+                return
+            mod_rs = (dir_path / "mod.rs").resolve()
+            mod_rs.parent.mkdir(parents=True, exist_ok=True)
+            if not mod_rs.exists():
+                try:
+                    mod_rs.write_text("// Auto-generated by c2rust transpiler\n", encoding="utf-8")
+                except Exception:
+                    return
+            txt = mod_rs.read_text(encoding="utf-8", errors="replace")
+            pub_pat = re.compile(rf'(?m)^\s*pub\s+mod\s+{re.escape(child_mod)}\s*;\s*$')
+            mod_pat = re.compile(rf'(?m)^\s*mod\s+{re.escape(child_mod)}\s*;\s*$')
+            if pub_pat.search(txt):
+                return
+            if mod_pat.search(txt):
+                # 升级为 pub mod（保留原缩进）
+                def _repl(m):
+                    line = m.group(0)
+                    ws = re.match(r'^(\s*)', line).group(1) if re.match(r'^(\s*)', line) else ""
+                    return f"{ws}pub mod {child_mod};"
+                new_txt = mod_pat.sub(_repl, txt, count=1)
+            else:
+                new_txt = (txt.rstrip() + f"\npub mod {child_mod};\n")
+            mod_rs.write_text(new_txt, encoding="utf-8")
+        except Exception:
+            pass
+
+    def _ensure_mod_chain_for_module(self, module: str) -> None:
+        """
+        根据目标模块文件，补齐从该文件所在目录向上的 mod.rs 声明链：
+        - 对于 src/foo/bar.rs：在 src/foo/mod.rs 确保 `pub mod bar;`
+          并在上层 src/mod.rs（不修改）改为在 src/lib.rs 确保 `pub mod foo;`（已由顶层函数处理）
+        - 对于 src/foo/bar/mod.rs：在 src/foo/mod.rs 确保 `pub mod bar;`
+        - 对多级目录，逐级在上层 mod.rs 确保对子目录的 `pub mod <child>;`
+        """
+        try:
+            mp = Path(module)
+            base = mp
+            if not mp.is_absolute():
+                base = (self.crate_dir / module).resolve()
+            crate_root = self.crate_dir.resolve()
+            # 必须在 crate/src 下
+            rel = base.relative_to(crate_root)
+            rel_s = str(rel).replace("\\", "/")
+            if not rel_s.startswith("src/"):
+                return
+            # 计算起始目录与首个子模块名
+            inside = rel_s[len("src/"):].strip("/")
+            if not inside:
+                return
+            parts = inside.split("/")
+            if parts[-1].endswith(".rs"):
+                if parts[-1] in ("lib.rs", "main.rs"):
+                    return
+                child = parts[-1][:-3]  # 去掉 .rs
+                start_dir = crate_root / "src" / "/".join(parts[:-1]) if len(parts) > 1 else (crate_root / "src")
+                # 在当前目录的 mod.rs 确保 pub mod <child>
+                if start_dir.name != "src":
+                    self._ensure_mod_rs_decl(start_dir, child)
+                # 向上逐级确保父目录对当前目录的 pub mod 声明
+                cur_dir = start_dir
+            else:
+                # 末尾为目录（mod.rs 情况）：确保父目录对该目录 pub mod
+                cur_dir = crate_root / "src" / "/".join(parts)
+            # 逐级向上到 src 根（不修改 src/mod.rs，顶层由 lib.rs 公开）
+            while True:
+                parent = cur_dir.parent
+                if not parent.exists():
+                    break
+                if parent.name == "src":
+                    # 顶层由 _ensure_top_level_pub_mod 负责
+                    break
+                # 在 parent/mod.rs 确保 pub mod <cur_dir.name>
+                self._ensure_mod_rs_decl(parent, cur_dir.name)
+                cur_dir = parent
+        except Exception:
+            pass
+
     def _module_file_to_crate_path(self, module: str) -> str:
         """
         将模块文件路径转换为 crate 路径前缀：
         - src/lib.rs -> crate
         - src/foo/mod.rs -> crate::foo
         - src/foo/bar.rs -> crate::foo::bar
-        其它（非 src/ 前缀）统一返回 'crate'
+        支持绝对路径：若 module 为绝对路径且位于 crate 根目录下，会自动转换为相对路径再解析；
+        其它（无法解析为 crate/src 下的路径）统一返回 'crate'
         """
         mod = str(module).strip()
+        # 若传入绝对路径且在 crate_dir 下，转换为相对路径以便后续按 src/ 前缀解析
+        try:
+            mp = Path(mod)
+            if mp.is_absolute():
+                try:
+                    rel = mp.resolve().relative_to(self.crate_dir.resolve())
+                    mod = str(rel).replace("\\", "/")
+                except Exception:
+                    # 绝对路径不在 crate_dir 下，保持原样
+                    pass
+        except Exception:
+            pass
+        # 规范化 ./ 前缀
+        if mod.startswith("./"):
+            mod = mod[2:]
+        # 仅处理位于 src/ 下的模块文件
         if not mod.startswith("src/"):
             return "crate"
         p = mod[len("src/"):]
@@ -886,8 +1365,8 @@ class Transpiler:
                     text = p.read_text(encoding="utf-8", errors="replace")
                 except Exception:
                     continue
-                needle = f'todo!("{symbol}")'
-                if needle in text:
+                pattern = re.compile(r'todo\s*!\s*\(\s*["\']' + re.escape(symbol) + r'["\']\s*\)')
+                if pattern.search(text):
                     try:
                         # 记录绝对路径，避免依赖当前工作目录
                         abs_path = str(p.resolve())
@@ -907,7 +1386,7 @@ class Transpiler:
                 f"- 其所在模块（crate路径提示）：{callee_path}",
                 f"- 函数签名提示：{callee_rust_sig}",
                 f"- 当前 crate 根目录路径：{self.crate_dir.resolve()}",
-                "- 你可以使用完全限定路径（如 crate::...::函数(...)），或在文件顶部添加合适的 use；",
+                "- 优先使用完全限定路径（如 crate::...::函数(...)）；如需在文件顶部添加 use，仅允许精确导入，不允许通配（例如 use ...::*）；",
                 "- 保持最小改动，不要进行与本次修复无关的重构或格式化；",
                 "- 如果参数列表暂不明确，可使用合理占位变量，确保编译通过。",
                 "",
@@ -942,6 +1421,14 @@ class Transpiler:
             output = (res.stdout or "") + "\n" + (res.stderr or "")
             print(f"[c2rust-transpiler] Cargo 构建失败 (第 {i} 次尝试)。")
             print(output)
+            # 准确性改进：尊重 max_retries 参数，防止无限循环
+            try:
+                maxr = int(self.max_retries)
+            except Exception:
+                maxr = 0
+            if maxr > 0 and i >= maxr:
+                print(f"[c2rust-transpiler] 已达到最大重试次数上限({maxr})，停止构建修复循环。")
+                return False
             # 为修复 Agent 提供更多上下文：symbols.jsonl 索引指引 + 最近处理的C源码片段
             symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
             try:
@@ -1090,6 +1577,11 @@ class Transpiler:
             content = (m.group(1).strip() if m else summary.strip()).upper()
             if content == "OK":
                 print("[c2rust-transpiler] 代码审查通过。")
+                # 二次审查：类型/边界一致性检查与最小化修复
+                try:
+                    self._type_boundary_review_and_fix(rec, module, rust_sig)
+                except Exception:
+                    pass
                 return
             # 需要优化：提供详细上下文背景，并明确审查意见仅针对 Rust crate，不修改 C 源码
             crate_tree = _dir_tree(self.crate_dir)
@@ -1142,8 +1634,134 @@ class Transpiler:
         self.progress["current"] = None
         self._save_progress()
 
+    def _type_boundary_review_and_fix(self, rec: FnRecord, module: str, rust_sig: str) -> None:
+        """
+        第二阶段审查：类型/边界一致性（仅准确性相关的最小问题）
+        - 关注点：指针可变性/空指针检查、长度/边界检查（若有切片或指针+长度语义）、显式的 unsafe 使用范围说明
+        - 输出：要求 Agent 仅在 <SUMMARY> 中给出 YAML verdict；若 not ok，触发一次最小修复 CodeAgent
+        """
+        try:
+            sys_p = (
+                "你是Rust类型与边界检查专家。仅检查以下问题：\n"
+                "1) 指针参数/返回值的可变性是否与语义匹配（C const* -> *const，非const -> *mut）。\n"
+                "2) 对来自指针的读写是否进行了必要的空指针检查/长度边界检查（如有长度参数或可判断长度的场景）。\n"
+                "3) 任何 unsafe 块必须最小化范围并以注释说明 SAFETY 理由（只需存在，内容无需冗长）。\n"
+                "不考虑风格/性能/日志等其他问题。"
+            )
+            # 仅提供必要上下文；Agent 可自行读取 crate 内代码
+            c_code = self._read_source_span(rec) or ""
+            usr_p = "\n".join([
+                f"目标函数：{rec.qname or rec.name}",
+                f"建议/当前签名：{rust_sig}",
+                f"模块文件：{module}",
+                f"crate 根目录：{self.crate_dir.resolve()}",
+                "",
+                "原始C函数源码片段（只读参考，不要修改C代码）：",
+                "<C_SOURCE>",
+                c_code,
+                "</C_SOURCE>",
+                "",
+                "若函数包含指针参数/返回值，请重点检查：可变性（*const/*mut）、空指针检查、必要时的边界检查。",
+                "若使用 unsafe，请确认 unsafe 块范围最小并有注释说明 SAFETY（存在即可）。",
+            ])
+            sum_p = (
+                "请仅输出一个 <SUMMARY> 块，块内为单个 <yaml> 对象，字段：\n"
+                "ok: bool\n"
+                "issues: [string, ...]  # 每条以 [type] 开头，示例：[type] param#0 missing null check\n"
+                "<SUMMARY><yaml>\nok: true\nissues: []\n</yaml></SUMMARY>"
+            )
+            agent = Agent(
+                system_prompt=sys_p,
+                name="C2Rust-TypeBoundary-Review",
+                model_group=self.llm_group,
+                summary_prompt=sum_p,
+                need_summary=True,
+                auto_complete=True,
+                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
+                plan=False,
+                non_interactive=True,
+                use_methodology=False,
+                use_analysis=False,
+                disable_file_edit=True,
+            )
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                review = str(agent.run(usr_p) or "")
+            finally:
+                os.chdir(prev_cwd)
+            verdict = _extract_json_from_summary(review)
+            if not isinstance(verdict, dict):
+                return
+            ok = bool(verdict.get("ok") is True)
+            issues = verdict.get("issues") if isinstance(verdict.get("issues"), list) else []
+            if ok or not issues:
+                # 记录类型/边界审查结果到进度（通过或无问题）
+                try:
+                    cur = self.progress.get("current") or {}
+                    cur["type_boundary_review"] = {"ok": True, "issues": []}
+                    self.progress["current"] = cur
+                    self._save_progress()
+                except Exception:
+                    pass
+                return
+            # 最小化修复提示
+            fix_lines = [
+                "请对目标函数进行最小必要的修复，仅限以下范围：",
+                "- 指针可变性不匹配：修正签名中的 *const / *mut；",
+                "- 缺少空指针检查：在解引用/读写前添加显式检查；",
+                "- 必要的边界检查：仅在可确定长度或需要防止越界的直观场景添加；",
+                "- 如涉及 unsafe：缩小 unsafe 块范围，并添加一条简短 SAFETY 注释说明；",
+                "",
+                f"模块文件：{module}",
+                f"crate 根目录：{self.crate_dir.resolve()}",
+                "问题列表：",
+                *[str(x) for x in issues],
+                "",
+                "仅输出补丁，不要输出解释；保持变更最小化。",
+            ]
+            prev = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                ca = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+                ca.run("\n".join(fix_lines), prefix="[c2rust-transpiler][type-boundary-fix]", suffix="")
+            finally:
+                os.chdir(prev)
+        except Exception:
+            # 二次审查失败不阻塞主流程
+            pass
+
     def transpile(self) -> None:
         """主流程"""
+        # 准确性兜底：在未执行 prepare 的情况下，确保 crate 目录与最小 Cargo 配置存在
+        try:
+            cd = self.crate_dir.resolve()
+            cd.mkdir(parents=True, exist_ok=True)
+            cargo = cd / "Cargo.toml"
+            src_dir = cd / "src"
+            lib_rs = src_dir / "lib.rs"
+            # 最小 Cargo.toml（不覆盖已有），edition 使用 2021 以兼容更广环境
+            if not cargo.exists():
+                pkg_name = cd.name
+                content = (
+                    f'[package]\nname = "{pkg_name}"\nversion = "0.1.0"\nedition = "2021"\n\n'
+                    '[lib]\npath = "src/lib.rs"\n'
+                )
+                try:
+                    cargo.write_text(content, encoding="utf-8")
+                except Exception:
+                    pass
+            # 确保 src/lib.rs 存在
+            src_dir.mkdir(parents=True, exist_ok=True)
+            if not lib_rs.exists():
+                try:
+                    lib_rs.write_text("// Auto-created by c2rust transpiler\n", encoding="utf-8")
+                except Exception:
+                    pass
+        except Exception:
+            # 保持稳健，失败不阻塞主流程
+            pass
+
         order_path = _ensure_order_file(self.project_root)
         steps = _iter_order_steps(order_path)
         if not steps:
@@ -1173,15 +1791,105 @@ class Transpiler:
             # 读取C函数源码
             c_code = self._read_source_span(rec)
 
+            # 若缺少源码片段且缺乏签名/参数信息，则跳过本函数，记录进度以便后续处理
+            if not c_code and not (getattr(rec, "signature", "") or getattr(rec, "params", None)):
+                skipped = self.progress.get("skipped_missing_source") or []
+                if rec.id not in skipped:
+                    skipped.append(rec.id)
+                self.progress["skipped_missing_source"] = skipped
+                typer.secho(f"[c2rust-transpiler] 跳过：缺少源码与签名信息 -> {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.YELLOW)
+                self._save_progress()
+                continue
             # 1) 规划：模块路径与Rust签名
             module, rust_sig = self._plan_module_and_signature(rec, c_code)
 
             # 记录当前进度
             self._update_progress_current(rec, module, rust_sig)
+            # 记录启发式签名建议，便于诊断与后续续跑
+            try:
+                hint = self._infer_rust_signature_hint(rec)
+                cur = self.progress.get("current") or {}
+                cur["signature_hint"] = hint or ""
+                self.progress["current"] = cur
+                self._save_progress()
+            except Exception:
+                pass
 
             # 2) 生成实现
             unresolved = self._untranslated_callee_symbols(rec)
             self._codeagent_generate_impl(rec, c_code, module, rust_sig, unresolved)
+            # 2.1) 生成后进行一次静态存在性校验，缺失则最小化修复补齐实现
+            try:
+                self._ensure_impl_present(module, rust_sig)
+            except Exception:
+                pass
+            # 2.2) 确保顶层模块在 src/lib.rs 中被公开（便于后续引用 crate::<mod>::...）
+            try:
+                mp = Path(module)
+                crate_root = self.crate_dir.resolve()
+                # 归一出相对路径（相对于 crate 根）
+                rel = mp.resolve().relative_to(crate_root) if mp.is_absolute() else Path(module)
+                rel_s = str(rel).replace("\\", "/")
+                if rel_s.startswith("./"):
+                    rel_s = rel_s[2:]
+                if rel_s.startswith("src/"):
+                    parts = rel_s[len("src/"):].strip("/").split("/")
+                    if parts and parts[0]:
+                        top_mod = parts[0]
+                        # 排除直接文件 lib.rs/main.rs 的情况
+                        if not top_mod.endswith(".rs"):
+                            self._ensure_top_level_pub_mod(top_mod)
+            except Exception:
+                pass
+
+            # 2.3) 签名一致性检查（基于 C 符号与 LLM 提供的 rust_sig）
+            try:
+                sig_hint_local = self._infer_rust_signature_hint(rec)
+                issues = self._check_signature_consistency(rust_sig, rec)
+                if issues:
+                    fix_prompt = "\n".join([
+                        f"请在文件 {module} 中根据以下问题最小化修正函数签名（仅签名层面）：",
+                        *issues,
+                        "",
+                        "参考（启发式）Rust 签名建议（可按需调整）：",
+                        sig_hint_local or "(无建议，保持最小改动)",
+                        "",
+                        "- 仅允许修改函数签名（参数类型/指针 *const/*mut、返回类型等），避免改动函数体逻辑；",
+                        "- 不要删除函数或大范围重构；",
+                        "- 修改后保证编译通过（若需引入 use，则最小化添加）。",
+                        "仅输出补丁，不要输出解释。",
+                    ])
+                    prev = os.getcwd()
+                    try:
+                        os.chdir(str(self.crate_dir))
+                        agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+                        agent.run(fix_prompt, prefix="[c2rust-transpiler][sig-fix]", suffix="")
+                    finally:
+                        os.chdir(prev)
+                    # 记录到进度，便于诊断与续跑（签名检查与类型/边界审查结果）
+                    try:
+                        cur = self.progress.get("current") or {}
+                        cur["signature_check"] = {"hint": sig_hint_local, "issues": issues}
+                        # 同步记录类型/边界审查结论与修复标记
+                        tbr = cur.get("type_boundary_review") or {}
+                        tbr.update({"ok": False, "issues": issues, "fixed": True})
+                        cur["type_boundary_review"] = tbr
+                        self.progress["current"] = cur
+                        self._save_progress()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            # 2.2b) 确保从目标模块向上的 mod.rs 声明链补齐
+            try:
+                self._ensure_mod_chain_for_module(module)
+                # 标记当前函数的模块链已补齐，便于诊断与续跑
+                cur = self.progress.get("current") or {}
+                cur["mod_chain_fixed"] = True
+                self.progress["current"] = cur
+                self._save_progress()
+            except Exception:
+                pass
 
             # 3) 构建与修复
             ok = self._cargo_build_loop()

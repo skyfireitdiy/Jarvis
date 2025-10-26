@@ -102,12 +102,24 @@ def transpile(
     only: Optional[str] = typer.Option(
         None, "--only", help="仅翻译指定的函数（名称或限定名称），以逗号分隔"
     ),
+    max_retries: int = typer.Option(
+        0, "-m", "--max-retries", help="构建/修复与审查的最大重试次数（0 表示不限制）"
+    ),
+    resume: bool = typer.Option(
+        True, "--resume/--no-resume", help="是否启用断点续跑（默认启用）"
+    ),
 ) -> None:
     """
     使用转译器按扫描顺序逐个函数转译并构建修复。
     需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl 与 translation_order.jsonl）
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/symbols.jsonl 读取数据。
     未指定目标 crate 时，使用默认 <cwd>/<cwd.name>_rs。
+
+    选项:
+    - --only: 仅翻译指定的函数（名称或限定名称），以逗号分隔
+    - --max-retries/-m: 构建/修复与审查的最大重试次数（0 表示不限制）
+    - --resume/--no-resume: 是否启用断点续跑（默认启用）
+    - --llm-group/-g: 指定用于翻译的 LLM 模型组
     """
     try:
         # Lazy import to avoid hard dependency if not used
@@ -117,6 +129,8 @@ def transpile(
             project_root=Path("."),
             crate_dir=None,
             llm_group=llm_group,
+            max_retries=max_retries,
+            resume=resume,
             only=only_list,
         )
     except Exception as e:
