@@ -29,7 +29,7 @@ from jarvis.jarvis_sec.types import Issue
 # ---------------------------
 
 RE_UNSAFE_API = re.compile(
-    r"\b(strcpy|strcat|gets|sprintf|vsprintf|scanf)\s*\(",
+    r"\b(strcpy|strcat|gets|sprintf|vsprintf)\s*\(",
     re.IGNORECASE,
 )
 RE_BOUNDARY_FUNCS = re.compile(
@@ -129,14 +129,230 @@ def _window(lines: Sequence[str], center: int, before: int = 3, after: int = 3) 
     return [(i, _safe_line(lines, i)) for i in range(start, end + 1)]
 
 
+def _remove_comments_preserve_strings(text: str) -> str:
+    """
+    移除 C/C++ 源码中的注释（// 与 /* */），保留字符串与字符字面量内容；
+    为了保持行号与窗口定位稳定，注释内容会被空格替换并保留换行符。
+    说明：本函数为启发式实现，旨在降低“注释中的API命中”造成的误报。
+    """
+    res: list[str] = []
+    i = 0
+    n = len(text)
+    in_sl_comment = False  # //
+    in_bl_comment = False  # /* */
+    in_string = False      # "
+    in_char = False        # '
+    escape = False
+
+    while i < n:
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+
+        if in_sl_comment:
+            # 单行注释直到换行结束
+            if ch == "\n":
+                in_sl_comment = False
+                res.append(ch)
+            else:
+                # 用空格占位，保持列数
+                res.append(" ")
+            i += 1
+            continue
+
+        if in_bl_comment:
+            # 多行注释直到 */
+            if ch == "*" and nxt == "/":
+                in_bl_comment = False
+                res.append(" ")
+                res.append(" ")
+                i += 2
+            else:
+                # 注释体内保留换行，其余替换为空格
+                res.append("\n" if ch == "\n" else " ")
+                i += 1
+            continue
+
+        # 非注释态下，处理字符串与字符字面量
+        if in_string:
+            res.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if in_char:
+            res.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == "'":
+                in_char = False
+            i += 1
+            continue
+
+        # 进入注释判定（需不在字符串/字符字面量中）
+        if ch == "/" and nxt == "/":
+            in_sl_comment = True
+            # 保留两个占位，避免拼接
+            res.append(" ")
+            res.append(" ")
+            i += 2
+            continue
+        if ch == "/" and nxt == "*":
+            in_bl_comment = True
+            res.append(" ")
+            res.append(" ")
+            i += 2
+            continue
+
+        # 进入字符串/字符字面量
+        if ch == '"':
+            in_string = True
+            res.append(ch)
+            i += 1
+            continue
+        if ch == "'":
+            in_char = True
+            res.append(ch)
+            i += 1
+            continue
+
+        # 普通字符
+        res.append(ch)
+        i += 1
+
+    return "".join(res)
+
+
+def _mask_strings_preserve_len(text: str) -> str:
+    """
+    将字符串与字符字面量内部内容替换为空格，保留引号与换行，保持长度与行号不变。
+    用于在扫描通用 API 模式时避免误将字符串中的片段（如 "system("）当作代码。
+    注意：此函数不移除注释，请在已移除注释的文本上调用。
+    """
+    res: list[str] = []
+    in_string = False
+    in_char = False
+    escape = False
+    for ch in text:
+        if in_string:
+            if escape:
+                # 保留转义反斜杠为两字符（反斜杠+空格），以不破坏列对齐过多
+                res.append(" ")
+                escape = False
+            elif ch == "\\":
+                res.append("\\")
+                escape = True
+            elif ch == '"':
+                res.append('"')
+                in_string = False
+            elif ch == "\n":
+                res.append("\n")
+            else:
+                res.append(" ")
+            continue
+        if in_char:
+            if escape:
+                res.append(" ")
+                escape = False
+            elif ch == "\\":
+                res.append("\\")
+                escape = True
+            elif ch == "'":
+                res.append("'")
+                in_char = False
+            elif ch == "\n":
+                res.append("\n")
+            else:
+                res.append(" ")
+            continue
+        if ch == '"':
+            in_string = True
+            res.append('"')
+            continue
+        if ch == "'":
+            in_char = True
+            res.append("'")
+            continue
+        res.append(ch)
+    return "".join(res)
+
+
+def _strip_if0_blocks(text: str) -> str:
+    """
+    预处理常见的 #if 0 … #else … #endif 结构：
+    - 跳过 #if 0 的主体；若存在 #else，则保留 #else 分支
+    - 保留行数与换行，确保行号稳定
+    限制：仅识别常量 0 的条件，不对复杂表达式求值；#elif 未处理
+    """
+    lines = text.splitlines(keepends=True)
+    out: list[str] = []
+    stack: list[dict] = []  # 每帧：{"kind": "if0"|"if", "skipping": bool, "in_else": bool}
+
+    def any_skipping() -> bool:
+        return any(frame.get("skipping", False) for frame in stack)
+
+    for line in lines:
+        if re.match(r"^\s*#\s*if\s+0\b", line):
+            # 进入 #if 0：主体跳过
+            stack.append({"kind": "if0", "skipping": True, "in_else": False})
+            out.append("\n" if line.endswith("\n") else "")
+            continue
+        if re.match(r"^\s*#\s*if\b", line):
+            # 其他 #if：不求值，仅记录，继承外层 skipping
+            stack.append({"kind": "if", "skipping": any_skipping(), "in_else": False})
+            out.append(line if not any_skipping() else ("\n" if line.endswith("\n") else ""))
+            continue
+        if re.match(r"^\s*#\s*else\b", line):
+            if stack:
+                top = stack[-1]
+                if top["kind"] == "if0":
+                    # #if 0 的 else：翻转 skipping，使 else 分支有效
+                    top["skipping"] = not top["skipping"]
+                    top["in_else"] = True
+            out.append(line if not any_skipping() else ("\n" if line.endswith("\n") else ""))
+            continue
+        if re.match(r"^\s*#\s*endif\b", line):
+            if stack:
+                stack.pop()
+            out.append(line if not any_skipping() else ("\n" if line.endswith("\n") else ""))
+            continue
+        # 常规代码
+        if any_skipping():
+            out.append("\n" if line.endswith("\n") else "")
+        else:
+            out.append(line)
+    return "".join(out)
+
+
 def _has_null_check_around(var: str, lines: Sequence[str], line_no: int, radius: int = 5) -> bool:
+    """
+    扩展空指针检查识别能力，减少误报：
+    - if (ptr) / if (!ptr)
+    - if (ptr == NULL/0) / if (NULL/0 == ptr)
+    - 断言/检查宏：assert(ptr)、assert(ptr != NULL)、BUG_ON(!ptr)、WARN_ON(!ptr)、CHECK/ENSURE 等
+    """
     for i, s in _window(lines, line_no, before=radius, after=radius):
-        # 粗略判定：出现 if(ptr) / if(ptr != NULL) / if(NULL != ptr) 等
+        # 直接真假判断
         if re.search(rf"\bif\s*\(\s*{re.escape(var)}\s*\)", s):
             return True
-        if re.search(rf"\bif\s*\(\s*{re.escape(var)}\s*(==|!=)\s*NULL\s*\)", s):
+        if re.search(rf"\bif\s*\(\s*!\s*{re.escape(var)}\s*\)", s):
             return True
-        if re.search(rf"\bif\s*\(\s*NULL\s*(==|!=)\s*{re.escape(var)}\s*\)", s):
+        # 显式与 NULL/0 比较（任意顺序）
+        if re.search(rf"\bif\s*\(\s*{re.escape(var)}\s*(==|!=)\s*(NULL|0)\s*\)", s):
+            return True
+        if re.search(rf"\bif\s*\(\s*(NULL|0)\s*(==|!=)\s*{re.escape(var)}\s*\)", s):
+            return True
+        # 断言/检查宏（常见宏名）：assert/BUG_ON/WARN_ON/CHECK/ENSURE
+        if re.search(
+            rf"\b(assert|BUG_ON|WARN_ON|CHECK|ENSURE)\s*\(\s*(!\s*)?{re.escape(var)}(\s*(==|!=)\s*(NULL|0))?\s*\)",
+            s,
+        ):
             return True
     return False
 
@@ -164,10 +380,21 @@ def _severity_from_confidence(conf: float, base: str) -> str:
 
 def _rule_unsafe_api(lines: Sequence[str], relpath: str) -> List[Issue]:
     issues: List[Issue] = []
+    is_header = str(relpath).lower().endswith((".h", ".hpp"))
+    re_type_kw = re.compile(r"\b(static|inline|const|volatile|unsigned|signed|long|short|int|char|void|size_t|ssize_t)\b")
     for idx, s in enumerate(lines, start=1):
+        # 跳过预处理行与声明行，减少原型/宏中的误报
+        t = s.lstrip()
+        if t.startswith("#") or re.search(r"\b(typedef|extern)\b", s):
+            continue
         m = RE_UNSAFE_API.search(s)
         if not m:
             continue
+        # 若在头文件中，且形如“返回类型 + 函数原型”的声明行（以 ); 结尾），跳过，避免将原型误报为调用
+        if is_header:
+            before = s[: m.start()]
+            if re_type_kw.search(before) and s.strip().endswith(");"):
+                continue
         api = m.group(1)
         conf = 0.85
         if not _has_len_bound_around(lines, idx, radius=2):
@@ -193,11 +420,35 @@ def _rule_unsafe_api(lines: Sequence[str], relpath: str) -> List[Issue]:
 def _rule_boundary_funcs(lines: Sequence[str], relpath: str) -> List[Issue]:
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
+        # 跳过预处理行与声明行，避免在 typedef/extern 原型中误报
+        t = s.lstrip()
+        if t.startswith("#") or re.search(r"\b(typedef|extern)\b", s):
+            continue
         m = RE_BOUNDARY_FUNCS.search(s)
         if not m:
             continue
         api = m.group(1)
         conf = 0.65
+        # 提取调用参数（启发式，便于准确性优化）
+        args = ""
+        try:
+            start = s.index("(", m.start())
+            end = s.rfind(")")
+            if end != -1 and end > start:
+                args = s[start + 1 : end]
+        except Exception:
+            args = ""
+
+        # 若为 memcpy/memmove 且第三参明显使用 sizeof(...)（且非 sizeof(*ptr)）且未混入 strlen，
+        # 通常为更安全的写法：降低误报（直接跳过告警）
+        safe_sizeof = False
+        if api.lower() in ("memcpy", "memmove") and args:
+            if "sizeof" in args and not RE_SIZEOF_PTR.search(args) and not RE_STRLEN_IN_SIZE.search(args):
+                safe_sizeof = True
+        if safe_sizeof:
+            # 跳过该条，以提高准确性（避免将安全写法误报为风险）
+            continue
+
         # 如果参数中包含 strlen 或 sizeof( *ptr )，提高风险（长度来源不稳定/指针大小）
         if RE_STRLEN_IN_SIZE.search(s) or RE_SIZEOF_PTR.search(s):
             conf += 0.15
@@ -290,45 +541,116 @@ def _rule_malloc_no_null_check(lines: Sequence[str], relpath: str) -> List[Issue
 
 
 def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
-    # 搜集 free(var) 的变量，再检查后续是否出现变量使用
+    """
+    启发式 UAF（use-after-free）线索检测（准确性优化版）：
+    - 仅在 free(var) 之后的窗口内检测到明显“解引用使用”（v->、*v、v[...）而且在此之前未见重新赋值/置空时告警
+    - 忽略 free 后立即将指针置为 NULL/0 的情况
+    说明：仍为启发式，需要结合上下文确认。
+    """
     issues: List[Issue] = []
-    text = "\n".join(lines)
-    free_vars = re.findall(RE_FREE_VAR, text)
-    for v in set(free_vars):
-        # free 后再次出现 v（非常粗糙的线索）
-        pattern = re.compile(rf"free\s*\(\s*{re.escape(v)}\s*\)\s*;(.|\n)+?\b{re.escape(v)}\b", re.MULTILINE)
-        if pattern.search(text):
-            # 取第一次 free 的行号作为证据
-            for idx, s in enumerate(lines, start=1):
-                if re.search(rf"free\s*\(\s*{re.escape(v)}\s*\)\s*;", s):
-                    issues.append(
-                        Issue(
-                            language="c/cpp",
-                            category="memory_mgmt",
-                            pattern="use_after_free_suspect",
-                            file=relpath,
-                            line=idx,
-                            evidence=_strip_line(s),
-                            description=f"变量 {v} 在 free 后可能仍被使用（UAF 线索，需人工确认）。",
-                            suggestion="free 后将指针置 NULL；严格管理生命周期；增加动态/静态检测。",
-                            confidence=0.6,
-                            severity="high",
-                        )
-                    )
-                    break
+    # 收集所有 free(var) 位置
+    free_calls: List[Tuple[str, int]] = []
+    for idx, s in enumerate(lines, start=1):
+        for m in re.finditer(r"free\s*\(\s*([A-Za-z_]\w*)\s*\)\s*;", s):
+            free_calls.append((m.group(1), idx))
+
+    # 针对每个 free(var)，在后续窗口中寻找“危险使用”
+    for var, free_ln in free_calls:
+        # free 后 50 行窗口
+        start = free_ln + 1
+        end = min(len(lines), free_ln + 50)
+
+        # 同/邻近行若有置空，先快速跳过
+        early_null = False
+        for j in range(free_ln, min(len(lines), free_ln + 3) + 1):
+            sj = _safe_line(lines, j)
+            if re.search(rf"\b{re.escape(var)}\s*=\s*(NULL|0)\s*;", sj):
+                early_null = True
+                break
+        if early_null:
+            continue
+
+        reassigned = False
+        uaf_evidence_line: Optional[int] = None
+
+        deref_arrow = re.compile(rf"\b{re.escape(var)}\s*->")
+        deref_star = re.compile(rf"(?<!\w)\*\s*{re.escape(var)}\b")
+        deref_index = re.compile(rf"\b{re.escape(var)}\s*\[")
+        assign_pat = re.compile(rf"\b{re.escape(var)}\s*=")
+
+        for j in range(start, end + 1):
+            sj = _safe_line(lines, j)
+            # 先检测重新赋值（包括置NULL或重新指向），则视为“生命周期重置”，不报本条
+            if assign_pat.search(sj):
+                reassigned = True
+                break
+            # 检测明显的解引用使用
+            if deref_arrow.search(sj) or deref_star.search(sj) or deref_index.search(sj):
+                uaf_evidence_line = j
+                break
+
+        if uaf_evidence_line and not reassigned:
+            # 以 free 行作为证据点（保持与既有输出一致性）
+            evidence = _strip_line(_safe_line(lines, free_ln))
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="memory_mgmt",
+                    pattern="use_after_free_suspect",
+                    file=relpath,
+                    line=free_ln,
+                    evidence=evidence,
+                    description=f"变量 {var} 在 free 后的邻近窗口内出现了解引用使用（UAF 线索），且未检测到重新赋值/置空。",
+                    suggestion="free 后应将指针置为 NULL，并避免在重新赋值前进行任何解引用；建议引入生命周期管理与动态/静态检测。",
+                    confidence=0.65,
+                    severity="high",
+                )
+            )
     return issues
 
 
 def _rule_unchecked_io(lines: Sequence[str], relpath: str) -> List[Issue]:
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
-        if not RE_IO_API.search(s):
+        # 排除预处理与声明
+        t = s.lstrip()
+        if t.startswith("#") or re.search(r"\b(typedef|extern)\b", s):
             continue
-        # 简单启发：若本行或紧随其后 2 行没有涉及条件判断/返回值比较，认为可能未检查错误
-        conf = 0.5
+        m = RE_IO_API.search(s)
+        if not m:
+            continue
+
+        # 若本行/紧随其后 2 行出现条件判断，认为已检查（直接跳过）
         nearby = " ".join(_safe_line(lines, i) for i in range(idx, min(idx + 2, len(lines)) + 1))
-        if not re.search(r"\bif\s*\(|>=|<=|==|!=|<|>", nearby):
-            conf += 0.15
+        if re.search(r"\b(if|while|for)\s*\(", nearby) or re.search(r"(>=|<=|==|!=|<|>)", nearby):
+            continue
+
+        # 若赋值给变量，则在后续窗口内寻找对该变量的检查
+        assigned_var: Optional[str] = None
+        try:
+            # 仅截取调用前的左侧以匹配最近的 "var ="
+            left = s[: m.start()]
+            assigns = list(RE_GENERIC_ASSIGN.finditer(left))
+            if assigns:
+                assigned_var = assigns[-1].group(1)
+        except Exception:
+            assigned_var = None
+
+        checked_via_var = False
+        if assigned_var:
+            end = min(len(lines), idx + 5)
+            var_pat_cond = re.compile(rf"\b(if|while|for)\s*\([^)]*\b{re.escape(assigned_var)}\b[^)]*\)")
+            var_pat_cmp = re.compile(rf"\b{re.escape(assigned_var)}\b\s*(>=|<=|==|!=|<|>)")
+            for j in range(idx + 1, end + 1):
+                sj = _safe_line(lines, j)
+                if var_pat_cond.search(sj) or var_pat_cmp.search(sj):
+                    checked_via_var = True
+                    break
+        if checked_via_var:
+            continue
+
+        # 到此仍未见检查，认为可能未检查错误
+        conf = 0.65  # 较原先略微提高基础置信度，因已进行更多排除
         issues.append(
             Issue(
                 language="c/cpp",
@@ -383,38 +705,178 @@ def _rule_strncpy_no_nullterm(lines: Sequence[str], relpath: str) -> List[Issue]
 
 def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
-    检测格式化字符串漏洞：printf/s(n)printf/v(s)printf 首参数不是字符串字面量；
-    fprintf 第二个参数不是字符串字面量。
+    检测格式化字符串漏洞：printf/sprintf/snprintf/vsprintf/vsnprintf 的格式参数不是字面量；
+    fprintf 的第二个参数不是字面量。
+    准确性优化：
+    - 允许常见本地化/包装宏作为格式参数包装字面量（如 _("..."), gettext("..."), tr("..."), QT_TR_NOOP("...")）
+    - 若参数为变量名，回看若干行，若变量被赋值为字面量字符串，则视为较安全用法（跳过）
+    - 针对不同函数，准确定位“格式串”所在的参数位置：
+      printf: 第1参；sprintf/vsprintf: 第2参；snprintf/vsnprintf: 第3参；fprintf: 第2参
     """
+    SAFE_WRAPPERS = ("_", "gettext", "dgettext", "ngettext", "tr", "QT_TR_NOOP", "QT_TRANSLATE_NOOP")
     issues: List[Issue] = []
+
+    def _arg_is_literal(s: str, j: int) -> bool:
+        while j < len(s) and s[j].isspace():
+            j += 1
+        return j < len(s) and s[j] == '"'
+
+    def _arg_is_wrapper_literal(s: str, j: int) -> bool:
+        k = j
+        while k < len(s) and (s[k].isalnum() or s[k] == "_"):
+            k += 1
+        name = s[j:k]
+        p = k
+        while p < len(s) and s[p].isspace():
+            p += 1
+        if name in SAFE_WRAPPERS and p < len(s) and s[p] == "(":
+            q = p + 1
+            while q < len(s) and s[q].isspace():
+                q += 1
+            return q < len(s) and s[q] == '"'
+        return False
+
+    def _leading_ident(s: str, j: int) -> Optional[str]:
+        k = j
+        if k < len(s) and (s[k].isalpha() or s[k] == "_"):
+            while k < len(s) and (s[k].isalnum() or s[k] == "_"):
+                k += 1
+            return s[j:k]
+        return None
+
+    def _var_assigned_literal(var: str, lines: Sequence[str], upto_idx: int, lookback: int = 5) -> bool:
+        start = max(1, upto_idx - lookback)
+        pat_assign = re.compile(rf"\b{re.escape(var)}\s*=\s*")
+        for j in range(start, upto_idx):
+            sj = _safe_line(lines, j)
+            m = pat_assign.search(sj)
+            if not m:
+                continue
+            k = m.end()
+            while k < len(sj) and sj[k].isspace():
+                k += 1
+            if k < len(sj) and sj[k] == '"':
+                return True
+        return False
+
+    def _nth_arg_start(s: str, open_paren_idx: int, n: int) -> Optional[int]:
+        """
+        返回第 n 个参数的起始索引（首个非空白字符），若失败返回 None。
+        仅在单行内进行括号配对和逗号计数（启发式）。
+        """
+        depth = 0
+        idx = open_paren_idx
+        arg_no = 0
+        # 从 '(' 后开始
+        i = open_paren_idx + 1
+        # 跳到第一个参数
+        arg_no = 1
+        # 如果需要第1个参数，先定位其起始
+        # 统一逻辑：遍历，记录每个参数的起始位置
+        starts: List[int] = []
+        token_started = False
+        start_pos = None
+        while i < len(s):
+            ch = s[i]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                if depth == 0:
+                    # 结束
+                    if start_pos is not None:
+                        starts.append(start_pos)
+                        start_pos = None
+                    break
+                depth -= 1
+            elif ch == "," and depth == 0:
+                # 参数分隔
+                if start_pos is None:
+                    # 空参数，记录当前位置（可能是宏展开），尽量返回后续判断
+                    starts.append(i + 1)
+                else:
+                    starts.append(start_pos)
+                    start_pos = None
+                # 下一个参数
+            else:
+                if not start_pos and not ch.isspace():
+                    start_pos = i
+            i += 1
+        # 补上最后一个参数起点
+        if start_pos is not None:
+            starts.append(start_pos)
+        # 去除参数起点的前导空白
+        cleaned: List[int] = []
+        for pos in starts:
+            j = pos
+            while j < len(s) and s[j].isspace():
+                j += 1
+            cleaned.append(j)
+        if 1 <= n <= len(cleaned):
+            return cleaned[n - 1]
+        return None
+
     for idx, s in enumerate(lines, start=1):
-        # printf/printf-like: 检查第一个参数是否为字面量
-        m1 = RE_PRINTF_LIKE.search(s)
         flagged = False
+        # 处理 printf/sprintf/snprintf/vsprintf/vsnprintf（格式串参数位置不同）
+        m1 = RE_PRINTF_LIKE.search(s)
         if m1:
             try:
-                start = s.index("(", m1.start())
-                j = start + 1
-                while j < len(s) and s[j].isspace():
-                    j += 1
-                if j < len(s) and s[j] != '"':
+                name = m1.group(1).lower()
+                open_idx = s.index("(", m1.start())
+                # 参数索引映射
+                fmt_arg_map = {
+                    "printf": 1,
+                    "sprintf": 2,
+                    "vsprintf": 2,
+                    "snprintf": 3,
+                    "vsnprintf": 3,
+                }
+                fmt_idx = fmt_arg_map.get(name, 1)
+                j = _nth_arg_start(s, open_idx, fmt_idx)
+                if j is not None:
+                    # 字面量/包装字面量/回看字面量赋值的变量
+                    if not _arg_is_literal(s, j):
+                        if (s[j].isalpha() or s[j] == "_"):
+                            if _arg_is_wrapper_literal(s, j):
+                                flagged = False
+                            else:
+                                ident = _leading_ident(s, j)
+                                if ident and _var_assigned_literal(ident, lines, idx, lookback=5):
+                                    flagged = False
+                                else:
+                                    flagged = True
+                        else:
+                            flagged = True
+                else:
+                    # 无法解析参数位置，保守告警
                     flagged = True
-            except ValueError:
+            except Exception:
                 pass
-        # fprintf: 检查第二个参数是否为字面量
+
+        # fprintf：第二个参数为格式串
         m2 = RE_FPRINTF.search(s)
         if not flagged and m2:
             try:
-                start = s.index("(", m2.start())
-                comma = s.find(",", start + 1)
-                if comma != -1:
-                    j = comma + 1
-                    while j < len(s) and s[j].isspace():
-                        j += 1
-                    if j < len(s) and s[j] != '"':
-                        flagged = True
-            except ValueError:
+                open_idx = s.index("(", m2.start())
+                j = _nth_arg_start(s, open_idx, 2)
+                if j is not None:
+                    if not _arg_is_literal(s, j):
+                        if (s[j].isalpha() or s[j] == "_"):
+                            if _arg_is_wrapper_literal(s, j):
+                                flagged = False
+                            else:
+                                ident = _leading_ident(s, j)
+                                if ident and _var_assigned_literal(ident, lines, idx, lookback=5):
+                                    flagged = False
+                                else:
+                                    flagged = True
+                        else:
+                            flagged = True
+                else:
+                    flagged = True
+            except Exception:
                 pass
+
         if flagged:
             issues.append(
                 Issue(
@@ -460,24 +922,75 @@ def _rule_insecure_tmpfile(lines: Sequence[str], relpath: str) -> List[Issue]:
 def _rule_command_execution(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测命令执行API：system/popen 和 exec* 系列，其中参数不是字面量（可能引入命令注入风险）
+    准确性优化：
+    - exec* 系列仅在第一个参数不是字面量路径时告警
+    - 若第一个参数为变量名，向前回看若干行，若检测到该变量被赋值为字面量字符串，则视为较安全用法（跳过）
     """
     issues: List[Issue] = []
+
+    def _arg_is_literal_or_wrapper(s: str, start_idx: int) -> bool:
+        # 跳过空白，判断是否直接为字面量
+        j = start_idx + 1
+        while j < len(s) and s[j].isspace():
+            j += 1
+        return j < len(s) and s[j] == '"'
+
+    def _first_arg_identifier(s: str, start_idx: int) -> Optional[str]:
+        j = start_idx + 1
+        while j < len(s) and s[j].isspace():
+            j += 1
+        if j < len(s) and (s[j].isalpha() or s[j] == "_"):
+            k = j
+            while k < len(s) and (s[k].isalnum() or s[k] == "_"):
+                k += 1
+            return s[j:k]
+        return None
+
+    def _var_assigned_literal(var: str, lines: Sequence[str], upto_idx: int, lookback: int = 5) -> bool:
+        # 在前 lookback 行内查找 var = "..."
+        start = max(1, upto_idx - lookback)
+        pat_assign = re.compile(rf"\b{re.escape(var)}\s*=\s*")
+        for j in range(start, upto_idx):
+            sj = _safe_line(lines, j)
+            m = pat_assign.search(sj)
+            if not m:
+                continue
+            # 检查赋值右侧是否为字面量（masked 文本中依旧保留引号）
+            k = m.end()
+            while k < len(sj) and sj[k].isspace():
+                k += 1
+            if k < len(sj) and sj[k] == '"':
+                return True
+        return False
+
     for idx, s in enumerate(lines, start=1):
         flagged = False
         m_sys = RE_SYSTEM_LIKE.search(s)
         if m_sys:
             try:
                 start = s.index("(", m_sys.start())
-                j = start + 1
-                while j < len(s) and s[j].isspace():
-                    j += 1
-                if j < len(s) and s[j] != '"':
-                    flagged = True
+                if not _arg_is_literal_or_wrapper(s, start):
+                    # 若首参为变量且之前赋过字面量，则跳过
+                    ident = _first_arg_identifier(s, start)
+                    if ident and _var_assigned_literal(ident, lines, idx, lookback=5):
+                        flagged = False
+                    else:
+                        flagged = True
             except Exception:
                 pass
-        if not flagged and RE_EXEC_LIKE.search(s):
-            # 对 exec* 系列保守告警：难以可靠判断参数是否安全构造
-            flagged = True
+        if not flagged:
+            m_exec = RE_EXEC_LIKE.search(s)
+            if m_exec:
+                try:
+                    start = s.index("(", m_exec.start())
+                    if not _arg_is_literal_or_wrapper(s, start):
+                        ident = _first_arg_identifier(s, start)
+                        if ident and _var_assigned_literal(ident, lines, idx, lookback=5):
+                            flagged = False
+                        else:
+                            flagged = True
+                except Exception:
+                    flagged = True
         if flagged:
             issues.append(
                 Issue(
@@ -500,6 +1013,9 @@ def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测 scanf/sscanf/fscanf 使用 %s 但未指定最大宽度，存在缓冲区溢出风险。
     仅对格式串直接字面量的情况进行粗略检查。
+    准确性优化：
+    - 忽略 GNU 扩展的 %ms（自动分配内存）与 %m[...] 模式（自动分配），这类不会对固定缓冲造成溢出
+    - 忽略丢弃输入的 %*s（不写入目标缓冲）
     """
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
@@ -507,8 +1023,17 @@ def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
         if not m:
             continue
         fmt = m.group(1)
-        # 若包含 "%s" 但未出现 "%<digits>s" 形式，则告警
+        unsafe = False
+        # 经典不安全情形：出现 %s 但未指定最大宽度
         if "%s" in fmt and not re.search(r"%\d+s", fmt):
+            unsafe = True
+        # 例外：%*s 丢弃输入，不写入目标缓冲
+        if unsafe and re.search(r"%\*s", fmt):
+            unsafe = False
+        # 例外：GNU 扩展 %ms 或 %m[...]（自动分配）
+        if unsafe and re.search(r"%m[a-z\[]", fmt, re.IGNORECASE):
+            unsafe = False
+        if unsafe:
             issues.append(
                 Issue(
                     language="c/cpp",
@@ -518,7 +1043,7 @@ def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
                     line=idx,
                     evidence=_strip_line(s),
                     description="scanf/sscanf/fscanf 使用 %s 但未限制最大宽度，存在缓冲区溢出风险。",
-                    suggestion="为 %s 指定最大宽度（如 \"%255s\"），或使用更安全的读取方式。",
+                    suggestion="为 %s 指定最大宽度（如 \"%255s\"），或使用更安全的读取方式；若使用 GNU 扩展 %ms/%m[...] 请确保对返回内存进行释放。",
                     confidence=0.75,
                     severity="high",
                 )
@@ -570,22 +1095,39 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
     启发式检测空指针解引用：
     - 出现 p->... 或 *p 访问，且邻近未见明显的 NULL 检查。
     注：可能存在误报，需结合上下文确认。
+    准确性优化：
+    - 对于 *p 的检测，引入上下文判定，尽量排除乘法表达式 a * p 的误报
+     （仅当 * 出现在典型解引用上下文，如行首/括号后/逗号后/赋值号后/分号后/冒号后/方括号后/逻辑非/取地址/另一解引用后）
     """
     issues: List[Issue] = []
     re_arrow = re.compile(r"\b([A-Za-z_]\w*)\s*->")
     re_star = re.compile(r"(?<!\w)\*\s*([A-Za-z_]\w*)\b")
     type_kw = re.compile(r"\b(typedef|struct|union|enum|class|char|int|long|short|void|size_t|ssize_t|FILE)\b")
+
+    def _is_deref_context(line: str, star_pos: int) -> bool:
+        k = star_pos - 1
+        while k >= 0 and line[k].isspace():
+            k -= 1
+        if k < 0:
+            return True
+        # 典型可视为解引用的前导字符集合
+        return line[k] in "(*,=:{;[!&"
+
     for idx, s in enumerate(lines, start=1):
-        vars_hit = []
+        vars_hit: List[str] = []
         # '->' 访问几乎必为解引用
         for m in re_arrow.finditer(s):
             vars_hit.append(m.group(1))
-        # '*p' 可能是声明，粗略排除类型声明行与函数指针/形参
+        # '*p'：排除类型声明行；并通过上下文过滤乘法用法
         if "*" in s and not type_kw.search(s):
             for m in re_star.finditer(s):
-                # 排除赋值左侧的声明模式很困难，保守纳入
+                star_pos = m.start(0)
+                if not _is_deref_context(s, star_pos):
+                    continue
                 vars_hit.append(m.group(1))
         for v in set(vars_hit):
+            if v == "this":  # C++ 成员函数中 this-> 通常不应视为空指针
+                continue
             if not _has_null_check_around(v, lines, idx, radius=3):
                 issues.append(
                     Issue(
@@ -984,6 +1526,9 @@ def _rule_alloca_unbounded(lines: Sequence[str], relpath: str) -> List[Issue]:
         # 纯数字常量或包含 sizeof 视为更安全
         if re.fullmatch(r"\d+\s*", arg) or "sizeof" in arg:
             continue
+        # 宏常量（全大写+下划线/数字）通常为编译期常量，减少误报
+        if re.fullmatch(r"[A-Z_][A-Z0-9_]*", arg):
+            continue
         conf = 0.6
         if re.search(r"(len|size|count|n)\b", arg, re.IGNORECASE):
             conf += 0.1
@@ -1021,6 +1566,9 @@ def _rule_vla_usage(lines: Sequence[str], relpath: str) -> List[Issue]:
             continue
         length_expr = m.group(1).strip()
         if re.fullmatch(r"\d+\s*", length_expr):
+            continue
+        # 宏常量（全大写+下划线/数字）通常为编译期常量（非 VLA），降低误报
+        if re.fullmatch(r"[A-Z_][A-Z0-9_]*", length_expr):
             continue
         issues.append(
             Issue(
@@ -1069,28 +1617,38 @@ def _rule_pthread_returns_unchecked(lines: Sequence[str], relpath: str) -> List[
 def _rule_cond_wait_no_loop(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测 pthread_cond_wait 未在 while 循环中使用（防止虚假唤醒）。
+    准确性优化：
+    - 支持检测“与调用在同一行的 while(predicate) pthread_cond_wait(...)”写法，避免误报
     """
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
-        if not RE_PTHREAD_COND_WAIT.search(s):
+        m = RE_PTHREAD_COND_WAIT.search(s)
+        if not m:
             continue
         # 回看 2 行内是否有 while( ... )
         prev_text = " ".join(_safe_line(lines, j) for j in range(max(1, idx - 2), idx))
-        if not re.search(r"\bwhile\s*\(", prev_text):
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="thread_safety",
-                    pattern="cond_wait_no_loop",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="pthread_cond_wait 建议置于条件谓词的 while 循环中，以防止虚假唤醒。",
-                    suggestion="使用 while(predicate_not_satisfied) 包裹 pthread_cond_wait 调用并在唤醒后重新检查条件。",
-                    confidence=0.6,
-                    severity="medium",
-                )
+        has_prev_while = re.search(r"\bwhile\s*\(", prev_text) is not None
+        # 同一行（调用前半部分）若包含 while(...)，也视为正确用法
+        same_line_before = s[: m.start()]
+        has_same_line_while = re.search(r"\bwhile\s*\(", same_line_before) is not None
+
+        if has_prev_while or has_same_line_while:
+            continue
+
+        issues.append(
+            Issue(
+                language="c/cpp",
+                category="thread_safety",
+                pattern="cond_wait_no_loop",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="pthread_cond_wait 建议置于条件谓词的 while 循环中，以防止虚假唤醒。",
+                suggestion="使用 while(predicate_not_satisfied) 包裹 pthread_cond_wait 调用并在唤醒后重新检查条件。",
+                confidence=0.6,
+                severity="medium",
             )
+        )
     return issues
 
 
@@ -1208,41 +1766,51 @@ def _rule_getenv_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
 def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     """
     基于提供的文本进行 C/C++ 启发式分析。
+    - 准确性优化：在启发式匹配前移除注释（保留字符串/字符字面量），
+      以避免注释中的API命中导致的误报。
+    - 准确性优化2：对通用 API 扫描使用“字符串内容掩蔽”的副本，避免把字符串里的片段当作代码。
     """
-    lines = text.splitlines()
+    pre_text = _strip_if0_blocks(text)
+    clean_text = _remove_comments_preserve_strings(pre_text)
+    masked_text = _mask_strings_preserve_len(clean_text)
+    # 原始行：保留字符串内容，供需要解析字面量的规则使用（如格式串、scanf 宽度等）
+    lines = clean_text.splitlines()
+    # 掩蔽行：字符串内容已被空格替换，适合用于通用 API/关键字匹配，减少误报
+    mlines = masked_text.splitlines()
+
     issues: List[Issue] = []
-    issues.extend(_rule_unsafe_api(lines, relpath))
-    issues.extend(_rule_boundary_funcs(lines, relpath))
-    issues.extend(_rule_realloc_assign_back(lines, relpath))
-    issues.extend(_rule_malloc_no_null_check(lines, relpath))
-    issues.extend(_rule_uaf_suspect(lines, relpath))
-    issues.extend(_rule_unchecked_io(lines, relpath))
+    # 通用 API/关键字匹配（使用掩蔽行）
+    issues.extend(_rule_unsafe_api(mlines, relpath))
+    issues.extend(_rule_boundary_funcs(mlines, relpath))
+    issues.extend(_rule_realloc_assign_back(mlines, relpath))
+    issues.extend(_rule_malloc_no_null_check(mlines, relpath))
+    issues.extend(_rule_unchecked_io(mlines, relpath))
+    # 需要字符串字面量信息的规则（使用原始行）
     issues.extend(_rule_strncpy_no_nullterm(lines, relpath))
-    # 新增规则
     issues.extend(_rule_format_string(lines, relpath))
-    issues.extend(_rule_insecure_tmpfile(lines, relpath))
-    issues.extend(_rule_command_execution(lines, relpath))
     issues.extend(_rule_scanf_no_width(lines, relpath))
-    issues.extend(_rule_alloc_size_overflow(lines, relpath))
-    # 新增：其他危险用法（低误报优先）
-    issues.extend(_rule_double_free_and_free_non_heap(lines, relpath))
-    issues.extend(_rule_atoi_family(lines, relpath))
-    issues.extend(_rule_rand_insecure(lines, relpath))
-    issues.extend(_rule_strtok_nonreentrant(lines, relpath))
-    issues.extend(_rule_open_permissive_perms(lines, relpath))
-    # 更多危险用法（第二批）
-    issues.extend(_rule_alloca_unbounded(lines, relpath))
-    issues.extend(_rule_vla_usage(lines, relpath))
-    issues.extend(_rule_pthread_returns_unchecked(lines, relpath))
-    issues.extend(_rule_cond_wait_no_loop(lines, relpath))
-    issues.extend(_rule_thread_leak_no_join(lines, relpath))
-    issues.extend(_rule_inet_legacy(lines, relpath))
-    issues.extend(_rule_time_apis_not_threadsafe(lines, relpath))
-    issues.extend(_rule_getenv_unchecked(lines, relpath))
-    # 新增：空指针/野指针/死锁检测
-    issues.extend(_rule_possible_null_deref(lines, relpath))
-    issues.extend(_rule_uninitialized_ptr_use(lines, relpath))
-    issues.extend(_rule_deadlock_patterns(lines, relpath))
+    # 其他规则
+    issues.extend(_rule_insecure_tmpfile(mlines, relpath))
+    issues.extend(_rule_command_execution(mlines, relpath))
+    issues.extend(_rule_alloc_size_overflow(mlines, relpath))
+    issues.extend(_rule_double_free_and_free_non_heap(mlines, relpath))
+    issues.extend(_rule_atoi_family(mlines, relpath))
+    issues.extend(_rule_rand_insecure(mlines, relpath))
+    issues.extend(_rule_strtok_nonreentrant(mlines, relpath))
+    issues.extend(_rule_open_permissive_perms(mlines, relpath))
+    issues.extend(_rule_alloca_unbounded(mlines, relpath))
+    issues.extend(_rule_vla_usage(mlines, relpath))
+    issues.extend(_rule_pthread_returns_unchecked(mlines, relpath))
+    issues.extend(_rule_cond_wait_no_loop(mlines, relpath))
+    issues.extend(_rule_thread_leak_no_join(mlines, relpath))
+    issues.extend(_rule_inet_legacy(mlines, relpath))
+    issues.extend(_rule_time_apis_not_threadsafe(mlines, relpath))
+    issues.extend(_rule_getenv_unchecked(mlines, relpath))
+    # 复杂语义（使用掩蔽行避免字符串干扰）
+    issues.extend(_rule_uaf_suspect(mlines, relpath))
+    issues.extend(_rule_possible_null_deref(mlines, relpath))
+    issues.extend(_rule_uninitialized_ptr_use(mlines, relpath))
+    issues.extend(_rule_deadlock_patterns(mlines, relpath))
     return issues
 
 
