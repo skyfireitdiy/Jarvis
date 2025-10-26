@@ -26,7 +26,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 class ReadSymbolsTool:
     # 文件名必须与工具名一致，便于注册表自动加载
     name = "read_symbols"
-    description = "从symbols.jsonl按需读取指定符号的记录，避免完整加载大文件。参数包含符号表路径和符号名列表（匹配 name 与 qualified_name）"
+    description = "从symbols.jsonl按需读取指定符号的记录，避免完整加载大文件。参数包含符号表路径和符号名列表（匹配 name 与 qualified_name）（C2Rust工具专用）"
     parameters = {
         "type": "object",
         "properties": {
