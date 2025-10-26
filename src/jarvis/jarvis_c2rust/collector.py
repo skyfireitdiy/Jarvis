@@ -97,6 +97,48 @@ def _ensure_parse_args_for_header(file: Path, base_args: Optional[List[str]]) ->
     return args
 
 
+def _collect_decl_function_names(cindex, file: Path, args: List[str]) -> List[str]:
+    """
+    Fallback for headers without inline definitions:
+    collect function declarations (prototypes/methods) defined in this header file.
+    """
+    try:
+        index = cindex.Index.create()
+        tu = index.parse(str(file), args=args, options=0)
+    except Exception:
+        return []
+    names: List[str] = []
+    seen = set()
+
+    def visit(node):
+        try:
+            kind = node.kind.name
+        except Exception:
+            kind = ""
+        if kind in {"FUNCTION_DECL", "CXX_METHOD", "FUNCTION_TEMPLATE", "CONSTRUCTOR", "DESTRUCTOR"}:
+            loc_file = getattr(getattr(node, "location", None), "file", None)
+            try:
+                same_file = loc_file is not None and Path(loc_file.name).resolve() == file.resolve()
+            except Exception:
+                same_file = False
+            if same_file:
+                try:
+                    nm = str(node.spelling or "").strip()
+                except Exception:
+                    nm = ""
+                if nm and nm not in seen:
+                    seen.add(nm)
+                    names.append(nm)
+        for ch in node.get_children():
+            visit(ch)
+
+    try:
+        visit(tu.cursor)
+    except Exception:
+        pass
+    return names
+
+
 def collect_function_names(
     files: List[Path],
     out_path: Path,
@@ -173,7 +215,8 @@ def collect_function_names(
             except Exception:
                 funcs = []
 
-        # Extract preferred name (qualified_name or name)
+        # Extract preferred name (qualified_name or name) from definitions
+        added_count = 0
         for fn in funcs:
             name = ""
             try:
@@ -183,12 +226,24 @@ def collect_function_names(
                 name = str(name).strip()
             except Exception:
                 name = ""
-            if not name:
-                continue
-            if name in seen:
+            if not name or name in seen:
                 continue
             seen.add(name)
             ordered_names.append(name)
+            added_count += 1
+
+        # Fallback: if no definitions found in this header, collect declarations
+        if not funcs or added_count == 0:
+            try:
+                decl_names = _collect_decl_function_names(cindex, hf, args)
+            except Exception:
+                decl_names = []
+            for nm in decl_names:
+                name = str(nm).strip()
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                ordered_names.append(name)
 
     # Write out file (one per line)
     out_path = Path(out_path)
