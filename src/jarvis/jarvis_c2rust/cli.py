@@ -239,6 +239,163 @@ def collect(
         typer.secho(f"[c2rust-collect] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+@app.command("run")
+def run(
+    files: Optional[List[Path]] = typer.Option(
+        None,
+        "--files",
+        help="用于 collect 阶段的头文件列表（.h/.hh/.hpp/.hxx）；提供则先执行 collect",
+    ),
+    out: Optional[Path] = typer.Option(
+        None,
+        "-o",
+        "--out",
+        help="collect 输出函数名文件；若未提供且指定 --files 则默认为 <root>/.jarvis/c2rust/roots.txt",
+    ),
+    llm_group: Optional[str] = typer.Option(
+        None,
+        "-g",
+        "--llm-group",
+        help="用于 LLM 相关阶段（lib-replace/prepare/transpile）的模型组",
+    ),
+    root_list_file: Optional[Path] = typer.Option(
+        None,
+        "--root-list-file",
+        help="兼容占位：run 会使用 collect 的 --out 作为 lib-replace 的输入；当提供 --files 时本参数将被忽略；未提供 --files 时，本命令要求使用 --root-list-syms",
+    ),
+    root_list_syms: Optional[str] = typer.Option(
+        None,
+        "--root-list-syms",
+        help="lib-replace 的根列表内联（逗号分隔）。未提供 --files 时该参数为必填",
+    ),
+    disabled_libs: Optional[str] = typer.Option(
+        None,
+        "--disabled-libs",
+        help="lib-replace 禁用库列表（逗号分隔）",
+    ),
+) -> None:
+    """
+    依次执行流水线：collect -> scan -> lib-replace -> prepare -> transpile
+
+    约束:
+    - collect 的输出文件就是 lib-replace 的输入文件；
+      当提供 --files 时，lib-replace 将固定读取 --out（或默认值）作为根列表文件，忽略 --root-list-file
+    - 未提供 --files 时，必须通过 --root-list-syms 提供根列表
+    - scan 始终执行以确保数据完整
+    - prepare/transpile 会使用 --llm-group 指定的模型组
+    """
+    try:
+        data_dir = Path(".") / ".jarvis" / "c2rust"
+        default_roots = data_dir / "roots.txt"
+
+        # Step 1: collect（可选）
+        roots_path: Optional[Path] = None
+        if files:
+            try:
+                if out is None:
+                    out = default_roots
+                out.parent.mkdir(parents=True, exist_ok=True)
+                from jarvis.jarvis_c2rust.collector import (
+                    collect_function_names as _collect_fn_names,
+                )
+                _collect_fn_names(files=files, out_path=out)
+                typer.secho(f"[c2rust-run] collect: 函数名已写入: {out}", fg=typer.colors.GREEN)
+                roots_path = out
+            except Exception as _e:
+                typer.secho(f"[c2rust-run] collect: 错误: {_e}", fg=typer.colors.RED, err=True)
+                raise
+
+        # Step 2: scan（始终执行）
+        typer.secho("[c2rust-run] scan: 开始", fg=typer.colors.BLUE)
+        _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False)
+        typer.secho("[c2rust-run] scan: 完成", fg=typer.colors.GREEN)
+
+        # Step 3: lib-replace（强制执行，依据约束获取根列表）
+        root_names: List[str] = []
+
+        if files:
+            # 约束：collect 的输出文件作为唯一文件来源
+            if not roots_path or not roots_path.exists():
+                typer.secho("[c2rust-run] lib-replace: 未找到 collect 输出文件，无法继续", fg=typer.colors.RED, err=True)
+                raise typer.Exit(code=2)
+            try:
+                txt = roots_path.read_text(encoding="utf-8")
+                root_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
+                typer.secho(f"[c2rust-run] lib-replace: 使用根列表文件: {roots_path}", fg=typer.colors.BLUE)
+            except Exception as _e:
+                typer.secho(f"[c2rust-run] lib-replace: 读取根列表失败: {roots_path}: {_e}", fg=typer.colors.RED, err=True)
+                raise
+            # 兼容参数提示
+            if root_list_file is not None:
+                typer.secho("[c2rust-run] 提示: --root-list-file 已被忽略（run 会固定使用 collect 的 --out 作为输入）", fg=typer.colors.YELLOW)
+        else:
+            # 约束：未传递 files 必须提供 --root-list-syms
+            if not (isinstance(root_list_syms, str) and root_list_syms.strip()):
+                typer.secho("[c2rust-run] 错误：未提供 --files 时，必须通过 --root-list-syms 指定根列表（逗号分隔）", fg=typer.colors.RED, err=True)
+                raise typer.Exit(code=2)
+            parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
+            root_names.extend(parts)
+
+        # 去重并校验非空
+        try:
+            root_names = list(dict.fromkeys(root_names))
+        except Exception:
+            root_names = sorted(list(set(root_names)))
+        if not root_names:
+            typer.secho("[c2rust-run] lib-replace: 根列表为空，无法继续", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=2)
+
+        # 可选禁用库列表
+        disabled_list: Optional[List[str]] = None
+        if isinstance(disabled_libs, str) and disabled_libs.strip():
+            disabled_list = [s.strip() for s in disabled_libs.replace("\n", ",").split(",") if s.strip()]
+            if disabled_list:
+                typer.secho(f"[c2rust-run] lib-replace: 禁用库: {', '.join(disabled_list)}", fg=typer.colors.YELLOW)
+
+        # 执行 lib-replace（默认库 std）
+        library = "std"
+        typer.secho(f"[c2rust-run] lib-replace: 开始（库: {library}，根数: {len(root_names)}）", fg=typer.colors.BLUE)
+        ret = _apply_library_replacement(
+            db_path=Path("."),
+            library_name=library,
+            llm_group=llm_group,
+            candidates=root_names,
+            out_symbols_path=None,
+            out_mapping_path=None,
+            max_funcs=None,
+            disabled_libraries=disabled_list,
+        )
+        try:
+            order_msg = f"\n[c2rust-run] lib-replace: 转译顺序: {ret['order']}" if 'order' in ret else ""
+            typer.secho(
+                f"[c2rust-run] lib-replace: 替代映射: {ret['mapping']}\n"
+                f"[c2rust-run] lib-replace: 新符号表: {ret['symbols']}"
+                + order_msg,
+                fg=typer.colors.GREEN,
+            )
+        except Exception as _e:
+            typer.secho(f"[c2rust-run] lib-replace: 结果输出时发生非致命错误: {_e}", fg=typer.colors.YELLOW, err=True)
+
+        # Step 4: prepare
+        typer.secho("[c2rust-run] prepare: 开始", fg=typer.colors.BLUE)
+        _execute_llm_plan(apply=True, llm_group=llm_group)
+        typer.secho("[c2rust-run] prepare: 完成", fg=typer.colors.GREEN)
+
+        # Step 5: transpile
+        typer.secho("[c2rust-run] transpile: 开始", fg=typer.colors.BLUE)
+        from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
+        _run_transpile(
+            project_root=Path("."),
+            crate_dir=None,
+            llm_group=llm_group,
+            only=None,
+        )
+        typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"[c2rust-run] 错误: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+
 def main() -> None:
     """主入口"""
     app()
