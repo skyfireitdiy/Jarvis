@@ -851,10 +851,12 @@ class ToolRegistry(OutputHandlerProtocol):
                 try:
                     args = json.loads(args)
                 except json.JSONDecodeError:
-                    PrettyOutput.print(
-                        f"工具参数格式无效: {name} {tool_call_help}", OutputType.ERROR
-                    )
-                    return ""
+                    # 返回错误并附带完整的工具使用提示，指导下一次正确调用
+                    try:
+                        usage_prompt = agent_instance.get_tool_usage_prompt()
+                    except Exception:
+                        usage_prompt = tool_call_help
+                    return f"工具参数格式无效: {name}。arguments 应为可解析的 JSON 或对象，请按工具调用格式提供。\n\n{usage_prompt}"
 
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
             result = self.execute_tool(name, args, agent)
@@ -873,6 +875,15 @@ class ToolRegistry(OutputHandlerProtocol):
                 agent_instance_for_record.set_user_data("__executed_tools__", executed_list)  # type: ignore
             except Exception:
                 pass
+
+            # 如果执行失败，附带工具使用提示返回
+            if not result.get("success", False):
+                try:
+                    usage_prompt = agent_instance.get_tool_usage_prompt()
+                except Exception:
+                    usage_prompt = tool_call_help
+                err_output = self._format_tool_output(result.get("stdout", ""), result.get("stderr", ""))
+                return f"{err_output}\n\n{usage_prompt}"
 
             # 格式化输出
             output = self._format_tool_output(
@@ -934,4 +945,10 @@ class ToolRegistry(OutputHandlerProtocol):
 
         except Exception as e:
             PrettyOutput.print(f"工具执行失败：{str(e)}", OutputType.ERROR)
-            return f"工具调用失败: {str(e)}"
+            try:
+                from jarvis.jarvis_agent import Agent  # 延迟导入避免循环依赖
+                agent_instance_for_prompt: Agent = agent  # type: ignore
+                usage_prompt = agent_instance_for_prompt.get_tool_usage_prompt()
+            except Exception:
+                usage_prompt = tool_call_help
+            return f"工具调用失败: {str(e)}\n\n{usage_prompt}"
