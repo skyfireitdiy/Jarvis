@@ -68,7 +68,6 @@ class CodeAgent:
 
         # 检测 git username 和 email 是否已设置
         self._check_git_config()
-        tool_registry = ToolRegistry()  # type: ignore
         base_tools = [
             "execute_script",
             "search_web",
@@ -88,7 +87,6 @@ class CodeAgent:
             # 去重
             base_tools = list(dict.fromkeys(base_tools))
 
-        tool_registry.use_tools(base_tools)
         code_system_prompt = self._get_system_prompt()
         # 先加载全局规则（数据目录 rules），再加载项目规则（.jarvis/rules），并拼接为单一规则块注入
         global_rules = self._read_global_rules()
@@ -116,6 +114,7 @@ class CodeAgent:
             use_analysis=False,  # 禁用分析
             non_interactive=self.non_interactive,
             plan=bool(plan) if plan is not None else is_plan_enabled(),
+            use_tools=base_tools,  # 仅启用限定工具
         )
 
         self.agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
