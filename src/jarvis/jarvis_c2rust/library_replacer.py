@@ -47,6 +47,10 @@ def apply_library_replacement(
     out_mapping_path: Optional[Path] = None,
     max_funcs: Optional[int] = None,
     disabled_libraries: Optional[List[str]] = None,
+    resume: bool = True,
+    checkpoint_path: Optional[Path] = None,
+    checkpoint_interval: int = 1,
+    clear_checkpoint_on_done: bool = True,
 ) -> Dict[str, Path]:
     """
     基于依赖图由 LLM 判定，对满足“整子树可由指定库单个 API 替代”的函数根进行替换并剪枝。
@@ -90,6 +94,10 @@ def apply_library_replacement(
     alias_symbols_path = data_dir / "symbols.jsonl"  # 通用别名
     order_prune_path = data_dir / "translation_order_prune.jsonl"
     alias_order_path = data_dir / "translation_order.jsonl"
+
+    # Checkpoint 默认路径
+    if checkpoint_path is None:
+        checkpoint_path = data_dir / "library_replacer_checkpoint.json"
 
     # 读取符号
     all_records: List[Dict[str, Any]] = []
@@ -265,6 +273,70 @@ def apply_library_replacement(
     if isinstance(disabled_libraries, list):
         disabled_norm = [str(x).strip().lower() for x in disabled_libraries if str(x).strip()]
         disabled_display = ", ".join([str(x).strip() for x in disabled_libraries if str(x).strip()])
+
+    # 断点恢复支持：工具函数与关键键构造
+    def _norm_list(items: Optional[List[str]]) -> List[str]:
+        if not isinstance(items, list):
+            return []
+        vals: List[str] = []
+        for x in items:
+            try:
+                s = str(x).strip()
+            except Exception:
+                continue
+            if s:
+                vals.append(s)
+        try:
+            vals = list(dict.fromkeys(vals))
+        except Exception:
+            vals = sorted(set(vals))
+        return vals
+
+    def _norm_list_lower(items: Optional[List[str]]) -> List[str]:
+        return [s.lower() for s in _norm_list(items)]
+
+    ckpt_path: Path = Path(checkpoint_path) if checkpoint_path is not None else (data_dir / "library_replacer_checkpoint.json")
+
+    def _make_ckpt_key() -> Dict[str, Any]:
+        try:
+            abs_sym = str(Path(sjsonl).resolve())
+        except Exception:
+            abs_sym = str(sjsonl)
+        key: Dict[str, Any] = {
+            "symbols": abs_sym,
+            "library_name": str(library_name),
+            "llm_group": str(llm_group or ""),
+            "candidates": _norm_list(candidates),
+            "disabled_libraries": _norm_list_lower(disabled_libraries),
+            "max_funcs": (int(max_funcs) if isinstance(max_funcs, int) or (isinstance(max_funcs, float) and float(max_funcs).is_integer()) else None),
+        }
+        return key
+
+    def _load_checkpoint_if_match() -> Optional[Dict[str, Any]]:
+        try:
+            if not resume:
+                return None
+            if not ckpt_path.exists():
+                return None
+            obj = json.loads(ckpt_path.read_text(encoding="utf-8"))
+            if not isinstance(obj, dict):
+                return None
+            if obj.get("key") != _make_ckpt_key():
+                return None
+            return obj
+        except Exception:
+            return None
+
+    def _atomic_write(path: Path, content: str) -> None:
+        try:
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(content, encoding="utf-8")
+            tmp.replace(path)
+        except Exception:
+            try:
+                path.write_text(content, encoding="utf-8")
+            except Exception:
+                pass
 
     def _new_model() -> Optional[Any]:
         if not _model_available:
@@ -539,6 +611,67 @@ def apply_library_replacement(
     pruned_dynamic: Set[int] = set()  # 动态累计的“将被剪除”的函数集合（不含选中根）
     selected_roots: List[Tuple[int, Dict[str, Any]]] = []  # 实时选中的可替代根（fid, LLM结果）
     processed_roots: Set[int] = set()  # 已处理（评估或跳过）的根集合
+    last_ckpt_saved = 0  # 上次保存的计数
+
+    # 若存在匹配的断点文件，则加载恢复
+    _loaded_ckpt = _load_checkpoint_if_match()
+    if resume and _loaded_ckpt:
+        try:
+            eval_counter = int(_loaded_ckpt.get("eval_counter") or 0)
+        except Exception:
+            pass
+        try:
+            processed_roots = set(int(x) for x in (_loaded_ckpt.get("processed_roots") or []))
+        except Exception:
+            processed_roots = set()
+        try:
+            pruned_dynamic = set(int(x) for x in (_loaded_ckpt.get("pruned_dynamic") or []))
+        except Exception:
+            pruned_dynamic = set()
+        try:
+            sr_list = []
+            for it in (_loaded_ckpt.get("selected_roots") or []):
+                if isinstance(it, dict) and "fid" in it and "res" in it:
+                    sr_list.append((int(it["fid"]), it["res"]))
+            selected_roots = sr_list
+        except Exception:
+            selected_roots = []
+        typer.secho(
+            f"[c2rust-library] 已从断点恢复: 已评估={eval_counter}, 已处理根={len(processed_roots)}, 已剪除={len(pruned_dynamic)}, 已选中替代根={len(selected_roots)}",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+
+    def _current_checkpoint_state() -> Dict[str, Any]:
+        try:
+            ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+        except Exception:
+            ts = ""
+        return {
+            "key": _make_ckpt_key(),
+            "eval_counter": eval_counter,
+            "processed_roots": sorted(list(processed_roots)),
+            "pruned_dynamic": sorted(list(pruned_dynamic)),
+            "selected_roots": [{"fid": fid, "res": res} for fid, res in selected_roots],
+            "timestamp": ts,
+        }
+
+    def _periodic_checkpoint_save(force: bool = False) -> None:
+        nonlocal last_ckpt_saved
+        if not resume:
+            return
+        try:
+            interval = int(checkpoint_interval)
+        except Exception:
+            interval = 1
+        need_save = force or (interval <= 0) or ((eval_counter - last_ckpt_saved) >= interval)
+        if not need_save:
+            return
+        try:
+            _atomic_write(ckpt_path, json.dumps(_current_checkpoint_state(), ensure_ascii=False, indent=2))
+            last_ckpt_saved = eval_counter
+        except Exception:
+            pass
 
     def _evaluate_node(fid: int) -> None:
         nonlocal eval_counter
@@ -564,6 +697,7 @@ def apply_library_replacement(
         eval_counter += 1
         processed_roots.add(fid)
         res["mode"] = "llm"
+        _periodic_checkpoint_save()
 
         # 若可替代，打印评估结果摘要（库/参考API/置信度/备注），并即时标记子孙剪除与后续跳过
         try:
@@ -625,6 +759,7 @@ def apply_library_replacement(
                     newly = len(to_prune - pruned_dynamic)
                     pruned_dynamic.update(to_prune)
                     selected_roots.append((fid, res))
+                    _periodic_checkpoint_save()
                     typer.secho(
                         f"[c2rust-library] 即时标记剪除子节点(本次新增): +{newly} 个 (累计={len(pruned_dynamic)})",
                         fg=typer.colors.MAGENTA,
@@ -761,6 +896,14 @@ def apply_library_replacement(
         order_path = alias_order_path
     except Exception as e:
         typer.secho(f"[c2rust-library] 基于剪枝符号表生成翻译顺序失败: {e}", fg=typer.colors.YELLOW, err=True)
+
+    # 完成后清理断点（可选）
+    try:
+        if resume and clear_checkpoint_on_done and ckpt_path.exists():
+            ckpt_path.unlink()
+            typer.secho(f"[c2rust-library] 已清理断点文件: {ckpt_path}", fg=typer.colors.BLUE, err=True)
+    except Exception:
+        pass
 
     typer.secho(
         "[c2rust-library] 库替代剪枝完成（LLM 子树评估）:\n"
