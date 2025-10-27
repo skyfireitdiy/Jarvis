@@ -97,9 +97,10 @@ def _run_cmd(cmd: List[str], cwd: Path, env: Optional[Dict[str, str]] = None) ->
 
 
 def _cargo_check(crate_dir: Path, stats: OptimizeStats, max_checks: int) -> Tuple[bool, str]:
+    # 统一使用 cargo test 作为验证手段
     if max_checks and stats.cargo_checks >= max_checks:
-        return False, "cargo check budget exhausted"
-    code, out, err = _run_cmd(["cargo", "check"], crate_dir)
+        return False, "cargo test budget exhausted"
+    code, out, err = _run_cmd(["cargo", "test", "-q"], crate_dir)
     stats.cargo_checks += 1
     ok = code == 0
     diag = err.strip() or out.strip()
@@ -109,14 +110,14 @@ def _cargo_check(crate_dir: Path, stats: OptimizeStats, max_checks: int) -> Tupl
 
 def _cargo_check_full(crate_dir: Path, stats: OptimizeStats, max_checks: int) -> Tuple[bool, str]:
     """
-    执行 cargo check，返回是否成功与完整输出（stdout+stderr）。
+    执行 cargo test，返回是否成功与完整输出（stdout+stderr）。
     会计入 stats.cargo_checks，并受 max_checks 预算限制。
     """
     if max_checks and stats.cargo_checks >= max_checks:
-        return False, "cargo check budget exhausted"
+        return False, "cargo test budget exhausted"
     try:
         res = subprocess.run(
-            ["cargo", "check", "-q"],
+            ["cargo", "test", "-q"],
             capture_output=True,
             text=True,
             check=False,
@@ -130,7 +131,7 @@ def _cargo_check_full(crate_dir: Path, stats: OptimizeStats, max_checks: int) ->
         return ok, msg
     except Exception as e:
         stats.cargo_checks += 1
-        return False, f"cargo check exception: {e}"
+        return False, f"cargo test exception: {e}"
 
 def _git_is_repo(root: Path) -> bool:
     try:
@@ -386,7 +387,7 @@ class Optimizer:
                             fixed = self._build_fix_loop(targets)
                             if not fixed:
                                 first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"check after unsafe_cleanup failed: {first}")
+                                self.stats.errors.append(f"test after unsafe_cleanup failed: {first}")
                                 # 回滚到快照并结束
                                 try:
                                     self._reset_to_snapshot()
@@ -404,7 +405,7 @@ class Optimizer:
                             fixed = self._build_fix_loop(targets)
                             if not fixed:
                                 first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"check after structure_opt failed: {first}")
+                                self.stats.errors.append(f"test after structure_opt failed: {first}")
                                 try:
                                     self._reset_to_snapshot()
                                 finally:
@@ -421,7 +422,7 @@ class Optimizer:
                             fixed = self._build_fix_loop(targets)
                             if not fixed:
                                 first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"check after visibility_opt failed: {first}")
+                                self.stats.errors.append(f"test after visibility_opt failed: {first}")
                                 try:
                                     self._reset_to_snapshot()
                                 finally:
@@ -438,7 +439,7 @@ class Optimizer:
                             fixed = self._build_fix_loop(targets)
                             if not fixed:
                                 first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"check after doc_opt failed: {first}")
+                                self.stats.errors.append(f"test after doc_opt failed: {first}")
                                 try:
                                     self._reset_to_snapshot()
                                 finally:
@@ -738,11 +739,11 @@ class Optimizer:
             "约束与范围：",
             "- 仅修改上述列出的文件；除非必须（如修复引用路径），否则不要修改其他文件。",
             "- 保持最小改动，不要进行与上述优化无关的重构或格式化。",
-            "- 修改后需保证 `cargo check` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
-            "- 输出仅为补丁，不要输出解释或多余文本。",
-            "",
-            "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo check -q` 进行验证；",
-            "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo check` 通过为止。",
+- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。
+- 输出仅为补丁，不要输出解释或多余文本。
+
+自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；
+若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。
         ]
         prompt = "\n".join(prompt_lines)
         prev_cwd = os.getcwd()
@@ -758,7 +759,7 @@ class Optimizer:
             fixed = self._build_fix_loop(target_files)
             if not fixed:
                 first = (diag.splitlines()[0] if isinstance(diag, str) and diag else "failed")
-                self.stats.errors.append(f"codeagent check failed: {first}")
+                self.stats.errors.append(f"codeagent test failed: {first}")
                 try:
                     self._reset_to_snapshot()
                 finally:
@@ -790,7 +791,7 @@ class Optimizer:
             # 执行构建
             try:
                 res = subprocess.run(
-                    ["cargo", "check", "-q"],
+                    ["cargo", "test", "-q"],
                     capture_output=True,
                     text=True,
                     check=False,
@@ -811,7 +812,7 @@ class Optimizer:
 
             # 生成最小修复提示
             prompt_lines = [
-                "请根据以下构建错误对 crate 进行最小必要的修复以通过 `cargo check`：",
+                "请根据以下测试/构建错误对 crate 进行最小必要的修复以通过 `cargo test`：",
                 f"- crate 根目录：{crate}",
                 "",
                 "本次修复优先且仅允许修改以下文件（除非确有必要，否则不要修改范围外文件）：",
@@ -821,8 +822,8 @@ class Optimizer:
                 "- 保持最小改动，不要进行与错误无关的重构或格式化；",
                 "- 仅输出补丁，不要输出解释或多余文本。",
                 "",
-                "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo check -q` 进行验证；",
-                "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo check` 通过为止。",
+自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；
+若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。
                 "",
                 "构建错误如下：",
                 "<BUILD_ERROR>",
