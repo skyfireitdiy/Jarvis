@@ -298,7 +298,7 @@ def run(
     ),
 ) -> None:
     """
-    依次执行流水线：collect -> scan -> lib-replace -> prepare -> transpile
+    依次执行流水线：collect -> scan -> lib-replace -> prepare -> transpile -> optimize
 
     约束:
     - collect 的输出文件就是 lib-replace 的输入文件；
@@ -306,6 +306,10 @@ def run(
     - 未提供 --files 时，必须通过 --root-list-syms 提供根列表
     - scan 始终执行以确保数据完整
     - prepare/transpile 会使用 --llm-group 指定的模型组
+    - optimize 阶段采用默认优化配置，自动检测 crate 根目录并进行保守优化（unsafe 清理、结构优化、可见性优化、文档补充）
+
+    补充:
+    - 如需精细化控制，可独立调用子命令：collect、scan、lib-replace、prepare、transpile、optimize
     """
     try:
         data_dir = Path(".") / ".jarvis" / "c2rust"
@@ -419,6 +423,27 @@ def run(
             only=None,
         )
         typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)
+
+        # Step 6: optimize
+        try:
+            typer.secho("[c2rust-run] optimize: 开始", fg=typer.colors.BLUE)
+            from jarvis.jarvis_c2rust.optimizer import optimize_project as _optimize_project
+            res = _optimize_project(crate_dir=None)
+            summary = (
+                f"[c2rust-run] optimize: 结果摘要:\n"
+                f"  files_scanned: {res.get('files_scanned')}\n"
+                f"  unsafe_removed: {res.get('unsafe_removed')}\n"
+                f"  unsafe_annotated: {res.get('unsafe_annotated')}\n"
+                f"  duplicates_tagged: {res.get('duplicates_tagged')}\n"
+                f"  visibility_downgraded: {res.get('visibility_downgraded')}\n"
+                f"  docs_added: {res.get('docs_added')}\n"
+                f"  cargo_checks: {res.get('cargo_checks')}\n"
+            )
+            typer.secho(summary, fg=typer.colors.GREEN)
+            typer.secho("[c2rust-run] optimize: 完成", fg=typer.colors.GREEN)
+        except Exception as _e:
+            typer.secho(f"[c2rust-run] optimize: 错误: {_e}", fg=typer.colors.RED, err=True)
+            raise
     except Exception as e:
         typer.secho(f"[c2rust-run] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
