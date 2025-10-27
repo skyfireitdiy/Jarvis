@@ -6,7 +6,7 @@
     margin: 2.5cm;
     @bottom-center {
         content: "Page " counter(page);
-        font-family: '微软雅黑', 'Arial', sans-serif;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", "WenQuanYi Micro Hei", sans-serif;
         font-size: 9pt;
         color: #555;
         vertical-align: top;
@@ -16,7 +16,7 @@
 
 /* --- General Body and Typography --- */
 body {
-    font-family: '微软雅黑', 'Times New Roman', serif;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", "WenQuanYi Micro Hei", sans-serif;
     line-height: 1.6;
     color: #000;
     background-color: #fff;
@@ -27,7 +27,7 @@ body {
 
 /* --- Headings --- */
 h1, h2, h3, h4, h5, h6 {
-    font-family: 'Helvetica Neue', 'Arial', sans-serif;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", "WenQuanYi Micro Hei", sans-serif;
     font-weight: bold;
     color: #2c3e50;
     line-height: 1.2;
@@ -88,7 +88,7 @@ pre {
 }
 
 code {
-    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
     background-color: #ecf0f1;
     padding: 0.2em 0.4em;
     border-radius: 3px;
