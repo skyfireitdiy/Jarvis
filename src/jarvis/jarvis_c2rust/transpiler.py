@@ -1048,7 +1048,7 @@ class Transpiler:
             "- 若已有函数占位/实现，尽量最小修改，不要破坏现有代码；",
             "- 你可以参考原 C 函数的关联实现（如同文件/同模块的相关辅助函数、内联实现、宏与注释等），在保持语义一致的前提下以符合 Rust 风格的方式实现；避免机械复制粘贴；",
             "- 禁止在函数实现中使用 todo!/unimplemented! 作为占位；仅当调用的函数尚未实现时，才在调用位置使用 todo!(\"符号名\") 占位；",
-            "- 为保证 cargo build 通过，如需返回占位值，请使用合理默认值或 Result/Option 等，而非 panic!/todo!/unimplemented!；",
+            "- 为保证 cargo test 通过，如需返回占位值，请使用合理默认值或 Result/Option 等，而非 panic!/todo!/unimplemented!；",
             "- 不要删除或移动其他无关文件。",
             "",
             "编码原则与规范：",
@@ -1061,6 +1061,9 @@ class Transpiler:
             "- 依赖未实现符号时，务必使用 todo!(\"符号名\") 明确标记，便于后续自动替换；",
             "- 文档：为新增函数添加简要文档注释，注明来源C函数与意图；",
             "- 导入：禁止使用 use ...::* 通配；仅允许精确导入所需符号",
+"- 测试生成：若函数可测试（无需外部环境/IO/网络/全局状态），在同文件添加 #[cfg(test)] mod tests 并编写至少一个可编译的单元测试（建议命名为 test_<函数名>_basic）；测试仅调用函数，避免使用 panic!/todo!/unimplemented!；unsafe 函数以 unsafe 调用；必要时使用占位参数（如 0、core::ptr::null()/null_mut()、默认值）以保证通过。",
+"- 测试设计文档：在测试函数顶部使用文档注释（///）简要说明测试用例设计，包括：输入构造、预置条件、期望行为（或成功执行）、边界/异常不作为否决项；注释内容仅用于说明，不影响实现。",
+"- 不可测试时：如函数依赖外部环境或调用未实现符号，暂不生成测试，但请在函数文档注释中注明不可测试原因（例如外部依赖/未实现符号）。",
             "- 指针+长度参数：如 C 存在 <ptr, len> 组合，请优先保持成对出现；若暂不清晰，至少保留长度参数占位",
             "- 风格：遵循 rustfmt 默认风格，避免引入与本次改动无关的大范围格式变化；",
             "- 输出限制：仅以补丁形式修改目标文件，不要输出解释或多余文本。",
@@ -1305,6 +1308,91 @@ class Transpiler:
         except Exception:
             pass
 
+    def _ensure_minimal_tests(self, module: str, rust_sig: str) -> None:
+        """
+        在目标模块文件中确保存在最小可编译的单元测试：
+        - 在 #[cfg(test)] mod tests 中添加针对当前函数的 smoke 测试
+        - 测试仅调用函数，不断言具体行为，以避免误判
+        - 对 unsafe fn，调用包裹在 unsafe 块内
+        """
+        try:
+            fn_name = self._extract_rust_fn_name_from_sig(rust_sig)
+            if not fn_name:
+                return
+            mp = Path(module)
+            if not mp.is_absolute():
+                mp = (self.crate_dir / module).resolve()
+            if not mp.exists():
+                return
+            text = mp.read_text(encoding="utf-8", errors="replace")
+
+            # 简单检测是否已存在针对该函数的测试
+            test_fn_pat = re.compile(rf"(?m)^\s*#\[test\]\s*fn\s+test_{re.escape(fn_name)}_basic\s*\(", re.IGNORECASE)
+            if test_fn_pat.search(text):
+                return
+
+            # 提取参数列表，生成占位入参
+            m = re.search(r"\bfn\s+[A-Za-z_][A-Za-z0-9_]*\s*\((.*?)\)", rust_sig, flags=re.S)
+            params_s = m.group(1) if m else ""
+            params = []
+            if params_s.strip():
+                # 朴素按逗号切分 name: type
+                parts = [x.strip() for x in params_s.split(",") if x.strip()]
+                for p in parts:
+                    mm = p.split(":")
+                    if len(mm) >= 2:
+                        ty = mm[1].strip()
+                    else:
+                        ty = ""
+                    # 生成占位表达式
+                    tys = ty.replace(" ", "")
+                    if "*const" in tys:
+                        expr = "core::ptr::null()"
+                    elif "*mut" in tys:
+                        expr = "core::ptr::null_mut()"
+                    elif re.search(r"\b(f32|f64)\b", tys):
+                        expr = "0.0"
+                    elif re.search(r"\b(u|i)(8|16|32|64|128)\b", tys) or re.search(r"\b(u|i)size\b", tys) or ("core::ffi::c_" in tys):
+                        expr = f"(0 as {ty})"
+                    else:
+                        expr = "unsafe { std::mem::zeroed() }"
+                    params.append(expr)
+            args = ", ".join(params)
+
+            call_line = f"let _res = {fn_name}({args});" if args else f"let _res = {fn_name}();"
+            if "unsafe" in rust_sig:
+                call_line = "unsafe { " + call_line + " }"
+
+            tests_block = "\n".join([
+                "",
+                "#[cfg(test)]",
+                "mod tests {",
+                "    use super::*;",
+                "    /// 测试用例设计: 冒烟测试，使用占位参数调用目标函数；验证可编译并可正常运行，不校验具体业务逻辑。",
+                "    /// 输入: 指针参数使用 core::ptr::null()/null_mut()，数值参数使用 0/0.0，其他类型使用默认值或 mem::zeroed。",
+                "    /// 预置条件: 无外部环境/IO/网络依赖；不依赖未实现符号。",
+                f"    /// 期望: {fn_name} 能正常调用且不发生 panic；若为 unsafe 函数，则在 unsafe 块内调用。",
+                "    #[test]",
+                f"    fn test_{fn_name}_basic() {{",
+                f"        {call_line}",
+                "    }",
+                "}",
+                "",
+            ])
+
+            # 若已存在 #[cfg(test)] mod tests，则追加测试函数；否则追加整个测试模块
+            tests_mod_pat = re.compile(r"(?s)#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*mod\s+tests\s*\{.*?\}")
+            if tests_mod_pat.search(text):
+                # 直接在文件末尾追加新的测试（避免复杂插入）
+                new_text = text.rstrip() + tests_block
+            else:
+                new_text = text.rstrip() + tests_block
+
+            mp.write_text(new_text, encoding="utf-8")
+        except Exception:
+            # 测试生成失败不阻塞主流程
+            pass
+
     def _module_file_to_crate_path(self, module: str) -> str:
         """
         将模块文件路径转换为 crate 路径前缀：
@@ -1409,14 +1497,14 @@ class Transpiler:
         while True:
             i += 1
             res = subprocess.run(
-                ["cargo", "build", "-q"],
+                ["cargo", "test", "-q"],
                 capture_output=True,
                 text=True,
                 check=False,
                 cwd=workspace_root,
             )
             if res.returncode == 0:
-                print("[c2rust-transpiler] Cargo 构建成功。")
+                print("[c2rust-transpiler] Cargo 测试通过。")
                 # 记录构建成功的度量与状态（用于准确性诊断与断点续跑）
                 try:
                     cur = self.progress.get("current") or {}
@@ -1431,7 +1519,7 @@ class Transpiler:
                     pass
                 return True
             output = (res.stdout or "") + "\n" + (res.stderr or "")
-            print(f"[c2rust-transpiler] Cargo 构建失败 (第 {i} 次尝试)。")
+            print(f"[c2rust-transpiler] Cargo 测试失败 (第 {i} 次尝试)。")
             print(output)
             # 准确性改进：尊重 max_retries 参数，防止无限循环
             try:
@@ -1486,7 +1574,7 @@ class Transpiler:
                 c_code = ""
 
             repair_prompt = "\n".join([
-                "目标：以最小的改动修复问题，使 `cargo build` 命令可以通过。",
+                "目标：以最小的改动修复问题，使 `cargo test` 命令可以通过。",
                 "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；避免大范围改动。",
                 "- 保持最小改动，避免与错误无关的重构或格式化；",
                 "- 请仅输出补丁，不要输出解释或多余文本。",
@@ -1514,7 +1602,7 @@ class Transpiler:
                 "<BUILD_ERROR>",
                 output,
                 "</BUILD_ERROR>",
-                "修复后请再次执行 `cargo build` 进行验证。",
+                "修复后请再次执行 `cargo test` 进行验证。",
             ])
             prev_cwd = os.getcwd()
             try:
@@ -1877,6 +1965,11 @@ class Transpiler:
             # 2.1) 生成后进行一次静态存在性校验，缺失则最小化修复补齐实现
             try:
                 self._ensure_impl_present(module, rust_sig)
+                # 为当前函数生成最小可编译的单元测试，并在后续以 cargo test 验证
+                try:
+                    self._ensure_minimal_tests(module, rust_sig)
+                except Exception:
+                    pass
             except Exception:
                 pass
             # 2.2) 确保顶层模块在 src/lib.rs 中被公开（便于后续引用 crate::<mod>::...）
