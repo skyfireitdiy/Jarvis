@@ -301,14 +301,20 @@ def run(
     依次执行流水线：collect -> scan -> lib-replace -> prepare -> transpile -> optimize
 
     约束:
+    
     - collect 的输出文件就是 lib-replace 的输入文件；
       当提供 --files 时，lib-replace 将固定读取 --out（或默认值）作为根列表文件，忽略 --root-list-file
+
     - 未提供 --files 时，必须通过 --root-list-syms 提供根列表
+
     - scan 始终执行以确保数据完整
+
     - prepare/transpile 会使用 --llm-group 指定的模型组
+
     - optimize 阶段采用默认优化配置，自动检测 crate 根目录并进行保守优化（unsafe 清理、结构优化、可见性优化、文档补充）
 
     补充:
+
     - 如需精细化控制，可独立调用子命令：collect、scan、lib-replace、prepare、transpile、optimize
     """
     try:
