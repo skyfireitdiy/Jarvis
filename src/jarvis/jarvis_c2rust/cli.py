@@ -424,6 +424,108 @@ def run(
         raise typer.Exit(code=1)
 
 
+@app.command("optimize")
+def optimize(
+    crate_dir: Optional[Path] = typer.Option(
+        None, "--crate-dir", help="Rust crate 根目录（包含 Cargo.toml）；未提供时自动检测"
+    ),
+    enable_unsafe_cleanup: bool = typer.Option(
+        True, "--unsafe/--no-unsafe", help="启用 unsafe 清理"
+    ),
+    enable_structure_opt: bool = typer.Option(
+        True, "--structure/--no-structure", help="启用代码结构优化（重复代码标注）"
+    ),
+    enable_visibility_opt: bool = typer.Option(
+        True, "--visibility/--no-visibility", help="启用可见性优化（尽可能最小可见性）"
+    ),
+    enable_doc_opt: bool = typer.Option(
+        True, "--doc/--no-doc", help="启用文档补充（模块/函数占位文档）"
+    ),
+    max_checks: int = typer.Option(
+        0, "-m", "--max-checks", help="cargo check 最大次数限制（0 表示不限）"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="仅统计潜在修改，不写回文件"
+    ),
+    include_patterns: Optional[str] = typer.Option(
+        None,
+        "--include",
+        help="仅处理匹配的文件（逗号分隔 glob，相对 crate 根，如: src/**/*.rs,src/foo/*.rs）",
+    ),
+    exclude_patterns: Optional[str] = typer.Option(
+        None,
+        "--exclude",
+        help="排除匹配的文件（逗号分隔 glob，相对 crate 根）",
+    ),
+    max_files: int = typer.Option(
+        0,
+        "-n",
+        "--max-files",
+        help="本次最多处理的文件数（0 表示不限，用于大项目分批优化）",
+    ),
+    resume: bool = typer.Option(
+        True,
+        "--resume/--no-resume",
+        help="是否启用断点续跑，跳过已处理文件（默认启用）",
+    ),
+    reset_progress: bool = typer.Option(
+        False,
+        "--reset-progress",
+        help="重置优化进度（清空已处理文件记录）后再执行",
+    ),
+    build_fix_retries: int = typer.Option(
+        3,
+        "-r",
+        "--build-fix-retries",
+        help="构建失败后的最小修复重试次数（使用 CodeAgent 迭代修复）",
+    ),
+    git_guard: bool = typer.Option(
+        True,
+        "--git-guard/--no-git-guard",
+        help="启用Git保护：每一步优化前记录当前HEAD，修复耗尽时自动git reset --hard回快照（默认启用）",
+    ),
+
+) -> None:
+    """
+    对生成的 Rust 代码执行保守优化（unsafe 清理、结构优化、可见性优化、文档补充）。
+    建议在转译完成后执行：jarvis-c2rust optimize
+    """
+    try:
+        from jarvis.jarvis_c2rust.optimizer import optimize_project as _optimize_project
+
+        typer.secho("[c2rust-optimize] 开始", fg=typer.colors.BLUE)
+        res = _optimize_project(
+            crate_dir=crate_dir,
+            enable_unsafe_cleanup=enable_unsafe_cleanup,
+            enable_structure_opt=enable_structure_opt,
+            enable_visibility_opt=enable_visibility_opt,
+            enable_doc_opt=enable_doc_opt,
+            max_checks=max_checks,
+            dry_run=dry_run,
+            include_patterns=include_patterns,
+            exclude_patterns=exclude_patterns,
+            max_files=max_files,
+            resume=resume,
+            reset_progress=reset_progress,
+            build_fix_retries=build_fix_retries,
+            git_guard=git_guard,
+        )
+        # 摘要输出
+        summary = (
+            f"[c2rust-optimize] 结果摘要:\n"
+            f"  files_scanned: {res.get('files_scanned')}\n"
+            f"  unsafe_removed: {res.get('unsafe_removed')}\n"
+            f"  unsafe_annotated: {res.get('unsafe_annotated')}\n"
+            f"  duplicates_tagged: {res.get('duplicates_tagged')}\n"
+            f"  visibility_downgraded: {res.get('visibility_downgraded')}\n"
+            f"  docs_added: {res.get('docs_added')}\n"
+            f"  cargo_checks: {res.get('cargo_checks')}\n"
+        )
+        typer.secho(summary, fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"[c2rust-optimize] 错误: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
 def main() -> None:
     """主入口"""
     app()
