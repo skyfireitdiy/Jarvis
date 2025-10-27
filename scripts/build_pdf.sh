@@ -34,17 +34,34 @@ ensure_deps() {
         if ! command -v java &> /dev/null; then
             missing_pkgs+=" default-jre" # For PlantUML
         fi
+        # Additional dependencies for PlantUML rendering and CJK fonts
+        if ! command -v dot &> /dev/null; then
+            missing_pkgs+=" graphviz"
+        fi
+        if ! command -v fc-list &> /dev/null; then
+            missing_pkgs+=" fontconfig"
+        fi
+        if command -v fc-list &> /dev/null; then
+            if ! fc-list | grep -Ei "Noto Sans CJK|Source Han Sans|WenQuanYi|Microsoft YaHei|PingFang" >/dev/null; then
+                missing_pkgs+=" fonts-noto-cjk"
+            fi
+        else
+            missing_pkgs+=" fonts-noto-cjk"
+        fi
 
         if [ -n "$missing_pkgs" ]; then
             echo "The following system packages are missing and will be installed:$missing_pkgs"
             echo "This requires sudo privileges."
             sudo apt-get update
             sudo apt-get install -y $missing_pkgs
+            if command -v fc-cache &> /dev/null; then
+                fc-cache -f >/dev/null 2>&1 || true
+            fi
         fi
     else
         echo "Warning: Not an Ubuntu system. Please ensure pandoc and java are installed manually."
         # Simple check for non-ubuntu systems
-          for cmd in pandoc java; do
+          for cmd in pandoc java dot; do
             if ! command -v "$cmd" &> /dev/null; then
               echo "Error: Required command '$cmd' not found."
               exit 1
@@ -128,6 +145,24 @@ echo "---------------------------------------------"
 export PLANTUML_JAR="$SCRIPT_DIR/plantuml.jar"
 export PLANTUML_BIN="java -jar $PLANTUML_JAR"
 export _JAVA_OPTIONS="-Djava.awt.headless=true"
+# Enforce PlantUML font/DPI to avoid text overlapping in diagrams
+PLANTUML_CFG=$(mktemp --suffix=.puml.cfg)
+cat > "$PLANTUML_CFG" <<'EOF'
+skinparam defaultFontName "Noto Sans CJK SC"
+skinparam ClassFontName "Noto Sans CJK SC"
+skinparam ActivityFontName "Noto Sans CJK SC"
+skinparam SequenceMessageFontName "Noto Sans CJK SC"
+skinparam SequenceParticipantFontName "Noto Sans CJK SC"
+skinparam NoteFontName "Noto Sans CJK SC"
+skinparam PackageFontName "Noto Sans CJK SC"
+skinparam ArrowFontName "Noto Sans CJK SC"
+skinparam defaultFontSize 12
+skinparam maxMessageSize 120
+skinparam dpi 200
+skinparam wrapWidth 180
+EOF
+export PLANTUML_CONFIG="$PLANTUML_CFG"
+export PANDOC_PLANTUML_FORMAT=png
 
 # --- Stage 1: Pandoc Markdown -> HTML ---
 echo "Step 1: Converting Markdown to HTML..."
@@ -150,4 +185,5 @@ echo "✅ PDF generation complete: '$OUTPUT_FILE_ABS'"
 
 # --- Cleanup ---
 rm "$TEMP_HTML_FILE"
+[ -n "${PLANTUML_CFG:-}" ] && rm -f "$PLANTUML_CFG"
 echo "Temporary HTML file removed."
