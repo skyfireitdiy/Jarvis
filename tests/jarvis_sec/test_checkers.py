@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-oh_sec 基础单元测试（阶段一）
+jarvis_sec 基础单元测试（阶段一）
 
 覆盖点：
 - C/C++ 启发式检查器：不安全API、内存管理、缓冲区操作、错误处理
@@ -19,12 +19,12 @@ from pathlib import Path
 
 import pytest
 
-from jarvis.oh_sec.checkers import (
+from jarvis.jarvis_sec.checkers import (
     analyze_c_cpp_text,
     analyze_rust_text,
 )
-from jarvis.oh_sec.workflow import direct_scan, run_security_analysis_fast
-from jarvis.oh_sec.report import aggregate_issues, format_markdown_report, build_json_and_markdown
+from jarvis.jarvis_sec.workflow import direct_scan, run_security_analysis_fast
+from jarvis.jarvis_sec.report import aggregate_issues, format_markdown_report, build_json_and_markdown
 
 
 def test_c_checker_detects_multiple_categories():
