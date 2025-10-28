@@ -11,10 +11,10 @@
 ### Agent 整体架构与核心模块
 - 安全分析（jsec）
   - CLI: src/jarvis/jarvis_sec/cli.py
-    - 子命令 agent：优先尝试多Agent分析（run_with_multi_agent），失败或无输出时回退直扫基线（run_security_analysis_fast）
+    - 子命令 agent：优先尝试单Agent逐条分析（run_with_multi_agent），失败或无输出时回退直扫基线（run_security_analysis_fast）
   - Workflow: src/jarvis/jarvis_sec/workflow.py
     - direct_scan: 基于启发式规则扫描 C/C++ 与 Rust 源码（模块化 checkers）
-    - run_with_multi_agent: 调用 jarvis.jarvis_sec.run_security_analysis（延迟导入）进行逐条候选多Agent分析，最后聚合
+    - run_with_multi_agent: 调用 jarvis.jarvis_sec.run_security_analysis（延迟导入）以单Agent逐条子任务分析模式处理候选，最后聚合
     - run_security_analysis_fast: 调用 report.build_json_and_markdown 输出统一 JSON + Markdown 报告
   - Checkers: src/jarvis/jarvis_sec/checkers/
     - c_checker.py：C/C++ 启发式规则（不安全 API、内存管理、边界长度、I/O 返回值检查、线程与锁、格式化字符串、命令执行、权限、随机源、安全时间接口等）
@@ -66,10 +66,10 @@
   - jsec：纯 Python 启发式（正则+邻域上下文），支持注释剥离与字符串掩蔽（降低误报），统一 Issue 数据结构
   - jc2r：libclang AST 扫描构建统一符号表（函数/类型），再进行 SCC/DAG 分析与顺序规划
 - 安全分析模块
-  - jsec checkers：C/C++ 与 Rust 启发式规则（详见 b. 核心算法）；workflow 统一聚合与 Markdown 报告
+  - jsec checkers：C/C++ 与 Rust 启发式规则（详见 b. 核心算法）；report 模块统一聚合与 Markdown 渲染
   - jc2r 辅助：转译器的类型/边界二次审查与优化器的 unsafe 清理策略
 - 决策引擎
-  - jsec：直扫 -> 多Agent验证回退机制；report 模块统一评分与 Top 风险定位
+  - jsec：先直扫生成候选，再单Agent逐条分析；report 模块统一评分与 Top 风险定位
   - jc2r：
     - 库替代剪枝（LLM）决定是否以标准库/第三方库替换整子树
     - 函数模块归属与签名（LLM）决策
@@ -83,7 +83,7 @@
 - jsec 数据流
   - 输入：项目根目录
   - 直扫（direct_scan）→ issues（Issue[]）→ report.build_json_and_markdown → 输出 JSON + Markdown
-  - 多Agent：direct_scan 候选 → 逐条 Agent 验证 → report 聚合
+  - 单Agent：direct_scan 候选 → 逐条 Agent 验证 → report 聚合
 - jc2r 数据流
   - scan：源代码 -> symbols.jsonl（统一记录函数/类型/位置/引用）+ meta.json
   - order：symbols.jsonl -> translation_order.jsonl（items 含完整记录）
@@ -94,7 +94,7 @@
 
 ### AI 模型选型与集成架构
 - 通过 jarvis_agent.Agent 与 CodeAgent 统一封装模型平台（jarvis_platform），可在 CLI 透传 llm_group
-- 使用非交互（non_interactive）与强格式 summary（<SUMMARY><yaml>）保证稳定性
+- 在 jc2r 分析与转译场景中采用强格式 <SUMMARY><yaml> 以提升稳定性与一致性；非交互（non_interactive）模式用于流水线自动化但非强制
 - LLM 参与点：
   - 模块规划（签名/模块归属）
   - 库替代剪枝（子树可替代性评估，支持禁用库）
@@ -106,9 +106,9 @@
 - Agent 模块组成与关系（模块清单与职责）
   - Agent（协调中心）：组装并管理 AgentRunLoop、PromptManager、SessionManager、EventBus、OutputHandler 链，协同 MemoryManager/TaskPlanner/TaskAnalyzer/FileMethodologyManager。
   - AgentRunLoop（运行循环）：承载主循环，驱动“模型调用→工具执行→中断处理→完成处理”，在关键节点发事件（BEFORE/AFTER_MODEL_CALL、BEFORE/AFTER_TOOL_CALL 等）。
-  - OutputHandler Chain（输出处理器链）：默认包含 ToolRegistry，负责解析并执行模型返回的 TOOL_CALL；可扩展其他处理器。
-  - ToolRegistry（工具注册表）：统一发现/加载/执行工具（内置/外部 .py/MCP），提供 execute_tool_call 标准协议 (need_return, tool_prompt)。
-  - PlatformRegistry（平台注册表）：管理平台/模型适配，统一 chat_until_success、set_system_prompt、upload_files 等。
+  - OutputHandler Chain（输出处理器链）：默认包含 ToolRegistry、EditFileHandler、RewriteFileHandler（在未禁用文件编辑时）；ToolRegistry 负责解析并执行模型返回的 TOOL_CALL，EditFileHandler/RewriteFileHandler 分别处理 PATCH/REWRITE；亦可按需扩展其他处理器。
+  - ToolRegistry（工具注册表）：统一发现/加载/执行工具（内置/外部 .py/MCP）；作为默认输出处理器，遵循统一处理协议 handle(response, agent) -> (need_return, tool_prompt)，供上层 execute_tool_call 委派执行。
+  - PlatformRegistry（平台注册表）：管理平台/模型的创建与选择（工厂/注册）；平台对象（BasePlatform）提供 chat_until_success、set_system_prompt、upload_files 等能力。
   - PromptManager（提示管理器）：构建系统提示与默认附加提示，集中注入工具使用规范与记忆提示。
   - SessionManager（会话管理器）：管理 prompt/addon_prompt/历史与持久化（saved_session.json）。
   - EventBus（事件总线）：轻量发布/订阅，旁路集成能力；回调异常隔离不影响主流程。
@@ -230,7 +230,7 @@ title 方法论集成关系
 - 运行循环要点（run_loop.py）
   - 轮次与提示管理：
     - conversation_rounds 计数，每到 JARVIS_TOOL_REMINDER_ROUNDS（默认20）自动将 get_tool_usage_prompt 追加到 addon_prompt，提醒工具使用规范。
-    - auto_summary_rounds 触发自动总结：优先取 agent.auto_summary_rounds，否则用全局 get_auto_summary_rounds；达到阈值后调用 _summarize_and_clear_history() 并将摘要再拼回 addon_prompt 以保持上下文连续。
+    - auto_summary_rounds 触发自动总结：优先取 agent.auto_summary_rounds，否则用全局 get_auto_summary_rounds（默认50）；达到阈值后调用 _summarize_and_clear_history() 并将摘要再拼回 addon_prompt 以保持上下文连续。
   - 首次运行与中断：
     - 首轮 ag.first 时执行 ag._first_run() 做初始化准备。
     - ag._handle_run_interrupt(current_response) 支持 skip_turn（继续下一轮）或直接返回最终结果（任务结束）。
@@ -250,6 +250,7 @@ title 方法论集成关系
     - bool need_return：是否立即返回结果给上层（典型：SEND_MESSAGE 将结构化结果直接返回）
     - Any tool_prompt：供继续交互的字符串提示（通常为格式化输出）；非字符串会在拼接时被安全忽略
   - OutputHandlerProtocol（protocols.py）定义统一接口：name/can_handle/prompt/handle；ToolRegistry 实现该协议，既是注册表也是默认输出处理器。
+  - 工具调用格式要求：工具调用需使用 TOOL_CALL 标签块，且起始与结束标签必须出现在行首；若结束标签缺失，系统会自动补全并给出提醒。
 
 - 提示构建与附加提示（prompt_manager.py）
   - 系统提示：build_system_prompt() 将 agent.system_prompt 与 get_tool_usage_prompt 拼装，作为统一 system_prompt 注入模型。
@@ -332,7 +333,7 @@ end
 ```
 - 设计亮点
   - 事件钩子：通过订阅 AFTER_TOOL_CALL，实现与通用 Agent 的“松耦合集成”，无需侵入 Agent 主循环。
-  - 工程规则内化：系统提示统一约束“最小变更/补丁输出/禁用通配/unsafe 最小化 + SAFETY 注释/最小单测”，输出可审计、可回退。
+  - 工程规则内化：系统提示统一约束“先读后写、最小变更、仅输出补丁”；unsafe 最小化与 SAFETY 注释、最小单测等策略由 jc2r 的转译器/优化器在各自流程中约束与执行，整体输出可审计、可回退。
   - 验证闭环：以统一验收（如测试/静态检查）为标准；失败进入最小修复循环，结合差异预览与提交工作流形成端到端可观测链路。
   - Git 安全网：强制 git 准入与 .gitignore/换行规则落地；提交前 shortstat 统计与大批量新增文件确认，降低误操作风险。
 
@@ -385,10 +386,10 @@ end
   - 未提交变更守护：
     - 提交前统计 shortstat 并记录到 jarvis_stats；新增文件批量添加时与 .gitignore 交互确认，避免误提交噪声文件。
 
-- Agent 三段式交互与强格式产出（通用）
+- Agent 三段式交互与强格式产出（在 jc2r 等分析型场景）
   - system_prompt：注入角色/原则/工具/规则（CodeAgent 注入工程规则；分析型 Agent 注入任务场景规则）。
   - user_prompt：上下文与任务（在 jc2r 中包含函数源码片段/依赖上下文/crate 目录树等；在 CodeAgent 中包含项目概况与改动规范）。
-  - summary_prompt：强格式约束产出：
+  - summary_prompt：在 jc2r 模块中采用强格式约束产出（<SUMMARY> YAML/纯文本）；Agent 本身不强制：
     - 规划/签名：<SUMMARY><yaml>，必须包含 module 与 rust_signature（路径位于 crate/src，禁止 main.rs）；本地校验失败会携原因重试。
     - 关键逻辑审查：仅允许 OK 或若干 [logic] 行；找不到实现必须输出 [logic] function not found。
     - 类型/边界审查：<SUMMARY><yaml> 包含 ok 与 issues（指针可变性/空指针/边界/unsafe 注释），不通过则触发一次最小修复补丁。
@@ -397,7 +398,7 @@ end
 
 - Orchestrator 与运行模式
   - 通用 CLI（jarvis.jarvis_agent.jarvis）：
-    - 提供 model_group/tool_group 与配置透传、内置配置选择器（agent/multi_agent/roles），支持 Web 模式（WebSocket I/O 重定向）。
+    - 提供 model_group/tool_group 等配置透传，展示命令概览与快捷方式（ja/jca/jma），并支持内置启动配置选择器（agent/multi_agent/roles）；支持 Web 模式（通过浏览器 WebSocket 交互）。
     - 通过 AgentManager 初始化并运行任务；非交互模式下要求显式传入 --task。
   - CodeAgent CLI（jarvis.jarvis_code_agent.code_agent.cli）：
     - 非交互模式要求 --requirement；启动时 init_env 并获取单实例锁；若非 Git 仓库可交互初始化。
@@ -408,7 +409,7 @@ end
     - Transpiler 使用“分析型 Agent”进行模块与签名规划/关键逻辑审查/类型与边界审查；使用 CodeAgent 生成实现与最小修复；AFTER_TOOL_CALL 负责提交与预览。
     - Optimizer 复用 CodeAgent 进行整体最小优化（unsafe 清理/可见性/文档/重复处理）的补丁生成与构建验证。
   - jsec：
-    - 多Agent模式由 workflow.run_with_multi_agent 触发通用 Agent 对直扫候选逐条核验；最终统一用 report 聚合评分与渲染。
+    - 单Agent模式由 workflow.run_with_multi_agent 触发通用 Agent 对直扫候选逐条核验；最终统一用 report 聚合评分与渲染。
 
 - 典型端到端序列（代码改造）
   1) CodeAgent 初始化 → 注入规则与工具 → 订阅 AFTER_TOOL_CALL
@@ -487,7 +488,7 @@ end
 
 ## 功能实现说明
 1) bzip2 代码分析能力（计划与可落地性）
-- 适配方式：将 bzip2 源码放置为扫描根目录，jsec 直扫与多Agent模式均可运行
+- 适配方式：将 bzip2 源码放置为扫描根目录，jsec 直扫与单Agent模式均可运行
 - 规则覆盖（典型命中点）：
   - 字符串/缓冲：strcpy/strncpy/memcpy/memmove 使用处的长度边界；读写窗口/缓冲复用
   - I/O：fopen/read/fread/fwrite 返回值检查缺失
