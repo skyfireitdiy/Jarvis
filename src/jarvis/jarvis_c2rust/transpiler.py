@@ -282,6 +282,7 @@ def _ensure_order_file(project_root: Path) -> Path:
     """确保 translation_order.jsonl 存在且包含有效步骤；仅基于 symbols.jsonl 生成，不使用任何回退。"""
     data_dir = project_root / C2RUST_DIRNAME
     order_path = data_dir / ORDER_JSONL
+    typer.secho(f"[c2rust-transpiler][order] target order file: {order_path}", fg=typer.colors.BLUE)
 
     def _has_steps(p: Path) -> bool:
         try:
@@ -291,10 +292,13 @@ def _ensure_order_file(project_root: Path) -> Path:
             return False
 
     # 已存在则校验是否有步骤
+    typer.secho(f"[c2rust-transpiler][order] checking existing order file validity: {order_path}", fg=typer.colors.BLUE)
     if order_path.exists():
         if _has_steps(order_path):
+            typer.secho(f"[c2rust-transpiler][order] existing order valid, using {order_path}", fg=typer.colors.GREEN)
             return order_path
         # 为空或不可读：基于标准路径重新计算（仅 symbols.jsonl）
+        typer.secho("[c2rust-transpiler][order] existing order empty/invalid, recomputing from symbols.jsonl", fg=typer.colors.YELLOW)
         try:
             compute_translation_order_jsonl(data_dir, out_path=order_path)
         except Exception as e:
@@ -307,6 +311,7 @@ def _ensure_order_file(project_root: Path) -> Path:
     except Exception as e:
         raise RuntimeError(f"计算翻译顺序失败: {e}")
 
+    typer.secho(f"[c2rust-transpiler][order] generated order file: {order_path} (exists={order_path.exists()})", fg=typer.colors.BLUE)
     if not order_path.exists():
         raise FileNotFoundError(f"计算后未找到 translation_order.jsonl: {order_path}")
 
@@ -444,6 +449,7 @@ class Transpiler:
         self.max_retries = max_retries
         self.resume = resume
         self.only = set(only or [])
+        typer.secho(f"[c2rust-transpiler][init] project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} max_retries={self.max_retries} resume={self.resume} only={sorted(list(self.only)) if self.only else []}", fg=typer.colors.BLUE)
 
         self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
         # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
@@ -487,6 +493,7 @@ class Transpiler:
         """
         self.fn_index_by_id.clear()
         self.fn_name_to_id.clear()
+        typer.secho(f"[c2rust-transpiler][index] loading order index from {order_jsonl}", fg=typer.colors.BLUE)
         try:
             with order_jsonl.open("r", encoding="utf-8") as f:
                 for ln in f:
@@ -550,6 +557,7 @@ class Transpiler:
         except Exception:
             # 若索引构建失败，保持为空，后续流程将跳过
             pass
+        typer.secho(f"[c2rust-transpiler][index] built indices: ids={len(self.fn_index_by_id)} names={len(self.fn_name_to_id)}", fg=typer.colors.BLUE)
 
     def _should_skip(self, rec: FnRecord) -> bool:
         # 如果 only 列表非空，则仅处理匹配者
@@ -782,8 +790,10 @@ class Transpiler:
             if ok:
                 module = str(meta.get("module") or "").strip()
                 rust_sig = str(meta.get("rust_signature") or "").strip()
+                typer.secho(f"[c2rust-transpiler][plan] attempt {attempt} OK: module={module}, signature={rust_sig}", fg=typer.colors.GREEN)
                 return module, rust_sig
             else:
+                typer.secho(f"[c2rust-transpiler][plan] attempt {attempt} failed: {reason}", fg=typer.colors.YELLOW)
                 last_reason = reason
 
     def _update_progress_current(self, rec: FnRecord, module: str, rust_sig: str) -> None:
@@ -1047,18 +1057,18 @@ class Transpiler:
             "- 若 module 文件不存在则新建；为所在模块添加必要的 mod 声明（若需要）；",
             "- 若已有函数占位/实现，尽量最小修改，不要破坏现有代码；",
             "- 你可以参考原 C 函数的关联实现（如同文件/同模块的相关辅助函数、内联实现、宏与注释等），在保持语义一致的前提下以符合 Rust 风格的方式实现；避免机械复制粘贴；",
-            "- 禁止在函数实现中使用 todo!/unimplemented! 作为占位；仅当调用的函数尚未实现时，才在调用位置使用 todo!(\"符号名\") 占位；",
-            "- 为保证 cargo test 通过，如需返回占位值，请使用合理默认值或 Result/Option 等，而非 panic!/todo!/unimplemented!；",
+            "- 禁止在函数实现中使用 todo!/unimplemented! 作为占位；对于尚未实现的被调符号，请阅读其原始 C 实现并在本次一并补齐等价的 Rust 实现，避免遗留占位；",
+            "- 为保证行为等价，禁止使用占位返回或随意默认值；必须实现与 C 语义等价的返回逻辑，不得使用 panic!/todo!/unimplemented!；",
             "- 不要删除或移动其他无关文件。",
             "",
             "编码原则与规范：",
             "- 保持最小变更，避免无关重构与格式化；禁止批量重排/重命名/移动文件；",
             "- 命名遵循Rust惯例（函数/模块蛇形命名），公共API使用pub；",
             "- 优先使用安全Rust；如需unsafe，将范围最小化并添加注释说明原因与SAFETY保证；",
-            "- 错误处理：可暂用 Result<_, anyhow::Error> 或 Option 作占位，避免 panic!/unwrap()；",
-            "- 实现中禁止使用 todo!/unimplemented! 占位；仅允许为尚未实现的被调符号在调用位置使用 todo!(\"符号名\")；",
-            "- 如需占位返回，使用合理默认值或 Result/Option 等而非 panic!/todo!/unimplemented!；",
-            "- 依赖未实现符号时，务必使用 todo!(\"符号名\") 明确标记，便于后续自动替换；",
+            "- 错误处理：遵循 C 语义保持等价行为，不引入占位性的 Result/Option；避免 panic!/unwrap()；必要时使用与 C 等价的错误码/返回值或合理的 Rust 表达方式；",
+            "- 实现中禁止使用 todo!/unimplemented! 占位；对于尚未实现的被调符号，应基于其 C 源码补齐等价 Rust 实现；",
+            "- 返回值必须与 C 语义等价，不得使用占位返回或随意默认值；避免 panic!/todo!/unimplemented!；",
+            "- 若依赖未实现符号，请通过 read_symbols/read_code 获取其 C 源码并生成等价的 Rust 实现（可放置在同一模块或合理模块），而不是使用 todo!；",
             "- 文档：为新增函数添加简要文档注释，注明来源C函数与意图；",
             "- 导入：禁止使用 use ...::* 通配；仅允许精确导入所需符号",
 "- 测试生成：若函数可测试（无需外部环境/IO/网络/全局状态），在同文件添加 #[cfg(test)] mod tests 并编写至少一个可编译的单元测试（建议命名为 test_<函数名>_basic）；测试仅调用函数，避免使用 panic!/todo!/unimplemented!；unsafe 函数以 unsafe 调用；必要时使用占位参数（如 0、core::ptr::null()/null_mut()、默认值）以保证通过。",
@@ -1085,7 +1095,7 @@ class Transpiler:
             "  symbols:",
             "    - 要读取的符号列表",
             "",
-            "尚未转换的被调符号如下（请在调用位置使用 todo!(\"<符号>\") 作为占位，以便后续自动消除）：",
+            "尚未转换的被调符号如下（请阅读这些符号的 C 源码并生成等价的 Rust 实现；必要时新增模块或签名）：",
             *[f"- {s}" for s in (unresolved or [])],
         ]
         # 若存在库替代上下文，则附加到实现提示中，便于生成器参考（多库组合、参考API、备注等）
@@ -1123,6 +1133,7 @@ class Transpiler:
             if not mp.exists():
                 try:
                     mp.write_text("// Auto-created by c2rust transpiler\n", encoding="utf-8")
+                    typer.secho(f"[c2rust-transpiler][gen] auto-created module file: {mp}", fg=typer.colors.GREEN)
                 except Exception:
                     pass
         except Exception:
@@ -1157,10 +1168,12 @@ class Transpiler:
             if not mp.is_absolute():
                 mp = (self.crate_dir / module).resolve()
             if not mp.exists():
+                typer.secho(f"[c2rust-transpiler][verify] module file not found: {mp}", fg=typer.colors.RED)
                 return False
             txt = mp.read_text(encoding="utf-8", errors="replace")
             pattern = re.compile(r'(?m)^\s*(?:pub(?:\s*\([^)]+\))?\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+"[^"]+"\s+)?fn\s+' + re.escape(fn) + r'\s*\([^)]*\)\s*(?:->\s*[^ {][^{]*)?\s*\{')
             if pattern.search(txt):
+                typer.secho(f"[c2rust-transpiler][verify] found target impl in {mp}", fg=typer.colors.GREEN)
                 return True
             # 触发一次最小修复，确保存在该函数实现
             prompt = "\n" .join([
@@ -1201,6 +1214,7 @@ class Transpiler:
             if not lib_rs.exists():
                 try:
                     lib_rs.write_text("// Auto-generated by c2rust transpiler\n", encoding="utf-8")
+                    typer.secho(f"[c2rust-transpiler][mod] created src/lib.rs at {lib_rs}", fg=typer.colors.GREEN)
                 except Exception:
                     return
             txt = lib_rs.read_text(encoding="utf-8", errors="replace")
@@ -1218,6 +1232,7 @@ class Transpiler:
             else:
                 new_txt = (txt.rstrip() + f"\npub mod {mod_name};\n")
             lib_rs.write_text(new_txt, encoding="utf-8")
+            typer.secho(f"[c2rust-transpiler][mod] updated src/lib.rs: ensured pub mod {mod_name}", fg=typer.colors.GREEN)
         except Exception:
             # 保持稳健，失败不阻塞主流程
             pass
@@ -1237,6 +1252,7 @@ class Transpiler:
             if not mod_rs.exists():
                 try:
                     mod_rs.write_text("// Auto-generated by c2rust transpiler\n", encoding="utf-8")
+                    typer.secho(f"[c2rust-transpiler][mod] created {mod_rs}", fg=typer.colors.GREEN)
                 except Exception:
                     return
             txt = mod_rs.read_text(encoding="utf-8", errors="replace")
@@ -1254,6 +1270,7 @@ class Transpiler:
             else:
                 new_txt = (txt.rstrip() + f"\npub mod {child_mod};\n")
             mod_rs.write_text(new_txt, encoding="utf-8")
+            typer.secho(f"[c2rust-transpiler][mod] updated {mod_rs}: ensured pub mod {child_mod}", fg=typer.colors.GREEN)
         except Exception:
             pass
 
@@ -1317,6 +1334,7 @@ class Transpiler:
         """
         try:
             fn_name = self._extract_rust_fn_name_from_sig(rust_sig)
+            typer.secho(f"[c2rust-transpiler][test] ensure minimal tests for module={module}, fn={fn_name or '(unknown)'}", fg=typer.colors.BLUE)
             if not fn_name:
                 return
             mp = Path(module)
@@ -1329,6 +1347,7 @@ class Transpiler:
             # 简单检测是否已存在针对该函数的测试
             test_fn_pat = re.compile(rf"(?m)^\s*#\[test\]\s*fn\s+test_{re.escape(fn_name)}_basic\s*\(", re.IGNORECASE)
             if test_fn_pat.search(text):
+                typer.secho(f"[c2rust-transpiler][test] test test_{fn_name}_basic already exists, skip", fg=typer.colors.GREEN)
                 return
 
             # 提取参数列表，生成占位入参
@@ -1389,6 +1408,7 @@ class Transpiler:
                 new_text = text.rstrip() + tests_block
 
             mp.write_text(new_text, encoding="utf-8")
+            typer.secho(f"[c2rust-transpiler][test] wrote minimal test for {fn_name} into {mp}", fg=typer.colors.GREEN)
         except Exception:
             # 测试生成失败不阻塞主流程
             pass
@@ -1463,9 +1483,11 @@ class Transpiler:
                     matches.append(abs_path)
 
         if not matches:
+            typer.secho(f"[c2rust-transpiler][todo] no occurrences of todo!(\"{symbol}\") found in src/", fg=typer.colors.BLUE)
             return
 
         # 在当前工作目录运行 CodeAgent，不进入 crate 目录
+        typer.secho(f"[c2rust-transpiler][todo] found {len(matches)} files with todo!(\"{symbol}\")", fg=typer.colors.YELLOW)
         for target_file in matches:
             prompt = "\n".join([
                 f"请在文件 {target_file} 中，定位所有 todo!(\"{symbol}\") 占位并替换为对已转换函数的真实调用。",
@@ -1493,6 +1515,7 @@ class Transpiler:
         """在 crate 目录执行 cargo build，失败则使用 CodeAgent 最小化修复，直到通过或达到上限"""
         # 在 crate 目录进行构建与修复循环（切换到 crate 目录执行构建命令）
         workspace_root = str(self.crate_dir)
+        typer.secho(f"[c2rust-transpiler][build] workspace={workspace_root} starting cargo test loop", fg=typer.colors.MAGENTA)
         i = 0
         while True:
             i += 1
@@ -1504,7 +1527,7 @@ class Transpiler:
                 cwd=workspace_root,
             )
             if res.returncode == 0:
-                print("[c2rust-transpiler] Cargo 测试通过。")
+                typer.secho("[c2rust-transpiler][build] Cargo 测试通过。", fg=typer.colors.GREEN)
                 # 记录构建成功的度量与状态（用于准确性诊断与断点续跑）
                 try:
                     cur = self.progress.get("current") or {}
@@ -1519,15 +1542,15 @@ class Transpiler:
                     pass
                 return True
             output = (res.stdout or "") + "\n" + (res.stderr or "")
-            print(f"[c2rust-transpiler] Cargo 测试失败 (第 {i} 次尝试)。")
-            print(output)
+            typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {i} 次尝试)。", fg=typer.colors.RED)
+            typer.secho(output, fg=typer.colors.RED)
             # 准确性改进：尊重 max_retries 参数，防止无限循环
             try:
                 maxr = int(self.max_retries)
             except Exception:
                 maxr = 0
             if maxr > 0 and i >= maxr:
-                print(f"[c2rust-transpiler] 已达到最大重试次数上限({maxr})，停止构建修复循环。")
+                typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
                 # 记录失败度量与状态，便于后续准确性诊断与续跑
                 try:
                     cur = self.progress.get("current") or {}
@@ -1622,8 +1645,8 @@ class Transpiler:
         """
         def build_review_prompts() -> Tuple[str, str, str]:
             sys_p = (
-                "你是Rust代码审查专家。验收标准：只要主要功能实现且主路径行为与预期一致即可判定为合格；允许忽略异常路径、边界条件和非关键性处理差异（如日志、错误信息格式、轻微风格或非功能性调整）。"
-                "关注点：仅检查主路径（happy path）上的核心输入输出与状态变化是否正确；边界条件、异常路径、资源释放细节等不作为否决项，除非直接影响主路径功能。"
+                "你是Rust代码审查专家。验收标准：Rust 实现必须与原始 C 实现等价，涵盖主路径与边界条件的功能与可观测副作用；允许非功能性差异（如日志、风格、错误信息表述）。"
+                "关注点：检查核心输入输出、状态变化以及边界/异常路径的处理是否与 C 实现一致；资源释放/内存语义需等价（如指针有效性、长度边界等）。"
                 "不考虑安全、性能、风格等其他方面。仅在总结阶段输出审查结论。"
                 "禁止尝试修复或修改任何代码；不要输出补丁或提出具体改动方案；仅进行审查并在总结阶段给出结论。"
             )
@@ -1701,7 +1724,7 @@ class Transpiler:
             m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
             content = (m.group(1).strip() if m else summary.strip()).upper()
             if content == "OK":
-                print("[c2rust-transpiler] 代码审查通过。")
+                typer.secho("[c2rust-transpiler][review] 代码审查通过。", fg=typer.colors.GREEN)
                 # 二次审查：类型/边界一致性检查与最小化修复
                 try:
                     self._type_boundary_review_and_fix(rec, module, rust_sig)
@@ -1819,6 +1842,7 @@ class Transpiler:
             if not isinstance(verdict, dict):
                 return
             ok = bool(verdict.get("ok") is True)
+            typer.secho(f"[c2rust-transpiler][type-review] verdict ok={ok}, issues={len(verdict.get('issues') or [])}", fg=typer.colors.CYAN)
             issues = verdict.get("issues") if isinstance(verdict.get("issues"), list) else []
             if ok or not issues:
                 # 记录类型/边界审查结果到进度（通过或无问题）
@@ -1835,6 +1859,7 @@ class Transpiler:
                     pass
                 return
             # 记录类型/边界审查问题与度量后，再进行最小化修复
+            typer.secho("[c2rust-transpiler][type-review] applying minimal fixes for type/boundary issues", fg=typer.colors.YELLOW)
             try:
                 cur = self.progress.get("current") or {}
                 cur["type_boundary_review"] = {"ok": False, "issues": list(issues)}
@@ -1874,6 +1899,7 @@ class Transpiler:
 
     def transpile(self) -> None:
         """主流程"""
+        typer.secho("[c2rust-transpiler][start] transpile begin", fg=typer.colors.BLUE)
         # 准确性兜底：在未执行 prepare 的情况下，确保 crate 目录与最小 Cargo 配置存在
         try:
             cd = self.crate_dir.resolve()
@@ -1890,6 +1916,7 @@ class Transpiler:
                 )
                 try:
                     cargo.write_text(content, encoding="utf-8")
+                    typer.secho(f"[c2rust-transpiler][init] created Cargo.toml at {cargo}", fg=typer.colors.GREEN)
                 except Exception:
                     pass
             # 确保 src/lib.rs 存在
@@ -1897,6 +1924,7 @@ class Transpiler:
             if not lib_rs.exists():
                 try:
                     lib_rs.write_text("// Auto-created by c2rust transpiler\n", encoding="utf-8")
+                    typer.secho(f"[c2rust-transpiler][init] created src/lib.rs at {lib_rs}", fg=typer.colors.GREEN)
                 except Exception:
                     pass
         except Exception:
@@ -1919,6 +1947,7 @@ class Transpiler:
 
         # 若支持 resume，则跳过 progress['converted'] 中已完成的
         done: Set[int] = set(self.progress.get("converted") or [])
+        typer.secho(f"[c2rust-transpiler][order] steps={len(steps)} total_ids={sum(len(g) for g in steps)} already_converted={len(done)}", fg=typer.colors.BLUE)
 
         for fid in seq:
             if fid in done:
@@ -1927,10 +1956,13 @@ class Transpiler:
             if not rec:
                 continue
             if self._should_skip(rec):
+                typer.secho(f"[c2rust-transpiler][skip] {rec.qname or rec.name} (id={rec.id}) at {rec.file}:{rec.start_line}-{rec.end_line}", fg=typer.colors.YELLOW)
                 continue
 
             # 读取C函数源码
+            typer.secho(f"[c2rust-transpiler][read] reading C source for {rec.qname or rec.name} (id={rec.id}) from {rec.file}:{rec.start_line}-{rec.end_line}", fg=typer.colors.BLUE)
             c_code = self._read_source_span(rec)
+            typer.secho(f"[c2rust-transpiler][read] loaded {len(c_code.splitlines()) if c_code else 0} lines", fg=typer.colors.BLUE)
 
             # 若缺少源码片段且缺乏签名/参数信息，则跳过本函数，记录进度以便后续处理
             if not c_code and not (getattr(rec, "signature", "") or getattr(rec, "params", None)):
@@ -1942,10 +1974,13 @@ class Transpiler:
                 self._save_progress()
                 continue
             # 1) 规划：模块路径与Rust签名
+            typer.secho(f"[c2rust-transpiler][plan] planning module and signature for {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.CYAN)
             module, rust_sig = self._plan_module_and_signature(rec, c_code)
+            typer.secho(f"[c2rust-transpiler][plan] selected module={module}, signature={rust_sig}", fg=typer.colors.CYAN)
 
             # 记录当前进度
             self._update_progress_current(rec, module, rust_sig)
+            typer.secho(f"[c2rust-transpiler][progress] updated current record id={rec.id}", fg=typer.colors.CYAN)
             # 记录启发式签名建议，便于诊断与后续续跑
             try:
                 hint = self._infer_rust_signature_hint(rec)
@@ -1967,13 +2002,18 @@ class Transpiler:
 
             # 2) 生成实现
             unresolved = self._untranslated_callee_symbols(rec)
+            typer.secho(f"[c2rust-transpiler][deps] unresolved callee symbols: {', '.join(unresolved) if unresolved else '(none)'}", fg=typer.colors.BLUE)
+            typer.secho(f"[c2rust-transpiler][gen] generating Rust implementation for {rec.qname or rec.name}", fg=typer.colors.GREEN)
             self._codeagent_generate_impl(rec, c_code, module, rust_sig, unresolved)
+            typer.secho(f"[c2rust-transpiler][gen] implementation generated or updated in {module}", fg=typer.colors.GREEN)
             # 2.1) 生成后进行一次静态存在性校验，缺失则最小化修复补齐实现
             try:
-                self._ensure_impl_present(module, rust_sig)
+                ok_impl = self._ensure_impl_present(module, rust_sig)
+                typer.secho(f"[c2rust-transpiler][verify] impl present: {bool(ok_impl)} in {module}", fg=typer.colors.GREEN)
                 # 为当前函数生成最小可编译的单元测试，并在后续以 cargo test 验证
                 try:
                     self._ensure_minimal_tests(module, rust_sig)
+                    typer.secho(f"[c2rust-transpiler][test] ensured minimal tests for {module}", fg=typer.colors.GREEN)
                 except Exception:
                     pass
             except Exception:
@@ -1994,6 +2034,7 @@ class Transpiler:
                         # 排除直接文件 lib.rs/main.rs 的情况
                         if not top_mod.endswith(".rs"):
                             self._ensure_top_level_pub_mod(top_mod)
+                            typer.secho(f"[c2rust-transpiler][mod] ensured top-level pub mod {top_mod} in src/lib.rs", fg=typer.colors.GREEN)
             except Exception:
                 pass
 
@@ -2001,6 +2042,7 @@ class Transpiler:
             try:
                 sig_hint_local = self._infer_rust_signature_hint(rec)
                 issues = self._check_signature_consistency(rust_sig, rec)
+                typer.secho(f"[c2rust-transpiler][sig] signature consistency issues: {len(issues)}", fg=typer.colors.YELLOW)
                 if issues:
                     fix_prompt = "\n".join([
                         f"请在文件 {module} 中根据以下问题最小化修正函数签名（仅签名层面）：",
@@ -2065,6 +2107,7 @@ class Transpiler:
             # 2.2b) 确保从目标模块向上的 mod.rs 声明链补齐
             try:
                 self._ensure_mod_chain_for_module(module)
+                typer.secho(f"[c2rust-transpiler][mod] ensured mod.rs chain for {module}", fg=typer.colors.GREEN)
                 # 标记当前函数的模块链已补齐，便于诊断与续跑；同时记录顶层可见性修复标记
                 cur = self.progress.get("current") or {}
                 cur["mod_chain_fixed"] = True
@@ -2075,25 +2118,31 @@ class Transpiler:
                 pass
 
             # 3) 构建与修复
+            typer.secho(f"[c2rust-transpiler][build] starting cargo test loop", fg=typer.colors.MAGENTA)
             ok = self._cargo_build_loop()
+            typer.secho(f"[c2rust-transpiler][build] result: {'OK' if ok else 'FAIL'}", fg=typer.colors.MAGENTA)
             if not ok:
                 typer.secho("[c2rust-transpiler] 在重试次数限制内未能成功构建，已停止。", fg=typer.colors.RED)
                 # 保留当前状态，便于下次 resume
                 return
 
             # 4) 审查与优化
+            typer.secho(f"[c2rust-transpiler][review] starting code review for {rec.qname or rec.name}", fg=typer.colors.MAGENTA)
             self._review_and_optimize(rec, module, rust_sig)
+            typer.secho(f"[c2rust-transpiler][review] review completed", fg=typer.colors.MAGENTA)
 
             # 5) 标记已转换与映射记录（JSONL）
             self._mark_converted(rec, module, rust_sig)
+            typer.secho(f"[c2rust-transpiler][mark] converted and mapped: {rec.qname or rec.name} -> {module}", fg=typer.colors.GREEN)
 
             # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除
             current_rust_fn = self._extract_rust_fn_name_from_sig(rust_sig)
             # 优先使用限定名匹配，其次使用简单名匹配
             for sym in [rec.qname, rec.name]:
                 if sym:
+                    typer.secho(f"[c2rust-transpiler][todo] resolving todo!(\'{sym}\') occurrences", fg=typer.colors.BLUE)
                     self._resolve_pending_todos_for_symbol(sym, module, current_rust_fn, rust_sig)
-                    # 尝试一次构建以验证修复
+                    typer.secho(f"[c2rust-transpiler][build] re-run cargo test after todo fix", fg=typer.colors.MAGENTA)
                     self._cargo_build_loop()
 
         typer.secho("[c2rust-transpiler] 所有符合条件的函数均已处理完毕。", fg=typer.colors.GREEN)
