@@ -75,7 +75,7 @@ class TaskPlanner:
                 "<PLAN>\n- 子任务1\n- 子任务2\n</PLAN>\n"
                 "示例：\n"
                 "<PLAN>\n- 分析当前任务，提取需要修改的文件列表\n- 修改配置默认值并更新相关 schema\n- 更新文档中对该默认值的描述\n</PLAN>\n"
-                "注意：不要将步骤拆分太细，一般不要超过4个步骤。\n"
+                "注意：必须拆分为独立可完成的任务；不要将步骤拆分太细，一般不要超过4个步骤；子任务应具备明确的输入与可验证的输出；若超过4步将被判定为拆分失败并重试。\n"
                 "要求：<PLAN> 内必须是有效 YAML 列表，仅包含字符串项；禁止输出任何额外解释。\n"
                 "当不需要拆分时，仅输出：\n<DONT_NEED/>\n"
                 "禁止输出任何额外解释。"
@@ -120,6 +120,48 @@ class TaskPlanner:
                 PrettyOutput.print("任务规划提示：无需拆分。", OutputType.INFO)
         else:
             PrettyOutput.print("任务规划提示：无需拆分。", OutputType.INFO)
+
+        # 若子任务数量超过上限，则视为拆分失败并进行一次重试
+        max_steps = 4
+        if len(subtasks) > max_steps:
+            PrettyOutput.print(
+                f"任务拆分产生 {len(subtasks)} 个子任务，超过上限 {max_steps}，视为拆分失败，正在重试一次...",
+                OutputType.WARNING,
+            )
+            try:
+                retry_prompt = (
+                    f"{plan_prompt}\n"
+                    "附加约束：子任务数量不要超过4个，务必合并可合并的步骤；保持每个子任务独立可完成且具有可验证的输出。"
+                )
+                plan_resp = temp_model.chat_until_success(retry_prompt)  # type: ignore
+                text = str(plan_resp).strip()
+                m = re.search(
+                    r"<\s*PLAN\s*>\s*(.*?)\s*<\s*/\s*PLAN\s*>",
+                    text,
+                    re.IGNORECASE | re.DOTALL,
+                )
+                subtasks = []
+                if m:
+                    block = m.group(1)
+                    try:
+                        data = yaml.safe_load(block)
+                        if isinstance(data, list):
+                            for item in data:
+                                if isinstance(item, str):
+                                    s = item.strip()
+                                    if s:
+                                        subtasks.append(s)
+                    except Exception:
+                        pass
+            except Exception as e:
+                PrettyOutput.print(f"重试任务拆分失败: {e}", OutputType.ERROR)
+
+            if len(subtasks) > max_steps:
+                PrettyOutput.print(
+                    "重试后仍超过子任务上限，放弃拆分，交由主流程处理。",
+                    OutputType.WARNING,
+                )
+                return
 
         if not subtasks:
             # 无有效子任务，直接返回
