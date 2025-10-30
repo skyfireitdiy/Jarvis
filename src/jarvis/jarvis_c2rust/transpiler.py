@@ -434,6 +434,7 @@ class Transpiler:
         project_root: Union[str, Path] = ".",
         crate_dir: Optional[Union[str, Path]] = None,
         llm_group: Optional[str] = None,
+        plan_max_retries: int = 5,
         max_retries: int = 0,
         resume: bool = True,
         only: Optional[List[str]] = None,  # 仅转译指定函数名（简单名或限定名）
@@ -446,10 +447,11 @@ class Transpiler:
         # 兼容旧版 JSON 字典格式
         self.legacy_symbol_map_path = self.data_dir / LEGACY_SYMBOL_MAP_JSON
         self.llm_group = llm_group
+        self.plan_max_retries = plan_max_retries
         self.max_retries = max_retries
         self.resume = resume
         self.only = set(only or [])
-        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} max_retries={self.max_retries} resume={self.resume} only={sorted(list(self.only)) if self.only else []}", fg=typer.colors.BLUE)
+        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} max_retries={self.max_retries} resume={self.resume} only={sorted(list(self.only)) if self.only else []}", fg=typer.colors.BLUE)
 
         self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
         # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
@@ -771,7 +773,8 @@ class Transpiler:
 
         attempt = 0
         last_reason = "未知错误"
-        while True:
+        max_attempts = int(getattr(self, "plan_max_retries", 0) or 5)
+        while attempt < max_attempts:
             attempt += 1
             sum_p = base_sum_p if attempt == 1 else _retry_sum_prompt(last_reason)
 
@@ -805,6 +808,15 @@ class Transpiler:
             else:
                 typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
                 last_reason = reason
+        # 规划超出重试上限：回退到兜底方案（默认模块 src/ffi.rs + 启发式签名）
+        try:
+            crate_root = self.crate_dir.resolve()
+            fallback_module = str((crate_root / "src" / "ffi.rs").resolve())
+        except Exception:
+            fallback_module = "src/ffi.rs"
+        hint_sig = self._infer_rust_signature_hint(rec) or f"pub fn {rec.name or ('fn_' + str(rec.id))}()"
+        typer.secho(f"[c2rust-transpiler][plan] 超出规划重试上限({max_attempts})，回退到兜底: module={fallback_module}, signature={hint_sig}", fg=typer.colors.YELLOW)
+        return fallback_module, hint_sig
 
     def _update_progress_current(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         self.progress["current"] = {
@@ -1123,8 +1135,15 @@ class Transpiler:
         self._current_context_compact_header = "\n".join(compact_lines)
         self._current_context_full_sent = False
 
-        # 初始化一次修复Agent（CodeAgent），单个函数生命周期内复用
-        self._current_agents[f"repair::{rec.id}"] = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+        # 初始化一次修复Agent（CodeAgent），单个函数生命周期内复用（启用方法论与分析）
+        self._current_agents[f"repair::{rec.id}"] = CodeAgent(
+            need_summary=False,
+            non_interactive=True,
+            plan=False,
+            model_group=self.llm_group,
+            use_methodology=True,
+            use_analysis=True,
+        )
 
     def _get_repair_agent(self) -> CodeAgent:
         """
@@ -1134,9 +1153,34 @@ class Transpiler:
         key = f"repair::{fid}" if fid is not None else "repair::default"
         agent = self._current_agents.get(key)
         if agent is None:
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+            # 复用的修复Agent启用方法论与分析
+            agent = CodeAgent(
+                need_summary=False,
+                non_interactive=True,
+                plan=False,
+                model_group=self.llm_group,
+                use_methodology=True,
+                use_analysis=True,
+            )
             self._current_agents[key] = agent
         return agent
+
+    def _refresh_compact_context(self, rec: FnRecord, module: str, rust_sig: str) -> None:
+        """
+        刷新精简上下文头部（在 sig-fix/ensure-impl 后调用，保证后续提示一致）。
+        仅更新精简头部，不影响已发送的全量头部。
+        """
+        try:
+            compact_lines = [
+                "【函数上下文简要（复用）】",
+                f"- 函数: {rec.qname or rec.name} (id={rec.id})",
+                f"- 模块: {module}",
+                f"- 签名: {rust_sig}",
+                f"- crate: {self.crate_dir.resolve()}",
+            ]
+            self._current_context_compact_header = "\n".join(compact_lines)
+        except Exception:
+            pass
 
     # ========= 代码生成与修复 =========
 
@@ -1612,14 +1656,155 @@ class Transpiler:
             finally:
                 os.chdir(prev_cwd)
 
+    def _classify_rust_error(self, text: str) -> List[str]:
+        """
+        朴素错误分类，用于提示 CodeAgent 聚焦修复：
+        - missing_import: unresolved import / not found in this scope / cannot find ...
+        - type_mismatch: mismatched types / expected ... found ...
+        - visibility: private module/field/function
+        - borrow_checker: does not live long enough / borrowed data escapes / cannot borrow as mutable
+        - dependency_missing: failed to select a version / could not find crate
+        - module_not_found: file not found for module / unresolved module
+        """
+        tags: List[str] = []
+        t = (text or "").lower()
+        def has(s: str) -> bool:
+            return s in t
+        if ("unresolved import" in t) or ("not found in this scope" in t) or ("cannot find" in t) or ("use of undeclared crate or module" in t):
+            tags.append("missing_import")
+        if ("mismatched types" in t) or ("expected" in t and "found" in t):
+            tags.append("type_mismatch")
+        if ("private" in t and "module" in t) or ("private" in t and "field" in t) or ("private" in t and "function" in t):
+            tags.append("visibility")
+        if ("does not live long enough" in t) or ("borrowed data escapes" in t) or ("cannot borrow" in t):
+            tags.append("borrow_checker")
+        if ("failed to select a version" in t) or ("could not find crate" in t) or ("no matching package named" in t):
+            tags.append("dependency_missing")
+        if ("file not found for module" in t) or ("unresolved module" in t):
+            tags.append("module_not_found")
+        # 去重
+        try:
+            tags = list(dict.fromkeys(tags))
+        except Exception:
+            tags = list(set(tags))
+        return tags
+
     def _cargo_build_loop(self) -> bool:
-        """在 crate 目录执行 cargo build，失败则使用 CodeAgent 最小化修复，直到通过或达到上限"""
-        # 在 crate 目录进行构建与修复循环（切换到 crate 目录执行构建命令）
+        """在 crate 目录执行构建与测试：先 cargo check，再 cargo test。失败则最小化修复直到通过或达到上限。"""
         workspace_root = str(self.crate_dir)
-        typer.secho(f"[c2rust-transpiler][build] 工作区={workspace_root}，开始 cargo 测试循环", fg=typer.colors.MAGENTA)
+        typer.secho(f"[c2rust-transpiler][build] 工作区={workspace_root}，开始构建循环（check -> test）", fg=typer.colors.MAGENTA)
         i = 0
         while True:
             i += 1
+            # 阶段一：cargo check（更快）
+            res_check = subprocess.run(
+                ["cargo", "check", "-q"],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=workspace_root,
+            )
+            if res_check.returncode != 0:
+                output = (res_check.stdout or "") + "\n" + (res_check.stderr or "")
+                typer.secho(f"[c2rust-transpiler][build] cargo check 失败 (第 {i} 次尝试)。", fg=typer.colors.RED)
+                typer.secho(output, fg=typer.colors.RED)
+                # 达到上限则记录并退出
+                try:
+                    maxr = int(self.max_retries)
+                except Exception:
+                    maxr = 0
+                if maxr > 0 and i >= maxr:
+                    typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
+                    try:
+                        cur = self.progress.get("current") or {}
+                        metrics = cur.get("metrics") or {}
+                        metrics["build_attempts"] = int(i)
+                        cur["metrics"] = metrics
+                        cur["impl_verified"] = False
+                        err_summary = (output or "").strip()
+                        if len(err_summary) > 2000:
+                            err_summary = err_summary[:2000] + "...(truncated)"
+                        cur["last_build_error"] = err_summary
+                        self.progress["current"] = cur
+                        self._save_progress()
+                    except Exception:
+                        pass
+                    return False
+                # 提示修复（分类标签）
+                tags = self._classify_rust_error(output)
+                symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
+                try:
+                    curr = self.progress.get("current") or {}
+                except Exception:
+                    curr = {}
+                sym_name = str(curr.get("qualified_name") or curr.get("name") or "")
+                src_loc = f"{curr.get('file')}:{curr.get('start_line')}-{curr.get('end_line')}" if curr else ""
+                c_code = ""
+                try:
+                    cf = curr.get("file")
+                    s = int(curr.get("start_line") or 0)
+                    e = int(curr.get("end_line") or 0)
+                    if cf and s:
+                        p = Path(cf)
+                        if not p.is_absolute():
+                            p = (self.project_root / p).resolve()
+                        if p.exists():
+                            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+                            s0 = max(1, s)
+                            e0 = min(len(lines), max(e, s0))
+                            c_code = "\n".join(lines[s0 - 1 : e0])
+                except Exception:
+                    c_code = ""
+                repair_prompt = "\n".join([
+                    "目标：以最小的改动修复问题，使 `cargo check` 和 `cargo test` 可以通过。",
+                    "阶段：cargo check",
+                    f"错误分类标签: {tags}",
+                    "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；在缺失/未实现的被调函数导致错误时，一并补齐这些依赖的Rust实现（可新增合理模块/函数）；避免大范围改动。",
+                    "- 保持最小改动，避免与错误无关的重构或格式化；",
+                    "- 如构建失败源于缺失或未实现的被调函数/依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时可在合理的模块中新建函数；",
+                    "- 禁止使用 todo!/unimplemented! 作为占位；",
+                    "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号，避免通配；",
+                    "- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]；",
+                    "",
+                    "最近处理的函数上下文（供参考，优先修复构建错误）：",
+                    f"- 函数：{sym_name}",
+                    f"- 源位置：{src_loc}",
+                    f"- 目标模块（progress）：{curr.get('module') or ''}",
+                    f"- 建议签名（progress）：{curr.get('rust_signature') or ''}",
+                    "",
+                    "原始C函数源码片段（只读参考）：",
+                    "<C_SOURCE>",
+                    c_code,
+                    "</C_SOURCE>",
+                    "",
+                    "如需定位或交叉验证 C 符号位置，请使用符号表检索工具：",
+                    "- 工具: read_symbols",
+                    "- 参数示例(YAML):",
+                    f"  symbols_file: \"{symbols_path}\"",
+                    "  symbols:",
+                    f"    - \"{sym_name}\"",
+                    "",
+                    "上下文：",
+                    f"- crate 根目录路径: {self.crate_dir.resolve()}",
+                    f"- 包名称（用于 cargo -p）: {self.crate_dir.name}",
+                    "",
+                    "请阅读以下构建错误并进行必要修复：",
+                    "<BUILD_ERROR>",
+                    output,
+                    "</BUILD_ERROR>",
+                    "修复后请再次执行 `cargo check` 验证，后续将自动运行 `cargo test`。",
+                ])
+                prev_cwd = os.getcwd()
+                try:
+                    os.chdir(str(self.crate_dir))
+                    agent = self._get_repair_agent()
+                    agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={i}][check]", suffix="")
+                finally:
+                    os.chdir(prev_cwd)
+                # 下一轮循环
+                continue
+
+            # 阶段二：cargo test
             res = subprocess.run(
                 ["cargo", "test", "-q"],
                 capture_output=True,
@@ -1629,7 +1814,6 @@ class Transpiler:
             )
             if res.returncode == 0:
                 typer.secho("[c2rust-transpiler][build] Cargo 测试通过。", fg=typer.colors.GREEN)
-                # 记录构建成功的度量与状态（用于准确性诊断与断点续跑）
                 try:
                     cur = self.progress.get("current") or {}
                     metrics = cur.get("metrics") or {}
@@ -1639,40 +1823,36 @@ class Transpiler:
                     self.progress["current"] = cur
                     self._save_progress()
                 except Exception:
-                    # 记录失败不影响主流程
                     pass
                 return True
+
             output = (res.stdout or "") + "\n" + (res.stderr or "")
             typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {i} 次尝试)。", fg=typer.colors.RED)
             typer.secho(output, fg=typer.colors.RED)
-            # 准确性改进：尊重 max_retries 参数，防止无限循环
             try:
                 maxr = int(self.max_retries)
             except Exception:
                 maxr = 0
             if maxr > 0 and i >= maxr:
                 typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
-                # 记录失败度量与状态，便于后续准确性诊断与续跑
                 try:
                     cur = self.progress.get("current") or {}
                     metrics = cur.get("metrics") or {}
                     metrics["build_attempts"] = int(i)
                     cur["metrics"] = metrics
                     cur["impl_verified"] = False
-                    # 保存最近一次构建错误摘要（截断以避免超长）
-                    try:
-                        err_summary = (output or "").strip()
-                        if len(err_summary) > 2000:
-                            err_summary = err_summary[:2000] + "...(truncated)"
-                        cur["last_build_error"] = err_summary
-                    except Exception:
-                        pass
+                    err_summary = (output or "").strip()
+                    if len(err_summary) > 2000:
+                        err_summary = err_summary[:2000] + "...(truncated)"
+                    cur["last_build_error"] = err_summary
                     self.progress["current"] = cur
                     self._save_progress()
                 except Exception:
                     pass
                 return False
-            # 为修复 Agent 提供更多上下文：symbols.jsonl 索引指引 + 最近处理的C源码片段
+
+            # 构建失败（测试阶段）修复
+            tags = self._classify_rust_error(output)
             symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
             try:
                 curr = self.progress.get("current") or {}
@@ -1699,6 +1879,8 @@ class Transpiler:
 
             repair_prompt = "\n".join([
                 "目标：以最小的改动修复问题，使 `cargo test` 命令可以通过。",
+                "阶段：cargo test",
+                f"错误分类标签: {tags}",
                 "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；在缺失/未实现的被调函数导致错误时，一并补齐这些依赖的Rust实现（可新增合理模块/函数）；避免大范围改动。",
                 "- 保持最小改动，避免与错误无关的重构或格式化；",
                 "- 如构建失败源于缺失或未实现的被调函数/依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时可在合理的模块中新建函数；",
@@ -1739,7 +1921,7 @@ class Transpiler:
             try:
                 os.chdir(str(self.crate_dir))
                 agent = self._get_repair_agent()
-                agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={i}]", suffix="")
+                agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={i}][test]", suffix="")
             finally:
                 os.chdir(prev_cwd)
 
@@ -2131,6 +2313,11 @@ class Transpiler:
             # 2.1) 生成后进行一次静态存在性校验，缺失则最小化修复补齐实现
             try:
                 ok_impl = self._ensure_impl_present(module, rust_sig)
+                # 刷新精简上下文（防止签名/模块调整后提示不同步）
+                try:
+                    self._refresh_compact_context(rec, module, rust_sig)
+                except Exception:
+                    pass
                 typer.secho(f"[c2rust-transpiler][verify] 实现存在: {bool(ok_impl)} 于 {module}", fg=typer.colors.GREEN)
                 # 为当前函数生成最小可编译的单元测试，并在后续以 cargo test 验证
                 try:
@@ -2222,6 +2409,11 @@ class Transpiler:
                             pass
                         self.progress["current"] = cur
                         self._save_progress()
+                        # 签名修正后刷新精简上下文，保证后续提示一致
+                        try:
+                            self._refresh_compact_context(rec, module, rust_sig)
+                        except Exception:
+                            pass
                     except Exception:
                         pass
             except Exception:
@@ -2274,6 +2466,7 @@ def run_transpile(
     project_root: Union[str, Path] = ".",
     crate_dir: Optional[Union[str, Path]] = None,
     llm_group: Optional[str] = None,
+    plan_max_retries: int = 5,
     max_retries: int = 0,
     resume: bool = True,
     only: Optional[List[str]] = None,
@@ -2291,6 +2484,7 @@ def run_transpile(
         project_root=project_root,
         crate_dir=crate_dir,
         llm_group=llm_group,
+        plan_max_retries=plan_max_retries,
         max_retries=max_retries,
         resume=resume,
         only=only,
