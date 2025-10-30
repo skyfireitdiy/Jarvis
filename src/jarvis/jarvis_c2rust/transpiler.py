@@ -449,7 +449,7 @@ class Transpiler:
         self.max_retries = max_retries
         self.resume = resume
         self.only = set(only or [])
-        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} max_retries={self.max_retries} resume={self.resume} only={sorted(list(self.only)) if self.only else []}", fg=typer.colors.BLUE)
+        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} max_retries={self.max_retries} resume={self.resume} only={sorted(list(self.only)) if self.only else []}", fg=typer.colors.BLUE)
 
         self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
         # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
