@@ -640,7 +640,7 @@ class Transpiler:
             "原则：\n"
             "- 按功能内聚与依赖方向选择模块，避免循环依赖；\n"
             "- 模块路径必须落在 crate 的 src/ 下，优先放置到已存在的模块中；必要时可建议创建新的子模块文件；\n"
-            "- 函数签名请尽量在Rust中表达指针/数组/结构体语义（可先用简单类型占位，后续由实现阶段细化）；\n"
+            "- 函数签名需尽量与 C 签名对齐：仅要求参数个数与顺序一致；类型可用合理占位，后续由实现阶段细化；\n"
             "- 仅输出必要信息，避免冗余解释。"
         )
         user_prompt = "\n".join([
@@ -685,7 +685,7 @@ class Transpiler:
             '- notes: "可选说明（若有上下文缺失或风险点，请在此列出）"\n'
             "注意：\n"
             "- module 必须位于 crate 的 src/ 目录下，接受绝对路径或以 src/ 开头的相对路径；尽量选择已有文件；如需新建文件，给出合理路径；\n"
-            "- rust_signature 请包含可见性修饰与函数名（可先用占位类型）。\n"
+            "- rust_signature 应尽量与 C 签名对齐（仅要求参数个数与顺序一致，类型可用合理占位）；并包含可见性修饰与函数名（可先用占位类型）。\n"
             "请严格按以下格式输出：\n"
             "<SUMMARY><yaml>\nmodule: \"...\"\nrust_signature: \"...\"\nnotes: \"...\"\n</yaml></SUMMARY>"
         )
@@ -1590,9 +1590,12 @@ class Transpiler:
                 c_code,
                 "</C_SOURCE>",
                 "",
-                "如需定位或交叉验证 C 符号位置，可在以下索引中检索：",
-                f"- 符号索引文件: {symbols_path}",
-                f"- 示例命令: grep -n '\\\"name\\\": \\\"{sym_name}\\\"' '{symbols_path}' || grep -n '\\\"qualified_name\\\": \\\"{sym_name}\\\"' '{symbols_path}'",
+                "如需定位或交叉验证 C 符号位置，请使用符号表检索工具：",
+                "- 工具: read_symbols",
+                "- 参数示例(YAML):",
+                f"  symbols_file: \"{symbols_path}\"",
+                "  symbols:",
+                f"    - \"{sym_name}\"",
                 "",
                 "上下文：",
                 f"- crate 根目录路径: {self.crate_dir.resolve()}",
@@ -1653,9 +1656,12 @@ class Transpiler:
                 crate_tree,
                 "</CRATE_TREE>",
                 "",
-                "如需定位或交叉验证 C 符号位置，可在以下索引中检索：",
-                f"- 符号索引文件: {(self.data_dir / 'symbols.jsonl').resolve()}",
-                f"- 示例命令: grep -n '\\\"name\\\": \\\"{rec.qname or rec.name}\\\"' '{(self.data_dir / 'symbols.jsonl').resolve()}' || grep -n '\\\"qualified_name\\\": \\\"{rec.qname or rec.name}\\\"' '{(self.data_dir / 'symbols.jsonl').resolve()}'",
+                "如需定位或交叉验证 C 符号位置，请使用符号表检索工具：",
+                "- 工具: read_symbols",
+                "- 参数示例(YAML):",
+                f"  symbols_file: \"{(self.data_dir / 'symbols.jsonl').resolve()}\"",
+                "  symbols:",
+                f"    - \"{rec.qname or rec.name}\"",
                 "",
                 "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
             ])
@@ -1999,6 +2005,25 @@ class Transpiler:
                     fix_prompt = "\n".join([
                         f"请在文件 {module} 中根据以下问题最小化修正函数签名（仅签名层面）：",
                         *issues,
+                        "",
+                        "上下文信息：",
+                        f"- crate 根目录路径: {self.crate_dir.resolve()}",
+                        f"- 目标模块文件: {module}",
+                        f"- 当前/建议 Rust 签名: {rust_sig}",
+                        "- 符号表签名与参数（只读参考）：",
+                        json.dumps({"signature": getattr(rec, "signature", ""), "params": getattr(rec, "params", None)}, ensure_ascii=False, indent=2),
+                        "",
+                        "C 源码片段（供参考，不要原样粘贴）：",
+                        "<C_SOURCE>",
+                        c_code,
+                        "</C_SOURCE>",
+                        "",
+                        "如需按需检索符号表记录，请使用符号表检索工具：",
+                        "- 工具: read_symbols",
+                        "- 参数示例(YAML):",
+                        f"  symbols_file: \"{(self.data_dir / 'symbols.jsonl').resolve()}\"",
+                        "  symbols:",
+                        f"    - \"{rec.qname or rec.name}\"",
                         "",
                         "参考（启发式）Rust 签名建议（可按需调整）：",
                         sig_hint_local or "(无建议，保持最小改动)",
