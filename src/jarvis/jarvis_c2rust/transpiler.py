@@ -1452,11 +1452,11 @@ class Transpiler:
     def _resolve_pending_todos_for_symbol(self, symbol: str, callee_module: str, callee_rust_fn: str, callee_rust_sig: str) -> None:
         """
         当某个 C 符号对应的函数已转换为 Rust 后：
-        - 扫描整个 crate（优先 src/ 目录）中所有 .rs 文件，查找 todo!("符号名") 占位
+        - 扫描整个 crate（优先 src/ 目录）中所有 .rs 文件，查找占位：todo!("符号名") 或 unimplemented!("符号名")
         - 对每个命中的文件，创建 CodeAgent 将占位替换为对已转换函数的真实调用（可使用 crate::... 完全限定路径或 use 引入）
         - 最小化修改，避免无关重构
 
-        说明：不再使用 todos.json，本方法直接搜索源码中的 todo!("xxxx")。
+        说明：不再使用 todos.json，本方法直接搜索源码中的 todo!("xxxx") / unimplemented!("xxxx")。
         """
         if not symbol:
             return
@@ -1464,7 +1464,7 @@ class Transpiler:
         # 计算被调函数的crate路径前缀，便于在提示中提供调用路径建议
         callee_path = self._module_file_to_crate_path(callee_module)
 
-        # 扫描 src 下的 .rs 文件，查找 todo!("symbol") 占位
+        # 扫描 src 下的 .rs 文件，查找 todo!("symbol") 或 unimplemented!("symbol") 占位
         matches: List[str] = []
         src_root = (self.crate_dir / "src").resolve()
         if src_root.exists():
@@ -1473,8 +1473,9 @@ class Transpiler:
                     text = p.read_text(encoding="utf-8", errors="replace")
                 except Exception:
                     continue
-                pattern = re.compile(r'todo\s*!\s*\(\s*["\']' + re.escape(symbol) + r'["\']\s*\)')
-                if pattern.search(text):
+                pat_todo = re.compile(r'todo\s*!\s*\(\s*["\']' + re.escape(symbol) + r'["\']\s*\)')
+                pat_unimpl = re.compile(r'unimplemented\s*!\s*\(\s*["\']' + re.escape(symbol) + r'["\']\s*\)')
+                if pat_todo.search(text) or pat_unimpl.search(text):
                     try:
                         # 记录绝对路径，避免依赖当前工作目录
                         abs_path = str(p.resolve())
@@ -1483,14 +1484,16 @@ class Transpiler:
                     matches.append(abs_path)
 
         if not matches:
-            typer.secho(f"[c2rust-transpiler][todo] 未在 src/ 中找到 todo!(\"{symbol}\") 的出现", fg=typer.colors.BLUE)
+            typer.secho(f"[c2rust-transpiler][todo] 未在 src/ 中找到 todo!(\"{symbol}\") 或 unimplemented!(\"{symbol}\") 的出现", fg=typer.colors.BLUE)
             return
 
         # 在当前工作目录运行 CodeAgent，不进入 crate 目录
-        typer.secho(f"[c2rust-transpiler][todo] 发现 {len(matches)} 个包含 todo!(\"{symbol}\") 的文件", fg=typer.colors.YELLOW)
+        typer.secho(f"[c2rust-transpiler][todo] 发现 {len(matches)} 个包含 todo!(\"{symbol}\") 或 unimplemented!(\"{symbol}\") 的文件", fg=typer.colors.YELLOW)
         for target_file in matches:
             prompt = "\n".join([
-                f"请在文件 {target_file} 中，定位所有 todo!(\"{symbol}\") 占位并替换为对已转换函数的真实调用。",
+                f"请在文件 {target_file} 中，定位所有以下占位并替换为对已转换函数的真实调用：",
+                f"- todo!(\"{symbol}\")",
+                f"- unimplemented!(\"{symbol}\")",
                 "要求：",
                 f"- 已转换的目标函数名：{callee_rust_fn}",
                 f"- 其所在模块（crate路径提示）：{callee_path}",
@@ -1500,7 +1503,7 @@ class Transpiler:
                 "- 保持最小改动，不要进行与本次修复无关的重构或格式化；",
                 "- 如果参数列表暂不明确，可使用合理占位变量，确保编译通过。",
                 "",
-                f"仅修改 {target_file} 中与 todo!(\"{symbol}\") 相关的代码，其他位置不要改动。",
+                f"仅修改 {target_file} 中与上述占位相关的代码，其他位置不要改动。",
                 "请仅输出补丁，不要输出解释或多余文本。",
             ])
             prev_cwd = os.getcwd()
