@@ -43,7 +43,16 @@ def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         further processing should be skipped.
     """
     # Regex to find paths in single quotes
-    file_paths = re.findall(r"'([^']+)'", user_input)
+    raw_paths = re.findall(r"'([^']+)'", user_input)
+    # Convert to absolute paths and de-duplicate by absolute path while preserving order
+    abs_to_raws = {}
+    file_paths = []
+    for _raw in raw_paths:
+        abs_path = os.path.abspath(_raw)
+        if abs_path not in abs_to_raws:
+            abs_to_raws[abs_path] = []
+            file_paths.append(abs_path)
+        abs_to_raws[abs_path].append(_raw)
 
     if not file_paths:
         return user_input, False
@@ -51,15 +60,16 @@ def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     added_context = ""
     read_code_tool = ReadCodeTool()
 
-    for path in file_paths:
-        if os.path.isfile(path) and is_text_file(path):
-            line_count = count_lines(path)
+    for abs_path in file_paths:
+        if os.path.isfile(abs_path) and is_text_file(abs_path):
+            line_count = count_lines(abs_path)
             if line_count > 0:
                 # Use ReadCodeTool to get formatted content
-                result = read_code_tool._handle_single_file(path)
+                result = read_code_tool._handle_single_file(abs_path)
                 if result["success"]:
-                    # Remove the file path from the original input to avoid redundancy
-                    user_input = user_input.replace(f"'{path}'", "")
+                    # Remove all original path tokens that map to this absolute path to avoid redundancy
+                    for _raw in abs_to_raws.get(abs_path, []):
+                        user_input = user_input.replace(f"'{_raw}'", "")
                     # Append the full, formatted output from the tool, which includes headers and line numbers
                     added_context += "\n" + result["stdout"]
 
