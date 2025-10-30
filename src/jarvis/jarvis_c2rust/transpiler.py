@@ -460,6 +460,16 @@ class Transpiler:
         # 使用 JSONL 存储的符号映射
         self.symbol_map = _SymbolMapJsonl(self.symbol_map_path, legacy_json_path=self.legacy_symbol_map_path)
 
+        # 当前函数上下文与Agent复用缓存（按单个函数生命周期）
+        self._current_agents: Dict[str, Any] = {}
+        # 全量与精简上下文头部
+        self._current_context_full_header: str = ""
+        self._current_context_compact_header: str = ""
+        # 是否已发送过全量头部（每函数仅一次）
+        self._current_context_full_sent: bool = False
+        # 兼容旧字段（不再使用）
+        self._current_context_header: str = ""
+        self._current_function_id: Optional[int] = None
 
     def _save_progress(self) -> None:
         _write_json(self.progress_path, self.progress)
@@ -1044,6 +1054,92 @@ class Transpiler:
         return issues
         return issues
 
+    # ========= Agent 复用与上下文拼接辅助 =========
+
+    def _compose_prompt_with_context(self, prompt: str) -> str:
+        """
+        在复用Agent时，将此前构建的函数上下文头部拼接到当前提示词前，确保连续性。
+        策略：
+        - 每个函数生命周期内，首次调用拼接“全量头部”；
+        - 后续调用仅拼接“精简头部”；
+        - 如头部缺失则直接返回原提示。
+        """
+        # 首次发送全量上下文
+        if (not getattr(self, "_current_context_full_sent", False)) and getattr(self, "_current_context_full_header", ""):
+            self._current_context_full_sent = True
+            return self._current_context_full_header + "\n\n" + prompt
+        # 后续拼接精简上下文
+        compact = getattr(self, "_current_context_compact_header", "")
+        if compact:
+            return compact + "\n\n" + prompt
+        return prompt
+
+    def _reset_function_context(self, rec: FnRecord, module: str, rust_sig: str, c_code: str) -> None:
+        """
+        初始化当前函数的上下文与复用Agent缓存。
+        在单个函数实现开始时调用一次，之后复用Repair/Review等Agent。
+        """
+        self._current_agents = {}
+        self._current_function_id = rec.id
+
+        # 汇总上下文头部，供后续复用时拼接
+        callees_ctx = self._collect_callees_context(rec)
+        crate_tree = _dir_tree(self.crate_dir)
+        librep_ctx = rec.lib_replacement if isinstance(rec.lib_replacement, dict) else None
+
+        header_lines = [
+            "【当前函数上下文（复用Agent专用）】",
+            f"- 函数: {rec.qname or rec.name} (id={rec.id})",
+            f"- 源位置: {rec.file}:{rec.start_line}-{rec.end_line}",
+            f"- 目标模块: {module}",
+            f"- 建议/当前签名: {rust_sig}",
+            f"- crate 根目录: {self.crate_dir.resolve()}",
+            "",
+            "原始C函数源码片段（只读参考）：",
+            "<C_SOURCE>",
+            c_code or "",
+            "</C_SOURCE>",
+            "",
+            "被引用符号上下文：",
+            json.dumps(callees_ctx, ensure_ascii=False, indent=2),
+            "",
+            "库替代上下文（若有）：",
+            json.dumps(librep_ctx, ensure_ascii=False, indent=2),
+            "",
+            "crate 目录结构（部分）：",
+            "<CRATE_TREE>",
+            crate_tree,
+            "</CRATE_TREE>",
+        ]
+        # 精简头部（后续复用）
+        compact_lines = [
+            "【函数上下文简要（复用）】",
+            f"- 函数: {rec.qname or rec.name} (id={rec.id})",
+            f"- 模块: {module}",
+            f"- 签名: {rust_sig}",
+            f"- crate: {self.crate_dir.resolve()}",
+        ]
+        self._current_context_full_header = "\n".join(header_lines)
+        self._current_context_compact_header = "\n".join(compact_lines)
+        self._current_context_full_sent = False
+
+        # 初始化一次修复Agent（CodeAgent），单个函数生命周期内复用
+        self._current_agents[f"repair::{rec.id}"] = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+
+    def _get_repair_agent(self) -> CodeAgent:
+        """
+        获取复用的修复Agent（CodeAgent）。若未初始化，则按当前函数id创建。
+        """
+        fid = self._current_function_id
+        key = f"repair::{fid}" if fid is not None else "repair::default"
+        agent = self._current_agents.get(key)
+        if agent is None:
+            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+            self._current_agents[key] = agent
+        return agent
+
+    # ========= 代码生成与修复 =========
+
     def _codeagent_generate_impl(self, rec: FnRecord, c_code: str, module: str, rust_sig: str, unresolved: List[str]) -> None:
         """
         使用 CodeAgent 生成/更新目标模块中的函数实现。
@@ -1057,7 +1153,7 @@ class Transpiler:
             "- 若 module 文件不存在则新建；为所在模块添加必要的 mod 声明（若需要）；",
             "- 若已有函数占位/实现，尽量最小修改，不要破坏现有代码；",
             "- 你可以参考原 C 函数的关联实现（如同文件/同模块的相关辅助函数、内联实现、宏与注释等），在保持语义一致的前提下以符合 Rust 风格的方式实现；避免机械复制粘贴；",
-            "- 禁止在函数实现中使用 todo!/unimplemented! 作为占位；对于尚未实现的被调符号，请阅读其原始 C 实现并在本次一并补齐等价的 Rust 实现，避免遗留占位；",
+            "- 禁止在函数实现中使用 todo!/unimplemented! 作为占位；对于尚未实现的被调符号，请阅读其原 C 实现并在本次一并补齐等价的 Rust 实现，避免遗留占位；",
             "- 为保证行为等价，禁止使用占位返回或随意默认值；必须实现与 C 语义等价的返回逻辑，不得使用 panic!/todo!/unimplemented!；",
             "- 不要删除或移动其他无关文件。",
             "",
@@ -1190,8 +1286,8 @@ class Transpiler:
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-                agent.run(prompt, prefix="[c2rust-transpiler][ensure-impl]", suffix="")
+                agent = self._get_repair_agent()
+                agent.run(self._compose_prompt_with_context(prompt), prefix="[c2rust-transpiler][ensure-impl]", suffix="")
             finally:
                 os.chdir(prev_cwd)
             # 再次检查
@@ -1511,8 +1607,8 @@ class Transpiler:
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-                agent.run(prompt, prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
+                agent = self._get_repair_agent()
+                agent.run(self._compose_prompt_with_context(prompt), prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
             finally:
                 os.chdir(prev_cwd)
 
@@ -1642,8 +1738,8 @@ class Transpiler:
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-                agent.run(repair_prompt, prefix=f"[c2rust-transpiler][build-fix iter={i}]", suffix="")
+                agent = self._get_repair_agent()
+                agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={i}]", suffix="")
             finally:
                 os.chdir(prev_cwd)
 
@@ -1708,13 +1804,15 @@ class Transpiler:
             return sys_p, usr_p, sum_p
 
         i = 0
-        while True:
-            sys_p, usr_p, sum_p = build_review_prompts()
-            agent = Agent(
-                system_prompt=sys_p,
+        # 复用 Review Agent（仅在本函数生命周期内构建一次）
+        review_key = f"review::{rec.id}"
+        sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
+        if self._current_agents.get(review_key) is None:
+            self._current_agents[review_key] = Agent(
+                system_prompt=sys_p_init,
                 name="C2Rust-Review-Agent",
                 model_group=self.llm_group,
-                summary_prompt=sum_p,
+                summary_prompt=sum_p_init,
                 need_summary=True,
                 auto_complete=True,
                 use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
@@ -1724,10 +1822,13 @@ class Transpiler:
                 use_analysis=False,
                 disable_file_edit=True,
             )
+
+        while True:
+            agent = self._current_agents[review_key]
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                summary = str(agent.run(usr_p) or "")
+                summary = str(agent.run(self._compose_prompt_with_context(usr_p_init)) or "")
             finally:
                 os.chdir(prev_cwd)
             m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
@@ -1765,16 +1866,17 @@ class Transpiler:
                 "",
                 "请仅以补丁形式输出修改，避免冗余解释。",
             ])
-            # 在当前工作目录运行 CodeAgent，不进入 crate 目录
-            ca = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+            # 在当前工作目录运行复用的修复 CodeAgent
+            ca = self._get_repair_agent()
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                ca.run(fix_prompt, prefix=f"[c2rust-transpiler][review-fix iter={i}]", suffix="")
+                ca.run(self._compose_prompt_with_context(fix_prompt), prefix=f"[c2rust-transpiler][review-fix iter={i}]", suffix="")
                 # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
                 self._cargo_build_loop()
             finally:
                 os.chdir(prev_cwd)
+            i += 1
 
     def _mark_converted(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """记录映射：C 符号 -> Rust 符号与模块路径（JSONL，每行一条，支持重载/同名）"""
@@ -1830,24 +1932,28 @@ class Transpiler:
                 "issues: [string, ...]  # 每条以 [type] 开头，示例：[type] param#0 missing null check\n"
                 "<SUMMARY><yaml>\nok: true\nissues: []\n</yaml></SUMMARY>"
             )
-            agent = Agent(
-                system_prompt=sys_p,
-                name="C2Rust-TypeBoundary-Review",
-                model_group=self.llm_group,
-                summary_prompt=sum_p,
-                need_summary=True,
-                auto_complete=True,
-                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
-                plan=False,
-                non_interactive=True,
-                use_methodology=False,
-                use_analysis=False,
-                disable_file_edit=True,
-            )
+            # 复用 Type Review Agent
+            key = f"type_review::{rec.id}"
+            if self._current_agents.get(key) is None:
+                self._current_agents[key] = Agent(
+                    system_prompt=sys_p,
+                    name="C2Rust-TypeBoundary-Review",
+                    model_group=self.llm_group,
+                    summary_prompt=sum_p,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
+                    plan=False,
+                    non_interactive=True,
+                    use_methodology=False,
+                    use_analysis=False,
+                    disable_file_edit=True,
+                )
+            agent = self._current_agents[key]
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                review = str(agent.run(usr_p) or "")
+                review = str(agent.run(self._compose_prompt_with_context(usr_p)) or "")
             finally:
                 os.chdir(prev_cwd)
             verdict = _extract_json_from_summary(review)
@@ -1902,8 +2008,8 @@ class Transpiler:
             prev = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                ca = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-                ca.run("\n".join(fix_lines), prefix="[c2rust-transpiler][type-boundary-fix]", suffix="")
+                ca = self._get_repair_agent()
+                ca.run(self._compose_prompt_with_context("\n".join(fix_lines)), prefix="[c2rust-transpiler][type-boundary-fix]", suffix="")
             finally:
                 os.chdir(prev)
         except Exception:
@@ -2013,6 +2119,9 @@ class Transpiler:
             except Exception:
                 pass
 
+            # 初始化函数上下文与修复Agent复用缓存（只在当前函数开始时执行一次）
+            self._reset_function_context(rec, module, rust_sig, c_code)
+
             # 2) 生成实现
             unresolved = self._untranslated_callee_symbols(rec)
             typer.secho(f"[c2rust-transpiler][deps] 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}", fg=typer.colors.BLUE)
@@ -2091,8 +2200,8 @@ class Transpiler:
                     prev = os.getcwd()
                     try:
                         os.chdir(str(self.crate_dir))
-                        agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
-                        agent.run(fix_prompt, prefix="[c2rust-transpiler][sig-fix]", suffix="")
+                        agent = self._get_repair_agent()
+                        agent.run(self._compose_prompt_with_context(fix_prompt), prefix="[c2rust-transpiler][sig-fix]", suffix="")
                     finally:
                         os.chdir(prev)
                     # 记录到进度，便于诊断与续跑（签名检查与类型/边界审查结果）
@@ -2139,7 +2248,7 @@ class Transpiler:
                 # 保留当前状态，便于下次 resume
                 return
 
-            # 4) 审查与优化
+            # 4) 审查与优化（复用 Review Agent）
             typer.secho(f"[c2rust-transpiler][review] 开始代码审查: {rec.qname or rec.name}", fg=typer.colors.MAGENTA)
             self._review_and_optimize(rec, module, rust_sig)
             typer.secho(f"[c2rust-transpiler][review] 代码审查完成", fg=typer.colors.MAGENTA)
@@ -2148,7 +2257,7 @@ class Transpiler:
             self._mark_converted(rec, module, rust_sig)
             typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module}", fg=typer.colors.GREEN)
 
-            # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除
+            # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除（复用修复Agent）
             current_rust_fn = self._extract_rust_fn_name_from_sig(rust_sig)
             # 优先使用限定名匹配，其次使用简单名匹配
             for sym in [rec.qname, rec.name]:
