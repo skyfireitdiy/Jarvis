@@ -100,7 +100,7 @@ def start_service(
     PrettyOutput.print(
         f"Starting Jarvis API server on {host}:{port}", OutputType.SUCCESS
     )
-    PrettyOutput.print("This server provides an OpenAI-compatible API", OutputType.INFO)
+    PrettyOutput.print("本服务提供与 OpenAI 兼容的 API", OutputType.INFO)
 
     if default_platform and default_model:
         PrettyOutput.print(
@@ -151,7 +151,7 @@ def start_service(
             if response:
                 f.write(f"\nResponse:\n{response}\n")
 
-        PrettyOutput.print(f"Conversation logged to {log_file}", OutputType.INFO)
+        PrettyOutput.print(f"会话已记录到 {log_file}", OutputType.INFO)
 
     @app.get("/v1/models")
     async def list_models() -> Dict[str, Any]:
