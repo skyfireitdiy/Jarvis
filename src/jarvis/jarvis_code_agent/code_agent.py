@@ -7,6 +7,7 @@
 import os
 import subprocess
 import sys
+import hashlib
 from typing import List, Optional, Tuple
 
 import typer
@@ -1044,8 +1045,8 @@ def cli(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
         config_file=config_file,
     )
-    # CodeAgent 单实例互斥：仅代码助手入口加锁，其他入口不受影响
-    _acquire_single_instance_lock(lock_name="code_agent.lock")
+    # CodeAgent 单实例互斥：改为按仓库维度加锁（延后至定位仓库根目录后执行）
+    # 锁的获取移动到确认并切换到git根目录之后
 
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
@@ -1098,6 +1099,14 @@ def cli(
 
     curr_dir = os.getcwd()
     find_git_root_and_cd(curr_dir)
+    # 在定位到 git 根目录后，按仓库维度加锁，避免跨仓库互斥
+    try:
+        repo_root = os.getcwd()
+        lock_name = f"code_agent_{hashlib.md5(repo_root.encode('utf-8')).hexdigest()}.lock"
+        _acquire_single_instance_lock(lock_name=lock_name)
+    except Exception:
+        # 回退到全局锁，确保至少有互斥保护
+        _acquire_single_instance_lock(lock_name="code_agent.lock")
     try:
         agent = CodeAgent(
             model_group=model_group,
