@@ -1,34 +1,31 @@
 # -*- coding: utf-8 -*-
 """
-OpenHarmony 安全演进多Agent套件（阶段一骨架）
+OpenHarmony 安全分析套件
 
-目标（阶段一）：
-- 在不修改现有核心框架文件的前提下，基于现有 Agent 与 MultiAgent 能力，
-  新增一个多Agent系统入口，专注于识别指定模块的安全问题（重点：内存管理、
-  缓冲区操作、错误处理等）。
+当前版本概述：
+- 关键路径：直扫（direct_scan）→ 单Agent逐条验证（只读工具：read_code/execute_script）→ 聚合输出（JSON + Markdown）
+- 目标范围：内存管理、缓冲区操作、错误处理等基础安全问题识别
+- 约束：不修改核心框架文件，保持最小侵入；严格只读分析
 
 集成方式：
-- 复用 jarvis.jarvis_agent 与 jarvis.jarvis_multi_agent 提供的能力，不侵入式新增模块。
-- 提供 create_security_multi_agent() 与 run_security_analysis(entry) 两个入口。
+- 复用 jarvis.jarvis_agent.Agent 与工具注册系统（jarvis.jarvis_tools.registry.ToolRegistry）
+- 提供入口：
+  - run_security_analysis(entry_path, ...)：直扫 + 单Agent逐条验证 + 聚合
+  - workflow.run_security_analysis_fast(entry_path, ...)：直扫基线（不经 LLM 验证）
+  - workflow.direct_scan(entry_path, ...)：仅启发式直扫
 
-后续扩展：
-- 在后续提交中会新增 prompts.py、checkers/ 与 report.py、workflow.py 等模块，并将本文件中的默认提示词迁移到专门文件。
+说明：
+- 已移除 MultiAgent 编排与相关提示词；不存在“阶段一”等表述
 """
 
 from typing import Dict, List, Optional
 
-from jarvis.jarvis_multi_agent import MultiAgent
-from jarvis.jarvis_agent import Agent, output_handler
-from jarvis.jarvis_sec.prompts import (
-    COMMON_SYSTEM_PROMPT,
-    PLANNER_PROMPT,
-    SOURCE_COLLECTOR_PROMPT,
-    C_ANALYZER_PROMPT,
-    RUST_ANALYZER_PROMPT,
-    AGGREGATOR_PROMPT,
-)
+from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_sec.workflow import run_security_analysis_fast, direct_scan, run_with_multi_agent
 from jarvis.jarvis_tools.registry import ToolRegistry
+
+
+  
 
 
 def _try_parse_issues_from_text(text: str) -> Optional[List[Dict]]:
@@ -182,85 +179,8 @@ meta:
 """.strip()
 
 
-def _default_common_system_prompt() -> str:
-    """
-    提供通用系统提示词（轻量），确保多Agent消息传递遵循单步操作与明确格式。
-    """
-    return COMMON_SYSTEM_PROMPT()
-
-
-def _default_agents_config() -> List[Dict]:
-    """
-    返回默认的多Agent配置（阶段一骨架）。
-    说明：
-    - Planner：面向用户输入的任务分解与路由
-    - SourceCollector：源码清单与语言分类（优先 C/C++/Rust）
-    - CAnalyzer：针对 C/C++ 的启发式安全检查（阶段一以启发式为主，后续增强）
-    - RustAnalyzer：Rust 代码安全性扫描（统计 unsafe、原始指针、Result 未处理等）
-    - Aggregator：聚合多方输出形成结构化报告并结束任务
-    """
-    planner_sp = PLANNER_PROMPT()
-
-    collector_sp = SOURCE_COLLECTOR_PROMPT()
-
-    canalyzer_sp = C_ANALYZER_PROMPT()
-
-    rustanalyzer_sp = RUST_ANALYZER_PROMPT()
-
-    aggregator_sp = AGGREGATOR_PROMPT()
-
-    return [
-        {
-            "name": "Planner",
-            "description": "规划与协调（任务分解与路由）",
-            "system_prompt": planner_sp,
-            # 作为主智能体，由 MultiAgent 控制自动补全策略；此处不强制开启
-        },
-        {
-            "name": "SourceCollector",
-            "description": "源码采集（列出C/C++/Rust文件清单并分派）",
-            "system_prompt": collector_sp,
-            "summary_on_send": False,  # 采集环节不强制生成交接摘要，减少模型开销
-        },
-        {
-            "name": "CAnalyzer",
-            "description": "C/C++ 安全问题启发式分析",
-            "system_prompt": canalyzer_sp,
-            "summary_on_send": False,
-        },
-        {
-            "name": "RustAnalyzer",
-            "description": "Rust 安全性分析（unsafe/指针/错误处理/FFI）",
-            "system_prompt": rustanalyzer_sp,
-            "summary_on_send": False,
-        },
-        {
-            "name": "Aggregator",
-            "description": "聚合并生成最终报告（JSON + Markdown）",
-            "system_prompt": aggregator_sp,
-            # 终端Agent：生成报告后返回字符串，MultiAgent.run 将返回至用户
-        },
-    ]
-
-
-def create_security_multi_agent(
-    agents_config: Optional[List[Dict]] = None,
-    main_agent_name: str = "Planner",
-    common_system_prompt: Optional[str] = None,
-) -> MultiAgent:
-    """
-    创建“OpenHarmony安全演进”多Agent实例。
-    - agents_config 为空时使用默认配置（阶段一骨架）
-    - common_system_prompt 若为空，将使用内置的轻量通用提示
-    """
-    config = agents_config or _default_agents_config()
-    # 强制禁用方法论与分析，仅作用于本模块创建的 Agent，避免全局行为变化
-    for c in config:
-        c.setdefault("use_methodology", False)
-        c.setdefault("use_analysis", False)
-    common_sp = common_system_prompt if common_system_prompt is not None else _default_common_system_prompt()
-    return MultiAgent(config, main_agent_name=main_agent_name, common_system_prompt=common_sp)
-
+# 注：当前版本不使用 MultiAgent 编排，已移除默认多智能体配置与创建函数。
+# 请使用 run_security_analysis（单Agent逐条验证）或 workflow.run_security_analysis_fast（直扫基线）。 
 
 def _git_restore_if_dirty(repo_root: str) -> int:
     """
@@ -293,7 +213,7 @@ def run_security_analysis(
     resume: bool = True,
 ) -> str:
     """
-    运行安全分析工作流（阶段一骨架，混合模式）。
+    运行安全分析工作流（混合模式）。
 
     改进：
     - 即使在 agent 模式下，也先进行本地正则/启发式直扫，生成候选问题；
@@ -449,17 +369,13 @@ def run_security_analysis(
             )
             continue
         # 使用单Agent逐条验证，避免多Agent复杂度与上下文污染
-        system_prompt = (
-            COMMON_SYSTEM_PROMPT()
-            + "\n"
-            + """
+        system_prompt = """
 # 单Agent安全分析约束
 - 仅围绕输入候选的位置进行验证与细化；避免无关扩展与大范围遍历。
 - 工具优先：使用 read_code 读取 {file} 附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
 - 禁止修改任何文件或执行写操作命令（rm/mv/cp/echo >、sed -i、git、patch、chmod、chown 等）；仅进行只读分析与读取。
 - 每次仅执行一个操作；等待工具结果后再进行下一步。
 """.strip()
-        )
         task_id = f"JARVIS-SEC-Analyzer-{idx}"
         # 显示当前进度
         try:
@@ -666,7 +582,7 @@ def _try_parse_summary_report(text: str) -> Optional[Dict]:
 
 
 __all__ = [
-    "create_security_multi_agent",
+    
     "run_security_analysis",
     "run_security_analysis_fast",
     "direct_scan",
