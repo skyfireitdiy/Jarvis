@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-OpenHarmony 安全演进多Agent套件 —— Rust 启发式安全检查器（阶段一）
+OpenHarmony 安全分析套件 —— Rust 启发式安全检查器
 
 目标与范围：
 - 聚焦 unsafe 使用、原始指针、错误处理、并发与 FFI 等基础安全问题。

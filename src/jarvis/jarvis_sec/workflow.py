@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-OpenHarmony 安全演进多Agent套件 —— Workflow（阶段一，含可复现直扫基线）
+OpenHarmony 安全分析套件 —— Workflow（含可复现直扫基线）
 
-目标（阶段一）：
+目标：
 - 识别指定模块的安全问题（内存管理、缓冲区操作、错误处理等），检出率≥60% 为目标。
 - 在不依赖外部服务的前提下，提供一个“可复现、可离线”的直扫基线（direct scan）。
-- 当前阶段采用“先直扫拆分子任务，再由单Agent逐条分析”的模式；保留接口便于后续切换。
+- 当前采用“先直扫拆分子任务，再由单Agent逐条分析”的模式；保留接口便于后续切换。
 
 本模块提供：
 - direct_scan(entry_path, languages=None, exclude_dirs=None) -> Dict：纯Python+正则/命令行辅助扫描，生成结构化结果
@@ -430,7 +430,7 @@ def format_markdown_report(result_json: Dict) -> str:
     s = result_json.get("summary", {})
     issues: List[Dict] = result_json.get("issues", [])
     md: List[str] = []
-    md.append("# OpenHarmony 安全问题分析报告（阶段一直扫基线）")
+    md.append("# OpenHarmony 安全问题分析报告（直扫基线）")
     md.append("")
     md.append(f"- 扫描根目录: {s.get('scanned_root', '')}")
     md.append(f"- 扫描文件数: {s.get('scanned_files', 0)}")

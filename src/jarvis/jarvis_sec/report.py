@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-OpenHarmony 安全演进多Agent套件 —— 报告聚合与评分模块（阶段一）
+OpenHarmony 安全分析套件 —— 报告聚合与评分模块
 
 目标：
 - 将启发式检查器输出的结构化问题列表进行聚合与评分，生成统一的 JSON 与 Markdown 报告。
@@ -186,7 +186,7 @@ def format_markdown_report(report_json: Dict) -> str:
     issues: List[Dict] = report_json.get("issues", [])
     lines: List[str] = []
 
-    lines.append("# OpenHarmony 安全问题分析报告（阶段一聚合）")
+    lines.append("# OpenHarmony 安全问题分析报告（聚合）")
     lines.append("")
     if "scanned_root" in s:
         lines.append(f"- 扫描根目录: {s.get('scanned_root')}")
