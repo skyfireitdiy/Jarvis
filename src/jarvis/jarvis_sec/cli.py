@@ -20,7 +20,7 @@ from typing import Optional
 import typer
 from jarvis.jarvis_utils.utils import init_env
 # removed: set_config import（避免全局覆盖模型组配置）
-from jarvis.jarvis_sec.workflow import run_with_multi_agent, run_security_analysis_fast
+from jarvis.jarvis_sec.workflow import run_with_agent, run_security_analysis_fast
 
 app = typer.Typer(
     add_completion=False,
@@ -54,7 +54,7 @@ def agent(
 
     text: Optional[str] = None
     try:
-        text = run_with_multi_agent(
+        text = run_with_agent(
             path,
             llm_group=llm_group,
         )

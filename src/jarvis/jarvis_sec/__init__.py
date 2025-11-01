@@ -21,7 +21,7 @@ OpenHarmony 安全分析套件
 from typing import Dict, List, Optional
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_sec.workflow import run_security_analysis_fast, direct_scan, run_with_multi_agent
+from jarvis.jarvis_sec.workflow import run_security_analysis_fast, direct_scan, run_with_agent
 from jarvis.jarvis_tools.registry import ToolRegistry
 
 
@@ -396,6 +396,7 @@ def run_security_analysis(
             use_methodology=False,
             use_analysis=False,
             output_handler=[ToolRegistry()],
+            disable_file_edit = True,
             use_tools=["read_code", "execute_script"],
         )
         # 将 llm_group 仅传递给本次 Agent，不覆盖全局配置
@@ -586,5 +587,5 @@ __all__ = [
     "run_security_analysis",
     "run_security_analysis_fast",
     "direct_scan",
-    "run_with_multi_agent",
+    "run_with_agent",
 ]

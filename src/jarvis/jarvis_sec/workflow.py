@@ -11,7 +11,7 @@ OpenHarmony 安全分析套件 —— Workflow（含可复现直扫基线）
 - direct_scan(entry_path, languages=None, exclude_dirs=None) -> Dict：纯Python+正则/命令行辅助扫描，生成结构化结果
 - format_markdown_report(result_json: Dict) -> str：将结构化结果转为可读的 Markdown
 - run_security_analysis_fast(entry_path, languages=None, exclude_dirs=None) -> str：一键运行直扫并输出（JSON + Markdown）
-- run_with_multi_agent(entry_path, languages=None) -> str：使用单Agent逐条子任务分析模式（复用 jarvis.jarvis_sec.__init__ 的实现）
+- run_with_agent(entry_path, languages=None) -> str：使用单Agent逐条子任务分析模式（复用 jarvis.jarvis_sec.__init__ 的实现）
 """
 
 import json
@@ -479,7 +479,7 @@ def run_security_analysis_fast(
     )
 
 
-def run_with_multi_agent(
+def run_with_agent(
     entry_path: str,
     languages: Optional[List[str]] = None,
     llm_group: Optional[str] = None,
@@ -509,5 +509,5 @@ __all__ = [
     "direct_scan",
     "format_markdown_report",
     "run_security_analysis_fast",
-    "run_with_multi_agent",
+    "run_with_agent",
 ]
