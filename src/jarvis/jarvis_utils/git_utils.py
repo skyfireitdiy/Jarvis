@@ -717,7 +717,7 @@ def confirm_add_new_files() -> None:
 
         if not user_confirm(
             "是否要添加这些变更（如果不需要请修改.gitignore文件以忽略不需要的文件）？",
-            False,
+            True,
         ):
             # 用户选择 N：自动将未跟踪文件列表添加到仓库根目录的 .gitignore
             try:
