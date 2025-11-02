@@ -20,7 +20,7 @@ import shutil
 import subprocess
 from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
 from jarvis.jarvis_sec.checkers import analyze_c_files, analyze_rust_files
 from jarvis.jarvis_sec.report import build_json_and_markdown
 from jarvis.jarvis_sec.types import Issue
@@ -52,7 +52,7 @@ def _iter_source_files(
     """
     entry = Path(entry_path)
     if not entry.exists():
-        return []
+        return
 
     exts = set((languages or ["c", "cpp", "h", "hpp", "rs"]))
     excludes = set(exclude_dirs or [".git", "build", "out", "target", "third_party", "vendor"])
@@ -397,8 +397,8 @@ def direct_scan(
     issues_r = analyze_rust_files(str(base), [str(p) for p in r_files]) if r_files else []
     issues: List[Issue] = issues_c + issues_r
 
-    # 统计
-    summary = {
+
+    summary: Dict[str, Any] = {
         "total": len(issues),
         "by_language": {"c/cpp": 0, "rust": 0},
         "by_category": {},
@@ -407,11 +407,13 @@ def direct_scan(
         "scanned_root": str(base),
     }
     file_score: Dict[str, int] = {}
+    # Safely update language/category counts with explicit typing
+    lang_counts = cast(Dict[str, int], summary["by_language"])
+    cat_counts = cast(Dict[str, int], summary["by_category"])
     for it in issues:
-        summary["by_language"][it.language] = summary["by_language"].get(it.language, 0) + 1
-        summary["by_category"][it.category] = summary["by_category"].get(it.category, 0) + 1
+        lang_counts[it.language] = lang_counts.get(it.language, 0) + 1
+        cat_counts[it.category] = cat_counts.get(it.category, 0) + 1
         file_score[it.file] = file_score.get(it.file, 0) + 1
-
     # Top 风险文件
     summary["top_risk_files"] = [f for f, _ in sorted(file_score.items(), key=lambda x: x[1], reverse=True)[:10]]
 

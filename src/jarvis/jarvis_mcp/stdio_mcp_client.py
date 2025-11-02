@@ -296,6 +296,6 @@ class StdioMcpClient(McpClient):
                 self._send_notification("notifications/exit", {})
                 # 等待进程结束
                 self.process.wait(timeout=1)
-            except:
+            except Exception:
                 # 如果进程没有正常退出，强制终止
                 self.process.kill()

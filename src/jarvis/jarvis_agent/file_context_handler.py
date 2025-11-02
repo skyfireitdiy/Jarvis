@@ -45,7 +45,7 @@ def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     # Regex to find paths in single quotes
     raw_paths = re.findall(r"'([^']+)'", user_input)
     # Convert to absolute paths and de-duplicate by absolute path while preserving order
-    abs_to_raws = {}
+    abs_to_raws: dict[str, list[str]] = {}
     file_paths = []
     for _raw in raw_paths:
         abs_path = os.path.abspath(_raw)

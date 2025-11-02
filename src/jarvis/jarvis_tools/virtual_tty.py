@@ -279,7 +279,7 @@ class VirtualTTYTool:
                         line = process.stdout.readline()
                         if line:
                             agent.tty_sessions[tty_id]["output_queue"].put(line)
-                    except:
+                    except Exception:
                         break
 
             output_thread = _threading.Thread(target=read_output, daemon=True)

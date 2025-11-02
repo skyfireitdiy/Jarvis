@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
 # 第三方库导入
@@ -30,7 +30,7 @@ from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
 from jarvis.jarvis_agent.prompts import (
     DEFAULT_SUMMARY_PROMPT,
     SUMMARY_REQUEST_PROMPT,
-    TASK_ANALYSIS_PROMPT,
+    TASK_ANALYSIS_PROMPT as TASK_ANALYSIS_PROMPT,
 )
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_agent.edit_file_handler import EditFileHandler
@@ -515,7 +515,7 @@ class Agent:
         use_tools: List[str],
     ):
         """初始化各种处理器"""
-        default_handlers = [ToolRegistry()]
+        default_handlers: List[Any] = [ToolRegistry()]
         if not getattr(self, "disable_file_edit", False):
             default_handlers.extend([EditFileHandler(), RewriteFileHandler()])
         handlers = output_handler or default_handlers

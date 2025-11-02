@@ -576,9 +576,9 @@ def apply_library_replacement(
 
                 # 禁用库命中时，强制视为不可替代
                 if disabled_norm:
-                    libs_lower = [l.lower() for l in libraries]
+                    libs_lower = [lib_name.lower() for lib_name in libraries]
                     lib_single_lower = lib.lower() if lib else ""
-                    banned_hit = any(l in disabled_norm for l in libs_lower) or (lib_single_lower and lib_single_lower in disabled_norm)
+                    banned_hit = any(lower_lib in disabled_norm for lower_lib in libs_lower) or (lib_single_lower and lib_single_lower in disabled_norm)
                     if banned_hit:
                         rep = False
                         warn_libs = ", ".join(sorted(set([lib] + libraries))) if (libraries or lib) else "(未提供库名)"

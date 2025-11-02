@@ -383,7 +383,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                             os.environ["COLUMNS"] = str(cols)
                             try:
                                 # 覆盖全局 rich Console 的宽度，便于 PrettyOutput 按照前端列数换行
-                                console._width = cols  # type: ignore[attr-defined]
+                                console._width = cols
                             except Exception:
                                 pass
                         if rows > 0:
@@ -419,11 +419,11 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
 
         import os as _os
         try:
-            import pty as _pty  # type: ignore
-            import fcntl as _fcntl  # type: ignore
-            import select as _select  # type: ignore
-            import termios as _termios  # type: ignore
-            import struct as _struct  # type: ignore
+            import pty as _pty
+            import fcntl as _fcntl
+            import select as _select
+            import termios as _termios
+            import struct as _struct
         except Exception:
             try:
                 await ws.send_text(json.dumps({"type": "output", "payload": {"text": "服务端缺少 PTY 相关依赖，无法启动交互式终端", "output_type": "ERROR"}}))
@@ -445,7 +445,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                 pass
 
         # 交互式会话状态与启动函数（优先执行 jvs 命令，失败回退到系统 shell）
-        session = {"pid": None, "master_fd": None}
+        session: Dict[str, Optional[int]] = {"pid": None, "master_fd": None}
         last_cols = 0
         last_rows = 0
         # 会话结束后等待用户按回车再重启
@@ -548,6 +548,9 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                         else:
                             await asyncio.sleep(0.5)
                             continue
+                    if not isinstance(fd, int):
+                        await asyncio.sleep(0.1)
+                        continue
                     try:
                         r, _, _ = _select.select([fd], [], [], 0.1)
                     except Exception:
@@ -569,8 +572,9 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                             try:
                                 # 关闭旧 master
                                 try:
-                                    if session.get("master_fd") is not None:
-                                        _os.close(session["master_fd"])  # type: ignore[index]
+                                    fd2 = session.get("master_fd")
+                                    if isinstance(fd2, int):
+                                        _os.close(fd2)
                                 except Exception:
                                     pass
                                 session["master_fd"] = None
@@ -607,7 +611,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
             rows = 0
         try:
             if cols > 0 and rows > 0:
-                _set_winsize(session["master_fd"], cols, rows)
+                _set_winsize(session.get("master_fd") or -1, cols, rows)
                 last_cols = cols
                 last_rows = rows
         except Exception:
@@ -680,18 +684,20 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
             except Exception:
                 pass
             try:
-                if session.get("master_fd") is not None:
+                fd3 = session.get("master_fd")
+                if isinstance(fd3, int):
                     try:
-                        _os.close(session["master_fd"])  # type: ignore[index]
+                        _os.close(fd3)
                     except Exception:
                         pass
             except Exception:
                 pass
             try:
-                if session.get("pid"):
-                    import signal as _signal  # type: ignore
+                pid_val = session.get("pid")
+                if isinstance(pid_val, int):
+                    import signal as _signal
                     try:
-                        _os.kill(session["pid"], _signal.SIGTERM)  # type: ignore[index]
+                        _os.kill(pid_val, _signal.SIGTERM)
                     except Exception:
                         pass
             except Exception:
@@ -716,7 +722,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
         # 退出时清理 PID 文件
         def _cleanup_pidfile() -> None:
             try:
-                pidfile.unlink(missing_ok=True)  # type: ignore[call-arg]
+                pidfile.unlink(missing_ok=True)
             except Exception:
                 pass
         try:
@@ -724,7 +730,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
         except Exception:
             pass
         # 处理 SIGTERM/SIGINT，清理后退出
-        def _signal_handler(signum, frame):  # type: ignore[no-untyped-def]
+        def _signal_handler(signum: int, frame: Any) -> None:
             try:
                 _cleanup_pidfile()
             finally:

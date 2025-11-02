@@ -190,7 +190,7 @@ def list():
                 try:
                     dt = datetime.fromisoformat(last_updated)
                     last_updated = dt.strftime("%Y-%m-%d %H:%M")
-                except:
+                except Exception:
                     pass
 
             # 获取数据点数和标签

@@ -298,12 +298,12 @@ def get_modified_line_ranges() -> Dict[str, List[Tuple[int, int]]]:
     """
     # 获取所有文件的Git差异
     # 仅用于解析修改行范围，减少上下文以降低输出体积和解析成本
-    result = subprocess.run(
+    proc = subprocess.run(
         ["git", "show", "--no-color"],
         capture_output=True,
         text=True,
     )
-    diff_output = result.stdout
+    diff_output = proc.stdout
 
     # 解析差异以获取修改的文件及其行范围
     result: Dict[str, List[Tuple[int, int]]] = {}
@@ -341,7 +341,7 @@ def is_file_in_git_repo(filepath: str) -> bool:
 
         # 检查文件路径是否在仓库根目录下
         return os.path.abspath(filepath).startswith(os.path.abspath(repo_root))
-    except:
+    except Exception:
         return False
 
 
@@ -622,7 +622,7 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
             if files_result.returncode == 0:
                 file_lines = files_result.stdout.splitlines()
                 unique_files: Set[str] = set(filter(None, file_lines))
-                commit["files"] = list(unique_files)[:20]  # type: ignore[list-item] # 限制最多20个文件
+                commit["files"] = list(unique_files)[:20]  # 限制最多20个文件
 
         return commits
 

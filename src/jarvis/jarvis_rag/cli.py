@@ -54,10 +54,10 @@ _project_root = os.path.abspath(
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_rag.llm_interface import LLMInterface
-from jarvis.jarvis_rag.rag_pipeline import JarvisRAGPipeline
+from jarvis.jarvis_platform.base import BasePlatform  # noqa: E402
+from jarvis.jarvis_platform.registry import PlatformRegistry  # noqa: E402
+from jarvis.jarvis_rag.llm_interface import LLMInterface  # noqa: E402
+from jarvis.jarvis_rag.rag_pipeline import JarvisRAGPipeline  # noqa: E402
 
 app = typer.Typer(
     name="jarvis-rag",

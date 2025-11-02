@@ -9,7 +9,7 @@ from jarvis.jarvis_utils.config import (
 )
 from jarvis.jarvis_utils.http import get as http_get
 from markdownify import markdownify as md  # type: ignore
-import requests
+import requests  # type: ignore[import-untyped]
 
 
 class WebpageTool:

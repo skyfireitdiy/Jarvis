@@ -75,7 +75,7 @@ def _try_import_libclang() -> Any:
     SUPPORTED_MAJORS = {16, 17, 18, 19, 20, 21}
 
     try:
-        from clang import cindex  # type: ignore
+        from clang import cindex
     except Exception as e:
         raise RuntimeError(
             "导入 clang.cindex 失败。本工具支持 clang 16-21。\n"
@@ -88,7 +88,7 @@ def _try_import_libclang() -> Any:
     # Verify Python clang bindings major version (if available)
     py_major: Optional[int] = None
     try:
-        import clang as _clang  # type: ignore
+        import clang as _clang
         import re as _re
         v = getattr(_clang, "__version__", None)
         if v:
@@ -121,11 +121,20 @@ def _try_import_libclang() -> Any:
             lib.clang_disposeString.argtypes = [CXString]
             s = lib.clang_getClangVersion()
             cstr = lib.clang_getCString(s)  # returns const char*
+            ver = ""
             try:
-                ver = cstr.decode("utf-8", "ignore") if cstr else ""
+                if cstr is not None:
+                    ver = cstr.decode("utf-8", "ignore")
+                else:
+                    ver = ""
             except Exception:
                 # Fallback if restype not honored by platform
-                ver = ctypes.cast(cstr, ctypes.c_char_p).value.decode("utf-8", "ignore") if cstr else ""
+                try:
+                    ptr = ctypes.cast(cstr, ctypes.c_char_p)
+                    raw = getattr(ptr, "value", None)
+                    ver = raw.decode("utf-8", "ignore") if raw is not None else ""
+                except Exception:
+                    ver = ""
             lib.clang_disposeString(s)
             if ver:
                 m = _re.search(r"clang version (\d+)", ver)
@@ -184,15 +193,15 @@ def _try_import_libclang() -> Any:
     llvm_home = os.environ.get("LLVM_HOME")
     if llvm_home:
         p = Path(llvm_home) / "lib"
-        candidates: List[Path] = []
+        candidates_llvm: List[Path] = []
         for maj in (21, 20, 19, 18, 17, 16):
-            candidates.append(p / f"libclang.so.{maj}")
-        candidates.extend([
+            candidates_llvm.append(p / f"libclang.so.{maj}")
+        candidates_llvm.extend([
             p / "libclang.so",
             p / "libclang.dylib",
             p / "libclang.dll",
         ])
-        for cand in candidates:
+        for cand in candidates_llvm:
             if cand.exists() and _ensure_supported_and_set(str(cand)):
                 return cindex
 
@@ -558,7 +567,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     # Fallback safeguard: if loader returned None, try importing directly
     if cindex is None:
         try:
-            from clang import cindex as _ci  # type: ignore
+            from clang import cindex as _ci
             cindex = _ci
         except Exception as e:
             raise RuntimeError(f"Failed to load libclang bindings: {e}")
@@ -582,9 +591,9 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             # Build candidate search dirs (Linux/macOS)
             import platform as _platform
             sys_name = _platform.system()
-            candidates: List[str] = []
+            lib_candidates = []
             if sys_name == "Linux":
-                candidates = [
+                lib_candidates = [
                     "/usr/lib/llvm-21/lib/libclang.so",
                     "/usr/lib/llvm-20/lib/libclang.so",
                     "/usr/lib/llvm-19/lib/libclang.so",
@@ -596,12 +605,12 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 ]
             elif sys_name == "Darwin":
                 # Homebrew locations
-                candidates = [
+                lib_candidates = [
                     "/opt/homebrew/opt/llvm/lib/libclang.dylib",
                     "/usr/local/opt/llvm/lib/libclang.dylib",
                 ]
 
-            good = [p for p in candidates if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")]
+            good = [p for p in lib_candidates if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")]
             hint = ""
             if good:
                 hint = f"\n建议的包含所需符号的库:\n  export CLANG_LIBRARY_FILE={good[0]}\n然后重新运行: jarvis-c2rust scan -r {scan_root}"
@@ -762,9 +771,9 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
 
                     import platform as _platform
                     sys_name = _platform.system()
-                    candidates: List[str] = []
+                    lib_candidates2: List[str] = []
                     if sys_name == "Linux":
-                        candidates = [
+                        lib_candidates2 = [
                             "/usr/lib/llvm-20/lib/libclang.so",
                             "/usr/lib/llvm-19/lib/libclang.so",
                             "/usr/lib/llvm-18/lib/libclang.so",
@@ -772,12 +781,12 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                             "/usr/local/lib/libclang.so",
                         ]
                     elif sys_name == "Darwin":
-                        candidates = [
+                        lib_candidates2 = [
                             "/opt/homebrew/opt/llvm/lib/libclang.dylib",
                             "/usr/local/opt/llvm/lib/libclang.dylib",
                         ]
 
-                    good = [lp for lp in candidates if Path(lp).exists() and _has_symbol(lp, "clang_getOffsetOfBase")]
+                    good = [lp for lp in lib_candidates2 if Path(lp).exists() and _has_symbol(lp, "clang_getOffsetOfBase")]
                     hint = ""
                     if good:
                         hint = f"\n建议的包含所需符号的库:\n  export CLANG_LIBRARY_FILE={good[0]}\n然后重新运行: jarvis-c2rust scan -r {scan_root}"
@@ -958,7 +967,7 @@ def scan_types_file(cindex, file_path: Path, args: List[str]) -> List[TypeInfo]:
 # ---------------------------
 
 
-def generate_dot_from_db(db_path: Path, out_path: Path) -> None:
+def generate_dot_from_db(db_path: Path, out_path: Path) -> Path:
     # Generate a global reference dependency graph (DOT) from symbols.jsonl.
     def _resolve_symbols_jsonl_path(hint: Path) -> Path:
         p = Path(hint)
@@ -1356,12 +1365,12 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
             if selected:
                 for nid in selected:
                     emitted.add(nid)
-                syms: List[str] = []
+                syms = []
                 for nid in sorted(selected):
                     meta = by_id.get(nid, {})
                     label = meta.get("qname") or meta.get("name") or f"sym_{nid}"
                     syms.append(label)
-                roots_labels: List[str] = []
+                roots_labels = []
                 if root_id is not None:
                     meta_r = by_id.get(root_id, {})
                     rlabel = meta_r.get("qname") or meta_r.get("name") or f"sym_{root_id}"
@@ -1380,12 +1389,12 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
         if delayed_entries:
             for nid in delayed_entries:
                 emitted.add(nid)
-            syms: List[str] = []
+            syms = []
             for nid in sorted(delayed_entries):
                 meta = by_id.get(nid, {})
                 label = meta.get("qname") or meta.get("name") or f"sym_{nid}"
                 syms.append(label)
-            roots_labels: List[str] = []
+            roots_labels = []
             if root_id is not None:
                 meta_r = by_id.get(root_id, {})
                 rlabel = meta_r.get("qname") or meta_r.get("name") or f"sym_{root_id}"

@@ -203,7 +203,7 @@ tags:
 
             # 解析响应
             import re
-            import yaml
+            import yaml  # type: ignore[import-untyped]
 
             # 提取 <merged_memory> 标签内的内容
             yaml_match = re.search(

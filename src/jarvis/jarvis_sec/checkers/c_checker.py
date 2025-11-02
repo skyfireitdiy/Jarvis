@@ -1281,10 +1281,10 @@ def _rule_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issue]:
         end = min(len(lines), idx + 50)
         unlocked = False
         for j in range(idx + 1, end + 1):
-            if RE_PTHREAD_UNLOCK.search(_safe_line(lines, j)):
-                if RE_PTHREAD_UNLOCK.search(_safe_line(lines, j)).group(1) == mtx:
-                    unlocked = True
-                    break
+            m_un = RE_PTHREAD_UNLOCK.search(_safe_line(lines, j))
+            if m_un and m_un.group(1) == mtx:
+                unlocked = True
+                break
         if not unlocked:
             issues.append(
                 Issue(
@@ -1662,10 +1662,12 @@ def _rule_thread_leak_no_join(lines: Sequence[str], relpath: str) -> List[Issue]
         joined_or_detached = False
         for j in range(idx + 1, end + 1):
             sj = _safe_line(lines, j)
-            if RE_PTHREAD_JOIN.search(sj) and RE_PTHREAD_JOIN.search(sj).group(1) == tid:
+            m_join = RE_PTHREAD_JOIN.search(sj)
+            if m_join and m_join.group(1) == tid:
                 joined_or_detached = True
                 break
-            if RE_PTHREAD_DETACH.search(sj) and RE_PTHREAD_DETACH.search(sj).group(1) == tid:
+            m_detach = RE_PTHREAD_DETACH.search(sj)
+            if m_detach and m_detach.group(1) == tid:
                 joined_or_detached = True
                 break
         if not joined_or_detached:
