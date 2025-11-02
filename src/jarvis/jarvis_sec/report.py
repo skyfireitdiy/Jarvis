@@ -44,7 +44,7 @@ OpenHarmony 安全分析套件 —— 报告聚合与评分模块
 from __future__ import annotations
 
 import hashlib
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 # 依赖 Issue 结构，但本模块不直接导入 dataclass，接受 dict/Issue 两种形态
 try:

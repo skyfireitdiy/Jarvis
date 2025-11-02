@@ -765,16 +765,12 @@ def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
         仅在单行内进行括号配对和逗号计数（启发式）。
         """
         depth = 0
-        idx = open_paren_idx
-        arg_no = 0
         # 从 '(' 后开始
         i = open_paren_idx + 1
         # 跳到第一个参数
-        arg_no = 1
         # 如果需要第1个参数，先定位其起始
         # 统一逻辑：遍历，记录每个参数的起始位置
         starts: List[int] = []
-        token_started = False
         start_pos = None
         while i < len(s):
             ch = s[i]

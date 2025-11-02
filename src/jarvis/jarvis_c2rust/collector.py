@@ -27,7 +27,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, Dict
 
-import typer
 
 from jarvis.jarvis_c2rust.scanner import (
     _try_import_libclang,

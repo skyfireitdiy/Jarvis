@@ -689,7 +689,7 @@ class Transpiler:
             "</CRATE_TREE>",
             "",
             "为避免完整读取体积较大的符号表，你也可以使用工具 read_symbols 按需获取指定符号记录：",
-            f"- 工具: read_symbols",
+            "- 工具: read_symbols",
             "- 参数示例(YAML):",
             f"  symbols_file: \"{(self.data_dir / 'symbols.jsonl').resolve()}\"",
             "  symbols:",
@@ -1230,7 +1230,7 @@ class Transpiler:
             "注意：所有修改均以补丁方式进行。",
             "",
             "如对实现细节不确定：可以使用工具 read_symbols 按需获取指定符号记录：",
-            f"- 工具: read_symbols",
+            "- 工具: read_symbols",
             "- 参数示例(YAML):",
             f"  symbols_file: \"{symbols_path}\"",
             "  symbols:",
@@ -2432,7 +2432,7 @@ class Transpiler:
                 pass
 
             # 3) 构建与修复
-            typer.secho(f"[c2rust-transpiler][build] 开始 cargo 测试循环", fg=typer.colors.MAGENTA)
+            typer.secho("[c2rust-transpiler][build] 开始 cargo 测试循环", fg=typer.colors.MAGENTA)
             ok = self._cargo_build_loop()
             typer.secho(f"[c2rust-transpiler][build] 构建结果: {'通过' if ok else '失败'}", fg=typer.colors.MAGENTA)
             if not ok:
@@ -2443,7 +2443,7 @@ class Transpiler:
             # 4) 审查与优化（复用 Review Agent）
             typer.secho(f"[c2rust-transpiler][review] 开始代码审查: {rec.qname or rec.name}", fg=typer.colors.MAGENTA)
             self._review_and_optimize(rec, module, rust_sig)
-            typer.secho(f"[c2rust-transpiler][review] 代码审查完成", fg=typer.colors.MAGENTA)
+            typer.secho("[c2rust-transpiler][review] 代码审查完成", fg=typer.colors.MAGENTA)
 
             # 5) 标记已转换与映射记录（JSONL）
             self._mark_converted(rec, module, rust_sig)
@@ -2456,7 +2456,7 @@ class Transpiler:
                 if sym:
                     typer.secho(f"[c2rust-transpiler][todo] 清理 todo!(\'{sym}\') 的出现位置", fg=typer.colors.BLUE)
                     self._resolve_pending_todos_for_symbol(sym, module, current_rust_fn, rust_sig)
-                    typer.secho(f"[c2rust-transpiler][build] 处理 todo 后重新运行 cargo test", fg=typer.colors.MAGENTA)
+                    typer.secho("[c2rust-transpiler][build] 处理 todo 后重新运行 cargo test", fg=typer.colors.MAGENTA)
                     self._cargo_build_loop()
 
         typer.secho("[c2rust-transpiler] 所有符合条件的函数均已处理完毕。", fg=typer.colors.GREEN)

@@ -96,7 +96,7 @@ def apply_library_replacement(
 
     # 兼容输出
     out_symbols_prune_path = data_dir / "symbols_prune.jsonl"
-    alias_symbols_path = data_dir / "symbols.jsonl"  # 通用别名
+    data_dir / "symbols.jsonl"  # 通用别名
     order_prune_path = data_dir / "translation_order_prune.jsonl"
     alias_order_path = data_dir / "translation_order.jsonl"
 
@@ -612,7 +612,7 @@ def apply_library_replacement(
 
     # 评估阶段：若某节点评估不可替代，则继续评估其子节点（递归/深度优先）
     eval_counter = 0
-    total_roots = len(root_funcs)
+    len(root_funcs)
     pruned_dynamic: Set[int] = set()  # 动态累计的“将被剪除”的函数集合（不含选中根）
     selected_roots: List[Tuple[int, Dict[str, Any]]] = []  # 实时选中的可替代根（fid, LLM结果）
     processed_roots: Set[int] = set()  # 已处理（评估或跳过）的根集合

@@ -1089,7 +1089,9 @@ def run_cli(
                     pass
                 # 记录用于交互式终端（PTY）重启的 jvs 启动命令（移除 web 相关参数）
                 try:
-                    import sys as _sys, os as _os, json as _json
+                    import sys as _sys
+                    import os as _os
+                    import json as _json
                     _argv = list(_sys.argv)
                     # 去掉程序名（argv[0]），并过滤 --web 相关参数
                     filtered = []

@@ -173,7 +173,9 @@ class generate_new_tool:
                         __import__(pkg)
                     except ImportError:
 
-                        import subprocess, sys, os
+                        import subprocess
+                        import sys
+                        import os
                         from shutil import which as _which
                         # 优先使用 uv 安装（先查 venv 内 uv，再查 PATH 中 uv），否则回退到 python -m pip
                         if sys.platform == "win32":

@@ -8,7 +8,7 @@
 - 不引入额外依赖，便于在 Agent 中渐进集成
 """
 from collections import defaultdict
-from typing import Callable, DefaultDict, Dict, List, Any
+from typing import Callable, DefaultDict, List, Any
 
 
 
