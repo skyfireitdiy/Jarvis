@@ -2909,3 +2909,471 @@ CLI 子命令主要参数（源码为准）
 ## 核心算法与策略
 
 ### 代码安全问题检测算法设计
+
+本节基于 src/jarvis/jarvis_sec 下的实现，对“直扫基线 + 单Agent逐条验证 + 聚合”的安全问题检测算法进行结构化说明，覆盖总体流程、核心启发式规则、证据与评分、误报控制、复杂度与可扩展性等。
+
+一、总体流程与数据流
+- 能力路径
+  - 直扫基线 direct_scan（workflow.py）
+    - 递归枚举目标仓库源文件 → 调用 C/C++ 与 Rust 启发式检查器 → 生成结构化 issues 与 summary
+  - 快速报告 run_security_analysis_fast（workflow.py）
+    - 调用 direct_scan → 交给 report.aggregate_issues/format_markdown_report 渲染 → 返回 JSON+Markdown
+  - 单Agent逐条验证 run_with_agent（workflow.py → __init__.py.run_security_analysis）
+    - 直扫产出 candidates → 为每条候选创建独立 Agent 使用只读工具核实并提炼摘要 → 聚合报告
+- 文件发现与过滤（workflow._iter_source_files）
+  - 包含扩展名：.c/.cpp/.h/.hpp/.rs
+  - 默认排除目录：.git、build、out、target、third_party、vendor（任一祖先匹配即排除）
+  - 以相对 entry_path 的相对路径输出，便于跨平台与报告呈现
+- 语言分派与检查器
+  - C/C++：checkers.c_checker.analyze_files
+  - Rust：checkers.rust_checker.analyze_files
+- 可选加速
+  - 预留 ripgrep（_rg_available/_try_rg_search）以便未来跨文件快速定位候选；当前默认逐文件正则扫描为主
+
+二、C/C++ 启发式检测算法（checkers/c_checker.py）
+1) 预处理（降低误报，保持行号稳定）
+- _strip_if0_blocks：跳过 #if 0 主体，保留 #else 与行数
+- _remove_comments_preserve_strings：移除注释（//、/* */），保留字符串/字符字面量与换行，维持列/行稳定
+- _mask_strings_preserve_len：将字符串/字符字面量内容掩蔽为空格，保留引号与换行，便于“通用 API 匹配”避免把字面量当作代码
+- 使用策略：
+  - 需解析字面量的规则（如格式串、scanf 宽度）使用原始行（clean_text）
+  - 通用 API/关键字匹配、复杂语义线索使用掩蔽行（masked_text）
+
+2) 规则分类与要点（部分示例）
+- 不安全/边界类
+  - unsafe_api：strcpy/strcat/gets/sprintf/vsprintf 等（跳过头文件函数原型）
+  - buffer_overflow：memcpy/memmove/strncpy/strncat 等；若第三参明显为 sizeof(非指针解引用) 且不含 strlen，则认定更安全用法并跳过；若出现 strlen/sizeof(*ptr) 则提高风险
+  - strncpy/strncat 未保证 NUL 结尾（邻近窗口无 '\0' 处理提示风险）
+  - scanf %s 未限宽（忽略 %*s、GNU %ms/%m[...] 等更安全用法）
+  - alloc_size_overflow：malloc(size 含乘法且未显式使用 sizeof)
+  - alloca_unbounded/VLA：非常量/未界定的栈分配
+- 内存管理类
+  - realloc_overwrite：realloc 直接覆写原指针（建议临时变量承接）
+  - alloc_no_null_check：malloc/calloc/new 后未见 NULL 检查即使用
+  - use_after_free_suspect：free(var) 后窗口内检测到解引用且未重新赋值/置空
+  - double_free/free_non_heap：重复释放或对非堆内存（&var/字符串字面量）调用 free
+  - possible_null_deref：p-> 或 *p 解引用附近无 NULL 判定（带上下文过滤乘法误报）
+  - wild_pointer_deref：未初始化指针声明后在赋值前被解引用
+- 错误处理与并发类
+  - unchecked_io：I/O/系统调用可能未检查返回值（尝试识别赋值后对变量的判断以降低误报）
+  - pthread_ret_unchecked：pthread 常见接口返回值未检查
+  - cond_wait_no_loop：pthread_cond_wait 未置于 while 谓词循环
+  - deadlock_patterns：双重加锁、锁顺序反转、缺失解锁怀疑（启发式）
+  - thread_leak_no_join：创建线程后未见 join/detach
+- 输入/权限/敏感信息与网络时间等
+  - format_string：printf/snprintf/fprintf 等格式串参数非字面量（允许本地化包装与回看变量字面量赋值）
+  - command_exec：system/exec* 非字面量参数（回看变量是否被赋值为字面量）
+  - getenv_unchecked：从环境变量读取后未见显式校验
+  - rand_insecure：安全敏感上下文使用 rand/srand
+  - strtok_nonreentrant：非重入线程不安全
+  - open_permissive_perms：open(..., O_CREAT, 0666/0777/...) 权限过宽；fopen 在敏感上下文写模式提示
+  - inet_legacy/time_api_not_threadsafe：过期/非线程安全接口使用
+
+3) 置信度与严重度
+- 置信度 confidence ∈ [0,1]：按命中模式 + 临近窗口信号加减（如存在边界检查/NULL 检查/字面量赋值/SAFETY 注释等）
+- 严重度 severity：_severity_from_confidence(conf, base) 阈值映射
+  - conf ≥ 0.8 → high；≥ 0.6 → medium；否则 low
+- 证据 evidence：截断 200 字符的命中行（剔除缩进与制表符）
+
+三、Rust 启发式检测算法（checkers/rust_checker.py）
+- unsafe_usage：unsafe 代码与关键不安全接口（mem::transmute、MaybeUninit/assume_init、原始指针）
+- 错误处理：unwrap/expect 与忽略结果（let _ = / .ok() 等）
+- FFI 与并发：extern "C"、unsafe impl Send/Sync
+- 置信度与降噪：
+  - SAFETY 注释附近降低置信度（_has_safety_comment_around）
+  - 测试上下文（#[test] 或 mod tests）降低置信度
+  - 严重度映射与 C/C++ 类似（high/medium/low）
+- 证据与行号同上
+
+四、聚合评分与报告（report.py）
+- 统一结构化 Issue（types.Issue）：language、category、pattern、file、line、evidence、description、suggestion、confidence、severity
+- 归一化与稳定 ID
+  - _normalize_issue 将 Issue 或 dict 统一为 dict，并补默认值
+  - 稳定 ID：id = PREFIX + sha1(file:line:category:pattern) 前 6 位；C 前缀为 C，Rust 为 R
+- 评分规则
+  - 严重度权重：_SEVERITY_WEIGHT = {"high":3.0, "medium":2.0, "low":1.0}
+  - 分数：score = round(confidence × severity_weight, 2)
+- Summary 聚合
+  - total/by_language/by_category/top_risk_files
+  - Top 风险文件按累计 score 降序，更稳定可解释
+  - 预设类别顺序 _CATEGORY_ORDER 用于 Markdown 展示；不在该序列的类别仍出现在 JSON 的 by_category 中
+- Markdown 渲染
+  - format_markdown_report：输出统计概览与逐条问题详情（含评分），附改进建议段落
+  - build_json_and_markdown：一次性输出 JSON + Markdown，便于评测
+
+五、单Agent逐条验证路径（workflow.run_with_agent → __init__.py.run_security_analysis）
+- 目的：在直扫候选基础上，以只读工具 read_code/execute_script 做证据核实与摘要提取，提升可解释性
+- 策略：
+  - 每条候选独立构造 Agent，隔离上下文与成本；失败不影响其他候选
+  - 通过 _try_parse_issues_from_text 宽松解析模型返回的 {"issues":[...]}（支持代码块/截取 JSON）
+  - 聚合回 report.build_json_and_markdown，形成与直扫一致的统一结构
+- 优势：隔离性（问题级上下文）、可恢复（progress JSONL）、成本可控、结果可解释
+
+六、误报控制与边界
+- 误报控制要点
+  - 注释移除 + 字符串掩蔽，避免把注释/字面量作为证据
+  - 头文件原型过滤（unsafe_api）
+  - 边界信号回看：长度上界/NULL 检查/条件判断/变量字面量赋值等
+  - 复杂语义采用滑窗与多信号合成（UAF、死锁、线程生命周期等）
+  - Rust 中 SAFETY 注释与测试上下文降低置信度
+- 边界与取舍
+  - 属启发式检测，部分规则需人工确认；报告中通过 confidence/severity/score 提示优先级
+  - Markdown 概览按预设类别输出，新增类别以 JSON 为准
+  - 直扫默认逐文件正则，保留 rg 加速接口；大仓库可结合目录排除降低复杂度
+
+七、复杂度与性能
+- 文件遍历 O(N_files)，行级规则总体 O(Σlines)
+- 预处理按线性时间实现，字符串掩蔽与注释移除保持行号稳定
+- 可按需启用目录排除/语言过滤；预留 rg 批搜索接口（批大小 200）
+
+八、可扩展性
+- 规则库可在 c_checker/rust_checker 中按模块化函数扩展；优先保证：
+  - 先预处理 → 再匹配 → 滑窗复核 → 动态调节置信度
+  - 返回最小可用结构化 Issue，描述与建议清晰可操作
+- 聚合与报告通过 report 模块统一收敛；新增类别只需规则产出即可被 JSON 记录，Markdown 可通过 _CATEGORY_ORDER 配置显示顺序
+
+### C/C++到Rust转换策略和决策树
+
+本节基于 src/jarvis/jarvis_c2rust 下的实现（scanner、library_replacer、llm_module_agent、transpiler、optimizer），梳理从“C/C++ 函数/子图候选”到“Rust 实现/库替代”的完整策略与决策树，覆盖路径选择、签名与类型映射、FFI 边界与错误语义、构建修复闭环与优化回退。
+
+一、总体策略与阶段职责
+- 扫描与顺序（scanner.py）
+  - 产物：symbols.jsonl（统一符号表）、translation_order.jsonl（函数转译顺序）、子图/DOT（可选）
+  - 用途：为“库替代评估”和“函数级转译”提供准确的函数/类型与引用关系基线
+- 库替代评估与剪枝（library_replacer.py.apply_library_replacement）
+  - 目标：若某“根函数的可达子树”可整体由成熟 Rust 库 API 组合替代，则保留根为库占位 lib::<library>，剪除其子孙函数
+  - 保护与门控：main 等入口默认不替代；命中 disabled_libraries 强制不可替代；支持断点续跑与原子写
+- 模块规划与落盘（llm_module_agent.py）
+  - 目标：以引用子图为上下文，生成 crate 模块结构（YAML）并写盘，确保初始 cargo check 通过（最小修复）
+- 函数级转译（transpiler.py.run_transpile）
+  - 目标：按 translation_order 逐函数完成“模块与签名规划 → 代码生成 → 构建修复闭环 → 审查与类型边界复核 → 符号映射”
+- 保守优化（optimizer.py）
+  - 目标：在保持可构建前提下“最小”提升质量（unsafe清理、重复标注/最小消除、可见性缩小、文档补齐），失败可回滚
+
+二、宏观路径选择（库替代 vs 函数级转译）
+- 决策依据（library_replacer）
+  - replaceable: LLM 评估该根的可达子树是否可由“指定库”或“多库组合”整体替代
+  - 禁用库：若建议命中 disabled_libraries，强制判定不可替代
+  - 入口保护：main 默认跳过库替代（可配置）
+- 行为与产物
+  - 可替代：保留根 → 根.ref=lib::<library>（可多库）→ 剪除子孙函数 → 写出新 symbols.jsonl 与 translation_order.jsonl
+  - 不可替代：保持原图，进入函数级转译路径
+
+PlantUML：路径选择（简化）
+```plantuml
+@startuml
+!theme plain
+title 库替代与函数级转译路径选择
+start
+:加载 symbols.jsonl/构建调用图;
+:选择根(父先子后/candidates可选);
+:对子树生成摘要与源码样本;
+:LLM 评估 replaceable/libraries/confidence;
+if (命中禁用库?) then (是)
+  :视为不可替代;
+endif
+if (入口函数?) then (是)
+  :跳过库替代, 评估子节点;
+else
+  if (可替代?) then (是)
+    :根.ref = lib::<library>(支持多库);
+    :剪除子孙函数; :写新 symbols/order;
+  else
+    :进入函数级转译路径;
+  endif
+endif
+stop
+@enduml
+```
+
+三、函数级转译闭环策略（transpiler）
+- 模块与签名规划
+  - 依据：C 源片段、调用上下文（已转译/未转译）、crate 目录树
+  - 约束：目标文件位于 crate/src；不写 main.rs；超限重试（plan_max_retries）
+- 代码生成与最小修复
+  - 生成实现后立即 cargo check；失败分类为 missing_import/type_mismatch/visibility/borrow_checker/dependency_missing/module_not_found 等
+  - 修复动作限于“最小必要变更”：精确 use 导入、补齐 pub mod 声明链、签名仅修复（sig-fix）、缺失实现最小占位、必要时最小增补依赖
+- 审查与类型边界复核
+  - Review：逻辑一致性；TypeBoundary：指针可变性、空指针/越界校验、FFI 不变式/unsafe SAFETY 注释
+- 进度与映射
+  - progress.json 记录 current/converted 与度量；symbol_map.jsonl 记录 C→Rust 符号映射（含源位置/可重复）
+
+PlantUML：函数级转译闭环（简化）
+```plantuml
+@startuml
+!theme plain
+title 函数级转译闭环
+start
+:选择下一函数(跳过已完成/only过滤);
+:LLM 规划模块与签名(限次重试);
+:CodeAgent 生成实现;
+:cargo check -> 分类错误;
+while (失败且重试未达上限?)
+  :最小修复(导入/可见性/签名/依赖/占位);
+  :cargo check 再试;
+endwhile
+if (通过?) then (是)
+  :cargo test(可选同策略);
+  :Review/TypeBoundary 复核 + 小修小补;
+  :记录映射与进度;
+else
+  :记录失败与上下文(供 resume);
+endif
+stop
+@enduml
+```
+
+四、签名与类型映射决策树
+- 指针与切片
+  - 输入 const 指针：优先 &T / &[T]；若需保持 ABI（extern "C"），边界层采用 *const T，内部转换为引用/切片并做边界检查
+  - 输入可变指针：优先 &mut T / &mut [T]；FFI 层使用 *mut T，内部最小 unsafe 包裹
+- 指针+长度（ptr,len）
+  - 首选 &[T]/&mut [T]；若 len 不可信或语义不明，保守保留原始指针，显式检查并在安全封装中转换
+- 字符串与字节
+  - const char* NUL 终止：&CStr / &str（需校验 UTF-8）
+  - 可变 char* 或需要拥有：CString / Vec<u8>
+- 所有权与生命周期
+  - malloc/calloc/realloc/free → Box/Vec/Arc 等 RAII 容器；realloc 覆盖风险由容器规避
+  - 输出参数/双指针：优先返回值或 Result<T,E>，必要时 &mut Option<T> 传回
+- 结构体/枚举/联合
+  - #[repr(C)] 保持 ABI；非等价抽象以 From/Into 实现转换；联合 union 需 unsafe 访问或以枚举+判别值建模
+- 错误语义
+  - errno/负值/NULL → Rust 层统一 Result<T,E>；保留 FFI 原返回码，在安全包装层转换
+- 并发
+  - pthread_* → std::thread/std::sync 映射；ABI 兼容场景保留 FFI，外层提供安全 API
+
+PlantUML：签名与类型映射（简化）
+```plantuml
+@startuml
+!theme plain
+title 签名与类型映射决策
+start
+:读取C签名与上下文/ABI约束;
+if (需对外FFI?) then (是)
+  :extern "C"+#[repr(C)] 保持ABI;
+  if (ptr+len) then (是)
+    :FFI层原指针+显式检查; 内部转 slice;
+  else
+    :*const/*mut 在内部转 &/&mut;
+  endif
+  :返回码保留; 安全API映射为 Result;
+else (否)
+  :纯Rust API 设计;
+  if (const指针) then (是)
+    :&T / &[T] / &CStr/&str(校验);
+  else if (可变指针) then (是)
+    :&mut T / &mut [T];
+  endif
+  if (输出参数) then (是)
+    :返回值/Result 或 &mut Option<T>;
+  endif
+endif
+stop
+@enduml
+```
+
+五、FFI 边界与安全不变式
+- extern "C" + #[repr(C)] 保持 ABI；在边界层进行
+  - 指针有效性与对齐校验、长度/边界校验、生命周期与别名约束
+  - 错误返回码到 Result 的转换策略说明
+  - 以 SAFETY 注释记录前置条件（与 rust_checker 中的约定一致）
+
+六、构建修复闭环与度量
+- 顺序：cargo check → 通过后 cargo test；每轮记录 build_attempts、impl_verified、last_build_error
+- 修复动作（最小化）
+  - use 导入精确到符号；补齐 pub/mod 声明链
+  - 签名仅修复（ptr+len→slice、指针可变性一致、返回类型与错误语义）
+  - 缺失实现最小占位；必要时最小增补 Cargo 依赖
+
+七、优化与回退（optimizer）
+- unsafe 最小化：逐处尝试移除，失败则回滚并补充 SAFETY 注释
+- 重复标注与最小消除：签名+主体文本粗匹配；必要时抽取公共函数
+- 可见性缩小：pub → pub(crate)，以 cargo check 保障回退
+- 文档补齐：//! 模块与 /// 函数占位文档
+- git_guard：步骤失败且修复耗尽时自动 reset 到快照
+
+八、落地建议（与实现约束一致）
+- 优先库替代：当子树可由成熟库覆盖时，优先选用，减少手写 unsafe 与维护面
+- FFI 边界最小不变：对外接口保持 C ABI；真正的 Rust API 在安全包装层提供
+- 所有权清晰：以 RAII 容器取代手动 malloc/free；在接口处一次性转换
+- 错误一致：统一 Result；兼容旧接口保留 errno/返回码
+- 构建先行：任何修复/优化后均以 cargo check/test 通过为准
+
+### unsafe使用决策机制
+
+目标与原则
+- 最小面积原则：仅在无法通过安全抽象达成语义时使用 unsafe，且将不安全操作限制在最小作用域内（minimal unsafe block）。
+- 可证明性：每处 unsafe 必须具备清晰的前置条件与不变式，并以 SAFETY: 注释进行说明（与 rust_checker 规则一致）。
+- 边界优先：优先将 unsafe 收敛在 FFI 边界层（extern "C" + #[repr(C)]），对外提供安全包装 API。
+- 可回退与可验证：通过构建与测试闭环验证，能去除则去除；失败则回滚并补全 SAFETY 注释（optimizer 行为）。
+
+与实现的对应关系
+- transpiler
+  - 签名与模块规划后生成实现，尽量以 &/&mut、slice、RAII 容器取代原始指针/手动内存。
+  - TypeBoundary Review 专注：指针可变性、一致性检查、空指针/越界检查、FFI 不变式与 SAFETY 注释。
+- optimizer
+  - 尝试移除 unsafe 块；若移除导致构建失败则回滚，同时为该处生成/补全 “/// SAFETY: ...” 注释并继续。
+- jarvis-sec rust_checker
+  - 对 unsafe/原始指针/transmute/MaybeUninit/assume_init 等规则进行提示；若附近存在 SAFETY 注释或测试上下文，置信度下降。
+
+决策树（何时需要 unsafe）
+```plantuml
+@startuml
+!theme plain
+title unsafe 使用决策（简化）
+start
+:功能需求/现有C语义分析;
+if (可用安全库/抽象覆盖?) then (是)
+  :使用安全API/容器(RAII/slice/Result);
+  stop
+endif
+if (是否FFI边界?) then (是)
+  :extern "C" + #[repr(C)] 保持ABI;
+  :边界层进行参数校验(非空/长度/对齐/别名/生命周期);
+  :内部转为安全抽象(&/&mut/&[T]/&CStr 等);
+  :必要处使用最小 unsafe 包裹;
+else (否)
+  if (涉及原始指针解引用/union/内存布局操作?) then (是)
+    :在最小作用域使用 unsafe;
+    :在进入前完成检查(非空/对齐/边界/初始化);
+  else if (需要未初始化内存优化?) then (是)
+    :MaybeUninit 写后再读; 严禁未初始化读取;
+    :必要时 assume_init 前完成全部初始化证明;
+  else if (涉及类型强转/transmute?) then (是)
+    :优先替代方案(From/Into/bytemuck/指针强转);
+    :若仍需, 在最小 unsafe 内并记录布局/对齐不变式;
+  else
+    :通常不需要 unsafe, 重新设计为安全写法;
+  endif
+endif
+:为每处不安全点撰写 SAFETY 注释(前置条件/不变式/证明要点);
+:cargo check/test 验证通过;
+stop
+@enduml
+```
+
+不变式与检查清单（用于 SAFETY 注释与自检）
+- 指针与别名
+  - 指针非空；可变引用/指针不存在别名（独占可变，不可变可多重）；指向内存对齐且有效。
+- 生命周期与所有权
+  - 引用在其生命周期内有效；返回的引用/切片不引用临时或已释放内存；跨 FFI 不悬空。
+- 边界与初始化
+  - 对 (ptr,len) 组合已做上界检查；读取前已完成初始化；使用 MaybeUninit 时“先写后读”，不提前 drop。
+- 布局与对齐
+  - transmute/union/FFI 结构体满足 #[repr(C)] 要求；类型大小/对齐与目标一致。
+- 错误与异常安全
+  - 错误路径保持资源与锁一致释放；panic 不破坏全局不变式；Result/Option 表示异常分支，避免 unwrap。
+- 并发与可发送性
+  - 避免手写 unsafe impl Send/Sync；若必须，证明线程安全的内部不变式；优先使用 std::sync 构件。
+
+落地策略
+- 先安全后不安全：评估是否可重写为安全抽象（slice/RAII/Iterator/Result）；确需不安全时再按决策树收敛。
+- 作用域收敛：只在指针解引用/布局敏感段落使用 unsafe；将校验与转换放在 unsafe 外侧。
+- 注释即契约：每处 unsafe 前添加 “/// SAFETY: ...” 说明，包含“假设/前置条件”和“为何成立”的简要证明。
+- 验证闭环：每次改动后执行 cargo check/test；optimizer 在可能时尝试移除 unsafe 并回退失败，形成自动化收敛。
+
+与工具链配合
+- rust_checker：用于发现潜在不当 unsafe 用法与原始指针/类型强转等风险点；存在 SAFETY 注释时减置信度。
+- transpiler/TypeBoundary：在生成与复核阶段强制补齐不变式与边界检查。
+- optimizer：自动尝试缩小或移除 unsafe 面积，并在失败时自动补充 SAFETY 注释实现“可回退”。
+
+
+### 渐进式代码演进路径规划
+
+目标
+- 在不打断业务与交付的前提下，分阶段将存量 C/C++ 代码演进为“更安全、更可维护”的形态，优先实现安全加固与可观测性增强，再逐步引入 Rust 化与库替代。
+- 明确每个阶段的输入/输出、门禁指标与回退策略，保证每步可验证、可回退、可度量。
+
+阶段分解与门禁
+- 阶段0：安全基线评估（jarvis-sec）
+  - 输入：项目根目录
+  - 动作：workflow.direct_scan → report.build_json_and_markdown
+  - 产出：issues.json(+md)、summary（by_language/by_category/top_risk_files）
+  - 门禁：留存基线分数（score_sum/issue_count），作为后续阶段“安全分数改进量”的对比基线
+- 阶段1：C/C++ 安全加固（最小修复）
+  - 目标：修复高优先问题（unsafe_api、buffer_overflow、memory_mgmt、error_handling）
+  - 方法：CodeAgent 驱动小步 PATCH（优先对 top_risk_files）；静态脚本验证（execute_script + rg/clang-tidy 可选）
+  - 门禁：构建不退化、report.score_sum 显著下降（例如 ≥15%），关键类别计数下降
+  - 回退：基于 git 提交与可逆补丁；失败不影响整体推进
+- 阶段2：结构化与可测试化（可选）
+  - 目标：拆分巨函数/巨文件、补充 smoke tests，明确模块边界与头文件契约
+  - 方法：CodeAgent 生成最小单测占位；对 I/O 与错误路径添加断言
+  - 门禁：构建通过；新增测试通过；report 问题不恶化
+- 阶段3：FFI 边界安全包装
+  - 目标：在 C 层引入“安全包装层”，将 (ptr,len)/返回码/errno 明确为契约
+  - 方法：添加边界检查与统一错误转换；为未来 Rust 化准备可替换边界
+  - 门禁：边界层单测通过；error-handling 类问题减少
+- 阶段4：库替代评估与剪枝（library_replacer）
+  - 目标：可由成熟 Rust 库整体替代的子树优先替代，减少自实现面积
+  - 方法：apply_library_replacement（支持 candidates/disabled_libraries/resume）
+  - 门禁：替代后 symbols/order 产物有效；后续转译规模减少
+  - 回退：保持原始 symbols.jsonl 与 mapping，失败即放弃替代继续转译路径
+- 阶段5：渐进式 Rust 转译（transpiler）
+  - 目标：按 translation_order 逐函数转译；每次小步提交、可断点续跑
+  - 方法：模块与签名规划 → CodeAgent 生成 → cargo check/test 闭环 → Review/TypeBoundary → 符号映射
+  - 门禁：每批次构建/测试通过，进度与映射持续更新；report 中 unsafe_usage 与 memory_mgmt 类风险在 Rust 新增代码中接近 0
+  - 回退：progress.json 断点；单函数级别失败可跳过/重试
+- 阶段6：保守优化与面向外部接口收口（optimizer）
+  - 目标：unsafe 最小化、重复消除、可见性缩小、文档补齐；对外接口稳定
+  - 方法：optimizer.optimize_project（git_guard 可回滚）
+  - 门禁：cargo test 全通过；unsafe_removed/annotated 指标提升；可见性收口不破坏 API
+- 阶段7：替换调用与退役 C 代码（持续）
+  - 目标：逐步用 Rust 安全封装替代 C 调用；最终退役对应 C 模块
+  - 方法：构建脚本/链接配置切换；保持 FFI 兼容期；渐进删除旧实现
+  - 门禁：覆盖率与性能不退化；关键路径延迟可接受；bug 回归为 0
+
+任务挑选与优先级
+- 以 report.summary.top_risk_files 为优先队列，穿插处理“高危类别”与“代价低收益高”的问题（如 format_string/scanf 未限宽、realloc 覆盖原指针）。
+- 转译阶段优先选择“调用图下游（被调）→ 上游（调用者）”的顺序，减少接口震荡；利用 translation_order.jsonl 已排序步骤。
+- 对可由库替代的子树优先替代（减少自实现与 unsafe），其余进入转译。
+
+指标体系与度量
+- 安全分数改进：Δscore_sum、各类别 Δcount（high/medium/low）
+- 构建/测试：cargo check/test 成功率、重试次数、build_attempts 分布
+- Rust 化进度：symbol_map.jsonl 映射条目数/占比、转译函数数/总数
+- unsafe 面积：optimizer.unsafe_removed/annotated；rust_checker 中 unsafe_usage 的计数变化
+- 可见性：pub→pub(crate) 成功数；文档补齐数（docs_added）
+- 性能/资源（可选）：关键路径基准延迟/内存
+
+回退与可靠性
+- git_guard：优化阶段失败自动 reset 到步骤前快照
+- 原子写：library_replacer 与产物写入使用原子写，避免部分写入损坏
+- 断点续跑：transpiler.progress.json、optimizer.optimize_progress.json 持续记录进度
+- 失败隔离：单函数/单文件失败不阻断全局流程，进入下一项
+
+自动化编排建议
+- 将阶段 0/1/4/5/6 编排为可重入流水线：
+  - 安全基线 → 小步安全修复 → 库替代评估 → 渐进转译 → 保守优化
+- 非交互运行：
+  - jarvis-sec: run_security_analysis_fast
+  - c2rust: scan → lib-replace → prepare → transpile → optimize
+- 中间产物版本化并入仓（.jarvis/c2rust/* 与 issues 基线），支持跨分支协作与回归对比
+
+PlantUML：演进路线图（简化）
+```plantuml
+@startuml
+!theme plain
+title 渐进式代码演进路线图
+start
+:阶段0 基线(直扫+报告);
+:阶段1 C/C++小步安全修复(CodeAgent+脚本验证);
+:阶段2 结构化与可测试化(可选);
+:阶段3 FFI边界安全包装;
+:阶段4 库替代评估与剪枝(library_replacer);
+:阶段5 渐进式转译(transpiler, 按顺序小批次);
+:阶段6 保守优化(optimizer, git_guard);
+:阶段7 切换调用并退役C模块(持续);
+stop
+@enduml
+```
+
+门禁判定（示例策略）
+- 若 report.score_sum 降幅 < X% 或 high 严重度问题仍 > N，继续阶段1修复
+- 若 library_replacer 替代覆盖率 < Y%，放宽 candidates 或进入阶段5转译
+- 若 cargo check/test 重试超过阈值，暂停本批次，返回阶段1/3补强边界与结构
+
+与现有实现的映射
+- 安全评估与修复：jarvis_sec.workflow/report + CodeAgent 小步补丁
+- 库替代与剪枝：jarvis_c2rust.library_replacer（resume/disabled_libraries）
+- 转译与闭环：jarvis_c2rust.transpiler（progress/symbol_map/Review/TypeBoundary）
+- 优化与回滚：jarvis_c2rust.optimizer（unsafe/可见性/文档 + git_guard）
