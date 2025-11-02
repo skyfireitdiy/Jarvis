@@ -90,6 +90,11 @@ class EditFileHandler(OutputHandler):
         """
         patches = self._parse_patches(response)
         if not patches:
+            # 当响应中存在 PATCH 标签但未能解析出合法的补丁内容时，提示格式错误并给出合法格式
+            has_patch_open = bool(re.search(ot("PATCH"), response))
+            has_patch_close = bool(re.search(ct("PATCH"), response))
+            if has_patch_open and has_patch_close:
+                return False, f"PATCH格式错误。合法的格式如下：\n{self.prompt()}"
             return False, "未找到有效的文件编辑指令"
 
         # 记录 PATCH 操作调用统计
@@ -122,7 +127,11 @@ class EditFileHandler(OutputHandler):
         Returns:
             bool: 返回是否能处理该响应
         """
-        return bool(self.patch_pattern.search(response))
+        # 只要检测到 PATCH 标签（包含起止标签），即认为可处理，
+        # 具体合法性由 handle() 内的解析与错误提示负责
+        has_patch_open = bool(re.search(ot("PATCH"), response))
+        has_patch_close = bool(re.search(ct("PATCH"), response))
+        return has_patch_open and has_patch_close
 
     def prompt(self) -> str:
         """获取处理器的提示信息
