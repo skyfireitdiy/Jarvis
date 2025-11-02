@@ -91,7 +91,7 @@ class EditFileHandler(OutputHandler):
         patches = self._parse_patches(response)
         if not patches:
             # 当响应中存在 PATCH 标签但未能解析出合法的补丁内容时，提示格式错误并给出合法格式
-            has_patch_open = bool(re.search(ot("PATCH"), response))
+            has_patch_open = bool(re.search("<PATCH", response))
             has_patch_close = bool(re.search(ct("PATCH"), response))
             if has_patch_open and has_patch_close:
                 return False, f"PATCH格式错误。合法的格式如下：\n{self.prompt()}"
@@ -129,7 +129,7 @@ class EditFileHandler(OutputHandler):
         """
         # 只要检测到 PATCH 标签（包含起止标签），即认为可处理，
         # 具体合法性由 handle() 内的解析与错误提示负责
-        has_patch_open = bool(re.search(ot("PATCH"), response))
+        has_patch_open = bool(re.search("<PATCH", response))
         has_patch_close = bool(re.search(ct("PATCH"), response))
         return has_patch_open and has_patch_close
 
