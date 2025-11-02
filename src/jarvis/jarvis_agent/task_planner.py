@@ -116,7 +116,7 @@ class TaskPlanner:
                                 subtasks.append(s)
                 else:
                     PrettyOutput.print("任务规划提示：无需拆分。", OutputType.INFO)
-            except Exception as e:
+            except Exception:
                 PrettyOutput.print("任务规划提示：无需拆分。", OutputType.INFO)
         else:
             PrettyOutput.print("任务规划提示：无需拆分。", OutputType.INFO)

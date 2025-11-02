@@ -11,11 +11,7 @@ from jarvis.jarvis_agent import (
     get_multiline_input,
     origin_agent_system_prompt,
 )
-from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
-from jarvis.jarvis_agent.file_context_handler import file_context_handler
-from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.task_manager import TaskManager
-from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import is_non_interactive, is_skip_predefined_tasks
 
 

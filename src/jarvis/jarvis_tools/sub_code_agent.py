@@ -10,7 +10,6 @@ sub_code_agent 工具
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
 from typing import Any, Dict, List
-import json
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_utils.globals import delete_agent

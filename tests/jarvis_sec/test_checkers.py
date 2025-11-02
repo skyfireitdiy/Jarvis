@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from jarvis.jarvis_sec.checkers import (
     analyze_c_cpp_text,

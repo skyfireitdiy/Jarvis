@@ -28,7 +28,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import re
 
-from jarvis.jarvis_c2rust.scanner import find_root_function_ids
 from jarvis.jarvis_agent import Agent  # 复用 LLM Agent 能力
 from jarvis.jarvis_utils.input import user_confirm
 
@@ -653,7 +652,6 @@ class LLMRustCratePlannerAgent:
         user_prompt = self._build_user_prompt(roots_ctx)
         base_summary_prompt = self._build_summary_prompt(roots_ctx)
 
-        last_yaml_text = ""
         last_error = "未知错误"
         attempt = 0
         while True:
@@ -681,7 +679,6 @@ class LLMRustCratePlannerAgent:
             summary_output = agent.run(user_prompt)  # type: ignore
             project_text = str(summary_output) if summary_output is not None else ""
             yaml_text = self._extract_yaml_from_project(project_text)
-            last_yaml_text = yaml_text
 
             # 尝试解析并校验
             try:
@@ -919,7 +916,6 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
             new_dir.mkdir(parents=True, exist_ok=True)
 
             child_mods: List[str] = []
-            mod_rs_present = False
             # 是否为 crate 根下的 src 目录
             is_src_root_dir = (new_dir == base_path / "src")
 
@@ -936,7 +932,7 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
                         else:
                             child_mods.append(stem)
                     if child == "mod.rs":
-                        mod_rs_present = True
+                        pass
                 elif isinstance(child, dict):
                     # 子目录
                     sub_name = list(child.keys())[0]

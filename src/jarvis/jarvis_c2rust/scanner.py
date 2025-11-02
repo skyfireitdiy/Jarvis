@@ -1583,7 +1583,7 @@ def run_scan(
     # Scan for C/C++ functions and persist results to JSONL; optionally generate DOT.
     # Determine data path
     root = Path('.')
-    data_path_raw = Path('.') / ".jarvis" / "c2rust" / "symbols_raw.jsonl"
+    Path('.') / ".jarvis" / "c2rust" / "symbols_raw.jsonl"
     data_path_curated = Path('.') / ".jarvis" / "c2rust" / "symbols.jsonl"
 
     # Helper: render a DOT file to PNG using Graphviz 'dot'

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, List, Tuple
 
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -76,7 +76,6 @@ class RewriteFileHandler(OutputHandler):
             pass
 
         results: List[str] = []
-        overall_success = True
 
         for file_path, content in rewrites:
             abs_path = os.path.abspath(file_path)
@@ -102,7 +101,6 @@ class RewriteFileHandler(OutputHandler):
                         files = [abs_path]
                     agent.set_user_data("files", files)
             except Exception as e:
-                overall_success = False
                 # 回滚已修改内容
                 try:
                     if processed:

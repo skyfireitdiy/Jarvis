@@ -17,16 +17,12 @@ from typing import Optional, List
 
 import typer
 from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
-from jarvis.jarvis_c2rust.scanner import (
-    compute_translation_order_jsonl as _compute_order,
-)
 from jarvis.jarvis_c2rust.library_replacer import (
     apply_library_replacement as _apply_library_replacement,
 )
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_c2rust.llm_module_agent import (
     execute_llm_plan as _execute_llm_plan,
-    entries_to_yaml as _entries_to_yaml,
 )
 
 app = typer.Typer(help="C2Rust 命令行工具")

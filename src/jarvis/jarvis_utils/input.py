@@ -705,7 +705,6 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     preset: Optional[str] = None
     preset_cursor: Optional[int] = None
     while True:
-        from jarvis.jarvis_utils.config import is_non_interactive, GLOBAL_CONFIG_DATA
         # 基于“当前Agent”精确判断非交互与自动完成，避免多Agent相互干扰
         if _is_non_interactive_for_current_agent():
             # 在多Agent系统中，无论是否启用自动完成，均提示可用智能体并建议使用 SEND_MESSAGE 转移控制权

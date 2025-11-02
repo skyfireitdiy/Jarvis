@@ -374,7 +374,7 @@ def _check_pip_updates() -> bool:
             )
 
             # 检测是否在虚拟环境中
-            in_venv = hasattr(sys, "real_prefix") or (
+            hasattr(sys, "real_prefix") or (
                 hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
             )
 

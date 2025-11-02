@@ -304,7 +304,7 @@ def run_security_analysis(
     compact_candidates = [_compact(it) for it in candidates]
     MAX_ITEMS = 200  # 避免提示过长
     compact_candidates = compact_candidates[:MAX_ITEMS]
-    candidates_json = json.dumps(compact_candidates, ensure_ascii=False)
+    json.dumps(compact_candidates, ensure_ascii=False)
     # 进度总数
     total = len(compact_candidates)
     # 将检测出的 issues 增量写入报告文件（JSONL），便于长任务中途查看
@@ -447,7 +447,7 @@ def run_security_analysis(
                 agent.event_bus.subscribe(_AFTER_SUMMARY, _on_after_summary)
             except Exception:
                 pass
-        out = agent.run(per_task)
+        agent.run(per_task)
         # 流程级工作区保护：调用 Agent 后如检测到文件被修改，则使用 git checkout -- . 恢复
         workspace_restore_info: Optional[Dict] = None
         try:
