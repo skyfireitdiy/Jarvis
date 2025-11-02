@@ -41,7 +41,7 @@ class StatsVisualizer:
         try:
             columns = os.get_terminal_size().columns
             return columns
-        except:
+        except Exception:
             return 80
 
     def plot_line_chart(

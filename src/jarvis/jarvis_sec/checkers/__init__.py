@@ -7,8 +7,7 @@ OpenHarmony 安全演进多Agent套件 —— Checkers 包初始化
 - 保持最小依赖，不在此处执行任何扫描逻辑，仅做导入与别名暴露。
 """
 
-from typing import Iterable, List
-from pathlib import Path
+
 
 from .c_checker import (
     analyze_files as analyze_c_files,

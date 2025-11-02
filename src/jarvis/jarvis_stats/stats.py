@@ -480,7 +480,7 @@ class StatsManager:
                     try:
                         dt = datetime.fromisoformat(last_updated)
                         last_updated = dt.strftime("%Y-%m-%d %H:%M")
-                    except:
+                    except Exception:
                         pass
 
             total_value = sum(r.get("value", 0) for r in records)

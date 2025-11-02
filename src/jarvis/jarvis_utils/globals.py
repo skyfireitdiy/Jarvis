@@ -19,9 +19,9 @@ MAX_HISTORY_SIZE = 50
 short_term_memories: List[Dict[str, Any]] = []
 MAX_SHORT_TERM_MEMORIES = 100
 
-import colorama
-from rich.console import Console
-from rich.theme import Theme
+import colorama  # noqa: E402
+from rich.console import Console  # noqa: E402
+from rich.theme import Theme  # noqa: E402
 
 # 初始化colorama以支持跨平台的彩色文本
 colorama.init()

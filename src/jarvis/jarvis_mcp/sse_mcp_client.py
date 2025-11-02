@@ -5,7 +5,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import parse_qs, urlencode, urljoin
 
-import requests
+import requests  # type: ignore[import-untyped]
 
 from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -568,7 +568,7 @@ class SSEMcpClient(McpClient):
         if self.sse_response:
             try:
                 self.sse_response.close()
-            except:
+            except Exception:
                 pass
 
         # 关闭HTTP会话

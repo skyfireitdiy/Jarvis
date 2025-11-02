@@ -2,7 +2,7 @@
 """网络搜索工具。"""
 from typing import Any, Dict
 
-import requests
+import requests  # type: ignore[import-untyped]
 from markdownify import markdownify as md  # type: ignore
 
 # pylint: disable=import-error,missing-module-docstring

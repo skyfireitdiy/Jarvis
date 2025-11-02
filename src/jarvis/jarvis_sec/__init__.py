@@ -196,7 +196,7 @@ def _git_restore_if_dirty(repo_root: str) -> int:
         proc = _sub.run(["git", "status", "--porcelain"], cwd=str(root), capture_output=True, text=True)
         if proc.returncode != 0:
             return 0
-        lines = [l for l in proc.stdout.splitlines() if l.strip()]
+        lines = [line for line in proc.stdout.splitlines() if line.strip()]
         if lines:
             _sub.run(["git", "checkout", "--", "."], cwd=str(root), capture_output=True, text=True)
             return len(lines)
@@ -557,7 +557,6 @@ def _try_parse_summary_report(text: str) -> Optional[Dict]:
     - 若提取/解析失败返回 None
     - YAML 解析采用安全模式，若环境无 PyYAML 则忽略
     """
-    import re
     import json as _json
     start = text.find("<REPORT>")
     end = text.find("</REPORT>")

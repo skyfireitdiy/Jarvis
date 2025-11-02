@@ -77,7 +77,7 @@ class YuanbaoPlatform(BasePlatform):
             "Referer": f"https://yuanbao.tencent.com/chat/{self.agent_id}",
             "X-Source": "web",
             "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Accept": "*/*",
+
             "Sec-Fetch-Site": "same-origin",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Dest": "empty",
