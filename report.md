@@ -2905,3 +2905,7 @@ CLI 子命令主要参数（源码为准）
 - transpiler.run_transpile
 - optimizer.optimize_project
 - cli 子命令：scan / prepare / transpile / lib-replace / collect / run / optimize
+
+## 核心算法与策略
+
+### 代码安全问题检测算法设计
