@@ -3377,3 +3377,8 @@ stop
 - 库替代与剪枝：jarvis_c2rust.library_replacer（resume/disabled_libraries）
 - 转译与闭环：jarvis_c2rust.transpiler（progress/symbol_map/Review/TypeBoundary）
 - 优化与回滚：jarvis_c2rust.optimizer（unsafe/可见性/文档 + git_guard）
+
+## 功能实现说明
+
+### bzip2代码分析能力描述
+
