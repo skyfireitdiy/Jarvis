@@ -231,19 +231,15 @@ def build_json_and_markdown(
     meta: Optional[List[Dict]] = None,
 ) -> str:
     """
-    一次性生成 JSON + Markdown 文本，便于直接输出与评测。
-    - meta: 可选的审计信息（例如每个子任务的触发逻辑、工具使用等），将以 "meta" 字段注入到最终 JSON 顶层。
+    一次性生成报告文本（仅 Markdown）。
     """
-    import json
     report = aggregate_issues(issues, scanned_root=scanned_root, scanned_files=scanned_files)
     if meta is not None:
         try:
-            report["meta"] = meta  # 注入可选审计信息
+            report["meta"] = meta  # 注入可选审计信息（仅用于JSON时保留，为兼容未来需要）
         except Exception:
             pass
-    json_text = json.dumps(report, ensure_ascii=False, indent=2)
-    md_text = format_markdown_report(report)
-    return f"{json_text}\n\n{md_text}"
+    return format_markdown_report(report)
 
 
 __all__ = [
