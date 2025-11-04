@@ -169,6 +169,7 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
   - id: 整数（本批次候选的序号，从1开始）
   - reason: 字符串（简洁说明返回该项的理由）
 - 不要在数组元素中包含 file/line/pattern 等位置信息；写入 jsonl 时系统会结合原始候选信息。
+- 确认是误报的条目请不要输出，仅输出确认是问题的条目。
 """.strip()
 
 
