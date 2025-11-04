@@ -302,8 +302,7 @@ def run_security_analysis(
         }
 
     compact_candidates = [_compact(it) for it in candidates]
-    MAX_ITEMS = 200  # 避免提示过长
-    compact_candidates = compact_candidates[:MAX_ITEMS]
+    # 移除问题条目上限，保留所有候选以逐条由Agent验证
     json.dumps(compact_candidates, ensure_ascii=False)
     # 进度总数
     total = len(compact_candidates)
