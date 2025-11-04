@@ -162,67 +162,52 @@ class BasePlatform(ABC):
                         expand=True,  # 允许面板自动调整大小
                     )
 
-                    buffer = []
-                    buffer_count = 0
                     with Live(panel, refresh_per_second=4, transient=False) as live:
+
+                        def _update_panel_content(content: str):
+                            text_content.append(content, style="bright_white")
+                            # --- Scrolling Logic ---
+                            # Calculate available height in the panel
+                            max_text_height = (
+                                console.height - 5
+                            )  # Leave space for borders/titles
+                            if max_text_height <= 0:
+                                max_text_height = 1
+
+                            # Get the actual number of lines the text will wrap to
+                            lines = text_content.wrap(
+                                console,
+                                console.width - 4 if console.width > 4 else 1,
+                            )
+
+                            # If content overflows, truncate to show only the last few lines
+                            if len(lines) > max_text_height:
+                                # Rebuild the text from the wrapped lines to ensure visual consistency
+                                # This correctly handles both wrapped long lines and explicit newlines
+                                text_content.plain = "\n".join(
+                                    [line.plain for line in lines[-max_text_height:]]
+                                )
+
+                            panel.subtitle = (
+                                "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                            )
+                            live.update(panel)
+
                         # Process first chunk
                         response += first_chunk
-                        buffer.append(first_chunk)
-                        buffer_count += 1
+                        if first_chunk:
+                            _update_panel_content(first_chunk)
 
                         # Process rest of the chunks
                         for s in chat_iterator:
                             if not s:
                                 continue
                             response += s  # Accumulate the full response string
-                            buffer.append(s)
-                            buffer_count += 1
-
-                            # 积累一定量或达到最后再更新，减少闪烁
-                            if buffer_count >= 5 or s == "":
-                                # Append buffered content to the Text object
-                                text_content.append(
-                                    "".join(buffer), style="bright_white"
-                                )
-                                buffer.clear()
-                                buffer_count = 0
-
-                                # --- Scrolling Logic ---
-                                # Calculate available height in the panel
-                                max_text_height = (
-                                    console.height - 5
-                                )  # Leave space for borders/titles
-                                if max_text_height <= 0:
-                                    max_text_height = 1
-
-                                # Get the actual number of lines the text will wrap to
-                                lines = text_content.wrap(
-                                    console,
-                                    console.width - 4 if console.width > 4 else 1,
-                                )
-
-                                # If content overflows, truncate to show only the last few lines
-                                if len(lines) > max_text_height:
-                                    # Rebuild the text from the wrapped lines to ensure visual consistency
-                                    # This correctly handles both wrapped long lines and explicit newlines
-                                    text_content.plain = "\n".join(
-                                        [line.plain for line in lines[-max_text_height:]]
-                                    )
-
-                                panel.subtitle = (
-                                    "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
-                                )
-                                live.update(panel)
+                            _update_panel_content(s)
 
                             if is_immediate_abort() and get_interrupt():
                                 self._append_session_history(message, response)
                                 return response  # Return the partial response immediately
-
-                        # Ensure any remaining content in the buffer is displayed
-                        if buffer:
-                            text_content.append(
-                                "".join(buffer), style="bright_white"
-                            )
 
                         # At the end, display the entire response
                         text_content.plain = response
