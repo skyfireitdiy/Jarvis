@@ -417,13 +417,15 @@ def run_security_analysis(
 - 完成对本批次候选问题的判断后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
 """.strip()
         task_id = f"JARVIS-SEC-Batch-{bidx}"
+        # 为本批次候选增加 1-based 的 id 字段，便于模型在摘要中引用
+        batch_with_ids: List[Dict] = [dict(it, id=i) for i, it in enumerate(batch, start=1)]
         agent_kwargs: Dict = dict(
             system_prompt=system_prompt,
             name=task_id,
             auto_complete=True,
             need_summary=True,
             # 复用现有摘要提示词构建器，candidate 传入批次列表包一层
-            summary_prompt=_build_summary_prompt(task_id, entry_path, langs, {"batch": True, "candidates": batch}),
+            summary_prompt=_build_summary_prompt(task_id, entry_path, langs, {"batch": True, "candidates": batch_with_ids}),
             non_interactive=True,
             in_multi_agent=False,
             use_methodology=False,
@@ -446,7 +448,7 @@ def run_security_analysis(
 - languages: {langs}
 
 批次候选(JSON数组):
-{_json2.dumps(batch, ensure_ascii=False, indent=2)}
+{_json2.dumps(batch_with_ids, ensure_ascii=False, indent=2)}
 
 操作建议：
 - 使用 read_code 读取目标文件（尽量提供绝对路径或以 entry_path 拼接），围绕各候选行号上下各约50行。
