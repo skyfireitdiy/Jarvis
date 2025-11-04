@@ -72,7 +72,16 @@ def _has_safety_comment_around(lines: Sequence[str], line_no: int, radius: int =
     如存在，适当降低置信度。
     """
     for _, s in _window(lines, line_no, before=radius, after=radius):
-        if "SAFETY:" in s or "Safety:" in s or "safety:" in s:
+        # 支持英文与中文“SAFETY/安全性”标注，兼容全角冒号
+        if (
+            "SAFETY:" in s
+            or "Safety:" in s
+            or "safety:" in s
+            or "SAFETY：" in s  # 全角冒号
+            or "安全性" in s
+            or "安全:" in s
+            or "安全：" in s
+        ):
             return True
     return False
 
@@ -82,7 +91,7 @@ def _in_test_context(lines: Sequence[str], line_no: int, radius: int = 20) -> bo
     近邻出现 #[test] 或 mod tests { ... } 等，可能处于测试上下文，适度降低严重度。
     """
     for _, s in _window(lines, line_no, before=radius, after=radius):
-        if "#[test]" in s or re.search(r"\bmod\s+tests\b", s):
+        if "#[test]" in s or "cfg(test)" in s or re.search(r"\bmod\s+tests\b", s):
             return True
     return False
 
@@ -102,7 +111,8 @@ def _severity_from_confidence(conf: float) -> str:
 def _rule_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
-        if not RE_UNSAFE.search(s):
+        # 避免对 unsafe impl 重复上报，由专门规则处理
+        if not RE_UNSAFE.search(s) or RE_UNSAFE_IMPL.search(s):
             continue
         conf = 0.8
         if _has_safety_comment_around(lines, idx, radius=5):
@@ -322,6 +332,34 @@ def _rule_ignore_result(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
+def _rule_forget(lines: Sequence[str], relpath: str) -> List[Issue]:
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if not RE_FORGET.search(s):
+            continue
+        conf = 0.75
+        if _has_safety_comment_around(lines, idx):
+            conf -= 0.1
+        if _in_test_context(lines, idx):
+            conf -= 0.05
+        conf = max(0.5, min(0.9, conf))
+        issues.append(
+            Issue(
+                language="rust",
+                category="resource_management",
+                pattern="mem::forget",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="使用 mem::forget 会跳过 Drop 导致资源泄漏，若错误使用可能破坏不变式或造成泄漏。",
+                suggestion="避免无必要的 mem::forget；如需抑制 Drop，优先使用 ManuallyDrop 或设计更安全的所有权转移。",
+                confidence=conf,
+                severity=_severity_from_confidence(conf),
+            )
+        )
+    return issues
+
+
 # ---------------------------
 # 对外主入口
 # ---------------------------
@@ -335,6 +373,7 @@ def analyze_rust_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_unsafe(lines, relpath))
     issues.extend(_rule_raw_pointer(lines, relpath))
     issues.extend(_rule_transmute(lines, relpath))
+    issues.extend(_rule_forget(lines, relpath))
     issues.extend(_rule_maybe_uninit(lines, relpath))
     issues.extend(_rule_unwrap_expect(lines, relpath))
     issues.extend(_rule_extern_c(lines, relpath))
