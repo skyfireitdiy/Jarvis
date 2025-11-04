@@ -41,6 +41,9 @@ def agent(
     output: Optional[str] = typer.Option(
         "report.md", "--output", "-o", help="最终Markdown报告输出路径（默认 ./report.md）"
     ),
+    batch_limit: int = typer.Option(
+        10, "--batch-limit", "-n", help="批量处理条数（一次最多处理一个文件的n条告警）"
+    ),
 ) -> None:
     # 初始化环境，确保平台/模型等全局配置就绪（避免 NoneType 平台）
     try:
@@ -57,6 +60,7 @@ def agent(
         text = run_with_agent(
             path,
             llm_group=llm_group,
+            batch_limit=batch_limit,
         )
     except Exception as e:
         try:

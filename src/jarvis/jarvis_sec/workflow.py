@@ -485,6 +485,7 @@ def run_with_agent(
     languages: Optional[List[str]] = None,
     llm_group: Optional[str] = None,
     report_file: Optional[str] = None,
+    batch_limit: int = 10,
 ) -> str:
     """
     使用单Agent逐条子任务分析模式运行（与 jarvis.jarvis_sec.__init__ 中保持一致）。
@@ -502,6 +503,7 @@ def run_with_agent(
         languages=languages,
         llm_group=llm_group,
         report_file=report_file,
+        batch_limit=batch_limit,
     )
 
 

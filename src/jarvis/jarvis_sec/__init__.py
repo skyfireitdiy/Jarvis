@@ -210,6 +210,7 @@ def run_security_analysis(
     languages: Optional[List[str]] = None,
     llm_group: Optional[str] = None,
     report_file: Optional[str] = None,
+    batch_limit: int = 10,
     resume: bool = True,
 ) -> str:
     """
@@ -302,7 +303,38 @@ def run_security_analysis(
         }
 
     compact_candidates = [_compact(it) for it in candidates]
-    # 移除问题条目上限，保留所有候选以逐条由Agent验证
+    # 批量模式：按文件分组，仅选择一个文件的前 n 条候选（默认 n=10）
+    try:
+        from collections import defaultdict as _dd
+        groups: Dict[str, List[Dict]] = _dd(list)
+        for it in compact_candidates:
+            groups[str(it.get("file") or "")].append(it)
+        selected_file: Optional[str] = None
+        selected_candidates: List[Dict] = []
+        if groups:
+            # 选择告警最多的文件作为本批次处理目标
+            selected_file, items = max(groups.items(), key=lambda kv: len(kv[1]))
+            limit = batch_limit if isinstance(batch_limit, int) and batch_limit > 0 else len(items)
+            # 为实现“所有告警分批处理”，此处不截断，保留该文件的全部候选，后续按 batch_limit 分批提交给 Agent
+            selected_candidates = items
+            try:
+                print(f"[JARVIS-SEC] batch selection: file={selected_file} count={len(selected_candidates)}/{len(items)} (limit={limit})")
+            except Exception:
+                pass
+            # 记录批次选择信息
+            _progress_append({
+                "event": "batch_selection",
+                "selected_file": selected_file,
+                "selected_count": len(selected_candidates),
+                "total_in_file": len(items),
+                "limit": limit,
+            })
+        # 将待处理候选替换为本批次（仅一个文件的前 n 条）
+        compact_candidates = selected_candidates
+    except Exception:
+        # 分组失败时保留原候选（不进行批量限制）
+        pass
+    # 保留所有候选以逐条由Agent验证（当前批次）
     json.dumps(compact_candidates, ensure_ascii=False)
     # 进度总数
     total = len(compact_candidates)
@@ -343,94 +375,91 @@ def run_security_analysis(
             # 报告写入失败不影响主流程
             pass
 
-    # 3) 针对每个候选，单独创建一次多Agent任务，逐条验证并收集结果
+    # 3) 按批次将候选问题提交给单Agent验证（一次提交一个文件的前 n 条，直到该文件全部处理完）
     all_issues: List[Dict] = []
     meta_records: List[Dict] = []
-    for idx, cand in enumerate(compact_candidates, start=1):
-        # 计算候选签名用于断点续扫（language|file|line|pattern）
-        cand_sig = f"{cand.get('language','')}|{cand.get('file','')}|{cand.get('line','')}|{cand.get('pattern','')}"
-        if resume and cand_sig in done_sigs:
-            try:
-                print(f"[JARVIS-SEC] resume-skip {idx}/{total}: {cand.get('file')}:{cand.get('line')} ({cand.get('language')})")
-            except Exception:
-                pass
-            # 写入进度：任务跳过（skipped）
-            _progress_append(
-                {
-                    "event": "task_status",
-                    "status": "skipped",
-                    "task_id": f"JARVIS-SEC-Analyzer-{idx}",
-                    "idx": idx,
-                    "total": total,
-                    "candidate_signature": cand_sig,
-                    "candidate": cand,
-                }
-            )
-            continue
-        # 使用单Agent逐条验证，避免多Agent复杂度与上下文污染
+
+    # 仅处理当前批次选择的文件的候选（compact_candidates 前面已替换为该文件的全部候选）
+    # 基于进度文件跳过已完成的候选
+    def _sig_of(c: Dict) -> str:
+        return f"{c.get('language','')}|{c.get('file','')}|{c.get('line','')}|{c.get('pattern','')}"
+
+    pending: List[Dict] = []
+    for c in compact_candidates:
+        if not (resume and _sig_of(c) in done_sigs):
+            pending.append(c)
+
+    # 分批：每批次最多 batch_limit 条
+    batch_size = batch_limit if isinstance(batch_limit, int) and batch_limit > 0 else len(pending)
+    batches: List[List[Dict]] = [pending[i : i + batch_size] for i in range(0, len(pending), batch_size)]
+    total_batches = len(batches)
+
+    for bidx, batch in enumerate(batches, start=1):
+        # 进度：批次开始
+        _progress_append(
+            {
+                "event": "batch_status",
+                "status": "running",
+                "batch_id": f"JARVIS-SEC-Batch-{bidx}",
+                "batch_index": bidx,
+                "total_batches": total_batches,
+                "batch_size": len(batch),
+                "file": batch[0].get("file") if batch else None,
+            }
+        )
+
+        # 显示进度
+        try:
+            print(f"[JARVIS-SEC] Batch {bidx}/{total_batches}: size={len(batch)} file={batch[0].get('file') if batch else 'N/A'}")
+        except Exception:
+            pass
+
+        # 构造 Agent（单次处理一批候选）
         system_prompt = """
 # 单Agent安全分析约束
 - 仅围绕输入候选的位置进行验证与细化；避免无关扩展与大范围遍历。
-- 工具优先：使用 read_code 读取 {file} 附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
+- 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
 - 禁止修改任何文件或执行写操作命令（rm/mv/cp/echo >、sed -i、git、patch、chmod、chown 等）；仅进行只读分析与读取。
 - 每次仅执行一个操作；等待工具结果后再进行下一步。
 """.strip()
-        task_id = f"JARVIS-SEC-Analyzer-{idx}"
-        # 显示当前进度
-        try:
-            print(f"[JARVIS-SEC] Progress {idx}/{total}: {cand.get('file')}:{cand.get('line')} ({cand.get('language')})")
-        except Exception:
-            # 打印失败不影响主流程
-            pass
+        task_id = f"JARVIS-SEC-Batch-{bidx}"
         agent_kwargs: Dict = dict(
             system_prompt=system_prompt,
             name=task_id,
             auto_complete=True,
-            # 启用摘要，通过摘要统一结构化输出
             need_summary=True,
-            summary_prompt=_build_summary_prompt(task_id, entry_path, langs, cand),
+            # 复用现有摘要提示词构建器，candidate 传入批次列表包一层
+            summary_prompt=_build_summary_prompt(task_id, entry_path, langs, {"batch": True, "candidates": batch}),
             non_interactive=True,
             in_multi_agent=False,
-            # 显式禁用方法论与分析，确保Agent按指令执行
             use_methodology=False,
             use_analysis=False,
             output_handler=[ToolRegistry()],
-            disable_file_edit = True,
+            disable_file_edit=True,
             use_tools=["read_code", "execute_script"],
         )
-        # 将 llm_group 仅传递给本次 Agent，不覆盖全局配置
         if llm_group:
             agent_kwargs["model_group"] = llm_group
         agent = Agent(**agent_kwargs)
+
+        # 任务上下文（批次）
+        import json as _json2
         per_task = f"""
-# 安全子任务（单点验证）
-目标：针对候选问题进行证据核实、风险评估与修复建议补充；若确认误报，issues 应为空。
+# 安全子任务批次（多点验证）
+目标：针对本批次候选问题进行证据核实、风险评估与修复建议补充；若确认误报，对应候选不返回问题。
 上下文参数：
 - entry_path: {entry_path}
 - languages: {langs}
 
-候选(JSON):
-{json.dumps(cand, ensure_ascii=False, indent=2)}
+批次候选(JSON数组):
+{_json2.dumps(batch, ensure_ascii=False, indent=2)}
 
 操作建议：
-- 使用 read_code 读取目标文件（尽量提供绝对路径或以 entry_path 拼接），围绕候选行号上下各约50行。
+- 使用 read_code 读取目标文件（尽量提供绝对路径或以 entry_path 拼接），围绕各候选行号上下各约50行。
 - 若需搜索更多线索，可使用 execute_script 调用 rg/find 对目标文件进行局部检索。
 """.strip()
 
-        # 写入进度：任务开始（running）
-        _progress_append(
-            {
-                "event": "task_status",
-                "status": "running",
-                "task_id": task_id,
-                "idx": idx,
-                "total": total,
-                "candidate_signature": cand_sig,
-                "candidate": cand,
-            }
-        )
-
-        # 订阅 AFTER_SUMMARY，捕获Agent内部生成的摘要，避免二次调用模型
+        # 订阅 AFTER_SUMMARY，捕获Agent内部生成的摘要
         try:
             from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY  # type: ignore
         except Exception:
@@ -446,100 +475,239 @@ def run_security_analysis(
                 agent.event_bus.subscribe(_AFTER_SUMMARY, _on_after_summary)
             except Exception:
                 pass
-        agent.run(per_task)
-        # 流程级工作区保护：调用 Agent 后如检测到文件被修改，则使用 git checkout -- . 恢复
-        workspace_restore_info: Optional[Dict] = None
-        try:
-            _changed = _git_restore_if_dirty(entry_path)
-            workspace_restore_info = {
-                "performed": bool(_changed),
-                "changed_files_count": int(_changed or 0),
-                "action": "git checkout -- .",
-            }
-            # 审计记录：每轮 Agent 执行后的工作区恢复情况，写入最终报告的 meta
-            meta_records.append(
-                {
-                    "task_id": task_id,
-                    "candidate": cand,
-                    "workspace_restore": workspace_restore_info,
-                }
-            )
-            if _changed:
-                try:
-                    print(f"[JARVIS-SEC] workspace restored ({_changed} file(s)) via: git checkout -- .")
-                except Exception:
-                    pass
-        except Exception:
-            # 即使获取/写入审计信息失败，也不影响后续流程
-            pass
 
-        # 优先解析摘要中的 <REPORT>（JSON/YAML），失败再回退主输出解析
+        # 执行Agent（增加重试机制：摘要解析失败或关键字段缺失时，重新运行当前批次）
         summary_items: Optional[List[Dict]] = None
-        summary_text = summary_container.get("text", "")
-        if summary_text:
-            rep = _try_parse_summary_report(summary_text)
-            if rep is None:
-                # 兼容：若摘要直接输出 JSON，则尝试旧解析
-                rep = _try_parse_summary_json(summary_text)
-            if isinstance(rep, dict):
-                items = rep.get("issues")
-                if isinstance(items, list):
-                    summary_items = items
+        workspace_restore_info: Optional[Dict] = None
+        max_retries = 2  # 失败后最多重试2次（共执行最多3次）
+        for attempt in range(max_retries + 1):
+            # 清空上一轮摘要容器
+            summary_container["text"] = ""
+            agent.run(per_task)
 
-        if isinstance(summary_items, list):
-            for it in summary_items:
-                it.setdefault("language", cand.get("language"))
-                it.setdefault("file", cand.get("file"))
-                it.setdefault("line", cand.get("line"))
-            if not summary_items:
+            # 工作区保护：调用 Agent 后如检测到文件被修改，则恢复（每次尝试都执行）
+            try:
+                _changed = _git_restore_if_dirty(entry_path)
+                workspace_restore_info = {
+                    "performed": bool(_changed),
+                    "changed_files_count": int(_changed or 0),
+                    "action": "git checkout -- .",
+                }
+                meta_records.append(
+                    {
+                        "task_id": task_id,
+                        "batch_index": bidx,
+                        "workspace_restore": workspace_restore_info,
+                        "attempt": attempt + 1,
+                    }
+                )
+                if _changed:
+                    try:
+                        print(f"[JARVIS-SEC] workspace restored ({_changed} file(s)) via: git checkout -- .")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # 解析摘要中的 <REPORT>（JSON/YAML）
+            summary_text = summary_container.get("text", "")
+            parsed_items: Optional[List[Dict]] = None
+            if summary_text:
+                rep = _try_parse_summary_report(summary_text)
+                if rep is None:
+                    rep = _try_parse_summary_json(summary_text)
+                if isinstance(rep, dict):
+                    items = rep.get("issues")
+                    if isinstance(items, list):
+                        parsed_items = items
+
+            # 关键字段校验：要求每个问题至少包含 file/line/category/pattern
+            def _valid_items(items: Optional[List[Dict]]) -> bool:
+                if not isinstance(items, list):
+                    return False
+                required = ("file", "line", "category", "pattern")
+                for it in items:
+                    for k in required:
+                        v = it.get(k)
+                        if v is None or (isinstance(v, str) and not v.strip()):
+                            return False
+                return True
+
+            if _valid_items(parsed_items):
+                summary_items = parsed_items
+                break  # 成功，退出重试循环
+            else:
+                # 本次尝试失败：打印并准备重试
                 try:
-                    print(f"[JARVIS-SEC] no-issue {idx}/{total}: {cand.get('file')}:{cand.get('line')} ({cand.get('language')})")
+                    print(f"[JARVIS-SEC] batch summary invalid -> retry {attempt + 1}/{max_retries} (batch={bidx})")
                 except Exception:
                     pass
-            else:
+
+        # 重试结束：summary_items 为 None 则视为失败
+        # 将检测结果写入报告，并按候选维度写入进度（done）
+        if isinstance(summary_items, list):
+            # 汇总有效问题（非误报）
+            if summary_items:
                 all_issues.extend(summary_items)
                 try:
-                    print(f"[JARVIS-SEC] issues-found {idx}/{total}: count={len(summary_items)} -> append report (summary)")
+                    print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(summary_items)} -> append report (summary)")
                 except Exception:
                     pass
-                _append_report(summary_items, "summary", task_id, cand)
-            # 写入进度：任务结束（done）
+                # 写入 JSONL 报告（批次）
+                _append_report(summary_items, "summary", task_id, {"batch": True, "candidates": batch})
+            else:
+                try:
+                    print(f"[JARVIS-SEC] batch no-issue {bidx}/{total_batches}")
+                except Exception:
+                    pass
+
+            # 为每个候选写入 done 记录（断点续扫用）
+            for c in batch:
+                sig = _sig_of(c)
+                cnt = sum(1 for it in summary_items if _sig_matches_item(sig, it)) if summary_items else 0
+                _progress_append(
+                    {
+                        "event": "task_status",
+                        "status": "done",
+                        "task_id": f"{task_id}",
+                        "candidate_signature": sig,
+                        "candidate": c,
+                        "issues_count": int(cnt),
+                        "workspace_restore": workspace_restore_info,
+                        "batch_index": bidx,
+                    }
+                )
+
+            # 批次结束记录
+            _progress_append(
+                {
+                    "event": "batch_status",
+                    "status": "done",
+                    "batch_id": task_id,
+                    "batch_index": bidx,
+                    "total_batches": total_batches,
+                    "issues_count": len(summary_items),
+                }
+            )
+            continue
+
+        # 摘要不可解析或关键字段缺失：记录失败并按候选维度写入 done（issues_count=0）
+        try:
+            print(f"[JARVIS-SEC] batch parse-fail {bidx}/{total_batches} (no <REPORT>/invalid fields in summary)")
+        except Exception:
+            pass
+        for c in batch:
             _progress_append(
                 {
                     "event": "task_status",
                     "status": "done",
-                    "task_id": task_id,
-                    "idx": idx,
-                    "total": total,
-                    "candidate_signature": cand_sig,
-                    "candidate": cand,
-                    "issues_count": len(summary_items) if isinstance(summary_items, list) else 0,
+                    "task_id": f"{task_id}",
+                    "candidate_signature": _sig_of(c),
+                    "candidate": c,
+                    "issues_count": 0,
+                    "parse_fail": True,
                     "workspace_restore": workspace_restore_info,
+                    "batch_index": bidx,
                 }
             )
-            continue  # 已通过摘要处理，进入下一条
-
-        # 摘要不可解析时，禁止回退解析主输出；直接记录失败并进入下一条
-        try:
-            print(f"[JARVIS-SEC] parse-fail {idx}/{total} (no <REPORT> in summary): {cand.get('file')}:{cand.get('line')} ({cand.get('language')})")
-        except Exception:
-            pass
-        # 写入进度：任务结束（done，解析失败视为0问题）
         _progress_append(
             {
-                "event": "task_status",
+                "event": "batch_status",
                 "status": "done",
-                "task_id": task_id,
-                "idx": idx,
-                "total": total,
-                "candidate_signature": cand_sig,
-                "candidate": cand,
+                "batch_id": task_id,
+                "batch_index": bidx,
+                "total_batches": total_batches,
                 "issues_count": 0,
                 "parse_fail": True,
-                "workspace_restore": workspace_restore_info,
             }
         )
-        continue
+
+        def _sig_matches_item(sig: str, item: Dict) -> bool:
+            # 用 file+line+pattern 粗略关联候选与输出项
+            parts = sig.split("|", 3)
+            f = parts[1] if len(parts) > 1 else ""
+            ln = parts[2] if len(parts) > 2 else ""
+            pat = parts[3] if len(parts) > 3 else ""
+            return str(item.get("file")) == f and str(item.get("line")) == ln and str(item.get("pattern") or "") == pat
+
+        # 将检测结果写入报告，并按候选维度写入进度（done）
+        if isinstance(summary_items, list):
+            # 汇总有效问题（非误报）
+            if summary_items:
+                all_issues.extend(summary_items)
+                try:
+                    print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(summary_items)} -> append report (summary)")
+                except Exception:
+                    pass
+                # 写入 JSONL 报告（批次）
+                _append_report(summary_items, "summary", task_id, {"batch": True, "candidates": batch})
+            else:
+                try:
+                    print(f"[JARVIS-SEC] batch no-issue {bidx}/{total_batches}")
+                except Exception:
+                    pass
+
+            # 为每个候选写入 done 记录（断点续扫用）
+            for c in batch:
+                sig = _sig_of(c)
+                cnt = sum(1 for it in summary_items if _sig_matches_item(sig, it)) if summary_items else 0
+                _progress_append(
+                    {
+                        "event": "task_status",
+                        "status": "done",
+                        "task_id": f"{task_id}",
+                        "candidate_signature": sig,
+                        "candidate": c,
+                        "issues_count": int(cnt),
+                        "workspace_restore": workspace_restore_info,
+                        "batch_index": bidx,
+                    }
+                )
+
+            # 批次结束记录
+            _progress_append(
+                {
+                    "event": "batch_status",
+                    "status": "done",
+                    "batch_id": task_id,
+                    "batch_index": bidx,
+                    "total_batches": total_batches,
+                    "issues_count": len(summary_items),
+                }
+            )
+            continue
+
+        # 摘要不可解析：记录失败并按候选维度写入 done（issues_count=0）
+        try:
+            print(f"[JARVIS-SEC] batch parse-fail {bidx}/{total_batches} (no <REPORT> in summary)")
+        except Exception:
+            pass
+        for c in batch:
+            _progress_append(
+                {
+                    "event": "task_status",
+                    "status": "done",
+                    "task_id": f"{task_id}",
+                    "candidate_signature": _sig_of(c),
+                    "candidate": c,
+                    "issues_count": 0,
+                    "parse_fail": True,
+                    "workspace_restore": workspace_restore_info,
+                    "batch_index": bidx,
+                }
+            )
+        _progress_append(
+            {
+                "event": "batch_status",
+                "status": "done",
+                "batch_id": task_id,
+                "batch_index": bidx,
+                "total_batches": total_batches,
+                "issues_count": 0,
+                "parse_fail": True,
+            }
+        )
+
     # 4) 使用统一聚合器生成最终报告（JSON + Markdown）
     from jarvis.jarvis_sec.report import build_json_and_markdown
     return build_json_and_markdown(
