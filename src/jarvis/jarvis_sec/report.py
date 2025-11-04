@@ -186,7 +186,7 @@ def format_markdown_report(report_json: Dict) -> str:
     issues: List[Dict] = report_json.get("issues", [])
     lines: List[str] = []
 
-    lines.append("# OpenHarmony 安全问题分析报告（聚合）")
+    lines.append("# 安全问题分析报告（聚合）")
     lines.append("")
     if "scanned_root" in s:
         lines.append(f"- 扫描根目录: {s.get('scanned_root')}")
@@ -220,13 +220,6 @@ def format_markdown_report(report_json: Dict) -> str:
         lines.append(f"- 建议: {it.get('suggestion')}")
         lines.append(f"- 置信度: {it.get('confidence')}, 严重性: {it.get('severity')}, 评分: {it.get('score')}")
         lines.append("")
-
-    # 建议与后续计划
-    lines.append("## 建议与后续计划")
-    lines.append("- 对高风险文件优先进行加固与测试覆盖提升（边界检查、错误处理路径）。")
-    lines.append("- 对不安全API统一替换/封装，审计 sprintf/scanf 等使用场景。")
-    lines.append("- 对内存管理路径进行生命周期审查，避免 realloc 覆盖与 UAF。")
-    lines.append("- 将关键模块迁移至 Rust（内存安全优先），对 FFI 边界进行条件约束与安全封装。")
 
     return "\n".join(lines)
 
