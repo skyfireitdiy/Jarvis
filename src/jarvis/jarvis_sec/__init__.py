@@ -152,30 +152,23 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
     cand_json = _json.dumps(candidate, ensure_ascii=False, indent=2)
     langs_json = _json.dumps(languages, ensure_ascii=False)
     return f"""
-请将本轮“安全子任务（单点验证）”的结构化结果仅放入以下标记中（允许 JSON 或 YAML）：
+请将本轮“安全子任务（单点验证）”的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出：
 <REPORT>
-# 推荐 JSON；如果使用 YAML 亦可
-issues:
-  - language: "c/cpp|rust"
-    category: "unsafe_api|buffer_overflow|memory_mgmt|error_handling|unsafe_usage|concurrency|ffi"
-    pattern: "命中的模式/关键字"
-    file: "相对或绝对路径"
-    line: 0
-    evidence: "证据代码片段（单行简化）"
-    description: "问题说明"
-    suggestion: "修复建议"
-    confidence: 0.0
-    severity: "high|medium|low"
-meta:
-  task_id: "{task_id}"
-  entry_path: "{entry_path}"
-  languages: {langs_json}
-  candidate: {cand_json}
+# 仅输出编号与理由（不含位置信息），编号为本批次候选的序号（从1开始）
+# 示例：
+# - id: 1
+#   reason: "使用不安全API，存在潜在缓冲区溢出风险"
+# - id: 3
+#   reason: "错误处理缺失，可能导致未定义行为"
+[]
 </REPORT>
 要求：
-- 报告只能出现在 <REPORT> 与 </REPORT> 中，且不得出现其他文本。
-- 若确认误报，请返回空列表 issues: []。
-- 值需与实际分析一致；未调用工具时可省略 used_tools 等非必要字段。
+- 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
+- 若确认本批次全部为误报或无问题，请返回空数组 []。
+- 数组元素为对象，包含字段：
+  - id: 整数（本批次候选的序号，从1开始）
+  - reason: 字符串（简洁说明返回该项的理由）
+- 不要在数组元素中包含 file/line/pattern 等位置信息；写入 jsonl 时系统会结合原始候选信息。
 """.strip()
 
 
@@ -511,26 +504,38 @@ def run_security_analysis(
 
             # 解析摘要中的 <REPORT>（JSON/YAML）
             summary_text = summary_container.get("text", "")
-            parsed_items: Optional[List[Dict]] = None
+            parsed_items: Optional[List] = None
             if summary_text:
                 rep = _try_parse_summary_report(summary_text)
                 if rep is None:
                     rep = _try_parse_summary_json(summary_text)
-                if isinstance(rep, dict):
+                if isinstance(rep, list):
+                    parsed_items = rep
+                elif isinstance(rep, dict):
                     items = rep.get("issues")
                     if isinstance(items, list):
                         parsed_items = items
 
-            # 关键字段校验：要求每个问题至少包含 file/line/category/pattern
-            def _valid_items(items: Optional[List[Dict]]) -> bool:
+            # 关键字段校验：当前要求每个元素为 {id:int, reason:str}
+            def _valid_items(items: Optional[List]) -> bool:
                 if not isinstance(items, list):
                     return False
-                required = ("file", "line", "category", "pattern")
                 for it in items:
-                    for k in required:
-                        v = it.get(k)
-                        if v is None or (isinstance(v, str) and not v.strip()):
+                    if not isinstance(it, dict):
+                        return False
+                    # 校验 id（批次内从1开始的整数）
+                    if "id" not in it:
+                        return False
+                    try:
+                        if int(it["id"]) < 1:
                             return False
+                    except Exception:
+                        return False
+                    # 校验 reason（非空字符串）
+                    if "reason" not in it:
+                        return False
+                    if not isinstance(it["reason"], str) or not it["reason"].strip():
+                        return False
                 return True
 
             if _valid_items(parsed_items):
@@ -546,15 +551,35 @@ def run_security_analysis(
         # 重试结束：summary_items 为 None 则视为失败
         # 将检测结果写入报告，并按候选维度写入进度（done）
         if isinstance(summary_items, list):
+            # 将 {id, reason} 映射回批次候选，并合并原始信息 + reason
+            merged_items: List[Dict] = []
+            id_counts: Dict[int, int] = {}
+            try:
+                for it in summary_items:
+                    if not isinstance(it, dict):
+                        continue
+                    try:
+                        idx = int(it.get("id", 0))
+                    except Exception:
+                        idx = 0
+                    if 1 <= idx <= len(batch):
+                        cand = dict(batch[idx - 1])
+                        reason = str(it.get("reason", "")).strip()
+                        cand["reason"] = reason if reason else ""
+                        merged_items.append(cand)
+                        id_counts[idx] = id_counts.get(idx, 0) + 1
+            except Exception:
+                pass
+
             # 汇总有效问题（非误报）
-            if summary_items:
-                all_issues.extend(summary_items)
+            if merged_items:
+                all_issues.extend(merged_items)
                 try:
-                    print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(summary_items)} -> append report (summary)")
+                    print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(merged_items)} -> append report (summary)")
                 except Exception:
                     pass
                 # 写入 JSONL 报告（批次）
-                _append_report(summary_items, "summary", task_id, {"batch": True, "candidates": batch})
+                _append_report(merged_items, "summary", task_id, {"batch": True, "candidates": batch})
             else:
                 try:
                     print(f"[JARVIS-SEC] batch no-issue {bidx}/{total_batches}")
@@ -562,9 +587,9 @@ def run_security_analysis(
                     pass
 
             # 为每个候选写入 done 记录（断点续扫用）
-            for c in batch:
+            for i, c in enumerate(batch, start=1):
                 sig = _sig_of(c)
-                cnt = sum(1 for it in summary_items if _sig_matches_item(sig, it)) if summary_items else 0
+                cnt = id_counts.get(i, 0)
                 _progress_append(
                     {
                         "event": "task_status",
@@ -586,7 +611,7 @@ def run_security_analysis(
                     "batch_id": task_id,
                     "batch_index": bidx,
                     "total_batches": total_batches,
-                    "issues_count": len(summary_items),
+                    "issues_count": len(merged_items),
                 }
             )
             continue
@@ -632,15 +657,35 @@ def run_security_analysis(
 
         # 将检测结果写入报告，并按候选维度写入进度（done）
         if isinstance(summary_items, list):
+            # 将 {id, reason} 映射回批次候选，并合并原始信息 + reason
+            merged_items: List[Dict] = []
+            id_counts: Dict[int, int] = {}
+            try:
+                for it in summary_items:
+                    if not isinstance(it, dict):
+                        continue
+                    try:
+                        idx = int(it.get("id", 0))
+                    except Exception:
+                        idx = 0
+                    if 1 <= idx <= len(batch):
+                        cand = dict(batch[idx - 1])
+                        reason = str(it.get("reason", "")).strip()
+                        cand["reason"] = reason if reason else ""
+                        merged_items.append(cand)
+                        id_counts[idx] = id_counts.get(idx, 0) + 1
+            except Exception:
+                pass
+
             # 汇总有效问题（非误报）
-            if summary_items:
-                all_issues.extend(summary_items)
+            if merged_items:
+                all_issues.extend(merged_items)
                 try:
-                    print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(summary_items)} -> append report (summary)")
+                    print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(merged_items)} -> append report (summary)")
                 except Exception:
                     pass
                 # 写入 JSONL 报告（批次）
-                _append_report(summary_items, "summary", task_id, {"batch": True, "candidates": batch})
+                _append_report(merged_items, "summary", task_id, {"batch": True, "candidates": batch})
             else:
                 try:
                     print(f"[JARVIS-SEC] batch no-issue {bidx}/{total_batches}")
@@ -648,9 +693,9 @@ def run_security_analysis(
                     pass
 
             # 为每个候选写入 done 记录（断点续扫用）
-            for c in batch:
+            for i, c in enumerate(batch, start=1):
                 sig = _sig_of(c)
-                cnt = sum(1 for it in summary_items if _sig_matches_item(sig, it)) if summary_items else 0
+                cnt = id_counts.get(i, 0)
                 _progress_append(
                     {
                         "event": "task_status",
@@ -672,7 +717,7 @@ def run_security_analysis(
                     "batch_id": task_id,
                     "batch_index": bidx,
                     "total_batches": total_batches,
-                    "issues_count": len(summary_items),
+                    "issues_count": len(merged_items),
                 }
             )
             continue
@@ -718,9 +763,9 @@ def run_security_analysis(
     )
 
 
-def _try_parse_summary_report(text: str) -> Optional[Dict]:
+def _try_parse_summary_report(text: str) -> Optional[object]:
     """
-    从摘要文本中提取 <REPORT>...</REPORT> 内容，并解析为 dict（支持 JSON 或 YAML）。
+    从摘要文本中提取 <REPORT>...</REPORT> 内容，并解析为对象（dict 或 list，支持 JSON 或 YAML）。
     - 若提取/解析失败返回 None
     - YAML 解析采用安全模式，若环境无 PyYAML 则忽略
     """
@@ -733,7 +778,15 @@ def _try_parse_summary_report(text: str) -> Optional[Dict]:
     # 优先 JSON
     try:
         data = _json.loads(content)
-        if isinstance(data, dict):
+        if isinstance(data, (dict, list)):
+            return data
+    except Exception:
+        pass
+    # 回退 YAML
+    try:
+        import yaml as _yaml  # type: ignore
+        data = _yaml.safe_load(content)
+        if isinstance(data, (dict, list)):
             return data
     except Exception:
         pass
