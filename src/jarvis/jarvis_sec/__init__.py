@@ -414,6 +414,7 @@ def run_security_analysis(
 - 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
 - 禁止修改任何文件或执行写操作命令（rm/mv/cp/echo >、sed -i、git、patch、chmod、chown 等）；仅进行只读分析与读取。
 - 每次仅执行一个操作；等待工具结果后再进行下一步。
+- 完成对本批次候选问题的判断后，主输出仅打印结束符“[END]”，不需要汇总结果；结构化结果仅在摘要中按规定格式输出。
 """.strip()
         task_id = f"JARVIS-SEC-Batch-{bidx}"
         agent_kwargs: Dict = dict(
