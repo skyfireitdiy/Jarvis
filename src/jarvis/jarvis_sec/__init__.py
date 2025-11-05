@@ -171,7 +171,7 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
   - consequences: 字符串（漏洞被触发后可能导致的后果）
   - suggestions: 字符串（修复或缓解该漏洞的建议）
 - 不要在数组元素中包含 file/line/pattern 等位置信息；写入 jsonl 时系统会结合原始候选信息。
-- 确认是误报的条目请不要输出，仅输出确认是问题的条目。
+- 只要在数组中输出，就会被记录为确认的问题。因此，对于确认是误报的条目，请不要输出，仅输出确认是问题的条目。
 """.strip()
 
 
