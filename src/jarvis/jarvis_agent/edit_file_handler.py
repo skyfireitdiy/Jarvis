@@ -158,12 +158,15 @@ class EditFileHandler(OutputHandler):
         if patch_format == "search":
             formats = search_prompt
             supported_formats = "仅支持单点替换（SEARCH/REPLACE）"
+            usage_recommendation = ""
         elif patch_format == "search_range":
             formats = search_range_prompt
             supported_formats = "仅支持区间替换（SEARCH_START/SEARCH_END/REPLACE），可选RANGE限定行号范围"
+            usage_recommendation = ""
         else:  # all
             formats = f"{search_prompt}\n或\n{search_range_prompt}"
             supported_formats = "支持两种DIFF块：单点替换（SEARCH/REPLACE）与区间替换（SEARCH_START/SEARCH_END/REPLACE）"
+            usage_recommendation = "\n推荐：优先使用单点替换（SEARCH/REPLACE）模式，除非需要大段修改，否则不要使用区间替换（SEARCH_START/SEARCH_END/REPLACE）模式"
 
         return f"""文件编辑指令格式：
 {ot("PATCH file=文件路径")}
@@ -172,7 +175,7 @@ class EditFileHandler(OutputHandler):
 
 注意：
 - {ot("PATCH")} 和 {ct("PATCH")} 必须出现在行首，否则不生效（会被忽略）
-- {supported_formats}
+- {supported_formats}{usage_recommendation}
 - {ot("RANGE")}start-end{ct("RANGE")} 仅用于区间替换模式（SEARCH_START/SEARCH_END），表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
 - 单点替换要求 SEARCH 在有效范围内唯一匹配（仅替换第一个匹配）
 - 区间替换会从包含 {ot("SEARCH_START")} 的行首开始，到包含 {ot("SEARCH_END")} 的行尾结束，替换整个区域
