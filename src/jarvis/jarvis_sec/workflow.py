@@ -485,7 +485,7 @@ def run_with_agent(
     languages: Optional[List[str]] = None,
     llm_group: Optional[str] = None,
     report_file: Optional[str] = None,
-    batch_limit: int = 10,
+    cluster_limit: int = 50,
 ) -> str:
     """
     使用单Agent逐条子任务分析模式运行（与 jarvis.jarvis_sec.__init__ 中保持一致）。
@@ -496,6 +496,7 @@ def run_with_agent(
     其他：
     - llm_group: 本次分析使用的模型组（仅透传给 Agent，不修改全局配置）
     - report_file: JSONL 报告文件路径（可选，透传）
+    - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
     """
     from jarvis.jarvis_sec import run_security_analysis  # 延迟导入，避免循环
     return run_security_analysis(
@@ -503,7 +504,7 @@ def run_with_agent(
         languages=languages,
         llm_group=llm_group,
         report_file=report_file,
-        batch_limit=batch_limit,
+        cluster_limit=cluster_limit,
     )
 
 

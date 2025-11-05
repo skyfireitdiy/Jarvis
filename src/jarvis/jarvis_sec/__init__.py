@@ -23,6 +23,7 @@ from typing import Dict, List, Optional
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_sec.workflow import run_security_analysis_fast, direct_scan, run_with_agent
 from jarvis.jarvis_tools.registry import ToolRegistry
+import re
 
 
 
@@ -143,7 +144,7 @@ def _try_parse_summary_json(text: str) -> Optional[Dict]:
 
 def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], candidate: Dict) -> str:
     """
-    构建摘要提示词：要求以 <REPORT>...</REPORT> 包裹的 JSON 或 YAML 输出。
+    构建摘要提示词：要求以 <REPORT>...</REPORT> 包裹的 YAML 输出（仅YAML）。
     系统提示词不强制规定主对话输出格式，仅在摘要中给出结构化结果。
     """
     import json as _json
@@ -152,9 +153,9 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
     return f"""
 请将本轮“安全子任务（单点验证）”的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出：
 <REPORT>
-# 仅输出编号与详细理由（不含位置信息），编号为本批次候选的序号（从1开始）
+# 仅输出全局编号（gid）与详细理由（不含位置信息），gid 为全局唯一的数字编号
 # 示例：
-# - id: 1
+# - gid: 1
 #   preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
 #   trigger_path: "函数 foobar 调用 strcpy 时，其输入 src 来自于未经校验的网络数据包，可导致缓冲区溢出"
 #   consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
@@ -165,7 +166,7 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
 - 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
 - 若确认本批次全部为误报或无问题，请返回空数组 []。
 - 数组元素为对象，包含字段：
-  - id: 整数（本批次候选的序号，从1开始）
+  - gid: 整数（全局唯一编号）
   - preconditions: 字符串（触发漏洞的前置条件）
   - trigger_path: 字符串（漏洞的触发路径，即从可控输入到缺陷代码的完整调用链路或关键步骤）
   - consequences: 字符串（漏洞被触发后可能导致的后果）
@@ -206,7 +207,8 @@ def run_security_analysis(
     languages: Optional[List[str]] = None,
     llm_group: Optional[str] = None,
     report_file: Optional[str] = None,
-    batch_limit: int = 10,
+
+    cluster_limit: int = 50,
     resume: bool = True,
 ) -> str:
     """
@@ -299,7 +301,15 @@ def run_security_analysis(
         }
 
     compact_candidates = [_compact(it) for it in candidates]
-    # 批量模式：按文件分组，仅选择一个文件的前 n 条候选（默认 n=10）
+    # 为所有候选分配全局唯一数字ID（gid: 1..N），用于跨批次/跨文件统一编号与跟踪
+    for i, it in enumerate(compact_candidates, start=1):
+        try:
+            it["gid"] = i
+        except Exception:
+            pass
+    # 为所有启发式候选分配稳定ID（HID），聚类改由 Agent 执行
+
+    # candidates already compacted; no additional enrichment required
     try:
         from collections import defaultdict as _dd
         groups: Dict[str, List[Dict]] = _dd(list)
@@ -310,11 +320,11 @@ def run_security_analysis(
         if groups:
             # 选择告警最多的文件作为本批次处理目标
             selected_file, items = max(groups.items(), key=lambda kv: len(kv[1]))
-            limit = batch_limit if isinstance(batch_limit, int) and batch_limit > 0 else len(items)
-            # 为实现“所有告警分批处理”，此处不截断，保留该文件的全部候选，后续按 batch_limit 分批提交给 Agent
+
+            # 为实现“所有告警分批处理”，此处不截断；后续改为按“聚类”逐个提交给验证Agent（不再使用 batch_limit）
             selected_candidates = items
             try:
-                print(f"[JARVIS-SEC] batch selection: file={selected_file} count={len(selected_candidates)}/{len(items)} (limit={limit})")
+                print(f"[JARVIS-SEC] batch selection: file={selected_file} count={len(selected_candidates)}/{len(items)}")
             except Exception:
                 pass
             # 记录批次选择信息
@@ -323,10 +333,10 @@ def run_security_analysis(
                 "selected_file": selected_file,
                 "selected_count": len(selected_candidates),
                 "total_in_file": len(items),
-                "limit": limit,
             })
         # 将待处理候选替换为本批次（仅一个文件的前 n 条）
-        compact_candidates = selected_candidates
+        # keep all files for clustering; do not narrow to a single file
+        # compact_candidates = selected_candidates
     except Exception:
         # 分组失败时保留原候选（不进行批量限制）
         pass
@@ -368,15 +378,412 @@ def run_security_analysis(
     def _sig_of(c: Dict) -> str:
         return f"{c.get('language','')}|{c.get('file','')}|{c.get('line','')}|{c.get('pattern','')}"
 
-    pending: List[Dict] = []
-    for c in compact_candidates:
-        if not (resume and _sig_of(c) in done_sigs):
-            pending.append(c)
+    # 按文件分组构建待聚类集合，并逐文件创建Agent进行一次聚类（提供该文件的告警作为上下文）
+    from collections import defaultdict as _dd2
+    _file_groups: Dict[str, List[Dict]] = _dd2(list)
+    for it in compact_candidates:
+        _file_groups[str(it.get("file") or "")].append(it)
 
-    # 分批：每批次最多 batch_limit 条
-    batch_size = batch_limit if isinstance(batch_limit, int) and batch_limit > 0 else len(pending)
-    batches: List[List[Dict]] = [pending[i : i + batch_size] for i in range(0, len(pending), batch_size)]
+    cluster_batches: List[List[Dict]] = []
+    cluster_records: List[Dict] = []
+
+    # 解析聚类输出（仅 YAML）
+    def _parse_clusters_from_text(text: str):
+        try:
+            start = text.find("<CLUSTERS>")
+            end = text.find("</CLUSTERS>")
+            if start == -1 or end == -1 or end <= start:
+                return None
+            content = text[start + len("<CLUSTERS>"):end].strip()
+            import yaml as _yaml3  # type: ignore
+            data = _yaml3.safe_load(content)
+            if isinstance(data, list):
+                return data
+            return None
+        except Exception:
+            return None
+
+    # 读取已有聚类报告以支持断点（若存在则按文件+批次复用既有聚类结果）
+    _existing_clusters: Dict[tuple[str, int], List[Dict]] = {}
+    try:
+        from pathlib import Path as _Path2
+        _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.yaml"
+        if _cluster_path.exists():
+            try:
+                import yaml as _yaml_exist  # type: ignore
+                _data = _yaml_exist.safe_load(_cluster_path.read_text(encoding="utf-8", errors="ignore"))
+                if isinstance(_data, dict):
+                    for rec in _data.get("clusters", []) or []:
+                        if not isinstance(rec, dict):
+                            continue
+                        f = str(rec.get("file") or "")
+                        bidx = int(rec.get("batch_index", 1) or 1)
+                        _existing_clusters.setdefault((f, bidx), []).append(rec)
+            except Exception:
+                _existing_clusters = {}
+    except Exception:
+        _existing_clusters = {}
+
+    # 快照写入函数：每处理完一个聚类批次后，写入当前聚类结果，支持断点恢复
+    def _write_cluster_report_snapshot():
+        try:
+            from pathlib import Path as _Path2
+            _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.yaml"
+            _cluster_path.parent.mkdir(parents=True, exist_ok=True)
+            _data_obj = {
+                "entry_path": entry_path,
+                "languages": langs,
+                "total_files": len(_file_groups),
+                "total_candidates": len(compact_candidates),
+                "clusters": cluster_records,
+            }
+            try:
+                import yaml as _yaml2  # type: ignore
+                with _cluster_path.open("w", encoding="utf-8") as _cf:
+                    _yaml2.safe_dump(_data_obj, _cf, allow_unicode=True, sort_keys=False)
+            except Exception:
+                # 简单回退：最小可读YAML
+                def _to_yaml(obj, indent=0):
+                    sp = "  " * indent
+                    if isinstance(obj, dict):
+                        lines = []
+                        for k, v in obj.items():
+                            if isinstance(v, (dict, list)):
+                                lines.append(f"{sp}{k}:")
+                                lines.append(_to_yaml(v, indent + 1))
+                            else:
+                                lines.append(f"{sp}{k}: {v!r}".replace("'", '"'))
+                        return "\n".join(lines)
+                    if isinstance(obj, list):
+                        lines = []
+                        for it in obj:
+                            if isinstance(it, (dict, list)):
+                                lines.append(f"{sp}-")
+                                lines.append(_to_yaml(it, indent + 1))
+                            else:
+                                lines.append(f"{sp}- {it!r}".replace("'", '"'))
+                        return "\n".join(lines)
+                    return f"{sp}{obj!r}".replace("'", '"')
+                with _cluster_path.open("w", encoding="utf-8") as _cf:
+                    _cf.write(_to_yaml(_data_obj) + "\n")
+            _progress_append(
+                {
+                    "event": "cluster_report_snapshot",
+                    "path": str(_cluster_path),
+                    "clusters": len(cluster_records),
+                    "total_candidates": len(compact_candidates),
+                }
+            )
+        except Exception:
+            pass
+
+    for _file, _items in _file_groups.items():
+        # 过滤掉已完成（resume）
+        pending_in_file: List[Dict] = []
+        for c in _items:
+            if not (resume and _sig_of(c) in done_sigs):
+                pending_in_file.append(c)
+        if not pending_in_file:
+            continue
+
+        # 构造聚类Agent（每个文件一个Agent，按批次聚类）
+        cluster_system_prompt = """
+# 单Agent聚类约束
+- 你的任务是对同一文件内的启发式候选进行“验证条件一致性”聚类。
+- 验证条件：为了确认是否存在漏洞需要成立/验证的关键前置条件。例如：“指针p在解引用前非空”“拷贝长度不超过目标缓冲区容量”等。
+- 工具优先：如需核对上下文，可使用 read_code 读取相邻代码；避免过度遍历。
+- 禁止写操作；仅只读分析。
+        """.strip()
+        import json as _json2
+        cluster_summary_prompt = """
+请仅在 <CLUSTERS> 与 </CLUSTERS> 中输出 YAML 数组：
+- 每个元素包含：
+  - verification: 字符串（对该聚类的验证条件描述，简洁明确，可直接用于后续Agent验证）
+  - gids: 整数数组（候选的全局唯一编号；输入JSON每个元素含 gid，可直接对应填入）
+- 要求：
+  - 严格要求：仅输出位于 <CLUSTERS> 与 </CLUSTERS> 间的 YAML 数组，其他位置不输出任何文本
+  - 相同验证条件的候选合并为同一项
+  - 不需要解释与长文本，仅给出可执行的验证条件短句
+  - 若无法聚类，请将每个候选单独成组，verification 为该候选的最小确认条件
+<CLUSTERS>
+- verification: ""
+  gids: []
+</CLUSTERS>
+        """.strip()
+
+        # 将该文件的告警按 cluster_limit 分批（每批最多 cluster_limit 条）
+        _limit = cluster_limit if isinstance(cluster_limit, int) and cluster_limit > 0 else 50
+        _chunks: List[List[Dict]] = [pending_in_file[i:i + _limit] for i in range(0, len(pending_in_file), _limit)]
+
+        for _chunk_idx, _chunk in enumerate(_chunks, start=1):
+            if not _chunk:
+                continue
+            # 构造本批次候选列表（元素已包含全局 gid）
+            pending_in_file_with_ids = list(_chunk)
+
+            # 若断点存在：优先使用已有聚类结果复建批次，跳过Agent运行（仅支持 gids）
+            _key = (_file, _chunk_idx)
+            if _key in _existing_clusters:
+
+                gid_to_item_resume: Dict[int, Dict] = {int(it.get("gid", 0)): it for it in pending_in_file_with_ids if int(it.get("gid", 0)) >= 1}
+                for rec in _existing_clusters.get(_key, []):
+                    verification = str(rec.get("verification", "")).strip()
+                    gids_list = rec.get("gids", [])
+                    norm_keys: List[int] = []
+                    if isinstance(gids_list, list):
+                        for x in gids_list:
+                            try:
+                                xi = int(x)
+                                if xi >= 1:
+                                    norm_keys.append(xi)
+                            except Exception:
+                                continue
+                    members: List[Dict] = []
+                    for k in norm_keys:
+                        it = gid_to_item_resume.get(k)
+                        if it:
+                            it["verify"] = verification
+                            members.append(it)
+                    if members:
+                        cluster_batches.append(members)
+                        cluster_records.append(
+                            {
+                                "file": _file,
+                                "verification": verification,
+                                "gids": [m.get("gid") for m in members],
+                                "count": len(members),
+                                "batch_index": _chunk_idx,
+                            }
+                        )
+                # 标记进度（断点复用）
+                _progress_append(
+                    {
+                        "event": "cluster_status",
+                        "status": "done",
+                        "file": _file,
+                        "batch_index": _chunk_idx,
+                        "reused": True,
+                        "clusters_count": len(_existing_clusters.get(_key, [])),
+                    }
+                )
+                # 写入快照（断点）
+                _write_cluster_report_snapshot()
+                continue
+
+            # 记录聚类批次开始（进度）
+            _progress_append(
+                {
+                    "event": "cluster_status",
+                    "status": "running",
+                    "file": _file,
+                    "batch_index": _chunk_idx,
+                    "total_in_batch": len(pending_in_file_with_ids),
+                }
+            )
+
+            cluster_task = f"""
+# 聚类任务（分析输入）
+上下文：
+- entry_path: {entry_path}
+- file: {_file}
+- languages: {langs}
+
+候选(JSON数组，包含 gid/file/line/pattern/category/evidence)：
+{_json2.dumps(pending_in_file_with_ids, ensure_ascii=False, indent=2)}
+            """.strip()
+
+            agent_kwargs_cluster: Dict = dict(
+                system_prompt=cluster_system_prompt,
+                name=f"JARVIS-SEC-Cluster::{_file}::batch{_chunk_idx}",
+                auto_complete=True,
+                need_summary=True,
+                summary_prompt=cluster_summary_prompt,
+                non_interactive=True,
+                in_multi_agent=False,
+                use_methodology=False,
+                use_analysis=False,
+                output_handler=[ToolRegistry()],
+                disable_file_edit=True,
+                use_tools=["read_code", "execute_script"],
+            )
+            if llm_group:
+                agent_kwargs_cluster["model_group"] = llm_group
+            cluster_agent = Agent(**agent_kwargs_cluster)
+
+            # 捕捉 AFTER_SUMMARY
+            try:
+                from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY2  # type: ignore
+            except Exception:
+                _AFTER_SUMMARY2 = None  # type: ignore
+            _cluster_summary: Dict[str, str] = {"text": ""}
+            if _AFTER_SUMMARY2:
+                def _on_after_summary_cluster(**kwargs):
+                    try:
+                        _cluster_summary["text"] = str(kwargs.get("summary", "") or "")
+                    except Exception:
+                        _cluster_summary["text"] = ""
+                try:
+                    cluster_agent.event_bus.subscribe(_AFTER_SUMMARY2, _on_after_summary_cluster)
+                except Exception:
+                    pass
+
+            # 运行聚类Agent（简单重试一次）
+            cluster_items = None
+            for _attempt in range(2):
+                _cluster_summary["text"] = ""
+                cluster_agent.run(cluster_task)
+                cluster_items = _parse_clusters_from_text(_cluster_summary.get("text", ""))
+                # 校验结构
+                valid = True
+                if not isinstance(cluster_items, list) or not cluster_items:
+                    valid = False
+                else:
+                    for it in cluster_items:
+                        if not isinstance(it, dict):
+                            valid = False
+                            break
+                        vals = it.get("gids", [])
+                        if not isinstance(it.get("verification", ""), str) or not isinstance(vals, list):
+                            valid = False
+                            break
+                if valid:
+                    break
+                else:
+                    cluster_items = None
+
+            # 合并聚类结果
+            if isinstance(cluster_items, list) and cluster_items:
+                # id_to_item removed; use gid_to_item only
+                gid_to_item: Dict[int, Dict] = {}
+                try:
+                    for it in pending_in_file_with_ids:
+                        try:
+                            _gid = int(it.get("gid", 0))
+                            if _gid >= 1:
+                                gid_to_item[_gid] = it
+                        except Exception:
+                            pass
+                except Exception:
+                    gid_to_item = {}
+
+                _merged_count = 0
+                for cl in cluster_items:
+                    verification = str(cl.get("verification", "")).strip()
+                    raw_gids = cl.get("gids", [])
+                    raw_ids = None
+                    norm_keys: List[int] = []
+                    use_gid = True
+                    if isinstance(raw_gids, list):
+                        use_gid = True
+                        for x in raw_gids:
+                            try:
+                                xi = int(x)
+                                if xi >= 1:
+                                    norm_keys.append(xi)
+                            except Exception:
+                                continue
+                    elif False:
+                        for x in raw_ids:
+                            try:
+                                xi = int(x)
+                                if xi >= 1:
+                                    norm_keys.append(xi)
+                            except Exception:
+                                continue
+                    members: List[Dict] = []
+                    for k in norm_keys:
+                        it = gid_to_item.get(k)
+                        if it:
+                            it["verify"] = verification
+                            members.append(it)
+                    if members:
+                        _merged_count += 1
+                        cluster_batches.append(members)
+                        cluster_records.append(
+                            {
+                                "file": _file,
+                                "verification": verification,
+                                "gids": [m.get("gid") for m in members],
+                                "count": len(members),
+                                "batch_index": _chunk_idx,
+                            }
+                        )
+                # 标记聚类批次完成（进度）
+                _progress_append(
+                    {
+                        "event": "cluster_status",
+                        "status": "done",
+                        "file": _file,
+                        "batch_index": _chunk_idx,
+                        "clusters_count": _merged_count,
+                    }
+                )
+                # 写入快照（断点）
+                _write_cluster_report_snapshot()
+    # 聚类报告（汇总所有文件）
+    try:
+        from pathlib import Path as _Path2
+        _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.yaml"
+        _cluster_path.parent.mkdir(parents=True, exist_ok=True)
+        _data_obj = {
+            "entry_path": entry_path,
+            "languages": langs,
+            "total_files": len(_file_groups),
+            "total_candidates": len(compact_candidates),
+            "clusters": cluster_records,
+        }
+        try:
+            import yaml as _yaml2  # type: ignore
+            with _cluster_path.open("w", encoding="utf-8") as _cf:
+                _yaml2.safe_dump(_data_obj, _cf, allow_unicode=True, sort_keys=False)
+        except Exception:
+            # 简单回退：最小可读YAML
+            def _to_yaml(obj, indent=0):
+                sp = "  " * indent
+                if isinstance(obj, dict):
+                    lines = []
+                    for k, v in obj.items():
+                        if isinstance(v, (dict, list)):
+                            lines.append(f"{sp}{k}:")
+                            lines.append(_to_yaml(v, indent + 1))
+                        else:
+                            lines.append(f"{sp}{k}: {v!r}".replace("'", '"'))
+                    return "\n".join(lines)
+                if isinstance(obj, list):
+                    lines = []
+                    for it in obj:
+                        if isinstance(it, (dict, list)):
+                            lines.append(f"{sp}-")
+                            lines.append(_to_yaml(it, indent + 1))
+                        else:
+                            lines.append(f"{sp}- {it!r}".replace("'", '"'))
+                    return "\n".join(lines)
+                return f"{sp}{obj!r}".replace("'", '"')
+            with _cluster_path.open("w", encoding="utf-8") as _cf:
+                _cf.write(_to_yaml(_data_obj) + "\n")
+        _progress_append(
+            {
+                "event": "cluster_report_written",
+                "path": str(_cluster_path),
+                "clusters": len(cluster_records),
+                "total_candidates": len(compact_candidates),
+            }
+        )
+    except Exception:
+        pass
+
+    # 若聚类失败或空，则回退为“按文件一次处理”
+    if not cluster_batches:
+        for _file, _items in _file_groups.items():
+            b = [c for c in _items if not (resume and _sig_of(c) in done_sigs)]
+            if b:
+                cluster_batches.append(b)
+
+
+    batches: List[List[Dict]] = cluster_batches
     total_batches = len(batches)
+    # 占位 batch_size 以兼容后续日志
+    batch_size = len(batches[0]) if batches else 0
 
     for bidx, batch in enumerate(batches, start=1):
         # 进度：批次开始
@@ -410,15 +817,13 @@ def run_security_analysis(
 - 完成对本批次候选问题的判断后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
 """.strip()
         task_id = f"JARVIS-SEC-Batch-{bidx}"
-        # 为本批次候选增加 1-based 的 id 字段，便于模型在摘要中引用
-        batch_with_ids: List[Dict] = [dict(it, id=i) for i, it in enumerate(batch, start=1)]
         agent_kwargs: Dict = dict(
             system_prompt=system_prompt,
             name=task_id,
             auto_complete=True,
             need_summary=True,
             # 复用现有摘要提示词构建器，candidate 传入批次列表包一层
-            summary_prompt=_build_summary_prompt(task_id, entry_path, langs, {"batch": True, "candidates": batch_with_ids}),
+            summary_prompt=_build_summary_prompt(task_id, entry_path, langs, {"batch": True, "candidates": batch}),
             non_interactive=True,
             in_multi_agent=False,
             use_methodology=False,
@@ -433,14 +838,24 @@ def run_security_analysis(
 
         # 任务上下文（批次）
         import json as _json2
+        # 使用全局 gid 进行验证（不再构造局部 id），并保留 verify
+        batch_ctx: List[Dict] = list(batch)
+        # 聚类上下文：本批次所有候选共享同一“验证条件”，传入验证条件与当前批次的连续 id 列表
+        cluster_verify = str(batch_ctx[0].get("verify") if batch_ctx else "")
+        # cluster_ids_ctx removed (using global gid only)
+        cluster_gids_ctx = [it.get("gid") for it in batch_ctx]
         per_task = f"""
 # 安全子任务批次
 上下文参数：
 - entry_path: {entry_path}
 - languages: {langs}
+- cluster_verification: {cluster_verify}
+
+- cluster_gids: {cluster_gids_ctx}
+- note: 每个候选含 gid/verify 字段，模型仅需输出 gid 统一给出验证/判断结论（全局编号）；无需使用局部 id
 
 批次候选(JSON数组):
-{_json2.dumps(batch_with_ids, ensure_ascii=False, indent=2)}
+{_json2.dumps(batch_ctx, ensure_ascii=False, indent=2)}
 """.strip()
 
         # 订阅 AFTER_SUMMARY，捕获Agent内部生成的摘要
@@ -493,13 +908,12 @@ def run_security_analysis(
             except Exception:
                 pass
 
-            # 解析摘要中的 <REPORT>（JSON/YAML）
+            # 解析摘要中的 <REPORT>（YAML）
             summary_text = summary_container.get("text", "")
             parsed_items: Optional[List] = None
             if summary_text:
                 rep = _try_parse_summary_report(summary_text)
-                if rep is None:
-                    rep = _try_parse_summary_json(summary_text)
+
                 if isinstance(rep, list):
                     parsed_items = rep
                 elif isinstance(rep, dict):
@@ -507,18 +921,18 @@ def run_security_analysis(
                     if isinstance(items, list):
                         parsed_items = items
 
-            # 关键字段校验：当前要求每个元素为 {id:int, preconditions:str, ...}
+            # 关键字段校验：当前要求每个元素为 {gid:int, preconditions:str, ...}
             def _valid_items(items: Optional[List]) -> bool:
                 if not isinstance(items, list):
                     return False
                 for it in items:
                     if not isinstance(it, dict):
                         return False
-                    # 校验 id（批次内从1开始的整数）
-                    if "id" not in it:
+                    # 校验 gid（全局唯一编号，>=1）
+                    if "gid" not in it:
                         return False
                     try:
-                        if int(it["id"]) < 1:
+                        if int(it["gid"]) < 1:
                             return False
                     except Exception:
                         return False
@@ -543,25 +957,35 @@ def run_security_analysis(
         # 重试结束：summary_items 为 None 则视为失败
         # 将检测结果写入报告，并按候选维度写入进度（done）
         if isinstance(summary_items, list):
-            # 将 {id, ...} 映射回批次候选，并合并原始信息
+            # 将 {gid, ...} 映射回批次候选，并合并原始信息（按全局 gid 关联）
             merged_items: List[Dict] = []
-            id_counts: Dict[int, int] = {}
+            gid_counts: Dict[int, int] = {}
             try:
+                # 建立 gid -> candidate 映射
+                gid_to_item_batch: Dict[int, Dict] = {}
+                for it_b in batch:
+                    try:
+                        _g = int(it_b.get("gid", 0))
+                        if _g >= 1:
+                            gid_to_item_batch[_g] = it_b
+                    except Exception:
+                        continue
                 for it in summary_items:
                     if not isinstance(it, dict):
                         continue
                     try:
-                        idx = int(it.get("id", 0))
+                        gid = int(it.get("gid", 0))
                     except Exception:
-                        idx = 0
-                    if 1 <= idx <= len(batch):
-                        cand = dict(batch[idx - 1])
+                        gid = 0
+                    cand_src = gid_to_item_batch.get(gid)
+                    if cand_src:
+                        cand = dict(cand_src)
                         cand["preconditions"] = str(it.get("preconditions", "")).strip()
                         cand["trigger_path"] = str(it.get("trigger_path", "")).strip()
                         cand["consequences"] = str(it.get("consequences", "")).strip()
                         cand["suggestions"] = str(it.get("suggestions", "")).strip()
                         merged_items.append(cand)
-                        id_counts[idx] = id_counts.get(idx, 0) + 1
+                        gid_counts[gid] = gid_counts.get(gid, 0) + 1
             except Exception:
                 pass
 
@@ -581,9 +1005,13 @@ def run_security_analysis(
                     pass
 
             # 为每个候选写入 done 记录（断点续扫用）
-            for i, c in enumerate(batch, start=1):
+            for c in batch:
                 sig = _sig_of(c)
-                cnt = id_counts.get(i, 0)
+                try:
+                    c_gid = int(c.get("gid", 0))
+                except Exception:
+                    c_gid = 0
+                cnt = gid_counts.get(c_gid, 0)
                 _progress_append(
                     {
                         "event": "task_status",
@@ -650,25 +1078,34 @@ def run_security_analysis(
 
         # 将检测结果写入报告，并按候选维度写入进度（done）
         if isinstance(summary_items, list):
-            # 将 {id, reason} 映射回批次候选，并合并原始信息 + reason
+            # 将 {gid, reason} 映射回批次候选，并合并原始信息 + reason
             merged_items: List[Dict] = []
-            id_counts: Dict[int, int] = {}
+            gid_counts: Dict[int, int] = {}
             try:
+                gid_to_item_batch: Dict[int, Dict] = {}
+                for it_b in batch:
+                    try:
+                        _g = int(it_b.get("gid", 0))
+                        if _g >= 1:
+                            gid_to_item_batch[_g] = it_b
+                    except Exception:
+                        continue
                 for it in summary_items:
                     if not isinstance(it, dict):
                         continue
                     try:
-                        idx = int(it.get("id", 0))
+                        gid = int(it.get("gid", 0))
                     except Exception:
-                        idx = 0
-                    if 1 <= idx <= len(batch):
-                        cand = dict(batch[idx - 1])
+                        gid = 0
+                    cand_src = gid_to_item_batch.get(gid)
+                    if cand_src:
+                        cand = dict(cand_src)
                         cand["preconditions"] = str(it.get("preconditions", "")).strip()
                         cand["trigger_path"] = str(it.get("trigger_path", "")).strip()
                         cand["consequences"] = str(it.get("consequences", "")).strip()
                         cand["suggestions"] = str(it.get("suggestions", "")).strip()
                         merged_items.append(cand)
-                        id_counts[idx] = id_counts.get(idx, 0) + 1
+                        gid_counts[gid] = gid_counts.get(gid, 0) + 1
             except Exception:
                 pass
 
@@ -688,9 +1125,13 @@ def run_security_analysis(
                     pass
 
             # 为每个候选写入 done 记录（断点续扫用）
-            for i, c in enumerate(batch, start=1):
+            for c in batch:
                 sig = _sig_of(c)
-                cnt = id_counts.get(i, 0)
+                try:
+                    c_gid = int(c.get("gid", 0))
+                except Exception:
+                    c_gid = 0
+                cnt = gid_counts.get(c_gid, 0)
                 _progress_append(
                     {
                         "event": "task_status",
@@ -760,7 +1201,7 @@ def run_security_analysis(
 
 def _try_parse_summary_report(text: str) -> Optional[object]:
     """
-    从摘要文本中提取 <REPORT>...</REPORT> 内容，并解析为对象（dict 或 list，支持 JSON 或 YAML）。
+    从摘要文本中提取 <REPORT>...</REPORT> 内容，并解析为对象（dict 或 list，仅支持 YAML）。
     - 若提取/解析失败返回 None
     - YAML 解析采用安全模式，若环境无 PyYAML 则忽略
     """
@@ -770,29 +1211,13 @@ def _try_parse_summary_report(text: str) -> Optional[object]:
     if start == -1 or end == -1 or end <= start:
         return None
     content = text[start + len("<REPORT>"):end].strip()
-    # 优先 JSON
-    try:
-        data = _json.loads(content)
-        if isinstance(data, (dict, list)):
-            return data
-    except Exception:
-        pass
-    # 回退 YAML
     try:
         import yaml as _yaml  # type: ignore
         data = _yaml.safe_load(content)
         if isinstance(data, (dict, list)):
             return data
     except Exception:
-        pass
-    # 回退 YAML
-    try:
-        import yaml as _yaml  # type: ignore
-        data = _yaml.safe_load(content)
-        if isinstance(data, dict):
-            return data
-    except Exception:
-        pass
+        return None
     return None
 
 
