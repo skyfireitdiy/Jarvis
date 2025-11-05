@@ -443,13 +443,16 @@ def run_security_analysis(
     _existing_clusters: Dict[tuple[str, int], List[Dict]] = {}
     try:
         from pathlib import Path as _Path2
-        _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.yaml"
+        import json as _json
+        _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
         if _cluster_path.exists():
             try:
-                import yaml as _yaml_exist  # type: ignore
-                _data = _yaml_exist.safe_load(_cluster_path.read_text(encoding="utf-8", errors="ignore"))
-                if isinstance(_data, dict):
-                    for rec in _data.get("clusters", []) or []:
+                with _cluster_path.open("r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        rec = _json.loads(line)
                         if not isinstance(rec, dict):
                             continue
                         f = str(rec.get("file") or "")
@@ -464,44 +467,14 @@ def run_security_analysis(
     def _write_cluster_report_snapshot():
         try:
             from pathlib import Path as _Path2
-            _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.yaml"
+            import json as _json
+            _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
             _cluster_path.parent.mkdir(parents=True, exist_ok=True)
-            _data_obj = {
-                "entry_path": entry_path,
-                "languages": langs,
-                "total_files": len(_file_groups),
-                "total_candidates": len(compact_candidates),
-                "clusters": cluster_records,
-            }
-            try:
-                import yaml as _yaml2  # type: ignore
-                with _cluster_path.open("w", encoding="utf-8") as _cf:
-                    _yaml2.safe_dump(_data_obj, _cf, allow_unicode=True, sort_keys=False)
-            except Exception:
-                # 简单回退：最小可读YAML
-                def _to_yaml(obj, indent=0):
-                    sp = "  " * indent
-                    if isinstance(obj, dict):
-                        lines = []
-                        for k, v in obj.items():
-                            if isinstance(v, (dict, list)):
-                                lines.append(f"{sp}{k}:")
-                                lines.append(_to_yaml(v, indent + 1))
-                            else:
-                                lines.append(f"{sp}{k}: {v!r}".replace("'", '"'))
-                        return "\n".join(lines)
-                    if isinstance(obj, list):
-                        lines = []
-                        for it in obj:
-                            if isinstance(it, (dict, list)):
-                                lines.append(f"{sp}-")
-                                lines.append(_to_yaml(it, indent + 1))
-                            else:
-                                lines.append(f"{sp}- {it!r}".replace("'", '"'))
-                        return "\n".join(lines)
-                    return f"{sp}{obj!r}".replace("'", '"')
-                with _cluster_path.open("w", encoding="utf-8") as _cf:
-                    _cf.write(_to_yaml(_data_obj) + "\n")
+            
+            with _cluster_path.open("w", encoding="utf-8") as f:
+                for record in cluster_records:
+                    f.write(_json.dumps(record, ensure_ascii=False) + "\n")
+
             _progress_append(
                 {
                     "event": "cluster_report_snapshot",
@@ -761,44 +734,14 @@ def run_security_analysis(
     # 聚类报告（汇总所有文件）
     try:
         from pathlib import Path as _Path2
-        _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.yaml"
+        import json as _json
+        _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
         _cluster_path.parent.mkdir(parents=True, exist_ok=True)
-        _data_obj = {
-            "entry_path": entry_path,
-            "languages": langs,
-            "total_files": len(_file_groups),
-            "total_candidates": len(compact_candidates),
-            "clusters": cluster_records,
-        }
-        try:
-            import yaml as _yaml2  # type: ignore
-            with _cluster_path.open("w", encoding="utf-8") as _cf:
-                _yaml2.safe_dump(_data_obj, _cf, allow_unicode=True, sort_keys=False)
-        except Exception:
-            # 简单回退：最小可读YAML
-            def _to_yaml(obj, indent=0):
-                sp = "  " * indent
-                if isinstance(obj, dict):
-                    lines = []
-                    for k, v in obj.items():
-                        if isinstance(v, (dict, list)):
-                            lines.append(f"{sp}{k}:")
-                            lines.append(_to_yaml(v, indent + 1))
-                        else:
-                            lines.append(f"{sp}{k}: {v!r}".replace("'", '"'))
-                    return "\n".join(lines)
-                if isinstance(obj, list):
-                    lines = []
-                    for it in obj:
-                        if isinstance(it, (dict, list)):
-                            lines.append(f"{sp}-")
-                            lines.append(_to_yaml(it, indent + 1))
-                        else:
-                            lines.append(f"{sp}- {it!r}".replace("'", '"'))
-                    return "\n".join(lines)
-                return f"{sp}{obj!r}".replace("'", '"')
-            with _cluster_path.open("w", encoding="utf-8") as _cf:
-                _cf.write(_to_yaml(_data_obj) + "\n")
+
+        with _cluster_path.open("w", encoding="utf-8") as f:
+            for record in cluster_records:
+                f.write(_json.dumps(record, ensure_ascii=False) + "\n")
+
         _progress_append(
             {
                 "event": "cluster_report_written",
