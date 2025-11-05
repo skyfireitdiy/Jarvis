@@ -401,8 +401,7 @@ def run_security_analysis(
         # 构造 Agent（单次处理一批候选）
         system_prompt = """
 # 单Agent安全分析约束
-- 你的核心任务是评估代码的安全问题。
-- 仅围绕输入候选的位置进行验证与细化；避免无关扩展与大范围遍历。
+- 你的核心任务是评估代码的安全问题，目标：针对本候选问题进行证据核实、风险评估与修复建议补充，查找漏洞触发路径，确认在某些条件下会触发；以此来判断是否是漏洞。
 - 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
 - 若多条告警位于同一文件且行号相距不远，可一次性读取共享上下文，对这些相邻告警进行联合分析与判断；但仍需避免无关扩展与大范围遍历。
 - 禁止修改任何文件或执行写操作命令（rm/mv/cp/echo >、sed -i、git、patch、chmod、chown 等）；仅进行只读分析与读取。
@@ -434,18 +433,13 @@ def run_security_analysis(
         # 任务上下文（批次）
         import json as _json2
         per_task = f"""
-# 安全子任务批次（多点验证）
-目标：针对本批次候选问题进行证据核实、风险评估与修复建议补充；若确认误报，对应候选不返回问题。
+# 安全子任务批次
 上下文参数：
 - entry_path: {entry_path}
 - languages: {langs}
 
 批次候选(JSON数组):
 {_json2.dumps(batch_with_ids, ensure_ascii=False, indent=2)}
-
-操作建议：
-- 使用 read_code 读取目标文件（尽量提供绝对路径或以 entry_path 拼接），围绕各候选行号上下各约50行。
-- 若需搜索更多线索，可使用 execute_script 调用 rg/find 对目标文件进行局部检索。
 """.strip()
 
         # 订阅 AFTER_SUMMARY，捕获Agent内部生成的摘要
