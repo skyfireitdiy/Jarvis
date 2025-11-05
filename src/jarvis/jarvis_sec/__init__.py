@@ -282,7 +282,7 @@ def run_security_analysis(
 
     if _heuristic_path.exists():
         try:
-            print(f"[JARVIS-SEC] Resuming heuristic scan from {_heuristic_path}")
+            print(f"[JARVIS-SEC] 从 {_heuristic_path} 恢复启发式扫描")
             with _heuristic_path.open("r", encoding="utf-8") as f:
                 for line in f:
                     if line.strip():
@@ -293,7 +293,7 @@ def run_security_analysis(
                 "issues_found": len(candidates)
             })
         except Exception as e:
-            print(f"[JARVIS-SEC] Failed to resume heuristic scan, performing full scan: {e}")
+            print(f"[JARVIS-SEC] 恢复启发式扫描失败，执行完整扫描: {e}")
             candidates = []  # 重置以便执行完整扫描
 
     if not candidates:
@@ -319,7 +319,7 @@ def run_security_analysis(
                 "path": str(_heuristic_path),
                 "issues_count": len(candidates),
             })
-            print(f"[JARVIS-SEC] Wrote {len(candidates)} heuristic issue(s) to {_heuristic_path}")
+            print(f"[JARVIS-SEC] 已将 {len(candidates)} 个启发式扫描问题写入 {_heuristic_path}")
         except Exception:
             pass
 
@@ -360,7 +360,7 @@ def run_security_analysis(
             # 为实现“所有告警分批处理”，此处不截断；后续改为按“聚类”逐个提交给验证Agent（不再使用 batch_limit）
             selected_candidates = items
             try:
-                print(f"[JARVIS-SEC] batch selection: file={selected_file} count={len(selected_candidates)}/{len(items)}")
+                print(f"[JARVIS-SEC] 批次选择: 文件={selected_file} 数量={len(selected_candidates)}/{len(items)}")
             except Exception:
                 pass
             # 记录批次选择信息
@@ -398,7 +398,7 @@ def run_security_analysis(
                     line = json.dumps(item, ensure_ascii=False)
                     f.write(line + "\n")
             try:
-                print(f"[JARVIS-SEC] write {len(items)} issue(s) to {path}")
+                print(f"[JARVIS-SEC] 已将 {len(items)} 个问题写入 {path}")
             except Exception:
                 pass
         except Exception:
@@ -513,7 +513,9 @@ def run_security_analysis(
         except Exception:
             pass
 
-    for _file, _items in _file_groups.items():
+    total_files_to_cluster = len(_file_groups)
+    for _file_idx, (_file, _items) in enumerate(_file_groups.items(), start=1):
+        print(f"\n[JARVIS-SEC] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}")
         # 过滤掉已完成
         pending_in_file: List[Dict] = []
         for c in _items:
@@ -837,7 +839,7 @@ def run_security_analysis(
 
         # 显示进度
         try:
-            print(f"[JARVIS-SEC] Batch {bidx}/{total_batches}: size={len(batch)} file={batch[0].get('file') if batch else 'N/A'}")
+            print(f"\n[JARVIS-SEC] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch[0].get('file') if batch else 'N/A'}'")
         except Exception:
             pass
 
@@ -938,7 +940,7 @@ def run_security_analysis(
                 )
                 if _changed:
                     try:
-                        print(f"[JARVIS-SEC] workspace restored ({_changed} file(s)) via: git checkout -- .")
+                        print(f"[JARVIS-SEC] 工作区已恢复 ({_changed} 个文件)，操作: git checkout -- .")
                     except Exception:
                         pass
             except Exception:
@@ -990,7 +992,7 @@ def run_security_analysis(
             else:
                 # 本次尝试失败：打印并准备重试
                 try:
-                    print(f"[JARVIS-SEC] batch summary invalid -> retry {attempt + 1}/{max_retries} (batch={bidx})")
+                    print(f"[JARVIS-SEC] 批次摘要无效 -> 重试 {attempt + 1}/{max_retries} (批次={bidx})")
                 except Exception:
                     pass
 
@@ -1023,12 +1025,12 @@ def run_security_analysis(
         # 汇总并报告
         if merged_items:
             all_issues.extend(merged_items)
-            print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(merged_items)} -> append report (summary)")
+            print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 发现问题: 数量={len(merged_items)} -> 追加到报告")
             _append_report(merged_items, "summary", task_id, {"batch": True, "candidates": batch})
         elif parse_fail:
-            print(f"[JARVIS-SEC] batch parse-fail {bidx}/{total_batches} (no <REPORT>/invalid fields in summary)")
+            print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)")
         else:
-            print(f"[JARVIS-SEC] batch no-issue {bidx}/{total_batches}")
+            print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 未发现问题")
 
         # 为本批次所有候选写入 done 记录（无论成功失败，都标记为已处理）
         for c in batch:
