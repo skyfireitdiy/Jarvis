@@ -74,54 +74,6 @@ def _iter_source_files(
             yield p.relative_to(entry)
 
 
-def _try_rg_search(pattern: str, files: List[Path], cwd: Path) -> List[Tuple[Path, int, str]]:
-    """
-    使用 rg -n PATTERN file1 file2 ... 搜索，返回 (file, line, text)。
-    若 rg 不可用或失败，返回空列表。
-    """
-    if not files:
-        return []
-    if not _rg_available():
-        return []
-
-    # rg 命令长度有限，分批执行
-    results: List[Tuple[Path, int, str]] = []
-    batch_size = 200
-    for i in range(0, len(files), batch_size):
-        batch = files[i : i + batch_size]
-        cmd = ["rg", "-n", pattern] + [str(cwd / f) for f in batch]
-        try:
-            proc = subprocess.run(
-                cmd, cwd=str(cwd), capture_output=True, text=True, check=False
-            )
-            if proc.returncode in (0, 1):  # 0: 有匹配；1: 无匹配
-                out = proc.stdout.splitlines()
-                for line in out:
-                    # 解析: path:lineno:content
-                    # 注意: Windows 路径中可能含冒号，这里采用从右侧第一次冒号分割两次的方案
-                    parts = line.split(":", 2)
-                    if len(parts) < 3:
-                        continue
-                    fpath = Path(parts[0])
-                    try:
-                        lineno = int(parts[1])
-                    except ValueError:
-                        continue
-                    text = parts[2]
-                    try:
-                        rel = fpath.relative_to(cwd)
-                    except Exception:
-                        # 回退：将绝对路径转相对路径
-                        try:
-                            rel = Path(os.path.relpath(fpath, cwd))
-                        except Exception:
-                            rel = fpath
-                    results.append((rel, lineno, text))
-        except Exception:
-            # 忽略 rg 错误，交由纯Python扫描兜底
-            return []
-    return results
-
 
 # ---------------------------
 # 汇总与报告

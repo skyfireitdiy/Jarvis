@@ -23,133 +23,13 @@ from typing import Dict, List, Optional
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_sec.workflow import direct_scan, run_with_agent
 from jarvis.jarvis_tools.registry import ToolRegistry
-import re
 
 
-
-def _try_parse_issues_from_text(text: str) -> Optional[List[Dict]]:
-    """
-    尝试从模型输出中解析出 {"issues": [...]}，宽松容错：
-    1) 直接作为完整JSON解析
-    2) 从 ```json ... ``` 或 ``` ... ``` 代码块中提取JSON解析
-    3) 从首个 { 开始进行大括号配对截取后解析
-
-    返回:
-    - 成功解析到 issues 列表则返回该列表（可为空列表）
-    - 未能解析则返回 None
-    """
-    import json
-    import re
-
-    # 尝试直接解析
-    try:
-        data = json.loads(text)
-        items = data.get("issues", [])
-        if isinstance(items, list):
-            return items
-    except Exception:
-        pass
-
-    # 尝试从代码块提取
-    try:
-        m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL | re.IGNORECASE)
-        if m:
-            data = json.loads(m.group(1))
-            items = data.get("issues", [])
-            if isinstance(items, list):
-                return items
-    except Exception:
-        pass
-
-    # 尝试基于大括号配对截取首个JSON对象
-    try:
-        start = text.find("{")
-        if start != -1:
-            stack = 0
-            end = None
-            for i, ch in enumerate(text[start:], start=start):
-                if ch == "{":
-                    stack += 1
-                elif ch == "}":
-                    stack -= 1
-                    if stack == 0:
-                        end = i + 1
-                        break
-            if end:
-                snippet = text[start:end]
-                data = json.loads(snippet)
-                items = data.get("issues", [])
-                if isinstance(items, list):
-                    return items
-    except Exception:
-        pass
-
-    return None
-
-
-def _try_parse_summary_json(text: str) -> Optional[Dict]:
-    """
-    从模型摘要文本中尽力提取严格 JSON 对象（非仅 issues 列表）。
-    解析顺序：
-    1) 直接 JSON
-    2) ```json ...``` 或 ```...``` 代码块中的 JSON
-    3) 基于首个花括号的配对截取 JSON 对象
-    成功时返回解析后的 dict；失败返回 None
-    """
-    import json
-    import re
-
-    # 直接解析
-    try:
-        data = json.loads(text)
-        if isinstance(data, dict):
-            return data
-    except Exception:
-        pass
-
-    # 代码块提取
-    try:
-        m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL | re.IGNORECASE)
-        if m:
-            data = json.loads(m.group(1))
-            if isinstance(data, dict):
-                return data
-    except Exception:
-        pass
-
-    # 花括号配对截取
-    try:
-        start = text.find("{")
-        if start != -1:
-            stack = 0
-            end = None
-            for i, ch in enumerate(text[start:], start=start):
-                if ch == "{":
-                    stack += 1
-                elif ch == "}":
-                    stack -= 1
-                    if stack == 0:
-                        end = i + 1
-                        break
-            if end:
-                snippet = text[start:end]
-                data = json.loads(snippet)
-                if isinstance(data, dict):
-                    return data
-    except Exception:
-        pass
-
-    return None
-
-
-def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], candidate: Dict) -> str:
+def _build_summary_prompt() -> str:
     """
     构建摘要提示词：要求以 <REPORT>...</REPORT> 包裹的 YAML 输出（仅YAML）。
     系统提示词不强制规定主对话输出格式，仅在摘要中给出结构化结果。
     """
-    import json as _json
-    cand_json = _json.dumps(candidate, ensure_ascii=False, indent=2)
-    langs_json = _json.dumps(languages, ensure_ascii=False)
     return f"""
 请将本轮“安全子任务（单点验证）”的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出：
 <REPORT>
@@ -804,7 +684,7 @@ def run_security_analysis(
             auto_complete=True,
             need_summary=True,
             # 复用现有摘要提示词构建器，candidate 传入批次列表包一层
-            summary_prompt=_build_summary_prompt(task_id, entry_path, langs, {"batch": True, "candidates": batch}),
+            summary_prompt=_build_summary_prompt(),
             non_interactive=True,
             in_multi_agent=False,
             use_methodology=False,
