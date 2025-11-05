@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-OpenHarmony 安全分析套件
+Jarvis 安全分析套件
 
 当前版本概述：
 - 关键路径：直扫（direct_scan）→ 单Agent逐条验证（只读工具：read_code/execute_script）→ 聚合输出（JSON + Markdown）
@@ -179,7 +179,7 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
 
 
 # 注：当前版本不使用 MultiAgent 编排，已移除默认多智能体配置与创建函数。
-# 请使用 run_security_analysis（单Agent逐条验证）或 workflow.run_security_analysis_fast（直扫基线）。 
+# 请使用 run_security_analysis（单Agent逐条验证）或 workflow.direct_scan + format_markdown_report（直扫基线）。 
 
 def _git_restore_if_dirty(repo_root: str) -> int:
     """

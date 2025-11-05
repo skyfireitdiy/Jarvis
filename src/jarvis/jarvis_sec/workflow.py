@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-OpenHarmony 安全分析套件 —— Workflow（含可复现直扫基线）
+Jarvis 安全分析套件 —— Workflow（含可复现直扫基线）
 
 目标：
 - 识别指定模块的安全问题（内存管理、缓冲区操作、错误处理等），检出率≥60% 为目标。
@@ -184,7 +184,7 @@ def format_markdown_report(result_json: Dict) -> str:
     s = result_json.get("summary", {})
     issues: List[Dict] = result_json.get("issues", [])
     md: List[str] = []
-    md.append("# OpenHarmony 安全问题分析报告（直扫基线）")
+    md.append("# Jarvis 安全问题分析报告（直扫基线）")
     md.append("")
     md.append(f"- 扫描根目录: {s.get('scanned_root', '')}")
     md.append(f"- 扫描文件数: {s.get('scanned_files', 0)}")
@@ -240,37 +240,10 @@ def run_with_agent(
         cluster_limit=cluster_limit,
     )
 
-    entry_path: str,
-    languages: Optional[List[str]] = None,
-    llm_group: Optional[str] = None,
-    report_file: Optional[str] = None,
-    cluster_limit: int = 50,
-) -> str:
-    """
-    使用单Agent逐条子任务分析模式运行（与 jarvis.jarvis_sec.__init__ 中保持一致）。
-    - 先执行本地直扫，生成候选问题
-    - 为每条候选创建一次普通Agent任务进行分析与验证
-    - 聚合为最终报告（JSON + Markdown）返回
-
-    其他：
-    - llm_group: 本次分析使用的模型组（仅透传给 Agent，不修改全局配置）
-    - report_file: JSONL 报告文件路径（可选，透传）
-    - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
-    """
-    from jarvis.jarvis_sec import run_security_analysis  # 延迟导入，避免循环
-    return run_security_analysis(
-        entry_path,
-        languages=languages,
-        llm_group=llm_group,
-        report_file=report_file,
-        cluster_limit=cluster_limit,
-    )
-
 
 __all__ = [
     "Issue",
     "direct_scan",
     "format_markdown_report",
-    
     "run_with_agent",
 ]

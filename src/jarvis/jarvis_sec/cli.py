@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-OpenHarmony 安全演进套件 —— 命令行入口（Typer 版本）
+Jarvis 安全演进套件 —— 命令行入口（Typer 版本）
 
 用法示例：
 - Agent模式（单Agent，逐条子任务分析）
@@ -20,12 +20,12 @@ from typing import Optional
 import typer
 from jarvis.jarvis_utils.utils import init_env
 # removed: set_config import（避免全局覆盖模型组配置）
-from jarvis.jarvis_sec.workflow import run_with_agent, run_security_analysis_fast
+from jarvis.jarvis_sec.workflow import run_with_agent, direct_scan, format_markdown_report
 
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="OpenHarmony 安全演进套件（单Agent逐条子任务分析）",
+    help="Jarvis 安全演进套件（单Agent逐条子任务分析）",
 )
 
 
@@ -48,7 +48,7 @@ def agent(
 ) -> None:
     # 初始化环境，确保平台/模型等全局配置就绪（避免 NoneType 平台）
     try:
-        init_env("欢迎使用 Jarvis-OpenHarmony 安全套件！", None)
+        init_env("欢迎使用 Jarvis 安全套件！", None)
     except Exception:
         # 环境初始化失败不应阻塞CLI基础功能，继续后续流程
         pass
@@ -75,7 +75,8 @@ def agent(
             typer.secho("[jarvis_sec] Agent 无输出，回退到直扫基线（fast）。", fg=typer.colors.YELLOW, err=True)
         except Exception:
             pass
-        text = run_security_analysis_fast(path)
+        result = direct_scan(path)
+        text = format_markdown_report(result)
 
     if output:
         try:
@@ -84,7 +85,7 @@ def agent(
                 lines = (text or "").splitlines()
                 idx = -1
                 for i, ln in enumerate(lines):
-                    if ln.strip().startswith("# OpenHarmony 安全问题分析报告"):
+                    if ln.strip().startswith("# Jarvis 安全问题分析报告"):
                         idx = i
                         break
                 if idx >= 0:

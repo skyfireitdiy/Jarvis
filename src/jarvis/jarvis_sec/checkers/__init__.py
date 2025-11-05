@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-OpenHarmony 安全演进多Agent套件 —— Checkers 包初始化
+Jarvis 安全演进多Agent套件 —— Checkers 包初始化
 
 说明：
 - 统一导出 C/C++ 与 Rust 启发式检查器的对外接口，便于上层工作流按需调用。

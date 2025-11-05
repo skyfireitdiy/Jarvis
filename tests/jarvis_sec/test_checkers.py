@@ -22,8 +22,8 @@ from jarvis.jarvis_sec.checkers import (
     analyze_c_cpp_text,
     analyze_rust_text,
 )
-from jarvis.jarvis_sec.workflow import direct_scan, run_security_analysis_fast
-from jarvis.jarvis_sec.report import aggregate_issues, format_markdown_report, build_json_and_markdown
+from jarvis.jarvis_sec.workflow import direct_scan, format_markdown_report
+from jarvis.jarvis_sec.report import aggregate_issues, build_json_and_markdown
 
 
 def test_c_checker_detects_multiple_categories():
@@ -157,11 +157,11 @@ def test_report_aggregate_and_markdown():
     assert report["summary"]["by_language"]["c/cpp"] >= 1
     assert report["summary"]["by_language"]["rust"] >= 1
     md = format_markdown_report(report)
-    assert "# OpenHarmony 安全问题分析报告" in md
+    assert "# 安全问题分析报告（聚合）" in md
     assert "Top 风险文件" in md or "详细问题" in md
 
 
-def test_run_security_analysis_fast_returns_json_and_markdown(tmp_path: Path):
+def test_direct_scan_and_format_markdown(tmp_path: Path):
     # 构造临时项目
     project = tmp_path / "proj2"
     project.mkdir()
@@ -169,20 +169,15 @@ def test_run_security_analysis_fast_returns_json_and_markdown(tmp_path: Path):
         "#include <stdio.h>\nvoid f(){ char b[4]; sprintf(b, \"%s\", \"x\"); }",
         encoding="utf-8",
     )
-    text = run_security_analysis_fast(str(project))
-    # JSON + Markdown 拼接输出
-    # 验证前若干字符可被解析为 JSON
-    first_newline = text.find("\n")
-    assert first_newline > 0
-    # 取开头的 JSON 对象（到第一个空行前）
-    parts = text.split("\n\n", 1)
-    json_part = parts[0]
-    parsed = json.loads(json_part)
-    assert isinstance(parsed, dict)
-    assert parsed.get("summary", {}).get("total", 0) >= 1
-    # 后半段应包含 Markdown 报告标题
-    if len(parts) > 1:
-        assert "OpenHarmony 安全问题分析报告" in parts[1]
+    result = direct_scan(str(project))
+    text = format_markdown_report(result)
+    # 验证 Markdown 格式报告
+    assert text.startswith("# Jarvis 安全问题分析报告（直扫基线）")
+    assert "- 扫描根目录:" in text
+    assert "- 扫描文件数:" in text
+    assert "- 检出问题总数:" in text
+    assert "## 统计概览" in text
+    assert "## 详细问题" in text
 
 
 def test_c_checker_new_rules_batch():
