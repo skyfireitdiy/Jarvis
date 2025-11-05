@@ -11,8 +11,8 @@ OpenHarmony 安全分析套件 —— Rust 启发式安全检查器
 - 置信度区间 [0,1]；严重性（severity）分为 high/medium/low。
 
 使用方式：
-- from jarvis.jarvis_sec.checkers.rust_checker import analyze_files
-- issues = analyze_files("./repo", ["src/lib.rs", "src/foo.rs"])
+- from jarvis.jarvis_sec.checkers.rust_checker import analyze_rust_files
+- issues = analyze_rust_files("./repo", ["src/lib.rs", "src/foo.rs"])
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import re
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
-from jarvis.jarvis_sec.types import Issue
+from ..types import Issue
 
 
 # ---------------------------
@@ -393,13 +393,13 @@ def analyze_rust_file(base: Path, relpath: Path) -> List[Issue]:
     return analyze_rust_text(str(relpath), text)
 
 
-def analyze_files(base_path: str, files: Iterable[str]) -> List[Issue]:
+def analyze_rust_files(base_path: str, relative_paths: List[str]) -> List[Issue]:
     """
     批量分析文件，相对路径相对于 base_path。
     """
     base = Path(base_path).resolve()
     out: List[Issue] = []
-    for f in files:
+    for f in relative_paths:
         p = Path(f)
         if p.suffix.lower() == ".rs":
             out.extend(analyze_rust_file(base, p))
