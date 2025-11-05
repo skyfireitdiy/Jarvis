@@ -15,7 +15,7 @@ from .c_checker import (
     analyze_c_cpp_text,
 )
 from .rust_checker import (
-    analyze_files as analyze_rust_files,
+    analyze_rust_files,
     analyze_rust_file,
     analyze_rust_text,
 )
