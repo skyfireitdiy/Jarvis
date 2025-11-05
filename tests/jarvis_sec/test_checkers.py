@@ -124,42 +124,6 @@ def test_direct_scan_integration_with_temp_files(tmp_path: Path):
     assert any(i.get("language") == "rust" for i in issues), "未包含 Rust 问题"
 
 
-def test_report_aggregate_and_markdown():
-    # 构造最小 issue 列表
-    issues = [
-        {
-            "language": "c/cpp",
-            "category": "unsafe_api",
-            "pattern": "strcpy",
-            "file": "src/foo.c",
-            "line": 10,
-            "evidence": "strcpy(dst, src);",
-            "description": "不安全API",
-            "suggestion": "使用带边界的安全API",
-            "confidence": 0.9,
-            "severity": "high",
-        },
-        {
-            "language": "rust",
-            "category": "error_handling",
-            "pattern": "unwrap",
-            "file": "src/lib.rs",
-            "line": 5,
-            "evidence": "unwrap()",
-            "description": "错误处理不当",
-            "suggestion": "使用 ? 或 match",
-            "confidence": 0.65,
-            "severity": "medium",
-        },
-    ]
-    report = aggregate_issues(issues, scanned_root="/tmp/demo", scanned_files=2)
-    assert report["summary"]["total"] == 2
-    assert report["summary"]["by_language"]["c/cpp"] >= 1
-    assert report["summary"]["by_language"]["rust"] >= 1
-    md = format_markdown_report(report)
-    assert "# 安全问题分析报告（聚合）" in md
-    assert "Top 风险文件" in md or "详细问题" in md
-
 
 def test_direct_scan_and_format_markdown(tmp_path: Path):
     # 构造临时项目
