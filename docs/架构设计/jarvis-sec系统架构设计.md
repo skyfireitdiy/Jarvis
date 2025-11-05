@@ -250,7 +250,6 @@ CLI --> User : 写入文件并输出摘要
 
 关键接口（源码参考）
 - _iter_source_files：递归枚举源文件，支持扩展名过滤与目录排除
-- _try_rg_search：使用 ripgrep 辅助搜索（可选，若不可用则回退）
 - direct_scan：主入口，调用检查器并汇总统计
 
 流程（PlantUML）
