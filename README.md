@@ -177,6 +177,8 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 | `jarvis-smart-shell` | `jss` | 实验性的智能Shell功能 |
 | `jarvis-stats` | `jst` | 通用统计模块，支持记录和可视化任意指标数据 |
 | `jarvis-memory-organizer` | `jmo` | 记忆管理工具，支持整理、合并、导入导出记忆 |
+| `jarvis-sec` | `jsec` | 安全分析套件，对代码工程进行安全扫描和分析 |
+| `jarvis-c2rust` | `jc2r` | C→Rust 迁移套件，将 C/C++ 代码迁移到 Rust |
 
 更多详细用法和参数，请查阅我们的 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
