@@ -61,6 +61,10 @@ COMMAND_MAPPING = {
     "jst": "jarvis-stats",
     # 记忆整理
     "jmo": "jarvis-memory-organizer",
+    # 安全分析
+    "jsec": "jarvis-sec",
+    # C2Rust迁移
+    "jc2r": "jarvis-c2rust",
 }
 
 # RAG 依赖检测工具函数（更精确）
