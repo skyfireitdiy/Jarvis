@@ -335,32 +335,20 @@ def run_security_analysis(
     # 将检测出的 issues 增量写入报告文件（JSONL），便于长任务中途查看
     def _append_report(items, source: str, task_id: str, cand: Dict):
         """
-        将当前子任务的检测结果追加写入 JSONL 报告文件（每行一个JSON对象）。
+        将当前子任务的检测结果追加写入 JSONL 报告文件（每行一个 issue）。
         仅当 items 非空时写入。
-        source: "summary" | "output_fallback"
         """
         if not items:
             return
         try:
             from pathlib import Path as _Path
-            from datetime import datetime as _dt
 
             path = _Path(report_file) if report_file else _Path(entry_path) / ".jarvis/sec" / "agent_issues.jsonl"
             path.parent.mkdir(parents=True, exist_ok=True)
-            rec = {
-                "task_id": task_id,
-                "candidate": cand,
-                "issues": items,
-                "meta": {
-                    "entry_path": entry_path,
-                    "languages": langs,
-                    "source": source,
-                    "timestamp": _dt.utcnow().isoformat() + "Z",
-                },
-            }
-            line = json.dumps(rec, ensure_ascii=False)
             with path.open("a", encoding="utf-8") as f:
-                f.write(line + "\n")
+                for item in items:
+                    line = json.dumps(item, ensure_ascii=False)
+                    f.write(line + "\n")
             try:
                 print(f"[JARVIS-SEC] write {len(items)} issue(s) to {path}")
             except Exception:
