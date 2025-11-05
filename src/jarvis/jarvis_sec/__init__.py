@@ -11,7 +11,7 @@ OpenHarmony 安全分析套件
 - 复用 jarvis.jarvis_agent.Agent 与工具注册系统（jarvis.jarvis_tools.registry.ToolRegistry）
 - 提供入口：
   - run_security_analysis(entry_path, ...)：直扫 + 单Agent逐条验证 + 聚合
-  - workflow.run_security_analysis_fast(entry_path, ...)：直扫基线（不经 LLM 验证）
+
   - workflow.direct_scan(entry_path, ...)：仅启发式直扫
 
 说明：
@@ -21,7 +21,7 @@ OpenHarmony 安全分析套件
 from typing import Dict, List, Optional
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_sec.workflow import run_security_analysis_fast, direct_scan, run_with_agent
+from jarvis.jarvis_sec.workflow import direct_scan, run_with_agent
 from jarvis.jarvis_tools.registry import ToolRegistry
 import re
 
@@ -1045,7 +1045,7 @@ def _try_parse_summary_report(text: str) -> Optional[object]:
 __all__ = [
     
     "run_security_analysis",
-    "run_security_analysis_fast",
+
     "direct_scan",
     "run_with_agent",
 ]

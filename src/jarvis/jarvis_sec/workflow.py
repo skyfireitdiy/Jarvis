@@ -10,7 +10,7 @@ OpenHarmony 安全分析套件 —— Workflow（含可复现直扫基线）
 本模块提供：
 - direct_scan(entry_path, languages=None, exclude_dirs=None) -> Dict：纯Python+正则/命令行辅助扫描，生成结构化结果
 - format_markdown_report(result_json: Dict) -> str：将结构化结果转为可读的 Markdown
-- run_security_analysis_fast(entry_path, languages=None, exclude_dirs=None) -> str：一键运行直扫并输出（JSON + Markdown）
+
 - run_with_agent(entry_path, languages=None) -> str：使用单Agent逐条子任务分析模式（复用 jarvis.jarvis_sec.__init__ 的实现）
 """
 
@@ -22,7 +22,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
 from jarvis.jarvis_sec.checkers import analyze_c_files, analyze_rust_files
-from jarvis.jarvis_sec.report import build_json_and_markdown
+
 from jarvis.jarvis_sec.types import Issue
 
 
@@ -213,27 +213,33 @@ def format_markdown_report(result_json: Dict) -> str:
     return "\n".join(md)
 
 
-def run_security_analysis_fast(
+def run_with_agent(
     entry_path: str,
     languages: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
+    llm_group: Optional[str] = None,
+    report_file: Optional[str] = None,
+    cluster_limit: int = 50,
 ) -> str:
     """
-    一键运行直扫基线，返回 JSON + Markdown 文本。
-    - 改进：使用统一的报告聚合与评分模块（oh_sec.report.build_json_and_markdown），
-      输出结构与多Agent Aggregator一致，便于评测与专家审阅。
+    使用单Agent逐条子任务分析模式运行（与 jarvis.jarvis_sec.__init__ 中保持一致）。
+    - 先执行本地直扫，生成候选问题
+    - 为每条候选创建一次普通Agent任务进行分析与验证
+    - 聚合为最终报告（JSON + Markdown）返回
+
+    其他：
+    - llm_group: 本次分析使用的模型组（仅透传给 Agent，不修改全局配置）
+    - report_file: JSONL 报告文件路径（可选，透传）
+    - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
     """
-    result = direct_scan(entry_path, languages=languages, exclude_dirs=exclude_dirs)
-    summary = result.get("summary", {})
-    issues = result.get("issues", [])
-    return build_json_and_markdown(
-        issues,
-        scanned_root=summary.get("scanned_root"),
-        scanned_files=summary.get("scanned_files"),
+    from jarvis.jarvis_sec import run_security_analysis  # 延迟导入，避免循环
+    return run_security_analysis(
+        entry_path,
+        languages=languages,
+        llm_group=llm_group,
+        report_file=report_file,
+        cluster_limit=cluster_limit,
     )
 
-
-def run_with_agent(
     entry_path: str,
     languages: Optional[List[str]] = None,
     llm_group: Optional[str] = None,
@@ -265,6 +271,6 @@ __all__ = [
     "Issue",
     "direct_scan",
     "format_markdown_report",
-    "run_security_analysis_fast",
+    
     "run_with_agent",
 ]
