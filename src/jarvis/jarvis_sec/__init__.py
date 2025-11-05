@@ -274,18 +274,54 @@ def run_security_analysis(
         except Exception:
             pass
 
-    # 1) 本地直扫，生成初始候选（不可完全依赖Agent进行发现）
-    _progress_append({"event": "pre_scan_start", "entry_path": entry_path, "languages": langs})
-    pre_scan = direct_scan(entry_path, languages=langs)
-    candidates = pre_scan.get("issues", [])
-    summary = pre_scan.get("summary", {})
-    _progress_append({
-        "event": "pre_scan_done",
-        "entry_path": entry_path,
-        "languages": langs,
-        "scanned_files": summary.get("scanned_files"),
-        "issues_found": len(candidates)
-    })
+    # 1) 启发式扫描（支持断点续扫）
+    from pathlib import Path as _Path
+    _heuristic_path = _Path(entry_path) / ".jarvis/sec" / "heuristic_issues.jsonl"
+    candidates: List[Dict] = []
+    summary: Dict = {}
+
+    if resume and _heuristic_path.exists():
+        try:
+            print(f"[JARVIS-SEC] Resuming heuristic scan from {_heuristic_path}")
+            with _heuristic_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        candidates.append(json.loads(line))
+            _progress_append({
+                "event": "pre_scan_resumed",
+                "path": str(_heuristic_path),
+                "issues_found": len(candidates)
+            })
+        except Exception as e:
+            print(f"[JARVIS-SEC] Failed to resume heuristic scan, performing full scan: {e}")
+            candidates = []  # 重置以便执行完整扫描
+
+    if not candidates:
+        _progress_append({"event": "pre_scan_start", "entry_path": entry_path, "languages": langs})
+        pre_scan = direct_scan(entry_path, languages=langs)
+        candidates = pre_scan.get("issues", [])
+        summary = pre_scan.get("summary", {})
+        _progress_append({
+            "event": "pre_scan_done",
+            "entry_path": entry_path,
+            "languages": langs,
+            "scanned_files": summary.get("scanned_files"),
+            "issues_found": len(candidates)
+        })
+        # 持久化
+        try:
+            _heuristic_path.parent.mkdir(parents=True, exist_ok=True)
+            with _heuristic_path.open("w", encoding="utf-8") as f:
+                for item in candidates:
+                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
+            _progress_append({
+                "event": "heuristic_report_written",
+                "path": str(_heuristic_path),
+                "issues_count": len(candidates),
+            })
+            print(f"[JARVIS-SEC] Wrote {len(candidates)} heuristic issue(s) to {_heuristic_path}")
+        except Exception:
+            pass
 
     # 2) 将候选问题精简为子任务清单，控制上下文长度
     def _compact(it: Dict) -> Dict:
