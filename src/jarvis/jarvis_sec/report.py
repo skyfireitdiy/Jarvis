@@ -27,7 +27,7 @@
       "line": 123,
       "evidence": "strcpy(dst, src);",
       "preconditions": "N/A",
-      "trigger_conditions": "调用不安全的 strcpy 函数",
+      "trigger_path": "函数 foobar 调用 strcpy 时，其输入 src 来自于未经校验的网络数据包",
       "consequences": "可能导致缓冲区溢出",
       "suggestions": "使用 strncpy_s 或其他安全函数替代",
       "confidence": 0.85,
@@ -91,7 +91,7 @@ def _as_dict(item: Union[Issue, Dict]) -> Dict:
         "line",
         "evidence",
         "preconditions",
-        "trigger_conditions",
+        "trigger_path",
         "consequences",
         "suggestions",
         "confidence",
@@ -115,7 +115,7 @@ def _normalize_issue(i: Dict) -> Dict:
         "line": int(i.get("line", 0) or 0),
         "evidence": i.get("evidence", ""),
         "preconditions": i.get("preconditions", ""),
-        "trigger_conditions": i.get("trigger_conditions", ""),
+        "trigger_path": i.get("trigger_path", ""),
         "consequences": i.get("consequences", ""),
         "suggestions": i.get("suggestions", ""),
         "confidence": float(i.get("confidence", 0.6)),
@@ -223,7 +223,7 @@ def format_markdown_report(report_json: Dict) -> str:
         lines.append(f"- 模式: {it.get('pattern')}")
         lines.append(f"- 证据: `{it.get('evidence')}`")
         lines.append(f"- 前置条件: {it.get('preconditions')}")
-        lines.append(f"- 触发条件: {it.get('trigger_conditions')}")
+        lines.append(f"- 触发路径: {it.get('trigger_path')}")
         lines.append(f"- 后果: {it.get('consequences')}")
         lines.append(f"- 建议: {it.get('suggestions')}")
         lines.append(f"- 置信度: {it.get('confidence')}, 严重性: {it.get('severity')}, 评分: {it.get('score')}")

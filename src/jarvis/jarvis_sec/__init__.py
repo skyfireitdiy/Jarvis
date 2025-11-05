@@ -25,8 +25,6 @@ from jarvis.jarvis_sec.workflow import run_security_analysis_fast, direct_scan, 
 from jarvis.jarvis_tools.registry import ToolRegistry
 
 
-  
-
 
 def _try_parse_issues_from_text(text: str) -> Optional[List[Dict]]:
     """
@@ -158,8 +156,8 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
 # 示例：
 # - id: 1
 #   preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
-#   trigger_conditions: "调用 strcpy 时未进行长度检查"
-#   consequences: "可能导致缓冲区溢出，引发程序崩溃或任意代码执行"
+#   trigger_path: "函数 foobar 调用 strcpy 时，其输入 src 来自于未经校验的网络数据包，可导致缓冲区溢出"
+#   consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
 #   suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
 []
 </REPORT>
@@ -169,7 +167,7 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
 - 数组元素为对象，包含字段：
   - id: 整数（本批次候选的序号，从1开始）
   - preconditions: 字符串（触发漏洞的前置条件）
-  - trigger_conditions: 字符串（直接导致漏洞触发的操作或条件）
+  - trigger_path: 字符串（漏洞的触发路径，即从可控输入到缺陷代码的完整调用链路或关键步骤）
   - consequences: 字符串（漏洞被触发后可能导致的后果）
   - suggestions: 字符串（修复或缓解该漏洞的建议）
 - 不要在数组元素中包含 file/line/pattern 等位置信息；写入 jsonl 时系统会结合原始候选信息。
@@ -530,7 +528,7 @@ def run_security_analysis(
                     except Exception:
                         return False
                     # 校验 reason 四元组（非空字符串）
-                    for key in ["preconditions", "trigger_conditions", "consequences", "suggestions"]:
+                    for key in ["preconditions", "trigger_path", "consequences", "suggestions"]:
                         if key not in it:
                             return False
                         if not isinstance(it[key], str) or not it[key].strip():
@@ -564,7 +562,7 @@ def run_security_analysis(
                     if 1 <= idx <= len(batch):
                         cand = dict(batch[idx - 1])
                         cand["preconditions"] = str(it.get("preconditions", "")).strip()
-                        cand["trigger_conditions"] = str(it.get("trigger_conditions", "")).strip()
+                        cand["trigger_path"] = str(it.get("trigger_path", "")).strip()
                         cand["consequences"] = str(it.get("consequences", "")).strip()
                         cand["suggestions"] = str(it.get("suggestions", "")).strip()
                         merged_items.append(cand)
@@ -647,7 +645,6 @@ def run_security_analysis(
                 "parse_fail": True,
             }
         )
-
         def _sig_matches_item(sig: str, item: Dict) -> bool:
             # 用 file+line+pattern 粗略关联候选与输出项
             parts = sig.split("|", 3)
@@ -672,7 +669,7 @@ def run_security_analysis(
                     if 1 <= idx <= len(batch):
                         cand = dict(batch[idx - 1])
                         cand["preconditions"] = str(it.get("preconditions", "")).strip()
-                        cand["trigger_conditions"] = str(it.get("trigger_conditions", "")).strip()
+                        cand["trigger_path"] = str(it.get("trigger_path", "")).strip()
                         cand["consequences"] = str(it.get("consequences", "")).strip()
                         cand["suggestions"] = str(it.get("suggestions", "")).strip()
                         merged_items.append(cand)
