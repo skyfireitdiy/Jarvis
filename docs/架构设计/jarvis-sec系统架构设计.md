@@ -1,37 +1,53 @@
-# jarvis-sec 系统架构设计
+# jarvis-sec 系统架构设计（vNext）
 
-本文档基于源码，对“jarvis-sec 安全分析套件”的整体设计进行结构化说明，聚焦两条能力路径：
-- 直扫基线（direct_scan）：纯 Python + 正则/命令行辅助，离线可复现，快速提供结构化结果与 Markdown 报告
-- 单Agent逐条验证（当前关键路径）：对直扫候选逐条创建独立 Agent 验证与摘要提取，最终统一聚合输出；支持并发或串行执行
+本文档基于最新源码实现，对“jarvis-sec 安全分析套件”的整体设计进行结构化说明。当前系统采用“启发式直扫 + 单Agent聚类分批验证 + 统一聚合”的关键路径，并提供可离线复现的直扫基线与可回溯的 JSONL 产物。
 
+适用范围
+- 编程语言：C/C++、Rust（可扩展）
+- 问题类别：缓冲区/字符串、内存管理、错误处理、并发与同步、FFI 边界、权限与敏感信息、不安全随机/时间/网络等
+- 输出：统一 JSON 结构与 Markdown 报告；进度/中间结果采用 JSONL 增量产物
 
 说明
-- 本文不展开 Agent 的内部实现，仅描述 jarvis-sec 如何使用 Agent
-- 风格与其他架构文档保持一致，PlantUML 用通俗术语表达
+- 不展开 Agent 的内部实现，仅描述 jarvis-sec 如何使用 Agent
+- 仅使用只读工具（read_code, execute_script），严禁对工作区写操作
+- 已移除 MultiAgent 编排，当前采用“单Agent逐批验证”的设计
 
 
-## 1. 设计目标与总体思路
+## 1. 关键变化一览
 
-- 可复现与可离线：提供一条完全不依赖外部服务的直扫路径（direct_scan），作为稳定的“基线能力”
-- 渐进增强：在具备模型运行条件时，采用“直扫 + 逐条验证 + 聚合”的路径，提升问题质量与可解释性
-- 安全聚焦：阶段目标覆盖内存管理、缓冲区操作、错误处理为主的基础问题；随规则库演进逐步覆盖并发、FFI、权限与敏感信息等
+- 单Agent聚类分批验证
+  - 对同一文件内的启发式候选进行“验证条件一致性”聚类，并按 cluster_limit 分批提交给一个 Agent 验证
+  - 降低长列表逐条验证的成本，提高鲁棒性与可控性
 
-- 结果统一：统一结构化输出（JSON）与阅读友好的 Markdown 报告，便于评测、审阅与归档
+- JSONL 产物与断点续扫
+  - heuristic_issues.jsonl：直扫候选增量快照
+  - progress.jsonl：阶段事件与任务状态流
+  - cluster_report.jsonl：聚类结果快照（可恢复）
+  - agent_issues.jsonl：经 Agent 确认的真实问题增量输出
+  - 默认开启断点续扫，运行中断后可基于以上文件恢复继续
+
+- 明确误报标识
+  - Agent 输出中仅当 has_risk 为 true 才被计为确认问题
+  - 允许对误报进行明确标记（has_risk=false 或不输出）
+
+- 工作区保护
+  - 每次 Agent 执行后检测工作区是否被修改，如有变更则自动 git checkout -- . 恢复
+
+- 直扫基线可离线复现
+  - 纯 Python + 正则/命令行辅助（优先使用 rg 以加速），不依赖外部 LLM
+  - 可作为评测的稳定“基线能力”
 
 
 ## 2. 模块组成（PlantUML）
 
-下图展示 jarvis-sec 的核心模块与相互关系，包含两条能力路径：直扫路径与多智能体路径。
-
 ```plantuml
 @startuml
 !theme vibrant
-title jarvis-sec 结构组成图（简化）
+title jarvis-sec 结构组成图（vNext）
 
 package "jarvis-sec" #LightGreen {
   component "工作流\n(workflow)" as Workflow
   component "报告聚合\n(report)" as Report
-  component "提示词库\n(prompts)" as Prompts
   component "类型定义\n(types.Issue)" as Types
 }
 
@@ -40,21 +56,28 @@ package "启发式检查器\n(checkers)" #Wheat {
   component "Rust 检查器" as RustChecker
 }
 
+package "Agent 集成" #LightYellow {
+  component "Agent(单体)" as Agent
+  component "ToolRegistry" as Tools
+}
 
 package "命令行" #AliceBlue {
   component "CLI (typer)" as CLI
 }
 
-' 直扫路径
+' 直扫基线
 CLI --> Workflow : 运行
 Workflow --> CChecker : 扫描 C/C++
 Workflow --> RustChecker : 扫描 Rust
-Workflow --> Report : 生成 JSON/Markdown
-Report --> CLI : 展示/写文件
+Workflow --> Report : 聚合(直扫基线)
 
+' 单Agent聚类分批验证
+CLI --> Workflow : run_with_agent
+Workflow --> Agent : 聚类/分批/验证
+Agent --> Tools : read_code/execute_script
+Workflow --> Report : 聚合(最终)
 
 ' 依赖
-Workflow --> Prompts : 按需读取提示词
 Workflow --> Types : 使用 Issue 结构
 CChecker --> Types
 RustChecker --> Types
@@ -62,106 +85,239 @@ RustChecker --> Types
 ```
 
 要点
-- 直扫路径独立可用，提供离线可复现的结果；在此基础上进行“逐条验证与聚合”
-
+- 直扫路径独立可用，提供离线可复现结果；在此基础上进行“聚类-分批-验证-聚合”
 - 报告聚合对两条路径的结构化结果保持一致，便于统一呈现与评测
 
 
-## 3. 能力与范围
+## 3. 核心流程
 
-目前覆盖的语言与类别（随规则库演进）
-- 语言：C/C++、Rust（已实现）；后续可扩展到 Go、Python、Java 等
-- 典型类别（示例，不限于此）
-  - 缓冲区/字符串：不安全 API（strcpy/strcat/sprintf/gets 等）、strncpy 无结尾风险、scanf 未限宽、格式化字符串问题
-  - 内存管理：malloc/free/realloc 不匹配、双重释放、未初始化使用、可能的空指针解引用
-  - 错误处理：返回值未检查、错误路径资源泄漏、errno 未处理
-  - 并发与同步：死锁模式、线程泄漏、条件变量等待未置于循环
-  - FFI/跨语言：extern "C"、不安全接口边界
-  - 权限与敏感信息：过宽权限、硬编码凭据/密钥（规则初步）
-  - 其他：不安全随机、时间与网络 API 风险
-- 输出结构统一：issues 列表 + summary 聚合（total/by_language/by_category/top_risk_files）
+A) 直扫基线（direct_scan）
+- 功能：基于规则库对 C/C++/Rust 文件进行启发式检出，返回结构化 issues 与 summary
+- 特点：
+  - 纯 Python + 正则/命令行辅助（优先使用 ripgrep 加速）
+  - 返回统一结构（issues + summary），可直接转 Markdown
 
-
-## 4. 直扫基线（direct_scan）
-
-直扫基线由 workflow.direct_scan 提供，特点：
-- 纯 Python + 正则/命令行辅助（优先使用 ripgrep 加速，自动探测 _rg_available）
-- 基于规则库检出安全疑点，返回结构化 issues，附带“证据片段/行号/文件路径”
-- 生成 summary：统计总量、语言与类别分布、Top 风险文件等
-- 可直接转 Markdown（workflow.format_markdown_report），便于阅读与归档
-
-直扫流程（PlantUML）
 ```plantuml
 @startuml
 !theme plain
-title 直扫流程（简化）
+title 直扫流程（基线）
 
 start
-:收集文件(按语言/排除目录);
-:逐语言运行启发式规则;
-:为每条命中生成 Issue(证据片段/置信度/严重性);
-:统计 summary(按语言/类别/Top文件);
-:输出 JSON + Markdown;
+:收集目标文件(按语言/排除目录);
+:逐语言执行启发式规则(C/C++/Rust);
+:生成 Issue(证据/行号/文件/置信度/严重性);
+:统计 summary(总数/语言/类别/Top文件);
+:输出 JSON + Markdown(基于 report);
 stop
 @enduml
 ```
 
-说明
-- C/C++ 与 Rust 分别由 checkers.c_checker / checkers.rust_checker 提供规则
-- 使用 ripgrep（如可用）快速定位候选，再读取上下文窗口计算置信度与严重性
-- 置信度 [0,1]；严重性分 high/medium/low（由命中规则与上下文线索推断）
-
-
-## 5. 验证流程（单Agent逐条）
-
-验证流程说明
-- 流程：先直扫得到候选 → 对每个候选构建独立 Agent 按只读工具进行证据核实与摘要提取 → 聚合生成 JSON + Markdown。
-- 入口：jarvis_sec.run_security_analysis（内部完成直扫、逐条验证与聚合）。
+B) 聚类-分批-验证（单Agent关键路径）
+- 入口：jarvis_sec.run_security_analysis(entry_path, ...)
+- 步骤：
+  1) 启发式直扫，增量写入 heuristic_issues.jsonl，并记录 progress.jsonl
+  2) 按文件聚合候选，基于 cluster_limit 分批进行“验证条件一致性”聚类
+     - 产物：cluster_report.jsonl（快照式写入，支持失败后恢复继续）
+  3) 针对每个聚类批次，创建单个 Agent 执行只读验证与摘要提取
+     - 输出 YAML（<REPORT>...</REPORT>）结构化结论
+     - 仅 has_risk=true 的条目被确认，增量写入 agent_issues.jsonl
+  4) 最终聚合（report.build_json_and_markdown）生成统一 JSON + Markdown
 
 ```plantuml
 @startuml
 !theme plain
-title 逐条验证流程（简化）
+title 逐条验证流程（含聚类-分批）
 
 start
 :调用直扫，得到候选问题列表;
-:逐条创建独立 Agent 执行只读验证（read_code/execute_script）;
-:提取每条验证的摘要与结构化结果;
+:增量记录 heuristic_issues.jsonl 与 progress.jsonl;
+:按文件聚合并按 cluster_limit 分批聚类;
+:写入 cluster_report.jsonl（快照）;
+repeat
+  :为该批次创建独立只读Agent;
+  :核实证据、提取摘要与结构化结果(<REPORT> YAML);
+  :过滤误报（has_risk=false）;
+  :增量写入 agent_issues.jsonl;
+repeat while(还有批次可处理?)
 :聚合所有验证结果并生成统一报告;
 :输出 JSON + Markdown;
 stop
 @enduml
 ```
 
-
-当前实现与“关键路径”澄清
-- 代码核对：在 run_security_analysis 中，针对每个候选是“逐条创建并运行单 Agent”完成验证与摘要解析。
-- 选择原因（当前版本）：隔离性（每条候选独立上下文，便于定位与复现）、可恢复（progress.jsonl 支持断点续扫）、可控成本（按条计费/超时控制）、确定性更强（统一 SUMMARY 报告提取）。
-
-## 6. 核心工具能力（验证流程中使用）
-
-在验证流程中，Agent 借助工具完成“检索/分析/验证/复核”，推荐能力与规范如下：
-- 读取代码：read_code
-  - 用途：读取目标文件（可带行号与范围），作为分析证据
-  - 建议：先读后写，按需指定范围避免膨胀
-- 命令执行（静态检测等）：execute_script
-  - 用途：执行 rg/grep 等命令检索证据、运行构建或本地分析脚本
-  - 约束：非交互模式有超时限制；输出建议过滤（rg/grep）
-  - 建议：在一个脚本中收敛多个命令，附上“可复现步骤”
+设计动机
+- 隔离性：每个批次独立上下文，便于定位与复现
+- 可恢复：多处 JSONL 快照与 progress 日志，支持断点续扫
+- 成本可控：按批次控制 LLM 调用规模（cluster_limit）
+- 确定性：统一的结构化摘要约束与“误报显式标识”机制
 
 
-## 7. 数据模型与报告结构
+## 4. 数据模型与中间产物
 
-统一的 Issue 结构（types.Issue）
+Issue 结构（types.Issue）
 - 字段：language、category、pattern、file、line、evidence、description、suggestion、confidence、severity
-- 说明：confidence 为 [0,1]，severity 为 high/medium/low
+- 说明：
+  - confidence 为 [0,1]
+  - severity 为 high/medium/low（默认 medium）
+  - 直扫阶段主要使用 description/suggestion
+  - 经 Agent 确认的问题会补充 preconditions/trigger_path/consequences/suggestions（见下）
 
-统一的报告结构（JSON）
-- issues: List[Issue or Dict]
-- summary:
-  - total: 总数
-  - by_language: {"c/cpp": N, "rust": M, ...}
-  - by_category: {"buffer_overflow": x, "unsafe_api": y, "memory_mgmt": z, ...}
-  - top_risk_files: ["path1", "path2", ...]
-- Markdown：report.format_markdown_report / workflow.format_markdown_report 负责将 JSON 转为可读报告（包含统计与改进建议片段）
+聚合后的统一 JSON（report.aggregate_issues）
+- summary
+  - total, by_language, by_category, top_risk_files
+  - scanned_root, scanned_files（可选）
+- issues（每项字段归一化并补充 score）
+  - 基于 file/line/category/pattern 生成稳定 id（C/R+哈希）
+  - score = confidence * severity_weight
 
+JSONL 产物（默认目录：<entry_path>/.jarvis/sec）
+- heuristic_issues.jsonl
+  - 启发式直扫的候选快照，1 行 1 记录
+  - 字段示例：{"language","category","pattern","file","line","evidence","confidence","severity", ...}
+  - 注：该阶段不包含 gid（全局编号在内存中为候选分配，用于聚类/验证）
+- cluster_report.jsonl
+  - 聚类结果快照，支持断点恢复与复用
+  - 记录示例：
+    - {"file":"path/to/foo.c","verification":"长度检查需满足","gids":[1,3,5],"count":3,"batch_index":1}
+- agent_issues.jsonl
+  - 经 Agent 确认的真实问题增量输出，1 行 1 issue
+  - 记录示例（合并直扫与 Agent 结论）：
+    - {"gid":3,"language":"c/cpp","file":"...","line":123,"pattern":"strcpy",...,"has_risk":true,"preconditions":"...","trigger_path":"...","consequences":"...","suggestions":"..."}
+- progress.jsonl
+  - 事件流日志，便于审计与断点续扫
+  - 事件类型（部分）：pre_scan_start/pre_scan_done/heuristic_report_written/cluster_status/cluster_report_snapshot/cluster_report_written/batch_status/task_status
+  - 示例：
+    - {"event":"cluster_status","status":"done","file":"foo.c","batch_index":1,"clusters_count":3,"timestamp":"...Z"}
+
+Markdown 报告
+- 直扫基线：workflow.format_markdown_report（标题：# OpenHarmony 安全问题分析报告（直扫基线））
+- 聚合最终：report.build_json_and_markdown → report.format_markdown_report（标题：# 安全问题分析报告（聚合））
+
+
+## 5. 核心 API 与调用关系
+
+入口 API
+- jarvis.jarvis_sec.workflow.direct_scan(entry_path, languages=None, exclude_dirs=None) -> Dict
+  - 启发式直扫，返回 {"summary": {...}, "issues": [...]}
+- jarvis.jarvis_sec.workflow.run_security_analysis_fast(entry_path, ...) -> str
+  - 一键运行直扫并聚合为 Markdown（不经 LLM 验证）
+- jarvis.jarvis_sec.run_security_analysis(entry_path, languages=None, llm_group=None, report_file=None, cluster_limit=50) -> str
+  - 关键路径：直扫 → 聚类分批 → 单Agent验证 → 聚合输出（返回 Markdown）
+  - JSONL 产物路径默认位于 <entry_path>/.jarvis/sec
+- jarvis.jarvis_sec.workflow.run_with_agent(...) -> str
+  - wrapper，内部直接调用 run_security_analysis
+
+报告聚合
+- jarvis.jarvis_sec.report.aggregate_issues(issues, scanned_root=None, scanned_files=None) -> Dict
+- jarvis.jarvis_sec.report.format_markdown_report(report_json) -> str
+- jarvis.jarvis_sec.report.build_json_and_markdown(issues, scanned_root=None, scanned_files=None, meta=None) -> str
+
+类型定义
+- jarvis.jarvis_sec.types.Issue（dataclass）：启发式直扫的统一结构
+
+
+## 6. CLI 使用
+
+命令
+- Agent 模式（推荐，包含聚类-分批-验证）
+  - python -m jarvis.jarvis_sec.cli agent --path ./target_project
+- 常用参数
+  - --path/-p: 待分析的根目录（必选）
+  - --llm-group/-g: 本次运行使用的模型组（不修改全局配置）
+  - --output/-o: 最终 Markdown 报告输出路径（默认 ./report.md）
+  - --cluster-limit/-c: 聚类每批最多处理的告警数（默认 50）
+
+容错与回退
+- Agent 流程异常或无输出时，CLI 自动回退到直扫基线（fast）
+
+
+## 7. 误报治理与确定性设计
+
+- 明确误报标识
+  - Agent 摘要中仅当 has_risk=true 的条目才写入 agent_issues.jsonl
+  - 误报可省略或设置 has_risk=false
+- 结构化摘要强约束
+  - 聚类输出：要求在 <CLUSTERS>...</CLUSTERS> 包裹的 YAML 数组
+  - 验证输出：要求在 <REPORT>...</REPORT> 包裹的 YAML 数组，包含 gid 与四元组理由
+- 断点续扫
+  - heuristic_issues.jsonl / cluster_report.jsonl / progress.jsonl 三方面保障阶段性恢复
+- 工作区保护
+  - 每次 Agent 执行后自动恢复潜在的工作区变更（git checkout -- .）
+
+
+## 8. 性能与工程实践
+
+- 文件枚举与排除
+  - 默认语言扩展：c, cpp, h, hpp, rs
+  - 默认排除目录：.git, build, out, target, third_party, vendor
+- 搜索与加速
+  - 优先使用 rg -n 进行快速匹配（自动探测可用性），失败回退纯 Python
+  - rg 命令分批（默认 200 文件）避免命令行过长
+- 批次控制
+  - cluster_limit 控制每批最多候选数，典型值 50
+- 报告评分
+  - 基于 confidence 与 severity 的权重计算 score，Top 风险文件按累计分排序（更稳定）
+
+
+## 9. 扩展与维护建议
+
+- 规则扩展
+  - 在 checkers.c_checker / checkers.rust_checker 中新增或优化规则，输出 types.Issue
+  - 可通过上下文窗口与模式过滤减少误报（参考现有实现的误报治理策略）
+- 语言扩展
+  - 按语言新增检查器模块（保持相同 Issue 结构）
+- 报告定制
+  - 可在 report 模块调整分类顺序、权重与渲染格式
+- 运行策略
+  - 结合 progress.jsonl 审计各阶段表现，定位瓶颈与误差来源
+  - 适当调整 cluster_limit 以平衡速度与效果
+
+
+## 10. 附录：结构化提示词约束（节选）
+
+聚类摘要模板（只输出 <CLUSTERS> 包裹的 YAML）
+```
+<CLUSTERS>
+- verification: "对该聚类的验证条件描述（简洁明确，可直接用于后续Agent验证）"
+  gids: [1, 3, 5]
+</CLUSTERS>
+```
+
+验证摘要模板（只输出 <REPORT> 包裹的 YAML）
+```
+<REPORT>
+- gid: 1
+  has_risk: true
+  preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
+  trigger_path: "函数 foobar 调用 strcpy 时，其输入 src 来自于未经校验的网络数据包，可导致缓冲区溢出"
+  consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
+  suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
+</REPORT>
+```
+
+注意
+- 不要在摘要中包含 file/line/pattern 等位置信息；系统会在写入 JSONL 时结合原始候选信息
+- 若确认本批次全部为误报或无问题，请返回空数组 []
+
+
+## 参考实现位置索引
+
+- 关键工作流（直扫/聚类/验证/聚合）
+  - src/jarvis/jarvis_sec/__init__.py: run_security_analysis（聚类-分批-验证-聚合关键路径）
+  - src/jarvis/jarvis_sec/workflow.py: direct_scan / run_security_analysis_fast / run_with_agent
+- 报告聚合
+  - src/jarvis/jarvis_sec/report.py: aggregate_issues / format_markdown_report / build_json_and_markdown
+- 类型定义
+  - src/jarvis/jarvis_sec/types.py: Issue
+- 启发式检查器
+  - src/jarvis/jarvis_sec/checkers/c_checker.py
+  - src/jarvis/jarvis_sec/checkers/rust_checker.py
+- CLI
+  - src/jarvis/jarvis_sec/cli.py
+
+本设计与实现已对齐以下近期变更
+- 分离 C++/Rust 检查器逻辑至独立模块
+- 聚类报告改为 JSONL（cluster_report.jsonl）
+- 日志输出汉化
+- 支持 LLM 明确标识误报（has_risk）
+- 启发式扫描与聚类/验证流程的断点续扫支持
