@@ -154,12 +154,13 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
     return f"""
 请将本轮“安全子任务（单点验证）”的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出：
 <REPORT>
-# 仅输出编号与理由（不含位置信息），编号为本批次候选的序号（从1开始）
+# 仅输出编号与详细理由（不含位置信息），编号为本批次候选的序号（从1开始）
 # 示例：
 # - id: 1
-#   reason: "使用不安全API，存在潜在缓冲区溢出风险"
-# - id: 3
-#   reason: "错误处理缺失，可能导致未定义行为"
+#   preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
+#   trigger_conditions: "调用 strcpy 时未进行长度检查"
+#   consequences: "可能导致缓冲区溢出，引发程序崩溃或任意代码执行"
+#   suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
 []
 </REPORT>
 要求：
@@ -167,7 +168,10 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
 - 若确认本批次全部为误报或无问题，请返回空数组 []。
 - 数组元素为对象，包含字段：
   - id: 整数（本批次候选的序号，从1开始）
-  - reason: 字符串（简洁说明返回该项的理由）
+  - preconditions: 字符串（触发漏洞的前置条件）
+  - trigger_conditions: 字符串（直接导致漏洞触发的操作或条件）
+  - consequences: 字符串（漏洞被触发后可能导致的后果）
+  - suggestions: 字符串（修复或缓解该漏洞的建议）
 - 不要在数组元素中包含 file/line/pattern 等位置信息；写入 jsonl 时系统会结合原始候选信息。
 - 确认是误报的条目请不要输出，仅输出确认是问题的条目。
 """.strip()
@@ -399,6 +403,7 @@ def run_security_analysis(
         # 构造 Agent（单次处理一批候选）
         system_prompt = """
 # 单Agent安全分析约束
+- 你的核心任务是评估代码的安全问题。
 - 仅围绕输入候选的位置进行验证与细化；避免无关扩展与大范围遍历。
 - 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
 - 若多条告警位于同一文件且行号相距不远，可一次性读取共享上下文，对这些相邻告警进行联合分析与判断；但仍需避免无关扩展与大范围遍历。
@@ -509,7 +514,7 @@ def run_security_analysis(
                     if isinstance(items, list):
                         parsed_items = items
 
-            # 关键字段校验：当前要求每个元素为 {id:int, reason:str}
+            # 关键字段校验：当前要求每个元素为 {id:int, preconditions:str, ...}
             def _valid_items(items: Optional[List]) -> bool:
                 if not isinstance(items, list):
                     return False
@@ -524,11 +529,12 @@ def run_security_analysis(
                             return False
                     except Exception:
                         return False
-                    # 校验 reason（非空字符串）
-                    if "reason" not in it:
-                        return False
-                    if not isinstance(it["reason"], str) or not it["reason"].strip():
-                        return False
+                    # 校验 reason 四元组（非空字符串）
+                    for key in ["preconditions", "trigger_conditions", "consequences", "suggestions"]:
+                        if key not in it:
+                            return False
+                        if not isinstance(it[key], str) or not it[key].strip():
+                            return False
                 return True
 
             if _valid_items(parsed_items):
@@ -544,7 +550,7 @@ def run_security_analysis(
         # 重试结束：summary_items 为 None 则视为失败
         # 将检测结果写入报告，并按候选维度写入进度（done）
         if isinstance(summary_items, list):
-            # 将 {id, reason} 映射回批次候选，并合并原始信息 + reason
+            # 将 {id, ...} 映射回批次候选，并合并原始信息
             merged_items: List[Dict] = []
             id_counts: Dict[int, int] = {}
             try:
@@ -557,8 +563,10 @@ def run_security_analysis(
                         idx = 0
                     if 1 <= idx <= len(batch):
                         cand = dict(batch[idx - 1])
-                        reason = str(it.get("reason", "")).strip()
-                        cand["reason"] = reason if reason else ""
+                        cand["preconditions"] = str(it.get("preconditions", "")).strip()
+                        cand["trigger_conditions"] = str(it.get("trigger_conditions", "")).strip()
+                        cand["consequences"] = str(it.get("consequences", "")).strip()
+                        cand["suggestions"] = str(it.get("suggestions", "")).strip()
                         merged_items.append(cand)
                         id_counts[idx] = id_counts.get(idx, 0) + 1
             except Exception:
@@ -663,8 +671,10 @@ def run_security_analysis(
                         idx = 0
                     if 1 <= idx <= len(batch):
                         cand = dict(batch[idx - 1])
-                        reason = str(it.get("reason", "")).strip()
-                        cand["reason"] = reason if reason else ""
+                        cand["preconditions"] = str(it.get("preconditions", "")).strip()
+                        cand["trigger_conditions"] = str(it.get("trigger_conditions", "")).strip()
+                        cand["consequences"] = str(it.get("consequences", "")).strip()
+                        cand["suggestions"] = str(it.get("suggestions", "")).strip()
                         merged_items.append(cand)
                         id_counts[idx] = id_counts.get(idx, 0) + 1
             except Exception:

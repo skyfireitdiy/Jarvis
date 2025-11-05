@@ -26,8 +26,10 @@
       "file": "src/foo.c",
       "line": 123,
       "evidence": "strcpy(dst, src);",
-      "description": "使用不安全API，缺少长度检查。",
-      "suggestion": "替换为安全API或增加长度验证。",
+      "preconditions": "N/A",
+      "trigger_conditions": "调用不安全的 strcpy 函数",
+      "consequences": "可能导致缓冲区溢出",
+      "suggestions": "使用 strncpy_s 或其他安全函数替代",
       "confidence": 0.85,
       "severity": "high | medium | low",
       "score": 2.55
@@ -88,8 +90,10 @@ def _as_dict(item: Union[Issue, Dict]) -> Dict:
         "file",
         "line",
         "evidence",
-        "description",
-        "suggestion",
+        "preconditions",
+        "trigger_conditions",
+        "consequences",
+        "suggestions",
         "confidence",
         "severity",
     ):
@@ -110,8 +114,10 @@ def _normalize_issue(i: Dict) -> Dict:
         "file": i.get("file", ""),
         "line": int(i.get("line", 0) or 0),
         "evidence": i.get("evidence", ""),
-        "description": i.get("description", ""),
-        "suggestion": i.get("suggestion", ""),
+        "preconditions": i.get("preconditions", ""),
+        "trigger_conditions": i.get("trigger_conditions", ""),
+        "consequences": i.get("consequences", ""),
+        "suggestions": i.get("suggestions", ""),
         "confidence": float(i.get("confidence", 0.6)),
         "severity": i.get("severity", "medium"),
     }
@@ -216,8 +222,10 @@ def format_markdown_report(report_json: Dict) -> str:
         lines.append(f"### [{i}] {it.get('file')}:{it.get('line')} ({it.get('language')}, {it.get('category')})")
         lines.append(f"- 模式: {it.get('pattern')}")
         lines.append(f"- 证据: `{it.get('evidence')}`")
-        lines.append(f"- 描述: {it.get('description')}")
-        lines.append(f"- 建议: {it.get('suggestion')}")
+        lines.append(f"- 前置条件: {it.get('preconditions')}")
+        lines.append(f"- 触发条件: {it.get('trigger_conditions')}")
+        lines.append(f"- 后果: {it.get('consequences')}")
+        lines.append(f"- 建议: {it.get('suggestions')}")
         lines.append(f"- 置信度: {it.get('confidence')}, 严重性: {it.get('severity')}, 评分: {it.get('score')}")
         lines.append("")
 
