@@ -156,6 +156,7 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
 # 仅输出全局编号（gid）与详细理由（不含位置信息），gid 为全局唯一的数字编号
 # 示例：
 # - gid: 1
+#   has_risk: true
 #   preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
 #   trigger_path: "函数 foobar 调用 strcpy 时，其输入 src 来自于未经校验的网络数据包，可导致缓冲区溢出"
 #   consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
@@ -167,12 +168,13 @@ def _build_summary_prompt(task_id: str, entry_path: str, languages: List[str], c
 - 若确认本批次全部为误报或无问题，请返回空数组 []。
 - 数组元素为对象，包含字段：
   - gid: 整数（全局唯一编号）
+  - has_risk: 布尔值 (true/false)，表示该项是否存在真实安全风险。
   - preconditions: 字符串（触发漏洞的前置条件）
   - trigger_path: 字符串（漏洞的触发路径，即从可控输入到缺陷代码的完整调用链路或关键步骤）
   - consequences: 字符串（漏洞被触发后可能导致的后果）
   - suggestions: 字符串（修复或缓解该漏洞的建议）
 - 不要在数组元素中包含 file/line/pattern 等位置信息；写入 jsonl 时系统会结合原始候选信息。
-- 只要在数组中输出，就会被记录为确认的问题。因此，对于确认是误报的条目，请不要输出，仅输出确认是问题的条目。
+- **关键**：仅当 `has_risk` 为 `true` 时，才会被记录为确认的问题。对于确认是误报的条目，请确保 `has_risk` 为 `false` 或不输出该条目。
 """.strip()
 
 
@@ -209,7 +211,6 @@ def run_security_analysis(
     report_file: Optional[str] = None,
 
     cluster_limit: int = 50,
-    resume: bool = True,
 ) -> str:
     """
     运行安全分析工作流（混合模式）。
@@ -229,8 +230,7 @@ def run_security_analysis(
     - llm_group: 模型组名称（仅在当前调用链内生效，不覆盖全局配置），将直接传入 Agent 用于选择模型
     - report_file: 增量报告文件路径（JSONL）。当每个子任务检测到 issues 时，立即将一条记录追加到该文件；
       若未指定，则默认写入 entry_path/.jarvis/sec/agent_issues.jsonl
-    - resume: 是否基于进度文件进行断点续扫（默认开启）。进度文件为 entry_path/.jarvis/sec/progress.jsonl
-      将在每个子任务开始（running）与结束（done）时追加记录，异常中断后可自动跳过已完成项。
+    - 断点续扫: 默认开启。会基于 .jarvis/sec/progress.jsonl 和 .jarvis/sec/heuristic_issues.jsonl 文件进行状态恢复。
     """
     import json
 
@@ -256,7 +256,7 @@ def run_security_analysis(
 
     # 已完成集合（按候选签名）
     done_sigs: set = set()
-    if resume and progress_path.exists():
+    if progress_path.exists():
         try:
             import json as _json
             for line in progress_path.read_text(encoding="utf-8", errors="ignore").splitlines():
@@ -280,7 +280,7 @@ def run_security_analysis(
     candidates: List[Dict] = []
     summary: Dict = {}
 
-    if resume and _heuristic_path.exists():
+    if _heuristic_path.exists():
         try:
             print(f"[JARVIS-SEC] Resuming heuristic scan from {_heuristic_path}")
             with _heuristic_path.open("r", encoding="utf-8") as f:
@@ -514,10 +514,10 @@ def run_security_analysis(
             pass
 
     for _file, _items in _file_groups.items():
-        # 过滤掉已完成（resume）
+        # 过滤掉已完成
         pending_in_file: List[Dict] = []
         for c in _items:
-            if not (resume and _sig_of(c) in done_sigs):
+            if not (_sig_of(c) in done_sigs):
                 pending_in_file.append(c)
         if not pending_in_file:
             continue
@@ -957,7 +957,7 @@ def run_security_analysis(
                     if isinstance(items, list):
                         parsed_items = items
 
-            # 关键字段校验：当前要求每个元素为 {gid:int, preconditions:str, ...}
+            # 关键字段校验：当前要求每个元素为 {gid:int, has_risk:bool, ...}
             def _valid_items(items: Optional[List]) -> bool:
                 if not isinstance(items, list):
                     return False
@@ -972,12 +972,16 @@ def run_security_analysis(
                             return False
                     except Exception:
                         return False
-                    # 校验 reason 四元组（非空字符串）
-                    for key in ["preconditions", "trigger_path", "consequences", "suggestions"]:
-                        if key not in it:
-                            return False
-                        if not isinstance(it[key], str) or not it[key].strip():
-                            return False
+                    # 校验 has_risk (布尔值)
+                    if "has_risk" not in it or not isinstance(it["has_risk"], bool):
+                        return False
+                    # 如果有风险，则校验 reason 四元组（非空字符串）
+                    if it.get("has_risk"):
+                        for key in ["preconditions", "trigger_path", "consequences", "suggestions"]:
+                            if key not in it:
+                                return False
+                            if not isinstance(it[key], str) or not it[key].strip():
+                                return False
                 return True
 
             if _valid_items(parsed_items):
@@ -990,29 +994,19 @@ def run_security_analysis(
                 except Exception:
                     pass
 
-        # 重试结束：summary_items 为 None 则视为失败
-        # 将检测结果写入报告，并按候选维度写入进度（done）
-        if isinstance(summary_items, list):
-            # 将 {gid, ...} 映射回批次候选，并合并原始信息（按全局 gid 关联）
-            merged_items: List[Dict] = []
-            gid_counts: Dict[int, int] = {}
+        # 重试结束：处理摘要结果
+        merged_items: List[Dict] = []
+        gid_counts: Dict[int, int] = {}
+        parse_fail = not isinstance(summary_items, list)
+
+        if not parse_fail:
+            # 摘要解析成功：处理有风险的条目
             try:
-                # 建立 gid -> candidate 映射
-                gid_to_item_batch: Dict[int, Dict] = {}
-                for it_b in batch:
-                    try:
-                        _g = int(it_b.get("gid", 0))
-                        if _g >= 1:
-                            gid_to_item_batch[_g] = it_b
-                    except Exception:
-                        continue
+                gid_to_item_batch: Dict[int, Dict] = {int(it.get("gid", 0)): it for it in batch if int(it.get("gid", 0)) >= 1}
                 for it in summary_items:
-                    if not isinstance(it, dict):
+                    if not isinstance(it, dict) or not it.get("has_risk"):
                         continue
-                    try:
-                        gid = int(it.get("gid", 0))
-                    except Exception:
-                        gid = 0
+                    gid = int(it.get("gid", 0))
                     cand_src = gid_to_item_batch.get(gid)
                     if cand_src:
                         cand = dict(cand_src)
@@ -1020,199 +1014,45 @@ def run_security_analysis(
                         cand["trigger_path"] = str(it.get("trigger_path", "")).strip()
                         cand["consequences"] = str(it.get("consequences", "")).strip()
                         cand["suggestions"] = str(it.get("suggestions", "")).strip()
+                        cand["has_risk"] = True
                         merged_items.append(cand)
                         gid_counts[gid] = gid_counts.get(gid, 0) + 1
             except Exception:
-                pass
+                pass  # 异常不影响流程
 
-            # 汇总有效问题（非误报）
-            if merged_items:
-                all_issues.extend(merged_items)
-                try:
-                    print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(merged_items)} -> append report (summary)")
-                except Exception:
-                    pass
-                # 写入 JSONL 报告（批次）
-                _append_report(merged_items, "summary", task_id, {"batch": True, "candidates": batch})
-            else:
-                try:
-                    print(f"[JARVIS-SEC] batch no-issue {bidx}/{total_batches}")
-                except Exception:
-                    pass
-
-            # 为每个候选写入 done 记录（断点续扫用）
-            for c in batch:
-                sig = _sig_of(c)
-                try:
-                    c_gid = int(c.get("gid", 0))
-                except Exception:
-                    c_gid = 0
-                cnt = gid_counts.get(c_gid, 0)
-                _progress_append(
-                    {
-                        "event": "task_status",
-                        "status": "done",
-                        "task_id": f"{task_id}",
-                        "candidate_signature": sig,
-                        "candidate": c,
-                        "issues_count": int(cnt),
-                        "workspace_restore": workspace_restore_info,
-                        "batch_index": bidx,
-                    }
-                )
-
-            # 批次结束记录
-            _progress_append(
-                {
-                    "event": "batch_status",
-                    "status": "done",
-                    "batch_id": task_id,
-                    "batch_index": bidx,
-                    "total_batches": total_batches,
-                    "issues_count": len(merged_items),
-                }
-            )
-            continue
-
-        # 摘要不可解析或关键字段缺失：记录失败并按候选维度写入 done（issues_count=0）
-        try:
+        # 汇总并报告
+        if merged_items:
+            all_issues.extend(merged_items)
+            print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(merged_items)} -> append report (summary)")
+            _append_report(merged_items, "summary", task_id, {"batch": True, "candidates": batch})
+        elif parse_fail:
             print(f"[JARVIS-SEC] batch parse-fail {bidx}/{total_batches} (no <REPORT>/invalid fields in summary)")
-        except Exception:
-            pass
-        for c in batch:
-            _progress_append(
-                {
-                    "event": "task_status",
-                    "status": "done",
-                    "task_id": f"{task_id}",
-                    "candidate_signature": _sig_of(c),
-                    "candidate": c,
-                    "issues_count": 0,
-                    "parse_fail": True,
-                    "workspace_restore": workspace_restore_info,
-                    "batch_index": bidx,
-                }
-            )
-        _progress_append(
-            {
-                "event": "batch_status",
-                "status": "done",
-                "batch_id": task_id,
-                "batch_index": bidx,
-                "total_batches": total_batches,
-                "issues_count": 0,
-                "parse_fail": True,
-            }
-        )
-        def _sig_matches_item(sig: str, item: Dict) -> bool:
-            # 用 file+line+pattern 粗略关联候选与输出项
-            parts = sig.split("|", 3)
-            f = parts[1] if len(parts) > 1 else ""
-            ln = parts[2] if len(parts) > 2 else ""
-            pat = parts[3] if len(parts) > 3 else ""
-            return str(item.get("file")) == f and str(item.get("line")) == ln and str(item.get("pattern") or "") == pat
+        else:
+            print(f"[JARVIS-SEC] batch no-issue {bidx}/{total_batches}")
 
-        # 将检测结果写入报告，并按候选维度写入进度（done）
-        if isinstance(summary_items, list):
-            # 将 {gid, reason} 映射回批次候选，并合并原始信息 + reason
-            merged_items: List[Dict] = []
-            gid_counts: Dict[int, int] = {}
+        # 为本批次所有候选写入 done 记录（无论成功失败，都标记为已处理）
+        for c in batch:
+            sig = _sig_of(c)
             try:
-                gid_to_item_batch: Dict[int, Dict] = {}
-                for it_b in batch:
-                    try:
-                        _g = int(it_b.get("gid", 0))
-                        if _g >= 1:
-                            gid_to_item_batch[_g] = it_b
-                    except Exception:
-                        continue
-                for it in summary_items:
-                    if not isinstance(it, dict):
-                        continue
-                    try:
-                        gid = int(it.get("gid", 0))
-                    except Exception:
-                        gid = 0
-                    cand_src = gid_to_item_batch.get(gid)
-                    if cand_src:
-                        cand = dict(cand_src)
-                        cand["preconditions"] = str(it.get("preconditions", "")).strip()
-                        cand["trigger_path"] = str(it.get("trigger_path", "")).strip()
-                        cand["consequences"] = str(it.get("consequences", "")).strip()
-                        cand["suggestions"] = str(it.get("suggestions", "")).strip()
-                        merged_items.append(cand)
-                        gid_counts[gid] = gid_counts.get(gid, 0) + 1
+                c_gid = int(c.get("gid", 0))
             except Exception:
-                pass
-
-            # 汇总有效问题（非误报）
-            if merged_items:
-                all_issues.extend(merged_items)
-                try:
-                    print(f"[JARVIS-SEC] batch issues-found {bidx}/{total_batches}: count={len(merged_items)} -> append report (summary)")
-                except Exception:
-                    pass
-                # 写入 JSONL 报告（批次）
-                _append_report(merged_items, "summary", task_id, {"batch": True, "candidates": batch})
-            else:
-                try:
-                    print(f"[JARVIS-SEC] batch no-issue {bidx}/{total_batches}")
-                except Exception:
-                    pass
-
-            # 为每个候选写入 done 记录（断点续扫用）
-            for c in batch:
-                sig = _sig_of(c)
-                try:
-                    c_gid = int(c.get("gid", 0))
-                except Exception:
-                    c_gid = 0
-                cnt = gid_counts.get(c_gid, 0)
-                _progress_append(
-                    {
-                        "event": "task_status",
-                        "status": "done",
-                        "task_id": f"{task_id}",
-                        "candidate_signature": sig,
-                        "candidate": c,
-                        "issues_count": int(cnt),
-                        "workspace_restore": workspace_restore_info,
-                        "batch_index": bidx,
-                    }
-                )
-
-            # 批次结束记录
-            _progress_append(
-                {
-                    "event": "batch_status",
-                    "status": "done",
-                    "batch_id": task_id,
-                    "batch_index": bidx,
-                    "total_batches": total_batches,
-                    "issues_count": len(merged_items),
-                }
-            )
-            continue
-
-        # 摘要不可解析：记录失败并按候选维度写入 done（issues_count=0）
-        try:
-            print(f"[JARVIS-SEC] batch parse-fail {bidx}/{total_batches} (no <REPORT> in summary)")
-        except Exception:
-            pass
-        for c in batch:
+                c_gid = 0
+            cnt = gid_counts.get(c_gid, 0)
             _progress_append(
                 {
                     "event": "task_status",
                     "status": "done",
                     "task_id": f"{task_id}",
-                    "candidate_signature": _sig_of(c),
+                    "candidate_signature": sig,
                     "candidate": c,
-                    "issues_count": 0,
-                    "parse_fail": True,
+                    "issues_count": int(cnt),
+                    "parse_fail": parse_fail,
                     "workspace_restore": workspace_restore_info,
                     "batch_index": bidx,
                 }
             )
+
+        # 批次结束记录
         _progress_append(
             {
                 "event": "batch_status",
@@ -1220,8 +1060,8 @@ def run_security_analysis(
                 "batch_id": task_id,
                 "batch_index": bidx,
                 "total_batches": total_batches,
-                "issues_count": 0,
-                "parse_fail": True,
+                "issues_count": len(merged_items),
+                "parse_fail": parse_fail,
             }
         )
 
