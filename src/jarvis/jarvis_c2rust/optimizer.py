@@ -66,6 +66,7 @@ class OptimizeOptions:
     # Git 保护：优化前快照 commit，失败时自动 reset 回快照
     git_guard: bool = True
     llm_group: Optional[str] = None
+    cargo_test_timeout: int = 300  # cargo test 超时（秒）
 
 
 @dataclass
@@ -84,7 +85,7 @@ class OptimizeStats:
             self.errors = []
 
 
-def _run_cmd(cmd: List[str], cwd: Path, env: Optional[Dict[str, str]] = None) -> Tuple[int, str, str]:
+def _run_cmd(cmd: List[str], cwd: Path, env: Optional[Dict[str, str]] = None, timeout: Optional[int] = None) -> Tuple[int, str, str]:
     p = subprocess.Popen(
         cmd,
         cwd=str(cwd),
@@ -93,15 +94,23 @@ def _run_cmd(cmd: List[str], cwd: Path, env: Optional[Dict[str, str]] = None) ->
         text=True,
         env=dict(os.environ, **(env or {})),
     )
-    out, err = p.communicate()
-    return p.returncode, out, err
+    try:
+        out, err = p.communicate(timeout=timeout if timeout and timeout > 0 else None)
+        return p.returncode, out, err
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out, err = p.communicate()
+        err_msg = f"Command '{' '.join(cmd)}' timed out after {timeout} seconds."
+        if err:
+            err_msg += f"\n{err}"
+        return -1, out, err_msg
 
 
-def _cargo_check(crate_dir: Path, stats: OptimizeStats, max_checks: int) -> Tuple[bool, str]:
+def _cargo_check(crate_dir: Path, stats: OptimizeStats, max_checks: int, timeout: Optional[int] = None) -> Tuple[bool, str]:
     # 统一使用 cargo test 作为验证手段
     if max_checks and stats.cargo_checks >= max_checks:
         return False, "cargo test budget exhausted"
-    code, out, err = _run_cmd(["cargo", "test", "-q"], crate_dir)
+    code, out, err = _run_cmd(["cargo", "test", "-q"], crate_dir, timeout=timeout)
     stats.cargo_checks += 1
     ok = code == 0
     diag = err.strip() or out.strip()
@@ -109,7 +118,7 @@ def _cargo_check(crate_dir: Path, stats: OptimizeStats, max_checks: int) -> Tupl
     first_line = next((ln for ln in diag.splitlines() if ln.strip()), "")
     return ok, first_line
 
-def _cargo_check_full(crate_dir: Path, stats: OptimizeStats, max_checks: int) -> Tuple[bool, str]:
+def _cargo_check_full(crate_dir: Path, stats: OptimizeStats, max_checks: int, timeout: Optional[int] = None) -> Tuple[bool, str]:
     """
     执行 cargo test，返回是否成功与完整输出（stdout+stderr）。
     会计入 stats.cargo_checks，并受 max_checks 预算限制。
@@ -123,6 +132,7 @@ def _cargo_check_full(crate_dir: Path, stats: OptimizeStats, max_checks: int) ->
             text=True,
             check=False,
             cwd=str(crate_dir),
+            timeout=timeout if timeout and timeout > 0 else None,
         )
         stats.cargo_checks += 1
         ok = (res.returncode == 0)
@@ -130,6 +140,15 @@ def _cargo_check_full(crate_dir: Path, stats: OptimizeStats, max_checks: int) ->
         err = (res.stderr or "")
         msg = (out + ("\n" + err if err else "")).strip()
         return ok, msg
+    except subprocess.TimeoutExpired as e:
+        stats.cargo_checks += 1
+        out_s = e.stdout.decode("utf-8", errors="ignore") if e.stdout else ""
+        err_s = e.stderr.decode("utf-8", errors="ignore") if e.stderr else ""
+        msg = f"cargo test timed out after {timeout} seconds"
+        full_output = (out_s + ("\n" + err_s if err_s else "")).strip()
+        if full_output:
+            msg += f"\nOutput:\n{full_output}"
+        return False, msg
     except Exception as e:
         stats.cargo_checks += 1
         return False, f"cargo test exception: {e}"
@@ -382,7 +401,7 @@ class Optimizer:
                     self._opt_unsafe_cleanup(targets)
                     # Step build verification
                     if not self.options.dry_run:
-                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks)
+                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             # 循环最小修复
                             fixed = self._build_fix_loop(targets)
@@ -401,7 +420,7 @@ class Optimizer:
                     self._opt_structure_duplicates(targets)
                     # Step build verification
                     if not self.options.dry_run:
-                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks)
+                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
                             if not fixed:
@@ -418,7 +437,7 @@ class Optimizer:
                     self._opt_visibility(targets)
                     # Step build verification
                     if not self.options.dry_run:
-                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks)
+                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
                             if not fixed:
@@ -435,7 +454,7 @@ class Optimizer:
                     self._opt_docs(targets)
                     # Step build verification
                     if not self.options.dry_run:
-                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks)
+                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
                             if not fixed:
@@ -500,7 +519,7 @@ class Optimizer:
                 bak = _backup_file(path)
                 try:
                     _write_file(path, trial)
-                    ok, diag = _cargo_check(self.crate_dir, self.stats, self.options.max_checks)
+                    ok, diag = _cargo_check(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                     if ok:
                         # 保留修改
                         content = trial
@@ -632,7 +651,7 @@ class Optimizer:
                 bak = _backup_file(path)
                 try:
                     _write_file(path, candidate)
-                    ok, _ = _cargo_check(self.crate_dir, self.stats, self.options.max_checks)
+                    ok, _ = _cargo_check(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                     if ok:
                         content = candidate
                         self.stats.visibility_downgraded += 1
@@ -755,7 +774,7 @@ class Optimizer:
         finally:
             os.chdir(prev_cwd)
         # 运行一次 cargo check 验证；若失败则进入本地最小修复循环
-        ok, diag = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks)
+        ok, diag = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
         if not ok:
             fixed = self._build_fix_loop(target_files)
             if not fixed:
@@ -790,6 +809,7 @@ class Optimizer:
             if self.options.max_checks and self.stats.cargo_checks >= self.options.max_checks:
                 return False
             # 执行构建
+            output = ""
             try:
                 res = subprocess.run(
                     ["cargo", "test", "-q"],
@@ -797,14 +817,23 @@ class Optimizer:
                     text=True,
                     check=False,
                     cwd=str(crate),
+                    timeout=self.options.cargo_test_timeout if self.options.cargo_test_timeout > 0 else None,
                 )
-            except Exception:
                 self.stats.cargo_checks += 1
-                return False
-            self.stats.cargo_checks += 1
-            if res.returncode == 0:
-                return True
-            output = ((res.stdout or "") + ("\n" + (res.stderr or ""))).strip()
+                if res.returncode == 0:
+                    return True
+                output = ((res.stdout or "") + ("\n" + (res.stderr or ""))).strip()
+            except subprocess.TimeoutExpired as e:
+                self.stats.cargo_checks += 1
+                out_s = e.stdout.decode("utf-8", errors="ignore") if e.stdout else ""
+                err_s = e.stderr.decode("utf-8", errors="ignore") if e.stderr else ""
+                output = f"cargo test timed out after {self.options.cargo_test_timeout} seconds"
+                full_output = (out_s + ("\n" + err_s if err_s else "")).strip()
+                if full_output:
+                    output += f"\nOutput:\n{full_output}"
+            except Exception as e:
+                self.stats.cargo_checks += 1
+                output = f"cargo test exception: {e}"
 
             # 达到重试上限则失败
             attempt += 1
@@ -858,6 +887,7 @@ def optimize_project(
     build_fix_retries: int = 3,
     git_guard: bool = True,
     llm_group: Optional[str] = None,
+    cargo_test_timeout: int = 300,
 ) -> Dict:
     """
     对指定 crate 执行优化。返回结果摘要 dict。
@@ -886,6 +916,7 @@ def optimize_project(
         build_fix_retries=build_fix_retries,
         git_guard=git_guard,
         llm_group=llm_group,
+        cargo_test_timeout=cargo_test_timeout,
     )
     optimizer = Optimizer(crate, opts)
     stats = optimizer.run()
