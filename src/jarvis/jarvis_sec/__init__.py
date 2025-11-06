@@ -44,13 +44,7 @@ def _build_summary_prompt() -> str:
   suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
 </REPORT>
 
-示例2：无告警的情况（has_risk: false）
-<REPORT>
-- gid: 2
-  has_risk: false
-</REPORT>
-
-示例3：全部为误报或无问题（返回空数组）
+示例2：误报或无问题（返回空数组）
 <REPORT>
 []
 </REPORT>
