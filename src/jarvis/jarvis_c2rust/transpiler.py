@@ -856,244 +856,7 @@ class Transpiler:
         }
         self._save_progress()
 
-    def _infer_rust_signature_hint(self, rec: FnRecord) -> str:
-        """
-        根据 C 符号信息（signature/params/return_type）启发式给出 Rust 函数签名建议（仅签名字符串）。
-        
-        注意：这只是一个基础映射建议，最终签名应遵循 Rust 最佳实践，不需要兼容 C 数据类型。
-        实际签名设计应优先使用 Rust 原生类型、引用、切片等惯用法，而非简单映射 C 类型。
-        
-        基础映射规则（仅供参考）：
-        - 基本整型：i32/u32/i16/u16/i64/u64 等，size_t -> usize，ssize_t -> isize；
-        - 浮点：float -> f32，double -> f64；
-        - 指针：含 '*' 视为指针；含 const 则 *const T，否则 *mut T；void* -> *mut/ *const std::ffi::c_void（允许使用 c_void）；
-        - char*：优先使用 *mut/*const u8；普通 char -> i8，unsigned char -> u8；
-        - 参数名缺失则使用 argN。
-        
-        仅为建议，不强制，供 LLM 参考与事后一致性校验。最终签名应遵循 Rust 最佳实践。
-        """
-        try:
-            def _base_ty(ct: str) -> str:
-                s = (ct or "").strip()
-                s = s.replace("volatile", " ").replace("CONST", "const").replace("  ", " ")
-                return s
 
-            def _is_ptr(ct: str) -> bool:
-                s = _base_ty(ct)
-                return "*" in s or "[]" in s
-
-            def _is_const(ct: str) -> bool:
-                s = _base_ty(ct).lower()
-                return "const" in s
-
-            def _map_prim(s: str) -> str:
-                t = s.lower().strip()
-                # C/C++ 基本整型 -> 原生 Rust 基本类型（启发式）
-                if t in ("int", "signed int"):
-                    return "i32"
-                if t in ("unsigned int", "uint", "unsigned"):
-                    return "u32"
-                if t in ("short", "short int", "signed short", "signed short int"):
-                    return "i16"
-                if t in ("unsigned short", "unsigned short int"):
-                    return "u16"
-                if t in ("long", "long int", "signed long", "signed long int"):
-                    # 启发式：long 映射为 i64（各平台宽度不同，此为建议）
-                    return "i64"
-                if t in ("unsigned long", "unsigned long int"):
-                    return "u64"
-                if t in ("long long", "long long int", "signed long long"):
-                    return "i64"
-                if t in ("unsigned long long", "unsigned long long int"):
-                    return "u64"
-                # 字符类
-                if t in ("char", "signed char"):
-                    return "i8"
-                if t in ("unsigned char",):
-                    return "u8"
-                # 浮点
-                if t in ("float",):
-                    return "f32"
-                if t in ("double",):
-                    return "f64"
-                # C/C++ 定宽与指针宽度类型
-                if t in ("int8_t",):
-                    return "i8"
-                if t in ("uint8_t",):
-                    return "u8"
-                if t in ("int16_t",):
-                    return "i16"
-                if t in ("uint16_t",):
-                    return "u16"
-                if t in ("int32_t",):
-                    return "i32"
-                if t in ("uint32_t",):
-                    return "u32"
-                if t in ("int64_t",):
-                    return "i64"
-                if t in ("uint64_t",):
-                    return "u64"
-                if t in ("intptr_t",):
-                    return "isize"
-                if t in ("uintptr_t",):
-                    return "usize"
-                # 其他常见别名
-                if t in ("size_t",):
-                    return "usize"
-                if t in ("ssize_t",):
-                    return "isize"
-                if t in ("bool", "_bool", "_bool_t", "boolean", "_bool32"):
-                    return "bool"
-                # 未知类型（结构体、typedef 等）原样返回，后续由指针包装逻辑处理
-                return s  # 保留原样（结构体名等）
-
-            def _map_type(ct: str, ptr: bool, is_const: bool) -> str:
-                bs = _base_ty(ct)
-                # 特例：void*
-                if "void" in bs and ptr:
-                    return "*const std::ffi::c_void" if is_const else "*mut std::ffi::c_void"
-                # 特例：char*
-                if "char" in bs and ptr:
-                    return "*const u8" if is_const else "*mut u8"
-                base = _map_prim(bs.replace("*", "").replace("const", "").strip())
-                if ptr:
-                    return f"*const {base}" if is_const else f"*mut {base}"
-                return base
-
-            name = rec.name or "func"
-            # 参数映射
-            params = rec.params or []
-            args_rs = []
-            for i, p in enumerate(params):
-                pn = (p.get("name") or f"arg{i}").strip() if isinstance(p, dict) else f"arg{i}"
-                ct = (p.get("type") or "").strip() if isinstance(p, dict) else ""
-                ptr = _is_ptr(ct)
-                cst = _is_const(ct)
-                ty_rs = _map_type(ct, ptr, cst)
-                args_rs.append(f"{pn}: {ty_rs}")
-            args_s = ", ".join(args_rs)
-
-            # 返回类型
-            rt = getattr(rec, "return_type", "") or ""
-            if not rt:
-                ret_rs = ""
-            else:
-                rts = rt.strip().lower()
-                if ("void" in rts) and (not _is_ptr(rt)):
-                    ret_rs = ""
-                else:
-                    prt = _is_ptr(rt)
-                    pc = _is_const(rt)
-                    ret_mapped = _map_type(rt, prt, pc)
-                    ret_rs = f" -> {ret_mapped}" if ret_mapped else ""
-
-            return f"pub fn {name}({args_s}){ret_rs}"
-        except Exception:
-            return ""
-
-    def _check_signature_consistency(self, rust_sig: str, rec: FnRecord) -> List[str]:
-        """
-        基于 LLM 提供的 rust_sig 与 C 符号（params/return_type）进行轻量一致性检查：
-        - 参数个数是否一致
-        - 指针可变性（const -> *const / 非 const -> *mut）是否匹配（按位置比对）
-        - 指针+长度参数组合的基本一致性（按位置对 param#i 与 param#i+1 进行启发式检查）
-        返回问题列表（空列表表示通过）。
-        """
-        issues: List[str] = []
-        try:
-            # 提取 Rust 参数串（支持生命周期参数和泛型参数）
-            # 匹配模式：fn 函数名 [<'...>] [<T...>] (参数...)
-            m = re.search(r"\bfn\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:<[^>]+>)?\s*\((.*?)\)", rust_sig or "", flags=re.S)
-            rs_inside = m.group(1) if m else ""
-            # 朴素切分（足够用于一致性检查；复杂泛型暂不处理）
-            rs_params = [x.strip() for x in rs_inside.split(",") if x.strip()] if rs_inside else []
-            c_params = rec.params or []
-            if len(rs_params) != len(c_params):
-                issues.append(f"[sig] parameter count mismatch: rust={len(rs_params)} vs c={len(c_params)}")
-            # 指针可变性检查（对齐位置）
-            def _rust_ptr_kind(s: str) -> Optional[str]:
-                ss = s.replace(" ", "")
-                if "*const" in ss:
-                    return "const"
-                if "*mut" in ss:
-                    return "mut"
-                return None
-            for i, cp in enumerate(c_params):
-                if i >= len(rs_params):
-                    break
-                cty = (cp.get("type") or "").lower()
-                is_ptr = ("*" in cty) or ("[]" in cty)
-                if not is_ptr:
-                    continue
-                is_const = "const" in cty
-                rk = _rust_ptr_kind(rs_params[i])
-                if is_const and rk != "const":
-                    issues.append(f"[sig] param#{i} pointer mutability: expected *const (from C 'const'), got {rk or 'none'}")
-                if (not is_const) and rk != "mut":
-                    issues.append(f"[sig] param#{i} pointer mutability: expected *mut (from C non-const), got {rk or 'none'}")
-            # 指针+长度（ptr,len）组合启发式检查：当 C 形参 i 为指针且 i+1 为长度整型时
-            def _is_c_len_type(t: str) -> bool:
-                tt = (t or "").strip().lower()
-                if not tt:
-                    return False
-                # 常见长度类型
-                if any(x in tt for x in ("size_t", "ssize_t", "uint32_t", "uint64_t", "int32_t", "int64_t")):
-                    return True
-                # 宽泛匹配 int/unsigned int
-                if tt in ("int", "unsigned int", "uint", "unsigned"):
-                    return True
-                return False
-            def _rs_is_pointer_or_slice(s: str) -> bool:
-                ss = (s or "").replace(" ", "")
-                return ("*const" in ss) or ("*mut" in ss) or ("&[" in ss) or ("Vec<" in ss)
-            def _rs_is_integer_like(s: str) -> bool:
-                ss = (s or "").strip()
-                if not ss:
-                    return False
-                # 允许 usize/isize 与 i*/u* 定宽
-                if re.search(r"\b(u|i)(8|16|32|64|128)\b", ss):
-                    return True
-                if re.search(r"\b(u|i)size\b", ss):
-                    return True
-                # 允许 core::ffi::c_* 基本整型
-                if "core::ffi::c_" in ss:
-                    return True
-                return False
-            for i in range(len(c_params) - 1):
-                cty_i = (c_params[i].get("type") or "").lower() if isinstance(c_params[i], dict) else ""
-                cty_j = (c_params[i+1].get("type") or "").lower() if isinstance(c_params[i+1], dict) else ""
-                c_is_ptr = ("*" in cty_i) or ("[]" in cty_i)
-                if not c_is_ptr:
-                    continue
-                if not _is_c_len_type(cty_j):
-                    continue
-                # 对应的 Rust 参数存在性
-                if i >= len(rs_params) or (i + 1) >= len(rs_params):
-                    issues.append(f"[sig] param#{i} pointer+len mismatch: expected pointer or slice with separate len (param#{i+1})")
-                    continue
-                rs_i = rs_params[i]
-                rs_j = rs_params[i+1]
-                if not _rs_is_pointer_or_slice(rs_i):
-                    issues.append(f"[sig] param#{i} pointer+len mismatch: expected pointer or slice with separate len (param#{i+1})")
-                if not _rs_is_integer_like(rs_j):
-                    issues.append(f"[sig] param#{i+1} length param missing or non-integer")
-            # 返回类型指针可变性（若存在）
-            rt = (getattr(rec, "return_type", "") or "").lower()
-            if rt:
-                is_ptr = ("*" in rt) or ("[]" in rt)
-                if is_ptr:
-                    is_const = "const" in rt
-                    mret = re.search(r"\)\s*->\s*([^{;]+)", rust_sig or "")
-                    rty = mret.group(1).strip() if mret else ""
-                    rk = _rust_ptr_kind(rty)
-                    if is_const and rk != "const":
-                        issues.append(f"[sig] return pointer mutability: expected *const (from C 'const'), got {rk or 'none'}")
-                    if (not is_const) and rk != "mut":
-                        issues.append(f"[sig] return pointer mutability: expected *mut (from C non-const), got {rk or 'none'}")
-        except Exception:
-            # 解析失败不阻塞，仅不产生问题
-            return issues
-        return issues
 
     # ========= Agent 复用与上下文拼接辅助 =========
 
@@ -1887,17 +1650,21 @@ class Transpiler:
     def _review_and_optimize(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """
         审查生成的实现；若 summary 报告问题，则调用 CodeAgent 进行优化，直到无问题或次数用尽。
+        合并了功能一致性审查和类型/边界严重问题审查，避免重复审查。
         审查只关注本次函数与相关最小上下文，避免全局重构。
         """
         def build_review_prompts() -> Tuple[str, str, str]:
             sys_p = (
-                "你是Rust代码审查专家。验收标准：Rust 实现应与原始 C 实现在功能上一致，仅关注核心功能是否正确实现。"
-                "审查标准：\n"
-                "- 仅检查功能一致性：核心输入输出、主要功能逻辑是否与 C 实现一致；\n"
-                "- 允许 Rust 实现修复 C 代码中的安全漏洞（如缓冲区溢出、空指针解引用、未初始化内存使用等），这些修复不应被视为功能不一致；\n"
-                "- 允许 Rust 实现使用不同的类型设计、错误处理方式、资源管理方式等，只要功能一致即可；\n"
-                "- 不检查类型匹配、边界检查、资源释放细节、内存语义等技术细节；\n"
-                "- 不考虑安全、性能、风格等其他方面。仅在总结阶段输出审查结论。"
+                "你是Rust代码审查专家。验收标准：Rust 实现应与原始 C 实现在功能上一致，且不应包含可能导致功能错误的严重问题。\n"
+                "审查标准（合并了功能一致性和严重问题检查）：\n"
+                "1. 功能一致性检查：\n"
+                "   - 核心输入输出、主要功能逻辑是否与 C 实现一致；\n"
+                "   - 允许 Rust 实现修复 C 代码中的安全漏洞（如缓冲区溢出、空指针解引用、未初始化内存使用等），这些修复不应被视为功能不一致；\n"
+                "   - 允许 Rust 实现使用不同的类型设计、错误处理方式、资源管理方式等，只要功能一致即可；\n"
+                "2. 严重问题检查（可能导致功能错误）：\n"
+                "   - 明显的空指针解引用或会导致 panic 的严重错误；\n"
+                "   - 明显的越界访问或会导致程序崩溃的问题；\n"
+                "不检查类型匹配、指针可变性、边界检查细节、资源释放细节、内存语义等技术细节（除非会导致功能错误）。\n"
                 "请在总结阶段详细指出问题和修改建议，但不要尝试修复或修改任何代码，不要输出补丁。"
             )
             # 附加原始C函数源码片段，供审查作为只读参考
@@ -1918,12 +1685,15 @@ class Transpiler:
                 c_code,
                 "</C_SOURCE>",
                 "",
-                "审查说明：",
-                "- 仅关注功能一致性：核心输入输出、主要功能逻辑是否与 C 实现一致；",
-                "- 允许Rust实现修复C代码中的安全漏洞（如缓冲区溢出、空指针解引用、未初始化内存使用等），这些修复不应被视为功能不一致；",
-                "- 允许Rust实现使用不同的类型设计、错误处理方式、资源管理方式等，只要功能一致即可；",
-                "- 不检查类型匹配、边界检查、资源释放细节等技术细节；",
-                "- 若Rust实现修复了安全漏洞或使用了不同的实现方式但保持了功能一致，应视为通过审查；",
+                "审查说明（合并审查）：",
+                "1. 功能一致性：",
+                "   - 核心输入输出、主要功能逻辑是否与 C 实现一致；",
+                "   - 允许Rust实现修复C代码中的安全漏洞（如缓冲区溢出、空指针解引用、未初始化内存使用等），这些修复不应被视为功能不一致；",
+                "   - 允许Rust实现使用不同的类型设计、错误处理方式、资源管理方式等，只要功能一致即可；",
+                "2. 严重问题（可能导致功能错误）：",
+                "   - 明显的空指针解引用或会导致 panic 的严重错误；",
+                "   - 明显的越界访问或会导致程序崩溃的问题；",
+                "不检查类型匹配、指针可变性、边界检查细节等技术细节（除非会导致功能错误）。",
                 "",
                 "被引用符号上下文（如已转译则包含Rust模块信息）：",
                 json.dumps(callees_ctx, ensure_ascii=False, indent=2),
@@ -1946,13 +1716,15 @@ class Transpiler:
                 "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
             ])
             sum_p = (
-                "请仅输出一个 <SUMMARY> 块，内容为纯文本：\n"
-                "- 若满足功能一致（核心输入输出、主要功能逻辑一致），请输出：OK\n"
-                "- 注意：若Rust实现修复了C代码中的安全漏洞或使用了不同的实现方式但保持了功能一致，应输出OK\n"
-                "- 前置条件：必须在crate中找到该函数的实现（匹配函数名或签名）。若未找到，禁止输出OK，请输出一行：[function] function not found\n"
-                "- 否则请详细列出发现的功能问题（每项问题以 [function] 开头，后面紧跟修改建议）。仅关注功能不一致，不报告类型、边界等技术细节问题。\n"
-                "<SUMMARY>...</SUMMARY>\n"
-                "不要在 <SUMMARY> 块外输出任何内容。"
+                "请仅输出一个 <SUMMARY> 块，块内为单个 <yaml> 对象，字段：\n"
+                "ok: bool  # 若满足功能一致且无严重问题，则为 true\n"
+                "function_issues: [string, ...]  # 功能一致性问题，每项以 [function] 开头，示例：[function] missing return value handling\n"
+                "critical_issues: [string, ...]  # 严重问题（可能导致功能错误），每项以 [critical] 开头，示例：[critical] obvious null pointer dereference\n"
+                "注意：\n"
+                "- 前置条件：必须在crate中找到该函数的实现（匹配函数名或签名）。若未找到，ok 必须为 false，function_issues 应包含 [function] function not found\n"
+                "- 若Rust实现修复了C代码中的安全漏洞或使用了不同的实现方式但保持了功能一致，且无严重问题，ok 应为 true\n"
+                "- 仅报告功能不一致和严重问题，不报告类型匹配、指针可变性、边界检查细节等技术细节（除非会导致功能错误）\n"
+                "<SUMMARY><yaml>\nok: true\nfunction_issues: []\ncritical_issues: []\n</yaml></SUMMARY>"
             )
             return sys_p, usr_p, sum_p
 
@@ -1986,23 +1758,61 @@ class Transpiler:
                 summary = str(agent.run(self._compose_prompt_with_context(usr_p_init)) or "")
             finally:
                 os.chdir(prev_cwd)
-            m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
-            content = (m.group(1).strip() if m else summary.strip()).upper()
-            if content == "OK":
+            
+            # 解析 YAML 格式的审查结果
+            verdict = _extract_json_from_summary(summary)
+            if not isinstance(verdict, dict):
+                # 兼容旧格式：尝试解析纯文本 OK
+                m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
+                content = (m.group(1).strip() if m else summary.strip()).upper()
+                if content == "OK":
+                    verdict = {"ok": True, "function_issues": [], "critical_issues": []}
+                else:
+                    # 无法解析，视为有问题
+                    verdict = {"ok": False, "function_issues": [content], "critical_issues": []}
+            
+            ok = bool(verdict.get("ok") is True)
+            function_issues = verdict.get("function_issues") if isinstance(verdict.get("function_issues"), list) else []
+            critical_issues = verdict.get("critical_issues") if isinstance(verdict.get("critical_issues"), list) else []
+            all_issues = function_issues + critical_issues
+            
+            typer.secho(f"[c2rust-transpiler][review][iter={i+1}] verdict ok={ok}, function_issues={len(function_issues)}, critical_issues={len(critical_issues)}", fg=typer.colors.CYAN)
+            
+            if ok and not all_issues:
                 limit_info = f" (上限: {max_iterations if max_iterations > 0 else '无限'})"
                 typer.secho(f"[c2rust-transpiler][review] 代码审查通过{limit_info} (共 {i+1} 次迭代)。", fg=typer.colors.GREEN)
-                # 二次审查：类型/边界一致性检查与最小化修复
+                # 记录审查结果到进度
                 try:
-                    self._type_boundary_review_and_fix(rec, module, rust_sig)
+                    cur = self.progress.get("current") or {}
+                    cur["review"] = {
+                        "ok": True,
+                        "function_issues": [],
+                        "critical_issues": [],
+                        "iterations": i + 1,
+                    }
+                    metrics = cur.get("metrics") or {}
+                    metrics["review_iterations"] = i + 1
+                    metrics["function_issues"] = 0
+                    metrics["type_issues"] = 0
+                    cur["metrics"] = metrics
+                    self.progress["current"] = cur
+                    self._save_progress()
                 except Exception:
                     pass
                 return
+            
             # 需要优化：提供详细上下文背景，并明确审查意见仅针对 Rust crate，不修改 C 源码
             crate_tree = _dir_tree(self.crate_dir)
+            issues_text = "\n".join([
+                "功能一致性问题：" if function_issues else "",
+                *[f"  - {issue}" for issue in function_issues],
+                "严重问题（可能导致功能错误）：" if critical_issues else "",
+                *[f"  - {issue}" for issue in critical_issues],
+            ])
             fix_prompt = "\n".join([
                 "请根据以下审查结论对目标函数进行最小优化（保留结构与意图，不进行大范围重构）：",
                 "<REVIEW>",
-                content,
+                issues_text if issues_text.strip() else "审查发现问题，但未提供具体问题描述",
                 "</REVIEW>",
                 "",
                 "上下文背景信息：",
@@ -2016,6 +1826,7 @@ class Transpiler:
                 "- 本次审查意见仅针对 Rust crate 的代码与配置；不要修改任何 C/C++ 源文件（*.c、*.h 等）。",
                 "- 仅允许在 crate_dir 下进行最小必要修改（Cargo.toml、src/**/*.rs）；不要改动其他目录。",
                 "- 保持最小改动，避免与问题无关的重构或格式化。",
+                "- 优先修复严重问题（可能导致功能错误），然后修复功能一致性问题；",
                 "- 如审查问题涉及缺失/未实现的被调函数或依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时在合理模块新增函数或引入精确 use；",
                 "- 禁止使用 todo!/unimplemented! 作为占位；",
                 "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号（禁止通配）；",
@@ -2033,6 +1844,25 @@ class Transpiler:
                 self._cargo_build_loop()
             finally:
                 os.chdir(prev_cwd)
+            
+            # 记录本次审查结果
+            try:
+                cur = self.progress.get("current") or {}
+                cur["review"] = {
+                    "ok": False,
+                    "function_issues": list(function_issues),
+                    "critical_issues": list(critical_issues),
+                    "iterations": i + 1,
+                }
+                metrics = cur.get("metrics") or {}
+                metrics["function_issues"] = len(function_issues)
+                metrics["type_issues"] = len(critical_issues)
+                cur["metrics"] = metrics
+                self.progress["current"] = cur
+                self._save_progress()
+            except Exception:
+                pass
+            
             i += 1
         
         # 达到迭代上限（仅当设置了上限时）
@@ -2065,140 +1895,6 @@ class Transpiler:
         self.progress["converted"] = converted
         self.progress["current"] = None
         self._save_progress()
-
-    def _type_boundary_review_and_fix(self, rec: FnRecord, module: str, rust_sig: str) -> None:
-        """
-        第二阶段审查：仅检查可能导致功能错误的严重问题
-        - 关注点：仅检查可能导致功能错误的严重问题（如明显的空指针解引用导致 panic、明显的越界访问等）
-        - 不检查类型匹配、指针可变性、边界检查细节等技术细节
-        - 输出：要求 Agent 仅在 <SUMMARY> 中给出 YAML verdict；若 not ok，触发一次最小修复 CodeAgent，然后重新验证，循环直到通过
-        """
-        def build_review_prompts() -> Tuple[str, str, str]:
-            sys_p = (
-                "你是Rust代码审查专家。仅检查可能导致功能错误的严重问题：\n"
-                "1) 明显的空指针解引用或会导致 panic 的严重错误；\n"
-                "2) 明显的越界访问或会导致程序崩溃的问题；\n"
-                "不检查类型匹配、指针可变性、边界检查细节、资源释放、内存语义等技术细节。仅关注可能导致功能错误的严重问题。"
-            )
-            # 仅提供必要上下文；Agent 可自行读取 crate 内代码
-            c_code = self._read_source_span(rec) or ""
-            usr_p = "\n".join([
-                f"目标函数：{rec.qname or rec.name}",
-                f"建议/当前签名：{rust_sig}",
-                f"模块文件：{module}",
-                f"crate 根目录：{self.crate_dir.resolve()}",
-                "",
-                "原始C函数源码片段（只读参考，不要修改C代码）：",
-                "<C_SOURCE>",
-                c_code,
-                "</C_SOURCE>",
-                "",
-                "审查标准：仅检查可能导致功能错误的严重问题（如明显的空指针解引用、明显的越界访问等）。",
-                "不检查类型匹配、指针可变性、边界检查细节等技术细节。",
-            ])
-            sum_p = (
-                "请仅输出一个 <SUMMARY> 块，块内为单个 <yaml> 对象，字段：\n"
-                "ok: bool\n"
-                "issues: [string, ...]  # 每条以 [critical] 开头，仅报告可能导致功能错误的严重问题，示例：[critical] obvious null pointer dereference\n"
-                "<SUMMARY><yaml>\nok: true\nissues: []\n</yaml></SUMMARY>"
-            )
-            return sys_p, usr_p, sum_p
-
-        try:
-            i = 0
-            # 复用 Type Review Agent（仅在本函数生命周期内构建一次）
-            key = f"type_review::{rec.id}"
-            sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
-            if self._current_agents.get(key) is None:
-                self._current_agents[key] = Agent(
-                    system_prompt=sys_p_init,
-                    name="C2Rust-TypeBoundary-Review",
-                    model_group=self.llm_group,
-                    summary_prompt=sum_p_init,
-                    need_summary=True,
-                    auto_complete=True,
-                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
-                    plan=False,
-                    non_interactive=True,
-                    use_methodology=False,
-                    use_analysis=False,
-                    disable_file_edit=True,
-                )
-            agent = self._current_agents[key]
-
-            while True:
-                i += 1
-                prev_cwd = os.getcwd()
-                try:
-                    os.chdir(str(self.crate_dir))
-                    review = str(agent.run(self._compose_prompt_with_context(usr_p_init)) or "")
-                finally:
-                    os.chdir(prev_cwd)
-                verdict = _extract_json_from_summary(review)
-                if not isinstance(verdict, dict):
-                    typer.secho(f"[c2rust-transpiler][type-review] 无法解析审查结果，跳过", fg=typer.colors.YELLOW)
-                    return
-                ok = bool(verdict.get("ok") is True)
-                issues = verdict.get("issues") if isinstance(verdict.get("issues"), list) else []
-                typer.secho(f"[c2rust-transpiler][type-review][iter={i}] verdict ok={ok}, issues={len(issues)}", fg=typer.colors.CYAN)
-                
-                if ok or not issues:
-                    # 记录类型/边界审查结果到进度（通过或无问题）
-                    try:
-                        cur = self.progress.get("current") or {}
-                        cur["type_boundary_review"] = {"ok": True, "issues": []}
-                        # 增加度量统计：类型/边界问题计数
-                        metrics = cur.get("metrics") or {}
-                        metrics["type_issues"] = 0
-                        cur["metrics"] = metrics
-                        self.progress["current"] = cur
-                        self._save_progress()
-                    except Exception:
-                        pass
-                    typer.secho(f"[c2rust-transpiler][type-review] 审查通过 (共 {i} 次迭代)", fg=typer.colors.GREEN)
-                    return
-
-                # 记录类型/边界审查问题与度量后，再进行最小化修复
-                typer.secho(f"[c2rust-transpiler][type-review][iter={i}] 发现问题，开始修复", fg=typer.colors.YELLOW)
-                try:
-                    cur = self.progress.get("current") or {}
-                    cur["type_boundary_review"] = {"ok": False, "issues": list(issues)}
-                    metrics = cur.get("metrics") or {}
-                    metrics["type_issues"] = int(len(issues))
-                    cur["metrics"] = metrics
-                    self.progress["current"] = cur
-                    self._save_progress()
-                except Exception:
-                    pass
-
-                # 最小化修复提示
-                fix_lines = [
-                    "请对目标函数进行最小必要的修复，仅修复可能导致功能错误的严重问题：",
-                    "- 明显的空指针解引用或会导致 panic 的严重错误；",
-                    "- 明显的越界访问或会导致程序崩溃的问题；",
-                    "- 如修复涉及缺失/未实现的被调函数或依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时在合理模块新增函数或引入精确 use；禁止使用 todo!/unimplemented! 作为占位；可使用 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；",
-                    "",
-                    f"模块文件：{module}",
-                    f"crate 根目录：{self.crate_dir.resolve()}",
-                    "问题列表：",
-                    *[str(x) for x in issues],
-                    "",
-                    "仅输出补丁，不要输出解释；保持变更最小化。",
-                ]
-                prev = os.getcwd()
-                try:
-                    os.chdir(str(self.crate_dir))
-                    ca = self._get_repair_agent()
-                    ca.run(self._compose_prompt_with_context("\n".join(fix_lines)), prefix=f"[c2rust-transpiler][type-boundary-fix iter={i}]", suffix="")
-                    # 修复后进行构建验证，确保修复后代码能编译
-                    typer.secho(f"[c2rust-transpiler][type-review][iter={i}] 修复后验证构建", fg=typer.colors.BLUE)
-                    self._cargo_build_loop()
-                finally:
-                    os.chdir(prev)
-                # 修复后继续循环，重新审查验证
-        except Exception:
-            # 二次审查失败不阻塞主流程
-            pass
 
     def transpile(self) -> None:
         """主流程"""
