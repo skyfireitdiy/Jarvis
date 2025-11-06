@@ -1070,7 +1070,6 @@ class Transpiler:
             # 解析失败不阻塞，仅不产生问题
             return issues
         return issues
-        return issues
 
     # ========= Agent 复用与上下文拼接辅助 =========
 
@@ -1695,6 +1694,103 @@ class Transpiler:
             tags = list(set(tags))
         return tags
 
+    def _get_current_function_context(self) -> Tuple[Dict[str, Any], str, str, str]:
+        """
+        获取当前函数上下文信息。
+        返回: (curr, sym_name, src_loc, c_code)
+        """
+        try:
+            curr = self.progress.get("current") or {}
+        except Exception:
+            curr = {}
+        sym_name = str(curr.get("qualified_name") or curr.get("name") or "")
+        src_loc = f"{curr.get('file')}:{curr.get('start_line')}-{curr.get('end_line')}" if curr else ""
+        c_code = ""
+        try:
+            cf = curr.get("file")
+            s = int(curr.get("start_line") or 0)
+            e = int(curr.get("end_line") or 0)
+            if cf and s:
+                p = Path(cf)
+                if not p.is_absolute():
+                    p = (self.project_root / p).resolve()
+                if p.exists():
+                    lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+                    s0 = max(1, s)
+                    e0 = min(len(lines), max(e, s0))
+                    c_code = "\n".join(lines[s0 - 1 : e0])
+        except Exception:
+            c_code = ""
+        return curr, sym_name, src_loc, c_code
+
+    def _build_repair_prompt(self, stage: str, output: str, tags: List[str], sym_name: str, src_loc: str, c_code: str, curr: Dict[str, Any], symbols_path: str, include_output_patch_hint: bool = False) -> str:
+        """
+        构建修复提示词。
+        
+        Args:
+            stage: 阶段名称（"cargo check" 或 "cargo test"）
+            output: 构建错误输出
+            tags: 错误分类标签
+            sym_name: 符号名称
+            src_loc: 源文件位置
+            c_code: C 源码片段
+            curr: 当前进度信息
+            symbols_path: 符号表文件路径
+            include_output_patch_hint: 是否包含"仅输出补丁"提示（test阶段需要）
+        """
+        base_lines = [
+            f"目标：以最小的改动修复问题，使 `{stage}` 命令可以通过。",
+            f"阶段：{stage}",
+            f"错误分类标签: {tags}",
+            "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；在缺失/未实现的被调函数导致错误时，一并补齐这些依赖的Rust实现（可新增合理模块/函数）；避免大范围改动。",
+            "- 保持最小改动，避免与错误无关的重构或格式化；",
+            "- 如构建失败源于缺失或未实现的被调函数/依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时可在合理的模块中新建函数；",
+            "- 禁止使用 todo!/unimplemented! 作为占位；",
+            "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号，避免通配；",
+            f"- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]{('，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值' if stage == "cargo test" else '')}；",
+        ]
+        if include_output_patch_hint:
+            base_lines.append("- 请仅输出补丁，不要输出解释或多余文本。")
+        base_lines.extend([
+            "",
+            "最近处理的函数上下文（供参考，优先修复构建错误）：",
+            f"- 函数：{sym_name}",
+            f"- 源位置：{src_loc}",
+            f"- 目标模块（progress）：{curr.get('module') or ''}",
+            f"- 建议签名（progress）：{curr.get('rust_signature') or ''}",
+            "",
+            "原始C函数源码片段（只读参考）：",
+            "<C_SOURCE>",
+            c_code,
+            "</C_SOURCE>",
+            "",
+            "如需定位或交叉验证 C 符号位置，请使用符号表检索工具：",
+            "- 工具: read_symbols",
+            "- 参数示例(YAML):",
+            f"  symbols_file: \"{symbols_path}\"",
+            "  symbols:",
+            f"    - \"{sym_name}\"",
+            "",
+            "上下文：",
+            f"- crate 根目录路径: {self.crate_dir.resolve()}",
+        ])
+        if stage == "cargo check":
+            base_lines.append(f"- 包名称（用于 cargo -p）: {self.crate_dir.name}")
+        else:
+            base_lines.append(f"- 包名称（用于 cargo build -p）: {self.crate_dir.name}")
+        base_lines.extend([
+            "",
+            "请阅读以下构建错误并进行必要修复：",
+            "<BUILD_ERROR>",
+            output,
+            "</BUILD_ERROR>",
+        ])
+        if stage == "cargo check":
+            base_lines.append("修复后请再次执行 `cargo check` 验证，后续将自动运行 `cargo test`。")
+        else:
+            base_lines.append("修复后请再次执行 `cargo test` 进行验证。")
+        return "\n".join(base_lines)
+
     def _cargo_build_loop(self) -> bool:
         """在 crate 目录执行构建与测试：先 cargo check，再 cargo test。失败则最小化修复直到通过或达到上限。"""
         workspace_root = str(self.crate_dir)
@@ -1739,67 +1835,18 @@ class Transpiler:
                 # 提示修复（分类标签）
                 tags = self._classify_rust_error(output)
                 symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
-                try:
-                    curr = self.progress.get("current") or {}
-                except Exception:
-                    curr = {}
-                sym_name = str(curr.get("qualified_name") or curr.get("name") or "")
-                src_loc = f"{curr.get('file')}:{curr.get('start_line')}-{curr.get('end_line')}" if curr else ""
-                c_code = ""
-                try:
-                    cf = curr.get("file")
-                    s = int(curr.get("start_line") or 0)
-                    e = int(curr.get("end_line") or 0)
-                    if cf and s:
-                        p = Path(cf)
-                        if not p.is_absolute():
-                            p = (self.project_root / p).resolve()
-                        if p.exists():
-                            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
-                            s0 = max(1, s)
-                            e0 = min(len(lines), max(e, s0))
-                            c_code = "\n".join(lines[s0 - 1 : e0])
-                except Exception:
-                    c_code = ""
-                repair_prompt = "\n".join([
-                    "目标：以最小的改动修复问题，使 `cargo check` 和 `cargo test` 可以通过。",
-                    "阶段：cargo check",
-                    f"错误分类标签: {tags}",
-                    "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；在缺失/未实现的被调函数导致错误时，一并补齐这些依赖的Rust实现（可新增合理模块/函数）；避免大范围改动。",
-                    "- 保持最小改动，避免与错误无关的重构或格式化；",
-                    "- 如构建失败源于缺失或未实现的被调函数/依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时可在合理的模块中新建函数；",
-                    "- 禁止使用 todo!/unimplemented! 作为占位；",
-                    "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号，避免通配；",
-                    "- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]；",
-                    "",
-                    "最近处理的函数上下文（供参考，优先修复构建错误）：",
-                    f"- 函数：{sym_name}",
-                    f"- 源位置：{src_loc}",
-                    f"- 目标模块（progress）：{curr.get('module') or ''}",
-                    f"- 建议签名（progress）：{curr.get('rust_signature') or ''}",
-                    "",
-                    "原始C函数源码片段（只读参考）：",
-                    "<C_SOURCE>",
-                    c_code,
-                    "</C_SOURCE>",
-                    "",
-                    "如需定位或交叉验证 C 符号位置，请使用符号表检索工具：",
-                    "- 工具: read_symbols",
-                    "- 参数示例(YAML):",
-                    f"  symbols_file: \"{symbols_path}\"",
-                    "  symbols:",
-                    f"    - \"{sym_name}\"",
-                    "",
-                    "上下文：",
-                    f"- crate 根目录路径: {self.crate_dir.resolve()}",
-                    f"- 包名称（用于 cargo -p）: {self.crate_dir.name}",
-                    "",
-                    "请阅读以下构建错误并进行必要修复：",
-                    "<BUILD_ERROR>",
-                    output,
-                    "</BUILD_ERROR>",
-                    "修复后请再次执行 `cargo check` 验证，后续将自动运行 `cargo test`。",
-                ])
+                curr, sym_name, src_loc, c_code = self._get_current_function_context()
+                repair_prompt = self._build_repair_prompt(
+                    stage="cargo check",
+                    output=output,
+                    tags=tags,
+                    sym_name=sym_name,
+                    src_loc=src_loc,
+                    c_code=c_code,
+                    curr=curr,
+                    symbols_path=symbols_path,
+                    include_output_patch_hint=False,
+                )
                 prev_cwd = os.getcwd()
                 try:
                     os.chdir(str(self.crate_dir))
@@ -1860,69 +1907,18 @@ class Transpiler:
             # 构建失败（测试阶段）修复
             tags = self._classify_rust_error(output)
             symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
-            try:
-                curr = self.progress.get("current") or {}
-            except Exception:
-                curr = {}
-            sym_name = str(curr.get("qualified_name") or curr.get("name") or "")
-            src_loc = f"{curr.get('file')}:{curr.get('start_line')}-{curr.get('end_line')}" if curr else ""
-            c_code = ""
-            try:
-                cf = curr.get("file")
-                s = int(curr.get("start_line") or 0)
-                e = int(curr.get("end_line") or 0)
-                if cf and s:
-                    p = Path(cf)
-                    if not p.is_absolute():
-                        p = (self.project_root / p).resolve()
-                    if p.exists():
-                        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
-                        s0 = max(1, s)
-                        e0 = min(len(lines), max(e, s0))
-                        c_code = "\n".join(lines[s0 - 1 : e0])
-            except Exception:
-                c_code = ""
-
-            repair_prompt = "\n".join([
-                "目标：以最小的改动修复问题，使 `cargo test` 命令可以通过。",
-                "阶段：cargo test",
-                f"错误分类标签: {tags}",
-                "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；在缺失/未实现的被调函数导致错误时，一并补齐这些依赖的Rust实现（可新增合理模块/函数）；避免大范围改动。",
-                "- 保持最小改动，避免与错误无关的重构或格式化；",
-                "- 如构建失败源于缺失或未实现的被调函数/依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时可在合理的模块中新建函数；",
-                "- 禁止使用 todo!/unimplemented! 作为占位；",
-                "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号，避免通配；",
-                "- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值；",
-                "- 请仅输出补丁，不要输出解释或多余文本。",
-                "",
-                "最近处理的函数上下文（供参考，优先修复构建错误）：",
-                f"- 函数：{sym_name}",
-                f"- 源位置：{src_loc}",
-                f"- 目标模块（progress）：{curr.get('module') or ''}",
-                f"- 建议签名（progress）：{curr.get('rust_signature') or ''}",
-                "",
-                "原始C函数源码片段（只读参考）：",
-                "<C_SOURCE>",
-                c_code,
-                "</C_SOURCE>",
-                "",
-                "如需定位或交叉验证 C 符号位置，请使用符号表检索工具：",
-                "- 工具: read_symbols",
-                "- 参数示例(YAML):",
-                f"  symbols_file: \"{symbols_path}\"",
-                "  symbols:",
-                f"    - \"{sym_name}\"",
-                "",
-                "上下文：",
-                f"- crate 根目录路径: {self.crate_dir.resolve()}",
-                f"- 包名称（用于 cargo build -p）: {self.crate_dir.name}",
-                "",
-                "请阅读以下构建错误并进行必要修复：",
-                "<BUILD_ERROR>",
-                output,
-                "</BUILD_ERROR>",
-                "修复后请再次执行 `cargo test` 进行验证。",
-            ])
+            curr, sym_name, src_loc, c_code = self._get_current_function_context()
+            repair_prompt = self._build_repair_prompt(
+                stage="cargo test",
+                output=output,
+                tags=tags,
+                sym_name=sym_name,
+                src_loc=src_loc,
+                c_code=c_code,
+                curr=curr,
+                symbols_path=symbols_path,
+                include_output_patch_hint=True,
+            )
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
