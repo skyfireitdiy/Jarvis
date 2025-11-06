@@ -45,6 +45,12 @@ SYMBOL_MAP_JSONL = "symbol_map.jsonl"
 # 兼容旧版：若存在 symbol_map.json 也尝试加载（只读）
 LEGACY_SYMBOL_MAP_JSON = "symbol_map.json"
 
+# 配置常量
+ERROR_SUMMARY_MAX_LENGTH = 2000  # 错误信息摘要最大长度
+DEFAULT_REVIEW_MAX_ITERATIONS = 10  # 审查阶段最大迭代次数
+DEFAULT_CHECK_MAX_RETRIES = 10  # cargo check 阶段默认最大重试次数
+DEFAULT_TEST_MAX_RETRIES = 10  # cargo test 阶段默认最大重试次数
+
 
 @dataclass
 class FnRecord:
@@ -393,11 +399,20 @@ def _read_json(path: Path, default: Any) -> Any:
 
 
 def _write_json(path: Path, obj: Any) -> None:
+    """原子性写入JSON文件：先写入临时文件，再重命名"""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        # 使用临时文件确保原子性
+        temp_path = path.with_suffix(path.suffix + ".tmp")
+        temp_path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        # 原子性重命名
+        temp_path.replace(path)
     except Exception:
-        pass
+        # 如果原子写入失败，回退到直接写入
+        try:
+            path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
 
 
 def _extract_json_from_summary(text: str) -> Dict[str, Any]:
@@ -435,7 +450,10 @@ class Transpiler:
         crate_dir: Optional[Union[str, Path]] = None,
         llm_group: Optional[str] = None,
         plan_max_retries: int = 5,
-        max_retries: int = 0,
+        max_retries: int = 0,  # 兼容旧接口，如未设置则使用 check_max_retries 和 test_max_retries
+        check_max_retries: Optional[int] = None,  # cargo check 阶段最大重试次数
+        test_max_retries: Optional[int] = None,  # cargo test 阶段最大重试次数
+        review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,  # 审查阶段最大迭代次数
         resume: bool = True,
         only: Optional[List[str]] = None,  # 仅转译指定函数名（简单名或限定名）
     ) -> None:
@@ -448,10 +466,18 @@ class Transpiler:
         self.legacy_symbol_map_path = self.data_dir / LEGACY_SYMBOL_MAP_JSON
         self.llm_group = llm_group
         self.plan_max_retries = plan_max_retries
-        self.max_retries = max_retries
+        # 兼容旧接口：如果只设置了 max_retries，则同时用于 check 和 test
+        if max_retries > 0 and check_max_retries is None and test_max_retries is None:
+            self.check_max_retries = max_retries
+            self.test_max_retries = max_retries
+        else:
+            self.check_max_retries = check_max_retries if check_max_retries is not None else DEFAULT_CHECK_MAX_RETRIES
+            self.test_max_retries = test_max_retries if test_max_retries is not None else DEFAULT_TEST_MAX_RETRIES
+        self.max_retries = max(self.check_max_retries, self.test_max_retries)  # 保持兼容性
+        self.review_max_iterations = review_max_iterations
         self.resume = resume
         self.only = set(only or [])
-        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} max_retries={self.max_retries} resume={self.resume} only={sorted(list(self.only)) if self.only else []}", fg=typer.colors.BLUE)
+        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} resume={self.resume} only={sorted(list(self.only)) if self.only else []}", fg=typer.colors.BLUE)
 
         self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
         # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
@@ -474,6 +500,7 @@ class Transpiler:
         self._current_function_id: Optional[int] = None
 
     def _save_progress(self) -> None:
+        """保存进度，使用原子性写入"""
         _write_json(self.progress_path, self.progress)
 
     # JSONL 模式下不再整体写回 symbol_map；此方法保留占位（兼容旧调用），无操作
@@ -1795,10 +1822,11 @@ class Transpiler:
         """在 crate 目录执行构建与测试：先 cargo check，再 cargo test。失败则最小化修复直到通过或达到上限。"""
         workspace_root = str(self.crate_dir)
         typer.secho(f"[c2rust-transpiler][build] 工作区={workspace_root}，开始构建循环（check -> test）", fg=typer.colors.MAGENTA)
-        i = 0
+        check_iter = 0
+        test_iter = 0
         while True:
-            i += 1
             # 阶段一：cargo check（更快）
+            check_iter += 1
             res_check = subprocess.run(
                 ["cargo", "check", "-q"],
                 capture_output=True,
@@ -1808,24 +1836,23 @@ class Transpiler:
             )
             if res_check.returncode != 0:
                 output = (res_check.stdout or "") + "\n" + (res_check.stderr or "")
-                typer.secho(f"[c2rust-transpiler][build] cargo check 失败 (第 {i} 次尝试)。", fg=typer.colors.RED)
+                typer.secho(f"[c2rust-transpiler][build] cargo check 失败 (第 {check_iter} 次尝试)。", fg=typer.colors.RED)
                 typer.secho(output, fg=typer.colors.RED)
                 # 达到上限则记录并退出
-                try:
-                    maxr = int(self.max_retries)
-                except Exception:
-                    maxr = 0
-                if maxr > 0 and i >= maxr:
+                maxr = self.check_max_retries
+                if maxr > 0 and check_iter >= maxr:
                     typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
                     try:
                         cur = self.progress.get("current") or {}
                         metrics = cur.get("metrics") or {}
-                        metrics["build_attempts"] = int(i)
+                        metrics["check_attempts"] = int(check_iter)
+                        metrics["test_attempts"] = int(test_iter)
                         cur["metrics"] = metrics
                         cur["impl_verified"] = False
+                        cur["failed_stage"] = "check"
                         err_summary = (output or "").strip()
-                        if len(err_summary) > 2000:
-                            err_summary = err_summary[:2000] + "...(truncated)"
+                        if len(err_summary) > ERROR_SUMMARY_MAX_LENGTH:
+                            err_summary = err_summary[:ERROR_SUMMARY_MAX_LENGTH] + "...(truncated)"
                         cur["last_build_error"] = err_summary
                         self.progress["current"] = cur
                         self._save_progress()
@@ -1851,13 +1878,26 @@ class Transpiler:
                 try:
                     os.chdir(str(self.crate_dir))
                     agent = self._get_repair_agent()
-                    agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={i}][check]", suffix="")
+                    agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={check_iter}][check]", suffix="")
+                    # 修复后进行轻量验证：检查语法是否正确
+                    res_verify = subprocess.run(
+                        ["cargo", "check", "--message-format=short", "-q"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        cwd=workspace_root,
+                    )
+                    if res_verify.returncode == 0:
+                        typer.secho(f"[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                    else:
+                        typer.secho(f"[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
                 finally:
                     os.chdir(prev_cwd)
                 # 下一轮循环
                 continue
 
-            # 阶段二：cargo test
+            # 阶段二：cargo test（check 通过后才执行）
+            test_iter += 1
             res = subprocess.run(
                 ["cargo", "test", "-q"],
                 capture_output=True,
@@ -1870,9 +1910,11 @@ class Transpiler:
                 try:
                     cur = self.progress.get("current") or {}
                     metrics = cur.get("metrics") or {}
-                    metrics["build_attempts"] = int(i)
+                    metrics["check_attempts"] = int(check_iter)
+                    metrics["test_attempts"] = int(test_iter)
                     cur["metrics"] = metrics
                     cur["impl_verified"] = True
+                    cur["failed_stage"] = None
                     self.progress["current"] = cur
                     self._save_progress()
                 except Exception:
@@ -1880,23 +1922,22 @@ class Transpiler:
                 return True
 
             output = (res.stdout or "") + "\n" + (res.stderr or "")
-            typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {i} 次尝试)。", fg=typer.colors.RED)
+            typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {test_iter} 次尝试)。", fg=typer.colors.RED)
             typer.secho(output, fg=typer.colors.RED)
-            try:
-                maxr = int(self.max_retries)
-            except Exception:
-                maxr = 0
-            if maxr > 0 and i >= maxr:
+            maxr = self.test_max_retries
+            if maxr > 0 and test_iter >= maxr:
                 typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
                 try:
                     cur = self.progress.get("current") or {}
                     metrics = cur.get("metrics") or {}
-                    metrics["build_attempts"] = int(i)
+                    metrics["check_attempts"] = int(check_iter)
+                    metrics["test_attempts"] = int(test_iter)
                     cur["metrics"] = metrics
                     cur["impl_verified"] = False
+                    cur["failed_stage"] = "test"
                     err_summary = (output or "").strip()
-                    if len(err_summary) > 2000:
-                        err_summary = err_summary[:2000] + "...(truncated)"
+                    if len(err_summary) > ERROR_SUMMARY_MAX_LENGTH:
+                        err_summary = err_summary[:ERROR_SUMMARY_MAX_LENGTH] + "...(truncated)"
                     cur["last_build_error"] = err_summary
                     self.progress["current"] = cur
                     self._save_progress()
@@ -1923,9 +1964,23 @@ class Transpiler:
             try:
                 os.chdir(str(self.crate_dir))
                 agent = self._get_repair_agent()
-                agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={i}][test]", suffix="")
+                agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]", suffix="")
+                # 修复后进行轻量验证：检查语法是否正确
+                res_verify = subprocess.run(
+                    ["cargo", "test", "--message-format=short", "-q", "--no-run"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    cwd=workspace_root,
+                )
+                if res_verify.returncode == 0:
+                    typer.secho(f"[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                else:
+                    typer.secho(f"[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
             finally:
                 os.chdir(prev_cwd)
+            # 重置 check 迭代计数，因为修复后需要重新 check
+            check_iter = 0
 
     def _review_and_optimize(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """
@@ -1988,6 +2043,7 @@ class Transpiler:
             return sys_p, usr_p, sum_p
 
         i = 0
+        max_iterations = self.review_max_iterations
         # 复用 Review Agent（仅在本函数生命周期内构建一次）
         review_key = f"review::{rec.id}"
         sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
@@ -2007,7 +2063,7 @@ class Transpiler:
                 disable_file_edit=True,
             )
 
-        while True:
+        while i < max_iterations:
             agent = self._current_agents[review_key]
             prev_cwd = os.getcwd()
             try:
@@ -2055,12 +2111,24 @@ class Transpiler:
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                ca.run(self._compose_prompt_with_context(fix_prompt), prefix=f"[c2rust-transpiler][review-fix iter={i}]", suffix="")
+                ca.run(self._compose_prompt_with_context(fix_prompt), prefix=f"[c2rust-transpiler][review-fix iter={i+1}]", suffix="")
                 # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
                 self._cargo_build_loop()
             finally:
                 os.chdir(prev_cwd)
             i += 1
+        
+        # 达到迭代上限
+        if i >= max_iterations:
+            typer.secho(f"[c2rust-transpiler][review] 已达到最大迭代次数上限({max_iterations})，停止审查优化。", fg=typer.colors.YELLOW)
+            try:
+                cur = self.progress.get("current") or {}
+                cur["review_max_iterations_reached"] = True
+                cur["review_iterations"] = i
+                self.progress["current"] = cur
+                self._save_progress()
+            except Exception:
+                pass
 
     def _mark_converted(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """记录映射：C 符号 -> Rust 符号与模块路径（JSONL，每行一条，支持重载/同名）"""
@@ -2306,6 +2374,117 @@ class Transpiler:
             # 初始化函数上下文与修复Agent复用缓存（只在当前函数开始时执行一次）
             self._reset_function_context(rec, module, rust_sig, c_code)
 
+            # 1.5) 签名一致性检查（提前到生成实现之前，避免生成错误签名后再修复）
+            sig_hint_local = None
+            try:
+                sig_hint_local = self._infer_rust_signature_hint(rec)
+                issues = self._check_signature_consistency(rust_sig, rec)
+                typer.secho(f"[c2rust-transpiler][sig] 签名一致性问题数: {len(issues)}", fg=typer.colors.YELLOW)
+                if issues:
+                    fix_prompt = "\n".join([
+                        f"请在文件 {module} 中根据以下问题最小化修正函数签名（仅签名层面，函数尚未生成）：",
+                        *issues,
+                        "",
+                        "上下文信息：",
+                        f"- crate 根目录路径: {self.crate_dir.resolve()}",
+                        f"- 目标模块文件: {module}",
+                        f"- 当前/建议 Rust 签名: {rust_sig}",
+                        "- 符号表签名与参数（只读参考）：",
+                        json.dumps({"signature": getattr(rec, "signature", ""), "params": getattr(rec, "params", None)}, ensure_ascii=False, indent=2),
+                        "",
+                        "C 源码片段（供参考，不要原样粘贴）：",
+                        "<C_SOURCE>",
+                        c_code,
+                        "</C_SOURCE>",
+                        "",
+                        "如需按需检索符号表记录，请使用符号表检索工具：",
+                        "- 工具: read_symbols",
+                        "- 参数示例(YAML):",
+                        f"  symbols_file: \"{(self.data_dir / 'symbols.jsonl').resolve()}\"",
+                        "  symbols:",
+                        f"    - \"{rec.qname or rec.name}\"",
+                        "",
+                        "参考（启发式）Rust 签名建议（可按需调整）：",
+                        sig_hint_local or "(无建议，保持最小改动)",
+                        "",
+                        "- 仅允许修改函数签名（参数类型/指针 *const/*mut、返回类型等），函数尚未生成，无需考虑函数体；",
+                        "- 不要删除函数或大范围重构；",
+                        "- 修改后保证模块文件存在且语法正确（若需引入 use，则最小化添加）。",
+                        "仅输出补丁，不要输出解释。",
+                    ])
+                    prev = os.getcwd()
+                    try:
+                        os.chdir(str(self.crate_dir))
+                        agent = self._get_repair_agent()
+                        agent.run(self._compose_prompt_with_context(fix_prompt), prefix="[c2rust-transpiler][sig-fix]", suffix="")
+                        # 修复后重新提取签名
+                        try:
+                            mp = Path(module)
+                            if not mp.is_absolute():
+                                mp = (self.crate_dir / module).resolve()
+                            if mp.exists():
+                                txt = mp.read_text(encoding="utf-8", errors="replace")
+                                # 尝试从文件中提取新的签名
+                                fn_name_match = re.search(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", rust_sig)
+                                if fn_name_match:
+                                    fn_name = fn_name_match.group(1)
+                                    sig_pattern = re.compile(rf'(?m)^\s*(?:pub(?:\s*\([^)]+\))?\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+"[^"]+"\s+)?fn\s+{re.escape(fn_name)}\s*\([^)]*\)\s*(?:->\s*[^ {{]{{[^{{{]*)?\s*(?:{{|;)', re.MULTILINE)
+                                    sig_match = sig_pattern.search(txt)
+                                    if sig_match:
+                                        # 提取完整签名行
+                                        line_start = txt.rfind("\n", 0, sig_match.start()) + 1
+                                        line_end = txt.find("\n", sig_match.end())
+                                        if line_end == -1:
+                                            line_end = len(txt)
+                                        new_sig_line = txt[line_start:line_end].strip()
+                                        if new_sig_line:
+                                            rust_sig = new_sig_line.rstrip(" {;")
+                                            typer.secho(f"[c2rust-transpiler][sig] 已更新签名: {rust_sig}", fg=typer.colors.GREEN)
+                        except Exception:
+                            pass
+                    finally:
+                        os.chdir(prev)
+                    # 记录到进度
+                    try:
+                        cur = self.progress.get("current") or {}
+                        cur["signature_check"] = {"hint": sig_hint_local, "issues": issues}
+                        metrics = cur.get("metrics") or {}
+                        metrics["sig_issues"] = int(len(issues))
+                        cur["metrics"] = metrics
+                        self.progress["current"] = cur
+                        self._save_progress()
+                        self._refresh_compact_context(rec, module, rust_sig)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # 1.6) 确保模块声明链（提前到生成实现之前，避免生成的代码无法被正确引用）
+            try:
+                self._ensure_mod_chain_for_module(module)
+                typer.secho(f"[c2rust-transpiler][mod] 已补齐 {module} 的 mod.rs 声明链", fg=typer.colors.GREEN)
+                # 确保顶层模块在 src/lib.rs 中被公开
+                mp = Path(module)
+                crate_root = self.crate_dir.resolve()
+                rel = mp.resolve().relative_to(crate_root) if mp.is_absolute() else Path(module)
+                rel_s = str(rel).replace("\\", "/")
+                if rel_s.startswith("./"):
+                    rel_s = rel_s[2:]
+                if rel_s.startswith("src/"):
+                    parts = rel_s[len("src/"):].strip("/").split("/")
+                    if parts and parts[0]:
+                        top_mod = parts[0]
+                        if not top_mod.endswith(".rs"):
+                            self._ensure_top_level_pub_mod(top_mod)
+                            typer.secho(f"[c2rust-transpiler][mod] 已在 src/lib.rs 确保顶层 pub mod {top_mod}", fg=typer.colors.GREEN)
+                cur = self.progress.get("current") or {}
+                cur["mod_chain_fixed"] = True
+                cur["mod_visibility_fixed"] = True
+                self.progress["current"] = cur
+                self._save_progress()
+            except Exception:
+                pass
+
             # 2) 生成实现
             unresolved = self._untranslated_callee_symbols(rec)
             typer.secho(f"[c2rust-transpiler][deps] 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}", fg=typer.colors.BLUE)
@@ -2329,31 +2508,13 @@ class Transpiler:
                     pass
             except Exception:
                 pass
-            # 2.2) 确保顶层模块在 src/lib.rs 中被公开（便于后续引用 crate::<mod>::...）
-            try:
-                mp = Path(module)
-                crate_root = self.crate_dir.resolve()
-                # 归一出相对路径（相对于 crate 根）
-                rel = mp.resolve().relative_to(crate_root) if mp.is_absolute() else Path(module)
-                rel_s = str(rel).replace("\\", "/")
-                if rel_s.startswith("./"):
-                    rel_s = rel_s[2:]
-                if rel_s.startswith("src/"):
-                    parts = rel_s[len("src/"):].strip("/").split("/")
-                    if parts and parts[0]:
-                        top_mod = parts[0]
-                        # 排除直接文件 lib.rs/main.rs 的情况
-                        if not top_mod.endswith(".rs"):
-                            self._ensure_top_level_pub_mod(top_mod)
-                            typer.secho(f"[c2rust-transpiler][mod] 已在 src/lib.rs 确保顶层 pub mod {top_mod}", fg=typer.colors.GREEN)
-            except Exception:
-                pass
 
-            # 2.3) 签名一致性检查（基于 C 符号与 LLM 提供的 rust_sig）
+            # 2.2) 签名一致性二次检查（生成后再次检查，确保实现与签名一致）
             try:
-                sig_hint_local = self._infer_rust_signature_hint(rec)
+                if sig_hint_local is None:
+                    sig_hint_local = self._infer_rust_signature_hint(rec)
                 issues = self._check_signature_consistency(rust_sig, rec)
-                typer.secho(f"[c2rust-transpiler][sig] 签名一致性问题数: {len(issues)}", fg=typer.colors.YELLOW)
+                typer.secho(f"[c2rust-transpiler][sig] 生成后签名一致性二次检查: 问题数={len(issues)}", fg=typer.colors.YELLOW)
                 if issues:
                     fix_prompt = "\n".join([
                         f"请在文件 {module} 中根据以下问题最小化修正函数签名（仅签名层面）：",
@@ -2381,7 +2542,7 @@ class Transpiler:
                         "参考（启发式）Rust 签名建议（可按需调整）：",
                         sig_hint_local or "(无建议，保持最小改动)",
                         "",
-                        "- 仅允许修改函数签名（参数类型/指针 *const/*mut、返回类型等），避免改动函数体逻辑；",
+                        "- 仅允许修改函数签名（参数类型/指针 *const/*mut、返回类型等），尽量保持函数体逻辑不变；",
                         "- 不要删除函数或大范围重构；",
                         "- 修改后保证编译通过（若需引入 use，则最小化添加）。",
                         "仅输出补丁，不要输出解释。",
@@ -2390,46 +2551,21 @@ class Transpiler:
                     try:
                         os.chdir(str(self.crate_dir))
                         agent = self._get_repair_agent()
-                        agent.run(self._compose_prompt_with_context(fix_prompt), prefix="[c2rust-transpiler][sig-fix]", suffix="")
+                        agent.run(self._compose_prompt_with_context(fix_prompt), prefix="[c2rust-transpiler][sig-fix-post]", suffix="")
                     finally:
                         os.chdir(prev)
-                    # 记录到进度，便于诊断与续跑（签名检查与类型/边界审查结果）
+                    # 记录到进度
                     try:
                         cur = self.progress.get("current") or {}
-                        cur["signature_check"] = {"hint": sig_hint_local, "issues": issues}
-                        # 同步记录类型/边界审查结论与修复标记
-                        tbr = cur.get("type_boundary_review") or {}
-                        tbr.update({"ok": False, "issues": issues, "fixed": True})
-                        cur["type_boundary_review"] = tbr
-                        # 增加度量统计：记录签名问题计数（便于后续诊断与汇总）
-                        try:
-                            metrics = cur.get("metrics") or {}
-                            metrics["sig_issues"] = int(len(issues))
-                            cur["metrics"] = metrics
-                        except Exception:
-                            # 统计失败不阻塞流程
-                            pass
+                        cur["signature_check_post"] = {"hint": sig_hint_local, "issues": issues}
+                        metrics = cur.get("metrics") or {}
+                        metrics["sig_issues_post"] = int(len(issues))
+                        cur["metrics"] = metrics
                         self.progress["current"] = cur
                         self._save_progress()
-                        # 签名修正后刷新精简上下文，保证后续提示一致
-                        try:
-                            self._refresh_compact_context(rec, module, rust_sig)
-                        except Exception:
-                            pass
+                        self._refresh_compact_context(rec, module, rust_sig)
                     except Exception:
                         pass
-            except Exception:
-                pass
-            # 2.2b) 确保从目标模块向上的 mod.rs 声明链补齐
-            try:
-                self._ensure_mod_chain_for_module(module)
-                typer.secho(f"[c2rust-transpiler][mod] 已补齐 {module} 的 mod.rs 声明链", fg=typer.colors.GREEN)
-                # 标记当前函数的模块链已补齐，便于诊断与续跑；同时记录顶层可见性修复标记
-                cur = self.progress.get("current") or {}
-                cur["mod_chain_fixed"] = True
-                cur["mod_visibility_fixed"] = True
-                self.progress["current"] = cur
-                self._save_progress()
             except Exception:
                 pass
 
@@ -2469,7 +2605,10 @@ def run_transpile(
     crate_dir: Optional[Union[str, Path]] = None,
     llm_group: Optional[str] = None,
     plan_max_retries: int = 5,
-    max_retries: int = 0,
+    max_retries: int = 0,  # 兼容旧接口
+    check_max_retries: Optional[int] = None,
+    test_max_retries: Optional[int] = None,
+    review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,
     resume: bool = True,
     only: Optional[List[str]] = None,
 ) -> None:
@@ -2488,6 +2627,9 @@ def run_transpile(
         llm_group=llm_group,
         plan_max_retries=plan_max_retries,
         max_retries=max_retries,
+        check_max_retries=check_max_retries,
+        test_max_retries=test_max_retries,
+        review_max_iterations=review_max_iterations,
         resume=resume,
         only=only,
     )
