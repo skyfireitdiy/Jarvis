@@ -2083,6 +2083,7 @@ def _rule_move_after_use(lines: Sequence[str], relpath: str) -> List[Issue]:
             moved_vars[var] = idx
         
         # 检测移动后的使用
+        vars_to_remove: set[str] = set()  # 收集要删除的键，避免在遍历时修改字典
         for var, move_line in moved_vars.items():
             if idx > move_line and idx <= move_line + 10:  # 在移动后 10 行内
                 # 检测变量使用（排除重新赋值）
@@ -2090,8 +2091,7 @@ def _rule_move_after_use(lines: Sequence[str], relpath: str) -> List[Issue]:
                     # 检查是否是重新赋值（重置移动状态）
                     if re.search(rf"\b{re.escape(var)}\s*=\s*(?!std::move)", s):
                         # 重新赋值，移除记录
-                        if var in moved_vars:
-                            del moved_vars[var]
+                        vars_to_remove.add(var)
                     else:
                         # 可能是使用
                         if re.search(rf"\b{re.escape(var)}\s*(->|\[|\.|\(|,)", s):
@@ -2110,8 +2110,11 @@ def _rule_move_after_use(lines: Sequence[str], relpath: str) -> List[Issue]:
                                 )
                             )
                             # 移除记录，避免重复报告
-                            if var in moved_vars:
-                                del moved_vars[var]
+                            vars_to_remove.add(var)
+        
+        # 遍历结束后再删除
+        for var in vars_to_remove:
+            moved_vars.pop(var, None)
     
     return issues
 
