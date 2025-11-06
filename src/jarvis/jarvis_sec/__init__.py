@@ -31,30 +31,43 @@ def _build_summary_prompt() -> str:
     系统提示词不强制规定主对话输出格式，仅在摘要中给出结构化结果。
     """
     return f"""
-请将本轮“安全子任务（单点验证）”的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出：
+请将本轮"安全子任务（单点验证）"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
+仅输出全局编号（gid）与详细理由（不含位置信息），gid 为全局唯一的数字编号。
+
+示例1：有告警的情况（has_risk: true）
 <REPORT>
-# 仅输出全局编号（gid）与详细理由（不含位置信息），gid 为全局唯一的数字编号
-# 示例：
-# - gid: 1
-#   has_risk: true
-#   preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
-#   trigger_path: "函数 foobar 调用 strcpy 时，其输入 src 来自于未经校验的网络数据包，可导致缓冲区溢出"
-#   consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
-#   suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
+- gid: 1
+  has_risk: true
+  preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
+  trigger_path: "函数 foobar 调用 strcpy 时，其输入 src 来自于未经校验的网络数据包，可导致缓冲区溢出"
+  consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
+  suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
+</REPORT>
+
+示例2：无告警的情况（has_risk: false）
+<REPORT>
+- gid: 2
+  has_risk: false
+</REPORT>
+
+示例3：全部为误报或无问题（返回空数组）
+<REPORT>
 []
 </REPORT>
+
 要求：
 - 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
 - 若确认本批次全部为误报或无问题，请返回空数组 []。
 - 数组元素为对象，包含字段：
   - gid: 整数（全局唯一编号）
   - has_risk: 布尔值 (true/false)，表示该项是否存在真实安全风险。
-  - preconditions: 字符串（触发漏洞的前置条件）
-  - trigger_path: 字符串（漏洞的触发路径，即从可控输入到缺陷代码的完整调用链路或关键步骤）
-  - consequences: 字符串（漏洞被触发后可能导致的后果）
-  - suggestions: 字符串（修复或缓解该漏洞的建议）
+  - preconditions: 字符串（触发漏洞的前置条件，仅当 has_risk 为 true 时必需）
+  - trigger_path: 字符串（漏洞的触发路径，即从可控输入到缺陷代码的完整调用链路或关键步骤，仅当 has_risk 为 true 时必需）
+  - consequences: 字符串（漏洞被触发后可能导致的后果，仅当 has_risk 为 true 时必需）
+  - suggestions: 字符串（修复或缓解该漏洞的建议，仅当 has_risk 为 true 时必需）
 - 不要在数组元素中包含 file/line/pattern 等位置信息；写入 jsonl 时系统会结合原始候选信息。
 - **关键**：仅当 `has_risk` 为 `true` 时，才会被记录为确认的问题。对于确认是误报的条目，请确保 `has_risk` 为 `false` 或不输出该条目。
+- **输出格式**：有告警的条目必须包含所有字段（gid, has_risk, preconditions, trigger_path, consequences, suggestions）；无告警的条目只需包含 gid 和 has_risk。
 """.strip()
 
 
