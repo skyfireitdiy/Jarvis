@@ -272,6 +272,7 @@ class Optimizer:
         self._target_files: List[Path] = []
         self._load_or_reset_progress()
         self._last_snapshot_commit: Optional[str] = None
+        self.log_prefix = "[c2rust-优化器]"
 
     def _snapshot_commit(self) -> None:
         """
@@ -385,22 +386,27 @@ class Optimizer:
 
     def run(self) -> OptimizeStats:
         report_path = self.report_dir / "optimize_report.json"
+        print(f"{self.log_prefix} 开始优化 Crate: {self.crate_dir}")
         try:
             # 计算本次批次的目标文件列表（按 include/exclude/resume/max_files）
             targets = self._compute_target_files()
             if not targets:
                 # 无文件可处理：仍然写出报告并返回
+                print(f"{self.log_prefix} 根据当前选项，无新文件需要处理。")
                 pass
             else:
+                print(f"{self.log_prefix} 本次批次发现 {len(targets)} 个待处理文件。")
                 # 批次开始前记录快照
                 self._snapshot_commit()
 
                 if self.options.enable_unsafe_cleanup:
                     # 步骤前快照
+                    print(f"\n{self.log_prefix} 第 1 步：unsafe 清理")
                     self._snapshot_commit()
                     self._opt_unsafe_cleanup(targets)
                     # Step build verification
                     if not self.options.dry_run:
+                        print(f"{self.log_prefix} unsafe 清理后，正在验证构建...")
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             # 循环最小修复
@@ -416,10 +422,12 @@ class Optimizer:
 
                 if self.options.enable_structure_opt:
                     # 步骤前快照
+                    print(f"\n{self.log_prefix} 第 2 步：结构优化 (重复代码检测)")
                     self._snapshot_commit()
                     self._opt_structure_duplicates(targets)
                     # Step build verification
                     if not self.options.dry_run:
+                        print(f"{self.log_prefix} 结构优化后，正在验证构建...")
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
@@ -433,10 +441,12 @@ class Optimizer:
 
                 if self.options.enable_visibility_opt:
                     # 步骤前快照
+                    print(f"\n{self.log_prefix} 第 3 步：可见性优化")
                     self._snapshot_commit()
                     self._opt_visibility(targets)
                     # Step build verification
                     if not self.options.dry_run:
+                        print(f"{self.log_prefix} 可见性优化后，正在验证构建...")
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
@@ -450,10 +460,12 @@ class Optimizer:
 
                 if self.options.enable_doc_opt:
                     # 步骤前快照
+                    print(f"\n{self.log_prefix} 第 4 步：文档补充")
                     self._snapshot_commit()
                     self._opt_docs(targets)
                     # Step build verification
                     if not self.options.dry_run:
+                        print(f"{self.log_prefix} 文档补充后，正在验证构建...")
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
@@ -469,6 +481,7 @@ class Optimizer:
                 # 在静态优化后执行一次 CodeAgent 以最小化进一步提升（可选：dry_run 时跳过）
                 if not self.options.dry_run:
                     try:
+                        print(f"\n{self.log_prefix} 第 5 步：CodeAgent 整体优化")
                         self._codeagent_optimize_crate(targets)
                     except Exception as _e:
                         self.stats.errors.append(f"codeagent: {_e}")
@@ -480,6 +493,7 @@ class Optimizer:
             self.stats.errors.append(f"fatal: {e}")
         finally:
             # 写出简要报告
+            print(f"{self.log_prefix} 优化流程结束。报告已生成于: {report_path.relative_to(Path.cwd())}")
             try:
                 _write_file(report_path, json.dumps(asdict(self.stats), ensure_ascii=False, indent=2))
             except Exception:
@@ -491,7 +505,12 @@ class Optimizer:
     _re_unsafe_block = re.compile(r"\bunsafe\s*\{", re.MULTILINE)
 
     def _opt_unsafe_cleanup(self, files: List[Path]) -> None:
-        for path in files:
+        for i, path in enumerate(files):
+            try:
+                rel_path = path.relative_to(self.crate_dir)
+            except ValueError:
+                rel_path = path
+            print(f"{self.log_prefix} [unsafe 清理] 正在处理文件 {i + 1}/{len(files)}: {rel_path}")
             try:
                 content = _read_file(path)
             except Exception:
@@ -568,6 +587,7 @@ class Optimizer:
 
     def _opt_structure_duplicates(self, files: List[Path]) -> None:
         # 建立函数签名+主体的简易哈希，重复则为后出现者添加 TODO 注释
+        print(f"{self.log_prefix} [结构优化] 正在扫描 {len(files)} 个文件以查找重复函数...")
         seen: Dict[str, Tuple[Path, int]] = {}
         for path in files:
             try:
@@ -635,7 +655,12 @@ class Optimizer:
     )
 
     def _opt_visibility(self, files: List[Path]) -> None:
-        for path in files:
+        for i, path in enumerate(files):
+            try:
+                rel_path = path.relative_to(self.crate_dir)
+            except ValueError:
+                rel_path = path
+            print(f"{self.log_prefix} [可见性优化] 正在处理文件 {i + 1}/{len(files)}: {rel_path}")
             try:
                 content = _read_file(path)
             except Exception:
@@ -667,7 +692,12 @@ class Optimizer:
     _re_any_doc = re.compile(r"(?m)^\s*///")
 
     def _opt_docs(self, files: List[Path]) -> None:
-        for path in files:
+        for i, path in enumerate(files):
+            try:
+                rel_path = path.relative_to(self.crate_dir)
+            except ValueError:
+                rel_path = path
+            print(f"{self.log_prefix} [文档补充] 正在处理文件 {i + 1}/{len(files)}: {rel_path}")
             try:
                 content = _read_file(path)
             except Exception:
@@ -767,6 +797,7 @@ class Optimizer:
         ]
         prompt = "\n".join(prompt_lines)
         prev_cwd = os.getcwd()
+        print(f"{self.log_prefix} [CodeAgent] 正在调用 CodeAgent 进行整体优化...")
         try:
             os.chdir(str(crate))
             agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.options.llm_group)
@@ -821,6 +852,7 @@ class Optimizer:
                 )
                 self.stats.cargo_checks += 1
                 if res.returncode == 0:
+                    print(f"{self.log_prefix} 构建修复成功。")
                     return True
                 output = ((res.stdout or "") + ("\n" + (res.stderr or ""))).strip()
             except subprocess.TimeoutExpired as e:
@@ -838,8 +870,10 @@ class Optimizer:
             # 达到重试上限则失败
             attempt += 1
             if attempt > maxr:
+                print(f"{self.log_prefix} 构建修复重试次数已用尽。")
                 return False
 
+            print(f"{self.log_prefix} 构建失败。正在尝试使用 CodeAgent 进行修复 (第 {attempt}/{maxr} 次尝试)...")
             # 生成最小修复提示
             prompt_lines = [
                 "请根据以下测试/构建错误对 crate 进行最小必要的修复以通过 `cargo test`：",
