@@ -2071,9 +2071,9 @@ class Transpiler:
         第二阶段审查：仅检查可能导致功能错误的严重问题
         - 关注点：仅检查可能导致功能错误的严重问题（如明显的空指针解引用导致 panic、明显的越界访问等）
         - 不检查类型匹配、指针可变性、边界检查细节等技术细节
-        - 输出：要求 Agent 仅在 <SUMMARY> 中给出 YAML verdict；若 not ok，触发一次最小修复 CodeAgent
+        - 输出：要求 Agent 仅在 <SUMMARY> 中给出 YAML verdict；若 not ok，触发一次最小修复 CodeAgent，然后重新验证，循环直到通过
         """
-        try:
+        def build_review_prompts() -> Tuple[str, str, str]:
             sys_p = (
                 "你是Rust代码审查专家。仅检查可能导致功能错误的严重问题：\n"
                 "1) 明显的空指针解引用或会导致 panic 的严重错误；\n"
@@ -2102,14 +2102,19 @@ class Transpiler:
                 "issues: [string, ...]  # 每条以 [critical] 开头，仅报告可能导致功能错误的严重问题，示例：[critical] obvious null pointer dereference\n"
                 "<SUMMARY><yaml>\nok: true\nissues: []\n</yaml></SUMMARY>"
             )
-            # 复用 Type Review Agent
+            return sys_p, usr_p, sum_p
+
+        try:
+            i = 0
+            # 复用 Type Review Agent（仅在本函数生命周期内构建一次）
             key = f"type_review::{rec.id}"
+            sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
             if self._current_agents.get(key) is None:
                 self._current_agents[key] = Agent(
-                    system_prompt=sys_p,
+                    system_prompt=sys_p_init,
                     name="C2Rust-TypeBoundary-Review",
                     model_group=self.llm_group,
-                    summary_prompt=sum_p,
+                    summary_prompt=sum_p_init,
                     need_summary=True,
                     auto_complete=True,
                     use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
@@ -2120,66 +2125,77 @@ class Transpiler:
                     disable_file_edit=True,
                 )
             agent = self._current_agents[key]
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                review = str(agent.run(self._compose_prompt_with_context(usr_p)) or "")
-            finally:
-                os.chdir(prev_cwd)
-            verdict = _extract_json_from_summary(review)
-            if not isinstance(verdict, dict):
-                return
-            ok = bool(verdict.get("ok") is True)
-            typer.secho(f"[c2rust-transpiler][type-review] verdict ok={ok}, issues={len(verdict.get('issues') or [])}", fg=typer.colors.CYAN)
-            issues = verdict.get("issues") if isinstance(verdict.get("issues"), list) else []
-            if ok or not issues:
-                # 记录类型/边界审查结果到进度（通过或无问题）
+
+            while True:
+                i += 1
+                prev_cwd = os.getcwd()
+                try:
+                    os.chdir(str(self.crate_dir))
+                    review = str(agent.run(self._compose_prompt_with_context(usr_p_init)) or "")
+                finally:
+                    os.chdir(prev_cwd)
+                verdict = _extract_json_from_summary(review)
+                if not isinstance(verdict, dict):
+                    typer.secho(f"[c2rust-transpiler][type-review] 无法解析审查结果，跳过", fg=typer.colors.YELLOW)
+                    return
+                ok = bool(verdict.get("ok") is True)
+                issues = verdict.get("issues") if isinstance(verdict.get("issues"), list) else []
+                typer.secho(f"[c2rust-transpiler][type-review][iter={i}] verdict ok={ok}, issues={len(issues)}", fg=typer.colors.CYAN)
+                
+                if ok or not issues:
+                    # 记录类型/边界审查结果到进度（通过或无问题）
+                    try:
+                        cur = self.progress.get("current") or {}
+                        cur["type_boundary_review"] = {"ok": True, "issues": []}
+                        # 增加度量统计：类型/边界问题计数
+                        metrics = cur.get("metrics") or {}
+                        metrics["type_issues"] = 0
+                        cur["metrics"] = metrics
+                        self.progress["current"] = cur
+                        self._save_progress()
+                    except Exception:
+                        pass
+                    typer.secho(f"[c2rust-transpiler][type-review] 审查通过 (共 {i} 次迭代)", fg=typer.colors.GREEN)
+                    return
+
+                # 记录类型/边界审查问题与度量后，再进行最小化修复
+                typer.secho(f"[c2rust-transpiler][type-review][iter={i}] 发现问题，开始修复", fg=typer.colors.YELLOW)
                 try:
                     cur = self.progress.get("current") or {}
-                    cur["type_boundary_review"] = {"ok": True, "issues": []}
-                    # 增加度量统计：类型/边界问题计数
+                    cur["type_boundary_review"] = {"ok": False, "issues": list(issues)}
                     metrics = cur.get("metrics") or {}
-                    metrics["type_issues"] = 0
+                    metrics["type_issues"] = int(len(issues))
                     cur["metrics"] = metrics
                     self.progress["current"] = cur
                     self._save_progress()
                 except Exception:
                     pass
-                return
-            # 记录类型/边界审查问题与度量后，再进行最小化修复
-            typer.secho("[c2rust-transpiler][type-review] applying minimal fixes for type/boundary issues", fg=typer.colors.YELLOW)
-            try:
-                cur = self.progress.get("current") or {}
-                cur["type_boundary_review"] = {"ok": False, "issues": list(issues)}
-                metrics = cur.get("metrics") or {}
-                metrics["type_issues"] = int(len(issues))
-                cur["metrics"] = metrics
-                self.progress["current"] = cur
-                self._save_progress()
-            except Exception:
-                pass
 
-            # 最小化修复提示
-            fix_lines = [
-                "请对目标函数进行最小必要的修复，仅修复可能导致功能错误的严重问题：",
-                "- 明显的空指针解引用或会导致 panic 的严重错误；",
-                "- 明显的越界访问或会导致程序崩溃的问题；",
-                "- 如修复涉及缺失/未实现的被调函数或依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时在合理模块新增函数或引入精确 use；禁止使用 todo!/unimplemented! 作为占位；可使用 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；",
-                "",
-                f"模块文件：{module}",
-                f"crate 根目录：{self.crate_dir.resolve()}",
-                "问题列表：",
-                *[str(x) for x in issues],
-                "",
-                "仅输出补丁，不要输出解释；保持变更最小化。",
-            ]
-            prev = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                ca = self._get_repair_agent()
-                ca.run(self._compose_prompt_with_context("\n".join(fix_lines)), prefix="[c2rust-transpiler][type-boundary-fix]", suffix="")
-            finally:
-                os.chdir(prev)
+                # 最小化修复提示
+                fix_lines = [
+                    "请对目标函数进行最小必要的修复，仅修复可能导致功能错误的严重问题：",
+                    "- 明显的空指针解引用或会导致 panic 的严重错误；",
+                    "- 明显的越界访问或会导致程序崩溃的问题；",
+                    "- 如修复涉及缺失/未实现的被调函数或依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时在合理模块新增函数或引入精确 use；禁止使用 todo!/unimplemented! 作为占位；可使用 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；",
+                    "",
+                    f"模块文件：{module}",
+                    f"crate 根目录：{self.crate_dir.resolve()}",
+                    "问题列表：",
+                    *[str(x) for x in issues],
+                    "",
+                    "仅输出补丁，不要输出解释；保持变更最小化。",
+                ]
+                prev = os.getcwd()
+                try:
+                    os.chdir(str(self.crate_dir))
+                    ca = self._get_repair_agent()
+                    ca.run(self._compose_prompt_with_context("\n".join(fix_lines)), prefix=f"[c2rust-transpiler][type-boundary-fix iter={i}]", suffix="")
+                    # 修复后进行构建验证，确保修复后代码能编译
+                    typer.secho(f"[c2rust-transpiler][type-review][iter={i}] 修复后验证构建", fg=typer.colors.BLUE)
+                    self._cargo_build_loop()
+                finally:
+                    os.chdir(prev)
+                # 修复后继续循环，重新审查验证
         except Exception:
             # 二次审查失败不阻塞主流程
             pass
