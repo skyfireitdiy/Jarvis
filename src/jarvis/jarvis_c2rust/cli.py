@@ -269,7 +269,7 @@ def run(
         None,
         "-g",
         "--llm-group",
-        help="用于 LLM 相关阶段（lib-replace/prepare/transpile）的模型组",
+        help="用于 LLM 相关阶段（lib-replace/prepare/transpile/optimize）的模型组",
     ),
     root_list_file: Optional[Path] = typer.Option(
         None,
@@ -430,7 +430,7 @@ def run(
         try:
             typer.secho("[c2rust-run] optimize: 开始", fg=typer.colors.BLUE)
             from jarvis.jarvis_c2rust.optimizer import optimize_project as _optimize_project
-            res = _optimize_project(crate_dir=None)
+            res = _optimize_project(crate_dir=None, llm_group=llm_group)
             summary = (
                 f"[c2rust-run] optimize: 结果摘要:\n"
                 f"  files_scanned: {res.get('files_scanned')}\n"
@@ -455,6 +455,12 @@ def run(
 def optimize(
     crate_dir: Optional[Path] = typer.Option(
         None, "--crate-dir", help="Rust crate 根目录（包含 Cargo.toml）；未提供时自动检测"
+    ),
+    llm_group: Optional[str] = typer.Option(
+        None,
+        "-g",
+        "--llm-group",
+        help="用于 CodeAgent 修复与整体优化的 LLM 模型组",
     ),
     enable_unsafe_cleanup: bool = typer.Option(
         True, "--unsafe/--no-unsafe", help="启用 unsafe 清理"
@@ -536,6 +542,7 @@ def optimize(
             reset_progress=reset_progress,
             build_fix_retries=build_fix_retries,
             git_guard=git_guard,
+            llm_group=llm_group,
         )
         # 摘要输出
         summary = (
