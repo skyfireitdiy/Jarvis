@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 from ..types import Issue
 

@@ -14,13 +14,9 @@ Jarvis 安全分析套件 —— Workflow（含可复现直扫基线）
 - run_with_agent(entry_path, languages=None) -> str：使用单Agent逐条子任务分析模式（复用 jarvis.jarvis_sec.__init__ 的实现）
 """
 
-import os
-import re
-import shutil
-import subprocess
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
+from typing import Any, Dict, Iterable, List, Optional, cast
 from jarvis.jarvis_sec.checkers import analyze_c_files, analyze_rust_files
 
 from jarvis.jarvis_sec.types import Issue
@@ -37,9 +33,6 @@ from jarvis.jarvis_sec.types import Issue
 # 工具函数
 # ---------------------------
 
-def _rg_available() -> bool:
-    return shutil.which("rg") is not None
-
 
 def _iter_source_files(
     entry_path: str,
@@ -55,7 +48,7 @@ def _iter_source_files(
         return
 
     exts = set((languages or ["c", "cpp", "h", "hpp", "rs"]))
-    excludes = set(exclude_dirs or [".git", "build", "out", "target", "third_party", "vendor"])
+    excludes = set(exclude_dirs or [".git", "build", "out", "target", "third_party", "vendor", "test", "tests", "__tests__", "spec", "testsuite", "testdata"])
 
     for p in entry.rglob("*"):
         if not p.is_file():
@@ -171,6 +164,7 @@ def run_with_agent(
     llm_group: Optional[str] = None,
     report_file: Optional[str] = None,
     cluster_limit: int = 50,
+    exclude_dirs: Optional[List[str]] = None,
 ) -> str:
     """
     使用单Agent逐条子任务分析模式运行（与 jarvis.jarvis_sec.__init__ 中保持一致）。
@@ -182,6 +176,7 @@ def run_with_agent(
     - llm_group: 本次分析使用的模型组（仅透传给 Agent，不修改全局配置）
     - report_file: JSONL 报告文件路径（可选，透传）
     - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
+    - exclude_dirs: 要排除的目录列表（可选），默认已包含测试目录（test, tests, __tests__, spec, testsuite, testdata）
     """
     from jarvis.jarvis_sec import run_security_analysis  # 延迟导入，避免循环
     return run_security_analysis(
@@ -190,6 +185,7 @@ def run_with_agent(
         llm_group=llm_group,
         report_file=report_file,
         cluster_limit=cluster_limit,
+        exclude_dirs=exclude_dirs,
     )
 
 
