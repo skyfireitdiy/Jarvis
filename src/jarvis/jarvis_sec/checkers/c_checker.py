@@ -77,6 +77,16 @@ RE_PTHREAD_COND_WAIT = re.compile(r"\bpthread_cond_(?:timed)?wait\s*\(", re.IGNO
 RE_PTHREAD_CREATE = re.compile(r"\bpthread_create\s*\(\s*&\s*([A-Za-z_]\w*)\s*,", re.IGNORECASE)
 RE_PTHREAD_JOIN = re.compile(r"\bpthread_join\s*\(\s*([A-Za-z_]\w*)\s*,", re.IGNORECASE)
 RE_PTHREAD_DETACH = re.compile(r"\bpthread_detach\s*\(\s*([A-Za-z_]\w*)\s*\)", re.IGNORECASE)
+# C++ 标准库锁相关
+RE_STD_MUTEX = re.compile(r"\b(?:std::)?mutex\s+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_MUTEX_LOCK = re.compile(r"\b([A-Za-z_]\w*)\s*\.lock\s*\(", re.IGNORECASE)
+RE_MUTEX_UNLOCK = re.compile(r"\b([A-Za-z_]\w*)\s*\.unlock\s*\(", re.IGNORECASE)
+RE_MUTEX_TRY_LOCK = re.compile(r"\b([A-Za-z_]\w*)\s*\.try_lock\s*\(", re.IGNORECASE)
+RE_LOCK_GUARD = re.compile(r"\b(?:std::)?lock_guard\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
+RE_UNIQUE_LOCK = re.compile(r"\b(?:std::)?unique_lock\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
+RE_SHARED_LOCK = re.compile(r"\b(?:std::)?shared_lock\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
+RE_STD_LOCK = re.compile(r"\bstd::lock\s*\(", re.IGNORECASE)
+RE_SCOPED_LOCK = re.compile(r"\b(?:std::)?scoped_lock\s*<", re.IGNORECASE)
 RE_INET_LEGACY = re.compile(r"\b(inet_addr|inet_aton)\s*\(", re.IGNORECASE)
 RE_TIME_UNSAFE = re.compile(r"\b(asctime|ctime|localtime|gmtime)\s*\(", re.IGNORECASE)
 RE_GETENV = re.compile(r'\bgetenv\s*\(\s*"[^"]*"\s*\)', re.IGNORECASE)
@@ -106,6 +116,33 @@ RE_STRLEN_IN_SIZE = re.compile(r"\bstrlen\s*\(", re.IGNORECASE)
 RE_SIZEOF_PTR = re.compile(r"\bsizeof\s*\(\s*\*\s*[A-Za-z_]\w*\s*\)", re.IGNORECASE)
 RE_STRNCPY = re.compile(r"\bstrncpy\s*\(", re.IGNORECASE)
 RE_STRNCAT = re.compile(r"\bstrncat\s*\(", re.IGNORECASE)
+
+# C++ 特定模式
+RE_SHARED_PTR = re.compile(r"\b(?:std::)?shared_ptr\s*<", re.IGNORECASE)
+RE_UNIQUE_PTR = re.compile(r"\b(?:std::)?unique_ptr\s*<", re.IGNORECASE)
+RE_WEAK_PTR = re.compile(r"\b(?:std::)?weak_ptr\s*<", re.IGNORECASE)
+RE_SMART_PTR_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*(?:std::)?(?:shared_ptr|unique_ptr|weak_ptr)\s*<", re.IGNORECASE)
+RE_NEW_ARRAY = re.compile(r"\bnew\s+[A-Za-z_]\w*\s*\[", re.IGNORECASE)
+RE_DELETE_ARRAY = re.compile(r"\bdelete\s*\[\s*\]", re.IGNORECASE)
+RE_DELETE = re.compile(r"\bdelete\s+(?!\[)", re.IGNORECASE)
+RE_STATIC_CAST = re.compile(r"\bstatic_cast\s*<", re.IGNORECASE)
+RE_DYNAMIC_CAST = re.compile(r"\bdynamic_cast\s*<", re.IGNORECASE)
+RE_REINTERPRET_CAST = re.compile(r"\breinterpret_cast\s*<", re.IGNORECASE)
+RE_CONST_CAST = re.compile(r"\bconst_cast\s*<", re.IGNORECASE)
+RE_VECTOR_ACCESS = re.compile(r"\b(?:std::)?vector\s*<[^>]+>\s*[A-Za-z_]\w*\s*\[", re.IGNORECASE)
+RE_STRING_ACCESS = re.compile(r"\b(?:std::)?(?:string|wstring)\s*[A-Za-z_]\w*\s*\[", re.IGNORECASE)
+RE_VECTOR_VAR = re.compile(r"\b(?:std::)?vector\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
+RE_STRING_VAR = re.compile(r"\b(?:std::)?(?:string|wstring)\s+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_AT_METHOD = re.compile(r"\.at\s*\(", re.IGNORECASE)
+RE_VIRTUAL_DTOR = re.compile(r"\bvirtual\s+~[A-Za-z_]\w*\s*\(", re.IGNORECASE)
+RE_CLASS_DECL = re.compile(r"\bclass\s+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_DTOR_DECL = re.compile(r"~\s*([A-Za-z_]\w*)\s*\(", re.IGNORECASE)
+RE_MOVE = re.compile(r"\bstd::move\s*\(", re.IGNORECASE)
+RE_MOVE_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*std::move\s*\(", re.IGNORECASE)
+RE_THROW = re.compile(r"\bthrow\s+", re.IGNORECASE)
+RE_TRY = re.compile(r"\btry\s*\{", re.IGNORECASE)
+RE_CATCH = re.compile(r"\bcatch\s*\(", re.IGNORECASE)
+RE_NOEXCEPT = re.compile(r"\bnoexcept\s*(?:\([^)]*\))?", re.IGNORECASE)
 
 
 # ---------------------------
@@ -1761,6 +1798,615 @@ def _rule_getenv_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
+# ---------------------------
+# C++ 特定检查规则
+# ---------------------------
+
+def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 new[]/delete[] 和 new/delete 的匹配问题：
+    - new[] 必须用 delete[] 释放
+    - new 必须用 delete 释放（不能用 delete[]）
+    """
+    issues: List[Issue] = []
+    new_array_vars: dict[str, int] = {}  # var -> line_no
+    new_vars: dict[str, int] = {}  # var -> line_no
+    
+    # 收集 new[] 和 new 的分配
+    for idx, s in enumerate(lines, start=1):
+        # new[] 分配
+        m = RE_NEW_ARRAY.search(s)
+        if m:
+            # 尝试提取变量名（简单启发式）
+            assign_match = re.search(r"\b([A-Za-z_]\w*)\s*=\s*new\s+", s, re.IGNORECASE)
+            if assign_match:
+                var = assign_match.group(1)
+                new_array_vars[var] = idx
+        
+        # new 分配（非数组）
+        m_new = re.search(r"\b([A-Za-z_]\w*)\s*=\s*new\s+(?!.*\[)", s, re.IGNORECASE)
+        if m_new:
+            var = m_new.group(1)
+            new_vars[var] = idx
+    
+    # 检查 delete[] 和 delete 的使用
+    for idx, s in enumerate(lines, start=1):
+        # delete[] 使用
+        if RE_DELETE_ARRAY.search(s):
+            # 提取变量名
+            m = re.search(r"delete\s*\[\s*\]\s*([A-Za-z_]\w*)", s, re.IGNORECASE)
+            if m:
+                var = m.group(1)
+                if var in new_vars:
+                    # 用 delete[] 释放了 new 分配的内存
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory_mgmt",
+                            pattern="delete_array_mismatch",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"使用 delete[] 释放由 new 分配的内存（非数组），存在未定义行为风险。",
+                            suggestion="new 分配的内存应使用 delete 释放；new[] 分配的内存应使用 delete[] 释放。",
+                            confidence=0.85,
+                            severity="high",
+                        )
+                    )
+        
+        # delete 使用（非数组）
+        if RE_DELETE.search(s):
+            m = re.search(r"delete\s+([A-Za-z_]\w*)", s, re.IGNORECASE)
+            if m:
+                var = m.group(1)
+                if var in new_array_vars:
+                    # 用 delete 释放了 new[] 分配的内存
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory_mgmt",
+                            pattern="delete_mismatch",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"使用 delete 释放由 new[] 分配的数组内存，存在未定义行为风险。",
+                            suggestion="new[] 分配的内存应使用 delete[] 释放；new 分配的内存应使用 delete 释放。",
+                            confidence=0.85,
+                            severity="high",
+                        )
+                    )
+    
+    return issues
+
+
+def _rule_reinterpret_cast_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 reinterpret_cast 的不安全使用（高风险类型转换）。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if RE_REINTERPRET_CAST.search(s):
+            conf = 0.7
+            # 如果转换为指针类型，风险更高
+            if "->" in s or "*" in s:
+                conf += 0.1
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="type_safety",
+                    pattern="reinterpret_cast_unsafe",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 reinterpret_cast 进行类型转换，可能导致未定义行为或类型安全问题。",
+                    suggestion="优先使用 static_cast 或 dynamic_cast；若必须使用 reinterpret_cast，需确保类型布局兼容并添加详细注释说明。",
+                    confidence=min(conf, 0.9),
+                    severity="high",
+                )
+            )
+    return issues
+
+
+def _rule_const_cast_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 const_cast 的不安全使用（移除 const 修饰符可能导致未定义行为）。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if RE_CONST_CAST.search(s):
+            conf = 0.65
+            # 如果通过 const_cast 修改原本为 const 的对象，风险更高
+            if "=" in s and not re.search(r"const\s+[A-Za-z_]\w*\s*\*", s):
+                conf += 0.1
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="type_safety",
+                    pattern="const_cast_unsafe",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 const_cast 移除 const 修饰符，可能导致未定义行为（如修改常量对象）。",
+                    suggestion="避免使用 const_cast；若必须使用，确保仅用于移除非底层 const 且对象本身可变。",
+                    confidence=min(conf, 0.8),
+                    severity="high",
+                )
+            )
+    return issues
+
+
+def _rule_vector_string_bounds_check(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 vector 和 string 的越界访问（使用 [] 而非 .at()）。
+    启发式：检测 [] 访问，若附近未见边界检查，则提示风险。
+    """
+    issues: List[Issue] = []
+    vector_vars: set[str] = set()
+    string_vars: set[str] = set()
+    
+    # 先收集 vector 和 string 变量
+    for idx, s in enumerate(lines, start=1):
+        m = RE_VECTOR_VAR.search(s)
+        if m:
+            vector_vars.add(m.group(1))
+        m = RE_STRING_VAR.search(s)
+        if m:
+            string_vars.add(m.group(1))
+    
+    for idx, s in enumerate(lines, start=1):
+        # vector 访问：检测 var[...] 模式
+        for var in vector_vars:
+            if re.search(rf"\b{re.escape(var)}\s*\[", s):
+                # 检查是否使用了 .at()（安全访问）
+                if not RE_AT_METHOD.search(s):
+                    # 检查附近是否有边界检查
+                    window_text = " ".join(t for _, t in _window(lines, idx, before=2, after=2))
+                    if not re.search(rf"\b{re.escape(var)}\s*\.(size|length|empty|at)\s*\(", window_text, re.IGNORECASE):
+                        issues.append(
+                            Issue(
+                                language="c/cpp",
+                                category="buffer_overflow",
+                                pattern="vector_bounds_check",
+                                file=relpath,
+                                line=idx,
+                                evidence=_strip_line(s),
+                                description=f"vector {var} 使用 [] 访问可能越界，建议使用 .at() 进行边界检查。",
+                                suggestion="使用 .at() 方法进行安全访问，或在使用 [] 前显式检查索引范围。",
+                                confidence=0.6,
+                                severity="medium",
+                            )
+                        )
+                        break  # 每行只报告一次
+        
+        # string 访问：检测 var[...] 模式
+        for var in string_vars:
+            if re.search(rf"\b{re.escape(var)}\s*\[", s):
+                if not RE_AT_METHOD.search(s):
+                    window_text = " ".join(t for _, t in _window(lines, idx, before=2, after=2))
+                    if not re.search(rf"\b{re.escape(var)}\s*\.(size|length|empty|at)\s*\(", window_text, re.IGNORECASE):
+                        issues.append(
+                            Issue(
+                                language="c/cpp",
+                                category="buffer_overflow",
+                                pattern="string_bounds_check",
+                                file=relpath,
+                                line=idx,
+                                evidence=_strip_line(s),
+                                description=f"string {var} 使用 [] 访问可能越界，建议使用 .at() 进行边界检查。",
+                                suggestion="使用 .at() 方法进行安全访问，或在使用 [] 前显式检查索引范围。",
+                                confidence=0.6,
+                                severity="medium",
+                            )
+                        )
+                        break  # 每行只报告一次
+    return issues
+
+
+def _rule_missing_virtual_dtor(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测基类缺少虚析构函数的问题。
+    启发式：检测 class 声明，若存在虚函数但析构函数非虚，则提示。
+    """
+    issues: List[Issue] = []
+    classes: dict[str, dict] = {}  # class_name -> {"line": int, "has_virtual": bool, "has_virtual_dtor": bool}
+    current_class: Optional[str] = None
+    in_class = False
+    brace_depth = 0
+    
+    for idx, s in enumerate(lines, start=1):
+        # 检测 class 声明
+        m_class = RE_CLASS_DECL.search(s)
+        if m_class:
+            class_name = m_class.group(1)
+            classes[class_name] = {"line": idx, "has_virtual": False, "has_virtual_dtor": False}
+            current_class = class_name
+            in_class = True
+            brace_depth = s.count("{") - s.count("}")
+            continue
+        
+        if in_class and current_class:
+            brace_depth += s.count("{") - s.count("}")
+            if brace_depth <= 0:
+                in_class = False
+                current_class = None
+                continue
+            
+            # 检测虚函数
+            if re.search(r"\bvirtual\s+[^~]", s, re.IGNORECASE):
+                classes[current_class]["has_virtual"] = True
+            
+            # 检测虚析构函数
+            if RE_VIRTUAL_DTOR.search(s):
+                classes[current_class]["has_virtual_dtor"] = True
+    
+    # 检查有虚函数但无虚析构函数的类
+    for class_name, info in classes.items():
+        if info["has_virtual"] and not info["has_virtual_dtor"]:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="memory_mgmt",
+                    pattern="missing_virtual_dtor",
+                    file=relpath,
+                    line=info["line"],
+                    evidence=_strip_line(_safe_line(lines, info["line"])),
+                    description=f"类 {class_name} 包含虚函数但析构函数非虚，通过基类指针删除派生类对象可能导致未定义行为。",
+                    suggestion="为基类添加虚析构函数，确保通过基类指针删除派生类对象时正确调用派生类析构函数。",
+                    confidence=0.75,
+                    severity="high",
+                )
+            )
+    
+    return issues
+
+
+def _rule_move_after_use(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测移动后使用的风险：对象被 std::move 后仍被使用。
+    """
+    issues: List[Issue] = []
+    moved_vars: dict[str, int] = {}  # var -> line_no
+    
+    for idx, s in enumerate(lines, start=1):
+        # 检测 std::move 赋值
+        m = RE_MOVE_ASSIGN.search(s)
+        if m:
+            var = m.group(1)
+            moved_vars[var] = idx
+        
+        # 检测移动后的使用
+        for var, move_line in moved_vars.items():
+            if idx > move_line and idx <= move_line + 10:  # 在移动后 10 行内
+                # 检测变量使用（排除重新赋值）
+                if re.search(rf"\b{re.escape(var)}\b", s) and not re.search(rf"\b{re.escape(var)}\s*=", s):
+                    # 检查是否是重新赋值（重置移动状态）
+                    if re.search(rf"\b{re.escape(var)}\s*=\s*(?!std::move)", s):
+                        # 重新赋值，移除记录
+                        if var in moved_vars:
+                            del moved_vars[var]
+                    else:
+                        # 可能是使用
+                        if re.search(rf"\b{re.escape(var)}\s*(->|\[|\.|\(|,)", s):
+                            issues.append(
+                                Issue(
+                                    language="c/cpp",
+                                    category="memory_mgmt",
+                                    pattern="move_after_use",
+                                    file=relpath,
+                                    line=idx,
+                                    evidence=_strip_line(s),
+                                    description=f"变量 {var} 在 std::move 后仍被使用，移动后的对象处于有效但未指定状态，可能导致未定义行为。",
+                                    suggestion="移动后的对象不应再使用，除非重新赋值；考虑使用移动语义后立即停止使用该对象。",
+                                    confidence=0.7,
+                                    severity="high",
+                                )
+                            )
+                            # 移除记录，避免重复报告
+                            if var in moved_vars:
+                                del moved_vars[var]
+    
+    return issues
+
+
+def _rule_uncaught_exception(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测可能未捕获的异常：throw 语句附近未见 try-catch。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if RE_THROW.search(s):
+            # 检查附近是否有 try-catch
+            window_text = " ".join(t for _, t in _window(lines, idx, before=10, after=10))
+            has_try = RE_TRY.search(window_text) is not None
+            has_catch = RE_CATCH.search(window_text) is not None
+            
+            if not (has_try and has_catch):
+                conf = 0.6
+                # 如果在 noexcept 函数中抛出异常，风险更高
+                prev_text = " ".join(t for _, t in _window(lines, idx, before=5, after=0))
+                if RE_NOEXCEPT.search(prev_text):
+                    conf += 0.2
+                
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="error_handling",
+                        pattern="uncaught_exception",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description="检测到 throw 语句，但附近未见 try-catch 块，可能导致未捕获异常。",
+                        suggestion="确保异常在适当的作用域内被捕获；考虑使用 RAII 确保资源在异常时正确释放。",
+                        confidence=min(conf, 0.85),
+                        severity="high" if conf >= 0.8 else "medium",
+                    )
+                )
+    return issues
+
+
+def _rule_smart_ptr_cycle(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测智能指针可能的循环引用问题（启发式）。
+    注意：完全检测循环引用需要图分析，这里仅做简单启发式检测。
+    """
+    issues: List[Issue] = []
+    shared_ptr_vars: set[str] = set()
+    
+    for idx, s in enumerate(lines, start=1):
+        # 收集 shared_ptr 变量
+        if RE_SHARED_PTR.search(s):
+            m = RE_SMART_PTR_ASSIGN.search(s)
+            if m:
+                var = m.group(1)
+                shared_ptr_vars.add(var)
+        
+        # 检测 shared_ptr 之间的相互引用（简单启发式）
+        if RE_SHARED_PTR.search(s) and shared_ptr_vars:
+            # 检查是否在 shared_ptr 初始化中使用了另一个 shared_ptr
+            for var in shared_ptr_vars:
+                if re.search(rf"\b{re.escape(var)}\b", s) and "make_shared" in s.lower():
+                    # 简单启发：如果两个 shared_ptr 相互引用，可能存在循环
+                    # 这里仅做提示，实际需要更复杂的分析
+                    pass
+    
+    # 检测 weak_ptr 的使用（通常用于打破循环引用）
+    has_weak_ptr = False
+    for idx, s in enumerate(lines, start=1):
+        if RE_WEAK_PTR.search(s):
+            has_weak_ptr = True
+            break
+    
+    # 如果大量使用 shared_ptr 但未见 weak_ptr，提示可能的循环引用风险
+    if len(shared_ptr_vars) > 3 and not has_weak_ptr:
+        # 在第一个 shared_ptr 使用处提示
+        for idx, s in enumerate(lines, start=1):
+            if RE_SHARED_PTR.search(s):
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="memory_mgmt",
+                        pattern="smart_ptr_cycle_risk",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description="检测到多个 shared_ptr 使用但未见 weak_ptr，可能存在循环引用导致内存泄漏的风险。",
+                        suggestion="检查对象间的引用关系，必要时使用 weak_ptr 打破循环引用；考虑使用 unique_ptr 替代 shared_ptr 以明确所有权。",
+                        confidence=0.5,
+                        severity="medium",
+                    )
+                )
+                break
+    
+    return issues
+
+
+def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 C++ 标准库（std::mutex）相关的死锁风险：
+    - 双重加锁：同一 mutex 在未解锁情况下再次加锁
+    - 可能缺失解锁：lock() 后在后续窗口内未看到对应 unlock()
+    - 锁顺序反转：存在 (A->B) 与 (B->A) 两种加锁顺序
+    - 未使用 std::lock/scoped_lock：手动锁定多个 mutex 时未使用死锁避免机制
+    实现基于启发式，可能产生误报。
+    """
+    issues: List[Issue] = []
+    lock_stack: list[str] = []  # 当前持有的锁栈
+    order_pairs: dict[tuple[str, str], int] = {}  # 加锁顺序对 -> 行号
+    mutex_vars: set[str] = set()  # 所有 mutex 变量名
+    
+    # 先收集所有 mutex 变量
+    for idx, s in enumerate(lines, start=1):
+        m = RE_STD_MUTEX.search(s)
+        if m:
+            mutex_vars.add(m.group(1))
+    
+    # 扫描加锁/解锁操作
+    for idx, s in enumerate(lines, start=1):
+        # 检测 lock() 调用
+        m_lock = RE_MUTEX_LOCK.search(s)
+        if m_lock:
+            mtx = m_lock.group(1)
+            if mtx in mutex_vars:
+                # 双重加锁检测
+                if mtx in lock_stack:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="error_handling",
+                            pattern="cpp_double_lock",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"mutex {mtx} 在未解锁的情况下被再次加锁，存在死锁风险。",
+                            suggestion="避免对同一 mutex 重复加锁；考虑使用 std::recursive_mutex 或重构代码避免嵌套加锁。",
+                            confidence=0.8,
+                            severity="high",
+                        )
+                    )
+                # 锁顺序记录
+                if lock_stack and lock_stack[-1] != mtx:
+                    pair = (lock_stack[-1], mtx)
+                    order_pairs.setdefault(pair, idx)
+                lock_stack.append(mtx)
+        
+        # 检测 unlock() 调用
+        m_unlock = RE_MUTEX_UNLOCK.search(s)
+        if m_unlock:
+            mtx = m_unlock.group(1)
+            if mtx in mutex_vars and mtx in lock_stack:
+                # 从栈中移除最近的相同锁
+                for k in range(len(lock_stack) - 1, -1, -1):
+                    if lock_stack[k] == mtx:
+                        del lock_stack[k]
+                        break
+        
+        # 检测 lock_guard/unique_lock（RAII，自动解锁，通常更安全）
+        m_guard = RE_LOCK_GUARD.search(s) or RE_UNIQUE_LOCK.search(s) or RE_SHARED_LOCK.search(s)
+        
+        # 检测 std::lock 或 scoped_lock（死锁避免机制）
+        has_safe_lock = RE_STD_LOCK.search(s) or RE_SCOPED_LOCK.search(s)
+        
+        # 粗略按作用域结束重置
+        if "}" in s and not has_safe_lock:
+            # 如果作用域结束且栈中还有锁，可能是问题（但可能是 RAII 锁，所以降低置信度）
+            if lock_stack:
+                # 这里不直接报错，因为可能是 RAII 锁
+                pass
+        
+        # 检测手动锁定多个 mutex 但未使用 std::lock
+        if m_lock and len(lock_stack) > 1 and not has_safe_lock:
+            # 在锁定第二个 mutex 时，如果之前已持有锁且未使用 std::lock，提示风险
+            if idx > 1:
+                prev_text = " ".join(_safe_line(lines, j) for j in range(max(1, idx - 3), idx))
+                if not RE_STD_LOCK.search(prev_text) and not RE_SCOPED_LOCK.search(prev_text):
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="error_handling",
+                            pattern="cpp_multiple_lock_unsafe",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"检测到手动锁定多个 mutex 但未使用 std::lock 或 std::scoped_lock，存在死锁风险。",
+                            suggestion="使用 std::lock 或 std::scoped_lock 同时锁定多个 mutex，可避免死锁；或统一加锁顺序。",
+                            confidence=0.65,
+                            severity="high",
+                        )
+                    )
+    
+    # 锁顺序反转检测
+    for (a, b), ln in order_pairs.items():
+        if (b, a) in order_pairs:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="error_handling",
+                    pattern="cpp_lock_order_inversion",
+                    file=relpath,
+                    line=order_pairs[(b, a)],
+                    evidence=_strip_line(_safe_line(lines, order_pairs[(b, a)])),
+                    description=f"检测到 mutex 加锁顺序反转：({a} -> {b}) 与 ({b} -> {a})，存在死锁风险。",
+                    suggestion="统一多锁的获取顺序，制定全局锁等级；或使用 std::lock/scoped_lock 避免死锁。",
+                    confidence=0.7,
+                    severity="high",
+                )
+            )
+    
+    # 可能缺失解锁：在 lock() 后的 50 行窗口内未见对应 unlock()
+    for idx, s in enumerate(lines, start=1):
+        m_lock = RE_MUTEX_LOCK.search(s)
+        if not m_lock:
+            continue
+        mtx = m_lock.group(1)
+        if mtx not in mutex_vars:
+            continue
+        
+        # 检查是否是 lock_guard/unique_lock（RAII，自动解锁）
+        window_text = " ".join(_safe_line(lines, j) for j in range(idx, min(idx + 3, len(lines)) + 1))
+        is_raii = RE_LOCK_GUARD.search(window_text) or RE_UNIQUE_LOCK.search(window_text) or RE_SHARED_LOCK.search(window_text)
+        if is_raii:
+            continue  # RAII 锁会自动解锁，跳过
+        
+        end = min(len(lines), idx + 50)
+        unlocked = False
+        for j in range(idx + 1, end + 1):
+            sj = _safe_line(lines, j)
+            m_un = RE_MUTEX_UNLOCK.search(sj)
+            if m_un and m_un.group(1) == mtx:
+                unlocked = True
+                break
+            # 检查作用域结束（可能是 RAII 锁）
+            if "}" in sj:
+                # 检查是否是 lock_guard/unique_lock 的作用域
+                prev_scope = " ".join(_safe_line(lines, k) for k in range(max(1, j - 5), j))
+                if RE_LOCK_GUARD.search(prev_scope) or RE_UNIQUE_LOCK.search(prev_scope):
+                    unlocked = True
+                    break
+        
+        if not unlocked:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="error_handling",
+                    pattern="cpp_missing_unlock_suspect",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description=f"在 mutex {mtx} 调用 lock() 之后的邻近窗口内未检测到匹配 unlock()，可能存在缺失解锁的风险。",
+                    suggestion="确保所有 lock() 路径都有配对的 unlock()；考虑使用 std::lock_guard 或 std::unique_lock（RAII）自动管理锁生命周期。",
+                    confidence=0.55,
+                    severity="medium",
+                )
+            )
+    
+    return issues
+
+
+def _rule_smart_ptr_get_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测智能指针的 .get() 方法不安全使用（返回的原始指针可能悬空）。
+    """
+    issues: List[Issue] = []
+    smart_ptr_vars: set[str] = set()
+    
+    # 先收集智能指针变量
+    for idx, s in enumerate(lines, start=1):
+        m = RE_SMART_PTR_ASSIGN.search(s)
+        if m:
+            smart_ptr_vars.add(m.group(1))
+        # 也检测声明
+        if RE_SHARED_PTR.search(s) or RE_UNIQUE_PTR.search(s) or RE_WEAK_PTR.search(s):
+            m = re.search(r"\b([A-Za-z_]\w*)\s*(?:=|;)", s)
+            if m:
+                smart_ptr_vars.add(m.group(1))
+    
+    for idx, s in enumerate(lines, start=1):
+        # 检测 .get() 调用
+        for var in smart_ptr_vars:
+            if re.search(rf"\b{re.escape(var)}\s*\.get\s*\(", s, re.IGNORECASE):
+                conf = 0.65
+                # 如果 .get() 的结果被存储或传递，风险更高
+                if "=" in s or re.search(r"\.get\s*\([^)]*\)\s*[=,\(]", s):
+                    conf += 0.1
+                
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="memory_mgmt",
+                        pattern="smart_ptr_get_unsafe",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description=f"智能指针 {var} 使用 .get() 方法获取原始指针，若智能指针生命周期结束，原始指针将悬空。",
+                        suggestion="避免存储 .get() 返回的原始指针；若必须使用，确保智能指针的生命周期覆盖原始指针的使用期。",
+                        confidence=min(conf, 0.8),
+                        severity="high",
+                    )
+                )
+                break  # 每行只报告一次
+    return issues
+
+
 def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     """
     基于提供的文本进行 C/C++ 启发式分析。
@@ -1809,6 +2455,18 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_possible_null_deref(mlines, relpath))
     issues.extend(_rule_uninitialized_ptr_use(mlines, relpath))
     issues.extend(_rule_deadlock_patterns(mlines, relpath))
+    # C++ 特定检查规则
+    issues.extend(_rule_new_delete_mismatch(mlines, relpath))
+    issues.extend(_rule_reinterpret_cast_unsafe(mlines, relpath))
+    issues.extend(_rule_const_cast_unsafe(mlines, relpath))
+    issues.extend(_rule_vector_string_bounds_check(mlines, relpath))
+    issues.extend(_rule_missing_virtual_dtor(mlines, relpath))
+    issues.extend(_rule_move_after_use(mlines, relpath))
+    issues.extend(_rule_uncaught_exception(mlines, relpath))
+    issues.extend(_rule_smart_ptr_cycle(mlines, relpath))
+    issues.extend(_rule_smart_ptr_get_unsafe(mlines, relpath))
+    # C++ 死锁检测
+    issues.extend(_rule_cpp_deadlock_patterns(mlines, relpath))
     return issues
 
 
