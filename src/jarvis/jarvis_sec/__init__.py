@@ -30,7 +30,7 @@ def _build_summary_prompt() -> str:
     构建摘要提示词：要求以 <REPORT>...</REPORT> 包裹的 YAML 输出（仅YAML）。
     系统提示词不强制规定主对话输出格式，仅在摘要中给出结构化结果。
     """
-    return f"""
+    return """
 请将本轮"安全子任务（单点验证）"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
 仅输出全局编号（gid）与详细理由（不含位置信息），gid 为全局唯一的数字编号。
 
@@ -96,8 +96,8 @@ def run_security_analysis(
     languages: Optional[List[str]] = None,
     llm_group: Optional[str] = None,
     report_file: Optional[str] = None,
-
     cluster_limit: int = 50,
+    exclude_dirs: Optional[List[str]] = None,
 ) -> str:
     """
     运行安全分析工作流（混合模式）。
@@ -117,6 +117,8 @@ def run_security_analysis(
     - llm_group: 模型组名称（仅在当前调用链内生效，不覆盖全局配置），将直接传入 Agent 用于选择模型
     - report_file: 增量报告文件路径（JSONL）。当每个子任务检测到 issues 时，立即将一条记录追加到该文件；
       若未指定，则默认写入 entry_path/.jarvis/sec/agent_issues.jsonl
+    - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
+    - exclude_dirs: 要排除的目录列表（可选），默认已包含测试目录（test, tests, __tests__, spec, testsuite, testdata）
     - 断点续扫: 默认开启。会基于 .jarvis/sec/progress.jsonl 和 .jarvis/sec/heuristic_issues.jsonl 文件进行状态恢复。
     """
     import json
@@ -185,7 +187,7 @@ def run_security_analysis(
 
     if not candidates:
         _progress_append({"event": "pre_scan_start", "entry_path": entry_path, "languages": langs})
-        pre_scan = direct_scan(entry_path, languages=langs)
+        pre_scan = direct_scan(entry_path, languages=langs, exclude_dirs=exclude_dirs)
         candidates = pre_scan.get("issues", [])
         summary = pre_scan.get("summary", {})
         _progress_append({
@@ -266,7 +268,7 @@ def run_security_analysis(
     # 保留所有候选以逐条由Agent验证（当前批次）
     json.dumps(compact_candidates, ensure_ascii=False)
     # 进度总数
-    total = len(compact_candidates)
+    len(compact_candidates)
     # 将检测出的 issues 增量写入报告文件（JSONL），便于长任务中途查看
     def _append_report(items, source: str, task_id: str, cand: Dict):
         """
@@ -379,7 +381,7 @@ def run_security_analysis(
         # 过滤掉已完成
         pending_in_file: List[Dict] = []
         for c in _items:
-            if not (_sig_of(c) in done_sigs):
+            if _sig_of(c) not in done_sigs:
                 pending_in_file.append(c)
         if not pending_in_file:
             continue
@@ -568,20 +570,9 @@ def run_security_analysis(
                 for cl in cluster_items:
                     verification = str(cl.get("verification", "")).strip()
                     raw_gids = cl.get("gids", [])
-                    raw_ids = None
                     norm_keys: List[int] = []
-                    use_gid = True
                     if isinstance(raw_gids, list):
-                        use_gid = True
                         for x in raw_gids:
-                            try:
-                                xi = int(x)
-                                if xi >= 1:
-                                    norm_keys.append(xi)
-                            except Exception:
-                                continue
-                    elif False:
-                        for x in raw_ids:
                             try:
                                 xi = int(x)
                                 if xi >= 1:
@@ -643,7 +634,7 @@ def run_security_analysis(
     # 若聚类失败或空，则回退为“按文件一次处理”
     if not cluster_batches:
         for _file, _items in _file_groups.items():
-            b = [c for c in _items if not (resume and _sig_of(c) in done_sigs)]
+            b = [c for c in _items if _sig_of(c) not in done_sigs]
             if b:
                 cluster_batches.append(b)
 
@@ -651,7 +642,7 @@ def run_security_analysis(
     batches: List[List[Dict]] = cluster_batches
     total_batches = len(batches)
     # 占位 batch_size 以兼容后续日志
-    batch_size = len(batches[0]) if batches else 0
+    len(batches[0]) if batches else 0
 
     for bidx, batch in enumerate(batches, start=1):
         # 进度：批次开始
@@ -913,7 +904,6 @@ def _try_parse_summary_report(text: str) -> Optional[object]:
     - 若提取/解析失败返回 None
     - YAML 解析采用安全模式，若环境无 PyYAML 则忽略
     """
-    import json as _json
     start = text.find("<REPORT>")
     end = text.find("</REPORT>")
     if start == -1 or end == -1 or end <= start:

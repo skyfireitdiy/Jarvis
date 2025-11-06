@@ -1435,7 +1435,7 @@ class Transpiler:
             "- 如构建失败源于缺失或未实现的被调函数/依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时可在合理的模块中新建函数；",
             "- 禁止使用 todo!/unimplemented! 作为占位；",
             "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号，避免通配；",
-            f"- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]{('，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值' if stage == "cargo test" else '')}；",
+            f"- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]{('，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值' if stage == 'cargo test' else '')}；",
         ]
         if include_output_patch_hint:
             base_lines.append("- 请仅输出补丁，不要输出解释或多余文本。")
@@ -1552,9 +1552,9 @@ class Transpiler:
                         cwd=workspace_root,
                     )
                     if res_verify.returncode == 0:
-                        typer.secho(f"[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                        typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
                     else:
-                        typer.secho(f"[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+                        typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
                 finally:
                     os.chdir(prev_cwd)
                 # 下一轮循环
@@ -1639,9 +1639,9 @@ class Transpiler:
                     cwd=workspace_root,
                 )
                 if res_verify.returncode == 0:
-                    typer.secho(f"[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                    typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
                 else:
-                    typer.secho(f"[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+                    typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
             finally:
                 os.chdir(prev_cwd)
             # 重置 check 迭代计数，因为修复后需要重新 check

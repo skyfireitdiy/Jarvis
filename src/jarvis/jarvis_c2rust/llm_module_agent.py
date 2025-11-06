@@ -112,7 +112,7 @@ class _GraphLoader:
                         continue
                     try:
                         obj = json.loads(line)
-                    except (json.JSONDecodeError, ValueError) as e:
+                    except (json.JSONDecodeError, ValueError):
                         # 跳过无效的 JSON 行，但记录以便调试
                         continue
                     # 不区分函数与类型，统一处理 symbols.jsonl 中的所有记录
@@ -872,7 +872,7 @@ def _parse_project_yaml_entries(yaml_text: str) -> List[Any]:
     except ImportError:
         # PyYAML 未安装，使用回退解析器
         pass
-    except (yaml.YAMLError, ValueError) as e:
+    except (yaml.YAMLError, ValueError):
         # YAML 解析错误，回退到轻量解析器
         pass
     except Exception:
@@ -995,7 +995,7 @@ def _ensure_cargo_toml(base_dir: Path, package_name: str) -> None:
         return
     try:
         cargo_path.touch(exist_ok=True)
-    except (OSError, PermissionError) as e:
+    except (OSError, PermissionError):
         # 如果无法创建文件，记录错误但不中断流程
         # 后续 CodeAgent 可能会处理 Cargo.toml 的创建
         pass

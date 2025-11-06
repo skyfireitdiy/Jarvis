@@ -14,7 +14,6 @@ jarvis_sec 基础单元测试（阶段一）
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 
@@ -23,7 +22,7 @@ from jarvis.jarvis_sec.checkers import (
     analyze_rust_text,
 )
 from jarvis.jarvis_sec.workflow import direct_scan, format_markdown_report
-from jarvis.jarvis_sec.report import aggregate_issues, build_json_and_markdown
+from jarvis.jarvis_sec.report import build_json_and_markdown
 
 
 def test_c_checker_detects_multiple_categories():
