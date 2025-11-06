@@ -65,6 +65,7 @@ class OptimizeOptions:
     build_fix_retries: int = 3  # 构建失败时的修复重试次数
     # Git 保护：优化前快照 commit，失败时自动 reset 回快照
     git_guard: bool = True
+    llm_group: Optional[str] = None
 
 
 @dataclass
@@ -749,7 +750,7 @@ class Optimizer:
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(crate))
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=None)
+            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -834,7 +835,7 @@ class Optimizer:
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(crate))
-                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=None)
+                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][build-fix iter={attempt}]", suffix="")
             finally:
                 os.chdir(prev_cwd)
@@ -856,6 +857,7 @@ def optimize_project(
     reset_progress: bool = False,
     build_fix_retries: int = 3,
     git_guard: bool = True,
+    llm_group: Optional[str] = None,
 ) -> Dict:
     """
     对指定 crate 执行优化。返回结果摘要 dict。
@@ -883,6 +885,7 @@ def optimize_project(
         reset_progress=reset_progress,
         build_fix_retries=build_fix_retries,
         git_guard=git_guard,
+        llm_group=llm_group,
     )
     optimizer = Optimizer(crate, opts)
     stats = optimizer.run()
