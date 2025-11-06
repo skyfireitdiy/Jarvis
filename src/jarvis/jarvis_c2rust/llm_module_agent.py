@@ -101,9 +101,8 @@ class _GraphLoader:
         self.adj: Dict[int, List[str]] = {}
         self.name_to_id: Dict[str, int] = {}
         self.fn_by_id: Dict[int, _FnMeta] = {}
-        """
-        从 symbols.jsonl 加载符号元数据与邻接关系（统一处理函数与类型，按 ref 构建名称邻接）。
-        """
+        
+        # 从 symbols.jsonl 加载符号元数据与邻接关系（统一处理函数与类型，按 ref 构建名称邻接）
         rows_loaded = 0
         try:
             with open(self.data_path, "r", encoding="utf-8") as f:
@@ -113,7 +112,8 @@ class _GraphLoader:
                         continue
                     try:
                         obj = json.loads(line)
-                    except Exception:
+                    except (json.JSONDecodeError, ValueError) as e:
+                        # 跳过无效的 JSON 行，但记录以便调试
                         continue
                     # 不区分函数与类型，统一处理 symbols.jsonl 中的所有记录
                     rows_loaded += 1
@@ -135,7 +135,7 @@ class _GraphLoader:
                         self.name_to_id.setdefault(qn, fid)
                     try:
                         rel_file = self._rel_path(fp)
-                    except Exception:
+                    except (ValueError, OSError):
                         rel_file = fp
                     self.fn_by_id[fid] = _FnMeta(
                         id=fid,
@@ -147,9 +147,10 @@ class _GraphLoader:
                     )
         except FileNotFoundError:
             raise
-        except Exception:
-            # 保持健壮性：出错时保持加载器为空
-            pass
+        except (OSError, IOError) as e:
+            raise RuntimeError(f"读取 symbols.jsonl 时发生错误: {e}") from e
+        except Exception as e:
+            raise RuntimeError(f"解析 symbols.jsonl 时发生未知错误: {e}") from e
 
     def _rel_path(self, abs_path: str) -> str:
         try:
@@ -181,8 +182,8 @@ class _GraphLoader:
     def build_roots_context(
         self,
         roots: List[int],
-        max_functions_per_ns: int = 200,
-        max_namespaces_per_root: int = 50,
+        max_functions_per_ns: int = 200,  # 保留参数以保持兼容性，但当前未使用
+        max_namespaces_per_root: int = 50,  # 保留参数以保持兼容性，但当前未使用
     ) -> List[Dict[str, Any]]:
         """
         为每个根函数构造上下文（仅函数名的调用关系，且不包含任何其他信息）：
@@ -206,10 +207,11 @@ class _GraphLoader:
                 simple = m.name or f"fn_{fid}"
                 fn_names.append(simple)
 
-            # 去重并排序
+            # 去重并排序（优先使用 dict.fromkeys 保持顺序）
             try:
                 fn_names = sorted(list(dict.fromkeys(fn_names)))
-            except Exception:
+            except (TypeError, ValueError):
+                # 如果 dict.fromkeys 失败（理论上不应该），回退到 set
                 fn_names = sorted(list(set(fn_names)))
 
             root_contexts.append(
@@ -227,39 +229,46 @@ def _perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
     以及 project_root/.jarvis/c2rust 下的 progress.json 与 symbol_map.jsonl。
     用户不同意则直接退出。
     """
+    import sys
+    import shutil
+    
     try:
-        import sys
-        import shutil
         cwd = Path(".").resolve()
-        try:
-            requested_root = Path(project_root).resolve()
-        except Exception:
-            requested_root = Path(project_root)
-        created_dir = cwd.parent / f"{cwd.name}_rs" if requested_root == cwd else requested_root
+    except (OSError, ValueError) as e:
+        raise RuntimeError(f"无法解析当前工作目录: {e}") from e
+    
+    try:
+        requested_root = Path(project_root).resolve()
+    except (OSError, ValueError):
+        requested_root = Path(project_root)
+    
+    created_dir = cwd.parent / f"{cwd.name}_rs" if requested_root == cwd else requested_root
 
-        cargo_path = cwd / "Cargo.toml"
-        data_dir = requested_root / ".jarvis" / "c2rust"
-        progress_path = data_dir / "progress.json"
-        symbol_map_jsonl_path = data_dir / "symbol_map.jsonl"
+    cargo_path = cwd / "Cargo.toml"
+    data_dir = requested_root / ".jarvis" / "c2rust"
+    progress_path = data_dir / "progress.json"
+    symbol_map_jsonl_path = data_dir / "symbol_map.jsonl"
 
-        targets: List[str] = []
-        if created_dir.exists():
-            targets.append(f"- 删除 crate 目录（如存在）：{created_dir}")
-        if cargo_path.exists():
-            targets.append(f"- 删除工作区文件：{cargo_path}")
-        if progress_path.exists():
-            targets.append(f"- 删除进度文件：{progress_path}")
-        if symbol_map_jsonl_path.exists():
-            targets.append(f"- 删除符号映射文件：{symbol_map_jsonl_path}")
+    targets: List[str] = []
+    if created_dir.exists():
+        targets.append(f"- 删除 crate 目录（如存在）：{created_dir}")
+    if cargo_path.exists():
+        targets.append(f"- 删除工作区文件：{cargo_path}")
+    if progress_path.exists():
+        targets.append(f"- 删除进度文件：{progress_path}")
+    if symbol_map_jsonl_path.exists():
+        targets.append(f"- 删除符号映射文件：{symbol_map_jsonl_path}")
 
-        if not targets:
-            return
+    if not targets:
+        return
 
-        tip_lines = ["将执行以下清理操作："] + targets + ["", "是否继续？"]
-        if not user_confirm("\n".join(tip_lines), default=False):
-            print("[c2rust-llm-planner] 用户取消清理操作，退出。")
-            sys.exit(0)
+    tip_lines = ["将执行以下清理操作："] + targets + ["", "是否继续？"]
+    if not user_confirm("\n".join(tip_lines), default=False):
+        print("[c2rust-llm-planner] 用户取消清理操作，退出。")
+        sys.exit(0)
 
+    # 执行清理操作
+    try:
         if created_dir.exists():
             shutil.rmtree(created_dir, ignore_errors=True)
         if cargo_path.exists():
@@ -268,8 +277,8 @@ def _perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
             progress_path.unlink()
         if symbol_map_jsonl_path.exists():
             symbol_map_jsonl_path.unlink()
-    except Exception:
-        pass
+    except (OSError, PermissionError) as e:
+        raise RuntimeError(f"清理操作失败: {e}") from e
 
 def _resolve_created_dir(target_root: Union[Path, str]) -> Path:
     """
@@ -339,6 +348,7 @@ class LLMRustCratePlannerAgent:
                 if n == "main" or q.endswith("::main"):
                     return True
         except Exception:
+            # 如果在遍历过程中发生异常，视为不存在 main
             pass
         return False
 
@@ -361,74 +371,72 @@ class LLMRustCratePlannerAgent:
         if not order_path.exists():
             raise FileNotFoundError(f"未找到 translation_order.jsonl: {order_path}")
 
+        def _deduplicate_names(names: List[str]) -> List[str]:
+            """去重并排序函数名列表"""
+            try:
+                return sorted(list(dict.fromkeys(names)))
+            except (TypeError, ValueError):
+                return sorted(list(set(names)))
+
+        def _extract_names_from_items(items: List[Any]) -> List[str]:
+            """从 items 中提取函数名"""
+            names: List[str] = []
+            for it in items:
+                if isinstance(it, dict):
+                    nm = it.get("name") or ""
+                    if isinstance(nm, str) and nm.strip():
+                        names.append(str(nm).strip())
+            return names
+
         groups: Dict[str, List[str]] = {}
-        with order_path.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = json.loads(line)
-                except Exception:
-                    continue
-                roots = obj.get("roots") or []
-                items = obj.get("items") or []
-                if not isinstance(items, list) or not items:
-                    continue
-                root_labels = [str(r).strip() for r in roots if isinstance(r, str) and str(r).strip()]
-                if not root_labels:
-                    continue
-                step_names: List[str] = []
-                for it in items:
-                    if isinstance(it, dict):
-                        nm = it.get("name") or ""
-                        if isinstance(nm, str) and nm.strip():
-                            step_names.append(str(nm).strip())
-                if not step_names:
-                    continue
-                try:
-                    step_names = list(dict.fromkeys(step_names))
-                except Exception:
-                    step_names = sorted(list(set(step_names)))
-                for r in root_labels:
-                    groups.setdefault(r, []).extend(step_names)
+        all_names_fallback: List[str] = []  # 用于回退场景
+        
+        try:
+            with order_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    
+                    roots = obj.get("roots") or []
+                    items = obj.get("items") or []
+                    if not isinstance(items, list) or not items:
+                        continue
+                    
+                    # 提取所有函数名（用于回退场景）
+                    item_names = _extract_names_from_items(items)
+                    all_names_fallback.extend(item_names)
+                    
+                    # 提取 root 标签
+                    root_labels = [str(r).strip() for r in roots if isinstance(r, str) and str(r).strip()]
+                    if not root_labels:
+                        continue
+                    
+                    # 去重 step_names
+                    step_names = _deduplicate_names(item_names)
+                    if not step_names:
+                        continue
+                    
+                    # 按 root 聚合
+                    for r in root_labels:
+                        groups.setdefault(r, []).extend(step_names)
+        except (OSError, IOError) as e:
+            raise RuntimeError(f"读取 translation_order.jsonl 时发生错误: {e}") from e
 
         contexts: List[Dict[str, Any]] = []
         for root_label, names in groups.items():
-            try:
-                names = list(dict.fromkeys(names))
-            except Exception:
-                names = sorted(list(set(names)))
+            names = _deduplicate_names(names)
             contexts.append({"root_function": root_label, "functions": sorted(names)})
 
+        # 回退：如果没有任何 root 组，使用所有 items 作为单组 'project'
         if not contexts:
-            all_names: List[str] = []
-            try:
-                with order_path.open("r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            obj = json.loads(line)
-                        except Exception:
-                            continue
-                        items = obj.get("items") or []
-                        if not isinstance(items, list):
-                            continue
-                        for it in items:
-                            if isinstance(it, dict):
-                                nm = it.get("name") or ""
-                                if isinstance(nm, str) and nm.strip():
-                                    all_names.append(str(nm).strip())
-                try:
-                    all_names = list(dict.fromkeys(all_names))
-                except Exception:
-                    all_names = sorted(list(set(all_names)))
-                if all_names:
-                    contexts.append({"root_function": "project", "functions": sorted(all_names)})
-            except Exception:
-                pass
+            all_names = _deduplicate_names(all_names_fallback)
+            if all_names:
+                contexts.append({"root_function": "project", "functions": sorted(all_names)})
 
         return contexts
 
@@ -640,10 +648,16 @@ class LLMRustCratePlannerAgent:
         )
         return base_summary_prompt + feedback
 
-    def _get_project_yaml_text(self) -> str:
+    def _get_project_yaml_text(self, max_retries: int = 10) -> str:
         """
         执行主流程并返回原始 <PROJECT> YAML 文本，不进行解析。
-        若格式校验失败，将自动重试，直到满足为止（不设置最大重试次数）。
+        若格式校验失败，将自动重试，直到满足为止或达到最大重试次数。
+        
+        Args:
+            max_retries: 最大重试次数，默认 10 次
+            
+        Raises:
+            RuntimeError: 达到最大重试次数仍未生成有效输出
         """
         # 从 translation_order.jsonl 生成上下文，不再基于 symbols.jsonl 的调用图遍历
         roots_ctx = self._build_roots_context_from_order()
@@ -654,7 +668,7 @@ class LLMRustCratePlannerAgent:
 
         last_error = "未知错误"
         attempt = 0
-        while True:
+        while attempt < max_retries:
             attempt += 1
             # 首次使用基础 summary_prompt；失败后附加反馈
             summary_prompt = (
@@ -683,14 +697,26 @@ class LLMRustCratePlannerAgent:
             # 尝试解析并校验
             try:
                 entries = _parse_project_yaml_entries(yaml_text)
-            except Exception:
-                entries = []
+            except (ValueError, TypeError) as e:
+                # 解析失败，记录错误并重试
+                last_error = f"YAML 解析失败: {e}"
+                continue
+            except Exception as e:
+                # 捕获其他异常（包括可能的 yaml.YAMLError）
+                last_error = f"解析时发生错误: {e}"
+                continue
 
             ok, reason = self._validate_project_entries(entries)
             if ok:
                 return yaml_text
             else:
                 last_error = reason
+        
+        # 达到最大重试次数
+        raise RuntimeError(
+            f"达到最大重试次数 ({max_retries}) 仍未生成有效的项目结构。"
+            f"最后一次错误: {last_error}"
+        )
 
     def plan_crate_yaml_with_project(self) -> List[Any]:
         """
@@ -704,11 +730,6 @@ class LLMRustCratePlannerAgent:
         return yaml_entries
 
     def plan_crate_yaml_text(self) -> str:
-        """
-        执行主流程但返回原始 <PROJECT> YAML 文本，不进行解析。
-        便于后续按原样应用目录结构，避免早期解析失败导致信息丢失。
-        """
-        return self._get_project_yaml_text()
         """
         执行主流程但返回原始 <PROJECT> YAML 文本，不进行解析。
         便于后续按原样应用目录结构，避免早期解析失败导致信息丢失。
@@ -847,7 +868,15 @@ def _parse_project_yaml_entries(yaml_text: str) -> List[Any]:
         data = yaml.safe_load(yaml_text)
         if isinstance(data, list):
             return data
+        # 如果解析结果不是列表，回退到轻量解析器
+    except ImportError:
+        # PyYAML 未安装，使用回退解析器
+        pass
+    except (yaml.YAMLError, ValueError) as e:
+        # YAML 解析错误，回退到轻量解析器
+        pass
     except Exception:
+        # 其他未知错误，回退到轻量解析器
         pass
     # 回退
     return _parse_project_yaml_entries_fallback(yaml_text)
@@ -966,7 +995,9 @@ def _ensure_cargo_toml(base_dir: Path, package_name: str) -> None:
         return
     try:
         cargo_path.touch(exist_ok=True)
-    except Exception:
+    except (OSError, PermissionError) as e:
+        # 如果无法创建文件，记录错误但不中断流程
+        # 后续 CodeAgent 可能会处理 Cargo.toml 的创建
         pass
 
 
@@ -997,95 +1028,8 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     # 确保 Cargo.toml 存在并设置包名
     _ensure_cargo_toml(base_dir, crate_pkg_name)
 
-    # 在当前工作目录创建/更新 workspace，使该 crate 作为成员
-    def _ensure_workspace_member(root_dir: Path, member_path: Path) -> None:
-        """
-        在 root_dir 下的 Cargo.toml 中确保 [workspace] 成员包含 member_path（相对于 root_dir 的路径）。
-        - 若 Cargo.toml 不存在：创建最小可用的 workspace 文件；
-        - 若存在但无 [workspace]：追加 [workspace] 与 members；
-        - 若存在且有 [workspace]：将成员路径加入 members（若不存在）。
-        尽量保留原有内容与格式，最小修改。
-        """
-        cargo_path = root_dir / "Cargo.toml"
-        # 计算成员的相对路径
-        try:
-            rel_member = str(member_path.resolve().relative_to(root_dir.resolve()))
-        except Exception:
-            rel_member = member_path.name
-
-        if not cargo_path.exists():
-            content = f"""[workspace]
-members = ["{rel_member}"]
-"""
-            try:
-                cargo_path.write_text(content, encoding="utf-8")
-            except Exception:
-                pass
-            return
-
-        try:
-            txt = cargo_path.read_text(encoding="utf-8")
-        except Exception:
-            return
-
-        if "[workspace]" not in txt:
-            new_txt = txt.rstrip() + f"\n\n[workspace]\nmembers = [\"{rel_member}\"]\n"
-            try:
-                cargo_path.write_text(new_txt, encoding="utf-8")
-            except Exception:
-                pass
-            return
-
-        # 提取 workspace 区块（直到下一个表头或文件末尾）
-        m_ws = re.search(r"(?s)(\[workspace\].*?)(?:\n\[|\Z)", txt)
-        if not m_ws:
-            new_txt = txt.rstrip() + f"\n\n[workspace]\nmembers = [\"{rel_member}\"]\n"
-            try:
-                cargo_path.write_text(new_txt, encoding="utf-8")
-            except Exception:
-                pass
-            return
-
-        ws_block = m_ws.group(1)
-
-        # 查找 members 数组
-        m_members = re.search(r"members\s*=\s*\[(.*?)\]", ws_block, flags=re.S)
-        if not m_members:
-            # 在 [workspace] 行后插入 members
-            new_ws_block = re.sub(r"(\[workspace\]\s*)", r"\1\nmembers = [\"" + rel_member + "\"]\n", ws_block, count=1)
-        else:
-            inner = m_members.group(1)
-            # 解析已有成员
-            existing_vals = []
-            for v in inner.split(","):
-                vv = v.strip()
-                if not vv:
-                    continue
-                if vv.startswith('"') or vv.startswith("'"):
-                    vv = vv.strip('"').strip("'")
-                existing_vals.append(vv)
-            if rel_member in existing_vals:
-                new_ws_block = ws_block  # 已存在，不改动
-            else:
-                # 根据原格式选择分隔符
-                sep = ", " if "\n" not in inner else ",\n"
-                new_inner = inner.strip()
-                if new_inner:
-                    new_inner = new_inner + f"{sep}\"{rel_member}\""
-                else:
-                    new_inner = f"\"{rel_member}\""
-                new_ws_block = ws_block[: m_members.start(1)] + new_inner + ws_block[m_members.end(1) :]
-
-        # 写回更新后的 workspace 区块
-        new_txt = txt[: m_ws.start(1)] + new_ws_block + txt[m_ws.end(1) :]
-        try:
-            cargo_path.write_text(new_txt, encoding="utf-8")
-        except Exception:
-            pass
-
     # 已弃用：不再将 crate 添加到 workspace（按新策略去除 workspace）
     # 构建与工具运行将直接在 crate 目录内进行
-    pass
 
 
 def execute_llm_plan(
@@ -1098,8 +1042,9 @@ def execute_llm_plan(
     返回 LLM 生成的目录结构原始 YAML 文本（来自 <PROJECT> 块）。
     不进行解析，便于后续按原样应用并在需要时使用更健壮的解析器处理。
     """
-    # 预清理已由 plan_crate_yaml_text/plan_crate_yaml_llm 处理，此处不再重复确认与清理
-    yaml_text = plan_crate_yaml_text(llm_group=llm_group)
+    # execute_llm_plan 是顶层入口，需要执行清理（skip_cleanup=False）
+    # plan_crate_yaml_text 内部会根据 skip_cleanup 决定是否执行清理
+    yaml_text = plan_crate_yaml_text(llm_group=llm_group, skip_cleanup=False)
     entries = _parse_project_yaml_entries(yaml_text)
     if not entries:
         raise ValueError("[c2rust-llm-planner] 从LLM输出解析目录结构失败。正在中止。")
@@ -1206,9 +1151,41 @@ def execute_llm_plan(
             # 切换到 crate 目录运行 CodeAgent 与构建
             os.chdir(str(created_dir))
             print(f"[c2rust-llm-planner] 已切换到 crate 目录: {os.getcwd()}，执行 CodeAgent 初始化")
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
-            agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
-            print("[c2rust-llm-planner] 初始 CodeAgent 运行完成。")
+            if llm_group:
+                print(f"[c2rust-llm-planner] 使用模型组: {llm_group}")
+            try:
+                # 验证模型配置在切换目录后是否仍然有效
+                from jarvis.jarvis_utils.config import get_normal_model_name, get_normal_platform_name
+                if llm_group:
+                    resolved_model = get_normal_model_name(llm_group)
+                    resolved_platform = get_normal_platform_name(llm_group)
+                    print(f"[c2rust-llm-planner] 解析的模型配置: 平台={resolved_platform}, 模型={resolved_model}")
+            except Exception as e:
+                print(f"[c2rust-llm-planner] 警告: 无法验证模型配置: {e}")
+            
+            try:
+                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
+                # 验证 agent 内部的模型配置
+                if hasattr(agent, 'agent') and hasattr(agent.agent, 'model'):
+                    actual_model = getattr(agent.agent.model, 'model_name', 'unknown')
+                    actual_platform = type(agent.agent.model).__name__
+                    print(f"[c2rust-llm-planner] CodeAgent 内部模型: {actual_platform}.{actual_model}")
+                agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
+                print("[c2rust-llm-planner] 初始 CodeAgent 运行完成。")
+            except Exception as e:
+                error_msg = str(e)
+                if "does not exist" in error_msg or "404" in error_msg:
+                    print(f"[c2rust-llm-planner] 模型配置错误: {error_msg}")
+                    print(f"[c2rust-llm-planner] 提示: 请检查模型组 '{llm_group}' 的配置是否正确")
+                    print(f"[c2rust-llm-planner] 当前工作目录: {os.getcwd()}")
+                    # 尝试显示当前解析的模型配置
+                    try:
+                        from jarvis.jarvis_utils.config import get_normal_model_name, get_normal_platform_name
+                        if llm_group:
+                            print(f"[c2rust-llm-planner] 当前解析的模型: {get_normal_platform_name(llm_group)}/{get_normal_model_name(llm_group)}")
+                    except Exception:
+                        pass
+                raise
 
             # 进入构建与修复循环：构建失败则生成新的 CodeAgent，携带错误上下文进行最小修复
             iter_count = 0
@@ -1243,8 +1220,17 @@ def execute_llm_plan(
                     "</BUILD_ERROR>",
                 ])
 
-                repair_agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
-                repair_agent.run(repair_prompt, prefix=f"[c2rust-llm-planner][iter={iter_count}]", suffix="")
+                if llm_group:
+                    print(f"[c2rust-llm-planner][iter={iter_count}] 使用模型组: {llm_group}")
+                try:
+                    repair_agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
+                    repair_agent.run(repair_prompt, prefix=f"[c2rust-llm-planner][iter={iter_count}]", suffix="")
+                except Exception as e:
+                    error_msg = str(e)
+                    if "does not exist" in error_msg or "404" in error_msg:
+                        print(f"[c2rust-llm-planner][iter={iter_count}] 模型配置错误: {error_msg}")
+                        print(f"[c2rust-llm-planner][iter={iter_count}] 提示: 请检查模型组 '{llm_group}' 的配置")
+                    raise
                 # 不切换目录，保持在原始工作目录
         finally:
             # 恢复之前的工作目录
