@@ -87,6 +87,14 @@ RE_UNIQUE_LOCK = re.compile(r"\b(?:std::)?unique_lock\s*<[^>]+>\s*([A-Za-z_]\w*)
 RE_SHARED_LOCK = re.compile(r"\b(?:std::)?shared_lock\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
 RE_STD_LOCK = re.compile(r"\bstd::lock\s*\(", re.IGNORECASE)
 RE_SCOPED_LOCK = re.compile(r"\b(?:std::)?scoped_lock\s*<", re.IGNORECASE)
+# 数据竞争检测相关
+RE_STATIC_VAR = re.compile(r"\bstatic\s+(?:const\s+|volatile\s+)?[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_EXTERN_VAR = re.compile(r"\bextern\s+[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_STD_THREAD = re.compile(r"\b(?:std::)?thread\s+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_ATOMIC = re.compile(r"\b(?:std::)?atomic\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
+RE_VOLATILE = re.compile(r"\bvolatile\s+[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_VAR_ACCESS = re.compile(r"\b([A-Za-z_]\w*)\s*(?:=|\[|->|\.)", re.IGNORECASE)
+RE_VAR_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=", re.IGNORECASE)
 RE_INET_LEGACY = re.compile(r"\b(inet_addr|inet_aton)\s*\(", re.IGNORECASE)
 RE_TIME_UNSAFE = re.compile(r"\b(asctime|ctime|localtime|gmtime)\s*\(", re.IGNORECASE)
 RE_GETENV = re.compile(r'\bgetenv\s*\(\s*"[^"]*"\s*\)', re.IGNORECASE)
@@ -2362,6 +2370,180 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
     return issues
 
 
+def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测可能的数据竞争（data race）风险：
+    - 共享变量（全局/静态变量）在多线程环境下未受保护访问
+    - 检测到线程创建但共享变量访问时未见锁保护
+    - volatile 误用（volatile 不能保证线程安全）
+    - 未使用原子操作保护共享变量
+    
+    实现基于启发式，需要结合上下文分析。
+    """
+    issues: List[Issue] = []
+    shared_vars: set[str] = set()  # 共享变量集合
+    thread_creation_lines: list[int] = []  # 线程创建行号
+    atomic_vars: set[str] = set()  # 原子变量集合
+    volatile_vars: set[str] = set()  # volatile 变量集合
+    
+    # 第一遍扫描：收集共享变量、线程创建、原子变量
+    for idx, s in enumerate(lines, start=1):
+        # 收集全局/静态变量
+        m_static = RE_STATIC_VAR.search(s)
+        if m_static:
+            var = m_static.group(1)
+            # 排除 const 变量（只读，通常安全）
+            if "const" not in s.lower():
+                shared_vars.add(var)
+        
+        m_extern = RE_EXTERN_VAR.search(s)
+        if m_extern:
+            var = m_extern.group(1)
+            if "const" not in s.lower():
+                shared_vars.add(var)
+        
+        # 检测全局变量声明（文件作用域）
+        if idx == 1 or (idx > 1 and _safe_line(lines, idx - 1).strip().endswith("}")):
+            # 可能是文件作用域的变量
+            m_global = re.search(r"^[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)\s*[=;]", s)
+            if m_global and "const" not in s.lower() and "static" not in s.lower():
+                var = m_global.group(1)
+                shared_vars.add(var)
+        
+        # 检测线程创建
+        if RE_PTHREAD_CREATE.search(s) or RE_STD_THREAD.search(s):
+            thread_creation_lines.append(idx)
+        
+        # 收集原子变量
+        m_atomic = RE_ATOMIC.search(s)
+        if m_atomic:
+            var = m_atomic.group(1)
+            atomic_vars.add(var)
+        
+        # 收集 volatile 变量
+        m_volatile = RE_VOLATILE.search(s)
+        if m_volatile:
+            var = m_volatile.group(1)
+            volatile_vars.add(var)
+    
+    # 如果没有线程创建，通常不存在数据竞争风险
+    if not thread_creation_lines:
+        return issues
+    
+    # 第二遍扫描：检测共享变量访问时的保护情况
+    for idx, s in enumerate(lines, start=1):
+        # 检测共享变量的访问（赋值或读取）
+        for var in shared_vars:
+            if var in atomic_vars:
+                continue  # 原子变量，通常安全
+            
+            # 检测变量访问
+            var_pattern = re.compile(rf"\b{re.escape(var)}\b")
+            if not var_pattern.search(s):
+                continue
+            
+            # 检查是否是赋值操作
+            is_write = RE_VAR_ASSIGN.search(s) and var in s[:s.find("=")]
+            
+            # 检查附近是否有锁保护
+            window_text = " ".join(t for _, t in _window(lines, idx, before=5, after=5))
+            has_lock = (
+                RE_PTHREAD_LOCK.search(window_text) is not None or
+                RE_MUTEX_LOCK.search(window_text) is not None or
+                RE_LOCK_GUARD.search(window_text) is not None or
+                RE_UNIQUE_LOCK.search(window_text) is not None or
+                RE_SHARED_LOCK.search(window_text) is not None
+            )
+            
+            # 检查是否在锁的作用域内（简单启发式）
+            # 查找最近的锁
+            lock_line = None
+            for j in range(max(1, idx - 10), idx):
+                sj = _safe_line(lines, j)
+                if RE_PTHREAD_LOCK.search(sj) or RE_MUTEX_LOCK.search(sj) or RE_LOCK_GUARD.search(sj) or RE_UNIQUE_LOCK.search(sj):
+                    lock_line = j
+                    break
+            
+            # 检查锁是否已解锁
+            unlocked = False
+            if lock_line:
+                for j in range(lock_line + 1, idx):
+                    sj = _safe_line(lines, j)
+                    if RE_PTHREAD_UNLOCK.search(sj) or RE_MUTEX_UNLOCK.search(sj):
+                        unlocked = True
+                        break
+            
+            # 如果未检测到锁保护，且是写操作，风险更高
+            if not has_lock or (lock_line and unlocked):
+                conf = 0.6
+                if is_write:
+                    conf += 0.15
+                if var in volatile_vars:
+                    # volatile 不能保证线程安全，但可能被误用
+                    conf += 0.1
+                
+                # 检查是否在函数参数中（可能是局部变量，降低风险）
+                if "(" in s and ")" in s:
+                    # 可能是函数调用参数，降低置信度
+                    conf -= 0.1
+                
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="concurrency",
+                        pattern="data_race_suspect",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description=f"共享变量 {var} 在多线程环境下访问但未见明确的锁保护，可能存在数据竞争风险。",
+                        suggestion="使用互斥锁保护共享变量访问；或使用原子操作（std::atomic）进行无锁编程；注意 volatile 不能保证线程安全。",
+                        confidence=min(conf, 0.85),
+                        severity="high" if conf >= 0.7 else "medium",
+                    )
+                )
+    
+    # 检测 volatile 的误用（volatile 不能保证线程安全）
+    for idx, s in enumerate(lines, start=1):
+        for var in volatile_vars:
+            if var in atomic_vars:
+                continue  # 如果同时是原子变量，跳过
+            
+            if re.search(rf"\b{re.escape(var)}\b", s):
+                # 检查是否在多线程上下文中使用 volatile
+                window_text = " ".join(t for _, t in _window(lines, idx, before=3, after=3))
+                has_thread = any(
+                    RE_PTHREAD_CREATE.search(window_text) or
+                    RE_STD_THREAD.search(window_text) or
+                    any(abs(j - idx) < 20 for j in thread_creation_lines)
+                )
+                
+                if has_thread:
+                    # 检查是否有锁保护
+                    has_lock = (
+                        RE_PTHREAD_LOCK.search(window_text) is not None or
+                        RE_MUTEX_LOCK.search(window_text) is not None or
+                        RE_LOCK_GUARD.search(window_text) is not None
+                    )
+                    
+                    if not has_lock:
+                        issues.append(
+                            Issue(
+                                language="c/cpp",
+                                category="concurrency",
+                                pattern="volatile_not_threadsafe",
+                                file=relpath,
+                                line=idx,
+                                evidence=_strip_line(s),
+                                description=f"volatile 变量 {var} 在多线程环境下使用，但 volatile 不能保证线程安全，可能存在数据竞争。",
+                                suggestion="volatile 仅防止编译器优化，不能保证原子性或内存可见性；使用 std::atomic 或互斥锁保护共享变量。",
+                                confidence=0.7,
+                                severity="high",
+                            )
+                        )
+    
+    return issues
+
+
 def _rule_smart_ptr_get_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测智能指针的 .get() 方法不安全使用（返回的原始指针可能悬空）。
@@ -2467,6 +2649,8 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_smart_ptr_get_unsafe(mlines, relpath))
     # C++ 死锁检测
     issues.extend(_rule_cpp_deadlock_patterns(mlines, relpath))
+    # 数据竞争检测
+    issues.extend(_rule_data_race_suspect(mlines, relpath))
     return issues
 
 

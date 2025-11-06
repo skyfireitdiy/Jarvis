@@ -44,6 +44,47 @@ RE_UNSAFE_IMPL = re.compile(r"\bunsafe\s+impl\s+(?:Send|Sync)\b|\bimpl\s+unsafe\
 RE_LET_UNDERSCORE = re.compile(r"\blet\s+_+\s*=\s*.+;")
 RE_MATCH_IGNORE_ERR = re.compile(r"\.ok\s*\(\s*\)|\.ok\?\s*;|\._?\s*=\s*.+\.err\(\s*\)", re.IGNORECASE)  # 粗略
 
+# 类型转换相关
+RE_AS_CAST = re.compile(r"\b\w+\s+as\s+[A-Za-z_]\w*", re.IGNORECASE)
+RE_FROM_RAW_PARTS = re.compile(r"\bfrom_raw_parts\s*\(")
+RE_FROM_RAW = re.compile(r"\bfrom_raw\s*\(")
+RE_INTO_RAW = re.compile(r"\binto_raw\s*\(")
+
+# 内存操作相关
+RE_GET_UNCHECKED = re.compile(r"\.get_unchecked\s*\(")
+RE_GET_UNCHECKED_MUT = re.compile(r"\.get_unchecked_mut\s*\(")
+RE_OFFSET = re.compile(r"\.offset\s*\(")
+RE_ADD = re.compile(r"\.add\s*\(")
+RE_COPY_NONOVERLAPPING = re.compile(r"\bcopy_nonoverlapping\s*\(")
+RE_COPY = re.compile(r"\bcopy\s*\(")
+RE_WRITE = re.compile(r"\bwrite\s*\(")
+RE_READ = re.compile(r"\bread\s*\(")
+RE_MANUALLY_DROP = re.compile(r"\bManuallyDrop\b")
+
+# 并发相关
+RE_ARC = re.compile(r"\bArc\s*<", re.IGNORECASE)
+RE_MUTEX = re.compile(r"\bMutex\s*<", re.IGNORECASE)
+RE_RWLOCK = re.compile(r"\bRwLock\s*<", re.IGNORECASE)
+RE_REFCELL = re.compile(r"\bRefCell\s*<", re.IGNORECASE)
+RE_CELL = re.compile(r"\bCell\s*<", re.IGNORECASE)
+
+# 错误处理相关
+RE_PANIC = re.compile(r"\bpanic!\s*\(")
+RE_UNREACHABLE = re.compile(r"\bunreachable!\s*\(")
+
+# FFI 相关
+RE_CSTRING = re.compile(r"\bCString\b")
+RE_CSTR = re.compile(r"\bCStr\b")
+RE_FFI_PTR_DEREF = re.compile(r"\*[A-Za-z_]\w*\s*[\[\.]")  # 原始指针解引用
+
+# 生命周期相关
+RE_LIFETIME_PARAM = re.compile(r"<['][a-z]\w*>")  # 生命周期参数
+RE_STATIC_LIFETIME = re.compile(r"&'static\s+")
+
+# 其他不安全模式
+RE_UNINIT = re.compile(r"\buninit\s*\(")
+RE_ZEROED = re.compile(r"\bzeroed\s*\(")
+
 
 # ---------------------------
 # 公共工具
@@ -360,6 +401,304 @@ def _rule_forget(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
+def _rule_get_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 get_unchecked/get_unchecked_mut 的使用，这些方法绕过边界检查。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if not (RE_GET_UNCHECKED.search(s) or RE_GET_UNCHECKED_MUT.search(s)):
+            continue
+        conf = 0.8
+        if _has_safety_comment_around(lines, idx):
+            conf -= 0.1
+        if _in_test_context(lines, idx):
+            conf -= 0.05
+        conf = max(0.6, min(0.95, conf))
+        issues.append(
+            Issue(
+                language="rust",
+                category="unsafe_usage",
+                pattern="get_unchecked",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="使用 get_unchecked/get_unchecked_mut 绕过边界检查，若索引无效将导致未定义行为。",
+                suggestion="优先使用安全的索引方法（[] 或 get）；必须使用 get_unchecked 时，在 SAFETY 注释中证明索引有效性。",
+                confidence=conf,
+                severity=_severity_from_confidence(conf),
+            )
+        )
+    return issues
+
+
+def _rule_pointer_arithmetic(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测指针算术操作（offset/add），这些操作可能产生无效指针。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if not (RE_OFFSET.search(s) or RE_ADD.search(s)):
+            continue
+        conf = 0.75
+        if _has_safety_comment_around(lines, idx):
+            conf -= 0.1
+        if _in_test_context(lines, idx):
+            conf -= 0.05
+        conf = max(0.5, min(0.9, conf))
+        issues.append(
+            Issue(
+                language="rust",
+                category="unsafe_usage",
+                pattern="pointer_arithmetic",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="使用 offset/add 进行指针算术，若计算结果超出有效范围将导致未定义行为。",
+                suggestion="确保指针算术结果在有效对象边界内；使用 slice 等安全抽象替代原始指针算术。",
+                confidence=conf,
+                severity=_severity_from_confidence(conf),
+            )
+        )
+    return issues
+
+
+def _rule_unsafe_mem_ops(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测不安全的内存操作（copy_nonoverlapping/copy/write/read）。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if not (RE_COPY_NONOVERLAPPING.search(s) or RE_COPY.search(s) or RE_WRITE.search(s) or RE_READ.search(s)):
+            continue
+        # 检查是否在 unsafe 块中
+        window_text = " ".join(t for _, t in _window(lines, idx, before=5, after=5))
+        if "unsafe" not in window_text.lower():
+            continue  # 这些函数必须在 unsafe 块中使用
+        
+        conf = 0.8
+        if _has_safety_comment_around(lines, idx):
+            conf -= 0.1
+        if _in_test_context(lines, idx):
+            conf -= 0.05
+        conf = max(0.6, min(0.95, conf))
+        issues.append(
+            Issue(
+                language="rust",
+                category="unsafe_usage",
+                pattern="unsafe_mem_ops",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="使用不安全的内存操作（copy/copy_nonoverlapping/write/read），需确保指针有效性、对齐与重叠检查。",
+                suggestion="优先使用安全的复制方法；必须使用时，在 SAFETY 注释中证明指针有效性、对齐与边界条件。",
+                confidence=conf,
+                severity=_severity_from_confidence(conf),
+            )
+        )
+    return issues
+
+
+def _rule_from_raw_parts(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 from_raw_parts/from_raw 等不安全构造函数。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if not (RE_FROM_RAW_PARTS.search(s) or RE_FROM_RAW.search(s)):
+            continue
+        conf = 0.85
+        if _has_safety_comment_around(lines, idx):
+            conf -= 0.1
+        if _in_test_context(lines, idx):
+            conf -= 0.05
+        conf = max(0.6, min(0.95, conf))
+        issues.append(
+            Issue(
+                language="rust",
+                category="unsafe_usage",
+                pattern="from_raw_parts/from_raw",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="使用 from_raw_parts/from_raw 从原始指针构造，需确保指针有效性、对齐与生命周期安全。",
+                suggestion="优先使用安全的构造函数；必须使用时，在 SAFETY 注释中证明所有前置条件（有效性/对齐/生命周期）。",
+                confidence=conf,
+                severity=_severity_from_confidence(conf),
+            )
+        )
+    return issues
+
+
+def _rule_manually_drop(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 ManuallyDrop 的使用，需要手动管理 Drop。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if not RE_MANUALLY_DROP.search(s):
+            continue
+        conf = 0.7
+        if _has_safety_comment_around(lines, idx):
+            conf -= 0.1
+        if _in_test_context(lines, idx):
+            conf -= 0.05
+        conf = max(0.5, min(0.85, conf))
+        issues.append(
+            Issue(
+                language="rust",
+                category="resource_management",
+                pattern="ManuallyDrop",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="使用 ManuallyDrop 需要手动管理 Drop，若使用不当可能导致资源泄漏或双重释放。",
+                suggestion="确保 ManuallyDrop 包装的对象在适当时候手动调用 drop；在 SAFETY 注释中说明生命周期管理策略。",
+                confidence=conf,
+                severity=_severity_from_confidence(conf),
+            )
+        )
+    return issues
+
+
+def _rule_panic_unreachable(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 panic!/unreachable! 的使用，可能导致程序崩溃。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if not (RE_PANIC.search(s) or RE_UNREACHABLE.search(s)):
+            continue
+        conf = 0.6
+        if _in_test_context(lines, idx):
+            conf -= 0.15  # 测试中 panic 更常见
+        if "assert" in s.lower():
+            conf -= 0.1  # assert! 宏中的 panic 通常可接受
+        conf = max(0.4, min(0.75, conf))
+        issues.append(
+            Issue(
+                language="rust",
+                category="error_handling",
+                pattern="panic/unreachable",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="使用 panic!/unreachable! 可能导致程序崩溃，缺少优雅的错误处理。",
+                suggestion="优先使用 Result 类型进行错误处理；仅在确实不可恢复的情况下使用 panic。",
+                confidence=conf,
+                severity=_severity_from_confidence(conf),
+            )
+        )
+    return issues
+
+
+def _rule_refcell_borrow(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 RefCell 的使用，运行时借用检查可能 panic。
+    """
+    issues: List[Issue] = []
+    refcell_vars: set[str] = set()
+    
+    # 收集 RefCell 变量
+    for idx, s in enumerate(lines, start=1):
+        if RE_REFCELL.search(s):
+            # 简单提取变量名
+            m = re.search(r"\bRefCell\s*<[^>]+>\s*([A-Za-z_]\w*)", s, re.IGNORECASE)
+            if m:
+                refcell_vars.add(m.group(1))
+    
+    # 检测 borrow/borrow_mut 的使用
+    for idx, s in enumerate(lines, start=1):
+        for var in refcell_vars:
+            if re.search(rf"\b{re.escape(var)}\s*\.borrow\s*\(", s, re.IGNORECASE):
+                conf = 0.55
+                # 检查是否有 try_borrow（更安全）
+                if "try_borrow" in s.lower():
+                    continue
+                if _in_test_context(lines, idx):
+                    conf -= 0.1
+                conf = max(0.4, min(0.7, conf))
+                issues.append(
+                    Issue(
+                        language="rust",
+                        category="error_handling",
+                        pattern="RefCell_borrow",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description=f"RefCell {var} 使用 borrow/borrow_mut 可能在运行时 panic（借用冲突）。",
+                        suggestion="考虑使用 try_borrow/try_borrow_mut 返回 Result，或使用 Mutex/RwLock 进行编译时检查。",
+                        confidence=conf,
+                        severity=_severity_from_confidence(conf),
+                    )
+                )
+                break  # 每行只报告一次
+    return issues
+
+
+def _rule_ffi_cstring(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 FFI 中 CString/CStr 的使用，需要确保正确转换与生命周期。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if not (RE_CSTRING.search(s) or RE_CSTR.search(s)):
+            continue
+        # 检查是否在 FFI 上下文中
+        window_text = " ".join(t for _, t in _window(lines, idx, before=5, after=5))
+        if RE_EXTERN_C.search(window_text) or "ffi" in window_text.lower():
+            conf = 0.65
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            conf = max(0.5, min(0.8, conf))
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="ffi",
+                    pattern="CString/CStr",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="FFI 中使用 CString/CStr 需要确保正确的生命周期管理与空字节处理。",
+                    suggestion="确保 CString 生命周期覆盖 FFI 调用期间；注意 CStr 不能包含内部空字节。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    return issues
+
+
+def _rule_uninit_zeroed(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测 uninit/zeroed 的使用，未初始化内存访问风险。
+    """
+    issues: List[Issue] = []
+    for idx, s in enumerate(lines, start=1):
+        if not (RE_UNINIT.search(s) or RE_ZEROED.search(s)):
+            continue
+        conf = 0.75
+        if _has_safety_comment_around(lines, idx):
+            conf -= 0.1
+        if _in_test_context(lines, idx):
+            conf -= 0.05
+        conf = max(0.5, min(0.9, conf))
+        issues.append(
+            Issue(
+                language="rust",
+                category="unsafe_usage",
+                pattern="uninit/zeroed",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="使用 uninit/zeroed 创建未初始化内存，若在初始化前读取将导致未定义行为。",
+                suggestion="确保在使用前完成初始化；优先使用 MaybeUninit 进行更安全的未初始化内存管理。",
+                confidence=conf,
+                severity=_severity_from_confidence(conf),
+            )
+        )
+    return issues
+
+
 # ---------------------------
 # 对外主入口
 # ---------------------------
@@ -370,15 +709,29 @@ def analyze_rust_text(relpath: str, text: str) -> List[Issue]:
     """
     lines = text.splitlines()
     issues: List[Issue] = []
+    # 基础 unsafe 使用
     issues.extend(_rule_unsafe(lines, relpath))
     issues.extend(_rule_raw_pointer(lines, relpath))
     issues.extend(_rule_transmute(lines, relpath))
     issues.extend(_rule_forget(lines, relpath))
     issues.extend(_rule_maybe_uninit(lines, relpath))
+    # 错误处理
     issues.extend(_rule_unwrap_expect(lines, relpath))
-    issues.extend(_rule_extern_c(lines, relpath))
-    issues.extend(_rule_unsafe_impl(lines, relpath))
     issues.extend(_rule_ignore_result(lines, relpath))
+    issues.extend(_rule_panic_unreachable(lines, relpath))
+    # FFI 相关
+    issues.extend(_rule_extern_c(lines, relpath))
+    issues.extend(_rule_ffi_cstring(lines, relpath))
+    # 并发相关
+    issues.extend(_rule_unsafe_impl(lines, relpath))
+    issues.extend(_rule_refcell_borrow(lines, relpath))
+    # 内存操作相关
+    issues.extend(_rule_get_unchecked(lines, relpath))
+    issues.extend(_rule_pointer_arithmetic(lines, relpath))
+    issues.extend(_rule_unsafe_mem_ops(lines, relpath))
+    issues.extend(_rule_from_raw_parts(lines, relpath))
+    issues.extend(_rule_manually_drop(lines, relpath))
+    issues.extend(_rule_uninit_zeroed(lines, relpath))
     return issues
 
 
