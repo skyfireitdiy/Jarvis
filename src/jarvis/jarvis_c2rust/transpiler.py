@@ -47,9 +47,9 @@ LEGACY_SYMBOL_MAP_JSON = "symbol_map.json"
 
 # 配置常量
 ERROR_SUMMARY_MAX_LENGTH = 2000  # 错误信息摘要最大长度
-DEFAULT_REVIEW_MAX_ITERATIONS = 10  # 审查阶段最大迭代次数
-DEFAULT_CHECK_MAX_RETRIES = 10  # cargo check 阶段默认最大重试次数
-DEFAULT_TEST_MAX_RETRIES = 10  # cargo test 阶段默认最大重试次数
+DEFAULT_REVIEW_MAX_ITERATIONS = 0  # 审查阶段最大迭代次数（0表示无限重试）
+DEFAULT_CHECK_MAX_RETRIES = 0  # cargo check 阶段默认最大重试次数（0表示无限重试）
+DEFAULT_TEST_MAX_RETRIES = 0  # cargo test 阶段默认最大重试次数（0表示无限重试）
 
 
 @dataclass
@@ -451,9 +451,9 @@ class Transpiler:
         llm_group: Optional[str] = None,
         plan_max_retries: int = 5,
         max_retries: int = 0,  # 兼容旧接口，如未设置则使用 check_max_retries 和 test_max_retries
-        check_max_retries: Optional[int] = None,  # cargo check 阶段最大重试次数
-        test_max_retries: Optional[int] = None,  # cargo test 阶段最大重试次数
-        review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,  # 审查阶段最大迭代次数
+        check_max_retries: Optional[int] = None,  # cargo check 阶段最大重试次数（0表示无限重试）
+        test_max_retries: Optional[int] = None,  # cargo test 阶段最大重试次数（0表示无限重试）
+        review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,  # 审查阶段最大迭代次数（0表示无限重试）
         resume: bool = True,
         only: Optional[List[str]] = None,  # 仅转译指定函数名（简单名或限定名）
     ) -> None:
@@ -1821,7 +1821,9 @@ class Transpiler:
     def _cargo_build_loop(self) -> bool:
         """在 crate 目录执行构建与测试：先 cargo check，再 cargo test。失败则最小化修复直到通过或达到上限。"""
         workspace_root = str(self.crate_dir)
-        typer.secho(f"[c2rust-transpiler][build] 工作区={workspace_root}，开始构建循环（check -> test）", fg=typer.colors.MAGENTA)
+        check_limit = f"最大重试: {self.check_max_retries if self.check_max_retries > 0 else '无限'}"
+        test_limit = f"最大重试: {self.test_max_retries if self.test_max_retries > 0 else '无限'}"
+        typer.secho(f"[c2rust-transpiler][build] 工作区={workspace_root}，开始构建循环（check -> test，{check_limit} / {test_limit}）", fg=typer.colors.MAGENTA)
         check_iter = 0
         test_iter = 0
         while True:
@@ -1836,9 +1838,10 @@ class Transpiler:
             )
             if res_check.returncode != 0:
                 output = (res_check.stdout or "") + "\n" + (res_check.stderr or "")
-                typer.secho(f"[c2rust-transpiler][build] cargo check 失败 (第 {check_iter} 次尝试)。", fg=typer.colors.RED)
+                limit_info = f" (上限: {self.check_max_retries if self.check_max_retries > 0 else '无限'})" if check_iter % 10 == 0 or check_iter == 1 else ""
+                typer.secho(f"[c2rust-transpiler][build] cargo check 失败 (第 {check_iter} 次尝试{limit_info})。", fg=typer.colors.RED)
                 typer.secho(output, fg=typer.colors.RED)
-                # 达到上限则记录并退出
+                # 达到上限则记录并退出（0表示无限重试）
                 maxr = self.check_max_retries
                 if maxr > 0 and check_iter >= maxr:
                     typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
@@ -1922,7 +1925,8 @@ class Transpiler:
                 return True
 
             output = (res.stdout or "") + "\n" + (res.stderr or "")
-            typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {test_iter} 次尝试)。", fg=typer.colors.RED)
+            limit_info = f" (上限: {self.test_max_retries if self.test_max_retries > 0 else '无限'})" if test_iter % 10 == 0 or test_iter == 1 else ""
+            typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {test_iter} 次尝试{limit_info})。", fg=typer.colors.RED)
             typer.secho(output, fg=typer.colors.RED)
             maxr = self.test_max_retries
             if maxr > 0 and test_iter >= maxr:
@@ -2063,7 +2067,8 @@ class Transpiler:
                 disable_file_edit=True,
             )
 
-        while i < max_iterations:
+        # 0表示无限重试，否则限制迭代次数
+        while max_iterations == 0 or i < max_iterations:
             agent = self._current_agents[review_key]
             prev_cwd = os.getcwd()
             try:
@@ -2074,7 +2079,8 @@ class Transpiler:
             m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
             content = (m.group(1).strip() if m else summary.strip()).upper()
             if content == "OK":
-                typer.secho("[c2rust-transpiler][review] 代码审查通过。", fg=typer.colors.GREEN)
+                limit_info = f" (上限: {max_iterations if max_iterations > 0 else '无限'})"
+                typer.secho(f"[c2rust-transpiler][review] 代码审查通过{limit_info} (共 {i+1} 次迭代)。", fg=typer.colors.GREEN)
                 # 二次审查：类型/边界一致性检查与最小化修复
                 try:
                     self._type_boundary_review_and_fix(rec, module, rust_sig)
@@ -2111,15 +2117,16 @@ class Transpiler:
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                ca.run(self._compose_prompt_with_context(fix_prompt), prefix=f"[c2rust-transpiler][review-fix iter={i+1}]", suffix="")
+                limit_info = f"/{max_iterations}" if max_iterations > 0 else "/∞"
+                ca.run(self._compose_prompt_with_context(fix_prompt), prefix=f"[c2rust-transpiler][review-fix iter={i+1}{limit_info}]", suffix="")
                 # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
                 self._cargo_build_loop()
             finally:
                 os.chdir(prev_cwd)
             i += 1
         
-        # 达到迭代上限
-        if i >= max_iterations:
+        # 达到迭代上限（仅当设置了上限时）
+        if max_iterations > 0 and i >= max_iterations:
             typer.secho(f"[c2rust-transpiler][review] 已达到最大迭代次数上限({max_iterations})，停止审查优化。", fg=typer.colors.YELLOW)
             try:
                 cur = self.progress.get("current") or {}

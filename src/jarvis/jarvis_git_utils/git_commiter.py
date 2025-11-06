@@ -177,30 +177,35 @@ commit信息
                 platform_name = None
                 model_name = None
 
-                if (
-                    agent_from_args
-                    and hasattr(agent_from_args, "model")
-                    and getattr(agent_from_args, "model", None)
-                ):
-                    try:
-                        platform_name = agent_from_args.model.platform_name()
-                        model_name = agent_from_args.model.name()
-                        if not model_group and hasattr(
-                            agent_from_args.model, "model_group"
-                        ):
-                            model_group = agent_from_args.model.model_group
-                    except Exception:
-                        # 安全回退到后续逻辑
-                        platform_name = None
-                        model_name = None
-
-                # 如果未能从agent获取到，再根据 model_group 获取
-                if not platform_name:
+                # 优先根据 model_group 获取（确保配置一致性）
+                # 如果 model_group 存在，强制使用它来解析，避免使用 agent.model 中可能不一致的值
+                if model_group:
                     platform_name = get_normal_platform_name(model_group)
-                if not model_name:
                     model_name = get_normal_model_name(model_group)
+                else:
+                    # 如果没有提供 model_group，尝试从传入的 agent 获取
+                    if (
+                        agent_from_args
+                        and hasattr(agent_from_args, "model")
+                        and getattr(agent_from_args, "model", None)
+                    ):
+                        try:
+                            platform_name = agent_from_args.model.platform_name()
+                            model_name = agent_from_args.model.name()
+                            if hasattr(agent_from_args.model, "model_group"):
+                                model_group = agent_from_args.model.model_group
+                        except Exception:
+                            # 安全回退到后续逻辑
+                            platform_name = None
+                            model_name = None
+                    
+                    # 如果仍未获取到，使用配置文件中的默认值（传入 None 会读取默认配置）
+                    if not platform_name:
+                        platform_name = get_normal_platform_name(None)
+                    if not model_name:
+                        model_name = get_normal_model_name(None)
 
-                # If no explicit parameters, try to get from existing global agent
+                # 最后的回退：尝试从全局 agent 获取（仅当仍未获取到时）
                 if not platform_name:
                     agent = get_agent(current_agent_name)
                     if (
@@ -208,10 +213,17 @@ commit信息
                         and hasattr(agent, "model")
                         and getattr(agent, "model", None)
                     ):
-                        platform_name = agent.model.platform_name()
-                        model_name = agent.model.name()
-                        if not model_group and hasattr(agent.model, "model_group"):
-                            model_group = agent.model.model_group
+                        try:
+                            platform_name = agent.model.platform_name()
+                            model_name = agent.model.name()
+                            if not model_group and hasattr(agent.model, "model_group"):
+                                model_group = agent.model.model_group
+                        except Exception:
+                            # 如果全局 agent 也无法获取，使用配置文件默认值
+                            if not platform_name:
+                                platform_name = get_normal_platform_name(None)
+                            if not model_name:
+                                model_name = get_normal_model_name(None)
 
                 # Create a new platform instance
                 if platform_name:
