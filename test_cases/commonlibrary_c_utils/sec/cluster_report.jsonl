@@ -1,0 +1,85 @@
+{"file": "base/src/io_event_reactor.cpp", "verification": "backend_指针在执行操作前必须非空", "gids": [1, 19, 25, 30, 39, 45, 46], "count": 7, "batch_index": 1}
+{"file": "base/src/io_event_reactor.cpp", "verification": "链表操作中prev/next指针关系正确且非空", "gids": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 24, 34, 35, 37, 38, 40, 41, 42, 43, 44, 47, 48, 49, 50], "count": 29, "batch_index": 1}
+{"file": "base/src/io_event_reactor.cpp", "verification": "fd值在有效范围[0, MAX_FD]内", "gids": [16, 18, 20, 21, 23, 26, 27, 31, 36], "count": 9, "batch_index": 1}
+{"file": "base/src/io_event_reactor.cpp", "verification": "链表遍历中每个节点的prev_指针非空", "gids": [51, 52, 53], "count": 3, "batch_index": 2}
+{"file": "base/src/mapped_file.cpp", "verification": "mmap()调用成功返回非MAP_FAILED", "gids": [54, 57], "count": 2, "batch_index": 1}
+{"file": "base/src/mapped_file.cpp", "verification": "数据对象data在转换为rStart_指针前有效", "gids": [55], "count": 1, "batch_index": 1}
+{"file": "base/src/mapped_file.cpp", "verification": "mremap()调用成功返回非MAP_FAILED", "gids": [56], "count": 1, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "分配器allocator_在调用Alloc/Realloc/Dealloc前必须非空", "gids": [63, 65, 66, 67, 68, 69], "count": 6, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "指针data_在reinterpret_cast和间接访问前必须非空", "gids": [100, 104, 106], "count": 3, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "写入/读取位置data_ + writeCursor_/readCursor_必须在数据有效范围内", "gids": [71, 78, 107], "count": 3, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "Parcelable对象指针在访问成员前必须非空", "gids": [72, 73, 74, 75, 76, 77], "count": 6, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "向量指针val在访问成员函数前必须非空", "gids": [81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98], "count": 18, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "new DefaultAllocator()返回值必须非空", "gids": [58], "count": 1, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "free(data) 前必须确保data指向的内存不再被使用", "gids": [62], "count": 1, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "reinterpret_cast仅用于合法内存布局转换而非类型混淆", "gids": [99, 101, 102, 103, 105], "count": 5, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "Write/Read模板函数返回值必须校验以确保操作成功", "gids": [59, 60, 61], "count": 3, "batch_index": 1}
+{"file": "base/src/parcel.cpp", "verification": "realloc返回的指针非空且类型转换对齐正确", "gids": [110, 113], "count": 2, "batch_index": 2}
+{"file": "base/src/parcel.cpp", "verification": "数据指针在有效缓冲区内且读取长度不超过边界", "gids": [108, 111], "count": 2, "batch_index": 2}
+{"file": "base/src/parcel.cpp", "verification": "字符串转换源数据长度有效且字符编码正确", "gids": [109, 114, 115, 116, 117, 118, 119, 120, 121], "count": 9, "batch_index": 2}
+{"file": "base/src/parcel.cpp", "verification": "const_cast操作的源对象不是真正的常量对象", "gids": [122, 123], "count": 2, "batch_index": 2}
+{"file": "base/src/parcel.cpp", "verification": "外部数据缓冲区指针初始化为有效内存区域", "gids": [112], "count": 1, "batch_index": 2}
+{"file": "base/src/io_event_handler.cpp", "verification": "prev_指针在prev_->next_赋值前非空", "gids": [124], "count": 1, "batch_index": 1}
+{"file": "base/src/io_event_handler.cpp", "verification": "next_指针在next_->prev_赋值前非空", "gids": [125], "count": 1, "batch_index": 1}
+{"file": "base/src/io_event_handler.cpp", "verification": "reactor指针在AddHandler/RemoveHandler/UpdateHandler调用前非空", "gids": [126, 127, 128], "count": 3, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "RefTracker分配操作成功", "gids": [129], "count": 1, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "refs_非空", "gids": [130, 131], "count": 2, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "refCounter_在IncRefCount()前非空", "gids": [132], "count": 1, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "refCounter_在DecRefCount()前非空", "gids": [133], "count": 1, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "refCounter_在IsRefPtrValid()前非空", "gids": [134], "count": 1, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "refCounter_在DecWeakRefCount(objectId)前非空", "gids": [135], "count": 1, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "refCounter_在IncWeakRefCount(objectId)前非空", "gids": [136], "count": 1, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "refCounter_在AttemptIncStrongRef(objectId, unuse)前非空", "gids": [137], "count": 1, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "refs_使用前已分配成功", "gids": [138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178], "count": 41, "batch_index": 1}
+{"file": "base/src/refbase.cpp", "verification": "指针refs_在解引用前必须非空", "gids": [179, 180], "count": 2, "batch_index": 2}
+{"file": "base/src/timer.cpp", "verification": "验证reactor_指针在构造函数中被正确初始化", "gids": [181, 182, 183, 197, 198, 205, 206, 207, 208, 209, 210, 211, 218, 219, 220], "count": 15, "batch_index": 1}
+{"file": "base/src/timer.cpp", "verification": "验证entry指针通过new TimerEntry()创建且非空", "gids": [184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 199, 200, 201, 202, 203, 204, 212, 213, 214, 215, 216, 217], "count": 25, "batch_index": 1}
+{"file": "base/src/event_reactor.cpp", "verification": "demultiplexer_成员指针在构造函数初始化后不为null", "gids": [221, 222, 223, 225, 226], "count": 5, "batch_index": 1}
+{"file": "base/src/event_reactor.cpp", "verification": "timerEventHandlers_容器迭代器有效且指向的元素不为null", "gids": [224, 230, 231], "count": 3, "batch_index": 1}
+{"file": "base/src/event_reactor.cpp", "verification": "ScheduleTimer()中创建的handler指针不为null", "gids": [227, 228, 229], "count": 3, "batch_index": 1}
+{"file": "base/src/file_ex.cpp", "verification": "文件打开操作成功验证", "gids": [232, 233], "count": 2, "batch_index": 1}
+{"file": "base/src/file_ex.cpp", "verification": "文件指针关闭操作验证", "gids": [234, 235], "count": 2, "batch_index": 1}
+{"file": "base/src/file_ex.cpp", "verification": "读取操作不超过缓冲区边界", "gids": [236], "count": 1, "batch_index": 1}
+{"file": "base/src/file_ex.cpp", "verification": "写入操作不超过目标缓冲区容量", "gids": [237], "count": 1, "batch_index": 1}
+{"file": "base/src/file_ex.cpp", "verification": "PATH_MAX缓冲区溢出防护检查", "gids": [238, 239], "count": 2, "batch_index": 1}
+{"file": "base/src/timer_event_handler.cpp", "verification": "文件关闭操作返回值检查", "gids": [240], "count": 1, "batch_index": 1}
+{"file": "base/src/unicode_ex.cpp", "verification": "输入字符串指针在进入UTF-16到UTF-8转换循环前已进行非空检查", "gids": [241, 242, 243, 244, 245, 246, 247], "count": 7, "batch_index": 1}
+{"file": "base/src/unicode_ex.cpp", "verification": "codePoint指针在调用Utf8ShiftAndMask前已完成有效验证", "gids": [248, 249, 250], "count": 3, "batch_index": 1}
+{"file": "base/src/unicode_ex.cpp", "verification": "u16cur指针在写入UTF-16缓冲区时确保不超过缓冲区边界", "gids": [251, 252, 253], "count": 3, "batch_index": 1}
+{"file": "base/src/unicode_ex.cpp", "verification": "reinterpret_cast转换确保不会导致未定义行为或数据对齐问题", "gids": [254, 255, 256], "count": 3, "batch_index": 1}
+{"file": "base/src/event_handler.cpp", "verification": "指针reactor_在解引用前非空", "gids": [257], "count": 1, "batch_index": 1}
+{"file": "base/src/io_event_epoll.cpp", "verification": "maxEvents_的值不会导致VLA分配过大内存", "gids": [258], "count": 1, "batch_index": 1}
+{"file": "base/src/observer.cpp", "verification": "观察者指针在NotifyObservers调用前必须非空", "gids": [259], "count": 1, "batch_index": 1}
+{"file": "base/src/thread_ex.cpp", "verification": "指针在解引用前非空", "gids": [262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279], "count": 18, "batch_index": 1}
+{"file": "base/src/thread_ex.cpp", "verification": "内存分配成功", "gids": [260], "count": 1, "batch_index": 1}
+{"file": "base/src/thread_ex.cpp", "verification": "创建分离线程无资源泄漏", "gids": [261], "count": 1, "batch_index": 1}
+{"file": "base/src/thread_ex.cpp", "verification": "reinterpret_cast类型转换安全", "gids": [280, 281], "count": 2, "batch_index": 1}
+{"file": "base/src/event_demultiplexer.cpp", "verification": "handler指针在解引用前必须非空", "gids": [283, 284, 285, 287, 288, 289, 290, 291], "count": 8, "batch_index": 1}
+{"file": "base/src/event_demultiplexer.cpp", "verification": "iterator在解引用前必须验证有效性", "gids": [286, 292], "count": 2, "batch_index": 1}
+{"file": "base/src/event_demultiplexer.cpp", "verification": "epoll文件描述符在关闭前必须有效", "gids": [282], "count": 1, "batch_index": 1}
+{"file": "base/src/ashmem.cpp", "verification": "文件描述符在错误路径中被正确关闭", "gids": [293, 294, 295, 296, 297, 298], "count": 6, "batch_index": 1}
+{"file": "base/src/ashmem.cpp", "verification": "pthread_mutex_lock返回值未被检查", "gids": [299], "count": 1, "batch_index": 1}
+{"file": "base/src/ashmem.cpp", "verification": "reinterpret_cast转换后的指针边界安全性", "gids": [300, 301, 302], "count": 3, "batch_index": 1}
+{"file": "base/src/directory_ex.cpp", "verification": "close()调用返回值是否被忽略，导致未能处理I/O错误", "gids": [303, 304, 305], "count": 3, "batch_index": 1}
+{"file": "base/src/directory_ex.cpp", "verification": "readdir()返回值空指针检查后，是否存在解引用空指针的风险", "gids": [306, 307, 308, 309, 310, 311, 312, 313, 314], "count": 9, "batch_index": 1}
+{"file": "base/src/directory_ex.cpp", "verification": "固定大小缓冲区是否可能因输入过长导致溢出", "gids": [315, 316], "count": 2, "batch_index": 1}
+{"file": "base/include/refbase.h", "verification": "指针在解引用前必须非空，但代码中未显式检查", "gids": [318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 337, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363], "count": 40, "batch_index": 1}
+{"file": "base/include/refbase.h", "verification": "new操作符分配内存必须成功，分配失败时指针不能解除引用", "gids": [317], "count": 1, "batch_index": 1}
+{"file": "base/include/refbase.h", "verification": "reinterpret_cast类型转换必须安全，源类型和目标类型必须兼容", "gids": [364, 365, 366], "count": 3, "batch_index": 1}
+{"file": "base/include/refbase.h", "verification": "弱引用对象在使用前必须有效且非空", "gids": [334, 335, 336, 338], "count": 4, "batch_index": 1}
+{"file": "base/include/refbase.h", "verification": "模板参数 O 到 T 的类型转换必须是安全的", "gids": [367], "count": 1, "batch_index": 2}
+{"file": "base/include/safe_queue.h", "verification": "迭代器iter在有效范围内(*iter == object比较前已被循环条件iter != deque_.end()确保)", "gids": [368], "count": 1, "batch_index": 1}
+{"file": "base/include/unique_fd.h", "verification": "文件描述符在关闭前必须非负（>= 0）", "gids": [369, 370], "count": 2, "batch_index": 1}
+{"file": "base/include/ashmem.h", "verification": "startAddr_在解引用前必须通过MapAshmem正确映射（非nullptr）", "gids": [371], "count": 1, "batch_index": 1}
+{"file": "base/include/parcel.h", "verification": "传入Read方法的vector指针参数val非空", "gids": [374, 375], "count": 2, "batch_index": 1}
+{"file": "base/include/parcel.h", "verification": "不存在空指针验证条件", "gids": [372, 373], "count": 2, "batch_index": 1}
+{"file": "base/include/sorted_vector.h", "verification": "index参数必须小于vec_容器的大小", "gids": [376, 378, 379], "count": 3, "batch_index": 1}
+{"file": "base/include/sorted_vector.h", "verification": "迭代器it不能指向vec_容器的末尾，且解引用结果必须有效", "gids": [377], "count": 1, "batch_index": 1}
+{"file": "base/include/safe_map.h", "verification": "在调用map[key]操作前需要检查key是否存在以避免创建默认值元素", "gids": [384], "count": 1, "batch_index": 1}
+{"file": "base/include/safe_map.h", "verification": "解引用迭代器前需要确保迭代器不等于map.end()", "gids": [381, 382], "count": 2, "batch_index": 1}
+{"file": "base/include/safe_map.h", "verification": "迭代器在对象遍历过程中保持有效范围", "gids": [383], "count": 1, "batch_index": 1}
+{"file": "base/src/rust/file_ex.rs", "verification": "指针base在索引访问前有效不为NULL", "gids": [385], "count": 1, "batch_index": 1}
+{"file": "base/src/rust/ashmem.rs", "verification": "FFI接口中C风格指针参数不能为null且必须指向有效内存区域", "gids": [386, 387, 388, 389, 390, 391, 396, 397, 398, 399, 400], "count": 11, "batch_index": 1}
+{"file": "base/src/rust/ashmem.rs", "verification": "Rust包装器函数需正确处理FFI边界并确保内存安全", "gids": [392, 393, 394, 395, 401, 402, 403, 404], "count": 8, "batch_index": 1}
+{"file": "base/src/rust/ashmem.rs", "verification": "CString创建时输入字符串不能包含null字节且有合适的错误处理", "gids": [405, 406, 407], "count": 3, "batch_index": 1}
+{"file": "base/src/rust/directory_ex.rs", "verification": "CXX FFI bridge声明，无需验证unsafe使用", "gids": [408], "count": 1, "batch_index": 1}
