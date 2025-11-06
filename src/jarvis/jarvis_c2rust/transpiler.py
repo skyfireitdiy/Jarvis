@@ -688,6 +688,7 @@ class Transpiler:
             "- 按功能内聚与依赖方向选择模块，避免循环依赖；\n"
             "- 模块路径必须落在 crate 的 src/ 下，优先放置到已存在的模块中；必要时可建议创建新的子模块文件；\n"
             "- 函数接口设计应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；优先使用 Rust 原生类型（如 i32/u32/usize、&[T]/&mut [T]、String、Result<T, E> 等），而不是 C 风格类型（如 core::ffi::c_*、libc::c_*）；\n"
+            "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI；\n"
             "- 参数个数与顺序可以保持与 C 一致，但类型设计应优先考虑 Rust 的惯用法和安全性；\n"
             "- 仅输出必要信息，避免冗余解释。"
         )
@@ -741,6 +742,7 @@ class Transpiler:
             "  * 错误处理：考虑使用 Result<T, E> 而非 C 风格的错误码；\n"
             "  * 参数个数与顺序可以保持与 C 一致，但类型应优先考虑 Rust 的惯用法、安全性和可读性；\n"
             "- 函数签名应包含可见性修饰（pub）与函数名；类型应为 Rust 最佳实践的选择，而非简单映射 C 类型。\n"
+            "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI。\n"
             "请严格按以下格式输出：\n"
             "<SUMMARY><yaml>\nmodule: \"...\"\nrust_signature: \"...\"\nnotes: \"...\"\n</yaml></SUMMARY>"
         )
@@ -795,6 +797,9 @@ class Transpiler:
                 return False, "module 路径不可解析或不在 crate/src 下"
             if not re.search(r"\bfn\s+[A-Za-z_][A-Za-z0-9_]*\s*\(", rust_sig):
                 return False, "rust_signature 无效：未检测到 Rust 函数签名（fn 名称）"
+            # 禁止使用 extern "C"
+            if re.search(r'extern\s+"C"', rust_sig, re.IGNORECASE):
+                return False, "rust_signature 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定"
             # Rust风格类型约束：避免使用 C 风格类型（core::ffi::c_* 或 libc::c_*）
             # 强制 Agent 产出更偏向原生 Rust 类型（如 i32/u32/usize/f32/f64/&[T] 等），并减少 c_* 类型的使用
             # 允许使用 c_void（void* 在 Rust 中的惯用类型），但尽量避免其他 c_* 基本类型
@@ -1255,6 +1260,7 @@ class Transpiler:
             "  * 指针/引用：优先使用引用 &T/&mut T 或切片 &[T]/&mut [T]，而非原始指针 *const T/*mut T；仅在必要时使用原始指针；",
             "  * 字符串：优先使用 String、&str 而非 *const c_char/*mut c_char；",
             "  * 错误处理：如适用，考虑使用 Result<T, E> 而非 C 风格的错误码；",
+            "  * 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI；",
             "- 保持最小变更，避免无关重构与格式化；禁止批量重排/重命名/移动文件；",
             "- 命名遵循Rust惯例（函数/模块蛇形命名），公共API使用pub；",
             "- 优先使用安全Rust；如需unsafe，将范围最小化并添加注释说明原因与SAFETY保证；",
