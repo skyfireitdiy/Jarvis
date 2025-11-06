@@ -706,6 +706,7 @@ class Transpiler:
             "注意：\n"
             "- module 必须位于 crate 的 src/ 目录下，接受绝对路径或以 src/ 开头的相对路径；尽量选择已有文件；如需新建文件，给出合理路径；\n"
             "- rust_signature 应尽量与 C 签名对齐（仅要求参数个数与顺序一致，类型可用合理占位）；并包含可见性修饰与函数名（可先用占位类型）。\n"
+            "- 强调 Rust 风格：避免使用 C 风格类型（如 core::ffi::c_* / libc::c_*）；优先使用原生 Rust 基本类型（i32/u32/usize/f32/f64/usize 等），指针使用 *const/*mut 原生类型；如适用可使用切片 &[T]/&mut [T] 或引用。\n"
             "请严格按以下格式输出：\n"
             "<SUMMARY><yaml>\nmodule: \"...\"\nrust_signature: \"...\"\nnotes: \"...\"\n</yaml></SUMMARY>"
         )
@@ -760,6 +761,11 @@ class Transpiler:
                 return False, "module 路径不可解析或不在 crate/src 下"
             if not re.search(r"\bfn\s+[A-Za-z_][A-Za-z0-9_]*\s*\(", rust_sig):
                 return False, "rust_signature 无效：未检测到 Rust 函数签名（fn 名称）"
+            # Rust风格类型约束：避免使用 C 风格类型（core::ffi::c_* 或 libc::c_*）
+            # 强制 Agent 产出更偏向原生 Rust 类型（如 i32/u32/usize/f32/f64/&[T] 等），并减少 c_* 类型的使用
+            # 允许使用 c_void（void* 在 Rust 中的惯用类型），但尽量避免其他 c_* 基本类型
+            if re.search(r"\bcore::ffi::c_(?!void)\w+\b", rust_sig) or re.search(r"\blibc::c_(?!void)\w+\b", rust_sig):
+                return False, "rust_signature 应使用 Rust 风格类型（如 i32/u32/usize/f32/f64 等），除 c_void 外避免使用 core::ffi::c_* / libc::c_*"
             return True, ""
 
         def _retry_sum_prompt(reason: str) -> str:
@@ -835,17 +841,17 @@ class Transpiler:
     def _infer_rust_signature_hint(self, rec: FnRecord) -> str:
         """
         根据 C 符号信息（signature/params/return_type）启发式给出 Rust 函数签名建议（仅签名字符串）。
-        映射策略（保守、跨平台更稳）：
-        - 整型优先 core::ffi c_* 类型（如 c_int/c_uint/c_long），float/double -> f32/f64，size_t -> usize
-        - 指针：包含 '*' 视为指针；含 const 则 *const T，否则 *mut T；void* -> *mut std::ffi::c_void（const 则 *const）
-        - char*：*mut/*const core::ffi::c_char
-        - 参数名缺失则使用 argN
+        Rust 风格优先（避免 c_* 基本类型）：
+        - 基本整型优先 i32/u32/i16/u16/i64/u64 等，size_t -> usize，ssize_t -> isize；
+        - 浮点：float -> f32，double -> f64；
+        - 指针：含 '*' 视为指针；含 const 则 *const T，否则 *mut T；void* -> *mut/ *const std::ffi::c_void（允许使用 c_void）；
+        - char*：优先使用 *mut/*const u8；普通 char -> i8，unsigned char -> u8；
+        - 参数名缺失则使用 argN。
         仅为建议，不强制，供 LLM 参考与事后一致性校验。
         """
         try:
             def _base_ty(ct: str) -> str:
                 s = (ct or "").strip()
-                # 去掉 const/volatile 与多余空白
                 s = s.replace("volatile", " ").replace("CONST", "const").replace("  ", " ")
                 return s
 
@@ -859,26 +865,27 @@ class Transpiler:
 
             def _map_prim(s: str) -> str:
                 t = s.lower().strip()
-                # C/C++ 基本整型（使用 core::ffi 以跨平台规避宽度差异）
+                # C/C++ 基本整型 -> 原生 Rust 基本类型（启发式）
                 if t in ("int", "signed int"):
-                    return "core::ffi::c_int"
-                if t in ("unsigned int", "uint"):
-                    return "core::ffi::c_uint"
+                    return "i32"
+                if t in ("unsigned int", "uint", "unsigned"):
+                    return "u32"
                 if t in ("short", "short int", "signed short", "signed short int"):
-                    return "core::ffi::c_short"
+                    return "i16"
                 if t in ("unsigned short", "unsigned short int"):
-                    return "core::ffi::c_ushort"
+                    return "u16"
                 if t in ("long", "long int", "signed long", "signed long int"):
-                    return "core::ffi::c_long"
+                    # 启发式：long 映射为 i64（各平台宽度不同，此为建议）
+                    return "i64"
                 if t in ("unsigned long", "unsigned long int"):
-                    return "core::ffi::c_ulong"
+                    return "u64"
                 if t in ("long long", "long long int", "signed long long"):
-                    return "core::ffi::c_longlong"
+                    return "i64"
                 if t in ("unsigned long long", "unsigned long long int"):
-                    return "core::ffi::c_ulonglong"
+                    return "u64"
                 # 字符类
                 if t in ("char", "signed char"):
-                    return "core::ffi::c_char"
+                    return "i8"
                 if t in ("unsigned char",):
                     return "u8"
                 # 浮点
@@ -924,7 +931,7 @@ class Transpiler:
                     return "*const std::ffi::c_void" if is_const else "*mut std::ffi::c_void"
                 # 特例：char*
                 if "char" in bs and ptr:
-                    return "*const core::ffi::c_char" if is_const else "*mut core::ffi::c_char"
+                    return "*const u8" if is_const else "*mut u8"
                 base = _map_prim(bs.replace("*", "").replace("const", "").strip())
                 if ptr:
                     return f"*const {base}" if is_const else f"*mut {base}"
@@ -948,7 +955,6 @@ class Transpiler:
             if not rt:
                 ret_rs = ""
             else:
-                # C 的 void 返回在 Rust 中无返回类型（省略 -> ...），仅当非指针时适用
                 rts = rt.strip().lower()
                 if ("void" in rts) and (not _is_ptr(rt)):
                     ret_rs = ""
@@ -1469,14 +1475,14 @@ class Transpiler:
 
     def _ensure_minimal_tests(self, module: str, rust_sig: str) -> None:
         """
-        在目标模块文件中确保存在最小可编译的单元测试：
-        - 在 #[cfg(test)] mod tests 中添加针对当前函数的 smoke 测试
-        - 测试仅调用函数，不断言具体行为，以避免误判
-        - 对 unsafe fn，调用包裹在 unsafe 块内
+        在目标模块文件中确保存在最小可编译且包含合理断言的单元测试：
+        - 使用 std::panic::catch_unwind 断言调用不发生 panic（合理的通用断言）
+        - 对 unsafe fn，在 unsafe 块中调用
+        - 若参数类型不适合自动构造（未知/不可安全默认构造），则不生成测试
         """
         try:
             fn_name = self._extract_rust_fn_name_from_sig(rust_sig)
-            typer.secho(f"[c2rust-transpiler][test] 确保最小单元测试: 模块={module}, 函数={fn_name or '(unknown)'}", fg=typer.colors.BLUE)
+            typer.secho(f"[c2rust-transpiler][test] 确保包含断言的最小单元测试: 模块={module}, 函数={fn_name or '(unknown)'}", fg=typer.colors.BLUE)
             if not fn_name:
                 return
             mp = Path(module)
@@ -1492,20 +1498,16 @@ class Transpiler:
                 typer.secho(f"[c2rust-transpiler][test] 测试 test_{fn_name}_basic 已存在，跳过", fg=typer.colors.GREEN)
                 return
 
-            # 提取参数列表，生成占位入参
+            # 提取参数列表，生成占位入参；如无法安全构造则跳过测试生成
             m = re.search(r"\bfn\s+[A-Za-z_][A-Za-z0-9_]*\s*\((.*?)\)", rust_sig, flags=re.S)
             params_s = m.group(1) if m else ""
-            params = []
+            params: List[str] = []
+            can_generate = True
             if params_s.strip():
-                # 朴素按逗号切分 name: type
                 parts = [x.strip() for x in params_s.split(",") if x.strip()]
                 for p in parts:
                     mm = p.split(":")
-                    if len(mm) >= 2:
-                        ty = mm[1].strip()
-                    else:
-                        ty = ""
-                    # 生成占位表达式
+                    ty = mm[1].strip() if len(mm) >= 2 else ""
                     tys = ty.replace(" ", "")
                     if "*const" in tys:
                         expr = "core::ptr::null()"
@@ -1513,14 +1515,20 @@ class Transpiler:
                         expr = "core::ptr::null_mut()"
                     elif re.search(r"\b(f32|f64)\b", tys):
                         expr = "0.0"
-                    elif re.search(r"\b(u|i)(8|16|32|64|128)\b", tys) or re.search(r"\b(u|i)size\b", tys) or ("core::ffi::c_" in tys):
+                    elif re.search(r"\b(u|i)(8|16|32|64|128)\b", tys) or re.search(r"\b(u|i)size\b", tys):
                         expr = f"(0 as {ty})"
                     else:
-                        expr = "unsafe { std::mem::zeroed() }"
+                        # 对未知或不安全默认构造类型，放弃生成测试以避免不合理构造
+                        can_generate = False
+                        break
                     params.append(expr)
-            args = ", ".join(params)
 
-            call_line = f"let _res = {fn_name}({args});" if args else f"let _res = {fn_name}();"
+            if not can_generate:
+                typer.secho(f"[c2rust-transpiler][test] 跳过测试生成：存在不可安全自动构造的参数类型（{rust_sig}）", fg=typer.colors.YELLOW)
+                return
+
+            args = ", ".join(params)
+            call_line = f"{fn_name}({args});" if args else f"{fn_name}();"
             if "unsafe" in rust_sig:
                 call_line = "unsafe { " + call_line + " }"
 
@@ -1529,28 +1537,26 @@ class Transpiler:
                 "#[cfg(test)]",
                 "mod tests {",
                 "    use super::*;",
-                "    /// 测试用例设计: 冒烟测试，使用占位参数调用目标函数；验证可编译并可正常运行，不校验具体业务逻辑。",
-                "    /// 输入: 指针参数使用 core::ptr::null()/null_mut()，数值参数使用 0/0.0，其他类型使用默认值或 mem::zeroed。",
+                "    use std::panic;",
+                "    /// 测试用例设计: 使用占位参数调用目标函数；通过 catch_unwind 断言不发生 panic。",
+                "    /// 输入: 指针参数使用 core::ptr::null()/null_mut()，数值参数使用 0/0.0。",
                 "    /// 预置条件: 无外部环境/IO/网络依赖；不依赖未实现符号。",
-                f"    /// 期望: {fn_name} 能正常调用且不发生 panic；若为 unsafe 函数，则在 unsafe 块内调用。",
+                f"    /// 期望: {fn_name} 调用不发生 panic（合理的通用断言）。",
                 "    #[test]",
                 f"    fn test_{fn_name}_basic() {{",
-                f"        {call_line}",
+                "        let result = panic::catch_unwind(|| {",
+                f"            {call_line}",
+                "        });",
+                "        assert!(result.is_ok(), \"function panicked\");",
                 "    }",
                 "}",
                 "",
             ])
 
-            # 若已存在 #[cfg(test)] mod tests，则追加测试函数；否则追加整个测试模块
-            tests_mod_pat = re.compile(r"(?s)#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*mod\s+tests\s*\{.*?\}")
-            if tests_mod_pat.search(text):
-                # 直接在文件末尾追加新的测试（避免复杂插入）
-                new_text = text.rstrip() + tests_block
-            else:
-                new_text = text.rstrip() + tests_block
-
+            # 直接在文件末尾追加测试模块/函数
+            new_text = text.rstrip() + tests_block
             mp.write_text(new_text, encoding="utf-8")
-            typer.secho(f"[c2rust-transpiler][test] 已为 {fn_name} 写入最小测试到 {mp}", fg=typer.colors.GREEN)
+            typer.secho(f"[c2rust-transpiler][test] 已为 {fn_name} 写入包含断言的最小测试到 {mp}", fg=typer.colors.GREEN)
         except Exception:
             # 测试生成失败不阻塞主流程
             pass
