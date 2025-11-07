@@ -235,6 +235,74 @@ def handle_commit_workflow() -> bool:
         if not has_uncommitted_changes():
             return False
 
+        # 在提交前检查是否有大量代码删除
+        # 获取diff统计信息（相对于HEAD）
+        try:
+            # 临时暂存所有文件以便获取完整的diff统计
+            subprocess.run(["git", "add", "-N", "."], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            # 检查是否有HEAD
+            head_check = subprocess.run(
+                ["git", "rev-parse", "--verify", "HEAD"],
+                stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+            )
+            
+            if head_check.returncode == 0:
+                # 有HEAD，获取相对于HEAD的diff统计
+                diff_result = subprocess.run(
+                    ["git", "diff", "HEAD", "--shortstat"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    check=False,
+                )
+            else:
+                # 空仓库，获取工作区diff统计
+                diff_result = subprocess.run(
+                    ["git", "diff", "--shortstat"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    check=False,
+                )
+            
+            # 重置暂存区
+            subprocess.run(["git", "reset"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            # 解析插入和删除行数
+            if diff_result.returncode == 0 and diff_result.stdout:
+                insertions = 0
+                deletions = 0
+                insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_result.stdout)
+                deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_result.stdout)
+                if insertions_match:
+                    insertions = int(insertions_match.group(1))
+                if deletions_match:
+                    deletions = int(deletions_match.group(1))
+                
+                # 检查是否有大量代码删除（净删除超过200行）
+                net_deletions = deletions - insertions
+                if net_deletions > 200:
+                    PrettyOutput.print(
+                        f"⚠️ 检测到大量代码删除：净删除 {net_deletions} 行（删除 {deletions} 行，新增 {insertions} 行）",
+                        OutputType.WARNING,
+                    )
+                    if not user_confirm(
+                        "此补丁包含大量代码删除，是否合理？", default=True
+                    ):
+                        # 用户认为不合理，拒绝提交
+                        revert_change()
+                        PrettyOutput.print(
+                            "已拒绝本次提交（用户认为补丁不合理）", OutputType.INFO
+                        )
+                        return False
+        except Exception:
+            # 如果检查过程中出错，不影响正常提交流程
+            pass
+
         # 获取当前分支的提交总数
         commit_result = subprocess.run(
             ["git", "rev-list", "--count", "HEAD"], capture_output=True, text=True
