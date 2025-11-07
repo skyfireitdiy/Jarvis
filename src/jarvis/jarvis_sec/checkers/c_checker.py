@@ -2514,9 +2514,9 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
             if re.search(rf"\b{re.escape(var)}\b", s):
                 # 检查是否在多线程上下文中使用 volatile
                 window_text = " ".join(t for _, t in _window(lines, idx, before=3, after=3))
-                has_thread = any(
-                    RE_PTHREAD_CREATE.search(window_text) or
-                    RE_STD_THREAD.search(window_text) or
+                has_thread = (
+                    RE_PTHREAD_CREATE.search(window_text) is not None or
+                    RE_STD_THREAD.search(window_text) is not None or
                     any(abs(j - idx) < 20 for j in thread_creation_lines)
                 )
                 
