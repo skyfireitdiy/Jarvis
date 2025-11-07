@@ -107,6 +107,346 @@ def _window(lines: Sequence[str], center: int, before: int = 3, after: int = 3) 
     return [(i, _safe_line(lines, i)) for i in range(start, end + 1)]
 
 
+def _remove_comments_preserve_strings(text: str) -> str:
+    """
+    移除 Rust 源码中的注释（//、///、//!、/* */、/** */、/*! */），保留字符串与字符字面量内容；
+    为了保持行号与窗口定位稳定，注释内容会被空格替换并保留换行符。
+    说明：本函数为启发式实现，旨在降低"注释中的API命中"造成的误报。
+    """
+    res: list[str] = []
+    i = 0
+    n = len(text)
+    in_sl_comment = False  # //
+    in_bl_comment = False  # /* */
+    in_string = False      # "
+    in_char = False        # '
+    in_raw_string = False   # r"..." 或 r#"..."#
+    raw_string_hash_count = 0  # 原始字符串的 # 数量
+    escape = False
+
+    while i < n:
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        nxt2 = text[i + 2] if i + 2 < n else ""
+
+        if in_sl_comment:
+            # 单行注释直到换行结束
+            if ch == "\n":
+                in_sl_comment = False
+                res.append(ch)
+            else:
+                # 用空格占位，保持列数
+                res.append(" ")
+            i += 1
+            continue
+
+        if in_bl_comment:
+            # 多行注释直到 */
+            if ch == "*" and nxt == "/":
+                in_bl_comment = False
+                res.append(" ")
+                res.append(" ")
+                i += 2
+            else:
+                # 注释体内保留换行，其余替换为空格
+                res.append("\n" if ch == "\n" else " ")
+                i += 1
+            continue
+
+        # 处理原始字符串（r"..." 或 r#"..."#）
+        if in_raw_string:
+            if ch == '"':
+                # 检查是否有足够的 # 来结束原始字符串
+                hash_count = 0
+                j = i - 1
+                while j >= 0 and text[j] == '#':
+                    hash_count += 1
+                    j -= 1
+                if hash_count == raw_string_hash_count:
+                    in_raw_string = False
+                    raw_string_hash_count = 0
+                    res.append(ch)
+                    i += 1
+                else:
+                    res.append(ch)
+                    i += 1
+            else:
+                res.append(ch)
+                i += 1
+            continue
+
+        # 非注释态下，处理字符串与字符字面量
+        if in_string:
+            res.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if in_char:
+            res.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == "'":
+                in_char = False
+            i += 1
+            continue
+
+        # 进入注释判定（需不在字符串/字符字面量中）
+        # 单行注释：//、///、//!
+        if ch == "/" and nxt == "/":
+            in_sl_comment = True
+            res.append(" ")
+            res.append(" ")
+            i += 2
+            continue
+        # 多行注释：/*、/**、/*!
+        if ch == "/" and nxt == "*":
+            in_bl_comment = True
+            res.append(" ")
+            res.append(" ")
+            i += 2
+            continue
+
+        # 进入原始字符串：r"..." 或 r#"..."# 或 br"..." 或 b"..."（字节字符串）
+        # 检查是否是 r" 或 br"
+        if ch == "r" and nxt == '"':
+            # 简单原始字符串：r"
+            in_raw_string = True
+            raw_string_hash_count = 0
+            res.append(ch)
+            res.append(nxt)
+            i += 2
+            continue
+        if ch == "b" and nxt == "r" and nxt2 == '"':
+            # 字节原始字符串：br"
+            in_raw_string = True
+            raw_string_hash_count = 0
+            res.append(ch)
+            res.append(nxt)
+            res.append(nxt2)
+            i += 3
+            continue
+        if ch == "r" and nxt == "#":
+            # 带 # 的原始字符串：r#"
+            # 计算 # 的数量
+            raw_string_hash_count = 1
+            j = i + 1
+            while j < n and text[j] == '#':
+                raw_string_hash_count += 1
+                j += 1
+            if j < n and text[j] == '"':
+                in_raw_string = True
+                # 输出 r 和所有 # 和 "
+                for k in range(i, j + 1):
+                    res.append(text[k])
+                i = j + 1
+                continue
+        if ch == "b" and nxt == "r" and nxt2 == "#":
+            # 字节原始字符串：br#"
+            raw_string_hash_count = 1
+            j = i + 2
+            while j < n and text[j] == '#':
+                raw_string_hash_count += 1
+                j += 1
+            if j < n and text[j] == '"':
+                in_raw_string = True
+                # 输出 br 和所有 # 和 "
+                res.append(ch)
+                res.append(nxt)
+                for k in range(i + 2, j + 1):
+                    res.append(text[k])
+                i = j + 1
+                continue
+
+        # 进入字符串/字符字面量
+        # 处理 b"..."（字节字符串，不是原始字符串，需要在原始字符串检测之后）
+        if ch == "b" and nxt == '"' and nxt2 != "r":
+            in_string = True
+            res.append(ch)
+            res.append(nxt)
+            i += 2
+            continue
+        if ch == '"':
+            in_string = True
+            res.append(ch)
+            i += 1
+            continue
+        if ch == "'":
+            in_char = True
+            res.append(ch)
+            i += 1
+            continue
+
+        # 普通字符
+        res.append(ch)
+        i += 1
+
+    return "".join(res)
+
+
+def _mask_strings_preserve_len(text: str) -> str:
+    """
+    将字符串与字符字面量内部内容替换为空格，保留引号与换行，保持长度与行号不变。
+    用于在扫描通用 API 模式时避免误将字符串中的片段（如 "unsafe("）当作代码。
+    注意：此函数不移除注释，请在已移除注释的文本上调用。
+    """
+    res: list[str] = []
+    in_string = False
+    in_char = False
+    in_raw_string = False
+    raw_string_hash_count = 0
+    escape = False
+    
+    i = 0
+    n = len(text)
+    
+    while i < n:
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        nxt2 = text[i + 2] if i + 2 < n else ""
+        
+        if in_raw_string:
+            if ch == '"':
+                # 检查是否有足够的 # 来结束原始字符串
+                hash_count = 0
+                j = i - 1
+                while j >= 0 and text[j] == '#':
+                    hash_count += 1
+                    j -= 1
+                if hash_count == raw_string_hash_count:
+                    in_raw_string = False
+                    raw_string_hash_count = 0
+                    res.append('"')
+                    i += 1
+                elif ch == "\n":
+                    res.append("\n")
+                    i += 1
+                else:
+                    res.append(" ")
+                    i += 1
+            else:
+                if ch == "\n":
+                    res.append("\n")
+                else:
+                    res.append(" ")
+                i += 1
+            continue
+        
+        if in_string:
+            if escape:
+                # 保留转义反斜杠为两字符（反斜杠+空格），以不破坏列对齐过多
+                res.append(" ")
+                escape = False
+            elif ch == "\\":
+                res.append("\\")
+                escape = True
+            elif ch == '"':
+                res.append('"')
+                in_string = False
+            elif ch == "\n":
+                res.append("\n")
+            else:
+                res.append(" ")
+            i += 1
+            continue
+            
+        if in_char:
+            if escape:
+                res.append(" ")
+                escape = False
+            elif ch == "\\":
+                res.append("\\")
+                escape = True
+            elif ch == "'":
+                res.append("'")
+                in_char = False
+            elif ch == "\n":
+                res.append("\n")
+            else:
+                res.append(" ")
+            i += 1
+            continue
+        
+        # 检测原始字符串开始：r"..." 或 r#"..."# 或 br"..." 或 b"..."（字节字符串）
+        if ch == "r" and nxt == '"':
+            # 简单原始字符串：r"
+            in_raw_string = True
+            raw_string_hash_count = 0
+            res.append(ch)
+            res.append(nxt)
+            i += 2
+            continue
+        if ch == "b" and nxt == "r" and nxt2 == '"':
+            # 字节原始字符串：br"
+            in_raw_string = True
+            raw_string_hash_count = 0
+            res.append(ch)
+            res.append(nxt)
+            res.append(nxt2)
+            i += 3
+            continue
+        if ch == "r" and nxt == "#":
+            # 带 # 的原始字符串：r#"
+            raw_string_hash_count = 1
+            j = i + 1
+            while j < n and text[j] == '#':
+                raw_string_hash_count += 1
+                j += 1
+            if j < n and text[j] == '"':
+                in_raw_string = True
+                # 输出 r 和所有 # 和 "
+                for k in range(i, j + 1):
+                    res.append(text[k])
+                i = j + 1
+                continue
+        if ch == "b" and nxt == "r" and nxt2 == "#":
+            # 字节原始字符串：br#"
+            raw_string_hash_count = 1
+            j = i + 2
+            while j < n and text[j] == '#':
+                raw_string_hash_count += 1
+                j += 1
+            if j < n and text[j] == '"':
+                in_raw_string = True
+                # 输出 br 和所有 # 和 "
+                res.append(ch)
+                res.append(nxt)
+                for k in range(i + 2, j + 1):
+                    res.append(text[k])
+                i = j + 1
+                continue
+        
+        # 处理 b"..."（字节字符串，不是原始字符串，需要在原始字符串检测之后）
+        if ch == "b" and nxt == '"' and nxt2 != "r":
+            in_string = True
+            res.append(ch)
+            res.append(nxt)
+            i += 2
+            continue
+        if ch == '"':
+            in_string = True
+            res.append('"')
+            i += 1
+            continue
+        if ch == "'":
+            in_char = True
+            res.append("'")
+            i += 1
+            continue
+        
+        res.append(ch)
+        i += 1
+    
+    return "".join(res)
+
+
 def _has_safety_comment_around(lines: Sequence[str], line_no: int, radius: int = 5) -> bool:
     """
     Rust 社区约定在 unsafe 附近写 SAFETY: 注释说明前置条件。
@@ -706,32 +1046,41 @@ def _rule_uninit_zeroed(lines: Sequence[str], relpath: str) -> List[Issue]:
 def analyze_rust_text(relpath: str, text: str) -> List[Issue]:
     """
     基于提供的文本进行 Rust 启发式分析。
+    - 准确性优化：在启发式匹配前移除注释（保留字符串/字符字面量），
+      以避免注释中的API命中导致的误报。
+    - 准确性优化2：对通用 API 扫描使用"字符串内容掩蔽"的副本，避免把字符串里的片段当作代码。
     """
-    lines = text.splitlines()
+    clean_text = _remove_comments_preserve_strings(text)
+    masked_text = _mask_strings_preserve_len(clean_text)
+    # 原始行：保留字符串内容，供需要解析字面量的规则使用
+    lines = clean_text.splitlines()
+    # 掩蔽行：字符串内容已被空格替换，适合用于通用 API/关键字匹配，减少误报
+    mlines = masked_text.splitlines()
+
     issues: List[Issue] = []
-    # 基础 unsafe 使用
-    issues.extend(_rule_unsafe(lines, relpath))
-    issues.extend(_rule_raw_pointer(lines, relpath))
-    issues.extend(_rule_transmute(lines, relpath))
-    issues.extend(_rule_forget(lines, relpath))
-    issues.extend(_rule_maybe_uninit(lines, relpath))
+    # 通用 API/关键字匹配（使用掩蔽行）
+    issues.extend(_rule_unsafe(mlines, relpath))
+    issues.extend(_rule_raw_pointer(mlines, relpath))
+    issues.extend(_rule_transmute(mlines, relpath))
+    issues.extend(_rule_forget(mlines, relpath))
+    issues.extend(_rule_maybe_uninit(mlines, relpath))
     # 错误处理
-    issues.extend(_rule_unwrap_expect(lines, relpath))
-    issues.extend(_rule_ignore_result(lines, relpath))
-    issues.extend(_rule_panic_unreachable(lines, relpath))
+    issues.extend(_rule_unwrap_expect(mlines, relpath))
+    issues.extend(_rule_ignore_result(mlines, relpath))
+    issues.extend(_rule_panic_unreachable(mlines, relpath))
     # FFI 相关
-    issues.extend(_rule_extern_c(lines, relpath))
-    issues.extend(_rule_ffi_cstring(lines, relpath))
+    issues.extend(_rule_extern_c(mlines, relpath))
+    issues.extend(_rule_ffi_cstring(mlines, relpath))
     # 并发相关
-    issues.extend(_rule_unsafe_impl(lines, relpath))
-    issues.extend(_rule_refcell_borrow(lines, relpath))
+    issues.extend(_rule_unsafe_impl(mlines, relpath))
+    issues.extend(_rule_refcell_borrow(mlines, relpath))
     # 内存操作相关
-    issues.extend(_rule_get_unchecked(lines, relpath))
-    issues.extend(_rule_pointer_arithmetic(lines, relpath))
-    issues.extend(_rule_unsafe_mem_ops(lines, relpath))
-    issues.extend(_rule_from_raw_parts(lines, relpath))
-    issues.extend(_rule_manually_drop(lines, relpath))
-    issues.extend(_rule_uninit_zeroed(lines, relpath))
+    issues.extend(_rule_get_unchecked(mlines, relpath))
+    issues.extend(_rule_pointer_arithmetic(mlines, relpath))
+    issues.extend(_rule_unsafe_mem_ops(mlines, relpath))
+    issues.extend(_rule_from_raw_parts(mlines, relpath))
+    issues.extend(_rule_manually_drop(mlines, relpath))
+    issues.extend(_rule_uninit_zeroed(mlines, relpath))
     return issues
 
 
