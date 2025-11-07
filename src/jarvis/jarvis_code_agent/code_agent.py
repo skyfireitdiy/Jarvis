@@ -22,9 +22,9 @@ from jarvis.jarvis_code_agent.lint import (
 from jarvis.jarvis_code_agent.build_validator import BuildValidator, BuildResult, FallbackBuildValidator
 from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
-from jarvis.jarvis_code_analyzer import ContextManager
-from jarvis.jarvis_code_analyzer.llm_context_recommender import ContextRecommender
-from jarvis.jarvis_code_analyzer import ImpactAnalyzer, parse_git_diff_to_edits
+from jarvis.jarvis_code_agent.code_analyzer import ContextManager
+from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import ContextRecommender
+from jarvis.jarvis_code_agent.code_analyzer import ImpactAnalyzer, parse_git_diff_to_edits
 from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
     is_enable_static_analysis,

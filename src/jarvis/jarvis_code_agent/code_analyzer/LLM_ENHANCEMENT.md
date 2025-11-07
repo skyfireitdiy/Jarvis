@@ -158,7 +158,7 @@ agent.run("修复数据处理函数中的空指针异常")
 ### 手动使用
 
 ```python
-from jarvis.jarvis_code_analyzer import (
+from jarvis.jarvis_code_agent.code_analyzer import (
     ContextManager,
     ContextRecommender
 )

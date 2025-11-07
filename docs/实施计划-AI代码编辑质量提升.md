@@ -1022,7 +1022,7 @@ def require_confirmation(self, warnings: List[DangerWarning]) -> bool:
 
 **统一代码分析层**
 ```
-jarvis_code_analyzer/
+code_analyzer/
 ├── __init__.py
 ├── ast_parser.py          # AST解析（第1项）
 ├── symbol_extractor.py    # 符号提取（第3项）
