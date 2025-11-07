@@ -55,6 +55,18 @@ from jarvis.jarvis_utils.utils import get_loc_stats, init_env, _acquire_single_i
 app = typer.Typer(help="Jarvis 代码助手")
 
 
+def _format_build_error(result: BuildResult, max_len: int = 2000) -> str:
+    """格式化构建错误信息，限制输出长度"""
+    error_msg = result.error_message or ""
+    output = result.output or ""
+
+    full_error = f"{error_msg}\n{output}".strip()
+
+    if len(full_error) > max_len:
+        return full_error[:max_len] + "\n... (输出已截断)"
+    return full_error
+
+
 class CodeAgent:
     """Jarvis系统的代码修改代理。
 
@@ -1471,7 +1483,7 @@ class CodeAgent:
                     # 检查文件是否存在
                     abs_file_path = os.path.join(self.root_dir, file_path) if not os.path.isabs(file_path) else file_path
                     if not os.path.exists(abs_file_path):
-                        PrettyOutput.print(f"    ⚠️  文件不存在，跳过", OutputType.WARNING)
+                        PrettyOutput.print("    ⚠️  文件不存在，跳过", OutputType.WARNING)
                         continue
                     
                     # 执行命令
@@ -1491,18 +1503,18 @@ class CodeAgent:
                         output = result.stdout + result.stderr
                         if output.strip():  # 有输出才记录
                             results.append((tool_name, file_path, command, result.returncode, output))
-                            PrettyOutput.print(f"    ❌ 发现问题", OutputType.WARNING)
+                            PrettyOutput.print("    ❌ 发现问题", OutputType.WARNING)
                         else:
-                            PrettyOutput.print(f"    ✅ 通过", OutputType.SUCCESS)
+                            PrettyOutput.print("    ✅ 通过", OutputType.SUCCESS)
                     else:
-                        PrettyOutput.print(f"    ✅ 通过", OutputType.SUCCESS)
+                        PrettyOutput.print("    ✅ 通过", OutputType.SUCCESS)
                 
                 except subprocess.TimeoutExpired:
                     results.append((tool_name, file_path, command, -1, "执行超时（30秒）"))
-                    PrettyOutput.print(f"    ⏱️  执行超时（30秒）", OutputType.WARNING)
+                    PrettyOutput.print("    ⏱️  执行超时（30秒）", OutputType.WARNING)
                 except FileNotFoundError:
                     # 工具未安装，跳过
-                    PrettyOutput.print(f"    ⚠️  工具未安装，跳过", OutputType.WARNING)
+                    PrettyOutput.print("    ⚠️  工具未安装，跳过", OutputType.WARNING)
                     continue
                 except Exception as e:
                     # 其他错误，记录但继续
@@ -1517,7 +1529,7 @@ class CodeAgent:
             error_count = len(results)
             PrettyOutput.print(f"🔍 静态检查完成: 发现 {error_count} 个问题", OutputType.WARNING)
         else:
-            PrettyOutput.print(f"🔍 静态检查完成: 全部通过", OutputType.SUCCESS)
+            PrettyOutput.print("🔍 静态检查完成: 全部通过", OutputType.SUCCESS)
         
         return results
     
