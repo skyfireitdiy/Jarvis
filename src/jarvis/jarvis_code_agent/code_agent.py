@@ -832,218 +832,438 @@ class CodeAgent:
             except Exception:
                 pass
 
+    def _build_name_status_map(self) -> dict:
+        """构造按文件的状态映射与差异文本，删除文件不展示diff，仅提示删除"""
+        status_map = {}
+        try:
+            head_exists = bool(get_latest_commit_hash())
+            # 临时 -N 以包含未跟踪文件的差异检测
+            subprocess.run(["git", "add", "-N", "."], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            cmd = ["git", "diff", "--name-status"] + (["HEAD"] if head_exists else [])
+            res = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+        finally:
+            subprocess.run(["git", "reset"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        if res.returncode == 0 and res.stdout:
+            for line in res.stdout.splitlines():
+                if not line.strip():
+                    continue
+                parts = line.split("\t")
+                if not parts:
+                    continue
+                status = parts[0]
+                if status.startswith("R") or status.startswith("C"):
+                    # 重命名/复制：使用新路径作为键
+                    if len(parts) >= 3:
+                        old_path, new_path = parts[1], parts[2]
+                        status_map[new_path] = status
+                        # 也记录旧路径，便于匹配 name-only 的结果
+                        status_map[old_path] = status
+                    elif len(parts) >= 2:
+                        status_map[parts[-1]] = status
+                else:
+                    if len(parts) >= 2:
+                        status_map[parts[1]] = status
+        return status_map
+
+    def _get_file_diff(self, file_path: str) -> str:
+        """获取单文件的diff，包含新增文件内容；失败时返回空字符串"""
+        head_exists = bool(get_latest_commit_hash())
+        try:
+            # 为了让未跟踪文件也能展示diff，临时 -N 该文件
+            subprocess.run(["git", "add", "-N", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            cmd = ["git", "diff"] + (["HEAD"] if head_exists else []) + ["--", file_path]
+            res = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+            if res.returncode == 0:
+                return res.stdout or ""
+            return ""
+        finally:
+            subprocess.run(["git", "reset", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def _build_per_file_patch_preview(self, modified_files: List[str]) -> str:
+        """构建按文件的补丁预览"""
+        status_map = self._build_name_status_map()
+        lines: List[str] = []
+
+        def _get_file_numstat(file_path: str) -> Tuple[int, int]:
+            """获取单文件的新增/删除行数，失败时返回(0,0)"""
+            head_exists = bool(get_latest_commit_hash())
+            try:
+                # 让未跟踪文件也能统计到新增行数
+                subprocess.run(["git", "add", "-N", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                cmd = ["git", "diff", "--numstat"] + (["HEAD"] if head_exists else []) + ["--", file_path]
+                res = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    check=False,
+                )
+                if res.returncode == 0 and res.stdout:
+                    for line in res.stdout.splitlines():
+                        parts = line.strip().split("\t")
+                        if len(parts) >= 3:
+                            add_s, del_s = parts[0], parts[1]
+
+                            def to_int(x: str) -> int:
+                                try:
+                                    return int(x)
+                                except Exception:
+                                    # 二进制或无法解析时显示为0
+                                    return 0
+
+                            return to_int(add_s), to_int(del_s)
+            finally:
+                subprocess.run(["git", "reset", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return (0, 0)
+
+        for f in modified_files:
+            status = status_map.get(f, "")
+            adds, dels = _get_file_numstat(f)
+            total_changes = adds + dels
+
+            # 删除文件：不展示diff，仅提示（附带删除行数信息如果可用）
+            if (status.startswith("D")) or (not os.path.exists(f)):
+                if dels > 0:
+                    lines.append(f"- {f} 文件被删除（删除{dels}行）")
+                else:
+                    lines.append(f"- {f} 文件被删除")
+                continue
+
+            # 变更过大：仅提示新增/删除行数，避免输出超长diff
+            if total_changes > 300:
+                lines.append(f"- {f} 新增{adds}行/删除{dels}行（变更过大，预览已省略）")
+                continue
+
+            # 其它情况：展示该文件的diff
+            file_diff = self._get_file_diff(f)
+            if file_diff.strip():
+                lines.append(f"文件: {f}\n```diff\n{file_diff}\n```")
+            else:
+                # 当无法获取到diff（例如重命名或特殊状态），避免空输出
+                lines.append(f"- {f} 变更已记录（无可展示的文本差异）")
+        return "\n".join(lines)
+
+    def _update_context_for_modified_files(self, modified_files: List[str]) -> None:
+        """更新上下文管理器：当文件被修改后，更新符号表和依赖图"""
+        for file_path in modified_files:
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                        content = f.read()
+                    self.context_manager.update_context_for_file(file_path, content)
+                except Exception:
+                    # 如果读取文件失败，跳过更新
+                    pass
+
+    def _analyze_edit_impact(self, modified_files: List[str]) -> Optional[Any]:
+        """进行影响范围分析（如果启用）
+        
+        Returns:
+            ImpactReport: 影响分析报告，如果未启用或失败则返回None
+        """
+        if not is_enable_impact_analysis():
+            return None
+        
+        try:
+            impact_analyzer = ImpactAnalyzer(self.context_manager)
+            all_edits = []
+            for file_path in modified_files:
+                if os.path.exists(file_path):
+                    edits = parse_git_diff_to_edits(file_path, self.root_dir)
+                    all_edits.extend(edits)
+            
+            if not all_edits:
+                return None
+            
+            # 按文件分组编辑
+            edits_by_file = {}
+            for edit in all_edits:
+                if edit.file_path not in edits_by_file:
+                    edits_by_file[edit.file_path] = []
+                edits_by_file[edit.file_path].append(edit)
+            
+            # 对每个文件进行影响分析
+            impact_report = None
+            for file_path, edits in edits_by_file.items():
+                report = impact_analyzer.analyze_edit_impact(file_path, edits)
+                if report:
+                    # 合并报告
+                    if impact_report is None:
+                        impact_report = report
+                    else:
+                        # 合并多个报告，去重
+                        impact_report.affected_files = list(set(impact_report.affected_files + report.affected_files))
+                        
+                        # 合并符号（基于文件路径和名称去重）
+                        symbol_map = {}
+                        for symbol in impact_report.affected_symbols + report.affected_symbols:
+                            key = (symbol.file_path, symbol.name, symbol.line_start)
+                            if key not in symbol_map:
+                                symbol_map[key] = symbol
+                        impact_report.affected_symbols = list(symbol_map.values())
+                        
+                        impact_report.affected_tests = list(set(impact_report.affected_tests + report.affected_tests))
+                        
+                        # 合并接口变更（基于符号名和文件路径去重）
+                        interface_map = {}
+                        for change in impact_report.interface_changes + report.interface_changes:
+                            key = (change.file_path, change.symbol_name, change.change_type)
+                            if key not in interface_map:
+                                interface_map[key] = change
+                        impact_report.interface_changes = list(interface_map.values())
+                        
+                        impact_report.impacts.extend(report.impacts)
+                        
+                        # 合并建议
+                        impact_report.recommendations = list(set(impact_report.recommendations + report.recommendations))
+                        
+                        # 使用更高的风险等级
+                        if report.risk_level.value == 'high' or impact_report.risk_level.value == 'high':
+                            impact_report.risk_level = report.risk_level if report.risk_level.value == 'high' else impact_report.risk_level
+                        elif report.risk_level.value == 'medium':
+                            impact_report.risk_level = report.risk_level
+            
+            return impact_report
+        except Exception as e:
+            # 影响分析失败不应该影响主流程，仅记录日志
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"影响范围分析失败: {e}", exc_info=True)
+            return None
+
+    def _handle_impact_report(self, impact_report: Optional[Any], agent: Agent, final_ret: str) -> str:
+        """处理影响范围分析报告
+        
+        Args:
+            impact_report: 影响分析报告
+            agent: Agent实例
+            final_ret: 当前的结果字符串
+            
+        Returns:
+            更新后的结果字符串
+        """
+        if not impact_report:
+            return final_ret
+        
+        impact_summary = impact_report.to_string(self.root_dir)
+        final_ret += f"\n\n{impact_summary}\n"
+        
+        # 如果是高风险，在提示词中提醒
+        if impact_report.risk_level.value == 'high':
+            agent.set_addon_prompt(
+                f"{agent.get_addon_prompt() or ''}\n\n"
+                f"⚠️ 高风险编辑警告：\n"
+                f"检测到此编辑为高风险操作，请仔细检查以下内容：\n"
+                f"- 受影响文件: {len(impact_report.affected_files)} 个\n"
+                f"- 接口变更: {len(impact_report.interface_changes)} 个\n"
+                f"- 相关测试: {len(impact_report.affected_tests)} 个\n"
+                f"建议运行相关测试并检查所有受影响文件。"
+            )
+        
+        return final_ret
+
+    def _handle_build_validation_disabled(self, modified_files: List[str], config: Any, agent: Agent, final_ret: str) -> str:
+        """处理构建验证已禁用的情况
+        
+        Returns:
+            更新后的结果字符串
+        """
+        reason = config.get_disable_reason()
+        reason_text = f"（原因: {reason}）" if reason else ""
+        final_ret += f"\n\nℹ️ 构建验证已禁用{reason_text}，仅进行基础静态检查\n"
+        
+        # 输出基础静态检查日志
+        file_count = len(modified_files)
+        files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
+        if file_count > 3:
+            files_str += f" 等{file_count}个文件"
+        PrettyOutput.print(f"🔍 正在进行基础静态检查 ({files_str})...", OutputType.INFO)
+        
+        # 使用兜底验证器进行基础静态检查
+        fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
+        static_check_result = fallback_validator.validate(modified_files)
+        if not static_check_result.success:
+            final_ret += f"\n⚠️ 基础静态检查失败:\n{static_check_result.error_message or static_check_result.output}\n"
+            agent.set_addon_prompt(
+                f"基础静态检查失败，请根据以下错误信息修复代码:\n{static_check_result.error_message or static_check_result.output}\n"
+            )
+        else:
+            final_ret += f"\n✅ 基础静态检查通过（耗时 {static_check_result.duration:.2f}秒）\n"
+        
+        return final_ret
+
+    def _handle_build_validation_failure(self, build_validation_result: Any, config: Any, modified_files: List[str], agent: Agent, final_ret: str) -> str:
+        """处理构建验证失败的情况
+        
+        Returns:
+            更新后的结果字符串
+        """
+        if not config.has_been_asked():
+            # 首次失败，询问用户
+            error_preview = (build_validation_result.error_message or build_validation_result.output)[:500]
+            PrettyOutput.print(
+                f"\n⚠️ 构建验证失败:\n{error_preview}\n",
+                OutputType.WARNING,
+            )
+            PrettyOutput.print(
+                "提示：如果此项目需要在特殊环境（如容器）中构建，或使用独立构建脚本，"
+                "可以选择禁用构建验证，后续将仅进行基础静态检查。",
+                OutputType.INFO,
+            )
+            
+            if user_confirm(
+                "是否要禁用构建验证，后续仅进行基础静态检查？",
+                default=False,
+            ):
+                # 用户选择禁用
+                config.disable_build_validation(
+                    reason="用户选择禁用（项目可能需要在特殊环境中构建）"
+                )
+                config.mark_as_asked()
+                final_ret += f"\n\nℹ️ 已禁用构建验证，后续将仅进行基础静态检查\n"
+                
+                # 输出基础静态检查日志
+                file_count = len(modified_files)
+                files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
+                if file_count > 3:
+                    files_str += f" 等{file_count}个文件"
+                PrettyOutput.print(f"🔍 正在进行基础静态检查 ({files_str})...", OutputType.INFO)
+                
+                # 立即进行基础静态检查
+                fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
+                static_check_result = fallback_validator.validate(modified_files)
+                if not static_check_result.success:
+                    final_ret += f"\n⚠️ 基础静态检查失败:\n{static_check_result.error_message or static_check_result.output}\n"
+                    agent.set_addon_prompt(
+                        f"基础静态检查失败，请根据以下错误信息修复代码:\n{static_check_result.error_message or static_check_result.output}\n"
+                    )
+                else:
+                    final_ret += f"\n✅ 基础静态检查通过（耗时 {static_check_result.duration:.2f}秒）\n"
+            else:
+                # 用户选择继续验证，标记为已询问
+                config.mark_as_asked()
+                final_ret += f"\n\n⚠️ 构建验证失败:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                # 如果构建失败，添加修复提示
+                agent.set_addon_prompt(
+                    f"构建验证失败，请根据以下错误信息修复代码:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                    "请仔细检查错误信息，修复编译/构建错误后重新提交。"
+                )
+        else:
+            # 已经询问过，直接显示错误
+            final_ret += f"\n\n⚠️ 构建验证失败:\n{build_validation_result.error_message or build_validation_result.output}\n"
+            # 如果构建失败，添加修复提示
+            agent.set_addon_prompt(
+                f"构建验证失败，请根据以下错误信息修复代码:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                "请仔细检查错误信息，修复编译/构建错误后重新提交。"
+            )
+        
+        return final_ret
+
+    def _handle_build_validation(self, modified_files: List[str], agent: Agent, final_ret: str) -> Tuple[Optional[Any], str]:
+        """处理构建验证
+        
+        Returns:
+            (build_validation_result, updated_final_ret)
+        """
+        if not is_enable_build_validation():
+            return None, final_ret
+        
+        config = BuildValidationConfig(self.root_dir)
+        
+        # 检查是否已禁用构建验证
+        if config.is_build_validation_disabled():
+            final_ret = self._handle_build_validation_disabled(modified_files, config, agent, final_ret)
+            return None, final_ret
+        
+        # 未禁用，进行构建验证
+        build_validation_result = self._validate_build_after_edit(modified_files)
+        if build_validation_result:
+            if not build_validation_result.success:
+                final_ret = self._handle_build_validation_failure(
+                    build_validation_result, config, modified_files, agent, final_ret
+                )
+            else:
+                build_system_info = f" ({build_validation_result.build_system.value})" if build_validation_result.build_system else ""
+                final_ret += f"\n\n✅ 构建验证通过{build_system_info}（耗时 {build_validation_result.duration:.2f}秒）\n"
+        
+        return build_validation_result, final_ret
+
+    def _handle_static_analysis(self, modified_files: List[str], build_validation_result: Optional[Any], config: Any, agent: Agent, final_ret: str) -> str:
+        """处理静态分析
+        
+        Returns:
+            更新后的结果字符串
+        """
+        lint_tools_info = "\n".join(
+            f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
+            for file in modified_files
+            if get_lint_tools(file)
+        )
+        
+        if not lint_tools_info or not is_enable_static_analysis():
+            return final_ret
+        
+        # 如果构建验证失败且未禁用，不进行静态分析（避免重复错误）
+        # 如果构建验证已禁用，则进行静态分析（因为只做了基础静态检查）
+        should_skip_static = (
+            build_validation_result 
+            and not build_validation_result.success 
+            and not config.is_build_validation_disabled()
+        )
+        
+        if not should_skip_static:
+            # 直接执行静态扫描
+            lint_results = self._run_static_analysis(modified_files)
+            if lint_results:
+                # 有错误或警告，让大模型修复
+                errors_summary = self._format_lint_results(lint_results)
+                addon_prompt = f"""
+静态扫描发现以下问题，请根据错误信息修复代码:
+
+{errors_summary}
+
+请仔细检查并修复所有问题。
+                """
+                agent.set_addon_prompt(addon_prompt)
+                final_ret += f"\n\n⚠️ 静态扫描发现问题，已提示修复\n"
+            else:
+                final_ret += f"\n\n✅ 静态扫描通过\n"
+        
+        return final_ret
+
     def _on_after_tool_call(self, agent: Agent, current_response=None, need_return=None, tool_prompt=None, **kwargs) -> None:
         """工具调用后回调函数。"""
         final_ret = ""
         diff = get_diff()
-
-        # 构造按文件的状态映射与差异文本，删除文件不展示diff，仅提示删除
-        def _build_name_status_map() -> dict:
-            status_map = {}
-            try:
-                head_exists = bool(get_latest_commit_hash())
-                # 临时 -N 以包含未跟踪文件的差异检测
-                subprocess.run(["git", "add", "-N", "."], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                cmd = ["git", "diff", "--name-status"] + (["HEAD"] if head_exists else [])
-                res = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    check=False,
-                )
-            finally:
-                subprocess.run(["git", "reset"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            if res.returncode == 0 and res.stdout:
-                for line in res.stdout.splitlines():
-                    if not line.strip():
-                        continue
-                    parts = line.split("\t")
-                    if not parts:
-                        continue
-                    status = parts[0]
-                    if status.startswith("R") or status.startswith("C"):
-                        # 重命名/复制：使用新路径作为键
-                        if len(parts) >= 3:
-                            old_path, new_path = parts[1], parts[2]
-                            status_map[new_path] = status
-                            # 也记录旧路径，便于匹配 name-only 的结果
-                            status_map[old_path] = status
-                        elif len(parts) >= 2:
-                            status_map[parts[-1]] = status
-                    else:
-                        if len(parts) >= 2:
-                            status_map[parts[1]] = status
-            return status_map
-
-        def _get_file_diff(file_path: str) -> str:
-            """获取单文件的diff，包含新增文件内容；失败时返回空字符串"""
-            head_exists = bool(get_latest_commit_hash())
-            try:
-                # 为了让未跟踪文件也能展示diff，临时 -N 该文件
-                subprocess.run(["git", "add", "-N", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                cmd = ["git", "diff"] + (["HEAD"] if head_exists else []) + ["--", file_path]
-                res = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    check=False,
-                )
-                if res.returncode == 0:
-                    return res.stdout or ""
-                return ""
-            finally:
-                subprocess.run(["git", "reset", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        def _build_per_file_patch_preview(modified_files: List[str]) -> str:
-            status_map = _build_name_status_map()
-            lines: List[str] = []
-
-            def _get_file_numstat(file_path: str) -> Tuple[int, int]:
-                """获取单文件的新增/删除行数，失败时返回(0,0)"""
-                head_exists = bool(get_latest_commit_hash())
-                try:
-                    # 让未跟踪文件也能统计到新增行数
-                    subprocess.run(["git", "add", "-N", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    cmd = ["git", "diff", "--numstat"] + (["HEAD"] if head_exists else []) + ["--", file_path]
-                    res = subprocess.run(
-                        cmd,
-                        capture_output=True,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
-                        check=False,
-                    )
-                    if res.returncode == 0 and res.stdout:
-                        for line in res.stdout.splitlines():
-                            parts = line.strip().split("\t")
-                            if len(parts) >= 3:
-                                add_s, del_s = parts[0], parts[1]
-
-                                def to_int(x: str) -> int:
-                                    try:
-                                        return int(x)
-                                    except Exception:
-                                        # 二进制或无法解析时显示为0
-                                        return 0
-
-                                return to_int(add_s), to_int(del_s)
-                finally:
-                    subprocess.run(["git", "reset", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return (0, 0)
-
-            for f in modified_files:
-                status = status_map.get(f, "")
-                adds, dels = _get_file_numstat(f)
-                total_changes = adds + dels
-
-                # 删除文件：不展示diff，仅提示（附带删除行数信息如果可用）
-                if (status.startswith("D")) or (not os.path.exists(f)):
-                    if dels > 0:
-                        lines.append(f"- {f} 文件被删除（删除{dels}行）")
-                    else:
-                        lines.append(f"- {f} 文件被删除")
-                    continue
-
-                # 变更过大：仅提示新增/删除行数，避免输出超长diff
-                if total_changes > 300:
-                    lines.append(f"- {f} 新增{adds}行/删除{dels}行（变更过大，预览已省略）")
-                    continue
-
-                # 其它情况：展示该文件的diff
-                file_diff = _get_file_diff(f)
-                if file_diff.strip():
-                    lines.append(f"文件: {f}\n```diff\n{file_diff}\n```")
-                else:
-                    # 当无法获取到diff（例如重命名或特殊状态），避免空输出
-                    lines.append(f"- {f} 变更已记录（无可展示的文本差异）")
-            return "\n".join(lines)
 
         if diff:
             start_hash = get_latest_commit_hash()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             modified_files = get_diff_file_list()
             
-            # 更新上下文管理器：当文件被修改后，更新符号表和依赖图
-            for file_path in modified_files:
-                if os.path.exists(file_path):
-                    try:
-                        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-                            content = f.read()
-                        self.context_manager.update_context_for_file(file_path, content)
-                    except Exception:
-                        # 如果读取文件失败，跳过更新
-                        pass
+            # 更新上下文管理器
+            self._update_context_for_modified_files(modified_files)
             
-            # 进行影响范围分析（如果启用）
-            impact_report = None
-            if is_enable_impact_analysis():
-                try:
-                    impact_analyzer = ImpactAnalyzer(self.context_manager)
-                    all_edits = []
-                    for file_path in modified_files:
-                        if os.path.exists(file_path):
-                            edits = parse_git_diff_to_edits(file_path, self.root_dir)
-                            all_edits.extend(edits)
-                    
-                    if all_edits:
-                        # 按文件分组编辑
-                        edits_by_file = {}
-                        for edit in all_edits:
-                            if edit.file_path not in edits_by_file:
-                                edits_by_file[edit.file_path] = []
-                            edits_by_file[edit.file_path].append(edit)
-                        
-                        # 对每个文件进行影响分析
-                        for file_path, edits in edits_by_file.items():
-                            report = impact_analyzer.analyze_edit_impact(file_path, edits)
-                            if report:
-                                # 合并报告
-                                if impact_report is None:
-                                    impact_report = report
-                                else:
-                                    # 合并多个报告，去重
-                                    impact_report.affected_files = list(set(impact_report.affected_files + report.affected_files))
-                                    
-                                    # 合并符号（基于文件路径和名称去重）
-                                    symbol_map = {}
-                                    for symbol in impact_report.affected_symbols + report.affected_symbols:
-                                        key = (symbol.file_path, symbol.name, symbol.line_start)
-                                        if key not in symbol_map:
-                                            symbol_map[key] = symbol
-                                    impact_report.affected_symbols = list(symbol_map.values())
-                                    
-                                    impact_report.affected_tests = list(set(impact_report.affected_tests + report.affected_tests))
-                                    
-                                    # 合并接口变更（基于符号名和文件路径去重）
-                                    interface_map = {}
-                                    for change in impact_report.interface_changes + report.interface_changes:
-                                        key = (change.file_path, change.symbol_name, change.change_type)
-                                        if key not in interface_map:
-                                            interface_map[key] = change
-                                    impact_report.interface_changes = list(interface_map.values())
-                                    
-                                    impact_report.impacts.extend(report.impacts)
-                                    
-                                    # 合并建议
-                                    impact_report.recommendations = list(set(impact_report.recommendations + report.recommendations))
-                                    
-                                    # 使用更高的风险等级
-                                    if report.risk_level.value == 'high' or impact_report.risk_level.value == 'high':
-                                        impact_report.risk_level = report.risk_level if report.risk_level.value == 'high' else impact_report.risk_level
-                                    elif report.risk_level.value == 'medium':
-                                        impact_report.risk_level = report.risk_level
-                except Exception as e:
-                    # 影响分析失败不应该影响主流程，仅记录日志
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(f"影响范围分析失败: {e}", exc_info=True)
+            # 进行影响范围分析
+            impact_report = self._analyze_edit_impact(modified_files)
             
-            per_file_preview = _build_per_file_patch_preview(modified_files)
+            per_file_preview = self._build_per_file_patch_preview(modified_files)
             commited = handle_commit_workflow()
             if commited:
                 # 统计代码行数变化
@@ -1078,151 +1298,14 @@ class CodeAgent:
                     )
                     
                     # 添加影响范围分析报告
-                    if impact_report:
-                        impact_summary = impact_report.to_string(self.root_dir)
-                        final_ret += f"\n\n{impact_summary}\n"
-                        
-                        # 如果是高风险，在提示词中提醒
-                        if impact_report.risk_level.value == 'high':
-                            agent.set_addon_prompt(
-                                f"{agent.get_addon_prompt() or ''}\n\n"
-                                f"⚠️ 高风险编辑警告：\n"
-                                f"检测到此编辑为高风险操作，请仔细检查以下内容：\n"
-                                f"- 受影响文件: {len(impact_report.affected_files)} 个\n"
-                                f"- 接口变更: {len(impact_report.interface_changes)} 个\n"
-                                f"- 相关测试: {len(impact_report.affected_tests)} 个\n"
-                                f"建议运行相关测试并检查所有受影响文件。"
-                            )
+                    final_ret = self._handle_impact_report(impact_report, agent, final_ret)
                     
                     # 构建验证
-                    build_validation_result = None
                     config = BuildValidationConfig(self.root_dir)
+                    build_validation_result, final_ret = self._handle_build_validation(modified_files, agent, final_ret)
                     
-                    # 检查是否已禁用构建验证
-                    if config.is_build_validation_disabled():
-                        # 已禁用，仅进行基础静态检查
-                        reason = config.get_disable_reason()
-                        reason_text = f"（原因: {reason}）" if reason else ""
-                        final_ret += f"\n\nℹ️ 构建验证已禁用{reason_text}，仅进行基础静态检查\n"
-                        # 输出基础静态检查日志
-                        file_count = len(modified_files)
-                        files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
-                        if file_count > 3:
-                            files_str += f" 等{file_count}个文件"
-                        PrettyOutput.print(f"🔍 正在进行基础静态检查 ({files_str})...", OutputType.INFO)
-                        # 使用兜底验证器进行基础静态检查
-                        fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
-                        static_check_result = fallback_validator.validate(modified_files)
-                        if not static_check_result.success:
-                            final_ret += f"\n⚠️ 基础静态检查失败:\n{static_check_result.error_message or static_check_result.output}\n"
-                            agent.set_addon_prompt(
-                                f"基础静态检查失败，请根据以下错误信息修复代码:\n{static_check_result.error_message or static_check_result.output}\n"
-                            )
-                        else:
-                            final_ret += f"\n✅ 基础静态检查通过（耗时 {static_check_result.duration:.2f}秒）\n"
-                    elif is_enable_build_validation():
-                        # 未禁用，进行构建验证
-                        build_validation_result = self._validate_build_after_edit(modified_files)
-                        if build_validation_result:
-                            if not build_validation_result.success:
-                                # 构建失败，检查是否需要询问用户
-                                if not config.has_been_asked():
-                                    # 首次失败，询问用户
-                                    error_preview = (build_validation_result.error_message or build_validation_result.output)[:500]
-                                    PrettyOutput.print(
-                                        f"\n⚠️ 构建验证失败:\n{error_preview}\n",
-                                        OutputType.WARNING,
-                                    )
-                                    PrettyOutput.print(
-                                        "提示：如果此项目需要在特殊环境（如容器）中构建，或使用独立构建脚本，"
-                                        "可以选择禁用构建验证，后续将仅进行基础静态检查。",
-                                        OutputType.INFO,
-                                    )
-                                    
-                                    if user_confirm(
-                                        "是否要禁用构建验证，后续仅进行基础静态检查？",
-                                        default=False,
-                                    ):
-                                        # 用户选择禁用
-                                        config.disable_build_validation(
-                                            reason="用户选择禁用（项目可能需要在特殊环境中构建）"
-                                        )
-                                        config.mark_as_asked()
-                                        final_ret += f"\n\nℹ️ 已禁用构建验证，后续将仅进行基础静态检查\n"
-                                        # 输出基础静态检查日志
-                                        file_count = len(modified_files)
-                                        files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
-                                        if file_count > 3:
-                                            files_str += f" 等{file_count}个文件"
-                                        PrettyOutput.print(f"🔍 正在进行基础静态检查 ({files_str})...", OutputType.INFO)
-                                        # 立即进行基础静态检查
-                                        fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
-                                        static_check_result = fallback_validator.validate(modified_files)
-                                        if not static_check_result.success:
-                                            final_ret += f"\n⚠️ 基础静态检查失败:\n{static_check_result.error_message or static_check_result.output}\n"
-                                            agent.set_addon_prompt(
-                                                f"基础静态检查失败，请根据以下错误信息修复代码:\n{static_check_result.error_message or static_check_result.output}\n"
-                                            )
-                                        else:
-                                            final_ret += f"\n✅ 基础静态检查通过（耗时 {static_check_result.duration:.2f}秒）\n"
-                                    else:
-                                        # 用户选择继续验证，标记为已询问
-                                        config.mark_as_asked()
-                                        final_ret += f"\n\n⚠️ 构建验证失败:\n{build_validation_result.error_message or build_validation_result.output}\n"
-                                        # 如果构建失败，添加修复提示
-                                        agent.set_addon_prompt(
-                                            f"构建验证失败，请根据以下错误信息修复代码:\n{build_validation_result.error_message or build_validation_result.output}\n"
-                                            "请仔细检查错误信息，修复编译/构建错误后重新提交。"
-                                        )
-                                else:
-                                    # 已经询问过，直接显示错误
-                                    final_ret += f"\n\n⚠️ 构建验证失败:\n{build_validation_result.error_message or build_validation_result.output}\n"
-                                    # 如果构建失败，添加修复提示
-                                    agent.set_addon_prompt(
-                                        f"构建验证失败，请根据以下错误信息修复代码:\n{build_validation_result.error_message or build_validation_result.output}\n"
-                                        "请仔细检查错误信息，修复编译/构建错误后重新提交。"
-                                    )
-                            else:
-                                build_system_info = f" ({build_validation_result.build_system.value})" if build_validation_result.build_system else ""
-                                final_ret += f"\n\n✅ 构建验证通过{build_system_info}（耗时 {build_validation_result.duration:.2f}秒）\n"
-                    
-                    # 修改后的提示逻辑
-                    lint_tools_info = "\n".join(
-                        f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
-                        for file in modified_files
-                        if get_lint_tools(file)
-                    )
-                    file_list = "\n".join(f"   - {file}" for file in modified_files)
-                    tool_info = (
-                        f"建议使用以下lint工具进行检查:\n{lint_tools_info}"
-                        if lint_tools_info
-                        else ""
-                    )
-                    if lint_tools_info and is_enable_static_analysis():
-                        # 如果构建验证失败且未禁用，不进行静态分析（避免重复错误）
-                        # 如果构建验证已禁用，则进行静态分析（因为只做了基础静态检查）
-                        should_skip_static = (
-                            build_validation_result 
-                            and not build_validation_result.success 
-                            and not config.is_build_validation_disabled()
-                        )
-                        if not should_skip_static:
-                            # 直接执行静态扫描
-                            lint_results = self._run_static_analysis(modified_files)
-                            if lint_results:
-                                # 有错误或警告，让大模型修复
-                                errors_summary = self._format_lint_results(lint_results)
-                                addon_prompt = f"""
-静态扫描发现以下问题，请根据错误信息修复代码:
-
-{errors_summary}
-
-请仔细检查并修复所有问题。
-                                """
-                                agent.set_addon_prompt(addon_prompt)
-                                final_ret += f"\n\n⚠️ 静态扫描发现问题，已提示修复\n"
-                            else:
-                                final_ret += f"\n\n✅ 静态扫描通过\n"
+                    # 静态分析
+                    final_ret = self._handle_static_analysis(modified_files, build_validation_result, config, agent, final_ret)
                 else:
                     final_ret += "\n\n修改没有生效\n"
             else:
