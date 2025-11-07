@@ -869,6 +869,11 @@ class CodeAgent:
             # 智能上下文推荐：根据用户输入推荐相关上下文
             context_recommendation_text = ""
             if self.context_recommender and is_enable_intent_recognition():
+                # 在意图识别和上下文推荐期间抑制模型输出
+                was_suppressed = False
+                if self.agent.model:
+                    was_suppressed = getattr(self.agent.model, '_suppress_output', False)
+                    self.agent.model.set_suppress_output(True)
                 try:
                     PrettyOutput.print("🔍 正在进行意图识别与上下文分析...", OutputType.INFO)
                     # 尝试从用户输入中提取目标文件和符号（简单启发式方法）
@@ -892,6 +897,10 @@ class CodeAgent:
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.debug(f"上下文推荐失败: {e}", exc_info=True)
+                finally:
+                    # 恢复模型输出设置
+                    if self.agent.model:
+                        self.agent.model.set_suppress_output(was_suppressed)
 
             if project_info:
                 enhanced_input = (

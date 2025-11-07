@@ -503,7 +503,7 @@ class Agent:
             self.model.set_model_name(model_name)
 
         self.model.set_model_group(model_group)
-        self.model.set_suppress_output(True)
+        self.model.set_suppress_output(False)
 
     def _init_session(self):
         """初始化会话管理器"""
