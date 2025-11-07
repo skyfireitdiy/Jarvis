@@ -342,6 +342,11 @@
       "description": "是否跳过预定义任务加载（不读取 pre-command 列表）",
       "default": false
     },
+    "JARVIS_ADDON_PROMPT_THRESHOLD": {
+      "type": "number",
+      "description": "附加提示的触发阈值（字符数）。当消息长度超过此值时，会自动添加默认的附加提示",
+      "default": 1024
+    },
     "JARVIS_GIT_CHECK_MODE": {
       "type": "string",
       "enum": ["strict", "warn"],

@@ -1427,7 +1427,16 @@ def _collect_optional_config_interactively(
         )
         or changed
     )
-    # 规划相关：最大递归层数（仅在启用规划时生效，CLI --plan/--no-plan 控制启用）
+    # 规划相关配置
+    changed = (
+        _ask_and_set(
+            "JARVIS_PLAN_ENABLED",
+            "是否默认启用任务规划？当 Agent 初始化时 plan 参数未指定，将从此配置加载",
+            False,
+            "bool",
+        )
+        or changed
+    )
     changed = (
         _ask_and_set_int(
             "JARVIS_PLAN_MAX_DEPTH",
@@ -1450,6 +1459,14 @@ def _collect_optional_config_interactively(
             "JARVIS_SCRIPT_EXECUTION_TIMEOUT",
             "脚本执行超时时间（秒，默认300，仅非交互模式生效）",
             300,
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set_int(
+            "JARVIS_ADDON_PROMPT_THRESHOLD",
+            "附加提示的触发阈值（字符数，默认1024）。当消息长度超过此值时，会自动添加默认的附加提示",
+            1024,
         )
         or changed
     )

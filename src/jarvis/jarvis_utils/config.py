@@ -816,3 +816,18 @@ def is_skip_predefined_tasks() -> bool:
         bool: 如果跳过预定义任务加载则返回True，默认为False
     """
     return GLOBAL_CONFIG_DATA.get("JARVIS_SKIP_PREDEFINED_TASKS", False) is True
+
+
+def get_addon_prompt_threshold() -> int:
+    """
+    获取附加提示的触发阈值（字符数）。
+    
+    当消息长度超过此阈值时，会自动添加默认的附加提示。
+    
+    返回:
+        int: 触发阈值，默认为1024
+    """
+    try:
+        return int(GLOBAL_CONFIG_DATA.get("JARVIS_ADDON_PROMPT_THRESHOLD", 1024))
+    except Exception:
+        return 1024
