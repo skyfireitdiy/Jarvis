@@ -1487,6 +1487,15 @@ def _collect_optional_config_interactively(
         )
         or changed
     )
+    changed = (
+        _ask_and_set(
+            "JARVIS_ENABLE_INTENT_RECOGNITION",
+            "是否启用意图识别功能？用于智能上下文推荐中的LLM意图提取和语义分析",
+            True,
+            "bool",
+        )
+        or changed
+    )
 
     # 目录类配置（逗号分隔）
     changed = (

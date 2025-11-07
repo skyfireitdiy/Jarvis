@@ -357,6 +357,11 @@
       "description": "附加提示的触发阈值（字符数）。当消息长度超过此值时，会自动添加默认的附加提示",
       "default": 1024
     },
+    "JARVIS_ENABLE_INTENT_RECOGNITION": {
+      "type": "boolean",
+      "description": "是否启用意图识别功能。用于智能上下文推荐中的LLM意图提取和语义分析",
+      "default": true
+    },
     "JARVIS_GIT_CHECK_MODE": {
       "type": "string",
       "enum": ["strict", "warn"],

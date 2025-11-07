@@ -22,6 +22,8 @@ from jarvis.jarvis_code_agent.lint import (
 from jarvis.jarvis_code_agent.build_validator import BuildValidator, BuildResult, FallbackBuildValidator
 from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
+from jarvis.jarvis_code_analyzer import ContextManager
+from jarvis.jarvis_code_analyzer.llm_context_recommender import ContextRecommender
 from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
     is_enable_static_analysis,
@@ -31,6 +33,7 @@ from jarvis.jarvis_utils.config import (
     set_config,
     get_data_dir,
     is_plan_enabled,
+    is_enable_intent_recognition,
 )
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
@@ -69,6 +72,11 @@ class CodeAgent:
         self.root_dir = os.getcwd()
         self.tool_group = tool_group
         self.non_interactive = non_interactive
+
+        # 初始化上下文管理器
+        self.context_manager = ContextManager(self.root_dir)
+        # 上下文推荐器将在Agent创建后初始化（需要LLM模型）
+        self.context_recommender: Optional[ContextRecommender] = None
 
         # 检测 git username 和 email 是否已设置
         self._check_git_config()
@@ -121,6 +129,22 @@ class CodeAgent:
             use_tools=base_tools,  # 仅启用限定工具
         )
 
+        # 建立CodeAgent与Agent的关联，便于工具获取上下文管理器
+        self.agent._code_agent = self
+
+        # 初始化上下文推荐器（需要LLM模型）
+        if hasattr(self.agent, 'model') and self.agent.model:
+            try:
+                self.context_recommender = ContextRecommender(
+                    self.context_manager,
+                    llm_model=self.agent.model
+                )
+            except Exception as e:
+                # LLM推荐器初始化失败
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"上下文推荐器初始化失败: {e}，将跳过上下文推荐功能")
+
         self.agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
     def _get_system_prompt(self) -> str:
@@ -150,6 +174,7 @@ class CodeAgent:
    - 依赖关系：如需分析依赖、调用关系，可结合代码分析工具辅助
    - 代码阅读：使用 read_code 工具获取目标文件的完整内容或指定范围内容，禁止凭空假设代码
    - 变更影响：如需分析变更影响范围，可结合版本控制工具辅助判断
+   - 上下文理解：系统已维护项目的符号表和依赖关系图，可以帮助理解代码结构和依赖关系
    - 工具优先级：优先使用自动化工具，减少人工推断，确保分析结果准确
 4. **方案设计**：确定最小变更方案，保持代码结构
 5. **实施修改**：遵循"先读后写"原则，保持代码风格一致性
@@ -743,17 +768,44 @@ class CodeAgent:
             6. 如遇信息不明，优先调用工具补充分析，不要主观臆断。
             """
 
+            # 智能上下文推荐：根据用户输入推荐相关上下文
+            context_recommendation_text = ""
+            if self.context_recommender and is_enable_intent_recognition():
+                try:
+                    # 尝试从用户输入中提取目标文件和符号（简单启发式方法）
+                    target_files = self._extract_file_paths_from_input(user_input)
+                    target_symbols = self._extract_symbols_from_input(user_input)
+                    
+                    # 生成上下文推荐
+                    recommendation = self.context_recommender.recommend_context(
+                        user_input=user_input,
+                        target_files=target_files,
+                        target_symbols=target_symbols,
+                    )
+                    
+                    # 格式化推荐结果
+                    context_recommendation_text = self.context_recommender.format_recommendation(recommendation)
+                    
+                    if context_recommendation_text:
+                        PrettyOutput.print("💡 正在生成智能上下文推荐...", OutputType.INFO)
+                except Exception as e:
+                    # 上下文推荐失败不应该影响主流程
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.debug(f"上下文推荐失败: {e}", exc_info=True)
+
             if project_info:
                 enhanced_input = (
                     "项目概况:\n"
                     + "\n\n".join(project_info)
                     + "\n\n"
                     + first_tip
+                    + context_recommendation_text
                     + "\n\n任务描述：\n"
                     + user_input
                 )
             else:
-                enhanced_input = first_tip + "\n\n任务描述：\n" + user_input
+                enhanced_input = first_tip + context_recommendation_text + "\n\n任务描述：\n" + user_input
 
             try:
                 self.agent.run(enhanced_input)
@@ -913,6 +965,18 @@ class CodeAgent:
             start_hash = get_latest_commit_hash()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             modified_files = get_diff_file_list()
+            
+            # 更新上下文管理器：当文件被修改后，更新符号表和依赖图
+            for file_path in modified_files:
+                if os.path.exists(file_path):
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                            content = f.read()
+                        self.context_manager.update_context_for_file(file_path, content)
+                    except Exception:
+                        # 如果读取文件失败，跳过更新
+                        pass
+            
             per_file_preview = _build_per_file_patch_preview(modified_files)
             commited = handle_commit_workflow()
             if commited:
@@ -957,6 +1021,12 @@ class CodeAgent:
                         reason = config.get_disable_reason()
                         reason_text = f"（原因: {reason}）" if reason else ""
                         final_ret += f"\n\nℹ️ 构建验证已禁用{reason_text}，仅进行基础静态检查\n"
+                        # 输出基础静态检查日志
+                        file_count = len(modified_files)
+                        files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
+                        if file_count > 3:
+                            files_str += f" 等{file_count}个文件"
+                        PrettyOutput.print(f"🔍 正在进行基础静态检查 ({files_str})...", OutputType.INFO)
                         # 使用兜底验证器进行基础静态检查
                         fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
                         static_check_result = fallback_validator.validate(modified_files)
@@ -996,6 +1066,12 @@ class CodeAgent:
                                         )
                                         config.mark_as_asked()
                                         final_ret += f"\n\nℹ️ 已禁用构建验证，后续将仅进行基础静态检查\n"
+                                        # 输出基础静态检查日志
+                                        file_count = len(modified_files)
+                                        files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
+                                        if file_count > 3:
+                                            files_str += f" 等{file_count}个文件"
+                                        PrettyOutput.print(f"🔍 正在进行基础静态检查 ({files_str})...", OutputType.INFO)
                                         # 立即进行基础静态检查
                                         fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
                                         static_check_result = fallback_validator.validate(modified_files)
@@ -1106,6 +1182,17 @@ class CodeAgent:
         if not commands:
             return []
         
+        # 输出静态检查日志
+        file_count = len(modified_files)
+        files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
+        if file_count > 3:
+            files_str += f" 等{file_count}个文件"
+        tool_names = list(set(cmd[0] for cmd in commands))
+        tools_str = ", ".join(tool_names[:3])
+        if len(tool_names) > 3:
+            tools_str += f" 等{len(tool_names)}个工具"
+        PrettyOutput.print(f"🔍 正在进行静态检查 ({files_str}, 使用 {tools_str})...", OutputType.INFO)
+        
         results = []
         
         # 按工具分组，相同工具可以批量执行
@@ -1180,6 +1267,87 @@ class CodeAgent:
         
         return "\n".join(lines)
     
+    def _extract_file_paths_from_input(self, user_input: str) -> List[str]:
+        """从用户输入中提取文件路径
+        
+        Args:
+            user_input: 用户输入文本
+            
+        Returns:
+            文件路径列表
+        """
+        import re
+        file_paths = []
+        
+        # 匹配常见的文件路径模式
+        # 1. 引号中的路径: "path/to/file.py" 或 'path/to/file.py'
+        quoted_paths = re.findall(r'["\']([^"\']+\.(?:py|js|ts|rs|go|java|cpp|c|h|hpp))["\']', user_input)
+        file_paths.extend(quoted_paths)
+        
+        # 2. 相对路径: ./path/to/file.py 或 path/to/file.py
+        relative_paths = re.findall(r'(?:\./)?[\w/]+\.(?:py|js|ts|rs|go|java|cpp|c|h|hpp)', user_input)
+        file_paths.extend(relative_paths)
+        
+        # 3. 绝对路径（简化匹配）
+        absolute_paths = re.findall(r'/(?:[\w\-\.]+/)+[\w\-\.]+\.(?:py|js|ts|rs|go|java|cpp|c|h|hpp)', user_input)
+        file_paths.extend(absolute_paths)
+        
+        # 转换为绝对路径并去重
+        unique_paths = []
+        seen = set()
+        for path in file_paths:
+            abs_path = os.path.abspath(path) if not os.path.isabs(path) else path
+            if abs_path not in seen and os.path.exists(abs_path):
+                seen.add(abs_path)
+                unique_paths.append(abs_path)
+        
+        return unique_paths
+
+    def _extract_symbols_from_input(self, user_input: str) -> List[str]:
+        """从用户输入中提取符号名称（函数名、类名等）
+        
+        Args:
+            user_input: 用户输入文本
+            
+        Returns:
+            符号名称列表
+        """
+        import re
+        symbols = []
+        
+        # 匹配常见的符号命名模式
+        # 1. 驼峰命名（类名）: MyClass, ProcessData
+        camel_case = re.findall(r'\b[A-Z][a-zA-Z0-9]+\b', user_input)
+        symbols.extend(camel_case)
+        
+        # 2. 下划线命名（函数名、变量名）: process_data, get_user_info
+        snake_case = re.findall(r'\b[a-z][a-z0-9_]+[a-z0-9]\b', user_input)
+        symbols.extend(snake_case)
+        
+        # 3. 在引号中的符号名: "function_name" 或 'ClassName'
+        quoted_symbols = re.findall(r'["\']([A-Za-z][A-Za-z0-9_]*?)["\']', user_input)
+        symbols.extend(quoted_symbols)
+        
+        # 过滤常见停用词和过短的符号
+        stop_words = {
+            'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'her', 'was', 'one',
+            'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now',
+            'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she',
+            'too', 'use', '添加', '修改', '实现', '修复', '更新', '删除', '创建', '文件', '代码',
+        }
+        
+        unique_symbols = []
+        seen = set()
+        for symbol in symbols:
+            symbol_lower = symbol.lower()
+            if (symbol_lower not in stop_words and 
+                len(symbol) > 2 and 
+                symbol_lower not in seen):
+                seen.add(symbol_lower)
+                unique_symbols.append(symbol)
+        
+        return unique_symbols[:10]  # 限制数量
+
     def _validate_build_after_edit(self, modified_files: List[str]) -> Optional[BuildResult]:
         """编辑后验证构建
         
@@ -1197,6 +1365,13 @@ class CodeAgent:
         if config.is_build_validation_disabled():
             # 已禁用，返回None，由调用方处理基础静态检查
             return None
+        
+        # 输出编译检查日志
+        file_count = len(modified_files)
+        files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
+        if file_count > 3:
+            files_str += f" 等{file_count}个文件"
+        PrettyOutput.print(f"🔨 正在进行编译检查 ({files_str})...", OutputType.INFO)
         
         try:
             timeout = get_build_validation_timeout()
