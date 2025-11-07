@@ -7,6 +7,8 @@ import os
 from dataclasses import dataclass
 from typing import Dict, List, Set, Optional
 
+from .file_ignore import filter_walk_dirs
+
 @dataclass
 class Dependency:
     """Represents an import dependency."""
@@ -99,8 +101,8 @@ class DependencyAnalyzer:
         
         # Walk through all source files in the project
         for root, dirs, files in os.walk(project_root):
-            # Skip hidden directories
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            # Skip hidden directories and common ignore patterns
+            dirs[:] = filter_walk_dirs(dirs)
             
             for file in files:
                 file_path = os.path.join(root, file)

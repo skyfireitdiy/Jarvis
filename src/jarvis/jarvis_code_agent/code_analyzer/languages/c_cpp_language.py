@@ -8,6 +8,7 @@ from tree_sitter import Language, Node
 
 from ..base_language import BaseLanguageSupport
 from ..dependency_analyzer import Dependency, DependencyAnalyzer, DependencyGraph
+from ..file_ignore import filter_walk_dirs
 from ..symbol_extractor import Symbol, SymbolExtractor
 from ..tree_sitter_extractor import TreeSitterExtractor
 
@@ -137,7 +138,7 @@ class CDependencyAnalyzer(DependencyAnalyzer):
         extensions = {'.c', '.h'}
         
         for root, dirs, files in os.walk(project_root):
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            dirs[:] = filter_walk_dirs(dirs)
             
             for file in files:
                 if not any(file.endswith(ext) for ext in extensions):
@@ -168,7 +169,7 @@ class CDependencyAnalyzer(DependencyAnalyzer):
         
         # Try in project root
         for root, dirs, files in os.walk(project_root):
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            dirs[:] = filter_walk_dirs(dirs)
             if header_name in files:
                 return os.path.join(root, header_name)
         
