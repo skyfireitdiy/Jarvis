@@ -1313,13 +1313,20 @@ class CodeAgent:
         Returns:
             更新后的结果字符串
         """
+        # 检查是否启用静态分析
+        if not is_enable_static_analysis():
+            PrettyOutput.print("ℹ️  静态分析已禁用，跳过静态检查", OutputType.INFO)
+            return final_ret
+        
+        # 检查是否有可用的lint工具
         lint_tools_info = "\n".join(
             f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
             for file in modified_files
             if get_lint_tools(file)
         )
         
-        if not lint_tools_info or not is_enable_static_analysis():
+        if not lint_tools_info:
+            PrettyOutput.print("ℹ️  未找到可用的静态检查工具，跳过静态检查", OutputType.INFO)
             return final_ret
         
         # 如果构建验证失败且未禁用，不进行静态分析（避免重复错误）
@@ -1330,23 +1337,26 @@ class CodeAgent:
             and not config.is_build_validation_disabled()
         )
         
-        if not should_skip_static:
-            # 直接执行静态扫描
-            lint_results = self._run_static_analysis(modified_files)
-            if lint_results:
-                # 有错误或警告，让大模型修复
-                errors_summary = self._format_lint_results(lint_results)
-                addon_prompt = f"""
+        if should_skip_static:
+            PrettyOutput.print("ℹ️  构建验证失败，跳过静态分析（避免重复错误）", OutputType.INFO)
+            return final_ret
+        
+        # 直接执行静态扫描
+        lint_results = self._run_static_analysis(modified_files)
+        if lint_results:
+            # 有错误或警告，让大模型修复
+            errors_summary = self._format_lint_results(lint_results)
+            addon_prompt = f"""
 静态扫描发现以下问题，请根据错误信息修复代码:
 
 {errors_summary}
 
 请仔细检查并修复所有问题。
-                """
-                agent.set_addon_prompt(addon_prompt)
-                final_ret += "\n\n⚠️ 静态扫描发现问题，已提示修复\n"
-            else:
-                final_ret += "\n\n✅ 静态扫描通过\n"
+            """
+            agent.set_addon_prompt(addon_prompt)
+            final_ret += "\n\n⚠️ 静态扫描发现问题，已提示修复\n"
+        else:
+            final_ret += "\n\n✅ 静态扫描通过\n"
         
         return final_ret
 
