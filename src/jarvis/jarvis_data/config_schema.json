@@ -322,6 +322,11 @@
       "description": "构建验证的超时时间（秒）。当构建验证执行时间超过此值时，将终止验证并报告超时。",
       "default": 30
     },
+    "JARVIS_ENABLE_IMPACT_ANALYSIS": {
+      "type": "boolean",
+      "description": "是否启用编辑影响范围分析。分析代码编辑的影响范围，识别可能受影响的文件、函数、测试等，帮助评估编辑风险。",
+      "default": true
+    },
     "JARVIS_FORCE_SAVE_MEMORY": {
       "type": "boolean",
       "description": "是否强制保存记忆",
