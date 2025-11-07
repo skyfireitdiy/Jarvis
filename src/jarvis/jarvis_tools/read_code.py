@@ -2,6 +2,8 @@
 import os
 from typing import Any, Dict
 
+from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
@@ -28,6 +30,29 @@ class ReadCodeTool:
         },
         "required": ["files"],
     }
+    
+    def _get_max_token_limit(self, agent: Any = None) -> int:
+        """获取基于最大窗口数量的token限制
+        
+        Args:
+            agent: Agent实例，用于获取模型组配置
+            
+        Returns:
+            int: 允许的最大token数（2/3最大窗口）
+        """
+        try:
+            # 尝试从agent获取模型组
+            model_group = None
+            if agent:
+                model_group = getattr(agent, "model_group", None)
+            
+            max_input_tokens = get_max_input_token_count(model_group)
+            # 计算2/3限制的token数
+            limit_tokens = int(max_input_tokens * 2 / 3)
+            return limit_tokens
+        except Exception:
+            # 如果获取失败，使用默认值（假设32000 token，2/3是21333）
+            return 21333
 
     def _handle_single_file(
         self, filepath: str, start_line: int = 1, end_line: int = -1, agent: Any = None
@@ -99,16 +124,41 @@ class ReadCodeTool:
                     "stderr": f"无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})",
                 }
 
-            # 添加行号并构建输出内容（第二遍流式读取，仅提取范围行）
-            selected_items = []
+            # 读取要读取的行范围内容，计算实际token数
+            selected_content_lines = []
             with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
                 for i, line in enumerate(f, start=1):
                     if i < start_line:
                         continue
                     if i > end_line:
                         break
-                    selected_items.append((i, line))
-            numbered_content = "".join(f"{i:4d}:{line}" for i, line in selected_items)
+                    selected_content_lines.append(line)
+            
+            # 构建带行号的内容用于token计算（与实际输出格式一致）
+            numbered_content = "".join(f"{i:4d}:{line}" for i, line in enumerate(selected_content_lines, start=start_line))
+            
+            # 计算实际token数
+            content_tokens = get_context_token_count(numbered_content)
+            max_token_limit = self._get_max_token_limit(agent)
+            
+            # 检查单文件读取token数是否超过2/3限制
+            if content_tokens > max_token_limit:
+                read_lines = end_line - start_line + 1
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": (
+                        f"⚠️ 读取范围过大: 请求读取内容约 {content_tokens} tokens，超过限制 ({max_token_limit} tokens，约2/3最大窗口)\n"
+                        f"📊 读取范围: {read_lines} 行 (第 {start_line}-{end_line} 行，文件总行数 {total_lines})\n"
+                        f"💡 建议：\n"
+                        f"   1. 分批读取：将范围分成多个较小的批次，每批内容不超过 {max_token_limit} tokens\n"
+                        f"   2. 先定位：使用搜索或分析工具定位大致位置，再读取具体范围\n"
+                        f"   3. 缩小范围：为文件指定更精确的行号范围"
+                    ),
+                }
+
+            # 使用已读取的内容构建输出（避免重复读取）
+            numbered_content = "".join(f"{i:4d}:{line}" for i, line in enumerate(selected_content_lines, start=start_line))
 
             # 构建输出格式
             output = (
@@ -256,7 +306,104 @@ class ReadCodeTool:
             all_outputs = []
             overall_success = True
             status_lines = []
+            total_tokens = 0  # 累计读取的token数
+            max_token_limit = self._get_max_token_limit(agent)
 
+            # 第一遍：检查所有文件的累计token数是否超过限制
+            file_read_info = []  # 存储每个文件要读取的信息
+            for file_info in args["files"]:
+                if not isinstance(file_info, dict) or "path" not in file_info:
+                    continue
+                
+                filepath = file_info["path"].strip()
+                start_line = file_info.get("start_line", 1)
+                end_line = file_info.get("end_line", -1)
+                
+                # 检查文件是否存在并计算要读取的token数
+                abs_path = os.path.abspath(filepath)
+                if not os.path.exists(abs_path):
+                    continue
+                
+                try:
+                    # 统计总行数
+                    with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                        total_lines = sum(1 for _ in f)
+                    
+                    if total_lines == 0:
+                        continue
+                    
+                    # 计算实际要读取的行范围
+                    if end_line == -1:
+                        actual_end_line = total_lines
+                    else:
+                        actual_end_line = (
+                            max(1, min(end_line, total_lines))
+                            if end_line >= 0
+                            else total_lines + end_line + 1
+                        )
+                    
+                    actual_start_line = (
+                        max(1, min(start_line, total_lines))
+                        if start_line >= 0
+                        else total_lines + start_line + 1
+                    )
+                    
+                    if actual_start_line <= actual_end_line:
+                        # 读取要读取的行范围内容
+                        selected_content_lines = []
+                        with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                            for i, line in enumerate(f, start=1):
+                                if i < actual_start_line:
+                                    continue
+                                if i > actual_end_line:
+                                    break
+                                selected_content_lines.append(line)
+                        
+                        # 构建带行号的内容用于token计算（与实际输出格式一致）
+                        numbered_content = "".join(
+                            f"{i:4d}:{line}" 
+                            for i, line in enumerate(selected_content_lines, start=actual_start_line)
+                        )
+                        
+                        # 计算实际token数
+                        content_tokens = get_context_token_count(numbered_content)
+                        
+                        file_read_info.append({
+                            "filepath": filepath,
+                            "start_line": actual_start_line,
+                            "end_line": actual_end_line,
+                            "read_lines": actual_end_line - actual_start_line + 1,
+                            "tokens": content_tokens,
+                            "file_info": file_info,
+                        })
+                        total_tokens += content_tokens
+                except Exception:
+                    continue
+
+            # 检查累计token数是否超过限制
+            if total_tokens > max_token_limit:
+                file_list = "\n   ".join(
+                    f"• {info['filepath']}: {info['tokens']} tokens ({info['read_lines']} 行, 范围: {info['start_line']}-{info['end_line']})"
+                    for info in file_read_info[:10]
+                )
+                more_files = len(file_read_info) - 10
+                if more_files > 0:
+                    file_list += f"\n   ... 还有 {more_files} 个文件"
+                
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": (
+                        f"⚠️ 累计读取范围过大: 请求累计读取内容约 {total_tokens} tokens，超过限制 ({max_token_limit} tokens，约2/3最大窗口)\n"
+                        f"📋 文件列表 ({len(file_read_info)} 个文件):\n   {file_list}\n"
+                        f"💡 建议：\n"
+                        f"   1. 分批读取：将文件分成多个批次，每批累计内容不超过 {max_token_limit} tokens\n"
+                        f"   2. 先定位：使用搜索或分析工具定位关键代码位置，再读取具体范围\n"
+                        f"   3. 缩小范围：为每个文件指定更精确的行号范围"
+                    ),
+                }
+
+            # 第二遍：实际读取文件
             for file_info in args["files"]:
                 if not isinstance(file_info, dict) or "path" not in file_info:
                     continue
