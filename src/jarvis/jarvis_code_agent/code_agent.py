@@ -19,7 +19,7 @@ from jarvis.jarvis_code_agent.lint import (
     get_lint_commands_for_files,
     group_commands_by_tool,
 )
-from jarvis.jarvis_code_agent.build_validator import BuildValidator, BuildResult, FallbackBuildValidator
+from jarvis.jarvis_code_agent.code_analyzer.build_validator import BuildValidator, BuildResult, FallbackBuildValidator
 from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
