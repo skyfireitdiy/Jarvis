@@ -133,7 +133,8 @@ class ContextRecommender:
         )
         
         # 7. 过滤和排序
-        final_files = [f for f, _ in sorted(scored_files.items(), key=lambda x: x[1], reverse=True)[:10]]
+        # 按修改时间对文件排序，并选择最新的10个
+        final_files = sorted(list(recommended_files), key=os.path.getmtime, reverse=True)[:10]
         final_symbols = [s for s, _ in sorted(scored_symbols.items(), key=lambda x: x[1], reverse=True)[:10]]
         
         # 8. 更新推荐原因
