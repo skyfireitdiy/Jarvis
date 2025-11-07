@@ -1341,6 +1341,15 @@ def _collect_optional_config_interactively(
     )
     changed = (
         _ask_and_set(
+            "JARVIS_ENABLE_IMPACT_ANALYSIS",
+            "是否启用编辑影响范围分析（Impact Analysis）？分析代码编辑的影响范围，识别可能受影响的文件、函数、测试等。",
+            True,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
             "JARVIS_USE_METHODOLOGY",
             "是否启用方法论系统（Methodology）？",
             True,

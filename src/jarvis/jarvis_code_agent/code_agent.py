@@ -24,6 +24,7 @@ from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConf
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_code_analyzer import ContextManager
 from jarvis.jarvis_code_analyzer.llm_context_recommender import ContextRecommender
+from jarvis.jarvis_code_analyzer import ImpactAnalyzer, parse_git_diff_to_edits
 from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
     is_enable_static_analysis,
@@ -34,6 +35,7 @@ from jarvis.jarvis_utils.config import (
     get_data_dir,
     is_plan_enabled,
     is_enable_intent_recognition,
+    is_enable_impact_analysis,
 )
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
@@ -977,6 +979,70 @@ class CodeAgent:
                         # 如果读取文件失败，跳过更新
                         pass
             
+            # 进行影响范围分析（如果启用）
+            impact_report = None
+            if is_enable_impact_analysis():
+                try:
+                    impact_analyzer = ImpactAnalyzer(self.context_manager)
+                    all_edits = []
+                    for file_path in modified_files:
+                        if os.path.exists(file_path):
+                            edits = parse_git_diff_to_edits(file_path, self.root_dir)
+                            all_edits.extend(edits)
+                    
+                    if all_edits:
+                        # 按文件分组编辑
+                        edits_by_file = {}
+                        for edit in all_edits:
+                            if edit.file_path not in edits_by_file:
+                                edits_by_file[edit.file_path] = []
+                            edits_by_file[edit.file_path].append(edit)
+                        
+                        # 对每个文件进行影响分析
+                        for file_path, edits in edits_by_file.items():
+                            report = impact_analyzer.analyze_edit_impact(file_path, edits)
+                            if report:
+                                # 合并报告
+                                if impact_report is None:
+                                    impact_report = report
+                                else:
+                                    # 合并多个报告，去重
+                                    impact_report.affected_files = list(set(impact_report.affected_files + report.affected_files))
+                                    
+                                    # 合并符号（基于文件路径和名称去重）
+                                    symbol_map = {}
+                                    for symbol in impact_report.affected_symbols + report.affected_symbols:
+                                        key = (symbol.file_path, symbol.name, symbol.line_start)
+                                        if key not in symbol_map:
+                                            symbol_map[key] = symbol
+                                    impact_report.affected_symbols = list(symbol_map.values())
+                                    
+                                    impact_report.affected_tests = list(set(impact_report.affected_tests + report.affected_tests))
+                                    
+                                    # 合并接口变更（基于符号名和文件路径去重）
+                                    interface_map = {}
+                                    for change in impact_report.interface_changes + report.interface_changes:
+                                        key = (change.file_path, change.symbol_name, change.change_type)
+                                        if key not in interface_map:
+                                            interface_map[key] = change
+                                    impact_report.interface_changes = list(interface_map.values())
+                                    
+                                    impact_report.impacts.extend(report.impacts)
+                                    
+                                    # 合并建议
+                                    impact_report.recommendations = list(set(impact_report.recommendations + report.recommendations))
+                                    
+                                    # 使用更高的风险等级
+                                    if report.risk_level.value == 'high' or impact_report.risk_level.value == 'high':
+                                        impact_report.risk_level = report.risk_level if report.risk_level.value == 'high' else impact_report.risk_level
+                                    elif report.risk_level.value == 'medium':
+                                        impact_report.risk_level = report.risk_level
+                except Exception as e:
+                    # 影响分析失败不应该影响主流程，仅记录日志
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"影响范围分析失败: {e}", exc_info=True)
+            
             per_file_preview = _build_per_file_patch_preview(modified_files)
             commited = handle_commit_workflow()
             if commited:
@@ -1010,6 +1076,23 @@ class CodeAgent:
                     final_ret += (
                         f"\n\n代码已修改完成\n补丁内容（按文件）:\n{per_file_preview}\n"
                     )
+                    
+                    # 添加影响范围分析报告
+                    if impact_report:
+                        impact_summary = impact_report.to_string(self.root_dir)
+                        final_ret += f"\n\n{impact_summary}\n"
+                        
+                        # 如果是高风险，在提示词中提醒
+                        if impact_report.risk_level.value == 'high':
+                            agent.set_addon_prompt(
+                                f"{agent.get_addon_prompt() or ''}\n\n"
+                                f"⚠️ 高风险编辑警告：\n"
+                                f"检测到此编辑为高风险操作，请仔细检查以下内容：\n"
+                                f"- 受影响文件: {len(impact_report.affected_files)} 个\n"
+                                f"- 接口变更: {len(impact_report.interface_changes)} 个\n"
+                                f"- 相关测试: {len(impact_report.affected_tests)} 个\n"
+                                f"建议运行相关测试并检查所有受影响文件。"
+                            )
                     
                     # 构建验证
                     build_validation_result = None

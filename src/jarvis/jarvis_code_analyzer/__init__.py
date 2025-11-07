@@ -11,6 +11,17 @@ from .llm_context_recommender import ContextRecommender
 from .language_support import detect_language, get_symbol_extractor, get_dependency_analyzer
 from .base_language import BaseLanguageSupport
 from .language_registry import LanguageRegistry, get_registry, register_language
+from .impact_analyzer import (
+    ImpactAnalyzer,
+    Impact,
+    ImpactReport,
+    ImpactType,
+    RiskLevel,
+    InterfaceChange,
+    Edit,
+    TestDiscoverer,
+    parse_git_diff_to_edits,
+)
 
 __all__ = [
     # Symbol extraction
@@ -38,5 +49,15 @@ __all__ = [
     'LanguageRegistry',
     'get_registry',
     'register_language',
+    # Impact analysis
+    'ImpactAnalyzer',
+    'Impact',
+    'ImpactReport',
+    'ImpactType',
+    'RiskLevel',
+    'InterfaceChange',
+    'Edit',
+    'TestDiscoverer',
+    'parse_git_diff_to_edits',
 ]
 

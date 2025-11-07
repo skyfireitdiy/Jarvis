@@ -468,6 +468,16 @@ def is_enable_build_validation() -> bool:
     return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_BUILD_VALIDATION", True) is True
 
 
+def is_enable_impact_analysis() -> bool:
+    """
+    获取是否启用编辑影响范围分析。
+
+    返回：
+        bool: 如果启用影响范围分析则返回True，默认为True
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_IMPACT_ANALYSIS", True) is True
+
+
 def get_build_validation_timeout() -> int:
     """
     获取构建验证的超时时间（秒）。
