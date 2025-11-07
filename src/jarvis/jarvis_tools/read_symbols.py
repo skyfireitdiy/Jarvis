@@ -68,6 +68,7 @@ class ReadSymbolsTool:
                 return {"success": False, "stdout": "", "stderr": "symbols 参数必须是字符串列表"}
 
             symbols_path = self._resolve_symbols_jsonl_path(symbols_file_arg)
+            print(f"[read_symbols] Resolved symbols file path: {symbols_path}")
             if not symbols_path.exists():
                 return {"success": False, "stdout": "", "stderr": f"符号表文件不存在: {symbols_path}"}
             if not symbols_path.is_file():
@@ -76,6 +77,7 @@ class ReadSymbolsTool:
             # 使用集合提升匹配效率；保持原请求顺序以便输出
             requested: List[str] = [s.strip() for s in symbols_arg if s and s.strip()]
             wanted_set = set(requested)
+            print(f"[read_symbols] Requested {len(wanted_set)} unique symbols.")
 
             results: Dict[str, List[Dict[str, Any]]] = {s: [] for s in requested}
 
@@ -100,6 +102,8 @@ class ReadSymbolsTool:
                         results[qname].append(obj)
 
             not_found = [s for s in requested if not results.get(s)]
+            if not_found:
+                print(f"[read_symbols] Symbols not found: {not_found}")
             found_counts = {s: len(results.get(s, [])) for s in requested}
 
             out_obj: Dict[str, Any] = {
