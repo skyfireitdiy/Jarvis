@@ -447,6 +447,7 @@ def run_security_analysis(
   - gids: 整数数组（候选的全局唯一编号；输入JSON每个元素含 gid，可直接对应填入）
 - 要求：
   - 严格要求：仅输出位于 <CLUSTERS> 与 </CLUSTERS> 间的 YAML 数组，其他位置不输出任何文本
+  - **必须要求**：输入JSON中的所有gid都必须被分类，不能遗漏任何一个gid。所有gid必须出现在某个聚类的gids数组中。
   - 相同验证条件的候选合并为同一项
   - 不需要解释与长文本，仅给出可执行的验证条件短句
   - 若无法聚类，请将每个候选单独成组，verification 为该候选的最小确认条件
@@ -469,8 +470,20 @@ def run_security_analysis(
             # 若断点存在：优先使用已有聚类结果复建批次，跳过Agent运行（仅支持 gids）
             _key = (_file, _chunk_idx)
             if _key in _existing_clusters:
-
-                gid_to_item_resume: Dict[int, Dict] = {int(it.get("gid", 0)): it for it in pending_in_file_with_ids if int(it.get("gid", 0)) >= 1}
+                # 收集输入的gid
+                input_gids_resume = set()
+                gid_to_item_resume: Dict[int, Dict] = {}
+                for it in pending_in_file_with_ids:
+                    try:
+                        _gid = int(it.get("gid", 0))
+                        if _gid >= 1:
+                            input_gids_resume.add(_gid)
+                            gid_to_item_resume[_gid] = it
+                    except Exception:
+                        pass
+                
+                # 收集已分类的gid
+                classified_gids_resume = set()
                 for rec in _existing_clusters.get(_key, []):
                     verification = str(rec.get("verification", "")).strip()
                     gids_list = rec.get("gids", [])
@@ -481,6 +494,7 @@ def run_security_analysis(
                                 xi = int(x)
                                 if xi >= 1:
                                     norm_keys.append(xi)
+                                    classified_gids_resume.add(xi)
                             except Exception:
                                 continue
                     members: List[Dict] = []
@@ -500,20 +514,27 @@ def run_security_analysis(
                                 "batch_index": _chunk_idx,
                             }
                         )
-                # 标记进度（断点复用）
-                _progress_append(
-                    {
-                        "event": "cluster_status",
-                        "status": "done",
-                        "file": _file,
-                        "batch_index": _chunk_idx,
-                        "reused": True,
-                        "clusters_count": len(_existing_clusters.get(_key, [])),
-                    }
-                )
-                # 写入快照（断点）
-                _write_cluster_report_snapshot()
-                continue
+                
+                # 检查断点恢复的完整性
+                missing_gids_resume = input_gids_resume - classified_gids_resume
+                if missing_gids_resume:
+                    print(f"[JARVIS-SEC] 断点恢复：发现遗漏的gid {sorted(list(missing_gids_resume))}，将重新聚类")
+                    # 不跳过，继续执行Agent运行以补充遗漏的gid
+                else:
+                    # 所有gid都已分类，标记进度（断点复用）
+                    _progress_append(
+                        {
+                            "event": "cluster_status",
+                            "status": "done",
+                            "file": _file,
+                            "batch_index": _chunk_idx,
+                            "reused": True,
+                            "clusters_count": len(_existing_clusters.get(_key, [])),
+                        }
+                    )
+                    # 写入快照（断点）
+                    _write_cluster_report_snapshot()
+                    continue
 
             # 记录聚类批次开始（进度）
             _progress_append(
@@ -572,12 +593,26 @@ def run_security_analysis(
                 except Exception:
                     pass
 
-            # 运行聚类Agent（简单重试一次）
+            # 运行聚类Agent（带完整性校验，无限重试直到所有gid都被分类）
             cluster_items = None
-            for _attempt in range(2):
+            input_gids = set()
+            missing_gids = set()  # 初始化，避免未定义错误
+            for it in pending_in_file_with_ids:
+                try:
+                    _gid = int(it.get("gid", 0))
+                    if _gid >= 1:
+                        input_gids.add(_gid)
+                except Exception:
+                    pass
+            
+            _attempt = 0
+            
+            while True:
+                _attempt += 1
                 _cluster_summary["text"] = ""
                 cluster_agent.run(cluster_task)
                 cluster_items = _parse_clusters_from_text(_cluster_summary.get("text", ""))
+                
                 # 校验结构
                 valid = True
                 if not isinstance(cluster_items, list) or not cluster_items:
@@ -591,10 +626,54 @@ def run_security_analysis(
                         if not isinstance(it.get("verification", ""), str) or not isinstance(vals, list):
                             valid = False
                             break
+                
+                # 完整性校验：检查所有输入的gid是否都被分类
                 if valid:
-                    break
-                else:
+                    classified_gids = set()
+                    for cl in cluster_items:
+                        raw_gids = cl.get("gids", [])
+                        if isinstance(raw_gids, list):
+                            for x in raw_gids:
+                                try:
+                                    xi = int(x)
+                                    if xi >= 1:
+                                        classified_gids.add(xi)
+                                except Exception:
+                                    continue
+                    
+                    missing_gids = input_gids - classified_gids
+                    if not missing_gids:
+                        # 所有gid都被分类，校验通过
+                        print(f"[JARVIS-SEC] 聚类完整性校验通过，所有gid已分类（共重试 {_attempt} 次）")
+                        break
+                    else:
+                        # 有遗漏的gid，需要重试
+                        missing_gids_list = sorted(list(missing_gids))
+                        missing_count = len(missing_gids)
+                        print(f"[JARVIS-SEC] 聚类完整性校验失败：遗漏的gid: {missing_gids_list}（{missing_count}个），重试第 {_attempt} 次")
+                        # 更新任务，明确指出遗漏的gid
+                        cluster_task = f"""
+# 聚类任务（分析输入）
+上下文：
+- entry_path: {entry_path}
+- file: {_file}
+- languages: {langs}
+
+候选(JSON数组，包含 gid/file/line/pattern/category/evidence)：
+{_json2.dumps(pending_in_file_with_ids, ensure_ascii=False, indent=2)}
+
+**重要提示**：上一次聚类结果中遗漏了以下gid（共{missing_count}个），这些gid必须被分类：
+遗漏的gid: {missing_gids_list}
+
+请确保所有输入的gid都被分类，包括上述遗漏的gid。请仔细检查每个gid，确保它们都出现在某个聚类的gids数组中。
+                        """.strip()
+                        valid = False
+                
+                if not valid:
                     cluster_items = None
+                    # 如果是格式错误（非遗漏gid），也继续重试
+                    if not missing_gids:
+                        print(f"[JARVIS-SEC] 聚类结果格式无效，重试第 {_attempt} 次")
 
             # 合并聚类结果
             if isinstance(cluster_items, list) and cluster_items:
@@ -612,6 +691,7 @@ def run_security_analysis(
                     gid_to_item = {}
 
                 _merged_count = 0
+                classified_gids_final = set()
                 for cl in cluster_items:
                     verification = str(cl.get("verification", "")).strip()
                     raw_gids = cl.get("gids", [])
@@ -622,6 +702,7 @@ def run_security_analysis(
                                 xi = int(x)
                                 if xi >= 1:
                                     norm_keys.append(xi)
+                                    classified_gids_final.add(xi)
                             except Exception:
                                 continue
                     members: List[Dict] = []
@@ -642,6 +723,29 @@ def run_security_analysis(
                                 "batch_index": _chunk_idx,
                             }
                         )
+                
+                # 最终完整性检查：如果仍有遗漏的gid，为每个遗漏的gid创建单独的聚类
+                missing_gids_final = input_gids - classified_gids_final
+                if missing_gids_final:
+                    print(f"[JARVIS-SEC] 警告：仍有遗漏的gid {sorted(list(missing_gids_final))}，将为每个遗漏的gid创建单独聚类")
+                    for missing_gid in sorted(missing_gids_final):
+                        missing_item = gid_to_item.get(missing_gid)
+                        if missing_item:
+                            # 为遗漏的gid创建默认验证条件
+                            default_verification = f"验证候选 {missing_gid} 的安全风险"
+                            missing_item["verify"] = default_verification
+                            cluster_batches.append([missing_item])
+                            cluster_records.append(
+                                {
+                                    "file": _file,
+                                    "verification": default_verification,
+                                    "gids": [missing_gid],
+                                    "count": 1,
+                                    "batch_index": _chunk_idx,
+                                    "note": "完整性校验补充的遗漏gid",
+                                }
+                            )
+                            _merged_count += 1
                 # 标记聚类批次完成（进度）
                 _progress_append(
                     {
