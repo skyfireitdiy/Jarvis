@@ -34,10 +34,9 @@ RUST_SYMBOL_QUERY = """
 # --- Rust Language Setup ---
 
 try:
-    # TODO: This requires a mechanism to locate the compiled grammar file.
-    # For now, we'll assume it's discoverable in the environment.
-    RUST_LANGUAGE: Optional[Language] = Language('build/my-languages.so', 'rust')
-except Exception:
+    import tree_sitter_rust
+    RUST_LANGUAGE: Optional[Language] = tree_sitter_rust.language()
+except (ImportError, Exception):
     RUST_LANGUAGE = None
 
 
