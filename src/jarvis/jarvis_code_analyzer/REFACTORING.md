@@ -110,5 +110,12 @@ jarvis_code_analyzer/
 
 ## 迁移说明
 
-旧的extractor文件（`rust_extractor.py`, `go_extractor.py`, `c_cpp_extractor.py`）仍然保留，但建议使用新的语言支持类。这些文件可能会在未来版本中移除。
+所有旧的extractor文件已完全迁移到新的语言支持类结构。
+
+已删除的旧文件：
+- `c_cpp_extractor.py` → 已迁移到 `languages/c_cpp_language.py`
+- `go_extractor.py` → 已迁移到 `languages/go_language.py`
+- `rust_extractor.py` → 已迁移到 `languages/rust_language.py`
+
+现在所有语言支持都统一在 `languages/` 目录下，使用 `*_language.py` 命名规范。
 
