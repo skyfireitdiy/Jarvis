@@ -97,9 +97,6 @@ class PythonSymbolExtractor(SymbolExtractor):
 # --- Extensibility and Factory ---
 
 # A registry to hold language-specific extractor classes
-# --- Extensibility and Factory ---
-
-# A registry to hold language-specific extractor classes
 EXTRACTOR_REGISTRY: Dict[str, Type[SymbolExtractor]] = {
     'python': PythonSymbolExtractor,
 }
