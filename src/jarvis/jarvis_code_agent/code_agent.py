@@ -858,6 +858,7 @@ class CodeAgent:
             context_recommendation_text = ""
             if self.context_recommender and is_enable_intent_recognition():
                 try:
+                    PrettyOutput.print("🔍 正在进行意图识别与上下文分析...", OutputType.INFO)
                     # 尝试从用户输入中提取目标文件和符号（简单启发式方法）
                     target_files = self._extract_file_paths_from_input(user_input)
                     target_symbols = self._extract_symbols_from_input(user_input)
@@ -894,6 +895,8 @@ class CodeAgent:
                 enhanced_input = first_tip + context_recommendation_text + "\n\n任务描述：\n" + user_input
 
             try:
+                if self.agent.model:
+                    self.agent.model.set_suppress_output(False)
                 self.agent.run(enhanced_input)
             except RuntimeError as e:
                 PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
