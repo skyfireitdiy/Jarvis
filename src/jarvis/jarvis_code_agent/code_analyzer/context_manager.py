@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Set
 
-from .dependency_analyzer import DependencyAnalyzer, DependencyGraph, Dependency
+from .dependency_analyzer import DependencyGraph
 from .file_ignore import filter_walk_dirs
 from .symbol_extractor import Symbol, SymbolTable
 from .language_support import detect_language, get_symbol_extractor, get_dependency_analyzer

@@ -118,7 +118,7 @@ class DependencyAnalyzer:
                         # Resolve dependency path (this should be done by language-specific analyzer)
                         # For now, we'll just store the module name
                         pass
-                except Exception as e:
+                except Exception:
                     # Skip files that can't be read or parsed
                     continue
         

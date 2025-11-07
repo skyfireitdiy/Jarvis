@@ -3,7 +3,6 @@
 保留推荐结果的数据结构和格式化方法。
 """
 
-import os
 from dataclasses import dataclass
 from typing import List
 

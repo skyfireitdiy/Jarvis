@@ -4,7 +4,7 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Set
+from typing import Optional, Set
 
 from .dependency_analyzer import DependencyAnalyzer
 from .symbol_extractor import SymbolExtractor

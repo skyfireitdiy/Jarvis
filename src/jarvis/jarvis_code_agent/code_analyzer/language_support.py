@@ -28,28 +28,28 @@ except ImportError as e:
 try:
     from .languages import RustLanguageSupport
     register_language(RustLanguageSupport())
-except (ImportError, RuntimeError) as e:
+except (ImportError, RuntimeError):
     pass  # 静默失败，tree-sitter可能不可用
 
 # Go语言支持（可选，需要tree-sitter）
 try:
     from .languages import GoLanguageSupport
     register_language(GoLanguageSupport())
-except (ImportError, RuntimeError) as e:
+except (ImportError, RuntimeError):
     pass  # 静默失败，tree-sitter可能不可用
 
 # C语言支持（可选，需要tree-sitter）
 try:
     from .languages import CLanguageSupport
     register_language(CLanguageSupport())
-except (ImportError, RuntimeError) as e:
+except (ImportError, RuntimeError):
     pass  # 静默失败，tree-sitter可能不可用
 
 # C++语言支持（可选，需要tree-sitter）
 try:
     from .languages import CppLanguageSupport
     register_language(CppLanguageSupport())
-except (ImportError, RuntimeError) as e:
+except (ImportError, RuntimeError):
     pass  # 静默失败，tree-sitter可能不可用
 
 

@@ -135,7 +135,7 @@ class TaskPlanner:
             eval_prompt = (
                 f"原始任务：\n{task_text}\n\n"
                 f"原始完整计划：\n" + "\n".join(f"- {t}" for t in original_plan) + "\n\n"
-                f"已完成的子任务：\n" + "\n".join(f"- {t}" for t in completed_tasks) + "\n\n"
+                "已完成的子任务：\n" + "\n".join(f"- {t}" for t in completed_tasks) + "\n\n"
                 f"已完成子任务的结果：\n{completed_results_text}\n\n"
                 f"剩余待执行的子任务：\n{remaining_tasks_text}\n\n"
                 "请评估剩余计划是否需要调整。如果需要调整，请提供调整后的剩余子任务列表（只能调整剩余部分，不能修改已完成的子任务）。"

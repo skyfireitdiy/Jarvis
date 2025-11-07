@@ -3,7 +3,6 @@
 提供统一的文件/目录忽略逻辑，用于代码分析、依赖分析等场景。
 """
 
-import os
 from pathlib import Path
 from typing import List, Set, Optional, Callable
 
