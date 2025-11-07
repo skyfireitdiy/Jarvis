@@ -9,13 +9,12 @@
 
 import os
 import subprocess
-import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict, Any
 from enum import Enum
 
-logger = logging.getLogger(__name__)
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class BuildSystem(Enum):
@@ -49,11 +48,21 @@ class BuildSystemDetector:
         self.project_root = project_root
     
     def detect(self) -> Optional[BuildSystem]:
-        """检测项目使用的构建系统
+        """检测项目使用的构建系统（兼容旧接口，返回第一个检测到的）
         
         Returns:
             检测到的构建系统，如果无法检测则返回None
         """
+        all_systems = self.detect_all()
+        return all_systems[0] if all_systems else None
+    
+    def detect_all(self) -> List[BuildSystem]:
+        """检测所有可能的构建系统
+        
+        Returns:
+            检测到的所有构建系统列表（按优先级排序）
+        """
+        detected = []
         # 按优先级检测（从最具体到最通用）
         detectors = [
             self._detect_rust,
@@ -68,10 +77,10 @@ class BuildSystemDetector:
         
         for detector in detectors:
             result = detector()
-            if result:
-                return result
+            if result and result not in detected:
+                detected.append(result)
         
-        return None
+        return detected
     
     def _detect_rust(self) -> Optional[BuildSystem]:
         """检测Rust项目（Cargo.toml）"""
@@ -250,6 +259,41 @@ class RustBuildValidator(BuildValidatorBase):
 class PythonBuildValidator(BuildValidatorBase):
     """Python构建验证器"""
     
+    def _extract_python_errors(self, output: str) -> str:
+        """提取Python错误信息"""
+        if not output:
+            return ""
+        
+        lines = output.split("\n")
+        errors = []
+        in_error = False
+        
+        for line in lines:
+            line_lower = line.lower()
+            # 检测错误关键词
+            if any(keyword in line_lower for keyword in ["error", "failed", "exception", "traceback", "syntaxerror", "indentationerror"]):
+                in_error = True
+                errors.append(line.strip())
+            elif in_error and line.strip():
+                # 继续收集错误相关的行
+                if line.strip().startswith(("File", "  File", "    ", "E ", "FAILED")):
+                    errors.append(line.strip())
+                elif not line.strip().startswith("="):
+                    # 如果遇到非错误相关的行，停止收集
+                    if len(errors) > 0 and not any(keyword in line_lower for keyword in ["error", "failed", "exception"]):
+                        break
+        
+        # 如果收集到错误，返回前20行（限制长度）
+        if errors:
+            error_text = "\n".join(errors[:20])
+            # 如果太长，截断
+            if len(error_text) > 1000:
+                error_text = error_text[:1000] + "\n... (错误信息已截断)"
+            return error_text
+        
+        # 如果没有提取到结构化错误，返回原始输出的前500字符
+        return output[:500] if output else ""
+    
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         import time
         start_time = time.time()
@@ -257,6 +301,7 @@ class PythonBuildValidator(BuildValidatorBase):
         # 策略1: 尝试使用 py_compile 编译修改的文件
         if modified_files:
             errors = []
+            error_outputs = []
             for file_path in modified_files:
                 if not file_path.endswith(".py"):
                     continue
@@ -267,31 +312,50 @@ class PythonBuildValidator(BuildValidatorBase):
                         timeout=5,
                     )
                     if returncode != 0:
-                        errors.append(f"{file_path}: {stderr}")
+                        error_msg = f"{file_path}: {stderr}".strip()
+                        errors.append(error_msg)
+                        error_outputs.append(stdout + stderr)
             
             if errors:
                 duration = time.time() - start_time
+                # 合并所有错误输出
+                full_output = "\n".join(error_outputs)
+                # 提取关键错误信息
+                error_message = self._extract_python_errors(full_output)
+                if not error_message:
+                    # 如果没有提取到结构化错误，使用简化的错误列表
+                    error_message = "\n".join(errors[:5])  # 最多显示5个文件的错误
+                    if len(errors) > 5:
+                        error_message += f"\n... 还有 {len(errors) - 5} 个文件存在错误"
                 return BuildResult(
                     success=False,
-                    output="\n".join(errors),
-                    error_message="Python语法检查失败",
+                    output=full_output,
+                    error_message=error_message,
                     build_system=BuildSystem.PYTHON,
                     duration=duration,
                 )
         
         # 策略2: 尝试运行 pytest --collect-only（如果存在）
         if os.path.exists(os.path.join(self.project_root, "pytest.ini")) or \
-           os.path.exists(os.path.join(self.project_root, "setup.py")):
+           os.path.exists(os.path.join(self.project_root, "setup.py"))):
             returncode, stdout, stderr = self._run_command(
                 ["python", "-m", "pytest", "--collect-only", "-q"],
                 timeout=10,
             )
             duration = time.time() - start_time
             success = returncode == 0
+            output = stdout + stderr
+            # 如果失败，提取关键错误信息
+            if not success:
+                error_msg = self._extract_python_errors(output)
+                if not error_msg:
+                    error_msg = "Python项目验证失败"
+            else:
+                error_msg = None
             return BuildResult(
                 success=success,
-                output=stdout + stderr,
-                error_message=None if success else "Python项目验证失败",
+                output=output,
+                error_message=error_msg,
                 build_system=BuildSystem.PYTHON,
                 duration=duration,
             )
@@ -354,7 +418,7 @@ class NodeJSBuildValidator(BuildValidatorBase):
                             duration=duration,
                         )
             except Exception as e:
-                logger.warning(f"读取package.json失败: {e}")
+                PrettyOutput.print(f"读取package.json失败: {e}", OutputType.WARNING)
         
         # 策略3: 使用 eslint 进行语法检查（如果存在）
         if modified_files:
@@ -609,6 +673,10 @@ class BuildValidator:
         self.timeout = timeout
         self.detector = BuildSystemDetector(project_root)
         
+        # 导入配置管理器
+        from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
+        self.config = BuildValidationConfig(project_root)
+        
         # 注册构建系统验证器
         self._validators: Dict[BuildSystem, BuildValidatorBase] = {
             BuildSystem.RUST: RustBuildValidator(project_root, timeout),
@@ -625,6 +693,62 @@ class BuildValidator:
         # 兜底验证器
         self._fallback_validator = FallbackBuildValidator(project_root, timeout)
     
+    def _select_build_system(self, detected_systems: List[BuildSystem]) -> Optional[BuildSystem]:
+        """让用户选择构建系统
+        
+        Args:
+            detected_systems: 检测到的所有构建系统列表
+        
+        Returns:
+            用户选择的构建系统，如果用户取消则返回None
+        """
+        if not detected_systems:
+            return None
+        
+        if len(detected_systems) == 1:
+            # 只有一个构建系统，直接返回
+            return detected_systems[0]
+        
+        # 检查配置文件中是否已有选择
+        saved_system = self.config.get_selected_build_system()
+        if saved_system:
+            try:
+                saved_enum = BuildSystem(saved_system)
+                if saved_enum in detected_systems:
+                    PrettyOutput.print(f"使用配置文件中保存的构建系统: {saved_system}", OutputType.INFO)
+                    return saved_enum
+            except ValueError:
+                # 配置文件中保存的构建系统无效，忽略
+                pass
+        
+        # 多个构建系统，需要用户选择
+        print("\n检测到多个构建系统，请选择要使用的构建系统：")
+        for idx, system in enumerate(detected_systems, start=1):
+            print(f"  {idx}. {system.value}")
+        print(f"  {len(detected_systems) + 1}. 取消（使用兜底验证器）")
+        
+        while True:
+            try:
+                choice = input(f"\n请选择 (1-{len(detected_systems) + 1}): ").strip()
+                choice_num = int(choice)
+                
+                if 1 <= choice_num <= len(detected_systems):
+                    selected = detected_systems[choice_num - 1]
+                    # 保存用户选择
+                    self.config.set_selected_build_system(selected.value)
+                    PrettyOutput.print(f"用户选择构建系统: {selected.value}", OutputType.INFO)
+                    return selected
+                elif choice_num == len(detected_systems) + 1:
+                    PrettyOutput.print("用户取消选择，使用兜底验证器", OutputType.INFO)
+                    return None
+                else:
+                    print(f"无效选择，请输入 1-{len(detected_systems) + 1}")
+            except ValueError:
+                print("请输入有效的数字")
+            except (KeyboardInterrupt, EOFError):
+                print("\n用户取消，使用兜底验证器")
+                return None
+    
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         """验证构建
         
@@ -634,21 +758,29 @@ class BuildValidator:
         Returns:
             BuildResult: 验证结果
         """
-        # 检测构建系统
-        build_system = self.detector.detect()
+        # 检测所有可能的构建系统
+        detected_systems = self.detector.detect_all()
+        
+        if not detected_systems:
+            # 未检测到构建系统，使用兜底验证器
+            PrettyOutput.print("未检测到构建系统，使用兜底验证器", OutputType.INFO)
+            return self._fallback_validator.validate(modified_files)
+        
+        # 让用户选择构建系统（如果多个）
+        build_system = self._select_build_system(detected_systems)
         
         if build_system and build_system in self._validators:
             validator = self._validators[build_system]
-            logger.info(f"检测到构建系统: {build_system.value}, 使用验证器: {validator.__class__.__name__}")
+            PrettyOutput.print(f"使用构建系统: {build_system.value}, 验证器: {validator.__class__.__name__}", OutputType.INFO)
             try:
                 return validator.validate(modified_files)
             except Exception as e:
-                logger.warning(f"验证器 {validator.__class__.__name__} 执行失败: {e}, 使用兜底验证器")
+                PrettyOutput.print(f"验证器 {validator.__class__.__name__} 执行失败: {e}, 使用兜底验证器", OutputType.WARNING)
                 # 验证器执行失败时，使用兜底验证器
                 return self._fallback_validator.validate(modified_files)
         else:
-            # 未检测到构建系统，使用兜底验证器
-            logger.info("未检测到构建系统，使用兜底验证器")
+            # 用户取消或未选择，使用兜底验证器
+            PrettyOutput.print("使用兜底验证器", OutputType.INFO)
             return self._fallback_validator.validate(modified_files)
     
     def register_validator(self, build_system: BuildSystem, validator: BuildValidatorBase):
@@ -659,5 +791,5 @@ class BuildValidator:
             validator: 验证器实例
         """
         self._validators[build_system] = validator
-        logger.info(f"注册自定义验证器: {build_system.value} -> {validator.__class__.__name__}")
+        PrettyOutput.print(f"注册自定义验证器: {build_system.value} -> {validator.__class__.__name__}", OutputType.INFO)
 

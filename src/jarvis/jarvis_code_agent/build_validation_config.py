@@ -12,6 +12,8 @@ import yaml
 from typing import Optional, Dict, Any
 from pathlib import Path
 
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
 CONFIG_FILE_NAME = "build_validation_config.yaml"
 
 
@@ -44,9 +46,7 @@ class BuildValidationConfig:
             return self._config
         except Exception as e:
             # 配置文件损坏时，返回空配置
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"加载构建验证配置失败: {e}，使用默认配置")
+            PrettyOutput.print(f"加载构建验证配置失败: {e}，使用默认配置", OutputType.WARNING)
             self._config = {}
             return self._config
     
@@ -58,9 +58,7 @@ class BuildValidationConfig:
                 yaml.safe_dump(self._config, f, allow_unicode=True, default_flow_style=False)
             return True
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"保存构建验证配置失败: {e}")
+            PrettyOutput.print(f"保存构建验证配置失败: {e}", OutputType.ERROR)
             return False
     
     def is_build_validation_disabled(self) -> bool:
@@ -107,6 +105,29 @@ class BuildValidationConfig:
         """标记为已询问"""
         config = self._load_config()
         config["has_been_asked"] = True
+        self._config = config
+        return self._save_config()
+    
+    def get_selected_build_system(self) -> Optional[str]:
+        """获取用户选择的构建系统
+        
+        Returns:
+            构建系统名称（如 "rust", "python"），如果未选择则返回None
+        """
+        config = self._load_config()
+        return config.get("selected_build_system")
+    
+    def set_selected_build_system(self, build_system: str) -> bool:
+        """保存用户选择的构建系统
+        
+        Args:
+            build_system: 构建系统名称（如 "rust", "python"）
+        
+        Returns:
+            bool: 是否成功保存配置
+        """
+        config = self._load_config()
+        config["selected_build_system"] = build_system
         self._config = config
         return self._save_config()
 
