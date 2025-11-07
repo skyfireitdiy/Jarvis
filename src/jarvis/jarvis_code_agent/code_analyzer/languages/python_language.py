@@ -6,6 +6,7 @@ from typing import List, Optional, Set, Union
 
 from ..base_language import BaseLanguageSupport
 from ..dependency_analyzer import Dependency, DependencyAnalyzer, DependencyGraph
+from ..file_ignore import filter_walk_dirs
 from ..symbol_extractor import Symbol, SymbolExtractor
 
 
@@ -120,7 +121,7 @@ class PythonDependencyAnalyzer(DependencyAnalyzer):
         # Walk through all Python files
         for root, dirs, files in os.walk(project_root):
             # Skip hidden directories and common ignore patterns
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules', 'venv', 'env']]
+            dirs[:] = filter_walk_dirs(dirs)
             
             for file in files:
                 if not file.endswith('.py'):
@@ -178,8 +179,8 @@ class PythonDependencyAnalyzer(DependencyAnalyzer):
             
             # Search in project root
             for root, dirs, files in os.walk(project_root):
-                # Skip hidden directories
-                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                # Skip hidden directories and common ignore patterns
+                dirs[:] = filter_walk_dirs(dirs)
                 
                 if parts[0] in dirs or f"{parts[0]}.py" in files:
                     module_path = os.path.join(root, *parts)

@@ -12,6 +12,7 @@ from typing import List, Optional, Set, Dict
 from enum import Enum
 
 from .context_manager import ContextManager
+from .file_ignore import filter_walk_dirs
 from .symbol_extractor import Symbol
 
 
@@ -185,8 +186,7 @@ class TestDiscoverer:
         # 在项目根目录搜索测试文件
         for root, dirs, files in os.walk(self.project_root):
             # 跳过隐藏目录和常见忽略目录
-            dirs[:] = [d for d in dirs if not d.startswith('.') and 
-                       d not in ['__pycache__', 'node_modules', 'venv', 'env', 'target', 'build']]
+            dirs[:] = filter_walk_dirs(dirs)
             
             for file in files:
                 file_path_full = os.path.join(root, file)

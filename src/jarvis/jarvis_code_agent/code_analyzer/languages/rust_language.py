@@ -8,6 +8,7 @@ from tree_sitter import Language, Node
 
 from ..base_language import BaseLanguageSupport
 from ..dependency_analyzer import Dependency, DependencyAnalyzer, DependencyGraph
+from ..file_ignore import filter_walk_dirs
 from ..symbol_extractor import Symbol, SymbolExtractor
 from ..tree_sitter_extractor import TreeSitterExtractor
 
@@ -123,7 +124,7 @@ class RustDependencyAnalyzer(DependencyAnalyzer):
         graph = DependencyGraph()
         
         for root, dirs, files in os.walk(project_root):
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d != 'target']
+            dirs[:] = filter_walk_dirs(dirs)
             
             for file in files:
                 if not file.endswith('.rs'):

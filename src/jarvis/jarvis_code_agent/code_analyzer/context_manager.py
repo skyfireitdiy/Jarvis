@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Set
 
 from .dependency_analyzer import DependencyAnalyzer, DependencyGraph, Dependency
+from .file_ignore import filter_walk_dirs
 from .symbol_extractor import Symbol, SymbolTable
 from .language_support import detect_language, get_symbol_extractor, get_dependency_analyzer
 
@@ -305,8 +306,8 @@ class ContextManager:
             # Absolute import - search in project
             parts = module_name.split('.')
             for root, dirs, files in os.walk(self.project_root):
-                # Skip hidden directories
-                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                # Skip hidden directories and common ignore patterns
+                dirs[:] = filter_walk_dirs(dirs)
                 
                 if parts[0] in dirs or f"{parts[0]}.py" in files:
                     module_path = os.path.join(root, *parts)

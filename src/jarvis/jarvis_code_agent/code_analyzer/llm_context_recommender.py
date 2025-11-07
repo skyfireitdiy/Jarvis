@@ -14,6 +14,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 from .context_recommender import ContextRecommendation
 from .context_manager import ContextManager
+from .file_ignore import filter_walk_dirs
 from .symbol_extractor import Symbol
 
 
@@ -566,7 +567,7 @@ symbol3: 6.0
         # 在项目根目录搜索测试文件
         for root, dirs, files in os.walk(project_root):
             # 跳过隐藏目录和常见忽略目录
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__', 'target']]
+            dirs[:] = filter_walk_dirs(dirs)
 
             # 检查是否是测试目录
             if 'test' in root.lower() or 'tests' in root.lower():
