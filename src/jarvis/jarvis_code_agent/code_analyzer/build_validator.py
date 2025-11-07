@@ -8,7 +8,7 @@
 """
 
 # 从新模块导入所有内容，保持向后兼容
-from jarvis.jarvis_code_agent.build_validator import (
+from jarvis.jarvis_code_agent.code_analyzer.build_validator import (
     BuildSystem,
     BuildResult,
     BuildValidatorBase,
