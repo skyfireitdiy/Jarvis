@@ -105,6 +105,8 @@ def run_security_analysis(
     改进：
     - 即使在 agent 模式下，也先进行本地正则/启发式直扫，生成候选问题；
       然后将候选问题拆分为子任务，交由多Agent进行深入分析与聚合。
+    
+    注意：此函数会在发生异常时更新状态文件为 error 状态。
 
     参数：
     - entry_path: 待分析的根目录路径
@@ -124,6 +126,21 @@ def run_security_analysis(
     import json
 
     langs = languages or ["c", "cpp", "h", "hpp", "rs"]
+
+    # 状态管理器（结构化进度状态文件）
+    from jarvis.jarvis_sec.status import StatusManager
+    status_mgr = StatusManager(entry_path)
+    
+    # 尝试从状态文件恢复并显示当前状态
+    try:
+        current_status = status_mgr.get_status()
+        if current_status:
+            stage = current_status.get("stage", "unknown")
+            progress = current_status.get("progress", 0)
+            message = current_status.get("message", "")
+            print(f"[JARVIS-SEC] 从状态文件恢复: 阶段={stage}, 进度={progress}%, {message}")
+    except Exception:
+        pass
 
     # 进度文件（JSONL，断点续扫）
     from pathlib import Path as _Path
@@ -187,14 +204,22 @@ def run_security_analysis(
 
     if not candidates:
         _progress_append({"event": "pre_scan_start", "entry_path": entry_path, "languages": langs})
+        status_mgr.update_pre_scan(message="开始启发式扫描...")
         pre_scan = direct_scan(entry_path, languages=langs, exclude_dirs=exclude_dirs)
         candidates = pre_scan.get("issues", [])
         summary = pre_scan.get("summary", {})
+        scanned_files = summary.get("scanned_files", 0)
+        status_mgr.update_pre_scan(
+            current_files=scanned_files,
+            total_files=scanned_files,
+            issues_found=len(candidates),
+            message=f"启发式扫描完成，发现 {len(candidates)} 个候选问题"
+        )
         _progress_append({
             "event": "pre_scan_done",
             "entry_path": entry_path,
             "languages": langs,
-            "scanned_files": summary.get("scanned_files"),
+            "scanned_files": scanned_files,
             "issues_found": len(candidates)
         })
         # 持久化
@@ -211,6 +236,12 @@ def run_security_analysis(
             print(f"[JARVIS-SEC] 已将 {len(candidates)} 个启发式扫描问题写入 {_heuristic_path}")
         except Exception:
             pass
+    else:
+        # 从断点恢复启发式扫描结果
+        status_mgr.update_pre_scan(
+            issues_found=len(candidates),
+            message=f"从断点恢复，已发现 {len(candidates)} 个候选问题"
+        )
 
     # 2) 将候选问题精简为子任务清单，控制上下文长度
     def _compact(it: Dict) -> Dict:
@@ -376,8 +407,22 @@ def run_security_analysis(
             pass
 
     total_files_to_cluster = len(_file_groups)
+    # 更新聚类阶段状态
+    if total_files_to_cluster > 0:
+        status_mgr.update_clustering(
+            current_file=0,
+            total_files=total_files_to_cluster,
+            message="开始聚类分析..."
+        )
     for _file_idx, (_file, _items) in enumerate(_file_groups.items(), start=1):
         print(f"\n[JARVIS-SEC] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}")
+        # 更新当前文件进度
+        status_mgr.update_clustering(
+            current_file=_file_idx,
+            total_files=total_files_to_cluster,
+            file_name=_file,
+            message=f"正在聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}"
+        )
         # 过滤掉已完成
         pending_in_file: List[Dict] = []
         for c in _items:
@@ -644,6 +689,14 @@ def run_security_analysis(
     # 占位 batch_size 以兼容后续日志
     len(batches[0]) if batches else 0
 
+    # 更新验证阶段状态
+    if total_batches > 0:
+        status_mgr.update_verification(
+            current_batch=0,
+            total_batches=total_batches,
+            message="开始安全验证..."
+        )
+
     for bidx, batch in enumerate(batches, start=1):
         # 进度：批次开始
         _progress_append(
@@ -656,6 +709,15 @@ def run_security_analysis(
                 "batch_size": len(batch),
                 "file": batch[0].get("file") if batch else None,
             }
+        )
+        # 更新验证阶段进度
+        batch_file = batch[0].get("file") if batch else None
+        status_mgr.update_verification(
+            current_batch=bidx,
+            total_batches=total_batches,
+            batch_id=f"JARVIS-SEC-Batch-{bidx}",
+            file_name=batch_file,
+            message=f"正在验证批次 {bidx}/{total_batches}"
         )
 
         # 显示进度
@@ -848,10 +910,24 @@ def run_security_analysis(
             all_issues.extend(merged_items)
             print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 发现问题: 数量={len(merged_items)} -> 追加到报告")
             _append_report(merged_items, "summary", task_id, {"batch": True, "candidates": batch})
+            # 更新状态：发现的问题数
+            status_mgr.update_verification(
+                current_batch=bidx,
+                total_batches=total_batches,
+                issues_found=len(all_issues),
+                message=f"已验证 {bidx}/{total_batches} 批次，发现 {len(all_issues)} 个问题"
+            )
         elif parse_fail:
             print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)")
         else:
             print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 未发现问题")
+            # 更新状态：继续验证
+            status_mgr.update_verification(
+                current_batch=bidx,
+                total_batches=total_batches,
+                issues_found=len(all_issues),
+                message=f"已验证 {bidx}/{total_batches} 批次"
+            )
 
         # 为本批次所有候选写入 done 记录（无论成功失败，都标记为已处理）
         for c in batch:
@@ -889,13 +965,28 @@ def run_security_analysis(
         )
 
     # 4) 使用统一聚合器生成最终报告（JSON + Markdown）
-    from jarvis.jarvis_sec.report import build_json_and_markdown
-    return build_json_and_markdown(
-        all_issues,
-        scanned_root=summary.get("scanned_root"),
-        scanned_files=summary.get("scanned_files"),
-        meta=meta_records or None,
-    )
+    try:
+        from jarvis.jarvis_sec.report import build_json_and_markdown
+        result = build_json_and_markdown(
+            all_issues,
+            scanned_root=summary.get("scanned_root"),
+            scanned_files=summary.get("scanned_files"),
+            meta=meta_records or None,
+        )
+        # 标记分析完成
+        status_mgr.mark_completed(
+            total_issues=len(all_issues),
+            message=f"安全分析完成，共发现 {len(all_issues)} 个问题"
+        )
+        return result
+    except Exception as e:
+        # 发生错误时更新状态
+        error_msg = str(e)
+        status_mgr.mark_error(
+            error_message=error_msg,
+            error_type=type(e).__name__
+        )
+        raise
 
 
 def _try_parse_summary_report(text: str) -> Optional[object]:
