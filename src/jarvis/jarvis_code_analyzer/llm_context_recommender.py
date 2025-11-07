@@ -7,7 +7,10 @@
 import json
 import os
 import re
+import yaml
 from typing import List, Optional, Dict, Any, Set
+
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 from .context_recommender import ContextRecommendation
 from .context_manager import ContextManager
@@ -155,7 +158,7 @@ class ContextRecommender:
         Returns:
             包含提取信息的字典
         """
-        prompt = f"""分析以下代码编辑任务，提取关键信息。请以JSON格式返回结果。
+        prompt = f"""分析以下代码编辑任务，提取关键信息。请以YAML格式返回结果，并用<INTENT>标签包裹。
 
 任务描述：
 {user_input}
@@ -167,38 +170,51 @@ class ContextRecommender:
 4. keywords: 关键概念列表（与任务相关的技术概念、功能模块等）
 5. description: 任务的核心描述（一句话总结）
 
-只返回JSON格式，不要包含其他文字。如果某项信息无法确定，使用空数组或空字符串。
+只返回YAML格式，用<INTENT>标签包裹，不要包含其他文字。如果某项信息无法确定，使用空数组或空字符串。
 
 示例格式：
-{{
-    "intent": "fix_bug",
-    "target_files": ["src/main.py"],
-    "target_symbols": ["process_data", "validate_input"],
-    "keywords": ["data processing", "validation", "error handling"],
-    "description": "修复数据处理函数中的验证逻辑错误"
-}}
+<INTENT>
+intent: fix_bug
+target_files:
+  - src/main.py
+target_symbols:
+  - process_data
+  - validate_input
+keywords:
+  - data processing
+  - validation
+  - error handling
+description: 修复数据处理函数中的验证逻辑错误
+</INTENT>
 """
 
         try:
             response = self._call_llm(prompt)
-            # 尝试解析JSON响应
-            # LLM可能返回带markdown代码块的JSON，需要清理
+            # 尝试解析YAML响应
+            # 从<INTENT>标签中提取内容
             response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-            response = response.strip()
+            # 提取<INTENT>标签内的内容
+            # 支持两种格式：<INTENT>...content...</INTENT> 或 <INTENT>...content...<INTENT>
+            yaml_match = re.search(r'<INTENT>\s*(.*?)\s*(?:</INTENT>|<INTENT>)', response, re.DOTALL)
+            if yaml_match:
+                yaml_content = yaml_match.group(1).strip()
+            else:
+                # 如果没有找到标签，尝试清理markdown代码块
+                if response.startswith("```yaml"):
+                    response = response[7:]
+                elif response.startswith("```"):
+                    response = response[3:]
+                if response.endswith("```"):
+                    response = response[:-3]
+                yaml_content = response.strip()
             
-            extracted = json.loads(response)
+            extracted = yaml.safe_load(yaml_content)
+            if extracted is None:
+                extracted = {}
             return extracted
         except Exception as e:
             # 解析失败，返回空结果
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.debug(f"LLM意图提取失败: {e}")
+            PrettyOutput.print(f"LLM意图提取失败: {e}", OutputType.WARNING)
             return {
                 "intent": "unknown",
                 "target_files": [],
@@ -245,25 +261,35 @@ class ContextRecommender:
 关键词：{', '.join(keywords)}
 
 符号列表：
-{json.dumps(symbols_sample, ensure_ascii=False, indent=2)}
+{yaml.dump(symbols_sample, allow_unicode=True, default_flow_style=False)}
 
-请返回最相关的5-10个符号名称（JSON数组格式），按相关性排序。
-只返回符号名称数组，例如：["symbol1", "symbol2", "symbol3"]
+请返回最相关的5-10个符号名称（YAML数组格式），按相关性排序，并用<SYMBOLS>标签包裹。
+只返回符号名称数组，例如：
+<SYMBOLS>
+- symbol1
+- symbol2
+- symbol3
+</SYMBOLS>
 """
 
         try:
             response = self._call_llm(prompt)
-            # 清理响应
+            # 从<SYMBOLS>标签中提取内容
             response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-            response = response.strip()
+            yaml_match = re.search(r'<SYMBOLS>\s*(.*?)\s*(?:</SYMBOLS>|<SYMBOLS>)', response, re.DOTALL)
+            if yaml_match:
+                yaml_content = yaml_match.group(1).strip()
+            else:
+                # 如果没有找到标签，尝试清理markdown代码块
+                if response.startswith("```yaml"):
+                    response = response[7:]
+                elif response.startswith("```"):
+                    response = response[3:]
+                if response.endswith("```"):
+                    response = response[:-3]
+                yaml_content = response.strip()
             
-            symbol_names = json.loads(response)
+            symbol_names = yaml.safe_load(yaml_content)
             if not isinstance(symbol_names, list):
                 return []
             
@@ -314,25 +340,34 @@ class ContextRecommender:
 关键词：{', '.join(keywords)}
 
 文件列表：
-{json.dumps(file_info, ensure_ascii=False, indent=2)}
+{yaml.dump(file_info, allow_unicode=True, default_flow_style=False)}
 
-请返回最相关的5-10个文件路径（JSON数组格式），按相关性排序。
-只返回文件路径数组，例如：["path/to/file1.py", "path/to/file2.py"]
+请返回最相关的5-10个文件路径（YAML数组格式），按相关性排序，并用<FILES>标签包裹。
+只返回文件路径数组，例如：
+<FILES>
+- path/to/file1.py
+- path/to/file2.py
+</FILES>
 """
 
         try:
             response = self._call_llm(prompt)
-            # 清理响应
+            # 从<FILES>标签中提取内容
             response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-            response = response.strip()
+            yaml_match = re.search(r'<FILES>\s*(.*?)\s*(?:</FILES>|<FILES>)', response, re.DOTALL)
+            if yaml_match:
+                yaml_content = yaml_match.group(1).strip()
+            else:
+                # 如果没有找到标签，尝试清理markdown代码块
+                if response.startswith("```yaml"):
+                    response = response[7:]
+                elif response.startswith("```"):
+                    response = response[3:]
+                if response.endswith("```"):
+                    response = response[:-3]
+                yaml_content = response.strip()
             
-            file_paths = json.loads(response)
+            file_paths = yaml.safe_load(yaml_content)
             if not isinstance(file_paths, list):
                 return []
             
@@ -378,30 +413,35 @@ class ContextRecommender:
 任务描述：{user_input}
 
 文件列表：
-{json.dumps(file_info, ensure_ascii=False, indent=2)}
+{yaml.dump(file_info, allow_unicode=True, default_flow_style=False)}
 
-请返回JSON对象，键为文件路径，值为相关性分数（0-10的浮点数）。
-只返回JSON对象，例如：
-{{
-    "path/to/file1.py": 8.5,
-    "path/to/file2.py": 7.0,
-    "path/to/file3.py": 5.5
-}}
+请返回YAML对象，键为文件路径，值为相关性分数（0-10的浮点数），并用<FILE_SCORES>标签包裹。
+只返回YAML对象，例如：
+<FILE_SCORES>
+path/to/file1.py: 8.5
+path/to/file2.py: 7.0
+path/to/file3.py: 5.5
+</FILE_SCORES>
 """
 
         try:
             response = self._call_llm(prompt)
-            # 清理响应
+            # 从<FILE_SCORES>标签中提取内容
             response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-            response = response.strip()
+            yaml_match = re.search(r'<FILE_SCORES>\s*(.*?)\s*(?:</FILE_SCORES>|<FILE_SCORES>)', response, re.DOTALL)
+            if yaml_match:
+                yaml_content = yaml_match.group(1).strip()
+            else:
+                # 如果没有找到标签，尝试清理markdown代码块
+                if response.startswith("```yaml"):
+                    response = response[7:]
+                elif response.startswith("```"):
+                    response = response[3:]
+                if response.endswith("```"):
+                    response = response[:-3]
+                yaml_content = response.strip()
             
-            scores = json.loads(response)
+            scores = yaml.safe_load(yaml_content)
             if not isinstance(scores, dict):
                 return {}
             
@@ -455,30 +495,35 @@ class ContextRecommender:
 任务描述：{user_input}
 
 符号列表：
-{json.dumps(symbol_info, ensure_ascii=False, indent=2)}
+{yaml.dump(symbol_info, allow_unicode=True, default_flow_style=False)}
 
-请返回JSON对象，键为符号名称，值为相关性分数（0-10的浮点数）。
-只返回JSON对象，例如：
-{{
-    "symbol1": 9.0,
-    "symbol2": 7.5,
-    "symbol3": 6.0
-}}
+请返回YAML对象，键为符号名称，值为相关性分数（0-10的浮点数），并用<SYMBOL_SCORES>标签包裹。
+只返回YAML对象，例如：
+<SYMBOL_SCORES>
+symbol1: 9.0
+symbol2: 7.5
+symbol3: 6.0
+</SYMBOL_SCORES>
 """
 
         try:
             response = self._call_llm(prompt)
-            # 清理响应
+            # 从<SYMBOL_SCORES>标签中提取内容
             response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-            response = response.strip()
+            yaml_match = re.search(r'<SYMBOL_SCORES>\s*(.*?)\s*(?:</SYMBOL_SCORES>|<SYMBOL_SCORES>)', response, re.DOTALL)
+            if yaml_match:
+                yaml_content = yaml_match.group(1).strip()
+            else:
+                # 如果没有找到标签，尝试清理markdown代码块
+                if response.startswith("```yaml"):
+                    response = response[7:]
+                elif response.startswith("```"):
+                    response = response[3:]
+                if response.endswith("```"):
+                    response = response[:-3]
+                yaml_content = response.strip()
             
-            scores = json.loads(response)
+            scores = yaml.safe_load(yaml_content)
             if not isinstance(scores, dict):
                 return {}
             
@@ -554,9 +599,7 @@ class ContextRecommender:
                 # 如果不支持chat_until_success，抛出异常
                 raise ValueError("LLM model does not support chat_until_success interface")
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"LLM调用失败: {e}")
+            PrettyOutput.print(f"LLM调用失败: {e}", OutputType.WARNING)
             raise
 
     def format_recommendation(self, recommendation: ContextRecommendation) -> str:
