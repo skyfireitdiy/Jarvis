@@ -1120,7 +1120,7 @@ class CodeAgent:
         """
         if not config.has_been_asked():
             # 首次失败，询问用户
-            error_preview = (build_validation_result.error_message or build_validation_result.output)[:500]
+            error_preview = _format_build_error(build_validation_result)
             PrettyOutput.print(
                 f"\n⚠️ 构建验证失败:\n{error_preview}\n",
                 OutputType.WARNING,
@@ -1162,18 +1162,18 @@ class CodeAgent:
             else:
                 # 用户选择继续验证，标记为已询问
                 config.mark_as_asked()
-                final_ret += f"\n\n⚠️ 构建验证失败:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                final_ret += f"\n\n⚠️ 构建验证失败:\n{_format_build_error(build_validation_result)}\n"
                 # 如果构建失败，添加修复提示
                 agent.set_addon_prompt(
-                    f"构建验证失败，请根据以下错误信息修复代码:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                    f"构建验证失败，请根据以下错误信息修复代码:\n{_format_build_error(build_validation_result)}\n"
                     "请仔细检查错误信息，修复编译/构建错误后重新提交。"
                 )
         else:
             # 已经询问过，直接显示错误
-            final_ret += f"\n\n⚠️ 构建验证失败:\n{build_validation_result.error_message or build_validation_result.output}\n"
+            final_ret += f"\n\n⚠️ 构建验证失败:\n{_format_build_error(build_validation_result)}\n"
             # 如果构建失败，添加修复提示
             agent.set_addon_prompt(
-                f"构建验证失败，请根据以下错误信息修复代码:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                f"构建验证失败，请根据以下错误信息修复代码:\n{_format_build_error(build_validation_result)}\n"
                 "请仔细检查错误信息，修复编译/构建错误后重新提交。"
             )
         
