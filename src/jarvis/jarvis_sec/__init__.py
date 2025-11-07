@@ -431,6 +431,40 @@ def run_security_analysis(
         if not pending_in_file:
             continue
 
+        # 优化：如果文件只有一个告警，跳过聚类，直接写入
+        if len(pending_in_file) == 1:
+            single_item = pending_in_file[0]
+            single_gid = single_item.get("gid", 0)
+            # 为单个告警创建默认验证条件
+            default_verification = f"验证候选 {single_gid} 的安全风险"
+            single_item["verify"] = default_verification
+            cluster_batches.append([single_item])
+            cluster_records.append(
+                {
+                    "file": _file,
+                    "verification": default_verification,
+                    "gids": [single_gid],
+                    "count": 1,
+                    "batch_index": 1,
+                    "note": "单告警跳过聚类",
+                }
+            )
+            # 标记进度
+            _progress_append(
+                {
+                    "event": "cluster_status",
+                    "status": "done",
+                    "file": _file,
+                    "batch_index": 1,
+                    "skipped": True,
+                    "reason": "single_alert",
+                }
+            )
+            # 写入快照
+            _write_cluster_report_snapshot()
+            print(f"[JARVIS-SEC] 文件 {_file} 仅有一个告警（gid={single_gid}），跳过聚类直接写入")
+            continue
+
         # 构造聚类Agent（每个文件一个Agent，按批次聚类）
         cluster_system_prompt = """
 # 单Agent聚类约束
