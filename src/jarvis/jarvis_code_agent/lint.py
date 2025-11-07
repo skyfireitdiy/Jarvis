@@ -146,11 +146,13 @@ def get_lint_tools(filename: str) -> List[str]:
         对应的lint工具列表，如果找不到则返回空列表
     """
     filename = os.path.basename(filename)
-    lint_tools = LINT_TOOLS.get(filename.lower(), [])
-    if lint_tools:
-        return lint_tools
     ext = os.path.splitext(filename)[1]
-    return LINT_TOOLS.get(ext.lower(), [])
+    if ext:
+        lint_tools = LINT_TOOLS.get(ext.lower(), [])
+        if lint_tools:
+            return lint_tools
+    # 如果扩展名匹配失败或没有扩展名，再尝试用完整文件名匹配
+    return LINT_TOOLS.get(filename.lower(), [])
 
 
 # Lint工具命令模板映射
